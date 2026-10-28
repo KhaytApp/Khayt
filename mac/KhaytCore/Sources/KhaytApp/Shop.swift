@@ -285,23 +285,35 @@ final class Shop {
     /// `unlessSentAs`: the same news already went out as that type (a "Print
     /// failed" from the finish seam, before the printer's own fault alert) —
     /// each channel that took that type is not told again.
-    func sendAlert(type: String, title: String, body: String, unlessSentAs earlier: String? = nil) async {
+    ///
+    /// `namedBody`: a print notice's body WITH the job's title and the file's
+    /// name. `body` is then the one without them, and each channel gets the
+    /// named one only when the shop ticked "include job and file names" for it
+    /// (`KhaytAlertRoutes.noticeNames`) — a job or a G-code file is often named
+    /// after the customer.
+    func sendAlert(type: String, title: String, body: String, namedBody: String? = nil,
+                   unlessSentAs earlier: String? = nil) async {
         guard let engine, source.build != nil,
               var routes = try? await engine.alertRoutes(type: type, settings: settingsDict) else { return }
         if let earlier, let took = try? await engine.alertRoutes(type: earlier, settings: settingsDict) {
             routes = Self.routesNotSentAlready(routes, took: took)
         }
+        let names = namedBody == nil ? KhaytEngine.AlertRoutes(telegram: false, ntfy: false)
+            : ((try? await engine.alertNoticeNames(settings: settingsDict)) ?? .init(telegram: false, ntfy: false))
+        let tgBody = names.telegram ? (namedBody ?? body) : body
+        let ntfyBody = names.ntfy ? (namedBody ?? body) : body
         if routes.telegram, case .object(let tg)? = settingsDict["telegram"],
            case .string(let sealed)? = tg["botToken"], case .string(let chat)? = tg["chatId"] {
             do {
                 let token = try await Secrets.open(sealed, for: source)
-                try await Telegram.send(botToken: token, chatId: chat, message: title + "\n" + body)
+                try await Telegram.send(botToken: token, chatId: chat,
+                                        message: tgBody.isEmpty ? title : title + "\n" + tgBody)
             } catch {
                 FileHandle.standardError.write(Data("printer alert telegram failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
         if routes.ntfy {
-            do { try await sendNtfy(type: type, title: title, body: body) }
+            do { try await sendNtfy(type: type, title: title, body: ntfyBody) }
             catch {
                 // Shown in the shop's own settings pane, where the address is
                 // theirs to see; the LOG gets the kind of failure only.
@@ -1967,6 +1979,8 @@ final class Shop {
     var vaultApplyBusy = false
     var vaultAppliedAt: Date?
     var vaultKeptCopies: [VaultKeptCopy] = []
+    /// Kept copies (by path) whose answer is being carried out: one answer each.
+    @ObservationIgnored var vaultResolving: Set<String> = []
     /// The snapshot runner's owner, for the plan pane's Upgrade: the sample
     /// book has no cloud sign-in to carry a role.
     var pretendsOwner = false
@@ -2468,6 +2482,9 @@ final class Shop {
     /// How far a batch has got, and what it is reading right now. Nil for a
     /// single file, which is over before a progress bar would finish drawing.
     var importProgress: (done: Int, total: Int, name: String)?
+    /// A model bundle being packed and written, for the banner
+    /// (`exportModelBundle`). Nil when none is.
+    var bundleExport: BundleProgress?
     /// Set by the Stop button. A batch checks it between files, so it stops
     /// cleanly between imports rather than halfway through one.
     var importCancelled = false

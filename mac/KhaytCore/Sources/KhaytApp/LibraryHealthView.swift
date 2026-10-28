@@ -102,7 +102,7 @@ struct LibraryHealthView: View {
     // MARK: One group
 
     private func card(_ group: LibraryHealth.Group) -> some View {
-        let look = Self.look(group.kind)
+        let look = Self.look(group.kind, byPlan: shop.healthGroupIsByPlan(group))
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: look.symbol).foregroundStyle(look.rail ?? Color.secondary)
@@ -276,11 +276,18 @@ struct LibraryHealthView: View {
         let rail: Color?
     }
 
-    static func look(_ kind: LibraryHealth.Kind) -> Look {
+    /// `byPlan`: every model in a "gone from the vault" group was purged
+    /// while the lapse said deletion was due (`vaultPurgeReason`). Only then
+    /// is the plan limit named; otherwise it says only what is known: not on
+    /// this Mac, and gone from the vault (beta.8 review H3).
+    static func look(_ kind: LibraryHealth.Kind, byPlan: Bool = false) -> Look {
         switch kind {
         case .deletedByPlan:
-            Look(symbol: "xmark.icloud", title: "mac.lh_plan_deleted", sentence: "mac.lh_plan_deleted_says",
-                 rail: Khayt.late)
+            byPlan
+                ? Look(symbol: "xmark.icloud", title: "mac.lh_plan_deleted", sentence: "mac.lh_plan_deleted_says",
+                       rail: Khayt.late)
+                : Look(symbol: "xmark.icloud", title: "mac.lh_vault_gone", sentence: "mac.lh_vault_gone_says",
+                       rail: Khayt.late)
         case .missing:
             Look(symbol: "questionmark.folder", title: "mac.lh_missing", sentence: "mac.lh_missing_says", rail: Khayt.late)
         case .unreachable:

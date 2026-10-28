@@ -419,6 +419,14 @@ extension LibraryEditPerfTests {
         first["category"] = .string("Toys")
         first["testedNotes"] = .string("Brim on the first layer")
         first.removeValue(forKey: "externalPath")
+        // What the beta.8 review found leaking past the top-level allowlist.
+        first["folder"] = .string("Customers/Noura Private Group")
+        first["setups"] = .array([.object(["name": .string("Fast"), "notes": .string("Call Noura before printing"),
+                                           "machineId": .string("M-internal-7")])])
+        first["parsed"] = .object(["printTimeMins": .number(95), "filamentGrams": .number(41),
+                                   "filamentCost": .number(7.77)])
+        first["licenceUrl"] = .string("file:///System/Applications/Calculator.app")
+        first["sourceUrl"] = .string("https://www.printables.com/model/4242-dragon")
         // The library knows these bytes, as it knows any file it imported.
         let stl = MeshTests.binarySTL(MeshTests.boxFacets(10, 10, 10))
         let hashed = FileManager.default.temporaryDirectory.appending(path: "khayt-3b-\(UUID().uuidString).stl")
@@ -438,10 +446,16 @@ extension LibraryEditPerfTests {
             let model = dir.appending(path: file.sourceFile?.filename ?? "model.stl")
             try stl.write(to: model)
             try Data("%PDF-1.4 guide".utf8).write(to: dir.appending(path: "guide.pdf"))
+            try Data("%PDF-1.4 quote for Noura Private".utf8).write(to: dir.appending(path: "quote.pdf"))
             #expect(shop.modelFile(for: file) != nil)
 
-            let data = try #require(try shop.modelBundle(file, includePrice: false))
-            for secret in ["Noura Private", "SECRET-LICENCE-123", primary] {
+            // The panel lists every file beside the model; only the ticked go.
+            let papers = try #require(shop.bundleContents(file)).settings.map(\.path)
+            #expect(papers.contains("settings/guide.pdf") && papers.contains("settings/quote.pdf"))
+            let data = try #require(try shop.modelBundle(file, includePrice: false,
+                                                         choice: .init(papers: ["settings/guide.pdf"])))
+            for secret in ["Noura Private", "SECRET-LICENCE-123", primary, "Call Noura", "M-internal-7", "7.77",
+                           "Calculator.app"] {
                 #expect(data.range(of: Data(secret.utf8)) == nil, "\(secret) left the shop in the bundle")
             }
             let out = FileManager.default.temporaryDirectory.appending(path: "khayt-3b-\(UUID().uuidString).khaytbundle")
@@ -452,6 +466,9 @@ extension LibraryEditPerfTests {
             #expect(opened.manifest.title == file.title && opened.manifest.fields["category"] == .string("Toys"))
             #expect(opened.others.contains { $0.lastPathComponent == "guide.pdf" }, "the guide was not packed")
             #expect(opened.manifest.price == nil)
+            #expect(opened.manifest.group == nil, "the group travelled without being ticked")
+            #expect(!opened.others.contains { $0.lastPathComponent == "quote.pdf" }, "an unticked paper was packed")
+            #expect(opened.manifest.from != nil, "the bundle carries no mark of this shop")
 
             // The same bytes: refused, as any import of a model already here.
             let count = shop.files.count
@@ -474,6 +491,29 @@ extension LibraryEditPerfTests {
             let added = try #require(shop.files.first { $0.title == file.title && $0.id != file.id })
             #expect(added.category == "Toys" && added.testedNotes == "Brim on the first layer")
             #expect(added.printNextNote == nil && added.licenceCode == nil, "shop-private fields came back in")
+            // Another shop's slice is an estimate from the bundle, never measured.
+            #expect((added.parsed?.printTimeMins ?? 0) == 0, "the bundle's time went in as measured")
+            #expect(added.bundleFigures?.printTimeMins == 95 && added.bundleFigures?.filamentGrams == 41)
+            #expect(added.licenceUrl == nil, "a file: licence link came in")
+            // Not this shop's own bytes, so its source is a stranger's note.
+            guard case .object(let back)? = shop.row(for: added.id) else { Issue.record("no row"); return }
+            #expect(back["sourceFromBundle"] == .bool(true))
+
+            // Papers of a kind this app does not know are not unpacked.
+            let odd = FileManager.default.temporaryDirectory.appending(path: "khayt-3b-\(UUID().uuidString).khaytbundle")
+            defer { try? FileManager.default.removeItem(at: odd) }
+            try ZipWrite.archive([
+                ZipWrite.Member("model/odd.stl", MeshTests.binarySTL(MeshTests.boxFacets(3, 4, 5))),
+                ZipWrite.Member("model/run.command", Data("#!/bin/sh\n".utf8)),
+                ZipWrite.Member("settings/open.webloc", Data("x".utf8)),
+                ZipWrite.Member("settings/profile.ini", Data("layer_height = 0.2".utf8)),
+                ZipWrite.Member("pictures/page.html", Data("<html>".utf8)),
+                ZipWrite.Member(ModelBundle.manifestName, try Zip.data(of: m, in: out)),
+            ]).write(to: odd)
+            let unpacked = try Shop.unpackBundle(odd)
+            defer { try? FileManager.default.removeItem(at: unpacked.scratch) }
+            #expect(unpacked.others.map(\.lastPathComponent) == ["profile.ini"])
+            #expect(unpacked.pictures.isEmpty)
 
             // A bundle that names a way out of its folder is refused before a byte is written.
             let evil = FileManager.default.temporaryDirectory.appending(path: "khayt-3b-\(UUID().uuidString).khaytbundle")

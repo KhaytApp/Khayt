@@ -1,5 +1,6 @@
 import SwiftUI
 import KhaytCore
+import KhaytWebSave
 
 /// The selected model, in detail.
 ///
@@ -120,7 +121,9 @@ struct LibraryInspector: View {
                 }
             }
             // ── HOW IT LOOKS FROM EACH SIDE, AND ONE PLATE AT A TIME ─────
-            if ModelViewer.canDraw(file) {
+            // Only for a file that is here: a section that opens to "the file
+            // is not on this Mac" is a section that should not be offered.
+            if ModelViewer.canDraw(file), shop.modelFile(for: file) != nil {
                 // Closed until asked for: drawing walks the whole mesh, and a
                 // 400 MB project is seconds of work on every click otherwise.
                 InspectorSection(id: "views", title: w.callIt("mac.mv_sec"), symbol: "rotate.3d",
@@ -280,8 +283,14 @@ struct LibraryInspector: View {
         func g(_ n: Double) -> String { PrintFigures.weight(n, w) }
         return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
                                               ["plates": .string(w.counting(plates.count, "mac.n_plates"))])) {
-            if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
-            if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: true) }
+            if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: !file.figuresStale) }
+            if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: !file.figuresStale) }
+            // What the slicer said about the OLD bytes (review M1): said so.
+            if file.figuresStale {
+                Text(w.callIt("mac.figures_stale_reason"))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(plates, id: \.index) { plate in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
@@ -457,7 +466,10 @@ struct LibraryInspector: View {
                     if let code = file.licenceCode, !code.isEmpty {
                         DetailLine(shop.words.callIt("mac.licence_code"), code)
                     }
-                    if let link = file.licenceUrl, let url = URL(string: link) {
+                    // https only, as the source link: a record filled from a
+                    // stranger's bundle (or typed long ago) must not open a
+                    // `file:`, `smb:` or app URL through one click.
+                    if let link = file.licenceUrl.flatMap(WebSave.https), let url = URL(string: link) {
                         Link(shop.words.callIt("mac.licence_verify"), destination: url).font(.callout)
                     }
                     if shop.canMoveJobs {
@@ -853,6 +865,18 @@ struct ModelSummaryCard: View {
 
     // MARK: The decision facts
 
+    /// A bundle's own estimate, said as one: "≈ 1 h 30 min · 45 g", only
+    /// while the model has no slice of its own. Nil otherwise.
+    static func bundleFiguresLine(_ file: LibraryFile, words w: Words) -> String? {
+        guard (file.parsed?.printTimeMins ?? 0) <= 0, (file.parsed?.filamentGrams ?? 0) <= 0,
+              let b = file.bundleFigures else { return nil }
+        var parts: [String] = []
+        if let m = b.printTimeMins, m > 0 { parts.append("≈ " + PrintFigures.duration(minutes: m, w)) }
+        if let g = b.filamentGrams, g > 0 { parts.append((parts.isEmpty ? "≈ " : "") + PrintFigures.weight(g, w)) }
+        guard !parts.isEmpty else { return nil }
+        return w.callIt("mac.mb_bundle_figures", ["figures": .string(parts.joined(separator: " · "))])
+    }
+
     /// Time and grams: the summary's (the catalogue's own figures), else what
     /// the record says on its own while that is worked out.
     private var hours: Double? {
@@ -896,6 +920,11 @@ struct ModelSummaryCard: View {
                          unit: cost == nil ? nil : Money.mark(shop.currency),
                          approximate: estimated && cost != nil)
                 }
+            }
+            if let said = Self.bundleFiguresLine(file, words: w) {
+                Text(said)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if file.figuresStale {
                 Text(w.callIt("mac.li_figures_stale"))

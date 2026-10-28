@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import KhaytCore
+import KhaytWebSave
 
 /// Library stage 3b, the pure half: stacks, Find Similar, the viewer's
 /// cameras and the model bundle's manifest and listing checks.
@@ -239,7 +240,11 @@ struct LibraryStage3bCoreTests {
         "externalPath": .string("/Users/shop/Models/dragon.stl"), "consumables": .array([.object(["unitCost": .number(3)])]),
         "tags": .array([.string("beast")]), "folder": .string("Beasts"), "stackId": .string("ST-1"),
         "timesPrinted": .number(7), "testedNotes": .string("Brim on"), "geometryKey": .string("1:2:3x4x5"),
-        "setups": .array([.object(["name": .string("Fast"), "nozzleMm": .number(0.4), "machineName": .string("X1C")])]),
+        "setups": .array([.object(["name": .string("Fast"), "nozzleMm": .number(0.4), "machineName": .string("X1C"),
+                                   "notes": .string("Noura wants it in red"), "machineId": .string("M-internal-7"),
+                                   "createdAt": .string("2026-09-01")])]),
+        "parsed": .object(["printTimeMins": .number(90), "filamentGrams": .number(40), "filamentCost": .number(3.2),
+                           "plates": .array([])]),
     ]
 
     @Test("the manifest is an allowlist: no customer, no licence code, no path, no price unless asked")
@@ -253,11 +258,21 @@ struct LibraryStage3bCoreTests {
         }
         #expect(rec["name"] == .string("Dragon") && rec["group"] == .string("Beasts") && rec["setups"] != nil)
         #expect(top["price"] == nil)
+        // All the way down: a setup's notes and machine id, and the slice's
+        // cost without the price, stay home.
+        #expect(rec["setups"] == .array([.object(["name": .string("Fast"), "nozzleMm": .number(0.4),
+                                                  "machineName": .string("X1C")])]))
+        #expect(rec["parsed"] == .object(["printTimeMins": .number(90), "filamentGrams": .number(40)]))
+        let noGroup = ModelBundle.manifest(record: Self.record, group: nil, members: [], price: nil, exportedAt: "", app: "")
+        guard case .object(let ng) = noGroup, case .object(let ngr)? = ng["record"] else { return }
+        #expect(ngr["group"] == nil, "the group travelled without being ticked")
         #expect(top["format"] == .string(ModelBundle.format))
         let priced = ModelBundle.manifest(record: Self.record, group: nil, members: [], price: (85, "SAR"),
                                           exportedAt: "", app: "")
-        guard case .object(let p) = priced else { return }
+        guard case .object(let p) = priced, case .object(let pr)? = p["record"] else { return }
         #expect(p["price"] == .object(["amount": .number(85), "currency": .string("SAR")]))
+        guard case .object(let parsed)? = pr["parsed"] else { Issue.record("no parsed"); return }
+        #expect(parsed["filamentCost"] == .number(3.2), "with the price goes the slice's cost")
         // The two lists never overlap.
         #expect(Set(ModelBundle.exported).isDisjoint(with: ModelBundle.neverExported))
     }
@@ -339,7 +354,9 @@ struct LibraryStage3bCoreTests {
                                                    "category": .string("Toys"),
                                                    "parsed": .object(["printTimeMins": .number(90)]),
                                                    "testedNotes": .string("Brim on")])
-        #expect(set == ["category", "parsed", "testedNotes"])
+        #expect(set == ["category", "bundleFigures", "testedNotes"])
+        #expect(record["parsed"] == .object(["printTimeMins": .null]), "a stranger's slice went in as measured")
+        #expect(record["bundleFigures"] == .object(["printTimeMins": .number(90), "estimate": .string("bundle")]))
         #expect(record["material"] == .string("PETG"), "what the import read is kept")
         #expect(record["name"] == .string("dragon.stl"), "the name goes in through the import itself")
     }
@@ -352,5 +369,84 @@ struct LibraryStage3bCoreTests {
         #expect(ModelBundle.memberPath(".hidden", in: .pictures, taken: &taken) == "pictures/hidden")
         #expect(ModelBundle.memberPath("", in: .settings, taken: &taken) == "settings/file")
         for path in taken { #expect(ModelBundle.isSafeName(path), "\(path)") }
+    }
+
+    // MARK: Beta.8 review
+
+    @Test("a bundle's links are https only; any other scheme is dropped")
+    func linksAreHttps() throws {
+        let f = ModelBundle.checkedFields([
+            "licenceUrl": .string("file:///Applications/Calculator.app"),
+            "sourceUrl": .string("smb://evil/share"),
+        ])
+        #expect(f["licenceUrl"] == nil && f["sourceUrl"] == nil)
+        let ok = ModelBundle.checkedFields(["licenceUrl": .string("https://example.com/licence#x"),
+                                            "sourceUrl": .string("HTTPS://www.printables.com/model/1")])
+        #expect(ok["licenceUrl"] == .string("https://example.com/licence"))
+        #expect(ok["sourceUrl"] == .string("https://www.printables.com/model/1"))
+        #expect(ModelBundle.checkedFields(["licenceUrl": .string("javascript:alert(1)")])["licenceUrl"] == nil)
+    }
+
+    @Test("a manifest's time and grams are capped, and its text loses control and format characters")
+    func capsAndPlainText() {
+        let f = ModelBundle.checkedFields([
+            "parsed": .object(["printTimeMins": .number(1e9), "filamentGrams": .number(1e9), "filamentCost": .number(5)]),
+            "colors": .array([.object(["hex": .string("#FF0000"), "grams": .number(1e12)])]),
+            "category": .string("Toys\u{202E}gnp.exe"), "source": .string("A\u{200B}B\u{0007}C"),
+        ])
+        #expect(f["parsed"] == .object(["printTimeMins": .number(ModelBundle.maxMinutes),
+                                        "filamentGrams": .number(ModelBundle.maxGrams)]),
+                "no filament cost on the way in, and the figures capped")
+        #expect(f["colors"] == .array([.object(["hex": .string("#FF0000"), "grams": .number(ModelBundle.maxGrams)])]))
+        #expect(f["category"] == .string("Toysgnp.exe") && f["source"] == .string("ABC"))
+    }
+
+    @Test("tags and the group are made tidy on the way in")
+    func tagsAndGroup() {
+        let f = ModelBundle.checkedFields([
+            "tags": .array([.string("Dragon"), .string("dragon"), .string(" beast "), .string("")]),
+            "group": .string("/../Customers//./.hidden/" + String(repeating: "a/", count: 20)),
+        ])
+        #expect(f["tags"] == .array([.string("Dragon"), .string("beast")]))
+        guard case .string(let g)? = f["group"] else { Issue.record("no group"); return }
+        #expect(!g.contains("..") && !g.hasPrefix("/") && !g.contains("//"))
+        #expect(g.split(separator: "/").count == ModelBundle.maxGroupDepth)
+        #expect(g.hasPrefix("Customers/hidden/"))
+        #expect(ModelBundle.groupPath("../..") == nil)
+    }
+
+    @Test("two member names a Mac would file as one are refused (NFC and case)")
+    func unicodeCollisions() {
+        let nfc = "model/caf\u{00E9}.stl", nfd = "model/cafe\u{0301}.stl"
+        func refused(_ entries: [Zip.Entry]) -> ModelBundle.Refusal? {
+            if case .failure(let r) = ModelBundle.verdict(entries, bundleBytes: 100) { return r }
+            return nil
+        }
+        #expect(refused([Self.entry("manifest.json"), Self.entry(nfc), Self.entry(nfd)]) == .badName(nfd))
+        #expect(refused([Self.entry("manifest.json"), Self.entry("model/CAF\u{00C9}.stl"), Self.entry(nfd)]) == .badName(nfd))
+        #expect(ModelBundle.safeLeaf(nfd) == "caf\u{00E9}.stl")
+    }
+
+    @Test("a stranger's source is a note: it does not capture the shop's own later web save")
+    func strangerSource() {
+        let fields: [String: JSONValue] = ["sourceUrl": .string("https://www.printables.com/model/123-dragon"),
+                                           "source": .string("Some designer")]
+        var theirs: [String: JSONValue] = ["id": .string("PF-1")]
+        ModelBundle.fill(&theirs, from: fields)
+        #expect(theirs["sourceFromBundle"] == .bool(true))
+        var mine: [String: JSONValue] = ["id": .string("PF-2")]
+        ModelBundle.fill(&mine, from: fields, ours: true)
+        #expect(mine["sourceFromBundle"] == nil)
+        let page = WebSave.Page(url: "https://www.printables.com/model/123-dragon", site: .web, title: "Dragon")
+        #expect(WebSaveRecord.existing(page, in: [.object(theirs)]) == nil, "the bundle's word filed the shop's save")
+        #expect(WebSaveRecord.existing(page, in: [.object(mine)]) == "PF-2")
+    }
+
+    @Test("a shop's mark is its own: keyed, stable, and different for another secret")
+    func mark() {
+        let a = ModelBundle.mark(secret: "s1", contentHash: "h")
+        #expect(a == ModelBundle.mark(secret: "s1", contentHash: "h") && a.count == 64)
+        #expect(a != ModelBundle.mark(secret: "s2", contentHash: "h"))
+        #expect(a != ModelBundle.mark(secret: "s1", contentHash: "h2"))
     }
 }

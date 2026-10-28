@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import KhaytCore
+import SwiftUI
 import UniformTypeIdentifiers
 
 /// ── A MODEL BUNDLE, OUT AND BACK IN ─────────────────────────────────────
@@ -81,13 +82,64 @@ extension Shop {
         return out
     }
 
-    /// The bundle's bytes: every member, then the manifest. Nil when the
-    /// model is not on this Mac or the files are over the caps.
-    func modelBundle(_ file: LibraryFile, includePrice: Bool) throws -> Data? {
+    /// What the shop chose in the export panel. Nothing beside the model
+    /// goes unless ticked: a quote or a brief dropped in the model's folder
+    /// is a customer's name, and so is a group called "Customers/Noura".
+    struct BundleChoice: Equatable, Sendable {
+        var includePrice = false
+        var includeGroup = false
+        /// The `settings/` member paths the shop ticked.
+        var papers: Set<String> = []
+    }
+
+    /// Everything an export needs, worked out on the main actor; the reading,
+    /// zipping and writing then happen off it (`bundleData`).
+    struct BundlePlan: Sendable {
+        var model: [(path: String, url: URL)]
+        var pictures: [(path: String, data: Data)]
+        var settings: [(path: String, url: URL)]
+        var record: [String: JSONValue]
+        var group: String?
+        var price: (amount: Double, currency: String)?
+        var app: String
+        var from: String?
+    }
+
+    /// This Mac's secret for `ModelBundle.mark`: made once, never exported.
+    static func bundleMarkSecret() -> String {
+        let key = "mac.bundleMarkSecret"
+        if let s = UserDefaults.standard.string(forKey: key), !s.isEmpty { return s }
+        let made = UUID().uuidString + UUID().uuidString
+        UserDefaults.standard.set(made, forKey: key)
+        return made
+    }
+
+    /// The plan for `file` as `choice` says. Nil when the model is not on
+    /// this Mac.
+    func bundlePlan(_ file: LibraryFile, choice: BundleChoice) -> BundlePlan? {
         guard let contents = bundleContents(file), case .object(let record)? = row(for: file.id) else { return nil }
+        let facts = libraryFacts(file)
+        let price: (amount: Double, currency: String)? = choice.includePrice ? facts.price.map { ($0, currency) } : nil
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development"
+        var from: String?
+        if case .string(let hash)? = record["contentHash"], !hash.isEmpty {
+            from = ModelBundle.mark(secret: Self.bundleMarkSecret(), contentHash: hash)
+        }
+        return BundlePlan(model: contents.model, pictures: contents.pictures,
+                          settings: contents.settings.filter { choice.papers.contains($0.path) },
+                          record: record, group: choice.includeGroup ? file.groupName : nil,
+                          price: price, app: "Khayt Mac " + version, from: from)
+    }
+
+    /// The bundle's bytes: every member, then the manifest. Off the main
+    /// actor — a 300 MB 3MF is seconds of reading. `progress` is told each
+    /// member as it is read (done, total, name).
+    nonisolated static func bundleData(_ plan: BundlePlan,
+                                       progress: @Sendable (Int, Int, String) -> Void = { _, _, _ in }) throws -> Data {
         var members: [ZipWrite.Member] = []
         var listed: [ModelBundle.Member] = []
         var total = 0
+        let count = plan.model.count + plan.pictures.count + plan.settings.count + 1
         func add(_ path: String, _ data: Data, _ role: ModelBundle.Folder) throws {
             guard data.count <= ModelBundle.maxMemberBytes else { throw BundleFailure.tooBig }
             total += data.count
@@ -95,54 +147,82 @@ extension Shop {
             else { throw BundleFailure.tooBig }
             members.append(ZipWrite.Member(path, data))
             listed.append(ModelBundle.Member(path: path, role: role, size: data.count))
+            progress(members.count, count, (path as NSString).lastPathComponent)
         }
-        for (path, url) in contents.model {
+        for (path, url) in plan.model {
             try add(path, try Data(contentsOf: url, options: .mappedIfSafe), .model)
         }
-        for (path, data) in contents.pictures { try add(path, data, .pictures) }
-        for (path, url) in contents.settings { try add(path, try Data(contentsOf: url, options: .mappedIfSafe), .settings) }
-        let facts = libraryFacts(file)
-        let price: (amount: Double, currency: String)? = includePrice ? facts.price.map { ($0, currency) } : nil
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development"
-        let manifest = ModelBundle.manifest(record: record, group: file.groupName, members: listed, price: price,
-                                            exportedAt: StoreWriter.iso(Date()), app: "Khayt Mac " + version)
+        for (path, data) in plan.pictures { try add(path, data, .pictures) }
+        for (path, url) in plan.settings { try add(path, try Data(contentsOf: url, options: .mappedIfSafe), .settings) }
+        let manifest = ModelBundle.manifest(record: plan.record, group: plan.group, members: listed, price: plan.price,
+                                            exportedAt: StoreWriter.iso(Date()), app: plan.app, from: plan.from)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         members.append(ZipWrite.Member(ModelBundle.manifestName, try encoder.encode(manifest)))
         return try ZipWrite.archive(members)
     }
 
+    /// The bundle's bytes for `file`, on the calling thread (the tests).
+    func modelBundle(_ file: LibraryFile, includePrice: Bool, choice: BundleChoice? = nil) throws -> Data? {
+        var c = choice ?? BundleChoice()
+        c.includePrice = includePrice
+        guard let plan = bundlePlan(file, choice: c) else { return nil }
+        return try Self.bundleData(plan)
+    }
+
     enum BundleFailure: Error { case tooBig }
 
+    /// How far an export has got, for the banner. Nil when none is running.
+    struct BundleProgress: Equatable, Sendable {
+        var done: Int, total: Int, name: String
+    }
+
     /// File ▸ Export Model Bundle…: the one selected model, to a file the
-    /// shop names. The panel asks first and holds the Include Price box; the
-    /// bundle is built only once there is somewhere to put it.
+    /// shop names. The panel asks first and holds the choices (price, group,
+    /// each file beside the model); the bundle is built only once there is
+    /// somewhere to put it, and built and written OFF the main actor, with
+    /// the banner saying how far it has got.
     func exportModelBundle() async {
         clearLastOutcome()
         guard let file = selectedFile else { return }
         guard permitted("inventory", "view") else { importProblem = moveProblem; return }
-        guard modelFile(for: file) != nil else {
+        guard modelFile(for: file) != nil, let contents = bundleContents(file) else {
             importProblem = words.callIt("mac.mb_not_here", ["name": .string(file.title)]); return
         }
+        guard bundleExport == nil else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [Self.bundleType]
         panel.nameFieldStringValue = ModelBundle.safeLeaf(file.title).isEmpty ? "model" : ModelBundle.safeLeaf(file.title)
         panel.message = words.callIt("mac.mb_export_says")
-        let box = NSButton(checkboxWithTitle: words.callIt("mac.mb_include_price"), target: nil, action: nil)
-        box.state = .off
-        box.isEnabled = libraryFacts(file).price != nil
-        panel.accessoryView = box
+        let options = BundleExportOptions.Model(
+            hasPrice: libraryFacts(file).price != nil, group: file.groupName,
+            papers: contents.settings.map { .init(path: $0.path, name: $0.url.lastPathComponent) })
+        let host = NSHostingView(rootView: BundleExportOptions(model: options, words: words))
+        host.frame.size = host.fittingSize
+        panel.accessoryView = host
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let includePrice = box.state == .on
-        do {
-            guard let data = try modelBundle(file, includePrice: includePrice) else {
-                importProblem = words.callIt("mac.mb_not_here", ["name": .string(file.title)]); return
+        guard let plan = bundlePlan(file, choice: options.choice) else {
+            importProblem = words.callIt("mac.mb_not_here", ["name": .string(file.title)]); return
+        }
+        let title = file.title
+        bundleExport = BundleProgress(done: 0, total: plan.model.count + plan.pictures.count + plan.settings.count + 1,
+                                      name: title)
+        defer { bundleExport = nil }
+        let report: @Sendable (Int, Int, String) -> Void = { done, total, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.bundleExport != nil else { return }
+                self.bundleExport = BundleProgress(done: done, total: total, name: title)
             }
-            try data.write(to: url, options: .atomic)
+        }
+        let outcome: Result<Void, Error> = await LibraryImport.offMain {
+            Result { try Self.bundleData(plan, progress: report).write(to: url, options: .atomic) }
+        }
+        switch outcome {
+        case .success:
             importNote = words.callIt("mac.mb_exported", ["name": .string(url.lastPathComponent)])
-        } catch BundleFailure.tooBig {
+        case .failure(BundleFailure.tooBig):
             importProblem = words.callIt("mac.mb_too_big")
-        } catch {
+        case .failure(let error):
             importProblem = words.callIt("mac.mb_export_failed", ["why": .string(self.said(error))])
         }
     }
@@ -187,21 +267,36 @@ extension Shop {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 let leaf = ModelBundle.safeLeaf(parts[1])
                 guard !leaf.isEmpty else { throw ModelBundle.Refusal.badName(entry.name) }
+                // Only the kinds of paper this app knows: a `.terminal`, a
+                // `.webloc` or an `.html` from a stranger's bundle is not
+                // unpacked at all, however it is named.
+                guard Self.bundleMayCarry(leaf, in: folder) else { continue }
                 let out = dir.appending(path: leaf)
                 // Inside the scratch folder, whatever the name said.
                 guard out.standardizedFileURL.path.hasPrefix(scratch.standardizedFileURL.path + "/")
+                else { throw ModelBundle.Refusal.badName(entry.name) }
+                // Two names a Mac files as one (NFC, case): refused before
+                // the second could truncate the first.
+                guard !FileManager.default.fileExists(atPath: out.path)
                 else { throw ModelBundle.Refusal.badName(entry.name) }
                 FileManager.default.createFile(atPath: out.path, contents: nil)
                 let handle = try FileHandle(forWritingTo: out)
                 defer { try? handle.close() }
                 var wrote = 0
+                var writeFailure: Error?
                 try Zip.stream(entry, in: url, totalLimit: ModelBundle.maxMemberBytes) { chunk in
                     wrote += chunk.count
                     guard total + wrote <= ModelBundle.maxTotalBytes else { return false }
-                    handle.write(Data(chunk))
+                    // THROWS on a full disk. `write(_ data:)` raises an
+                    // Objective-C exception there, which no Swift catch stops.
+                    do { try handle.write(contentsOf: Data(chunk)) } catch { writeFailure = error; return false }
                     return true
                 }
+                if let writeFailure { throw writeFailure }
                 total += wrote
+                // Downloaded is downloaded: the bundle's quarantine goes on
+                // every file it held, as an archive's does.
+                ArchiveMembers.carryQuarantine(from: url, to: out)
                 guard total <= ModelBundle.maxTotalBytes else { throw ModelBundle.Refusal.tooBig }
                 switch folder {
                 case .model:
@@ -219,6 +314,22 @@ extension Shop {
             throw error
         }
     }
+
+    /// The kinds a bundle may hold in each folder: a model the library
+    /// imports (or a part of one), a picture, a paper (`documentKinds`) or a
+    /// slicer profile (`settingsKinds`). Nothing else is unpacked.
+    nonisolated static func bundleMayCarry(_ leaf: String, in folder: ModelBundle.Folder) -> Bool {
+        let ext = (leaf as NSString).pathExtension.lowercased()
+        switch folder {
+        case .model: return LibraryImport.kinds.contains(ext)
+        case .pictures: return bundlePictureKinds.contains(ext)
+        case .settings: return settingsKinds.contains(ext) || bundlePaperKinds.contains(ext)
+        }
+    }
+
+    nonisolated static let bundlePictureKinds: Set<String> = ["png", "jpg", "jpeg", "webp", "heic"]
+    /// `ArchiveImport.documentKinds`, read from off the main actor.
+    nonisolated static let bundlePaperKinds: Set<String> = ["pdf"]
 
     /// The words for a refusal.
     func said(_ refusal: ModelBundle.Refusal) -> String {
@@ -278,9 +389,14 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) }, whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
             await load(source)
             let fields = opened.manifest.fields
+            // This shop's own bundle coming home: its word on where the model
+            // came from is the shop's own.
+            let ours = opened.manifest.from.map { from in
+                added.contentHash.map { ModelBundle.mark(secret: Self.bundleMarkSecret(), contentHash: $0) == from } ?? false
+            } ?? false
             if !fields.isEmpty {
                 editFiles([added.id], named: words.callIt("mac.mb_import")) { record in
-                    ModelBundle.fill(&record, from: fields)
+                    ModelBundle.fill(&record, from: fields, ours: ours)
                 }
             }
             importNote = words.callIt("mac.mb_imported", ["name": .string(added.name)])

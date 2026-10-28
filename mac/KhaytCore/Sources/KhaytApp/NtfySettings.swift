@@ -17,6 +17,9 @@ struct NtfySettings: View {
         var token = ""          // typed this session, never the stored one
         var clearToken = false
         var error = true, offline = true, stall = false, runout = true
+        /// A print finished, failed or paused: OPT-IN, and without the job
+        /// and file names unless `printNames` (`lib/alert-routes.js`).
+        var printNotices = false, printNames = false
 
         @MainActor static func read(_ settings: [String: JSONValue]) -> Draft {
             guard case .object(let n)? = settings["ntfy"] else { return Draft() }
@@ -29,7 +32,9 @@ struct NtfySettings: View {
                 d.offline = Shop.plainBool(e["offline"]) ?? true
                 d.stall = Shop.plainBool(e["stall"]) ?? false
                 d.runout = Shop.plainBool(e["runout"]) ?? true
+                d.printNotices = PrintNoticeKind.allCases.contains { Shop.plainBool(e[$0.rawValue]) == true }
             }
+            d.printNames = Shop.plainBool(n["printNoticeNames"]) ?? false
             return d
         }
     }
@@ -76,6 +81,7 @@ struct NtfySettings: View {
                     Toggle(shop.words.callIt("mac.tg_printer_offline"), isOn: $draft.offline)
                     Toggle(shop.words.callIt("mac.ntfy_runout"), isOn: $draft.runout)
                     Toggle(shop.words.callIt("mac.tg_printer_stall"), isOn: $draft.stall)
+                    PrintNoticeSwitches(shop: shop, on: $draft.printNotices, names: $draft.printNames)
                 }
             }
             HStack {
@@ -111,13 +117,18 @@ struct NtfySettings: View {
 
     /// What the pane sends, the token aside — for the draft being saved and
     /// for the one it opened with, so what was not touched is kept as stored.
+    /// Every key the pane draws is in here: one it leaves out is one a save
+    /// cannot change (the print notices were, until the beta.8 review).
     static func form(_ draft: Draft) -> [String: JSONValue] {
-        [
+        var events: [String: JSONValue] = ["error": .bool(draft.error), "offline": .bool(draft.offline),
+                                           "stall": .bool(draft.stall), "runout": .bool(draft.runout)]
+        for kind in PrintNoticeKind.allCases { events[kind.rawValue] = .bool(draft.printNotices) }
+        return [
             "enabled": .bool(draft.enabled),
             "server": .string(draft.server.trimmingCharacters(in: .whitespaces)),
             "topic": .string(draft.topic.trimmingCharacters(in: .whitespaces)),
-            "events": .object(["error": .bool(draft.error), "offline": .bool(draft.offline),
-                               "stall": .bool(draft.stall), "runout": .bool(draft.runout)]),
+            "events": .object(events),
+            "printNoticeNames": .bool(draft.printNames),
         ]
     }
 
@@ -149,4 +160,31 @@ struct NtfySettings: View {
             result = String(describing: error)
         }
     }
+}
+
+/// A print finished, failed or paused, to this channel — and whether the
+/// message may name the job and the file. Drawn in the Telegram and the ntfy
+/// pane alike; both are off until the shop turns them on.
+struct PrintNoticeSwitches: View {
+    let shop: Shop
+    @Binding var on: Bool
+    @Binding var names: Bool
+
+    var body: some View {
+        Toggle(shop.words.callIt("mac.notice_to_phone"), isOn: $on)
+        if on {
+            Toggle(shop.words.callIt("mac.notice_names"), isOn: $names)
+                .padding(.leading, 18)
+            Text(shop.words.callIt("mac.notice_names_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 18)
+        }
+    }
+}
+
+extension Shop {
+    /// `settings.telegram`'s switches for a print's own news
+    /// (`lib/alert-routes.js` NOTICE_KEYS).
+    nonisolated static let printNoticeKeys = ["notifyPrintFinished", "notifyPrintFailed", "notifyPrintPaused"]
 }

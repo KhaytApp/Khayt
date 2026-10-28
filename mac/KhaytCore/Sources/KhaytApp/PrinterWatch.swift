@@ -522,7 +522,11 @@ final class PrinterWatch {
             // A fault the finish seam already told as "Print failed" went to
             // the phones then too (`noticePrintEnded`): not a second message
             // on a channel that took it.
-            await shop.sendAlert(type: alert.type, title: title, body: body,
+            // The phones get the file's name only where the shop ticked
+            // "include job and file names": a G-code file is often named
+            // after the customer, and ntfy.sh is public to the topic.
+            let bare = Self.body(alert, machine: name, shop: shop, withFile: false)
+            await shop.sendAlert(type: alert.type, title: title, body: bare, namedBody: body,
                                  unlessSentAs: toldAsFailed && PrintNoticeKind.failed.wanted
                                      ? PrintNoticeKind.failed.rawValue : nil)
         }
@@ -537,12 +541,13 @@ final class PrinterWatch {
         }
     }
 
-    static func body(_ alert: KhaytEngine.PrinterAlerts.Alert, machine: String, shop: Shop) -> String {
+    static func body(_ alert: KhaytEngine.PrinterAlerts.Alert, machine: String, shop: Shop,
+                     withFile: Bool = true) -> String {
         // The file it was making, and how far it had got. A shop deciding
         // whether to walk over needs both, and "Printer error" alone needs a
         // second look at the app to mean anything.
         var parts: [String] = []
-        if !alert.filename.isEmpty { parts.append(alert.filename) }
+        if withFile, !alert.filename.isEmpty { parts.append(alert.filename) }
         // Clamped, for two reasons: `Int(someDouble)` traps on an infinity or a
         // NaN, and a percentage outside 0-100 is not one — a printer reporting
         // 5000 would have printed "5000%" on the shop floor.

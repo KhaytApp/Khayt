@@ -147,9 +147,15 @@ public struct VaultSync: Sendable {
         public var base: String?
         /// When this device first heard of it.
         public var at: Date
+        /// For a purge: the library key the file was under. The purge takes
+        /// the file out of the state (`keys`, `records`), so without it a
+        /// record that never had `vaultFileId` written could not be found
+        /// again (beta.8 review H1). Nil on anything else, and on a change
+        /// kept by a build before it.
+        public var key: String?
 
-        public init(change: Change, base: String? = nil, at: Date = Date()) {
-            self.change = change; self.base = base; self.at = at
+        public init(change: Change, base: String? = nil, at: Date = Date(), key: String? = nil) {
+            self.change = change; self.base = base; self.at = at; self.key = key
         }
     }
 
@@ -208,18 +214,20 @@ public struct VaultSync: Sendable {
         let old = st.files[f.fileId]
         let held = old.flatMap(acceptedSha256)
         // Said to the caller AND kept for the app (`pending`).
-        func say(_ c: Change) {
+        func say(_ c: Change, key: String? = nil) {
             out.append(c)
             var list = st.pending ?? []
             if !list.contains(where: { $0.change == c && $0.base == held }) {
-                list.append(Pending(change: c, base: held, at: now))
+                list.append(Pending(change: c, base: held, at: now, key: key))
             }
             if list.count > Self.pendingCap { list.removeFirst(list.count - Self.pendingCap) }
             st.pending = list
         }
         if f.purged {
             if let old {
-                say(.purged(fileId: f.fileId, recordId: old.recordId))
+                let key = st.keys.first { $0.value == f.fileId }?.key
+                    ?? old.row.flatMap { try? VaultMeta.open($0, vaultKey: keys.vaultKey, lastSeenSeq: nil).meta.key }
+                say(.purged(fileId: f.fileId, recordId: old.recordId), key: key)
                 st.files[f.fileId] = nil
                 st.keys = st.keys.filter { $0.value != f.fileId }
                 st.records = st.records.filter { $0.value != f.fileId }

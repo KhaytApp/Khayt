@@ -204,7 +204,7 @@ enum WebSaveWords {
         "mac.sfw_no_group": ["en": "This build of Khayt was not signed by a developer team, so it has no folder to share with the extension. Use a build from khaytapp.com.",
                             "ar": "هذه النسخة من خيط غير موقّعة من فريق مطوّر، لذا لا تملك مجلدًا مشتركًا مع الإضافة. استخدم نسخة من khaytapp.com."],
         "mac.sfw_last": ["en": "Last saved: {title}", "ar": "آخر ما حُفظ: \u{2068}{title}\u{2069}"],
-        "mac.sfw_privacy": ["en": "Page details go to Khayt on this Mac and nowhere else. Khayt fetches only the page's picture, from the site itself.",
-                           "ar": "تذهب تفاصيل الصفحة إلى خيط على هذا الماك فقط ولا تُرسل إلى أي مكان آخر. لا يجلب خيط إلا صورة الصفحة، من الموقع نفسه."],
+        "mac.sfw_privacy": ["en": "Page details go to Khayt on this Mac and nowhere else. Khayt fetches only the page's picture, from the address the page gives.",
+                           "ar": "تذهب تفاصيل الصفحة إلى خيط على هذا الماك فقط ولا تُرسل إلى أي مكان آخر. لا يجلب خيط إلا صورة الصفحة، من العنوان الذي تذكره الصفحة."],
     ]
 }

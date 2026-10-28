@@ -323,6 +323,60 @@ import KhaytCore
         ])
     }
 
+    /// Beta.8 review: a print's own news to Telegram and ntfy is opt-in per
+    /// channel, and names the job and the file only when ticked. The two
+    /// switches, as each pane draws them — off, then on with names off.
+    @Test("the print notice switches each channel pane draws")
+    func printNoticeSwitches() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        func shoot(_ name: String, on: Bool, names: Bool) throws {
+            try render(VStack(alignment: .leading, spacing: 4) {
+                Text(shop.words.callIt("mac.tg_when")).font(.callout.weight(.medium))
+                Toggle(shop.words.callIt("mac.tg_printer_error"), isOn: .constant(true))
+                PrintNoticeSwitches(shop: shop, on: .constant(on), names: .constant(names))
+            }
+            .padding(20).frame(width: 560, alignment: .leading).background(Khayt.ground),
+                       name, size: CGSize(width: 560, height: on ? 200 : 120))
+        }
+        try shoot("b8-notice-switches-off", on: false, names: false)
+        try shoot("b8-notice-switches-on", on: true, names: false)
+    }
+
+    /// The export panel's choices (the save panel itself is the system's and
+    /// cannot be drawn), and the notes an export or import leaves behind.
+    @Test("the model bundle's export choices, and what an export or import says after")
+    func bundleExportAndNotes() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let w = shop.words
+        let model = BundleExportOptions.Model(
+            hasPrice: true, group: "Customers/Noura",
+            papers: [.init(path: "settings/brief.pdf", name: "brief.pdf"),
+                     .init(path: "settings/profile.ini", name: "profile.ini")])
+        model.ticked = ["settings/profile.ini"]
+        try render(BundleExportOptions(model: model, words: w).background(Khayt.ground),
+                   "b8-bundle-export-options", size: CGSize(width: 420, height: 200))
+        try render(VStack(spacing: 0) {
+            Banner(text: w.callIt("mac.mb_packing", ["name": .string("Dragon"), "done": .number(2), "total": .number(5)]),
+                   symbol: "shippingbox", tint: Khayt.brand) {
+                ProgressView(value: 2, total: 5).progressViewStyle(.linear).frame(width: 120)
+            }
+            Banner(text: w.callIt("mac.mb_exported", ["name": .string("Dragon.khaytbundle")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: w.callIt("mac.mb_imported", ["name": .string("Dragon")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            Banner(text: w.callIt("mac.sim_none", ["name": .string("Dragon")]),
+                   symbol: "checkmark.circle", tint: Khayt.done)
+            ForEach([w.callIt("mac.mb_not_bundle"),
+                     w.callIt("mac.mb_bad_name", ["name": .string("model/../../escape.stl")]),
+                     w.callIt("mac.mb_encrypted", ["name": .string("model/dragon.stl")]),
+                     w.callIt("mac.mb_no_model"), w.callIt("mac.mb_too_big")], id: \.self) { problem in
+                Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention)
+            }
+        }.frame(width: 720), "b8-bundle-notes", size: CGSize(width: 720, height: 380))
+    }
+
     /// The monthly costs, empty and filled.
     ///
     /// The empty one is the picture that matters: it is what a shop sees after
@@ -625,6 +679,22 @@ import KhaytCore
                    symbol: "checkmark.circle", tint: Khayt.done)
         }.frame(width: 720), "30-import-banners", size: CGSize(width: 720, height: 160))
         _ = shop
+    }
+
+    /// The kept-both vault banner (beta.8 UI review): three copies drawn and
+    /// "And 1 more", each saying the other copy goes to the Trash.
+    @Test("the kept-both vault banners, with how many more")
+    func vaultKeptBanners() throws {
+        let shop = Shop()
+        let folder = URL(fileURLWithPath: "/tmp/khayt-kept")
+        shop.vaultKeptCopies = (1...4).map { n in
+            VaultKeptCopy(recordId: "PF-\(n)", title: "Model \(n)", mine: folder.appending(path: "m\(n).stl"),
+                          copy: folder.appending(path: "m\(n) (vault v2).stl"), version: 2)
+        }
+        let text = shop.words.callIt("mac.vault_kept_both", ["name": .string("Model 1"), "copy": .string("m1 (vault v2).stl")])
+        #expect(text.contains("Trash"))
+        try render(VStack(spacing: 0) { VaultKeptBanners(shop: shop) }.frame(width: 820),
+                   "30b-vault-kept-banners", size: CGSize(width: 820, height: 260))
     }
 
     /// The state a search leaves behind, on the two screens that reach it

@@ -1,4 +1,6 @@
+import CryptoKit
 import Foundation
+import KhaytWebSave
 
 /// A `.khaytbundle`: one library model, packed to hand to someone else — the
 /// model file(s), its pictures, its tested print setups and a manifest of what
@@ -13,6 +15,13 @@ import Foundation
 /// in consumables. So nothing is copied unless it is named in `exported`; a
 /// field added to records tomorrow stays home until somebody decides it may
 /// travel. A price goes in only when the shop ticks "include price".
+///
+/// And the allowlist goes all the way down (beta.8 review): a structured
+/// field is shaped on the way OUT by the same per-field rule as on the way in
+/// (`checkedFields`), so a print setup's free-text notes and its machine's
+/// internal id, a slice's filament cost and anything a record grows inside
+/// `parsed` tomorrow stay home too. The group — a folder path, often a
+/// customer's name ("Customers/Noura") — travels only when the shop ticks it.
 ///
 /// ── WHAT COMES BACK IN: THE SAME LIST, AND NOTHING ELSE ──────────────────
 ///
@@ -70,7 +79,15 @@ public enum ModelBundle {
         "archiveLocked", "archiveGone", "archiveBytes", "archiveModified", "consumables", "timesPrinted",
         "lastPrinted", "favorite", "rev", "updatedAt", "createdAt", "userPhoto", "thumbFile",
         "stackId", "stackTop", "folder", "activeVersionId", "versions", "slicerProfileId", "printRisk",
+        "bundleFigures", "sourceFromBundle",
     ]
+
+    /// The most a manifest may claim: a year of printing, a hundred kilos.
+    public static let maxMinutes: Double = 525_600
+    public static let maxGrams: Double = 100_000
+    /// A group path: this many folders deep, each this long.
+    public static let maxGroupDepth = 8
+    public static let maxGroupPart = 80
 
     /// One file in the bundle.
     public struct Member: Sendable, Equatable {
@@ -83,15 +100,15 @@ public enum ModelBundle {
     }
 
     /// The manifest for `record`. `group` is the record's group as the app
-    /// reads it (`folder` before `group`); `price` goes in only when given.
+    /// reads it (`folder` before `group`), given only when the shop ticked
+    /// it; `price` goes in only when given, and with it the slice's filament
+    /// cost. `from` is this shop's mark for the model (`mark`), so an import
+    /// back into the same shop can tell its own bundle from a stranger's.
     public static func manifest(record: [String: JSONValue], group: String?, members: [Member],
                                 price: (amount: Double, currency: String)?, exportedAt: String,
-                                app: String) -> JSONValue {
-        var out: [String: JSONValue] = [:]
-        for key in exported where key != "group" {
-            if let v = record[key], v != .null { out[key] = v }
-        }
-        if let group, !group.isEmpty { out["group"] = .string(group) }
+                                app: String, from: String? = nil) -> JSONValue {
+        var out = checkedFields(record, keys: Set(exported).subtracting(["group"]), includeCost: price != nil)
+        if let group, let path = groupPath(group) { out["group"] = .string(path) }
         var top: [String: JSONValue] = [
             "format": .string(format), "version": .number(Double(version)),
             "exportedAt": .string(exportedAt), "app": .string(app), "record": .object(out),
@@ -99,6 +116,7 @@ public enum ModelBundle {
                 .object(["path": .string(m.path), "role": .string(m.role.rawValue), "size": .number(Double(m.size))])
             }),
         ]
+        if let from, !from.isEmpty { top["from"] = .string(String(from.prefix(64))) }
         if let price, price.amount.isFinite, price.amount >= 0 {
             top["price"] = .object(["amount": .number(price.amount), "currency": .string(String(price.currency.prefix(8)))])
         }
@@ -122,10 +140,49 @@ public enum ModelBundle {
         return path
     }
 
+    /// This shop's mark for one model's bytes: a keyed hash of the content
+    /// hash under a secret that never leaves the Mac, so a bundle says "this
+    /// shop made me" to this shop alone and links nothing for anybody else.
+    public static func mark(secret: String, contentHash: String) -> String {
+        let key = SymmetricKey(data: Data(secret.utf8))
+        let code = HMAC<SHA256>.authenticationCode(for: Data(contentHash.utf8), using: key)
+        return code.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// A member name as APFS compares it: NFC, case folded — so two names a
+    /// Mac would file as one are one name here too.
+    public static func comparable(_ name: String) -> String {
+        name.precomposedStringWithCanonicalMapping.folding(options: [.caseInsensitive], locale: nil)
+    }
+
+    /// Text as kept from outside: control (Cc) and format (Cf) characters
+    /// out, so a name cannot hide a direction override or a zero-width
+    /// letter, then NFC.
+    public static func plain(_ s: String) -> String {
+        String(String.UnicodeScalarView(s.unicodeScalars.filter {
+            let c = $0.properties.generalCategory
+            return c != .control && c != .format
+        })).precomposedStringWithCanonicalMapping
+    }
+
+    /// A group path made tidy: plain parts, no empty, `.` or `..` part, no
+    /// leading dot, at most `maxGroupDepth` deep. Nil when nothing is left.
+    public static func groupPath(_ raw: String) -> String? {
+        let parts = plain(raw).split(whereSeparator: { $0 == "/" || $0 == "\\" }).compactMap { p -> String? in
+            var t = String(p).trimmingCharacters(in: .whitespacesAndNewlines)
+            while t.hasPrefix(".") { t.removeFirst() }
+            t = String(t.prefix(maxGroupPart)).trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        let kept = parts.prefix(maxGroupDepth)
+        return kept.isEmpty ? nil : kept.joined(separator: "/")
+    }
+
     /// A leaf as kept: the last path part only, control characters, slashes
-    /// and backslashes out, leading dots off, cut at 120 characters.
+    /// and backslashes out, leading dots off, cut at 120 characters, NFC.
     public static func safeLeaf(_ raw: String) -> String {
-        let last = raw.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+        let last = raw.precomposedStringWithCanonicalMapping
+            .split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
         let clean = String(String.UnicodeScalarView(last.unicodeScalars.filter {
             !CharacterSet.controlCharacters.contains($0) && $0 != ":"
         }))
@@ -170,7 +227,7 @@ public enum ModelBundle {
         var total = 0
         var seen: Set<String> = []
         for e in files {
-            guard isSafeName(e.name), !e.isSymlink, seen.insert(e.name.lowercased()).inserted
+            guard isSafeName(e.name), !e.isSymlink, seen.insert(comparable(e.name)).inserted
             else { return .failure(.badName(e.name)) }
             guard !e.isEncrypted else { return .failure(.encrypted(e.name)) }
             guard e.size >= 0, e.size <= (e.name == manifestName ? maxManifestBytes : maxMemberBytes)
@@ -178,7 +235,7 @@ public enum ModelBundle {
             total += e.size
             guard total <= maxTotalBytes else { return .failure(.tooBig) }
         }
-        guard seen.contains(manifestName) else { return .failure(.noManifest) }
+        guard seen.contains(comparable(manifestName)) else { return .failure(.noManifest) }
         guard files.contains(where: { $0.name.hasPrefix(Folder.model.rawValue + "/") }) else { return .failure(.noModel) }
         return .success(files)
     }
@@ -192,6 +249,8 @@ public enum ModelBundle {
         public var group: String?
         public var price: Double?
         public var currency: String?
+        /// The exporting shop's mark (`mark`), when the bundle carried one.
+        public var from: String? = nil
     }
 
     /// Read a manifest. Nil when it is not one of ours.
@@ -213,7 +272,10 @@ public enum ModelBundle {
             price = n
             if case .string(let c)? = p["currency"] { currency = String(c.prefix(8)) }
         }
-        return Opened(fields: fields, title: title, tags: tags, group: group, price: price, currency: currency)
+        var from: String?
+        if case .string(let f)? = top["from"], f.count <= 64 { from = f }
+        return Opened(fields: fields, title: title, tags: tags, group: group, price: price, currency: currency,
+                      from: from)
     }
 
     /// The manifest's fields put on a record the import just made: only where
@@ -221,14 +283,37 @@ public enum ModelBundle {
     /// bytes (the slice's figures, the colours) is evidence, the manifest is
     /// a note. The name, tags and group were given to the import itself.
     /// Returns the keys it set.
+    ///
+    /// A manifest's print time and grams are ANOTHER shop's slice, on its
+    /// printer and profile, and a crafted bundle can say anything: they are
+    /// never `parsed` (which the price paths read as measured). They go in as
+    /// `bundleFigures`, capped and marked `estimate: "bundle"`.
+    ///
+    /// `ours`: the bundle carries this shop's own mark. A stranger's source
+    /// and address are kept as notes, but marked `sourceFromBundle`, so the
+    /// shop's own later save of that page from the browser is not filed into
+    /// the bundle's record on the bundle's word (`WebSaveRecord.existing`).
     @discardableResult
-    public static func fill(_ record: inout [String: JSONValue], from fields: [String: JSONValue]) -> [String] {
+    public static func fill(_ record: inout [String: JSONValue], from fields: [String: JSONValue],
+                            ours: Bool = false) -> [String] {
         var set: [String] = []
         for key in fields.keys.sorted() where !["name", "tags", "group"].contains(key) {
             guard let value = fields[key] else { continue }
+            if key == "parsed" {
+                guard case .object(var figures) = value else { continue }
+                if let have = record["bundleFigures"], !isBlank(have) { continue }
+                figures["estimate"] = .string("bundle")
+                record["bundleFigures"] = .object(figures)
+                set.append("bundleFigures")
+                continue
+            }
             if let have = record[key], !isBlank(have) { continue }
             record[key] = value
             set.append(key)
+        }
+        if !ours, set.contains(where: { $0 == "source" || $0 == "sourceUrl" }) {
+            record["sourceFromBundle"] = .bool(true)
+            set.append("sourceFromBundle")
         }
         return set
     }
@@ -245,41 +330,59 @@ public enum ModelBundle {
         }
     }
 
-    /// `importable` fields, each of the type a record holds and cut to size:
-    /// text to 4,000 characters (a name to 200), lists to 50 items, objects
-    /// passed through only for the structured fields (`parsed`, `colors`,
-    /// `setups`) and only as JSON values, never as anything that names a path.
-    public static func checkedFields(_ record: [String: JSONValue]) -> [String: JSONValue] {
-        let texts: Set<String> = ["name", "originalName", "material", "category", "group", "testedNotes", "source",
-                                  "licence", "licenceUrl", "sourceUrl", "sourceSite", "sourceLicenceText", "sourceNote"]
+    /// `importable` fields (or `keys`), each of the type a record holds and
+    /// cut to size: text to 4,000 characters (a name to 200) with control and
+    /// format characters out, links only as https, tags and the group made
+    /// tidy, lists to 50 items, objects passed through only for the
+    /// structured fields (`parsed`, `colors`, `setups`) and only their named
+    /// sub-keys, never as anything that names a path. The SAME shaping runs
+    /// on the way out (`manifest`), so what a bundle can carry is what an
+    /// import can take — a setup's notes and machine id never travel, and a
+    /// slice's filament cost only when `includeCost` (the price is going too).
+    public static func checkedFields(_ record: [String: JSONValue], keys: Set<String> = importable,
+                                     includeCost: Bool = false) -> [String: JSONValue] {
+        let texts: Set<String> = ["name", "originalName", "material", "category", "testedNotes", "source",
+                                  "licence", "sourceSite", "sourceLicenceText", "sourceNote",
+                                  "contentHash", "geometryKey", "geometryReader"]
+        let links: Set<String> = ["licenceUrl", "sourceUrl"]
+        func capped(_ v: JSONValue?, _ max: Double) -> JSONValue? {
+            if case .number(let n)? = v, n.isFinite, n >= 0 { return .number(min(n, max)) }
+            return nil
+        }
         var out: [String: JSONValue] = [:]
-        for key in importable {
+        for key in keys {
             guard let v = record[key] else { continue }
             switch (key, v) {
             case (_, .string(let s)) where texts.contains(key):
-                let cut = String(s.prefix(key == "name" ? 200 : 4000)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let cut = String(plain(s).prefix(key == "name" ? 200 : 4000)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !cut.isEmpty { out[key] = .string(cut) }
+            case (_, .string(let s)) where links.contains(key):
+                if let link = WebSave.https(s) { out[key] = .string(link) }
+            case ("group", .string(let s)):
+                if let path = groupPath(s) { out[key] = .string(path) }
             case ("tags", .array(let a)):
-                let t = a.compactMap { x -> JSONValue? in
+                let typed = a.compactMap { x -> JSONValue? in
                     guard case .string(let s) = x else { return nil }
-                    let c = String(s.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    return c.isEmpty ? nil : .string(c)
+                    return .string(String(plain(s).prefix(60)))
                 }
-                if !t.isEmpty { out[key] = .array(Array(t.prefix(50))) }
+                let t = Tags.normalise(.array(typed)).prefix(50).map(JSONValue.string)
+                if !t.isEmpty { out[key] = .array(Array(t)) }
             case ("swapCount", .number(let n)) where n.isFinite && n >= 0:
                 out[key] = .number(min(n, 10_000).rounded())
             case ("parsed", .object(let o)):
                 var p: [String: JSONValue] = [:]
-                for k in ["printTimeMins", "filamentGrams"] { if case .number(let n)? = o[k], n.isFinite, n >= 0 { p[k] = .number(n) } }
-                for k in ["filamentType", "slicer"] { if case .string(let s)? = o[k] { p[k] = .string(String(s.prefix(80))) } }
+                if let m = capped(o["printTimeMins"], maxMinutes) { p["printTimeMins"] = m }
+                if let g = capped(o["filamentGrams"], maxGrams) { p["filamentGrams"] = g }
+                if includeCost, let c = capped(o["filamentCost"], 1_000_000) { p["filamentCost"] = c }
+                for k in ["filamentType", "slicer"] { if case .string(let s)? = o[k] { p[k] = .string(String(plain(s).prefix(80))) } }
                 if !p.isEmpty { out[key] = .object(p) }
             case ("colors", .array(let a)):
                 let c = a.prefix(16).compactMap { x -> JSONValue? in
                     guard case .object(let o) = x else { return nil }
                     var c: [String: JSONValue] = [:]
-                    if case .string(let h)? = o["hex"], h.count <= 9 { c["hex"] = .string(h) }
-                    if case .number(let g)? = o["grams"], g.isFinite, g >= 0 { c["grams"] = .number(g) }
-                    if case .string(let l)? = o["label"] { c["label"] = .string(String(l.prefix(80))) }
+                    if case .string(let h)? = o["hex"], h.count <= 9 { c["hex"] = .string(plain(h)) }
+                    if let g = capped(o["grams"], maxGrams) { c["grams"] = g }
+                    if case .string(let l)? = o["label"] { c["label"] = .string(String(plain(l).prefix(80))) }
                     return c.isEmpty ? nil : .object(c)
                 }
                 if !c.isEmpty { out[key] = .array(c) }
@@ -288,10 +391,10 @@ public enum ModelBundle {
                     guard case .object(let o) = x else { return nil }
                     var c: [String: JSONValue] = [:]
                     for k in ["id", "name", "machineName", "material", "colour", "status"] {
-                        if case .string(let t)? = o[k] { c[k] = .string(String(t.prefix(120))) }
+                        if case .string(let t)? = o[k] { c[k] = .string(String(plain(t).prefix(120))) }
                     }
                     for k in ["ok", "failed", "layerHeightMm", "nozzleMm"] {
-                        if case .number(let n)? = o[k], n.isFinite, n >= 0 { c[k] = .number(n) }
+                        if case .number(let n)? = o[k], n.isFinite, n >= 0 { c[k] = .number(min(n, 1_000_000)) }
                     }
                     return c.isEmpty ? nil : .object(c)
                 }

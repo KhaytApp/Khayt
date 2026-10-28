@@ -820,6 +820,13 @@ extension Shop {
                                        "groups": .string(names.prefix(3).joined(separator: ", ")
                                                          + (names.count > 3 ? "\u{2026}" : ""))]))
         }
+        // Gone from the vault and not on this Mac is not gone everywhere:
+        // another Mac may hold the file, and a delete reaches it too
+        // (beta.8 review H3).
+        if chosen.contains(where: { !($0.vaultPurgedAt ?? "").isEmpty }) {
+            lines.append("")
+            lines.append(words.callIt("mac.delete_vault_gone"))
+        }
         return lines
     }
 
