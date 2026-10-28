@@ -35,6 +35,11 @@ struct TelegramSettings: View {
         var printerError = true
         var printerOffline = true
         var printerStall = false
+        /// A print finished, failed or paused (`PrintNotices`): OPT-IN, so
+        /// a bot set up for faults is not told about every print.
+        var printNotices = false
+        /// …and with the job's title and the file's name in it.
+        var printNames = false
 
         /// Typed this session, or empty. The stored token is never in here —
         /// a draft holding the ciphertext would write it back on the next save
@@ -55,6 +60,8 @@ struct TelegramSettings: View {
             out.printerError = Shop.plainBool(t["notifyPrinterError"]) ?? true
             out.printerOffline = Shop.plainBool(t["notifyPrinterOffline"]) ?? true
             out.printerStall = Shop.plainBool(t["notifyPrinterStall"]) ?? false
+            out.printNotices = Shop.printNoticeKeys.contains { Shop.plainBool(t[$0]) == true }
+            out.printNames = Shop.plainBool(t["printNoticeNames"]) ?? false
             return out
         }
     }
@@ -97,6 +104,7 @@ struct TelegramSettings: View {
                     Toggle(shop.words.callIt("mac.tg_printer_error"), isOn: $draft.printerError)
                     Toggle(shop.words.callIt("mac.tg_printer_offline"), isOn: $draft.printerOffline)
                     Toggle(shop.words.callIt("mac.tg_printer_stall"), isOn: $draft.printerStall)
+                    PrintNoticeSwitches(shop: shop, on: $draft.printNotices, names: $draft.printNames)
                 }
             }
 
@@ -139,7 +147,8 @@ struct TelegramSettings: View {
             "notifyPrinterError": .bool(draft.printerError),
             "notifyPrinterOffline": .bool(draft.printerOffline),
             "notifyPrinterStall": .bool(draft.printerStall),
-        ]
+        ].merging(Shop.printNoticeKeys.map { ($0, JSONValue.bool(draft.printNotices)) }, uniquingKeysWith: { a, _ in a })
+        .merging(["printNoticeNames": .bool(draft.printNames)], uniquingKeysWith: { a, _ in a })
     }
 
     private func save() async {

@@ -118,6 +118,19 @@ struct MoveBanners: View {
                 if !Task.isCancelled, shop.importNote == note { shop.importNote = nil }
             }
         }
+        if let packing = shop.bundleExport {
+            // A model bundle being packed, off the main actor: a 300 MB 3MF
+            // is seconds of reading, and a bar says the app is at work.
+            Banner(text: shop.words.callIt("mac.mb_packing", [
+                        "name": .string(packing.name),
+                        "done": .number(Double(packing.done)),
+                        "total": .number(Double(packing.total))]),
+                   symbol: "shippingbox", tint: Khayt.brand) {
+                ProgressView(value: Double(packing.done), total: Double(max(packing.total, 1)))
+                    .progressViewStyle(.linear)
+                    .frame(width: 120)
+            }
+        }
         if shop.importing {
             // A batch says where it has got to and offers a way out. Three
             // thousand models is minutes of work, and a progress line with no

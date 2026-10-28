@@ -12,6 +12,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Re-measuring after a new version no longer stops at 25 models that are only online. Archived models whose only copy is in the vault are offered for Bring Back too. A double click on "Use the Vault’s" can no longer send both copies to the Trash. The first pass after the update no longer calls this Mac's own unuploaded edit "changed on another Mac", and files are hashed once while unchanged, with the pass written and settled 200 changes at a time.
   - Security: a second vault file in a record's folder (a G-code, a part) never writes its hash onto the record or archives it. A kept-copy marker is believed only when it names one file of its own folder and a vault file this Mac knows.
   - The kept-both banner says that the other copy goes to the Trash, and isolates the file names in Arabic. The lapse banner's button no longer repeats the date.
+- **Mac: beta.8 review fixes — model bundles and print notices.**
+  - Print notices to Telegram and ntfy are opt-in per channel: each pane has "A print finishes, fails or pauses" (off by default) and, under it, "Include job and file names" (off by default). Without it a message names only the printer and what happened, because a job or a G-code file is often named after a customer. The ntfy pane's Save now keeps these switches (`lib/settings-edit.js` merged only the four fault events). What the desktop sends is unchanged.
+  - Export Model Bundle shapes every field the way import does: a print setup's notes and machine id stay home, and so does the slice's filament cost unless Include Price is ticked. The group (a folder path, often a customer's name) and each PDF or slicer file beside the model are listed in the save panel with a tick each, all off by default. Export runs off the main thread, with progress in the banner.
+  - Import Model Bundle: a licence or source link is kept only when it is https. Only known kinds are unpacked (models, pictures, PDFs and slicer profiles), and each carries the bundle's quarantine. Tags and the group are tidied, text loses control and format characters, member names are compared as macOS compares them (NFC, case), and a full disk fails the import instead of crashing. A bundle's print time and grams are kept as "the bundle's estimate", capped, and never read as measured. A stranger's source no longer captures the shop's own later save of that page from the browser; a bundle this shop exported is recognised by a mark only this Mac can make.
+  - Library stage 3b words and layout: the variants suggestion reads correctly for one, two and more in English and Arabic; "Stack N Models" has its Arabic count forms; the Views help names the shortcuts in order (Iso first); the stack's member list marks the cover, bolds this model and selects a member on click; the Views section is offered only when the file is on this Mac; «السعة» is now «الحجم».
 
 - **iPhone: archived models stay off the library away from the shop.** The library copy the phone keeps for pricing on mobile data listed models put aside on the Mac (`archivedAt`), which the Mac's own library and the list it serves the phone on Wi-Fi both leave out. The copy now leaves them out too, and a model brought back on the Mac returns with its next sync.
 - **iPhone: library pictures from every folder, not only the top one.** Keeping the library's pictures for away from the shop asked the Mac for its list with no folder, which lists the top folder's models and nothing below it, so models in folders had no picture away from the shop. It now walks every folder, and a walk that finishes lets go of the pictures of models the Mac no longer lists (archived, deleted, or without a picture now).
@@ -20,7 +25,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - After the vault deleted such a model, Library Health lists it as "Deleted from the vault by the plan limit" (first, above Missing), with Remove from Library and no Locate. A vault purge now stamps `vaultPurgedAt` on the record, cleared when the vault holds it again.
   - "Ready to print" no longer waits for the Library screen to be opened.
   - The menu bar's "Bed not cleared" is worked out after every printer check, not only while the Machines screen is open.
-  - Print finished, failed and paused notices also go to the shop's Telegram and ntfy when those are set up, following the Mac's own switch for each. A failed print the printer also reports as a fault is sent once.
+  - Print finished, failed and paused notices can also go to the shop's Telegram and ntfy, switched on per channel in that channel's settings (off by default). A failed print the printer also reports as a fault is sent once.
   - Mesh estimates: a thin, wide model with no measured area (a HueForge relief, a lithophane) is priced as solid and marked "slice it" instead of reading as a 2-hour print at a fifth infill (`lib/stl-estimate.js`).
 
 - **Mac: library stage 3b — stacks, Find Similar, viewer sides and plates, model bundles.**
@@ -8832,6 +8837,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.8] - 2026-10-26
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Stacks:** keep a model's variants under one tile (Model ▸ Stack, or accept a suggestion on the model's page). Unstacking can be undone.
+- **Find Similar:** the same file, the same shape (with the mirrored-copy caveat), then the closest in size and volume.
+- **Model views:** front, top, side and iso (⌥⌘1–4), and one plate at a time from a multi-plate 3MF.
+- **Model bundles:** File ▸ Export Model Bundle… and Import Model Bundle… — a model with its pictures, papers and slicer settings in one file. Nothing private goes out unless you tick it.
+- **Vault changes from your other Macs now arrive here:** new files, new versions, trash and restore. A file edited on both sides keeps both copies until you choose.
+- **Before a vault over its plan deletes anything:** "Bring back N models" for the models whose only copy is in the vault. Library Health lists any that were deleted.
+- **Save to Khayt** connects to Chrome, Edge, Brave, Vivaldi and Firefox from Settings ▸ Preferences ▸ Browser extension.
+- **Print notices to Telegram and ntfy** (opt-in per channel): a print finishes, fails or pauses. Job and file names only if you turn them on.
+
+### Changed
+
+- A model whose file changed on another Mac shows its print figures as out of date and is measured again; until then nothing is priced from the old figures.
+- Thin, wide reliefs (HueForge) are estimated as solid and marked "slice it for an exact time".
+- STL and OBJ thumbnails are no longer drawn as mirror images; old ones redraw as they come on screen.
+
+### Fixed
+
+- Ready to print could read 0 until the Library was opened; "Bed not cleared" in the menu bar no longer needs the Machines screen.
 
 ## [4.0.0-beta.7] - 2026-10-25
 

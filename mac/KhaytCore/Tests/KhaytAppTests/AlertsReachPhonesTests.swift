@@ -84,7 +84,9 @@ struct AlertsReachPhonesTests {
         #expect(watch.contains("try? await engine.alertEnable(settings: shop.settingsDict)"))
         #expect(!watch.contains("enable: KhaytEngine.Alerting.sensible) else {"),
                 "the fixed set is back, so runouts and requested stalls are lost again")
-        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: body,"))
+        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: bare, namedBody: body,"),
+                "a fault alert reaches the phones, and its file name only where the shop asked for names")
+        #expect(watch.contains("withFile: false"))
         #expect(MenuCoverageTests.source("Integrations.swift").contains("NtfySettings(shop: shop)"))
         let engine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytCore/KhaytEngine.swift")
@@ -94,26 +96,46 @@ struct AlertsReachPhonesTests {
 
     // MARK: The print's own news (beta.8)
 
-    @Test("finished, failed and paused go to a Telegram or ntfy that is set up, through the alerts' own path")
+    @Test("finished, failed and paused are OPT-IN per channel, and name the job and file only when ticked")
     func printNoticesReachPhones() async throws {
         let engine = try KhaytEngine()
         let both: [String: JSONValue] = [
             "telegram": .object(["botToken": .string("__enc__x"), "chatId": .string("-100")]),
             "ntfy": .object(["enabled": .bool(true), "topic": .string("athar-printers")]),
         ]
+        // A channel set up for faults is not told about prints.
         for kind in PrintNoticeKind.allCases {
-            let routes = try await engine.alertRoutes(type: kind.rawValue, settings: both)
-            #expect(routes == .init(telegram: true, ntfy: true), "\(kind.rawValue)")
+            #expect(try await engine.alertRoutes(type: kind.rawValue, settings: both) == .init(telegram: false, ntfy: false),
+                    "\(kind.rawValue) went out to a channel that never asked")
+        }
+        // Switched on in each pane: the panes' own forms are what the book holds.
+        var tgDraft = TelegramSettings.Draft(); tgDraft.chatId = "-100"; tgDraft.printNotices = true
+        var ntDraft = NtfySettings.Draft(); ntDraft.enabled = true; ntDraft.topic = "athar-printers"; ntDraft.printNotices = true
+        var tg = TelegramSettings.form(tgDraft); tg["botToken"] = .string("__enc__x")
+        let on: [String: JSONValue] = ["telegram": .object(tg), "ntfy": .object(NtfySettings.form(ntDraft))]
+        for kind in PrintNoticeKind.allCases {
+            #expect(try await engine.alertRoutes(type: kind.rawValue, settings: on) == .init(telegram: true, ntfy: true),
+                    "\(kind.rawValue)")
             let none = try await engine.alertRoutes(type: kind.rawValue, settings: [:])
             #expect(none == .init(telegram: false, ntfy: false))
-            let req = try #require(try await engine.ntfyRequest(type: kind.rawValue, title: "t", body: "b", settings: both))
+            let req = try #require(try await engine.ntfyRequest(type: kind.rawValue, title: "t", body: "b", settings: on))
             #expect(req.url.hasSuffix("/athar-printers"))
         }
-        // Wired: both seams send, after the Mac's own switch and the ledger.
+        #expect(TelegramSettings.Draft.read(on).printNotices && NtfySettings.Draft.read(on).printNotices,
+                "a pane reads back what it saved")
+        // Names: off unless ticked, per channel.
+        #expect(try await engine.alertNoticeNames(settings: on) == .init(telegram: false, ntfy: false))
+        ntDraft.printNames = true
+        let named: [String: JSONValue] = ["telegram": .object(tg), "ntfy": .object(NtfySettings.form(ntDraft))]
+        #expect(try await engine.alertNoticeNames(settings: named) == .init(telegram: false, ntfy: true))
+        #expect(NtfySettings.Draft.read(named).printNames)
+        // Wired: both seams send, after the Mac's own switch and the ledger;
+        // the phone's copy is the bare one unless the channel took names.
         let notices = MenuCoverageTests.source("PrintNotices.swift")
-        #expect(notices.components(separatedBy: "sendPrintNotice(kind, notice)").count - 1 == 2,
+        #expect(notices.components(separatedBy: "sendPrintNotice(kind, notice,").count - 1 == 2,
                 "the pause watch and the finish seam each send once")
-        #expect(notices.contains("Task { await sendAlert(type: kind.rawValue, title: notice.title, body: notice.body) }"))
+        #expect(notices.contains("await sendAlert(type: kind.rawValue, title: notice.title, body: bare, namedBody: notice.body)"))
+        #expect(MenuCoverageTests.source("Shop.swift").contains("let ntfyBody = names.ntfy ? (namedBody ?? body) : body"))
     }
 
     @Test("a fault already told as Print failed is not sent again on a channel that took it")

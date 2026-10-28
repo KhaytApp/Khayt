@@ -50,6 +50,10 @@ public enum WebSaveRecord {
         var bySource: String?
         for case .object(let o) in rows {
             guard case .string(let id)? = o["id"] else { continue }
+            // A stranger's model bundle said where it came from: a note, not
+            // the shop's own word, so the shop's own save of that page is not
+            // filed into it (`ModelBundle.fill`).
+            if case .bool(true)? = o["sourceFromBundle"] { continue }
             if case .string(let url)? = o["sourceUrl"], WebSave.identity(of: url) == want { return id }
             if bySource == nil, case .string(let s)? = o["source"],
                let typed = WebSave.https(s), WebSave.identity(of: typed) == want { bySource = id }

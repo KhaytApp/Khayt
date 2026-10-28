@@ -83,7 +83,7 @@ struct KhaytCommands: Commands {
             SortMenu().environment(shop).disabled(shop.needsSignIn)
             // Grid or list, and the tile size — `LibraryDisplay`.
             LibraryViewCommands().environment(shop).disabled(shop.needsSignIn)
-            // The inspector's viewer: front, top, side, three-quarters.
+            // The inspector's viewer: iso, front, top, side (⌥⌘1–4).
             ModelViewCommands().environment(shop).disabled(shop.needsSignIn)
             Divider()
             KioskCommand().disabled(shop.needsSignIn)

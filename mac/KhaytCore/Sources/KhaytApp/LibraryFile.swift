@@ -18,6 +18,10 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let updatedAt: String?
     let sourceFile: SourceFile?
     let parsed: Parsed?
+    /// A model bundle's word on time and grams: ANOTHER shop's slice, capped
+    /// and marked `estimate: "bundle"` (`ModelBundle.fill`). Shown as a note,
+    /// never read as `parsed` — the price paths treat `parsed` as measured.
+    let bundleFigures: Parsed?
     let colors: [Colour]?
     let swapCount: Int?
     let thumbFile: String?
