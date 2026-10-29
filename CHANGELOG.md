@@ -8862,6 +8862,20 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.9] - 2026-10-29
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Quote form for your store** (Settings ▸ Online): put an instant-quote form on your own website — a link, a frame or a script. A visitor uploads a model, sees a price from your published quote sheet, and sends it to you as a request with the file. Choose which websites may show it in a frame, and see this month's prices and requests. It appears once Khayt Cloud switches the form on.
+- **Requests from the quote form arrive with the model.** Importing one downloads the file, checks it, files it in your library and points the job at it, and only then clears it from Khayt Cloud. Only models (STL, 3MF, OBJ, STEP, IGES, AMF, PLY) are filed; anything else, or a file that expired after 14 days, is imported without it and the job says so.
+
+### Changed
+
+- Clearing a request from Khayt Cloud now tells the cloud this Mac downloads the file first, so an older app cannot delete a visitor's model unread.
+
 ## [4.0.0-beta.8] - 2026-10-26
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
