@@ -1964,6 +1964,52 @@ function trackShipment(trackingNumber, carrier) {
     }) + (q.reliable === false ? t('intake.instant_quote_rough') : '');
   }
 
+  // The quote form's signed figures as one costed part (`payload.quote`, only
+  // when verified): grams (waste included) and hours are PER PIECE, the qty is
+  // the request's. Costed at this shop's own rates, through the quote sheet's
+  // material and printer preset (settings.lanApi.intakeQuote) when it has them,
+  // so the quote opens at a real cost instead of 0. The price is not set from
+  // the customer's figure: the shop prices it.
+  function intakeQuotePart(p) {
+    const q = p && p.quote;
+    if (!q || q.verified !== true) return null;
+    const grams = +q.grams, hours = +q.hours;
+    if (!(grams > 0) || !(hours > 0) || !Number.isFinite(grams) || !Number.isFinite(hours)) return null;
+    const PR = global.KhaytPrintRates, CC = global.KhaytCalculatorCost;
+    if (!PR || !CC) return null;
+    const cfg = (settings.lanApi && settings.lanApi.intakeQuote) || {};
+    const inv = (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [];
+    const presets = (typeof printers !== 'undefined' && Array.isArray(printers)) ? printers : [];
+    // The material the quote sheet prices with: its spool, net of a reclaimed
+    // tax as lib/public-quote.js reads it, else its flat basis, else unknown
+    // (material at 0 for the shop to pick).
+    const T = global.KhaytTax, SE = global.KhaytSpoolEdit;
+    const reclaimsTax = !!(T && T.profileFromSettings && (T.profileFromSettings(settings).rates || []).length);
+    const item = cfg.filamentId ? inv.find((i) => i && i.id === cfg.filamentId) : null;
+    let spoolCost = 0, spoolWeight = 1000;
+    if (item) {
+      spoolCost = (SE && typeof SE.netCost === 'function' && item.cost != null) ? SE.netCost(item, reclaimsTax) : (+item.cost || 0);
+      spoolWeight = +(item.spoolWeight ?? item.weight) || 1000;
+    } else if (+cfg.spoolCost > 0) {
+      spoolCost = +cfg.spoolCost;
+      spoolWeight = +cfg.spoolWeight || 1000;
+    }
+    const preset = cfg.presetId ? presets.find((x) => x && x.id === cfg.presetId) : null;
+    const part = PR.withRates({
+      id: uid('PRT'),
+      name: p.title || (p.file && p.file.name) || t('intake.requests'),
+      qty: Math.max(1, Math.round(+p.qty || +q.qty || 1)),
+      printWeight: grams, supportWeight: 0, printTime: hours,
+      spoolCost, spoolWeight,
+      filamentId: item ? item.id : '',
+      material: item ? (item.material || '') : '',
+      extraMaterials: [],
+    }, { settings, preset });
+    // A LINE total, as every part's baseCost is (lib/calculator-cost.js).
+    part.baseCost = CC.partTotalCost(part, { inventory: inv, settings });
+    return part;
+  }
+
   async function importIntakeAsQuote(it, c) {
     const p = it.payload || {};
     const now = new Date();
@@ -1995,14 +2041,16 @@ function trackShipment(trackingNumber, carrier) {
       fileGone ? t('intake.file_gone_note', { name: p.file.name }) : '',
       intakeQuoteNote(p.quote),
     ].filter(Boolean).join('\n');
+    const quotedPart = intakeQuotePart(p);
     const order = {
       id: orderId,
       date: localDateStr(now),
       timestamp: now.toISOString(),
       project: p.title || p.description?.slice(0, 60) || t('intake.requests'),
       clientId: clientId || null,
-      material: p.material || '',
-      printTime: 0,
+      material: (quotedPart && quotedPart.material) || p.material || '',
+      // Per piece, as lib/order-new.js sums a job's parts.
+      printTime: quotedPart ? +quotedPart.printTime.toFixed(1) : 0,
       price: 0,
       status: 'quote',
       statusHistory: [{ status: 'quote', at: now.toISOString() }],
@@ -2011,9 +2059,10 @@ function trackShipment(trackingNumber, carrier) {
       notes: notes,
       internalNotes: `↳ ${t('intake.requests')}`,
       attachedFiles,
-      parts: [],
+      parts: quotedPart ? [quotedPart] : [],
       tags: ['portal'],
       quoteSentAt: null,
+      quoteExpiresAt: null,
       quoteVersion: 1,
       quoteRevisions: [],
       source: 'online',

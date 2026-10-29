@@ -122,3 +122,40 @@ test('an unverified quote is not noted', async () => {
   assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote: { price: 1, currency: 'SAR' } } }, CLOUD), true);
   assert.doesNotMatch(global.printLog[0].notes, /instant_quote/);
 });
+
+test('a verified quote opens costed at the shop\'s rates from the per-piece grams and hours, price unset', async () => {
+  stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+  require('../lib/print-rates.js'); require('../lib/calculator-cost.js');
+  Object.assign(global, {
+    inventory: [{ id: 'SP1', material: 'PETG', cost: 100, spoolWeight: 1000 }],
+    printers: [{ id: 'PR1', wearRate: 1, powerDraw: 0, elecRate: 0, prepTime: 0, postTime: 0, laborRate: 0, failureRate: 0 }],
+    settings: { lanApi: { intakeQuote: { filamentId: 'SP1', presetId: 'PR1' } } },
+  });
+  const { importIntakeAsQuote } = require('../renderer/integrations.js');
+  const quote = { price: 65.88, currency: 'SAR', qty: 3, grams: 20, hours: 1.5, verified: true };
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, qty: '3', quote } }, CLOUD), true);
+  const o = global.printLog[0];
+  assert.equal(o.parts.length, 1);
+  const part = o.parts[0];
+  assert.equal(part.qty, 3);
+  assert.equal(part.printWeight, 20);
+  assert.equal(part.printTime, 1.5);
+  assert.equal(part.filamentId, 'SP1');
+  // per piece: 20 g of a 100/1000 g spool = 2, plus 1.5 h at 1/h wear = 1.5 → 3.5; three pieces → 10.5
+  assert.ok(Math.abs(part.baseCost - 10.5) < 1e-9, String(part.baseCost));
+  assert.equal(o.material, 'PETG');
+  assert.equal(o.printTime, 1.5);
+  assert.equal(o.price, 0, 'the customer\'s figure is not forced as the price');
+  assert.equal(o.quoteSentAt, null);
+  assert.equal(o.quoteExpiresAt, null);
+});
+
+test('an unverified or unmeasured quote adds no part', async () => {
+  for (const quote of [{ price: 9, grams: 20, hours: 1.5 }, { price: 9, grams: 0, hours: 1.5, verified: true }, { price: 9, grams: 20, verified: true }]) {
+    stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+    const { importIntakeAsQuote } = require('../renderer/integrations.js');
+    assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote } }, CLOUD), true);
+    assert.deepEqual(global.printLog[0].parts, []);
+    assert.equal(global.printLog[0].printTime, 0);
+  }
+});

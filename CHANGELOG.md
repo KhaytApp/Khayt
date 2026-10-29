@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: an imported quote-form request opens costed, not at 0.** When Khayt Cloud signed the form's figures (`payload.quote.verified`), "Create quote" adds one part: the per-piece grams (waste included) and hours, times the request's quantity, at the shop's own rates. Material and printer rates come from the quote sheet's spool or flat basis and printer preset (`settings.lanApi.intakeQuote`, which the published quote sheet is built from); without them, the shop's default rates are used and material is left at 0. The price stays unset for the shop to decide, and `quoteExpiresAt` is null like `quoteSentAt`. Matches the Mac (#2096).
+
 - **Desktop: an imported quote-form request notes the instant price the customer was shown.** "Create quote" adds a note with Khayt Cloud's signed estimate (`payload.quote`, only when `verified`): price and currency, plus grams and hours, and "rough estimate" when the cloud says it is not reliable. The quote's own price stays 0 for the shop to set, because the form's figure is the published sheet's estimate and is never binding.
 
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
