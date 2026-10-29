@@ -1293,7 +1293,9 @@ import KhaytCore
     @Test("what each customer has been worth, and who has stopped coming back")
     func clientValueTable() async throws {
         let shop = Shop()
-        await shop.load(.sample)
+        // At the anchor, so the book is as written for the fixed `now` below:
+        // loaded at today it shifts forward and drifts away from that date.
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
         let engine = try #require(shop.engine)
         let worth = try await engine.clientValue(
             clients: shop.clientRows, orders: shop.orderRows,
@@ -1371,7 +1373,9 @@ import KhaytCore
     @Test("the quote funnel, both rates and the open ones")
     func quoteFunnelCard() async throws {
         let shop = Shop()
-        await shop.load(.sample)
+        // At the anchor, so the book is as written for the fixed `now` below:
+        // loaded at today it shifts forward and drifts away from that date.
+        await shop.load(.sample, asOf: try #require(SampleBook.anchor))
         let engine = try #require(shop.engine)
         let funnel = try await engine.quoteFunnel(
             orders: shop.orderRows,
