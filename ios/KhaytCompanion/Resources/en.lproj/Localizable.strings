@@ -807,6 +807,7 @@
 "library.plate.n" = "Plate %d";
 "library.calculator" = "Open in the calculator";
 "library.notes" = "Notes from printing it";
+"library.stale" = "This model has a new version the Mac has not measured yet. Price it on the shop Wi-Fi, or use the calculator.";
 "library.not_estimable" = "The Mac can price STL, OBJ, 3MF and G-code models. Use the calculator for this one.";
 "library.needs_mac" = "Pricing from the library needs your Mac on the shop's Wi-Fi, with a Khayt version that has it. The calculator still works.";
 "library.reason.no-file" = "The Mac has this model listed but not its file.";

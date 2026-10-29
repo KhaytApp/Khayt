@@ -28,7 +28,7 @@ enum LibraryCopy {
     static let kept: Set<String> = [
         "id", "rev", "updatedAt", "name", "originalName", "folder", "tags", "category", "material",
         "favorite", "timesPrinted", "lastPrinted", "parsed", "colors", "setups", "consumables",
-        "geometryKey", "testedNotes", "sourceFile",
+        "geometryKey", "testedNotes", "sourceFile", "figuresStaleFor",
     ]
 
     /// Every model the Mac's library shows, slimmed. A model put aside on the
@@ -76,7 +76,10 @@ enum LibraryCopy {
     /// one decoder for both.
     static func item(_ row: JSONValue) -> LibraryItem? {
         guard case .object(let o) = row else { return nil }
-        let parsed: [String: JSONValue] = { if case .object(let p)? = o["parsed"] { return p } else { return [:] } }()
+        // A new version the Mac has not measured yet: its figures and its
+        // shape are the old file's, and the Mac sends none of them (#2077).
+        let stale = figuresStale(row)
+        let parsed: [String: JSONValue] = stale ? [:] : { if case .object(let p)? = o["parsed"] { return p } else { return [:] } }()
         var shaped: [String: JSONValue] = [:]
         for key in ["id", "folder", "category", "tags", "material", "favorite", "timesPrinted", "lastPrinted", "testedNotes"] {
             if let v = o[key] { shaped[key] = v }
@@ -105,9 +108,16 @@ enum LibraryCopy {
         }
         shaped["plates"] = .array(plates)
         let sliced = number(parsed["printTimeMins"]) != nil || number(parsed["filamentGrams"]) != nil
-        shaped["estimable"] = .bool(sliced || mesh(text(o["geometryKey"])) != nil)
+        shaped["estimable"] = .bool(!stale && (sliced || mesh(text(o["geometryKey"])) != nil))
+        if stale { shaped["figuresStale"] = .bool(true) }
         guard let data = try? JSONEncoder().encode(JSONValue.object(shaped)) else { return nil }
         return try? JSONDecoder().decode(LibraryItem.self, from: data)
+    }
+
+    /// `figuresStaleFor`: the new file's hash, until the Mac re-measures it.
+    static func figuresStale(_ row: JSONValue) -> Bool {
+        guard case .object(let o) = row, case .string(let hash)? = o["figuresStaleFor"] else { return false }
+        return !hash.isEmpty
     }
 
     private static func text(_ v: JSONValue?) -> String? { if case .string(let s)? = v { return s } else { return nil } }
@@ -130,7 +140,7 @@ enum LibraryCopy {
 
     static func figures(_ row: JSONValue, plate: Int?, engine: KhaytEngine,
                         settings: [String: JSONValue], orders: [JSONValue]) async -> Figures? {
-        guard case .object(var o) = row else { return nil }
+        guard case .object(var o) = row, !figuresStale(row) else { return nil }
         // One plate: the record as the shared rule reads it, with that plate's
         // own figures in place of the whole file's — the Mac's `modelPart`.
         if let plate {
