@@ -515,6 +515,22 @@ struct QuoteFormImportTests {
         #expect(QuoteFormFile.heldFolder(storeURL: store, requestId: "..").lastPathComponent == "request")
     }
 
+    @Test("a quote-form request is a QUOTE: no invoice number taken")
+    func requestIsAQuote() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let cloud = Cloud(scratch: scratch, body: Self.model, headers: ["X-Content-SHA256": Self.sha(Self.model)])
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal == nil)
+        let job = try #require(try scratch.jobs().first)
+        #expect(Shop.plainString(job["status"]) == "quote")
+        #expect(job["invoiceNum"] == nil || job["invoiceNum"] == .null)
+        #expect(!(Shop.plainString(job["id"]) ?? "").hasPrefix("INV"))
+        guard case .object(let settings)? = try scratch.read()["settings"] else { Issue.record("no settings"); return }
+        #expect(settings["invNumNext"] == .number(1), "the invoice counter must not move")
+    }
+
     @Test("a file object with no name is still a quote-form file")
     func namelessFileIsStillAFile() throws {
         guard case .object(var p) = Self.payload(Self.model), case .object(var f)? = p["file"] else { return }

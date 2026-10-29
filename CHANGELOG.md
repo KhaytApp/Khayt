@@ -8868,6 +8868,15 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.11] - 2026-10-29
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **A quote-form request now arrives as a quote, not an order.** Importing one used to make a numbered job and take the next invoice number, which then could only be cancelled, never deleted. Each request is now an unnumbered quote, as on the desktop app, so the invoice sequence is only used for real orders.
+
 ## [4.0.0-beta.10] - 2026-10-29
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

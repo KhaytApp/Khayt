@@ -356,6 +356,14 @@ extension Shop {
         }
 
         // 4. THE BOOK.
+        //
+        // A visitor's request is a QUOTE, not an order: nothing was agreed and
+        // nothing paid, so it takes no invoice number. As an order it took the
+        // next one (`INV-…`) — a number the shop can then never delete, only
+        // cancel — for every stranger who pressed Send. The desktop has always
+        // imported these as quotes (`importIntakeAsQuote`).
+        var input = input
+        if !paid { input["asQuote"] = .bool(true) }
         var put: PutOnline?
         do {
             try await StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
