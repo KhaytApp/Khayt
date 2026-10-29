@@ -101,6 +101,7 @@ extension Shop {
             return 0
         }
         webStoreAutoProblem = nil
+        noteQuoteRequests(items)
 
         var made = 0
         var changed = false

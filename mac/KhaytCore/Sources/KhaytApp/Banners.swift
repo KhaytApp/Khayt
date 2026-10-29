@@ -42,9 +42,20 @@ struct MoveBanners: View {
                                            ["n": .number(Double(arrived.count))]),
                    symbol: "bag.badge.plus", tint: Khayt.brand) {
                 Button(shop.words.callIt("mac.review") + "\u{2026}") {
-                    shop.showingOnlineOrders = true
+                    shop.openOnlineOrders()
                 }
                 BannerClose(words: shop.words) { shop.webStoreArrived.removeAll() }
+            }
+        }
+        // QUOTE REQUESTS FROM THE WEBSITE, WAITING. Each one's file is kept
+        // 14 days; a request nobody opens is lost quietly, so the window says
+        // how many until the sheet is opened and they are dealt with.
+        if shop.quoteRequestsWaiting > 0, !shop.showingOnlineOrders {
+            Banner(text: shop.words.counting(shop.quoteRequestsWaiting, "mac.qfe_waiting"),
+                   symbol: "doc.text.magnifyingglass", tint: Khayt.brand) {
+                Button(shop.words.callIt("mac.review") + "\u{2026}") {
+                    shop.openOnlineOrders()
+                }
             }
         }
         // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of

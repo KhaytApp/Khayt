@@ -299,6 +299,39 @@ struct OnlineOrderReadingTests {
         #expect(QuoteFormFile.Shown(Self.quoteFormPayload(quote: nil)) == nil)
     }
 
+    @Test("waiting quote requests are counted; the first read is the baseline, later ones are new")
+    func quoteRequestsCounted() async {
+        let shop = await Self.shop()
+        func item(_ id: String, _ source: String = "quote-form") -> CloudIntake.Item {
+            CloudIntake.Item(id: id, payload: .object(["title": .string("Q" + id), "source": .string(source)]),
+                             createdAt: Date())
+        }
+        shop.noteQuoteRequests([item("1"), item("2"), item("3", "salla")])
+        #expect(shop.quoteRequestsWaiting == 2, "a storefront order is not a quote request")
+        #expect(shop.quoteRequestsSeen == ["1", "2"])
+        shop.noteQuoteRequests([item("2"), item("4")])
+        #expect(shop.quoteRequestsWaiting == 2)
+        #expect(shop.quoteRequestsSeen == ["1", "2", "4"], "a new id joins the announced set")
+    }
+
+    @Test("a platform's shared address is flagged as an allowed origin")
+    func sharedPlatformOrigins() {
+        let flagged = QuoteFormEmbed.sharedPlatformOrigins(["https://salla.sa", "https://myshop.com", "https://zid.store"])
+        #expect(flagged == ["https://salla.sa", "https://zid.store"])
+        #expect(QuoteFormEmbed.sharedPlatformOrigins(["https://shop.salla.sa.example"]).isEmpty)
+    }
+
+    @Test("the waiting count reads right in Arabic: one, two, a few, many")
+    func waitingCountsInArabic() async {
+        let shop = await Self.shop()
+        let ar = Words()
+        if let engine = shop.engine { await ar.load("ar", engine: engine) }
+        #expect(ar.counting(1, "mac.qfe_waiting").contains("واحد"))
+        #expect(ar.counting(2, "mac.qfe_waiting").hasPrefix("طلبا"))
+        #expect(ar.counting(3, "mac.qfe_waiting").contains("طلبات"))
+        #expect(shop.words.counting(1, "mac.qfe_files_count") != shop.words.counting(5, "mac.qfe_files_count"))
+    }
+
     @Test("the quote form's limits read in the units the form uses")
     func memorySizes() {
         #expect(Format.memorySize(32 << 20).hasPrefix("32"))

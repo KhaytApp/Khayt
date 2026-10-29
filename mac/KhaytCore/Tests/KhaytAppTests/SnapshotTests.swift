@@ -1809,11 +1809,30 @@ import KhaytCore
         #expect(orders.contains { $0.unmatched > 0 }, "no card draws the unmatched branch")
         #expect(orders.contains { $0.fromShelf > 0 && $0.toPrint > 0 },
                 "no card draws the part-shelf-part-print branch")
+        // A visitor's request from the quote form: its own card (notes,
+        // contact, link, what the form showed), Delete and Import as quote.
+        let request = JSONValue.object([
+            "title": .string("Quote request — bracket.stl"), "source": .string("quote-form"),
+            "name": .string("Sara A."), "contact": .string("sara@example.com"), "qty": .number(2),
+            "description": .string("Two of these in black PETG, please."),
+            "link": .string("https://example.com/models/bracket"),
+            "quote": .object(["price": .number(65.88), "currency": .string("SAR"), "qty": .number(2),
+                              "grams": .number(20), "hours": .number(1.5), "verified": .bool(true)]),
+            "file": .object(["name": .string("bracket.stl"), "bytes": .number(684),
+                             "sha256": .string(String(repeating: "a", count: 64)),
+                             "expiresAt": .string("2026-11-12T16:00:00.000Z")]),
+        ])
+        let requestItem = CloudIntake.Item(id: "planted-qf", payload: request, createdAt: Date())
+        orders.insert(Shop.OnlineOrder(item: requestItem,
+                                       reading: try await Shop.reading(requestItem, products: shop.productRows,
+                                                                       stock: stock, engine: engine)), at: 0)
         shop.onlineOrders = orders
+        shop.onlineMade = ("QUO-2026-0007", "Nora")
+        shop.onlineNotice = shop.words.callIt("mac.qfe_imported_held")
 
         let renderer = SnapshotTests()
         try renderer.render(OnlineOrdersSheet(shop: shop),
                             "29b-online-orders",
-                            size: CGSize(width: SheetMetrics.outerWidth(520), height: 760))
+                            size: CGSize(width: SheetMetrics.outerWidth(520), height: 1000))
     }
 }

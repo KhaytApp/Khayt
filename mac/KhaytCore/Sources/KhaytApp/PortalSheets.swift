@@ -28,6 +28,14 @@ struct CustomerLinkSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 if shop.isPortalPublished(job.id) {
                     Button(shop.words.callIt("mac.portal_copy")) { Task { await copy() } }
+                    // THE QUOTE, TO THE CUSTOMER. A visitor from the website is
+                    // not on the shop's Wi‑Fi; this link works anywhere.
+                    if job.status == "quote" {
+                        Button(shop.words.callIt("mac.qfe_send_whatsapp")) { Task { await sendWhatsApp() } }
+                            .disabled(busy)
+                        Button(shop.words.callIt("mac.qfe_send_email")) { Task { await sendEmail() } }
+                            .disabled(busy)
+                    }
                     if job.status == "quote" {
                         Button(shop.words.callIt("cloud.portal_check")) { Task { await check() } }
                             .disabled(busy)
@@ -96,6 +104,44 @@ struct CustomerLinkSection: View {
         } else {
             said = shop.moveProblem
         }
+    }
+
+    private func quoteMessage(_ link: String) -> String {
+        shop.words.callIt("mac.qfe_send_text", ["shop": .string(shop.shopName), "link": .string(link)])
+    }
+
+    /// WhatsApp's own app, never `wa.me`: the link is the customer's key to
+    /// approve, and a web URL carrying it would sit in a server's log and the
+    /// browser's history (the reason `sendLinkOnWhatsApp` gives).
+    private func sendWhatsApp() async {
+        guard let link = await shop.portalLink(for: job.id) else { return }
+        let chat = await shop.whatsAppRecipient(for: job)
+        guard chat.ok, !chat.digits.isEmpty else { said = shop.words.callIt("mac.qfe_send_no_phone"); return }
+        var unreserved = CharacterSet.alphanumerics
+        unreserved.insert(charactersIn: "-._~")
+        guard let text = quoteMessage(link).addingPercentEncoding(withAllowedCharacters: unreserved),
+              let url = URL(string: "whatsapp://send?phone=" + chat.digits + "&text=" + text),
+              NSWorkspace.shared.urlForApplication(toOpen: url) != nil else {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(quoteMessage(link), forType: .string)
+            said = shop.words.callIt("mac.qfe_send_no_app")
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func sendEmail() async {
+        guard let link = await shop.portalLink(for: job.id) else { return }
+        let email = shop.clientRecord(for: job)?.client.email.trimmingCharacters(in: .whitespaces) ?? ""
+        guard email.contains("@") else { said = shop.words.callIt("mac.qfe_send_no_email"); return }
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let subject = shop.words.callIt("mac.qfe_send_subject", ["shop": .string(shop.shopName)])
+        guard let s = subject.addingPercentEncoding(withAllowedCharacters: allowed),
+              let b = quoteMessage(link).addingPercentEncoding(withAllowedCharacters: allowed),
+              let to = email.addingPercentEncoding(withAllowedCharacters: allowed.union(CharacterSet(charactersIn: "@+"))),
+              let url = URL(string: "mailto:" + to + "?subject=" + s + "&body=" + b) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func copy() async {

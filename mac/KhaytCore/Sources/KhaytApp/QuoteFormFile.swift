@@ -512,9 +512,10 @@ extension Shop {
             webStoreArrived.append(WebStoreArrival(
                 intakeId: order.id, reference: order.item.reference, jobId: jobId,
                 customer: order.customer, automatic: false))
-            if result.expired { onlineProblem = words.callIt("mac.qfe_imported_expired") }
+            onlineMade = (jobId, order.customer)
+            if result.expired { onlineNotice = words.callIt("mac.qfe_imported_expired") }
             if result.notTaken {
-                onlineProblem = words.callIt(result.heldAt == nil ? "mac.qfe_imported_not_taken" : "mac.qfe_imported_held")
+                onlineNotice = words.callIt(result.heldAt == nil ? "mac.qfe_imported_not_taken" : "mac.qfe_imported_held")
             }
         case .alreadyThere?:
             onlineProblem = words.callIt("mac.online_already_recorded")

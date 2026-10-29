@@ -86,7 +86,26 @@ struct QuoteFormEmbedSection: View {
     // MARK: - The form, as the cloud has it
 
     @ViewBuilder private func shown(_ state: QuoteFormEmbed.State) -> some View {
+        // SAVES ITSELF. Flipped and left, it looked on and was not.
         Toggle(words.callIt("mac.qfe_enable"), isOn: $enabled).disabled(!canChange || busy)
+            .onChange(of: enabled) { _, now in
+                if now != state.enabled, canChange { Task { await save() } }
+            }
+        // WHERE REQUESTS ARRIVE, and the form as a visitor sees it.
+        HStack {
+            Text(words.callIt("mac.qfe_where")).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(words.callIt("mac.qfe_open_requests")) {
+                shop.openOnlineOrders()
+                NSApp.keyWindow?.performClose(nil)
+            }
+            .controlSize(.small)
+            if let page = state.links?.page, let url = URL(string: QuoteFormEmbed.page(page, lang: lang, theme: theme)) {
+                Button(words.callIt("mac.qfe_preview")) { NSWorkspace.shared.open(url) }
+                    .controlSize(.small)
+            }
+        }
 
         // ── WHAT IT CAN AND CANNOT DO RIGHT NOW ─────────────────────────
         if state.priceAvailable == false {
@@ -136,6 +155,14 @@ struct QuoteFormEmbedSection: View {
             Text(words.callIt("mac.qfe_origins_hint", ["n": .number(Double(QuoteFormEmbed.maxOrigins))]))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // A PLATFORM'S OWN ADDRESS IS EVERY STORE ON IT. Allowing it lets
+            // any Salla or Zid store frame this shop's form.
+            ForEach(QuoteFormEmbed.sharedPlatformOrigins(QuoteFormEmbed.tidy(originsText.components(separatedBy: .newlines))), id: \.self) { origin in
+                Label(words.callIt("mac.qfe_origins_shared", ["origin": .string(origin)]),
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         if canChange {
             HStack {
@@ -218,7 +245,7 @@ struct QuoteFormEmbedSection: View {
         var parts: [String] = []
         if let count = f.count {
             parts.append(f.maxCount.map { words.callIt("mac.qfe_files_count_of", ["n": .number(Double(count)), "max": .number(Double($0))]) }
-                         ?? words.callIt("mac.qfe_files_count", ["n": .number(Double(count))]))
+                         ?? words.counting(count, "mac.qfe_files_count"))
         }
         if let bytes = f.bytes {
             // In the units the form itself says ("up to 32 MB" is 32 MiB),

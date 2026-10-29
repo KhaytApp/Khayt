@@ -29,6 +29,24 @@ struct OnlineOrdersSheet: View {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // GOOD NEWS IS NOT A WARNING: what an import did, and the quote it
+            // made — the card it came from has just left the list.
+            if let made = shop.onlineMade {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle").foregroundStyle(Khayt.done)
+                    Text(shop.words.callIt("mac.qfe_made", [
+                        "job": .string(Figure.isolated(made.jobId)),
+                        "name": .string(made.customer.isEmpty ? "—" : made.customer)]))
+                        .font(.caption)
+                    Spacer()
+                    Button(shop.words.callIt("mac.qfe_open_job")) { shop.openOnlineMade() }
+                        .controlSize(.small)
+                }
+            }
+            if let notice = shop.onlineNotice {
+                Text(notice).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if shop.onlineBusy && shop.onlineOrders.isEmpty {
                 ProgressView().controlSize(.small)
@@ -120,6 +138,7 @@ private struct WebStoreJobRow: View {
 private struct OnlineOrderCard: View {
     @Bindable var shop: Shop
     let order: Shop.OnlineOrder
+    @State private var confirmingDelete = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -153,6 +172,9 @@ private struct OnlineOrderCard: View {
             // than folded into the total, because a deduction is invisible
             // once made — the number it leaves looks exactly like a number
             // somebody counted.
+            if order.item.isQuoteForm {
+                QuoteRequestDetails(shop: shop, order: order)
+            } else {
             ForEach(order.lines) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     // ISOLATED, because `×` is a neutral character and a
@@ -174,6 +196,7 @@ private struct OnlineOrderCard: View {
                         .padding(.leading, 36)
                 }
             }
+            }
 
             // WHY THIS ONE IS WAITING. A paid web-store order becomes a job by
             // itself; anything still here was left for a person on purpose,
@@ -192,12 +215,29 @@ private struct OnlineOrderCard: View {
             // sale" and "2 off the shelf" on the same pixels, both unreadable.
             // Nothing in the source says so — it took the photograph.
             HStack {
+                if order.item.isQuoteForm {
+                    Button(shop.words.callIt("mac.qfe_delete"), role: .destructive) { confirmingDelete = true }
+                        .disabled(shop.onlineBusy || !shop.canMoveJobs)
+                        .controlSize(.small)
+                }
                 Spacer()
                 record
             }
             .padding(.top, 2)
         }
         .padding(.vertical, 6)
+        .confirmationDialog(
+            shop.words.callIt("mac.qfe_delete_q", ["name": .string(order.customer.isEmpty ? order.title : order.customer)]),
+            isPresented: $confirmingDelete, titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.qfe_delete_confirm"), role: .destructive) {
+                Task { await shop.deleteOnlineRequest(order) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(order.item.file.map { shop.words.callIt("mac.qfe_delete_why_file", ["file": .string($0.name)]) }
+                 ?? shop.words.callIt("mac.qfe_delete_why"))
+        }
     }
 
     /// Why this order was not made into a job by itself, as a key — nil for a
@@ -239,13 +279,52 @@ private struct OnlineOrderCard: View {
     /// one with printing left in it goes into the queue. Calling both "Import"
     /// would leave a shop to work out which happened by looking afterwards.
     @ViewBuilder private var record: some View {
-        Button(order.allFromShelf
+        Button(order.item.isQuoteForm ? shop.words.callIt("mac.qfe_import")
+               : order.allFromShelf
                ? shop.words.callIt("mac.online_record_sale")
                : shop.words.callIt("mac.online_add_to_queue")) {
             Task { await shop.recordOnlineOrder(order) }
         }
         .disabled(shop.onlineBusy || !shop.canMoveJobs)
         .controlSize(.small)
+    }
+}
+
+/// What a quote-form request needs before it is imported: how many, the
+/// visitor's words, how to reach them, their link, and what the form showed.
+/// A storefront order's line-by-line shelf reading means nothing here — a
+/// custom model is never "in your catalogue".
+private struct QuoteRequestDetails: View {
+    let shop: Shop
+    let order: Shop.OnlineOrder
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let qty = order.lines.first?.qty, qty > 1 {
+                Text(shop.words.callIt("mac.qfe_qty", ["n": .number(Double(qty))])).font(.caption)
+            }
+            if let notes = order.item.text("description"), !notes.isEmpty {
+                // The visitor's own words, shown as sent.
+                Text(verbatim: notes).font(.callout).lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let contact = order.item.text("contact"), !contact.isEmpty {
+                Label { Text(verbatim: contact).textSelection(.enabled) } icon: { Image(systemName: "person") }
+                    .font(.caption).foregroundStyle(.secondary)
+                    .environment(\.layoutDirection, .leftToRight)
+            }
+            if let link = order.item.text("link"), let url = URL(string: link),
+               ["https", "http"].contains(url.scheme?.lowercased() ?? "") {
+                Link(destination: url) {
+                    Label { Text(verbatim: link).lineLimit(1).truncationMode(.middle) } icon: { Image(systemName: "link") }
+                }
+                .font(.caption)
+            }
+            if let shown = QuoteFormFile.Shown(order.item.payload) {
+                Text(shown.note(shop.words)).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 

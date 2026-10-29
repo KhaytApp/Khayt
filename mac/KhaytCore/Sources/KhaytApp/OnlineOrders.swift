@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 import KhaytCore
 
 /// The orders a storefront has already sent, and what the shelf can answer.
@@ -154,6 +155,7 @@ extension Shop {
                                                        stock: stock, engine: engine))
             }
             onlineOrders = read
+            noteQuoteRequests(items)
         } catch {
             onlineOrders = []
             onlineProblem = (error as? LocalizedError)?.errorDescription
@@ -238,6 +240,8 @@ extension Shop {
         guard permitted("orders", "create") else { return }
         guard case .store = source else { return }
         onlineProblem = nil
+        onlineNotice = nil
+        onlineMade = nil
         onlineBusy = true
         defer { onlineBusy = false }
 
@@ -263,6 +267,7 @@ extension Shop {
             webStoreArrived.append(WebStoreArrival(
                 intakeId: order.id, reference: order.item.reference, jobId: jobId,
                 customer: order.customer, automatic: false))
+            if order.item.isQuoteForm { onlineMade = (jobId, order.customer) }
         }
         if let problem = await drainOnlineOrder(order, fetch: fetch) {
             onlineProblem = problem
@@ -275,6 +280,73 @@ extension Shop {
     ///
     /// Only after the write — for an order already in the book, this is the
     /// step that failed last time.
+    /// Delete a request without importing it — spam, or one the shop will
+    /// not take. The cloud deletes its file with it (the privacy page says
+    /// so). Asked first by the sheet, which names the request and the file.
+    func deleteOnlineRequest(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async {
+        // lock: asks — `permitted` below; nothing is written to the book.
+        guard permitted("orders", "create") else { return }
+        onlineProblem = nil
+        onlineNotice = nil
+        onlineMade = nil
+        onlineBusy = true
+        defer { onlineBusy = false }
+        if let problem = await drainOnlineOrder(order, fetch: fetch) {
+            onlineProblem = problem
+        } else {
+            onlineNotice = words.callIt("mac.qfe_deleted")
+            quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count
+        }
+    }
+
+    /// The jobs list, on the quote an import just made.
+    func openOnlineMade() {
+        guard let made = onlineMade else { return }
+        showingOnlineOrders = false
+        shelf = .jobs(nil)
+        selectJobs([made.jobId])
+    }
+
+    /// The Online orders sheet, from anywhere: it hangs off the catalogue.
+    func openOnlineOrders() {
+        shelf = .catalogue
+        showingOnlineOrders = true
+    }
+
+    /// Count the waiting quote-form requests and announce the new ones.
+    ///
+    /// The first read only sets the baseline — a launch is not twenty
+    /// notifications for requests the banner already counts.
+    func noteQuoteRequests(_ items: [CloudIntake.Item]) {
+        let waiting = items.filter(\.isQuoteForm)
+        quoteRequestsWaiting = waiting.count
+        let ids = Set(waiting.map(\.id))
+        guard let seen = quoteRequestsSeen else { quoteRequestsSeen = ids; return }
+        let fresh = waiting.filter { !seen.contains($0.id) }
+        quoteRequestsSeen = seen.union(ids)
+        guard !fresh.isEmpty, PrinterNotice.canDeliver else { return }
+        let title = words.callIt("mac.qfe_notify_title")
+        let bodies = fresh.map { item in
+            words.callIt("mac.qfe_notify_body", ["name": .string(item.customer.isEmpty ? "—" : item.customer),
+                                                 "title": .string(item.title)])
+        }
+        Task { await Self.notify(title: title, bodies: bodies, ids: fresh.map(\.id)) }
+    }
+
+    nonisolated static func notify(title: String, bodies: [String], ids: [String]) async {
+        let centre = UNUserNotificationCenter.current()
+        _ = try? await centre.requestAuthorization(options: [.alert, .sound])
+        for (body, id) in zip(bodies, ids) {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            content.threadIdentifier = "quote-requests"
+            try? await centre.add(UNNotificationRequest(identifier: "quote-request:" + id,
+                                                        content: content, trigger: nil))
+        }
+    }
+
     func drainOnlineOrder(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async -> String? {
         guard let build = source.build else { return nil }
         do {
