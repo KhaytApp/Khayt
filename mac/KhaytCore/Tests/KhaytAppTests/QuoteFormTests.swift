@@ -455,6 +455,55 @@ struct QuoteFormImportTests {
         #expect(try scratch.libraryRecords().isEmpty)
     }
 
+    static func renamed(_ payload: JSONValue, to name: String) -> JSONValue {
+        guard case .object(var p) = payload, case .object(var f)? = p["file"] else { return payload }
+        f["name"] = .string(name); p["file"] = .object(f)
+        return .object(p)
+    }
+
+    @Test("a machine file from a visitor is never filed: imported without it, noted, then drained")
+    func machineFileNotTaken() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let gcode = Data("G28\nM104 S300\nM500\n".utf8)
+        let cloud = Cloud(scratch: scratch, body: gcode, headers: ["X-Content-SHA256": Self.sha(gcode)])
+        let result = try await Self.run(Self.renamed(Self.payload(gcode), to: "part.gcode"),
+                                        cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal == nil)
+        #expect(result.notTaken)
+        #expect(result.drained)
+        #expect(result.printFileId == nil)
+        #expect(try scratch.libraryRecords().isEmpty)
+        let job = try #require(try scratch.jobs().first)
+        guard case .object(let facts)? = job["quoteFile"] else { Issue.record("no quoteFile"); return }
+        #expect(facts["notTaken"] == .bool(true))
+        #expect(facts["printFileId"] == nil)
+    }
+
+    @Test("a file object with no name is still a quote-form file")
+    func namelessFileIsStillAFile() throws {
+        guard case .object(var p) = Self.payload(Self.model), case .object(var f)? = p["file"] else { return }
+        f["name"] = nil; p["file"] = .object(f)
+        let meta = try #require(QuoteFormFile.Meta(.object(p)))
+        #expect(meta.safeName == "model")
+    }
+
+    @Test("a long name is bounded in UTF-8 bytes, keeping its extension")
+    func longNameBoundedInBytes() {
+        let meta = QuoteFormFile.Meta(name: String(repeating: "👨‍👩‍👧", count: 120) + ".stl", bytes: 1, sha256: "")
+        #expect(meta.safeName.utf8.count <= 200)
+        #expect(meta.safeName.hasSuffix(".stl"))
+    }
+
+    @Test("PinWork carries the inflate budget across the Dispatch hop")
+    func pinWorkCarriesBudget() async {
+        let seen = await Zip.$inflateBudget.withValue(1234) { await PinWork.run { Zip.inflateBudget } }
+        #expect(seen == 1234)
+        let none = await PinWork.run { Zip.inflateBudget }
+        #expect(none == nil)
+    }
+
     @Test("404 no-route on the file route: the feature is off — nothing written, nothing drained")
     func noRouteStaysQueued() async throws {
         let engine = try KhaytEngine()
@@ -528,7 +577,7 @@ struct QuoteFormImportTests {
         #expect(name(".hidden.stl") == "hidden.stl")
         #expect(name("a:b\u{0}.stl") == "ab.stl")
         #expect(name("/") == "model")
-        #expect(name(String(repeating: "x", count: 300) + ".3mf").count <= 120)
+        #expect(name(String(repeating: "x", count: 300) + ".3mf").utf8.count <= 200)
     }
 
     @Test("the payload's file is read; an intake row shows its name, size and expiry")
@@ -583,5 +632,16 @@ struct IntakeFileCapableTests {
         } catch CloudIntake.Failure.refused(let code, _) {
             #expect(code == 409)
         } catch { Issue.record("expected refused, got \(error)") }
+    }
+}
+
+struct QuoteFormLinksTests {
+    @Test("links that are not https are dropped, not shown or copied")
+    func linksMustBeHttps() throws {
+        let json = #"{"enabled":true,"origins":[],"links":{"page":"https://cloud.example/q/s","frame":"http://evil.example/f","script":"javascript:alert(1)"}}"#
+        let state = try JSONDecoder().decode(QuoteFormEmbed.State.self, from: Data(json.utf8))
+        #expect(state.links?.page == "https://cloud.example/q/s")
+        #expect(state.links?.frame == nil)
+        #expect(state.links?.script == nil)
     }
 }

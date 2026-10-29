@@ -530,9 +530,15 @@ extension Shop {
 /// dispatch queue and a continuation hold no pool thread while they wait —
 /// the pattern memory calls swift-pool-starvation, and `Mesh3MFTests.offMain`.
 enum PinWork {
+    /// A Dispatch queue does not carry task-locals, so the one that bounds
+    /// reading a stranger's file (`Zip.inflateBudget`) is carried by hand —
+    /// otherwise a budget set around an import never reaches the unzip.
     static func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await withCheckedContinuation { done in
-            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: work()) }
+        let budget = Zip.inflateBudget
+        return await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async {
+                done.resume(returning: Zip.$inflateBudget.withValue(budget) { work() })
+            }
         }
     }
 }

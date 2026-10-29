@@ -27,6 +27,19 @@ import KhaytCore
 /// written and nothing is drained.
 enum QuoteFormFile {
 
+    /// What the quote form may put in the library: meshes and CAD a shop
+    /// slices itself. A machine file (G-code and the rest) from an anonymous
+    /// visitor is never filed where a job could send it to a printer.
+    static let modelKinds: Set<String> = ["stl", "3mf", "obj", "step", "stp", "iges", "igs", "amf", "ply"]
+
+    /// The most a quote-form file can be (khayt-cloud `QUOTE_MAX_BYTES`
+    /// default), used when the request does not say its size.
+    static let maxBytes = 32 << 20
+
+    /// How far a visitor's 3MF may inflate while it is read — the LAN
+    /// server's rule for a stranger's upload.
+    static func inflateBudget(_ bytes: Int) -> Int { min(max(bytes, 1) * 250, LanServer.maxInflate) }
+
     /// `payload.file`, as the cloud files it.
     struct Meta: Equatable, Sendable {
         let name: String
@@ -35,12 +48,13 @@ enum QuoteFormFile {
         let type: String
         let expiresAt: Date?
 
-        /// Nil when the payload carries no file object with a name.
+        /// Nil when the payload carries no file object. A file object with no
+        /// name is still a file: gating on the name would let the automatic
+        /// pass import and drain it, and the drain deletes the file.
         init?(_ payload: JSONValue) {
             guard case .object(let fields) = payload,
-                  case .object(let f)? = fields["file"],
-                  case .string(let name)? = f["name"], !name.isEmpty else { return nil }
-            self.name = name
+                  case .object(let f)? = fields["file"] else { return nil }
+            if case .string(let name)? = f["name"], !name.isEmpty { self.name = name } else { self.name = "model" }
             if case .number(let n)? = f["bytes"], n.isFinite, n >= 0, n < 1e15 { bytes = Int(n) } else { bytes = -1 }
             if case .string(let s)? = f["sha256"] { sha256 = s.lowercased() } else { sha256 = "" }
             if case .string(let s)? = f["type"] { type = s } else { type = "" }
@@ -63,9 +77,12 @@ enum QuoteFormFile {
             }.map(Character.init))
             leaf = leaf.trimmingCharacters(in: .whitespaces)
             while leaf.hasPrefix(".") { leaf.removeFirst() }
-            if leaf.count > 120 {
-                let ext = (leaf as NSString).pathExtension
-                let stem = String((leaf as NSString).deletingPathExtension.prefix(100))
+            // Bounded in UTF-8 bytes, which is what NAME_MAX (255) counts:
+            // 120 emoji are 120 Characters and far more bytes.
+            if leaf.utf8.count > 200 {
+                let ext = String((leaf as NSString).pathExtension.prefix(12))
+                var stem = (leaf as NSString).deletingPathExtension
+                while stem.utf8.count > 180 { stem.removeLast() }
                 leaf = ext.isEmpty ? stem : stem + "." + ext
             }
             return leaf.isEmpty ? "model" : leaf
@@ -120,6 +137,9 @@ enum QuoteFormFile {
             /// The cloud had already deleted it. `note` goes on the job, in
             /// the shop's words, so nobody goes looking for a model.
             case expired(note: String)
+            /// Not a kind the quote form files (a machine file, an empty
+            /// one): imported without it, the note says why.
+            case notTaken(note: String)
         }
         let meta: Meta
         let state: State
@@ -129,7 +149,7 @@ enum QuoteFormFile {
     /// the job's parts at it. Called inside the write (`putOnlineOrder`).
     static func stamp(_ attach: Attach, on record: inout [String: JSONValue]) {
         var facts: [String: JSONValue] = [
-            "name": .string(attach.meta.name),
+            "name": .string(attach.meta.safeName),
             "bytes": .number(Double(max(0, attach.meta.bytes))),
             "sha256": .string(attach.meta.sha256),
         ]
@@ -150,6 +170,11 @@ enum QuoteFormFile {
                 }
                 record["parts"] = .array(parts)
             }
+        case .notTaken(let note):
+            facts["expired"] = .bool(false)
+            facts["notTaken"] = .bool(true)
+            let notes = Shop.plainString(record["notes"]) ?? ""
+            record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
         case .expired(let note):
             facts["expired"] = .bool(true)
             let notes = Shop.plainString(record["notes"]) ?? ""
@@ -179,6 +204,8 @@ extension Shop {
         var refusal: QuoteFormFile.Refusal?
         /// The file was gone (404 `no-file`): imported without it.
         var expired = false
+        /// The file was not a kind the quote form files: imported without it.
+        var notTaken = false
         /// The library model the job points at, when the file was filed.
         var printFileId: String?
         var drained = false
@@ -198,6 +225,7 @@ extension Shop {
                                 storeURL: URL, libraryRoot: URL?,
                                 existingModel: (String) -> String?,
                                 analyseRisk: Bool = false,
+                                notTakenNote: String = "",
                                 expiredNote: String,
                                 owns: @escaping @Sendable () -> Bool,
                                 whoHasIt: @escaping @Sendable () -> String?,
@@ -233,6 +261,12 @@ extension Shop {
                 result.refusal = refusal
                 return result
             }
+            let kind = (meta.safeName as NSString).pathExtension.lowercased()
+            if data.isEmpty || !QuoteFormFile.modelKinds.contains(kind) {
+                result.notTaken = true
+                attach = .init(meta: meta, state: .notTaken(note: notTakenNote))
+                break
+            }
             // The same bytes already in the library: the job points at that
             // model rather than adding a second copy — what any import does.
             if let existing = existingModel(meta.sha256) {
@@ -257,9 +291,13 @@ extension Shop {
                 return result
             }
             do {
-                let made = try await LibraryImport.prepare(
-                    file, libraryRoot: libraryRoot, knownHashes: [], nameOfExisting: { _ in nil },
-                    engine: engine, analyseRisk: analyseRisk)
+                // A stranger's 3MF is read with the LAN server's inflate
+                // budget, so a zip bomb stops early (PinWork carries it).
+                let made = try await Zip.$inflateBudget.withValue(QuoteFormFile.inflateBudget(data.count)) {
+                    try await LibraryImport.prepare(
+                        file, libraryRoot: libraryRoot, knownHashes: [], nameOfExisting: { _ in nil },
+                        engine: engine, analyseRisk: analyseRisk)
+                }
                 preparedDir = made.dir
                 let id = made.added.id
                 attach = .init(meta: meta, state: .filed(printFileId: id, newRecord: made.record))
@@ -335,10 +373,11 @@ extension Shop {
             libraryRoot: libraryRoots.map { URL(fileURLWithPath: $0.primary) },
             existingModel: { hash in files.first { $0.contentHash == hash }?.id },
             analyseRisk: analysesRiskAtImport,
-            expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.name)]),
+            notTakenNote: words.callIt("mac.qfe_file_not_taken_note", ["name": .string(meta.safeName)]),
+            expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.safeName)]),
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: meta.bytes, fetch: network) },
+            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: meta.bytes >= 0 ? meta.bytes : QuoteFormFile.maxBytes, fetch: network) },
             drain: { try await CloudIntake.drain(connection, token: token, id: order.id, fetch: network) })
 
         if let refusal = result.refusal {
@@ -352,6 +391,7 @@ extension Shop {
                 intakeId: order.id, reference: order.item.reference, jobId: jobId,
                 customer: order.customer, automatic: false))
             if result.expired { onlineProblem = words.callIt("mac.qfe_imported_expired") }
+            if result.notTaken { onlineProblem = words.callIt("mac.qfe_imported_not_taken") }
         case .alreadyThere?:
             onlineProblem = words.callIt("mac.online_already_recorded")
         case nil:

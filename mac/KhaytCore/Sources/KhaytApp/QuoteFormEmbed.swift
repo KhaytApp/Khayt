@@ -64,7 +64,15 @@ enum QuoteFormEmbed {
             keepsFiles = try? c.decodeIfPresent(Bool.self, forKey: .keepsFiles)
             files = try? c.decodeIfPresent(Files.self, forKey: .files)
             month = try? c.decodeIfPresent(Month.self, forKey: .month)
-            links = try? c.decodeIfPresent(Links.self, forKey: .links)
+            // Shown and copied into a shop's website as given, so only https.
+            if var l = try? c.decodeIfPresent(Links.self, forKey: .links) {
+                func safe(_ s: String?) -> String? {
+                    guard let s, let u = URL(string: s), u.scheme == "https", u.host != nil else { return nil }
+                    return s
+                }
+                l.page = safe(l.page); l.frame = safe(l.frame); l.script = safe(l.script)
+                links = l
+            } else { links = nil }
         }
         private enum Key: String, CodingKey {
             case enabled, origins, updatedAt, priceAvailable, keepsFiles, files, month, links
