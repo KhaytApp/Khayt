@@ -167,10 +167,37 @@ extension Shop {
                             engine: KhaytEngine) async throws -> OnlineOrder {
         var order = OnlineOrder(
             item: item,
-            reading: try await engine.shelfSaleReading(payload: item.payload,
-                                                      products: products, stock: stock))
+            reading: try await reading(item, products: products, stock: stock, engine: engine))
         order.decision = try? await engine.webStoreDecision(item.payload)
         return order
+    }
+
+    /// The order read against the shelf — except a quote-form request.
+    ///
+    /// ── A VISITOR'S REQUEST NEVER TOUCHES THE SHELF ──────────────────────
+    ///
+    /// The shelf reading turns every line of the description that starts
+    /// with `-`, `•` or `*` into an order line and matches it by name — and
+    /// trusts a `productId` in the payload. A visitor who wrote "- Phone
+    /// stand" (or sent a real product id) had a stocked piece deducted and the
+    /// request recorded as a COMPLETED job nobody priced. A quote-form request
+    /// is one line, what the visitor asked for, to print: never a shelf sale.
+    static func reading(_ item: CloudIntake.Item, products: [JSONValue], stock: JSONValue,
+                        engine: KhaytEngine) async throws -> JSONValue {
+        guard item.isQuoteForm else {
+            return try await engine.shelfSaleReading(payload: item.payload, products: products, stock: stock)
+        }
+        var qty = 1.0
+        if case .object(let p) = item.payload, case .number(let n)? = p["qty"], n.isFinite {
+            qty = min(1000, max(1, n.rounded(.down)))
+        }
+        let name = item.title.isEmpty ? "Quote request" : item.title
+        return .object([
+            "lines": .array([.object(["name": .string(name), "qty": .number(qty),
+                                      "onShelf": .number(0), "fromShelf": .number(0), "toPrint": .number(qty)])]),
+            "fromShelf": .number(0), "toPrint": .number(qty), "unmatched": .number(1),
+            "allFromShelf": .bool(false),
+        ])
     }
 
     /// `settings.storefront.stockQty`, or an empty map.
@@ -347,10 +374,11 @@ extension Shop {
         // cannot cover now goes to a machine.
         let fresh = OnlineOrder(
             item: order.item,
-            reading: try await engine.shelfSaleReading(
-                payload: order.item.payload, products: Self.rows(root, "products"),
-                stock: Self.stockCounts(Self.settings(root))))
-        let deductions = Self.deductions(try await engine.shelfSaleEffects(fresh.reading, at: now))
+            reading: try await Self.reading(
+                order.item, products: Self.rows(root, "products"),
+                stock: Self.stockCounts(Self.settings(root)), engine: engine))
+        let deductions = order.item.isQuoteForm ? []
+            : Self.deductions(try await engine.shelfSaleEffects(fresh.reading, at: now))
         let allFromShelf = fresh.allFromShelf
 
         // ── THE CUSTOMER ───────────────────────────────────────────────────
@@ -386,10 +414,25 @@ extension Shop {
             consumables: rows(root, "consumables"))
         guard case .object(var record) = out.order,
               case .string(let jobId)? = record["id"] else {
-            return PutOnline(recorded: .alreadyThere)
+            // NOT "already there": that answer lets the caller drain, which
+            // deletes the request (and a quote-form file) with nothing saved.
+            throw OnlineWriteFailure("The job could not be made from this request.")
         }
-        // Which queue item this came from, so a second pass finds it.
+        // Which queue item this came from, so a second pass finds it — and
+        // when the cloud filed it, so a queue that hands out an old id again
+        // (a store restarted without its counter) is not mistaken for it.
         record["intakeId"] = .string(order.id)
+        if let at = order.item.createdAt { record["intakeAt"] = .string(StoreWriter.iso(at)) }
+        // ── A REQUEST NOBODY HAS ANSWERED IS NOT A SENT QUOTE ───────────
+        //
+        // `newOrder` dates a new quote as sent today and sets it to expire,
+        // which starts the follow-up and expiry clocks (`lib/quote-followup.js`
+        // reads `quoteExpiresAt`) on a request the shop has not replied to.
+        // On every path, with a file or without. The desktop does the same.
+        if order.item.isQuoteForm, Shop.plainString(record["status"]) == "quote" {
+            record["quoteSentAt"] = .null
+            record["quoteExpiresAt"] = .null
+        }
         // AND WHICH PLATFORM ORDER. `lib/order-new.js` builds the record from
         // a fixed list of fields and keeps neither `source` nor
         // `sourceOrderId`, so until this they were handed in and dropped: the
@@ -508,9 +551,12 @@ extension Shop {
                                                       sourceOrderId: order.item.reference)) == true {
             return true
         }
+        let filed = order.item.createdAt.map(StoreWriter.iso)
         return orders.contains { row in
-            guard case .object(let o) = row, case .string(let id)? = o["intakeId"] else { return false }
-            return id == order.id
+            guard case .object(let o) = row, case .string(let id)? = o["intakeId"], id == order.id else { return false }
+            // Same id, different filing time: a new request under a reused id.
+            if let filed, case .string(let had)? = o["intakeAt"], had != filed { return false }
+            return true
         }
     }
 
@@ -630,7 +676,7 @@ extension Shop {
                 // model: grams and hours per piece. Costed here at THIS shop's
                 // rates, so the quote opens at a real figure rather than zero;
                 // what the visitor was shown goes in the notes beside it.
-                if let shown, order.lines.count == 1, shown.grams > 0, shown.hours > 0 {
+                if let shown, shown.grams > 0, shown.hours > 0 {
                     unpriced.grams = Money.fieldValue(shown.grams)
                     unpriced.hours = Money.fieldValue(shown.hours)
                     if let costed = await costedPart(spoolId: nil, grams: shown.grams, hours: shown.hours,
@@ -711,7 +757,19 @@ extension Shop {
         let chosen = order.lines.filter { !$0.options.isEmpty }
             .map { "\($0.name) × \($0.qty) — \($0.optionText)" }
         let shownNote = shown.map { $0.note(words) } ?? ""
-        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen + [shownNote])
+        // The visitor's link (the form asks for one when it could not keep the
+        // file — it can be the only copy) and how to reach them.
+        var reach: [String] = []
+        if order.item.isQuoteForm {
+            if let link = order.item.text("link"), let url = URL(string: link),
+               url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" {
+                reach.append(words.callIt("mac.qfe_note_link", ["link": .string(link)]))
+            }
+            if let contact = order.item.text("contact"), !contact.isEmpty {
+                reach.append(words.callIt("mac.qfe_note_contact", ["contact": .string(contact)]))
+            }
+        }
+        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen + reach + [shownNote])
             .filter { !$0.isEmpty }.joined(separator: "\n"))
         // The platform's own reference, structured rather than only quoted in
         // the notes — it is the identity a retried delivery shares with its

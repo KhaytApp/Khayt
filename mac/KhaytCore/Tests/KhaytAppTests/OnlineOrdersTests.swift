@@ -239,7 +239,7 @@ struct OnlineOrderReadingTests {
         var p: [String: JSONValue] = [
             "title": .string("Quote request — cube.stl"), "source": .string("quote-form"),
             "name": .string("Sara"), "contact": .string("sara@example.com"), "qty": .number(1),
-            "description": .string("Please print this"),
+            "description": .string("Please print this"), "link": .string("https://example.com/m/42"),
         ]
         if let quote { p["quote"] = .object(quote) }
         return .object(p)
@@ -267,6 +267,7 @@ struct OnlineOrderReadingTests {
         let notes = Shop.plainString(verified["notes"]) ?? ""
         #expect(notes.contains("Please print this"))
         #expect(notes.contains("65.88 SAR"), "the shop sees what the visitor was shown")
+        #expect(notes.contains("sara@example.com"), "and how to reach them")
         guard case .array(let parts)? = verified["parts"], case .object(let part)? = parts.first else {
             Issue.record("no part"); return
         }
@@ -279,6 +280,7 @@ struct OnlineOrderReadingTests {
         let unsigned = try await input(claimed)
         #expect(unsigned["asQuote"] == .bool(true))
         #expect(!(Shop.plainString(unsigned["notes"]) ?? "").contains("65.88"))
+        #expect((Shop.plainString(unsigned["notes"]) ?? "").contains("https://example.com/m/42"), "the visitor's link is kept")
     }
 
     @Test("the signed quote is read per piece, and a rough one says so")

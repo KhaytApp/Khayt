@@ -106,7 +106,9 @@ extension Shop {
         var changed = false
         // Never a request that carries a file: draining it would delete the
         // file on the cloud, and only the button downloads it first.
-        for item in items where !webStoreGaveUp.contains(item.id) && item.file == nil {
+        // Nor a quote-form request: a visitor's request is the shop's to
+        // answer, never recorded by itself.
+        for item in items where !webStoreGaveUp.contains(item.id) && item.file == nil && !item.isQuoteForm {
             // Read against the shelf as it is NOW — a previous order on this
             // pass may just have taken the last one.
             guard let order = try? await Self.onlineOrder(

@@ -157,6 +157,9 @@ enum QuoteFormFile {
         case size(expected: Int, got: Int)
         /// This Mac has no library folder to put the file in.
         case noLibrary
+        /// The cloud has no file for a request well before its keep-until
+        /// date: a fault on the cloud, so the request is kept.
+        case missingEarly
         /// The library would not take the file (an unknown kind, a copy that
         /// did not arrive intact…).
         case library(LibraryImport.Failure)
@@ -237,11 +240,25 @@ enum QuoteFormFile {
             record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
         }
         record["quoteFile"] = .object(facts)
-        // Nothing has been sent to the visitor: the shop has not answered
-        // yet. `newOrder` stamps a quote as sent today, which would start its
-        // follow-up and expiry clocks on a request nobody has replied to. The
-        // desktop imports these with no sent date as well.
-        if Shop.plainString(record["status"]) == "quote" { record["quoteSentAt"] = .null }
+    }
+
+    /// A sliced plate in 3MF clothing — Bambu/Orca `*.gcode.3mf`, or any 3MF
+    /// holding `Metadata/plate_N.gcode`. It is a MACHINE file: a job could
+    /// send it to a printer (`PrinterSend.slicedFiles` lists `.gcode.3mf`), so
+    /// a visitor's one is held beside the book like G-code, never filed.
+    static func isSlicedPlate(name: String, data: Data) -> Bool {
+        let lower = name.lowercased()
+        if lower.hasSuffix(".gcode.3mf") { return true }
+        guard lower.hasSuffix(".3mf") else { return false }
+        let probe = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-3mf-probe-\(UUID().uuidString).3mf")
+        defer { try? FileManager.default.removeItem(at: probe) } // scratch
+        guard (try? data.write(to: probe)) != nil,
+              let entries = try? Zip.entries(of: probe) else { return false }
+        return entries.contains { e in
+            let n = e.name.lowercased()
+            return n.hasPrefix("metadata/") && n.hasSuffix(".gcode")
+        }
     }
 
     nonisolated static func instant(_ text: String) -> Date? {
@@ -317,6 +334,12 @@ extension Shop {
             .appending(path: "khayt-quote-form-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: scratch) } // scratch
         switch answer {
+        case .expired where meta.expiresAt.map({ $0 > now.addingTimeInterval(3600) }) ?? false:
+            // The cloud says the file is gone well before the date it gave
+            // for it — a storage fault, not an expiry. Draining now would
+            // lose a file that may still be in the bucket; it stays queued.
+            result.refusal = .missingEarly
+            return result
         case .expired:
             result.expired = true
             attach = .init(meta: meta, state: .expired(note: expiredNote))
@@ -327,7 +350,9 @@ extension Shop {
                 return result
             }
             let kind = (meta.safeName as NSString).pathExtension.lowercased()
-            if data.isEmpty || !QuoteFormFile.modelKinds.contains(kind) {
+            let name = meta.safeName
+            let sliced = await PinWork.run { QuoteFormFile.isSlicedPlate(name: name, data: data) }
+            if data.isEmpty || !QuoteFormFile.modelKinds.contains(kind) || sliced {
                 result.notTaken = true
                 if data.isEmpty {
                     attach = .init(meta: meta, state: .notTaken(note: notTakenNote, heldAt: nil))
@@ -514,6 +539,7 @@ extension Shop {
             words.callIt("mac.qfe_err_size", ["expected": .string(Format.fileSize(Int64(expected))),
                                               "got": .string(Format.fileSize(Int64(got)))])
         case .noLibrary: LibraryImport.Failure.noLibrary.said(words)
+        case .missingEarly: words.callIt("mac.qfe_err_missing_early")
         case .library(let failure): failure.said(words)
         case .write(let why): words.callIt("mac.qfe_err_write", ["why": .string(why)])
         }

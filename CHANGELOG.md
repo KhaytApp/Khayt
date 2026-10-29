@@ -8878,7 +8878,13 @@ missing its dot. And a Prusa can be sent binary G-code.
 ### Fixed
 
 - **A quote-form request sent without a file is a quote too.** beta.11 fixed requests that carry a model; one sent with only a description still took an invoice number.
-- An imported quote-form request is no longer marked as a quote sent today, since nothing has been sent to the customer yet.
+- An imported quote-form request is no longer marked as a quote sent today, and gets no expiry date, since nothing has been sent to the customer yet. Follow-ups no longer treat it as about to expire.
+- **A quote-form request never takes stock off the shelf.** A visitor who listed one of your stocked products in the notes had a piece deducted and the request recorded as a completed sale. It is now always one quote line to print.
+- **A sliced Bambu or Orca plate (`.gcode.3mf`) from the quote form is held beside the book like G-code,** not filed in the library, where a job could send a stranger's machine file to a printer.
+- If Khayt Cloud has no file for a request that should still be kept, the request now stays in the queue rather than being imported without its file.
+- A request whose job could not be built is no longer cleared from the cloud as if it had been imported.
+- A new request is no longer mistaken for an old one if the cloud reuses a request number.
+- Imported quote-form requests keep the customer's model link and contact in the job's notes.
 
 ### Changed
 
