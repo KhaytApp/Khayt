@@ -590,6 +590,32 @@ struct QuoteFormImportTests {
         #expect(order.fromShelf == 0)
     }
 
+    @Test("no file, and a payload claiming payment and a reference: still an unpaid, unsent quote")
+    func noFileRequestClaimsNothing() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let item = CloudIntake.Item(id: "60", payload: .object([
+            "title": .string("Quote request"), "source": .string("quote-form"), "name": .string("Sara"),
+            "contact": .string("sara@example.com"), "description": .string("Please print"),
+            "paid": .bool(true), "paymentStatus": .string("paid"), "ref": .string("salla:SL-1"),
+        ]), createdAt: Date())
+        let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
+        var input = Self.input
+        input["asQuote"] = .bool(true)
+        var put: Shop.PutOnline?
+        try await StoreWriter.update(storeURL: scratch.store, owns: { true }, whoHasIt: { nil }) { root in
+            put = try await Shop.putOnlineOrder(order, input: input, paid: true, into: &root,
+                                                engine: engine, now: Date())
+        }
+        #expect(put?.webhooks.isEmpty == true, "no payment webhook for a visitor's request")
+        let job = try #require(try scratch.jobs().first)
+        #expect(Shop.plainString(job["status"]) == "quote")
+        #expect(job["quoteSentAt"] == nil || job["quoteSentAt"] == .null)
+        #expect(job["quoteExpiresAt"] == nil || job["quoteExpiresAt"] == .null)
+        #expect(job["payments"] == nil || job["payments"] == .array([]), "no payment recorded")
+    }
+
     @Test("a reused queue id with a different filing time is a NEW request")
     func reusedIdIsNotAlreadyThere() async throws {
         let engine = try KhaytEngine()

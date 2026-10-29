@@ -36,7 +36,7 @@ struct OnlineOrdersSheet: View {
                     Image(systemName: "checkmark.circle").foregroundStyle(Khayt.done)
                     Text(shop.words.callIt("mac.qfe_made", [
                         "job": .string(Figure.isolated(made.jobId)),
-                        "name": .string(made.customer.isEmpty ? "—" : made.customer)]))
+                        "name": .string(made.customer.isEmpty ? "—" : Figure.isolated(made.customer))]))
                         .font(.caption)
                     Spacer()
                     Button(shop.words.callIt("mac.qfe_open_job")) { shop.openOnlineMade() }
@@ -227,7 +227,7 @@ private struct OnlineOrderCard: View {
         }
         .padding(.vertical, 6)
         .confirmationDialog(
-            shop.words.callIt("mac.qfe_delete_q", ["name": .string(order.customer.isEmpty ? order.title : order.customer)]),
+            shop.words.callIt("mac.qfe_delete_q", ["name": .string(Figure.isolated(order.customer.isEmpty ? order.title : order.customer))]),
             isPresented: $confirmingDelete, titleVisibility: .visible
         ) {
             Button(shop.words.callIt("mac.qfe_delete_confirm"), role: .destructive) {

@@ -114,6 +114,7 @@ struct CustomerLinkSection: View {
     /// approve, and a web URL carrying it would sit in a server's log and the
     /// browser's history (the reason `sendLinkOnWhatsApp` gives).
     private func sendWhatsApp() async {
+        guard shop.lockAllows("orders", "edit") else { said = shop.moveProblem; return }
         guard let link = await shop.portalLink(for: job.id) else { return }
         let chat = await shop.whatsAppRecipient(for: job)
         guard chat.ok, !chat.digits.isEmpty else { said = shop.words.callIt("mac.qfe_send_no_phone"); return }
@@ -131,9 +132,11 @@ struct CustomerLinkSection: View {
     }
 
     private func sendEmail() async {
+        guard shop.lockAllows("orders", "edit") else { said = shop.moveProblem; return }
         guard let link = await shop.portalLink(for: job.id) else { return }
         let email = shop.clientRecord(for: job)?.client.email.trimmingCharacters(in: .whitespaces) ?? ""
-        guard email.contains("@") else { said = shop.words.callIt("mac.qfe_send_no_email"); return }
+        // ONE address: a comma or semicolon is a second recipient to Mail.
+        guard email.contains("@"), email.rangeOfCharacter(from: CharacterSet(charactersIn: ",;").union(.whitespacesAndNewlines)) == nil else { said = shop.words.callIt("mac.qfe_send_no_email"); return }
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
         let subject = shop.words.callIt("mac.qfe_send_subject", ["shop": .string(shop.shopName)])

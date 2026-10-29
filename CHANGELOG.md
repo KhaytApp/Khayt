@@ -8885,6 +8885,7 @@ missing its dot. And a Prusa can be sent binary G-code.
 - A request whose job could not be built is no longer cleared from the cloud as if it had been imported.
 - A new request is no longer mistaken for an old one if the cloud reuses a request number.
 - Imported quote-form requests keep the customer's model link and contact in the job's notes.
+- A quote-form request is never recorded as paid, whatever its contents claim.
 
 ### Added
 

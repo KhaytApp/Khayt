@@ -256,7 +256,10 @@ extension Shop {
 
         // Paid only when the store says so (or cannot place an unpaid order):
         // a button press is not a payment.
-        let paid = order.decision?.paid ?? false
+        // A quote-form request is never paid, whatever its payload claims: the
+        // payload is a visitor's, and `paid` would record a payment and fire
+        // its webhooks for a stranger's request.
+        let paid = order.item.isQuoteForm ? false : (order.decision?.paid ?? false)
         switch await writeOnlineOrder(order, paid: paid) {
         case .failure(let problem):
             onlineProblem = problem.sentence
@@ -269,6 +272,7 @@ extension Shop {
                 customer: order.customer, automatic: false))
             if order.item.isQuoteForm { onlineMade = (jobId, order.customer) }
         }
+        defer { quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count }
         if let problem = await drainOnlineOrder(order, fetch: fetch) {
             onlineProblem = problem
         }
@@ -428,6 +432,7 @@ extension Shop {
                                into root: inout [String: JSONValue],
                                engine: KhaytEngine, now: Date,
                                file: QuoteFormFile.Attach? = nil) async throws -> PutOnline {
+        let paid = order.item.isQuoteForm ? false : paid
         let orders = rows(root, "printLog")
         let source = order.source.isEmpty ? "online" : order.source
         if await alreadyInBook(order, source: source, orders: orders, engine: engine) {
@@ -618,7 +623,10 @@ extension Shop {
     /// queue item for the same order are one), or by the queue item's own id.
     static func alreadyInBook(_ order: OnlineOrder, source: String, orders: [JSONValue],
                               engine: KhaytEngine) async -> Bool {
-        if !order.item.reference.isEmpty,
+        // A quote-form request's reference is the visitor's to write: matched
+        // against the book it could pass for an order already recorded, and
+        // be drained — deleted with its file — unimported.
+        if !order.item.reference.isEmpty, !order.item.isQuoteForm,
            (try? await engine.storefrontOrderRecorded(printLog: .array(orders), source: source,
                                                       sourceOrderId: order.item.reference)) == true {
             return true

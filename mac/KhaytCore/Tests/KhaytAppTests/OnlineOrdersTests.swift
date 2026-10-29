@@ -255,10 +255,9 @@ struct OnlineOrderReadingTests {
         ]
         func input(_ quote: [String: JSONValue]?) async throws -> [String: JSONValue] {
             let payload = Self.quoteFormPayload(quote: quote)
-            let order = Shop.OnlineOrder(
-                item: CloudIntake.Item(id: "40", payload: payload, createdAt: Date()),
-                reading: try await engine.shelfSaleReading(payload: payload, products: shop.productRows,
-                                                           stock: Shop.stockCounts(shop.settingsDict)))
+            let order = try await Shop.onlineOrder(
+                CloudIntake.Item(id: "40", payload: payload, createdAt: Date()),
+                products: shop.productRows, stock: Shop.stockCounts(shop.settingsDict), engine: engine)
             return await shop.onlineJobInput(order)
         }
 

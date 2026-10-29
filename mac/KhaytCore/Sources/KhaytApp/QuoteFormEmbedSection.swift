@@ -281,6 +281,7 @@ struct QuoteFormEmbedSection: View {
         // The cloud's rule, here first: the same sentence it would send back.
         if let local = QuoteFormEmbed.problem(origins) {
             problem = shop.embedProblem(local)
+            revertSwitch()
             return
         }
         busy = true
@@ -292,6 +293,13 @@ struct QuoteFormEmbedSection: View {
             originsText = state.origins.joined(separator: "\n")
         case .failure(let failure):
             if failure.notAvailable { pane = .notAvailable } else { problem = failure.sentence }
+            revertSwitch()
         }
+    }
+
+    /// A save that did not happen leaves the switch where the cloud has it:
+    /// flipped and refused, it looked on and was not.
+    private func revertSwitch() {
+        if case .shown(let s)? = pane { enabled = s.enabled }
     }
 }

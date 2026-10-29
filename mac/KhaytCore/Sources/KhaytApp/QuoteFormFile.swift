@@ -489,7 +489,7 @@ extension Shop {
         let input = await onlineJobInput(order)
         let files = self.files
         let result = await Self.recordQuoteForm(
-            order, meta: meta, input: input, paid: order.decision?.paid ?? false,
+            order, meta: meta, input: input, paid: false,
             engine: engine, storeURL: build.storeURL,
             libraryRoot: libraryRoots.map { URL(fileURLWithPath: $0.primary) },
             existingModel: { hash in files.first { $0.contentHash == hash }?.id },
@@ -524,6 +524,7 @@ extension Shop {
         }
         if result.drained {
             onlineOrders.removeAll { $0.id == order.id }
+            quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count
         } else if let problem = result.drainProblem {
             onlineProblem = words.callIt("mac.online_kept_in_queue") + " " + problem
         }

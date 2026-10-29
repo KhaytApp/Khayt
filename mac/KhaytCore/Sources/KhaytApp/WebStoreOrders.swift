@@ -94,6 +94,7 @@ extension Shop {
             items = try await CloudIntake.list(connection, token: token,
                                                fetch: fetch ?? Self.webStoreNetwork)
         } catch CloudIntake.Failure.notConnected {
+            quoteRequestsWaiting = 0
             return 0
         } catch {
             webStoreAutoProblem = (error as? LocalizedError)?.errorDescription
