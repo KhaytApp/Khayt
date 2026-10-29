@@ -70,6 +70,9 @@ enum CloudIntake {
         case notOffered
         /// The download was bigger than the request said its file is.
         case tooLarge(Int)
+        /// 409 `reason:"file-not-downloaded"`: the cloud still keeps this
+        /// request's file and the DELETE did not say it was downloaded.
+        case fileNotDownloaded
 
         var errorDescription: String? {
             switch self {
@@ -77,6 +80,7 @@ enum CloudIntake {
             case .malformed: return "The cloud answered with something this app could not read."
             case .notOffered: return "Khayt Cloud does not offer this yet."
             case .tooLarge(let most): return "The file was larger than the \(most) bytes it should be."
+            case .fileNotDownloaded: return "Update Khayt to import this request with its file."
             case .refused(let code, let why):
                 return why.isEmpty ? "The cloud refused the request (HTTP \(code))" : why
             }
@@ -106,9 +110,19 @@ enum CloudIntake {
     /// write then failed, and the queue is the only copy this app has.
     static func drain(_ connection: CloudReader.Connection, token: String, id: String,
                       fetch: Fetch) async throws {
-        let request = try CloudReader.request(connection, token: token, method: "DELETE",
+        var request = try CloudReader.request(connection, token: token, method: "DELETE",
                                               tail: "/intake/" + id.uriComponent)
+        // A claim, so it is made here and nowhere else: this app downloads and
+        // checks a request's file before it ever drains it (`recordQuoteForm`),
+        // and khayt-cloud refuses to delete a kept file for a client that does
+        // not say so — an older build would throw the visitor's model away.
+        request.setValue("1", forHTTPHeaderField: "X-Intake-File-Capable")
         let (data, response) = try await fetch(request)
+        if (response as? HTTPURLResponse)?.statusCode == 409,
+           let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           body["reason"] as? String == "file-not-downloaded" {
+            throw Failure.fileNotDownloaded
+        }
         try check(response, data)
     }
 
