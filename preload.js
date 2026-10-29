@@ -258,6 +258,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudPublishedList: (opts) => ipcRenderer.invoke('hub:cloud-published-list', opts),
   cloudIntakeList: (opts) => ipcRenderer.invoke('hub:cloud-intake-list', opts),
   cloudIntakeDelete: (opts) => ipcRenderer.invoke('hub:cloud-intake-delete', opts),
+  cloudIntakeTakeFile: (opts) => ipcRenderer.invoke('hub:cloud-intake-take-file', opts),
   cloudStorefrontStats: (opts) => ipcRenderer.invoke('hub:cloud-storefront-stats', opts),
   cloudPortalMessages: (opts) => ipcRenderer.invoke('hub:cloud-portal-messages', opts),
   cloudPortalReply: (opts) => ipcRenderer.invoke('hub:cloud-portal-reply', opts),
