@@ -3908,6 +3908,8 @@
   "intake.file_failed": "お客様のモデルファイルを保存できなかったため、リクエストは一覧に残ります。{error}",
   "intake.dismiss_file_q": "このリクエストを却下しますか？お客様のモデルファイル（{name}）も Khayt Cloud から削除されます。",
   "intake.file_gone_note": "モデルファイル: {name}（Khayt Cloud の 14 日間の保管期間が過ぎています）",
+  "intake.instant_quote_note": "お客様に表示された即時見積もり: {price} {currency}{details}",
+  "intake.instant_quote_rough": "（概算）",
   "stl.estimate_btn": "📐 3Dモデルから見積",
   "stl.note_tpl": "サイズ {x}×{y}×{z} mm · ソリッド {solid} g → 推定 {weight} g · 約{time} h",
   "stl.note_assume": "インフィル {infill}% · {density} g/cm³",

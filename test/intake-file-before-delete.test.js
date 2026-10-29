@@ -104,3 +104,21 @@ test('a file the server no longer holds is noted on the quote', async () => {
   assert.deepEqual(global.printLog[0].attachedFiles, []);
   assert.match(global.printLog[0].notes, /intake\.file_gone_note/);
 });
+
+test('the verified instant price the customer saw is noted on the quote, not set as its price', async () => {
+  stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+  global.t = (k, v) => k + (v ? JSON.stringify(v) : '');
+  const { importIntakeAsQuote } = require('../renderer/integrations.js');
+  const quote = { price: 65.875, currency: 'SAR', qty: 1, grams: 41.6, hours: 3.14, exact: true, reliable: false, fileType: 'stl', verified: true };
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote } }, CLOUD), true);
+  const notes = global.printLog[0].notes;
+  assert.match(notes, /intake\.instant_quote_note\{"price":"65\.88","currency":"SAR","details":" · 42 g · 3\.1 h"\}intake\.instant_quote_rough/);
+  assert.equal(global.printLog[0].price, 0);
+});
+
+test('an unverified quote is not noted', async () => {
+  stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+  const { importIntakeAsQuote } = require('../renderer/integrations.js');
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote: { price: 1, currency: 'SAR' } } }, CLOUD), true);
+  assert.doesNotMatch(global.printLog[0].notes, /instant_quote/);
+});

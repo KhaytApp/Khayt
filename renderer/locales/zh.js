@@ -3908,6 +3908,8 @@
   "intake.file_failed": "无法保存客户的模型文件，因此该请求仍保留在列表中。{error}",
   "intake.dismiss_file_q": "忽略此请求？这也会从 Khayt Cloud 删除客户的模型文件（{name}）。",
   "intake.file_gone_note": "模型文件：{name}（已不在 Khayt Cloud 上，其保留期为 14 天）",
+  "intake.instant_quote_note": "向客户显示的即时报价：{price} {currency}{details}",
+  "intake.instant_quote_rough": "（粗略估算）",
   "stl.estimate_btn": "📐 从3D模型估算",
   "stl.note_tpl": "尺寸 {x}×{y}×{z} mm · 实心 {solid} g → 估计 {weight} g · ~{time} h",
   "stl.note_assume": "填充 {infill}% · {density} g/cm³",

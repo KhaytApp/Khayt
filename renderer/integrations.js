@@ -1949,6 +1949,21 @@ function trackShipment(trackingNumber, carrier) {
     return created.id;
   }
 
+  // The instant price the quote form showed the customer, signed by Khayt Cloud
+  // (`payload.quote`, only when verified). Kept as a note, not as the quote's
+  // price: it is the published sheet's estimate, never binding.
+  function intakeQuoteNote(q) {
+    if (!q || q.verified !== true || !Number.isFinite(+q.price)) return '';
+    const details = [
+      Number.isFinite(+q.grams) && +q.grams > 0 ? `${Math.round(+q.grams)} g` : '',
+      Number.isFinite(+q.hours) && +q.hours > 0 ? `${(+q.hours).toFixed(1)} h` : '',
+    ].filter(Boolean).join(' · ');
+    return t('intake.instant_quote_note', {
+      price: (+q.price).toFixed(2), currency: String(q.currency || ''),
+      details: details ? ` · ${details}` : '',
+    }) + (q.reliable === false ? t('intake.instant_quote_rough') : '');
+  }
+
   async function importIntakeAsQuote(it, c) {
     const p = it.payload || {};
     const now = new Date();
@@ -1978,6 +1993,7 @@ function trackShipment(trackingNumber, carrier) {
       p.link ? `Model: ${p.link}` : '',
       p.contact ? `Contact: ${p.contact}` : '',
       fileGone ? t('intake.file_gone_note', { name: p.file.name }) : '',
+      intakeQuoteNote(p.quote),
     ].filter(Boolean).join('\n');
     const order = {
       id: orderId,

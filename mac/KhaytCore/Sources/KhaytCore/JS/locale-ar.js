@@ -3908,6 +3908,8 @@
   "intake.file_failed": "تعذّر حفظ ملف المجسّم الخاص بالعميل، لذلك يبقى الطلب في القائمة. {error}",
   "intake.dismiss_file_q": "تجاهل هذا الطلب؟ سيؤدي ذلك أيضًا إلى حذف ملف المجسّم الخاص بالعميل ({name}) من Khayt Cloud.",
   "intake.file_gone_note": "ملف المجسّم: {name} (لم يعد على Khayt Cloud، الذي يحتفظ به 14 يومًا)",
+  "intake.instant_quote_note": "السعر الفوري الذي ظهر للعميل: {price} {currency}{details}",
+  "intake.instant_quote_rough": " (تقدير تقريبي)",
   "stl.estimate_btn": "📐 تقدير من نموذج ثلاثي الأبعاد",
   "stl.note_tpl": "الحجم {x}×{y}×{z} مم · صلب {solid} غ → تقديري {weight} غ · ~{time} ساعة",
   "stl.note_assume": "تعبئة {infill}٪ · {density} غ/سم³",
