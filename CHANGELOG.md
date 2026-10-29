@@ -4,8 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a quote-form G-code is imported, not left queued.** Deleting a request now sends `X-Intake-File-Capable: 2` (khayt-cloud #147): the desktop saves a request's file of any type, G-code included, before it deletes the request. With level 1 the cloud refused to delete a G-code request (409 `file-not-downloaded`).
-
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.
@@ -6559,6 +6557,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.33] - 2026-10-29
+
+### Fixed
+
+- **Desktop: a quote-form G-code is imported, not left queued.** Deleting a request now sends `X-Intake-File-Capable: 2` (khayt-cloud #147): the desktop saves a request's file of any type, G-code included, before it deletes the request. With level 1 the cloud refused to delete a G-code request (409 `file-not-downloaded`).
 
 ## [3.11.32] - 2026-10-29
 
