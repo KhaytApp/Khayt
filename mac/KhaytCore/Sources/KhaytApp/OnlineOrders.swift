@@ -759,8 +759,17 @@ extension Shop {
                 if let shown, shown.grams > 0, shown.hours > 0 {
                     unpriced.grams = Money.fieldValue(shown.grams)
                     unpriced.hours = Money.fieldValue(shown.hours)
-                    if let costed = await costedPart(spoolId: nil, grams: shown.grams, hours: shown.hours,
-                                                     qty: unpriced.qty) {
+                    // At the quote sheet's own spool and printer — what the
+                    // form priced with (`settings.lanApi.intakeQuote`), and what
+                    // the desktop costs these at too.
+                    var sheetSpool: String?, sheetPreset: String?
+                    if case .object(let lan)? = settingsDict["lanApi"], case .object(let iq)? = lan["intakeQuote"] {
+                        if case .string(let f)? = iq["filamentId"], !f.isEmpty { sheetSpool = f }
+                        if case .string(let p)? = iq["presetId"], !p.isEmpty { sheetPreset = p }
+                    }
+                    unpriced.spoolId = sheetSpool
+                    if let costed = await costedPart(spoolId: sheetSpool, grams: shown.grams, hours: shown.hours,
+                                                     qty: unpriced.qty, presetId: sheetPreset) {
                         unpriced.cost = costed.cost
                         unpriced.parts = costed.parts
                         unpriced.rates = costed.rates
