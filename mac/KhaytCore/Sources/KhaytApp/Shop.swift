@@ -1332,6 +1332,10 @@ final class Shop {
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
             if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
+            // Another book's requests are not this one's: counted afresh, and
+            // its first read is a new baseline rather than a burst of alerts.
+            quoteRequestsWaiting = 0
+            quoteRequestsSeen = nil
             if next.build != nil { await restoreCloudKey() }
             if overtaken() { return }
             // After the key: the launch check seals with it. Never for the
@@ -2575,6 +2579,17 @@ final class Shop {
     /// (ScreenActions) and the old toolbar is only drawn in the classic one.
     var showingWebStore = false
     var showingOnlineOrders = false
+    /// Quote-form requests waiting in the cloud queue, as last read — for the
+    /// banner and the badge. A request nobody opens expires with its file.
+    var quoteRequestsWaiting = 0
+    /// The quote-form request ids already announced this session; nil until
+    /// the first read, which sets the baseline without a notification each.
+    @ObservationIgnored var quoteRequestsSeen: Set<String>?
+    /// Good news from the Online orders sheet — "Imported. The file…" — kept
+    /// apart from `onlineProblem` so it is not drawn as a warning.
+    var onlineNotice: String?
+    /// The quote an import just made, to open from the sheet.
+    var onlineMade: (jobId: String, customer: String)?
     /// Whether Khayt Cloud holds a published catalogue: nil until asked.
     var webStoreLive: Bool?
     /// When the published catalogue was last replaced, by either app.

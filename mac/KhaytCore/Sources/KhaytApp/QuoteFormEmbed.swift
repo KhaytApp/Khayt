@@ -16,6 +16,21 @@ import KhaytCore
 /// with `enabled:false` is a shop that simply has the form off.
 enum QuoteFormEmbed {
 
+    /// Hosts every store on a platform shares (Salla, Zid). An allowed origin
+    /// on one of these lets ANY store there frame this shop's form.
+    static let sharedPlatformHosts: Set<String> = [
+        "salla.sa", "www.salla.sa", "salla.com", "www.salla.com", "s.salla.sa",
+        "zid.sa", "www.zid.sa", "zid.store", "www.zid.store",
+    ]
+
+    /// The allowed origins that are a platform's shared address.
+    static func sharedPlatformOrigins(_ origins: [String]) -> [String] {
+        origins.filter { o in
+            guard let host = URL(string: o)?.host?.lowercased() else { return false }
+            return sharedPlatformHosts.contains(host)
+        }
+    }
+
     /// What both routes answer. Every field but `enabled` and `origins` is
     /// optional on the way in: a missing one is shown as unknown, never as a
     /// false the cloud did not say.

@@ -294,13 +294,14 @@ struct QuoteFormImportTests {
     }
 
     static func run(_ payload: JSONValue, cloud: Cloud, scratch: Scratch, engine: KhaytEngine,
-                    existing: @escaping (String) -> String? = { _ in nil }) async throws -> Shop.QuoteFormResult {
+                    existing: @escaping (String) -> String? = { _ in nil },
+                    now: Date = Date()) async throws -> Shop.QuoteFormResult {
         let item = CloudIntake.Item(id: "21", payload: payload, createdAt: Date())
         let meta = try #require(item.file)
         let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
         let fetch = cloud.fetch
         return await Shop.recordQuoteForm(
-            order, meta: meta, input: input, paid: false, engine: engine,
+            order, meta: meta, input: input, paid: false, engine: engine, now: now,
             storeURL: scratch.store, libraryRoot: scratch.library, existingModel: existing,
             expiredNote: "FILE EXPIRED NOTE", owns: { true }, whoHasIt: { nil },
             download: { try await CloudIntake.file(connection, token: "t", id: "21", maxBytes: meta.bytes, fetch: fetch) },
@@ -441,7 +442,9 @@ struct QuoteFormImportTests {
         defer { try? FileManager.default.removeItem(at: scratch.dir) }
         let cloud = Cloud(scratch: scratch, status: 404,
                           body: Data(#"{"error":"Not found","reason":"no-file"}"#.utf8))
-        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
+        // After the keep-until date the payload gives (2026-11-05).
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine,
+                                        now: try #require(QuoteFormFile.instant("2026-11-06T00:00:00Z")))
         #expect(result.refusal == nil)
         #expect(result.expired)
         #expect(result.drained)
@@ -527,8 +530,104 @@ struct QuoteFormImportTests {
         #expect(Shop.plainString(job["status"]) == "quote")
         #expect(job["invoiceNum"] == nil || job["invoiceNum"] == .null)
         #expect(!(Shop.plainString(job["id"]) ?? "").hasPrefix("INV"))
+        #expect(job["quoteSentAt"] == nil || job["quoteSentAt"] == .null, "nothing was sent to the visitor yet")
+        #expect(job["quoteExpiresAt"] == nil || job["quoteExpiresAt"] == .null, "no follow-up clock on an unanswered request")
         guard case .object(let settings)? = try scratch.read()["settings"] else { Issue.record("no settings"); return }
         #expect(settings["invNumNext"] == .number(1), "the invoice counter must not move")
+    }
+
+    @Test("no file BEFORE its keep-until date is a cloud fault: kept in the queue, nothing written")
+    func missingEarlyStaysQueued() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let cloud = Cloud(scratch: scratch, status: 404,
+                          body: Data(#"{"error":"Not found","reason":"no-file"}"#.utf8))
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine,
+                                        now: try #require(QuoteFormFile.instant("2026-10-29T00:00:00Z")))
+        #expect(result.refusal == .missingEarly)
+        #expect(!result.drained)
+        #expect(cloud.log == [Self.filePath])
+        #expect(try scratch.jobs().isEmpty)
+    }
+
+    @Test("a sliced plate in a 3MF is held like G-code, never filed")
+    func slicedPlateIsHeld() async throws {
+        #expect(QuoteFormFile.isSlicedPlate(name: "Benchy.gcode.3mf", data: Data()))
+        #expect(!QuoteFormFile.isSlicedPlate(name: "bracket.stl", data: Self.model))
+        let plate = try ArchiveImportTests.makeZip([("Metadata/plate_1.gcode", Data("G28\n".utf8)),
+                                                    ("3D/3dmodel.model", Data("<model/>".utf8))])
+        defer { try? FileManager.default.removeItem(at: plate.deletingLastPathComponent()) }
+        let bytes = try Data(contentsOf: plate)
+        #expect(QuoteFormFile.isSlicedPlate(name: "plate.3mf", data: bytes), "a renamed sliced plate is caught by content")
+
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let cloud = Cloud(scratch: scratch, body: bytes)
+        let result = try await Self.run(Self.renamed(Self.payload(bytes), to: "plate.3mf"),
+                                        cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.notTaken)
+        #expect(result.heldAt != nil)
+        #expect(try scratch.libraryRecords().isEmpty)
+    }
+
+    @Test("a quote-form request never touches the shelf, whatever its notes or lines say")
+    func quoteFormNeverAShelfSale() async throws {
+        let engine = try KhaytEngine()
+        let item = CloudIntake.Item(id: "50", payload: .object([
+            "title": .string("Quote request — stand.stl"), "source": .string("quote-form"), "qty": .number(2),
+            "description": .string("- Phone stand\n- Phone stand x 3"),
+            "lines": .array([.object(["name": .string("Phone stand"), "qty": .number(1), "productId": .string("P-1")])]),
+        ]), createdAt: Date())
+        let products: [JSONValue] = [.object(["id": .string("P-1"), "name": .string("Phone stand")])]
+        let stock: JSONValue = .object(["P-1": .number(5)])
+        let order = try await Shop.onlineOrder(item, products: products, stock: stock, engine: engine)
+        #expect(order.lines.count == 1)
+        #expect(order.lines.first?.productId == nil)
+        #expect(order.lines.first?.qty == 2)
+        #expect(!order.allFromShelf)
+        #expect(order.fromShelf == 0)
+    }
+
+    @Test("no file, and a payload claiming payment and a reference: still an unpaid, unsent quote")
+    func noFileRequestClaimsNothing() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let item = CloudIntake.Item(id: "60", payload: .object([
+            "title": .string("Quote request"), "source": .string("quote-form"), "name": .string("Sara"),
+            "contact": .string("sara@example.com"), "description": .string("Please print"),
+            "paid": .bool(true), "paymentStatus": .string("paid"), "ref": .string("salla:SL-1"),
+        ]), createdAt: Date())
+        let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
+        var input = Self.input
+        input["asQuote"] = .bool(true)
+        var put: Shop.PutOnline?
+        try await StoreWriter.update(storeURL: scratch.store, owns: { true }, whoHasIt: { nil }) { root in
+            put = try await Shop.putOnlineOrder(order, input: input, paid: true, into: &root,
+                                                engine: engine, now: Date())
+        }
+        #expect(put?.webhooks.isEmpty == true, "no payment webhook for a visitor's request")
+        let job = try #require(try scratch.jobs().first)
+        #expect(Shop.plainString(job["status"]) == "quote")
+        #expect(job["quoteSentAt"] == nil || job["quoteSentAt"] == .null)
+        #expect(job["quoteExpiresAt"] == nil || job["quoteExpiresAt"] == .null)
+        #expect(job["payments"] == nil || job["payments"] == .array([]), "no payment recorded")
+    }
+
+    @Test("a reused queue id with a different filing time is a NEW request")
+    func reusedIdIsNotAlreadyThere() async throws {
+        let engine = try KhaytEngine()
+        let old = Date(timeIntervalSince1970: 1_800_000_000)
+        let item = CloudIntake.Item(id: "7", payload: .object(["title": .string("Q"), "source": .string("quote-form")]),
+                                    createdAt: old.addingTimeInterval(86_400))
+        let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
+        let sameId: [JSONValue] = [.object(["intakeId": .string("7"), "intakeAt": .string(StoreWriter.iso(old))])]
+        #expect(!(await Shop.alreadyInBook(order, source: "quote-form", orders: sameId, engine: engine)))
+        let legacy: [JSONValue] = [.object(["intakeId": .string("7")])]
+        #expect(await Shop.alreadyInBook(order, source: "quote-form", orders: legacy, engine: engine),
+                "a job recorded before intakeAt existed still counts")
     }
 
     @Test("a file object with no name is still a quote-form file")

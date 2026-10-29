@@ -138,7 +138,9 @@ struct ScreenActions: View {
                 // only, and this shell draws no toolbar — so a shop could not
                 // reach its web store or its storefront orders at all.
                 if shop.cloudConnected {
-                    NavyAction(label: shop.words.callIt("mac.online_orders"),
+                    // With how many quote requests wait, so the button says it.
+                    NavyAction(label: shop.words.callIt("mac.online_orders")
+                               + (shop.quoteRequestsWaiting > 0 ? " (\(Figure.isolated(Format.count(shop.quoteRequestsWaiting))))" : ""),
                                symbol: "tray.and.arrow.down") { shop.showingOnlineOrders = true }
                     NavyAction(label: shop.words.callIt("mac.ws_button"),
                                symbol: "storefront") { shop.showingWebStore = true }

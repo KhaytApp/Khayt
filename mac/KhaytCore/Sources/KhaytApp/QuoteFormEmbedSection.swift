@@ -86,7 +86,26 @@ struct QuoteFormEmbedSection: View {
     // MARK: - The form, as the cloud has it
 
     @ViewBuilder private func shown(_ state: QuoteFormEmbed.State) -> some View {
+        // SAVES ITSELF. Flipped and left, it looked on and was not.
         Toggle(words.callIt("mac.qfe_enable"), isOn: $enabled).disabled(!canChange || busy)
+            .onChange(of: enabled) { _, now in
+                if now != state.enabled, canChange { Task { await save() } }
+            }
+        // WHERE REQUESTS ARRIVE, and the form as a visitor sees it.
+        HStack {
+            Text(words.callIt("mac.qfe_where")).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(words.callIt("mac.qfe_open_requests")) {
+                shop.openOnlineOrders()
+                NSApp.keyWindow?.performClose(nil)
+            }
+            .controlSize(.small)
+            if let page = state.links?.page, let url = URL(string: QuoteFormEmbed.page(page, lang: lang, theme: theme)) {
+                Button(words.callIt("mac.qfe_preview")) { NSWorkspace.shared.open(url) }
+                    .controlSize(.small)
+            }
+        }
 
         // ── WHAT IT CAN AND CANNOT DO RIGHT NOW ─────────────────────────
         if state.priceAvailable == false {
@@ -136,6 +155,14 @@ struct QuoteFormEmbedSection: View {
             Text(words.callIt("mac.qfe_origins_hint", ["n": .number(Double(QuoteFormEmbed.maxOrigins))]))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // A PLATFORM'S OWN ADDRESS IS EVERY STORE ON IT. Allowing it lets
+            // any Salla or Zid store frame this shop's form.
+            ForEach(QuoteFormEmbed.sharedPlatformOrigins(QuoteFormEmbed.tidy(originsText.components(separatedBy: .newlines))), id: \.self) { origin in
+                Label(words.callIt("mac.qfe_origins_shared", ["origin": .string(origin)]),
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         if canChange {
             HStack {
@@ -218,14 +245,16 @@ struct QuoteFormEmbedSection: View {
         var parts: [String] = []
         if let count = f.count {
             parts.append(f.maxCount.map { words.callIt("mac.qfe_files_count_of", ["n": .number(Double(count)), "max": .number(Double($0))]) }
-                         ?? words.callIt("mac.qfe_files_count", ["n": .number(Double(count))]))
+                         ?? words.counting(count, "mac.qfe_files_count"))
         }
         if let bytes = f.bytes {
-            let used = Format.fileSize(Int64(bytes))
-            parts.append(f.maxBytes.map { used + " / " + Format.fileSize(Int64($0)) } ?? used)
+            // In the units the form itself says ("up to 32 MB" is 32 MiB),
+            // so the pane and the form name the same limit the same way.
+            let used = Format.memorySize(Int64(bytes))
+            parts.append(f.maxBytes.map { used + " / " + Format.memorySize(Int64($0)) } ?? used)
         }
         if let each = f.maxFileBytes {
-            parts.append(words.callIt("mac.qfe_files_each", ["size": .string(Format.fileSize(Int64(each)))]))
+            parts.append(words.callIt("mac.qfe_files_each", ["size": .string(Format.memorySize(Int64(each)))]))
         }
         guard !parts.isEmpty else { return nil }
         return parts.map { "\u{2068}" + $0 + "\u{2069}" }.joined(separator: " · ")
@@ -252,6 +281,7 @@ struct QuoteFormEmbedSection: View {
         // The cloud's rule, here first: the same sentence it would send back.
         if let local = QuoteFormEmbed.problem(origins) {
             problem = shop.embedProblem(local)
+            revertSwitch()
             return
         }
         busy = true
@@ -263,6 +293,13 @@ struct QuoteFormEmbedSection: View {
             originsText = state.origins.joined(separator: "\n")
         case .failure(let failure):
             if failure.notAvailable { pane = .notAvailable } else { problem = failure.sentence }
+            revertSwitch()
         }
+    }
+
+    /// A save that did not happen leaves the switch where the cloud has it:
+    /// flipped and refused, it looked on and was not.
+    private func revertSwitch() {
+        if case .shown(let s)? = pane { enabled = s.enabled }
     }
 }

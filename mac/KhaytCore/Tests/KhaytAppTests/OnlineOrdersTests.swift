@@ -235,6 +235,108 @@ struct OnlineOrderReadingTests {
         #expect(Shop.OnlineOrder.count(7.9) == 7)
     }
 
+    static func quoteFormPayload(quote: [String: JSONValue]?) -> JSONValue {
+        var p: [String: JSONValue] = [
+            "title": .string("Quote request — cube.stl"), "source": .string("quote-form"),
+            "name": .string("Sara"), "contact": .string("sara@example.com"), "qty": .number(1),
+            "description": .string("Please print this"), "link": .string("https://example.com/m/42"),
+        ]
+        if let quote { p["quote"] = .object(quote) }
+        return .object(p)
+    }
+
+    @Test("a quote-form request is a quote on the no-file path too, costed from the signed figures")
+    func quoteFormRequestIsCostedQuote() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let signed: [String: JSONValue] = [
+            "price": .number(65.88), "currency": .string("SAR"), "qty": .number(1),
+            "grams": .number(20), "hours": .number(1.5), "reliable": .bool(true), "verified": .bool(true),
+        ]
+        func input(_ quote: [String: JSONValue]?) async throws -> [String: JSONValue] {
+            let payload = Self.quoteFormPayload(quote: quote)
+            let order = try await Shop.onlineOrder(
+                CloudIntake.Item(id: "40", payload: payload, createdAt: Date()),
+                products: shop.productRows, stock: Shop.stockCounts(shop.settingsDict), engine: engine)
+            return await shop.onlineJobInput(order)
+        }
+
+        let verified = try await input(signed)
+        #expect(verified["asQuote"] == .bool(true), "no invoice number, with or without a file")
+        let notes = Shop.plainString(verified["notes"]) ?? ""
+        #expect(notes.contains("Please print this"))
+        #expect(notes.contains("65.88 SAR"), "the shop sees what the visitor was shown")
+        #expect(notes.contains("sara@example.com"), "and how to reach them")
+        guard case .array(let parts)? = verified["parts"], case .object(let part)? = parts.first else {
+            Issue.record("no part"); return
+        }
+        #expect(Shop.plainNumber(part["printWeight"]) == 20)
+        #expect(Shop.plainNumber(part["printTime"]) == 1.5)
+        #expect((Shop.plainNumber(part["baseCost"]) ?? 0) > 0, "costed at the shop's rates, not zero")
+
+        // A price the browser merely claims is not the cloud's: no note, no figures.
+        var claimed = signed; claimed["verified"] = nil
+        let unsigned = try await input(claimed)
+        #expect(unsigned["asQuote"] == .bool(true))
+        #expect(!(Shop.plainString(unsigned["notes"]) ?? "").contains("65.88"))
+        #expect((Shop.plainString(unsigned["notes"]) ?? "").contains("https://example.com/m/42"), "the visitor's link is kept")
+    }
+
+    @Test("the signed quote is read per piece, and a rough one says so")
+    func shownQuote() async {
+        let shop = await Self.shop()
+        let p = Self.quoteFormPayload(quote: ["price": .number(120), "currency": .string("SAR"), "qty": .number(3),
+                                              "grams": .number(12.5), "hours": .number(0.75),
+                                              "reliable": .bool(false), "verified": .bool(true)])
+        let shown = QuoteFormFile.Shown(p)
+        #expect(shown?.qty == 3)
+        #expect(shown?.grams == 12.5)
+        #expect(shown?.reliable == false)
+        #expect(shown.map { $0.note(shop.words) }?.contains("120.00 SAR") == true)
+        #expect(shown.map { $0.note(shop.words) }?.contains("rough") == true)
+        #expect(QuoteFormFile.Shown(Self.quoteFormPayload(quote: ["price": .number(0), "verified": .bool(true)])) == nil)
+        #expect(QuoteFormFile.Shown(Self.quoteFormPayload(quote: nil)) == nil)
+    }
+
+    @Test("waiting quote requests are counted; the first read is the baseline, later ones are new")
+    func quoteRequestsCounted() async {
+        let shop = await Self.shop()
+        func item(_ id: String, _ source: String = "quote-form") -> CloudIntake.Item {
+            CloudIntake.Item(id: id, payload: .object(["title": .string("Q" + id), "source": .string(source)]),
+                             createdAt: Date())
+        }
+        shop.noteQuoteRequests([item("1"), item("2"), item("3", "salla")])
+        #expect(shop.quoteRequestsWaiting == 2, "a storefront order is not a quote request")
+        #expect(shop.quoteRequestsSeen == ["1", "2"])
+        shop.noteQuoteRequests([item("2"), item("4")])
+        #expect(shop.quoteRequestsWaiting == 2)
+        #expect(shop.quoteRequestsSeen == ["1", "2", "4"], "a new id joins the announced set")
+    }
+
+    @Test("a platform's shared address is flagged as an allowed origin")
+    func sharedPlatformOrigins() {
+        let flagged = QuoteFormEmbed.sharedPlatformOrigins(["https://salla.sa", "https://myshop.com", "https://zid.store"])
+        #expect(flagged == ["https://salla.sa", "https://zid.store"])
+        #expect(QuoteFormEmbed.sharedPlatformOrigins(["https://shop.salla.sa.example"]).isEmpty)
+    }
+
+    @Test("the waiting count reads right in Arabic: one, two, a few, many")
+    func waitingCountsInArabic() async {
+        let shop = await Self.shop()
+        let ar = Words()
+        if let engine = shop.engine { await ar.load("ar", engine: engine) }
+        #expect(ar.counting(1, "mac.qfe_waiting").contains("واحد"))
+        #expect(ar.counting(2, "mac.qfe_waiting").hasPrefix("طلبا"))
+        #expect(ar.counting(3, "mac.qfe_waiting").contains("طلبات"))
+        #expect(shop.words.counting(1, "mac.qfe_files_count") != shop.words.counting(5, "mac.qfe_files_count"))
+    }
+
+    @Test("the quote form's limits read in the units the form uses")
+    func memorySizes() {
+        #expect(Format.memorySize(32 << 20).hasPrefix("32"))
+        #expect(Format.memorySize(0).hasPrefix("0"))
+    }
+
     @Test("an order already in the book is found, by its reference or by its queue item")
     func alreadyInBook() async throws {
         let shop = await Self.shop()
