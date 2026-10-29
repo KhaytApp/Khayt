@@ -640,7 +640,7 @@ struct IntakeFileCapableTests {
         }
         try await CloudIntake.drain(Self.connection, token: "t", id: "21", fetch: fetch)
         _ = try await CloudIntake.list(Self.connection, token: "t", fetch: fetch)
-        #expect(seen[0].value(forHTTPHeaderField: "X-Intake-File-Capable") == "1")
+        #expect(seen[0].value(forHTTPHeaderField: "X-Intake-File-Capable") == "2")
         #expect(seen[0].value(forHTTPHeaderField: "x-delta-capable") == "1")
         #expect(seen[1].value(forHTTPHeaderField: "X-Intake-File-Capable") == nil)
     }

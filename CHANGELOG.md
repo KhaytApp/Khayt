@@ -8870,6 +8870,7 @@ missing its dot. And a Prusa can be sent binary G-code.
 ### Fixed
 
 - **A quote-form request with a G-code (or any file that is not a model) no longer loses the file.** It still stays out of your library, so nothing can send a stranger's machine file to a printer, but it is now saved in a "Quote form files" folder beside your book before the request is cleared from Khayt Cloud, and the job says where. If it cannot be saved, the request stays in the queue.
+- Clearing a quote-form request now tells Khayt Cloud this Mac keeps every file type, not only models, so a Mac still on beta.9 is refused before it can drop a G-code.
 
 ## [4.0.0-beta.9] - 2026-10-29
 
