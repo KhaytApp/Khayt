@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac tests:** the customer-worth and quote-funnel snapshot tests load the sample book at its anchor day, matching the fixed date they ask about. Loaded at today, the book shifted forward until no customer counted as quiet, and main went red on Oct 28.
+
 - **Mac: beta.8 review fixes for applying the vault, the lapse warning and Library Health.**
   - Another Mac's new version of a model now waits until this book holds that Mac's record (the new hash) before the bytes come down, and then nothing is written to the book. Before, the hash was stamped onto this Mac's old copy of the record, and in a sync merge that stamp beat the other Mac's edit (name, tags, figures). After a day with no such record, the change is applied as before.
   - A vault purge is now decided by what this Mac holds (a vault sidecar with no bytes beside it), not by `vaultFileId` alone, so a model moved online by Free Up Space here does show in Library Health once the vault deletes it.
