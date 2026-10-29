@@ -8872,6 +8872,39 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.12] - 2026-10-29
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **A quote-form request sent without a file is a quote too.** beta.11 fixed requests that carry a model; one sent with only a description still took an invoice number.
+- An imported quote-form request is no longer marked as a quote sent today, and gets no expiry date, since nothing has been sent to the customer yet. Follow-ups no longer treat it as about to expire.
+- **A quote-form request never takes stock off the shelf.** A visitor who listed one of your stocked products in the notes had a piece deducted and the request recorded as a completed sale. It is now always one quote line to print.
+- **A sliced Bambu or Orca plate (`.gcode.3mf`) from the quote form is held beside the book like G-code,** not filed in the library, where a job could send a stranger's machine file to a printer.
+- If Khayt Cloud has no file for a request that should still be kept, the request now stays in the queue rather than being imported without its file.
+- A request whose job could not be built is no longer cleared from the cloud as if it had been imported.
+- A new request is no longer mistaken for an old one if the cloud reuses a request number.
+- Imported quote-form requests keep the customer's model link and contact in the job's notes.
+- A quote-form request is never recorded as paid, whatever its contents claim.
+
+### Added
+
+- **Khayt tells you when a quote request arrives.** A banner counts the requests waiting, the Online orders button shows how many, and each new request posts a notification — so none is left to expire unseen.
+- **Quote requests have their own card** in Online orders: the customer's notes, contact, model link and the price the form showed them, with **Import as quote** and **Delete** (spam or requests you won't take; the cloud deletes the file with it).
+- **Send a quote to the customer** by WhatsApp or email, from the job's customer link once it is published — a link that works anywhere, not only on your Wi‑Fi.
+- After an import, the sheet says which quote was made, with a button to open it.
+
+### Changed
+
+- **Quote-form requests show what the customer was quoted.** The job's notes say the price the form showed the customer, and when the form measured the model, the quote opens costed at your own rates from its weight and print time, not at zero.
+- Settings ▸ Online shows the quote form's file limits in the same units as the form ("up to 32 MB").
+- Settings ▸ Online: the switch is now "Accept quote requests from my store" and saves as soon as you flip it; the pane says where requests arrive, with **Open requests** and **Preview** buttons.
+- The link is offered first as the way that works on Salla and Zid; the frame and script are for stores that let you paste HTML.
+- A warning appears if an allowed website is a platform's shared address (such as https://salla.sa), which would let any store there show your form.
+- Clearer wording in English and Arabic: the form keeps a visitor's file for 14 days (unlike the Wi‑Fi instant quote), "model" and "form" are no longer the same Arabic word, and counts read correctly in Arabic.
+
 ## [4.0.0-beta.11] - 2026-10-29
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

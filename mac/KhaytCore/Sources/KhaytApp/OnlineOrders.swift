@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 import KhaytCore
 
 /// The orders a storefront has already sent, and what the shelf can answer.
@@ -154,6 +155,7 @@ extension Shop {
                                                        stock: stock, engine: engine))
             }
             onlineOrders = read
+            noteQuoteRequests(items)
         } catch {
             onlineOrders = []
             onlineProblem = (error as? LocalizedError)?.errorDescription
@@ -167,10 +169,37 @@ extension Shop {
                             engine: KhaytEngine) async throws -> OnlineOrder {
         var order = OnlineOrder(
             item: item,
-            reading: try await engine.shelfSaleReading(payload: item.payload,
-                                                      products: products, stock: stock))
+            reading: try await reading(item, products: products, stock: stock, engine: engine))
         order.decision = try? await engine.webStoreDecision(item.payload)
         return order
+    }
+
+    /// The order read against the shelf — except a quote-form request.
+    ///
+    /// ── A VISITOR'S REQUEST NEVER TOUCHES THE SHELF ──────────────────────
+    ///
+    /// The shelf reading turns every line of the description that starts
+    /// with `-`, `•` or `*` into an order line and matches it by name — and
+    /// trusts a `productId` in the payload. A visitor who wrote "- Phone
+    /// stand" (or sent a real product id) had a stocked piece deducted and the
+    /// request recorded as a COMPLETED job nobody priced. A quote-form request
+    /// is one line, what the visitor asked for, to print: never a shelf sale.
+    static func reading(_ item: CloudIntake.Item, products: [JSONValue], stock: JSONValue,
+                        engine: KhaytEngine) async throws -> JSONValue {
+        guard item.isQuoteForm else {
+            return try await engine.shelfSaleReading(payload: item.payload, products: products, stock: stock)
+        }
+        var qty = 1.0
+        if case .object(let p) = item.payload, case .number(let n)? = p["qty"], n.isFinite {
+            qty = min(1000, max(1, n.rounded(.down)))
+        }
+        let name = item.title.isEmpty ? "Quote request" : item.title
+        return .object([
+            "lines": .array([.object(["name": .string(name), "qty": .number(qty),
+                                      "onShelf": .number(0), "fromShelf": .number(0), "toPrint": .number(qty)])]),
+            "fromShelf": .number(0), "toPrint": .number(qty), "unmatched": .number(1),
+            "allFromShelf": .bool(false),
+        ])
     }
 
     /// `settings.storefront.stockQty`, or an empty map.
@@ -211,6 +240,8 @@ extension Shop {
         guard permitted("orders", "create") else { return }
         guard case .store = source else { return }
         onlineProblem = nil
+        onlineNotice = nil
+        onlineMade = nil
         onlineBusy = true
         defer { onlineBusy = false }
 
@@ -225,7 +256,10 @@ extension Shop {
 
         // Paid only when the store says so (or cannot place an unpaid order):
         // a button press is not a payment.
-        let paid = order.decision?.paid ?? false
+        // A quote-form request is never paid, whatever its payload claims: the
+        // payload is a visitor's, and `paid` would record a payment and fire
+        // its webhooks for a stranger's request.
+        let paid = order.item.isQuoteForm ? false : (order.decision?.paid ?? false)
         switch await writeOnlineOrder(order, paid: paid) {
         case .failure(let problem):
             onlineProblem = problem.sentence
@@ -236,7 +270,9 @@ extension Shop {
             webStoreArrived.append(WebStoreArrival(
                 intakeId: order.id, reference: order.item.reference, jobId: jobId,
                 customer: order.customer, automatic: false))
+            if order.item.isQuoteForm { onlineMade = (jobId, order.customer) }
         }
+        defer { quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count }
         if let problem = await drainOnlineOrder(order, fetch: fetch) {
             onlineProblem = problem
         }
@@ -248,6 +284,73 @@ extension Shop {
     ///
     /// Only after the write — for an order already in the book, this is the
     /// step that failed last time.
+    /// Delete a request without importing it — spam, or one the shop will
+    /// not take. The cloud deletes its file with it (the privacy page says
+    /// so). Asked first by the sheet, which names the request and the file.
+    func deleteOnlineRequest(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async {
+        // lock: asks — `permitted` below; nothing is written to the book.
+        guard permitted("orders", "create") else { return }
+        onlineProblem = nil
+        onlineNotice = nil
+        onlineMade = nil
+        onlineBusy = true
+        defer { onlineBusy = false }
+        if let problem = await drainOnlineOrder(order, fetch: fetch) {
+            onlineProblem = problem
+        } else {
+            onlineNotice = words.callIt("mac.qfe_deleted")
+            quoteRequestsWaiting = onlineOrders.filter(\.item.isQuoteForm).count
+        }
+    }
+
+    /// The jobs list, on the quote an import just made.
+    func openOnlineMade() {
+        guard let made = onlineMade else { return }
+        showingOnlineOrders = false
+        shelf = .jobs(nil)
+        selectJobs([made.jobId])
+    }
+
+    /// The Online orders sheet, from anywhere: it hangs off the catalogue.
+    func openOnlineOrders() {
+        shelf = .catalogue
+        showingOnlineOrders = true
+    }
+
+    /// Count the waiting quote-form requests and announce the new ones.
+    ///
+    /// The first read only sets the baseline — a launch is not twenty
+    /// notifications for requests the banner already counts.
+    func noteQuoteRequests(_ items: [CloudIntake.Item]) {
+        let waiting = items.filter(\.isQuoteForm)
+        quoteRequestsWaiting = waiting.count
+        let ids = Set(waiting.map(\.id))
+        guard let seen = quoteRequestsSeen else { quoteRequestsSeen = ids; return }
+        let fresh = waiting.filter { !seen.contains($0.id) }
+        quoteRequestsSeen = seen.union(ids)
+        guard !fresh.isEmpty, PrinterNotice.canDeliver else { return }
+        let title = words.callIt("mac.qfe_notify_title")
+        let bodies = fresh.map { item in
+            words.callIt("mac.qfe_notify_body", ["name": .string(item.customer.isEmpty ? "—" : item.customer),
+                                                 "title": .string(item.title)])
+        }
+        Task { await Self.notify(title: title, bodies: bodies, ids: fresh.map(\.id)) }
+    }
+
+    nonisolated static func notify(title: String, bodies: [String], ids: [String]) async {
+        let centre = UNUserNotificationCenter.current()
+        _ = try? await centre.requestAuthorization(options: [.alert, .sound])
+        for (body, id) in zip(bodies, ids) {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            content.threadIdentifier = "quote-requests"
+            try? await centre.add(UNNotificationRequest(identifier: "quote-request:" + id,
+                                                        content: content, trigger: nil))
+        }
+    }
+
     func drainOnlineOrder(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async -> String? {
         guard let build = source.build else { return nil }
         do {
@@ -329,6 +432,7 @@ extension Shop {
                                into root: inout [String: JSONValue],
                                engine: KhaytEngine, now: Date,
                                file: QuoteFormFile.Attach? = nil) async throws -> PutOnline {
+        let paid = order.item.isQuoteForm ? false : paid
         let orders = rows(root, "printLog")
         let source = order.source.isEmpty ? "online" : order.source
         if await alreadyInBook(order, source: source, orders: orders, engine: engine) {
@@ -347,10 +451,11 @@ extension Shop {
         // cannot cover now goes to a machine.
         let fresh = OnlineOrder(
             item: order.item,
-            reading: try await engine.shelfSaleReading(
-                payload: order.item.payload, products: Self.rows(root, "products"),
-                stock: Self.stockCounts(Self.settings(root))))
-        let deductions = Self.deductions(try await engine.shelfSaleEffects(fresh.reading, at: now))
+            reading: try await Self.reading(
+                order.item, products: Self.rows(root, "products"),
+                stock: Self.stockCounts(Self.settings(root)), engine: engine))
+        let deductions = order.item.isQuoteForm ? []
+            : Self.deductions(try await engine.shelfSaleEffects(fresh.reading, at: now))
         let allFromShelf = fresh.allFromShelf
 
         // ── THE CUSTOMER ───────────────────────────────────────────────────
@@ -386,10 +491,25 @@ extension Shop {
             consumables: rows(root, "consumables"))
         guard case .object(var record) = out.order,
               case .string(let jobId)? = record["id"] else {
-            return PutOnline(recorded: .alreadyThere)
+            // NOT "already there": that answer lets the caller drain, which
+            // deletes the request (and a quote-form file) with nothing saved.
+            throw OnlineWriteFailure("The job could not be made from this request.")
         }
-        // Which queue item this came from, so a second pass finds it.
+        // Which queue item this came from, so a second pass finds it — and
+        // when the cloud filed it, so a queue that hands out an old id again
+        // (a store restarted without its counter) is not mistaken for it.
         record["intakeId"] = .string(order.id)
+        if let at = order.item.createdAt { record["intakeAt"] = .string(StoreWriter.iso(at)) }
+        // ── A REQUEST NOBODY HAS ANSWERED IS NOT A SENT QUOTE ───────────
+        //
+        // `newOrder` dates a new quote as sent today and sets it to expire,
+        // which starts the follow-up and expiry clocks (`lib/quote-followup.js`
+        // reads `quoteExpiresAt`) on a request the shop has not replied to.
+        // On every path, with a file or without. The desktop does the same.
+        if order.item.isQuoteForm, Shop.plainString(record["status"]) == "quote" {
+            record["quoteSentAt"] = .null
+            record["quoteExpiresAt"] = .null
+        }
         // AND WHICH PLATFORM ORDER. `lib/order-new.js` builds the record from
         // a fixed list of fields and keeps neither `source` nor
         // `sourceOrderId`, so until this they were handed in and dropped: the
@@ -503,14 +623,20 @@ extension Shop {
     /// queue item for the same order are one), or by the queue item's own id.
     static func alreadyInBook(_ order: OnlineOrder, source: String, orders: [JSONValue],
                               engine: KhaytEngine) async -> Bool {
-        if !order.item.reference.isEmpty,
+        // A quote-form request's reference is the visitor's to write: matched
+        // against the book it could pass for an order already recorded, and
+        // be drained — deleted with its file — unimported.
+        if !order.item.reference.isEmpty, !order.item.isQuoteForm,
            (try? await engine.storefrontOrderRecorded(printLog: .array(orders), source: source,
                                                       sourceOrderId: order.item.reference)) == true {
             return true
         }
+        let filed = order.item.createdAt.map(StoreWriter.iso)
         return orders.contains { row in
-            guard case .object(let o) = row, case .string(let id)? = o["intakeId"] else { return false }
-            return id == order.id
+            guard case .object(let o) = row, case .string(let id)? = o["intakeId"], id == order.id else { return false }
+            // Same id, different filing time: a new request under a reused id.
+            if let filed, case .string(let had)? = o["intakeAt"], had != filed { return false }
+            return true
         }
     }
 
@@ -617,12 +743,38 @@ extension Shop {
         var onlyProduct: Product?
         var products = 0
 
+        // What the quote form showed the visitor, when the cloud signed it.
+        let shown = order.item.isQuoteForm ? QuoteFormFile.Shown(order.item.payload) : nil
+
         for (index, line) in order.lines.enumerated() {
             guard let id = line.productId,
                   let product = await productForEditing(id) else {
                 var unpriced = NewJobSheet.Draft()
                 unpriced.name = line.name
                 unpriced.qty = max(1, line.qty)
+                // A quote-form request is one line, and the cloud measured its
+                // model: grams and hours per piece. Costed here at THIS shop's
+                // rates, so the quote opens at a real figure rather than zero;
+                // what the visitor was shown goes in the notes beside it.
+                if let shown, shown.grams > 0, shown.hours > 0 {
+                    unpriced.grams = Money.fieldValue(shown.grams)
+                    unpriced.hours = Money.fieldValue(shown.hours)
+                    // At the quote sheet's own spool and printer — what the
+                    // form priced with (`settings.lanApi.intakeQuote`), and what
+                    // the desktop costs these at too.
+                    var sheetSpool: String?, sheetPreset: String?
+                    if case .object(let lan)? = settingsDict["lanApi"], case .object(let iq)? = lan["intakeQuote"] {
+                        if case .string(let f)? = iq["filamentId"], !f.isEmpty { sheetSpool = f }
+                        if case .string(let p)? = iq["presetId"], !p.isEmpty { sheetPreset = p }
+                    }
+                    unpriced.spoolId = sheetSpool
+                    if let costed = await costedPart(spoolId: sheetSpool, grams: shown.grams, hours: shown.hours,
+                                                     qty: unpriced.qty, presetId: sheetPreset) {
+                        unpriced.cost = costed.cost
+                        unpriced.parts = costed.parts
+                        unpriced.rates = costed.rates
+                    }
+                }
                 drafts.append(unpriced)
                 origin.append(nil)
                 continue
@@ -665,7 +817,10 @@ extension Shop {
         var input = newJobInput(
             parts: drafts, project: order.title, clientId: nil,
             margin: margin, discountPct: 0, shippingCost: 0, deposit: 0,
-            rush: false, asQuote: false,
+            // A quote-form request is a QUOTE on every path — with a file
+            // (`recordQuoteForm`) or without one (`writeOnlineOrder`): nothing
+            // was agreed or paid, so it takes no invoice number.
+            rush: false, asQuote: order.item.isQuoteForm,
             // Only when the whole order IS that product. A basket of three
             // different things is not one of them, and stamping it with a
             // productId would report the sale against the wrong catalogue row
@@ -690,7 +845,20 @@ extension Shop {
         // red one. Said after the description, one line per chosen line.
         let chosen = order.lines.filter { !$0.options.isEmpty }
             .map { "\($0.name) × \($0.qty) — \($0.optionText)" }
-        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen)
+        let shownNote = shown.map { $0.note(words) } ?? ""
+        // The visitor's link (the form asks for one when it could not keep the
+        // file — it can be the only copy) and how to reach them.
+        var reach: [String] = []
+        if order.item.isQuoteForm {
+            if let link = order.item.text("link"), let url = URL(string: link),
+               url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" {
+                reach.append(words.callIt("mac.qfe_note_link", ["link": .string(link)]))
+            }
+            if let contact = order.item.text("contact"), !contact.isEmpty {
+                reach.append(words.callIt("mac.qfe_note_contact", ["contact": .string(contact)]))
+            }
+        }
+        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen + reach + [shownNote])
             .filter { !$0.isEmpty }.joined(separator: "\n"))
         // The platform's own reference, structured rather than only quoted in
         // the notes — it is the identity a retried delivery shares with its
