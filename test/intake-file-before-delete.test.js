@@ -52,11 +52,11 @@ test('only a 404 that says the file is gone counts as gone', async () => {
   });
 });
 
-test('deleting a request says this client keeps the file first', async () => {
+test('deleting a request says this client keeps any file type first (level 2)', async () => {
   await withServer((req, res) => json(res, 200, { ok: true }), async (url, seen) => {
     await cc.deleteIntake(url, 'S', 't', 'I');
     assert.equal(seen[0].method, 'DELETE');
-    assert.equal(seen[0].headers['x-intake-file-capable'], '1');
+    assert.equal(seen[0].headers['x-intake-file-capable'], '2');
   });
 });
 
