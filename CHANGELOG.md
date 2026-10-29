@@ -4,10 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: an imported quote-form request opens costed, not at 0.** When Khayt Cloud signed the form's figures (`payload.quote.verified`), "Create quote" adds one part: the per-piece grams (waste included) and hours, times the request's quantity, at the shop's own rates. Material and printer rates come from the quote sheet's spool or flat basis and printer preset (`settings.lanApi.intakeQuote`, which the published quote sheet is built from); without them, the shop's default rates are used and material is left at 0. The price stays unset for the shop to decide, and `quoteExpiresAt` is null like `quoteSentAt`. Matches the Mac (#2096).
-
-- **Desktop: an imported quote-form request notes the instant price the customer was shown.** "Create quote" adds a note with Khayt Cloud's signed estimate (`payload.quote`, only when `verified`): price and currency, plus grams and hours, and "rough estimate" when the cloud says it is not reliable. The quote's own price stays 0 for the shop to set, because the form's figure is the published sheet's estimate and is never binding.
-
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.
@@ -6561,6 +6557,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.34] - 2026-10-29
+
+### Fixed
+
+- **Desktop: an imported quote-form request opens costed, not at 0.** When Khayt Cloud signed the form's figures (`payload.quote.verified`), "Create quote" adds one part: the per-piece grams (waste included) and hours, times the request's quantity, at the shop's own rates. Material and printer rates come from the quote sheet's spool or flat basis and printer preset (`settings.lanApi.intakeQuote`, which the published quote sheet is built from); without them, the shop's default rates are used and material is left at 0. The price stays unset for the shop to decide, and `quoteExpiresAt` is null like `quoteSentAt`. Matches the Mac (#2096).
+
+- **Desktop: an imported quote-form request notes the instant price the customer was shown.** "Create quote" adds a note with Khayt Cloud's signed estimate (`payload.quote`, only when `verified`): price and currency, plus grams and hours, and "rough estimate" when the cloud says it is not reliable. The quote's own price stays 0 for the shop to set, because the form's figure is the published sheet's estimate and is never binding.
 
 ## [3.11.33] - 2026-10-29
 
