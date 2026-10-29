@@ -527,6 +527,7 @@ struct QuoteFormImportTests {
         #expect(Shop.plainString(job["status"]) == "quote")
         #expect(job["invoiceNum"] == nil || job["invoiceNum"] == .null)
         #expect(!(Shop.plainString(job["id"]) ?? "").hasPrefix("INV"))
+        #expect(job["quoteSentAt"] == nil || job["quoteSentAt"] == .null, "nothing was sent to the visitor yet")
         guard case .object(let settings)? = try scratch.read()["settings"] else { Issue.record("no settings"); return }
         #expect(settings["invNumNext"] == .number(1), "the invoice counter must not move")
     }

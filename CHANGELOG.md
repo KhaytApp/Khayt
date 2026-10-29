@@ -8870,6 +8870,21 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.12] - 2026-10-29
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **A quote-form request sent without a file is a quote too.** beta.11 fixed requests that carry a model; one sent with only a description still took an invoice number.
+- An imported quote-form request is no longer marked as a quote sent today, since nothing has been sent to the customer yet.
+
+### Changed
+
+- **Quote-form requests show what the customer was quoted.** The job's notes say the price the form showed the customer, and when the form measured the model, the quote opens costed at your own rates from its weight and print time, not at zero.
+- Settings ▸ Online shows the quote form's file limits in the same units as the form ("up to 32 MB").
+
 ## [4.0.0-beta.11] - 2026-10-29
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

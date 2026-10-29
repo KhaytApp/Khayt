@@ -1070,6 +1070,12 @@ enum Format {
         n.formatted(.byteCount(style: .file).locale(Money.digits))
     }
 
+    /// A size counted in 1024s, as a server's limit is set ("32 MB" for
+    /// 32 MiB), with a plain 0 rather than "Zero kB".
+    static func memorySize(_ n: Int64) -> String {
+        n.formatted(.byteCount(style: .memory, spellsOutZero: false).locale(Money.digits))
+    }
+
     /// Millimetres with no more precision than a shop can hold a caliper to.
     static func mm(_ v: Double) -> String { String(format: "%.0f", v) }
 

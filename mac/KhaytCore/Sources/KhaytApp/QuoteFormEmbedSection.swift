@@ -221,11 +221,13 @@ struct QuoteFormEmbedSection: View {
                          ?? words.callIt("mac.qfe_files_count", ["n": .number(Double(count))]))
         }
         if let bytes = f.bytes {
-            let used = Format.fileSize(Int64(bytes))
-            parts.append(f.maxBytes.map { used + " / " + Format.fileSize(Int64($0)) } ?? used)
+            // In the units the form itself says ("up to 32 MB" is 32 MiB),
+            // so the pane and the form name the same limit the same way.
+            let used = Format.memorySize(Int64(bytes))
+            parts.append(f.maxBytes.map { used + " / " + Format.memorySize(Int64($0)) } ?? used)
         }
         if let each = f.maxFileBytes {
-            parts.append(words.callIt("mac.qfe_files_each", ["size": .string(Format.fileSize(Int64(each)))]))
+            parts.append(words.callIt("mac.qfe_files_each", ["size": .string(Format.memorySize(Int64(each)))]))
         }
         guard !parts.isEmpty else { return nil }
         return parts.map { "\u{2068}" + $0 + "\u{2069}" }.joined(separator: " · ")

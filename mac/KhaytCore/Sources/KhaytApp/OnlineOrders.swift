@@ -617,12 +617,29 @@ extension Shop {
         var onlyProduct: Product?
         var products = 0
 
+        // What the quote form showed the visitor, when the cloud signed it.
+        let shown = order.item.isQuoteForm ? QuoteFormFile.Shown(order.item.payload) : nil
+
         for (index, line) in order.lines.enumerated() {
             guard let id = line.productId,
                   let product = await productForEditing(id) else {
                 var unpriced = NewJobSheet.Draft()
                 unpriced.name = line.name
                 unpriced.qty = max(1, line.qty)
+                // A quote-form request is one line, and the cloud measured its
+                // model: grams and hours per piece. Costed here at THIS shop's
+                // rates, so the quote opens at a real figure rather than zero;
+                // what the visitor was shown goes in the notes beside it.
+                if let shown, order.lines.count == 1, shown.grams > 0, shown.hours > 0 {
+                    unpriced.grams = Money.fieldValue(shown.grams)
+                    unpriced.hours = Money.fieldValue(shown.hours)
+                    if let costed = await costedPart(spoolId: nil, grams: shown.grams, hours: shown.hours,
+                                                     qty: unpriced.qty) {
+                        unpriced.cost = costed.cost
+                        unpriced.parts = costed.parts
+                        unpriced.rates = costed.rates
+                    }
+                }
                 drafts.append(unpriced)
                 origin.append(nil)
                 continue
@@ -665,7 +682,10 @@ extension Shop {
         var input = newJobInput(
             parts: drafts, project: order.title, clientId: nil,
             margin: margin, discountPct: 0, shippingCost: 0, deposit: 0,
-            rush: false, asQuote: false,
+            // A quote-form request is a QUOTE on every path — with a file
+            // (`recordQuoteForm`) or without one (`writeOnlineOrder`): nothing
+            // was agreed or paid, so it takes no invoice number.
+            rush: false, asQuote: order.item.isQuoteForm,
             // Only when the whole order IS that product. A basket of three
             // different things is not one of them, and stamping it with a
             // productId would report the sale against the wrong catalogue row
@@ -690,7 +710,8 @@ extension Shop {
         // red one. Said after the description, one line per chosen line.
         let chosen = order.lines.filter { !$0.options.isEmpty }
             .map { "\($0.name) × \($0.qty) — \($0.optionText)" }
-        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen)
+        let shownNote = shown.map { $0.note(words) } ?? ""
+        input["notes"] = .string(([order.item.text("description") ?? ""] + chosen + [shownNote])
             .filter { !$0.isEmpty }.joined(separator: "\n"))
         // The platform's own reference, structured rather than only quoted in
         // the notes — it is the identity a retried delivery shares with its

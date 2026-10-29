@@ -31,6 +31,42 @@ import KhaytCore
 /// written and nothing is drained.
 enum QuoteFormFile {
 
+    /// What the form showed the visitor — the cloud's own signed figure
+    /// (`payload.quote`, `verified: true`; khayt-cloud drops a price the
+    /// browser merely claims). Never binding: the shop confirms the price.
+    /// `grams` and `hours` are PER PIECE; `price` is for all `qty`.
+    struct Shown: Equatable, Sendable {
+        let price: Double
+        let currency: String
+        let qty: Int
+        let grams: Double
+        let hours: Double
+        let reliable: Bool
+
+        init?(_ payload: JSONValue) {
+            guard case .object(let p) = payload, case .object(let q)? = p["quote"],
+                  q["verified"] == .bool(true),
+                  case .number(let price)? = q["price"], price > 0, price.isFinite else { return nil }
+            func number(_ key: String) -> Double {
+                if case .number(let n)? = q[key], n.isFinite, n > 0 { return n }
+                return 0
+            }
+            self.price = price
+            if case .string(let c)? = q["currency"] { currency = c } else { currency = "" }
+            qty = max(1, Int(number("qty")))
+            grams = number("grams")
+            hours = number("hours")
+            reliable = q["reliable"] != .bool(false)
+        }
+
+        /// The line the job's notes carry, in the shop's words.
+        @MainActor func note(_ words: Words) -> String {
+            let amount = String(format: "%.2f", price) + (currency.isEmpty ? "" : " " + currency)
+            let key = reliable ? "mac.qfe_shown_note" : "mac.qfe_shown_note_unreliable"
+            return words.callIt(key, ["price": .string(amount), "qty": .number(Double(qty))])
+        }
+    }
+
     /// What the quote form may put in the library: meshes and CAD a shop
     /// slices itself. A machine file (G-code and the rest) from an anonymous
     /// visitor is never filed where a job could send it to a printer.
@@ -201,6 +237,11 @@ enum QuoteFormFile {
             record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
         }
         record["quoteFile"] = .object(facts)
+        // Nothing has been sent to the visitor: the shop has not answered
+        // yet. `newOrder` stamps a quote as sent today, which would start its
+        // follow-up and expiry clocks on a request nobody has replied to. The
+        // desktop imports these with no sent date as well.
+        if Shop.plainString(record["status"]) == "quote" { record["quoteSentAt"] = .null }
     }
 
     nonisolated static func instant(_ text: String) -> Date? {
@@ -280,7 +321,8 @@ extension Shop {
             result.expired = true
             attach = .init(meta: meta, state: .expired(note: expiredNote))
         case .file(let data, let header):
-            if let refusal = QuoteFormFile.verify(data, meta: meta, header: header) {
+            // Hashed off the main thread: up to 32 MB of SHA-256.
+            if let refusal = await PinWork.run({ QuoteFormFile.verify(data, meta: meta, header: header) }) {
                 result.refusal = refusal
                 return result
             }
