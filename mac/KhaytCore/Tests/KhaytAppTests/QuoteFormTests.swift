@@ -540,3 +540,48 @@ struct QuoteFormImportTests {
         #expect(meta.expiresAt != nil)
     }
 }
+
+/// The DELETE says this app downloads a request's file first — and only the
+/// DELETE says it.
+@MainActor
+struct IntakeFileCapableTests {
+    static let connection = CloudReader.Connection(url: "https://cloud.example", shopId: "shop_a1", storedToken: "")
+
+    @Test("every intake DELETE carries X-Intake-File-Capable; a list does not")
+    func header() async throws {
+        var seen: [URLRequest] = []
+        let fetch: CloudIntake.Fetch = { r in
+            seen.append(r)
+            let body = r.httpMethod == "GET" ? Data(#"{"items":[]}"#.utf8) : Data("{}".utf8)
+            return (body, HTTPURLResponse(url: r.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        try await CloudIntake.drain(Self.connection, token: "t", id: "21", fetch: fetch)
+        _ = try await CloudIntake.list(Self.connection, token: "t", fetch: fetch)
+        #expect(seen[0].value(forHTTPHeaderField: "X-Intake-File-Capable") == "1")
+        #expect(seen[0].value(forHTTPHeaderField: "x-delta-capable") == "1")
+        #expect(seen[1].value(forHTTPHeaderField: "X-Intake-File-Capable") == nil)
+    }
+
+    @Test("409 file-not-downloaded is its own failure; another 409 is a refusal")
+    func conflict() async throws {
+        func answer(_ json: String) -> CloudIntake.Fetch {
+            { r in (Data(json.utf8), HTTPURLResponse(url: r.url!, statusCode: 409, httpVersion: nil, headerFields: nil)!) }
+        }
+        await #expect(throws: CloudIntake.Failure.self) {
+            try await CloudIntake.drain(Self.connection, token: "t", id: "21",
+                                        fetch: answer(#"{"error":"Conflict","reason":"file-not-downloaded"}"#))
+        }
+        do {
+            try await CloudIntake.drain(Self.connection, token: "t", id: "21",
+                                        fetch: answer(#"{"error":"Conflict","reason":"file-not-downloaded"}"#))
+        } catch CloudIntake.Failure.fileNotDownloaded {
+        } catch { Issue.record("expected fileNotDownloaded, got \(error)") }
+        do {
+            try await CloudIntake.drain(Self.connection, token: "t", id: "21",
+                                        fetch: answer(#"{"error":"Busy","reason":"other"}"#))
+            Issue.record("expected a refusal")
+        } catch CloudIntake.Failure.refused(let code, _) {
+            #expect(code == 409)
+        } catch { Issue.record("expected refused, got \(error)") }
+    }
+}
