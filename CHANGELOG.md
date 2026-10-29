@@ -4,7 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a quote-form request's model file is saved with the quote before the request is deleted.** Requests from Khayt Cloud's quote form can carry the customer's model file, and deleting a request on Khayt Cloud deletes that file. "Create quote" in Order requests now downloads the file first, checks its size and SHA-256, and attaches it to the new quote. Only then does it delete the request. If the download or the check fails, nothing is created and the request stays in the list. A file Khayt Cloud no longer holds (it keeps them 14 days) is noted on the quote. Dismiss asks before deleting a request that still has a file. The row shows the file's name and size, or that it expired. The desktop now tells Khayt Cloud it handles these files (`X-Intake-File-Capable: 1`), so the server can refuse a delete from an older build that would lose the file.
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.
@@ -6558,6 +6557,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.32] - 2026-10-29
+
+### Fixed
+
+- **Desktop: a quote-form request's model file is saved with the quote before the request is deleted.** Requests from Khayt Cloud's quote form can carry the customer's model file, and deleting a request on Khayt Cloud deletes that file. "Create quote" in Order requests now downloads the file first, checks its size and SHA-256, and attaches it to the new quote. Only then does it delete the request. If the download or the check fails, nothing is created and the request stays in the list. A file Khayt Cloud no longer holds (it keeps them 14 days) is noted on the quote. Dismiss asks before deleting a request that still has a file. The row shows the file's name and size, or that it expired. The desktop now tells Khayt Cloud it handles these files (`X-Intake-File-Capable: 1`), so the server can refuse a delete from an older build that would lose the file.
 
 ## [3.11.31] - 2026-10-29
 
