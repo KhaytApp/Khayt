@@ -345,7 +345,7 @@ struct LibraryItemPage: View {
         problemIsQuiet = true
         guard item.estimable || item.grams != nil else {
             answer = nil
-            problem = L10n.tr("library.not_estimable")
+            problem = L10n.tr(item.figuresStale ? "library.stale" : "library.not_estimable")
             return
         }
         guard !api.isSampleShop else {

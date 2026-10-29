@@ -75,10 +75,13 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let grams: Double?
     let plates: [Plate]
     let testedNotes: String?
+    /// A new version the Mac has not measured yet (`figuresStaleFor`), as
+    /// the phone's copy reads it.
+    let figuresStale: Bool
 
     private enum CodingKeys: String, CodingKey {
         case id, name, folder, category, tags, material, ext, favorite, timesPrinted, lastPrinted, thumb,
-             estimable, printTimeMins, grams, plates, testedNotes
+             estimable, printTimeMins, grams, plates, testedNotes, figuresStale
     }
 
     init(from decoder: Decoder) throws {
@@ -97,6 +100,7 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
         timesPrinted = try? c.decode(Int.self, forKey: .timesPrinted)
         thumb = (try? c.decode(Bool.self, forKey: .thumb)) ?? false
         estimable = (try? c.decode(Bool.self, forKey: .estimable)) ?? false
+        figuresStale = (try? c.decode(Bool.self, forKey: .figuresStale)) ?? false
         // A recorded 0 is a slicer that measured nothing, not a free print.
         func positive(_ k: CodingKeys) -> Double? { (try? c.decode(Double.self, forKey: k)).flatMap { $0 > 0 ? $0 : nil } }
         printTimeMins = positive(.printTimeMins)
