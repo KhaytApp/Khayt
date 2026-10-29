@@ -19,6 +19,10 @@ import KhaytCore
 ///      write;
 ///   5. and ONLY THEN drain the queue.
 ///
+/// A file that is not a model (G-code and the rest) never goes in the library
+/// at step 3: it is kept beside the book instead (`heldFolder`), and a failure
+/// to keep it is a failure before 5 like any other.
+///
 /// Anything that fails before 5 leaves the request in the queue, with its
 /// file, for the next try. A file the cloud has already let expire (404
 /// `no-file`) is the one exception: there is nothing left to lose, so the
@@ -31,6 +35,20 @@ enum QuoteFormFile {
     /// slices itself. A machine file (G-code and the rest) from an anonymous
     /// visitor is never filed where a job could send it to a printer.
     static let modelKinds: Set<String> = ["stl", "3mf", "obj", "step", "stp", "iges", "igs", "amf", "ply"]
+
+    /// Where a file the library does not take is kept instead: beside the
+    /// book, one folder per request, never under a library root. The DELETE
+    /// that follows deletes the cloud's copy too (khayt-cloud #146 trusts
+    /// `X-Intake-File-Capable` to mean the Mac kept it), so a customer's
+    /// G-code must land here before the drain, not be dropped.
+    static func heldFolder(storeURL: URL, requestId: String) -> URL {
+        let safe = String(requestId.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
+        }.map(Character.init))
+        return storeURL.deletingLastPathComponent()
+            .appending(path: "Quote form files", directoryHint: .isDirectory)
+            .appending(path: safe.isEmpty ? "request" : safe, directoryHint: .isDirectory)
+    }
 
     /// The most a quote-form file can be (khayt-cloud `QUOTE_MAX_BYTES`
     /// default), used when the request does not say its size.
@@ -138,8 +156,9 @@ enum QuoteFormFile {
             /// the shop's words, so nobody goes looking for a model.
             case expired(note: String)
             /// Not a kind the quote form files (a machine file, an empty
-            /// one): imported without it, the note says why.
-            case notTaken(note: String)
+            /// one): not in the library, the note says why. `heldAt` is
+            /// where the bytes were kept instead; nil only for an empty file.
+            case notTaken(note: String, heldAt: String?)
         }
         let meta: Meta
         let state: State
@@ -170,9 +189,10 @@ enum QuoteFormFile {
                 }
                 record["parts"] = .array(parts)
             }
-        case .notTaken(let note):
+        case .notTaken(let note, let heldAt):
             facts["expired"] = .bool(false)
             facts["notTaken"] = .bool(true)
+            if let heldAt { facts["heldAt"] = .string(heldAt) }
             let notes = Shop.plainString(record["notes"]) ?? ""
             record["notes"] = .string(notes.isEmpty ? note : notes + "\n" + note)
         case .expired(let note):
@@ -204,8 +224,10 @@ extension Shop {
         var refusal: QuoteFormFile.Refusal?
         /// The file was gone (404 `no-file`): imported without it.
         var expired = false
-        /// The file was not a kind the quote form files: imported without it.
+        /// The file was not a kind the quote form files: not in the library.
         var notTaken = false
+        /// Where such a file was kept instead (nil for an empty one).
+        var heldAt: URL?
         /// The library model the job points at, when the file was filed.
         var printFileId: String?
         var drained = false
@@ -226,6 +248,7 @@ extension Shop {
                                 existingModel: (String) -> String?,
                                 analyseRisk: Bool = false,
                                 notTakenNote: String = "",
+                                heldNote: ((String) -> String)? = nil,
                                 expiredNote: String,
                                 owns: @escaping @Sendable () -> Bool,
                                 whoHasIt: @escaping @Sendable () -> String?,
@@ -264,7 +287,28 @@ extension Shop {
             let kind = (meta.safeName as NSString).pathExtension.lowercased()
             if data.isEmpty || !QuoteFormFile.modelKinds.contains(kind) {
                 result.notTaken = true
-                attach = .init(meta: meta, state: .notTaken(note: notTakenNote))
+                if data.isEmpty {
+                    attach = .init(meta: meta, state: .notTaken(note: notTakenNote, heldAt: nil))
+                    break
+                }
+                // Kept beside the book, out of the library, BEFORE the
+                // drain deletes the cloud's copy. If it cannot be kept, the
+                // request stays in the queue with its file.
+                let folder = QuoteFormFile.heldFolder(storeURL: storeURL, requestId: order.id)
+                let held = folder.appending(path: meta.safeName)
+                let wrote: String? = await PinWork.run {
+                    do {
+                        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                        try data.write(to: held, options: .atomic)
+                        return nil
+                    } catch { return error.localizedDescription }
+                }
+                if let wrote {
+                    result.refusal = .write(wrote)
+                    return result
+                }
+                result.heldAt = held
+                attach = .init(meta: meta, state: .notTaken(note: heldNote?(held.path) ?? held.path, heldAt: held.path))
                 break
             }
             // The same bytes already in the library: the job points at that
@@ -320,6 +364,8 @@ extension Shop {
             }
         } catch {
             if let preparedDir { await PinWork.run { try? FileManager.default.removeItem(at: preparedDir) } }
+            // The held copy stays: the cloud still has the request, the next
+            // try writes the same bytes to the same place.
             result.refusal = .write((error as? LocalizedError)?.errorDescription ?? String(describing: error))
             return result
         }
@@ -374,6 +420,7 @@ extension Shop {
             existingModel: { hash in files.first { $0.contentHash == hash }?.id },
             analyseRisk: analysesRiskAtImport,
             notTakenNote: words.callIt("mac.qfe_file_not_taken_note", ["name": .string(meta.safeName)]),
+            heldNote: { [words] path in words.callIt("mac.qfe_file_held_note", ["name": .string(meta.safeName), "path": .string(path)]) },
             expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.safeName)]),
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
@@ -391,7 +438,9 @@ extension Shop {
                 intakeId: order.id, reference: order.item.reference, jobId: jobId,
                 customer: order.customer, automatic: false))
             if result.expired { onlineProblem = words.callIt("mac.qfe_imported_expired") }
-            if result.notTaken { onlineProblem = words.callIt("mac.qfe_imported_not_taken") }
+            if result.notTaken {
+                onlineProblem = words.callIt(result.heldAt == nil ? "mac.qfe_imported_not_taken" : "mac.qfe_imported_held")
+            }
         case .alreadyThere?:
             onlineProblem = words.callIt("mac.online_already_recorded")
         case nil:

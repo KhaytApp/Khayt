@@ -8862,6 +8862,15 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.10] - 2026-10-29
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **A quote-form request with a G-code (or any file that is not a model) no longer loses the file.** It still stays out of your library, so nothing can send a stranger's machine file to a printer, but it is now saved in a "Quote form files" folder beside your book before the request is cleared from Khayt Cloud, and the job says where. If it cannot be saved, the request stays in the queue.
+
 ## [4.0.0-beta.9] - 2026-10-29
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

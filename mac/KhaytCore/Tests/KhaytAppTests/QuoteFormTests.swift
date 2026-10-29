@@ -461,7 +461,7 @@ struct QuoteFormImportTests {
         return .object(p)
     }
 
-    @Test("a machine file from a visitor is never filed: imported without it, noted, then drained")
+    @Test("a machine file from a visitor is never filed: kept beside the book, noted, then drained")
     func machineFileNotTaken() async throws {
         let engine = try KhaytEngine()
         let scratch = try Self.scratch()
@@ -479,6 +479,40 @@ struct QuoteFormImportTests {
         guard case .object(let facts)? = job["quoteFile"] else { Issue.record("no quoteFile"); return }
         #expect(facts["notTaken"] == .bool(true))
         #expect(facts["printFileId"] == nil)
+        // The DELETE deletes the cloud's copy too (khayt-cloud #146), so the
+        // G-code must already be kept, out of the library, when it goes.
+        let held = try #require(result.heldAt)
+        #expect(facts["heldAt"] == .string(held.path))
+        #expect(try Data(contentsOf: held) == gcode)
+        #expect(!held.path.hasPrefix(scratch.library.path))
+        #expect(held.lastPathComponent == "part.gcode")
+        #expect(cloud.log == [Self.filePath, Self.drainPath])
+    }
+
+    @Test("a machine file that cannot be kept stays in the queue: nothing written, no drain")
+    func machineFileUnkeptStaysQueued() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        // A plain file where the held folder would go: the save fails.
+        let blocker = scratch.store.deletingLastPathComponent().appending(path: "Quote form files")
+        try Data("x".utf8).write(to: blocker)
+        let gcode = Data("G28\n".utf8)
+        let cloud = Cloud(scratch: scratch, body: gcode)
+        let result = try await Self.run(Self.renamed(Self.payload(gcode), to: "part.gcode"),
+                                        cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal != nil)
+        #expect(!result.drained)
+        #expect(cloud.log == [Self.filePath])
+        #expect(try scratch.jobs().isEmpty)
+    }
+
+    @Test("the held folder name is made of the request id's safe characters")
+    func heldFolderIsSafe() {
+        let store = URL(fileURLWithPath: "/shop/khayt.json")
+        let folder = QuoteFormFile.heldFolder(storeURL: store, requestId: "../../etc")
+        #expect(folder.path == "/shop/Quote form files/etc")
+        #expect(QuoteFormFile.heldFolder(storeURL: store, requestId: "..").lastPathComponent == "request")
     }
 
     @Test("a file object with no name is still a quote-form file")
