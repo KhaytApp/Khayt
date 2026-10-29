@@ -3908,6 +3908,8 @@
   "intake.file_failed": "Müşterinin model dosyası kaydedilemedi, bu yüzden talep listede kalıyor. {error}",
   "intake.dismiss_file_q": "Bu talep yok sayılsın mı? Bu, müşterinin model dosyasını ({name}) da Khayt Cloud'dan siler.",
   "intake.file_gone_note": "Model dosyası: {name} (artık Khayt Cloud'da değil; orada 14 gün saklanır)",
+  "intake.instant_quote_note": "Müşteriye gösterilen anlık fiyat: {price} {currency}{details}",
+  "intake.instant_quote_rough": " (kaba tahmin)",
   "stl.estimate_btn": "📐 3D modelden tahmin et",
   "stl.note_tpl": "Boyut {x}×{y}×{z} mm · dolu {solid} g → tah. {weight} g · ~{time} sa",
   "stl.note_assume": "%{infill} dolgu · {density} g/cm³",

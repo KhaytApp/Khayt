@@ -3908,6 +3908,8 @@
   "intake.file_failed": "No se pudo guardar el archivo del modelo del cliente, así que la solicitud sigue en la lista. {error}",
   "intake.dismiss_file_q": "¿Descartar esta solicitud? También se eliminará de Khayt Cloud el archivo del modelo del cliente ({name}).",
   "intake.file_gone_note": "Archivo del modelo: {name} (ya no está en Khayt Cloud, que lo guarda durante 14 días)",
+  "intake.instant_quote_note": "Precio instantáneo mostrado al cliente: {price} {currency}{details}",
+  "intake.instant_quote_rough": " (estimación aproximada)",
   "stl.estimate_btn": "📐 Estimar desde modelo 3D",
   "stl.note_tpl": "Tamaño {x}×{y}×{z} mm · sólido {solid} g → est. {weight} g · ~{time} h",
   "stl.note_assume": "{infill}% relleno · {density} g/cm³",

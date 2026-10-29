@@ -3909,6 +3909,8 @@
   "intake.file_failed": "Could not save the customer's model file, so the request stays in the list. {error}",
   "intake.dismiss_file_q": "Dismiss this request? This also deletes the customer's model file ({name}) from Khayt Cloud.",
   "intake.file_gone_note": "Model file: {name} (no longer on Khayt Cloud, which keeps it for 14 days)",
+  "intake.instant_quote_note": "Instant price shown to the customer: {price} {currency}{details}",
+  "intake.instant_quote_rough": " (rough estimate)",
   "stl.estimate_btn": "📐 Estimate from 3D model",
   "stl.note_tpl": "Size {x}×{y}×{z} mm · solid {solid} g → est. {weight} g · ~{time} h",
   "stl.note_assume": "{infill}% infill · {density} g/cm³",
