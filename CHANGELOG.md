@@ -20,8 +20,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Import Model Bundle: a licence or source link is kept only when it is https. Only known kinds are unpacked (models, pictures, PDFs and slicer profiles), and each carries the bundle's quarantine. Tags and the group are tidied, text loses control and format characters, member names are compared as macOS compares them (NFC, case), and a full disk fails the import instead of crashing. A bundle's print time and grams are kept as "the bundle's estimate", capped, and never read as measured. A stranger's source no longer captures the shop's own later save of that page from the browser; a bundle this shop exported is recognised by a mark only this Mac can make.
   - Library stage 3b words and layout: the variants suggestion reads correctly for one, two and more in English and Arabic; "Stack N Models" has its Arabic count forms; the Views help names the shortcuts in order (Iso first); the stack's member list marks the cover, bolds this model and selects a member on click; the Views section is offered only when the file is on this Mac; «السعة» is now «الحجم».
 
-- **Desktop: saving Telegram settings keeps the Mac's own Telegram switches.** The desktop's Telegram form replaced the whole Telegram block when saved. That reset the switches the Mac keeps there and the desktop doesn't show: filament runout alerts and the print finished, failed and paused messages, with or without job names. It now saves over what's stored, as the Mac's settings save already does.
-- **Desktop: the colour planner costs a print's time in hours, not minutes.** "Add to calculator" in the multicolour planner passed the slicer's time in minutes where the calculator expects hours. So a 5-hour print was costed as 300 hours of machine wear, power and printer time. It now converts to hours. A file whose figures the Mac has marked as measured from an older version of the file uses the calculator's own time instead.
 - **iPhone: a model with a new version the Mac has not measured yet is not priced from the old one.** Away from the shop the library copy priced such a model (`figuresStaleFor`) from the previous file's slicer figures or shape, which the Mac no longer uses for it. The copy now shows no time or weight for it and says to price it on the shop Wi-Fi or use the calculator, until the Mac measures it again.
 - **iPhone: archived models stay off the library away from the shop.** The library copy the phone keeps for pricing on mobile data listed models put aside on the Mac (`archivedAt`), which the Mac's own library and the list it serves the phone on Wi-Fi both leave out. The copy now leaves them out too, and a model brought back on the Mac returns with its next sync.
 - **iPhone: library pictures from every folder, not only the top one.** Keeping the library's pictures for away from the shop asked the Mac for its list with no folder, which lists the top folder's models and nothing below it, so models in folders had no picture away from the shop. It now walks every folder, and a walk that finishes lets go of the pictures of models the Mac no longer lists (archived, deleted, or without a picture now).
@@ -6551,6 +6549,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.31] - 2026-10-29
+
+### Fixed
+
+- **Desktop: the colour planner costs a print's time in hours, not minutes.** "Add to calculator" in the multicolour planner passed the slicer's time in minutes where the calculator expects hours. So a 5-hour print was costed as 300 hours of machine wear, power and printer time. It now converts to hours. A file whose figures the Mac has marked as measured from an older version of the file uses the calculator's own time instead.
+- **Desktop: saving Telegram settings keeps the Mac's own Telegram switches.** The desktop's Telegram form replaced the whole Telegram block when saved. That reset the switches the Mac keeps there and the desktop doesn't show: filament runout alerts and the print finished, failed and paused messages, with or without job names. It now saves over what's stored, as the Mac's settings save already does.
 
 ## [3.11.30] - 2026-10-26
 
