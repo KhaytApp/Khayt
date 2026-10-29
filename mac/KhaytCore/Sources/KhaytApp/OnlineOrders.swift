@@ -214,6 +214,15 @@ extension Shop {
         onlineBusy = true
         defer { onlineBusy = false }
 
+        // A REQUEST CARRYING A FILE (the quote form) has one more step, and it
+        // comes first: draining deletes the file on the cloud, so it is
+        // downloaded, checked and filed before anything else — see
+        // `QuoteFormFile`.
+        if let meta = order.item.file {
+            await recordQuoteFormOrder(order, meta: meta, fetch: fetch)
+            return
+        }
+
         // Paid only when the store says so (or cannot place an unpaid order):
         // a button press is not a payment.
         let paid = order.decision?.paid ?? false
@@ -297,6 +306,8 @@ extension Shop {
     struct PutOnline {
         let recorded: Recorded
         var webhooks: [KhaytEngine.WebhookDelivery] = []
+        /// A quote-form file was written into the book with the job.
+        var fileFiled = false
     }
 
     /// The order, into a book already open for writing. INSIDE the chain,
@@ -316,7 +327,8 @@ extension Shop {
     /// deduction from the shelf.
     static func putOnlineOrder(_ order: OnlineOrder, input: [String: JSONValue], paid: Bool,
                                into root: inout [String: JSONValue],
-                               engine: KhaytEngine, now: Date) async throws -> PutOnline {
+                               engine: KhaytEngine, now: Date,
+                               file: QuoteFormFile.Attach? = nil) async throws -> PutOnline {
         let orders = rows(root, "printLog")
         let source = order.source.isEmpty ? "online" : order.source
         if await alreadyInBook(order, source: source, orders: orders, engine: engine) {
@@ -409,6 +421,20 @@ extension Shop {
         // through the shared payment rule — not by setting a flag, which is
         // how a book ends up with a job that says paid and a balance that
         // says owed. `other`, because the store did not say which card.
+        // ── THE VISITOR'S MODEL, WHEN THE QUOTE FORM CARRIED ONE ──────────
+        //
+        // In this same write: the library record (when the file is new to the
+        // library) and the job pointing at it land together or not at all.
+        // `QuoteFormFile` says why the drain waits for this.
+        var fileFiled = false
+        if let file {
+            QuoteFormFile.stamp(file, on: &record)
+            if case .filed(_, let newRecord?) = file.state {
+                root["printFiles"] = .array([.object(newRecord)] + rows(root, "printFiles"))
+            }
+            fileFiled = true
+        }
+
         var job: JSONValue = .object(record)
         var webhooks: [KhaytEngine.WebhookDelivery] = []
         let settingsNow = out.settings
@@ -469,7 +495,7 @@ extension Shop {
         root["settings"] = .object(settings)
         return PutOnline(recorded: .made(jobId: jobId, clientId: clientId,
                                          newCustomer: newCustomer, paid: paid && amount > 0),
-                         webhooks: webhooks)
+                         webhooks: webhooks, fileFiled: fileFiled)
     }
 
     /// Is this queue item's order already a job in the book? By the

@@ -425,6 +425,33 @@ import KhaytCore
     /// picture is given a client id; the shipped app has Khayt's built in and
     /// draws the same screen. The connected card is handed its account and
     /// usage, because a picture cannot ask Google.
+    /// The quote form pane (khayt-cloud #144) in the states a shop can meet:
+    /// not connected, not available yet, and shown — for an owner, and for a
+    /// sign-in that can only read it. Handed its state: nothing asks the cloud.
+    @Test("the quote form pane renders, not connected, not available and shown")
+    func quoteFormPane() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        defer { shop.pretendsOwner = false }
+        let lang = Direction.shopLanguage()
+        let state = try JSONDecoder().decode(QuoteFormEmbed.State.self, from: Data(QuoteFormEmbedTests.full.utf8))
+
+        func shoot(_ name: String, _ height: CGFloat, _ shown: Shop.QuoteFormPane) throws {
+            func pane() -> some View {
+                QuoteFormEmbedSection(shop: shop, shown: shown, flat: true)
+                    .padding(20)
+                    .frame(width: 600, height: height, alignment: .top)
+            }
+            try render(pane().background(Khayt.ground), "\(name)-\(lang)-light", size: CGSize(width: 600, height: height))
+            try renderDark(pane(), "\(name)-\(lang)-dark", size: CGSize(width: 600, height: height))
+        }
+        try shoot("64-quote-form-needs-cloud", 140, .needsCloud)
+        try shoot("65-quote-form-not-available", 140, .notAvailable)
+        try shoot("66-quote-form-read-only", 900, .shown(state))
+        shop.pretendsOwner = true
+        try shoot("67-quote-form-owner", 900, .shown(state))
+    }
+
     @Test("the online storage pane renders, before, during and after connecting Drive")
     func onlineStorage() async throws {
         let shop = Shop()

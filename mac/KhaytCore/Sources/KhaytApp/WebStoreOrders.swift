@@ -104,7 +104,9 @@ extension Shop {
 
         var made = 0
         var changed = false
-        for item in items where !webStoreGaveUp.contains(item.id) {
+        // Never a request that carries a file: draining it would delete the
+        // file on the cloud, and only the button downloads it first.
+        for item in items where !webStoreGaveUp.contains(item.id) && item.file == nil {
             // Read against the shelf as it is NOW — a previous order on this
             // pass may just have taken the last one.
             guard let order = try? await Self.onlineOrder(
