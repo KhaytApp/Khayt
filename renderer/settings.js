@@ -6645,7 +6645,11 @@ function renderTelegramSettings() {
     const notifyPrinterError   = el.querySelector('#tgNotifyPrinterError').checked;
     const notifyPrinterOffline = el.querySelector('#tgNotifyPrinterOffline').checked;
     const notifyPrinterStall   = el.querySelector('#tgNotifyPrinterStall').checked;
+    // Over what is stored, not instead of it: the Mac writes switches this form
+    // does not show (notifyPrinterRunout, the print notices and noticeNames),
+    // and a desktop Save must not turn them back to their defaults.
     settings.telegram = {
+      ...(settings.telegram || {}),
       botToken, chatId, notifyOnComplete, notifyOnHold, notifyOnLowStock,
       notifyPrinterError, notifyPrinterOffline, notifyPrinterStall,
     };
