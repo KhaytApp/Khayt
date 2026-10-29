@@ -1854,6 +1854,18 @@ function trackShipment(trackingNumber, carrier) {
     else toast(link, 'info', 6000);
   }
 
+  // A quote-form request can carry the customer's model file, kept on Khayt
+  // Cloud until the request is deleted or 14 days pass (`expiresAt`).
+  const intakeFileExpired = (f) => !!(f && f.expiresAt && Date.parse(f.expiresAt) <= Date.now());
+  function intakeFileLine(f) {
+    if (!f || !f.name) return '';
+    const size = Number.isFinite(+f.bytes) ? ` · ${(+f.bytes / 1048576).toFixed(1)} MB` : '';
+    const label = intakeFileExpired(f)
+      ? t('intake.file_expired', { name: f.name })
+      : `📎 ${f.name}${size}`;
+    return `<div style="font-size:12.5px;margin-top:4px;color:var(--text-muted);">${escapeHtml(label)}</div>`;
+  }
+
   function intakeRequestRow(it) {
     const p = it.payload || {};
     const when = it.createdAt ? new Date(it.createdAt).toLocaleString() : '';
@@ -1872,6 +1884,7 @@ function trackShipment(trackingNumber, carrier) {
       ${meta ? `<div style="font-size:12.5px;color:var(--text-muted);">${meta}</div>` : ''}
       ${p.link ? `<div style="font-size:12.5px;margin-top:4px;"><a href="#" data-intake-link="${escapeHtml(p.link)}" style="color:var(--primary);">${escapeHtml(p.link)}</a></div>` : ''}
       ${p.photo ? `<img src="${escapeHtml(p.photo)}" alt="" style="max-width:160px;border-radius:8px;margin-top:8px;border:1px solid var(--border-soft);">` : ''}
+      ${intakeFileLine(p.file)}
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn primary small" data-intake-import="${escapeHtml(it.id)}">${escapeHtml(t('intake.import'))}</button>
         <button class="btn ghost small" data-intake-dismiss="${escapeHtml(it.id)}">${escapeHtml(t('intake.dismiss'))}</button>
@@ -1902,10 +1915,13 @@ function trackShipment(trackingNumber, carrier) {
         modal.querySelectorAll('[data-intake-import]').forEach(btn =>
           btn.addEventListener('click', async () => {
             const it = byId(btn.dataset.intakeImport);
-            if (it) { await importIntakeAsQuote(it, c); modal.querySelector('[data-act="cancel"]')?.click(); }
+            if (it && await importIntakeAsQuote(it, c)) modal.querySelector('[data-act="cancel"]')?.click();
           }));
         modal.querySelectorAll('[data-intake-dismiss]').forEach(btn =>
           btn.addEventListener('click', async () => {
+            const it = byId(btn.dataset.intakeDismiss);
+            const f = it && it.payload && it.payload.file;
+            if (f && !intakeFileExpired(f) && !(await confirmModal(t('intake.dismiss_file_q', { name: f.name || '' }), { danger: true }))) return;
             await dismissIntake(btn.dataset.intakeDismiss, c);
             modal.querySelector(`[data-intake="${CSS.escape(btn.dataset.intakeDismiss)}"]`)?.remove();
           }));
@@ -1935,19 +1951,36 @@ function trackShipment(trackingNumber, carrier) {
 
   async function importIntakeAsQuote(it, c) {
     const p = it.payload || {};
-    const clientId = clientFromIntake(p);
     const now = new Date();
     const seq = (typeof nextQuoteSeq === 'function') ? nextQuoteSeq() : String(now.getTime()).slice(-4);
     const prefix = (settings.quotePrefix || 'QUO');
+    const orderId = `${prefix}-${now.getFullYear()}-${seq}`;
+    // Deleting the request below deletes its kept model file on the server, so
+    // the file is saved with the quote first. If that fails, nothing is created
+    // and the request stays in the list to try again.
+    const attachedFiles = [];
+    let fileGone = false;
+    // Asked even past `expiresAt`: the server, not this computer's clock, says
+    // whether the file is gone.
+    if (p.file && p.file.name) {
+      const r = await window.hubAPI.cloudIntakeTakeFile({
+        url: c.url, shopId: c.shopId, token: c.token, id: it.id, orderId,
+        file: { name: p.file.name, bytes: p.file.bytes, sha256: p.file.sha256 },
+      });
+      if (!r || !r.ok) { toast(t('intake.file_failed', { error: (r && r.error) || 'failed' }), 'error', 8000); return false; }
+      if (r.gone) fileGone = true; else attachedFiles.push(r.attached);
+    }
+    const clientId = clientFromIntake(p);
     const notes = [
       p.description || '',
       p.qty ? `Qty: ${p.qty}` : '',
       p.material ? `Material: ${p.material}` : '',
       p.link ? `Model: ${p.link}` : '',
       p.contact ? `Contact: ${p.contact}` : '',
+      fileGone ? t('intake.file_gone_note', { name: p.file.name }) : '',
     ].filter(Boolean).join('\n');
     const order = {
-      id: `${prefix}-${now.getFullYear()}-${seq}`,
+      id: orderId,
       date: localDateStr(now),
       timestamp: now.toISOString(),
       project: p.title || p.description?.slice(0, 60) || t('intake.requests'),
@@ -1961,7 +1994,7 @@ function trackShipment(trackingNumber, carrier) {
       paidAmount: 0,
       notes: notes,
       internalNotes: `↳ ${t('intake.requests')}`,
-      attachedFiles: [],
+      attachedFiles,
       parts: [],
       tags: ['portal'],
       quoteSentAt: null,
@@ -1975,6 +2008,7 @@ function trackShipment(trackingNumber, carrier) {
     saveAll();
     toast(t('intake.imported'), 'success');
     if (typeof switchTab === 'function') switchTab('logs-tab');
+    return true;
   }
 
   async function dismissIntake(id, c, silent) {
@@ -1987,6 +2021,7 @@ function trackShipment(trackingNumber, carrier) {
   global.BNPL_CATALOG = BNPL_CATALOG;
   const api = {
     openOrderRequestsModal,
+    importIntakeAsQuote,
     copyIntakeLink,
     autoSendEmailNotification,
     checkAndSendDigest,

@@ -6325,6 +6325,24 @@ ipcMain.handle('hub:cloud-intake-delete', async (_e, { url, shopId, token, id } 
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+// A quote-form request's model file, saved as the quote's attached file BEFORE
+// the request is deleted — deleting the request deletes the file on the server.
+// `{ ok: true, gone: true }` only when the server says the file is past its 14
+// days; every other failure is `ok: false` and the caller keeps the request.
+ipcMain.handle('hub:cloud-intake-take-file', async (_e, { url, shopId, token, id, orderId, file } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.downloadIntakeFile(url, shopId, token, id, file || {});
+    if (r.gone) return { ok: true, gone: true };
+    const originalName = path.basename(String((file && file.name) || 'model')).slice(0, 200) || 'model';
+    const ext = (path.extname(originalName).slice(1).toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin').slice(0, 10);
+    const safeId = path.basename(String(orderId || '')).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${safeId}-${Date.now().toString(36)}.${ext}`;
+    await fs.promises.writeFile(path.join(orderFilesDir(), filename), r.bytes);
+    return { ok: true, gone: false, attached: { filename, originalName, size: r.bytes.length } };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('hub:cloud-storefront-stats', async (_e, { url, shopId, token } = {}) => {
   try {
     token = cloudToken(token, url);
