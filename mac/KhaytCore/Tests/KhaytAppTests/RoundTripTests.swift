@@ -739,6 +739,7 @@ struct RoundTripTests {
         "saveSeen": "the LAN server's replay list, a file of its own; not a record in the book",
         "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",
         "saveLocation": "sets name and address on the stored record in place (Shop.writeLocation) and never re-encodes it; LocationsTests.editKeepsFields proves every other field survives",
+        "saveQuoteFormEmbed": "never writes the book: PUTs {enabled, origins} to the cloud and shows what the cloud answers; QuoteFormEmbedTests covers the body and the answer",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 

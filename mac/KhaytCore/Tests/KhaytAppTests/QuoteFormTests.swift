@@ -10,6 +10,7 @@ import KhaytCore
 ///
 /// None of this speaks to the service: every call goes through a fetch seam.
 @MainActor
+@Suite(.serialized)
 struct QuoteFormEmbedTests {
 
     static let connection = CloudReader.Connection(

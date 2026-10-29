@@ -203,6 +203,7 @@ extension Shop {
                                 whoHasIt: @escaping @Sendable () -> String?,
                                 download: () async throws -> CloudIntake.FileAnswer,
                                 drain: () async throws -> Void) async -> QuoteFormResult {
+        // lock: callers — recordQuoteFormOrder
         var result = QuoteFormResult()
 
         // 1. DOWNLOAD.
@@ -312,6 +313,7 @@ extension Shop {
     /// hands over to this; the caller holds the busy flag.
     func recordQuoteFormOrder(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
                               fetch: CloudIntake.Fetch?) async {
+        guard permitted("orders", "create") else { return }
         guard case .store(let build) = source, let engine else { return }
         let connection: CloudReader.Connection
         let token: String
