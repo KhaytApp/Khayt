@@ -9,12 +9,16 @@ final class QuotesOnPhoneTests: XCTestCase {
 
     private var dir: URL!
     private var book: CompanionBook!
+    /// One for the class: starting the rules costs about a fifth of a second.
+    private static let sharedEngine = Result { try KhaytEngine() }
+    private var engine: KhaytEngine!
 
     override func setUpWithError() throws {
         dir = FileManager.default.temporaryDirectory
             .appending(path: "quotes-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         book = CompanionBook(directory: dir)
+        engine = try Self.sharedEngine.get()
         try book.replace(with: shop(), scope: nil)
     }
 
@@ -91,20 +95,20 @@ final class QuotesOnPhoneTests: XCTestCase {
 
     // MARK: - The answers
 
-    func testApproveMakesAPendingJobStampedAcceptedToday() throws {
+    func testApproveMakesAPendingJobStampedAcceptedToday() async throws {
         let now = ISO8601DateFormatter().date(from: "2026-10-27T09:00:00Z")!
         XCTAssertEqual(QuoteAnswer.approve.status, "pending")
-        try BookWriter(book: book).setOrderStatus(orderId: "Q-1", to: QuoteAnswer.approve.status, now: now)
+        try await BookWriter(book: book).setOrderStatus(orderId: "Q-1", to: QuoteAnswer.approve.status, engine: engine, now: now)
         let q = try record("Q-1")
         XCTAssertEqual(q["status"], .string("pending"))
         XCTAssertEqual(q["quoteAcceptedAt"], .string(BookWriter.localDay(now)))
         XCTAssertNil(q["cancelledAt"])
     }
 
-    func testDeclineCancelsAndKeepsTheQuoteUnaccepted() throws {
+    func testDeclineCancelsAndKeepsTheQuoteUnaccepted() async throws {
         let now = ISO8601DateFormatter().date(from: "2026-10-27T09:00:00Z")!
         XCTAssertEqual(QuoteAnswer.decline.status, "cancelled")
-        try BookWriter(book: book).setOrderStatus(orderId: "Q-2", to: QuoteAnswer.decline.status, now: now)
+        try await BookWriter(book: book).setOrderStatus(orderId: "Q-2", to: QuoteAnswer.decline.status, engine: engine, now: now)
         let q = try record("Q-2")
         XCTAssertEqual(q["status"], .string("cancelled"))
         XCTAssertEqual(q["cancelledAt"], .string(BookWriter.localDay(now)))
@@ -114,8 +118,8 @@ final class QuotesOnPhoneTests: XCTestCase {
 
     func testAnAnsweredQuoteLeavesTheList() async throws {
         let writer = BookWriter(book: book)
-        try writer.setOrderStatus(orderId: "Q-1", to: QuoteAnswer.approve.status)
-        try writer.setOrderStatus(orderId: "Q-2", to: QuoteAnswer.decline.status)
+        try await writer.setOrderStatus(orderId: "Q-1", to: QuoteAnswer.approve.status, engine: engine)
+        try await writer.setOrderStatus(orderId: "Q-2", to: QuoteAnswer.decline.status, engine: engine)
         let quotes = QuoteList.select(try await BookReader(book: book).recentOrders(limit: 200, status: "quote"))
         XCTAssertEqual(quotes.map(\.id), ["Q-3"])
     }

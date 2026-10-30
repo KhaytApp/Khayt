@@ -1179,8 +1179,26 @@ final class KhaytAPIClient: ObservableObject {
         throw try decodeAPIError(body, status: http.statusCode)
     }
 
+    /// Move a job — the order page's stage picker, the queue's advance
+    /// button, a notification's action, Siri, a quote's Approve or Decline.
+    ///
+    /// With a book, by the shop's own status rule (`BookWriter.setOrderStatus`):
+    /// the filament comes off the shelf and the completion is dated, as on the
+    /// Mac. A move the rule refuses throws its sentence and is NOT sent to the
+    /// desktop instead. Without a book, the desktop's PATCH, as it always was.
     func updateOrderStatus(orderId: String, status: String) async throws {
-        if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
+        if let book, book.exists, let reader {
+            let engine = try await reader.sharedEngine()
+            do {
+                try await BookWriter(book: book).setOrderStatus(orderId: orderId, to: status, engine: engine)
+                await refreshPendingCount()
+                await deliverPending()
+                return
+            } catch is BookWriter.Refusal {
+                // Not in this book. Fall through to the desktop, which either
+                // does it properly or fails honestly — as `writeLocally` does.
+            }
+        }
         let encodedId = try encodeOrderIdForPath(orderId)
         let body = try JSONEncoder().encode(["status": status])
         let (data, response) = try await request(
