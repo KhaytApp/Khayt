@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: quotes stay on the phone, with Approve and Decline.** A quote made on the phone disappeared from it: Orders' Active list is the queue, which leaves quotes out, and History takes only finished jobs. Orders now has a third segment, Quotes, between the two: the book's open quotes, newest first, with client, price, the day it was made and the day it stands until (or EXPIRED). A phone that holds no book (Wi-Fi only, to an older desktop) says the quotes are on the Mac. A quote's page has Approve, which makes it a Pending job and stamps `quoteAcceptedAt`, and Decline, which asks first and cancels it with `cancelledAt` stamped, kept in History rather than deleted. Both go through the same status write as every other move. The sample shop has two quotes.
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.
