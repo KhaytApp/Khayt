@@ -44,6 +44,10 @@ public enum ModelLicence {
         .init(id: "cc-by-nc", commercial: false, attribution: true, derivatives: true, share: false),
         .init(id: "cc-by-nc-sa", commercial: false, attribution: true, derivatives: true, share: true),
         .init(id: "cc-by-nc-nd", commercial: false, attribution: true, derivatives: false, share: false),
+        // A model site's own terms (MakerWorld's and Printables' "Standard
+        // Digital File License"): personal printing; a sale needs the
+        // designer's permission. See `lib/model-licence.js`.
+        .init(id: "sdfl", commercial: false, attribution: false, derivatives: true, share: false),
         // Bought from the designer, which overrides whatever the free licence said.
         .init(id: "commercial", commercial: true, attribution: false, derivatives: true, share: false),
     ]
@@ -182,6 +186,58 @@ public enum ModelLicence {
         return out
     }
 
+    /// One model behind a sale whose licence asks for the designer's credit.
+    public struct Credit: Equatable, Sendable {
+        public let id: String
+        public let name: String
+        /// Who made it, as the record says (`source` when it is not an address).
+        public let designer: String
+        public let licence: String
+        /// Where it came from (`sourceUrl`, or `source` when that is one).
+        public let url: String
+
+        /// "CC BY-SA" for `cc-by-sa`: how a credit line names the licence.
+        public var licenceName: String {
+            licence.hasPrefix("cc-") ? "CC " + licence.dropFirst(3).uppercased() : licence.uppercased()
+        }
+
+        /// The line a listing carries: `“Dragon” — Ana (CC BY), https://…`.
+        /// No word of any language in it: it goes into whichever the
+        /// listing is written in.
+        public var line: String {
+            var out = "“\(name)”"
+            if !designer.isEmpty { out += " — \(designer)" }
+            out += " (\(licenceName))"
+            if !url.isEmpty { out += ", \(url)" }
+            return out
+        }
+    }
+
+    /// The models behind a sale whose licence requires crediting the designer
+    /// wherever a print is sold (every CC BY licence), in the order asked.
+    public static func credits(_ ids: [String], records: [JSONValue]) -> [Credit] {
+        var seen = Set<String>()
+        var out: [Credit] = []
+        for raw in ids {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, seen.insert(key).inserted,
+                  let record = records.first(where: {
+                      if case .object(let o) = $0 { return str(o["id"]) == key } else { return false }
+                  }), case .object(let o) = record,
+                  let found = byId(str(o["licence"])), found.attribution else { continue }
+            var name = str(o["title"])
+            if name.isEmpty { name = str(o["name"]) }
+            if name.isEmpty { name = str(o["originalName"]) }
+            let source = str(o["source"])
+            let isAddress = source.lowercased().hasPrefix("http")
+            var url = str(o["sourceUrl"])
+            if url.isEmpty, isAddress { url = source }
+            out.append(.init(id: key, name: name, designer: isAddress ? "" : source,
+                             licence: found.id, url: url))
+        }
+        return out
+    }
+
     private static func isDay(_ s: String) -> Bool {
         s.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
     }
@@ -199,12 +255,15 @@ extension ModelLicence {
     ///
     /// Measured on a real shop's ninety files, the licence strings that
     /// actually turn up are: `BY-NC-SA`, `Standard Digital File License` and
-    /// `MakerWorld Exclusive License`. Only the first is a licence this module
-    /// can reason about. The other two are a platform's own terms — they are
-    /// not Creative Commons, they are not "commercial", and deciding either
-    /// way would be this app inventing a legal opinion.
+    /// `MakerWorld Exclusive License`. The first is Creative Commons. The
+    /// second is a platform's own terms, and its text answers the shop's one
+    /// question plainly — no printed copy may be sold "in any way whatsoever
+    /// in which you charge money" without the designer's permission — so it is
+    /// `sdfl` (Oct 2026: left blank, it kept "Not for sale" off the very files
+    /// a shop downloads most). The third's terms could not be read, and
+    /// deciding either way would be this app inventing a legal opinion.
     ///
-    /// So they come back nil, and nil means NOBODY HAS SAID — which the rest
+    /// So that one comes back nil, and nil means NOBODY HAS SAID — which the rest
     /// of this module is careful to keep distinct from "no". The alternative
     /// is worse in both directions: guessing permissive tells a shop it may
     /// sell something it may not, and guessing restrictive tells a shop it may
@@ -215,6 +274,8 @@ extension ModelLicence {
         // The id itself, first: a file that already spells it this module's
         // way needs no table.
         if let exact = byId(raw) { return exact }
+        // The platform licence, however the page or slicer spelled it.
+        if raw.hasPrefix("standard digital file licen") || raw == "sdfl" { return byId("sdfl") }
         // `CC BY-NC-SA 4.0`, `cc-by-nc-sa`, `BY-NC-SA` — one shape.
         var tidy = raw.replacingOccurrences(of: "_", with: "-")
             .replacingOccurrences(of: " ", with: "-")

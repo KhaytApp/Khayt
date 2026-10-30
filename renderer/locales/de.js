@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — nicht verkäuflich",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — nicht verkäuflich",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — nicht verkäuflich",
+  "plib.licence_sdfl": "Standard Digital File License — nicht zum Verkauf",
   "plib.licence_commercial": "Kommerzielle Lizenz gekauft",
   "plib.photo": "Foto (optional)",
   "plib.photo_failed": "Bild konnte nicht geladen werden",

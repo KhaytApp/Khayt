@@ -29,8 +29,8 @@ struct ModelLicenceParityTests {
     /// Every id the module knows, plus the ways a record can say nothing.
     private let inputs = [
         "own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd",
-        "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "commercial",
-        "", "  ", "CC-BY", "  cc-by-nc  ", "CC0", "Commercial",
+        "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl", "commercial",
+        "SDFL", "", "  ", "CC-BY", "  cc-by-nc  ", "CC0", "Commercial",
         "cc", "cc-by-nc-sa-4.0", "mit", "gpl", "cc_by", "ccby",
         "cc-by ", "nc", "own ", "OWN", "unknown", "null", "0", "false",
     ]

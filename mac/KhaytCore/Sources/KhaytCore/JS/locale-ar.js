@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — غير قابل للبيع",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — غير قابل للبيع",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — غير قابل للبيع",
+  "plib.licence_sdfl": "ترخيص الملف الرقمي القياسي — غير قابل للبيع",
   "plib.licence_commercial": "ترخيص تجاري مشترى",
   "plib.photo": "صورة (اختياري)",
   "plib.photo_failed": "تعذّر تحميل الصورة",
