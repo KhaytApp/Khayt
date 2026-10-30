@@ -1203,9 +1203,24 @@ struct Reports: View {
                                 .monospacedDigit().foregroundStyle(Khayt.attention)
                         }
                         .width(min: 100, ideal: 130)
+                        // The day it falls due: invoice date + the customer's
+                        // payment terms (`lib/payment-terms.js`). A row on
+                        // terms whose day has not come is owed, not overdue.
+                        TableColumn(shop.words.callIt("mac.aged_due"), value: \.dueSortKey) { row in
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(row.due?.isEmpty == false ? row.due! : "—").monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                                if row.notYetDue {
+                                    Text(shop.words.callIt("mac.not_yet_due"))
+                                        .font(.caption2).foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                        .width(min: 90, ideal: 110)
                         TableColumn(shop.words.callIt("an.aged_col_days"), value: \.days) { row in
                             Text("\(row.days)").monospacedDigit()
-                                .foregroundStyle(Self.tint(row.bucket))
+                                .foregroundStyle(row.notYetDue ? AnyShapeStyle(.tertiary)
+                                                               : AnyShapeStyle(Self.tint(row.bucket)))
                         }
                         .width(min: 60, ideal: 80)
                     }

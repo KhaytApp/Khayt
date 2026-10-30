@@ -1592,7 +1592,7 @@ final class Shop {
         // them on, and both return nothing on a book with no due dates — so
         // the section they feed simply does not appear.
         let invoices = (try? await engine.invoicesToChase(
-            orders: orders, settings: settings, owed: owedByOrderId)) ?? []
+            orders: orders, settings: settings, owed: owedByOrderId, clients: clients)) ?? []
         guard ticket == loadGeneration else { return }
         invoicesToChase = invoices
         let quotes = (try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []

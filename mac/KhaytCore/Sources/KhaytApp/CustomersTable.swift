@@ -314,6 +314,21 @@ struct CustomerInspector: View {
                         if person.overdueCount > 0 {
                             DetailLine(shop.words.callIt("mac.past_due"), "\(person.overdueCount)", warn: true)
                         }
+                        // Their terms, and what is past them. Shown only for
+                        // a customer on terms: for due on receipt, everything
+                        // owed is overdue from the next day and the line would
+                        // repeat Owed.
+                        if person.paymentTermsDays > 0 {
+                            DetailLine(shop.words.callIt("mac.payment_terms"),
+                                       shop.words.callIt("mac.terms_net",
+                                                         ["n": .number(Double(person.paymentTermsDays))]),
+                                       dim: true)
+                            let late = person.overdueOwed(today: Calendar.book.dayString(Date()))
+                            if late >= 0.005 {
+                                DetailLine(shop.words.callIt("mac.terms_overdue"),
+                                           Money.text(late, shop.currency), warn: true)
+                            }
+                        }
                     }
                     if shop.loyaltyOn, standing != nil {
                         LayerRule()

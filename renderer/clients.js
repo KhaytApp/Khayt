@@ -702,6 +702,15 @@ function openClientEditor(clientId = null) {
       <div style="flex:2; padding-top:20px; font-size:12px; color:var(--text-muted);">${escapeHtml(t('ce.default_discount_hint'))}</div>
     </div>
 
+    <div style="margin-top:14px; display:flex; align-items:center; gap:12px;">
+      <div style="flex:1;">
+        <label style="margin-top:0;" for="cePaymentTerms">${escapeHtml(t('ce.payment_terms_days'))}</label>
+        <input type="number" id="cePaymentTerms" min="0" max="365" step="1" list="cePaymentTermsPresets" value="${KhaytPaymentTerms.termsDays(draft)}" placeholder="0">
+        <datalist id="cePaymentTermsPresets">${KhaytPaymentTerms.PRESETS.map(n => `<option value="${n}"></option>`).join('')}</datalist>
+      </div>
+      <div style="flex:2; padding-top:20px; font-size:12px; color:var(--text-muted);">${escapeHtml(t('ce.payment_terms_hint'))}</div>
+    </div>
+
     <div style="margin-top:14px;">
       <label style="margin-top:0;">${escapeHtml(t('ce.currency'))}</label>
       <select id="ceCurrency">
@@ -1016,6 +1025,10 @@ function openClientEditor(clientId = null) {
       } else delete draft.whatsappMarketingOptIn;
       draft.currency = modal.querySelector('#ceCurrency')?.value || null;
       draft.creditLimit = Math.max(0, num(modal.querySelector('#ceCreditLimit')?.value, 0)) || 0;
+      // Payment terms (lib/payment-terms.js): whole days, 0 = due on receipt.
+      // Always written, so taking terms back to 0 sticks.
+      draft.paymentTermsDays = KhaytPaymentTerms.termsDays(
+        { paymentTermsDays: modal.querySelector('#cePaymentTerms')?.value || 0 });
       draft.source = modal.querySelector('[data-f="source"]')?.value || 'other';
       draft.priceList = (draft.priceList || []).filter(pl => pl.product.trim() || pl.price > 0);
       draft.addresses = (draft.addresses || []).filter(a => a.label.trim() || a.address.trim());

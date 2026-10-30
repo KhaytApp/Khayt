@@ -11,7 +11,10 @@
  * An invoice is due for a payment reminder when ALL hold:
  *   (a) it is a real order (not a quote) and not voided
  *   (b) it still owes money — owed(order) > 0 (caller supplies the owed amount)
- *   (c) it has a dueDate that is at least `graceDays` in the past
+ *   (c) it has a due date that is at least `graceDays` in the past — the
+ *       customer's PAYMENT TERMS due date (invoice date + terms,
+ *       lib/payment-terms.js) when the customer has terms, else the order's
+ *       own `dueDate` as before. A net-30 company is not nudged on day one.
  *   (d) it hasn't been reminded "recently" — dedupe by `payRemindedAt`
  *       (cooldown) and capped by `payReminderMaxCount`.
  */
@@ -43,9 +46,26 @@ function dayStartFromYmd(ymd) {
 }
 function startOfDay(now) { const d = new Date(now); d.setHours(0, 0, 0, 0); return d; }
 
+/** The payment-terms rule, however this file happens to be loaded. */
+function terms() {
+  if (typeof globalThis !== 'undefined' && globalThis.KhaytPaymentTerms) return globalThis.KhaytPaymentTerms;
+  try { return require('./payment-terms.js'); } catch (e) { return null; }
+}
+
+/**
+ * The day payment is due: invoice date + the customer's terms when the
+ * customer has terms, else the order's own `dueDate` (unchanged behaviour for
+ * every customer without terms).
+ */
+function paymentDueDate(order, client) {
+  const T = terms();
+  if (T && client && T.termsDays(client) > 0) return T.dueDate(order, client) || null;
+  return (order && order.dueDate) || null;
+}
+
 /** Whole-day count the invoice is PAST due (0 = due today, negative = future). */
-function daysOverdue(order, now) {
-  const due = dayStartFromYmd(order && order.dueDate);
+function daysOverdue(order, now, client) {
+  const due = dayStartFromYmd(paymentDueDate(order, client));
   if (!due) return null;
   return Math.round((startOfDay(now) - due) / DAY_MS);
 }
@@ -72,9 +92,9 @@ function cooldownElapsed(order, now, cooldownDays) {
  * @param {object} cfg   resolved config (see reminderConfig)
  * @param {Date|number} now
  */
-function isDueForReminder(order, owed, cfg, now) {
+function isDueForReminder(order, owed, cfg, now, client) {
   if (!isReminderEligible(order, owed)) return false;
-  const od = daysOverdue(order, now);
+  const od = daysOverdue(order, now, client);
   if (od === null) return false;
   if (od < cfg.graceDays) return false; // not overdue enough yet
   if ((+order.payReminderCount || 0) >= cfg.maxCount) return false;
@@ -86,14 +106,21 @@ function isDueForReminder(order, owed, cfg, now) {
  * Select invoices due for a payment reminder. `owedOf(order)` returns the
  * outstanding balance for an order (injected so currency conversion stays in
  * the renderer). Sorted by most-overdue first. Pure.
+ *
+ * `clients` (optional) is the customer list, for each customer's payment
+ * terms; without it every order is read by its own `dueDate`, as before.
  */
-function selectInvoicesDueForReminder(orders, settings, owedOf, now = Date.now()) {
+function selectInvoicesDueForReminder(orders, settings, owedOf, now = Date.now(), clients = []) {
   const cfg = reminderConfig(settings);
   const list = Array.isArray(orders) ? orders : [];
   const owed = typeof owedOf === 'function' ? owedOf : () => 0;
+  const clientOf = (o) => {
+    if (!o || o.clientId == null || !Array.isArray(clients)) return null;
+    return clients.find((c) => c && c.id === o.clientId) || null;
+  };
   return list
-    .filter((o) => isDueForReminder(o, owed(o), cfg, now))
-    .sort((a, b) => (daysOverdue(b, now) || 0) - (daysOverdue(a, now) || 0));
+    .filter((o) => isDueForReminder(o, owed(o), cfg, now, clientOf(o)))
+    .sort((a, b) => (daysOverdue(b, now, clientOf(b)) || 0) - (daysOverdue(a, now, clientOf(a)) || 0));
 }
 
 /** Patch to apply after a reminder is sent. */
@@ -108,6 +135,7 @@ const api = {
   DEFAULTS,
   reminderConfig,
   daysOverdue,
+  paymentDueDate,
   isReminderEligible,
   cooldownElapsed,
   isDueForReminder,
