@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — 不可出售",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — 不可出售",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — 不可出售",
+  "plib.licence_sdfl": "Standard Digital File License — 不可出售",
   "plib.licence_commercial": "已购商业许可",
   "lic.not_for_sale": "未获销售授权",
   "lic.nc_line": "{name}：其许可不允许出售打印件。",

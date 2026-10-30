@@ -297,7 +297,7 @@ struct SettingsView: View {
     }
 
     private var unpairButton: some View {
-        Button(role: .destructive) { settings.unpair() } label: {
+        Button(role: .destructive) { api.unpair() } label: {
             Text(L10n.tr("settings.unpair"))
                 .font(.khayt(15.5, .semibold, relativeTo: .body))
                 .foregroundStyle(KhaytDesign.late)

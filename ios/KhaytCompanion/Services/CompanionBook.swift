@@ -75,6 +75,9 @@ struct CompanionBook {
         case notYetPulled
         /// The book kept changing under a fold, three times running.
         case busy
+        /// The baseline is there but cannot be read — a phone still locked
+        /// since it started, typically. The pull waits for the next try.
+        case baselineUnreadable
 
         var description: String {
             switch self {
@@ -87,6 +90,9 @@ struct CompanionBook {
             case .busy:
                 return "The book was being changed on this phone while changes arrived. "
                      + "They will be folded in on the next sync."
+            case .baselineUnreadable:
+                return "This phone cannot read its record of what was last synced right now. "
+                     + "Unlock it; the sync will try again."
             }
         }
     }
@@ -122,7 +128,14 @@ struct CompanionBook {
         try? FileManager.default.createDirectory(
             at: dir, withIntermediateDirectories: true,
             attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
-        return CompanionBook(directory: dir)
+        let book = CompanionBook(directory: dir)
+        // A baseline written by an older build is still `.complete`. Moved to
+        // the book's class here, at the next launch with the phone unlocked,
+        // rather than waiting for a sync to rewrite it.
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: book.baselineURL.path)
+        return book
     }
 
     /// The book's path. Named as the desktop names it, so anybody who has seen
@@ -153,11 +166,45 @@ struct CompanionBook {
     /// own way.
     var baselineURL: URL { directory.appending(path: "khayt-store.baseline.json") }
 
-    /// What the Mac last gave this phone, or nil if it has never given it one.
+    /// What the Mac last gave this phone, or nil if it has never given it one
+    /// — or if it cannot be read just now. A caller about to REPLACE something
+    /// on the strength of that nil asks `readBaseline()` instead.
     func baseline() -> [String: JSONValue]? {
-        guard let data = try? Data(contentsOf: baselineURL) else { return nil }
-        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        if case .held(let store) = readBaseline() { return store }
+        return nil
     }
+
+    /// The baseline, with "not there" kept apart from "there, but unreadable".
+    ///
+    /// ── WHY THE TWO ARE NOT THE SAME NIL ─────────────────────────────────
+    ///
+    /// The baseline was written `.complete`, unreadable whenever the phone is
+    /// locked, beside a book that stays readable. A background pull on a
+    /// locked phone saw a book and no baseline, took it for a first pull and
+    /// replaced the book — every edit not yet sent went with it. The class is
+    /// the book's now (see `baselineProtection`), and a file that exists but
+    /// will not open is `.unreadable`, which no caller treats as permission
+    /// to replace anything. One that decodes to garbage is `.absent`: it will
+    /// not get better by waiting.
+    enum BaselineRead {
+        case absent
+        case unreadable
+        case held([String: JSONValue])
+    }
+
+    func readBaseline() -> BaselineRead {
+        guard FileManager.default.fileExists(atPath: baselineURL.path) else { return .absent }
+        guard let data = try? Data(contentsOf: baselineURL) else { return .unreadable }
+        guard let store = try? JSONDecoder().decode([String: JSONValue].self, from: data) else { return .absent }
+        return .held(store)
+    }
+
+    /// The baseline holds what the book holds, and is read by the same
+    /// background syncs, so it gets the book's protection class — see
+    /// `inSharedContainer`. Spelled out on every write, not left to the
+    /// folder, because a baseline that is unreadable when the book is not is
+    /// exactly the bug `readBaseline` describes.
+    private static let baselineProtection: Data.WritingOptions = .completeFileProtectionUntilFirstUserAuthentication
 
     /// Where the description of what this phone holds lives.
     ///
@@ -229,7 +276,7 @@ struct CompanionBook {
         // leave the phone unable to tell its own edits from the Mac's, and the
         // next outbox would either send nothing or send everything. Failing the
         // pull is the safe direction: a phone with no book asks for one again.
-        try next.write(to: baselineURL, options: [.atomic, .completeFileProtection])
+        try next.write(to: baselineURL, options: [.atomic, Self.baselineProtection])
     }
 
     /// Change the book in place, atomically.
@@ -283,11 +330,35 @@ struct CompanionBook {
     /// The stamping is what makes an edit made on this phone syncable at all:
     /// `lib/sync.js` decides what to send by comparing revisions, so an edit
     /// that did not bump one is an edit the Mac will never hear about.
+    ///
+    /// ── A CHANGE THAT CHANGED NOTHING IS NOT AN EDIT ──────────────────────
+    ///
+    /// Stamped regardless, a save that set a field to what it already was
+    /// still bumped `rev` — and a phone whose copy was a sync behind then
+    /// outranked a real edit made on the Mac, and put the old record back
+    /// everywhere. So an unchanged record is neither stamped nor written. Done
+    /// here rather than in `StoreWriter.updateRecord`, which the Mac shares.
     func updateRecord(collection: String, id: String,
                       change: (inout [String: JSONValue]) -> Void) throws {
-        try StoreWriter.updateRecord(storeURL: url,
-                                     owns: { true }, whoHasIt: { nil },
-                                     collection: collection, id: id, change: change)
+        struct Unchanged: Error {}
+        do {
+            try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+                guard case .array(var rows)? = root[collection],
+                      let index = rows.firstIndex(where: {
+                          if case .object(let o) = $0, case .string(let rowId)? = o["id"] { return rowId == id }
+                          return false
+                      }),
+                      case .object(var record) = rows[index] else { throw Unchanged() }
+                let before = record
+                change(&record)
+                guard record != before else { throw Unchanged() }
+                StoreWriter.stamp(&record)
+                rows[index] = .object(record)
+                root[collection] = .array(rows)
+            }
+        } catch is Unchanged {
+            // Nothing to write — and no `.prev` rolled over for it.
+        }
     }
 
     /// Put a new record in the book, stamped.
@@ -359,16 +430,20 @@ struct CompanionBook {
     /// copy alone. See `CloudSync`.
     func replaceBaseline(with store: [String: JSONValue]) throws {
         let data = try JSONEncoder().encode(store)
-        try data.write(to: baselineURL, options: [.atomic, .completeFileProtection])
+        try data.write(to: baselineURL, options: [.atomic, Self.baselineProtection])
     }
 
-    /// The Mac has taken everything this phone had changed.
+    /// Upstream has taken everything in `sent` — the book as it was when the
+    /// outbox was measured, NOT as it is now.
     ///
-    /// The baseline becomes the book, so the next outbox measures from here.
-    /// Called only after a send the Mac confirmed — see `sendPendingChanges`.
-    func markSynced() throws {
-        let current = try Data(contentsOf: url)
-        try current.write(to: baselineURL, options: [.atomic, .completeFileProtection])
+    /// Called only after a send upstream confirmed — see `sendPendingChanges`
+    /// and `CloudSync.push`. It used to copy the book as it stood after the
+    /// reply, so an edit made while the send was in flight (a payment
+    /// recorded on another screen) counted as delivered, was never sent, and
+    /// the next pull put the old record back. Measured from the snapshot, that
+    /// edit still differs from the baseline, and stays pending.
+    func markSynced(_ sent: [String: JSONValue]) throws {
+        try replaceBaseline(with: sent)
     }
 
     /// Forget the shop entirely. Unpairing must not leave a client list behind.

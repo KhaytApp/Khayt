@@ -17,7 +17,7 @@ struct LibraryProvenanceTests {
         // writes a value the other app reads as "not recorded".
         #expect(ModelLicence.all.map(\.id) == [
             "own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd",
-            "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "commercial",
+            "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl", "commercial",
         ])
         // And every one of them has a name in both languages Khayt's own
         // catalogue carries, because the menu draws `plib.licence_<id>`.

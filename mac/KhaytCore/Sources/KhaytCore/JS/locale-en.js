@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — not for sale",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — not for sale",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — not for sale",
+  "plib.licence_sdfl": "Standard Digital File License — not for sale",
   "plib.licence_commercial": "Commercial licence bought",
   "lic.not_for_sale": "Not licensed for sale",
   "lic.nc_line": "{name}: its licence does not allow selling prints.",

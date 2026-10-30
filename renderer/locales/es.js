@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — no se puede vender",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — no se puede vender",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — no se puede vender",
+  "plib.licence_sdfl": "Standard Digital File License — no se puede vender",
   "plib.licence_commercial": "Licencia comercial comprada",
   "lic.not_for_sale": "Sin licencia para la venta",
   "lic.nc_line": "{name}: su licencia no permite vender impresiones.",

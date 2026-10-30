@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — 販売不可",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — 販売不可",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — 販売不可",
+  "plib.licence_sdfl": "Standard Digital File License — 販売不可",
   "plib.licence_commercial": "商用ライセンス購入済み",
   "lic.not_for_sale": "販売ライセンスなし",
   "lic.nc_line": "{name}：ライセンスにより造形物の販売はできません。",
