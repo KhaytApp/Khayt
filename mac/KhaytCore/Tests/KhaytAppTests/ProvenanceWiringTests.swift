@@ -31,15 +31,21 @@ struct ProvenanceWiringTests {
     /// It must only ever fill a blank. A shop that typed "my own design" over
     /// a remix has said something this must not undo, and a licence a person
     /// CHOSE outranks one a slicer copied into the file.
-    @Test("only records with both fields blank are even considered")
+    ///
+    /// Oct 2026: a record with a designer but no licence is asked too (a file
+    /// whose `Standard Digital File License` once translated to nothing), so
+    /// the guard is now the write, which fills each field only while blank.
+    @Test("only records with no licence are considered, and only blanks are filled")
     func itOnlyFillsBlanks() throws {
         let shop = try Self.shopSource()
+        #expect(shop.contains("let blank = files.filter { ($0.licence ?? \"\").isEmpty }"),
+                "the candidate filter changed — a record with a licence must never be re-read")
         #expect(shop.contains("""
-                ($0.source ?? "").isEmpty && ($0.licence ?? "").isEmpty
-            """), """
-            the candidate filter changed — if it stopped requiring BOTH fields \
-            blank, this overwrites what a shop wrote about its own models
-            """)
+                if !said.source.isEmpty, (Self.plainString(record["source"]) ?? "").isEmpty {
+            """), "the source is written over what a shop typed")
+        #expect(shop.contains("""
+                if !said.licence.isEmpty, (Self.plainString(record["licence"]) ?? "").isEmpty {
+            """), "the licence is written over what a shop chose")
     }
 
     /// A book nobody has opened, and a sample with no vault behind it: neither

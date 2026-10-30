@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Licences: model sites' own terms, the designer's credit, and selling a file.**
+  - New licence `sdfl` (`lib/model-licence.js` and `ModelLicence.swift`): MakerWorld's and Printables' "Standard Digital File License", which forbids selling a printed copy without the designer's permission. It is not for sale, so "Not for sale" now fires on the files shops download most. `fromFile` reads the platform's wording, so 3MF imports and web saves record it. Named in all nine languages. "MakerWorld Exclusive License" stays unknown, because its terms could not be read.
+  - Backfill: the launch read of model files now covers every record with a blank licence, not only those with no designer either. A page saved from the web is translated from its kept wording, with no file opened. It still only fills blanks.
+  - Product sheet: a CC BY model shows the credit its licence asks for (`“Dragon” — Ana (CC BY), link`, with no word of any language) and a button that adds it to the listing's description once.
+  - Vault release sheet: files that were downloaded, or carry a licence that may not allow selling the file itself (NC, SDFL, or a bought licence, which usually covers prints only), are named before release. It is a warning, not a block.
 - **Mac: quote-form requests, the three open items.**
   - The request's file is streamed and stopped once past its declared size (`CloudIntake.capped`). Before, `data(for:)` held the whole answer in memory and only then refused it. A `Content-Length` over the size is refused before any bytes are read.
   - "Import without the file": when Khayt Cloud has no file for a request it should still keep (`missingEarly`), the request card offers to import it anyway. It asks first, then imports it as a quote with a note that the file is missing and drains it.

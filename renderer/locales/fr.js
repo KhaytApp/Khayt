@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — vente interdite",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — vente interdite",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — vente interdite",
+  "plib.licence_sdfl": "Standard Digital File License — pas de vente",
   "plib.licence_commercial": "Licence commerciale achetée",
   "plib.photo": "Photo (facultatif)",
   "plib.photo_failed": "Impossible de charger l'image",

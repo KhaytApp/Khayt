@@ -28,11 +28,24 @@ struct LicenceFromFileTests {
 
     /// THE HALF THAT MATTERS. Fifteen of that shop's files say "Standard
     /// Digital File License" and three say "MakerWorld Exclusive License".
-    /// Neither is Creative Commons. A wrong answer here is a shop told it may
-    /// sell something it may not, or told it may not sell its own work.
+    /// Neither is Creative Commons. The first's text forbids selling a printed
+    /// copy without the designer's permission, so it is `sdfl` — not for
+    /// sale. The second's terms could not be read, so it stays unknown.
+    @Test("the Standard Digital File License is read as not for sale")
+    func standardDigitalFileLicence() {
+        for said in ["Standard Digital File License", "standard digital file licence",
+                     "  STANDARD DIGITAL FILE LICENSE  ", "SDFL"] {
+            #expect(ModelLicence.fromFile(said)?.id == "sdfl", Comment(rawValue: said))
+        }
+        #expect(ModelLicence.fromFile("Standard Digital File License")?.commercial == false)
+        #expect(ModelLicence.sellable("sdfl") == false)
+    }
+
+    /// A wrong answer here is a shop told it may sell something it may not,
+    /// or told it may not sell its own work.
     @Test("a platform's own terms are not translated into a permission")
     func platformTermsAreRefused() {
-        for said in ["Standard Digital File License", "MakerWorld Exclusive License",
+        for said in ["MakerWorld Exclusive License",
                      "All Rights Reserved", "Royalty Free", "Personal use only",
                      "https://creativecommons.org/licenses/by-nc-sa/4.0/",
                      "Free for personal use, contact me for commercial",
@@ -48,7 +61,7 @@ struct LicenceFromFileTests {
     /// it is not the same as "no". A refusal must not become a refusal to sell.
     @Test("a licence that could not be translated leaves sellable unknown")
     func refusedIsNotForbidden() {
-        #expect(ModelLicence.fromFile("Standard Digital File License") == nil)
+        #expect(ModelLicence.fromFile("MakerWorld Exclusive License") == nil)
         #expect(ModelLicence.sellable(nil) == nil, "unknown became a no")
         // And the one that does translate carries its real answer through.
         #expect(ModelLicence.fromFile("BY-NC-SA")?.commercial == false)
@@ -64,4 +77,22 @@ struct LicenceFromFileTests {
                     Comment(rawValue: "\(said) became \(ModelLicence.fromFile(said)?.id ?? "-")"))
         }
     }
+
+    @Test("a sale credits the designer of every CC BY model, once, and no one else")
+    func credits() {
+        let records: [JSONValue] = [
+            .object(["id": .string("a"), "title": .string("Dragon"), "licence": .string("cc-by"),
+                     "source": .string("Ana"), "sourceUrl": .string("https://printables.com/model/1")]),
+            .object(["id": .string("b"), "name": .string("Vase"), "licence": .string("cc-by-nc-sa"),
+                     "source": .string("https://makerworld.com/en/models/2")]),
+            .object(["id": .string("c"), "title": .string("Mine"), "licence": .string("own")]),
+            .object(["id": .string("d"), "title": .string("Box"), "licence": .string("sdfl")]),
+            .object(["id": .string("e"), "title": .string("Free"), "licence": .string("cc0")]),
+        ]
+        let out = ModelLicence.credits(["a", "b", "a", "c", "d", "e", "zz"], records: records)
+        #expect(out.map(\.id) == ["a", "b"])
+        #expect(out[0].line == "“Dragon” — Ana (CC BY), https://printables.com/model/1")
+        #expect(out[1].line == "“Vase” (CC BY-NC-SA), https://makerworld.com/en/models/2")
+    }
 }
+
