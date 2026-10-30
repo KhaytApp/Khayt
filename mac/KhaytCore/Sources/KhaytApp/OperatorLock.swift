@@ -178,6 +178,7 @@ extension Shop {
         planningBatch = false; planningCampaign = false; reviewingDeposits = false
         reviewingSyncLosses = false; scanning = false; schedulingWork = false
         sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
+        showingSlicerInbox = false; slicerJobAfterSheet = nil
         showingSpoolRepair = false; showingWebStore = false; signingIntoCloud = false
         takingAJob = false; goingTo = false; jumping = false
         libraryRangesShown = false; librarySaveSearchShown = false

@@ -718,6 +718,10 @@ struct WindowSheets: ViewModifier {
             .shopSheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
             .shopSheet(isPresented: $shop.reviewingDeposits) { DepositAuditSheet(shop: shop) }
             .shopSheet(isPresented: $shop.reviewingSyncLosses) { SyncLossesSheet(shop: shop) }
+            // What a slicer sent (`SlicerInboxSheet`). A job asked for from it
+            // opens once this sheet has gone.
+            .shopSheet(isPresented: $shop.showingSlicerInbox,
+                       onDismiss: { Task { await shop.openSlicerJobAfterSheet() } }) { SlicerInboxSheet(shop: shop) }
             // Reached from a banner on every screen, so it is the window's —
             // not the catalogue's, where it used to be the only way in.
             .shopSheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
