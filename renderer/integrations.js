@@ -1969,7 +1969,7 @@ function trackShipment(trackingNumber, carrier) {
   // the request's. Costed at this shop's own rates, through the quote sheet's
   // material and printer preset (settings.lanApi.intakeQuote) when it has them,
   // so the quote opens at a real cost instead of 0. The price is not set from
-  // the customer's figure: the shop prices it.
+  // the customer's figure: see intakeQuotePrice.
   function intakeQuotePart(p) {
     const q = p && p.quote;
     if (!q || q.verified !== true) return null;
@@ -2008,6 +2008,31 @@ function trackShipment(trackingNumber, carrier) {
     // A LINE total, as every part's baseCost is (lib/calculator-cost.js).
     part.baseCost = CC.partTotalCost(part, { inventory: inv, settings });
     return part;
+  }
+
+  /* What the imported quote opens at: the part's cost plus the shop's default
+   * margin (30 when unset), through the shared KhaytPricing.quoteTotal, with no
+   * discount, shipping, rush or overhead. This is what the Mac does
+   * (OnlineOrders.swift: a quote-form line carries no unitPrice, so its
+   * PriceRule() prices cost × defaultMargin) and what the LAN owner quote does
+   * (lib/lan-library.js). It used to be 0 here.
+   *
+   * NOT the figure the customer was shown. That stays a note: the quote sheet's
+   * figure and this book's VAT mode can disagree, and Turki's rule (Oct 29) is
+   * that the signed estimate is carried as grams, hours and a note, never as an
+   * override. The shop can still edit the price before sending. */
+  function intakeQuotePrice(part) {
+    const P = global.KhaytPricing;
+    if (!part || !P || !(+part.baseCost > 0)) return 0;
+    const margin = typeof settings.defaultMargin === 'number' && Number.isFinite(settings.defaultMargin) ? settings.defaultMargin : 30;
+    try {
+      const q = P.quoteTotal({
+        baseCost: +part.baseCost, qty: 1, margin, discountPct: 0, shippingCost: 0,
+        rushEnabled: false, business: true, agreedAmount: 0,
+      });
+      const total = Math.round((Number(q && q.total) || 0) * 100) / 100;
+      return total > 0 ? total : 0;
+    } catch (_) { return 0; }
   }
 
   async function importIntakeAsQuote(it, c) {
@@ -2051,7 +2076,7 @@ function trackShipment(trackingNumber, carrier) {
       material: (quotedPart && quotedPart.material) || p.material || '',
       // Per piece, as lib/order-new.js sums a job's parts.
       printTime: quotedPart ? +quotedPart.printTime.toFixed(1) : 0,
-      price: 0,
+      price: intakeQuotePrice(quotedPart),
       status: 'quote',
       statusHistory: [{ status: 'quote', at: now.toISOString() }],
       paymentStatus: 'unpaid',
