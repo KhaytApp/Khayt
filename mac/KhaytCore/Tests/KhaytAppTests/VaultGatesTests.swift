@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import KhaytCore
 @testable import KhaytApp
 
 /// Sharing or selling vault files moves them off this Mac, so with the staff
@@ -43,4 +44,30 @@ struct VaultGatesTests {
         #expect(!Shop.releaseMatches(shown: ["a": 3], now: ["a": 3, "b": 1]), "a file shown missing came back")
         #expect(!Shop.releaseMatches(shown: [:], now: [:]))
     }
+
+    static func model(_ id: String, licence: String = "", source: String = "", url: String = "") throws -> LibraryFile {
+        var row: [String: JSONValue] = ["id": .string(id), "name": .string(id), "title": .string(id),
+                                        "licence": .string(licence), "source": .string(source)]
+        if !url.isEmpty { row["sourceUrl"] = .string(url) }
+        return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(row)))
+    }
+
+    @Test("a release names the files that may not be the shop's to sell as files")
+    func resaleDoubts() throws {
+        let files = [
+            try Self.model("own"), // nothing recorded and from nowhere: the shop's own
+            try Self.model("mine", licence: "own", source: "https://printables.com/model/1"),
+            try Self.model("by", licence: "cc-by"),
+            try Self.model("nc", licence: "cc-by-nc"),
+            try Self.model("sdfl", licence: "sdfl"),
+            try Self.model("bought", licence: "commercial"),
+            try Self.model("web", url: "https://makerworld.com/en/models/2"),
+            try Self.model("site", source: "Thingiverse"),
+        ]
+        let records = Dictionary(uniqueKeysWithValues: files.map { ($0.id, "F-" + $0.id) })
+        let doubts = Shop.resaleDoubts(files.map { "F-" + $0.id }, records: records, files: files)
+        #expect(doubts == ["nc", "sdfl", "bought", "web", "site"])
+        #expect(Shop.resaleDoubts(["F-unknown"], records: records, files: files).isEmpty)
+    }
 }
+

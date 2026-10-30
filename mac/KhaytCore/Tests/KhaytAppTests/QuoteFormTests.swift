@@ -295,7 +295,7 @@ struct QuoteFormImportTests {
 
     static func run(_ payload: JSONValue, cloud: Cloud, scratch: Scratch, engine: KhaytEngine,
                     existing: @escaping (String) -> String? = { _ in nil },
-                    now: Date = Date()) async throws -> Shop.QuoteFormResult {
+                    now: Date = Date(), withoutFile: Bool = false) async throws -> Shop.QuoteFormResult {
         let item = CloudIntake.Item(id: "21", payload: payload, createdAt: Date())
         let meta = try #require(item.file)
         let order = try await Shop.onlineOrder(item, products: [], stock: .object([:]), engine: engine)
@@ -303,7 +303,8 @@ struct QuoteFormImportTests {
         return await Shop.recordQuoteForm(
             order, meta: meta, input: input, paid: false, engine: engine, now: now,
             storeURL: scratch.store, libraryRoot: scratch.library, existingModel: existing,
-            expiredNote: "FILE EXPIRED NOTE", owns: { true }, whoHasIt: { nil },
+            expiredNote: "FILE EXPIRED NOTE", withoutFile: withoutFile, lostNote: "FILE LOST NOTE",
+            owns: { true }, whoHasIt: { nil },
             download: { try await CloudIntake.file(connection, token: "t", id: "21", maxBytes: meta.bytes, fetch: fetch) },
             drain: { try await CloudIntake.drain(connection, token: "t", id: "21", fetch: fetch) })
     }
@@ -551,6 +552,25 @@ struct QuoteFormImportTests {
         #expect(try scratch.jobs().isEmpty)
     }
 
+    @Test("the shop's choice after a lost file: imported as a quote with the lost note, then drained")
+    func missingEarlyImportedWithoutFile() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let cloud = Cloud(scratch: scratch, status: 404,
+                          body: Data(#"{"error":"Not found","reason":"no-file"}"#.utf8))
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine,
+                                        now: try #require(QuoteFormFile.instant("2026-10-29T00:00:00Z")),
+                                        withoutFile: true)
+        #expect(result.refusal == nil)
+        #expect(result.expired)
+        #expect(result.drained)
+        #expect(cloud.log == [Self.filePath, Self.drainPath])
+        let job = try #require(try scratch.jobs().first)
+        #expect(Shop.plainString(job["status"]) == "quote")
+        #expect((Shop.plainString(job["notes"]) ?? "").contains("FILE LOST NOTE"))
+    }
+
     @Test("a sliced plate in a 3MF is held like G-code, never filed")
     func slicedPlateIsHeld() async throws {
         #expect(QuoteFormFile.isSlicedPlate(name: "Benchy.gcode.3mf", data: Data()))
@@ -781,6 +801,59 @@ struct IntakeFileCapableTests {
         } catch CloudIntake.Failure.refused(let code, _) {
             #expect(code == 409)
         } catch { Issue.record("expected refused, got \(error)") }
+    }
+}
+
+/// The streamed download: refused past the cap, before the rest is read.
+@Suite(.serialized)
+@MainActor
+struct QuoteFormCappedFetchTests {
+    final class Big: URLProtocol, @unchecked Sendable {
+        nonisolated(unsafe) static var size = 0
+        nonisolated(unsafe) static var declare = true
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            var headers = ["content-type": "application/octet-stream"]
+            if Self.declare { headers["content-length"] = String(Self.size) }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+                                           headerFields: headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(repeating: 7, count: Self.size))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    static func session() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [Big.self]
+        return URLSession(configuration: config)
+    }
+
+    func fetch(size: Int, declare: Bool, cap: Int) async throws -> Int {
+        Big.size = size
+        Big.declare = declare
+        let (data, _) = try await CloudIntake.capped(Self.session(), maxBytes: cap)(
+            URLRequest(url: URL(string: "https://cloud.test/file")!))
+        return data.count
+    }
+
+    @Test("within the cap: every byte comes back")
+    func withinCap() async throws {
+        #expect(try await fetch(size: 1000, declare: true, cap: 1000) == 1000)
+    }
+
+    @Test("over the cap, declared or not: refused as too large")
+    func overCap() async {
+        for declare in [true, false] {
+            do {
+                _ = try await fetch(size: 5000, declare: declare, cap: 1000)
+                Issue.record("expected tooLarge (declared: \(declare))")
+            } catch CloudIntake.Failure.tooLarge(let most) {
+                #expect(most == 1000)
+            } catch { Issue.record("expected tooLarge, got \(error)") }
+        }
     }
 }
 

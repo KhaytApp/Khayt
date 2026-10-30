@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — 販売不可",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — 販売不可",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — 販売不可",
+  "plib.licence_sdfl": "Standard Digital File License — 販売不可",
   "plib.licence_commercial": "商用ライセンス購入済み",
   "plib.photo": "写真（任意）",
   "plib.photo_failed": "画像を読み込めませんでした",

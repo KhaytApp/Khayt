@@ -308,11 +308,13 @@ extension Shop {
                                 notTakenNote: String = "",
                                 heldNote: ((String) -> String)? = nil,
                                 expiredNote: String,
+                                withoutFile: Bool = false,
+                                lostNote: String = "",
                                 owns: @escaping @Sendable () -> Bool,
                                 whoHasIt: @escaping @Sendable () -> String?,
                                 download: () async throws -> CloudIntake.FileAnswer,
                                 drain: () async throws -> Void) async -> QuoteFormResult {
-        // lock: callers — recordQuoteFormOrder
+        // lock: callers — importQuoteForm
         var result = QuoteFormResult()
 
         // 1. DOWNLOAD.
@@ -337,9 +339,14 @@ extension Shop {
         case .expired where meta.expiresAt.map({ $0 > now.addingTimeInterval(3600) }) ?? false:
             // The cloud says the file is gone well before the date it gave
             // for it — a storage fault, not an expiry. Draining now would
-            // lose a file that may still be in the bucket; it stays queued.
-            result.refusal = .missingEarly
-            return result
+            // lose a file that may still be in the bucket; it stays queued —
+            // unless the shop, told so, chose to take the request without it.
+            guard withoutFile else {
+                result.refusal = .missingEarly
+                return result
+            }
+            result.expired = true
+            attach = .init(meta: meta, state: .expired(note: lostNote))
         case .expired:
             result.expired = true
             attach = .init(meta: meta, state: .expired(note: expiredNote))
@@ -470,42 +477,19 @@ extension Shop {
 
     /// The button, for a request that carries a file. `recordOnlineOrder`
     /// hands over to this; the caller holds the busy flag.
+    ///
+    /// `withoutFile` is the shop's choice, made on the card after a
+    /// `missingEarly` refusal: take the request with a note instead of the file.
     func recordQuoteFormOrder(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
-                              fetch: CloudIntake.Fetch?) async {
+                              fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async {
         guard permitted("orders", "create") else { return }
-        guard case .store(let build) = source, let engine else { return }
-        let connection: CloudReader.Connection
-        let token: String
-        do {
-            connection = try CloudReader.connection(settingsDict)
-            token = try await Secrets.open(connection.storedToken, for: build)
-            guard !token.isEmpty else { throw CloudIntake.Failure.notConnected }
-        } catch {
-            onlineProblem = words.callIt("mac.qfe_kept") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        let outcome = await importQuoteForm(order, meta: meta, fetch: fetch, withoutFile: withoutFile)
+        guard case .success(let result) = outcome else {
+            if case .failure(let problem) = outcome, !problem.said.isEmpty { onlineProblem = problem.said }
+            if case .failure(.refused(.missingEarly, _)) = outcome { quoteFilesMissing.insert(order.id) }
             return
         }
-        let network = fetch ?? Self.quoteFormNetwork
-        let input = await onlineJobInput(order)
-        let files = self.files
-        let result = await Self.recordQuoteForm(
-            order, meta: meta, input: input, paid: false,
-            engine: engine, storeURL: build.storeURL,
-            libraryRoot: libraryRoots.map { URL(fileURLWithPath: $0.primary) },
-            existingModel: { hash in files.first { $0.contentHash == hash }?.id },
-            analyseRisk: analysesRiskAtImport,
-            notTakenNote: words.callIt("mac.qfe_file_not_taken_note", ["name": .string(meta.safeName)]),
-            heldNote: { [words] path in words.callIt("mac.qfe_file_held_note", ["name": .string(meta.safeName), "path": .string(path)]) },
-            expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.safeName)]),
-            owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: meta.bytes >= 0 ? meta.bytes : QuoteFormFile.maxBytes, fetch: network) },
-            drain: { try await CloudIntake.drain(connection, token: token, id: order.id, fetch: network) })
-
-        if let refusal = result.refusal {
-            onlineProblem = words.callIt("mac.qfe_kept") + " " + saidRefusal(refusal)
-            return
-        }
+        quoteFilesMissing.remove(order.id)
         if !result.webhooks.isEmpty { await fire(result.webhooks) }
         switch result.recorded {
         case .made(let jobId, _, _, _)?:
@@ -529,6 +513,60 @@ extension Shop {
             onlineProblem = words.callIt("mac.online_kept_in_queue") + " " + problem
         }
         await load(source)
+    }
+
+    /// Why an import of a request with a file did not go ahead.
+    enum QuoteFormProblem: Error {
+        case refused(QuoteFormFile.Refusal, said: String)
+        case other(String)
+        var said: String {
+            switch self { case .refused(_, let said), .other(let said): said }
+        }
+    }
+
+    /// The import of a request with a file, without touching the sheet:
+    /// shared by the button and the automatic pass.
+    func importQuoteForm(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
+                         fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async -> Result<QuoteFormResult, QuoteFormProblem> {
+        // The button checks `permitted`; the automatic pass is the owner's own
+        // setting, run only on the Mac holding the book.
+        // lock: callers — recordQuoteFormOrder, recordPaidWebStoreOrders
+        guard case .store(let build) = source, let engine else { return .failure(.other("")) }
+        let connection: CloudReader.Connection
+        let token: String
+        do {
+            connection = try CloudReader.connection(settingsDict)
+            token = try await Secrets.open(connection.storedToken, for: build)
+            guard !token.isEmpty else { throw CloudIntake.Failure.notConnected }
+        } catch {
+            return .failure(.other(words.callIt("mac.qfe_kept") + " "
+                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))))
+        }
+        let network = fetch ?? Self.quoteFormNetwork
+        let cap = meta.bytes >= 0 ? meta.bytes : QuoteFormFile.maxBytes
+        // Streamed and stopped at the declared size, not buffered whole.
+        let download = fetch ?? CloudIntake.capped(CloudReader.session, maxBytes: cap)
+        let input = await onlineJobInput(order)
+        let files = self.files
+        let result = await Self.recordQuoteForm(
+            order, meta: meta, input: input, paid: false,
+            engine: engine, storeURL: build.storeURL,
+            libraryRoot: libraryRoots.map { URL(fileURLWithPath: $0.primary) },
+            existingModel: { hash in files.first { $0.contentHash == hash }?.id },
+            analyseRisk: analysesRiskAtImport,
+            notTakenNote: words.callIt("mac.qfe_file_not_taken_note", ["name": .string(meta.safeName)]),
+            heldNote: { [words] path in words.callIt("mac.qfe_file_held_note", ["name": .string(meta.safeName), "path": .string(path)]) },
+            expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.safeName)]),
+            withoutFile: withoutFile,
+            lostNote: words.callIt("mac.qfe_file_lost_note", ["name": .string(meta.safeName)]),
+            owns: { StoreLock.weOwnIt(build) },
+            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: cap, fetch: download) },
+            drain: { try await CloudIntake.drain(connection, token: token, id: order.id, fetch: network) })
+        if let refusal = result.refusal {
+            return .failure(.refused(refusal, said: words.callIt("mac.qfe_kept") + " " + saidRefusal(refusal)))
+        }
+        return .success(result)
     }
 
     /// A refusal in the shop's words.

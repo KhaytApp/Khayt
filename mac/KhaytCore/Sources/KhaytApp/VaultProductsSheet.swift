@@ -500,6 +500,7 @@ struct VaultReleaseSheet: View {
     @State private var lines: [(fileId: String, name: String, version: Int)] = []
     @State private var missing: [String] = []
     @State private var dropping: [String] = []
+    @State private var doubts: [String] = []
     @State private var working = false
     @State private var loading = true
     @State private var problem: String?
@@ -543,6 +544,19 @@ struct VaultReleaseSheet: View {
                 if !missing.isEmpty {
                     Text(Shop.say(words, "mac.vp_missing", missing.count)).font(.callout)
                         .foregroundStyle(Khayt.attention).fixedSize(horizontal: false, vertical: true)
+                }
+                // FILES THAT MAY NOT BE THE SHOP'S TO SELL: downloaded, or under
+                // a licence that does not allow selling the file itself.
+                if !doubts.isEmpty {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(Shop.say(words, "mac.vp_licence_doubt", doubts.count))
+                            Text(doubts.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+                    } icon: { Image(systemName: "exclamationmark.triangle") }
+                    .font(.callout).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 // The privacy policy's own sentences (website #74). Change them
                 // there first, then here.
@@ -590,6 +604,8 @@ struct VaultReleaseSheet: View {
             return (s.row.fileId, names[s.row.fileId] ?? s.row.fileId, v)
         }
         missing = gone
+        doubts = Shop.resaleDoubts(lines.map(\.fileId), records: engine.remote.sync.load().records,
+                                   files: shop.files)
         // Files on sale before that are not in the listing now: taking them
         // out of the release is said, and the confirm button says it too.
         if let state = try? await engine.products.releaseState(product.productId) {

@@ -412,6 +412,7 @@
   "plib.licence_cc_by_nc": "CC BY-NC — satılamaz",
   "plib.licence_cc_by_nc_sa": "CC BY-NC-SA — satılamaz",
   "plib.licence_cc_by_nc_nd": "CC BY-NC-ND — satılamaz",
+  "plib.licence_sdfl": "Standard Digital File License — satılamaz",
   "plib.licence_commercial": "Ticari lisans satın alındı",
   "plib.photo": "Fotoğraf (isteğe bağlı)",
   "plib.photo_failed": "Resim yüklenemedi",

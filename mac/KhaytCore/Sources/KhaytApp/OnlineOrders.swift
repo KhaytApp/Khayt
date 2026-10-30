@@ -236,7 +236,7 @@ extension Shop {
     ///
     /// A drain that fails is reported and the write stands. It is not retried
     /// silently — see `never loop a destructive probe`.
-    func recordOnlineOrder(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async {
+    func recordOnlineOrder(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil, withoutFile: Bool = false) async {
         guard permitted("orders", "create") else { return }
         guard case .store = source else { return }
         onlineProblem = nil
@@ -250,7 +250,7 @@ extension Shop {
         // downloaded, checked and filed before anything else — see
         // `QuoteFormFile`.
         if let meta = order.item.file {
-            await recordQuoteFormOrder(order, meta: meta, fetch: fetch)
+            await recordQuoteFormOrder(order, meta: meta, fetch: fetch, withoutFile: withoutFile)
             return
         }
 

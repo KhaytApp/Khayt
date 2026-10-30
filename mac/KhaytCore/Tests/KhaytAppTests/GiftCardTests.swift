@@ -282,7 +282,7 @@ struct LicenceStandingTests {
     func everyLicenceHasWords() async throws {
         let shop = try await Self.shop()
         for id in ["own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd",
-                   "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "commercial"] {
+                   "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl", "commercial"] {
             let key = "plib.licence_" + id.replacingOccurrences(of: "-", with: "_")
             #expect(shop.words.callIt(key) != key, "\(id) has no words")
         }
