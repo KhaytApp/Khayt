@@ -74,7 +74,8 @@ enum SlicerInbox {
         // lock: system — a slicer's upload through the LAN server, which checked its API key; it only fills this Mac's own inbox folder.
         guard list(root: root).count < maxWaiting else { throw Full() }
         let stamp = Int(now.timeIntervalSince1970 * 1000)
-        let id = "SU-\(stamp)-\(String(format: "%04x", Int(UInt16.random(in: 0...UInt16.max))))"
+        let id = ["SU", String(stamp), String(format: "%04x", Int(UInt16.random(in: 0...UInt16.max)))]
+            .joined(separator: "-")
         let dir = root.appending(path: id, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let dest = dir.appending(path: name)

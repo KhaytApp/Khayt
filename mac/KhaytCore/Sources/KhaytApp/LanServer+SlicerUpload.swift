@@ -347,8 +347,8 @@ enum Multipart {
     /// Every part, in order, up to `maxParts`; nil when the body is not
     /// well-formed multipart for this boundary.
     static func parts(_ data: Data, boundary: String, maxParts: Int = 32) -> [Part]? {
-        let dash = Array("--\(boundary)".utf8)
-        let next = Array("\r\n--\(boundary)".utf8)
+        let dash = Array(("--" + boundary).utf8)
+        let next = Array(("\r\n--" + boundary).utf8)
         let blank = Array("\r\n\r\n".utf8)
         let end = data.endIndex
         guard var cursor = find(dash, in: data, from: data.startIndex, to: end).map({ $0 + dash.count }) else { return nil }
