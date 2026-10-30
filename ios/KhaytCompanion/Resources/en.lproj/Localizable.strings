@@ -573,6 +573,14 @@
 "alert.print.no_order" = "That job is not in this phone’s book.";
 "alert.print.not_shippable" = "Only a finished job that has not been delivered can be marked shipped.";
 
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "The shop’s rules don’t allow that move.";
+"move.refused.production_paused" = "Production is paused. Resume production before starting a print.";
+"move.refused.wip_blocked" = "%1$@ already holds its limit of %2$lld jobs. Finish one first.";
+"move.refused.assembly_not_assembled" = "Every part passed QC. Mark the assembly as assembled before completing this job.";
+"move.refused.assembly_parts" = "This job is waiting on parts: %@";
+"move.refused.stage_not_a_status" = "Shipped isn’t a stage you can move a job to. Use Mark shipped on a finished job.";
+
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
 "PUSH_TITLE" = "Khayt";

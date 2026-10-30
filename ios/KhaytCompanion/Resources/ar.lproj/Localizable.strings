@@ -573,6 +573,14 @@
 "alert.print.no_order" = "هذه المهمة ليست في دفتر هذا الهاتف.";
 "alert.print.not_shippable" = "لا تُعلَّم كمشحونة إلا مهمة منتهية لم تُسلَّم بعد.";
 
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "قواعد الورشة لا تسمح بهذا النقل.";
+"move.refused.production_paused" = "الإنتاج متوقف. استأنف الإنتاج قبل بدء أي طباعة.";
+"move.refused.wip_blocked" = "بلغ عمود %1$@ حدّه من المهام (%2$lld). أنهِ واحدة أولًا.";
+"move.refused.assembly_not_assembled" = "نجحت كل القطع في الفحص. حدّد التجميعة كمُجمَّعة قبل إكمال هذه المهمة.";
+"move.refused.assembly_parts" = "هذه المهمة بانتظار القطع: %@";
+"move.refused.stage_not_a_status" = "«مشحون» ليست مرحلة تُنقل إليها المهمة. استخدم «علّمها مشحونة» على مهمة منتهية.";
+
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
 "PUSH_TITLE" = "خيط";

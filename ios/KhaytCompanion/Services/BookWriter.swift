@@ -4,23 +4,33 @@ import KhaytCore
 /**
  * Changing the shop's records on the phone, with the Mac switched off.
  *
- * ── WHAT THESE WRITES ARE, AND DELIBERATELY ARE NOT ───────────────────────
+ * ── A STATUS MOVE RUNS THE SHOP'S RULE; EVERY OTHER WRITE IS A FIELD SET ──
  *
- * Each of these sets fields on one record and stamps it. None of them runs the
- * shop's status rules — no `moveJob`, no filament deduction, no customer email
- * — and that is parity rather than a shortcut.
+ * Most of these set fields on one record and stamp it. Moving a job is the
+ * exception: `setOrderStatus` runs the shop's own status rule — `gate` and
+ * `apply` from `lib/order-status.js`, and the deductions in
+ * `lib/order-deduction.js` — through the engine, the same expression the Mac
+ * runs (`KhaytEngine.moveJob`).
  *
- * Advancing a job from the phone has never done those things. `lib/lan-server.js`
- * answers `PATCH /api/orders/:id` with `updated.status = status` and writes the
- * record back; the renderer's `lan-order-updated` handler does the same
- * in memory to keep its screen in step. A plain field set, on both sides, since
- * the endpoint existed.
+ * It used to be a plain field set, for parity with `lib/lan-server.js`'s
+ * `PATCH /api/orders/:id`. That was superseded on 2026-10-30 (Turki): a job
+ * finished on the phone kept its filament on the shelf and had no
+ * `completedAt`, so the stock was wrong and the job was missing from every
+ * figure that counts finished work by the day it was finished. Moving it on
+ * the Mac did both. So the phone now moves a job as the Mac does — the stage,
+ * `statusHistory`, `completedAt`, the quote and cancel days, the grams off the
+ * spools and the packaging off the consumables — and writes the job, the
+ * spools and the consumables in ONE write, so the shelf and the job can never
+ * disagree about whether it was finished.
  *
- * So writing the same field locally and letting the delta carry it produces the
- * same book as being online does. Running `moveJob` here instead would be a
- * change in what the product does — a shop would start seeing stock drop for
- * jobs advanced from the phone, which it never has — and that is a decision
- * about the product, not a detail of working offline.
+ * WHAT IT STILL DOES NOT DO is reach anybody. The rule asks for a webhook, a
+ * Telegram message, an email and a portal refresh on every move; this phone
+ * sends none of them, exactly as before. Nor does it number an invoice (see
+ * `Invoice.swift`), write the activity log, or take a model off Print next —
+ * those stay with the Mac and the PC.
+ *
+ * The no-book path — a LAN PATCH to an older desktop — is unchanged: the
+ * desktop decides what that move does.
  *
  * ── WHY EVERY WRITE GOES THROUGH `updateRecord` ───────────────────────────
  *
@@ -29,42 +39,157 @@ import KhaytCore
  * fold keeps the higher one. An unstamped edit is invisible to the first and
  * loses to the second — it would sit on the phone looking saved and never
  * arrive.
+ *
+ * A status move is the one write that does not: it changes rows in three
+ * collections at once, so it stamps each row it changed itself (`putBack`, the
+ * Mac's `Shop.write`) and swaps the whole book in one `CompanionBook.update`.
  */
 struct BookWriter {
 
     let book: CompanionBook
 
-    /// Advance or set a job's stage.
+    /// Advance or set a job's stage, by the shop's own status rule.
     ///
-    /// A quote that leaves the Quote column has been accepted, and the day
-    /// is stamped as `lib/order-status.js` stamps it on the Mac: once, not
-    /// for a cancellation, as the LOCAL day. That day is the quote conversion
-    /// rate's and the VAT tax point's (`taxPointDate`); without it a quote
-    /// won from the phone counted as never accepted.
+    /// `KhaytEngine.moveJob` is the Mac's expression: `gate`, then `apply`,
+    /// then the deductions `apply` asks for, on the spools and consumables it
+    /// is handed. Everything it decides comes from the rule, so it matches the
+    /// Mac by construction: a quote leaving the Quote column is stamped
+    /// accepted on the LOCAL day (once, not for a cancellation); a cancel is
+    /// dated and a job brought back loses the date; a completion stamps
+    /// `completedAt`, appends `statusHistory` and takes its filament and
+    /// packaging off the shelf; a finished job moved back gives back what its
+    /// completion took (`returnMaterial`, as the Mac asks), except into
+    /// Cancelled, where the piece was made and the filament is gone.
     ///
-    /// A move INTO cancelled stamps `cancelledAt` the same way, and a move out
-    /// of it removes the stamp: that day decides which VAT period the reversal
-    /// lands in, and a job brought back is no longer reversed.
-    func setOrderStatus(orderId: String, to status: String, now: Date = Date()) throws {
-        try book.updateRecord(collection: "printLog", id: orderId) { record in
-            let was: String? = { if case .string(let s)? = record["status"] { return s } else { return nil } }()
-            let stamped: Bool = {
-                switch record["quoteAcceptedAt"] {
-                case .string(let s)?: return !s.isEmpty
-                case nil, .null?: return false
-                default: return true
+    /// Worked out against the book as read, and written only if the book is
+    /// still that book — otherwise worked out again. The engine is async and
+    /// a write is not, so this is the compare-and-swap the Mac's async
+    /// `StoreWriter.update` does: a change computed from a stale copy would
+    /// put the stale copy back.
+    ///
+    /// A move the rule refuses throws `MoveRefused`, NOT a `Refusal`: a
+    /// `Refusal` falls through to the desktop, and a move the shop's rule
+    /// refuses must not be made by another route. Returns the rule's notices
+    /// (filament taken, a spool running low), by code.
+    @discardableResult
+    func setOrderStatus(orderId: String, to status: String,
+                        engine: KhaytEngine, now: Date = Date()) async throws -> [Notice] {
+        struct Moved: Error {}
+        for _ in 0..<5 {
+            let store = try book.read()
+            let orders = Self.rows(store, "printLog")
+            guard let order = orders.first(where: { Self.rowId($0) == orderId }) else {
+                throw Refusal.noSuchOrder
+            }
+            var settings: [String: JSONValue] = [:]
+            if case .object(let s)? = store["settings"] { settings = s }
+            let inventory = Self.rows(store, "inventory")
+            let consumables = Self.rows(store, "consumables")
+
+            let move = try await engine.moveJob(
+                order: order, to: status, orders: orders, settings: settings,
+                inventory: inventory, consumables: consumables,
+                machines: Self.rows(store, "machines"),
+                now: now, today: Self.localDay(now))
+            guard move.ok else { throw MoveRefused(gate: move.gate) }
+            guard case .object(var moved)? = move.order else { throw Refusal.noSuchOrder }
+            // A completion asks for a survey token, minted by the host because
+            // a pure module has no random source. The format is the shared one.
+            if move.performed?.contains("ensure_survey_token") == true, moved["surveyToken"] == nil {
+                moved["surveyToken"] = .string(Self.surveyToken())
+            }
+            // Everything else the move asked for — the webhooks, the Telegram
+            // message, the email, the portal refresh, the activity log, the
+            // redraws — is not done here. See the top of this file.
+
+            var next = store
+            Self.putBack(&next, "printLog", changed: [.object(moved)])
+            Self.putBack(&next, "inventory", changed: move.inventory ?? [])
+            Self.putBack(&next, "consumables", changed: move.consumables ?? [])
+            // Nothing changed — a job moved to where it already is. No write,
+            // no stamp: a stamp would outrank a real edit made on the Mac.
+            guard next != store else { return move.notices ?? [] }
+            do {
+                try book.update { root in
+                    guard root == store else { throw Moved() }
+                    root = next
                 }
-            }()
-            if was == "quote", status != "quote", status != "cancelled", !stamped {
-                record["quoteAcceptedAt"] = .string(Self.localDay(now))
+                return move.notices ?? []
+            } catch is Moved {
+                continue
             }
-            if status == "cancelled", was != "cancelled" {
-                record["cancelledAt"] = .string(Self.localDay(now))
-            } else if status != "cancelled" {
-                record["cancelledAt"] = nil
-            }
-            record["status"] = .string(status)
         }
+        throw StoreWriter.Refusal.unreadable("the book kept changing while this change was being made; try again")
+    }
+
+    /// A move the shop's status rule refused (`order-status.gate`), said in
+    /// the person's language. The code is the rule's; the sentence is ours.
+    struct MoveRefused: Error, LocalizedError, Equatable {
+        let code: String?
+        let params: [String: JSONValue]
+
+        init(gate: StatusGate) {
+            code = gate.block?.code
+            params = gate.block?.params ?? [:]
+        }
+
+        var errorDescription: String? {
+            switch code {
+            case "production_paused":
+                return L10n.tr("move.refused.production_paused")
+            case "wip_blocked":
+                let col: String = { if case .string(let c)? = params["col"] { return c } else { return "" } }()
+                let n: Int = { if case .number(let v)? = params["n"] { return Int(v) } else { return 0 } }()
+                let named = L10n.tr("status." + col)
+                return L10n.format("move.refused.wip_blocked", named == "status." + col ? col : named, n)
+            case "assembly_not_assembled":
+                return L10n.tr("move.refused.assembly_not_assembled")
+            case "assembly_parts":
+                let parts: String = { if case .string(let p)? = params["parts"] { return p } else { return "" } }()
+                return L10n.format("move.refused.assembly_parts", parts)
+            case "stage_not_a_status":
+                return L10n.tr("move.refused.stage_not_a_status")
+            default:
+                return L10n.tr("move.refused")
+            }
+        }
+    }
+
+    /// Put moved rows back where they were, stamping only the ones that
+    /// changed — the Mac's `Shop.write`. A row stamped without a change is an
+    /// edit nobody made, and on a phone a sync behind it would win.
+    private static func putBack(_ root: inout [String: JSONValue], _ collection: String,
+                                changed: [JSONValue]) {
+        guard !changed.isEmpty, case .array(var rows)? = root[collection] else { return }
+        var byId: [String: JSONValue] = [:]
+        for row in changed { if let id = rowId(row) { byId[id] = row } }
+        var touched = false
+        for i in rows.indices {
+            guard let id = rowId(rows[i]), let next = byId[id], next != rows[i],
+                  case .object(var now) = next else { continue }
+            StoreWriter.stamp(&now)
+            rows[i] = .object(now)
+            touched = true
+        }
+        if touched { root[collection] = .array(rows) }
+    }
+
+    private static func rows(_ store: [String: JSONValue], _ collection: String) -> [JSONValue] {
+        if case .array(let r)? = store[collection] { return r }
+        return []
+    }
+
+    private static func rowId(_ row: JSONValue) -> String? {
+        if case .object(let o) = row, case .string(let id)? = o["id"] { return id }
+        return nil
+    }
+
+    /// `srv-` and twelve random bytes in hex — the format `lib/order-status.js`
+    /// defines and the Mac's `Shop.surveyToken` mints.
+    static func surveyToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 12)
+        for i in bytes.indices { bytes[i] = UInt8.random(in: 0...255) }
+        return "srv-" + bytes.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Put a job on a printer, or take it off one.
