@@ -122,6 +122,10 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// `savedFromWebAt` is what "Saved from web" finds; the rest is the page's
     /// and is refreshed by the next save of it.
     let sourceUrl: String?
+    /// A REMIX: the address of the model this one was made from. Its
+    /// licence follows the remix — a remix of a NonCommercial model may not be
+    /// sold either (`Shop.saleProblems`).
+    let remixOf: String?
     let sourceSite: String?
     let sourceLicenceText: String?
     let sourceNote: String?

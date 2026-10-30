@@ -158,6 +158,10 @@ public enum ModelLicence {
         /// `not-commercial` or `expired`.
         public let reason: String
         public let until: String
+
+        public init(id: String, name: String, licence: String, reason: String, until: String) {
+            self.id = id; self.name = name; self.licence = licence; self.reason = reason; self.until = until
+        }
     }
 
     /// The models behind a sale that may not be sold today, in the order asked.
