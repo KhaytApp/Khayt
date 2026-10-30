@@ -637,8 +637,14 @@ final class LanServer {
         defer { if slot.slicer { slicerUploads -= 1 } }
         do {
             guard let request = try await readRequest(connection, on: queue, remote: remote, slot: slot) else { return }
-            defer { if let file = request.bodyFile { try? FileManager.default.removeItem(at: file) } } // scratch
-            let response = await respond(to: request)
+            // The spooled body goes once it is answered, BEFORE the answer is
+            // written: removed in a defer it outlived the reply, and a client
+            // that looked straight after its 201 could still find it.
+            let response: Response
+            do {
+                defer { if let file = request.bodyFile { try? FileManager.default.removeItem(at: file) } } // scratch
+                response = await respond(to: request)
+            }
             try await write(response, method: request.method, to: connection)
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
             try? await write(.open(413, #"{"error":"Request too large"}"#), method: "POST", to: connection)

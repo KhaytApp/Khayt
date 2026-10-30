@@ -26,6 +26,8 @@ struct ProvenanceMenu: View {
     @Bindable var shop: Shop
     @State private var typing = false
     @State private var typed = ""
+    @State private var remixing = false
+    @State private var remixTyped = ""
     @Environment(\.stripCompact) private var compact
 
     private var count: Int { shop.selectedIds.count }
@@ -64,6 +66,10 @@ struct ProvenanceMenu: View {
                     typed = shop.sourceOnSelection
                     typing = true
                 }
+                Button(shop.words.callIt("mac.remix_of") + "\u{2026}") {
+                    remixTyped = shop.remixOfOnSelection
+                    remixing = true
+                }
             }
         } label: {
             // Its symbol alone when the strip is narrow — the words are on
@@ -87,6 +93,16 @@ struct ProvenanceMenu: View {
                    confirm: shop.words.callIt("mac.file_it")) { line in
                 typing = false
                 Task { await shop.setSourceOnSelection(line) }
+            }
+        }
+        .shopPopover(isPresented: $remixing, arrowEdge: .bottom) {
+            NameIt(words: shop.words, typed: $remixTyped,
+                   title: shop.words.callIt("mac.remix_of"),
+                   example: "https://www.printables.com/model/…",
+                   note: shop.words.callIt("mac.remix_note"),
+                   confirm: shop.words.callIt("mac.file_it")) { line in
+                remixing = false
+                Task { await shop.setRemixOfOnSelection(line) }
             }
         }
     }
