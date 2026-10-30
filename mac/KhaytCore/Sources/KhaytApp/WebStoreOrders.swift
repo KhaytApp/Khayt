@@ -142,8 +142,65 @@ extension Shop {
             // The shelf and the catalogue the next order is read against.
             await load(source)
         }
+        // QUOTE-FORM REQUESTS, only when the shop asked for them to come in by
+        // themselves (Settings › Online, this Mac). Each becomes an unnumbered
+        // QUOTE — never an order, never paid — so nothing is agreed or owed
+        // until the shop sends it. A file is downloaded and filed before the
+        // drain, as the button does; a file the cloud lost stays for a person.
+        if Self.quoteAutoImport {
+            var quotesIn = 0
+            for item in items where item.isQuoteForm && !webStoreGaveUp.contains(item.id) {
+                guard let order = try? await Self.onlineOrder(
+                    item, products: productRows, stock: Self.stockCounts(settingsDict), engine: engine) else { continue }
+                var jobId: String?
+                if let meta = item.file {
+                    switch await importQuoteForm(order, meta: meta, fetch: fetch) {
+                    case .failure(let problem):
+                        webStoreGaveUp.insert(item.id)
+                        if case .refused(.missingEarly, _) = problem { quoteFilesMissing.insert(item.id) }
+                        if !problem.said.isEmpty { webStoreAutoProblem = problem.said }
+                        continue
+                    case .success(let result):
+                        if !result.webhooks.isEmpty { await fire(result.webhooks) }
+                        if case .made(let id, _, _, _)? = result.recorded { jobId = id }
+                        if let problem = result.drainProblem { webStoreAutoProblem = problem }
+                    }
+                } else {
+                    switch await writeOnlineOrder(order, paid: false) {
+                    case .failure(let problem):
+                        webStoreGaveUp.insert(item.id)
+                        webStoreAutoProblem = problem.sentence
+                        continue
+                    case .success(.alreadyThere):
+                        break
+                    case .success(.made(let id, _, _, _)):
+                        jobId = id
+                    }
+                    if let problem = await drainOnlineOrder(order, fetch: fetch) {
+                        webStoreAutoProblem = problem
+                    }
+                }
+                if let jobId {
+                    made += 1
+                    quotesIn += 1
+                    webStoreArrived.append(WebStoreArrival(
+                        intakeId: item.id, reference: item.reference, jobId: jobId,
+                        customer: order.customer, automatic: true))
+                }
+                changed = true
+                await load(source)
+            }
+            quoteRequestsWaiting = max(0, quoteRequestsWaiting - quotesIn)
+        }
         if changed, showingOnlineOrders { await readOnlineOrders(fetch: fetch) }
         return made
+    }
+
+    /// Quote-form requests come in as quotes by themselves — a choice made
+    /// per Mac, since only the Mac holding the book runs the pass.
+    nonisolated static let quoteAutoImportKey = "quoteForm.autoImport"
+    nonisolated static var quoteAutoImport: Bool {
+        UserDefaults.standard.bool(forKey: quoteAutoImportKey)
     }
 
     private static let webStoreNetwork: CloudIntake.Fetch = { request in

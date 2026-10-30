@@ -223,6 +223,17 @@ struct ProductSheet: View {
             if !problems.isEmpty {
                 LicenceWarning(shop: shop, problems: problems)
             }
+            // CC BY asks for the designer's name wherever a print is sold:
+            // said here, with the line ready to go into the listing.
+            let credits = shop.licenceCredits(parts.compactMap(\.printFileId))
+            if !credits.isEmpty {
+                LicenceCredits(shop: shop, credits: credits,
+                               written: draft.descriptions[shop.catalogueLanguages.first?.language ?? language] ?? "") { text in
+                    let code = shop.catalogueLanguages.first?.language ?? language
+                    let now = draft.descriptions[code] ?? ""
+                    draft.descriptions[code] = now.isEmpty ? text : now + "\n\n" + text
+                }
+            }
 
             if shop.catalogueLanguages.count > 1 {
                 Picker("", selection: $language) {

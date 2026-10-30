@@ -121,7 +121,7 @@ final class CloudSyncTests: XCTestCase {
         // One device without it closes the delta gate for the whole shop.
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
         (s, _) = try await sync().push(s)
         XCTAssertFalse(cloud.requests.isEmpty)
         for r in cloud.requests {
@@ -146,7 +146,7 @@ final class CloudSyncTests: XCTestCase {
     func testAFirstPullKeepsWhatWasChangedHereAndNotSent() async throws {
         // A phone that worked offline against the Mac, then signs in to the cloud.
         try book.replace(with: shop(orders: 2, finished: 0), scope: nil)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-1", to: "qc")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 3)
 
         _ = try await sync().pull(session)
@@ -179,7 +179,7 @@ final class CloudSyncTests: XCTestCase {
     func testAnEditGoesUpAsOneAppendedChange() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
 
         let pushed: CloudSync.Pushed
         (s, pushed) = try await sync().push(s)
@@ -200,7 +200,7 @@ final class CloudSyncTests: XCTestCase {
     func testAFullChainLeavesTheEditsHereAndNeverUploadsTheSlice() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
         cloud.chainFull = true
 
         let pushed: CloudSync.Pushed
@@ -217,13 +217,13 @@ final class CloudSyncTests: XCTestCase {
     func testAnEditMadeDuringTheSendStaysPending() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
 
         var during = sync()
-        let fake = cloud!, book = book!
+        let fake = cloud!, book = book!, engine = engine!
         during.fetch = { request in
             if request.httpMethod == "POST" {
-                try BookWriter(book: book).setOrderStatus(orderId: "O-1", to: "qc")
+                try await BookWriter(book: book).setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
             }
             return try fake.answer(request)
         }
@@ -238,7 +238,7 @@ final class CloudSyncTests: XCTestCase {
     func testARaceIsPulledAgainAndRetried() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         let (s, _) = try await sync().pull(session)
-        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
         // Somebody else writes after this phone's pull, before its send.
         try cloud.append(["deltas": .array([.object(["collection": .string("printLog"), "record": .object([
             "id": .string("O-1"), "status": .string("qc"), "rev": .number(2)])])]),

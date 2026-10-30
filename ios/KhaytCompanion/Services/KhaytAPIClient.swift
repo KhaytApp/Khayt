@@ -234,6 +234,7 @@ final class KhaytAPIClient: ObservableObject {
         let store = SampleShop.book(now: now)
         try book.replace(with: store, scope: SampleShop.scope(now: now))
         try book.replaceBaseline(with: store)
+        try book.replaceLibrary(SampleShop.library())
         settings.host = ""
         settings.pin = ""
         settings.shopLabel = SampleShop.label
@@ -780,6 +781,13 @@ final class KhaytAPIClient: ObservableObject {
         return BookWriter.paymentState(order: order, gross: due.gross, cash: due.cash)
     }
 
+    /// The models behind a job that may not be sold today (`LibraryCopy.saleProblems`).
+    /// Empty without a book: unknown is not no.
+    func saleProblems(orderId: String, now: Date = Date()) -> [ModelLicence.SaleProblem] {
+        guard let book else { return [] }
+        return LibraryCopy.saleProblems(orderId: orderId, book: book, now: now)
+    }
+
     /// Record a payment — from the book only. No LAN route takes one, and the
     /// rule it runs is the shop's (`BookWriter.recordPayment`).
     func recordPayment(orderId: String, totalPaid: Double, method: String) async throws {
@@ -1179,16 +1187,36 @@ final class KhaytAPIClient: ObservableObject {
         throw try decodeAPIError(body, status: http.statusCode)
     }
 
+    /// Move a job — the order page's stage picker, the queue's advance
+    /// button, a notification's action, Siri, a quote's Approve or Decline.
+    ///
+    /// With a book, by the shop's own status rule (`BookWriter.setOrderStatus`):
+    /// the filament comes off the shelf and the completion is dated, as on the
+    /// Mac. A move the rule refuses throws its sentence and is NOT sent to the
+    /// desktop instead. Without a book, the desktop's PATCH, as it always was.
     func updateOrderStatus(orderId: String, status: String) async throws {
-        if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
+        if let book, book.exists, let reader {
+            let engine = try await reader.sharedEngine()
+            do {
+                try await BookWriter(book: book).setOrderStatus(orderId: orderId, to: status, engine: engine)
+                await refreshPendingCount()
+                await deliverPending()
+                return
+            } catch is BookWriter.Refusal {
+                // Not in this book. Fall through to the desktop, which either
+                // does it properly or fails honestly — as `writeLocally` does.
+            }
+        }
         let encodedId = try encodeOrderIdForPath(orderId)
         let body = try JSONEncoder().encode(["status": status])
-        _ = try await request(
+        let (data, response) = try await request(
             path: "/api/orders/\(encodedId)",
             method: "PATCH",
             body: body,
             requiresPin: true
         )
+        // A refusal (locked pairing, bad stage) must surface, not look saved.
+        try ensureOK(data, response)
     }
 
     func assignMachine(orderId: String, machineId: String?) async throws {
@@ -1325,10 +1353,10 @@ final class KhaytAPIClient: ObservableObject {
         if !lot.isEmpty { payload["lot"] = lot }
 
         let printTrim = draft.printTemp.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let printTemp = Int(printTrim), printTemp > 0 { payload["printTemp"] = printTemp }
+        if let printTemp = PhoneCalculator.wholeNumber(printTrim), printTemp > 0 { payload["printTemp"] = printTemp }
 
         let bedTrim = draft.bedTemp.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let bedTemp = Int(bedTrim), bedTemp > 0 { payload["bedTemp"] = bedTemp }
+        if let bedTemp = PhoneCalculator.wholeNumber(bedTrim), bedTemp > 0 { payload["bedTemp"] = bedTemp }
 
         let data = try JSONSerialization.data(withJSONObject: payload)
         let (responseData, response) = try await request(
@@ -1665,7 +1693,7 @@ final class KhaytAPIClient: ObservableObject {
            let msg = decoded.error, !msg.isEmpty {
             return .server(msg)
         }
-        return .server("Request failed (HTTP \(status))")
+        return .server(L10n.format("api.request_failed", status))
     }
 }
 

@@ -5339,3 +5339,13 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
   border-radius: var(--radius);
   font-size: 13px;
 }
+
+/* What a sale's models' licences say (app-helpers.js licenceAtSaleHtml): the
+   job editor and the product editor. Warning tint for "not licensed for sale",
+   a quiet panel for the credit a CC BY model asks for. */
+.licence-at-sale { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius); font-size: 12.5px; display: grid; gap: 4px; }
+.licence-at-sale.warn { background: rgba(245,166,35,0.12); border: 1px solid rgba(245,166,35,0.4); color: var(--warning); }
+.licence-at-sale.warn div { color: var(--text); }
+.licence-at-sale.credit { background: var(--surface-2); border: 1px solid var(--border-soft); }
+.licence-at-sale .licence-credit-line { color: var(--text-muted); user-select: text; overflow-wrap: anywhere; }
+.licence-at-sale .btn { justify-self: start; margin-top: 4px; }

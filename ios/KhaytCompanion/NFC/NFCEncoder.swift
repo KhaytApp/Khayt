@@ -107,12 +107,12 @@ enum NFCEncoder {
         if draft.weightGrams > 0 { json["weight"] = draft.weightGrams }
         json["diameter"] = 1.75
 
-        let printC = Int(draft.printTemp.trimmingCharacters(in: .whitespaces))
+        let printC = PhoneCalculator.wholeNumber(draft.printTemp)
         if let printC, printC > 0 {
             json["min_temp"] = max(printC - 15, 150)
             json["max_temp"] = printC + 15
         }
-        let bedC = Int(draft.bedTemp.trimmingCharacters(in: .whitespaces))
+        let bedC = PhoneCalculator.wholeNumber(draft.bedTemp)
         if let bedC, bedC > 0 {
             json["bed_min_temp"] = max(bedC - 10, 0)
             json["bed_max_temp"] = bedC + 10
@@ -144,10 +144,10 @@ enum NFCEncoder {
 
         writeU16(&bytes, offset: 0x5C, value: 1750) // 1.75 mm
         writeU16(&bytes, offset: 0x5E, value: min(max(draft.weightGrams, 1), 65_535))
-        if let printC = Int(draft.printTemp.trimmingCharacters(in: .whitespaces)), printC > 0 {
+        if let printC = PhoneCalculator.wholeNumber(draft.printTemp), printC > 0 {
             bytes[0x60] = UInt8(min(printC / 5, 255))
         }
-        if let bedC = Int(draft.bedTemp.trimmingCharacters(in: .whitespaces)), bedC > 0 {
+        if let bedC = PhoneCalculator.wholeNumber(draft.bedTemp), bedC > 0 {
             bytes[0x61] = UInt8(min(bedC / 5, 255))
         }
         writeU16(&bytes, offset: 0x62, value: densityFor(material: base))
@@ -176,10 +176,10 @@ enum NFCEncoder {
         entries.append((16, min(max(draft.weightGrams, 1), 65_535)))
         let (r, g, b) = try rgbComponents(from: draft.colorHex)
         entries.append((19, [r, g, b]))
-        if let printC = Int(draft.printTemp.trimmingCharacters(in: .whitespaces)), printC > 0 {
+        if let printC = PhoneCalculator.wholeNumber(draft.printTemp), printC > 0 {
             entries.append((34, printC))
         }
-        if let bedC = Int(draft.bedTemp.trimmingCharacters(in: .whitespaces)), bedC > 0 {
+        if let bedC = PhoneCalculator.wholeNumber(draft.bedTemp), bedC > 0 {
             entries.append((37, bedC))
         }
         return CBOR.encodeMap(entries)

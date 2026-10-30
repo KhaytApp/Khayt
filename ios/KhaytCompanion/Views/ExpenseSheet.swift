@@ -45,7 +45,7 @@ struct ExpenseSheet: View {
     /// An amount and a category: a receipt fills the first and never the
     /// second, because it does not say what the money was for.
     private var canSave: Bool {
-        (Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0) > 0 && !category.isEmpty
+        PhoneCalculator.number(amount) > 0 && !category.isEmpty
     }
 
     /// The QR route needs the book: the shared rule and the shop's suppliers live there.
@@ -288,13 +288,13 @@ struct ExpenseSheet: View {
         }
 
         var payload = ExpenseDraft(
-            amount: Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0,
+            amount: PhoneCalculator.number(amount),
             category: category,
             note: note.trimmingCharacters(in: .whitespaces),
             receiptBase64: base64
         )
         if let d = fromReceipt {
-            payload.vatAmount = reclaimsTax ? Double(vatAmount.trimmingCharacters(in: .whitespaces)) ?? 0 : 0
+            payload.vatAmount = reclaimsTax ? PhoneCalculator.number(vatAmount) : 0
             payload.date = d.draft.date
             payload.receiptRef = d.draft.receiptRef
         }

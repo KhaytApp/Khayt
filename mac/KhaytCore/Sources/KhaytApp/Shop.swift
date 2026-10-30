@@ -1336,6 +1336,7 @@ final class Shop {
             // its first read is a new baseline rather than a burst of alerts.
             quoteRequestsWaiting = 0
             quoteRequestsSeen = nil
+            quoteFilesMissing = []
             if next.build != nil { await restoreCloudKey() }
             if overtaken() { return }
             // After the key: the launch check seals with it. Never for the
@@ -2594,6 +2595,9 @@ final class Shop {
     /// The quote-form request ids already announced this session; nil until
     /// the first read, which sets the baseline without a notification each.
     @ObservationIgnored var quoteRequestsSeen: Set<String>?
+    /// Quote-form requests whose file the cloud should still have and does
+    /// not (`missingEarly`): their card offers "Import without the file".
+    var quoteFilesMissing: Set<String> = []
     /// Good news from the Online orders sheet — "Imported. The file…" — kept
     /// apart from `onlineProblem` so it is not drawn as a warning.
     var onlineNotice: String?

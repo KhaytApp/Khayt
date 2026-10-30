@@ -46,6 +46,8 @@ struct AdvanceJobIntent: AppIntent {
     static let title: LocalizedStringResource = "Advance a job"
     static let description = IntentDescription("Moves a job in the queue to its next stage.")
     static let supportedModes: IntentModes = .background
+    /// Writes the book: not from a locked phone.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Job") var job: ShopJobEntity
 
@@ -67,6 +69,8 @@ struct FilamentLeftIntent: AppIntent {
     static let title: LocalizedStringResource = "Filament left"
     static let description = IntentDescription("Says how much of a material is left on the shelf.")
     static let supportedModes: IntentModes = .background
+    /// Reads the shop's stock: not from a locked phone.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Material") var material: String?
 
