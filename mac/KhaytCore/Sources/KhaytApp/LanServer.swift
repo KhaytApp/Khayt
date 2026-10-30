@@ -185,6 +185,20 @@ final class LanServer {
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
             = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// The slicer upload's API key (`SlicerKey`), or nil while the shop
+        /// has not switched "Accept files from slicers" on — and then the
+        /// OctoPrint routes are not here at all (see `LanServer+SlicerUpload`).
+        /// Asked per request, so the switch and Regenerate take effect at once.
+        var slicerKey: @MainActor () -> String? = { nil }
+        /// File one upload into the "From slicer" inbox: the G-code the server
+        /// wrote to a scratch file, and the name the slicer gave it (already
+        /// made safe). Throws when the inbox cannot take it.
+        var slicerReceive: @MainActor (_ file: URL, _ name: String) async throws -> Void
+            = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// The most one slicer upload may be, multipart and all.
+        var slicerMaxBytes: Int = LanServer.maxInflate
+        /// Where an upload's body is streamed while it arrives.
+        var slicerScratch: URL = FileManager.default.temporaryDirectory
     }
 
     struct Request {
@@ -197,6 +211,9 @@ final class LanServer {
         /// The request-target exactly as on the request line, still
         /// percent-encoded: what a signed request signs (`LanDevices`).
         var target: String = ""
+        /// A body streamed to disk instead of held in `body` — only a slicer
+        /// upload (`LanServer+SlicerUpload`). Deleted once answered.
+        var bodyFile: URL? = nil
     }
 
     struct Response {
@@ -242,6 +259,11 @@ final class LanServer {
     private var submits: [String: KhaytEngine.LanFailures] = [:]
     private var surveys: [String: KhaytEngine.LanFailures] = [:]
     private var estimates: [String: KhaytEngine.LanFailures] = [:]
+    /// Wrong slicer API keys, by visitor — their own bucket, so a slicer with
+    /// a stale key cannot lock the owner's phone out of the PIN.
+    var slicerFailures: [String: KhaytEngine.LanFailures] = [:]
+    /// Slicer uploads being received right now (`maxSlicerUploads`).
+    var slicerUploads = 0
 
     // ── ONE COUNTER UPDATE AT A TIME ──────────────────────────────────────
     //
@@ -253,11 +275,11 @@ final class LanServer {
     // makes the read-decide-write one step. Oct 2026 review.
     private var counting = false
     private var countWaiters: [CheckedContinuation<Void, Never>] = []
-    private func lockCounters() async {
+    func lockCounters() async {
         guard counting else { counting = true; return }
         await withCheckedContinuation { countWaiters.append($0) }
     }
-    private func unlockCounters() {
+    func unlockCounters() {
         if countWaiters.isEmpty { counting = false } else { countWaiters.removeFirst().resume() }
     }
 
@@ -359,8 +381,9 @@ final class LanServer {
         case refused(Response)
     }
 
-    /// Whether this connection holds one of the `maxLargeBodies` slots.
-    final class LargeBodySlot { var held = false }
+    /// Whether this connection holds one of the `maxLargeBodies` slots, or
+    /// one of the slicer upload's.
+    final class LargeBodySlot { var held = false; var slicer = false }
 
     /// How long a client may take to finish sending its request.
     ///
@@ -611,8 +634,10 @@ final class LanServer {
         // runs while the read is waiting for the client's bytes. Oct 2026.
         let slot = LargeBodySlot()
         defer { if slot.held { largeBodies -= 1 } }
+        defer { if slot.slicer { slicerUploads -= 1 } }
         do {
             guard let request = try await readRequest(connection, on: queue, remote: remote, slot: slot) else { return }
+            defer { if let file = request.bodyFile { try? FileManager.default.removeItem(at: file) } } // scratch
             let response = await respond(to: request)
             try await write(response, method: request.method, to: connection)
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
@@ -667,6 +692,12 @@ final class LanServer {
         // and every byte the route reads must be one that was signed.
         guard let length = Int(headers["content-length"] ?? "0"), length >= 0 else {
             throw URLError(.badServerResponse)
+        }
+        // A slicer's upload goes to DISK, judged from the head first — see
+        // `LanServer+SlicerUpload`. Nothing else here reads to a file.
+        if Self.isSlicerUpload(method: requestLine[0], target: requestLine[1]) {
+            return try await readSlicerUpload(connection, on: queue, requestLine: requestLine, headers: headers,
+                                              start: body, length: length, remote: remote, slot: slot)
         }
         if length > Self.maxBody {
             // Only the upload route reads past a megabyte, and the slot is
@@ -836,7 +867,7 @@ final class LanServer {
         case 200: "OK"; case 302: "Found"; case 400: "Bad Request"; case 401: "Unauthorized"
         case 404: "Not Found"; case 409: "Conflict"; case 413: "Payload Too Large"
         case 403: "Forbidden"; case 415: "Unsupported Media Type"; case 429: "Too Many Requests"
-        case 503: "Service Unavailable"
+        case 503: "Service Unavailable"; case 201: "Created"; case 500: "Internal Server Error"
         default: "OK"
         }
     }
@@ -1160,6 +1191,16 @@ final class LanServer {
             return Response(status: 200,
                             headers: ["Content-Type": "application/javascript", "Service-Worker-Allowed": "/"],
                             body: Data(js.utf8))
+
+        // ── KHAYT AS A PRINTER IN THE SLICER (`LanServer+SlicerUpload`) ──
+        //
+        // The two OctoPrint routes a slicer's "Send" uses. While the shop has
+        // not switched them on they are not here: the default 404 below.
+        case ("/api/version", true) where host.slicerKey() != nil:
+            return await slicerVersion(request)
+
+        case ("/api/files/local", false) where request.method == "POST" && host.slicerKey() != nil:
+            return await slicerUpload(request)
 
         case ("/icon-192.png", true), ("/icon-512.png", true), ("/icon-maskable-512.png", true):
             let name = String(path.dropFirst())
@@ -2707,6 +2748,15 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.foldFromPhone(payload)
         }
+        // Khayt as a printer in the slicer: off until the shop switches it on
+        // (`SlicerKey`), asked per request so the switch needs no restart.
+        host.slicerKey = { SlicerKey.active() }
+        host.slicerReceive = { [weak self] file, name in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            try await self.receiveSlicerUpload(file, name: name)
+        }
+        if let root = slicerInboxRoot { host.slicerScratch = SlicerInbox.incoming(root: root) }
+        refreshSlicerInbox()
         let server = LanServer(host: host)
         do {
             _ = try await server.start(port: config.port, bind: config.bindLan ? .lan : .loopback)

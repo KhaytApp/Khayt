@@ -138,12 +138,17 @@ struct Books: Sendable {
         let aged = try await engine.receivables(
             orders: orders, settings: settings, clients: rows("clients"),
             currencies: await currencyTable(), language: language, now: now)
-        let pastDue = try await engine.daysPastDue(orders: orders, now: now)
+        let pastDue = try await engine.daysPastDue(orders: orders, clients: rows("clients"), now: now)
         var dueDates: [String: String] = [:]
         for case .object(let o) in orders {
             if case .string(let id)? = o["id"], case .string(let due)? = o["dueDate"], !due.isEmpty {
                 dueDates[id] = due
             }
+        }
+        // A customer on payment terms: the row's own due date is invoice date
+        // + terms (`lib/payment-terms.js`), which is what it is chased from.
+        for r in aged.rows where !r.instalment && (r.termsDays ?? 0) > 0 {
+            if let due = r.due, !due.isEmpty { dueDates[r.id] = due }
         }
         func daysPast(_ r: Receivables.Row) -> Int? { r.instalment ? nil : pastDue[r.id] }
         var shown = aged.rows

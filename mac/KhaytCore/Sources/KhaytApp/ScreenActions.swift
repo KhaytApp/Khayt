@@ -103,6 +103,13 @@ struct ScreenActions: View {
                            enabled: shop.canMoveJobs && !shop.importing, titled: true) {
                     Task { await shop.addModelToLibrary() }
                 }
+                // WHAT A SLICER SENT — only once the shop has switched it on,
+                // or something is waiting.
+                if SlicerKey.accepting || !shop.slicerUploads.isEmpty {
+                    NavyAction(label: shop.words.callIt("mac.su_button")
+                               + (shop.slicerUploads.isEmpty ? "" : " (\(Figure.isolated(Format.count(shop.slicerUploads.count))))"),
+                               symbol: "tray.and.arrow.down") { shop.showingSlicerInbox = true }
+                }
                 // WHAT IS ALREADY IN THE FOLDER. A model dropped into the
                 // library's folder from the Finder, another Mac or a phone is
                 // adopted where it sits — see `LibraryStorage`. Runs on load

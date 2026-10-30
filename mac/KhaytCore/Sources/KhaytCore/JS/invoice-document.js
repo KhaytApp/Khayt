@@ -426,6 +426,16 @@ function invoiceHtml(order, ctx) {
   const clientName = (linkedClient && typeof KhaytContentLanguages !== 'undefined')
     ? (KhaytContentLanguages.read(linkedClient, 'name', i18n.current, settings) || '').trim()
     : ((linkedClient && linkedClient.name) || '').trim();
+  // PAYMENT TERMS (lib/payment-terms.js): a customer on net-30 is handed an
+  // invoice that says so, and the day it falls due — counted from the date
+  // printed above it, so the two can never disagree on the paper. Nothing is
+  // printed for due-on-receipt (the default), nor on a quote, which is not
+  // yet an invoice; every existing document stays byte for byte as it was.
+  const PT = (typeof global.KhaytPaymentTerms !== 'undefined')
+    ? global.KhaytPaymentTerms
+    : (function () { try { return require('./payment-terms.js'); } catch (e) { return null; } })();
+  const termsDays = (PT && !isQuoteDoc) ? PT.termsDays(linkedClient) : 0;
+  const dueOn = termsDays > 0 ? PT.dueDate(order, linkedClient) : '';
   const project = (order.project || '').trim();
   const billToName = clientName || project || t('inv.walk_in');
   const billToSub  = billToName === t('inv.walk_in')
@@ -635,7 +645,15 @@ function invoiceHtml(order, ctx) {
             <div class="meta-row">
               <span class="k">${escapeHtml(L.date[0])}</span>
               <span class="v">${escapeHtml(num(issuedDate))}</span>
+            </div>${dueOn ? `
+            <div class="meta-row">
+              <span class="k">${escapeHtml(t("doc.payment_terms"))}</span>
+              <span class="v">${escapeHtml(num(t("doc.net_days", { n: termsDays })))}</span>
             </div>
+            <div class="meta-row">
+              <span class="k">${escapeHtml(t("doc.due_date"))}</span>
+              <span class="v">${escapeHtml(num(formatPrintDate(dueOn)))}</span>
+            </div>` : ''}
             ${hijri ? `
             <div class="meta-row">
               <span class="k">${escapeHtml(t("doc.hijri"))}</span>

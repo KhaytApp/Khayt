@@ -58,6 +58,13 @@ struct MoveBanners: View {
                 }
             }
         }
+        // FILES A SLICER SENT (`SlicerInboxSheet`), waiting for the shop.
+        if !shop.slicerUploads.isEmpty, !shop.showingSlicerInbox {
+            Banner(text: shop.words.counting(shop.slicerUploads.count, "mac.su_waiting"),
+                   symbol: "tray.and.arrow.down", tint: Khayt.brand) {
+                Button(shop.words.callIt("mac.review") + "\u{2026}") { shop.showingSlicerInbox = true }
+            }
+        }
         // MONEY THE BOOK IS UNDERSTATING. Not a move's answer like the rest of
         // these, and it sits at the top for that reason: it is true until
         // somebody acts on it, on every screen, and what it is about is the

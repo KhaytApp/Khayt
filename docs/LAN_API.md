@@ -833,6 +833,44 @@ A carrier saying where a parcel is. **Served by both apps**; the rule is
 The printer webhook (`/api/webhook/printer/:id`) is **served by the Windows
 and Linux app only** — the Mac polls its printers itself.
 
+### `GET /api/version` and `POST /api/files/local` — Khayt as a printer in the slicer
+
+> **Served by the native Mac app only**, and only while the shop has switched
+> on Settings → Online → "Accept files from slicers (OctoPrint upload)". Off
+> (the default), both are the ordinary **404**. `lib/lan-server.js` does not
+> implement them.
+
+The two OctoPrint routes a slicer's "Send" uses (OrcaSlicer, PrusaSlicer,
+Bambu Studio: a physical printer of host type OctoPrint, with the Mac's LAN
+address and the API key shown in that pane). They are the server side of the
+same shapes `lib/printer-upload.js` sends to a real OctoPrint.
+
+- **Auth:** `X-Api-Key: <key>`. The key is 32 upper-case hex characters,
+  minted on this Mac and kept in its login Keychain (not in the book, so it
+  never travels in `/api/store`); "Regenerate" replaces it. No key **401**,
+  wrong key **403**, ten wrong keys from one visitor **429** for a minute (its
+  own bucket — it never locks the owner PIN). Not accepted in the query.
+- **`GET /api/version`** → `200 {"api":"0.1","server":"1.10.0","text":"OctoPrint 1.10.0 (Khayt)"}`.
+- **`POST /api/files/local`** — `multipart/form-data`, the file in the field
+  `file`. Taken: `.gcode`, `.gco`, `.g`, `.bgcode`, `.gcode.3mf` (else
+  **415**); no file part **400**. The key, the `Content-Length` and the cap are
+  judged from the head **before** the body is read; over 1 GiB is **413**; at
+  most two uploads at once (**503** `busy`). The body is streamed to disk, not
+  memory. `print` and `select` are read and **ignored** — nothing here ever
+  starts a printer — and the answer says so. A full inbox (100 files) is
+  **409**.
+- **201**, `Location` the resource:
+  ```json
+  {"done":true,"effectivePrint":false,"effectiveSelect":false,
+   "files":{"local":{"name":"plate.gcode","display":"plate.gcode","path":"plate.gcode","origin":"local",
+     "refs":{"resource":"http://<host>/api/files/local/plate.gcode",
+             "download":"http://<host>/downloads/files/local/plate.gcode"}}}}
+  ```
+- **Where it goes:** the "From slicer" inbox beside the book
+  (`<book folder>/From slicer/<id>/`), with the slicer's own grams, time,
+  material and slicer name read off the file. The shop adds it to the library,
+  or starts a job or a quote from it, in the app.
+
 ## Errors
 
 | HTTP | Meaning |

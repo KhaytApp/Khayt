@@ -17,8 +17,12 @@
  * * An order on an INSTALMENT PLAN is aged by each unpaid instalment's OWN due
  *   date, not by the order's. A plan agreed in January with a payment due in
  *   June is not six months overdue in July; it is one month overdue.
- * * Everything else ages from the order's date, because that is when the shop
- *   did the work.
+ * * Everything else ages from its DUE DATE: the invoice date plus the
+ *   customer's payment terms (`lib/payment-terms.js`). A customer with no
+ *   terms is due on receipt, so the due date is the order's date and the age
+ *   is what it always was; a company on net-30 is not overdue until day 31.
+ *   `days` is days PAST due, never negative — a row not yet due is 0 and
+ *   carries `overdue: false` — and `due` is the day it falls due.
  * * The amount owed is `orderOwedBase` — the price less credit notes, less
  *   what has been paid, in the shop's own currency — so a foreign order is
  *   comparable with the rest.
@@ -31,6 +35,11 @@
 
   const money = () => (typeof global.KhaytOrderMoney !== 'undefined') ? global.KhaytOrderMoney : null;
   const payment = () => (typeof global.KhaytOrderPayment !== 'undefined') ? global.KhaytOrderPayment : null;
+  /** The payment-terms rule, however this file happens to be loaded. */
+  function terms() {
+    if (typeof global.KhaytPaymentTerms !== 'undefined') return global.KhaytPaymentTerms;
+    try { return require('./payment-terms.js'); } catch (e) { return null; }
+  }
   /** The content-language rules, however this file happens to be loaded. */
   function languages() {
     if (typeof global.KhaytContentLanguages !== 'undefined') return global.KhaytContentLanguages;
@@ -67,6 +76,7 @@
     const now = c.now instanceof Date ? c.now : new Date();
     const M = money();
     const P = payment();
+    const T = terms();
     const moneyCtx = { settings: c.settings || {}, clients: c.clients || [] };
     const known = c.currencies || null;
     const clients = Array.isArray(c.clients) ? c.clients : [];
@@ -97,18 +107,25 @@
         for (const { ins, amount } of capInstalments(o, owedOwnOf(o))) {
           const owed = toBase(amount, o);
           if (owed <= 0) continue;
-          const days = daysSince(ins.dueDate || o.date, now);
+          // A plan's own dates are the agreement; the customer's terms are
+          // not added on top of them.
+          const due = String(ins.dueDate || o.date || '').slice(0, 10);
+          const days = daysSince(due, now);
           rows.push({ id: o.id, project: o.project || '', client: name, owed, days,
-                      bucket: bucketFor(days), payStatus: status, instalment: true });
+                      bucket: bucketFor(days), payStatus: status, instalment: true,
+                      due, termsDays: 0, overdue: days > 0 });
           total += owed;
         }
         continue;
       }
       const owed = owedOf(o);
       if (owed <= 0) continue;
-      const days = daysSince(o.date || o.timestamp, now);
+      const termsDays = T ? T.termsDays(client) : 0;
+      const due = T ? T.dueDate(o, client) : String(o.date || o.timestamp || '').slice(0, 10);
+      const days = daysSince(due || o.date || o.timestamp, now);
       rows.push({ id: o.id, project: o.project || '', client: name, owed, days,
-                  bucket: bucketFor(days), payStatus: status, instalment: false });
+                  bucket: bucketFor(days), payStatus: status, instalment: false,
+                  due, termsDays, overdue: days > 0 });
       total += owed;
     }
 

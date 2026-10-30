@@ -1592,7 +1592,7 @@ final class Shop {
         // them on, and both return nothing on a book with no due dates — so
         // the section they feed simply does not appear.
         let invoices = (try? await engine.invoicesToChase(
-            orders: orders, settings: settings, owed: owedByOrderId)) ?? []
+            orders: orders, settings: settings, owed: owedByOrderId, clients: clients)) ?? []
         guard ticket == loadGeneration else { return }
         invoicesToChase = invoices
         let quotes = (try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []
@@ -2064,6 +2064,15 @@ final class Shop {
     /// port or the PIN restarts it and one that did not leaves it be.
     var lanRunning: LanConfig?
     var lanProblem: String?
+    /// Files a slicer sent to this Mac (`SlicerInbox`), newest first, and the
+    /// sheet that lists them (`Shop+SlicerInbox`).
+    var slicerUploads: [SlicerUpload] = []
+    var showingSlicerInbox = false
+    var slicerInboxSaid: String?
+    var slicerInboxProblem: String?
+    /// The job or quote to open once the inbox sheet has gone — two sheets
+    /// cannot be up at once.
+    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool)?
     /// The calendar subscription token, opened, while the server runs.
     var lanCalendarToken: String?
     /// What the last "Copy quote link" did, shown beside the button.

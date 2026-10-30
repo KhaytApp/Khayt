@@ -269,7 +269,7 @@ function processPaymentReminders() {
   const cfg = KhaytPaymentReminder.reminderConfig(settings);
   if (!cfg.enabled) return;
   const owedOf = (o) => (typeof orderOwedBase === 'function' ? orderOwedBase(o) : (+o.price || 0) - (+o.paidAmount || 0));
-  const due = KhaytPaymentReminder.selectInvoicesDueForReminder(printLog, settings, owedOf, Date.now());
+  const due = KhaytPaymentReminder.selectInvoicesDueForReminder(printLog, settings, owedOf, Date.now(), clients);
   if (due.length === 0) return;
   for (const o of due) Object.assign(o, KhaytPaymentReminder.markReminderPatch(o, Date.now()));
   saveAll();

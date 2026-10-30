@@ -382,3 +382,32 @@ test('on a discounted job the rows add up to the Subtotal, before the Discount r
   const order = { price: 1150, discountPct: 12.5, priceBeforeDiscount: 1300, rushFeeAmount: 90, shippingCost: 60 };
   assert.equal(invoiceSummary(order, globalThis.KhaytTax.profileFromSettings({ enableVat: true, vatRate: 15 })).itemsSubtotal, 1162.5);
 });
+
+/* PAYMENT TERMS (lib/payment-terms.js). A customer on net 30 is handed an
+   invoice that says so and names the day it falls due — counted from the date
+   printed above it. Due on receipt prints nothing, so every existing document
+   is unchanged (the fixtures above prove that), and a quote prints nothing. */
+test('a customer on terms gets "Payment terms" and "Due date" under the date', () => {
+  const net30 = Object.assign({}, ACME, { paymentTermsDays: 30 });
+  const { meta } = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                                    { settings: SHOP, clients: [net30] }));
+  const at = meta.findIndex((m) => m[0] === 'Payment terms');
+  assert.ok(at > 0, 'the terms row is printed');
+  assert.equal(meta[at][1], 'Net 30');
+  assert.equal(meta[at + 1][0], 'Due date');
+  // 2026-09-04 + 30 days = 4 October 2026, in whatever format the date prints.
+  const printedDate = meta[meta.findIndex((m) => m[0] === 'Date')][1];
+  assert.notEqual(meta[at + 1][1], printedDate);
+  assert.match(meta[at + 1][1], /2026/);
+  assert.match(meta[at + 1][1], /Oct|10/);
+});
+
+test('due on receipt, and a quote, print no terms at all', () => {
+  const none = addressee(render(Object.assign({}, ORDER, { clientId: 'C1' }),
+                                { settings: SHOP, clients: [ACME] }));
+  assert.ok(!none.meta.some((m) => m[0] === 'Payment terms'));
+  const net30 = Object.assign({}, ACME, { paymentTermsDays: 30 });
+  const quote = addressee(render(Object.assign({}, ORDER, { clientId: 'C1', status: 'quote', id: 'QUO-1' }),
+                                 { settings: SHOP, clients: [net30] }));
+  assert.ok(!quote.meta.some((m) => m[0] === 'Payment terms'));
+});
