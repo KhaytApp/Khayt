@@ -46,15 +46,17 @@ struct Customer: Identifiable, Hashable, Sendable {
     func overdueOwed(today: String) -> Double {
         orders.reduce(0) { sum, job in
             guard job.owesAtAll, !job.isSettled else { return sum }
-            let late: Bool
             if !job.instalments.isEmpty {
-                late = job.instalments.contains {
-                    !$0.paid && PaymentTerms.isPastDue(invoiceDate: $0.dueDate.isEmpty ? job.date : $0.dueDate,
-                                                       terms: 0, today: today)
+                // Only the instalments that are late, not the whole plan: one
+                // missed SAR 1,000 of a SAR 10,000 plan is SAR 1,000 overdue,
+                // as `receivables.js` ages each instalment on its own.
+                let late = job.instalments.reduce(0.0) { due, row in
+                    !row.paid && PaymentTerms.isPastDue(invoiceDate: row.dueDate.isEmpty ? job.date : row.dueDate,
+                                                        terms: 0, today: today) ? due + row.amount : due
                 }
-            } else {
-                late = PaymentTerms.isPastDue(invoiceDate: job.date, terms: paymentTermsDays, today: today)
+                return sum + min(late, job.owed)
             }
+            let late = PaymentTerms.isPastDue(invoiceDate: job.date, terms: paymentTermsDays, today: today)
             return late ? sum + job.owed : sum
         }
     }

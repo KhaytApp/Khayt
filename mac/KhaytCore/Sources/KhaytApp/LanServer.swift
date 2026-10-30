@@ -699,6 +699,12 @@ final class LanServer {
         guard let length = Int(headers["content-length"] ?? "0"), length >= 0 else {
             throw URLError(.badServerResponse)
         }
+        // Only Content-Length bodies are read. A chunked body would be taken
+        // as no body at all, or, sent with a length too, have its chunk
+        // framing read as content (into a slicer's G-code). Refused instead.
+        if let coding = headers["transfer-encoding"], !coding.isEmpty, coding.lowercased() != "identity" {
+            throw ReadRefusal.refused(.json(411, #"{"error":"Send a Content-Length, not a chunked body"}"#))
+        }
         // A slicer's upload goes to DISK, judged from the head first — see
         // `LanServer+SlicerUpload`. Nothing else here reads to a file.
         if Self.isSlicerUpload(method: requestLine[0], target: requestLine[1]) {
@@ -2761,7 +2767,13 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             try await self.receiveSlicerUpload(file, name: name)
         }
-        if let root = slicerInboxRoot { host.slicerScratch = SlicerInbox.incoming(root: root) }
+        if let root = slicerInboxRoot {
+            host.slicerScratch = SlicerInbox.incoming(root: root)
+            // Nothing is uploading before the server starts, so whatever is
+            // here was left by a quit or a crash mid-upload: up to a GiB a
+            // file, in a folder nobody sees.
+            SlicerInbox.sweepIncoming(root: root)
+        }
         refreshSlicerInbox()
         let server = LanServer(host: host)
         do {

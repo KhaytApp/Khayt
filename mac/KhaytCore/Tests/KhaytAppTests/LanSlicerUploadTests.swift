@@ -92,6 +92,37 @@ struct LanSlicerUploadTests {
                 "PrusaSlicer and its forks only accept a host whose text starts with OctoPrint")
     }
 
+    @Test("a chunked upload is refused, not filed with its framing inside")
+    func chunkedIsRefused() async throws {
+        let b = try await Self.bench()
+        defer { b.server.stop() }
+        let (body, type) = Self.multipart(name: "plate.gcode", contents: Self.gcode)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(b.port)/api/files/local")!)
+        request.httpMethod = "POST"
+        request.setValue(Self.key, forHTTPHeaderField: "X-Api-Key")
+        request.setValue(type, forHTTPHeaderField: "Content-Type")
+        // A stream with no length: URLSession sends it chunked.
+        request.httpBodyStream = InputStream(data: body)
+        let (_, response) = try await LanServerTests.NoRedirect.session.data(for: request)
+        #expect((response as? HTTPURLResponse)?.statusCode == 411)
+        #expect(SlicerInbox.list(root: b.box.root).isEmpty)
+    }
+
+    @Test("what a quit left in the scratch folder is swept, and the inbox is not")
+    func sweepIncoming() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-slicer-sweep-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let incoming = SlicerInbox.incoming(root: root)
+        try FileManager.default.createDirectory(at: incoming.appending(path: "khayt-slicer-x"),
+                                                withIntermediateDirectories: true)
+        try Data("half".utf8).write(to: incoming.appending(path: "khayt-slicer-1.part"))
+        try Data("kept".utf8).write(to: root.appending(path: "keep.txt"))
+        SlicerInbox.sweepIncoming(root: root)
+        #expect(((try? FileManager.default.contentsOfDirectory(atPath: incoming.path)) ?? []).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "keep.txt").path))
+    }
+
     @Test("no key is 401 and a wrong key is 403, on both routes, and nothing is filed")
     func keyIsChecked() async throws {
         let b = try await Self.bench()

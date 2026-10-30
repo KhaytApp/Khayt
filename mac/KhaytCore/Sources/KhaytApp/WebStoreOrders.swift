@@ -149,7 +149,8 @@ extension Shop {
         // drain, as the button does; a file the cloud lost stays for a person.
         if Self.quoteAutoImport {
             var quotesIn = 0
-            for item in items where item.isQuoteForm && !webStoreGaveUp.contains(item.id) {
+            for item in items where item.isQuoteForm && !webStoreGaveUp.contains(item.id)
+                && !quoteFormsInFlight.contains(item.id) {
                 guard let order = try? await Self.onlineOrder(
                     item, products: productRows, stock: Self.stockCounts(settingsDict), engine: engine) else { continue }
                 var jobId: String?

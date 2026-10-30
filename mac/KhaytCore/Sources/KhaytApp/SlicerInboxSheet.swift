@@ -108,10 +108,12 @@ struct SlicerUploadSection: View {
     @State private var accepting = SlicerKey.accepting
     @State private var key: String?
     @State private var copied = false
+    private var canEdit: Bool { shop.permitted("settings", "edit") }
 
     var body: some View {
         Section(shop.words.callIt("mac.su_settings_title")) {
             Toggle(shop.words.callIt("mac.su_accept"), isOn: $accepting)
+                .disabled(!canEdit)
                 .onChange(of: accepting) { _, on in
                     SlicerKey.accepting = on
                     if on { key = SlicerKey.current() }
@@ -130,7 +132,12 @@ struct SlicerUploadSection: View {
                         .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if let key {
+                // The key lets anyone on the network send files into the
+                // book: shown to those who may change settings, not to an
+                // operator who may only look at them.
+                if !canEdit {
+                    EmptyView()
+                } else if let key {
                     LabeledContent(shop.words.callIt("mac.su_key")) {
                         HStack(spacing: 8) {
                             Text(key).font(.body.monospaced()).textSelection(.enabled)
@@ -157,6 +164,6 @@ struct SlicerUploadSection: View {
                 }
             }
         }
-        .task { if accepting { key = SlicerKey.current() } }
+        .task { if accepting, canEdit { key = SlicerKey.current() } }
     }
 }

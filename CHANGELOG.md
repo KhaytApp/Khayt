@@ -8907,6 +8907,33 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.13] - 2026-10-30
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Send prints straight from your slicer.** Settings ▸ Online ▸ "Accept files from slicers" lets OrcaSlicer, PrusaSlicer and Bambu Studio send to Khayt as if it were an OctoPrint printer, with the address and key Khayt shows you. Files land in **From Your Slicer** with the slicer's own weight and print time, ready to add to the library or start a job or quote. Khayt never starts a print from a slicer upload.
+- **Payment terms per customer.** Set Net 7 to Net 90, or your own number of days, on a customer. Invoices and payment reminders print the terms and the due date, Receivables ages bills from the due date with a Due column, and a customer on terms is not overdue until the terms run out.
+- **A designer's licence can cover their whole catalogue.** The licence proof sheet can apply one membership code or page to every model by the same designer, in one step. It needs the code or the page before it does.
+- **Remix of…** records the original model's page. A remix of a model that may not be sold is flagged at the sale too.
+- **Use a finished job's photo as the model's picture** in the library.
+- **Designer credit.** A product built from a CC BY model shows the credit line its licence asks for, with a button to add it to the description.
+- **Quote form:** an optional switch imports quote requests by themselves, and a request whose file the cloud has lost can be imported without it.
+
+### Changed
+
+- **MakerWorld and Printables' Standard Digital File License counts as not for sale.** Models saved from those sites under it now show "Not licensed for sale" on jobs and products.
+- Releasing a model to the Vault warns when its licence may not allow reselling the file.
+- The quote form's file download is streamed and stopped at its declared size, rather than held in memory first.
+
+### Fixed
+
+- A quote request could be imported twice at once, by the automatic import and the Import button, filing its model twice.
+- A customer with one late instalment showed the whole plan as overdue; only the late instalments count now.
+- Uploads interrupted by quitting are cleaned up the next time Khayt starts, and an upload is refused when the Mac has too little disk space for it.
+
 ## [4.0.0-beta.12] - 2026-10-29
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
