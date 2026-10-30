@@ -30,7 +30,7 @@ enum SampleShop {
 
         func order(_ id: String, _ status: String, _ project: String, _ client: String, _ clientId: String,
                    placed: Int, due: Int?, price: Double, paid: Double, material: String, qty: Int,
-                   machine: (String, String)? = nil) -> JSONValue {
+                   machine: (String, String)? = nil, extra: [String: JSONValue] = [:]) -> JSONValue {
             var o: [String: JSONValue] = [
                 "id": .string(id), "status": .string(status), "project": .string(project),
                 "client": .string(client), "clientId": .string(clientId), "date": day(placed),
@@ -40,6 +40,7 @@ enum SampleShop {
             ]
             if let due { o["dueDate"] = day(due) }
             if let machine { o["machineId"] = .string(machine.0); o["machine"] = .string(machine.1) }
+            for (k, v) in extra { o[k] = v }
             return .object(o)
         }
         let x1c = ("M-X1C", "Bambu X1C"), mk4 = ("M-MK4", "Prusa MK4"), saturn = ("M-SAT", "Elegoo Saturn 4")
@@ -93,6 +94,13 @@ enum SampleShop {
                 order("S-1045", "pending", "Terrain tiles", "Tabletop Guild", "C-4", placed: -4, due: -1, price: 120, paid: 60, material: "PLA", qty: 24),
                 order("S-1046", "post", "Enclosure lid", "Acme Robotics", "C-1", placed: -5, due: 0, price: 95, paid: 95, material: "ABS", qty: 1),
                 order("S-1047", "qc", "Bracket v3", "Omar Haddad", "C-5", placed: -6, due: 1, price: 60, paid: 0, material: "PETG", qty: 2),
+                // Two quotes waiting on the customer, so the Quotes list and
+                // a quote's Approve and Decline can be seen. A quote has no
+                // invoice number and no due day until it is approved.
+                order("S-1049", "quote", "Trophy bases", "Omar Haddad", "C-5", placed: 0, due: nil, price: 85, paid: 0, material: "PLA", qty: 3,
+                      extra: ["quoteExpiresAt": day(7)]),
+                order("S-1048", "quote", "Prototype housing", "Acme Robotics", "C-1", placed: -2, due: nil, price: 340, paid: 0, material: "ABS", qty: 2,
+                      extra: ["quoteExpiresAt": day(5)]),
                 order("S-1038", "completed", "Planter", "Maya Chen", "C-3", placed: -9, due: -2, price: 35, paid: 35, material: "PLA", qty: 1),
                 order("S-1036", "completed", "Gear housing", "Acme Robotics", "C-1", placed: -12, due: -5, price: 150, paid: 150, material: "Nylon", qty: 3),
                 order("S-1031", "completed", "Crown models", "Northside Dental", "C-2", placed: -20, due: -14, price: 310, paid: 310, material: "Resin", qty: 8),

@@ -534,6 +534,10 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     let dueDate: String?
     let date: String?
     let paymentStatus: String?
+    /// A quote's last day, as the shop's calendar day (`lib/order-new.js`
+    /// writes it from `quoteValidityDays`). Nil on everything that is not a
+    /// quote, and on quotes made before the field existed.
+    let quoteExpiresAt: String?
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? id
