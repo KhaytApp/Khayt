@@ -234,6 +234,7 @@ final class KhaytAPIClient: ObservableObject {
         let store = SampleShop.book(now: now)
         try book.replace(with: store, scope: SampleShop.scope(now: now))
         try book.replaceBaseline(with: store)
+        try book.replaceLibrary(SampleShop.library())
         settings.host = ""
         settings.pin = ""
         settings.shopLabel = SampleShop.label
@@ -778,6 +779,13 @@ final class KhaytAPIClient: ObservableObject {
         guard let engine = try? await reader.sharedEngine(),
               let due = try? await engine.cashDue(order: .object(order), settings: settings) else { return nil }
         return BookWriter.paymentState(order: order, gross: due.gross, cash: due.cash)
+    }
+
+    /// The models behind a job that may not be sold today (`LibraryCopy.saleProblems`).
+    /// Empty without a book: unknown is not no.
+    func saleProblems(orderId: String, now: Date = Date()) -> [ModelLicence.SaleProblem] {
+        guard let book else { return [] }
+        return LibraryCopy.saleProblems(orderId: orderId, book: book, now: now)
     }
 
     /// Record a payment — from the book only. No LAN route takes one, and the

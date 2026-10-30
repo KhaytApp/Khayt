@@ -875,3 +875,6 @@
 "quote.decline" = "Decline";
 "quote.decline_q" = "Decline this quote?";
 "quote.decline_body" = "It leaves Quotes and stays in History as cancelled.";
+"licence.not_for_sale" = "Not licensed for sale";
+"licence.nc_line" = "%1$@: its licence does not allow selling prints.";
+"licence.expired_line" = "%1$@: the bought licence ended on %2$@.";

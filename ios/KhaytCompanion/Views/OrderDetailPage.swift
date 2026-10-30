@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// One job, as `design/ios-v2/` draws it: a PAGE pushed onto the stack — not a
 /// sheet — with the job and who it is for, the few facts a shop floor needs,
@@ -32,6 +33,7 @@ struct OrderDetailPage: View {
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
+    @State private var saleProblems: [ModelLicence.SaleProblem] = []
 
     init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
          onChanged: @escaping () async -> Void) {
@@ -43,6 +45,12 @@ struct OrderDetailPage: View {
 
     var body: some View {
         ScrollView {
+            // Asked where the sale is, as on the Mac: a model that may not be
+            // sold, printed and handed over, has a designer on the other end.
+            if !saleProblems.isEmpty {
+                LicenceNote(problems: saleProblems)
+                    .padding(.horizontal, 16).padding(.top, 12)
+            }
             OrderDetailContent(order: order, facts: facts,
                                live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
                                isUpdating: isUpdating, machines: machines,
@@ -109,6 +117,7 @@ struct OrderDetailPage: View {
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
+            saleProblems = api.saleProblems(orderId: order.id)
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
