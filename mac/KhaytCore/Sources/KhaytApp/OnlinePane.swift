@@ -204,6 +204,8 @@ struct OnlinePane: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // Khayt as a printer in the slicer — rides on the server above.
+                SlicerUploadSection(shop: shop)
                 // The plaintext copy of the shop's customers for its own
                 // storefront — off, and shut until the privacy policy says so.
                 // Asked here rather than inside the sections, so that what a

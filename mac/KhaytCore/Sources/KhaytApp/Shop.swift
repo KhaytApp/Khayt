@@ -2064,6 +2064,15 @@ final class Shop {
     /// port or the PIN restarts it and one that did not leaves it be.
     var lanRunning: LanConfig?
     var lanProblem: String?
+    /// Files a slicer sent to this Mac (`SlicerInbox`), newest first, and the
+    /// sheet that lists them (`Shop+SlicerInbox`).
+    var slicerUploads: [SlicerUpload] = []
+    var showingSlicerInbox = false
+    var slicerInboxSaid: String?
+    var slicerInboxProblem: String?
+    /// The job or quote to open once the inbox sheet has gone — two sheets
+    /// cannot be up at once.
+    var slicerJobAfterSheet: (file: LibraryFile, asQuote: Bool)?
     /// The calendar subscription token, opened, while the server runs.
     var lanCalendarToken: String?
     /// What the last "Copy quote link" did, shown beside the button.
