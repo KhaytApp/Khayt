@@ -397,10 +397,6 @@ struct WaitingListItem: Codable, Identifiable, Sendable {
     let source: String?
     let submittedAt: String?
 
-    var displayTitle: String {
-        let p = project?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (p?.isEmpty == false) ? p! : "Request \(id)"
-    }
     var displayClient: String {
         clientName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
     }

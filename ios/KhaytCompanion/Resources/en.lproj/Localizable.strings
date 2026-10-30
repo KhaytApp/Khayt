@@ -845,6 +845,9 @@
 "invoice.refused.cancelled" = "A cancelled job has no invoice.";
 "invoice.refused.not_numbered" = "This invoice needs its number first. Open it once on the Mac or PC, which numbers it, then it shows here.";
 "invoice.refused.failed" = "The invoice couldn't be made. Try again, or open it on the Mac or PC.";
+
+"api.request_failed" = "Request failed (HTTP %lld)";
+"order.untitled" = "Request %@";
 "orders.quotes" = "Quotes";
 "orders.no_quotes" = "No open quotes";
 "orders.no_quotes.sub" = "Quotes made here or on the Mac wait here for the customer's answer.";

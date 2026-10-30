@@ -1183,12 +1183,14 @@ final class KhaytAPIClient: ObservableObject {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)
         let body = try JSONEncoder().encode(["status": status])
-        _ = try await request(
+        let (data, response) = try await request(
             path: "/api/orders/\(encodedId)",
             method: "PATCH",
             body: body,
             requiresPin: true
         )
+        // A refusal (locked pairing, bad stage) must surface, not look saved.
+        try ensureOK(data, response)
     }
 
     func assignMachine(orderId: String, machineId: String?) async throws {
@@ -1325,10 +1327,10 @@ final class KhaytAPIClient: ObservableObject {
         if !lot.isEmpty { payload["lot"] = lot }
 
         let printTrim = draft.printTemp.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let printTemp = Int(printTrim), printTemp > 0 { payload["printTemp"] = printTemp }
+        if let printTemp = PhoneCalculator.wholeNumber(printTrim), printTemp > 0 { payload["printTemp"] = printTemp }
 
         let bedTrim = draft.bedTemp.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let bedTemp = Int(bedTrim), bedTemp > 0 { payload["bedTemp"] = bedTemp }
+        if let bedTemp = PhoneCalculator.wholeNumber(bedTrim), bedTemp > 0 { payload["bedTemp"] = bedTemp }
 
         let data = try JSONSerialization.data(withJSONObject: payload)
         let (responseData, response) = try await request(
@@ -1665,7 +1667,7 @@ final class KhaytAPIClient: ObservableObject {
            let msg = decoded.error, !msg.isEmpty {
             return .server(msg)
         }
-        return .server("Request failed (HTTP \(status))")
+        return .server(L10n.format("api.request_failed", status))
     }
 }
 

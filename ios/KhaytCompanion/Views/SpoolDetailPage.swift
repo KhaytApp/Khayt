@@ -72,7 +72,7 @@ struct SpoolDetailPage: View {
             TextField(L10n.tr("spool.detail.grams"), text: $adjustText)
                 .keyboardType(.numberPad)
             Button(L10n.tr("common.save")) {
-                if let g = Int(adjustText.trimmingCharacters(in: .whitespaces)) {
+                if let g = PhoneCalculator.wholeNumber(adjustText) {
                     set(g)
                 } else {
                     errorMessage = L10n.tr("spool.detail.grams_error")
