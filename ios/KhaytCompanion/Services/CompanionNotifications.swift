@@ -52,7 +52,9 @@ final class CompanionNotifications: ObservableObject {
         queue: [QueueOrder],
         lowStockCount: Int,
         settings: ConnectionSettings,
-        livePrints: [WidgetPrint]? = nil
+        livePrints: [WidgetPrint]? = nil,
+        connected: Bool = true,
+        asOf: Date = Date()
     ) {
         if settings.notifyQueueChanges {
             let q = status.queued
@@ -99,8 +101,8 @@ final class CompanionNotifications: ObservableObject {
                 post: status.post,
                 qc: status.qc,
                 completedToday: status.completedToday,
-                connected: true,
-                updatedAt: Date(),
+                connected: connected,
+                updatedAt: asOf,
                 // Carry over the last known prints when a caller (e.g. a health
                 // poll) doesn't supply fresh live data, so it isn't clobbered.
                 prints: livePrints ?? WidgetSnapshotStore.load()?.prints

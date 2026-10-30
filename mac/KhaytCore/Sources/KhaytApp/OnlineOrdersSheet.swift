@@ -1,5 +1,6 @@
 import SwiftUI
 import KhaytCore
+import KhaytWebSave
 
 /// The orders a storefront has already sent, and what the shelf can answer.
 ///
@@ -139,6 +140,7 @@ private struct OnlineOrderCard: View {
     @Bindable var shop: Shop
     let order: Shop.OnlineOrder
     @State private var confirmingDelete = false
+    @State private var confirmingWithoutFile = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -221,11 +223,29 @@ private struct OnlineOrderCard: View {
                         .controlSize(.small)
                 }
                 Spacer()
+                // The cloud lost a file it should still have: the shop may
+                // take the request with a note instead, once told what goes.
+                if order.item.file != nil, shop.quoteFilesMissing.contains(order.id) {
+                    Button(shop.words.callIt("mac.qfe_import_without_file")) { confirmingWithoutFile = true }
+                        .disabled(shop.onlineBusy || !shop.canMoveJobs)
+                        .controlSize(.small)
+                }
                 record
             }
             .padding(.top, 2)
         }
         .padding(.vertical, 6)
+        .confirmationDialog(
+            shop.words.callIt("mac.qfe_without_file_q"),
+            isPresented: $confirmingWithoutFile, titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.qfe_import_without_file")) {
+                Task { await shop.recordOnlineOrder(order, withoutFile: true) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(shop.words.callIt("mac.qfe_without_file_why"))
+        }
         .confirmationDialog(
             shop.words.callIt("mac.qfe_delete_q", ["name": .string(Figure.isolated(order.customer.isEmpty ? order.title : order.customer))]),
             isPresented: $confirmingDelete, titleVisibility: .visible
@@ -319,6 +339,16 @@ private struct QuoteRequestDetails: View {
                     Label { Text(verbatim: link).lineLimit(1).truncationMode(.middle) } icon: { Image(systemName: "link") }
                 }
                 .font(.caption)
+                // A model site's page: whoever downloads it is bound by its
+                // licence, and a print of a NonCommercial or personal-use
+                // model may not be sold — the quote is that sale.
+                let site = WebSave.Site.of(host: url.host())
+                if site != .web {
+                    Label(shop.words.callIt("mac.qfe_link_licence", ["site": .string(site.displayName)]),
+                          systemImage: "exclamationmark.shield")
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if let shown = QuoteFormFile.Shown(order.item.payload) {
                 Text(shown.note(shop.words)).font(.caption).foregroundStyle(.secondary)

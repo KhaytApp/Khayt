@@ -250,14 +250,24 @@ struct WebSaveTests {
         #expect(r["tags"] == .array([.string("Dragon"), .string("flexi")]))
     }
 
-    @Test("a platform's own licence terms stay unsaid in `licence`, kept as words beside it")
+    @Test("the Standard Digital File License is recorded as `sdfl`, its words kept beside it")
     func platformLicence() throws {
         var rows: [JSONValue] = []
         WebSaveRecord.apply(try Self.page(["licence": "Standard Digital File License"]), to: &rows,
                             newId: "PF-1", nowMs: 0, nowISO: "x")
         guard case .object(let r) = rows[0] else { return }
-        #expect(r["licence"] == .string(""))
+        #expect(r["licence"] == .string("sdfl"))
         #expect(r["sourceLicenceText"] == .string("Standard Digital File License"))
+    }
+
+    @Test("terms this app cannot read stay unsaid in `licence`, kept as words beside it")
+    func unreadablePlatformLicence() throws {
+        var rows: [JSONValue] = []
+        WebSaveRecord.apply(try Self.page(["licence": "MakerWorld Exclusive License"]), to: &rows,
+                            newId: "PF-1", nowMs: 0, nowISO: "x")
+        guard case .object(let r) = rows[0] else { return }
+        #expect(r["licence"] == .string(""))
+        #expect(r["sourceLicenceText"] == .string("MakerWorld Exclusive License"))
     }
 
     @Test("the same model saved again updates it, and never undoes what the shop changed")

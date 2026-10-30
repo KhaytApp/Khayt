@@ -724,8 +724,8 @@ struct BookWriter {
         guard case .object? = made.spool, let spool = made.spool else { throw Refusal.noMaterial }
 
         var edit: [String: JSONValue] = ["weight": .number(grams)]
-        if let p = Int(draft.printTemp.trimmingCharacters(in: .whitespaces)), p > 0 { edit["printTemp"] = .number(Double(p)) }
-        if let b = Int(draft.bedTemp.trimmingCharacters(in: .whitespaces)), b > 0 { edit["bedTemp"] = .number(Double(b)) }
+        if let p = PhoneCalculator.wholeNumber(draft.printTemp), p > 0 { edit["printTemp"] = .number(Double(p)) }
+        if let b = PhoneCalculator.wholeNumber(draft.bedTemp), b > 0 { edit["bedTemp"] = .number(Double(b)) }
         let edited = try await engine.editSpool(spool, input: edit, settings: [:], today: today)
         guard case .object(var record) = edited.spool else { throw Refusal.noMaterial }
 
