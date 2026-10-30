@@ -63,6 +63,11 @@ struct LicenceAtSaleTests {
         #expect(Shop.sameDesigner(as: files[5], in: files).isEmpty, "an address is not a designer")
         #expect(MenuCoverageTests.source("LicenceProofSheet.swift")
             .contains("alsoFor: wholeCatalogue ? shop.sameDesigner(as: file).map(\\.id) : []"))
+        // Widening makes NonCommercial models sellable, so it needs a code or
+        // a page: the sheet will not offer it without one, the write refuses.
+        #expect(MenuCoverageTests.source("LicenceProofSheet.swift").contains(".disabled(noProof)"))
+        #expect(MenuCoverageTests.source("Shop+Library.swift")
+            .contains("if !widened.isEmpty, code.isEmpty, url.isEmpty {"))
     }
 
     @Test("a remix of a model that may not be sold may not be sold either")

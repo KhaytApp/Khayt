@@ -17,6 +17,12 @@ struct LicenceProofSheet: View {
     @State private var hasEnd = false
     @State private var until = Date()
     @State private var wholeCatalogue = false
+
+    /// The whole catalogue is made sellable only with a code or a page.
+    private var noProof: Bool {
+        code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -51,6 +57,14 @@ struct LicenceProofSheet: View {
                 Toggle(Shop.say(shop.words, "mac.licence_whole_catalogue", others.count,
                                 ["designer": .string(file.source ?? "")]), isOn: $wholeCatalogue)
                     .fixedSize(horizontal: false, vertical: true)
+                    .disabled(noProof)
+                    .onChange(of: noProof) { _, none in if none { wholeCatalogue = false } }
+                if wholeCatalogue {
+                    // Name what the proof is about to make sellable.
+                    Text(others.map(\.title).joined(separator: shop.words.language == "ar" ? "، " : ", "))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Text(shop.words.callIt("mac.licence_proof_hint"))
                 .font(.caption).foregroundStyle(.secondary)

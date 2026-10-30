@@ -77,6 +77,18 @@ struct PaymentTermsTests {
         #expect(out.total == 200, "not yet due is still owed")
     }
 
+    @Test("one late instalment is overdue by its own amount, not the whole plan")
+    func lateInstalmentOnly() throws {
+        let job = try JSONDecoder().decode(Order.self, from: Data("""
+        {"id":"PLAN","date":"2026-09-01","price":10000,"paidAmount":0,"status":"completed","client":"Lab",
+         "instalments":[{"id":"1","amount":1000,"dueDate":"2026-10-01","paid":false},
+                        {"id":"2","amount":9000,"dueDate":"2026-12-01","paid":false}]}
+        """.utf8))
+        let customer = Customer(id: "C", name: "Lab", orders: [job], clientId: nil, record: nil)
+        #expect(customer.overdueOwed(today: "2026-10-30") == 1000)
+        #expect(customer.overdueOwed(today: "2026-09-15") == 0)
+    }
+
     @Test("the invoice prints the terms and the due date for a customer on terms")
     func invoiceSaysDue() async throws {
         let engine = try KhaytEngine()

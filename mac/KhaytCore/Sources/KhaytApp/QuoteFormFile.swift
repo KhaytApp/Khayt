@@ -532,6 +532,9 @@ extension Shop {
         // setting, run only on the Mac holding the book.
         // lock: callers — recordQuoteFormOrder, recordPaidWebStoreOrders
         guard case .store(let build) = source, let engine else { return .failure(.other("")) }
+        // One import of a request at a time, whichever of the two started it.
+        guard quoteFormsInFlight.insert(order.id).inserted else { return .failure(.other("")) }
+        defer { quoteFormsInFlight.remove(order.id) }
         let connection: CloudReader.Connection
         let token: String
         do {

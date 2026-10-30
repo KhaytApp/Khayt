@@ -5657,6 +5657,7 @@ final class Words {
             "ar": "ترخيصه يطلب ذكر المصمّم أينما بِيع:"],
         "mac.licence_credit_add": ["en": "Add the credit to the description", "ar": "إضافة ذكر المصمّم إلى الوصف"],
         "mac.licence_credit_lead": ["en": "Design credit:", "ar": "التصميم:"],
+        "mac.licence_whole_needs_proof": ["en": "To cover the designer's other models, add the licence code or the page that shows it.", "ar": "لتشمل بقية نماذج المصمم، أضف رمز الترخيص أو الصفحة التي تثبته."],
         "mac.licence_whole_catalogue": ["en": "Also for the {n} other models by {designer} (a membership covers them all)",
             "ar": "وأيضًا لـ {n} موديلات أخرى من {designer} (الاشتراك يشملها كلها)"],
         "mac.licence_whole_catalogue_n1": ["en": "Also for the other model by {designer} (a membership covers them all)",

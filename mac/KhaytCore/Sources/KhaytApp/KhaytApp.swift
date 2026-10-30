@@ -811,6 +811,14 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the beta.13 scenes (licence warning and credit, the proof
+            // sheet, the From-slicer inbox, payment terms), on the sample, in
+            // memory (`SnapshotBeta13.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B13"] == "1", let shop = subject {
+                await captureBeta13(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the vault over its plan (khayt-cloud #143): the plan pane,
             // the library banner and the vault sheets, not over / read-only /
             // deleting, on the sample, in memory (`SnapshotVaultLapse.swift`).

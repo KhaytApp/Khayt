@@ -1489,6 +1489,12 @@ extension Shop {
             }
         }
         let widened = Set(others).subtracting([fileId])
+        // Widening turns NonCommercial and Standard Digital File models
+        // sellable, so it takes the proof that says so: a code or a page.
+        // An end date alone proves nothing.
+        if !widened.isEmpty, code.isEmpty, url.isEmpty {
+            writeProblem = words.callIt("mac.licence_whole_needs_proof"); return
+        }
         editFiles(widened.union([fileId]), named: words.callIt("mac.licence_proof")) { record in
             if case .string(let id)? = record["id"], widened.contains(id) {
                 record["licence"] = .string("commercial")

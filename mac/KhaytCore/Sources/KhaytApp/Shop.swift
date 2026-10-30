@@ -2067,6 +2067,10 @@ final class Shop {
     /// Files a slicer sent to this Mac (`SlicerInbox`), newest first, and the
     /// sheet that lists them (`Shop+SlicerInbox`).
     var slicerUploads: [SlicerUpload] = []
+    /// The quote-form requests being imported right now, by intake id. The
+    /// button and the automatic pass both import; without this they could
+    /// download and file the same request's model at once.
+    @ObservationIgnored var quoteFormsInFlight: Set<String> = []
     var showingSlicerInbox = false
     var slicerInboxSaid: String?
     var slicerInboxProblem: String?

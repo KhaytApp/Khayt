@@ -115,6 +115,15 @@ extension LanServer {
         guard length <= host.slicerMaxBytes else {
             throw ReadRefusal.refused(.json(413, #"{"error":"File too large"}"#))
         }
+        // The body is spooled, then the file part copied out of it: twice its
+        // size, with room to spare, or the disk fills and the book cannot save.
+        try? FileManager.default.createDirectory(at: host.slicerScratch, withIntermediateDirectories: true)
+        // Asked of the file system each time: `URL.resourceValues` caches on
+        // the URL, and this one lives as long as the server.
+        if let free = (try? FileManager.default.attributesOfFileSystem(forPath: host.slicerScratch.path))?[.systemFreeSize]
+            as? NSNumber, free.int64Value < Int64(length) * 2 + 512 * 1024 * 1024 {
+            throw ReadRefusal.refused(.json(507, #"{"error":"Not enough disk space on the Mac"}"#))
+        }
         guard slicerUploads < Self.maxSlicerUploads else { throw ReadRefusal.busy }
         slicerUploads += 1
         slot.slicer = true
