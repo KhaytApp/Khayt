@@ -74,11 +74,17 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// send to it (`lib/campaigns.js whatsappOffersOptedIn`, which also needs
     /// no `marketingOptOut`); this app only records it.
     let whatsappMarketingOptIn: [String: JSONValue]?
+    /// Payment terms in whole days — 0 is due on receipt, the default.
+    /// The due date is the invoice date plus these (`lib/payment-terms.js`,
+    /// `KhaytCore.PaymentTerms`), so a company on net 30 is not overdue on
+    /// day one. Read through the shared rule: a hand-typed "30" counts, a
+    /// negative or unreadable value is 0.
+    let paymentTermsDays: Int
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
         case priceList, recurring, commLog, source, marketingOptOut, messageLang, whatsappOptIn
-        case whatsappMarketingOptIn
+        case whatsappMarketingOptIn, paymentTermsDays
     }
 
     /// Is there anything under the heading?
@@ -141,6 +147,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         } else {
             whatsappMarketingOptIn = nil
         }
+        paymentTermsDays = PaymentTerms.termsDays(
+            (try? c.decodeIfPresent(JSONValue.self, forKey: .paymentTermsDays)) ?? nil)
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -153,7 +161,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
          commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "",
          whatsappOptIn: [String: JSONValue]? = nil,
-         whatsappMarketingOptIn: [String: JSONValue]? = nil) {
+         whatsappMarketingOptIn: [String: JSONValue]? = nil,
+         paymentTermsDays: Int = 0) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
@@ -163,6 +172,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         self.messageLang = messageLang
         self.whatsappOptIn = whatsappOptIn
         self.whatsappMarketingOptIn = whatsappMarketingOptIn
+        self.paymentTermsDays = max(0, min(PaymentTerms.maxDays, paymentTermsDays))
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -200,6 +210,9 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             "whatsappOptIn": whatsappOptIn.map(JSONValue.object) ?? .null,
             // The same, for the same reason.
             "whatsappMarketingOptIn": whatsappMarketingOptIn.map(JSONValue.object) ?? .null,
+            // Always written, 0 included: an omitted key is carried through
+            // from disk, so leaving 0 out could never take terms back off.
+            "paymentTermsDays": .number(Double(paymentTermsDays)),
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -242,7 +255,19 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             marketingOptOut: marketingOptOut,
             messageLang: key == \Client.messageLang ? value : messageLang,
             whatsappOptIn: whatsappOptIn,
-               whatsappMarketingOptIn: whatsappMarketingOptIn)
+               whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays)
+    }
+
+    /// The same customer on different payment terms, in whole days.
+    func onTerms(_ days: Int) -> Client {
+        Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+               cr: cr, vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
+               priceList: priceList, recurring: recurring, commLog: commLog,
+               marketingOptOut: marketingOptOut, messageLang: messageLang,
+               whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: days)
     }
 
     /// The same customer, marketed to or not.
@@ -252,7 +277,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn,
-               whatsappMarketingOptIn: whatsappMarketingOptIn)
+               whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays)
     }
 
     /// The same customer, agreeing to WhatsApp updates or not. `at` and `how`
@@ -264,7 +290,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       defaultDiscount: defaultDiscount, createdAt: createdAt,
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
-                      whatsappOptIn: next, whatsappMarketingOptIn: whatsappMarketingOptIn)
+                      whatsappOptIn: next, whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays)
     }
 
     /// The same customer, agreeing to offers on WhatsApp or not — kept the
@@ -276,7 +303,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       defaultDiscount: defaultDiscount, createdAt: createdAt,
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
-                      whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: next)
+                      whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: next,
+                      paymentTermsDays: paymentTermsDays)
     }
 
     /// When they agreed to WhatsApp updates, and how — nil when they have not.
@@ -315,7 +343,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: next, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
-               whatsappMarketingOptIn: whatsappMarketingOptIn)
+               whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays)
     }
 
     /// The same customer with a different standing order.
@@ -326,7 +355,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: next, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
-               whatsappMarketingOptIn: whatsappMarketingOptIn)
+               whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays)
     }
 }
 

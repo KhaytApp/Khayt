@@ -1344,6 +1344,28 @@ final class Words {
         // "Owed". A borrowed key wins over this app's own, so the label needs a
         // key of its own rather than a different value under the same one.
         "mac.paid":          ["en": "Paid",           "ar": "مدفوع"],
+        // ── PAYMENT TERMS (lib/payment-terms.js) ─────────────────────────
+        //
+        // A customer's terms: due on receipt, net 7…90, or a custom number of
+        // days. "صافي 30" carries no counted noun, so it needs no plural forms;
+        // the explanation under the picker does, and has them.
+        "mac.payment_terms":   ["en": "Payment terms", "ar": "شروط الدفع"],
+        "mac.terms_receipt":   ["en": "Due on receipt", "ar": "الدفع عند الاستلام"],
+        "mac.terms_net":       ["en": "Net {n}", "ar": "صافي {n}"],
+        "mac.terms_custom":    ["en": "Custom…", "ar": "مخصص…"],
+        "mac.terms_days":      ["en": "Due {n} days after the invoice date",
+                                "ar": "يُستحق بعد {n} يومًا من تاريخ الفاتورة"],
+        "mac.terms_days_one":  ["en": "Due {n} day after the invoice date",
+                                "ar": "يُستحق بعد يوم واحد من تاريخ الفاتورة"],
+        "mac.terms_days_two":  ["en": "Due 2 days after the invoice date",
+                                "ar": "يُستحق بعد يومين من تاريخ الفاتورة"],
+        "mac.terms_days_few":  ["en": "Due {n} days after the invoice date",
+                                "ar": "يُستحق بعد {n} أيام من تاريخ الفاتورة"],
+        // Money past the customer's terms — not the jobs past their delivery
+        // date, which `mac.past_due` counts beside it.
+        "mac.terms_overdue":   ["en": "Overdue", "ar": "تجاوز موعد السداد"],
+        "mac.aged_due":        ["en": "Due", "ar": "الاستحقاق"],
+        "mac.not_yet_due":     ["en": "Not yet due", "ar": "لم يحن موعده"],
         "mac.overdue_jobs":  ["en": "{n} unpaid jobs past their due date",
                               "ar": "{n} أعمال غير مدفوعة تجاوزت موعدها"],
         // ── GROUPING THE QUEUE BY COLOUR (lib/swap-queue.js) ─────────────
