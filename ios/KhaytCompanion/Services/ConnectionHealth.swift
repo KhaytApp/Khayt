@@ -96,13 +96,17 @@ final class ConnectionHealth: ObservableObject {
             lastStatus = status
             do {
                 let queue = try await api.fetchQueue()
-                state = .connected
+                // "Connected" is the Mac answering or the cloud having synced.
+                // A queue read from the stored book alone is the book's age,
+                // not a live link, so it must not read as connected.
+                let reached = macInReach || Self.cloudSynced(api.lastSync)
+                state = reached ? .connected : .unreachable
                 if macInReach {
                     await pinMacIdentity(); await enrolThisPhone()
                     // On the shop's Wi-Fi: keep the library's pictures for later.
                     Task { await api.keepAllLibraryPictures() }
                 }
-                await refreshWidgetsAndAlerts(status: status, queue: queue)
+                await refreshWidgetsAndAlerts(status: status, queue: queue, connected: reached)
             } catch let err as KhaytAPIError {
                 lastStatus = nil
                 if case .pinTooShort = err {
@@ -131,6 +135,15 @@ final class ConnectionHealth: ObservableObject {
             notifyConnectionChange()
             if let settings { CompanionNotifications.shared.saveDisconnectedSnapshot(shopName: settings.shopLabel) }
         }
+    }
+
+    /// How recent a cloud sync still counts as "the cloud answered".
+    nonisolated static let cloudFreshness: TimeInterval = 600
+
+    /// The cloud synced a moment ago (the Mac's own syncs are `macInReach`).
+    static func cloudSynced(_ mark: KhaytAPIClient.SyncMark?, now: Date = Date()) -> Bool {
+        guard let mark, mark.route == .cloud else { return false }
+        return now.timeIntervalSince(mark.at) < cloudFreshness
     }
 
     private func notifyConnectionChange() {
@@ -221,7 +234,7 @@ final class ConnectionHealth: ObservableObject {
         macMoved = nil
     }
 
-    private func refreshWidgetsAndAlerts(status: ShopStatus, queue: [QueueOrder]) async {
+    private func refreshWidgetsAndAlerts(status: ShopStatus, queue: [QueueOrder], connected: Bool) async {
         guard let settings else { return }
         var lowStock = 0
         if settings.notifyLowStock {
@@ -236,7 +249,9 @@ final class ConnectionHealth: ObservableObject {
             queue: queue,
             lowStockCount: lowStock,
             settings: settings,
-            livePrints: livePrints
+            livePrints: livePrints,
+            connected: connected,
+            asOf: connected ? Date() : (api.bookAsOf ?? Date())
         )
     }
 }

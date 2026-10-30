@@ -140,6 +140,7 @@ final class LocalizationCompletenessTests: XCTestCase {
         "ExpenseSheet.swift",
         "WriteNFCTagSheet.swift",
         "ConnectionBanner.swift",
+        "QuoteCard.swift",
     ]
 
     func testTranslatedScreensHaveNoEnglishLeftInThem() throws {

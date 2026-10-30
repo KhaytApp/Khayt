@@ -113,7 +113,7 @@ struct LogWasteSheet: View {
         error = nil
         defer { isSaving = false }
 
-        let grams = Double(weight.trimmingCharacters(in: .whitespaces)) ?? 0
+        let grams = PhoneCalculator.number(weight)
         let entry = WasteEntry(
             material: material.trimmingCharacters(in: .whitespaces),
             failureType: failureType,

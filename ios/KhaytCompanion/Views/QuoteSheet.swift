@@ -186,7 +186,7 @@ struct QuoteSheet: View {
         return currency.isEmpty ? amount : "\(amount) \(currency)"
     }
 
-    private func num(_ s: String) -> Double { Double(s.trimmingCharacters(in: .whitespaces)) ?? 0 }
+    private func num(_ s: String) -> Double { PhoneCalculator.number(s) }
 
     private func calculate() async {
         isLoading = true
@@ -198,7 +198,7 @@ struct QuoteSheet: View {
         let input = QuoteRequest(
             printWeight: num(printWeight),
             printTime: num(printTime),
-            qty: max(1, Int(qty.trimmingCharacters(in: .whitespaces)) ?? 1),
+            qty: max(1, PhoneCalculator.wholeNumber(qty) ?? 1),
             margin: num(margin),
             spoolCost: num(spoolCost),
             spoolWeight: 1000,
