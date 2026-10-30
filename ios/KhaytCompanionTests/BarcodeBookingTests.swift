@@ -142,7 +142,7 @@ final class BarcodeBookingTests: XCTestCase {
         book = CompanionBook(directory: dir)
         reader = BookReader(book: book)
         try book.replace(with: ["settings": .object([:]), "inventory": .array([])], scope: nil)
-        try book.markSynced()
+        try book.markSynced(try book.read())
     }
 
     override func tearDownWithError() throws {

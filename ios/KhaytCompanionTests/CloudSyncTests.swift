@@ -212,6 +212,29 @@ final class CloudSyncTests: XCTestCase {
                        "a PUT from a phone would replace the shop with the phone's slice")
     }
 
+    /// A payment recorded while the send is on the wire was counted as sent
+    /// with it, and never left the phone.
+    func testAnEditMadeDuringTheSendStaysPending() async throws {
+        try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
+        var (s, _) = try await sync().pull(session)
+        try BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post")
+
+        var during = sync()
+        let fake = cloud!, book = book!
+        during.fetch = { request in
+            if request.httpMethod == "POST" {
+                try BookWriter(book: book).setOrderStatus(orderId: "O-1", to: "qc")
+            }
+            return try fake.answer(request)
+        }
+        let pushed: CloudSync.Pushed
+        (s, pushed) = try await during.push(s)
+        XCTAssertEqual(pushed, .sent(count: 1, rev: 2))
+        XCTAssertEqual(try order("O-1")?["status"], .string("qc"))
+        let waiting = try await pending()
+        XCTAssertEqual(waiting, 1, "the edit made during the send was marked as sent")
+    }
+
     func testARaceIsPulledAgainAndRetried() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         let (s, _) = try await sync().pull(session)

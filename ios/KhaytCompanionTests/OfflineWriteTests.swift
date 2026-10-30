@@ -281,7 +281,7 @@ final class OfflineWriteTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(before).count, 1)
 
         // What a confirmed send does.
-        try book.markSynced()
+        try book.markSynced(try book.read())
 
         let after = try await reader.pendingChanges()
         XCTAssertTrue(try XCTUnwrap(after).isEmpty,
@@ -292,7 +292,7 @@ final class OfflineWriteTests: XCTestCase {
 
     func testAnEditMadeAfterSyncingIsPendingOnItsOwn() async throws {
         try writer.setOrderStatus(orderId: "O-1", to: "qc")
-        try book.markSynced()
+        try book.markSynced(try book.read())
         try writer.setOrderStatus(orderId: "O-1", to: "completed")
 
         let produced = try await reader.pendingChanges()
@@ -451,7 +451,7 @@ final class OfflineWriteTests: XCTestCase {
     /// must not read as the phone deleting the entry.
     func testAPullAfterSendingWasteDoesNotDeleteIt() async throws {
         try writer.logWaste(waste(grams: 40, deduct: false))
-        try book.markSynced()
+        try book.markSynced(try book.read())
         try await reader.adopt(shop(), scope: nil)
         let outbox = try await reader.pendingChanges()
         XCTAssertEqual(outbox?.tombstones.count ?? 0, 0, "absence after a pull is not a deletion")

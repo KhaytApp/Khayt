@@ -99,6 +99,21 @@ final class LiveActivityPush {
         await api?.deleteLiveActivityToken(hex: startToken)
     }
 
+    /// Unpaired: no shop is this phone's any more. Every token is withdrawn
+    /// — start AND update, while the cloud sign-in still works — and every
+    /// card ends at once, so nothing of the old shop stays on the Lock Screen
+    /// or can be started on it.
+    /// `session` is the sign-in taken before the sign-out: the client's own
+    /// is already gone by the time this runs.
+    func forgetShop(session: CloudSession?) async {
+        let held = updateTokens
+        updateTokens = [:]
+        for a in Activity<PrintActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+        guard let api, let session else { return }
+        if let startToken { await api.deleteLiveActivityToken(hex: startToken, session: session) }
+        for (_, t) in held { await api.deleteLiveActivityToken(hex: t.hex, session: session) }
+    }
+
     nonisolated static func hex(_ data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
@@ -129,8 +144,10 @@ extension KhaytAPIClient {
         _ = try? await CloudReader.session.data(for: request)
     }
 
-    func deleteLiveActivityToken(hex: String) async {
-        guard let session = cloud,
+    /// `session` for a withdrawal after a sign-out (`forgetShop`); otherwise
+    /// the sign-in the client holds.
+    func deleteLiveActivityToken(hex: String, session given: CloudSession? = nil) async {
+        guard let session = given ?? cloud,
               let request = try? CloudReader.request(
                 CloudReader.Connection(url: session.url, shopId: session.shopId, storedToken: ""),
                 token: session.token, method: "DELETE", tail: "/live-activity/tokens/" + hex) else { return }
