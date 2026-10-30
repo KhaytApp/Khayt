@@ -3243,6 +3243,13 @@ function renderAgedReceivables() {
   const buckets = {};
   for (const b of aged.buckets) buckets[LABEL[b.label]] = aged.rows.filter(r => r.bucket === b.label);
   const totalOwed = aged.total;
+  /* Payment terms (lib/payment-terms.js): a row ages from its DUE date, so a
+   * customer on net 30 invoiced last week is owed but not late. The module
+   * says which with `overdue` and `due`; this screen used to show such a row
+   * as "0 days" in the 0–30 bucket, which reads as just-overdue. It now says
+   * "Not yet due", and the total is split into what is late and what is not. */
+  const notYetDue = aged.rows.filter(r => r.overdue === false).reduce((s, r) => s + r.owed, 0);
+  const overdueOwed = totalOwed - notYetDue;
 
   const bucketColors = { '0–30': 'var(--success)', '31–60': 'var(--warning)', '61–90': '#f97316', '90+': 'var(--danger)' };
 
@@ -3258,20 +3265,24 @@ function renderAgedReceivables() {
       }).join('')}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <strong style="font-size:14px;">${escapeHtml(t('an.aged_total_outstanding'))} <span style="color:var(--danger);">${fmtPrice(totalOwed)}</span></strong>
+      <div>
+        <strong style="font-size:14px;">${escapeHtml(t('an.aged_total_outstanding'))} <span style="color:var(--danger);">${fmtPrice(totalOwed)}</span></strong>
+        ${notYetDue > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${escapeHtml(t('an.aged_overdue'))} ${fmtPrice(overdueOwed)} · ${escapeHtml(t('an.aged_not_yet_due'))} ${fmtPrice(notYetDue)}</div>` : ''}
+      </div>
       <button class="btn small ghost" id="btnExportAgedCsv">⬇ ${escapeHtml(t('exp.export_csv'))}</button>
     </div>`;
 
   Object.entries(buckets).forEach(([label, items]) => {
     if (items.length === 0) return;
     html += `<div style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:600;color:${bucketColors[label]};margin-bottom:6px;padding:4px 8px;background:rgba(0,0,0,0.1);border-radius:4px;">${label} DAYS — ${items.length} order(s)</div>
+      <div style="font-size:12px;font-weight:600;color:${bucketColors[label]};margin-bottom:6px;padding:4px 8px;background:rgba(0,0,0,0.1);border-radius:4px;">${escapeHtml(t('an.aged_bucket_days', { label }))} — ${escapeHtml(t('an.aged_orders_n', { n: items.length }))}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="color:var(--text-dim);">
           <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_order'))}</th>
           <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_project'))}</th>
           <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_client'))}</th>
           <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_owed'))}</th>
+          <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_due'))}</th>
           <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_days'))}</th>
         </tr></thead>
         <tbody>${items.map(i => `<tr style="border-top:1px solid var(--border);">
@@ -3279,16 +3290,18 @@ function renderAgedReceivables() {
           <td style="padding:5px 6px;">${escapeHtml(i.project||'—')}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.client||'—')}</td>
           <td style="padding:5px 6px;text-align:right;color:var(--danger);font-weight:600;">${fmtPrice(i.owed)}</td>
-          <td style="padding:5px 6px;text-align:right;color:${bucketColors[label]};">${i.days}</td>
+          <td style="padding:5px 6px;text-align:right;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(i.due || '—')}</td>
+          <td style="padding:5px 6px;text-align:right;color:${i.overdue === false ? 'var(--text-muted)' : bucketColors[label]};">${i.overdue === false ? escapeHtml(t('an.aged_not_yet_due')) : i.days}</td>
         </tr>`).join('')}</tbody>
       </table></div>`;
   });
   el.innerHTML = html;
 
   el.querySelector('#btnExportAgedCsv')?.addEventListener('click', () => {
-    const rows = [['Order ID','Project','Client','Owed','Days Outstanding','Bucket']];
+    const rows = [['Order ID','Project','Client','Owed','Due Date','Days Overdue','Overdue','Bucket']];
     Object.entries(buckets).forEach(([label, items]) => {
-      items.forEach(i => rows.push([i.id, i.project||'', i.client||'', i.owed.toFixed(2), i.days, label]));
+      items.forEach(i => rows.push([i.id, i.project||'', i.client||'', i.owed.toFixed(2), i.due || '', i.days,
+        i.overdue === false ? 'no' : 'yes', label]));
     });
     downloadBlob(new Blob([rows.map(r => r.map(csvEsc).join(',')).join('\n')], { type: 'text/csv' }), 'aged-receivables.csv');
   });
