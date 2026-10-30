@@ -15,6 +15,8 @@ struct LicenceWarning: View {
             ForEach(problems, id: \.id) { p in
                 Text(p.reason == "expired"
                      ? shop.words.callIt("mac.licence_expired_line", ["name": .string(p.name), "until": .string(p.until)])
+                     : p.reason == "remix"
+                     ? shop.words.callIt("mac.licence_remix_line", ["name": .string(p.name), "parent": .string(p.until)])
                      : shop.words.callIt("mac.licence_nc_line", ["name": .string(p.name)]))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

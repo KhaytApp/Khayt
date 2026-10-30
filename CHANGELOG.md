@@ -6,6 +6,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Desktop: Aged Receivables follows payment terms.** Each row now shows its due date, which is the invoice date plus the customer's terms (#2106). A row that isn't due yet says "Not yet due" instead of "0" days. When anything is on terms, the total is split into overdue and not yet due. The bucket headers are translated (they were hard-coded English), and the CSV gains Due Date and Overdue columns.
 
+- Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
+
+- **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
+  - Licence proof sheet: "Also for the N other models by {designer}" makes them `commercial` with the same code, link and last day, in one Undo step. A membership is one record to renew, not one per model. Matching is by `source`, ignoring case and accents, never an address, and never the shop's own (`own`) models.
+  - "Remix of…" on the provenance menu records the original's page (`remixOf`, https only). A remix whose original is in the library and may not be sold is flagged at the sale too ("a remix of X, whose licence does not allow selling prints"), unless the remix carries a bought licence. The inspector links the original.
+  - A job's photos offer "Use as model photo" when the job printed one library model: the real print becomes the library picture, as model sites' "makes" do.
+
 - **iPhone: "Not licensed for sale" on a job.** A job whose parts come from a model with a non-commercial licence, or one whose bought licence has run out, now says so at the top of its page on the phone, with the same words and the same check as the Mac (`ModelLicence.saleProblems`, #2103). The phone's library copy now keeps `licence` and `licenceExpires`; it moved to `library-2.json` so a phone holding the old copy takes one whole pull and learns them. A phone that reaches the Mac only on Wi-Fi holds no library copy and says nothing, as an unknown licence is not a no. The sample shop's "Terrain tiles" shows both lines.
 - **iPhone: finishing a job on the phone now takes its filament off the spool and records when it was finished, as on the Mac.** Moving a job on the iPhone (the order page, the queue, a notification button, Siri, or approving or declining a quote) now follows the same rules as moving it on the Mac. The filament and packaging come off the shelf in the same save as the move, the finish date and stage history are recorded, and moving a finished job back puts its filament back. A move the shop's rules don't allow, such as starting a print while production is paused, is refused with the reason. The phone still sends no customer emails, webhooks or messages for a move.
 - **Desktop: licence warnings where a sale is edited.** The job editor and the product editor now show "Not licensed for sale" for a model whose licence is non-commercial or whose bought licence has run out (`KhaytModelLicence.saleProblems`, as on the Mac). For a CC BY model they show the credit its licence asks for: `“Title” — Designer (CC BY), page`. The product editor can add that credit to the description, once. A model with no licence recorded shows nothing. The shared `credits()` in `lib/model-licence.js` builds the line the same way as the Mac's `ModelLicence.credits`.
@@ -28,6 +35,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Saving a job or customer without changing anything no longer marks it as edited, so it cannot outrank a real edit made on the Mac.
   - Unpair now signs out of Khayt Cloud straight away: the phone stops syncing, stops receiving the shop's alerts, and ends the shop's Live Activities, instead of carrying on until the app was closed.
 
+- **Mac: Khayt as a printer in the slicer.** Settings → Online → "Accept files from slicers (OctoPrint upload)" (off by default) lets OrcaSlicer, PrusaSlicer or Bambu Studio add the Mac as an OctoPrint host: the LAN server answers `GET /api/version` and `POST /api/files/local` behind a Keychain-held API key (Copy, Regenerate), streams the file to disk, and never starts a printer. Each file lands in a "From slicer" inbox with the slicer's own grams and time, to add to the library or start a job or quote from.
 - **Payment terms per customer.** A customer can be on due-on-receipt (the default), net 7/15/30/45/60/90 or a custom number of days (`paymentTermsDays`). The due date is the invoice date plus the terms (`lib/payment-terms.js`, ported to Swift as `KhaytCore.PaymentTerms` with a parity test). Receivables now age from that due date, so a net-30 company is no longer overdue from day one. Payment reminders and the dashboard's "Invoices to chase" wait for the terms too. The invoice prints "Payment terms: Net 30" and the due date. The Mac customer sheet has the picker, the customer pane shows the terms and what is overdue, and Reports › Receivables has a Due column. The desktop customer editor has a days field.
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
@@ -15240,7 +15248,6 @@ hand back work done away from the desk.
   quotes and bought nothing sat at the top of "lifetime value". And a customer
   whose first two jobs landed on the same day counted as two new customers.
 
-
 ## [4.0.0-alpha.25] - 2026-09-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
@@ -17435,7 +17442,6 @@ against them test for test. It becomes the main Khayt on macOS, a native Windows
 app follows, and this Electron build continues as the third option for everyone
 else. Nothing you have to do, and nothing about this release depends on it.
 
-
 ### Before you update
 
 - **Finishing a job now takes off the shelf what the job actually used, not
@@ -17749,7 +17755,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   (`29:12 + 0:00 + 41:50 = 71:02`) and becomes a total over a count beyond that,
   because ten terms is not an arithmetic anybody verifies.
 
-
 - **The tax you pay on a purchase is money you get back, and Khayt can hold it
   now.** A box on an expense for the VAT on the supplier's invoice. It comes off
   the VAT you charged, so the quarterly report shows what you actually owe
@@ -17763,7 +17768,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   workarounds — the VAT column below was written as a squeezed second line
   because a conditional table column needs 14.4.
 
-
 - **The Mac app's tests run on a pull request.** Everything in CI ran on Linux,
   so for as long as the native app has existed none of its 705 tests had run on
   a PR — not the guard that the Quick Look extension carries no Swift entry
@@ -17773,8 +17777,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   It builds the extensions before testing, because the entry-point guard READS
   THE BUILT BINARY and skips when there is nothing to read.
-
-
 
 - **The space bar answers the question too.** Pressing space on a `.3mf` in
   Finder shows the plate render large, with the printer, layer height, nozzle,
@@ -19283,7 +19285,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It now requires a window big enough to be one somebody reads, and when it
   finds none it says which windows were open instead of failing quietly.
 
-
 - **Two of ten models in one real library were filed under a picture of
   themselves from above.** Importing a 3MF took the largest `Metadata/*.png` in
   the archive, and a slicer writes several: the plate render, a small copy of it,
@@ -19633,7 +19634,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   shop (the daily backup and a named restore point). They are minted on demand,
   so an import re-mints; a shop that migrates by export republishes its portal
   links.
-
 
 - **Your backups before an app update are kept properly.** They were counted
   as ordinary daily backups and survived only by accident of how the filenames
@@ -20162,7 +20162,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   converter's colour dialog, "Delivered", "Done", "Resent", and the hint inside
   the product name box. Every one is written properly now, in all nine
   languages, and Khayt will not build if another one appears.
-
 
 ## [3.7.0-beta.24] - 2026-09-02
 
@@ -20742,7 +20741,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   It always says what it did: converted, resized, recompressed, and from what
   size to what size.
 
-
 - **Khayt can tell a customer when their order would actually be ready.**
   Settings now has **Delivery estimates**: how many printing hours you get
   through on a working day, how many days a week you work, and how long
@@ -20841,7 +20839,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Those protections are now applied to every response the shop's server sends,
   rather than page by page, so a page added later cannot be left out.
 
-
 - **A model measured in inches, centimetres or metres is now the right size in the
   preview.** A 3MF file records the units its numbers are in, and the preview was
   reading every file as though it were in millimetres. A part drawn as 12×12×6
@@ -20903,7 +20900,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   nowhere. Update times sent as `eventTime` are also read now; they were being
   dropped.
 
-
 - **Hardened a text-escaping helper that could have stopped escaping.** Two
   places in Khayt used a short helper to make customer-supplied text safe to
   display, and each was written to fall back to the raw text if the main
@@ -20923,7 +20919,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   The file Khayt generates for a Medusa store also declares its imports the way
   Medusa's own examples do, which keeps it compiling in projects with stricter
   TypeScript settings than the default.
-
 
 ## [3.7.0-beta.9] - 2026-08-27
 
@@ -21030,7 +21025,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Printing something twice as fast as you quoted is not flagged. You will hear
   about overcharging from your customers.
 
-
 - **You can install a design someone else made.** Khayt has had the machinery
   for custom designs for a long time and nobody has ever used it, because there
   was nowhere to put one: designs lived inside the application file, which is
@@ -21053,7 +21047,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   the problem rather than just saying no. Checking again on load matters because
   a file that was fine when you installed it may not be fine tomorrow — if it
   changes on disk it stops loading, and says so instead of quietly applying.
-
 
 ### Fixed
 
@@ -21127,7 +21120,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   utilisation"* — so you can choose on looks and know the price, or choose on the
   numbers you need. A design that costs you nothing says nothing.
 
-
 ### Fixed
 
 - **The Flow board never marked an order late.** Not "rarely" — never, since the
@@ -21139,7 +21131,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
 
   If you use Flow and have wondered why nothing ever looked urgent: it was this,
   and it is fixed.
-
 
 ### Added
 
@@ -21161,7 +21152,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   behaviour is covered by tests end to end, but if you have one, this is the
   release to tell us about it.
 
-
 ### Fixed
 
 - **An order that arrives twice from your online store no longer becomes two
@@ -21181,7 +21171,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   Orders that carry no order number are still accepted exactly as before — an
   order Khayt cannot recognise is still an order, and losing it would be worse
   than the duplicate.
-
 
 ### Added
 
@@ -21262,7 +21251,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   accepts the connection and then says nothing at all, which looks identical to a
   dead printer. The message now names it, and the machine dialog says so before
   you spend eight seconds finding out.
-
 
 - **An OctoPrint printer reported the slicer's guess as the measured weight.**
   When a job finishes, Khayt reads what it *actually* used off the printer. On
@@ -21617,7 +21605,6 @@ else. Nothing you have to do, and nothing about this release depends on it.
   run branches. If any of them cannot, your shop quietly keeps sending whole
   stores exactly as before, with no error and nothing for you to do. The saving
   starts on its own once they are all updated.
-
 
 ## [3.6.0] - 2026-08-21
 
@@ -22294,7 +22281,6 @@ are unaffected; those were never estimates.
   rather than looking expired. A server that is genuinely misconfigured still
   reports as a failure, because that one will not fix itself by waiting.
 
-
 ## [3.6.0-beta.14] - 2026-08-09
 
 ### Added
@@ -22360,7 +22346,6 @@ are unaffected; those were never estimates.
   spanning two currencies refuses to add them. **Disband** takes the jobs back
   out and leaves the prints untouched.
 
-
 ### Security
 
 - **Khayt no longer has any way to read a message thread without proving the
@@ -22371,7 +22356,6 @@ are unaffected; those were never estimates.
   route can now be closed on the server with nothing left depending on it. If your
   Khayt Cloud server is older than this build, the Messages panel now says so and
   tells you to update it, rather than quietly reading the thread another way.
-
 
 ## [3.6.0-beta.13] - 2026-08-07
 
@@ -22478,13 +22462,11 @@ are unaffected; those were never estimates.
   plaques the same size on the outside can carry different faces, and only you
   can say whether they are the same job.
 
-
 ## [3.6.0-beta.12] - 2026-08-06
 
 Mostly about telling you the truth when something did not work. Signing in to the
 cloud stops asking you to wait for a code the server already failed to send, and
 "Slice for exact quote" stops handing back a time with the weight left blank.
-
 
 ### Fixed
 
@@ -22519,12 +22501,10 @@ cloud stops asking you to wait for a code the server already failed to send, and
   each say plainly when the email could not be sent, instead of sending you to
   wait for it.
 
-
 ## [3.6.0-beta.11] - 2026-08-04
 
 Signing in to the cloud, when it goes wrong, now says what went wrong. Nothing
 about quoting changes on this build.
-
 
 ### Fixed
 
@@ -22544,7 +22524,6 @@ about quoting changes on this build.
   comes from when the server reports one, and offers **Send it again** without
   making you close the dialog and start over.
 
-
 ## [3.6.0-beta.10] - 2026-08-04
 
 The estimator stops pretending it knows one number. Grams-per-hour was learned
@@ -22556,7 +22535,6 @@ disagreed, rather than as something your printer does.
 
 **Quotes for unsliced models move again on this build**, for a different reason
 than they moved in beta.9 — see [docs/BETA-RELEASE.md](./docs/BETA-RELEASE.md).
-
 
 ### Added
 
@@ -22867,7 +22845,6 @@ installs that did not work.
   The board is now what you get, in every theme. If you prefer the list, switch
   once and it stays switched — including for shops that already chose it.
 
-
 ## [3.6.0-beta.6] - 2026-08-02
 
 One change you will see, and it exists because two prints ran back to back —
@@ -22910,7 +22887,6 @@ which is an ordinary day in a shop and something no test had ever imagined.
 
 - The Snapmaker U1 catalogue entry is pinned to what the machine itself reports.
 
-
 ## [3.6.0-beta.5] - 2026-08-02
 
 Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
@@ -22944,7 +22920,6 @@ Two fixes to the files Bed Ready sends a Snapmaker U1, both found by opening a
   rather than an invented shape. `lib/hueforge.js` gained tests in beta.4; its
   mesh geometry proved correct.
 
-
 ## [3.6.0-beta.4] - 2026-08-01
 
 A small one, and only for Bed Ready. Two settings that Khayt would accept
@@ -22973,7 +22948,6 @@ without complaint and then quietly build an unprintable plan from.
   be correct — every test heightfield produces exactly the volume its shape
   implies, checked against Khayt's own STL reader, and the output slices cleanly
   in PrusaSlicer.
-
 
 ## [3.6.0-beta.3] - 2026-08-01
 
@@ -23010,7 +22984,6 @@ without real hardware in front of it.
   checked against hand-written examples, which can agree with a mistake
   forever. Read live, mid-print, from a Snapmaker U1 on stock firmware: every
   field correct. Stock firmware is enough; no custom firmware needed.
-
 
 ## [3.6.0-beta.2] - 2026-08-01
 
@@ -23068,7 +23041,6 @@ is the reason this exists.
 - `npm run verify:estimator` slices a spread of shapes with a real PrusaSlicer
   and prints Khayt's estimate beside the truth. That is where the percentages
   above come from.
-
 
 ## [3.6.0-beta.1] - 2026-07-31
 
@@ -23167,7 +23139,6 @@ becomes the default download.
 - **A part's file reference can be a real link.** The free-text file field is
   still there; alongside it you can now pick from your print library, which is
   what lets a finished job teach the file it printed.
-
 
 ## [3.5.3] - 2026-08-01
 
@@ -23379,7 +23350,6 @@ they first downloaded, with no sign anything was wrong.
 This release is the first to publish that file, which means **3.4.1 still has to
 be installed by hand**; from here on the AppImage will offer updates by itself.
 
-
 ### Fixed
 
 - **Linux never received automatic updates.** Khayt's Linux builds were published
@@ -23393,7 +23363,6 @@ be installed by hand**; from here on the AppImage will offer updates by itself.
   can replace itself, but the check did not know that and reported the same
   answer as a genuine no-update-found. It now says plainly that this install
   cannot update itself, and points at the download page.
-
 
 ## [3.4.0] - 2026-07-29
 
@@ -23944,7 +23913,6 @@ this is what changed for you since 3.1.0.
 - Per-printer camera feed (LAN only).
 - Printer discovery on the local network, including PrusaLink and Moonraker.
 - Keyboard shortcuts shown on the sidebar items they belong to.
-
 
 ## [3.2.0-beta.61] - 2026-07-22
 

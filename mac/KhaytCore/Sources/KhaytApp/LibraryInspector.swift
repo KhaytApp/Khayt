@@ -443,6 +443,9 @@ struct LibraryInspector: View {
                 if !standing.source.isEmpty {
                     DetailLine(shop.words.callIt("plib.source"), standing.source)
                 }
+                if let link = file.remixOf.flatMap(WebSave.https), let url = URL(string: link) {
+                    Link(shop.words.callIt("mac.remix_of"), destination: url).font(.callout)
+                }
                 if standing.known {
                     // ONE ROW, in the licence's own name: every language spells
                     // the NonCommercial ones "… — not for sale".

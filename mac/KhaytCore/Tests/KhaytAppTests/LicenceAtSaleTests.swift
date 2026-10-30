@@ -48,4 +48,45 @@ struct LicenceAtSaleTests {
         #expect(ModelLicence.sellableOn(r, today: "2026-09-23") == true)
         #expect(ModelLicence.sellableOn(r, today: "2026-09-24") == false)
     }
+
+    @Test("a designer's licence reaches their other models, never the shop's own or a stranger's")
+    func sameDesigner() throws {
+        func model(_ id: String, _ source: String, _ licence: String = "") throws -> LibraryFile {
+            let row: JSONValue = .object(["id": .string(id), "name": .string(id), "title": .string(id),
+                                          "source": .string(source), "licence": .string(licence)])
+            return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(row))
+        }
+        let files = [try model("a", "Whale3D", "commercial"), try model("b", " whale3d ", "sdfl"),
+                     try model("c", "Whale3D"), try model("d", "Whale3D", "own"),
+                     try model("e", "Other"), try model("f", "https://makerworld.com/@whale3d")]
+        #expect(Shop.sameDesigner(as: files[0], in: files).map(\.id) == ["b", "c"])
+        #expect(Shop.sameDesigner(as: files[5], in: files).isEmpty, "an address is not a designer")
+        #expect(MenuCoverageTests.source("LicenceProofSheet.swift")
+            .contains("alsoFor: wholeCatalogue ? shop.sameDesigner(as: file).map(\\.id) : []"))
+    }
+
+    @Test("a remix of a model that may not be sold may not be sold either")
+    func remixFollowsItsOriginal() throws {
+        func model(_ id: String, licence: String = "", url: String = "", remixOf: String = "") throws -> LibraryFile {
+            var row: [String: JSONValue] = ["id": .string(id), "name": .string(id), "title": .string(id),
+                                            "licence": .string(licence)]
+            if !url.isEmpty { row["sourceUrl"] = .string(url) }
+            if !remixOf.isEmpty { row["remixOf"] = .string(remixOf) }
+            return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(row)))
+        }
+        let files = [
+            try model("nc", licence: "cc-by-nc", url: "https://www.printables.com/model/1"),
+            try model("by", licence: "cc-by", url: "https://www.printables.com/model/2"),
+            try model("r1", remixOf: "https://www.printables.com/model/1/"),        // of NC, says nothing
+            try model("r2", licence: "commercial", remixOf: "https://www.printables.com/model/1"), // bought
+            try model("r3", remixOf: "https://www.printables.com/model/2"),          // of BY
+            try model("r4", remixOf: "https://example.com/not-in-library"),
+            try model("r5", licence: "cc-by-nc", remixOf: "https://www.printables.com/model/1"), // its own problem
+        ]
+        let out = Shop.remixProblems(files.map(\.id), files: files, today: "2026-10-30")
+        #expect(out.map(\.id) == ["r1"])
+        #expect(out.first?.reason == "remix")
+        #expect(out.first?.until == "nc")
+    }
 }
+

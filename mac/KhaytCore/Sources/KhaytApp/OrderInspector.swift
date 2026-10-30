@@ -549,6 +549,7 @@ struct JobPhotos: View {
 
     @State private var working: String?
     @State private var said: [String: Shop.ProductPhotoResult] = [:]
+    @State private var modelSaid: [String: Shop.ProductPhotoResult] = [:]
 
     var body: some View {
         DetailSection(shop.words.callIt("mac.print_photos")) {
@@ -571,6 +572,24 @@ struct JobPhotos: View {
                                 .buttonStyle(.link)
                                 .font(.callout)
                                 .disabled(working != nil)
+                            }
+                            if shop.canUseAsModelPhoto(job) {
+                                Button(shop.words.callIt("mac.use_as_model_photo")) {
+                                    working = snap.id
+                                    Task {
+                                        let result = await shop.useAsModelPhoto(snap)
+                                        modelSaid[snap.id] = result
+                                        working = nil
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.callout)
+                                .disabled(working != nil)
+                            }
+                            if let result = modelSaid[snap.id], result != .failed {
+                                Text(shop.words.callIt(result == .added ? "mac.model_photo_added" : "mac.model_photo_already"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             if let result = said[snap.id], result != .failed {
                                 Text(shop.words.callIt(result == .added

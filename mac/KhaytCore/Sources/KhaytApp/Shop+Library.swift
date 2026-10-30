@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 import AppKit
 import Observation
 import KhaytCore
+import KhaytWebSave
 
 extension Shop {
 
@@ -1464,7 +1465,13 @@ extension Shop {
     /// a date must be a real `YYYY-MM-DD`, or nothing is written: a proof the
     /// shop cannot click, or a date `lib/model-licence.js` cannot read, is a
     /// proof that silently never expires.
-    func setLicenceProof(_ fileId: LibraryFile.ID, code: String, url: String, expires: String) {
+    ///
+    /// `alsoFor`: other models by the same designer the shop's licence covers
+    /// (a membership or merchant tier covers the designer's whole catalogue).
+    /// They become `commercial` with the same proof, in the same Undo step, so
+    /// renewing the membership is one edit, not one per model.
+    func setLicenceProof(_ fileId: LibraryFile.ID, code: String, url: String, expires: String,
+                         alsoFor others: [LibraryFile.ID] = []) {
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
         let url = url.trimmingCharacters(in: .whitespacesAndNewlines)
         let expires = expires.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1481,10 +1488,29 @@ extension Shop {
                 writeProblem = words.callIt("mac.licence_bad_date"); return
             }
         }
-        editFiles([fileId], named: words.callIt("mac.licence_proof")) { record in
+        let widened = Set(others).subtracting([fileId])
+        editFiles(widened.union([fileId]), named: words.callIt("mac.licence_proof")) { record in
+            if case .string(let id)? = record["id"], widened.contains(id) {
+                record["licence"] = .string("commercial")
+            }
             for (key, value) in [("licenceCode", code), ("licenceUrl", url), ("licenceExpires", expires)] {
                 if value.isEmpty { record.removeValue(forKey: key) } else { record[key] = .string(value) }
             }
+        }
+    }
+
+    /// The other models by the designer `file` names, that a licence bought
+    /// from that designer could cover: same `source` (not an address), not
+    /// the shop's own work. Empty when the file names no designer.
+    func sameDesigner(as file: LibraryFile) -> [LibraryFile] { Self.sameDesigner(as: file, in: files) }
+
+    nonisolated static func sameDesigner(as file: LibraryFile, in files: [LibraryFile]) -> [LibraryFile] {
+        let designer = (file.source ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !designer.isEmpty, !designer.lowercased().hasPrefix("http") else { return [] }
+        return files.filter {
+            $0.id != file.id && ($0.licence ?? "") != "own"
+                && ($0.source ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    .compare(designer, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
         }
     }
 
@@ -1493,6 +1519,58 @@ extension Shop {
     /// are not in it: unknown is not no. `ModelLicence.saleProblems`.
     func saleProblems(_ printFileIds: [String]) -> [ModelLicence.SaleProblem] {
         ModelLicence.saleProblems(printFileIds, records: libraryRows, today: Self.today())
+            + Self.remixProblems(printFileIds, files: files, today: Self.today())
+    }
+
+    /// Remixes whose ORIGINAL may not be sold, where the remix itself says
+    /// nothing that settles it.
+    ///
+    /// A remix carries its parent's terms (NC stays NC, and a platform's
+    /// personal-use terms cover a remix of the file). So a model whose
+    /// `remixOf` names a library model — matched by its page address — that
+    /// may not be sold is a problem too, unless the remix is the shop's own
+    /// licence to give (`commercial`, bought) or already a problem by itself.
+    /// An original that is not in the library is not guessed at.
+    nonisolated static func remixProblems(_ ids: [String], files: [LibraryFile],
+                                          today: String) -> [ModelLicence.SaleProblem] {
+        func key(_ s: String?) -> String {
+            var t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            while t.hasSuffix("/") { t.removeLast() }
+            return t
+        }
+        var seen = Set<String>()
+        var out: [ModelLicence.SaleProblem] = []
+        for id in ids where seen.insert(id).inserted {
+            guard let file = files.first(where: { $0.id == id }) else { continue }
+            let parentUrl = key(file.remixOf)
+            guard !parentUrl.isEmpty,
+                  ModelLicence.sellable(file.licence) != false,
+                  (file.licence ?? "") != "commercial",
+                  let parent = files.first(where: { $0.id != id && key($0.sourceUrl) == parentUrl }),
+                  ModelLicence.sellable(parent.licence) == false else { continue }
+            out.append(.init(id: id, name: file.title, licence: parent.licence ?? "",
+                             reason: "remix", until: parent.title))
+        }
+        return out
+    }
+
+    /// Record (or clear, with blank) what the selection is a remix of.
+    func setRemixOfOnSelection(_ typed: String) async {
+        let ids = selectedIds
+        guard !ids.isEmpty else { return }
+        let url = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        if !url.isEmpty, WebSave.https(url) == nil {
+            writeProblem = words.callIt("mac.licence_bad_link"); return
+        }
+        editFiles(ids, named: words.callIt("mac.remix_set")) { record in
+            if url.isEmpty { record.removeValue(forKey: "remixOf") } else { record["remixOf"] = .string(url) }
+        }
+    }
+
+    var remixOfOnSelection: String {
+        let chosen = selectedFiles
+        guard let first = chosen.first?.remixOf else { return "" }
+        return chosen.allSatisfy { ($0.remixOf ?? "") == first } ? first : ""
     }
 
     /// The designers a sale of these models must credit (CC BY licences).
