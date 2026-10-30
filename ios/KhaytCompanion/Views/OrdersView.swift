@@ -4,6 +4,12 @@ import SwiftUI
 /// segmented pair, stage chips beneath, and a list of cards — each swiped
 /// forward to move the job on, and tapped to open its page.
 ///
+/// Quotes are a third segment, between the two. A quote is in neither of the
+/// others — it is not work yet, so the queue leaves it out, and it is not
+/// finished — and a chip on Active would have mixed the queue's rule with the
+/// book's. They are read from the book, so a phone that holds none (paired
+/// over Wi-Fi to an older desktop) says the quotes are on the Mac instead.
+///
 /// History is WINDOWED. The phone holds every unfinished order and the newest
 /// finished ones, so the list ends with a line saying how many of how many it
 /// shows, and where the rest are. Without it the list simply stops, and a shop
@@ -16,9 +22,16 @@ struct OrdersView: View {
 
     enum Segment: String, CaseIterable, Identifiable {
         case active
+        case quotes
         case history
         var id: String { rawValue }
-        var title: String { L10n.tr(self == .active ? "orders.active" : "orders.history") }
+        var title: String {
+            switch self {
+            case .active: return L10n.tr("orders.active")
+            case .quotes: return L10n.tr("orders.quotes")
+            case .history: return L10n.tr("orders.history")
+            }
+        }
     }
 
     /// A chip. `.overdue` is not one of the design's: it appears only when Home's
@@ -33,6 +46,10 @@ struct OrdersView: View {
     @State private var chip: Chip = .all
     @State private var queue: [QueueOrder] = []
     @State private var history: [OrderLogEntry] = []
+    @State private var quotes: [OrderLogEntry] = []
+    /// False when this phone holds no book, so has no quotes to list.
+    @State private var quotesHeld = true
+    @State private var currency: String?
     @State private var facts: [String: OrderFacts] = [:]
     @State private var loaded = false
     @State private var errorMessage: String?
@@ -51,6 +68,9 @@ struct OrdersView: View {
             return ids
         case .history:
             return [.all, .stage(.completed)]
+        case .quotes:
+            // A quote has one stage; a lone "All" chip would filter nothing.
+            return []
         }
     }
 
@@ -103,7 +123,8 @@ struct OrdersView: View {
     /// `.id`: the page keeps the order it was opened with in its own state, so
     /// picking another row in the split view must make a new page.
     private func detailPage(_ order: QueueOrder) -> some View {
-        OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
+        OrderDetailPage(order: order, facts: facts[order.id],
+                        quote: quotes.first { $0.id == order.id && $0.status == order.status }) { await load() }
             .id(order.id)
     }
 
@@ -111,8 +132,8 @@ struct OrdersView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 segmentPicker
-                chipRow
-                list
+                if !chips.isEmpty { chipRow }
+                if segment == .quotes { quoteList } else { list }
                 if segment == .history, let window = api.historyWindow {
                     windowLine(window)
                 }
@@ -146,6 +167,14 @@ struct OrdersView: View {
     }
 
     private func applyExternalFilters() {
+        #if DEBUG
+        // `-KhaytOpen orders-quotes` (or `orders-quote:<id>`): the Quotes list.
+        if UserDefaults.standard.string(forKey: "KhaytOpen")?.hasPrefix("orders-quote") == true,
+           segment != .quotes {
+            segment = .quotes
+            chip = .all
+        }
+        #endif
         if let pending = ordersNav.pendingStatusFilter {
             if pending == .completed {
                 segment = .history
@@ -267,6 +296,38 @@ struct OrdersView: View {
         }
     }
 
+    /// The Quotes segment: the book's open quotes, newest first.
+    @ViewBuilder
+    private var quoteList: some View {
+        if !loaded && errorMessage == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if quotes.isEmpty {
+            VStack(spacing: 5) {
+                Text(L10n.tr(quotesHeld ? "orders.no_quotes" : "orders.quotes_on_mac"))
+                    .font(.khayt(15, .semibold, relativeTo: .headline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(errorMessage ?? L10n.tr(quotesHeld ? "orders.no_quotes.sub" : "orders.quotes_on_mac.sub"))
+                    .font(.khayt(13, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 44).padding(.horizontal, 16)
+        } else {
+            LazyVStack(spacing: 8) {
+                ForEach(quotes) { quote in
+                    QuoteCard(quote: quote, currency: currency) {
+                        openOrder = QueueOrder(entry: quote)
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 11)
+                        .strokeBorder(KhaytDesign.brand, lineWidth: 2)
+                        .opacity(isSplit && openOrder?.id == quote.id ? 1 : 0))
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
     private var emptyTitle: String {
         L10n.tr(segment == .history ? "orders.no_completed" : "orders.queue_clear")
     }
@@ -317,10 +378,33 @@ struct OrdersView: View {
                 let data = try await api.fetchRecentOrders(limit: 200)
                 guard generation == loadGeneration else { return }
                 history = data
+            case .quotes:
+                // From the book only. `/api/queue` leaves quotes out, and the
+                // native Mac serves no `/api/orders` to ask instead.
+                guard api.holdsBook else {
+                    quotes = []
+                    quotesHeld = false
+                    break
+                }
+                let data = try await api.fetchRecentOrders(limit: 200, status: OrderStatus.quote.rawValue)
+                currency = await api.shopCurrency()
+                guard generation == loadGeneration else { return }
+                quotes = QuoteList.select(data)
+                quotesHeld = true
+                #if DEBUG
+                // `-KhaytOpen orders-quote:<id>`: that quote's page, for screenshots.
+                if let id = KhaytCompanionApp.ScreenshotOpen.take("orders-quote:") {
+                    openOrder = quotes.first { $0.id == id }.map(QueueOrder.init(entry:))
+                }
+                #endif
             }
         } catch {
             guard generation == loadGeneration else { return }
-            if segment == .active { queue = [] } else { history = [] }
+            switch segment {
+            case .active: queue = []
+            case .history: history = []
+            case .quotes: quotes = []
+            }
             errorMessage = error.localizedDescription
         }
         facts = await factsTask
