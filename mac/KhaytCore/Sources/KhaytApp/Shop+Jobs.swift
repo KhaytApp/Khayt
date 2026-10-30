@@ -1589,6 +1589,43 @@ extension Shop {
         }
     }
 
+    /// The library model a job printed, when it printed exactly one that is
+    /// still in the library — the model a photo of the job shows.
+    func modelOf(_ job: Order) -> LibraryFile.ID? {
+        let ids = Set(job.parts.compactMap(\.printFileId).filter { !$0.isEmpty })
+        guard ids.count == 1, let id = ids.first, files.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    /// Whether "Use as model photo" is offered on this job at all.
+    func canUseAsModelPhoto(_ job: Order) -> Bool {
+        canWrite && modelOf(job) != nil
+    }
+
+    /// Put one of a job's photos on the library model it printed — the
+    /// model sites' "makes": a photo of the real print beats a render, and
+    /// `thumbnail(for:)` already prefers one. Made at the library photo's size
+    /// from the full file when it is on this Mac, else the inline thumbnail.
+    @discardableResult
+    func useAsModelPhoto(_ snap: Snapshot) async -> ProductPhotoResult {
+        guard permitted("inventory", "edit") else { return .failed }
+        guard source.build != nil, canWrite,
+              let job = orders.first(where: { $0.id == snap.orderId }), let modelId = modelOf(job) else {
+            writeProblem = words.callIt("mac.move_sample"); return .failed
+        }
+        let file = snap.file
+        let made: String? = await PinWork.run { file.flatMap { try? LibraryPhoto.dataURI(of: $0) } }
+        guard let uri = made ?? snap.thumb, uri.hasPrefix("data:image/") else {
+            writeProblem = words.callIt("pe.upload_failed"); return .failed
+        }
+        if files.first(where: { $0.id == modelId })?.userPhoto == uri { return .already }
+        let wrote = editFiles([modelId], named: words.callIt("mac.lp_action")) { record in
+            record["userPhoto"] = .string(uri)
+            record.removeValue(forKey: "userPhotoRemoved")
+        }
+        return wrote ? .added : .failed
+    }
+
     /// The bytes inside a `data:…;base64,` URI.
     static func dataURIBytes(_ uri: String) -> Data? {
         guard uri.hasPrefix("data:"), let comma = uri.firstIndex(of: ",") else { return nil }

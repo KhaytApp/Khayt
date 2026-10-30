@@ -16,6 +16,7 @@ struct LicenceProofSheet: View {
     @State private var link = ""
     @State private var hasEnd = false
     @State private var until = Date()
+    @State private var wholeCatalogue = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -43,6 +44,14 @@ struct LicenceProofSheet: View {
                     }
                 }
             }
+            // A membership covers everything the designer made: one proof,
+            // one renewal date, for each of their models in the library.
+            let others = shop.sameDesigner(as: file)
+            if !others.isEmpty {
+                Toggle(Shop.say(shop.words, "mac.licence_whole_catalogue", others.count,
+                                ["designer": .string(file.source ?? "")]), isOn: $wholeCatalogue)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(shop.words.callIt("mac.licence_proof_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -51,7 +60,8 @@ struct LicenceProofSheet: View {
                 Button(shop.words.callIt("common.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
                     shop.setLicenceProof(file.id, code: code, url: link,
-                                         expires: hasEnd ? Shop.today(until) : "")
+                                         expires: hasEnd ? Shop.today(until) : "",
+                                         alsoFor: wholeCatalogue ? shop.sameDesigner(as: file).map(\.id) : [])
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

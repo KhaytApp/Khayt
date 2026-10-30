@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
+  - Licence proof sheet: "Also for the N other models by {designer}" makes them `commercial` with the same code, link and last day, in one Undo step. A membership is one record to renew, not one per model. Matching is by `source`, ignoring case and accents, never an address, and never the shop's own (`own`) models.
+  - "Remix of…" on the provenance menu records the original's page (`remixOf`, https only). A remix whose original is in the library and may not be sold is flagged at the sale too ("a remix of X, whose licence does not allow selling prints"), unless the remix carries a bought licence. The inspector links the original.
+  - A job's photos offer "Use as model photo" when the job printed one library model: the real print becomes the library picture, as model sites' "makes" do.
+
 - **Licences: model sites' own terms, the designer's credit, and selling a file.**
   - New licence `sdfl` (`lib/model-licence.js` and `ModelLicence.swift`): MakerWorld's and Printables' "Standard Digital File License", which forbids selling a printed copy without the designer's permission. It is not for sale, so "Not for sale" now fires on the files shops download most. `fromFile` reads the platform's wording, so 3MF imports and web saves record it. Named in all nine languages. "MakerWorld Exclusive License" stays unknown, because its terms could not be read.
   - Backfill: the launch read of model files now covers every record with a blank licence, not only those with no designer either. A page saved from the web is translated from its kept wording, with no file opened. It still only fills blanks.
