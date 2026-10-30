@@ -91,7 +91,13 @@ enum SampleShop {
                 order("S-1042", "printing", "Cable clips", "Tabletop Guild", "C-4", placed: -2, due: 2, price: 45, paid: 0, material: "PLA", qty: 40, machine: mk4),
                 order("S-1043", "pending", "Aligner trays", "Northside Dental", "C-2", placed: -1, due: 3, price: 260, paid: 0, material: "Resin", qty: 6),
                 order("S-1044", "pending", "Phone stand", "Maya Chen", "C-3", placed: 0, due: 4, price: 25, paid: 25, material: "PLA", qty: 1),
-                order("S-1045", "pending", "Terrain tiles", "Tabletop Guild", "C-4", placed: -4, due: -1, price: 120, paid: 60, material: "PLA", qty: 24),
+                // Two models the shop may not sell prints of (`library()`), so
+                // the job's page draws "Not licensed for sale" with both lines.
+                order("S-1045", "pending", "Terrain tiles", "Tabletop Guild", "C-4", placed: -4, due: -1, price: 120, paid: 60, material: "PLA", qty: 24,
+                      extra: ["parts": .array([
+                          .object(["qty": .number(16), "printFileId": .string("PF-sample-terrain")]),
+                          .object(["qty": .number(8), "printFileId": .string("PF-sample-tile-base")]),
+                      ])]),
                 order("S-1046", "post", "Enclosure lid", "Acme Robotics", "C-1", placed: -5, due: 0, price: 95, paid: 95, material: "ABS", qty: 1),
                 order("S-1047", "qc", "Bracket v3", "Omar Haddad", "C-5", placed: -6, due: 1, price: 60, paid: 0, material: "PETG", qty: 2),
                 // Two quotes waiting on the customer, so the Quotes list and
@@ -173,6 +179,19 @@ enum SampleShop {
             ctx.cgContext.fillEllipse(in: CGRect(x: 30, y: 30, width: 60, height: 60))
         }
         return "data:image/jpeg;base64," + data.base64EncodedString()
+    }
+
+    /// The library copy (`LibraryCopy.slim`) behind the sample's jobs: one
+    /// model for non-commercial use only and one whose bought licence ran out
+    /// on New Year's Eve 2025, both on "Terrain tiles".
+    static func library() -> [JSONValue] {
+        [
+            .object(["id": .string("PF-sample-terrain"), "rev": .number(1), "name": .string("Dungeon terrain tiles"),
+                     "folder": .string("Tabletop"), "material": .string("PLA"), "licence": .string("cc-by-nc")]),
+            .object(["id": .string("PF-sample-tile-base"), "rev": .number(1), "name": .string("Tile base"),
+                     "folder": .string("Tabletop"), "material": .string("PLA"), "licence": .string("commercial"),
+                     "licenceExpires": .string("2025-12-31")]),
+        ]
     }
 
     static func scope(now: Date = Date()) -> BookScope.Taken {

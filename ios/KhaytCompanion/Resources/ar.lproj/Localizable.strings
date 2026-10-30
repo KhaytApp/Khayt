@@ -867,3 +867,6 @@
 "quote.decline" = "رفض";
 "quote.decline_q" = "رفض عرض السعر هذا؟";
 "quote.decline_body" = "يخرج من عروض الأسعار ويبقى في السجل طلبًا ملغى.";
+"licence.not_for_sale" = "غير مرخّص للبيع";
+"licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
+"licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
