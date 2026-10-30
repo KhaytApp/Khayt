@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: finishing a job on the phone now takes its filament off the spool and records when it was finished, as on the Mac.** Moving a job on the iPhone (the order page, the queue, a notification button, Siri, or approving or declining a quote) now follows the same rules as moving it on the Mac. The filament and packaging come off the shelf in the same save as the move, the finish date and stage history are recorded, and moving a finished job back puts its filament back. A move the shop's rules don't allow, such as starting a print while production is paused, is refused with the reason. The phone still sends no customer emails, webhooks or messages for a move.
+
 - **iPhone: edits made during a sync, on a locked phone, or before unpairing are no longer lost.**
   - An edit saved while a sync was sending (a payment recorded on another screen) was counted as sent with it, never reached the Mac or the cloud, and was undone by the next refresh. It now stays waiting and goes with the next send.
   - A sync that ran while the phone was locked could not read the phone's record of what was last synced, took the phone for a new one, and replaced its book, dropping every edit not yet sent. That record is now readable whenever the book is, and a sync that still cannot read it waits for the next try instead. A phone with no such record keeps its own records and lets a newer copy from the Mac win.

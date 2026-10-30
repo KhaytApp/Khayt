@@ -15,6 +15,9 @@ final class OfflineWriteTests: XCTestCase {
     private var book: CompanionBook!
     private var writer: BookWriter!
     private var reader: BookReader!
+    /// One for the class: starting the rules costs about a fifth of a second.
+    private static let sharedEngine = Result { try KhaytEngine() }
+    private var engine: KhaytEngine!
 
     override func setUpWithError() throws {
         dir = FileManager.default.temporaryDirectory
@@ -23,6 +26,7 @@ final class OfflineWriteTests: XCTestCase {
         book = CompanionBook(directory: dir)
         writer = BookWriter(book: book)
         reader = BookReader(book: book)
+        engine = try Self.sharedEngine.get()
         try book.replace(with: shop(), scope: nil)
     }
 
@@ -65,7 +69,7 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testAdvancingAJobLandsInTheBookAndIsStampedToTravel() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
 
         let order = try record("printLog", "O-1")
         XCTAssertEqual(order["status"], .string("qc"))
@@ -219,42 +223,42 @@ final class OfflineWriteTests: XCTestCase {
         XCTAssertEqual(try record("printLog", "O-1")["machine"], .string("Bambu X1C"))
     }
 
-    func testAQuoteMovedOnIsStampedAcceptedOnTheLocalDay() throws {
+    func testAQuoteMovedOnIsStampedAcceptedOnTheLocalDay() async throws {
         // 22:30 UTC is already the next day in Riyadh: the stamp is the local
         // day, as the Mac's Approve button and `lib/order-status.js` write it.
         let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
-        try writer.setOrderStatus(orderId: "Q-1", to: "pending", now: now)
+        try await writer.setOrderStatus(orderId: "Q-1", to: "pending", engine: engine, now: now)
         XCTAssertEqual(try record("printLog", "Q-1")["quoteAcceptedAt"], .string(BookWriter.localDay(now)))
 
-        try writer.setOrderStatus(orderId: "Q-2", to: "pending", now: now)
+        try await writer.setOrderStatus(orderId: "Q-2", to: "pending", engine: engine, now: now)
         XCTAssertEqual(try record("printLog", "Q-2")["quoteAcceptedAt"], .string("2026-10-01"), "an earlier yes stays")
 
-        try writer.setOrderStatus(orderId: "Q-3", to: "cancelled", now: now)
+        try await writer.setOrderStatus(orderId: "Q-3", to: "cancelled", engine: engine, now: now)
         XCTAssertNil(try record("printLog", "Q-3")["quoteAcceptedAt"], "a cancelled quote was not accepted")
 
-        try writer.setOrderStatus(orderId: "O-1", to: "qc", now: now)
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine, now: now)
         XCTAssertNil(try record("printLog", "O-1")["quoteAcceptedAt"], "only a quote is accepted")
     }
 
-    func testACancelIsStampedOnTheLocalDayAndUnstampedWhenUndone() throws {
+    func testACancelIsStampedOnTheLocalDayAndUnstampedWhenUndone() async throws {
         // The cancel day places the VAT reversal in a period, as
         // `lib/order-status.js` stamps it on the Mac.
         let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
-        try writer.setOrderStatus(orderId: "O-1", to: "cancelled", now: now)
+        try await writer.setOrderStatus(orderId: "O-1", to: "cancelled", engine: engine, now: now)
         XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)))
 
         let later = now.addingTimeInterval(3 * 86_400)
-        try writer.setOrderStatus(orderId: "O-1", to: "cancelled", now: later)
+        try await writer.setOrderStatus(orderId: "O-1", to: "cancelled", engine: engine, now: later)
         XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)),
                        "staying cancelled keeps the first day")
 
-        try writer.setOrderStatus(orderId: "O-1", to: "pending", now: later)
+        try await writer.setOrderStatus(orderId: "O-1", to: "pending", engine: engine, now: later)
         XCTAssertNil(try record("printLog", "O-1")["cancelledAt"], "a job brought back is not cancelled")
     }
 
     func testTwoEditsToOneRecordTravelAsOne() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
-        try writer.setOrderStatus(orderId: "O-1", to: "completed")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
+        try await writer.setOrderStatus(orderId: "O-1", to: "completed", engine: engine)
 
         let produced = try await reader.pendingChanges()
         let outbox = try XCTUnwrap(produced)
@@ -266,7 +270,7 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testEditsAcrossCollectionsAllTravel() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
         try writer.setSpoolRemaining(spoolId: "S-1", grams: 410)
         try writer.setWaitingStatus(id: "W-1", to: "reminded")
 
@@ -276,7 +280,7 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testOnceTheMacHasTakenThemNothingIsPendingAgain() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
         let before = try await reader.pendingChanges()
         XCTAssertEqual(try XCTUnwrap(before).count, 1)
 
@@ -291,9 +295,9 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testAnEditMadeAfterSyncingIsPendingOnItsOwn() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
         try book.markSynced(try book.read())
-        try writer.setOrderStatus(orderId: "O-1", to: "completed")
+        try await writer.setOrderStatus(orderId: "O-1", to: "completed", engine: engine)
 
         let produced = try await reader.pendingChanges()
         let outbox = try XCTUnwrap(produced)
@@ -301,7 +305,7 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testEditsSurviveBeingClosedAndReopened() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)
 
         // A different handle on the same directory — the phone was put down and
         // picked up again. An edit held only in memory would vanish here, and
@@ -314,7 +318,7 @@ final class OfflineWriteTests: XCTestCase {
     /// Edit offline, walk back into range, open a screen: the refresh that
     /// screen triggers used to REPLACE the book and take the edit with it.
     func testAPullFromTheMacKeepsAnEditNotYetSent() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")         // rev 3 → 4, pending
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)         // rev 3 → 4, pending
         var fromMac = shop()
         // The Mac's copy moved on elsewhere too: a spool it corrected at rev 5.
         fromMac["inventory"] = .array([.object(["id": .string("S-1"), "material": .string("PLA"),
@@ -328,13 +332,173 @@ final class OfflineWriteTests: XCTestCase {
     }
 
     func testANewerChangeFromTheMacStillWins() async throws {
-        try writer.setOrderStatus(orderId: "O-1", to: "qc")         // rev 4 here
+        try await writer.setOrderStatus(orderId: "O-1", to: "qc", engine: engine)         // rev 4 here
         var fromMac = shop()
         fromMac["printLog"] = .array([.object(["id": .string("O-1"), "status": .string("completed"),
                                                "project": .string("Bracket"), "rev": .number(9)])])
         try await reader.adopt(fromMac, scope: nil)
         XCTAssertEqual(try record("printLog", "O-1")["status"], .string("completed"),
                        "the higher revision wins, as it does everywhere else")
+    }
+
+    // MARK: - A move runs the shop's status rule
+
+    /// A shop that deducts on completion, with one job in QC that owes 120 g
+    /// of PLA from S-1, and one with no filament data at all.
+    private func finishingShop(paused: Bool = false) -> [String: JSONValue] {
+        var settings: [String: JSONValue] = ["shopName": .string("Ward"), "autoDeduct": .bool(true)]
+        if paused { settings["productionPaused"] = .bool(true) }
+        return [
+            "settings": .object(settings),
+            "printLog": .array([
+                .object(["id": .string("J-1"), "status": .string("qc"), "project": .string("Bracket"),
+                         "parts": .array([.object(["name": .string("Bracket"), "filamentId": .string("S-1"),
+                                                   "printWeight": .number(120), "qty": .number(1)])]),
+                         "rev": .number(2)]),
+                .object(["id": .string("J-2"), "status": .string("qc"), "project": .string("Nothing known"),
+                         "rev": .number(1)]),
+                .object(["id": .string("J-3"), "status": .string("pending"), "project": .string("Next"),
+                         "rev": .number(1)]),
+            ]),
+            "inventory": .array([
+                .object(["id": .string("S-1"), "material": .string("PLA"), "weight": .number(640),
+                         "spoolWeight": .number(1000), "rev": .number(1)]),
+                .object(["id": .string("S-2"), "material": .string("PETG"), "weight": .number(800),
+                         "spoolWeight": .number(1000), "rev": .number(1)]),
+            ]),
+            "consumables": .array([]),
+            "machines": .array([]),
+        ]
+    }
+
+    private func number(_ v: JSONValue?) -> Double? {
+        if case .number(let n)? = v { return n }
+        return nil
+    }
+
+    func testCompletingAJobTakesItsFilamentAndDatesItInOneWrite() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        let before = try book.read()
+        let now = ISO8601DateFormatter().date(from: "2026-10-30T09:15:00Z")!
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine, now: now)
+
+        let order = try record("printLog", "J-1")
+        XCTAssertEqual(order["status"], .string("completed"))
+        XCTAssertEqual(order["completedAt"], .string("2026-10-30T09:15:00.000Z"))
+        guard case .array(let history)? = order["statusHistory"],
+              case .object(let last)? = history.last else { return XCTFail("no statusHistory: \(order)") }
+        XCTAssertEqual(last["status"], .string("completed"))
+
+        let spool = try record("inventory", "S-1")
+        XCTAssertEqual(number(spool["weight"]), 520, "120 g off the spool the part was assigned")
+        guard case .array(let usage)? = spool["usageHistory"], case .object(let line)? = usage.first else {
+            return XCTFail("no usage line: \(spool)")
+        }
+        XCTAssertEqual(line["orderId"], .string("J-1"))
+        XCTAssertEqual(number(line["weightUsed"]), 120)
+        XCTAssertEqual(line["date"], .string(BookWriter.localDay(now)))
+        XCTAssertEqual(number(spool["rev"]), 2, "the spool is stamped so it travels")
+        XCTAssertEqual(number(try record("inventory", "S-2")["weight"]), 800, "another material is not touched")
+        XCTAssertEqual(number(try record("inventory", "S-2")["rev"]), 1, "an untouched spool is not stamped")
+
+        // ONE write: the rollback copy is the book as it was before the move,
+        // not a book with the status changed and the spool not yet.
+        let prev = book.url.appendingPathExtension("prev")
+        let rolledBack = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: prev))
+        XCTAssertEqual(rolledBack, before)
+
+        let produced = try await reader.pendingChanges()
+        XCTAssertEqual(try XCTUnwrap(produced).count, 2, "the job and the spool travel together")
+    }
+
+    /// The Mac's move is `lib/order-status.js` `apply` followed by
+    /// `lib/order-deduction.js` `deductForOrder`. Run those two directly, here,
+    /// on the same book, and the phone's write must hold the same job and the
+    /// same spool — apart from the stamps and the survey token, which the host
+    /// mints.
+    func testTheMoveMatchesTheSharedRuleRunDirectly() async throws {
+        let shop = finishingShop()
+        try book.replace(with: shop, scope: nil)
+        let now = ISO8601DateFormatter().date(from: "2026-10-30T21:30:00Z")!
+        let today = BookWriter.localDay(now)
+
+        func js(_ v: JSONValue) throws -> String { String(decoding: try JSONEncoder().encode(v), as: UTF8.self) }
+        guard case .array(let orders)? = shop["printLog"], case .array(let inventory)? = shop["inventory"],
+              case .object(let settings)? = shop["settings"] else { return XCTFail() }
+        struct Expected: Decodable { let order: [String: JSONValue]; let inventory: [JSONValue] }
+        let orderJS = try js(orders[0]), inventoryJS = try js(.array(inventory)), settingsJS = try js(.object(settings))
+        let nowMs = Int(now.timeIntervalSince1970 * 1000)
+        let expected = try await engine.raw("""
+            (function () {
+              var order = \(orderJS), inventory = \(inventoryJS);
+              KhaytOrderStatus.apply(order, 'completed',
+                { now: \(nowMs), inventory: inventory, consumables: [], returnMaterial: true });
+              KhaytOrderDeduction.deductForOrder(order, { settings: \(settingsJS),
+                inventory: inventory, consumables: [], machines: [], today: '\(today)', actualGrams: order.actualWeight });
+              KhaytOrderDeduction.deductPackaging(order, { consumables: [] });
+              return { order: order, inventory: inventory };
+            })()
+            """, as: Expected.self)
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine, now: now)
+
+        func content(_ o: [String: JSONValue]) -> [String: JSONValue] {
+            var c = o
+            for k in ["rev", "updatedAt", "surveyToken"] { c.removeValue(forKey: k) }
+            return c
+        }
+        XCTAssertEqual(content(try record("printLog", "J-1")), content(expected.order))
+        guard case .object(let expectedSpool)? = expected.inventory.first else { return XCTFail() }
+        XCTAssertEqual(content(try record("inventory", "S-1")), content(expectedSpool))
+    }
+
+    func testMovingAFinishedJobBackGivesItsFilamentBackAsTheMacDoes() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 520)
+
+        try await writer.setOrderStatus(orderId: "J-1", to: "qc", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 640,
+                       "the completion's grams go back, as the Mac's move (returnMaterial) gives them")
+        XCTAssertNil(try record("printLog", "J-1")["completedAt"], "no longer finished")
+
+        // And finishing it again takes them once, not twice.
+        try await writer.setOrderStatus(orderId: "J-1", to: "completed", engine: engine)
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 520)
+    }
+
+    func testAJobWithNoFilamentDataCompletesWithoutTouchingTheShelf() async throws {
+        try book.replace(with: finishingShop(), scope: nil)
+        try await writer.setOrderStatus(orderId: "J-2", to: "completed", engine: engine)
+        let order = try record("printLog", "J-2")
+        XCTAssertEqual(order["status"], .string("completed"))
+        XCTAssertNotNil(order["completedAt"])
+        XCTAssertEqual(number(try record("inventory", "S-1")["weight"]), 640)
+        XCTAssertEqual(number(try record("inventory", "S-1")["rev"]), 1)
+    }
+
+    func testAMoveTheRuleRefusesIsNotMadeAndSaysWhy() async throws {
+        try book.replace(with: finishingShop(paused: true), scope: nil)
+        do {
+            try await writer.setOrderStatus(orderId: "J-3", to: "printing", engine: engine)
+            XCTFail("a paused shop started a print")
+        } catch let refused as BookWriter.MoveRefused {
+            XCTAssertEqual(refused.code, "production_paused")
+            XCTAssertEqual(refused.errorDescription, L10n.tr("move.refused.production_paused"))
+            XCTAssertNotEqual(refused.errorDescription, "move.refused.production_paused", "the sentence exists")
+        }
+        XCTAssertEqual(try record("printLog", "J-3")["status"], .string("pending"))
+        let produced = try await reader.pendingChanges()
+        XCTAssertTrue(try XCTUnwrap(produced).isEmpty, "nothing was written")
+
+        // Shipped is a stamp, not a stage: refused by the rule too.
+        do {
+            try await writer.setOrderStatus(orderId: "J-1", to: "shipped", engine: engine)
+            XCTFail("shipped was written as a status")
+        } catch let refused as BookWriter.MoveRefused {
+            XCTAssertEqual(refused.code, "stage_not_a_status")
+        }
     }
 
     // MARK: - Deleting, waste and expenses
