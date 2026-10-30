@@ -28,7 +28,7 @@ final class OrderBookingTests: XCTestCase {
             ]),
             "machines": .array([.object(["id": .string("M-1"), "name": .string("Bambu X1C")])]),
         ], scope: nil)
-        try book.markSynced()
+        try book.markSynced(try book.read())
     }
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }

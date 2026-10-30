@@ -195,6 +195,9 @@ struct CloudSync {
             return (s, .changes(0))
         }
         let payloads = try reply.deltas.map { try SyncCrypto.store($0.blob, dek: s.dek) }
+        // Checked before the book is touched: changes folded into the book but
+        // not the baseline would read as this phone's own, and be sent back.
+        if case .unreadable = book.readBaseline() { throw CompanionBook.Failure.baselineUnreadable }
         // The library copy takes the same changes, by the same rule.
         if let rows = book.library() {
             let lib = try? await engine.foldDeltas(base: ["printFiles": .array(rows), "tombstones": .array([])],
@@ -230,13 +233,16 @@ struct CloudSync {
         var (s, _) = try await pull(session)
         for attempt in 0..<2 {
             guard let baseline = book.baseline() else { return (s, .nothingToSend) }
-            let outbox = try await BookReader.outbox(engine, local: try book.read(), server: baseline)
+            // Measured from a snapshot, and that snapshot is what `markSynced`
+            // records as sent: an edit made during the send stays pending.
+            let measured = try book.read()
+            let outbox = try await BookReader.outbox(engine, local: measured, server: baseline)
             guard !outbox.isEmpty else { return (s, .nothingToSend) }
             guard let base = s.seenRev else { return (s, .needsTheMac) }
             do {
                 let sent = try await CloudWriter.send(connection(s), token: s.token, payload: outbox,
                                                       dek: s.dek, baseRev: base, fetch: fetch)
-                try book.markSynced()
+                try book.markSynced(measured)
                 s.seenRev = sent.rev
                 return (s, .sent(count: sent.count, rev: sent.rev))
             } catch CloudWriter.Failure.moved where attempt == 0 {

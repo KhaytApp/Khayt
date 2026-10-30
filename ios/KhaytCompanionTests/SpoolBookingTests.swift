@@ -26,7 +26,7 @@ final class SpoolBookingTests: XCTestCase {
                 .object(["id": .string("S-1"), "material": .string("PLA"), "weight": .number(640), "rev": .number(1)]),
             ]),
         ], scope: nil)
-        try book.markSynced()
+        try book.markSynced(try book.read())
     }
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: dir) }
