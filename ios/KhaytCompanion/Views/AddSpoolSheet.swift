@@ -384,7 +384,7 @@ struct SpoolReviewForm: View {
                 }
                 TextField(L10n.tr("spool.form.weight"), text: Binding(
                     get: { String(draft.weightGrams) },
-                    set: { draft.weightGrams = Int($0) ?? draft.weightGrams }
+                    set: { draft.weightGrams = PhoneCalculator.wholeNumber($0) ?? draft.weightGrams }
                 ))
                 .keyboardType(.numberPad)
             }

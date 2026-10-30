@@ -134,6 +134,60 @@ function priorityBadgeHtml(order) {
   if (lv === 'high')   return `<span class="priority-label priority-high">${escapeHtml(t('ord.priority_high'))}</span>`;
   return '';
 }
+/**
+ * What a sale's models' licences say, drawn where the sale is edited: the job
+ * editor and the product editor. The Mac's LicenceWarning/LicenceCredits.
+ *
+ * Two things, both from the shared rule in lib/model-licence.js. A model
+ * recorded as non-commercial, or whose bought licence has run out, gets "Not
+ * licensed for sale". A CC BY model gets the credit line its licence asks for
+ * wherever a print is sold. A model nobody recorded a licence for gets
+ * nothing: unknown is not no, and a warning on every sale is one nobody reads.
+ *
+ * `creditButton` adds "Add the credit to the description" (the product editor
+ * only, since a job has no listing). Its click is the caller's to wire, via
+ * [data-act="licence-credit-add"].
+ */
+function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } = {}) {
+  const ML = typeof KhaytModelLicence !== 'undefined' ? KhaytModelLicence : null;
+  const records = typeof printFiles !== 'undefined' && Array.isArray(printFiles) ? printFiles : [];
+  if (!ML || !records.length) return '';
+  const ids = (printFileIds || []).filter(Boolean);
+  if (!ids.length) return '';
+  const problems = ML.saleProblems(ids, records, localDateStr());
+  const credits = ML.credits(ids, records);
+  let html = '';
+  if (problems.length) {
+    html += `<div class="licence-at-sale warn" role="alert">
+      <strong>⚠ ${escapeHtml(t('lic.not_for_sale'))}</strong>
+      ${problems.map((p) => `<div>${escapeHtml(p.reason === 'expired'
+        ? t('lic.expired_line', { name: p.name, until: p.until })
+        : t('lic.nc_line', { name: p.name }))}</div>`).join('')}
+    </div>`;
+  }
+  if (credits.length) {
+    const missing = credits.filter((c) => !String(written || '').includes(c.line));
+    html += `<div class="licence-at-sale credit">
+      <strong>${escapeHtml(t('lic.credit_title'))}</strong>
+      ${credits.map((c) => `<div class="licence-credit-line" dir="auto">${escapeHtml(c.line)}</div>`).join('')}
+      ${creditButton && missing.length
+        ? `<button type="button" class="btn small" data-act="licence-credit-add">${escapeHtml(t('lic.credit_add'))}</button>`
+        : ''}
+    </div>`;
+  }
+  return html;
+}
+
+/** The text "Add the credit" appends: the lead, then each credit not already written. */
+function licenceCreditText(printFileIds, written) {
+  const ML = typeof KhaytModelLicence !== 'undefined' ? KhaytModelLicence : null;
+  const records = typeof printFiles !== 'undefined' && Array.isArray(printFiles) ? printFiles : [];
+  if (!ML) return '';
+  const missing = ML.credits((printFileIds || []).filter(Boolean), records)
+    .filter((c) => !String(written || '').includes(c.line));
+  return missing.length ? `${t('lic.credit_lead')} ${missing.map((c) => c.line).join('; ')}` : '';
+}
+
 /* Invoicing — renderer/invoicing.js */
 
 function formatDueDateBadge(dueDate) {
@@ -507,6 +561,8 @@ function openActivityLog() {
     prioritySortValue,
     priorityBadgeHtml,
     formatDueDateBadge,
+    licenceAtSaleHtml,
+    licenceCreditText,
     openCsvImportModal,
     safeBizLogo,
     inRange,

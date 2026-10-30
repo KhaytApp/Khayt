@@ -573,6 +573,14 @@
 "alert.print.no_order" = "هذه المهمة ليست في دفتر هذا الهاتف.";
 "alert.print.not_shippable" = "لا تُعلَّم كمشحونة إلا مهمة منتهية لم تُسلَّم بعد.";
 
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "قواعد الورشة لا تسمح بهذا النقل.";
+"move.refused.production_paused" = "الإنتاج متوقف. استأنف الإنتاج قبل بدء أي طباعة.";
+"move.refused.wip_blocked" = "بلغ عمود %1$@ حدّه من المهام (%2$lld). أنهِ واحدة أولًا.";
+"move.refused.assembly_not_assembled" = "نجحت كل القطع في الفحص. حدّد التجميعة كمُجمَّعة قبل إكمال هذه المهمة.";
+"move.refused.assembly_parts" = "هذه المهمة بانتظار القطع: %@";
+"move.refused.stage_not_a_status" = "«مشحون» ليست مرحلة تُنقل إليها المهمة. استخدم «علّمها مشحونة» على مهمة منتهية.";
+
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
 "PUSH_TITLE" = "خيط";
@@ -845,3 +853,28 @@
 "invoice.refused.cancelled" = "الطلب الملغى ليس له فاتورة.";
 "invoice.refused.not_numbered" = "تحتاج هذه الفاتورة إلى رقمها أولًا. افتحها مرة على الماك أو الكمبيوتر ليعطيها رقمًا، ثم تظهر هنا.";
 "invoice.refused.failed" = "تعذّر إنشاء الفاتورة. حاول مرة أخرى، أو افتحها على الماك أو الكمبيوتر.";
+
+"api.request_failed" = "فشل الطلب (HTTP %lld)";
+"order.untitled" = "طلب %@";
+"orders.quotes" = "عروض الأسعار";
+"orders.no_quotes" = "لا عروض أسعار مفتوحة";
+"orders.no_quotes.sub" = "عروض الأسعار التي تُعدّ هنا أو على الماك تنتظر هنا ردّ العميل.";
+"orders.quotes_on_mac" = "عروض الأسعار على الماك";
+"orders.quotes_on_mac.sub" = "لا يحمل هذا الجوال دفتر المتجر، فافتح عروض الأسعار على الماك.";
+"status.cancelled" = "ملغى";
+"stage.short.quote" = "عرض سعر";
+"stage.short.cancelled" = "ملغى";
+"quote.made_on" = "أُعدّ في %@";
+"quote.valid_until" = "صالح حتى %@";
+"quote.expired" = "منتهي";
+"quote.expired_on" = "انتهى في %@";
+"quote.field.made" = "تاريخ الإعداد";
+"quote.field.valid_until" = "صالح حتى";
+"quote.approve" = "موافقة";
+"quote.approve_note" = "وافق عندما يقبل العميل، فيصبح عرض السعر طلبًا قيد الانتظار.";
+"quote.decline" = "رفض";
+"quote.decline_q" = "رفض عرض السعر هذا؟";
+"quote.decline_body" = "يخرج من عروض الأسعار ويبقى في السجل طلبًا ملغى.";
+"licence.not_for_sale" = "غير مرخّص للبيع";
+"licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
+"licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";

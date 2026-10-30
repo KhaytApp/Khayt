@@ -5,28 +5,62 @@ extension QueueOrder {
         DueDateParser.isOverdue(dueDate)
     }
 
-    var formattedDueDate: String? {
-        guard let dueDate, !dueDate.isEmpty else { return nil }
-        // "8 Oct" / "8 أكتوبر" in the app's language (Western digits), the year only when it is
-        // not this one — rather than the book's "2026-10-08", which read as a
-        // stray Western number on an Arabic screen. Unparseable: as written.
-        guard let date = DueDateParser.parse(dueDate) else { return dueDate }
-        let gregorian = Calendar(identifier: .gregorian)   // the book's calendar, as `pulse` says why
-        let thisYear = gregorian.isDate(date, equalTo: Date(), toGranularity: .year)
-        let style = Date.FormatStyle(date: .omitted, time: .omitted, locale: L10n.locale, calendar: gregorian)
-            .day().month(.abbreviated)
-        return thisYear ? date.formatted(style) : date.formatted(style.year())
-    }
+    var formattedDueDate: String? { DueDateParser.display(dueDate) }
 }
 
 extension OrderLogEntry {
     var isOverdue: Bool {
         DueDateParser.isOverdue(dueDate)
     }
+
+    /// Whether a quote's last day has gone by, on the shop's calendar day —
+    /// the same comparison `lib/lan-quote-page.js` makes before it lets a
+    /// customer approve one. A quote with no last day never expires.
+    func isQuoteExpired(today: String = BookReader.today()) -> Bool {
+        guard let last = quoteExpiresAt?.trimmingCharacters(in: .whitespacesAndNewlines), !last.isEmpty else {
+            return false
+        }
+        return String(last.prefix(10)) < today
+    }
+}
+
+/// The Quotes list: which records are on it, and in what order.
+///
+/// Quotes are not in the queue — `/api/queue` and the book's own queue rule
+/// both leave them out, because a quote is not work yet — and History takes
+/// only finished jobs. So a quote made on this phone used to vanish from it
+/// the moment it was saved. This is the list that keeps it.
+enum QuoteList {
+    /// Open quotes only, newest first, as the book's `date` says; the id breaks
+    /// a tie so two quotes made the same day keep one order between reloads.
+    static func select(_ entries: [OrderLogEntry]) -> [OrderLogEntry] {
+        entries.filter { $0.status == OrderStatus.quote.rawValue }
+            .sorted { a, b in
+                let da = a.date ?? "", db = b.date ?? ""
+                return da != db ? da > db : a.id > b.id
+            }
+    }
 }
 
 enum DueDateParser {
     private static let formats = ["yyyy-MM-dd", "yyyy/MM/dd", "dd/MM/yyyy", "MM/dd/yyyy"]
+
+    /// A day from the book, for a person: "8 Oct" / "8 أكتوبر" in the app's
+    /// language (Western digits), the year only when it is not this one —
+    /// rather than the book's "2026-10-08", which read as a stray Western
+    /// number on an Arabic screen. Unparseable: as written.
+    ///
+    /// Gregorian, always: the book's days are Gregorian, and a Saudi phone's
+    /// own calendar is Umm al-Qura (see `pulse`).
+    static func display(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        guard let date = parse(raw) else { return raw }
+        let gregorian = Calendar(identifier: .gregorian)
+        let thisYear = gregorian.isDate(date, equalTo: Date(), toGranularity: .year)
+        let style = Date.FormatStyle(date: .omitted, time: .omitted, locale: L10n.locale, calendar: gregorian)
+            .day().month(.abbreviated)
+        return thisYear ? date.formatted(style) : date.formatted(style.year())
+    }
 
     static func isOverdue(_ raw: String?) -> Bool {
         guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty,
@@ -106,4 +140,28 @@ extension InventorySpool: Hashable {
         a.id == b.id && a.remaining == b.remaining && a.weight == b.weight
     }
     func hash(into h: inout Hasher) { h.combine(id) }
+}
+
+/// The customer's answer to a quote, as the order page writes it.
+///
+/// Both go through `BookWriter.setOrderStatus` (by way of
+/// `KhaytAPIClient.updateOrderStatus`), never a write of their own: that is
+/// where a move out of `quote` is stamped `quoteAcceptedAt` and a move into
+/// `cancelled` is stamped `cancelledAt`, and where the shop's order-status rule
+/// will run when the phone takes it on.
+///
+/// Decline CANCELS, it does not delete. The desktop's Reject removes the quote
+/// (or cancels it, when it already took money); a phone that deleted records
+/// would be one more way to lose them, and a cancelled quote is still the
+/// record of what was offered and turned down.
+enum QuoteAnswer {
+    case approve
+    case decline
+
+    var status: String {
+        switch self {
+        case .approve: return OrderStatus.pending.rawValue
+        case .decline: return "cancelled"
+        }
+    }
 }

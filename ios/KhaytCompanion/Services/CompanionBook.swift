@@ -236,7 +236,14 @@ struct CompanionBook {
     /// Cloud already sends. Beside the book rather than in it, for the reason
     /// `scopeURL` gives: the library is not part of the working set, and a
     /// collection in the store is one the sync would try to send back.
-    var libraryURL: URL { directory.appending(path: "library.json") }
+    ///
+    /// The name carries the shape. `library.json` was cut before the copy kept
+    /// a model's licence, and a change only brings the records it touches, so
+    /// a phone holding it would never learn which models are not for sale.
+    /// Without this file the next pull takes the whole book once
+    /// (`CloudSync`), which writes it with every kept field.
+    var libraryURL: URL { directory.appending(path: "library-2.json") }
+    private var oldLibraryURL: URL { directory.appending(path: "library.json") }
 
     var hasLibrary: Bool { FileManager.default.fileExists(atPath: libraryURL.path) }
 
@@ -247,6 +254,7 @@ struct CompanionBook {
 
     func replaceLibrary(_ rows: [JSONValue]) throws {
         try JSONEncoder().encode(rows).write(to: libraryURL, options: .atomic)
+        try? FileManager.default.removeItem(at: oldLibraryURL)
     }
 
     /// The whole book, as the engine wants it.
@@ -452,6 +460,7 @@ struct CompanionBook {
         // list, same prices. It goes with everything else.
         try? FileManager.default.removeItem(at: baselineURL)
         try? FileManager.default.removeItem(at: libraryURL)
+        try? FileManager.default.removeItem(at: oldLibraryURL)
         try? FileManager.default.removeItem(at: scopeURL)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))

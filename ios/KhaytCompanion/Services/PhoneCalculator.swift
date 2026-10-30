@@ -253,17 +253,51 @@ final class PhoneCalculator {
 
     // MARK: Reading what was typed
 
-    /// A typed figure: Arabic-Indic digits and a comma decimal read too, since
-    /// a phone's keyboard can type either.
-    static func number(_ text: String) -> Double {
-        var said = ""
-        for ch in text.trimmingCharacters(in: .whitespaces) {
-            if let d = ch.wholeNumberValue, ch.isNumber { said.append(String(d)) }
-            else if ch == "," || ch == "٫" { said.append(".") }
-            else { said.append(ch) }
-        }
-        guard let n = Double(said), n.isFinite else { return 0 }
+    /// A typed figure, or 0 when it reads as nothing — see `parse`.
+    nonisolated static func number(_ text: String) -> Double {
+        guard let n = parse(text) else { return 0 }
         return max(0, n)
+    }
+
+    /// The ONE reader for a figure typed on this phone. Western, Arabic-Indic
+    /// (٠-٩) and Extended Arabic-Indic (۰-۹) digits all read, since the Arabic
+    /// number keypad types the first two and a paste can bring the third.
+    /// "." and "٫" are the decimal point. "," and "٬" are a THOUSANDS mark
+    /// when exactly three digits follow ("1,500" is 1500), and a decimal comma
+    /// otherwise ("75,50" is 75.5, the European keypad). Nil for empty or
+    /// anything else, so a caller can tell "nothing typed" from "zero".
+    nonisolated static func parse(_ text: String) -> Double? {
+        let chars = Array(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        var out = ""
+        var decimalSeen = false
+        for (i, ch) in chars.enumerated() {
+            if let d = ch.wholeNumberValue, ch.isNumber, ch.isASCII || "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹".contains(ch) {
+                out.append(String(d))
+            } else if ch == "." || ch == "٫" {
+                if decimalSeen { return nil }
+                decimalSeen = true
+                out.append(".")
+            } else if ch == "," || ch == "٬" {
+                var run = 0
+                var j = i + 1
+                while j < chars.count, let d = chars[j].wholeNumberValue, chars[j].isNumber, d >= 0 { run += 1; j += 1 }
+                let intPart = out.split(separator: ".", omittingEmptySubsequences: false).first.map(String.init) ?? ""
+                if run == 3, !decimalSeen, !intPart.isEmpty, intPart != "0" { continue }
+                if decimalSeen { return nil }
+                decimalSeen = true
+                out.append(".")
+            } else {
+                return nil
+            }
+        }
+        guard let n = Double(out), n.isFinite else { return nil }
+        return n
+    }
+
+    /// A whole number typed the same way (grams, a quantity, a temperature).
+    nonisolated static func wholeNumber(_ text: String) -> Int? {
+        guard let n = parse(text), n >= 0, n == n.rounded(), n < 1e9 else { return nil }
+        return Int(n)
     }
 
     var gramsValue: Double { lines.reduce(0) { $0 + Self.number($1.grams) } }
