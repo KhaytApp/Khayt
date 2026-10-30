@@ -4110,6 +4110,8 @@ final class Words {
         "mac.qfe_auto_import": ["en": "Import requests as quotes automatically", "ar": "استيراد الطلبات كعروض أسعار تلقائيًا"],
         "mac.qfe_auto_import_hint": ["en": "On this Mac. Each request becomes an unnumbered quote with its file, and nothing is sent to the customer until you send the quote.",
                                      "ar": "على هذا الماك. يصبح كل طلب عرض سعر بلا رقم مع ملفه، ولا يُرسل شيء إلى العميل حتى ترسل عرض السعر بنفسك."],
+        "mac.qfe_link_licence": ["en": "A model from {site}: check its licence allows selling prints before you quote. Many there are for personal use only.",
+                                 "ar": "موديل من {site}: تحقّق أن ترخيصه يسمح ببيع المطبوعات قبل التسعير، فكثير منها للاستخدام الشخصي فقط."],
         "mac.qfe_err_missing_early": ["en": "Khayt Cloud has no file for this request, though it should still be kept. Nothing was imported; try again later or tell Khayt support.",
                                       "ar": "لا يوجد ملف لهذا الطلب في سحابة خيط مع أنه يُفترض أن يكون محفوظًا. لم يُستورد شيء؛ أعد المحاولة لاحقًا أو راسل دعم خيط."],
         "mac.qfe_shown_note": ["en": "The quote form showed the customer {price} for a quantity of {qty} (an estimate, not binding).",

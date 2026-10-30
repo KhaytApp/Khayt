@@ -314,7 +314,7 @@ extension Shop {
                                 whoHasIt: @escaping @Sendable () -> String?,
                                 download: () async throws -> CloudIntake.FileAnswer,
                                 drain: () async throws -> Void) async -> QuoteFormResult {
-        // lock: callers — recordQuoteFormOrder
+        // lock: callers — importQuoteForm
         var result = QuoteFormResult()
 
         // 1. DOWNLOAD.
@@ -482,6 +482,7 @@ extension Shop {
     /// `missingEarly` refusal: take the request with a note instead of the file.
     func recordQuoteFormOrder(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
                               fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async {
+        guard permitted("orders", "create") else { return }
         let outcome = await importQuoteForm(order, meta: meta, fetch: fetch, withoutFile: withoutFile)
         guard case .success(let result) = outcome else {
             if case .failure(let problem) = outcome, !problem.said.isEmpty { onlineProblem = problem.said }
@@ -527,8 +528,9 @@ extension Shop {
     /// shared by the button and the automatic pass.
     func importQuoteForm(_ order: OnlineOrder, meta: QuoteFormFile.Meta,
                          fetch: CloudIntake.Fetch?, withoutFile: Bool = false) async -> Result<QuoteFormResult, QuoteFormProblem> {
-        // lock: callers — the button checks `permitted`; the automatic pass is
-        // the owner's own setting, run only on the Mac holding the book.
+        // The button checks `permitted`; the automatic pass is the owner's own
+        // setting, run only on the Mac holding the book.
+        // lock: callers — recordQuoteFormOrder, recordPaidWebStoreOrders
         guard case .store(let build) = source, let engine else { return .failure(.other("")) }
         let connection: CloudReader.Connection
         let token: String

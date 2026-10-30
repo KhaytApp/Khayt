@@ -1,5 +1,6 @@
 import SwiftUI
 import KhaytCore
+import KhaytWebSave
 
 /// The orders a storefront has already sent, and what the shelf can answer.
 ///
@@ -338,6 +339,16 @@ private struct QuoteRequestDetails: View {
                     Label { Text(verbatim: link).lineLimit(1).truncationMode(.middle) } icon: { Image(systemName: "link") }
                 }
                 .font(.caption)
+                // A model site's page: whoever downloads it is bound by its
+                // licence, and a print of a NonCommercial or personal-use
+                // model may not be sold — the quote is that sale.
+                let site = WebSave.Site.of(host: url.host())
+                if site != .web {
+                    Label(shop.words.callIt("mac.qfe_link_licence", ["site": .string(site.displayName)]),
+                          systemImage: "exclamationmark.shield")
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if let shown = QuoteFormFile.Shown(order.item.payload) {
                 Text(shown.note(shop.words)).font(.caption).foregroundStyle(.secondary)
