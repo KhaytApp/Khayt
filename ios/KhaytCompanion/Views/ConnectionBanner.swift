@@ -33,7 +33,7 @@ struct ConnectionBanner: View {
                         .foregroundStyle(KhaytDesign.textDim)
                 }
                 Spacer(minLength: 0)
-                Button(L10n.tr("sample.pair")) { settings.unpair() }
+                Button(L10n.tr("sample.pair")) { api.unpair() }
                     .font(.khayt(12, .semibold, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.brand)
                     .padding(.horizontal, 11)

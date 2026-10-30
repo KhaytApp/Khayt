@@ -365,14 +365,17 @@ final class KhaytAPIClient: ObservableObject {
     /// ── THE BASELINE MOVES ONLY ON SUCCESS ───────────────────────────────
     ///
     /// After the Mac has taken the changes, this phone and that Mac agree, so
-    /// the baseline becomes the book. Doing it before the reply, or after a
-    /// failure, would tell the next outbox that edits already went which never
-    /// did — and they would never be sent again. A write that is silently
-    /// dropped is worse than one that visibly fails.
+    /// the baseline becomes the book THE OUTBOX WAS MEASURED FROM — not the
+    /// book as it is after the reply, which may hold an edit made during the
+    /// send. Doing it before the reply, or after a failure, would tell the
+    /// next outbox that edits already went which never did — and they would
+    /// never be sent again. A write that is silently dropped is worse than one
+    /// that visibly fails.
     @discardableResult
     func sendPendingChanges() async throws -> Int? {
         guard let book, let reader else { return nil }
-        guard let outbox = try await reader.pendingChanges(), !outbox.isEmpty else { return nil }
+        guard let pending = try await reader.pendingSnapshot(), !pending.outbox.isEmpty else { return nil }
+        let (outbox, measured) = pending
 
         let body = try JSONEncoder().encode(JSONValue.object(outbox.wire))
         let (data, response) = try await request(path: "/api/store/deltas", method: "POST",
@@ -383,9 +386,9 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
-        // The Mac has it. Only now do the two agree.
-        try book.markSynced()
-        pendingCount = 0
+        // The Mac has it. Only now do the two agree — up to what was sent.
+        try book.markSynced(measured)
+        await refreshPendingCount()
         return outbox.count
     }
 
@@ -550,6 +553,28 @@ final class KhaytAPIClient: ObservableObject {
         cloudProblem = nil
         cloudNeedsSignIn = false
         if lastSync?.route == .cloud { lastSync = nil }
+    }
+
+    /// Unpair, from Settings or the sample shop's banner: everything
+    /// `ConnectionSettings.unpair` deletes, AND the cloud sign-in this client
+    /// holds in memory.
+    ///
+    /// `settings.unpair()` alone forgot the stored sign-in but left `cloud`
+    /// set, so the phone kept syncing, kept its push registration, and kept
+    /// the shop's prints on its Lock Screen until the app was killed. Now it
+    /// goes through the same sign-out a person can choose on its own. The
+    /// Live Activity tokens are withdrawn with the session taken beforehand —
+    /// the one that registered them — so the phone is unpaired at once and
+    /// the network catches up behind it.
+    func unpair() {
+        let session = cloud
+        let push = liveActivityPush
+        signOutOfCloud()
+        settings.unpair()
+        pendingCount = 0
+        historyWindow = nil
+        lastSync = nil
+        Task { await push?.forgetShop(session: session) }
     }
 
     /// How many edits are waiting to reach the Mac, for a screen that says so.

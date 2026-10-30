@@ -5,6 +5,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **iPhone: Arabic digits, Siri on a locked phone, honest connection state.** Quote, waste, expense, spool-adjust and temperature fields now read Arabic-Indic and Extended Arabic-Indic digits and the Arabic decimal mark through one parser (`PhoneCalculator.parse`), and a pasted "1,500" is 1500, not 1.5. Advancing a job and asking about filament by Siri need the phone unlocked. A refused order-status change now shows its error instead of looking saved. "Connected" and the widget's time mean the Mac answered or the cloud synced, not that the stored book was read; the fallback "Request failed" and "Request n" texts are translated.
+- **iPhone: edits made during a sync, on a locked phone, or before unpairing are no longer lost.**
+  - An edit saved while a sync was sending (a payment recorded on another screen) was counted as sent with it, never reached the Mac or the cloud, and was undone by the next refresh. It now stays waiting and goes with the next send.
+  - A sync that ran while the phone was locked could not read the phone's record of what was last synced, took the phone for a new one, and replaced its book, dropping every edit not yet sent. That record is now readable whenever the book is, and a sync that still cannot read it waits for the next try instead. A phone with no such record keeps its own records and lets a newer copy from the Mac win.
+  - Saving a job or customer without changing anything no longer marks it as edited, so it cannot outrank a real edit made on the Mac.
+  - Unpair now signs out of Khayt Cloud straight away: the phone stops syncing, stops receiving the shop's alerts, and ends the shop's Live Activities, instead of carrying on until the app was closed.
+
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.
