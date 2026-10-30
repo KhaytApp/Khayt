@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: Arabic digits, Siri on a locked phone, honest connection state.** Quote, waste, expense, spool-adjust and temperature fields now read Arabic-Indic and Extended Arabic-Indic digits and the Arabic decimal mark through one parser (`PhoneCalculator.parse`), and a pasted "1,500" is 1500, not 1.5. Advancing a job and asking about filament by Siri need the phone unlocked. A refused order-status change now shows its error instead of looking saved. "Connected" and the widget's time mean the Mac answered or the cloud synced, not that the stored book was read; the fallback "Request failed" and "Request n" texts are translated.
 - **Mac 4.0.0-beta.9: quote-form import hardening and the cloud's file guard.**
   - Every intake DELETE sends `X-Intake-File-Capable: 1` (khayt-cloud #146), the claim that this app downloads and checks a request's file before it drains it. Only `CloudIntake.drain` makes it, never the shared `CloudReader.request` the iPhone also uses. A 409 `file-not-downloaded` reads "Update Khayt to import this request with its file."
   - A visitor's file is filed only when it is a mesh or CAD model (STL, 3MF, OBJ, STEP, IGES, AMF, PLY). A G-code or other machine file, or an empty one, is imported without the file, with a note on the job, so nothing a stranger sent can reach a printer from the job.

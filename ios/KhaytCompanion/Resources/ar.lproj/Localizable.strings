@@ -845,3 +845,6 @@
 "invoice.refused.cancelled" = "الطلب الملغى ليس له فاتورة.";
 "invoice.refused.not_numbered" = "تحتاج هذه الفاتورة إلى رقمها أولًا. افتحها مرة على الماك أو الكمبيوتر ليعطيها رقمًا، ثم تظهر هنا.";
 "invoice.refused.failed" = "تعذّر إنشاء الفاتورة. حاول مرة أخرى، أو افتحها على الماك أو الكمبيوتر.";
+
+"api.request_failed" = "فشل الطلب (HTTP %lld)";
+"order.untitled" = "طلب %@";
