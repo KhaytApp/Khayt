@@ -25,3 +25,36 @@ struct LicenceWarning: View {
         .background(Khayt.attention.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 }
+
+/// The designers a product must credit (CC BY), and the button that puts the
+/// credit into the listing's description — once; a line already there is not
+/// added twice.
+struct LicenceCredits: View {
+    let shop: Shop
+    let credits: [ModelLicence.Credit]
+    let written: String
+    let add: (String) -> Void
+
+    private var missing: [ModelLicence.Credit] { credits.filter { !written.contains($0.line) } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(shop.words.callIt("mac.licence_credit_title"), systemImage: "person.text.rectangle")
+                .font(.callout.weight(.semibold))
+            ForEach(credits, id: \.id) { c in
+                Text(verbatim: c.line).font(.caption).foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !missing.isEmpty {
+                Button(shop.words.callIt("mac.licence_credit_add")) {
+                    add(shop.words.callIt("mac.licence_credit_lead") + "\n" + missing.map(\.line).joined(separator: "\n"))
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Role.line2.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+    }
+}

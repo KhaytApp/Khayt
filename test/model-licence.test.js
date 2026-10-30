@@ -129,3 +129,28 @@ test('the models behind a sale that may not be sold, and only those', () => {
   assert.equal(out[1].name, 'dragon.3mf');
   assert.equal(out[1].until, '2026-09-01');
 });
+
+// ── crediting the designer (CC BY) ────────────────────────────────────────
+// The line a listing carries, in step with the Mac's ModelLicence.credits.
+
+test('a CC BY model behind a sale is credited: title, designer, licence, page', () => {
+  const lib = [
+    { id: 'A', name: 'dragon.3mf', title: 'Dragon', licence: 'cc-by-sa', source: 'Ana', sourceUrl: 'https://printables.com/model/1' },
+    { id: 'B', name: 'Vase', licence: 'cc-by', source: 'https://makerworld.com/models/2' },
+    { id: 'C', name: 'Mine', licence: 'own' },
+    { id: 'D', name: 'Nobody said' },
+    { id: 'E', name: 'Owl', licence: 'cc-by-nc', source: 'Ben' },
+  ];
+  const out = L.credits(['A', 'B', 'C', 'D', 'E', 'A', 'missing'], lib);
+  assert.deepEqual(out.map((c) => c.line), [
+    '“Dragon” — Ana (CC BY-SA), https://printables.com/model/1',
+    '“Vase” (CC BY), https://makerworld.com/models/2',
+    '“Owl” — Ben (CC BY-NC)',
+  ]);
+  assert.equal(out[1].designer, '', 'a source that is an address is the page, not the designer');
+});
+
+test('no ids, no library, no credit', () => {
+  assert.deepEqual(L.credits(null, null), []);
+  assert.deepEqual(L.credits(['A'], []), []);
+});

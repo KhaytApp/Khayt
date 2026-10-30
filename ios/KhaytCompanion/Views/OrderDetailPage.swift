@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytCore
 
 /// One job, as `design/ios-v2/` draws it: a PAGE pushed onto the stack — not a
 /// sheet — with the job and who it is for, the few facts a shop floor needs,
@@ -6,12 +7,18 @@ import SwiftUI
 ///
 /// There is no on-hold chip. The design has five stages and so does this page;
 /// holding a job is the Mac's.
+///
+/// A QUOTE has no stages to pick yet. Its page asks for the customer's answer
+/// instead — Approve, or Decline behind a confirmation — and shows the price
+/// and how long it stands, when the Quotes list handed the record over.
 struct OrderDetailPage: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var printers: LivePrinters
 
     @State private var order: QueueOrder
     let facts: OrderFacts?
+    /// The quote's own record, from the Quotes list: its price and last day.
+    let quote: OrderLogEntry?
     /// Called after a write, so the screen underneath is current when the page
     /// is popped.
     let onChanged: () async -> Void
@@ -26,22 +33,34 @@ struct OrderDetailPage: View {
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
+    @State private var saleProblems: [ModelLicence.SaleProblem] = []
 
-    init(order: QueueOrder, facts: OrderFacts?, onChanged: @escaping () async -> Void) {
+    init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
+         onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
         self.facts = facts
+        self.quote = quote
         self.onChanged = onChanged
     }
 
     var body: some View {
         ScrollView {
+            // Asked where the sale is, as on the Mac: a model that may not be
+            // sold, printed and handed over, has a designer on the other end.
+            if !saleProblems.isEmpty {
+                LicenceNote(problems: saleProblems)
+                    .padding(.horizontal, 16).padding(.top, 12)
+            }
             OrderDetailContent(order: order, facts: facts,
                                live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
                                isUpdating: isUpdating, machines: machines,
                                errorMessage: errorMessage,
                                onAdvance: { Task { await advance() } },
                                onSetStatus: { st in Task { await setStatus(st) } },
-                               onAssignMachine: { id in Task { await assignMachine(id) } })
+                               onAssignMachine: { id in Task { await assignMachine(id) } },
+                               quote: order.status == OrderStatus.quote.rawValue ? quote : nil,
+                               currency: currency,
+                               onAnswer: { answer in Task { await answerQuote(answer) } })
             if let payment {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
@@ -98,6 +117,7 @@ struct OrderDetailPage: View {
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
+            saleProblems = api.saleProblems(orderId: order.id)
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
@@ -122,8 +142,16 @@ struct OrderDetailPage: View {
         await setStatus(next.rawValue)
     }
 
+    /// The customer's answer. Only from a quote: a second tap after the first
+    /// has landed finds a pending or cancelled job and writes nothing.
+    private func answerQuote(_ answer: QuoteAnswer) async {
+        guard order.status == OrderStatus.quote.rawValue else { return }
+        await setStatus(answer.status)
+    }
+
     private func setStatus(_ status: String) async {
-        guard status != order.status else { return }
+        // One write at a time: a double tap must not send two moves.
+        guard status != order.status, !isUpdating else { return }
         isUpdating = true
         defer { isUpdating = false }
         do {
@@ -202,10 +230,23 @@ struct OrderDetailContent: View {
     let onAdvance: () -> Void
     let onSetStatus: (String) -> Void
     var onAssignMachine: ((String?) -> Void)? = nil
+    /// Set only while the job is a quote, by a page that has its record.
+    var quote: OrderLogEntry? = nil
+    var currency: String? = nil
+    /// Approve or Decline. Nil draws neither — a rendering of the layout alone.
+    var onAnswer: ((QuoteAnswer) -> Void)? = nil
+
+    @State private var confirmingDecline = false
 
     private static let stages: [OrderStatus] = [.pending, .printing, .post, .qc, .completed]
 
     private var current: OrderStatus? { OrderStatus(rawValue: order.status) }
+    private var isQuote: Bool { current == .quote }
+    /// The stage's name. `cancelled` is not an `OrderStatus` — the phone only
+    /// ever writes it as a quote's Decline — but it is a stage a page can show.
+    private var stageName: String {
+        current?.localizedLabel ?? (order.status == "cancelled" ? L10n.tr("status.cancelled") : order.status)
+    }
     private var next: OrderStatus? { current?.nextInQueue }
     private var tone: Color { KhaytDesign.statusColor(for: order.status) }
 
@@ -213,13 +254,17 @@ struct OrderDetailContent: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             fields
-            picker
+            if !isQuote { picker }
             if let errorMessage {
                 Text(errorMessage)
                     .font(.khayt(12.5, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.late)
             }
-            action.padding(.top, 6)
+            if isQuote {
+                if let onAnswer { answers(onAnswer).padding(.top, 6) }
+            } else {
+                action.padding(.top, 6)
+            }
         }
         .padding(16)
     }
@@ -229,7 +274,7 @@ struct OrderDetailContent: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(current?.localizedLabel ?? order.status)
+                Text(stageName)
                     .font(.khayt(12, .semibold, relativeTo: .caption))
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .foregroundStyle(tone)
@@ -305,6 +350,26 @@ struct OrderDetailContent: View {
     /// would say the job has no filament, which is not what the phone knows.
     private var fields: some View {
         VStack(spacing: 0) {
+            if let quote {
+                if let price = quote.price {
+                    row(L10n.tr("order.new.price")) {
+                        Text(Money.text(price, currency)).foregroundStyle(KhaytDesign.ink).monospacedDigit()
+                    }
+                    Divider().overlay(KhaytDesign.hairline)
+                }
+                if let made = DueDateParser.display(quote.date) {
+                    row(L10n.tr("quote.field.made")) { Text(made).foregroundStyle(KhaytDesign.ink) }
+                    Divider().overlay(KhaytDesign.hairline)
+                }
+                if let last = DueDateParser.display(quote.quoteExpiresAt) {
+                    let expired = quote.isQuoteExpired()
+                    row(L10n.tr("quote.field.valid_until")) {
+                        Text(expired ? L10n.format("quote.expired_on", last) : last)
+                            .foregroundStyle(expired ? KhaytDesign.late : KhaytDesign.ink)
+                    }
+                    Divider().overlay(KhaytDesign.hairline)
+                }
+            }
             if let due = order.formattedDueDate {
                 row(L10n.tr("order.detail.due_date")) {
                     Text(due).foregroundStyle(order.isOverdue ? KhaytDesign.late : KhaytDesign.ink)
@@ -407,6 +472,53 @@ struct OrderDetailContent: View {
             }
             .buttonStyle(.plain)
             .disabled(isUpdating)
+        }
+    }
+}
+
+extension OrderDetailContent {
+    /// A quote's two answers. Approve is the page's one brand button, as
+    /// "Move to" is on a job; Decline is quieter and asks first, because a
+    /// declined quote leaves the list and its customer is not asked again.
+    fileprivate func answers(_ onAnswer: @escaping (QuoteAnswer) -> Void) -> some View {
+        VStack(spacing: 10) {
+            Button { onAnswer(.approve) } label: {
+                HStack(spacing: 9) {
+                    if isUpdating {
+                        ProgressView().tint(KhaytDesign.onBrand)
+                    } else {
+                        Text(L10n.tr("quote.approve"))
+                        Image(systemName: "checkmark")
+                    }
+                }
+                .font(.khayt(17, .semibold, relativeTo: .headline))
+                .foregroundStyle(KhaytDesign.onBrand)
+                .frame(maxWidth: .infinity, minHeight: 62)
+                .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(isUpdating)
+            Button { confirmingDecline = true } label: {
+                Text(L10n.tr("quote.decline"))
+                    .font(.khayt(15.5, .semibold, relativeTo: .body))
+                    .foregroundStyle(KhaytDesign.late)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(isUpdating)
+            .confirmationDialog(L10n.tr("quote.decline_q"), isPresented: $confirmingDecline, titleVisibility: .visible) {
+                Button(L10n.tr("quote.decline"), role: .destructive) { onAnswer(.decline) }
+                Button(L10n.tr("common.cancel"), role: .cancel) {}
+            } message: {
+                Text(L10n.tr("quote.decline_body"))
+            }
+            Text(L10n.tr("quote.approve_note"))
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

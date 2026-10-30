@@ -21,6 +21,7 @@ struct QuoteFormEmbedSection: View {
     @State private var busy = false
     @State private var problem: String?
     @State private var copied: String?
+    @AppStorage(Shop.quoteAutoImportKey) private var autoImport = false
     private let preloaded: Bool
     /// The rows in a plain stack, for a photograph: `ImageRenderer` cannot
     /// draw a `Form`.
@@ -106,6 +107,12 @@ struct QuoteFormEmbedSection: View {
                     .controlSize(.small)
             }
         }
+
+        // IN BY THEMSELVES, as quotes — off unless the shop asks. Per Mac:
+        // only the Mac holding the book runs the pass that imports them.
+        Toggle(words.callIt("mac.qfe_auto_import"), isOn: $autoImport)
+        Text(words.callIt("mac.qfe_auto_import_hint")).font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
         // ── WHAT IT CAN AND CANNOT DO RIGHT NOW ─────────────────────────
         if state.priceAvailable == false {

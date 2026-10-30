@@ -206,7 +206,7 @@ struct PairingView: View {
                 .keyboardType(.numberPad)
                 .modifier(BigField())
                 .onAppear { portText = String(settings.port) }
-                .onChange(of: portText) { _, v in if let p = Int(v), (1...65535).contains(p) { settings.port = p } }
+                .onChange(of: portText) { _, v in if let p = PhoneCalculator.wholeNumber(v), (1...65535).contains(p) { settings.port = p } }
             Spacer(minLength: 18)
             primary(L10n.tr("pair.continue"), disabled: !settings.isConfigured) {
                 if settings.shopLabel.trimmingCharacters(in: .whitespaces).isEmpty {

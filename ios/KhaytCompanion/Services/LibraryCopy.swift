@@ -24,11 +24,12 @@ import KhaytCore
 /// several colours is costed on one spool, as the desktop does.
 enum LibraryCopy {
     /// The fields a model keeps on the phone. `rev` and `updatedAt` so cloud
-    /// changes fold in by the sync's own rule.
+    /// changes fold in by the sync's own rule; `licence` and `licenceExpires`
+    /// for "Not licensed for sale" on a job (`ModelLicence.saleProblems`).
     static let kept: Set<String> = [
         "id", "rev", "updatedAt", "name", "originalName", "folder", "tags", "category", "material",
         "favorite", "timesPrinted", "lastPrinted", "parsed", "colors", "setups", "consumables",
-        "geometryKey", "testedNotes", "sourceFile", "figuresStaleFor",
+        "geometryKey", "testedNotes", "sourceFile", "figuresStaleFor", "licence", "licenceExpires",
     ]
 
     /// Every model the Mac's library shows, slimmed. A model put aside on the
@@ -39,6 +40,23 @@ enum LibraryCopy {
     static func slimAll(_ printFiles: JSONValue?) -> [JSONValue] {
         guard case .array(let rows)? = printFiles else { return [] }
         return rows.filter { !isArchived($0) }.compactMap(slim)
+    }
+
+    /// The models behind a job that may not be sold today: non-commercial, or
+    /// a bought licence past its last day — the Mac's own check
+    /// (`ModelLicence.saleProblems`), on the job's parts and this copy. Empty
+    /// without a book or a copy: unknown is not no. A phone that reaches the
+    /// Mac only on Wi-Fi holds no copy, so says nothing here.
+    static func saleProblems(orderId: String, book: CompanionBook, now: Date) -> [ModelLicence.SaleProblem] {
+        guard book.exists, let library = book.library(),
+              case .array(let rows)? = try? book.read()["printLog"],
+              case .object(let order)? = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }), case .array(let parts)? = order["parts"] else { return [] }
+        var ids: [String] = []
+        for case .object(let p) in parts { if case .string(let id)? = p["printFileId"] { ids.append(id) } }
+        return ModelLicence.saleProblems(ids, records: library, today: BookWriter.localDay(now))
     }
 
     static func isArchived(_ row: JSONValue) -> Bool {

@@ -36,18 +36,12 @@ struct SpoolDraft: Sendable {
     /// booked in — label, tag, camera — and it never asked.
     ///
     /// Whatever the keypad typed is accepted: a European one sends `75,50`,
-    /// an Arabic one `٧٥٫٥٠`. `Double` reads neither, and reading a price as
-    /// nothing is exactly how it went missing before.
+    /// an Arabic one `٧٥٫٥٠`, a paste `1,500`. `Double` reads none of them, and
+    /// reading a price as nothing is exactly how it went missing before.
     var costValue: Double? { Self.price(cost) }
 
     static func price(_ typed: String) -> Double? {
-        var t = ""
-        for ch in typed.trimmingCharacters(in: .whitespaces) {
-            if let d = ch.wholeNumberValue, ch.isNumber { t.append(String(d)) }
-            else if ch == "," || ch == "٫" || ch == "." { t.append(".") }
-            else { return nil }
-        }
-        guard let v = Double(t), v.isFinite, v > 0 else { return nil }
+        guard let v = PhoneCalculator.parse(typed), v > 0 else { return nil }
         return v
     }
 

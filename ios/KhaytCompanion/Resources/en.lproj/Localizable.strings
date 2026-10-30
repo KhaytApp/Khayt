@@ -573,6 +573,14 @@
 "alert.print.no_order" = "That job is not in this phone’s book.";
 "alert.print.not_shippable" = "Only a finished job that has not been delivered can be marked shipped.";
 
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "The shop’s rules don’t allow that move.";
+"move.refused.production_paused" = "Production is paused. Resume production before starting a print.";
+"move.refused.wip_blocked" = "%1$@ already holds its limit of %2$lld jobs. Finish one first.";
+"move.refused.assembly_not_assembled" = "Every part passed QC. Mark the assembly as assembled before completing this job.";
+"move.refused.assembly_parts" = "This job is waiting on parts: %@";
+"move.refused.stage_not_a_status" = "Shipped isn’t a stage you can move a job to. Use Mark shipped on a finished job.";
+
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
 "PUSH_TITLE" = "Khayt";
@@ -845,3 +853,28 @@
 "invoice.refused.cancelled" = "A cancelled job has no invoice.";
 "invoice.refused.not_numbered" = "This invoice needs its number first. Open it once on the Mac or PC, which numbers it, then it shows here.";
 "invoice.refused.failed" = "The invoice couldn't be made. Try again, or open it on the Mac or PC.";
+
+"api.request_failed" = "Request failed (HTTP %lld)";
+"order.untitled" = "Request %@";
+"orders.quotes" = "Quotes";
+"orders.no_quotes" = "No open quotes";
+"orders.no_quotes.sub" = "Quotes made here or on the Mac wait here for the customer's answer.";
+"orders.quotes_on_mac" = "Quotes are on the Mac";
+"orders.quotes_on_mac.sub" = "This phone doesn't hold the shop's book, so open quotes on the Mac.";
+"status.cancelled" = "Cancelled";
+"stage.short.quote" = "Quote";
+"stage.short.cancelled" = "Cancelled";
+"quote.made_on" = "Made %@";
+"quote.valid_until" = "Valid until %@";
+"quote.expired" = "EXPIRED";
+"quote.expired_on" = "Expired %@";
+"quote.field.made" = "Made";
+"quote.field.valid_until" = "Valid until";
+"quote.approve" = "Approve";
+"quote.approve_note" = "Approve when the customer says yes: the quote becomes a job in Pending.";
+"quote.decline" = "Decline";
+"quote.decline_q" = "Decline this quote?";
+"quote.decline_body" = "It leaves Quotes and stays in History as cancelled.";
+"licence.not_for_sale" = "Not licensed for sale";
+"licence.nc_line" = "%1$@: its licence does not allow selling prints.";
+"licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
