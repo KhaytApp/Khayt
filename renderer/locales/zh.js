@@ -417,6 +417,7 @@
   "lic.not_for_sale": "未获销售授权",
   "lic.nc_line": "{name}：其许可不允许出售打印件。",
   "lic.expired_line": "{name}：购买的许可已于 {until} 结束。",
+  "lic.remix_line": "{name}：{parent} 的改编版本，原作的许可不允许出售打印件。",
   "lic.credit_title": "其许可要求在销售处注明设计者：",
   "lic.credit_add": "将署名添加到描述",
   "lic.credit_lead": "设计：",

@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a remix of a model that may not be sold is flagged at sale too.** When a library model's `remixOf` (set on the Mac) names another library model by its page address, and that original is non-commercial, the job and product editors say "{name}: a remix of {parent}, whose licence does not allow selling prints." A remix with its own bought (`commercial`) licence is not flagged, and an original that is not in the library is not guessed at. `remixProblems` in `lib/model-licence.js` follows the Mac's `Shop.remixProblems` (beta.13).
+
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**

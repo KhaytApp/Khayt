@@ -154,3 +154,20 @@ test('no ids, no library, no credit', () => {
   assert.deepEqual(L.credits(null, null), []);
   assert.deepEqual(L.credits(['A'], []), []);
 });
+
+test('a remix of a library model that may not be sold is not for sale either', () => {
+  const lib = [
+    { id: 'P', name: 'Sleeping fox', licence: 'cc-by-nc', sourceUrl: 'https://example.com/fox/' },
+    { id: 'R', name: 'Sleeping fox, hollow', remixOf: 'HTTPS://example.com/fox' },
+    { id: 'RB', name: 'Fox, bought', licence: 'commercial', remixOf: 'https://example.com/fox' },
+    { id: 'RN', name: 'Fox, NC itself', licence: 'cc-by-nc', remixOf: 'https://example.com/fox' },
+    { id: 'Q', name: 'Owl', licence: 'cc-by', sourceUrl: 'https://example.com/owl' },
+    { id: 'RQ', name: 'Owl remix', remixOf: 'https://example.com/owl' },
+    { id: 'RX', name: 'Elsewhere remix', remixOf: 'https://example.com/not-here' },
+  ];
+  assert.deepEqual(L.remixProblems(['R', 'R', 'RB', 'RN', 'RQ', 'RX', 'missing'], lib), [
+    { id: 'R', name: 'Sleeping fox, hollow', licence: 'cc-by-nc', reason: 'remix', until: 'Sleeping fox' },
+  ]);
+  assert.deepEqual(L.remixProblems([], lib), []);
+  assert.deepEqual(L.remixProblems(['R'], null), []);
+});

@@ -417,6 +417,7 @@
   "lic.not_for_sale": "Satış için lisanslı değil",
   "lic.nc_line": "{name}: lisansı baskı satışına izin vermiyor.",
   "lic.expired_line": "{name}: satın alınan lisans {until} tarihinde sona erdi.",
+  "lic.remix_line": "{name}: {parent} modelinin bir remiksi; orijinalin lisansı baskı satışına izin vermiyor.",
   "lic.credit_title": "Lisansı, satıldığı her yerde tasarımcının belirtilmesini istiyor:",
   "lic.credit_add": "Tasarımcıyı açıklamaya ekle",
   "lic.credit_lead": "Tasarım:",

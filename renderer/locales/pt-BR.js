@@ -418,6 +418,7 @@
   "lic.not_for_sale": "Sem licença para venda",
   "lic.nc_line": "{name}: a licença não permite vender impressões.",
   "lic.expired_line": "{name}: a licença comprada terminou em {until}.",
+  "lic.remix_line": "{name}: um remix de {parent}, cuja licença não permite vender impressões.",
   "lic.credit_title": "A licença pede o crédito ao designer onde quer que seja vendido:",
   "lic.credit_add": "Adicionar o crédito à descrição",
   "lic.credit_lead": "Design:",
