@@ -89,6 +89,26 @@ enum CloudIntake {
 
     typealias Fetch = (URLRequest) async throws -> (Data, URLResponse)
 
+    /// `data(for:)`, read as a stream and stopped once past `maxBytes`.
+    ///
+    /// For the quote form's file. `data(for:)` buffered the whole body before
+    /// `file` could look at its size, so an answer far past what the request
+    /// declared was held in memory in full and only then refused. A declared
+    /// `Content-Length` over the limit is refused before a byte is read.
+    static func capped(_ session: URLSession, maxBytes: Int) -> Fetch {
+        { request in
+            let (bytes, response) = try await session.bytes(for: request)
+            if response.expectedContentLength > Int64(maxBytes) { throw Failure.tooLarge(maxBytes) }
+            var data = Data()
+            data.reserveCapacity(min(maxBytes, max(0, Int(response.expectedContentLength))))
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > maxBytes { throw Failure.tooLarge(maxBytes) }
+            }
+            return (data, response)
+        }
+    }
+
     /// Everything waiting, oldest first — the order a shop would work through.
     static func list(_ connection: CloudReader.Connection, token: String,
                      fetch: Fetch) async throws -> [Item] {

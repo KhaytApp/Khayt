@@ -38,7 +38,7 @@ extension Shop {
     /// find is barely a caller. Background and best-effort — nothing on any
     /// screen waits for it, and a book where every model has already been
     /// asked does no work at all, because `readProvenanceFromFiles` looks only
-    /// at records with BOTH fields still blank.
+    /// at records whose licence is still blank.
     ///
     /// The cost on a book where the files say nothing is one bounded header
     /// read per model — the part before `<resources`, not the geometry — which
@@ -1495,6 +1495,11 @@ extension Shop {
         ModelLicence.saleProblems(printFileIds, records: libraryRows, today: Self.today())
     }
 
+    /// The designers a sale of these models must credit (CC BY licences).
+    func licenceCredits(_ printFileIds: [String]) -> [ModelLicence.Credit] {
+        ModelLicence.credits(printFileIds, records: libraryRows)
+    }
+
     /// Read provenance out of the model files a shop ALREADY has.
     ///
     /// ── A FIX ONLY ON NEW IMPORTS STRANDS THE WHOLE LIBRARY ───────────────
@@ -1517,10 +1522,21 @@ extension Shop {
     /// than left to go and look.
     @discardableResult
     func readProvenanceFromFiles() async -> Int {
-        let candidates = files.filter {
-            ($0.source ?? "").isEmpty && ($0.licence ?? "").isEmpty
+        // Every record with no licence yet, not only those with no designer
+        // either: a file whose designer was read when its licence (`Standard
+        // Digital File License`) still translated to nothing was otherwise
+        // never asked again.
+        let blank = files.filter { ($0.licence ?? "").isEmpty }
+        // A page saved from the web worded its licence already: translated
+        // from that, with no file to open.
+        var fromPage: [LibraryFile.ID: (source: String, licence: String)] = [:]
+        for file in blank {
+            if let text = file.sourceLicenceText, let licence = ModelLicence.fromFile(text) {
+                fromPage[file.id] = ("", licence.id)
+            }
         }
-        guard !candidates.isEmpty else { return 0 }
+        let candidates = blank.filter { fromPage[$0.id] == nil }
+        guard !candidates.isEmpty || !fromPage.isEmpty else { return 0 }
 
         // Read first, write once, and read OFF the main thread: this opens
         // up to a few hundred model zips, and doing that on the MainActor
@@ -1541,7 +1557,7 @@ extension Shop {
             }
             return out
         }
-        var found: [LibraryFile.ID: (source: String, licence: String)] = [:]
+        var found = fromPage
         for (id, said) in read {
             let licence = ModelLicence.fromFile(said.licence)?.id ?? ""
             guard !said.designer.isEmpty || !licence.isEmpty else { continue }

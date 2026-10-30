@@ -57,6 +57,33 @@ extension Shop {
         showingVaultProducts = true
     }
 
+    /// The files in a release whose model may not be SOLD AS A FILE, by name.
+    ///
+    /// Selling a file is not selling a print. A NonCommercial or platform
+    /// licence forbids it outright, and a bought commercial licence almost
+    /// always covers printed copies only. A model with no licence recorded that
+    /// came from somewhere (`source`, `sourceUrl`) was downloaded, so the same
+    /// question stands. Only the shop's own work (`own`) and the licences that
+    /// let anyone redistribute commercially (CC0, BY, BY-SA, BY-ND) pass.
+    /// A warning, not a refusal: the shop may hold a licence this app has not
+    /// been told about.
+    nonisolated static func resaleDoubts(_ fileIds: [String], records: [String: String],
+                                         files: [LibraryFile]) -> [String] {
+        let free: Set<String> = ["own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd"]
+        var byFile: [String: LibraryFile] = [:]
+        for (recordId, fileId) in records {
+            if let f = files.first(where: { $0.id == recordId }) { byFile[fileId] = f }
+        }
+        return fileIds.compactMap { fid in
+            guard let f = byFile[fid] else { return nil }
+            let licence = ModelLicence.find(f.licence)?.id ?? ""
+            if free.contains(licence) { return nil }
+            let fromSomewhere = !(f.sourceUrl ?? "").isEmpty || !(f.source ?? "").isEmpty
+            guard !licence.isEmpty || fromSomewhere else { return nil }
+            return f.title
+        }
+    }
+
     /// The vault files a release would send, each at its current version.
     /// Files gone from the vault come back in `missing`.
     nonisolated static func releaseSources(_ fileIds: [String], state: VaultSyncState)
