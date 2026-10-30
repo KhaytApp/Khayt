@@ -1501,6 +1501,10 @@ function openOrderEditor(orderId) {
         ⚠ ${escapeHtml(order.material)} ${escapeHtml(t('mach.compat_warn'))} <em>${escapeHtml(mach.name)}</em> (supports: ${escapeHtml(mach.compatMaterials.join(', '))})
       </div>`;
     })()}
+    ${/* A non-commercial model, or one whose bought licence ran out, printed
+         and invoiced is the one mistake here with a designer on the other end
+         of it. Said where the job is edited, as the Mac's OrderInspector does. */
+      licenceAtSaleHtml((order.parts || []).map((p) => p && p.printFileId))}
     <label style="margin-top:14px;">${escapeHtml(t('oe.due_date'))}</label>
     <input type="date" data-f="dueDate" value="${escapeHtml(draft.dueDate)}" style="max-width:180px;">
     <small id="oe_due_hint" style="color:var(--text-muted);display:none;margin-top:3px;">📅 ${escapeHtml(t('ord.due_suggestion'))}</small>

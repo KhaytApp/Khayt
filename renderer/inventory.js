@@ -3572,6 +3572,14 @@ function openProductEditor(productId = null) {
       </div>`).join('');
   };
 
+  /* What the parts' licences say about selling this: "Not licensed for sale"
+   * for a non-commercial or lapsed model, and the credit a CC BY model asks
+   * for, with a button that writes it into the description (the first content
+   * language's, the one a listing leads with). The Mac's ProductSheet. */
+  const creditField = () => KhaytContentLanguages.fieldKey('description', CONTENT_LANGS[0]);
+  const licenceHtml = () => licenceAtSaleHtml(draft.parts.map((p) => p && p.printFileId),
+    { creditButton: true, written: draft[creditField()] || '' });
+
   const partsHtml = () => (draft.parts.length === 0
     ? `<div class="empty-state" style="padding:18px;">${escapeHtml(t('pe.no_parts'))}</div>`
     : draft.parts.map((part, i) => renderPartRow(part, i)).join(''));
@@ -3777,6 +3785,7 @@ function openProductEditor(productId = null) {
     </div>
 
     <div class="parts-editor" id="partsEditor">${partsHtml()}</div>
+    <div id="prodLicence">${licenceHtml()}</div>
 
     <div style="display:flex; align-items:center; margin: 18px 0 8px; gap:10px;">
       <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span>${escapeHtml(t('bom.components') || 'Components (non-printed)')}</h3>
@@ -3865,8 +3874,11 @@ function openProductEditor(productId = null) {
         }
       }
 
+      const licenceBlock = modal.querySelector('#prodLicence');
+      const refreshLicence = () => { if (licenceBlock) licenceBlock.innerHTML = licenceHtml(); };
       function refreshParts() {
         partsContainer.innerHTML = partsHtml();
+        refreshLicence();
         refreshPricing();
       }
       refreshPricing();
@@ -3899,6 +3911,23 @@ function openProductEditor(productId = null) {
           if (f === 'defaultMargin') refreshPricing();
         });
       });
+
+      // "Add the credit to the description": appended to the first content
+      // language's description, once. A line already written is not added again.
+      if (licenceBlock) licenceBlock.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-act="licence-credit-add"]')) return;
+        const key = creditField();
+        const now = draft[key] || '';
+        const text = licenceCreditText(draft.parts.map((p) => p && p.printFileId), now);
+        if (!text) return;
+        draft[key] = now.trim() ? `${now.trim()} ${text}` : text;
+        const field = modal.querySelector(`[data-f="${CSS.escape(key)}"]`);
+        if (field) field.value = draft[key];
+        refreshLicence();
+      });
+      // Writing the credit by hand counts too: the button goes once it is there.
+      const creditInput = modal.querySelector(`[data-f="${CSS.escape(creditField())}"]`);
+      if (creditInput) creditInput.addEventListener('input', refreshLicence);
 
       // Part row inputs (delegated)
       partsContainer.addEventListener('input', (e) => {
