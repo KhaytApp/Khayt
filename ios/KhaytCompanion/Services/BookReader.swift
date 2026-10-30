@@ -106,10 +106,29 @@ actor BookReader {
     /// onto the incoming book by the shop's own rule (a newer rev from
     /// upstream still wins), and the baseline is set to upstream's copy alone
     /// — which keeps exactly those edits pending.
+    ///
+    /// ── A BOOK IS REPLACED ONLY WHEN THERE IS NO BOOK ───────────────────
+    ///
+    /// It used to be replaced whenever the baseline did not come back, and a
+    /// locked phone could not read its baseline: a background pull took the
+    /// book away with every offline edit in it. Now an unreadable baseline
+    /// stops the pull (`baselineUnreadable`; the next one tries again), and a
+    /// book with NO baseline — an older build's, or a pull whose baseline
+    /// write failed — is measured against an empty one. Every record on the
+    /// phone then counts as possibly unsent and is folded onto upstream by
+    /// rev, so a newer upstream copy still wins and a deleted record stays
+    /// deleted, but nothing only this phone holds is thrown away. The cost is
+    /// re-sending records upstream already has, which it skips.
     func adopt(_ upstream: [String: JSONValue], scope: BookScope.Taken?) async throws {
-        guard book.exists, let baseline = book.baseline() else {
+        guard book.exists else {
             try book.replace(with: upstream, scope: scope)
             return
+        }
+        let baseline: [String: JSONValue]
+        switch book.readBaseline() {
+        case .held(let held): baseline = held
+        case .unreadable: throw CompanionBook.Failure.baselineUnreadable
+        case .absent: baseline = [:]
         }
         // Measured and folded from a snapshot, then swapped in only if nothing
         // was written here meanwhile — an edit made during the await would
@@ -365,9 +384,16 @@ actor BookReader {
     /// Returns nil when there is no baseline: a phone that has never been given
     /// the book has not changed anything, and has nothing to say.
     func pendingChanges() async throws -> KhaytEngine.Outbox? {
+        try await pendingSnapshot()?.outbox
+    }
+
+    /// The outbox AND the book it was measured from. A sender hands `book`
+    /// to `CompanionBook.markSynced` once upstream has taken the outbox, so
+    /// anything written here while the send was in flight stays pending.
+    func pendingSnapshot() async throws -> (outbox: KhaytEngine.Outbox, book: [String: JSONValue])? {
         guard let baseline = book.baseline() else { return nil }
         let local = try book.read()
-        return try await Self.outbox(engine(), local: local, server: baseline)
+        return (try await Self.outbox(engine(), local: local, server: baseline), local)
     }
 
     /// Collections the phone READS and never sends. The catalogue reaches
