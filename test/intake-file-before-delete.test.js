@@ -113,7 +113,8 @@ test('the verified instant price the customer saw is noted on the quote, not set
   assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote } }, CLOUD), true);
   const notes = global.printLog[0].notes;
   assert.match(notes, /intake\.instant_quote_note\{"price":"65\.88","currency":"SAR","details":" · 42 g · 3\.1 h"\}intake\.instant_quote_rough/);
-  assert.equal(global.printLog[0].price, 0);
+  assert.notEqual(global.printLog[0].price, 65.88, 'the customer\'s figure is a note, never the price');
+  assert.notEqual(global.printLog[0].price, 65.875);
 });
 
 test('an unverified quote is not noted', async () => {
@@ -123,9 +124,9 @@ test('an unverified quote is not noted', async () => {
   assert.doesNotMatch(global.printLog[0].notes, /instant_quote/);
 });
 
-test('a verified quote opens costed at the shop\'s rates from the per-piece grams and hours, price unset', async () => {
+test('a verified quote opens costed at the shop\'s rates from the per-piece grams and hours, priced at cost + default margin', async () => {
   stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
-  require('../lib/print-rates.js'); require('../lib/calculator-cost.js');
+  require('../lib/print-rates.js'); require('../lib/calculator-cost.js'); require('../lib/pricing.js');
   Object.assign(global, {
     inventory: [{ id: 'SP1', material: 'PETG', cost: 100, spoolWeight: 1000 }],
     printers: [{ id: 'PR1', wearRate: 1, powerDraw: 0, elecRate: 0, prepTime: 0, postTime: 0, laborRate: 0, failureRate: 0 }],
@@ -145,9 +146,22 @@ test('a verified quote opens costed at the shop\'s rates from the per-piece gram
   assert.ok(Math.abs(part.baseCost - 10.5) < 1e-9, String(part.baseCost));
   assert.equal(o.material, 'PETG');
   assert.equal(o.printTime, 1.5);
-  assert.equal(o.price, 0, 'the customer\'s figure is not forced as the price');
+  // Cost + the default 30 % margin, as the Mac prices a quote-form line
+  // (PriceRule() with defaultMargin): 10.5 → 13.65. Not the 65.88 shown.
+  assert.equal(o.price, 13.65);
   assert.equal(o.quoteSentAt, null);
   assert.equal(o.quoteExpiresAt, null);
+});
+
+test('the shop\'s own default margin prices it, and a quote with no part opens at 0', async () => {
+  stubApp(() => ({ ok: true, gone: false, attached: { filename: 'f.stl', originalName: 'bracket.stl', size: BYTES.length } }));
+  global.settings = { lanApi: { intakeQuote: { filamentId: 'SP1', presetId: 'PR1' } }, defaultMargin: 50 };
+  const { importIntakeAsQuote } = require('../renderer/integrations.js');
+  const quote = { price: 65.88, currency: 'SAR', qty: 3, grams: 20, hours: 1.5, verified: true };
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, qty: '3', quote } }, CLOUD), true);
+  assert.equal(global.printLog[0].price, 15.75);
+  assert.equal(await importIntakeAsQuote({ ...REQ, payload: { ...REQ.payload, quote: { price: 9, grams: 20, hours: 1.5 } } }, CLOUD), true);
+  assert.equal(global.printLog[0].price, 0, 'nothing measured, nothing to price');
 });
 
 test('an unverified or unmeasured quote adds no part', async () => {

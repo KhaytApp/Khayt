@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: an imported quote-form quote opens at cost plus your default margin, not 0.** This is the Mac's rule: the costed part (from the signed grams and hours, #2097) is priced through `KhaytPricing.quoteTotal` at `settings.defaultMargin`, or 30 % when unset, with no discount, shipping, rush or overhead. The figure the customer was shown stays a note and is not copied in as the price, because the quote sheet's figure and the book's VAT mode can disagree. A request with nothing measured still opens at 0. The price stays editable before the quote is sent.
+
 - **Desktop: Aged Receivables follows payment terms.** Each row now shows its due date, which is the invoice date plus the customer's terms (#2106). A row that isn't due yet says "Not yet due" instead of "0" days. When anything is on terms, the total is split into overdue and not yet due. The bucket headers are translated (they were hard-coded English), and the CSV gains Due Date and Overdue columns.
 
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
