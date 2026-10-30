@@ -4,10 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: an imported quote-form quote opens at cost plus your default margin, not 0.** This is the Mac's rule: the costed part (from the signed grams and hours, #2097) is priced through `KhaytPricing.quoteTotal` at `settings.defaultMargin`, or 30 % when unset, with no discount, shipping, rush or overhead. The figure the customer was shown stays a note and is not copied in as the price, because the quote sheet's figure and the book's VAT mode can disagree. A request with nothing measured still opens at 0. The price stays editable before the quote is sent.
-
-- **Desktop: Aged Receivables follows payment terms.** Each row now shows its due date, which is the invoice date plus the customer's terms (#2106). A row that isn't due yet says "Not yet due" instead of "0" days. When anything is on terms, the total is split into overdue and not yet due. The bucket headers are translated (they were hard-coded English), and the CSV gains Due Date and Overdue columns.
-
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
@@ -17,8 +13,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **iPhone: "Not licensed for sale" on a job.** A job whose parts come from a model with a non-commercial licence, or one whose bought licence has run out, now says so at the top of its page on the phone, with the same words and the same check as the Mac (`ModelLicence.saleProblems`, #2103). The phone's library copy now keeps `licence` and `licenceExpires`; it moved to `library-2.json` so a phone holding the old copy takes one whole pull and learns them. A phone that reaches the Mac only on Wi-Fi holds no library copy and says nothing, as an unknown licence is not a no. The sample shop's "Terrain tiles" shows both lines.
 - **iPhone: finishing a job on the phone now takes its filament off the spool and records when it was finished, as on the Mac.** Moving a job on the iPhone (the order page, the queue, a notification button, Siri, or approving or declining a quote) now follows the same rules as moving it on the Mac. The filament and packaging come off the shelf in the same save as the move, the finish date and stage history are recorded, and moving a finished job back puts its filament back. A move the shop's rules don't allow, such as starting a print while production is paused, is refused with the reason. The phone still sends no customer emails, webhooks or messages for a move.
-- **Desktop: licence warnings where a sale is edited.** The job editor and the product editor now show "Not licensed for sale" for a model whose licence is non-commercial or whose bought licence has run out (`KhaytModelLicence.saleProblems`, as on the Mac). For a CC BY model they show the credit its licence asks for: `“Title” — Designer (CC BY), page`. The product editor can add that credit to the description, once. A model with no licence recorded shows nothing. The shared `credits()` in `lib/model-licence.js` builds the line the same way as the Mac's `ModelLicence.credits`.
-
 - **iPhone: Arabic digits, Siri on a locked phone, honest connection state.** Quote, waste, expense, spool-adjust and temperature fields now read Arabic-Indic and Extended Arabic-Indic digits and the Arabic decimal mark through one parser (`PhoneCalculator.parse`), and a pasted "1,500" is 1500, not 1.5. Advancing a job and asking about filament by Siri need the phone unlocked. A refused order-status change now shows its error instead of looking saved. "Connected" and the widget's time mean the Mac answered or the cloud synced, not that the stored book was read; the fallback "Request failed" and "Request n" texts are translated.
 - **iPhone: quotes stay on the phone, with Approve and Decline.** A quote made on the phone disappeared from it: Orders' Active list is the queue, which leaves quotes out, and History takes only finished jobs. Orders now has a third segment, Quotes, between the two: the book's open quotes, newest first, with client, price, the day it was made and the day it stands until (or EXPIRED). A phone that holds no book (Wi-Fi only, to an older desktop) says the quotes are on the Mac. A quote's page has Approve, which makes it a Pending job and stamps `quoteAcceptedAt`, and Decline, which asks first and cancels it with `cancelledAt` stamped, kept in History rather than deleted. Both go through the same status write as every other move. The sample shop has two quotes.
 - **Licences: model sites' own terms, the designer's credit, and selling a file.**
@@ -6592,6 +6586,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.35] - 2026-10-30
+
+### Fixed
+
+- **Desktop: licence warnings where a sale is edited.** The job editor and the product editor now show "Not licensed for sale" for a model whose licence is non-commercial or whose bought licence has run out (`KhaytModelLicence.saleProblems`, as on the Mac). For a CC BY model they show the credit its licence asks for: `“Title” — Designer (CC BY), page`. The product editor can add that credit to the description, once. A model with no licence recorded shows nothing. The shared `credits()` in `lib/model-licence.js` builds the line the same way as the Mac's `ModelLicence.credits`.
+
+- **Desktop: Aged Receivables follows payment terms.** Each row now shows its due date, which is the invoice date plus the customer's terms (#2106). A row that isn't due yet says "Not yet due" instead of "0" days. When anything is on terms, the total is split into overdue and not yet due. The bucket headers are translated (they were hard-coded English), and the CSV gains Due Date and Overdue columns.
+
+- **Desktop: an imported quote-form quote opens at cost plus your default margin, not 0.** This is the Mac's rule: the costed part (from the signed grams and hours, #2097) is priced through `KhaytPricing.quoteTotal` at `settings.defaultMargin`, or 30 % when unset, with no discount, shipping, rush or overhead. The figure the customer was shown stays a note and is not copied in as the price, because the quote sheet's figure and the book's VAT mode can disagree. A request with nothing measured still opens at 0. The price stays editable before the quote is sent.
 
 ## [3.11.34] - 2026-10-29
 
