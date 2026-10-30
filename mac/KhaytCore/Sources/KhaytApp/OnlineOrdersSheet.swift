@@ -139,6 +139,7 @@ private struct OnlineOrderCard: View {
     @Bindable var shop: Shop
     let order: Shop.OnlineOrder
     @State private var confirmingDelete = false
+    @State private var confirmingWithoutFile = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -221,11 +222,29 @@ private struct OnlineOrderCard: View {
                         .controlSize(.small)
                 }
                 Spacer()
+                // The cloud lost a file it should still have: the shop may
+                // take the request with a note instead, once told what goes.
+                if order.item.file != nil, shop.quoteFilesMissing.contains(order.id) {
+                    Button(shop.words.callIt("mac.qfe_import_without_file")) { confirmingWithoutFile = true }
+                        .disabled(shop.onlineBusy || !shop.canMoveJobs)
+                        .controlSize(.small)
+                }
                 record
             }
             .padding(.top, 2)
         }
         .padding(.vertical, 6)
+        .confirmationDialog(
+            shop.words.callIt("mac.qfe_without_file_q"),
+            isPresented: $confirmingWithoutFile, titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.qfe_import_without_file")) {
+                Task { await shop.recordOnlineOrder(order, withoutFile: true) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(shop.words.callIt("mac.qfe_without_file_why"))
+        }
         .confirmationDialog(
             shop.words.callIt("mac.qfe_delete_q", ["name": .string(Figure.isolated(order.customer.isEmpty ? order.title : order.customer))]),
             isPresented: $confirmingDelete, titleVisibility: .visible

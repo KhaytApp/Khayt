@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: quote-form requests, the three open items.**
+  - The request's file is streamed and stopped once past its declared size (`CloudIntake.capped`). Before, `data(for:)` held the whole answer in memory and only then refused it. A `Content-Length` over the size is refused before any bytes are read.
+  - "Import without the file": when Khayt Cloud has no file for a request it should still keep (`missingEarly`), the request card offers to import it anyway. It asks first, then imports it as a quote with a note that the file is missing and drains it.
+  - Settings › Online › "Import requests as quotes automatically" (off by default, saved per Mac). The Mac holding the book imports each request by itself as an unnumbered, unpaid quote. A file is downloaded and filed before the drain, the same as the button does. A request whose file is missing is left for a person.
 - **iPhone: edits made during a sync, on a locked phone, or before unpairing are no longer lost.**
   - An edit saved while a sync was sending (a payment recorded on another screen) was counted as sent with it, never reached the Mac or the cloud, and was undone by the next refresh. It now stays waiting and goes with the next send.
   - A sync that ran while the phone was locked could not read the phone's record of what was last synced, took the phone for a new one, and replaced its book, dropping every edit not yet sent. That record is now readable whenever the book is, and a sync that still cannot read it waits for the next try instead. A phone with no such record keeps its own records and lets a newer copy from the Mac win.
