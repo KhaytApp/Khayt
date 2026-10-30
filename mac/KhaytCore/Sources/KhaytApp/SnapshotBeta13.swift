@@ -27,7 +27,7 @@ extension Snapshot {
 
         let rtl = Direction.rtlLanguages.contains(shop.words.language)
         func shot(_ name: String, width: CGFloat, _ view: some View) {
-            captureView(named: "b13-\(name)\(tag)",
+            captureView(named: "beta13-\(name)\(tag)",
                         view.frame(width: width, alignment: .topLeading)
                             .background(dark ? Color(white: 0.16) : Khayt.ground)
                             .environment(\.colorScheme, dark ? .dark : .light)
