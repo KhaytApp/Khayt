@@ -587,6 +587,10 @@ public actor KhaytEngine {
         // AND ORDER-PAYMENT ARE ALREADY ABOVE and must be: it reaches both
         // through globals, and without them every order reads as unpaid at its
         // gross price.
+        // PAYMENT-TERMS first: it reads each customer's terms and says when an
+        // invoice falls due, and receivables (and the invoice, and the
+        // payment reminders) reach it through its global.
+        "payment-terms",
         "receivables",
         // Which of a shop's backups may be rotated away, and which is the
         // insurance it would want after a schema change.
@@ -3492,16 +3496,21 @@ public actor KhaytEngine {
     ///
     /// The `.map` is a projection and not arithmetic: `daysOverdue` is the
     /// module's own, so the figure on screen is the one it selected on.
+    ///
+    /// `clients` carries each customer's payment terms: a customer on net 30
+    /// is chased from invoice date + 30, not from the job's own due date.
     public func invoicesToChase(orders: [JSONValue], settings: [String: JSONValue],
-                                owed: [String: Double], now: Date = Date()) throws -> [Chase] {
+                                owed: [String: Double], clients: [JSONValue] = [],
+                                now: Date = Date()) throws -> [Chase] {
         try runtime.call2(
             "KhaytPaymentReminder.selectInvoicesDueForReminder(ARG0, ARG1,"
-          + " function (o) { return ARG2[o.id] || 0; }, ARG3)"
+          + " function (o) { return ARG2[o.id] || 0; }, ARG3, ARG4)"
           + ".map(function (o) { return {id: o.id, name: o.project || '',"
-          + " days: KhaytPaymentReminder.daysOverdue(o, ARG3)}; })",
+          + " days: KhaytPaymentReminder.daysOverdue(o, ARG3,"
+          + " KhaytPaymentTerms.customerOf(o, ARG4))}; })",
             [.array(orders), .object(settings),
              .object(owed.mapValues(JSONValue.number)),
-             .number(now.timeIntervalSince1970 * 1000)],
+             .number(now.timeIntervalSince1970 * 1000), .array(clients)],
             as: [Chase].self)
     }
 
@@ -13807,19 +13816,21 @@ public actor KhaytEngine {
     /// `KhaytPaymentReminder.daysOverdue`, the figure the payment reminder
     /// selects on. A job with no due date is absent; 0 is due today and a
     /// negative figure is not yet due.
-    public func daysPastDue(orders: [JSONValue], now: Date) throws -> [String: Int] {
+    public func daysPastDue(orders: [JSONValue], clients: [JSONValue] = [],
+                            now: Date) throws -> [String: Int] {
         try runtime.call2("""
-            (function (orders, now) {
+            (function (orders, now, clients) {
               var out = {};
               for (var i = 0; i < orders.length; i++) {
                 var o = orders[i];
                 if (!o || o.id == null) continue;
-                var d = KhaytPaymentReminder.daysOverdue(o, now);
+                var d = KhaytPaymentReminder.daysOverdue(o, now,
+                  KhaytPaymentTerms.customerOf(o, clients));
                 if (d !== null) out[String(o.id)] = d;
               }
               return out;
-            })(ARG0, ARG1)
-            """, [.array(orders), .number(now.timeIntervalSince1970 * 1000)],
+            })(ARG0, ARG1, ARG2)
+            """, [.array(orders), .number(now.timeIntervalSince1970 * 1000), .array(clients)],
             as: [String: Int].self)
     }
 

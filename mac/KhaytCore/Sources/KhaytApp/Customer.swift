@@ -32,6 +32,33 @@ struct Customer: Identifiable, Hashable, Sendable {
     var overdueCount: Int { orders.count { $0.isOverdue() } }
     var isSettled: Bool { owed < 0.005 }
 
+    /// This customer's payment terms in days — 0, due on receipt, for someone
+    /// with no record.
+    var paymentTermsDays: Int { record?.paymentTermsDays ?? 0 }
+
+    /// What they owe that is PAST its due date — invoice date plus their
+    /// payment terms (`PaymentTerms`, held to `lib/payment-terms.js`). A
+    /// company on net 30 owes money on day one and is overdue on day 31.
+    ///
+    /// A job on an instalment plan is overdue when one of its unpaid
+    /// instalments is past ITS date: the plan is the agreement, and the
+    /// customer's terms are not added on top (as `lib/receivables.js`).
+    func overdueOwed(today: String) -> Double {
+        orders.reduce(0) { sum, job in
+            guard job.owesAtAll, !job.isSettled else { return sum }
+            let late: Bool
+            if !job.instalments.isEmpty {
+                late = job.instalments.contains {
+                    !$0.paid && PaymentTerms.isPastDue(invoiceDate: $0.dueDate.isEmpty ? job.date : $0.dueDate,
+                                                       terms: 0, today: today)
+                }
+            } else {
+                late = PaymentTerms.isPastDue(invoiceDate: job.date, terms: paymentTermsDays, today: today)
+            }
+            return late ? sum + job.owed : sum
+        }
+    }
+
     /// Whether anything this customer's work was ever priced at.
     ///
     /// `isSettled` is `owed < 0.005`, which is equally true of a customer whose

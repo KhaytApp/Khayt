@@ -30,6 +30,9 @@ struct CustomerSheet: View {
     @State private var agreements: [AgreementRow]
     @State private var schedule: Recurring
     @State private var hasEnd: Bool
+    /// The terms are a number of days the presets do not offer, so the field
+    /// for typing it is showing.
+    @State private var customTerms: Bool
     @State private var started = false
     /// The sources the picker offers, asked of the shared rule on appear.
     @State private var sources: [String] = []
@@ -72,6 +75,7 @@ struct CustomerSheet: View {
         _agreements = State(initialValue: opened.agreements)
         _schedule = State(initialValue: opened.schedule)
         _hasEnd = State(initialValue: opened.schedule.endDate != nil)
+        _customTerms = State(initialValue: !PaymentTerms.presets.contains(existing.paymentTermsDays))
     }
 
     /// What the sheet holds while a customer is open.
@@ -290,6 +294,41 @@ struct CustomerSheet: View {
                 .fixedSize()
             }
             GridRow {
+                // ── PAYMENT TERMS ─────────────────────────────────────────
+                //
+                // When this customer's invoices fall due: on receipt (the
+                // default), net 7…90, or a custom number of days. The rule is
+                // `lib/payment-terms.js` / `PaymentTerms`; receivables, the
+                // invoice and the reminders all count from it.
+                Text(shop.words.callIt("mac.payment_terms")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Picker("", selection: termsChoice) {
+                            Text(shop.words.callIt("mac.terms_receipt")).tag(0)
+                            ForEach(PaymentTerms.presets.filter { $0 > 0 }, id: \.self) { n in
+                                Text(shop.words.callIt("mac.terms_net", ["n": .number(Double(n))])).tag(n)
+                            }
+                            Divider()
+                            Text(shop.words.callIt("mac.terms_custom")).tag(Self.customTag)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                        if customTerms {
+                            TextField("", value: Binding(
+                                get: { draft.paymentTermsDays },
+                                set: { draft = draft.onTerms($0) }), format: .number.locale(Money.digits))
+                                .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                        }
+                    }
+                    if draft.paymentTermsDays > 0 {
+                        Text(shop.words.counting(draft.paymentTermsDays, "mac.terms_days"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            GridRow {
                 Text(shop.words.callIt("ce.notes")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 TextField("", text: binding(\.notes), axis: .vertical)
@@ -473,6 +512,24 @@ struct CustomerSheet: View {
                 }
             }
         }
+    }
+
+    /// The picker's tag for "a number of days of my own".
+    static let customTag = -1
+
+    /// What the terms picker shows: a preset, or Custom for anything else.
+    /// Choosing Custom keeps the days already set, so the field opens on them.
+    private var termsChoice: Binding<Int> {
+        Binding(
+            get: { customTerms ? Self.customTag : draft.paymentTermsDays },
+            set: { choice in
+                if choice == Self.customTag {
+                    customTerms = true
+                } else {
+                    customTerms = false
+                    draft = draft.onTerms(choice)
+                }
+            })
     }
 
     private func binding(_ key: KeyPath<Client, String>) -> Binding<String> {

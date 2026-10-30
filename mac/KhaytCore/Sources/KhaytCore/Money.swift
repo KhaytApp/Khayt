@@ -570,6 +570,20 @@ public struct Receivables: Decodable, Sendable, Equatable {
         public let bucket: String
         public let payStatus: String
         public let instalment: Bool
+        /// The day it falls due, `YYYY-MM-DD` — invoice date + the customer's
+        /// payment terms (`lib/payment-terms.js`), or the instalment's own.
+        /// Optional so a row from an older bundle still decodes.
+        public let due: String?
+        /// The customer's terms in days; 0 is due on receipt.
+        public let termsDays: Int?
+        /// Past its due date. A net-30 invoice is owed but not overdue for
+        /// its first thirty days.
+        public let overdue: Bool?
+
+        /// Owed but not yet due — a row on terms whose day has not come.
+        public var notYetDue: Bool { overdue == false && (termsDays ?? 0) > 0 }
+        /// For sorting a table by due date: `YYYY-MM-DD` sorts as text.
+        public var dueSortKey: String { due ?? "" }
     }
 
     /// One of the four ages a shop reads.
