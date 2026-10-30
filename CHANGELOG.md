@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
+
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
   - Licence proof sheet: "Also for the N other models by {designer}" makes them `commercial` with the same code, link and last day, in one Undo step. A membership is one record to renew, not one per model. Matching is by `source`, ignoring case and accents, never an address, and never the shop's own (`own`) models.
   - "Remix of…" on the provenance menu records the original's page (`remixOf`, https only). A remix whose original is in the library and may not be sold is flagged at the sale too ("a remix of X, whose licence does not allow selling prints"), unless the remix carries a bought licence. The inspector links the original.
