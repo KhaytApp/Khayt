@@ -18,46 +18,48 @@ struct OvercommitTests {
     }
 
     @Test("open jobs' reservations plus the new parts, against what is on the spool")
-    func theSum() throws {
+    func theSum() async throws {
         let engine = try KhaytEngine()
         let orders: [JSONValue] = [
             .object(["id": .string("o1"), "status": .string("printing"), "parts": .array([Self.part("s1", grams: 400)])]),
             .object(["id": .string("q"), "status": .string("quote"), "parts": .array([Self.part("s1", grams: 400)])]),
             .object(["id": .string("c"), "status": .string("cancelled"), "parts": .array([Self.part("s1", grams: 400)])]),
         ]
-        let fits = try engine.overcommit(parts: [Self.part("s1", grams: 100)], orders: orders, spools: Self.spools)
+        let fits = try await engine.overcommit(parts: [Self.part("s1", grams: 100)], orders: orders, spools: Self.spools)
         #expect(fits.isEmpty, "400 reserved + 100 fits 500; the quote and the cancelled job reserve nothing")
-        let over = try engine.overcommit(parts: [Self.part("s1", grams: 50, qty: 3)], orders: orders, spools: Self.spools)
+        let over = try await engine.overcommit(parts: [Self.part("s1", grams: 50, qty: 3)], orders: orders, spools: Self.spools)
         #expect(over == [KhaytEngine.Overcommit(spoolId: "s1", spoolName: "PLA Black", needed: 150, available: 100)])
-        let mine = try engine.overcommit(parts: [Self.part("s1", grams: 450)], orders: orders, spools: Self.spools,
+        let mine = try await engine.overcommit(parts: [Self.part("s1", grams: 450)], orders: orders, spools: Self.spools,
                                          excludeOrderId: "o1")
         #expect(mine.isEmpty, "the job being edited does not count against itself")
     }
 
     @Test("an item counted in ml is not weighed against grams")
-    func notGrams() throws {
+    func notGrams() async throws {
         let engine = try KhaytEngine()
-        #expect(try engine.overcommit(parts: [Self.part("r1", grams: 900)], orders: [], spools: Self.spools).isEmpty)
+        #expect(try await engine.overcommit(parts: [Self.part("r1", grams: 900)], orders: [], spools: Self.spools).isEmpty)
     }
 
     @Test("the new job's parts reach the check through the rows the job is saved with")
-    func throughPartRows() throws {
+    func throughPartRows() async throws {
         let engine = try KhaytEngine()
         let spool = try JSONDecoder().decode(Spool.self, from: JSONEncoder().encode(Self.spools[0]))
         var draft = NewJobSheet.Draft()
         draft.grams = "600"
         draft.spoolId = "s1"
         let rows = Shop.partRows([draft], spools: [spool], unnamed: "")
-        let found = try engine.overcommit(parts: rows, orders: [], spools: Self.spools)
+        let found = try await engine.overcommit(parts: rows, orders: [], spools: Self.spools)
         #expect(found.map(\.spoolId) == ["s1"])
         #expect(found.first?.needed == 600)
     }
 
     @Test("the sentence is the desktop's, rounded to the gram")
-    func sentence() {
+    func sentence() async throws {
+        let words = Words()
+        await words.load("en", engine: try KhaytEngine())
         let s = Shop.overcommitSentence(.init(spoolId: "s1", spoolName: "PLA", needed: 299.6, available: 120.2),
-                                        words: Words())
-        #expect(s.contains("PLA") && s.contains("300") && s.contains("120"))
+                                        words: words)
+        #expect(s.contains("PLA") && s.contains("300") && s.contains("120"), "\(s)")
         #expect(!s.contains("{"), "every placeholder filled")
     }
 

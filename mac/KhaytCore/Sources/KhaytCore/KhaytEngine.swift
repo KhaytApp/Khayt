@@ -2337,6 +2337,11 @@ public actor KhaytEngine {
         public let needed: Double
         /// What is left on it after the other open jobs' reservations.
         public let available: Double
+
+        public init(spoolId: String, spoolName: String, needed: Double, available: Double) {
+            self.spoolId = spoolId; self.spoolName = spoolName
+            self.needed = needed; self.available = available
+        }
     }
 
     /// Would saving these parts over-commit a spool? `KhaytReorder.
