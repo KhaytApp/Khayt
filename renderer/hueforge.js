@@ -35,8 +35,17 @@
   }
   /** What the mesher needs to add a hanger (hangLayout in lib/hueforge.js). */
   function hangOpts() {
-    return S.hang ? { hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers } : {};
+    return S.hang && !tiled() ? { hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers } : {};
   }
+
+  /** A relief bigger than the bed prints as tiles (planTiles in lib/hueforge.js). */
+  function tilePlan() {
+    const hf = HF();
+    if (isFlat() || !S.solve || !hf || !hf.planTiles) return null;
+    const prof = u1Profile();
+    return hf.planTiles(S.solve.width, S.solve.height, S.widthMm, prof && prof.bed ? prof.bed : { x: 270, y: 270 });
+  }
+  function tiled() { const t = tilePlan(); return !!t && t.tiles.length > 1; }
   const LAYER_PRESETS = [[0.04, 'ultra'], [0.08, 'recommended'], [0.12, 'faster'], [0.16, 'fast']];
 
   function u1Profile() { const P = global.KhaytPrinterProfiles; return P ? P.getProfile(U1_ID) : null; }
@@ -467,7 +476,7 @@
       '<div class="hf-card-h">PRINT SETTINGS</div>',
       '<div class="hf-set">',
       modeSel,
-      '<label class="hf-num wide" title="Printed width on the bed (mm)">width (mm)<input type="number" id="hfWidth" min="40" max="270" step="1" value="' + esc(S.widthMm) + '" /></label>',
+      '<label class="hf-num wide" title="Printed width (mm). A relief wider or deeper than the bed prints as tiles that butt together.">width (mm)<input type="number" id="hfWidth" min="40" max="' + (flat ? 270 : 1000) + '" step="1" value="' + esc(S.widthMm) + '" /></label>',
       '<label class="hf-num wide" title="Layer height">layer height<select class="input" id="hfLayerH">' + lopt + '</select></label>',
       flat ? '' : '<label class="hf-num wide" title="Solid base layers before the first colour">base layers<input type="number" id="hfBase" min="1" max="20" step="1" value="' + esc(S.baseLayers) + '" /></label>',
       '<label class="hf-num wide" title="Total relief height. More height = more colour layers = richer tones (and longer print).">height (mm)<input type="number" id="hfHeight" min="0.8" max="6" step="0.1" value="' + esc(S.heightMm) + '" /></label>',
@@ -589,6 +598,18 @@
     id.data.set(src.preview, extra * src.width * 4);
     if (hang) paintHang(id, hang);
     ctx.putImageData(id, 0, 0);
+    const tp = tilePlan();
+    if (tp && tp.tiles.length > 1 && typeof ctx.setLineDash === 'function') {
+      // Where the pieces meet, so the maker can see a face is not about to be cut in two.
+      ctx.save();
+      ctx.setLineDash([6, 4]); ctx.lineWidth = Math.max(1, src.width / 400); ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      for (const t of tp.tiles) {
+        if (t.col > 0) { ctx.moveTo(t.i0, t.j0); ctx.lineTo(t.i0, t.j1); }
+        if (t.row > 0) { ctx.moveTo(t.i0, t.j0); ctx.lineTo(t.i1, t.j0); }
+      }
+      ctx.stroke(); ctx.restore();
+    }
     if (!isFlat() && S.fixPick && typeof ctx.arc === 'function') {
       // Mark the spot waiting for a colour, so the maker sees which area they picked.
       const r = Math.max(4, src.width / 60);
@@ -698,7 +719,7 @@
   /** The hanger in preview pixels: one pixel per grid point, as the mesher counts. */
   function previewHang() {
     const hf = HF();
-    if (!S.hang || !S.solve || !hf || !hf.hangLayout) return null;
+    if (!S.hang || !S.solve || !hf || !hf.hangLayout || tiled()) return null;
     return hf.hangLayout(S.solve.width, S.solve.height, S.widthMm / (S.solve.width - 1), hangOpts());
   }
 
@@ -769,7 +790,9 @@
     const depthMm = S.img ? (S.widthMm * S.img.height / S.img.width) + (hang ? hang.extra * S.widthMm / (S.solve.width - 1) : 0) : 0;
     const size = S.img ? (Math.round(S.widthMm) + '×' + Math.round(depthMm) + '×' + heightMm + ' mm') : '';
     const bedX = prof && prof.bed ? prof.bed.x : 270;
-    const overBed = S.img && (S.widthMm > bedX || depthMm > (prof && prof.bed ? prof.bed.y : 270));
+    const tp = tilePlan();
+    const nTiles = tp ? tp.tiles.length : 1;
+    const overBed = nTiles <= 1 && S.img && (S.widthMm > bedX || depthMm > (prof && prof.bed ? prof.bed.y : 270));
     const ok = p.automatic;
     const badge = ok
       ? '<span class="hf-vd-badge ok">' + wrapIco('check') + 'FULLY AUTOMATIC</span>'
@@ -786,7 +809,8 @@
       '<div class="hf-vd-line">' + line2 + '</div>',
       reloadList,
       '<div class="hf-vd-facts"><span>' + size + '</span><span>' + (S.stack ? S.stack.totalLayers : 0) + ' layers</span>'
-        + (overBed ? '<span class="hf-over">exceeds ' + bedX + ' mm bed — reduce width</span>' : '') + '</div>',
+        + (overBed ? '<span class="hf-over">exceeds ' + bedX + ' mm bed — reduce width</span>' : '')
+        + (nTiles > 1 ? '<span>' + tp.cols + '×' + tp.rows + ' tiles, each fits the bed' + (S.hang ? ' · no hanger on a tiled print' : '') + '</span>' : '') + '</div>',
     ].join('');
   }
 
@@ -815,7 +839,7 @@
     // the settings, the parts pane and the export card are all different shapes.
     on('#hfMode', 'change', (e) => { S.mode = e.target.value === 'flat' ? 'flat' : 'relief'; render(); });
     on('#hfLayerH', 'change', (e) => { S.layerH = clampNum(e.target.value, 0.04, 0.28, 0.12); scheduleRepaint(); });
-    on('#hfWidth', 'input', (e) => { S.widthMm = clampNum(e.target.value, 40, 270, 120); scheduleRepaint(); });
+    on('#hfWidth', 'input', (e) => { S.widthMm = clampNum(e.target.value, 40, isFlat() ? 270 : 1000, 120); scheduleRepaint(); });
     on('#hfBase', 'input', (e) => { S.baseLayers = Math.round(clampNum(e.target.value, 1, 20, 5)); scheduleRepaint(); });
     on('#hfHeight', 'input', (e) => { S.heightMm = clampNum(e.target.value, 0.8, 6, 2.4); scheduleRepaint(); });
     on('#hfVivid', 'input', (e) => { S.vivid = Math.round(clampNum(e.target.value, 1, 10, 9)); scheduleRepaint(); });
@@ -933,7 +957,7 @@
       heights: Array.from(p.solve.heights),
       width: p.solve.width, height: p.solve.height,
       layerH: p.layerH, widthMm: S.widthMm,
-      hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers,
+      hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers, tiles: true,
       bands: p.bands,                              // many bands, filaments reused across heads
       filaments: p.filaments.map((f) => f.hex),    // 4 slot colours, indexed by head
       name: (S.imgName || 'hueforge').replace(/\.[^.]+$/, ''),
@@ -943,7 +967,8 @@
       thumbSmallPng: solvePreviewPng(128),
     }).then((r) => {
       render();
-      if (r && r.ok) toast('U1 3MF saved · open in Snapmaker Orca');
+      if (r && r.ok && r.files > 1) toast(r.files + ' tile 3MFs saved (' + r.cols + '×' + r.rows + ') · open each in Snapmaker Orca');
+      else if (r && r.ok) toast('U1 3MF saved · open in Snapmaker Orca');
       else if (r && r.canceled) { /* silent */ }
       else toast(t('common.export_failed') + (r && r.error ? ': ' + r.error : ''));
     }).catch((e) => { render(); toast(t('common.export_failed')); });
@@ -994,6 +1019,8 @@
       mesh = { triangles: tris, triangleCount: tris.length, sizeMm: S.flat.sizeMm };
     } else {
       if (!S.solve || !S.stack) { toast(t('common.export_empty')); return; }
+      const tp = tilePlan();
+      if (tp && tp.tiles.length > 1) { exportStlTiles(tp); return; }
       mesh = hf.heightfieldToMesh(S.solve, Object.assign({ layerH: S.stack.layerH, widthMm: S.widthMm }, hangOpts()));
     }
     if (!mesh.triangleCount) { toast(t('hf.empty_model')); return; }
@@ -1006,6 +1033,24 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast('STL exported · ' + Math.round(mesh.sizeMm.x) + '×' + Math.round(mesh.sizeMm.y) + '×' + mesh.sizeMm.z.toFixed(1) + ' mm');
+  }
+
+  /** One STL per tile, named by row and column (top-left is r1c1). */
+  function exportStlTiles(tp) {
+    const hf = HF(), stem = (S.imgName || 'painting').replace(/\.[^.]+$/, '');
+    tp.tiles.forEach((t, n) => {
+      const mesh = hf.heightfieldToMesh(hf.tileSolve(S.solve, t), { layerH: S.stack.layerH, widthMm: t.widthMm });
+      if (!mesh.triangleCount) return;
+      const url = URL.createObjectURL(new Blob([hf.meshToStlBinary(mesh.triangles)], { type: 'model/stl' }));
+      // Spaced out: a burst of downloads from one click is what browsers block.
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = url; a.download = stem + '-r' + (t.row + 1) + 'c' + (t.col + 1) + '-U1.stl';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }, n * 300);
+    });
+    toast(tp.tiles.length + ' tile STLs exported (' + tp.cols + '×' + tp.rows + ')');
   }
 
   // ---- utils --------------------------------------------------------------

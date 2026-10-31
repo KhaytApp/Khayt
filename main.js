@@ -4251,15 +4251,40 @@ ipcMain.handle('hub:mf-to-stl', async (_e, { path: srcPath } = {}) => {
 // HueForge → U1: build a zero-slicer Snapmaker-Orca 3MF from a solved heightfield + a
 // per-band head plan (colour swaps encoded as layer_config_ranges). The relief is rebuilt
 // in-process from the compact heightfield (lighter over IPC than the full triangle soup).
-ipcMain.handle('hub:hf-export-3mf', async (_e, { heights, width, height, layerH, widthMm, hang, holeMm, baseLayers, bands, filaments, name, thumbPng, thumbSmallPng } = {}) => {
+ipcMain.handle('hub:hf-export-3mf', async (_e, { heights, width, height, layerH, widthMm, hang, holeMm, baseLayers, tiles, bands, filaments, name, thumbPng, thumbSmallPng } = {}) => {
   try {
     if (!Array.isArray(heights) || !width || !height || !Array.isArray(bands) || !bands.length) return { ok: false, error: 'Nothing to export yet.' };
     const HF = require('./lib/hueforge');
     const HF3 = require('./lib/hueforge-3mf');
     const solve = { heights: Uint16Array.from(heights), width, height };
+    const b64ToBuf = (b64) => { try { return b64 ? Buffer.from(String(b64), 'base64') : null; } catch (_) { return null; } };
+    // Bigger than the bed: one 3MF per tile, all with the same bands, saved side by side
+    // under the one name the maker chose. A hanger belongs to a whole picture, so a tiled
+    // one goes without (the panel says so).
+    const plan = tiles ? HF.planTiles(width, height, widthMm, { x: 270, y: 270 }) : null;
+    if (plan && plan.tiles.length > 1) {
+      const base = String(name || 'hueforge').replace(/[^\w.-]+/g, '_') + '-U1.3mf';
+      const finalPath = await mfAskWhereToSave(_e.sender, { defaultPath: base, filters: [{ name: '3MF model', extensions: ['3mf'] }] });
+      if (!finalPath) return { ok: false, canceled: true };
+      const stem = finalPath.replace(/(-U1)?\.3mf$/i, '');
+      const written = [];
+      for (const t of plan.tiles) {
+        const tag = '-r' + (t.row + 1) + 'c' + (t.col + 1);
+        const m = HF.heightfieldToMesh(HF.tileSolve(solve, t), { layerH, widthMm: t.widthMm });
+        if (!m.triangleCount) continue;
+        const buf = HF3.buildU1_3mf({
+          triangles: m.triangles, bands, filaments, layerH, name: String(name || 'hueforge') + tag, sizeMm: m.sizeMm, bed: { x: 270, y: 270 },
+          thumbnailPng: b64ToBuf(thumbPng), thumbnailSmallPng: b64ToBuf(thumbSmallPng),
+        });
+        if (!buf) return { ok: false, error: 'Failed to build the 3MF for tile' + tag + '.' };
+        const out = stem + tag + '-U1.3mf';
+        await fs.promises.writeFile(out, buf);
+        written.push(out);
+      }
+      return { ok: true, outPath: written[0], files: written.length, cols: plan.cols, rows: plan.rows };
+    }
     const mesh = HF.heightfieldToMesh(solve, { layerH, widthMm, hang, holeMm, baseLayers });
     if (!mesh.triangleCount) return { ok: false, error: 'Empty model.' };
-    const b64ToBuf = (b64) => { try { return b64 ? Buffer.from(String(b64), 'base64') : null; } catch (_) { return null; } };
     const buf = HF3.buildU1_3mf({
       triangles: mesh.triangles, bands, filaments, layerH, name, sizeMm: mesh.sizeMm, bed: { x: 270, y: 270 },
       thumbnailPng: b64ToBuf(thumbPng), thumbnailSmallPng: b64ToBuf(thumbSmallPng),

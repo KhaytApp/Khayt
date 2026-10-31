@@ -318,3 +318,20 @@ test('a colour fix picked on the preview reaches the exported heights', async ()
   assert.notDeepEqual(exported[1].heights, e.heights, 'removing the fix changes the export back');
   assert.ok(fixedK > 0);
 });
+
+test('a relief wider than the bed is offered as tiles, and the export asks for them', async () => {
+  const { window, doc, exported } = await boot();
+  assert.doesNotMatch(doc.getElementById('hfVerdict').textContent, /tiles/);
+  const w = doc.getElementById('hfWidth');
+  assert.equal(w.max, '1000', 'a relief may be wider than the bed');
+  w.value = '600';
+  w.dispatchEvent(new window.Event('input', { bubbles: true }));
+  await settle(window);
+  const v = doc.getElementById('hfVerdict').textContent;
+  assert.match(v, /\d+×\d+ tiles, each fits the bed/);
+  assert.doesNotMatch(v, /reduce width/, 'tiles replace the over-the-bed warning');
+  click(window, doc.getElementById('hf3mf'));
+  await settle(window);
+  assert.equal(exported[0].tiles, true);
+  assert.equal(exported[0].widthMm, 600);
+});
