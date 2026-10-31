@@ -253,7 +253,9 @@ line. See VERSIONING.md and `test/updater-channel-ladder.test.js`.)*
 
 No hold is active — see [docs/RELEASE-HOLD.md](./docs/RELEASE-HOLD.md).
 
-**Bed Ready is on its own line and is current: `1.2.0`** (2026-08-28), built by
+**Bed Ready is on its own line and is current: `1.4.0`** (2026-10-31): the HueForge calibration card, relief hanger, per-area colour fixes and tiles. `1.3.0` was 2026-10-05 (macOS 13 or later). The `1.2.0` paragraph below is kept as history.
+
+`1.2.0` (2026-08-28) was built by
 CI from this repo and published to `KhaytApp/bedready`, all three platforms.
 Verified after the publish rather than assumed: all three manifests read
 `version: 1.2.0` and each of the five binaries they name serves 200.
