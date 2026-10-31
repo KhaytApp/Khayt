@@ -4,6 +4,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a move made from an alert's button says what followed.** Tapping "Move to post-processing" or "Reprint" on a print-finished alert now posts one quiet follow-up alert (no sound, no buttons) when the shop's rules did something with the move, such as filament taken or put back, or a spool running low. Before, only moves made inside the app said this.
+
+>>>>>>> origin/main
 - **Mac: proforma invoices, as on the desktop.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has "Generate Proforma" on its right-click menu and on its details pane. It opens the job's paper titled "Proforma invoice", with a watermark saying so, ready to save as a PDF. A proforma is not a tax invoice: it carries no ZATCA QR and prints the job's own id, never an invoice number, and drawing one never numbers the job, so it does not mark the tax point. The shared invoice document (`lib/invoice-document.js`) takes a `proforma` option for this; without it, every invoice is byte-for-byte unchanged.
 
 - **Mac: a credit limit per customer, as on the desktop.** The customer sheet has a credit limit in the shop's currency; 0, the default, is no limit. A customer who owes more than it gets a mark beside their name in the list, and "Over credit limit" with the limit on their page. It is the desktop's `creditLimit` field, so a limit set in either app shows in both. A hand-typed figure counts, a negative or unreadable one is no limit, and saving a customer without touching the limit leaves it exactly as stored.
