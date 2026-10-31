@@ -580,6 +580,12 @@
 "move.refused.assembly_not_assembled" = "Every part passed QC. Mark the assembly as assembled before completing this job.";
 "move.refused.assembly_parts" = "This job is waiting on parts: %@";
 "move.refused.stage_not_a_status" = "Shipped isn’t a stage you can move a job to. Use Mark shipped on a finished job.";
+"move.note.due_extended" = "Due date pushed back %1$lld days for the time on hold: now %2$@.";
+"move.note.filament_deducted" = "Took %1$@ off %2$lld spool(s).";
+"move.note.filament_deducted_low" = "Took %1$@ off %2$lld spool(s); %3$lld now low.";
+"move.note.filament_returned" = "Put %1$@ back on the shelf — the job is no longer finished, so its filament is not used yet.";
+"move.note.packaging_deducted" = "Packaging taken off the shelf for the finished job.";
+"move.note.low" = "Running low: %1$@";
 
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */

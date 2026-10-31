@@ -6,6 +6,7 @@ struct QueueView: View {
     @State private var orders: [QueueOrder] = []
     @State private var errorMessage: String?
     @State private var updatingId: String?
+    @State private var moveNotes: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -31,6 +32,7 @@ struct QueueView: View {
                 }
             }
             .navigationTitle(L10n.tr("queue.title"))
+            .moveNotes($moveNotes)
             .refreshable { await load() }
             .task { await load() }
         }
@@ -50,7 +52,7 @@ struct QueueView: View {
         updatingId = order.id
         defer { updatingId = nil }
         do {
-            try await api.updateOrderStatus(orderId: order.id, status: status)
+            moveNotes = try await api.updateOrderStatus(orderId: order.id, status: status)
             await load()
         } catch {
             errorMessage = error.localizedDescription
@@ -63,7 +65,7 @@ struct QueueView: View {
         updatingId = order.id
         defer { updatingId = nil }
         do {
-            try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
+            moveNotes = try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
             await load()
         } catch {
             errorMessage = error.localizedDescription

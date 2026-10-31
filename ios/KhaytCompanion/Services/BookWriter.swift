@@ -155,6 +155,33 @@ struct BookWriter {
         }
     }
 
+    /// What a move's notice says, in the person's language — the Mac's
+    /// `Words.sentence(for:)`. The codes come from `lib/order-status.js` and
+    /// `lib/order-deduction.js`. A code with no sentence here is shown as the
+    /// code: it reads as wrong, which is the point — a notice that renders as
+    /// nothing was never delivered.
+    static func sentence(for notice: Notice) -> String {
+        let p = notice.params
+        func int(_ k: String) -> Int { if case .number(let v)? = p[k] { return Int(v) } else { return 0 } }
+        func text(_ k: String) -> String { if case .string(let v)? = p[k] { return v } else { return "" } }
+        switch notice.code {
+        case "due_extended":
+            return L10n.format("move.note.due_extended", int("days"), text("date"))
+        case "filament_deducted":
+            return L10n.format("move.note.filament_deducted", L10n.grams(int("weight")), int("spools"))
+        case "filament_deducted_low":
+            return L10n.format("move.note.filament_deducted_low", L10n.grams(int("weight")), int("spools"), int("low"))
+        case "filament_returned":
+            return L10n.format("move.note.filament_returned", L10n.grams(int("weight")))
+        case "packaging_deducted":
+            return L10n.tr("move.note.packaging_deducted")
+        case "consumable_low", "packaging_low":
+            return L10n.format("move.note.low", text("name"))
+        default:
+            return notice.code
+        }
+    }
+
     /// Put moved rows back where they were, stamping only the ones that
     /// changed — the Mac's `Shop.write`. A row stamped without a change is an
     /// edit nobody made, and on a phone a sync behind it would win.

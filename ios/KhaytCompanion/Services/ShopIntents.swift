@@ -59,8 +59,11 @@ struct AdvanceJobIntent: AppIntent {
               let next = OrderStatus(rawValue: order.status)?.nextInQueue else {
             return .result(dialog: IntentDialog(stringLiteral: L10n.tr("intent.advance.gone")))
         }
-        try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
-        return .result(dialog: IntentDialog(stringLiteral: L10n.format("intent.advance.done", order.displayTitle, next.localizedLabel)))
+        let notes = try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
+        // What the rule said — filament taken, a spool running low — is said
+        // too: a Siri move has no screen for it to appear on afterwards.
+        let done = L10n.format("intent.advance.done", order.displayTitle, next.localizedLabel)
+        return .result(dialog: IntentDialog(stringLiteral: ([done] + notes).joined(separator: " ")))
     }
 }
 
