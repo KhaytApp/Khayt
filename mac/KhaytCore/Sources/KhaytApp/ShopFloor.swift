@@ -1388,6 +1388,14 @@ struct SpoolCard: View {
     /// written before this existed genuinely is.
     private var unit: KhaytEngine.InventoryUnit? { shop.unit(of: spool) }
 
+    /// OPEN JOBS HAVE PROMISED MORE THAN IS ON IT — the desktop's
+    /// "Over-committed" badge (`renderer/inventory.js`). Grams only: a part's
+    /// weight against a bottle counted in ml compares nothing.
+    static func overcommitted(weight: Double?, unit: String?, runway: KhaytEngine.Runway?) -> Bool {
+        guard (unit ?? "g") == "g", let committed = runway?.committedG, committed > 0 else { return false }
+        return committed > (weight ?? 0) + 0.5
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             face
@@ -1419,6 +1427,9 @@ struct SpoolCard: View {
                     // glance in a bright workshop should not have to know that
                     // amber means anything.
                     Chip(text: shop.words.callIt("cons.low"), tint: Khayt.attention)
+                }
+                if Self.overcommitted(weight: spool.weight, unit: unit?.unit, runway: runway) {
+                    Chip(text: shop.words.callIt("inv.overcommit_warn"), tint: Khayt.attention)
                 }
             }
             // Per kilo where it is KNOWN, the purchase price where it is not.

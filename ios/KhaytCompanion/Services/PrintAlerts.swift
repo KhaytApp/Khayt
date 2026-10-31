@@ -175,20 +175,43 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     /// job someone has already moved.
     func perform(_ action: PrintAlertAction, orderId: String) async {
         let status = ((try? await api.fetchQueue()) ?? []).first { $0.id == orderId }?.status
+        var notes: [String] = []
         do {
             switch action {
             case .moveToPost:
                 guard status == "printing" else { return }
-                try await api.updateOrderStatus(orderId: orderId, status: "post")
+                notes = try await api.updateOrderStatus(orderId: orderId, status: "post")
             case .reprint:
                 guard status == "printing" else { return }
-                try await api.updateOrderStatus(orderId: orderId, status: "pending")
+                notes = try await api.updateOrderStatus(orderId: orderId, status: "pending")
             case .markShipped:
                 try await api.markShipped(orderId: orderId)
             }
         } catch {
             // Nothing to show it on; the job is as it was, and the app says
             // why the next time the person opens it.
+            return
         }
+        // What the shop's rules did with the move — filament taken back, a
+        // spool running low — said the only place a button tap from the lock
+        // screen can be answered: one quiet follow-up alert.
+        if let content = Self.notesContent(notes) {
+            try? await UNUserNotificationCenter.current()
+                .add(UNNotificationRequest(identifier: "move.\(orderId).\(Date().timeIntervalSince1970)",
+                                           content: content, trigger: nil))
+        }
+    }
+
+    /// The follow-up for a move's notes — nil when the rules said nothing.
+    /// No sound and no buttons: the person has just acted, this only tells
+    /// them what followed.
+    nonisolated static func notesContent(_ notes: [String]) -> UNMutableNotificationContent? {
+        guard !notes.isEmpty else { return nil }
+        let c = UNMutableNotificationContent()
+        c.title = L10n.tr("PUSH_TITLE")
+        c.body = notes.joined(separator: "\n")
+        c.threadIdentifier = "khayt.move"
+        c.interruptionLevel = .passive
+        return c
     }
 }
