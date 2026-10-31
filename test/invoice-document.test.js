@@ -411,3 +411,27 @@ test('due on receipt, and a quote, print no terms at all', () => {
                                  { settings: SHOP, clients: [net30] }));
   assert.ok(!quote.meta.some((m) => m[0] === 'Payment terms'));
 });
+
+/* ── A proforma ────────────────────────────────────────────────────────────────
+   The job's paper as a request for payment before it is invoiced. Not a tax
+   invoice: no ZATCA QR, and the job's id under "No." rather than an invoice
+   number, so printing one can never look like the invoice was issued. */
+
+test('a proforma is titled and watermarked as one, with no QR and no invoice number', () => {
+  const zatca = Object.assign({}, SHOP, { enableZatca: true });
+  const numbered = Object.assign({}, ORDER, { id: 'JOB-77', invoiceNumber: 'INV-2026-0042', invoiceNum: 'INV-2026-0042' });
+  const invoice = render(numbered, { settings: zatca });
+  const proforma = render(numbered, { settings: zatca }, { proforma: true });
+  assert.match(invoice, /id="zatca-qr"/, 'the invoice carries the QR');
+  assert.doesNotMatch(proforma, /id="zatca-qr"|class="qr-box"/, 'the proforma does not');
+  assert.match(proforma, /class="proforma-watermark"/);
+  assert.doesNotMatch(invoice, /proforma-watermark/);
+  const no = (html) => addressee(html).meta.find(([k]) => /No/i.test(k));
+  assert.equal(no(proforma)[1], 'JOB-77', 'the job, not the invoice number');
+  assert.doesNotMatch(proforma, /INV-2026-0042/);
+  assert.match(proforma, /<div class="title">[^<]*PROFORMA[^<]*<\/div>/i);
+});
+
+test('without the flag the document is unchanged (the fixtures hold)', () => {
+  assert.equal(render(ORDER, { settings: SHOP }, { proforma: false }), render(ORDER, { settings: SHOP }));
+});

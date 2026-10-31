@@ -29,7 +29,8 @@ struct InvoiceSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(shop.words.callIt(job.flatMap(Stage.of) == .quote ? "doc.quotation" : "doc.invoice"))
+                    Text(shop.words.callIt(subject.proforma ? "inv.proforma_title"
+                                           : job.flatMap(Stage.of) == .quote ? "doc.quotation" : "doc.invoice"))
                         .font(.headline)
                     Text(subject.project)
                         .font(.callout).foregroundStyle(.secondary).lineLimit(1)
@@ -84,7 +85,7 @@ struct InvoiceSheet: View {
     /// and File ▸ Share… take as well, so the three cannot disagree about
     /// which number a document carries or when it may not be drawn.
     private func build() async {
-        switch await shop.invoiceDocument(for: subject.id) {
+        switch await shop.invoiceDocument(for: subject.id, proforma: subject.proforma) {
         case .refused(let why):
             problem = why
         case .paper(let doc, let n):
@@ -102,7 +103,7 @@ struct InvoiceSheet: View {
         guard let paper else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = Self.filename(job, words: shop.words, number: number)
+        panel.nameFieldStringValue = (subject.proforma ? "Proforma-" : "") + Self.filename(job, words: shop.words, number: number)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             do {

@@ -300,6 +300,13 @@ private struct Detail: View {
             Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
                 .buttonStyle(.link)
                 .font(.callout)
+            // Before the work is invoiced: the same paper as a request for
+            // payment, which numbers nothing (`showProforma`).
+            if Shop.offersProforma(job) {
+                Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
             // The customer's way to say yes. Only on a quote, only on a real
             // book (the link is minted into the job), and only while the
             // server is up — the link points at this Mac.

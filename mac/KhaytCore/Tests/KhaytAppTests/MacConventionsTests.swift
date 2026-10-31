@@ -61,7 +61,7 @@ struct MacConventionsTests {
     @Test("Print and Share draw the invoice through the sheet's own path")
     func onePathToThePaper() throws {
         let sheet = try QuoteSheetStatusTests.source("InvoiceSheet.swift")
-        #expect(sheet.contains("await shop.invoiceDocument(for: subject.id)"),
+        #expect(sheet.contains("await shop.invoiceDocument(for: subject.id, proforma: subject.proforma)"),
                 "the invoice sheet draws its paper some other way than Print and Share")
         let commands = try QuoteSheetStatusTests.source("Shop+Conventions.swift")
         #expect(commands.contains("await issueInvoiceNumberIfOwed(id)"),

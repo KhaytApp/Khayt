@@ -262,6 +262,8 @@ extension Shop {
     struct PendingHold: Identifiable, Sendable {
         let id: Order.ID
         let project: String
+        /// For the invoice sheet: show the job's PROFORMA, not its invoice.
+        var proforma = false
     }
 
     /// Save a customer — a new one, or changes to one the shop already has.
@@ -1750,6 +1752,24 @@ extension Shop {
     func showInvoice(_ id: Order.ID) {
         guard let job = orders.first(where: { $0.id == id }) else { return }
         pendingInvoice = PendingHold(id: id, project: job.project)
+    }
+
+    /// Show a job's proforma: its paper as a request for payment, before the
+    /// work is invoiced (`invoiceDocument(for:proforma:)`).
+    func showProforma(_ id: Order.ID) {
+        guard let job = orders.first(where: { $0.id == id }), Self.offersProforma(job) else { return }
+        pendingInvoice = PendingHold(id: id, project: job.project, proforma: true)
+    }
+
+    /// Whether a job has a proforma to give: priced, accepted, and not yet
+    /// finished — the desktop offers it on pending and printing work. A quote
+    /// already is the paper for asking; a finished job gets its invoice.
+    static func offersProforma(_ job: Order) -> Bool {
+        guard job.price > 0, let stage = Stage.of(job) else { return false }
+        switch stage {
+        case .pending, .on_hold, .printing, .post, .qc: return true
+        case .quote, .completed, .shipped, .delivered, .cancelled: return false
+        }
     }
 
     /// Give a job that began as a quote the invoice number it is owed, the
