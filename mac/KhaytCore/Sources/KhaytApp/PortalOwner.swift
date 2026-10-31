@@ -132,7 +132,7 @@ extension Shop {
                 written = record
             }
         } catch {
-            moveProblem = String(describing: error); return nil
+            moveProblem = ErrorText.plain(error); return nil
         }
         await load(source)
         guard let record = written else { moveProblem = words.callIt("mac.move_gone"); return nil }
@@ -350,6 +350,6 @@ extension Shop {
         if let failure = error as? PortalClient.Failure {
             return words.callIt("mac.portal_failed") + " " + (failure.errorDescription ?? "")
         }
-        return words.callIt("mac.portal_failed") + " " + String(describing: error)
+        return words.callIt("mac.portal_failed") + " " + ErrorText.plain(error)
     }
 }

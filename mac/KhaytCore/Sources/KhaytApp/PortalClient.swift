@@ -115,7 +115,7 @@ enum PortalClient {
             try CloudSignIn.requireHttps(base)
         } catch {
             throw Failure.badAddress((error as? LocalizedError)?.errorDescription
-                                     ?? String(describing: error))
+                                     ?? ErrorText.plain(error))
         }
         guard !path.isEmpty, let url = URL(string: base + path) else {
             throw Failure.badAddress("That address cannot be read")
@@ -164,7 +164,7 @@ enum PortalClient {
             try CloudSignIn.requireHttps(base)
         } catch {
             throw Failure.badAddress((error as? LocalizedError)?.errorDescription
-                                     ?? String(describing: error))
+                                     ?? ErrorText.plain(error))
         }
         let path = (try? await engine.portalPath(shopId: shopId, pubToken: refresh.pubToken)) ?? ""
         guard !path.isEmpty, let url = URL(string: base + path) else {

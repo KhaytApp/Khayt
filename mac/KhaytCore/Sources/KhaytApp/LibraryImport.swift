@@ -244,7 +244,7 @@ enum LibraryImport {
         } catch {
             // The book refused it, so the copy has no record to belong to.
             try? FileManager.default.removeItem(at: made.dir)
-            throw Failure.failed(String(describing: error))
+            throw Failure.failed(ErrorText.plain(error))
         }
 
         // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
@@ -910,7 +910,7 @@ enum LibraryImport {
             // belong to. Each is named, and the next scan finds it again.
             for item in batch {
                 try? FileManager.default.removeItem(at: item.made.dir)
-                report.failures.append("\(item.url.lastPathComponent): \(Failure.failed(String(describing: error)))")
+                report.failures.append("\(item.url.lastPathComponent): \(Failure.failed(ErrorText.plain(error)))")
             }
         }
     }

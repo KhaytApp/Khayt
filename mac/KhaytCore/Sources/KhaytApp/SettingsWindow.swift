@@ -83,9 +83,12 @@ struct SettingsWindow: View {
                         .disabled(!shop.lockAllows("settings", "edit"))
                 }
             }
-            .frame(width: 600)
+            // At least 600 and as wide as the shop makes it. A fixed 600 x 640
+            // was a window nobody could widen: a long label, a larger text
+            // size, or Arabic left a row cut off with no way to reach it.
+            .frame(minWidth: 600, maxWidth: .infinity)
         }
-        .frame(height: 640)
+        .frame(minHeight: 640, maxHeight: .infinity)
         .navigationTitle(shop.words.callIt(shop.settingsPane.wordKey))
         // Raised HERE rather than from the shop window: the list it is reached
         // from lives on the Integrations pane, and a sheet bound to the same
@@ -1623,7 +1626,7 @@ extension Shop {
                 root["settings"] = .object(Self.sharingCustomerNames(on, over: Self.settings(root)))
             }
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = ErrorText.plain(error)
             return
         }
         await load(source)

@@ -326,7 +326,7 @@ struct EmailSettings: View {
             // The provider's own words where there are any: "535 5.7.8
             // Authentication credentials invalid" tells a shop what to change
             // and "the test failed" does not.
-            let why = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            let why = ErrorText.plain(error)
             result = shop.words.callIt("mac.email_test_failed") + " " + why
         }
     }

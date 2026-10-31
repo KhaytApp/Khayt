@@ -325,7 +325,7 @@ extension Shop {
             result.refusal = .notOffered
             return result
         } catch {
-            result.refusal = .download((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+            result.refusal = .download(ErrorText.plain(error))
             return result
         }
 
@@ -424,7 +424,7 @@ extension Shop {
                 result.refusal = .library(failure)
                 return result
             } catch {
-                result.refusal = .library(.failed(String(describing: error)))
+                result.refusal = .library(.failed(ErrorText.plain(error)))
                 return result
             }
         }
@@ -448,7 +448,7 @@ extension Shop {
             if let preparedDir { await PinWork.run { try? FileManager.default.removeItem(at: preparedDir) } }
             // The held copy stays: the cloud still has the request, the next
             // try writes the same bytes to the same place.
-            result.refusal = .write((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+            result.refusal = .write(ErrorText.plain(error))
             return result
         }
         guard let put else {
@@ -470,7 +470,7 @@ extension Shop {
             try await drain()
             result.drained = true
         } catch {
-            result.drainProblem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            result.drainProblem = ErrorText.plain(error)
         }
         return result
     }
@@ -543,7 +543,7 @@ extension Shop {
             guard !token.isEmpty else { throw CloudIntake.Failure.notConnected }
         } catch {
             return .failure(.other(words.callIt("mac.qfe_kept") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))))
+                + (ErrorText.plain(error))))
         }
         let network = fetch ?? Self.quoteFormNetwork
         let cap = meta.bytes >= 0 ? meta.bytes : QuoteFormFile.maxBytes

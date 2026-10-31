@@ -50,7 +50,7 @@ extension Shop {
             libraryMoveProblem = words.callIt("mac.linked_not_vault"); return
         }
         do { try await writeLinked(linkedFolders + [path]) }
-        catch { libraryMoveProblem = String(describing: error); return }
+        catch { libraryMoveProblem = ErrorText.plain(error); return }
         await load(source)
         await rescanLinkedFolders()
     }
@@ -91,7 +91,7 @@ extension Shop {
             await load(source)
             libraryMoveNote = words.callIt("mac.linked_unlinked", ["n": .number(Double(gone.count))])
         } catch {
-            libraryMoveProblem = String(describing: error)
+            libraryMoveProblem = ErrorText.plain(error)
         }
     }
 
@@ -375,7 +375,7 @@ extension Shop {
             await load(source)
             libraryMoveNote = words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])
         } catch {
-            libraryMoveProblem = String(describing: error)
+            libraryMoveProblem = ErrorText.plain(error)
         }
     }
 
@@ -614,7 +614,7 @@ extension Shop {
                 cloudLibraryProblem = words.callIt("mac.storage_downloaded_duplicate", ["name": .string(same)])
             }
         } catch {
-            cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + String(describing: error)
+            cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + ErrorText.plain(error)
         }
     }
 }

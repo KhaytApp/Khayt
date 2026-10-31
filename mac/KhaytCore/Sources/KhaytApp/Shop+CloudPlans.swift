@@ -60,7 +60,7 @@ extension Shop {
     /// The cloud's refusal in the shop's language.
     func planProblem(_ error: Error) -> String {
         guard let r = error as? CloudPlans.Refusal else {
-            return (error as? CustomStringConvertible)?.description ?? String(describing: error)
+            return ErrorText.plain(error)
         }
         switch r.reason {
         case "owner-only": return words.callIt("mac.plan_owner_only")

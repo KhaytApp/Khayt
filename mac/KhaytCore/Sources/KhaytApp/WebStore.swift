@@ -665,7 +665,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            webStoreSaid = String(describing: error)
+            webStoreSaid = ErrorText.plain(error)
             webStoreProblem = true
         }
     }
@@ -704,7 +704,7 @@ extension Shop {
             webStoreProblem = false
             webStoreSaidAt = Date()
         } catch {
-            webStoreSaid = String(describing: error)
+            webStoreSaid = ErrorText.plain(error)
             webStoreProblem = true
         }
     }

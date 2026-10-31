@@ -201,7 +201,7 @@ struct TelegramSettings: View {
         } catch let locked as Secrets.Failure {
             result = shop.words.callIt("tg.error") + " " + locked.description
         } catch {
-            result = shop.words.callIt("tg.error") + " " + String(describing: error)
+            result = shop.words.callIt("tg.error") + " " + ErrorText.plain(error)
         }
     }
 }

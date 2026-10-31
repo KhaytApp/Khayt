@@ -1665,7 +1665,7 @@ extension Shop {
             }
         }
         guard let f = error as? CloudLibrary.Failure else {
-            return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            return ErrorText.plain(error)
         }
         switch f {
         case .notThere: return words.callIt("mac.cloudlib_not_there")

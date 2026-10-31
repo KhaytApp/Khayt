@@ -700,7 +700,7 @@ extension Shop {
             for case .string(let id)? in records.map({ $0["id"] }) {
                 try? fm.removeItem(at: root.appending(path: LibraryLocation.itemDirName(id)))
             }
-            report.failures.append(String(describing: error))
+            report.failures.append(ErrorText.plain(error))
             report.added = 0; report.addedIds = []; report.photos = 0
         }
         return report

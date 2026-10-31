@@ -121,7 +121,7 @@ struct CarrierSettings: View {
                 let secret = typed.trimmingCharacters(in: .whitespaces)
                 guard !secret.isEmpty else { continue }
                 do { cfg[key] = .string(try await Secrets.seal(secret, for: build)) }
-                catch { shop.settingsProblem = String(describing: error); return }
+                catch { shop.settingsProblem = ErrorText.plain(error); return }
             }
             form[id] = .object(cfg)
         }

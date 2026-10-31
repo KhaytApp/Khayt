@@ -73,7 +73,7 @@ enum GoogleSignIn {
         } catch let f as Failure {
             throw f
         } catch {
-            await loopback.reply(title: no, body: String(describing: error))
+            await loopback.reply(title: no, body: ErrorText.plain(error))
             throw error
         }
     }
@@ -127,7 +127,7 @@ enum GoogleSignIn {
             params.acceptLocalOnly = true
             let listener: NWListener
             do { listener = try NWListener(using: params) }
-            catch { throw Failure.listener(String(describing: error)) }
+            catch { throw Failure.listener(ErrorText.plain(error)) }
             let port: UInt16 = try await withCheckedThrowingContinuation { cont in
                 let once = Once()
                 listener.stateUpdateHandler = { state in

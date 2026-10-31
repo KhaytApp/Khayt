@@ -107,7 +107,7 @@ extension Shop {
                     Shop.applyDownloaded(batch, to: &book)
                 }
             } catch {
-                libraryMoveProblem = String(describing: error)
+                libraryMoveProblem = ErrorText.plain(error)
                 return false
             }
             measured += pendingMeasured; skipped += pendingSkipped

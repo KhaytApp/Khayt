@@ -59,7 +59,7 @@ struct SpoolmanSheet: View {
         Task {
             do { result = try await shop.importFromSpoolman(typed) }
             catch let refusal as Shop.MoveRefused { problem = refusal.sentence }
-            catch { problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error) }
+            catch { problem = ErrorText.plain(error) }
             working = false
         }
     }

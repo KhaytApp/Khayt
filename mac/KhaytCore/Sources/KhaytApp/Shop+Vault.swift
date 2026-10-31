@@ -72,7 +72,7 @@ extension Shop {
         } catch VaultClient.Failure.vaultOff {
             return .off
         } catch {
-            return .problem((error as? CustomStringConvertible)?.description ?? String(describing: error))
+            return .problem(ErrorText.plain(error))
         }
     }
 
