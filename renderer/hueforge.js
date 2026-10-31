@@ -31,7 +31,11 @@
   let _rafPending = false;
 
   function defaults() {
-    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: 2.4, dither: false, vivid: 9, smooth: 0, stack: null, solve: null, plan: null, paint: null, flat: null };
+    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: 2.4, dither: false, vivid: 9, smooth: 0, hang: '', holeMm: 4, stack: null, solve: null, plan: null, paint: null, flat: null };
+  }
+  /** What the mesher needs to add a hanger (hangLayout in lib/hueforge.js). */
+  function hangOpts() {
+    return S.hang ? { hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers } : {};
   }
   const LAYER_PRESETS = [[0.04, 'ultra'], [0.08, 'recommended'], [0.12, 'faster'], [0.16, 'fast']];
 
@@ -465,6 +469,13 @@
       flat ? '' : '<label class="hf-num wide" title="Solid base layers before the first colour">base layers<input type="number" id="hfBase" min="1" max="20" step="1" value="' + esc(S.baseLayers) + '" /></label>',
       '<label class="hf-num wide" title="Total relief height. More height = more colour layers = richer tones (and longer print).">height (mm)<input type="number" id="hfHeight" min="0.8" max="6" step="0.1" value="' + esc(S.heightMm) + '" /></label>',
       flat ? '' : '<label class="hf-num wide" title="Colour vividness (front-lit correction). Higher = more saturated, punchier colour; lower = softer, more blended. 9 is a good default for reflective prints.">vividness<input type="number" id="hfVivid" min="1" max="10" step="1" value="' + esc(S.vivid) + '" /></label>',
+      flat ? '' : '<label class="hf-num wide" title="A hole through the top of the picture to hang it on a nail, or a loop on a tab above it for a keyring.">hanger'
+        + '<select class="input" id="hfHang">'
+        + '<option value=""' + (S.hang ? '' : ' selected') + '>None</option>'
+        + '<option value="hole"' + (S.hang === 'hole' ? ' selected' : '') + '>Hole · hang on a nail</option>'
+        + '<option value="loop"' + (S.hang === 'loop' ? ' selected' : '') + '>Loop · keychain tab</option>'
+        + '</select></label>',
+      flat || !S.hang ? '' : '<label class="hf-num wide" title="Hole diameter. 4 mm takes a keyring; 5–6 mm a nail head.">hole (mm)<input type="number" id="hfHoleMm" min="2" max="12" step="0.5" value="' + esc(S.holeMm) + '" /></label>',
       flat ? '' : '<label class="hf-num wide" title="The relief is already smoothed to keep flat areas clean. 0 = default; raise it (1–3) only if a busy photo still looks noisy — higher trades fine detail for a smoother surface.">smoothing<input type="number" id="hfSmooth" min="0" max="3" step="1" value="' + esc(S.smooth) + '" /></label>',
       '</div></div>',
     ].join('');
@@ -566,8 +577,12 @@
     cv.hidden = false; if (empty) empty.hidden = true;
     cv.width = src.width; cv.height = src.height;
     const ctx = cv.getContext('2d');
-    const id = ctx.createImageData(src.width, src.height);
-    id.data.set(src.preview);
+    const hang = isFlat() ? null : previewHang();
+    const extra = hang ? hang.extra : 0;
+    cv.height = src.height + extra;
+    const id = ctx.createImageData(src.width, src.height + extra);
+    id.data.set(src.preview, extra * src.width * 4);
+    if (hang) paintHang(id, hang);
     ctx.putImageData(id, 0, 0);
     if (isFlat()) {
       if (match) {
@@ -582,6 +597,35 @@
       const q = de < 2 ? 'exact' : de < 4 ? 'close' : de < 8 ? 'ok' : 'far';
       match.textContent = 'match ΔE ' + de.toFixed(1) + ' avg';
       match.className = 'hf-card-hx hf-match ' + q;
+    }
+  }
+
+  /** The hanger in preview pixels: one pixel per grid point, as the mesher counts. */
+  function previewHang() {
+    const hf = HF();
+    if (!S.hang || !S.solve || !hf || !hf.hangLayout) return null;
+    return hf.hangLayout(S.solve.width, S.solve.height, S.widthMm / (S.solve.width - 1), hangOpts());
+  }
+
+  /** Punch the hole and draw the tab, in the colour its thickness prints. */
+  function paintHang(id, hang) {
+    const W = id.width, d = id.data;
+    let tab = null;
+    if (hang.kind === 'loop' && S.paint && S.paint.palette.length) {
+      let max = 0;
+      for (const h of S.solve.heights) if (h > max) max = h;
+      const k = HF().hangTabLayers(S.paint.layerH, S.baseLayers, max);
+      const pe = S.paint.palette[Math.min(k, S.paint.palette.length) - 1];
+      tab = pe && pe.rgb;
+    }
+    for (let y = 0; y < id.height; y++) {
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4;
+        if (hang.inHole(x, y)) { d[o + 3] = 0; continue; }
+        if (y >= hang.extra) continue;
+        if (tab && hang.inTab(x, y)) { d[o] = tab.r; d[o + 1] = tab.g; d[o + 2] = tab.b; d[o + 3] = 255; }
+        else d[o + 3] = 0;
+      }
     }
   }
 
@@ -626,7 +670,8 @@
     if (!S.plan) { host.innerHTML = ''; return; }
     const p = S.plan, prof = u1Profile();
     const heightMm = S.stack ? (S.stack.totalLayers * S.stack.layerH).toFixed(2) : '0';
-    const depthMm = S.img ? (S.widthMm * S.img.height / S.img.width) : 0;
+    const hang = previewHang();   // a loop's tab adds to the depth
+    const depthMm = S.img ? (S.widthMm * S.img.height / S.img.width) + (hang ? hang.extra * S.widthMm / (S.solve.width - 1) : 0) : 0;
     const size = S.img ? (Math.round(S.widthMm) + '×' + Math.round(depthMm) + '×' + heightMm + ' mm') : '';
     const bedX = prof && prof.bed ? prof.bed.x : 270;
     const overBed = S.img && (S.widthMm > bedX || depthMm > (prof && prof.bed ? prof.bed.y : 270));
@@ -680,6 +725,8 @@
     on('#hfHeight', 'input', (e) => { S.heightMm = clampNum(e.target.value, 0.8, 6, 2.4); scheduleRepaint(); });
     on('#hfVivid', 'input', (e) => { S.vivid = Math.round(clampNum(e.target.value, 1, 10, 9)); scheduleRepaint(); });
     on('#hfSmooth', 'input', (e) => { S.smooth = Math.round(clampNum(e.target.value, 0, 3, 0)); scheduleRepaint(); });
+    on('#hfHang', 'change', (e) => { S.hang = e.target.value === 'hole' || e.target.value === 'loop' ? e.target.value : ''; render(); });
+    on('#hfHoleMm', 'input', (e) => { S.holeMm = clampNum(e.target.value, 2, 12, 4); paint(); });
     on('#hfCopy', 'click', copyPlan);
     on('#hfStl', 'click', exportStl);
     on('#hf3mf', 'click', export3mf);
@@ -750,7 +797,8 @@
   function copyPlan() {
     if (!S.stack || !S.plan) return;
     const lh = S.stack.layerH, mm = (k) => (k * lh).toFixed(2);
-    const depthMm = S.img ? Math.round(S.widthMm * S.img.height / S.img.width) : 0;
+    const hang = previewHang();
+    const depthMm = S.img ? Math.round(S.widthMm * S.img.height / S.img.width + (hang ? hang.extra * S.widthMm / (S.solve.width - 1) : 0)) : 0;
     const lines = [];
     lines.push('HueForge → Snapmaker U1  ·  ' + (S.imgName || 'painting'));
     lines.push('Size ' + Math.round(S.widthMm) + '×' + depthMm + '×' + mm(S.stack.totalLayers) + ' mm · '
@@ -787,6 +835,7 @@
       heights: Array.from(p.solve.heights),
       width: p.solve.width, height: p.solve.height,
       layerH: p.layerH, widthMm: S.widthMm,
+      hang: S.hang, holeMm: S.holeMm, baseLayers: S.baseLayers,
       bands: p.bands,                              // many bands, filaments reused across heads
       filaments: p.filaments.map((f) => f.hex),    // 4 slot colours, indexed by head
       name: (S.imgName || 'hueforge').replace(/\.[^.]+$/, ''),
@@ -847,7 +896,7 @@
       mesh = { triangles: tris, triangleCount: tris.length, sizeMm: S.flat.sizeMm };
     } else {
       if (!S.solve || !S.stack) { toast(t('common.export_empty')); return; }
-      mesh = hf.heightfieldToMesh(S.solve, { layerH: S.stack.layerH, widthMm: S.widthMm });
+      mesh = hf.heightfieldToMesh(S.solve, Object.assign({ layerH: S.stack.layerH, widthMm: S.widthMm }, hangOpts()));
     }
     if (!mesh.triangleCount) { toast(t('hf.empty_model')); return; }
     const bytes = hf.meshToStlBinary(mesh.triangles);
