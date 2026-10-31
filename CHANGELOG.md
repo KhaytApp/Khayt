@@ -6,6 +6,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: proforma invoices, as on the desktop.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has "Generate Proforma" on its right-click menu and on its details pane. It opens the job's paper titled "Proforma invoice", with a watermark saying so, ready to save as a PDF. A proforma is not a tax invoice: it carries no ZATCA QR and prints the job's own id, never an invoice number, and drawing one never numbers the job, so it does not mark the tax point. The shared invoice document (`lib/invoice-document.js`) takes a `proforma` option for this; without it, every invoice is byte-for-byte unchanged.
 
+- **Mac: a credit limit per customer, as on the desktop.** The customer sheet has a credit limit in the shop's currency; 0, the default, is no limit. A customer who owes more than it gets a mark beside their name in the list, and "Over credit limit" with the limit on their page. It is the desktop's `creditLimit` field, so a limit set in either app shows in both. A hand-typed figure counts, a negative or unreadable one is no limit, and saving a customer without touching the limit leaves it exactly as stored.
+
 - **iPhone: moving a job says what the shop's rules did.** Finishing a job on the phone now shows "Took 120 g off 1 spool", a spool or packaging running low, filament put back when a finished job is moved back, and a due date pushed back after a hold, at the foot of the screen, as the Mac does. Siri says it too.
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
@@ -6590,7 +6592,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [bedready-v1.4.0] - 2026-10-31
+
+### Added
+
+- **Bed Ready HueForge: reliefs bigger than the bed print as tiles.** In relief mode the width can go up to 1000 mm. A picture wider or deeper than the U1 bed, less 10 mm to spare, is cut evenly into tiles that each fit. The preview shows the seams, and the verdict says "3×2 tiles, each fits the bed" instead of asking you to reduce the width. Neighbouring tiles share their edge heights, so the pieces butt together flush. Every tile prints with the same colour bands, so it is one picture, not several re-solved ones. The 3MF export asks for one name and saves `name-r1c1-U1.3mf`, `-r1c2-` and so on beside it; STL saves one file per tile. A hanger is left off a tiled print, and the verdict says so.
+
+- **Bed Ready HueForge: fix the colour of one area.** In relief mode, click an area of the preview and pick, from the colours the stack can print, the one it should be. The area is the connected run of similar colour in the picture around the click (small, medium or large spread), so a second patch of the same colour elsewhere is left alone. Fixes are listed with how many pixels each took and the colour it actually prints, and each can be removed. They are kept as a spot and a colour, not a height, so they hold when the width, height, filaments or vividness change; a new picture clears them. The 3MF and the STL print the fixed heights.
+
+- **Bed Ready HueForge: hang a relief on a nail, or make it a keychain.** Print settings in relief mode have a "hanger": a round hole through the top of the picture, a wall's width in from the edge, or a loop on a tab above it. The hole is 2 to 12 mm (4 mm takes a keyring). The loop's tab prints 1.6 mm thick, or the relief's full height if that is thinner, never thinner than the base, so it does not snap off a keyring. The preview shows the hole and the tab in the colour the tab prints, and the size includes the tab. Both the U1 3MF and the STL carry it. The part stays one closed shell; a hole that would cut a small picture in two is left out.
+
+- **Bed Ready HueForge: measure your filaments from a printed card.** "Calibrate filaments" prints a small U1 card from the stack: one row per filament, steps of 1 to 13 layers over two contrasting backings, framed in the darkest filament with a light square marking the top-left. Photograph it, click its four corners, and Bed Ready measures each filament's real colour and TD (`lib/hueforge-calibrate.js`), shows them next to the stated values with a fit check, and puts them into the stack on "Use measured values". The relief then composites with measured numbers instead of the colour on the label and a TD guessed from lightness. Exposure and white balance are corrected from the lightest filament's stated colour. TD is read from the difference between the two backings, so exposure does not change it. A filament too opaque or too translucent for the steps is flagged rather than given a made-up TD.
+
 ## [4.1.0] - 2026-10-31
+
+> **No change to Khayt itself.** Every entry below is in Bed Ready (`renderer/bedready.html`, the `KHAYT_FLAVOR=bedready` build); Khayt loads `index.html` and has no HueForge tab. They reach users through Bed Ready 1.4.0 (`## [bedready-v1.4.0]` above; downloads in KhaytApp/bedready). Khayt 4.1.0 behaves exactly like 4.0.0.
 
 ### Added
 

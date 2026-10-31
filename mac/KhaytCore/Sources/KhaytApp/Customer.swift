@@ -36,6 +36,13 @@ struct Customer: Identifiable, Hashable, Sendable {
     /// with no record.
     var paymentTermsDays: Int { record?.paymentTermsDays ?? 0 }
 
+    /// The most they may owe — 0, no limit, for someone with no record.
+    var creditLimit: Double { record?.creditLimit ?? 0 }
+
+    /// Owing more than their credit limit, as the desktop's customer list
+    /// flags it (`renderer/clients.js`: outstanding balance over the limit).
+    var isOverLimit: Bool { creditLimit > 0 && owed > creditLimit + 0.005 }
+
     /// What they owe that is PAST its due date — invoice date plus their
     /// payment terms (`PaymentTerms`, held to `lib/payment-terms.js`). A
     /// company on net 30 owes money on day one and is overdue on day 31.
