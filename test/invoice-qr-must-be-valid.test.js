@@ -83,7 +83,7 @@ test('the builder still produces an empty tag if called directly', () => {
 });
 
 test('the invoice refuses to draw an incomplete QR, and tells the shop', () => {
-  const at = src.indexOf('if (settings.enableZatca && window.hubAPI?.generateQR)');
+  const at = src.indexOf('if (settings.enableZatca && !proforma && window.hubAPI?.generateQR)');
   assert.ok(at > 0, 'the ZATCA block is gone');
   const body = src.slice(at, at + 2200);
   assert.match(body, /const ready = zatcaQrReadiness\(settings\)/, 'nothing checks readiness');
