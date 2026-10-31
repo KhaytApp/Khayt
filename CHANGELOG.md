@@ -8968,6 +8968,22 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.14] - 2026-11-01
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A credit limit per customer.** Set the most a customer may owe on their sheet; 0 is no limit. Anyone owing more gets a mark beside their name and "Over credit limit" on their page. It is the same field the Windows and Linux app uses, so a limit set in either shows in both.
+- **Proforma invoices.** An accepted job that is not finished yet has "Generate Proforma" on its right-click menu and its details pane: the job's paper titled and watermarked as a proforma, ready to save as a PDF. It is not a tax invoice. It has no ZATCA QR, shows the job's own id instead of an invoice number, and never numbers the job.
+- **Over-committed spools.** Taking a job whose parts, together with what your open jobs already need, come to more than a spool holds now asks first, and the shelf marks that spool "Over-committed". A quote asks nothing, since it reserves nothing.
+
+### Fixed
+
+- **Settings can be resized.** The Settings window was fixed at 600 points wide, so a long label, a larger text size or Arabic could cut a row off with no way to reach it. It now grows as wide and tall as you drag it.
+- **Errors from macOS read as a sentence.** A failed or cancelled network request showed the system's raw error dump (domain, code and every URL) in Settings and elsewhere. It now shows the system's short message, such as "cancelled" or "The Internet connection appears to be offline."
+
 ## [4.0.0-beta.13] - 2026-10-30
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
