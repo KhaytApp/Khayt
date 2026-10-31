@@ -417,6 +417,7 @@
   "lic.not_for_sale": "Nicht für den Verkauf lizenziert",
   "lic.nc_line": "{name}: Die Lizenz erlaubt keinen Verkauf von Drucken.",
   "lic.expired_line": "{name}: Die gekaufte Lizenz endete am {until}.",
+  "lic.remix_line": "{name}: ein Remix von {parent}, dessen Lizenz den Verkauf von Drucken nicht erlaubt.",
   "lic.credit_title": "Die Lizenz verlangt, den Designer überall zu nennen, wo es verkauft wird:",
   "lic.credit_add": "Nennung zur Beschreibung hinzufügen",
   "lic.credit_lead": "Design:",

@@ -417,6 +417,7 @@
   "lic.not_for_sale": "販売ライセンスなし",
   "lic.nc_line": "{name}：ライセンスにより造形物の販売はできません。",
   "lic.expired_line": "{name}：購入したライセンスは {until} に終了しました。",
+  "lic.remix_line": "{name}：{parent} のリミックスで、元のライセンスはプリントの販売を許可していません。",
   "lic.credit_title": "このライセンスでは、販売する場所でデザイナーの表記が必要です：",
   "lic.credit_add": "クレジットを説明に追加",
   "lic.credit_lead": "デザイン：",

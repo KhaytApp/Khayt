@@ -154,7 +154,8 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
   if (!ML || !records.length) return '';
   const ids = (printFileIds || []).filter(Boolean);
   if (!ids.length) return '';
-  const problems = ML.saleProblems(ids, records, localDateStr());
+  const problems = ML.saleProblems(ids, records, localDateStr())
+    .concat(typeof ML.remixProblems === 'function' ? ML.remixProblems(ids, records) : []);
   const credits = ML.credits(ids, records);
   let html = '';
   if (problems.length) {
@@ -162,6 +163,8 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
       <strong>⚠ ${escapeHtml(t('lic.not_for_sale'))}</strong>
       ${problems.map((p) => `<div>${escapeHtml(p.reason === 'expired'
         ? t('lic.expired_line', { name: p.name, until: p.until })
+        : p.reason === 'remix'
+        ? t('lic.remix_line', { name: p.name, parent: p.until })
         : t('lic.nc_line', { name: p.name }))}</div>`).join('')}
     </div>`;
   }

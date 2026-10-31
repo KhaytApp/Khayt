@@ -417,6 +417,7 @@
   "lic.not_for_sale": "غير مرخّص للبيع",
   "lic.nc_line": "{name}: ترخيصه لا يسمح ببيع المطبوعات.",
   "lic.expired_line": "{name}: انتهى الترخيص المشترى في {until}.",
+  "lic.remix_line": "{name}: معدَّل عن {parent}، وترخيص الأصل لا يسمح ببيع المطبوعات.",
   "lic.credit_title": "يطلب ترخيصه ذكر المصمّم أينما بيع:",
   "lic.credit_add": "إضافة ذكر المصمّم إلى الوصف",
   "lic.credit_lead": "التصميم:",

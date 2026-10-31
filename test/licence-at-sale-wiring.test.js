@@ -48,3 +48,18 @@ test('the block: a warning for a non-commercial model, a credit for CC BY, nothi
   assert.equal(H.licenceCreditText(['BY'], ''), 'lic.credit_lead “Vase” — Ana (CC BY)');
   assert.equal(H.licenceCreditText(['BY'], written), '');
 });
+
+test('the block: a remix of a non-commercial original says so', () => {
+  require('../lib/model-licence.js');
+  global.t = (k, p) => k + (p ? JSON.stringify(p) : '');
+  global.escapeHtml = (s) => String(s);
+  global.localDateStr = () => '2026-10-30';
+  global.printFiles = [
+    { id: 'NC', name: 'Owl', licence: 'cc-by-nc', sourceUrl: 'https://example.com/owl' },
+    { id: 'RX', name: 'Owl, hollow', remixOf: 'https://example.com/owl/' },
+  ];
+  const H = require('../renderer/app-helpers.js');
+  const html = H.licenceAtSaleHtml(['RX']);
+  assert.match(html, /lic\.not_for_sale/);
+  assert.match(html, /lic\.remix_line\{"name":"Owl, hollow","parent":"Owl"\}/);
+});
