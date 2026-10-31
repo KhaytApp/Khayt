@@ -128,9 +128,12 @@ jobs:
           cp "$RUNNER_TEMP/appcast.xml" site/mac/appcast.xml
           node scripts/mac-site-version.js site/index.html || echo "::warning::could not update the Mac version on the site"
           cd site
+          # ar/index.html is generated from index.html, so the version just written
+          # reaches the Arabic page too (the site's sync-release.yml does the same).
+          node scripts/make-ar.js || echo "::warning::could not regenerate ar/index.html"
           git config user.name  "khayt-release"
           git config user.email "release@khaytapp.com"
-          git add mac/appcast.xml index.html
+          git add mac/appcast.xml index.html ar/index.html
           git commit -m "Khayt for macOS ${TAG#v}: the Sparkle feed" || { echo "the feed already names this build"; exit 0; }
           git push
           echo "### Khayt for macOS ${TAG#v} — built on a Mac, published here" >> "$GITHUB_STEP_SUMMARY"
