@@ -2329,6 +2329,43 @@ public actor KhaytEngine {
             as: [String: Runway].self)
     }
 
+    /// One spool a job would promise more than it holds.
+    public struct Overcommit: Decodable, Sendable, Equatable {
+        public let spoolId: String
+        public let spoolName: String
+        /// What the job's parts need from it.
+        public let needed: Double
+        /// What is left on it after the other open jobs' reservations.
+        public let available: Double
+
+        public init(spoolId: String, spoolName: String, needed: Double, available: Double) {
+            self.spoolId = spoolId; self.spoolName = spoolName
+            self.needed = needed; self.available = available
+        }
+    }
+
+    /// Would saving these parts over-commit a spool? `KhaytReorder.
+    /// overcommitWarnings`, the desktop's save-time check, on the deduction's
+    /// own grams. Only items counted in grams: a bottle of resin in ml is not
+    /// something a part's grams can be weighed against.
+    public func overcommit(parts: [JSONValue], orders: [JSONValue], spools: [JSONValue],
+                           excludeOrderId: String? = nil) throws -> [Overcommit] {
+        try runtime.call2("""
+            (function (parts, orders, inv, exclude) {
+              var grams = inv.filter(function (i) {
+                return i && KhaytInventoryUnits.unitOf(i) === 'g';
+              });
+              return KhaytReorder.overcommitWarnings(parts, orders, grams, {
+                partGrams: KhaytOrderDeduction.partGramsConsumed,
+                excludeOrderId: exclude,
+              });
+            })(ARG0, ARG1, ARG2, ARG3)
+            """,
+            [.array(parts), .array(orders), .array(spools),
+             excludeOrderId.map { .string($0) } ?? .null],
+            as: [Overcommit].self)
+    }
+
     /// One field of `new URL(input)`, as a bundled rule would read it.
     ///
     /// For `UrlPolyfillTests` and nothing else. JavaScriptCore has no `URL`, so
