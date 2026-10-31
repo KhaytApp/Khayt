@@ -73,6 +73,9 @@ struct NewJobSheet: View {
     @State private var rush = false
     @State private var quoted: QuoteTotal?
     @State private var problem: String?
+    /// The spools taking this job would over-commit, one sentence each, held
+    /// while the shop decides (`Shop.overcommitWarnings`).
+    @State private var overcommitted: [String] = []
     /// The last word on the total: round it to 1, 5 or 10, or type it.
     @State private var rule = Shop.PriceRule()
     /// The typed total as typed. Text, because a `Double?` behind a field
@@ -216,6 +219,23 @@ struct NewJobSheet: View {
         // growing the window past the screen.
         .frame(width: Self.width)
         .frame(maxHeight: 640)
+        // THE DESKTOP ASKS, so this does: a job whose parts and the open jobs'
+        // reservations come to more than a spool holds. A question, not a
+        // block — a delivery may be arriving tomorrow.
+        .confirmationDialog(
+            shop.words.callIt("inv.overcommit_warn"),
+            isPresented: Binding(get: { !overcommitted.isEmpty },
+                                 set: { if !$0 { overcommitted = [] } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.take_the_job")) {
+                overcommitted = []
+                Task { await save(asQuote: false, checked: true) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) { overcommitted = [] }
+        } message: {
+            Text(overcommitted.joined(separator: "\n"))
+        }
         .task {
             platforms = await shop.platforms()
             // A draft reopened already carrying a marketplace's lines must
@@ -1074,7 +1094,12 @@ struct NewJobSheet: View {
             overheadHours: hours)
     }
 
-    private func save(asQuote: Bool) async {
+    private func save(asQuote: Bool, checked: Bool = false) async {
+        // A quote reserves nothing, so only taking the job asks.
+        if !asQuote, !checked {
+            let warnings = await shop.overcommitWarnings(for: parts)
+            if !warnings.isEmpty { overcommitted = warnings; return }
+        }
         await shop.createJob(shop.newJobInput(
             parts: parts, project: project, clientId: clientId,
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
