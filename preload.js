@@ -189,6 +189,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   mfToStl:    (opts)  => ipcRenderer.invoke('hub:mf-to-stl', opts),
   hfExport3mf:(opts)  => ipcRenderer.invoke('hub:hf-export-3mf', opts),
   hfExportFlat3mf:(opts) => ipcRenderer.invoke('hub:hf-export-flat-3mf', opts),
+  hfExportCard3mf:(opts) => ipcRenderer.invoke('hub:hf-export-card-3mf', opts),
 
   // Feature 8 (new): Status page auto-export
   writeStatusPage: (html, orderId) => ipcRenderer.invoke('hub:write-status-page', { html, orderId }),
