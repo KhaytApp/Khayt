@@ -34,6 +34,7 @@ struct OrderDetailPage: View {
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
+    @State private var moveNotes: [String] = []
 
     init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
          onChanged: @escaping () async -> Void) {
@@ -111,6 +112,7 @@ struct OrderDetailPage: View {
                 }
             }
         }
+        .moveNotes($moveNotes)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             machines = (try? await api.fetchMachines()) ?? []
@@ -155,7 +157,7 @@ struct OrderDetailPage: View {
         isUpdating = true
         defer { isUpdating = false }
         do {
-            try await api.updateOrderStatus(orderId: order.id, status: status)
+            moveNotes = try await api.updateOrderStatus(orderId: order.id, status: status)
             CompanionHaptics.success()
             errorMessage = nil
             await refresh(status: status, machineId: order.machineId, machine: order.machine)

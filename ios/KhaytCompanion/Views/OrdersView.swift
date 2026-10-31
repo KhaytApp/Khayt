@@ -54,6 +54,7 @@ struct OrdersView: View {
     @State private var loaded = false
     @State private var errorMessage: String?
     @State private var updatingId: String?
+    @State private var moveNotes: [String] = []
     @State private var openOrder: QueueOrder?
     @State private var showIntake = false
     @State private var showNewOrder = false
@@ -157,6 +158,7 @@ struct OrdersView: View {
         .sheet(isPresented: $showNewOrder) {
             NewOrderSheet(machines: machines) { Task { await load() } }
         }
+        .moveNotes($moveNotes)
         .refreshable { await load() }
         .task(id: segment) { await load() }
         .watchesPrinters(when: segment == .active
@@ -416,7 +418,7 @@ struct OrdersView: View {
         updatingId = order.id
         defer { updatingId = nil }
         do {
-            try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
+            moveNotes = try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
             CompanionHaptics.success()
             await load()
         } catch {
