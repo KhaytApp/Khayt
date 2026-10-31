@@ -7,7 +7,7 @@ let portfolioSearchTerm = '';
 function renderScheduleView() {
   const el = $('#scheduleView');
   if (!el) return;
-  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const activeOrders = printLog.filter(o => KhaytOrderStatus.isOpen(o));
   if (activeOrders.length === 0) {
     el.innerHTML = `<div class="card"><p style="color:var(--text-muted); font-size:13px; text-align:center; padding:20px 0;">${escapeHtml(t('queue.empty'))}</p></div>`;
     return;

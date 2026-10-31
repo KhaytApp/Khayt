@@ -55,7 +55,7 @@ function buildNotifications() {
 
   // 1. Overdue orders
   const overdue = printLog.filter(o =>
-    o.dueDate && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' &&
+    o.dueDate && KhaytOrderStatus.isOpen(o) &&
     new Date(o.dueDate + 'T00:00:00') < today
   );
   for (const o of overdue.slice(0, 8)) {
@@ -377,7 +377,7 @@ function openNotifPanel() {
 
 function updateTabBadges() {
   // Queue tab: count all active (non-completed, non-quote) orders
-  const activeCount = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
+  const activeCount = printLog.filter(o => KhaytOrderStatus.isOpen(o)).length;
   const queueTabBtn = document.querySelector('.tab-btn[data-tab="queue-tab"]');
   if (queueTabBtn) {
     let badge = queueTabBtn.querySelector('.tab-badge');

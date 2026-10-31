@@ -169,7 +169,7 @@
       ? `${revDeltaPct >= 0 ? '▲' : '▼'} ${Math.abs(revDeltaPct)}% ${tr('dash.vs_yest', 'vs yest')}` : '';
     const revDeltaCls = revDeltaPct == null ? '' : revDeltaPct >= 0 ? 'up' : 'down';
 
-    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+    const openOrders = log.filter((o) => KhaytOrderStatus.isOpen(o));
     const dueToday = openOrders.filter((o) => o.dueDate === todayStr).length;
 
     const nowPrinting = log.filter((o) => o.status === 'printing');

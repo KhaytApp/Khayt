@@ -1395,7 +1395,7 @@ function exportClientPortal(clientId) {
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   // Both spellings, both ways round: a delivered order is finished, so it is
   // not still active and it does belong in the finished count.
-  const activeOrders = orders.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const activeOrders = orders.filter(o => KhaytOrderStatus.isOpen(o));
   const completedOrders = orders.filter(o => KhaytOrderStatus.isFinished(o));
   const outstanding = orders
     .filter(o => payStatus(o) !== 'paid')
@@ -1442,7 +1442,7 @@ function exportClientPortal(clientId) {
     return `<tr style="border-bottom:1px solid #2a2a2a;">
       <td style="padding:8px;font-size:12px;white-space:nowrap;color:#888;">${escapeHtml(o.date || '')}</td>
       <td style="padding:8px;font-size:12px;"><strong style="color:#e2e8f0;">${escapeHtml(o.project || o.id)}</strong><div style="font-size:10px;color:#666;">${escapeHtml(o.id)}</div>
-        ${!KhaytOrderStatus.isFinished(o) && o.status !== 'quote' ? stepperHtml(o) : ''}
+        ${KhaytOrderStatus.isOpen(o) ? stepperHtml(o) : ''}
       </td>
       <td style="padding:8px;"><span style="background:${statusColors[o.status]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${escapeHtml(o.status)}</span></td>
       <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtPrice(o.price)}</td>
