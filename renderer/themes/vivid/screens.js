@@ -275,7 +275,7 @@
       ? `${revDeltaPct >= 0 ? '▲' : '▼'} ${Math.abs(revDeltaPct)}% ${tr('dash.vs_prev_month', 'vs last month')}`
       : '';
 
-    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+    const openOrders = log.filter((o) => KhaytOrderStatus.isOpen(o));
     const nowPrinting = log.filter((o) => o.status === 'printing');
     const queued = openOrders.filter((o) => o.status === 'pending').length;
     const activeDelta = tr('dash.vv_active_sub', `${queued} in queue · ${nowPrinting.length} printing`)

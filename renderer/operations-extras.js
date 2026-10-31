@@ -58,7 +58,7 @@ function openEndOfDayReport() {
   const wasteTotalG    = wasteToday.reduce((s, w) => s + (+w.weight || 0), 0);
   const timeToday      = timeEntries.filter(te => (te.date || te.startedAt || '').startsWith(today));
   const timeTotal      = timeToday.reduce((s, te) => s + (+te.durationMins || 0), 0);
-  const overdueOrders  = printLog.filter(o => o.dueDate === today && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const overdueOrders  = printLog.filter(o => o.dueDate === today && KhaytOrderStatus.isOpen(o));
 
   const overdueHtml = overdueOrders.length > 0 ? `
     <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
