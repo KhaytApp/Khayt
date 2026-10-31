@@ -31,7 +31,7 @@
   let _rafPending = false;
 
   function defaults() {
-    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: 2.4, dither: false, vivid: 9, smooth: 0, hang: '', holeMm: 4, stack: null, solve: null, plan: null, paint: null, flat: null };
+    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: 2.4, dither: false, vivid: 9, smooth: 0, hang: '', holeMm: 4, fixes: [], fixPick: null, stack: null, solve: null, plan: null, paint: null, flat: null };
   }
   /** What the mesher needs to add a hanger (hangLayout in lib/hueforge.js). */
   function hangOpts() {
@@ -68,6 +68,7 @@
         S.img = ctx.getImageData(0, 0, w, h);
         S.imgUrl = reader.result;
         S.imgName = file.name || 'image';
+        S.fixes = []; S.fixPick = null;   // a fix names a spot in the OLD picture
         autoPalette();
         render();
       };
@@ -105,6 +106,7 @@
       // vividness → front-lit TD scale (higher vivid = more opaque = more saturated pop)
       tdScale: Math.max(0.1, 1.1 - (S.vivid || 9) * 0.1),
       smooth: S.smooth || 0,
+      fixes: S.fixes,
     });
     S.paint = paint;
     S.solve = paint ? paint.solve : null;
@@ -222,6 +224,7 @@
       '</section>',
       '<section class="hf-col hf-right">',
       previewHtml(),
+      isFlat() ? '' : '<div class="hf-card" id="hfFixes"></div>',
       elevationHtml(),
       verdictHtml(),
       exportHtml(),
@@ -561,6 +564,7 @@
 
   function paint() {
     paintCanvas();
+    paintFixes();
     paintElevation();
     paintVerdict();
   }
@@ -575,6 +579,7 @@
     const src = isFlat() ? S.flat : S.solve;
     if (!src || !S.img) { cv.hidden = true; if (empty) empty.hidden = false; if (match) match.textContent = ''; return; }
     cv.hidden = false; if (empty) empty.hidden = true;
+    cv.classList.toggle('fixable', !isFlat());   // relief areas take a colour fix
     cv.width = src.width; cv.height = src.height;
     const ctx = cv.getContext('2d');
     const hang = isFlat() ? null : previewHang();
@@ -584,6 +589,15 @@
     id.data.set(src.preview, extra * src.width * 4);
     if (hang) paintHang(id, hang);
     ctx.putImageData(id, 0, 0);
+    if (!isFlat() && S.fixPick && typeof ctx.arc === 'function') {
+      // Mark the spot waiting for a colour, so the maker sees which area they picked.
+      const r = Math.max(4, src.width / 60);
+      ctx.lineWidth = Math.max(1.5, r / 3);
+      for (const [c, w] of [['#000', ctx.lineWidth + 2], ['#fff', ctx.lineWidth]]) {
+        ctx.strokeStyle = c; ctx.lineWidth = w;
+        ctx.beginPath(); ctx.arc(S.fixPick.x * (src.width - 1), extra + S.fixPick.y * (src.height - 1), r, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
     if (isFlat()) {
       if (match) {
         const n = S.flat.palette.length;
@@ -598,6 +612,87 @@
       match.textContent = 'match ΔE ' + de.toFixed(1) + ' avg';
       match.className = 'hf-card-hx hf-match ' + q;
     }
+  }
+
+  // ---- colour fixes ---------------------------------------------------------
+
+  /** The colours the stack can print, above the base, without near-repeats (ΔE76 < 3). */
+  function fixSwatches() {
+    if (!S.paint || !S.paint.palette) return [];
+    const out = [];
+    for (const p of S.paint.palette) {
+      if (p.k < S.paint.baseLayers) continue;
+      const last = out[out.length - 1];
+      if (last && Math.hypot(p.lab.L - last.lab.L, p.lab.a - last.lab.a, p.lab.b - last.lab.b) < 3) continue;
+      out.push(p);
+    }
+    return out;
+  }
+
+  /**
+   * "Colour fixes": click an area of the preview, pick the colour it should print. Kept
+   * as a point and a hex (applyRegionFixes in lib/hueforge.js), so a fix outlives every
+   * re-solve; painted on its own so picking a spot does not re-solve the picture.
+   */
+  function paintFixes() {
+    const host = document.getElementById('hfFixes');
+    if (!host) return;
+    if (!S.solve) { host.hidden = true; return; }
+    host.hidden = false;
+    const done = (S.solve.fixes || []);
+    const rows = S.fixes.map((f, i) => {
+      const got = done[i] || {};
+      const prints = got.hex ? ' → prints <span class="hf-fix-sw" style="background:' + css(got.hex) + '"></span>' : '';
+      return '<div class="hf-fix-row"><span class="hf-fix-sw" style="background:' + css(f.hex) + '"></span>'
+        + '<span class="hf-fix-t">' + esc(f.spread || 'medium') + ' area · ' + (got.count || 0) + ' px' + prints + '</span>'
+        + '<button type="button" class="btn ghost sm" data-fix-del="' + i + '" title="Remove this fix" aria-label="Remove this fix">×</button></div>';
+    }).join('');
+    let pick = '';
+    if (S.fixPick) {
+      const sw = fixSwatches().map((p) => '<button type="button" class="hf-fix-pick" data-fix-hex="' + esc(p.hex) + '" title="' + esc(p.hex) + '" aria-label="' + esc(p.hex) + '" style="background:' + css(p.hex) + '"></button>').join('');
+      pick = '<div class="hf-note" style="margin-top:0">Pick the colour this area should print:</div>'
+        + '<div class="hf-fix-pal">' + sw + '</div>'
+        + '<div class="hf-auto" style="margin-top:8px">'
+        + '<label class="hf-num">area<select class="input" id="hfFixSpread">'
+        + ['small', 'medium', 'large'].map((v) => '<option value="' + v + '"' + ((S.fixSpread || 'medium') === v ? ' selected' : '') + '>' + v + '</option>').join('')
+        + '</select></label>'
+        + '<button type="button" class="btn ghost sm" data-fix-cancel="1">Cancel</button></div>';
+    }
+    host.innerHTML = '<div class="hf-card-h">COLOUR FIXES</div>'
+      + (pick || '<div class="hf-note" style="margin-top:0">Click an area in the preview to choose the colour it prints.</div>')
+      + rows
+      + (S.fixes.length > 1 ? '<div class="hf-auto" style="margin-top:8px"><button type="button" class="btn ghost sm" data-fix-clear="1">Clear all fixes</button></div>' : '');
+  }
+
+  function onFixesClick(e) {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.fixHex && S.fixPick) {
+      S.fixes = S.fixes.concat([{ x: S.fixPick.x, y: S.fixPick.y, hex: b.dataset.fixHex, spread: S.fixSpread || 'medium' }]);
+      S.fixPick = null;
+      scheduleRepaint();
+    } else if (b.dataset.fixDel != null) {
+      S.fixes = S.fixes.filter((_, i) => i !== +b.dataset.fixDel);
+      scheduleRepaint();
+    } else if (b.dataset.fixClear) {
+      S.fixes = []; scheduleRepaint();
+    } else if (b.dataset.fixCancel) {
+      S.fixPick = null; paintCanvas(); paintFixes();
+    }
+  }
+
+  /** A click on the preview, as a fraction of the PICTURE (a loop's tab is above it). */
+  function onCanvasClick(e) {
+    if (isFlat() || !S.solve) return;
+    const cv = e.currentTarget, r = cv.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const px = (e.clientX - r.left) * cv.width / r.width;
+    const py = (e.clientY - r.top) * cv.height / r.height;
+    const hang = previewHang(), extra = hang ? hang.extra : 0;
+    const x = px / (S.solve.width - 1), y = (py - extra) / (S.solve.height - 1);
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    S.fixPick = { x, y };
+    paintCanvas(); paintFixes();
   }
 
   /** The hanger in preview pixels: one pixel per grid point, as the mesher counts. */
@@ -727,6 +822,9 @@
     on('#hfSmooth', 'input', (e) => { S.smooth = Math.round(clampNum(e.target.value, 0, 3, 0)); scheduleRepaint(); });
     on('#hfHang', 'change', (e) => { S.hang = e.target.value === 'hole' || e.target.value === 'loop' ? e.target.value : ''; render(); });
     on('#hfHoleMm', 'input', (e) => { S.holeMm = clampNum(e.target.value, 2, 12, 4); paint(); });
+    on('#hfCanvas', 'click', onCanvasClick);
+    on('#hfFixes', 'click', onFixesClick);
+    on('#hfFixes', 'change', (e) => { if (e.target.id === 'hfFixSpread') S.fixSpread = e.target.value; });
     on('#hfCopy', 'click', copyPlan);
     on('#hfStl', 'click', exportStl);
     on('#hf3mf', 'click', export3mf);
