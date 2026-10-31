@@ -290,3 +290,31 @@ test('a keychain loop reaches the export and adds its tab to the size', async ()
   assert.equal(exported[0].holeMm, 4);
   assert.ok(exported[0].baseLayers >= 1);
 });
+
+test('a colour fix picked on the preview reaches the exported heights', async () => {
+  const { window, doc, exported } = await boot();
+  const cv = doc.getElementById('hfCanvas');
+  // jsdom lays nothing out: give the canvas a box the size of its pixels.
+  cv.getBoundingClientRect = () => ({ left: 0, top: 0, width: cv.width, height: cv.height });
+  assert.equal(doc.querySelector('.hf-fix-pick'), null, 'no swatches before a pick');
+  cv.dispatchEvent(new window.MouseEvent('click', { bubbles: true, clientX: 2, clientY: 2 }));
+  const picks = doc.querySelectorAll('.hf-fix-pick');
+  assert.ok(picks.length >= 2, 'the achievable colours are offered');
+  // Choose the swatch furthest from what the corner prints now, so the fix shows.
+  click(window, picks[picks.length - 1]);
+  await settle(window);
+  assert.equal(doc.querySelectorAll('.hf-fix-row').length, 1, 'the fix is listed');
+  assert.match(doc.querySelector('.hf-fix-row').textContent, /[1-9]\d* px/, 'and it took an area');
+
+  click(window, doc.getElementById('hf3mf'));
+  await settle(window);
+  const e = exported[0];
+  const fixedK = e.heights[0];
+  click(window, doc.querySelector('[data-fix-del="0"]'));
+  await settle(window);
+  click(window, doc.getElementById('hf3mf'));
+  await settle(window);
+  assert.equal(doc.querySelectorAll('.hf-fix-row').length, 0, 'removed');
+  assert.notDeepEqual(exported[1].heights, e.heights, 'removing the fix changes the export back');
+  assert.ok(fixedK > 0);
+});
