@@ -1,5 +1,6 @@
 import XCTest
 import KhaytCore
+import UserNotifications
 @testable import KhaytCompanion
 
 /// What the shop's rule says about a move reaches the person who made it:
@@ -100,5 +101,16 @@ final class MoveNotesTests: XCTestCase {
     /// which is the point, rather than nothing.
     func testAnUnknownCodeIsShownNotDropped() throws {
         XCTAssertEqual(BookWriter.sentence(for: try notice(#"{"code":"brand_new","params":{}}"#)), "brand_new")
+    }
+
+    /// A move made from an alert's button still says what followed — as a
+    /// quiet alert of its own; a move the rules said nothing about adds none.
+    func testAlertButtonMoveSaysItsNotesQuietly() {
+        XCTAssertNil(PrintAlertCenter.notesContent([]))
+        let c = PrintAlertCenter.notesContent(["120 g taken from PLA Black.", "PLA Black is running low."])
+        XCTAssertEqual(c?.body, "120 g taken from PLA Black.\nPLA Black is running low.")
+        XCTAssertEqual(c?.interruptionLevel, .passive)
+        XCTAssertNil(c?.sound)
+        XCTAssertEqual(c?.categoryIdentifier, "")
     }
 }
