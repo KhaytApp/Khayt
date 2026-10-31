@@ -267,3 +267,26 @@ test('the copied plan counts the colours the maker actually has', async () => {
   assert.equal(copied.length, 1, 'the plan should have been copied');
   assert.ok(copied[0].length > 0, 'and not be empty');
 });
+
+test('a keychain loop reaches the export and adds its tab to the size', async () => {
+  const { window, doc, exported } = await boot();
+  const size = () => (doc.getElementById('hfVerdict')?.textContent.match(/(\d+)×(\d+)×/) || []).slice(1).map(Number);
+  const [w, d] = size();
+  assert.equal(doc.getElementById('hfHoleMm'), null, 'no hole size until a hanger is chosen');
+
+  const sel = doc.getElementById('hfHang');
+  sel.value = 'loop';
+  sel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await settle(window);
+  assert.ok(doc.getElementById('hfHoleMm'), 'the hole size appears with the hanger');
+  const [w2, d2] = size();
+  assert.equal(w2, w);
+  assert.ok(d2 > d, `the tab should add depth (${d} → ${d2})`);
+
+  click(window, doc.getElementById('hf3mf'));
+  await settle(window);
+  assert.equal(exported.length, 1);
+  assert.equal(exported[0].hang, 'loop');
+  assert.equal(exported[0].holeMm, 4);
+  assert.ok(exported[0].baseLayers >= 1);
+});
