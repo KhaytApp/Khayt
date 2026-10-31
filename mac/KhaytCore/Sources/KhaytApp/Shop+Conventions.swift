@@ -103,9 +103,21 @@ extension Shop {
     /// numbered first (`issueInvoiceNumberIfOwed`), and one still owed a
     /// number after that — this viewer could not give it one — is refused
     /// with the reason rather than drawn.
-    func invoiceDocument(for id: Order.ID) async -> InvoiceBuild {
+    func invoiceDocument(for id: Order.ID, proforma: Bool = false) async -> InvoiceBuild {
         guard orders.contains(where: { $0.id == id }) else {
             return .refused(words.callIt("mac.move_gone"))
+        }
+        // A PROFORMA ISSUES NOTHING. It is not a tax invoice: drawing one must
+        // not number the job (VAT is due on an issued invoice), so it takes
+        // none of the numbering below and states the job's own id.
+        if proforma {
+            guard let job = orders.first(where: { $0.id == id }) else {
+                return .refused(words.callIt("mac.move_gone"))
+            }
+            guard let doc = await Invoice.html(for: job, shop: self, proforma: true) else {
+                return .refused(words.callIt("mac.no_document"))
+            }
+            return .paper(doc, number: job.id)
         }
         await issueInvoiceNumberIfOwed(id)
         guard let job = orders.first(where: { $0.id == id }) else {

@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: proforma invoices, as on the desktop.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has "Generate Proforma" on its right-click menu and on its details pane. It opens the job's paper titled "Proforma invoice", with a watermark saying so, ready to save as a PDF. A proforma is not a tax invoice: it carries no ZATCA QR and prints the job's own id, never an invoice number, and drawing one never numbers the job, so it does not mark the tax point. The shared invoice document (`lib/invoice-document.js`) takes a `proforma` option for this; without it, every invoice is byte-for-byte unchanged.
+
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**

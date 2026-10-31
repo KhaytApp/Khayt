@@ -541,6 +541,9 @@ struct JobActions: View {
         // customer changes nothing, and refusing to draw the sample's invoice
         // would hide the thing this app is for.
         Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+        if Shop.offersProforma(job) {
+            Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
+        }
         Divider()
         JobDeleteItems(shop: shop, ids: [job.id])
     }

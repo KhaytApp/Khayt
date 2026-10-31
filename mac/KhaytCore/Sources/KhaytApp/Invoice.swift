@@ -26,7 +26,7 @@ enum Invoice {
     /// Gathering and building are separate on purpose: a test can hand this the
     /// awkward shop — no tax registration, a missing ZATCA field, a job with no
     /// parts — without opening a book to get one.
-    static func html(for job: Order, shop: Shop) async -> InvoiceDocument? {
+    static func html(for job: Order, shop: Shop, proforma: Bool = false) async -> InvoiceDocument? {
         guard let engine = shop.engine else { return nil }
         // The tax split, by the shop's own rule. A shop with no tax
         // registration has nothing to split: the whole price is what it keeps,
@@ -56,7 +56,8 @@ enum Invoice {
             subtotal: money?.subtotal ?? job.price,
             taxTotal: money?.taxTotal ?? 0,
             vatRate: await shop.taxPercent(),
-            timestamp: stamp)
+            timestamp: stamp,
+            proforma: proforma)
         return await document(paper, engine: engine, words: shop.words)
     }
 
@@ -89,6 +90,9 @@ enum Invoice {
         var vatRate: Double
         /// When the job was taken — the moment the QR is stamped with.
         var timestamp: String
+        /// A proforma: titled and watermarked as one, no ZATCA QR, the job's
+        /// id for a number (`proforma` in `lib/invoice-document.js`).
+        var proforma = false
     }
 
     /// The document itself.
@@ -99,7 +103,9 @@ enum Invoice {
         // is missing, rather than printing an empty box.
         var qrSvg = ""
         var qrProblem: String?
-        if case .bool(true)? = paper.settings["enableZatca"] {
+        // No QR on a proforma: it is not a tax invoice, and the document
+        // leaves the box out for one.
+        if !paper.proforma, case .bool(true)? = paper.settings["enableZatca"] {
             // `try?` on a call returning an optional gives an optional
             // optional; flattened once so "the call failed" and "the shop is
             // ready" are not the same value.
@@ -137,6 +143,7 @@ enum Invoice {
             "subtotalShown": .string(Self.amount(summary?.itemsSubtotal ?? paper.price)),
             "vatRate": .number(paper.vatRate),
             "shipping": .number(0),
+            "proforma": .bool(paper.proforma),
         ]
         return try? await engine.invoiceHtml(
             order: paper.row, settings: paper.settings, clients: paper.clients,
