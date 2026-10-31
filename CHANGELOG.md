@@ -6589,6 +6589,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [4.1.0] - 2026-10-31
 
+> **No change to Khayt itself.** Every entry below is in Bed Ready (`renderer/bedready.html`, the `KHAYT_FLAVOR=bedready` build); Khayt loads `index.html` and has no HueForge tab. They reach users only through a Bed Ready release (`gh workflow run "Build & Release" -f bedready_version=…`, downloads in KhaytApp/bedready). Khayt 4.1.0 behaves exactly like 4.0.0.
+
 ### Added
 
 - **Bed Ready HueForge: reliefs bigger than the bed print as tiles.** In relief mode the width can go up to 1000 mm. A picture wider or deeper than the U1 bed, less 10 mm to spare, is cut evenly into tiles that each fit. The preview shows the seams, and the verdict says "3×2 tiles, each fits the bed" instead of asking you to reduce the width. Neighbouring tiles share their edge heights, so the pieces butt together flush. Every tile prints with the same colour bands, so it is one picture, not several re-solved ones. The 3MF export asks for one name and saves `name-r1c1-U1.3mf`, `-r1c2-` and so on beside it; STL saves one file per tile. A hanger is left off a tiled print, and the verdict says so.
