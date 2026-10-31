@@ -308,9 +308,12 @@ jobs:
             echo "download link still resolves, but the version beside it is stale."
           }
           cd site
+          # ar/index.html is generated from index.html, so the version just written
+          # reaches the Arabic page too (the site's sync-release.yml does the same).
+          node scripts/make-ar.js || echo "::warning::could not regenerate ar/index.html"
           git config user.name  "khayt-release"
           git config user.email "release@khaytapp.com"
-          git add mac/appcast.xml index.html
+          git add mac/appcast.xml index.html ar/index.html
           git commit -m "Khayt for macOS ${{ needs.build.outputs.version }}: the Sparkle feed" || {
             echo "nothing to commit — the feed already names this build"; exit 0; }
           git push
