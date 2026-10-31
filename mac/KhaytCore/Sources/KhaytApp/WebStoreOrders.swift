@@ -98,7 +98,7 @@ extension Shop {
             return 0
         } catch {
             webStoreAutoProblem = (error as? LocalizedError)?.errorDescription
-                ?? String(describing: error)
+                ?? ErrorText.plain(error)
             return 0
         }
         webStoreAutoProblem = nil
@@ -290,7 +290,7 @@ extension Shop {
             webStoreStatusSaid = words.callIt("mac.webstore_status_not_offered")
         } catch {
             webStoreStatusSaid = words.callIt("mac.webstore_status_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + (ErrorText.plain(error))
         }
     }
 

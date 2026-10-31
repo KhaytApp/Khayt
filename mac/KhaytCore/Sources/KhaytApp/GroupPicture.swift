@@ -155,7 +155,7 @@ extension Shop {
         }
         switch made {
         case .failure(let error):
-            writeProblem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            writeProblem = ErrorText.plain(error)
         case .success(let rel):
             await writeGroupCover(.image(rel), for: path, in: build)
         }
@@ -192,7 +192,7 @@ extension Shop {
                 for key in undo.groupEntries.keys { undo.groupAfter[key] = .some(entriesAfter[key]) }
             }
         } catch {
-            writeProblem = String(describing: error); return
+            writeProblem = ErrorText.plain(error); return
         }
         // The picture it wore before, to the Trash — only when no group
         // wears it any more (a folder moved and moved back can leave two

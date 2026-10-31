@@ -142,7 +142,7 @@ struct NtfySettings: View {
             ntfy["token"] = .string("")
         } else if !typed.isEmpty {
             do { ntfy["token"] = .string(try await Secrets.seal(typed, for: build)) }
-            catch { shop.settingsProblem = String(describing: error); return }
+            catch { shop.settingsProblem = ErrorText.plain(error); return }
         }
         await shop.saveSettings(["ntfy": .object(ntfy)], opened: ["ntfy": .object(Self.form(original))])
         result = nil
@@ -157,7 +157,7 @@ struct NtfySettings: View {
                                     body: shop.words.callIt("mac.ntfy_test_body"))
             result = "✓ " + shop.words.callIt("mac.ntfy_test_sent")
         } catch {
-            result = String(describing: error)
+            result = ErrorText.plain(error)
         }
     }
 }

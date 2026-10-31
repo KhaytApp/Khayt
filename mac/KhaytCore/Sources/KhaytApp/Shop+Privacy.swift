@@ -124,7 +124,7 @@ extension Shop {
                case .number(let n)? = counts["orders"] { orders = Int(n) }
             moveNotices = [words.callIt("priv.exported", ["n": .number(Double(orders))])]
         } catch {
-            moveProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.export_failed") + " " + ErrorText.plain(error)
         }
     }
 
@@ -145,7 +145,7 @@ extension Shop {
                                                           collections: Self.privacyCollections(root), full: true)
             erasingCustomer = CustomerEraseRequest(clientId: clientId, name: person.name, plan: plan)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = ErrorText.plain(error)
         }
     }
 

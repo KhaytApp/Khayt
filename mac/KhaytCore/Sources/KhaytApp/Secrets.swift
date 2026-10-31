@@ -108,7 +108,7 @@ enum Secrets {
                let opened = try? SafeStorage.open(value, key: other) {
                 return opened
             }
-            throw Failure.unreadable(String(describing: error))
+            throw Failure.unreadable(ErrorText.plain(error))
         }
     }
 
@@ -172,7 +172,7 @@ enum Secrets {
         // restored book, which is the case this whole path exists for.
         guard let key = await key(for: build, making: true) else { throw Failure.noKeychain }
         do { return try SafeStorage.seal(text, key: key) }
-        catch { throw Failure.unreadable(String(describing: error)) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
     }
 
     /// Forget the session's key — for a test, and for a book being closed.

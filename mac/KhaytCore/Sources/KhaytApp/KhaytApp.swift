@@ -33,6 +33,8 @@ struct KhaytApp: App {
             SettingsWindow(shop: shop)
                 .modifier(ShopsLocale(words: shop.words))
         }
+        // Resizable down to what the panes need, never below it.
+        .windowResizability(.contentMinSize)
 
         // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
         // of it: somebody reading "how do I file a download into groups" wants

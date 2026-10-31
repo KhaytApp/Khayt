@@ -288,7 +288,7 @@ enum Feedback {
                 urls.append(url)
             }
         } catch {
-            return .failed(String(describing: error))
+            return .failed(ErrorText.plain(error))
         }
 
         let items: [Any] = [parts.message as NSString] + urls.map { $0 as NSURL }
@@ -315,7 +315,7 @@ enum Feedback {
             NSWorkspace.shared.activateFileViewerSelecting([url])
             return .saved(url)
         } catch {
-            return .failed(String(describing: error))
+            return .failed(ErrorText.plain(error))
         }
     }
 

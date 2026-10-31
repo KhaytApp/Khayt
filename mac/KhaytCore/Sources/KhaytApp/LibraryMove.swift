@@ -233,7 +233,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            libraryMoveProblem = String(describing: error); return
+            libraryMoveProblem = ErrorText.plain(error); return
         }
         await moveStrandedFiles()
     }
@@ -275,7 +275,7 @@ extension Shop {
                 }.value
                 if r.action == LibraryMove.same { duplicates += 1 } else { moved += 1 }
             } catch {
-                failures.append(item.rel + ": " + ((error as? LocalizedError)?.errorDescription ?? String(describing: error)))
+                failures.append(item.rel + ": " + (ErrorText.plain(error)))
             }
         }
         // Folders emptied by the move, and only empty ones, never a root.

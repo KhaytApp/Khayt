@@ -224,7 +224,7 @@ enum Converter {
 
         let entries: [Zip.Entry]
         do { entries = try Zip.entries(of: source) }
-        catch { throw Failure.unreadable(String(describing: error)) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
         guard !entries.isEmpty else { throw Failure.unreadable("it holds nothing") }
         // The whole file's declared size, summed before a byte is read — see
         // `rebuildLimit`. Overflow-safe: a lying directory can claim anything.
@@ -335,7 +335,7 @@ enum Converter {
         // FROM, and a plain write truncated the only copy before writing the
         // new one — a crash or a full disk in between lost both.
         do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
-        catch { throw Failure.unreadable(String(describing: error)) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
         return Result(url: destination, report: planned.report)
     }
 

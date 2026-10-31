@@ -415,7 +415,7 @@ extension Shop {
             let hashed = hash
             try await StoreWriter.updateOffMain(build) { root in Self.writePinHash(into: &root, id: id, hash: hashed) }
             await load(source)
-        } catch { moveProblem = String(describing: error) }
+        } catch { moveProblem = ErrorText.plain(error) }
     }
 
     /// Would this change leave the lock switched on with nobody who can sign
@@ -487,7 +487,7 @@ extension Shop {
                 root["settings"] = .object(settings)
             }
             await load(source)
-        } catch { moveProblem = String(describing: error) }
+        } catch { moveProblem = ErrorText.plain(error) }
     }
 
     /// A new recovery code, shown once. Writes its hash the way the other
@@ -512,7 +512,7 @@ extension Shop {
             }
             await load(source)
             return code
-        } catch { moveProblem = String(describing: error); return nil }
+        } catch { moveProblem = ErrorText.plain(error); return nil }
     }
 
     var hasRecoveryCode: Bool {

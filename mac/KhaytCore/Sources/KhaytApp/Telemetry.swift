@@ -795,7 +795,7 @@ extension Shop {
                 root["settings"] = .object(settings)
             }
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = ErrorText.plain(error)
             return false
         }
         // Any choice answers the one-time ask, wherever it was made.

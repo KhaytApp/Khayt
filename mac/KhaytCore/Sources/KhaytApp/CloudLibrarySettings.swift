@@ -612,9 +612,14 @@ struct CloudLibrarySettings: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         if let problem = shop.cloudLibraryProblem {
+            // Held to the pane's width and a few lines. A message is not
+            // ours to size: one with a long URL and no spaces once pushed the
+            // whole pane past the Settings window's edge.
             Label(problem, systemImage: "exclamationmark.triangle")
                 .font(.caption).foregroundStyle(Khayt.attention)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(6).truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
     }
 

@@ -320,7 +320,7 @@ extension Shop {
             customerRecordsNotBefore = nil
             await publishCustomerRecords(delete: !on, byPerson: true)
         } catch {
-            customerRecordsSaid = words.callIt("mac.cr_failed") + " " + String(describing: error)
+            customerRecordsSaid = words.callIt("mac.cr_failed") + " " + ErrorText.plain(error)
             customerRecordsProblem = true
         }
     }

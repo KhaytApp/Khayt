@@ -141,7 +141,7 @@ extension Shop {
         } catch let failure as LibraryImport.Failure {
             throw .failed(failure.said(words))
         } catch {
-            throw .failed(String(describing: error))
+            throw .failed(ErrorText.plain(error))
         }
         let imported = made.record, savedId = offer.recordId
         let attached: WebSaveRecord.Attached?

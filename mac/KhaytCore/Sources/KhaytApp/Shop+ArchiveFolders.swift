@@ -226,7 +226,7 @@ extension Shop {
                 scan.addedIds += held.map(\.added.id)
             } catch {
                 for p in held { try? FileManager.default.removeItem(at: p.dir) }
-                scan.failures.append(String(describing: error))
+                scan.failures.append(ErrorText.plain(error))
             }
             held = []
         }

@@ -33,7 +33,7 @@ extension Shop {
         case let failure as LibraryImport.Failure: return failure.said(words)
         case let failure as Converter.Failure: return failure.said(words)
         case let failure as CustomerRecordsPublisher.Failure: return failure.said(words)
-        default: return String(describing: error)
+        default: return ErrorText.plain(error)
         }
     }
 }

@@ -136,7 +136,7 @@ extension Shop {
             catch {
                 // Not remembered means it comes back on the next launch, which
                 // is the safe way round — but the shop is told why.
-                moveProblem = words.callIt("mac.losses_review_unsaved") + " " + String(describing: error)
+                moveProblem = words.callIt("mac.losses_review_unsaved") + " " + ErrorText.plain(error)
             }
         }
         dismissSyncLosses()

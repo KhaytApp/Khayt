@@ -205,7 +205,7 @@ struct TeamSettings: View {
             if r.status == 403 { return r.error.isEmpty ? shop.words.callIt("mac.team_not_allowed") : r.error }
             if !r.error.isEmpty { return r.error }
         }
-        return (error as? CustomStringConvertible)?.description ?? String(describing: error)
+        return ErrorText.plain(error)
     }
 }
 

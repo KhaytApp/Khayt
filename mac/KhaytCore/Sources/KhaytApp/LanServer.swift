@@ -3211,7 +3211,7 @@ extension Shop {
         let trimmed = typed.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty, let build = source.build {
             do { lan["pin"] = .string(try await Secrets.seal(trimmed, for: build)) }
-            catch { settingsProblem = String(describing: error); return }
+            catch { settingsProblem = ErrorText.plain(error); return }
         }
         // Blank keeps what is stored, as it does for the PIN; anything typed is
         // sealed before it goes near the book.
@@ -3220,7 +3220,7 @@ extension Shop {
             guard !secret.isEmpty, let build = source.build,
                   let field = LanServer.storefrontSecretField[platform] else { continue }
             do { lan[field] = .string(try await Secrets.seal(secret, for: build)) }
-            catch { settingsProblem = String(describing: error); return }
+            catch { settingsProblem = ErrorText.plain(error); return }
         }
         await saveSettings(["lanApi": .object(lan)], opened: opened.map { ["lanApi": .object($0)] })
         // NOW, not on the next tick. The publisher runs ninety seconds after

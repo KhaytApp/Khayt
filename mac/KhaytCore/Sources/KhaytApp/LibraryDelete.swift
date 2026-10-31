@@ -284,7 +284,7 @@ extension Shop {
                     }
                 }
                 do { try await target.delete(key, fetch: fetch) }
-                catch { problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error); break }
+                catch { problem = ErrorText.plain(error); break }
             }
             if let problem { failed[id] = problem } else { done.append(id) }
         }
@@ -321,7 +321,7 @@ extension Shop {
     struct ListFailure: Error, Equatable, Sendable {
         let said: String
         init(_ error: any Error) {
-            said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            said = ErrorText.plain(error)
         }
     }
 

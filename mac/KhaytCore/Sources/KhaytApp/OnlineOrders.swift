@@ -159,7 +159,7 @@ extension Shop {
         } catch {
             onlineOrders = []
             onlineProblem = (error as? LocalizedError)?.errorDescription
-                ?? String(describing: error)
+                ?? ErrorText.plain(error)
         }
     }
 
@@ -362,7 +362,7 @@ extension Shop {
             return nil
         } catch {
             return words.callIt("mac.online_kept_in_queue") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + (ErrorText.plain(error))
         }
     }
 
@@ -391,7 +391,7 @@ extension Shop {
             }
         } catch {
             return .failure(OnlineWriteFailure((error as? LocalizedError)?.errorDescription
-                                               ?? String(describing: error)))
+                                               ?? ErrorText.plain(error)))
         }
         // After the write, like a payment's: a delivery that went out for a
         // payment the book then refused to keep would be a lie told outward.

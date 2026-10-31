@@ -282,7 +282,7 @@ extension Shop {
 
     func embedProblem(_ error: Error) -> String {
         guard let failure = error as? QuoteFormEmbed.Failure else {
-            return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            return ErrorText.plain(error)
         }
         switch failure {
         case .notAvailable: return words.callIt("mac.qfe_not_available")

@@ -205,7 +205,7 @@ enum Restore {
             // Copy the book before replacing it. If that fails, stop: a restore
             // that cannot be undone is a second way to lose a shop's data.
             do { try await protect() }
-            catch { throw Refusal.couldNotProtectTheBook(String(describing: error)) }
+            catch { throw Refusal.couldNotProtectTheBook(ErrorText.plain(error)) }
             snapshot = carryForward(into: snapshot, from: current, paths: try await engine?.secretPaths() ?? [])
         }
         // WHAT RUNS ON THIS MAC STAYS THIS MAC'S. A backup's slicer settings
