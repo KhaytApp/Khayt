@@ -29,6 +29,7 @@ struct DashboardView: View {
     @State private var waiting: [WaitingListItem] = []
     @State private var lane: String = "all"
     @State private var updatingId: String?
+    @State private var moveNotes: [String] = []
     @State private var showAddSpool = false
     @State private var showQuote = false
     @State private var showLibrary = false
@@ -80,6 +81,7 @@ struct DashboardView: View {
             .scrollIndicators(.hidden)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .moveNotes($moveNotes)
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
@@ -554,7 +556,7 @@ struct DashboardView: View {
         updatingId = order.id
         defer { updatingId = nil }
         do {
-            try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
+            moveNotes = try await api.updateOrderStatus(orderId: order.id, status: next.rawValue)
             CompanionHaptics.success()
             await load()
         } catch {

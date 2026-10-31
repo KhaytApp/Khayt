@@ -580,6 +580,12 @@
 "move.refused.assembly_not_assembled" = "نجحت كل القطع في الفحص. حدّد التجميعة كمُجمَّعة قبل إكمال هذه المهمة.";
 "move.refused.assembly_parts" = "هذه المهمة بانتظار القطع: %@";
 "move.refused.stage_not_a_status" = "«مشحون» ليست مرحلة تُنقل إليها المهمة. استخدم «علّمها مشحونة» على مهمة منتهية.";
+"move.note.due_extended" = "تم تمديد تاريخ التسليم %1$lld يوم بسبب الإيقاف: الآن %2$@.";
+"move.note.filament_deducted" = "تم خصم %1$@ من %2$lld بكرة.";
+"move.note.filament_deducted_low" = "تم خصم %1$@ من %2$lld بكرة؛ %3$lld على وشك النفاد.";
+"move.note.filament_returned" = "أُعيد %1$@ إلى المخزون — لم يعد العمل منتهيًا، فخيوطه لم تُستهلك بعد.";
+"move.note.packaging_deducted" = "خُصمت مواد التغليف للطلب المكتمل.";
+"move.note.low" = "على وشك النفاد: %1$@";
 
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
