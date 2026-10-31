@@ -26,6 +26,14 @@ struct CustomersTable: View {
                                             ["n": .number(Double(person.overdueCount))]))
                     }
                     Text(person.name).lineLimit(1)
+                    if person.isOverLimit {
+                        // The desktop's "Over credit limit" badge, as a mark
+                        // that says it on hover: a row has no room for words.
+                        Image(systemName: "creditcard.trianglebadge.exclamationmark")
+                            .foregroundStyle(Khayt.attention)
+                            .help(shop.words.callIt("cl.over_limit"))
+                            .accessibilityLabel(shop.words.callIt("cl.over_limit"))
+                    }
                 }
             }
             // Every column is capped. Without a max the name column absorbs
@@ -313,6 +321,14 @@ struct CustomerInspector: View {
                                    strong: !person.isSettled, warn: person.overdueCount > 0)
                         if person.overdueCount > 0 {
                             DetailLine(shop.words.callIt("mac.past_due"), "\(person.overdueCount)", warn: true)
+                        }
+                        if person.creditLimit > 0 {
+                            DetailLine(shop.words.callIt("ce.credit_limit"), Money.text(person.creditLimit, shop.currency),
+                                       dim: !person.isOverLimit, warn: person.isOverLimit)
+                            if person.isOverLimit {
+                                Label(shop.words.callIt("cl.over_limit"), systemImage: "creditcard.trianglebadge.exclamationmark")
+                                    .font(.caption).foregroundStyle(Khayt.attention)
+                            }
                         }
                         // Their terms, and what is past them. Shown only for
                         // a customer on terms: for due on receipt, everything

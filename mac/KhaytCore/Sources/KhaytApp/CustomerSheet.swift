@@ -329,6 +329,24 @@ struct CustomerSheet: View {
                 }
             }
             GridRow {
+                // The most this customer may owe; 0 is no limit. The list and
+                // the customer's page flag anyone over it, as the desktop does.
+                Text(shop.words.callIt("ce.credit_limit")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        TextField("", value: Binding(
+                            get: { draft.creditLimit },
+                            set: { draft = draft.limited(to: $0) }), format: .number.locale(Money.digits))
+                            .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                        Text(shop.currency).foregroundStyle(.secondary)
+                    }
+                    Text(shop.words.callIt("ce.credit_limit_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            GridRow {
                 Text(shop.words.callIt("ce.notes")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 TextField("", text: binding(\.notes), axis: .vertical)

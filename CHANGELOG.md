@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a credit limit per customer, as on the desktop.** The customer sheet has a credit limit in the shop's currency; 0, the default, is no limit. A customer who owes more than it gets a mark beside their name in the list, and "Over credit limit" with the limit on their page. It is the desktop's `creditLimit` field, so a limit set in either app shows in both. A hand-typed figure counts, a negative or unreadable one is no limit, and saving a customer without touching the limit leaves it exactly as stored.
+
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
