@@ -3269,28 +3269,6 @@ button.tag-chip, .tag-chip[data-act] {
   border-inline-start: 3px solid #fb923c;
 }
 
-/* ── New Feature 3: Proforma watermark ──────────────────────── */
-.proforma-watermark {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-45deg);
-  font-size: 72px;
-  font-weight: 900;
-  color: rgba(200, 50, 50, 0.12);
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 10;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  user-select: none;
-}
-@media print {
-  .proforma-watermark {
-    color: rgba(200, 50, 50, 0.18);
-  }
-}
-
 /* ── New Feature 8: Elapsed timer badge ────────────────────── */
 .elapsed-timer {
   font-family: var(--font-num, monospace);

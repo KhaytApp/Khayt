@@ -749,7 +749,12 @@ function zatcaSubmissionStatusLabel(order) {
 }
 
 // Render the invoice with QR (used by Print, PDF, and WhatsApp paths)
-async function renderInvoiceForOrder(order) {
+async function renderInvoiceForOrder(order, opts = {}) {
+  // A proforma is a request for payment before the work is done, not a tax
+  // invoice: no ZATCA QR (and no ZATCA UUID stamped on the job for one), no
+  // auto-submit, and the job's id rather than an invoice number. The document
+  // itself titles and watermarks it (`proforma` in lib/invoice-document.js).
+  const proforma = opts.proforma === true;
   const ts = order.timestamp
     || (order.date && !Number.isNaN(Date.parse(`${order.date}T12:00:00`))
       ? new Date(`${order.date}T12:00:00`).toISOString()
@@ -785,7 +790,7 @@ async function renderInvoiceForOrder(order) {
   // to say what is missing, and the shop needs telling before it hands the
   // document over — not by noticing grey text on a PDF.
   let qrProblem = null;
-  if (settings.enableZatca && window.hubAPI?.generateQR) {
+  if (settings.enableZatca && !proforma && window.hubAPI?.generateQR) {
     // A QR missing a required tag SCANS and is invalid, which is worse than an
     // empty box: a code that reads invites no question. Refuse to draw one.
     const ready = zatcaQrReadiness(settings);
@@ -859,15 +864,15 @@ async function renderInvoiceForOrder(order) {
     const iban = settings.iban.replace(/\s+/g, '');
     const beneName = shopName() || '';
     const payAmt = price.toFixed(2);
-    const payRef = invoiceDocNumber(order);
+    const payRef = proforma ? String(order.id) : invoiceDocNumber(order);
     // Structured format: BeneficiaryName\nIBAN\nAmount\nRef
     const payText = `${beneName}\n${iban}\n${payAmt}\n${payRef}`;
     try { payQrSvg = await window.hubAPI.generateQR(payText, { width: 120, margin: 1 }); }
     catch (e) { console.warn('Payment QR failed', e); }
   }
 
-  renderInvoice(order, { qrSvg, qrProblem, payQrSvg, total, vatAmount, subtotal, subtotalShown, vatRate: rate, shipping });
-  maybeAutoSubmitZatca(order);
+  renderInvoice(order, { qrSvg, qrProblem, payQrSvg, total, vatAmount, subtotal, subtotalShown, vatRate: rate, shipping, proforma });
+  if (!proforma) maybeAutoSubmitZatca(order);
 }
 
 /* ============================================================
@@ -876,37 +881,12 @@ async function renderInvoiceForOrder(order) {
 async function generateProformaInvoice(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
-
-  // Render the regular invoice first
-  await renderInvoiceForOrder(order);
-
-  // Inject proforma watermark and change the title
-  const area = $('#invoice-print-area');
-  if (area) {
-    // Change title text nodes that say "Invoice" / "فاتورة"
-    area.querySelectorAll('.inv-title, .inv-heading, h1, h2').forEach(el => {
-      if (/invoice|فاتورة/i.test(el.textContent)) {
-        el.textContent = t('inv.proforma_title');
-      }
-    });
-    // Inject watermark overlay if not already present
-    if (!area.querySelector('.proforma-watermark')) {
-      const wm = document.createElement('div');
-      wm.className = 'proforma-watermark';
-      wm.textContent = t('inv.proforma_title');
-      area.style.position = 'relative';
-      area.appendChild(wm);
-    }
-  }
-
-  // Open print dialog
+  // The shared document draws the proforma — title, watermark, no QR, the
+  // job's id under "No." — the same paper the Mac prints. This used to render
+  // a full tax invoice and then patch its DOM, which left the ZATCA QR and the
+  // invoice number on a document that is neither.
+  await renderInvoiceForOrder(order, { proforma: true });
   window.print();
-
-  // Remove watermark after print so area is clean for next real invoice
-  setTimeout(() => {
-    const wm = area?.querySelector('.proforma-watermark');
-    if (wm) wm.remove();
-  }, 1000);
 }
 
 /* --- extracted 18039-18214 --- */
