@@ -1194,14 +1194,19 @@ final class KhaytAPIClient: ObservableObject {
     /// the filament comes off the shelf and the completion is dated, as on the
     /// Mac. A move the rule refuses throws its sentence and is NOT sent to the
     /// desktop instead. Without a book, the desktop's PATCH, as it always was.
-    func updateOrderStatus(orderId: String, status: String) async throws {
+    ///
+    /// Returns what the rule has to say about the move — filament taken, a
+    /// spool running low, a due date pushed back — as sentences to show. The
+    /// desktop's PATCH says nothing, so that route returns none.
+    @discardableResult
+    func updateOrderStatus(orderId: String, status: String) async throws -> [String] {
         if let book, book.exists, let reader {
             let engine = try await reader.sharedEngine()
             do {
-                try await BookWriter(book: book).setOrderStatus(orderId: orderId, to: status, engine: engine)
+                let notices = try await BookWriter(book: book).setOrderStatus(orderId: orderId, to: status, engine: engine)
                 await refreshPendingCount()
                 await deliverPending()
-                return
+                return notices.map(BookWriter.sentence(for:))
             } catch is BookWriter.Refusal {
                 // Not in this book. Fall through to the desktop, which either
                 // does it properly or fails honestly — as `writeLocally` does.
@@ -1217,6 +1222,7 @@ final class KhaytAPIClient: ObservableObject {
         )
         // A refusal (locked pairing, bad stage) must surface, not look saved.
         try ensureOK(data, response)
+        return []
     }
 
     func assignMachine(orderId: String, machineId: String?) async throws {
