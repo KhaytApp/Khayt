@@ -4309,6 +4309,33 @@ ipcMain.handle('hub:hf-export-flat-3mf', async (_e, { labels, palette, width, he
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
+// The HueForge calibration card (lib/hueforge-calibrate.js): rows of stepped layers of each
+// loaded filament over two backings, photographed afterwards to measure colour and TD. Built
+// here from the filament list alone — the layout is deterministic, so the renderer reads the
+// photo against the same plan without the geometry ever crossing IPC.
+ipcMain.handle('hub:hf-export-card-3mf', async (_e, { filaments, layerH, name } = {}) => {
+  try {
+    if (!Array.isArray(filaments) || filaments.length < 2 || filaments.length > 4) {
+      return { ok: false, error: 'The card needs 2 to 4 filaments.' };
+    }
+    const CAL = require('./lib/hueforge-calibrate');
+    const HF3 = require('./lib/hueforge-3mf');
+    const plan = CAL.planCard(filaments.map((f) => String(f)), { layerH: +layerH > 0 ? +layerH : undefined });
+    const built = plan && CAL.buildCardParts(plan);
+    if (!built || !built.parts.length) return { ok: false, error: 'Needs at least two different filaments.' };
+    const buf = HF3.buildFlatU1_3mf({
+      parts: built.parts, filaments: built.filaments, sizeMm: built.sizeMm,
+      baseHead: built.baseHead, layerH: plan.layerH, name: name || 'calibration-card', bed: { x: 270, y: 270 },
+    });
+    if (!buf) return { ok: false, error: 'Failed to build the 3MF.' };
+    const base = String(name || 'calibration-card').replace(/[^\w.-]+/g, '_') + '-U1.3mf';
+    const finalPath = await mfAskWhereToSave(_e.sender, { defaultPath: base, filters: [{ name: '3MF model', extensions: ['3mf'] }] });
+    if (!finalPath) return { ok: false, canceled: true };
+    await fs.promises.writeFile(finalPath, buf);
+    return { ok: true, outPath: finalPath, sizeMm: built.sizeMm };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
 // Extract an embedded preview + (3MF) colour/swap info from a print file. Local only.
 ipcMain.handle('hub:extract-thumbnail', async (_e, filePath) => {
   const empty = { pngBase64: null, colors: [], swapCount: 0, source: null };

@@ -19,6 +19,8 @@
   const KC = () => global.KhaytColor;
   const HF = () => global.KhaytHueForge;
   const FLAT = () => global.KhaytHueForgeFlat;
+  const CAL = () => global.KhaytHueForgeCalibrate;
+  const CAL_PHOTO_MAX = 1600; // longest side (px) a card photo is read at — enough for 8 mm cells
   const isFlat = () => S && S.mode === 'flat';
   const U1_ID = 'snapmaker-u1';
   const WORK_MAX = 640; // longest side (px) of the working image; the solver then samples to
@@ -211,6 +213,7 @@
       '<section class="hf-col hf-left">',
       sourceHtml(),
       paletteHtml(),
+      isFlat() ? '' : calibrateHtml(),
       settingsHtml(),
       '</section>',
       '<section class="hf-col hf-right">',
@@ -270,13 +273,175 @@
       '<label class="hf-sw" style="background:' + css(f.hex) + '"><input type="color" data-fld="hex" value="' + esc(normHex(f.hex)) + '" aria-label="colour" /></label>',
       '<div class="hf-fil-body">',
       '<div class="hf-fil-hex">' + esc(String(f.hex).toUpperCase()) + '</div>',
-      near,
+      f.measured ? '<span class="hf-fil-near" title="colour and TD measured from a calibration card">measured</span>' : near,
       '</div>',
       '<label class="hf-num" title="Transmission distance (mm) — lower = opaque, higher = translucent">TD<input type="number" data-fld="td" min="0.3" max="20" step="0.1" value="' + esc(f.td) + '" /></label>',
       '<label class="hf-num" title="Band thickness in layers">ly<input type="number" data-fld="layers" min="1" max="80" step="1" value="' + esc(f.layers) + '" /></label>',
       '<button type="button" class="hf-fil-x" data-act="del" aria-label="remove">' + ico('cross', 14) + '</button>',
       '</div>',
     ].join('');
+  }
+
+  /**
+   * Measure the stack's real colours and TDs from a printed card (lib/hueforge-calibrate.js).
+   * The card is printed from the stack AS IT IS NOW and remembered (S.calCard), because a
+   * photo can only be read against the layout it was printed from — reorder the stack after
+   * printing and the rows would be read as the wrong filaments.
+   */
+  function calibrateHtml() {
+    const n = S.filaments.length;
+    const can = n >= 2 && n <= 4 && !!CAL();
+    const measured = S.filaments.filter((f) => f.measured).length;
+    return [
+      '<div class="hf-card">',
+      '<div class="hf-card-h">CALIBRATE FILAMENTS</div>',
+      '<div class="hf-note" style="margin-top:0">Print a small card with the filaments in your stack, photograph it flat in even daylight, and Bed Ready measures each filament’s real colour and TD from it. Measured values replace the guesses the painting uses.</div>',
+      '<div class="hf-auto" style="margin-top:10px">',
+      '<button type="button" class="btn sm" id="hfCalCard"' + (can ? '' : ' disabled title="Needs 2 to 4 filaments in the stack"') + '>' + wrapIco('cube') + 'Print calibration card</button>',
+      '<button type="button" class="btn ghost sm" id="hfCalRead"' + (S.calCard ? '' : ' disabled title="Print the card first"') + '>' + wrapIco('camera') + 'Read photo of card</button>',
+      '</div>',
+      measured ? '<div class="hf-note">' + measured + ' of ' + n + ' filament' + (n === 1 ? '' : 's') + ' measured from a card.</div>' : '',
+      '<input type="file" id="hfCalFile" accept="image/*" hidden />',
+      '</div>',
+    ].join('');
+  }
+
+  function exportCalCard() {
+    const cal = CAL();
+    const api = (typeof window !== 'undefined' && window.hubAPI);
+    if (!cal || !api || !api.hfExportCard3mf) { toast(t('common.feature_missing')); return; }
+    const hexes = S.filaments.map((f) => String(f.hex).toUpperCase());
+    const plan = cal.planCard(hexes, { layerH: S.layerH });
+    if (!plan) { toast(t('hf.cal_two_filaments')); return; }
+    api.hfExportCard3mf({ filaments: hexes, layerH: S.layerH, name: 'calibration-card' }).then((r) => {
+      if (r && r.ok) {
+        S.calCard = { filaments: hexes, layerH: S.layerH };
+        render();
+        toast(t('hf.cal_card_saved', { last: hexes.length - 1 }));
+      } else if (!(r && r.canceled)) toast(t('common.export_failed') + (r && r.error ? ': ' + r.error : ''));
+    }).catch(() => toast(t('common.export_failed')));
+  }
+
+  function loadCalPhoto(file) {
+    if (!file || !/^image\//.test(file.type) || !S.calCard) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, CAL_PHOTO_MAX / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.width * scale));
+        cv.height = Math.max(1, Math.round(img.height * scale));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        openCornerPicker(cv);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /** Overlay: the maker clicks the card's four corners, light square first, clockwise. */
+  function openCornerPicker(cv) {
+    const cal = CAL();
+    const plan = cal.planCard(S.calCard.filaments, { layerH: S.calCard.layerH });
+    const ov = document.createElement('div');
+    ov.className = 'hf-cal-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Read the calibration card');
+    ov.innerHTML = '<div class="hf-cal-box"><div class="hf-cal-h" id="hfCalHint"></div>'
+      + '<div class="hf-cal-stage"></div><div class="hf-cal-res" id="hfCalRes"></div>'
+      + '<div class="hf-auto hf-cal-act"><button type="button" class="btn ghost sm" data-cal="undo">Undo corner</button>'
+      + '<button type="button" class="btn ghost sm" data-cal="close">Cancel</button>'
+      + '<button type="button" class="btn primary sm" data-cal="apply" disabled>Use measured values</button></div></div>';
+    document.body.appendChild(ov);
+    const stage = ov.querySelector('.hf-cal-stage');
+    const view = document.createElement('canvas');
+    view.width = cv.width; view.height = cv.height;
+    stage.appendChild(view);
+    const ctx = view.getContext('2d');
+    const imgData = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
+    const NAMES = ['the light-square corner (top-left)', 'the top-right corner', 'the bottom-right corner', 'the bottom-left corner'];
+    const pts = [];
+    let result = null;
+
+    const draw = () => {
+      ctx.drawImage(cv, 0, 0);
+      const r = Math.max(4, cv.width / 200);
+      ctx.lineWidth = Math.max(2, cv.width / 500);
+      ctx.strokeStyle = '#00E0FF'; ctx.fillStyle = '#00E0FF';
+      ctx.beginPath();
+      pts.forEach((p, i) => { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+      if (pts.length === 4) ctx.closePath();
+      ctx.stroke();
+      pts.forEach((p) => { ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2); ctx.fill(); });
+      ov.querySelector('#hfCalHint').textContent = pts.length < 4
+        ? 'Click ' + NAMES[pts.length] + ' of the card.'
+        : (result ? 'Measured. Check the values, then use them.' : 'Those corners could not be read. Undo and try again.');
+    };
+    const measure = () => {
+      const out = cal.measureCard(imgData, pts, plan);
+      result = out;
+      const box = ov.querySelector('#hfCalRes');
+      const apply = ov.querySelector('[data-cal="apply"]');
+      if (!out) { box.innerHTML = ''; apply.disabled = true; draw(); return; }
+      const WARN = {
+        'too-opaque': 'so opaque the thinnest step hides the backing; TD is an upper bound',
+        'too-translucent': 'so translucent the thickest step still shows the backing; TD is a lower bound',
+        'low-contrast-backings': 'its backings are too alike to read well; add a much lighter or darker filament',
+        'one-backing': 'read over one backing only; add a third filament for a better reading',
+        'few-steps': 'only one step was usable',
+        'poor-fit': 'the card does not fit the model well; check the corners and the lighting',
+      };
+      box.innerHTML = '<table class="hf-cal-t"><thead><tr><th>Head</th><th>Stated</th><th>Measured</th><th>TD</th><th>Fit ΔE</th></tr></thead><tbody>'
+        + out.results.map((r) => r.error
+          ? '<tr><td>T' + r.head + '</td><td><span class="hf-cal-sw" style="background:' + css(r.statedHex) + '"></span>' + esc(r.statedHex) + '</td><td colspan="3">Could not read this row</td></tr>'
+          : '<tr><td>T' + r.head + '</td>'
+            + '<td><span class="hf-cal-sw" style="background:' + css(r.statedHex) + '"></span>' + esc(r.statedHex) + '</td>'
+            + '<td><span class="hf-cal-sw" style="background:' + css(r.hex) + '"></span>' + esc(r.hex) + '</td>'
+            + '<td>' + esc(r.td) + '</td><td>' + esc(r.residual) + '</td></tr>'
+            + (r.warnings.length ? '<tr class="hf-cal-w"><td></td><td colspan="4">' + r.warnings.map((w) => esc(WARN[w] || w)).join('; ') + '</td></tr>' : ''))
+          .join('') + '</tbody></table>';
+      apply.disabled = !out.results.some((r) => !r.error);
+      draw();
+    };
+    view.addEventListener('click', (e) => {
+      if (pts.length >= 4) return;
+      const b = view.getBoundingClientRect();
+      pts.push([(e.clientX - b.left) * view.width / b.width, (e.clientY - b.top) * view.height / b.height]);
+      if (pts.length === 4) measure(); else draw();
+    });
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-cal]'); if (!act) return;
+      const a = act.dataset.cal;
+      if (a === 'close') close();
+      else if (a === 'undo') { pts.pop(); result = null; ov.querySelector('#hfCalRes').innerHTML = ''; ov.querySelector('[data-cal="apply"]').disabled = true; draw(); }
+      else if (a === 'apply' && result) { applyCal(result.results); close(); }
+    });
+    draw();
+  }
+
+  /**
+   * Write the measurements onto the stack. A row is matched to the filament it was PRINTED
+   * as (its stated hex), not to whatever now sits at that index — the stack may have been
+   * reordered since the card was printed.
+   */
+  function applyCal(results) {
+    let n = 0;
+    for (const r of results) {
+      if (r.error) continue;
+      const f = S.filaments.find((x) => !x._calDone && String(x.hex).toUpperCase() === r.statedHex);
+      if (!f) continue;
+      f.hex = r.hex; f.td = r.td; f.measured = true; f.name = null; f.deltaE = null; f._calDone = true;
+      n++;
+    }
+    for (const f of S.filaments) delete f._calDone;
+    S.calCard = null;   // the card describes the old hexes now; print again to re-measure
+    render();
+    toast(n ? t('hf.cal_measured', { n }) : t('hf.cal_no_match'));
   }
 
   function settingsHtml() {
@@ -518,6 +683,10 @@
     on('#hfCopy', 'click', copyPlan);
     on('#hfStl', 'click', exportStl);
     on('#hf3mf', 'click', export3mf);
+    on('#hfCalCard', 'click', exportCalCard);
+    const calFile = host.querySelector('#hfCalFile');
+    on('#hfCalRead', 'click', () => calFile && calFile.click());
+    if (calFile) calFile.addEventListener('change', (e) => { if (e.target.files[0]) loadCalPhoto(e.target.files[0]); e.target.value = ''; });
 
     const stack = host.querySelector('#hfStack');
     if (stack) {
@@ -531,12 +700,12 @@
     const i = +row.dataset.idx, fld = e.target.dataset.fld, f = S.filaments[i];
     if (!f || !fld) return;
     if (fld === 'hex') {
-      f.hex = e.target.value; f.name = null; f.deltaE = null;
+      f.hex = e.target.value; f.name = null; f.deltaE = null; f.measured = false;
       const sw = row.querySelector('.hf-sw'); if (sw) sw.style.background = css(f.hex);
       const hx = row.querySelector('.hf-fil-hex'); if (hx) hx.textContent = String(f.hex).toUpperCase();
       const near = row.querySelector('.hf-fil-near'); if (near) near.remove();
     } else if (fld === 'td') {
-      f.td = clampNum(e.target.value, 0.3, 20, 2);
+      f.td = clampNum(e.target.value, 0.3, 20, 2); f.measured = false;
     } else if (fld === 'layers') {
       f.layers = Math.round(clampNum(e.target.value, 1, 80, 12));
     }
