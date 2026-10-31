@@ -6,8 +6,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Bed Ready HueForge: measure your filaments from a printed card.** "Calibrate filaments" prints a small U1 card from the stack: one row per filament, steps of 1 to 13 layers over two contrasting backings, framed in the darkest filament with a light square marking the top-left. Photograph it, click its four corners, and Bed Ready measures each filament's real colour and TD (`lib/hueforge-calibrate.js`), shows them next to the stated values with a fit check, and puts them into the stack on "Use measured values". The relief then composites with measured numbers instead of the colour on the label and a TD guessed from lightness. Exposure and white balance are corrected from the lightest filament's stated colour. TD is read from the difference between the two backings, so exposure does not change it. A filament too opaque or too translucent for the steps is flagged rather than given a made-up TD.
 
-- **Desktop: a remix of a model that may not be sold is flagged at sale too.** When a library model's `remixOf` (set on the Mac) names another library model by its page address, and that original is non-commercial, the job and product editors say "{name}: a remix of {parent}, whose licence does not allow selling prints." A remix with its own bought (`commercial`) licence is not flagged, and an original that is not in the library is not guessed at. `remixProblems` in `lib/model-licence.js` follows the Mac's `Shop.remixProblems` (beta.13).
-
 - Mac: the LAN server deletes a slicer upload's spooled body before it writes the answer, not after, so nothing is left in the inbox's scratch folder once a slicer has its reply.
 
 - **Mac library: a designer's licence for their whole catalogue, remixes, and the finished print as the model's photo.**
@@ -6590,6 +6588,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.0.0] - 2026-10-31
+
+### Changed
+
+- **Desktop: version 4, to match Khayt for macOS.** The Windows and Linux app moves from 3.11 to 4.0.0 so the number says what is true: it and the native Mac app (4.0) are one product, reading the same book through the same shop rules in `lib/`. Nothing moves, no data changes, and settings, the store file and sync are untouched, so the update needs no consent. Version numbers from here are the desktop's own: a Mac 4.x feature reaches Windows and Linux only when a desktop release says so.
+
+### Added
+
+- **Desktop: a remix of a model that may not be sold is flagged at sale too.** When a library model's `remixOf` (set on the Mac) names another library model by its page address, and that original is non-commercial, the job and product editors say "{name}: a remix of {parent}, whose licence does not allow selling prints." A remix with its own bought (`commercial`) licence is not flagged, and an original that is not in the library is not guessed at. `remixProblems` in `lib/model-licence.js` follows the Mac's `Shop.remixProblems` (beta.13).
 
 ## [3.11.35] - 2026-10-30
 
