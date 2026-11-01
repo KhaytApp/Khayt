@@ -19,7 +19,7 @@ function buildFarmLocationOverview() {
     const printing = locOrders.filter(o => o.status === 'printing').length;
     const pending = locOrders.filter(o => o.status === 'pending').length;
     const activeHrs = locOrders
-      .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote')
+      .filter(o => KhaytOrderStatus.isOpen(o))
       .reduce((s, o) => s + (+o.printTime || 0), 0);
     const todayRev = locOrders
       .filter(o => KhaytOrderStatus.isFinished(o) && o.date === todayStr)
@@ -27,7 +27,7 @@ function buildFarmLocationOverview() {
     return { loc, printers: locMachines.length, printing, pending, activeHrs, todayRev };
   });
 
-  const unassigned = printLog.filter(o => !orderLocationId(o) && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const unassigned = printLog.filter(o => !orderLocationId(o) && KhaytOrderStatus.isOpen(o));
   const unassignedHrs = unassigned.reduce((s, o) => s + (+o.printTime || 0), 0);
 
   const cards = rows.map((r) => `
@@ -314,7 +314,7 @@ function renderDashboard() {
     </div>`;
 
   // Stats
-  const active   = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const active   = printLog.filter(o => KhaytOrderStatus.isOpen(o));
   const todayDone = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.date === todayStr);
   const todayRev  = todayDone.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const todayNew = printLog.filter(o => o.date === todayStr && !KhaytOrderStatus.isFinished(o));
@@ -519,7 +519,7 @@ function renderDashboard() {
     ${renderDashFilament()}
 
     ${machines.length > 0 ? (() => {
-      const activeOrds = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+      const activeOrds = printLog.filter(o => KhaytOrderStatus.isOpen(o));
       const WORK_HRS_PER_DAY = Math.max(1, avgDailyWorkingHours()); // use configured working hours
       // Feature 1: Per-machine clearance forecast
       const machRows = activeMachines().map(m => {

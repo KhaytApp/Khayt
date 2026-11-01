@@ -275,7 +275,7 @@ function renderMachines() {
   const ordered = machines.filter(m => !isRetired(m)).concat(machines.filter(isRetired));
   list.innerHTML = ordered.map(m => {
     const retired = isRetired(m);
-    const active = printLog.filter(o => o.machineId === m.id && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
+    const active = printLog.filter(o => o.machineId === m.id && KhaytOrderStatus.isOpen(o)).length;
     const svc = machineServiceStatus(m);
     const svcBadge = svc.due
       ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">⚠ ${escapeHtml(t('mach.service_due'))}</span>`

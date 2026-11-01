@@ -97,7 +97,7 @@
     const byId = new Map(lanes.map((l) => [l.machine.id, l]));
     const staged = [];
 
-    const active = orders.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived);
+    const active = orders.filter((o) => KhaytOrderStatus.isOpen(o) && !o.archived);
 
     // Anchor the running work first — it is the only thing with a real start.
     for (const o of active.filter((x) => x.status === 'printing')) {

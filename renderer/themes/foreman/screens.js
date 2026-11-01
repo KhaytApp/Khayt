@@ -179,7 +179,7 @@
     // something. Four idle machines emitting four near-identical rows padded a
     // list whose whole promise is that every row needs an action from you, and
     // pushed the genuinely urgent rows off the screen.
-    const waiting = orders.filter((o) => o && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote'
+    const waiting = orders.filter((o) => o && KhaytOrderStatus.isOpen(o)
       && o.status !== 'printing' && !o.archived).length;
     if (waiting > 0 && global.KhaytAttention?.machineState) {
       const idle = [];
