@@ -8978,6 +8978,16 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.16] - 2026-11-01
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **Settings ▸ Online fits its window.** With the store quote form switched on, the Online pane grew wider than the Settings window at any size: every card ran off the right edge and slid under the sidebar. The form's language and look pickers each have their own row now, and every pane fits at the window's opening size and at its smallest.
+- **The seven new languages, reviewed.** 397 words corrected across German, Spanish, French, Japanese, Chinese, Turkish and Portuguese (Brazil), each read against English and the Windows and Linux app's own words. The biggest: German used "Sichern" (back up) for Save, Chinese used 还原 (restore) for Undo and a different word for "product" than the other app, and Spanish used "valorar" (rate) for pricing. These are still machine translations, checked by a second pass rather than by native speakers.
+
 ## [4.0.0-beta.15] - 2026-11-01
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
