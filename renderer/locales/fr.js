@@ -154,6 +154,7 @@
   "slicer.pick_title": "Choisir un slicer",
   "slicer.pick_hint": "Ouvrir ce fichier avec quel slicer ?",
   "tab.converter": "Convertisseur",
+  "tab.hueforge": "HueForge",
   "conv.title": "Convertir 3MF",
   "conv.subtitle": "Reciblez un 3MF multicolore vers une autre imprimante, ou normalisez-le en 3MF standard propre. La géométrie n'est jamais modifiée.",
   "conv.pick": "Choisir un fichier 3MF…",

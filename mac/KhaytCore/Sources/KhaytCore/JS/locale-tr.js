@@ -154,6 +154,7 @@
   "slicer.pick_title": "Dilimleyici seç",
   "slicer.pick_hint": "Bu dosya hangi dilimleyiciyle açılsın?",
   "tab.converter": "Dönüştürücü",
+  "tab.hueforge": "HueForge",
   "conv.title": "3MF Dönüştür",
   "conv.subtitle": "Çok renkli bir 3MF'yi farklı bir yazıcıya yönlendirin veya temiz bir standart 3MF'ye normalleştirin. Geometri asla değiştirilmez.",
   "conv.pick": "Bir 3MF dosyası seçin…",

@@ -248,6 +248,30 @@ async function testLanPinGate(window) {
   await window.evaluate(() => window.hubAPI.stopLanServer());
 }
 
+// 4.2: HueForge (filament painting) is a Khayt tab too, not only Bed Ready's. It shows in
+// Simple and Professional, renders, and is styled by the shared renderer/hueforge.css
+// (its rules used to sit in bedready-theme.css, which Khayt does not load).
+async function testHueForge(window) {
+  const r = await window.evaluate(() => {
+    const vis = (id) => { const b = document.getElementById(id); return !!(b && b.offsetParent !== null); };
+    const out = {};
+    settings.mode = 'simple'; applyMode();
+    out.simpleVisible = vis('tabbtn-hueforge-tab');
+    settings.mode = 'professional'; applyMode();
+    out.proVisible = vis('tabbtn-hueforge-tab');
+    switchTab('hueforge-tab');
+    const tab = document.getElementById('hueforge-tab');
+    out.active = document.querySelector('.tab-content.active')?.id === 'hueforge-tab';
+    out.rendered = (tab?.innerHTML?.length || 0) > 200;
+    const root = tab?.querySelector('.hf');
+    out.styled = !!root && getComputedStyle(root).maxWidth === '1180px';
+    out.libs = typeof KhaytHueForge === 'object' && typeof KhaytHueForgeCalibrate === 'object';
+    return out;
+  });
+  const bad = Object.entries(r).filter(([, v]) => v !== true).map(([k]) => k);
+  if (bad.length) throw new Error(`HueForge checks failed: ${bad.join(', ')} — ${JSON.stringify(r)}`);
+}
+
 // 3.2 (Bed Ready split): "enthusiast" is RETIRED as a Khayt-selectable mode — its maker
 // tools (converter / Colour Studio / print-file library) are now core Simple/Pro features.
 // Verify the retirement (no switcher pill + stored enthusiast migrates to Simple), that the
@@ -584,6 +608,7 @@ try {
   await testModesAndPrintFiles(window);
   await testColourStudioAndPlanner(window);
   await testConverter(window);
+  await testHueForge(window);
   await testIndexes(window);
   await testPruneArchived(window);
   const owner = testStoreOwnership();

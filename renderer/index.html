@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="themes/flow/tokens.css" />
   <link rel="stylesheet" href="themes/flow/shell.css" />
   <link rel="stylesheet" href="themes/theme-picker.css" />
+  <link rel="stylesheet" href="hueforge.css" />
 </head>
 <body class="bedready-ui">
 <a class="skip-link" href="#mainContent" data-i18n="a11y.skip">Skip to main content</a>
@@ -87,6 +88,10 @@
           <button type="button" class="tab-btn khayt-navitem" data-tab="converter-tab" role="tab" id="tabbtn-converter-tab" aria-selected="false" aria-controls="converter-tab" tabindex="-1">
             <span class="nav-icon" aria-hidden="true">🔄</span>
             <span class="nav-label grow" data-i18n="tab.converter">Converter</span>
+          </button>
+          <button type="button" class="tab-btn khayt-navitem" data-tab="hueforge-tab" role="tab" id="tabbtn-hueforge-tab" aria-selected="false" aria-controls="hueforge-tab" tabindex="-1">
+            <span class="nav-icon" aria-hidden="true">🖼️</span>
+            <span class="nav-label grow" data-i18n="tab.hueforge">HueForge</span>
           </button>
           <button type="button" class="tab-btn khayt-navitem biz-only" data-tab="catalog-tab" role="tab" id="tabbtn-catalog-tab" aria-selected="false" aria-controls="catalog-tab" tabindex="-1">
             <span class="nav-icon" aria-hidden="true">▣</span>
@@ -643,6 +648,7 @@
     <section id="printfiles-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-printfiles-tab" aria-hidden="true" tabindex="-1"></section>
     <section id="colorstudio-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-colorstudio-tab" aria-hidden="true" tabindex="-1"></section>
     <section id="converter-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-converter-tab" aria-hidden="true" tabindex="-1"></section>
+    <section id="hueforge-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-hueforge-tab" aria-hidden="true" tabindex="-1"></section>
 
     <!-- ===================== QUEUE ===================== -->
     <section id="queue-tab" class="tab-content khayt-queue" role="tabpanel" aria-labelledby="tabbtn-queue-tab" aria-hidden="true" tabindex="-1">
@@ -2831,6 +2837,9 @@
 <script src="../lib/color-mix.js"></script>
 <script src="../lib/slicers.js"></script>
 <script src="../lib/printer-profiles.js"></script>
+<script src="../lib/hueforge.js"></script>
+<script src="../lib/hueforge-flat.js"></script>
+<script src="../lib/hueforge-calibrate.js"></script>
 <script src="../lib/printer-facts.js"></script>
 <script src="../lib/printer-catalog.js"></script>
 <script src="../lib/printer-relocate.js"></script>
@@ -2975,6 +2984,8 @@
 <script src="../lib/spool-match.js"></script>
 <script src="converter-spools.js"></script>
 <script src="converter.js"></script>
+<script src="bedready-icons.js"></script>
+<script src="hueforge.js"></script>
 <script src="notifications.js"></script>
 <script src="waiting-list.js"></script>
 <script src="kanban.js"></script>
