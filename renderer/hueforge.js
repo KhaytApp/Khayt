@@ -11,7 +11,8 @@
  *
  * This module is the UI. All colour + relief maths is in lib/hueforge.js (KhaytHueForge)
  * over lib/color-mix.js (KhaytColor). Reads the live `inventory` global for palette
- * suggestions. Bed Ready only (bedready.html ships this tab).
+ * suggestions. Both apps ship this tab: Khayt (index.html, beside Converter) and
+ * Bed Ready (bedready.html); its styles are renderer/hueforge.css.
  *
  * v1 = design + live preview + print plan. The zero-slicer U1 3MF export lands next.
  */
@@ -51,6 +52,7 @@
   function u1Profile() { const P = global.KhaytPrinterProfiles; return P ? P.getProfile(U1_ID) : null; }
   function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
   function css(hex, fb) { return (typeof safeCssColor === 'function') ? safeCssColor(hex, fb || '#888') : (hex || fb || '#888'); }
+  function appName() { return (typeof document !== 'undefined' && document.documentElement.dataset.app === 'bedready') ? 'Bed Ready' : 'Khayt'; }
   function ico(name, size) { return (global.BedReadyIcons) ? global.BedReadyIcons.get(name, size || 15) : ''; }
 
   function ownedColored() {
@@ -217,7 +219,7 @@
       '<div class="hf-drop" id="hfDrop" tabindex="0" role="button" aria-label="Add an image">',
       '<div class="hf-drop-mark" aria-hidden="true">' + ico('camera', 30) + '</div>',
       '<div class="hf-drop-t">Drop an image, or click to browse</div>',
-      '<div class="hf-drop-h">JPG or PNG. Bed Ready picks the filaments and builds the relief — everything stays on your machine.</div>',
+      '<div class="hf-drop-h">JPG or PNG. ' + appName() + ' picks the filaments and builds the relief — everything stays on your machine.</div>',
       '</div>',
     ].join('');
   }
@@ -311,7 +313,7 @@
     return [
       '<div class="hf-card">',
       '<div class="hf-card-h">CALIBRATE FILAMENTS</div>',
-      '<div class="hf-note" style="margin-top:0">Print a small card with the filaments in your stack, photograph it flat in even daylight, and Bed Ready measures each filament’s real colour and TD from it. Measured values replace the guesses the painting uses.</div>',
+      '<div class="hf-note" style="margin-top:0">Print a small card with the filaments in your stack, photograph it flat in even daylight, and ' + appName() + ' measures each filament’s real colour and TD from it. Measured values replace the guesses the painting uses.</div>',
       '<div class="hf-auto" style="margin-top:10px">',
       '<button type="button" class="btn sm" id="hfCalCard"' + (can ? '' : ' disabled title="Needs 2 to 4 filaments in the stack"') + '>' + wrapIco('cube') + 'Print calibration card</button>',
       '<button type="button" class="btn ghost sm" id="hfCalRead"' + (S.calCard ? '' : ' disabled title="Print the card first"') + '>' + wrapIco('camera') + 'Read photo of card</button>',

@@ -154,6 +154,7 @@
   "slicer.pick_title": "选择切片软件",
   "slicer.pick_hint": "用哪个切片软件打开此文件？",
   "tab.converter": "转换器",
+  "tab.hueforge": "HueForge",
   "conv.title": "转换3MF",
   "conv.subtitle": "将多色3MF重定向到其他打印机，或规范化为标准3MF。几何形状绝不会被改动。",
   "conv.pick": "选择3MF文件…",

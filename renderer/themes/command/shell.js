@@ -27,7 +27,7 @@
   // original position (e.g. dashboard stays at top, settings in footer).
   const GROUPS = [
     { key: 'work', labelKey: 'command.group.work', label: 'Work',
-      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'inventory-tab', 'waste-tab'] },
+      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab'] },
     { key: 'catalog', labelKey: 'command.group.catalog', label: 'Catalog',
       tabs: ['catalog-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab'] },
     { key: 'money', labelKey: 'command.group.money', label: 'Money',
@@ -42,6 +42,7 @@
     'printfiles-tab': 'var(--cmd-calc)',
     'colorstudio-tab': 'var(--cmd-analytics)',
     'converter-tab': 'var(--cmd-queue)',
+    'hueforge-tab': 'var(--cmd-queue)',
     'inventory-tab': 'var(--cmd-inv)',
     'waste-tab': 'var(--cmd-warn)',
     'catalog-tab': 'var(--cmd-dash)',
@@ -62,6 +63,7 @@
     'printfiles-tab': '▧',
     'colorstudio-tab': '◑',
     'converter-tab': '⇄',
+    'hueforge-tab': '▤',
     'inventory-tab': '▣',
     'waste-tab': '△',
     'catalog-tab': '▤',
@@ -77,7 +79,7 @@
   // The rail mirrors these tabs, top to bottom (settings rides the rail footer).
   const RAIL_ORDER = [
     'dashboard-tab', 'calculator-tab', 'queue-tab',
-    'printfiles-tab', 'colorstudio-tab', 'converter-tab',
+    'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab',
     'inventory-tab', 'waste-tab',
     'catalog-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab',
     'logs-tab', 'analytics-tab', 'expenses-tab',
@@ -246,6 +248,11 @@
       // inline display does not care which stylesheets shipped, and it rides on a wrapper
       // this shell removes wholesale on teardown.
       if (built) sec.style.display = shows ? '' : 'none';
+      // An original section the regrouping emptied needs the same inline hide, for the
+      // same reason (Bed Ready: HueForge was the last button "Production" kept, until it
+      // joined Work). It is marked, so only a display this shell set is ever cleared.
+      else if (!shows) { sec.style.display = 'none'; sec.dataset.cmdEmptyHidden = '1'; }
+      else if (sec.dataset.cmdEmptyHidden) { sec.style.display = ''; delete sec.dataset.cmdEmptyHidden; }
     });
   }
 
@@ -276,6 +283,7 @@
     document.querySelectorAll('[data-cmd-group]').forEach((el) => el.remove());
     document.querySelectorAll('.khayt-navsec').forEach((sec) => {
       sec.classList.remove('cmd-nav-empty');
+      if (sec.dataset.cmdEmptyHidden) { sec.style.display = ''; delete sec.dataset.cmdEmptyHidden; }
       sec.style.removeProperty('display');
     });
   }

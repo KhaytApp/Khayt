@@ -154,6 +154,7 @@
   "slicer.pick_title": "スライサーを選択",
   "slicer.pick_hint": "このファイルをどのスライサーで開きますか？",
   "tab.converter": "コンバーター",
+  "tab.hueforge": "HueForge",
   "conv.title": "3MFを変換",
   "conv.subtitle": "マルチカラー3MFを別のプリンター向けに再設定するか、標準的なクリーンな3MFに正規化します。ジオメトリは変更されません。",
   "conv.pick": "3MFファイルを選択…",
