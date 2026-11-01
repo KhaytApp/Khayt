@@ -6,15 +6,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: every language the Windows and Linux app speaks.** Settings ▸ Preferences ▸ Default language now offers German, Spanish, French, Turkish, Japanese, Chinese and Portuguese (Brazil) beside English and Arabic. The shared words are Khayt's own (`renderer/locales/`, all nine now bundled, each read the first time it is used), so both apps call a thing by the same name. The Mac's own words for the seven are in `mac-words-<code>.json`, and `MacLanguagesTests` holds each file complete, with every `{placeholder}` kept. A bilingual invoice whose second language is one of the seven now prints that half in it rather than in English. WhatsApp's default messages exist in English and Arabic only, so a shop in another language starts from the English one instead of the Arabic.
 
-- **Both apps: 270 strings that were still English in German, Spanish, French and Chinese are translated** ("Start server", "Put on hold", "Drying Log", the CSV import screen, and others), with some outdated wordings brought up to date. Japanese, Portuguese and Turkish had none; what remains identical to English there and in the other four is a name, a code, a unit or a word the language uses as it is.
-
-- **Desktop: a cancelled job is no longer counted as open work.** Twenty-six places tested "not finished and not a quote" by hand, so a cancelled job still reserved its filament (a false "spool over-committed" warning when saving the next job), still counted in the dashboard's active, due-today and per-machine numbers and the theme headers, and still got due-date reminders. They all ask `KhaytOrderStatus.isOpen` now (`lib/order-status.js`: not finished, not a quote, not cancelled), and `test/open-jobs-predicate.test.js` refuses the hand-written form. What a customer owes was already right: a cancelled job owes nothing.
-
 - **Mac: Settings could be cut off at the window's edge, and showed raw system errors.** The Settings window was a fixed 800 x 640 and clipped anything wider (Online, with the Vault in use, lost "Stop Using the Vault" and the days field). It now resizes, and cannot be made smaller than its content. Errors from the system (a cancelled Google token request was shown as six lines of `NSErrorFailingURLKey=…`) are now said in the system's own short words everywhere the Mac app shows an error (`ErrorText.plain`), and the online-storage problem line is held to the pane's width.
 
 - **Mac: over-committed spools, as on the desktop.** Taking a job whose parts, together with what open jobs already reserve, need more than a spool holds now asks first, in the desktop's words ("Spool PLA needs 300g but only 120g available after existing reservations"), and the shelf marks such a spool "Over-committed". A quote asks nothing, because it reserves nothing. The sums are shared: `overcommitWarnings` in `lib/reorder.js` counts open jobs only (a cancelled or archived job reserves nothing), and is colour-aware for multicolour parts. Items counted in ml or sheets are not weighed against grams.
-
-- **Desktop: a proforma is no longer a tax invoice with a new title.** "Generate Proforma" used to draw the full invoice and then retitle it, so the paper still carried the ZATCA QR, quoted the invoice number in its payment QR, stamped a ZATCA id on the job, and could warn that the QR was not compliant. It now asks the shared document for a proforma (`lib/invoice-document.js`), the same paper the Mac prints: titled and watermarked as one, no ZATCA QR, the job's own id under "No." and in the payment QR, and nothing written to the job. The old watermark style is removed; it pushed the document's watermark off the page.
 
 - **iPhone: a move made from an alert's button says what followed.** Tapping "Move to post-processing" or "Reprint" on a print-finished alert now posts one quiet follow-up alert (no sound, no buttons) when the shop's rules did something with the move, such as filament taken or put back, or a spool running low. Before, only moves made inside the app said this.
 
@@ -6605,6 +6599,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.1.2] - 2026-11-01
+
+- **Desktop: a cancelled job is no longer counted as open work.** Twenty-six places tested "not finished and not a quote" by hand, so a cancelled job still reserved its filament (a false "spool over-committed" warning when saving the next job), still counted in the dashboard's active, due-today and per-machine numbers and the theme headers, and still got due-date reminders. They all ask `KhaytOrderStatus.isOpen` now (`lib/order-status.js`: not finished, not a quote, not cancelled), and `test/open-jobs-predicate.test.js` refuses the hand-written form. What a customer owes was already right: a cancelled job owes nothing.
+
+- **Both apps: 270 strings that were still English in German, Spanish, French and Chinese are translated** ("Start server", "Put on hold", "Drying Log", the CSV import screen, and others), with some outdated wordings brought up to date. Japanese, Portuguese and Turkish had none; what remains identical to English there and in the other four is a name, a code, a unit or a word the language uses as it is.
 
 ## [bedready-v1.4.0] - 2026-10-31
 
