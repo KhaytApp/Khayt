@@ -44,7 +44,9 @@ done
 # Khayt's own translations, from renderer/locales/. Not lib/, and not named the
 # way modules are — nine files all assigning onto one global — so they are copied
 # by their own list rather than bent into the rule above.
-LOCALES=$(sed -n '/static let locales = \[/,/\]/p' mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift \
+# One line, as test/mac-core-is-not-a-fork.test.js reads it: a range would run
+# on into `eagerLocales` below it.
+LOCALES=$(sed -n 's/.*static let locales = \[\(.*\)\].*/\1/p' mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift \
           | grep -oE '"[a-zA-Z-]+"' | tr -d '"')
 for l in $LOCALES; do
   cp "renderer/locales/$l.js" "$DEST/locale-$l.js"

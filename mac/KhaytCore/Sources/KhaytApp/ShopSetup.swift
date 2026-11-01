@@ -200,7 +200,8 @@ struct ShopSetup: Equatable {
     /// speaks. The name is localised, so a shop that ran the setup in English
     /// and again in Arabic must still find the ONE preset it made.
     static var presetNames: [String] {
-        Words.own["mac.setup_preset_name"].map { Array($0.values) } ?? []
+        (Words.own["mac.setup_preset_name"].map { Array($0.values) } ?? [])
+            + Words.supported.compactMap { Words.translated($0)["mac.setup_preset_name"] }
     }
 
     /// The three settings step 1 compares against, as the book holds them.

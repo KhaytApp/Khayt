@@ -1066,14 +1066,25 @@ public actor KhaytEngine {
         "telemetry-sender",
     ]
 
-    /// The languages whose strings are bundled.
+    /// The languages whose strings are bundled: all nine the other app speaks.
     ///
-    /// Two, not nine: these are 200KB each and the app only shows one at a time.
-    /// English because it is the fallback, Arabic because it is the language the
-    /// other half of this shop's customers read — and because right-to-left is a
-    /// layout property, not a translation, so it has to be exercised now rather
-    /// than retrofitted across a dozen finished screens.
-    static let locales = ["en", "ar"]
+    /// Bundled is not loaded. These are 250–330KB each and the app shows one at
+    /// a time, so only `eagerLocales` are read when an engine starts; the rest
+    /// are read the first time something asks for them (`ensureLocale`).
+    static let locales = ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh"]
+
+    /// Read at start: English because every lookup falls back to it, Arabic
+    /// because it is the shop's other everyday language.
+    static let eagerLocales = ["en", "ar"]
+
+    /// Load one bundled language's strings if this engine has not yet. An
+    /// unknown code is ignored: it reads as no catalogue, so English, which is
+    /// what it read as before. Not a failure to report: a missing file in the
+    /// bundle surfaces at the `mac-core-is-not-a-fork` test, not in a shop.
+    private func ensureLocale(_ language: String?) {
+        guard let language, Self.locales.contains(language) else { return }
+        try? runtime.loadLocale(language)
+    }
 
     public init(bundle: Bundle? = nil) throws {
         // One of a few threads every engine shares (see `EngineThread` for
@@ -1084,7 +1095,7 @@ public actor KhaytEngine {
         // that thread's run loop and not on the caller's (the main one).
         nonisolated(unsafe) let bundle = bundle
         runtime = try thread.sync {
-            try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
+            try JSRuntime(modules: Self.modules, locales: Self.eagerLocales, bundle: bundle)
         }
     }
 
@@ -1200,10 +1211,11 @@ public actor KhaytEngine {
     /// bridge with four thousand strings, which is cheap once and absurd per
     /// label. The caller holds the result for the life of the language.
     public func translations(language: String) throws -> [String: String] {
+        ensureLocale(language)
         // The language is an ARGUMENT, not source: pasted into the script, a
         // code like `en'];globalThis.x=1;//` was code. It comes from settings.
         // `hasOwnProperty`, so `__proto__` or `constructor` reads as no catalogue.
-        try runtime.call2("""
+        return try runtime.call2("""
             (function (all, lang) {
               return Object.prototype.hasOwnProperty.call(all, lang) ? all[lang] : {};
             })(globalThis.KhaytLocales || {}, ARG0)
@@ -7880,7 +7892,12 @@ public actor KhaytEngine {
                             language: String, money: [String: JSONValue],
                             sellerFields: [String: JSONValue],
                             orders: [JSONValue] = []) throws -> InvoiceDocument {
-        try runtime.call2(INVOICE_SCRIPT,
+        // The document's language and its second one (`invoiceSecondLang`,
+        // resolved by `lib/invoice-language.js`) must both be loaded, or a
+        // German half of a bilingual invoice prints in English.
+        ensureLocale(language)
+        if case .string(let second)? = settings["invoiceSecondLang"] { ensureLocale(second) }
+        return try runtime.call2(INVOICE_SCRIPT,
                           [order, .object(settings), .array(clients), .object(currencies),
                            .string(language), .object(money), .object(sellerFields),
                            .array(orders)],

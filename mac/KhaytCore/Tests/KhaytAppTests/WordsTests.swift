@@ -27,7 +27,9 @@ struct WordsTests {
     @Test("every word this app supplies itself carries both languages")
     func ownKeysAreComplete() {
         for (key, values) in Words.own {
-            for language in Words.supported {
+            // English and Arabic live in `Words.own`; the other seven are in
+            // `mac-words-<code>.json`, held complete by `MacLanguagesTests`.
+            for language in ["en", "ar"] {
                 let value = values[language]
                 #expect(value?.isEmpty == false, "\(key) has no \(language)")
             }
@@ -127,7 +129,9 @@ struct WordsTests {
     @Test("an unsupported language falls back to English rather than to nothing")
     func fallsBack() async throws {
         let words = Words()
-        await words.load("ja", engine: try KhaytEngine())
+        // Japanese was the example while the Mac spoke two languages; it
+        // speaks all nine now, so a code no locale has stands in.
+        await words.load("xx", engine: try KhaytEngine())
         #expect(words.language == "en")
         #expect(!words.isRTL)
         #expect(words.callIt("queue.printing") == "Printing")

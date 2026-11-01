@@ -56,7 +56,7 @@ enum ResourceCheck {
         // into the engine, which is a screen away rather than a line away.
         do {
             _ = try KhaytEngine()
-            say("  ok  engine: every bundled module and locale loaded")
+            say("  ok  engine: every bundled module, English and Arabic loaded")
         } catch {
             say("FAIL  engine: \(error)")
             failed = true
@@ -77,6 +77,23 @@ enum ResourceCheck {
                 // refuses to open, and the invoice prints with no styling at
                 // all — a shop's own document, sent to a customer, as raw HTML.
                 say("FAIL  \(what): \(name).\(ext) is not in this bundle")
+                failed = true
+            }
+        }
+
+        // Every language the Settings menu offers: Khayt's shared strings
+        // (read on first use, so the engine start above does not prove them)
+        // and, beyond English and Arabic, this app's own words. Missing, the
+        // app still runs and reads English, which is how it would go unseen.
+        for code in Words.supported {
+            let shared = BundledResources.javaScript.url(forResource: "locale-\(code)", withExtension: "js",
+                                                         subdirectory: "JS")
+            let ownOK = code == "en" || code == "ar" || !Words.translated(code).isEmpty
+            if shared != nil, ownOK {
+                say("  ok  language \(code)")
+            } else {
+                say("FAIL  language \(code): " + (shared == nil ? "locale-\(code).js " : "")
+                    + (ownOK ? "" : "mac-words-\(code).json ") + "not in this bundle")
                 failed = true
             }
         }
