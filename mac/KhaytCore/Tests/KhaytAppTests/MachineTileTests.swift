@@ -135,7 +135,7 @@ struct MachineTileTests {
         let language = Words()
         for quiet in [Shop.Quiet.idle, .notSetUp, .noProtocol, .notAnswering] {
             for tongue in Words.supported {
-                #expect(Words.own[quiet.wordKey]?[tongue]?.isEmpty == false,
+                #expect(Words.ownExact(quiet.wordKey, tongue)?.isEmpty == false,
                         Comment(rawValue: "\(quiet.wordKey) has nothing in \(tongue)"))
             }
             #expect(!language.callIt(quiet.wordKey).hasPrefix("mac."),

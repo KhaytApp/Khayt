@@ -42,7 +42,7 @@ struct DashboardHonestyTests {
         #expect(words.callIt("mac.machines_online") != "Machines",
                 "the tile counts printers reporting, not machines the shop owns")
         for language in Words.supported {
-            #expect(Words.own["mac.machines_online"]?[language]?.isEmpty == false)
+            #expect(Words.ownExact("mac.machines_online", language)?.isEmpty == false)
         }
     }
 

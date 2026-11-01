@@ -2603,7 +2603,7 @@
  "mac.state_quoted": "Devisé",
  "mac.state_running": "En cours",
  "mac.state_stopped": "Arrêté",
- "mac.state_today": "Aujourd’hui",
+ "mac.state_today": "Ce jour",
  "mac.state_worn": "Usé",
  "mac.stk_accept": "Empiler avec {variants}",
  "mac.stk_badge_close": "Une pile de {variants} — les masquer",
