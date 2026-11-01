@@ -6600,6 +6600,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [4.2.0] - 2026-11-01
+
+- **Desktop: HueForge is in Khayt, not only Bed Ready.** The filament-painting tab (turn a picture into a layered relief for the Snapmaker U1, with the calibration card that measures each filament's real colour and TD, a hanger hole, area colour fixes, and tiles for a picture bigger than the bed) now sits under Work, beside Converter, in Simple and Professional. It reads the shop's own spools for its palette and saves the same 3MF files as Bed Ready. Its styles moved out of Bed Ready's theme into `renderer/hueforge.css`, which both apps load, and its words name whichever app is running. A theme that regroups the sidebar now hides an original section it has emptied even where its own stylesheet is not loaded (Bed Ready's "Production", once HueForge joined Work). Windows and Linux; the Mac app does not have it.
+
 ## [4.1.2] - 2026-11-01
 
 - **Desktop: a cancelled job is no longer counted as open work.** Twenty-six places tested "not finished and not a quote" by hand, so a cancelled job still reserved its filament (a false "spool over-committed" warning when saving the next job), still counted in the dashboard's active, due-today and per-machine numbers and the theme headers, and still got due-date reminders. They all ask `KhaytOrderStatus.isOpen` now (`lib/order-status.js`: not finished, not a quote, not cancelled), and `test/open-jobs-predicate.test.js` refuses the hand-written form. What a customer owes was already right: a cancelled job owes nothing.

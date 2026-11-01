@@ -154,6 +154,7 @@
   "slicer.pick_title": "Escolher fatiador",
   "slicer.pick_hint": "Abrir este arquivo com qual fatiador?",
   "tab.converter": "Conversor",
+  "tab.hueforge": "HueForge",
   "conv.title": "Converter 3MF",
   "conv.subtitle": "Redirecione um 3MF multicolorido para outra impressora, ou normalize-o em um 3MF padrão limpo. A geometria nunca é alterada.",
   "conv.pick": "Escolher um arquivo 3MF…",

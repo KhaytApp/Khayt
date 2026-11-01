@@ -154,6 +154,7 @@
   "slicer.pick_title": "اختر برنامج التقطيع",
   "slicer.pick_hint": "بأي برنامج تقطيع تريد فتح هذا الملف؟",
   "tab.converter": "المحوّل",
+  "tab.hueforge": "HueForge",
   "conv.title": "تحويل 3MF",
   "conv.subtitle": "أعد توجيه ملف 3MF متعدد الألوان إلى طابعة أخرى، أو حوّله إلى ملف 3MF قياسي نظيف. لا يُمَس المجسم إطلاقًا.",
   "conv.pick": "اختر ملف 3MF…",

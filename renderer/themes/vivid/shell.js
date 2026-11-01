@@ -26,7 +26,7 @@
   // their original position (e.g. dashboard stays at top, settings in footer).
   const GROUPS = [
     { key: 'work', labelKey: 'vivid.group.work', label: 'Work',
-      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'inventory-tab', 'waste-tab'] },
+      tabs: ['calculator-tab', 'queue-tab', 'printfiles-tab', 'colorstudio-tab', 'converter-tab', 'hueforge-tab', 'inventory-tab', 'waste-tab'] },
     { key: 'catalog', labelKey: 'vivid.group.catalog', label: 'Catalog',
       tabs: ['catalog-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab'] },
     { key: 'money', labelKey: 'vivid.group.money', label: 'Money',
@@ -175,6 +175,11 @@
       // inline display does not care which stylesheets shipped, and it rides on a wrapper
       // this shell removes wholesale on teardown.
       if (built) sec.style.display = shows ? '' : 'none';
+      // An original section the regrouping emptied needs the same inline hide, for the
+      // same reason (Bed Ready: HueForge was the last button "Production" kept, until it
+      // joined Work). It is marked, so only a display this shell set is ever cleared.
+      else if (!shows) { sec.style.display = 'none'; sec.dataset.vvEmptyHidden = '1'; }
+      else if (sec.dataset.vvEmptyHidden) { sec.style.display = ''; delete sec.dataset.vvEmptyHidden; }
     });
   }
 
@@ -209,6 +214,7 @@
     document.querySelectorAll('[data-vv-group]').forEach((el) => el.remove());
     document.querySelectorAll('.khayt-navsec').forEach((sec) => {
       sec.classList.remove('vv-nav-empty');
+      if (sec.dataset.vvEmptyHidden) { sec.style.display = ''; delete sec.dataset.vvEmptyHidden; }
       sec.style.removeProperty('display');
     });
   }
