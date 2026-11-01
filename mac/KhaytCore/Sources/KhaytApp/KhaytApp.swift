@@ -742,6 +742,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the Settings window, at its opening size and its smallest,
+            // with what runs off its edge — see `captureSettingsOnly`.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SETTINGS"] == "1", let shop = subject {
+                await captureSettingsOnly(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the model page and the multi-select pane (library
             // inspector redesign), on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBINSP"] == "1", let shop = subject {
@@ -1679,6 +1686,22 @@ final class Activator: NSObject, NSApplicationDelegate {
                     // — was outside every picture ever taken of this window.
                     capturePanes(named: "17-settings-\(pane.rawValue)", window: settings, into: dir)
                 }
+                // AND AT ITS SMALLEST. The window resizes (#2130), and the
+                // opening size is not where a pane breaks: Nov 1, the Online
+                // pane ran off the right edge at the narrowest width a shop
+                // can drag it to, in a picture nobody had taken.
+                let opening = settings.frame
+                settings.setContentSize(settings.contentMinSize)
+                await settle()
+                FileHandle.standardError.write(Data(
+                    "settings at its smallest: \(Int(settings.frame.width))×\(Int(settings.frame.height))\n".utf8))
+                for pane in SettingsPane.allCases {
+                    shop.settingsPane = pane
+                    await settle()
+                    capture(named: "17m-settings-\(pane.rawValue)", window: settings, into: dir)
+                    FileHandle.standardError.write(Data((paneFit(settings, "min \(pane.rawValue)") + "\n").utf8))
+                }
+                settings.setFrame(opening, display: true)
                 settings.close()
                 await settle()
             } else {

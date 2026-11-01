@@ -189,17 +189,19 @@ struct QuoteFormEmbedSection: View {
         // ── THE THREE WAYS ON TO A STORE, LINK FIRST ────────────────────
         if let links = state.links, links.page != nil || links.frame != nil || links.script != nil {
             Divider()
-            HStack {
-                Picker(words.callIt("mac.qfe_lang"), selection: $lang) {
-                    Text(verbatim: "العربية").tag("ar")
-                    Text(verbatim: "English").tag("en")
-                }
-                .fixedSize()
-                Picker(words.callIt("mac.qfe_theme"), selection: $theme) {
-                    Text(words.callIt("mac.qfe_theme_light")).tag("light")
-                    Text(words.callIt("mac.qfe_theme_dark")).tag("dark")
-                }
-                .fixedSize()
+            // ONE ROW EACH, as every other picker in Settings. Side by side
+            // in an HStack, each `.fixedSize()`, a grouped Form's picker is
+            // as wide as a whole form row, so the pair asked 144pt more than
+            // the pane had and the Online pane grew past the window — every
+            // card off the right edge and over the sidebar (Nov 1, found by
+            // hiding one row at a time on a shop with the quote form on).
+            Picker(words.callIt("mac.qfe_lang"), selection: $lang) {
+                Text(verbatim: "العربية").tag("ar")
+                Text(verbatim: "English").tag("en")
+            }
+            Picker(words.callIt("mac.qfe_theme"), selection: $theme) {
+                Text(words.callIt("mac.qfe_theme_light")).tag("light")
+                Text(words.callIt("mac.qfe_theme_dark")).tag("dark")
             }
             if let page = links.page {
                 snippet("mac.qfe_link", hint: "mac.qfe_link_hint",
