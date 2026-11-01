@@ -8974,6 +8974,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.15] - 2026-11-01
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Seven more languages.** Settings ▸ Preferences ▸ Default language now offers German, Spanish, French, Turkish, Japanese, Chinese and Portuguese (Brazil) beside English and Arabic: every language the Windows and Linux app speaks. Both apps use the same words for the same things. A bilingual invoice whose second language is one of the seven prints that half in it. WhatsApp's default messages exist in English and Arabic only, so a shop in another language starts from the English one. The help pages are still in English and Arabic. The new translations are machine-made and have not yet been checked by native speakers.
+
+### Fixed
+
+- **270 words that were still English in German, Spanish, French and Chinese** are translated ("Start server", "Put on hold", "Drying Log", the CSV import screen and others).
+
 ## [4.0.0-beta.14] - 2026-11-01
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
