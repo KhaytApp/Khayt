@@ -396,12 +396,46 @@ jobs:
   # one of them failing, and nobody could have known: the four required checks
   # cannot see a single line of Swift.
   #
-  # NO PATH FILTER, deliberately. A required check that does not report blocks
-  # a PR forever, and `lib/*.js` is bundled into this app — a change there with
-  # no `mac/` file touched is exactly the change that breaks it. See the note on
-  # `iOS contract` in CLAUDE.md for the version of this that got it wrong.
+  # NO WORKFLOW PATH FILTER, deliberately. A required check that does not
+  # report blocks a PR forever (see `iOS contract` in CLAUDE.md). Instead
+  # `mac-relevant` below decides, and this job is SKIPPED by its own `if:` when
+  # a PR touches nothing the Mac app builds from or its tests read. A skipped
+  # job still reports, and a required check counts it as passing. Every push to
+  # main runs it regardless, so the cache stays warm and anything the list
+  # missed is caught there.
+  #
+  # Why: a docs or desktop-only PR (a release cut, a renderer fix) waited ~32
+  # minutes on this job for an answer that could not change.
+  mac-relevant:
+    name: Does this touch the Mac app?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          # MAC-RELEVANT PATHS: everything the Mac app builds from or its tests
+          # read. lib/ is bundled into the app. The renderer files, main.js,
+          # fixtures and vectors are read by named Mac tests.
+          # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
+          # name matches this pattern, so a new one can't be missed silently.
+          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|\.github/workflows/ci\.yml$)'
+          if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
   mac:
     name: Mac app tests
+    needs: mac-relevant
+    if: needs.mac-relevant.outputs.run == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
