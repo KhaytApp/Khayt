@@ -29,6 +29,8 @@ public enum KhaytJSError: Error, CustomStringConvertible {
 public final class JSRuntime {
     private let context: JSContext
     private var lastException: String?
+    /// Where the JS resources are, kept for languages loaded after start.
+    private let bundle: Bundle
 
     /// Load `modules` in order, then `locales`, from `bundle`'s `JS` resource
     /// directory.
@@ -49,6 +51,7 @@ public final class JSRuntime {
     /// second vocabulary for one shop.
     public init(modules: [String], locales: [String] = [], bundle: Bundle? = nil) throws {
         let bundle = bundle ?? BundledResources.javaScript
+        self.bundle = bundle
         guard let context = JSContext() else {
             throw KhaytJSError.evaluationFailed("could not create a JavaScript context")
         }
@@ -149,20 +152,30 @@ public final class JSRuntime {
         }
 
         for language in locales {
-            let name = "locale-\(language)"
-            guard let url = bundle.url(forResource: name, withExtension: "js", subdirectory: "JS") else {
-                throw KhaytJSError.moduleMissing("\(name).js")
-            }
-            let source = try String(contentsOf: url, encoding: .utf8)
-            lastException = nil
-            context.evaluateScript(source, withSourceURL: url)
-            if let problem = lastException {
-                throw KhaytJSError.evaluationFailed("loading \(name).js: \(problem)")
-            }
-            guard let all = context.objectForKeyedSubscript("KhaytLocales"),
-                  all.objectForKeyedSubscript(language)?.isUndefined == false else {
-                throw KhaytJSError.moduleMissing("\(name).js loaded but defined no strings for \(language)")
-            }
+            try loadLocale(language)
+        }
+    }
+
+    /// Load `locale-<language>.js` from the bundle, once. A language already
+    /// on `KhaytLocales` is left alone, so asking twice costs nothing.
+    public func loadLocale(_ language: String) throws {
+        if let all = context.objectForKeyedSubscript("KhaytLocales"),
+           !all.isUndefined, all.objectForKeyedSubscript(language)?.isUndefined == false {
+            return
+        }
+        let name = "locale-\(language)"
+        guard let url = bundle.url(forResource: name, withExtension: "js", subdirectory: "JS") else {
+            throw KhaytJSError.moduleMissing("\(name).js")
+        }
+        let source = try String(contentsOf: url, encoding: .utf8)
+        lastException = nil
+        context.evaluateScript(source, withSourceURL: url)
+        if let problem = lastException {
+            throw KhaytJSError.evaluationFailed("loading \(name).js: \(problem)")
+        }
+        guard let all = context.objectForKeyedSubscript("KhaytLocales"),
+              all.objectForKeyedSubscript(language)?.isUndefined == false else {
+            throw KhaytJSError.moduleMissing("\(name).js loaded but defined no strings for \(language)")
         }
     }
 

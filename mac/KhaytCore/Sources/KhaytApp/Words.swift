@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import SwiftUI
 import KhaytCore
 import KhaytWidgetData
@@ -38,10 +39,11 @@ final class Words {
     /// starts. This value is kept for views that need to ask, and for the tests.
     var layout: LayoutDirection { isRTL ? .rightToLeft : .leftToRight }
 
-    /// Which languages this app has words for. English is the fallback and Arabic
-    /// is the one that changes the layout; the other seven are a matter of
-    /// bundling more files, not of new machinery.
-    nonisolated static let supported = ["en", "ar"]
+    /// Which languages this app has words for: the nine the other app speaks,
+    /// in the order its language menu lists them. English is the fallback and
+    /// Arabic is the one that changes the layout. The Mac's own words for the
+    /// seven beyond those two live in `mac-words-<code>.json` (`translated`).
+    nonisolated static let supported = ["en", "ar", "de", "es", "fr", "tr", "ja", "zh", "pt-BR"]
 
     init() {
         if let warm = Self.warm {
@@ -127,9 +129,39 @@ final class Words {
     /// screen to be reported rather than quietly reading as a label.
     func callIt(_ key: String) -> String {
         if let theirs = khayt[key], !theirs.isEmpty { return theirs }
-        if let mine = Self.own[key]?[language] ?? Self.own[key]?["en"] { return mine }
+        if let mine = Self.mine(key, language) { return mine }
         return key
     }
+
+    /// This app's own word for `key` in `language`: the catalogue's own entry,
+    /// then the language's file, then English. Nil only for a key this app
+    /// does not have.
+    nonisolated static func mine(_ key: String, _ language: String) -> String? {
+        if let said = own[key]?[language], !said.isEmpty { return said }
+        if let said = translated(language)[key], !said.isEmpty { return said }
+        return own[key]?["en"]
+    }
+
+    /// The Mac's own words in a language beyond English and Arabic, from
+    /// `Resources/mac-words-<code>.json`: `{ key: text }`, read once per
+    /// language and kept. A missing or unreadable file is an empty table, so
+    /// the screen reads English rather than keys; `test/mac-words.test.js`
+    /// is what holds each file complete.
+    nonisolated static func translated(_ language: String) -> [String: String] {
+        guard language != "en", language != "ar" else { return [:] }
+        return translatedTables.withLock { tables in
+            if let table = tables[language] { return table }
+            var table: [String: String] = [:]
+            if let url = AppResources.bundle.url(forResource: "mac-words-\(language)", withExtension: "json"),
+               let data = try? Data(contentsOf: url),
+               let read = try? JSONDecoder().decode([String: String].self, from: data) {
+                table = read
+            }
+            tables[language] = table
+            return table
+        }
+    }
+    private nonisolated static let translatedTables = OSAllocatedUnfairLock(initialState: [String: [String: String]]())
 
     /// One of a thing, or several.
     ///
@@ -362,7 +394,7 @@ final class Words {
     nonisolated static func upfront(_ key: String) -> String {
         if let theirs = warm?.strings[key], !theirs.isEmpty { return theirs }
         let lang = warm?.language ?? "en"
-        if let mine = own[key]?[lang] ?? own[key]?["en"] { return mine }
+        if let mine = mine(key, lang) { return mine }
         return key
     }
 
@@ -6333,8 +6365,17 @@ extension Words {
         // English keeps the shop's own spelling ("Rolls", "pcs") — only a
         // language with a word of its own replaces it.
         if language == "en" { return raw }
-        guard let said = Self.own[key]?[language], !said.isEmpty else { return raw }
+        guard let said = Self.ownExact(key, language) else { return raw }
         return said
+    }
+
+    /// This app's word in exactly `language`, never the English fallback: for
+    /// a shop's own unit or shelf name, which stays as written rather than
+    /// turn into English.
+    nonisolated static func ownExact(_ key: String, _ language: String) -> String? {
+        if let said = own[key]?[language], !said.isEmpty { return said }
+        if let said = translated(language)[key], !said.isEmpty { return said }
+        return nil
     }
 
     /// A quantity and its unit, held together in their own direction.
@@ -6390,7 +6431,7 @@ extension Words {
         let folded = raw.lowercased().split(separator: " ", omittingEmptySubsequences: true)
             .joined(separator: " ")
         guard language != "en", let key = Self.shelfKeys[folded],
-              let said = Self.own[key]?[language], !said.isEmpty else { return raw }
+              let said = Self.ownExact(key, language) else { return raw }
         return said
     }
 

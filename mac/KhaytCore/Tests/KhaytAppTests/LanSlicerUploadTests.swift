@@ -42,6 +42,11 @@ struct LanSlicerUploadTests {
         let book = shop.lanBook
         var host = LanServer.Host(store: { book }, pin: "24682468", engine: engine)
         host.slicerKey = { key }
+        // A fixed lockout clock: the window is a real minute, and on a loaded
+        // CI runner ten requests have taken longer than that, so the lockout
+        // had lapsed before the test asked for it (PR #2135, Nov 1).
+        let frozen = LanPairingWindow.monotonic()
+        host.lockoutClock = { frozen }
         host.slicerMaxBytes = maxBytes
         host.slicerScratch = SlicerInbox.incoming(root: root)
         host.slicerReceive = { file, name in

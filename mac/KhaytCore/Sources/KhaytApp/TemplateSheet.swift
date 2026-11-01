@@ -160,7 +160,9 @@ struct TemplateSheet: View {
         guard loaded, message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || message == defaults else { return }
         guard !milestone.isEmpty else { return }
-        let wanted = lang.isEmpty ? (shop.words.language == "en" ? "en" : "ar") : lang
+        // The defaults are written in English and Arabic only
+        // (`lib/whatsapp-message.js`); any other language starts from English.
+        let wanted = lang.isEmpty ? (shop.words.language == "ar" ? "ar" : "en") : lang
         Task {
             let words = (try? await shop.engine?.whatsAppDefaultBody(milestone: milestone, lang: wanted)) ?? ""
             message = words

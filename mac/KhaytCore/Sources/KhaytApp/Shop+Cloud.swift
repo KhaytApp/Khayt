@@ -420,7 +420,11 @@ extension Shop {
                         connection, token: session.token, keyset: keyset) { try await web.data(for: $0) } == .published
                 } catch {
                     cloudProblem = words.callIt("mac.cloud_key_not_published") + " "
-                        + ((error as? CustomStringConvertible)?.description ?? self.said(error))
+                        // Every error is CustomStringConvertible, so the old cast
+                        // always took `description`: NSError's debug dump for a
+                        // failed request. `ErrorText.plain` keeps a Khayt error's
+                        // own description and gives Foundation's its sentence.
+                        + ErrorText.plain(error)
                 }
                 if published { await sendToCloud() }
             }
