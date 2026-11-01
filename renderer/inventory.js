@@ -1234,7 +1234,7 @@ function openPriceHistory(itemId) {
 
 function getQueuedWeight(itemId) {
   return printLog
-    .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived)
+    .filter(o => KhaytOrderStatus.isOpen(o) && !o.archived)
     .reduce((s, o) =>
       s + (o.parts || [])
         .filter(p => p.filamentId === itemId)
@@ -1476,7 +1476,7 @@ function getSpoolReservedGrams(spoolId) {
   // Key on the same id the deduction uses: the explicitly chosen spool when set,
   // otherwise the part's filament (most parts only carry filamentId).
   return printLog
-    .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived)
+    .filter(o => KhaytOrderStatus.isOpen(o) && !o.archived)
     .reduce((s, o) =>
       s + (o.parts || [])
         .reduce((ps, p) => ps + partGramsForSpool(p, spoolId), 0)
@@ -1515,7 +1515,7 @@ function checkSpoolOvercommit(parts, excludeOrderId) {
     const alreadyReserved = printLog
       // !archived: renderPipelineDemand already excludes archived orders, so a
       // reservation that survives archiving contradicts the demand view beside it.
-      .filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived && o.id !== excludeOrderId)
+      .filter(o => KhaytOrderStatus.isOpen(o) && !o.archived && o.id !== excludeOrderId)
       .reduce((s, o) =>
         s + (o.parts || []).reduce((ps, p) => ps + partGramsForSpool(p, key), 0)
       , 0);
@@ -1535,7 +1535,7 @@ function renderPipelineDemand() {
   const el = $('#pipelineDemand');
   if (!el) return;
 
-  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.archived);
+  const activeOrders = printLog.filter(o => KhaytOrderStatus.isOpen(o) && !o.archived);
   if (activeOrders.length === 0) {
     el.innerHTML = '';
     return;

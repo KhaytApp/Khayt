@@ -2251,7 +2251,7 @@ function openOrderEditor(orderId) {
 
 /* ── Batch Print Planner ────────────────────────────────── */
 function openBatchPlannerModal() {
-  const candidates = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote' && !o.voidedAt);
+  const candidates = printLog.filter(o => KhaytOrderStatus.isOpen(o) && !o.voidedAt);
   if (candidates.length === 0) {
     toast(t('batch.no_orders') || 'No pending orders to plan', 'info');
     return;

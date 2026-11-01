@@ -8,6 +8,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Both apps: 270 strings that were still English in German, Spanish, French and Chinese are translated** ("Start server", "Put on hold", "Drying Log", the CSV import screen, and others), with some outdated wordings brought up to date. Japanese, Portuguese and Turkish had none; what remains identical to English there and in the other four is a name, a code, a unit or a word the language uses as it is.
 
+- **Desktop: a cancelled job is no longer counted as open work.** Twenty-six places tested "not finished and not a quote" by hand, so a cancelled job still reserved its filament (a false "spool over-committed" warning when saving the next job), still counted in the dashboard's active, due-today and per-machine numbers and the theme headers, and still got due-date reminders. They all ask `KhaytOrderStatus.isOpen` now (`lib/order-status.js`: not finished, not a quote, not cancelled), and `test/open-jobs-predicate.test.js` refuses the hand-written form. What a customer owes was already right: a cancelled job owes nothing.
+
 - **Mac: Settings could be cut off at the window's edge, and showed raw system errors.** The Settings window was a fixed 800 x 640 and clipped anything wider (Online, with the Vault in use, lost "Stop Using the Vault" and the days field). It now resizes, and cannot be made smaller than its content. Errors from the system (a cancelled Google token request was shown as six lines of `NSErrorFailingURLKey=…`) are now said in the system's own short words everywhere the Mac app shows an error (`ErrorText.plain`), and the online-storage problem line is held to the pane's width.
 
 - **Mac: over-committed spools, as on the desktop.** Taking a job whose parts, together with what open jobs already reserve, need more than a spool holds now asks first, in the desktop's words ("Spool PLA needs 300g but only 120g available after existing reservations"), and the shelf marks such a spool "Over-committed". A quote asks nothing, because it reserves nothing. The sums are shared: `overcommitWarnings` in `lib/reorder.js` counts open jobs only (a cancelled or archived job reserves nothing), and is colour-aware for multicolour parts. Items counted in ml or sheets are not weighed against grams.
@@ -8971,6 +8973,22 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.14] - 2026-11-01
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A credit limit per customer.** Set the most a customer may owe on their sheet; 0 is no limit. Anyone owing more gets a mark beside their name and "Over credit limit" on their page. It is the same field the Windows and Linux app uses, so a limit set in either shows in both.
+- **Proforma invoices.** An accepted job that is not finished yet has "Generate Proforma" on its right-click menu and its details pane: the job's paper titled and watermarked as a proforma, ready to save as a PDF. It is not a tax invoice. It has no ZATCA QR, shows the job's own id instead of an invoice number, and never numbers the job.
+- **Over-committed spools.** Taking a job whose parts, together with what your open jobs already need, come to more than a spool holds now asks first, and the shelf marks that spool "Over-committed". A quote asks nothing, since it reserves nothing.
+
+### Fixed
+
+- **Settings can be resized.** The Settings window was fixed at 600 points wide, so a long label, a larger text size or Arabic could cut a row off with no way to reach it. It now grows as wide and tall as you drag it.
+- **Errors from macOS read as a sentence.** A failed or cancelled network request showed the system's raw error dump (domain, code and every URL) in Settings and elsewhere. It now shows the system's short message, such as "cancelled" or "The Internet connection appears to be offline."
 
 ## [4.0.0-beta.13] - 2026-10-30
 

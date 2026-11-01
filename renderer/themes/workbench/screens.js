@@ -255,7 +255,7 @@
     //                     it is the only one of these you must act on, and it
     //                     was the only one Analytics had no home for.
     const nowPrinting = log.filter((o) => o.status === 'printing');
-    const openOrders = log.filter((o) => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+    const openOrders = log.filter((o) => KhaytOrderStatus.isOpen(o));
 
     /* ---- Today's work (real active orders) ---- */
     const ACTIVE_ORDER = ['printing', 'pending', 'post', 'qc', 'on_hold'];
