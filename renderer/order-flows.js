@@ -148,6 +148,9 @@ function logPrint(asQuote = false) {
   }, {
     settings,
     orders: printLog,
+    // The client's currency is the job's when none is picked on the quote, and
+    // the price is converted into it at save (lib/order-new.js jobCurrency).
+    clients: (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [],
     now: new Date(),
     tokens: { tracking: bytes(N.TOKEN_BYTES), quoteApproval: bytes(N.TOKEN_BYTES) },
   });
@@ -2477,7 +2480,11 @@ function openOrderTimeline(orderId) {
 function duplicateOrder(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
-  currentBuild = (order.parts || []).map(p => {
+  // A job billed in another currency carries its figures in that currency;
+  // the calculator reads the shop's (lib/order-new.js inShopCurrency).
+  const shop = NewOrderRules() ? NewOrderRules().inShopCurrency(order, settings)
+    : { shippingCost: order.shippingCost, extraLines: order.extraLines || [], parts: order.parts || [] };
+  currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
@@ -2487,9 +2494,9 @@ function duplicateOrder(orderId) {
   });
   currentBuildFromProductId = order.productId || null;
   currentClientId = order.clientId || null;
-  currentExtraLines = (order.extraLines || []).map(l => ({ ...l }));
+  currentExtraLines = (shop.extraLines || []).map(l => ({ ...l }));
   if ($('#discountPct'))   $('#discountPct').value   = String(order.discountPct   || 0);
-  if ($('#shippingCost'))  $('#shippingCost').value  = String(order.shippingCost  || 0);
+  if ($('#shippingCost'))  $('#shippingCost').value  = String(shop.shippingCost  || 0);
   if ($('#calcClientRef')) $('#calcClientRef').value = order.clientRef || '';
   // Pre-fill client field with the order's client display name
   $('#clientInput').value = order.project || '';
@@ -2507,7 +2514,11 @@ function duplicateOrder(orderId) {
 // original's material accounting is never touched.
 function createLinkedReprint(original, reason, costMode) {
   if (!original) return;
-  currentBuild = (original.parts || []).map(p => {
+  // A job billed in another currency carries its figures in that currency;
+  // the calculator reads the shop's (lib/order-new.js inShopCurrency).
+  const shop = NewOrderRules() ? NewOrderRules().inShopCurrency(original, settings)
+    : { shippingCost: original.shippingCost, extraLines: original.extraLines || [], parts: original.parts || [] };
+  currentBuild = (shop.parts || []).map(p => {
     const copy = { ...p, id: uid('PRT') };
     // baseCost is a LINE total (unit cost x qty), matching what the calculator stores
     // when the part is first added. Using the per-unit cost here re-quoted a duplicated
@@ -2517,7 +2528,7 @@ function createLinkedReprint(original, reason, costMode) {
   });
   currentBuildFromProductId = original.productId || null;
   currentClientId = original.clientId || null;
-  currentExtraLines = (original.extraLines || []).map(l => ({ ...l }));
+  currentExtraLines = (shop.extraLines || []).map(l => ({ ...l }));
   pendingReprintMeta = {
     of: original.id,
     reason: reason || 'manual',
@@ -2527,7 +2538,7 @@ function createLinkedReprint(original, reason, costMode) {
   switchTab('calculator-tab');
   if ($('#clientInput')) $('#clientInput').value = original.project || '';
   if ($('#discountPct')) $('#discountPct').value = String(original.discountPct || 0);
-  if ($('#shippingCost')) $('#shippingCost').value = String(original.shippingCost || 0);
+  if ($('#shippingCost')) $('#shippingCost').value = String(shop.shippingCost || 0);
   renderBuild();
   renderExtraLines();
   updateGrandTotal(); // populates #calcCurrency options
