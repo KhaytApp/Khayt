@@ -204,6 +204,11 @@ final class KhaytAPIClient: ObservableObject {
         await fromBook { try await $0.pairingSummary() }
     }
 
+    /// One customer's page, from this phone's book; nil with no book.
+    func fetchCustomer(id: String) async -> CustomerSummary? {
+        await fromBook { try await $0.customer(id: id) } ?? nil
+    }
+
     func fetchPulse() async -> ShopPulse? {
         await fromBook { try await $0.pulse() }
     }
