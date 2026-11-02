@@ -884,3 +884,7 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* Rush, machine job */
+"orders.rush" = "عاجل";
+"machines.job" = "الطلب: %@";
