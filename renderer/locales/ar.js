@@ -1020,6 +1020,7 @@
   "doc.due_date": "تاريخ الاستحقاق",
   "doc.payment_terms": "شروط الدفع",
   "doc.net_days": "صافي {n}",
+  "doc.milestone_of": "{pct}% من {total}",
   "doc.post_checklist": "قائمة التحقق بعد الطباعة",
   "doc.operator": "المشغّل",
   "doc.reviewed_by": "المراجع",

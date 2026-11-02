@@ -103,7 +103,8 @@ extension Shop {
     /// numbered first (`issueInvoiceNumberIfOwed`), and one still owed a
     /// number after that — this viewer could not give it one — is refused
     /// with the reason rather than drawn.
-    func invoiceDocument(for id: Order.ID, proforma: Bool = false) async -> InvoiceBuild {
+    func invoiceDocument(for id: Order.ID, proforma: Bool = false,
+                         milestone milestoneId: String? = nil) async -> InvoiceBuild {
         guard orders.contains(where: { $0.id == id }) else {
             return .refused(words.callIt("mac.move_gone"))
         }
@@ -114,7 +115,13 @@ extension Shop {
             guard let job = orders.first(where: { $0.id == id }) else {
                 return .refused(words.callIt("mac.move_gone"))
             }
-            guard let doc = await Invoice.html(for: job, shop: self, proforma: true) else {
+            // One part of the job, asked for on its own (`Milestones`).
+            var part: Milestone?
+            if let milestoneId {
+                part = milestones(of: id).first { $0.id == milestoneId }
+                if part == nil { return .refused(words.callIt("mac.move_gone")) }
+            }
+            guard let doc = await Invoice.html(for: job, shop: self, proforma: true, milestone: part) else {
                 return .refused(words.callIt("mac.no_document"))
             }
             return .paper(doc, number: job.id)

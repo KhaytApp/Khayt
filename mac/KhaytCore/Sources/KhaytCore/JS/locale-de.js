@@ -896,6 +896,7 @@
   "doc.due_date": "Fälligkeitsdatum",
   "doc.payment_terms": "Zahlungsbedingungen",
   "doc.net_days": "Netto {n} Tage",
+  "doc.milestone_of": "{pct} % von {total}",
   "doc.post_checklist": "Checkliste Nachbearbeitung",
   "doc.operator": "Bediener",
   "doc.reviewed_by": "Geprüft von",
