@@ -690,8 +690,8 @@
 "focus.kind.shop" = "الورشة";
 /* Scanning a Khayt label (lib/scan.js) */
 "scan.label.title" = "مسح ملصق";
-"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من خيط.";
-"scan.label.unknown" = "هذا الرمز ليس ملصقًا من خيط.";
+"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من Khayt.";
+"scan.label.unknown" = "هذا الرمز ليس ملصقًا من Khayt.";
 "scan.label.missing" = "الطلب أو البكرة في هذا الملصق غير موجودة على هذا الهاتف.";
 
 /* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
@@ -884,3 +884,25 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* Printer control */
+"printer.pause" = "إيقاف مؤقت";
+"printer.resume" = "استئناف";
+"printer.stop" = "إيقاف";
+"printer.stop.confirm" = "إيقاف الطباعة على %@؟";
+"printer.stop.message" = "لا يمكن استئناف الطباعة بعد إيقافها.";
+"printer.sending" = "جارٍ سؤال الماك…";
+"printer.sending.cloud" = "جارٍ سؤال الماك عبر Khayt Cloud…";
+"printer.done.pause" = "أُوقفت مؤقتًا.";
+"printer.done.resume" = "استُؤنفت.";
+"printer.done.stop" = "أُوقفت.";
+"printer.refused" = "قالت الطابعة: %@";
+"printer.why.device" = "يحتاج هذا الهاتف إلى الاقتران بالماك من جديد قبل التحكم بالطابعات.";
+"printer.why.not_found" = "هذه الآلة غير موجودة على الماك.";
+"printer.why.not_connected" = "الماك غير متصل بهذه الطابعة الآن.";
+"printer.why.unsupported" = "لا يمكن التحكم بهذه الطابعة من Khayt.";
+"printer.why.no_job" = "لا شيء قيد الطباعة عليها.";
+"printer.why.busy" = "الماك مشغول بهذه الطابعة. حاول بعد لحظة.";
+"printer.why.old_mac" = "حدّث Khayt على الماك للتحكم بالطابعات من الهاتف.";
+"printer.why.no_answer" = "لم يُجب الماك. ربما هو في وضع السكون أو غير متصل.";
+"printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى Khayt Cloud.";

@@ -3,6 +3,7 @@ import SwiftUI
 struct MachinesView: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var printers: LivePrinters
+    @EnvironmentObject private var settings: ConnectionSettings
 
     @State private var machines: [MachineInfo] = []
     @State private var errorMessage: String?
@@ -94,6 +95,10 @@ struct MachinesView: View {
                             ForEach(rows) { m in
                                 VStack(spacing: 10) {
                                     MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
+                                    // A print on the bed, on a printer the Mac drives.
+                                    if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop {
+                                        PrinterControls(machine: m)
+                                    }
                                     cameraLink(m)
                                 }
                                 .frame(maxHeight: .infinity, alignment: .top)

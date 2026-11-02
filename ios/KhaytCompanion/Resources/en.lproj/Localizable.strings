@@ -884,3 +884,25 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Printer control */
+"printer.pause" = "Pause";
+"printer.resume" = "Resume";
+"printer.stop" = "Stop";
+"printer.stop.confirm" = "Stop the print on %@?";
+"printer.stop.message" = "A stopped print cannot be resumed.";
+"printer.sending" = "Asking the Mac…";
+"printer.sending.cloud" = "Asking the Mac through Khayt Cloud…";
+"printer.done.pause" = "Paused.";
+"printer.done.resume" = "Resumed.";
+"printer.done.stop" = "Stopped.";
+"printer.refused" = "The printer said: %@";
+"printer.why.device" = "This phone needs to pair with the Mac again before it can control printers.";
+"printer.why.not_found" = "The Mac doesn’t have this machine.";
+"printer.why.not_connected" = "The Mac isn’t connected to this printer right now.";
+"printer.why.unsupported" = "This printer can’t be controlled from Khayt.";
+"printer.why.no_job" = "Nothing is printing on it.";
+"printer.why.busy" = "The Mac is busy with this printer. Try again in a moment.";
+"printer.why.old_mac" = "Update Khayt on the Mac to control printers from the phone.";
+"printer.why.no_answer" = "The Mac didn’t answer. It may be asleep or offline.";
+"printer.why.unreachable" = "Neither the Mac nor Khayt Cloud could be reached.";
