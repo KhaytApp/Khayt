@@ -789,6 +789,29 @@ still lists it, and the phone hides it either way:
 
 `progress`, `timeRemaining` (seconds) and the temperatures are rounded integers. A machine never heard from has its `id`, `name` and `hasPrinterApi`, and `null` for the rest.
 
+### `POST /api/printer/{machineId}/{pause|resume|stop}`
+
+> **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it.
+
+A paired phone pausing, resuming or stopping a print. `stop` cancels the job (`cancel` is accepted too). The body is empty. The command is the Mac printer card's own path (`PrinterControl.send`), so the phone sends the printer exactly what the Mac's button would.
+
+**Requires a signed, enrolled phone** (the `x-khayt-device` headers, see
+`LanDevices`). The owner PIN sent bare is refused with
+`403 {"ok":false,"reason":"device-key-required"}`: this moves a machine
+mid-print. The usual gate runs first, so a non-local `Host` is `421` and an
+unset or short PIN is `401`.
+
+**Response 200:** `{"ok":true,"state":"paused"}`. `state` is the printer's own word, read right after a refresh, or `null`.
+
+**Refusals:** `{"ok":false,"reason":…,"message"?:…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no machine in use with that id |
+| 409 | `not-connected`, `not-watched` (under service / retired / another app's protocol), `unsupported` (this protocol has no such verb), `no-job` |
+| 502 | `refused`: the printer said no, and `message` is what it said |
+| 503 | `busy`: the app is starting |
+
 ### `POST /api/webhook/salla` and `POST /api/webhook/zid`
 
 A storefront telling the shop it has an order. **Served by both apps** — the
