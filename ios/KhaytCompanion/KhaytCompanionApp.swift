@@ -60,8 +60,8 @@ struct KhaytCompanionApp: App {
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
-        channel.onEvent = { kind, at, ciphertext, session in
-            await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
+        channel.onEvent = { kind, at, ciphertext, session, ref in
+            await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at, ref: ref)
         }
         PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()
