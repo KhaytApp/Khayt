@@ -386,6 +386,9 @@ struct NewOrderDraft {
     var dueDate = ""          // yyyy-MM-dd, empty = none
     var machineId: String?
     var isQuote = false
+    /// The saved customer this order is for, when one was picked — so the
+    /// customer's terms, prices and currency follow the order.
+    var clientId: String?
 }
 
 /// Inbound job request from `/api/waiting-list` (the intake funnel).
