@@ -307,6 +307,69 @@
   }
 
   /**
+   * The currency a new job is billed in, and how to get there from the shop's.
+   *
+   * The calculator prices in the shop's own currency: every cost behind it
+   * (spools, power, labour) is. The job used to be saved with that figure but
+   * LABELLED with the quote's or the client's currency, so a 115 SAR job for a
+   * EUR client invoiced as 115 EUR, and the books then counted it as 115 × the
+   * EUR rate in SAR. Decided Nov 2 2026 (Turki): convert at save.
+   *
+   * - the job's currency is the one picked on the quote, else the client's,
+   *   else the shop's;
+   * - with a rate for it in Settings (`exchangeRates[code]` = shop currency per
+   *   one unit, as `order-money.js` `convertToBase` reads it), every money
+   *   figure is converted and the code is stamped on the job, so a later change
+   *   of rate does not move what the customer was quoted;
+   * - with NO rate the price cannot be converted, so the job is stamped with
+   *   the shop's currency: an honest SAR price beats a SAR number wearing EUR.
+   *
+   * `fx` is shop currency per one unit of the job's currency (1 = no change).
+   * `currency` is what goes on the record: undefined for an ordinary job in
+   * the shop's currency with nothing picked, so its shape is unchanged.
+   */
+  function jobCurrency(i, settings, clients) {
+    const base = settings.currency || 'SAR';
+    let code = i.currency || '';
+    if (!code && i.clientId) {
+      const cl = arrayOf(clients).find((x) => x && x.id === i.clientId);
+      code = (cl && cl.currency) || '';
+    }
+    if (!code || code === base) return { fx: 1, currency: i.currency || undefined };
+    const rate = num((settings.exchangeRates || {})[code], 0);
+    if (rate > 0) return { fx: rate, currency: code };
+    return { fx: 1, currency: base };
+  }
+
+  /**
+   * A saved job's money figures back in the SHOP's currency, for loading it
+   * into the calculator again (a copy, a reprint). The calculator reads every
+   * figure as the shop's, so a EUR job's 10 EUR shipping loaded as typed would
+   * be read as 10 SAR and converted a second time on save. Uses today's rate;
+   * a job in the shop's currency, or one with no rate, comes back unchanged.
+   *
+   * Returns `{ fx, shippingCost, extraLines, parts }` — only what the copy
+   * paths reload.
+   */
+  function inShopCurrency(order, settings) {
+    const o = ctxOf(order);
+    const st = ctxOf(settings);
+    const base = st.currency || 'SAR';
+    const rate = o.currency && o.currency !== base ? num((st.exchangeRates || {})[o.currency], 0) : 0;
+    const fx = rate > 0 ? rate : 1;
+    const back = (v) => +(num(v, 0) * fx).toFixed(2);
+    const P = pricing();
+    return {
+      fx,
+      shippingCost: fx === 1 ? num(o.shippingCost, 0) : back(o.shippingCost),
+      extraLines: arrayOf(o.extraLines).map((l) => (fx !== 1 && l && !(P && P.isPercentLine(l))
+        ? Object.assign({}, l, { amount: back(l.amount) }) : Object.assign({}, l))),
+      parts: arrayOf(o.parts).map((p) => (fx !== 1 && isAgreed(p)
+        ? Object.assign({}, p, { agreedPrice: back(p.agreedPrice) }) : Object.assign({}, p))),
+    };
+  }
+
+  /**
    * A new job, as the book records it.
    *
    * `input`:
@@ -316,7 +379,7 @@
    *   `margin`, `discountPct`, `shippingCost`, `depositAmount`
    *   `rushEnabled`, `extraLines`, `components`, `assemblyQty`
    *   `priceRound`   `{ step, mode }` — round the total, as a product's price is
-   *   `priceOverride` a typed total, used as is
+   *   `priceOverride` a typed total, used as is — in the JOB's currency
    *   `asQuote`      a quote rather than an order
    *   `fromStock`    this piece came off the shelf; it was printed in a batch
    *                  weeks ago and is being SOLD now, not made now
@@ -335,7 +398,13 @@
    * priced at cost plus margin with the rest of the cart, as the catalogue
    * prices them; their cost is frozen on the record as `componentsCost`.
    *
-   * `ctx`: `{ settings, orders, now, tokens, consumables }`. `tokens` is
+   * Every other money input (costs, shipping, deposit, fixed extra lines,
+   * overhead, agreed prices) is in the SHOP's currency, as the calculator
+   * shows it, and is converted to the job's currency (`jobCurrency`). Costs
+   * stay in the shop's currency on the record (`baseCost`, `componentsCost`,
+   * `overheadCost`), as every report reads them.
+   *
+   * `ctx`: `{ settings, orders, now, tokens, consumables, clients }`. `tokens` is
    * `{ tracking, quoteApproval }`, each 16 bytes.
    */
   function newOrder(input, ctx) {
@@ -346,13 +415,19 @@
     const now = c.now instanceof Date ? c.now : new Date(typeof c.now === 'number' ? c.now : Date.now());
     const tokens = ctxOf(c.tokens);
     const asQuote = !!i.asQuote;
+    const cur = jobCurrency(i, settings, c.clients);
+    const fx = cur.fx;
+    const toJob = (v) => (fx === 1 ? v : +(num(v, 0) / fx).toFixed(4));
 
     const parts = arrayOf(i.parts).map(p => Object.assign({}, p, {
       partStatus: p.partStatus || 'pending',
-    }));
+    }, fx !== 1 && isAgreed(p) ? { agreedPrice: +toJob(p.agreedPrice).toFixed(2) } : {}));
     const totalBaseCost = parts.reduce((s, p) => s + num(p.baseCost, 0), 0);
     const totalPrintTime = parts.reduce((s, p) => s + num(p.printTime, 0), 0);
-    const extraLines = arrayOf(i.extraLines);
+    // A percentage line is a share of the bill whatever its currency; a fixed
+    // line is an amount typed in the shop's currency.
+    const extraLines = arrayOf(i.extraLines).map((l) => (fx !== 1 && l && !pricing().isPercentLine(l)
+      ? Object.assign({}, l, { amount: +toJob(l.amount).toFixed(2) }) : l));
 
     // The cart in two halves: what the customer has agreed a price for, and
     // what is priced at cost plus margin.
@@ -369,7 +444,7 @@
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
     const rushEnabled = !!i.rushEnabled;
     const quote = P.quoteTotal({
-      baseCost: costedBase,
+      baseCost: toJob(costedBase),
       agreedAmount,
       qty: 1,                    // the cart's parts already carry their own qty
       margin: positive(i.margin),
@@ -377,11 +452,11 @@
       discountPct: Math.min(100, positive(i.discountPct)),
       rushEnabled,
       rushPct: rushEnabled ? num(settings.rushFeePct, 25) : 0,
-      shippingCost: positive(i.shippingCost),
+      shippingCost: toJob(positive(i.shippingCost)),
       extraLines,
       priceRound: i.priceRound || null,
       priceOverride: i.priceOverride,
-      overheadPerHour: positive(i.overheadPerHour),
+      overheadPerHour: toJob(positive(i.overheadPerHour)),
       printHours: overheadHours(parts, { productId: i.productId }),
       business: true,
     });
@@ -394,10 +469,10 @@
     const seq = asQuote ? allocateQuoteSeq(settings, year)
                         : String((settings.invNumNext || 2) - 1).padStart(4, '0');
 
-    const deposit = positive(i.depositAmount);
+    const deposit = toJob(positive(i.depositAmount));
     const finalPrice = +quote.total.toFixed(2);
     const discountPct = Math.min(100, positive(i.discountPct));
-    const shippingCost = positive(i.shippingCost);
+    const shippingCost = toJob(positive(i.shippingCost));
     const rushFee = quote.rushFee > 0 ? +quote.rushFee.toFixed(2) : 0;
 
     return {
@@ -409,7 +484,7 @@
       project: i.project || '',
       clientId: i.clientId || null,
       productId: i.productId || null,
-      currency: i.currency || undefined,
+      currency: cur.currency,
       // NOT filtered for blanks. A part with no filament chosen contributes an
       // empty string, so a two-part job can read "PLA, " with a dangling comma.
       // That is what every record already in a shop's book carries, and a lift
@@ -507,7 +582,7 @@
       // customer pays whatever the cost lines say, so nothing of it was priced
       // to carry the overhead, and a record claiming it was would misreport.
       ...(quote.overhead > 0 && quote.priceSource !== 'override'
-        ? { overheadCost: +quote.overhead.toFixed(2) } : {}),
+        ? { overheadCost: +(quote.overhead * fx).toFixed(2) } : {}),
       actualPrintTime: null,
       actualWeight: null,
       quoteSentAt: asQuote ? localDateStr(now) : null,
@@ -530,7 +605,7 @@
   const api = {
     TOKEN_BYTES,
     allocateInvoiceNumber, allocateQuoteSeq, avgDailyWorkingHours,
-    estimateDueDate, newOrder, componentsCost, overheadHours, isAgreed,
+    estimateDueDate, newOrder, componentsCost, jobCurrency, inShopCurrency, overheadHours, isAgreed,
     invoiceNumberOwed, ensureInvoiceNumber, beganAsQuote, awaitingApproval,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
