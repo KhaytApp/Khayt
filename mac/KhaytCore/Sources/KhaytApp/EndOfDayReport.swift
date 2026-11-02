@@ -45,7 +45,7 @@ enum EndOfDayPage {
             (w.callIt("mac.eod_revenue"), money(r.revenue)),
             (w.callIt("mac.eod_open"), e(Money.quantity(Double(r.inProgress), decimals: 0))),
             (w.callIt("mac.eod_overdue"), e(Money.quantity(Double(r.overdue), decimals: 0))),
-            (w.callIt("mac.eod_waste"), e(Money.quantity(r.wasteGrams, decimals: 0) + " g")),
+            (w.callIt("mac.eod_waste"), e(Money.quantity(r.wasteGrams, decimals: 0) + " " + w.callIt("common.grams"))),
             (w.callIt("mac.eod_hours"), e(Money.quantity(r.hoursLogged, decimals: 1))),
         ]
         let tileHTML = tiles.map { label, value in
