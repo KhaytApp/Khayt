@@ -1862,6 +1862,7 @@ extension Shop {
         pendingQcFail = nil
         pendingInvoice = nil
         pendingLabels = nil
+        pendingDayReport = nil
     }
 
     /// Whether a job may be moved at all: a real book, held by this app, with
