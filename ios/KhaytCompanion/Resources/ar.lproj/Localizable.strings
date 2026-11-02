@@ -884,3 +884,13 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* Customer page messages */
+"portal.title" = "صفحة العميل";
+"portal.share" = "مشاركة الرابط";
+"portal.none" = "لا توجد رسائل على هذه الصفحة بعد.";
+"portal.reply" = "الرد على العميل";
+"portal.send" = "إرسال";
+"portal.messages.failed" = "تعذّر تحميل الرسائل.";
+"portal.reply.failed" = "لم يُرسل الرد.";
+"portal.reply.viewer" = "هذا الحساب للعرض فقط.";

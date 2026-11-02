@@ -82,6 +82,12 @@ struct OrderDetailPage: View {
                 OrderPhotosCard(access: photoAccess)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            // The customer's page: its link, and the messages on it.
+            if case .ready(let token)? = photoAccess {
+                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
+            } else if case .viewOnly(let token)? = photoAccess {
+                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
+            }
         }
         .sheet(isPresented: $recordingPayment) {
             if let payment {

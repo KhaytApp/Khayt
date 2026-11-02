@@ -884,3 +884,13 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Customer page messages */
+"portal.title" = "Customer page";
+"portal.share" = "Share link";
+"portal.none" = "No messages on this page yet.";
+"portal.reply" = "Reply to the customer";
+"portal.send" = "Send";
+"portal.messages.failed" = "The messages could not be loaded.";
+"portal.reply.failed" = "The reply was not sent.";
+"portal.reply.viewer" = "This sign-in can only view the shop.";
