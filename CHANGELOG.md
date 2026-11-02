@@ -8982,6 +8982,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.17] - 2026-11-02
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Help in all nine languages.** Help ▸ Khayt Help (⌘?) now has all 16 articles in German, Spanish, French, Turkish, Japanese, Chinese and Portuguese (Brazil), naming every menu, button and screen the way the app shows it in that language. The welcome page's list of what is still only in Khayt for Windows and Linux is brought up to date, and two wrong menu names in English and Arabic are fixed. The new translations are machine-made and have not yet been read by a native speaker.
+
+### Fixed
+
+- **The Library opens at once on a big library.** On a library of 14,151 models with 137 creators, clicking Library held the app for about six seconds while the filter bar laid out every creator, category and tag menu several times over just to decide how many menus fit. It now takes about a third of a second, and the bar looks the same at every window width.
+
 ## [4.0.0-beta.16] - 2026-11-01
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
