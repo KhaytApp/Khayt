@@ -65,3 +65,13 @@ test('a milestone proforma is ONE line at the milestone amount, with the tax on 
   assert.match(html, new RegExp(`<span class="v">${f(tax.taxTotal)} `), 'and so is the VAT line');
   assert.notEqual(grand, '1150.00');
 });
+
+test('a milestone proforma leaves out the whole job\'s payment schedule', () => {
+  const scheduled = Object.assign({}, BUSY, {
+    instalments: [{ dueDate: '2026-11-10', amount: 575 }, { dueDate: '2026-12-10', amount: 575 }],
+  });
+  const whole = render(scheduled, { settings: SHOP }, { proforma: true });
+  assert.match(whole, /Payment Schedule/i, 'a proforma for the whole job shows its schedule');
+  const { html } = withMilestone(scheduled, MS, { settings: SHOP }, { proforma: true });
+  assert.doesNotMatch(html, /Payment Schedule/i, 'one part of the job is not the whole schedule');
+});

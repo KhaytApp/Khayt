@@ -804,7 +804,7 @@ function invoiceHtml(order, ctx) {
 
       ${bankSectionHtml}
 
-      ${(order.instalments && order.instalments.length > 0) ? `
+      ${(!ms && order.instalments && order.instalments.length > 0) ? `
       <div class="inv-notes-section" style="margin-top:12px;">
         <div class="label-strip">
           <span>${escapeHtml(t("doc.payment_schedule"))}</span>
