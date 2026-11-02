@@ -1780,6 +1780,7 @@ final class Words {
         "mac.team_invite": ["en": "Invite", "ar": "دعوة"],
         "mac.team_invite_hint": ["en": "They get a code by email that lasts 7 days. A viewer can read the shop but not change it — use one for a store's server.", "ar": "يصلهم رمز بالبريد صالح 7 أيام. يستطيع المشاهد قراءة بيانات المطبعة دون تغييرها — استخدمه لخادم المتجر."],
         "mac.team_invited": ["en": "Invited {email}. The code is on its way by email.", "ar": "تمت دعوة {email}. الرمز في طريقه بالبريد."],
+        "mac.team_invite_elsewhere": ["en": "{email} already has an invite from another shop on Khayt Cloud. Ask them to accept or decline it first; it lapses after 7 days.", "ar": "لدى {email} دعوة قائمة من متجر آخر على سحابة خيط. اطلب منهم قبولها أو رفضها أولًا؛ تنتهي بعد ٧ أيام."],
         "mac.team_invited_no_mail": ["en": "Invited {email}, but Khayt Cloud could not send the email. Ask them to sign up with this address.", "ar": "تمت دعوة {email}، لكن سحابة خيط لم تتمكن من إرسال البريد. اطلب منهم التسجيل بهذا العنوان."],
         "mac.team_remove": ["en": "Remove", "ar": "إزالة"],
         "mac.team_remove_title": ["en": "Remove this member?", "ar": "إزالة هذا العضو؟"],

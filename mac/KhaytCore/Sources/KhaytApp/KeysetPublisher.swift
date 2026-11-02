@@ -50,6 +50,11 @@ enum KeysetPublisher {
         let (body, response) = try await fetch(put)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200, 204: return .published
+        // Another device put a keyset there between the GET and this PUT, and
+        // replacing one is the owner's alone (khayt-cloud, Nov 2026): it is
+        // there, which is all this wanted.
+        case 403 where String(decoding: body.prefix(400), as: UTF8.self).contains("owner-only"):
+            return .alreadyThere
         case 403: throw Failure.readOnly
         case let code: throw Failure.http(code, String(decoding: body.prefix(200), as: UTF8.self))
         }

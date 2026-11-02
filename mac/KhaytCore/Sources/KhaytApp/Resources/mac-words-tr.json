@@ -2742,6 +2742,7 @@
  "mac.tax_none": "Vergi uygulanmaz.",
  "mac.team_email": "E-posta adresi",
  "mac.team_invite": "Davet Et",
+ "mac.team_invite_elsewhere": "{email} adresinin Khayt Cloud’da başka bir mağazadan bekleyen bir daveti var. Önce kabul etmesini ya da reddetmesini isteyin; 7 gün sonra geçersiz olur.",
  "mac.team_invite_hint": "E-postayla 7 gün geçerli bir kod alırlar. Görüntüleyici dükkânı okuyabilir ama değiştiremez — bir mağazanın sunucusu için birini kullanın.",
  "mac.team_invited": "{email} davet edildi. Kod e-postayla yolda.",
  "mac.team_invited_no_mail": "{email} davet edildi, ancak Khayt Cloud e-postayı gönderemedi. Onlardan bu adresle kaydolmalarını isteyin.",

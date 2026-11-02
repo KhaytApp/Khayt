@@ -39,8 +39,16 @@ public enum CloudTeam {
 
     public struct Refusal: Error, Equatable, CustomStringConvertible {
         public let status: Int
-        /// The cloud's own sentence (these routes answer `{error}`, not `reason`).
+        /// The cloud's own sentence (these routes answer `{error}`).
         public let error: String
+        /// A machine-readable reason, where the route gives one: `POST
+        /// /members/invite` answers 409 `invite-pending-elsewhere` when the
+        /// address already has a live invite from another shop (khayt-cloud,
+        /// Nov 2026). It used to cancel that shop's invite without a word.
+        public var reason: String = ""
+        public init(status: Int, error: String, reason: String = "") {
+            self.status = status; self.error = error; self.reason = reason
+        }
         public var description: String { "Khayt Cloud refused (\(status))" + (error.isEmpty ? "" : ": \(error)") }
     }
 
@@ -93,7 +101,8 @@ public enum CloudTeam {
         let code = S3.status(response)
         guard (200..<300).contains(code) else {
             let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            throw Refusal(status: code, error: (o?["error"] as? String) ?? "")
+            throw Refusal(status: code, error: (o?["error"] as? String) ?? "",
+                          reason: (o?["reason"] as? String) ?? "")
         }
         return data
     }

@@ -77,4 +77,22 @@ struct KeysetPublisherTests {
         #expect(s.contains("if published { await sendToCloud() }"), "a key with nothing behind it restores to empty")
         #expect(!s.contains("createKeyset"), "the Mac must not mint a keyset over a book that has one")
     }
+
+    @Test("a keyset put there between the GET and the PUT, refused as owner-only, is already there")
+    func raceIsAlreadyThere() async throws {
+        let log = Log()
+        let fetch: (URLRequest) async throws -> (Data, URLResponse) = { request in
+            log.requests.append(request)
+            let code = request.httpMethod == "GET" ? 204 : 403
+            let body = request.httpMethod == "GET" ? Data() : Data(#"{"error":"Only the owner can replace the keyset","reason":"owner-only"}"#.utf8)
+            return (body, HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: [:])!)
+        }
+        let outcome = try await KeysetPublisher.publishIfAbsent(Self.connection, token: "tok", keyset: Self.keyset, fetch: fetch)
+        #expect(outcome == .alreadyThere)
+        // A 403 without that reason is still a sign-in that cannot write.
+        await #expect(throws: KeysetPublisher.Failure.readOnly) {
+            _ = try await KeysetPublisher.publishIfAbsent(Self.connection, token: "tok", keyset: Self.keyset,
+                                                          fetch: Self.server(Log(), get: 204, put: 403))
+        }
+    }
 }
