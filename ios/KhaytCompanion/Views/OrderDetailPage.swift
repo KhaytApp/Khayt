@@ -131,7 +131,7 @@ struct OrderDetailPage: View {
     }
 
     private func loadPayment() async {
-        currency = await api.shopCurrency()
+        currency = await api.orderCurrency(orderId: order.id)
         payment = await api.paymentState(orderId: order.id)
         #if DEBUG
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
