@@ -1160,6 +1160,7 @@ final class Shop {
             lowSpools = low
             await warnAboutLowStock(inventoryRows, settings: Self.settings(root))
             if overtaken() { return }
+            await checkShopAlerts()
             let runway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                     now: Date())) ?? [:]
             if overtaken() { return }
@@ -1428,6 +1429,7 @@ final class Shop {
     /// would be paying for the wrong thing.
     func printersAnswered() async {
         await publishLivePrinters()
+        await checkShopAlerts()
         WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
         let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
@@ -2471,6 +2473,8 @@ final class Shop {
     /// This Mac's printers, published to the cloud for viewers away from the
     /// shop — see `LivePrinterPublisher`.
     let livePublisher = LivePrinterPublisher()
+    /// Morning digests and low-stock alerts for the shop's phones (`ShopAlerts`).
+    let shopAlerts = ShopAlerts()
 
     /// The nightly off-site backup: its settings, when it last ran and
     /// whether it is failing. See `OffsiteBackups.swift`.
