@@ -70,10 +70,13 @@ struct Kanban: View {
             // history. A card found only by its lot says so, as its row in
             // the orders table does.
             let lots = shop.lotReasons(shop.orders)
+            // The board once per draw, not once per column: each build sorts
+            // every column's jobs by their dates.
+            let lanes = shop.board
             ScrollView([.horizontal, .vertical]) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(columns) { stage in
-                        Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop,
+                        Column(stage: stage, jobs: lanes[stage] ?? [], shop: shop,
                                board: board, lots: lots)
                     }
                 }

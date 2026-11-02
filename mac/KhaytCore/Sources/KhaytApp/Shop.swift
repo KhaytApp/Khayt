@@ -618,8 +618,10 @@ final class Shop {
         }
         for (stage, jobs) in out {
             // Urgent first, then by due date, then by what has been waiting
-            // longest — the order someone would work through them in.
-            out[stage] = jobs.sorted(by: Self.boardOrder)
+            // longest — the order someone would work through them in. Each
+            // job's two days are read once, not once per comparison (Nov 2026:
+            // parsing them inside the sort was most of the Board's draw).
+            out[stage] = Self.boardSorted(jobs)
         }
         return out
     }
@@ -628,11 +630,33 @@ final class Shop {
     /// then by what has been waiting longest. The desktop widget's "Up next"
     /// is the waiting column in this same order (`WidgetFeed.upNext`).
     nonisolated static func boardOrder(_ a: Order, _ b: Order) -> Bool {
+        boardOrder(BoardKey(a), BoardKey(b))
+    }
+
+    /// What `boardOrder` compares, read off a job once.
+    struct BoardKey: Sendable {
+        let priority: Bool
+        let due: Date?
+        let day: Date
+        init(_ o: Order) {
+            priority = o.priority
+            due = Order.day(o.dueDate)
+            day = o.day ?? .distantPast
+        }
+    }
+
+    nonisolated static func boardOrder(_ a: BoardKey, _ b: BoardKey) -> Bool {
         if a.priority != b.priority { return a.priority }
-        let da = Order.day(a.dueDate), db = Order.day(b.dueDate)
-        if let da, let db, da != db { return da < db }
-        if (da == nil) != (db == nil) { return da != nil }
-        return (a.day ?? .distantPast) < (b.day ?? .distantPast)
+        if let da = a.due, let db = b.due, da != db { return da < db }
+        if (a.due == nil) != (b.due == nil) { return a.due != nil }
+        return a.day < b.day
+    }
+
+    /// `jobs` in `boardOrder`, each job's days read once.
+    nonisolated static func boardSorted(_ jobs: [Order]) -> [Order] {
+        jobs.map { ($0, BoardKey($0)) }
+            .sorted { boardOrder($0.1, $1.1) }
+            .map(\.0)
     }
 
     /// The jobs that match what is typed in the search box, or all of them.
