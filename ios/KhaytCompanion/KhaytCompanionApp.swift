@@ -30,7 +30,7 @@ struct KhaytCompanionApp: App {
     @StateObject private var api: KhaytAPIClient
     @StateObject private var health: ConnectionHealth
     @StateObject private var nfc = NFCReader()
-    @StateObject private var ordersNav = OrdersNavigationState()
+    @StateObject private var ordersNav: OrdersNavigationState
     @StateObject private var live: LivePrinters
     @StateObject private var channel: LiveChannel
     @Environment(\.scenePhase) private var scenePhase
@@ -54,6 +54,9 @@ struct KhaytCompanionApp: App {
         let channel = LiveChannel(api: apiClient, printers: printers)
         _channel = StateObject(wrappedValue: channel)
         let center = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
+        let nav = OrdersNavigationState()
+        _ordersNav = StateObject(wrappedValue: nav)
+        center.navigation = nav
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)

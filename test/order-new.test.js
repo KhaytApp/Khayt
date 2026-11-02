@@ -104,7 +104,12 @@ function originalRecord(form, g) {
     project,
     clientId: form.clientId || null,
     productId: form.productId || null,
-    currency: form.currency || undefined,
+    // ONE DELIBERATE CHANGE (Nov 2 2026, convert at save): the price is
+    // worked out in the shop's currency, and these shops keep no exchange
+    // rates, so a job for another currency is stamped with the shop's own
+    // rather than wearing a currency its figure was never converted into.
+    currency: form.currency && form.currency !== (settings.currency || 'SAR')
+      ? (settings.currency || 'SAR') : (form.currency || undefined),
     material: materials,
     printTime: +totalPrintTime.toFixed(1),
     price: +finalPrice.toFixed(2),
@@ -534,4 +539,97 @@ test('a job from a product with components prices exactly as the catalogue does'
 
   // No components: nothing new on the record.
   assert.equal('componentsCost' in job({ components: [] }), false);
+});
+
+
+/* ── Convert at save (Nov 2 2026) ─────────────────────────────────────────── */
+
+const fxShop = (extra) => Object.assign({
+  currency: 'SAR', invNumNext: 5, invNumYear: 2026, quoteNumNext: 1, quoteNumYear: 2026,
+  exchangeRates: { EUR: 4 },
+}, extra || {});
+const fxJob = (input, settings, clients) => N.newOrder(Object.assign({
+  parts: [{ name: 'p', material: 'PLA', baseCost: 100, printTime: 2, qty: 1 }],
+  margin: 15,
+}, input), { settings: settings || fxShop(), orders: [], now: NOW, tokens: TOKENS, clients: clients || [] });
+
+test('a job for a EUR client is priced in EUR at the rate, and says so', () => {
+  const sar = fxJob({}, fxShop());
+  assert.equal(sar.price, 115);
+  assert.equal(sar.currency, undefined, 'an ordinary job keeps its shape');
+  const eur = fxJob({ clientId: 'C1' }, fxShop(), [{ id: 'C1', currency: 'EUR' }]);
+  assert.equal(eur.currency, 'EUR');
+  assert.equal(eur.price, 28.75);
+  // The cost stays in the shop's currency: every report reads it that way.
+  assert.equal(eur.parts[0].baseCost, 100);
+  // And the books count it at what it was worth: 28.75 EUR × 4 = 115 SAR.
+  const M = require('../lib/order-money.js');
+  assert.equal(M.orderRevenueBase(eur, { settings: fxShop(), clients: [{ id: 'C1', currency: 'EUR' }] }), 115);
+});
+
+test('the currency picked on the quote wins over the client\'s', () => {
+  const j = fxJob({ clientId: 'C1', currency: 'EUR' }, fxShop({ exchangeRates: { EUR: 4, USD: 3.75 } }),
+    [{ id: 'C1', currency: 'USD' }]);
+  assert.equal(j.currency, 'EUR');
+  assert.equal(j.price, 28.75);
+});
+
+test('shipping, a fixed extra and the deposit are converted; a percentage line is not', () => {
+  const j = fxJob({
+    currency: 'EUR', shippingCost: 40, depositAmount: 20,
+    extraLines: [{ label: 'Design', amount: 80 }, { label: 'Card fee', pct: 10 }],
+  });
+  assert.equal(j.shippingCost, 10);
+  assert.equal(j.extraLines[0].amount, 20);
+  assert.equal(j.extraLines[1].pct, 10);
+  assert.equal(j.depositAmount, 5);
+  // The SAR job at the same inputs, divided by the rate.
+  const s = fxJob({
+    shippingCost: 40, depositAmount: 20,
+    extraLines: [{ label: 'Design', amount: 80 }, { label: 'Card fee', pct: 10 }],
+  });
+  assert.ok(Math.abs(j.price - s.price / 4) < 0.02, `${j.price} vs ${s.price}/4`);
+});
+
+test('a typed price is already in the job\'s currency', () => {
+  const j = fxJob({ currency: 'EUR', priceOverride: 50 });
+  assert.equal(j.price, 50);
+  assert.equal(j.currency, 'EUR');
+});
+
+test('an agreed price is converted like any other shop-currency figure', () => {
+  const j = fxJob({
+    currency: 'EUR',
+    parts: [{ name: 'p', material: 'PLA', baseCost: 100, printTime: 2, qty: 2, agreedPrice: 60 }],
+  });
+  assert.equal(j.parts[0].agreedPrice, 15);
+  assert.equal(j.price, 30);
+});
+
+test('with no rate for the currency the job is stamped in the shop\'s own', () => {
+  const j = fxJob({ clientId: 'C1' }, fxShop({ exchangeRates: {} }), [{ id: 'C1', currency: 'EUR' }]);
+  assert.equal(j.currency, 'SAR');
+  assert.equal(j.price, 115);
+});
+
+test('a converted job loads back into the calculator in the shop\'s currency', () => {
+  const input = {
+    currency: 'EUR', shippingCost: 40,
+    extraLines: [{ label: 'Design', amount: 80 }, { label: 'Card fee', pct: 10 }],
+    parts: [{ name: 'p', material: 'PLA', baseCost: 100, printTime: 2, qty: 2, agreedPrice: 60 }],
+  };
+  const saved = fxJob(input);
+  const back = N.inShopCurrency(saved, fxShop());
+  assert.equal(back.shippingCost, 40);
+  assert.equal(back.extraLines[0].amount, 80);
+  assert.equal(back.extraLines[1].pct, 10);
+  assert.equal(back.parts[0].agreedPrice, 60);
+  // Saving the copy again gives the same EUR job, not one shrunk by the rate twice.
+  const again = fxJob(Object.assign({}, input, {
+    shippingCost: back.shippingCost, extraLines: back.extraLines, parts: back.parts,
+  }));
+  assert.equal(again.price, saved.price);
+  // A job in the shop's own currency comes back as it is.
+  const plain = fxJob({ shippingCost: 40 });
+  assert.equal(N.inShopCurrency(plain, fxShop()).shippingCost, 40);
 });
