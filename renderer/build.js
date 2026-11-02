@@ -690,12 +690,12 @@ function updateGrandTotal() {
     const base = settings.currency || 'SAR';
     const N = (typeof KhaytOrderNew !== 'undefined') ? KhaytOrderNew : null;
     const picked = $('#calcCurrency')?.value || '';
+    const clientId = (typeof currentClientId !== 'undefined') ? currentClientId : null;
+    const book = (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [];
     let wanted = picked;
-    if (!wanted && currentClientId && typeof clients !== 'undefined' && Array.isArray(clients)) {
-      wanted = (clients.find(c => c && c.id === currentClientId) || {}).currency || '';
-    }
+    if (!wanted && clientId) wanted = (book.find(c => c && c.id === clientId) || {}).currency || '';
     const jc = (biz && N && N.jobCurrency && wanted && wanted !== base)
-      ? N.jobCurrency({ currency: picked, clientId: currentClientId }, settings, (typeof clients !== 'undefined' ? clients : []))
+      ? N.jobCurrency({ currency: picked, clientId }, settings, book)
       : null;
     if (jc && jc.fx !== 1) {
       const fx = jc.fx;
