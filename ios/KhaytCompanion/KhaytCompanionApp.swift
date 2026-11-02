@@ -57,6 +57,7 @@ struct KhaytCompanionApp: App {
         let nav = OrdersNavigationState()
         _ordersNav = StateObject(wrappedValue: nav)
         center.navigation = nav
+        JobSearch.open = { id in nav.openOrder(id: id) }
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)

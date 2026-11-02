@@ -524,6 +524,8 @@ struct DashboardView: View {
         waiting = await waitingTask ?? []
         pulse = await pulseTask
         facts = await factsTask
+        // Spotlight and Siri find the jobs this phone holds.
+        Task { await JobSearch.index() }
         // A sheet an App Intent asked for (Siri, Shortcuts, a Control).
         switch PendingAction.take() {
         case "waste": showWaste = true
