@@ -452,6 +452,7 @@
  "mac.creator_show_all": "この作者のものをすべて表示",
  "mac.cs_unrecorded": "流入元が記録された顧客がまだいません。顧客に設定すると、仕事の入り口が分かります。",
  "mac.cs_unset": "未記録",
+ "mac.currency_default": "既定 ({code})",
  "mac.customer": "顧客",
  "mac.customer_has_cards": "ギフトカードあり（{n}）",
  "mac.customer_has_jobs": "ジョブ {n} 件あり",

@@ -2471,6 +2471,7 @@ final class Words {
         "mac.setup_finish_hint": ["en": "You can come back to this any time from the Book menu.",
                                   "ar": "يمكنك العودة إلى هذا في أي وقت من قائمة الدفتر."],
         "mac.setup_sum_currency": ["en": "Prices in {code}", "ar": "الأسعار بعملة {code}"],
+        "mac.currency_default": ["en": "Default ({code})", "ar": "افتراضي ({code})"],
         "mac.setup_sum_vat_on": ["en": "VAT at {rate}%", "ar": "ضريبة القيمة المضافة بنسبة {rate}%"],
         "mac.setup_sum_vat_off": ["en": "No VAT", "ar": "بلا ضريبة قيمة مضافة"],
         "mac.setup_sum_electricity": ["en": "Electricity at {rate} per kWh, for the whole shop",

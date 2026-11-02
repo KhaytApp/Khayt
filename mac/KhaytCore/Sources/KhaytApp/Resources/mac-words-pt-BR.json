@@ -452,6 +452,7 @@
  "mac.creator_show_all": "Mostrar tudo deste criador",
  "mac.cs_unrecorded": "Nenhum cliente tem uma origem registrada ainda — defina uma em um cliente para ver de onde vem o seu trabalho.",
  "mac.cs_unset": "Não registrado",
+ "mac.currency_default": "Padrão ({code})",
  "mac.customer": "Cliente",
  "mac.customer_has_cards": "Tem vales-presente ({n})",
  "mac.customer_has_jobs": "Tem {n} trabalhos",

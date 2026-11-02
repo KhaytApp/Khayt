@@ -452,6 +452,7 @@
  "mac.creator_show_all": "Alles von diesem Urheber zeigen",
  "mac.cs_unrecorded": "Bei keinem Kunden ist bisher eine Quelle erfasst – legen Sie bei einem Kunden eine fest, um zu sehen, woher Ihre Arbeit kommt.",
  "mac.cs_unset": "Nicht erfasst",
+ "mac.currency_default": "Standard ({code})",
  "mac.customer": "Kunde",
  "mac.customer_has_cards": "Hat Geschenkkarten ({n})",
  "mac.customer_has_jobs": "Hat {n} Aufträge",

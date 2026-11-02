@@ -452,6 +452,7 @@
  "mac.creator_show_all": "Mostrar todo lo de este creador",
  "mac.cs_unrecorded": "Ningún cliente tiene aún un origen registrado: indícalo en un cliente para ver de dónde viene tu trabajo.",
  "mac.cs_unset": "Sin registrar",
+ "mac.currency_default": "Predeterminada ({code})",
  "mac.customer": "Cliente",
  "mac.customer_has_cards": "Tiene tarjetas regalo ({n})",
  "mac.customer_has_jobs": "Tiene {n} trabajos",
