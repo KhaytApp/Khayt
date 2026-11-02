@@ -691,7 +691,20 @@ extension Shop {
 
     var selectedCustomer: Customer? { customers.first { $0.id == customerSelection } }
 
-    func count(group: String) -> Int { files.count { $0.groupName == group } }
+    /// From a table made once per change to the book: the sidebar asks this
+    /// for every group a shop has, which on 1,198 groups was a pass over all
+    /// 14,151 models per row.
+    func count(group: String) -> Int {
+        let memo = libraryMemo
+        _ = files.count
+        if memo.groupCountsRevision != filesRevision {
+            var counts: [String: Int] = [:]
+            for f in files { if let g = f.groupName { counts[g, default: 0] += 1 } }
+            memo.groupCountsRevision = filesRevision
+            memo.groupCounts = counts
+        }
+        return memo.groupCounts[group] ?? 0
+    }
 
     /// The record's folder on this Mac, if it is on this Mac at all.
     /// Take a model out of the library — the record, and its files.

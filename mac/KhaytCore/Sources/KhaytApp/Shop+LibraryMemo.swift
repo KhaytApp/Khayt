@@ -211,6 +211,13 @@ final class LibraryMemo {
 
     /// Who is in which stack, for the book revision it was read at
     /// (`Shop.libraryStacks`), and the suggestions worked out from it.
+    /// `Shop.groups` and `Shop.folderPaths`, as of `filesRevision`.
+    var groupsRevision = -1
+    var groups: [String] = []
+    var groupCountsRevision = -1
+    var groupCounts: [String: Int] = [:]
+    var folderPathsRevision = -1
+    var folderPaths: [String] = []
     var stacksRevision = -1
     var stacks = Shop.StackIndex()
     var stackSuggestionsRevision = -1

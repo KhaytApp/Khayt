@@ -50,6 +50,29 @@ extension Snapshot {
         t = .now; _ = shop.memoEntries(); say("libtime   memoEntries \(ms(t))")
         t = .now; _ = shop.memoShownFiles(); say("libtime   memoShownFiles \(ms(t))")
         say("libtime: selected \(shop.selectedFiles.count) models")
+        // Choosing models: the toolbar's Group menu, the Edit menu and the
+        // inspector each list every group once something is chosen.
+        let tiles = shop.visibleFiles
+        say("libtime: \(tiles.count) model tiles drawn at the top level")
+        if tiles.count >= 3 {
+            for round in 1...2 {
+                shop.clearLibrarySelection()
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                await settle()
+                t = .now
+                shop.select(tiles[0], modifiers: .replace)
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                say("libtime round \(round): select one \(ms(t))")
+                await settle()
+                t = .now
+                shop.select(tiles[2], modifiers: .extend)
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                say("libtime round \(round): extend to three \(ms(t))")
+                await settle()
+            }
+            shop.clearLibrarySelection()
+            await settle()
+        }
         // The filter bar at a wide and a narrow window: how many axis menus
         // it chose to draw inline is visible in the picture.
         for width in [1500.0, 1000.0] {
