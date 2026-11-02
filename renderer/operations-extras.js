@@ -51,13 +51,24 @@ function openShiftChecklistModal() {
 /* ── Feature 3: End-of-Day Report Modal ─────────────────────── */
 function openEndOfDayReport() {
   const today = localDateStr();
-  const completedToday = printLog.filter(o => KhaytOrderStatus.isFinished(o) && (o.completedAt || o.date || '').startsWith(today));
+  /* The shop's day a record belongs to. A plain `YYYY-MM-DD` is already written
+   * in local time; a full ISO stamp (completedAt) is UTC, so slicing it filed a
+   * job finished between midnight and 03:00 in Riyadh under yesterday. */
+  const dayOf = (raw) => {
+    const s = String(raw || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    return s && !isNaN(d) ? localDateStr(d) : '';
+  };
+  const completedToday = printLog.filter(o => KhaytOrderStatus.isFinished(o) && dayOf(o.completedAt || o.date) === today);
   const revenueToday   = completedToday.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const inProgress     = printLog.filter(o => ['pending','printing','post','qc'].includes(o.status));
-  const wasteToday     = wasteLog.filter(w => (w.date || '').startsWith(today));
+  const wasteToday     = wasteLog.filter(w => dayOf(w.date) === today);
   const wasteTotalG    = wasteToday.reduce((s, w) => s + (+w.weight || 0), 0);
-  const timeToday      = timeEntries.filter(te => (te.date || te.startedAt || '').startsWith(today));
-  const timeTotal      = timeToday.reduce((s, te) => s + (+te.durationMins || 0), 0);
+  /* Time entries are written with `hours` (ops-locations.js, lib/operators.js);
+   * this summed a `durationMins` nothing writes, so it always read 0. */
+  const timeToday      = timeEntries.filter(te => dayOf(te.date || te.createdAt) === today);
+  const timeTotal      = Math.round(timeToday.reduce((s, te) => s + (+te.hours > 0 ? +te.hours : 0), 0) * 60);
   const overdueOrders  = printLog.filter(o => o.dueDate === today && KhaytOrderStatus.isOpen(o));
 
   const overdueHtml = overdueOrders.length > 0 ? `
@@ -81,7 +92,7 @@ function openEndOfDayReport() {
         <div style="font-size:24px;font-weight:700;">${inProgress.length}</div>
       </div>
       <div class="card" style="padding:12px;">
-        <div style="font-size:11px;color:var(--text-muted);">Filament Used Today</div>
+        <div style="font-size:11px;color:var(--text-muted);">Filament Wasted Today</div>
         <div style="font-size:20px;font-weight:700;">${wasteTotalG.toFixed(0)}g</div>
       </div>
       <div class="card" style="padding:12px;grid-column:1/-1;">
@@ -98,7 +109,7 @@ function openEndOfDayReport() {
     <tr><td>Orders Completed</td><td>${completedToday.length}</td></tr>
     <tr><td>Revenue</td><td>${fmtPrice(revenueToday)}</td></tr>
     <tr><td>In Progress</td><td>${inProgress.length}</td></tr>
-    <tr><td>Filament Used</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
+    <tr><td>Filament Wasted</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
     <tr><td>Time Logged</td><td>${timeTotal} min</td></tr>
     </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || o.id)}</li>`).join('') + '</ul>' : ''}
     </body></html>`;

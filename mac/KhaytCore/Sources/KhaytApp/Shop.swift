@@ -2786,6 +2786,8 @@ final class Shop {
     /// spool is real work — CoreImage rasterises each one — and a shelf of
     /// forty would redo it on every frame of the sheet's animation.
     var pendingLabels: LabelSheetRequest?
+    /// Book ▸ End of Day Report…, built once when asked (`EndOfDayReport.swift`).
+    var pendingDayReport: DayReportRequest?
 
     /// The job being dragged, or nil.
     var draggingJob: Order.ID?
