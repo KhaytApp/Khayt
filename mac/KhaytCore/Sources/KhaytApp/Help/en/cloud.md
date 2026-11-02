@@ -19,7 +19,7 @@ that leaves never contains them.
 
 ## Locking
 
-**Book → Lock cloud** ends automatic sync and forgets the key held in memory.
+**Book → Lock Khayt Cloud** ends automatic sync and forgets the key held in memory.
 It is the way back out, and the only one — worth knowing if you are leaving a
 Mac somewhere you do not control.
 

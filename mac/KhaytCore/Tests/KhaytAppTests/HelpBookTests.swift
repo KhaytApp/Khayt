@@ -39,18 +39,22 @@ struct HelpBookTests {
         #expect(HelpBook.order.count == Set(HelpBook.order).count, "an article is listed twice")
     }
 
-    /// Arabic is not an afterthought here — the app lays itself out right to
-    /// left and a Riyadh shop reads it that way. An article missing in Arabic
-    /// falls back to English at runtime rather than vanishing, which is right,
-    /// and is also how a gap goes unnoticed. So it is named here.
-    @Test("the book is complete in Arabic as well as English")
-    func arabicIsComplete() throws {
+    /// Every language the app speaks has the whole book. An article missing
+    /// in one falls back to English at runtime rather than vanishing, which is
+    /// right, and is also how a gap goes unnoticed. So it is named here.
+    /// Arabic is not an afterthought — the app lays itself out right to left
+    /// and a Riyadh shop reads it that way — and since Nov 2026 the other
+    /// seven languages the interface speaks have the book too.
+    @Test("the book is complete in every language the app speaks")
+    func everyLanguageIsComplete() throws {
         let english = try Self.ids(in: "en")
-        let arabic = try Self.ids(in: "ar")
-        #expect(english.subtracting(arabic).isEmpty,
-                "not translated: \(english.subtracting(arabic).sorted())")
-        #expect(arabic.subtracting(english).isEmpty,
-                "translated but not in the English book: \(arabic.subtracting(english).sorted())")
+        for language in Words.supported where language != "en" {
+            let ids = try Self.ids(in: language)
+            #expect(english.subtracting(ids).isEmpty,
+                    "\(language): not translated: \(english.subtracting(ids).sorted())")
+            #expect(ids.subtracting(english).isEmpty,
+                    "\(language): translated but not in the English book: \(ids.subtracting(english).sorted())")
+        }
     }
 
     /// The title is the first `# ` line, and it is what the contents list
@@ -58,7 +62,7 @@ struct HelpBookTests {
     /// screen — deliberately, but it should never ship that way.
     @Test("every article has a title and something under it")
     func articlesAreWritten() throws {
-        for language in ["en", "ar"] {
+        for language in Words.supported {
             for id in HelpBook.order {
                 let url = Self.helpDirectory(language).appending(path: "\(id).md")
                 let text = try String(contentsOf: url, encoding: .utf8)
@@ -70,20 +74,34 @@ struct HelpBookTests {
         }
     }
 
-    /// Arabic that is still English is the failure `test/locale-quality.test.js`
-    /// catches for the interface strings; the help files are markdown and that
-    /// guard cannot see them. A translated article whose body is byte-identical
-    /// to the English one has not been translated.
-    @Test("an Arabic article is not the English one copied")
-    func arabicIsNotACopy() throws {
+    /// A translation that is still English is the failure
+    /// `test/locale-quality.test.js` catches for the interface strings; the
+    /// help files are markdown and that guard cannot see them. A translated
+    /// article byte-identical to the English one has not been translated, and
+    /// one whose headings are still the English headings is half done.
+    @Test("a translated article is not the English one copied")
+    func translationsAreNotCopies() throws {
+        func headings(_ text: String) -> [String] {
+            text.split(separator: "\n").filter { $0.hasPrefix("#") }.map(String.init)
+        }
+        for language in Words.supported where language != "en" {
+            for id in HelpBook.order {
+                let en = try String(contentsOf: Self.helpDirectory("en").appending(path: "\(id).md"),
+                                    encoding: .utf8)
+                let other = try String(contentsOf: Self.helpDirectory(language).appending(path: "\(id).md"),
+                                       encoding: .utf8)
+                #expect(en != other, "\(language)/\(id).md is the English file")
+                // One shared heading is a word the languages share — French
+                // "Secrets", Brazilian "Backups". Two is a file left half done.
+                let same = Set(headings(en)).intersection(headings(other))
+                #expect(same.count <= 1, "\(language)/\(id).md keeps English headings: \(same.sorted())")
+            }
+        }
+        // Arabic script anywhere in it. A file of English prose with an
+        // Arabic title is the shape a half-done translation takes.
         for id in HelpBook.order {
-            let en = try String(contentsOf: Self.helpDirectory("en").appending(path: "\(id).md"),
-                                encoding: .utf8)
             let ar = try String(contentsOf: Self.helpDirectory("ar").appending(path: "\(id).md"),
                                 encoding: .utf8)
-            #expect(en != ar, "ar/\(id).md is the English file")
-            // Arabic script anywhere in it. A file of English prose with an
-            // Arabic title is the shape a half-done translation takes.
             #expect(ar.unicodeScalars.contains { (0x0600...0x06FF).contains(Int($0.value)) },
                     "ar/\(id).md carries no Arabic")
         }
@@ -128,6 +146,15 @@ struct HelpBookTests {
 
     /// The Help menu is supplied empty by macOS and stays empty unless
     /// something is put in it; the window and the menu must name the same id.
+    /// The renderer joins soft-wrapped lines with a space; between Chinese or
+    /// Japanese characters that space is a visible gap.
+    @Test("soft-wrapped CJK joins without a space, Latin with one")
+    func unwrapCJK() {
+        #expect(HelpWindow.unwrap("打印机\n正在工作") == "打印机正在工作")
+        #expect(HelpWindow.unwrap("ジョブを\n開きます") == "ジョブを開きます")
+        #expect(HelpWindow.unwrap("a spool\nruns out") == "a spool runs out")
+    }
+
     @Test("the help is reachable from the menu and the scene")
     func reachable() throws {
         let menus = try String(contentsOf: Self.repoRoot.appending(
