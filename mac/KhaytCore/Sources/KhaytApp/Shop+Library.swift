@@ -1404,7 +1404,22 @@ extension Shop {
     // MARK: - What the library shows
 
     /// The groups a shop has actually made, in the order it reads them.
+    ///
+    /// Kept per change to the book (`LibraryMemo.groups`): on 14,151 models it
+    /// took 36 ms, and the sidebar, the toolbar's Group menu, the Edit menu
+    /// and the inspector each read it on every draw, so choosing a model
+    /// paid for it several times over (Nov 2 2026).
     var groups: [String] {
+        let memo = libraryMemo
+        _ = files.count
+        if memo.groupsRevision == filesRevision { return memo.groups }
+        let out = buildGroups()
+        memo.groupsRevision = filesRevision
+        memo.groups = out
+        return out
+    }
+
+    private func buildGroups() -> [String] {
         var seen = Set<String>(), out: [String] = []
         for g in files.compactMap(\.groupName) where !seen.contains(g) {
             seen.insert(g); out.append(g)
@@ -1417,7 +1432,18 @@ extension Shop {
     /// Every folder in the library, including the levels between — so a file
     /// filed under `A/B/C` offers `A`, `A/B` and `A/B/C` as places to move to,
     /// not only the leaf it happens to sit in.
+    /// Kept per change to the book, as `groups` is (42 ms on 14,151 models).
     var folderPaths: [String] {
+        let memo = libraryMemo
+        _ = files.count
+        if memo.folderPathsRevision == filesRevision { return memo.folderPaths }
+        let out = buildFolderPaths()
+        memo.folderPathsRevision = filesRevision
+        memo.folderPaths = out
+        return out
+    }
+
+    private func buildFolderPaths() -> [String] {
         var seen = Set<String>()
         for group in files.compactMap(\.groupName) {
             var parts: [String] = []
