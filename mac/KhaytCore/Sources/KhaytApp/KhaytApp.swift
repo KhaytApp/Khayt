@@ -742,6 +742,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // How long opening the Library holds the main thread — see
+            // `timeLibrary`. Pair with KHAYT_SNAPSHOT_REAL=1 for a big book.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBTIME"] == "1", let shop = subject {
+                await timeLibrary(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the Settings window, at its opening size and its smallest,
             // with what runs off its edge — see `captureSettingsOnly`.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SETTINGS"] == "1", let shop = subject {

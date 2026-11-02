@@ -23,6 +23,13 @@ import KhaytCore
 /// here is only what the chips MEAN.
 struct LibraryFilterBar: View {
     @Bindable var shop: Shop
+    /// How many axes are drawn as menus of their own; the rest are in More.
+    /// Chosen by the stand-in row behind this one (see `body`).
+    @State private var inline = LibraryFilterBar.axes.count
+    /// The narrowest the row can be drawn: every axis in More. Below it the
+    /// row keeps this width and pushes, as `ViewThatFits` did with nothing
+    /// fitting, rather than being squeezed under the count beside it.
+    @State private var narrowest: CGFloat = 0
 
     /// Counts come from the shared rule, which FOLDS SPELLINGS: a shop that
     /// typed "Wall art" once and "wall art" twice gets one chip holding all
@@ -228,12 +235,39 @@ struct LibraryFilterBar: View {
             // "Ta" — a label cut mid-word reads as broken. Now the row is
             // drawn with as many axis menus as fit WHOLE, and the rest go
             // into one More menu: every axis, all five, five to none inline.
-            ViewThatFits(in: .horizontal) {
-                ForEach((0...Self.axes.count).reversed(), id: \.self) { inline in
-                    filters(all, inline: inline)
+            //
+            // ── MEASURED WITH EMPTY MENUS (Nov 2026) ───────────────────────
+            //
+            // `ViewThatFits` builds and sizes every candidate it tries, and
+            // each candidate's menus carried every item: on a library with
+            // 137 creators that was six rows of full menus, ~1,600 items laid
+            // out to choose one, and opening the Library held the app for a
+            // second (14,151 models, measured with KHAYT_SNAPSHOT_LIBTIME).
+            // The choosing is now done behind the row by stand-ins with the
+            // same labels and nothing in their menus, and only the row that
+            // won is drawn with its items.
+            // The real row is held to the room the row is given (no wider
+            // than its narrowest form), or the frame grows to the row's own
+            // width, the stand-ins behind it are measured against that and
+            // always fit, and the row ran off the window (Nov 2026 capture).
+            filters(all, inline: inline)
+                .frame(minWidth: narrowest, maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .leading) {
+                    filters(all, inline: 0, labelsOnly: true)
+                        .hidden()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { narrowest = $0 }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .leading) {
+                    ViewThatFits(in: .horizontal) {
+                        ForEach((0...Self.axes.count).reversed(), id: \.self) { n in
+                            filters(all, inline: n, labelsOnly: true)
+                                .onAppear { if inline != n { inline = n } }
+                        }
+                    }
+                    .hidden()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
             // ── HOW IT IS SHOWN, ON THE TRAILING SIDE OF THE SAME ROW ──────
             //
             // The order was a menu in the title strip, beside three menus
@@ -252,7 +286,7 @@ struct LibraryFilterBar: View {
 
     /// The leading half of the row with the first `inline` axes drawn as
     /// menus and any others folded into More.
-    private func filters(_ all: [FilterChipModel], inline: Int) -> some View {
+    private func filters(_ all: [FilterChipModel], inline: Int, labelsOnly: Bool = false) -> some View {
         HStack(spacing: 8) {
             // Only at the top. Inside an open group both choices draw that
             // group's own levels (`Shop.libraryEntries`), so the switch was
@@ -277,10 +311,10 @@ struct LibraryFilterBar: View {
             }
 
             ForEach(Array(Self.axes.prefix(inline).enumerated()), id: \.offset) { _, axis in
-                menu(all, axis)
+                menu(all, axis, labelsOnly: labelsOnly)
             }
             if inline < Self.axes.count {
-                more(all, Array(Self.axes.dropFirst(inline)))
+                more(all, Array(Self.axes.dropFirst(inline)), labelsOnly: labelsOnly)
             }
 
             // The ranges: one button, always there, with a popover — five
@@ -371,7 +405,7 @@ struct LibraryFilterBar: View {
 
     /// One axis as a menu. Disabled — never hidden — when it has nothing to offer.
     @ViewBuilder
-    private func menu(_ all: [FilterChipModel], _ axis: Axis) -> some View {
+    private func menu(_ all: [FilterChipModel], _ axis: Axis, labelsOnly: Bool = false) -> some View {
         let rows = all.filter(axis.holds)
         if !Self.menuEnabled(rows: rows.count) {
             Menu {
@@ -386,9 +420,9 @@ struct LibraryFilterBar: View {
         } else {
             let on = rows.filter(\.on)
             Menu {
-                items(rows)
+                if !labelsOnly { items(rows) }
                 // The way into Library Health, under what the grid can show.
-                if axis.key == "mac.lib_show" {
+                if axis.key == "mac.lib_show" && !labelsOnly {
                     Divider()
                     Button(shop.words.callIt("mac.lh_title")) { shop.openLibraryHealth() }
                 }
@@ -410,14 +444,14 @@ struct LibraryFilterBar: View {
     /// The axes that did not fit, as submenus of one More menu — each still
     /// there, greyed when empty, and the More title says how many of them
     /// are narrowing the grid.
-    private func more(_ all: [FilterChipModel], _ hidden: [Axis]) -> some View {
+    private func more(_ all: [FilterChipModel], _ hidden: [Axis], labelsOnly: Bool = false) -> some View {
         let active = hidden.reduce(0) { $0 + all.filter($1.holds).filter(\.on).count }
         return Menu {
-            ForEach(Array(hidden.enumerated()), id: \.offset) { _, axis in
+            if !labelsOnly { ForEach(Array(hidden.enumerated()), id: \.offset) { _, axis in
                 let rows = all.filter(axis.holds)
                 Menu(title(axis, on: rows.filter(\.on))) { items(rows) }
                     .disabled(!Self.menuEnabled(rows: rows.count))
-            }
+            } }
         } label: {
             Text(active == 0 ? shop.words.callIt("mac.lg_more_filters")
                  : shop.words.callIt("mac.lg_more_filters") + ": " + shop.words.numeral(active))
