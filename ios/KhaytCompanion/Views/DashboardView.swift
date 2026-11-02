@@ -259,9 +259,17 @@ struct DashboardView: View {
 
     private var money: some View {
         HStack(spacing: 0) {
-            moneyFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
-                        note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "",
-                        tint: KhaytDesign.attention)
+            // Owed opens who owes it — a figure with no way to act on it was
+            // the one thing on Home a shop chases every day.
+            NavigationLink { OwedView() } label: {
+                moneyFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
+                            note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "",
+                            tint: KhaytDesign.attention)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(pulse == nil)
+            .accessibilityHint(L10n.tr("owed.open.hint"))
             Rectangle().fill(KhaytDesign.hairline).frame(width: 1)
             moneyFigure(pulse?.thisMonth, L10n.tr("pulse.this_month"), note: currencyNote, tint: KhaytDesign.done)
             Rectangle().fill(KhaytDesign.hairline).frame(width: 1)

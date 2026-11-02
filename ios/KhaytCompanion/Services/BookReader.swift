@@ -173,6 +173,40 @@ actor BookReader {
     /// year "1448-", matched no row, and every Saudi shop read 0 and 0. Only
     /// the caller's time zone is taken; the calendar is always Gregorian —
     /// the Mac's `Calendar.book` rule (#1568).
+    /// The jobs behind Home's Owed figure, most owed first: the same open
+    /// jobs and the same shared rule (`owedByOrder`), so the list adds up to
+    /// the figure it was opened from.
+    func owing() async throws -> [OwedLine] {
+        let store = try book.read()
+        let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r }; return [] }()
+        let clients: [JSONValue] = { if case .array(let r)? = store["clients"] { return r }; return [] }()
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let engine = try engine()
+        let currencies: [String: JSONValue] = ((try? await engine.currencies()) ?? [:]).mapValues {
+            .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
+        }
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        let open: [[String: JSONValue]] = orders.compactMap { row in
+            guard case .object(let o) = row, case .string(let st)? = o["status"],
+                  !finished.contains(st), st != "quote" else { return nil }
+            return o
+        }
+        let owedBy = try await engine.owedByOrder(open.map(JSONValue.object), settings: settings,
+                                                  clients: clients, currencies: currencies)
+        func text(_ v: JSONValue?) -> String {
+            if case .string(let s)? = v { return s }
+            return ""
+        }
+        return open.compactMap { o -> OwedLine? in
+            let id = text(o["id"])
+            guard let owed = owedBy[id], owed > 0.005 else { return nil }
+            let due = text(o["dueDate"])
+            return OwedLine(id: id, project: text(o["project"]), client: text(o["client"]),
+                            owed: owed, dueDate: due.isEmpty ? nil : due)
+        }.sorted { $0.owed > $1.owed }
+    }
+
     func pulse(now: Date = Date(), calendar callers: Calendar = .current) async throws -> ShopPulse {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = callers.timeZone
@@ -539,6 +573,16 @@ struct PairingSummary: Equatable, Sendable {
 struct OrderFacts: Equatable, Sendable {
     var material: String?
     var quantity: Int?
+}
+
+/// One open job with money still owed on it — a line of "Who owes".
+struct OwedLine: Identifiable, Equatable, Sendable {
+    let id: String
+    let project: String
+    let client: String
+    /// In the shop's currency, by the shared rule (`owedByOrder`).
+    let owed: Double
+    let dueDate: String?
 }
 
 struct ShopPulse: Equatable, Sendable {

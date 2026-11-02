@@ -208,6 +208,11 @@ final class KhaytAPIClient: ObservableObject {
         await fromBook { try await $0.pulse() }
     }
 
+    /// Who owes, from this phone's book; nil with no book.
+    func fetchOwing() async -> [OwedLine]? {
+        await fromBook { try await $0.owing() }
+    }
+
     func fetchInventory() async throws -> [InventorySpool] {
         if let local = await fromBook({ try await $0.inventory() }) { return local }
         return try await get("/api/inventory", requiresPin: true, as: [InventorySpool].self)

@@ -884,3 +884,15 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Who owes */
+"owed.title" = "Who owes";
+"owed.empty" = "Nothing is owed on open jobs.";
+"owed.total" = "%@ owed on %d jobs";
+"owed.due" = "Due %@";
+"owed.remind" = "Remind on WhatsApp";
+"owed.remind.a11y" = "Remind %@ on WhatsApp";
+"owed.remind.text" = "Hello, a friendly reminder that %2$@ is still due for %1$@. Thank you!";
+"owed.remind.no_phone" = "This customer has no phone number saved.";
+"owed.remind.no_customer" = "This job is not linked to a saved customer.";
+"owed.open.hint" = "Shows the jobs with money owed.";
