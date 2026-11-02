@@ -749,6 +749,23 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // The End of Day Report: its page as HTML, and the sheet showing it.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_EOD"] == "1", let shop = subject {
+                await shop.askForEndOfDay()
+                try? shop.pendingDayReport?.html.write(to: dir.appending(path: "eod.html"),
+                                                       atomically: true, encoding: .utf8)
+                await settle(); await settle()
+                // The sheet is a window of its own; the main window behind it
+                // is only dimmed. Closed again before quitting: a window with
+                // a sheet up holds `terminate` and the run never ends.
+                if let window = NSApp.windows.first(where: { $0.isVisible && $0.frame.width >= 600 }) {
+                    capture(named: "eod", window: window.attachedSheet ?? window, into: dir)
+                }
+                shop.pendingDayReport = nil
+                await settle()
+                NSApp.terminate(nil)
+                return
+            }
             // Only the Settings window, at its opening size and its smallest,
             // with what runs off its edge — see `captureSettingsOnly`.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SETTINGS"] == "1", let shop = subject {
