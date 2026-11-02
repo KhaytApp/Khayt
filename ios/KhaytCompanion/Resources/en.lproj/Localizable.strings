@@ -884,3 +884,16 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* End of day */
+"eod.title" = "End of day";
+"eod.finished" = "Finished today";
+"eod.revenue" = "Earned today";
+"eod.open" = "Still open";
+"eod.overdue" = "Late";
+"eod.waste" = "Filament wasted";
+"eod.grams" = "%@ g";
+"eod.hours" = "Hours logged";
+"eod.finished_list" = "Finished today";
+"eod.due_list" = "Due today, not done";
+"eod.nothing" = "Nothing was finished today.";

@@ -43,6 +43,18 @@ final class SampleShopTests: XCTestCase {
         XCTAssertEqual(pulse.currency, "USD")
     }
 
+    /// End of Day is the Mac's report on the phone's book: today's shop day,
+    /// every open job counted, and the late ones among them.
+    func testEndOfDayIsTheMacsReportOnThePhonesBook() async throws {
+        let reader = BookReader(book: book)
+        let day = try await reader.endOfDay()
+        XCTAssertEqual(day.report.day, Calendar.book.dayString(Date()))
+        let queue = try await reader.queue()
+        XCTAssertEqual(day.report.inProgress, queue.count, "every open job on the board")
+        XCTAssertGreaterThan(day.report.overdue + day.report.dueNotDone.count, 0, "the sample's late job is counted")
+        XCTAssertGreaterThanOrEqual(day.report.revenue, 0)
+    }
+
     /// A phone set to Saudi Arabia runs Umm al-Qura. Home keyed this month as
     /// "1448-04" against the P&L's "2026-10" rows and showed 0 and 0.
     func testASaudiPhonesCalendarStillCountsTheShopsMoney() async throws {

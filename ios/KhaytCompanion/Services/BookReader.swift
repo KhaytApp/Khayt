@@ -173,6 +173,25 @@ actor BookReader {
     /// year "1448-", matched no row, and every Saudi shop read 0 and 0. Only
     /// the caller's time zone is taken; the calendar is always Gregorian —
     /// the Mac's `Calendar.book` rule (#1568).
+    /// Today's End of Day figures, by the Mac's own `EndOfDay.report` and the
+    /// shared per-order facts (`endOfDayFacts`): the same day (the shop's
+    /// local Gregorian day), the same revenue rule.
+    func endOfDay(now: Date = Date()) async throws -> DayReport {
+        let store = try book.read()
+        func rows(_ key: String) -> [JSONValue]? {
+            if case .array(let r)? = store[key] { return r }
+            return nil
+        }
+        let orders = rows("printLog") ?? []
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let facts = try await engine().endOfDayFacts(orders: orders, settings: settings, clients: rows("clients") ?? [])
+        let report = EndOfDay.report(day: Calendar.book.dayString(now), orders: orders, facts: facts,
+                                     waste: rows("wasteLog") ?? [], time: rows("timeEntries") ?? [],
+                                     dayOf: { Calendar.localDay(ofInstant: $0) })
+        return DayReport(report: report, holdsWaste: rows("wasteLog") != nil, holdsTime: rows("timeEntries") != nil)
+    }
+
     func pulse(now: Date = Date(), calendar callers: Calendar = .current) async throws -> ShopPulse {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = callers.timeZone
@@ -539,6 +558,15 @@ struct PairingSummary: Equatable, Sendable {
 struct OrderFacts: Equatable, Sendable {
     var material: String?
     var quantity: Int?
+}
+
+/// Today, closed — the Mac's End of Day Report (`EndOfDay` in KhaytCore),
+/// with whether the phone holds the waste log and the time entries (it does
+/// not today: those figures are the Mac's).
+struct DayReport: Sendable {
+    let report: EndOfDay
+    let holdsWaste: Bool
+    let holdsTime: Bool
 }
 
 struct ShopPulse: Equatable, Sendable {

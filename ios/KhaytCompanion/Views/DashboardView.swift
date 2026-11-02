@@ -34,6 +34,7 @@ struct DashboardView: View {
     @State private var showQuote = false
     @State private var showLibrary = false
     @State private var showCatalogue = false
+    @State private var showEndOfDay = false
     @State private var showWaste = false
     @State private var showExpense = false
     @State private var showIntake = false
@@ -90,6 +91,7 @@ struct DashboardView: View {
             .sheet(isPresented: $showQuote) { CalculatorScreen(asSheet: true) }
             .sheet(isPresented: $showLibrary) { LibraryView() }
             .sheet(isPresented: $showCatalogue) { CatalogueView() }
+            .sheet(isPresented: $showEndOfDay) { NavigationStack { EndOfDayView() } }
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
@@ -207,6 +209,9 @@ struct DashboardView: View {
                 Button { pickingModel = true } label: { Label(L10n.tr("quote.file.pick"), systemImage: "cube") }
                 Button { showLibrary = true } label: { Label(L10n.tr("library.price"), systemImage: "books.vertical") }
                 Button { showCatalogue = true } label: { Label(L10n.tr("catalogue.title"), systemImage: "shippingbox") }
+                if api.holdsBook {
+                    Button { showEndOfDay = true } label: { Label(L10n.tr("eod.title"), systemImage: "moon.stars") }
+                }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))

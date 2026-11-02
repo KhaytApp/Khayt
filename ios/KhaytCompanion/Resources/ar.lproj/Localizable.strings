@@ -884,3 +884,16 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* End of day */
+"eod.title" = "نهاية اليوم";
+"eod.finished" = "اكتمل اليوم";
+"eod.revenue" = "إيراد اليوم";
+"eod.open" = "ما زال مفتوحًا";
+"eod.overdue" = "متأخر";
+"eod.waste" = "الخيوط المهدرة";
+"eod.grams" = "%@ غ";
+"eod.hours" = "الساعات المسجلة";
+"eod.finished_list" = "اكتمل اليوم";
+"eod.due_list" = "مستحق اليوم ولم يكتمل";
+"eod.nothing" = "لم يكتمل أي طلب اليوم.";
