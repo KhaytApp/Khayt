@@ -884,3 +884,12 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* Edit order */
+"edit.title" = "تعديل";
+"edit.due" = "تاريخ التسليم";
+"edit.priority" = "الأولوية";
+"edit.priority.normal" = "عادية";
+"edit.priority.high" = "عالية";
+"edit.priority.urgent" = "عاجلة";
+"edit.price.note" = "السعر الجديد هو الإجمالي الذي يدفعه العميل. يبقى المدفوع كما هو حتى الإجمالي الجديد.";

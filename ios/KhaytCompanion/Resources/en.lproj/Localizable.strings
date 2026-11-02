@@ -884,3 +884,12 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Edit order */
+"edit.title" = "Edit";
+"edit.due" = "Due date";
+"edit.priority" = "Priority";
+"edit.priority.normal" = "Normal";
+"edit.priority.high" = "High";
+"edit.priority.urgent" = "Urgent";
+"edit.price.note" = "A new price is the total the customer pays. What was already paid stays, up to the new total.";
