@@ -1428,6 +1428,9 @@ final class Shop {
     /// would be paying for the wrong thing.
     func printersAnswered() async {
         await publishLivePrinters()
+        // A phone away from the shop's Wi-Fi asking to pause or stop a print:
+        // read on the same sweep that publishes what the printers said.
+        await cloudCommands.pollIfDue(shop: self)
         WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
         let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
@@ -2471,6 +2474,8 @@ final class Shop {
     /// This Mac's printers, published to the cloud for viewers away from the
     /// shop — see `LivePrinterPublisher`.
     let livePublisher = LivePrinterPublisher()
+    /// Printer commands a phone sent through Khayt Cloud (`CloudPrinterCommands`).
+    let cloudCommands = CloudPrinterCommands()
 
     /// The nightly off-site backup: its settings, when it last ran and
     /// whether it is failing. See `OffsiteBackups.swift`.

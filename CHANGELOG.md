@@ -4,7 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Mac: a paired iPhone can pause, resume or stop a print.** The phone already showed the printer's camera and whether it was paused. `POST /api/printer/{machine}/{pause|resume|stop}` on the Mac's LAN server sends the printer the same command the Mac's own buttons do. It takes a signed, enrolled phone only: the owner PIN on its own is refused, because this moves a machine mid-print. The phone side is the iPhone app's.
+- **Mac: a paired iPhone can pause, resume or stop a print.** The phone already showed the printer's camera and whether it was paused. `POST /api/printer/{machine}/{pause|resume|stop}` on the Mac's LAN server sends the printer the same command the Mac's own buttons do. It takes a signed, enrolled phone only: the owner PIN on its own is refused, because this moves a machine mid-print. Away from the shop's Wi-Fi the phone sends the same command through Khayt Cloud (a sealed, silent `cmd-printer` shop event). The Mac reads it on its printer sweep, runs it the same way and answers with a sealed `cmd-result`. A command older than two minutes is not run, and none runs twice. The phone side is the iPhone app's.
 
 - **iPhone: tapping an alert opens what it is about.** Tapping a print alert itself (not one of its buttons) now opens that job, over whichever tab is showing. A new-request alert opens the requests waiting, a late-jobs alert opens Orders on its Late chip, and a low-filament alert opens the low shelf. In the Notifications screen, the late and low-stock lines now open those lists too; before, they did nothing.
 
