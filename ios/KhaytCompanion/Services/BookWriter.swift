@@ -337,10 +337,14 @@ struct BookWriter {
     ///
     /// `converted` is the same move with the other word — what the desktop's
     /// `promoteWaitingItem` writes when a request becomes an order.
-    func setWaitingStatus(id: String, to status: String, now: Date = Date()) throws {
+    ///
+    /// `reminderDate` (yyyy-MM-dd) goes with `reminded`: the day the desktop's
+    /// waiting list says "Reminder due".
+    func setWaitingStatus(id: String, to status: String, reminderDate: String? = nil, now: Date = Date()) throws {
         guard status == "declined" || status == "converted" else {
             try book.updateRecord(collection: "waitingList", id: id) { record in
                 record["status"] = .string(status)
+                if let reminderDate { record["reminderDate"] = .string(reminderDate) }
             }
             return
         }

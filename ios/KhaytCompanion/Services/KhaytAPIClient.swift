@@ -716,10 +716,12 @@ final class KhaytAPIClient: ObservableObject {
         try ensureOK(data, response)
     }
 
-    func updateWaitingStatus(id: String, status: String) async throws {
-        if try await writeLocally({ try $0.setWaitingStatus(id: id, to: status) }) { return }
+    func updateWaitingStatus(id: String, status: String, reminderDate: String? = nil) async throws {
+        if try await writeLocally({ try $0.setWaitingStatus(id: id, to: status, reminderDate: reminderDate) }) { return }
         let encodedId = try encodeOrderIdForPath(id)
-        let body = try JSONEncoder().encode(["status": status])
+        var fields = ["status": status]
+        if let reminderDate { fields["reminderDate"] = reminderDate }
+        let body = try JSONEncoder().encode(fields)
         let (data, response) = try await request(
             path: "/api/waiting-list/\(encodedId)", method: "PATCH", body: body, requiresPin: true
         )
@@ -770,6 +772,52 @@ final class KhaytAPIClient: ObservableObject {
         try book.updateRecord(collection: "printLog", id: orderId) { record in
             record["shippedAt"] = shipped["shippedAt"]
             if let history = shipped["statusHistory"] { record["statusHistory"] = history }
+        }
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
+    /// The carriers to ship a job with — the Mac's Ship sheet list (Manual
+    /// last, always there) — or nil when the job is not one to ship now:
+    /// unfinished, already sent or already delivered.
+    func shipChoices(orderId: String) async -> [KhaytEngine.CarrierChoice]? {
+        guard let book, book.exists, let reader, let store = try? book.read(),
+              case .array(let rows)? = store["printLog"],
+              case .object(let o)? = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }),
+              o["status"] == .string("completed"),
+              o["deliveredAt"] == nil || o["deliveredAt"] == .null,
+              o["shippedAt"] == nil || o["shippedAt"] == .null else { return nil }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = store["settings"] { settings = s }
+        return try? await reader.sharedEngine().carriersToShipWith(settings: .object(settings))
+    }
+
+    /// Hand a finished job to a carrier, with the number off the courier's
+    /// receipt — `lib/shipment.js`'s `create`, as the Mac's `Shop.ship` does —
+    /// so the customer's page has something to follow.
+    func ship(orderId: String, carrier: String, service: String?, tracking: String, now: Date = Date()) async throws {
+        guard let book, book.exists, let reader else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.needs_book"))
+        }
+        guard case .array(let rows)? = try book.read()["printLog"],
+              let row = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }), case .object(let before) = row else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.no_order"))
+        }
+        guard before["status"] == .string("completed"),
+              before["deliveredAt"] == nil || before["deliveredAt"] == .null else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.not_shippable"))
+        }
+        let shipped = try await reader.sharedEngine().shipmentCreate(order: row, carrier: carrier, service: service,
+                                                                      trackingNumber: tracking, at: now)
+        guard case .object(let after) = shipped else { throw KhaytAPIError.server(L10n.tr("alert.print.not_shippable")) }
+        try book.updateRecord(collection: "printLog", id: orderId) { record in
+            for (key, value) in after where before[key] != value { record[key] = value }
         }
         await refreshPendingCount()
         await deliverPending()

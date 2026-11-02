@@ -33,6 +33,9 @@ struct OrderDetailPage: View {
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
+    /// The carriers to ship with, when this job is finished and not yet sent.
+    @State private var shipChoices: [KhaytEngine.CarrierChoice]?
+    @State private var shipping = false
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
     @State private var moveNotes: [String] = []
 
@@ -72,6 +75,16 @@ struct OrderDetailPage: View {
                 Button { showingInvoice = true } label: { InvoiceCard() }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            if let shipChoices, !shipChoices.isEmpty {
+                Button { shipping = true } label: { ShipCard() }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+                    .sheet(isPresented: $shipping) {
+                        ShipSheet(orderId: order.id, carriers: shipChoices) {
+                            self.shipChoices = await api.shipChoices(orderId: order.id)
+                        }
+                    }
             }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
@@ -118,6 +131,7 @@ struct OrderDetailPage: View {
             machines = (try? await api.fetchMachines()) ?? []
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
+            shipChoices = await api.shipChoices(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             #if DEBUG
@@ -198,6 +212,28 @@ struct OrderDetailPage: View {
 }
 
 /// The way into a job's invoice.
+/// "Ship it": carrier and tracking number, for a finished job not yet sent.
+struct ShipCard: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shippingbox.fill").foregroundStyle(KhaytDesign.brandV2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.tr("ship.open"))
+                    .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(L10n.tr("ship.open.sub"))
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                .font(.caption).foregroundStyle(KhaytDesign.note)
+        }
+        .padding(14)
+        .card()
+    }
+}
+
 struct InvoiceCard: View {
     var body: some View {
         HStack(spacing: 10) {

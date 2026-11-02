@@ -884,3 +884,22 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Intake reminder */
+"intake.remind.when" = "Remind me";
+"intake.remind.tomorrow" = "Tomorrow morning";
+"intake.remind.3days" = "In 3 days";
+"intake.remind.week" = "In a week";
+"intake.remind.alert" = "Reminder: get back to %@ about their request.";
+
+/* Ship */
+"ship.title" = "Ship";
+"ship.carrier" = "Carrier";
+"ship.service" = "Service";
+"ship.tracking" = "Tracking number";
+"ship.scan" = "Scan the waybill";
+"ship.scan.hint" = "Point at the barcode on the courier’s receipt.";
+"ship.hint" = "From the courier’s receipt. The customer’s page shows it.";
+"ship.create" = "Mark shipped";
+"ship.open" = "Ship";
+"ship.open.sub" = "Carrier and tracking number";
