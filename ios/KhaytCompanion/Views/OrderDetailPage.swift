@@ -33,6 +33,7 @@ struct OrderDetailPage: View {
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
+    @State private var showingProforma = false
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
     @State private var moveNotes: [String] = []
 
@@ -73,6 +74,12 @@ struct OrderDetailPage: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            // Accepted, not yet finished: a proforma to ask for payment with.
+            if BookReader.offersProforma(status: order.status) {
+                Button { showingProforma = true } label: { InvoiceCard(proforma: true) }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
@@ -95,6 +102,7 @@ struct OrderDetailPage: View {
             WhatsAppSheet(orderId: order.id)
         }
         .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
+        .navigationDestination(isPresented: $showingProforma) { InvoicePage(orderId: order.id, proforma: true) }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -199,14 +207,16 @@ struct OrderDetailPage: View {
 
 /// The way into a job's invoice.
 struct InvoiceCard: View {
+    var proforma = false
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "doc.text.fill").foregroundStyle(KhaytDesign.brandV2)
             VStack(alignment: .leading, spacing: 2) {
-                Text(L10n.tr("invoice.open"))
+                Text(L10n.tr(proforma ? "proforma.open" : "invoice.open"))
                     .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(L10n.tr("invoice.open.sub"))
+                Text(L10n.tr(proforma ? "proforma.open.sub" : "invoice.open.sub"))
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.note)
             }

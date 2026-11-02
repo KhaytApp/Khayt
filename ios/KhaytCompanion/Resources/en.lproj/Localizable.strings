@@ -884,3 +884,9 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+
+/* Proforma */
+"proforma.title" = "Proforma invoice";
+"proforma.open" = "Proforma invoice";
+"proforma.open.sub" = "Ask for payment before the work is invoiced";
+"proforma.refused" = "A proforma is for a priced job that is accepted and not yet finished.";

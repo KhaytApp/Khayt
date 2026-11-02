@@ -884,3 +884,9 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+
+/* Proforma */
+"proforma.title" = "فاتورة مبدئية";
+"proforma.open" = "فاتورة مبدئية";
+"proforma.open.sub" = "اطلب الدفع قبل إصدار الفاتورة";
+"proforma.refused" = "الفاتورة المبدئية لطلب مسعّر ومقبول ولم يكتمل بعد.";
