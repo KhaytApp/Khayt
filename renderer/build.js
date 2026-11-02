@@ -680,6 +680,55 @@ function updateGrandTotal() {
       computedLine.style.display = 'none';
     }
   }
+  // The job is saved in the quote's or the client's currency, converted at the
+  // rate in Settings (lib/order-new.js jobCurrency). Everything above is in
+  // the shop's; this says what the customer will actually be asked for. The
+  // same pricing call, with the shop-currency inputs divided by the rate — a
+  // typed price is already in the job's currency, and rounding happens there.
+  const curLine = $('#priceCurrencyLine');
+  if (curLine) {
+    const base = settings.currency || 'SAR';
+    const N = (typeof KhaytOrderNew !== 'undefined') ? KhaytOrderNew : null;
+    const picked = $('#calcCurrency')?.value || '';
+    let wanted = picked;
+    if (!wanted && currentClientId && typeof clients !== 'undefined' && Array.isArray(clients)) {
+      wanted = (clients.find(c => c && c.id === currentClientId) || {}).currency || '';
+    }
+    const jc = (biz && N && N.jobCurrency && wanted && wanted !== base)
+      ? N.jobCurrency({ currency: picked, clientId: currentClientId }, settings, (typeof clients !== 'undefined' ? clients : []))
+      : null;
+    if (jc && jc.fx !== 1) {
+      const fx = jc.fx;
+      const conv = KhaytPricing.quoteTotal({
+        baseCost: totalBase / fx,
+        overheadPerHour: overheadRate / fx,
+        printHours: overheadHours,
+        agreedAmount: agreedAmount / fx,
+        qty,
+        margin,
+        priceTier: null,
+        priceRound,
+        priceOverride,
+        discountPct,
+        rushEnabled,
+        rushPct,
+        shippingCost: shippingCost / fx,
+        extraLines: (currentExtraLines || []).map(l => (l && !KhaytPricing.isPercentLine(l)
+          ? Object.assign({}, l, { amount: (+l.amount || 0) / fx }) : l)),
+        business: biz,
+      });
+      const amount = (typeof fmtMoneyIn === 'function') ? fmtMoneyIn(conv.total, jc.currency) : `${conv.total.toFixed(2)} ${jc.currency}`;
+      curLine.textContent = t('calc.saved_in_currency', { amount, code: jc.currency, rate: fx, base });
+      curLine.style.display = 'inline';
+    } else if (jc && jc.currency === base) {
+      // A currency was wanted but Settings has no rate for it: the job is
+      // saved in the shop's own, and the shop should know before it quotes.
+      curLine.textContent = t('calc.no_rate_for_currency', { code: wanted, base });
+      curLine.style.display = 'inline';
+    } else {
+      curLine.style.display = 'none';
+    }
+  }
   // In enthusiast mode the "Project total" is really the cost — relabel it.
   const totalLabel = document.querySelector('.total-display .label');
   if (totalLabel) totalLabel.textContent = biz

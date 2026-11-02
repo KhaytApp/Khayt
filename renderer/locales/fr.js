@@ -2169,6 +2169,8 @@
   "calc.client_ref": "Bon de commande client / référence",
   "calc.currency": "Devise",
   "calc.currency_auto": "Auto",
+  "calc.saved_in_currency": "Enregistré à {amount} ({code}, 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "Aucun taux pour {code} dans Réglages ▸ Devise : ce travail est enregistré en {base}",
   "calc.client_ref_ph": "ex. BC-2024-001",
   "oe.internal_notes": "Notes internes (non visibles par le client)",
   "oe.internal_notes_ph": "ex. manipulation spéciale, rappels pour l'opérateur…",
