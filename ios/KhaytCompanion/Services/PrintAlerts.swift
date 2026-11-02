@@ -185,6 +185,15 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     /// into the book, offline-safe, sent on like any edit. Checked against
     /// the job as it is NOW: an alert tapped an hour later must not move a
     /// job someone has already moved.
+    /// A Live Activity's button: the same move, for the one job printing on
+    /// that machine — none when there is not exactly one, as the alert's rule.
+    func perform(move: String, machineId: String) async {
+        let onMachine = ((try? await api.fetchQueue()) ?? [])
+            .filter { $0.machineId == machineId && $0.status == "printing" }
+        guard onMachine.count == 1 else { return }
+        await perform(move == "post" ? .moveToPost : .reprint, orderId: onMachine[0].id)
+    }
+
     func perform(_ action: PrintAlertAction, orderId: String) async {
         let status = ((try? await api.fetchQueue()) ?? []).first { $0.id == orderId }?.status
         var notes: [String] = []

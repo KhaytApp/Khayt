@@ -57,6 +57,9 @@ struct KhaytCompanionApp: App {
         let nav = OrdersNavigationState()
         _ordersNav = StateObject(wrappedValue: nav)
         center.navigation = nav
+        PrintActivityActions.handler = { machineId, move in
+            await center.perform(move: move, machineId: machineId)
+        }
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
