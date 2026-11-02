@@ -121,11 +121,33 @@ struct HelpWindow: View {
                 }
             } else {
                 // Soft-wrapped prose is one paragraph, so the newlines inside a
-                // chunk become spaces rather than breaks.
-                out.append(Block(kind: .paragraph,
-                                 text: piece.replacingOccurrences(of: "\n", with: " ")))
+                // chunk become spaces rather than breaks — except between
+                // Chinese or Japanese characters, which take no space.
+                out.append(Block(kind: .paragraph, text: unwrap(piece)))
             }
         }
         return out
+    }
+
+    /// Joins soft-wrapped lines. A space between two CJK characters reads as
+    /// a stray gap, so a break with one on either side joins with nothing.
+    static func unwrap(_ piece: String) -> String {
+        let lines = piece.split(separator: "\n", omittingEmptySubsequences: false)
+        guard var out = lines.first.map(String.init) else { return "" }
+        for line in lines.dropFirst() {
+            let joinTight = out.unicodeScalars.last.map(isCJK) == true
+                || line.unicodeScalars.first.map(isCJK) == true
+            out += (joinTight ? "" : " ") + line
+        }
+        return out
+    }
+
+    static func isCJK(_ s: Unicode.Scalar) -> Bool {
+        switch s.value {
+        case 0x3000...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, 0xFF00...0xFFEF:
+            return true
+        default:
+            return false
+        }
     }
 }

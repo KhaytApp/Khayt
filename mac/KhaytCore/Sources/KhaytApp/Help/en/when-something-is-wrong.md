@@ -33,12 +33,6 @@ If it still disagrees, that is worth reporting, with both figures.
   over.
 - Importing your own library folder into itself does nothing, on purpose.
 
-## An invoice looks unstyled
-
-That was a real fault in 4.0.0-alpha.1 and alpha.2, fixed in alpha.3. If you are
-on an alpha older than that, update — those builds could not launch at all on a
-Mac that had not built them, so you are most likely already past it.
-
 ## Getting a build that works
 
 **Khayt → Check for Updates…**. If the app will not start at all, no update can
