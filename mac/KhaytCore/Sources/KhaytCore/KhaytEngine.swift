@@ -6412,6 +6412,27 @@ public actor KhaytEngine {
                 oldestOpenDays: report.totals.oldestOpenDays))
     }
 
+    // MARK: - The day, closed
+
+    /// Per order, in order: finished, still open work, and net revenue in the
+    /// base currency, from `KhaytOrderStatus` and `KhaytOrderMoney` so the
+    /// End of Day figures are the ones every other report shows. The day
+    /// itself is `EndOfDay.report`, native.
+    public func endOfDayFacts(orders: [JSONValue], settings: [String: JSONValue],
+                              clients: [JSONValue]) throws -> [EndOfDay.Facts] {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG1, clients: ARG2 };
+          var S = globalThis.KhaytOrderStatus;
+          return ARG0.map(function (o) {
+            var finished = !!S.isFinished(o);
+            var n = finished ? Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx)) : 0;
+            return { finished: finished, open: !!S.isOpen(o), revenue: isFinite(n) ? n : 0 };
+          });
+        })()
+        """#, [.array(orders), .object(settings), .array(clients)], as: [EndOfDay.Facts].self)
+    }
+
     // MARK: - Can the shop take this job?
 
     /// Agreed, unfinished work against the hours each machine is actually run.

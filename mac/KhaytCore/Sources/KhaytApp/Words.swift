@@ -1472,6 +1472,18 @@ final class Words {
         "mac.shelf_labels":  ["en": "Shelf labels",   "ar": "ملصقات الرف"],
         "mac.print_labels":  ["en": "Print shelf labels…", "ar": "طباعة ملصقات الرف…"],
         "mac.print":         ["en": "Print",          "ar": "طباعة"],
+        // The End of Day Report — see `EndOfDayReport.swift`.
+        "mac.eod_menu":      ["en": "End of Day Report…", "ar": "تقرير نهاية اليوم…"],
+        "mac.eod_title":     ["en": "End of day — {day}", "ar": "نهاية اليوم — {day}"],
+        "mac.eod_finished":  ["en": "Jobs finished",  "ar": "الطلبات المنجزة"],
+        "mac.eod_revenue":   ["en": "Revenue, net of tax", "ar": "الإيرادات دون الضريبة"],
+        "mac.eod_open":      ["en": "Open work",      "ar": "أعمال مفتوحة"],
+        "mac.eod_overdue":   ["en": "Past due",       "ar": "متأخرة عن موعدها"],
+        "mac.eod_waste":     ["en": "Filament wasted", "ar": "الخيوط المهدرة"],
+        "mac.eod_hours":     ["en": "Hours logged",   "ar": "الساعات المسجلة"],
+        "mac.eod_due_today": ["en": "Due today, not finished", "ar": "مستحقة اليوم ولم تُنجز"],
+        "mac.eod_finished_list": ["en": "Finished today", "ar": "أُنجز اليوم"],
+        "mac.eod_nothing":   ["en": "Nothing was finished today.", "ar": "لم يُنجز أي طلب اليوم."],
         // The File menu's Mac commands — see `Shop+Conventions.swift`.
         "mac.share":         ["en": "Share",          "ar": "مشاركة"],
         "mac.duplicate":     ["en": "Duplicate",      "ar": "تكرار"],

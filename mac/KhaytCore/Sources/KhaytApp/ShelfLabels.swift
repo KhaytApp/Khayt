@@ -140,10 +140,12 @@ final class LabelPaper: NSObject, ObservableObject, WKNavigationDelegate {
     let webView = DocumentWeb.view()
     @Published private(set) var drawn = false
 
-    init(html: String) {
+    /// `wholePage`: `html` is a complete document of its own (the End of Day
+    /// Report), not label markup to be put inside the labels' page.
+    init(html: String, wholePage: Bool = false) {
         super.init()
         webView.navigationDelegate = self
-        webView.loadHTMLString(Self.page(html), baseURL: nil)
+        webView.loadHTMLString(wholePage ? html : Self.page(html), baseURL: nil)
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) { drawn = true }

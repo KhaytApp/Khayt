@@ -864,6 +864,7 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingMilestones) { MilestonesSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingDayReport) { DayReportSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
             .shopSheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
             .shopSheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet(shop: shop) }

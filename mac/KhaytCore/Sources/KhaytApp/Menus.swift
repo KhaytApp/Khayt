@@ -228,6 +228,14 @@ private struct BookMenu: View {
         }
         .disabled(shop.spools.isEmpty)
 
+        // Today's figures on one page. A read, like the labels: a read-only
+        // book can still be reported on. Behind the analytics lock, because
+        // it is the day's revenue.
+        Button(Words.upfront("mac.eod_menu")) {
+            Task { await shop.askForEndOfDay() }
+        }
+        .disabled(shop.engine == nil || !shop.lockAllows("analytics", "view"))
+
         // Only where the shop has agreed to it. A menu item offering to send a
         // summary of the book to a vendor, on a shop that has switched the
         // feature off, is an advertisement in a menu.
