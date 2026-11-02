@@ -13,8 +13,8 @@ import Foundation
 ///   instant, so in Riyadh a job finished before 03:00 counted toward
 ///   yesterday. `dayOf` turns a stamp into the shop's own day
 ///   (`Calendar.localDay(ofInstant:)`).
-/// - **"Filament used"** was the waste log's grams. It is called waste here,
-///   because that is what it is.
+/// - **"Filament used"** was the waste log's grams. It is "Filament wasted"
+///   here, as on the desktop since #2146.
 ///
 /// What a job earned is NOT worked out here: it is `orderNetRevenueBase`,
 /// handed in per order, so this figure is the same net-of-tax number every
@@ -64,7 +64,9 @@ public struct EndOfDay: Sendable, Equatable {
             let title = text(o["project"]).isEmpty ? id : text(o["project"])
             let earned = BusinessScope.countsForBusiness(row) && fact.revenue.isFinite ? fact.revenue : 0
             if fact.finished {
-                let stamp = text(o["completedAt"])
+                // `completedAt`, else the job's own `date`: the desktop's rule
+                // (#2146), for jobs finished before either app stamped it.
+                let stamp = text(o["completedAt"]).isEmpty ? text(o["date"]) : text(o["completedAt"])
                 if !stamp.isEmpty, dayOf(stamp) == day {
                     finished.append((stamp, Job(id: id, title: title, revenue: earned)))
                     revenue += earned
@@ -86,7 +88,7 @@ public struct EndOfDay: Sendable, Equatable {
         var hours = 0.0
         for row in time {
             guard case .object(let t) = row else { continue }
-            let stamp = text(t["date"]).isEmpty ? text(t["startedAt"]) : text(t["date"])
+            let stamp = text(t["date"]).isEmpty ? text(t["createdAt"]) : text(t["date"])
             guard dayOf(stamp) == day else { continue }
             if let h = t["hours"], number(h) > 0 { hours += number(h) }
             else { hours += number(t["durationMins"]) / 60 }

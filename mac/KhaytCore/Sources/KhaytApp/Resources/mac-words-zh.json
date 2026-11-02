@@ -656,7 +656,7 @@
  "mac.eod_overdue": "已逾期",
  "mac.eod_revenue": "收入（不含税）",
  "mac.eod_title": "日终 — {day}",
- "mac.eod_waste": "废料",
+ "mac.eod_waste": "浪费的耗材",
  "mac.erase_customer": "抹除客户…",
  "mac.erase_keeps_cards": "有 {n} 张礼品卡仍有余额。它们会保留持卡人的姓名，因为余额是店铺欠下的钱。",
  "mac.erase_keeps_cards_one": "有 {n} 张礼品卡仍有余额。它会保留持卡人的姓名，因为余额是店铺欠下的钱。",

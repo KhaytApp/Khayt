@@ -656,7 +656,7 @@
  "mac.eod_overdue": "期限超過",
  "mac.eod_revenue": "売上（税抜）",
  "mac.eod_title": "日次締め — {day}",
- "mac.eod_waste": "廃棄",
+ "mac.eod_waste": "廃棄フィラメント",
  "mac.erase_customer": "顧客を消去…",
  "mac.erase_keeps_cards": "ギフトカード {n} 枚に残高があります。残高はショップが負う金額のため、保有者の名前は残ります。",
  "mac.erase_keeps_cards_one": "ギフトカード {n} 枚に残高があります。残高はショップが負う金額のため、保有者の名前は残ります。",

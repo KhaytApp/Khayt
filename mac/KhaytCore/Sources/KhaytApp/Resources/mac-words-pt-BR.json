@@ -656,7 +656,7 @@
  "mac.eod_overdue": "Atrasados",
  "mac.eod_revenue": "Receita sem impostos",
  "mac.eod_title": "Fechamento do dia — {day}",
- "mac.eod_waste": "Desperdício",
+ "mac.eod_waste": "Filamento desperdiçado",
  "mac.erase_customer": "Apagar cliente…",
  "mac.erase_keeps_cards": "{n} vales-presente ainda têm saldo. Eles mantêm o nome dos titulares, porque o saldo é dinheiro que a loja deve.",
  "mac.erase_keeps_cards_one": "{n} vale-presente ainda tem saldo. Ele mantém o nome do titular, porque o saldo é dinheiro que a loja deve.",

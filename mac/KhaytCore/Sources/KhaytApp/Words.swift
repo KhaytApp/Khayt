@@ -1470,7 +1470,7 @@ final class Words {
         "mac.eod_revenue":   ["en": "Revenue, net of tax", "ar": "الإيرادات دون الضريبة"],
         "mac.eod_open":      ["en": "Open work",      "ar": "أعمال مفتوحة"],
         "mac.eod_overdue":   ["en": "Past due",       "ar": "متأخرة عن موعدها"],
-        "mac.eod_waste":     ["en": "Waste",          "ar": "الهدر"],
+        "mac.eod_waste":     ["en": "Filament wasted", "ar": "الخيوط المهدرة"],
         "mac.eod_hours":     ["en": "Hours logged",   "ar": "الساعات المسجلة"],
         "mac.eod_due_today": ["en": "Due today, not finished", "ar": "مستحقة اليوم ولم تُنجز"],
         "mac.eod_finished_list": ["en": "Finished today", "ar": "أُنجز اليوم"],

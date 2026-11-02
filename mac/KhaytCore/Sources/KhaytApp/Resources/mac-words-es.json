@@ -656,7 +656,7 @@
  "mac.eod_overdue": "Vencidos",
  "mac.eod_revenue": "Ingresos sin impuestos",
  "mac.eod_title": "Cierre del día — {day}",
- "mac.eod_waste": "Desperdicio",
+ "mac.eod_waste": "Filamento desperdiciado",
  "mac.erase_customer": "Borrar cliente…",
  "mac.erase_keeps_cards": "{n} tarjetas regalo aún tienen saldo. Conservan los nombres de sus titulares, porque el saldo es dinero que el taller debe.",
  "mac.erase_keeps_cards_one": "{n} tarjeta regalo aún tiene saldo. Conserva el nombre de su titular, porque el saldo es dinero que el taller debe.",

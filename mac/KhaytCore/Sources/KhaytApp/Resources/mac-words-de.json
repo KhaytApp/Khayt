@@ -656,7 +656,7 @@
  "mac.eod_overdue": "Überfällig",
  "mac.eod_revenue": "Umsatz ohne Steuer",
  "mac.eod_title": "Tagesabschluss — {day}",
- "mac.eod_waste": "Ausschuss",
+ "mac.eod_waste": "Filament verschwendet",
  "mac.erase_customer": "Kunde löschen …",
  "mac.erase_keeps_cards": "{n} Geschenkkarten haben noch ein Guthaben. Sie behalten die Namen ihrer Inhaber, weil das Guthaben Geld ist, das der Shop schuldet.",
  "mac.erase_keeps_cards_one": "{n} Geschenkkarte hat noch ein Guthaben. Sie behält den Namen ihres Inhabers, weil das Guthaben Geld ist, das der Shop schuldet.",

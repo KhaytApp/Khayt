@@ -656,7 +656,7 @@
  "mac.eod_overdue": "Gecikmiş",
  "mac.eod_revenue": "Vergi hariç gelir",
  "mac.eod_title": "Gün sonu — {day}",
- "mac.eod_waste": "Fire",
+ "mac.eod_waste": "Boşa giden filament",
  "mac.erase_customer": "Müşteriyi Sil…",
  "mac.erase_keeps_cards": "{n} hediye kartının hâlâ bakiyesi var. Bakiye dükkânın borcu olan para olduğundan, sahiplerinin adları saklanır.",
  "mac.erase_keeps_cards_one": "{n} hediye kartının hâlâ bakiyesi var. Bakiye dükkânın borcu olan para olduğundan, sahibinin adı saklanır.",

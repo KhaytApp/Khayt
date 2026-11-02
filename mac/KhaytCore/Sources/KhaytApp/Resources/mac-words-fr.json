@@ -656,7 +656,7 @@
  "mac.eod_overdue": "En retard",
  "mac.eod_revenue": "Chiffre d’affaires hors taxes",
  "mac.eod_title": "Fin de journée — {day}",
- "mac.eod_waste": "Déchets",
+ "mac.eod_waste": "Filament gaspillé",
  "mac.erase_customer": "Effacer le client…",
  "mac.erase_keeps_cards": "{n} cartes cadeaux ont encore un solde. Elles gardent le nom de leurs titulaires, car le solde est de l’argent que l’atelier doit.",
  "mac.erase_keeps_cards_one": "{n} carte cadeau a encore un solde. Elle garde le nom de son titulaire, car le solde est de l’argent que l’atelier doit.",

@@ -47,15 +47,26 @@ struct EndOfDayTests {
         #expect(r.overdue == 1)
     }
 
+    @Test func aFinishedJobWithNoStampFallsBackToItsDate() {
+        let orders = [order("A", status: "completed", extra: ["date": .string("2026-11-02")]),
+                      order("B", status: "completed", extra: ["date": .string("2026-11-01")])]
+        let facts: [EndOfDay.Facts] = [.init(finished: true, open: false, revenue: 5),
+                                       .init(finished: true, open: false, revenue: 7)]
+        let r = EndOfDay.report(day: day, orders: orders, facts: facts, waste: [], time: [], dayOf: dayOf)
+        #expect(r.finished.map(\.id) == ["A"])
+        #expect(r.revenue == 5)
+    }
+
     @Test func timeIsReadFromHoursAsBothAppsWriteIt() {
         let time: [JSONValue] = [
             .object(["date": .string(day), "hours": .number(1.5)]),
             .object(["date": .string(day), "hours": .string("2")]),
             .object(["date": .string(day), "durationMins": .number(30)]),
             .object(["date": .string("2026-11-01"), "hours": .number(8)]),
+            .object(["createdAt": .string("2026-11-02T10:00:00+03:00"), "hours": .number(1)]),
         ]
         let r = EndOfDay.report(day: day, orders: [], facts: [], waste: [], time: time, dayOf: dayOf)
-        #expect(r.hoursLogged == 4)
+        #expect(r.hoursLogged == 5)
     }
 
     @Test func wasteIsTheDaysGrams() {
