@@ -135,15 +135,23 @@ final class OrderBookingTests: XCTestCase {
         .object(["id": .string("C-3"), "nameEn": .string("Noura")]),
     ]
 
-    /// A picked customer is linked, and since the price was typed in the
-    /// shop's riyals, the order says so — or the shared rule would read 120.5
-    /// as dollars, the customer's currency.
-    func testAPickedCustomerIsLinkedAndThePriceKeepsTheShopsCurrency() throws {
+    /// A picked customer is linked. The price was typed in the shop's
+    /// riyals: with no dollar rate it stays riyals and says so (or the shared
+    /// rule would read 120.5 as dollars); with one it is converted at save,
+    /// as `lib/order-new.js` `jobCurrency` does on the Mac and desktop.
+    func testAPickedCustomerIsLinkedAndThePriceFollowsConvertAtSave() throws {
         let o = try BookWriter.orderRecord(from: draft { $0.clientId = "C-1" },
                                            settings: ["currency": .string("SAR")],
                                            machines: machines, existing: [], clients: saved)
         XCTAssertEqual(o["clientId"], .string("C-1"))
         XCTAssertEqual(o["currency"], .string("SAR"))
+        XCTAssertEqual(o["price"], .number(120.5))
+        let fx = try BookWriter.orderRecord(from: draft { $0.clientId = "C-1" },
+                                            settings: ["currency": .string("SAR"),
+                                                       "exchangeRates": .object(["USD": .number(3.75)])],
+                                            machines: machines, existing: [], clients: saved)
+        XCTAssertEqual(fx["currency"], .string("USD"))
+        XCTAssertEqual(fx["price"], .number(32.13), "120.5 SAR / 3.75")
     }
 
     /// A name typed exactly is linked when one saved customer has it, and

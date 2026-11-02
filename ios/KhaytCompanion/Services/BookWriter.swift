@@ -906,10 +906,22 @@ struct BookWriter {
             "paymentStatus": .string("unpaid"),
             "parts": .array([]),
         ]
-        // The price was typed in the shop's currency (the sheet says so). A
-        // customer kept in another one would otherwise make the shared rule
-        // read this price in theirs — so the order says its own.
-        if linkedCurrency != nil, linkedCurrency != shopCurrency { order["currency"] = .string(shopCurrency) }
+        // The price was typed in the shop's currency (the sheet says so). For
+        // a customer kept in another one, the shared rule (`lib/order-new.js`
+        // `jobCurrency`, Turki's "convert at save"): with a rate in Settings
+        // the price is converted and the job stamped with their currency; with
+        // none it is stamped with the shop's — an honest SAR price beats a SAR
+        // number wearing EUR.
+        if let code = linkedCurrency, code != shopCurrency {
+            var rate = 0.0
+            if case .object(let rates)? = settings["exchangeRates"], case .number(let r)? = rates[code] { rate = r }
+            if rate > 0 {
+                order["price"] = .number((price / rate * 100).rounded() / 100)
+                order["currency"] = .string(code)
+            } else {
+                order["currency"] = .string(shopCurrency)
+            }
+        }
         if asQuote {
             var days = 7.0
             if case .number(let n)? = settings["quoteValidityDays"], n > 0 { days = n }
