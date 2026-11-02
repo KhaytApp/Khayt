@@ -2732,6 +2732,7 @@
  "mac.tax_none": "Aucune taxe n’est facturée.",
  "mac.team_email": "Adresse e-mail",
  "mac.team_invite": "Inviter",
+ "mac.team_invite_elsewhere": "{email} a déjà une invitation d’une autre boutique sur Khayt Cloud. Demandez-lui de l’accepter ou de la refuser d’abord ; elle expire au bout de 7 jours.",
  "mac.team_invite_hint": "Ils reçoivent par e-mail un code valable 7 jours. Un lecteur peut consulter l’atelier sans le modifier — utilisez-en un pour le serveur d’une boutique.",
  "mac.team_invited": "{email} invité. Le code arrive par e-mail.",
  "mac.team_invited_no_mail": "{email} invité, mais Khayt Cloud n’a pas pu envoyer l’e-mail. Demandez-lui de s’inscrire avec cette adresse.",

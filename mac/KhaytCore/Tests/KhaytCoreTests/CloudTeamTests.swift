@@ -68,4 +68,15 @@ struct CloudTeamTests {
             #expect(e.status == 403 && e.error.hasPrefix("Only the owner"))
         }
     }
+
+    @Test("an invite another shop already holds is a 409 with its reason kept")
+    func inviteElsewhere() async throws {
+        do {
+            _ = try await CloudTeam.invite("a@x.com", role: "operator", Self.connection, token: "tok",
+                                           fetch: Self.answering(409, #"{"error":"This email already has a pending invite from another shop","reason":"invite-pending-elsewhere"}"#))
+            Issue.record("accepted a refusal")
+        } catch let e as CloudTeam.Refusal {
+            #expect(e.status == 409 && e.reason == "invite-pending-elsewhere")
+        }
+    }
 }

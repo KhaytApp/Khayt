@@ -2732,6 +2732,7 @@
  "mac.tax_none": "Nenhum imposto é cobrado.",
  "mac.team_email": "Endereço de e-mail",
  "mac.team_invite": "Convidar",
+ "mac.team_invite_elsewhere": "{email} já tem um convite de outra loja no Khayt Cloud. Peça que aceite ou recuse esse convite primeiro; ele expira em 7 dias.",
  "mac.team_invite_hint": "A pessoa recebe um código por e-mail que dura 7 dias. Um visualizador pode ler a loja, mas não alterá-la — use um para o servidor de uma loja virtual.",
  "mac.team_invited": "Convite enviado a {email}. O código está a caminho por e-mail.",
  "mac.team_invited_no_mail": "Convite enviado a {email}, mas o Khayt Cloud não conseguiu enviar o e-mail. Peça que a pessoa se cadastre com este endereço.",

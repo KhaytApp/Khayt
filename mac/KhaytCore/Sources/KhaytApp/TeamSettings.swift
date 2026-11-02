@@ -172,6 +172,11 @@ struct TeamSettings: View {
             email = ""
             problem = nil
             await load()
+        } catch let refusal as CloudTeam.Refusal where refusal.reason == "invite-pending-elsewhere" {
+            // Said in the shop's words: the cloud's sentence is English, and
+            // the other shop's invite is still standing, so there is nothing
+            // to retry until it is used or runs out (7 days).
+            problem = shop.words.callIt("mac.team_invite_elsewhere", ["email": .string(address)])
         } catch {
             problem = said(error)
         }

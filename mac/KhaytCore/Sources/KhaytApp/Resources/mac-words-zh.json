@@ -2732,6 +2732,7 @@
  "mac.tax_none": "不收取税款。",
  "mac.team_email": "电子邮件地址",
  "mac.team_invite": "邀请",
+ "mac.team_invite_elsewhere": "{email} 已有来自 Khayt Cloud 上另一家店铺的邀请。请先让对方接受或拒绝该邀请；邀请 7 天后失效。",
  "mac.team_invite_hint": "对方会通过电子邮件收到一个有效期为 7 天的代码。查看者可以读取店铺但不能更改——可用于店面的服务器。",
  "mac.team_invited": "已邀请 {email}。代码正通过电子邮件发送。",
  "mac.team_invited_no_mail": "已邀请 {email}，但 Khayt Cloud 无法发送电子邮件。请让对方使用此地址注册。",

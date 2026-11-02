@@ -2732,6 +2732,7 @@
  "mac.tax_none": "税は課されません。",
  "mac.team_email": "メールアドレス",
  "mac.team_invite": "招待",
+ "mac.team_invite_elsewhere": "{email} には Khayt Cloud で別のショップからの招待がすでにあります。先にその招待を承諾または辞退してもらってください。招待は7日で失効します。",
  "mac.team_invite_hint": "メールでコードが届き、7日間有効です。閲覧者はショップを読み取れますが、変更はできません。ストアのサーバー用には、これを使ってください。",
  "mac.team_invited": "{email} を招待しました。コードがメールで届きます。",
  "mac.team_invited_no_mail": "{email} を招待しましたが、Khayt Cloudがメールを送信できませんでした。このアドレスでサインアップするよう、お伝えください。",

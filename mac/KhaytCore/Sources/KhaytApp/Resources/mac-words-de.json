@@ -2732,6 +2732,7 @@
  "mac.tax_none": "Es wird keine Steuer berechnet.",
  "mac.team_email": "E-Mail-Adresse",
  "mac.team_invite": "Einladen",
+ "mac.team_invite_elsewhere": "{email} hat bereits eine Einladung eines anderen Shops in Khayt Cloud. Bitte zuerst annehmen oder ablehnen lassen; sie verfällt nach 7 Tagen.",
  "mac.team_invite_hint": "Sie erhalten per E-Mail einen Code, der 7 Tage gilt. Ein Betrachter kann den Shop lesen, aber nicht ändern – verwenden Sie einen für den Server eines Shops.",
  "mac.team_invited": "{email} eingeladen. Der Code ist per E-Mail unterwegs.",
  "mac.team_invited_no_mail": "{email} eingeladen, aber Khayt Cloud konnte die E-Mail nicht senden. Bitten Sie die Person, sich mit dieser Adresse zu registrieren.",
