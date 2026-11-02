@@ -23,6 +23,8 @@ struct MilestonesSheet: View {
     @State private var label = ""
     @State private var percentage: Double = 50
     @State private var amount: Double = 0
+    /// The milestone a Delete was clicked on, held until it is answered.
+    @State private var deleting: Milestone?
 
     private var canAdd: Bool {
         shop.canMoveJobs && !label.trimmingCharacters(in: .whitespaces).isEmpty
@@ -63,6 +65,15 @@ struct MilestonesSheet: View {
             }
         }
         .onAppear { amount = Milestones.amount(percent: percentage, of: price) }
+        // Asked first, as every removal is (`AskFirstTests`). It can be
+        // undone (Edit ▸ Undo Delete Milestone), so the question says nothing
+        // about it being final.
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.label)]) },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { row in
+            Task { await shop.deleteMilestone(from: subject.id, milestone: row.id) }
+        }
     }
 
     /// One milestone: what it is called, its share and amount, when its
@@ -89,7 +100,7 @@ struct MilestonesSheet: View {
             .controlSize(.small)
             .disabled(!shop.canMoveJobs)
             Button(role: .destructive) {
-                Task { await shop.deleteMilestone(from: subject.id, milestone: row.id) }
+                deleting = row
             } label: {
                 Image(systemName: "trash")
             }
