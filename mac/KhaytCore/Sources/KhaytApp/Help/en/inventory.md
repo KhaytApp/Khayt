@@ -28,7 +28,7 @@ why recording actuals is worth the few seconds.
 
 ## Labels
 
-**Book → Print labels** prints the whole rack. One spool's label is on its own
+**Book → Print shelf labels…** prints the whole rack. One spool's label is on its own
 right-click menu. The labels carry what the spool is, so a rack stays legible
 after the manufacturer's sticker has gone.
 

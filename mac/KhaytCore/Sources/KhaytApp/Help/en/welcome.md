@@ -27,9 +27,9 @@ When you have a real book, pick it from that same menu in the top-left. See
 
 ## What is still only in the other app
 
-The Mac app is newer. Three things are still done in Khayt for Windows and
-Linux: most of the analytics (the money itself is here, under Reports; the
-thirty-odd ways of looking at it are not yet), the storefront and customer
-portal, and the local server that lets a phone on the shop's Wi-Fi see the
-floor. Your book is the same file either way, so you can do one thing there
-and the rest here.
+The Mac app is newer, and a few things are still done only in Khayt for
+Windows and Linux. Among them: some of the rarer analytics views (the money
+itself, and the reports most shops use, are here under Reports), the
+end-of-day PDF, invoicing a customer in their own currency, shift checklists,
+the HueForge tab, and sending a job straight to a Bambu printer. Your book is
+the same file either way, so you can do one thing there and the rest here.
