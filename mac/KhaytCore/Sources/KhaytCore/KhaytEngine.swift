@@ -12030,15 +12030,27 @@ public actor KhaytEngine {
     public func newOrder(_ input: [String: JSONValue], orders: [JSONValue],
                          settings: [String: JSONValue], now: Date,
                          tokens: (tracking: [UInt8], quoteApproval: [UInt8]),
-                         consumables: [JSONValue] = []) throws -> NewOrder {
+                         consumables: [JSONValue] = [],
+                         clients: [JSONValue] = []) throws -> NewOrder {
         let bytes = { (b: [UInt8]) in JSONValue.array(b.map { .number(Double($0)) }) }
         return try runtime.call2(NEW_ORDER_SCRIPT,
                                  [.object(input), .array(orders), .object(settings),
                                   .number(now.timeIntervalSince1970 * 1000),
                                   .object(["tracking": bytes(tokens.tracking),
                                            "quoteApproval": bytes(tokens.quoteApproval)]),
-                                  .array(consumables)],
+                                  .array(consumables), .array(clients)],
                                  as: NewOrder.self)
+    }
+
+    /// `lib/order-new.js`'s `inShopCurrency`: a saved job's shipping, extra
+    /// lines and agreed prices back in the shop's currency, at today's rate,
+    /// for loading it into the new-job sheet again. The sheet reads every
+    /// figure as the shop's and `newOrder` converts on save, so a euro job
+    /// loaded as stored would be converted twice. Returns
+    /// `{ fx, shippingCost, extraLines, parts }`.
+    public func inShopCurrency(_ order: JSONValue, settings: [String: JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytOrderNew.inShopCurrency(ARG0, ARG1)", [order, .object(settings)],
+                          as: [String: JSONValue].self)
     }
 
     /// `lib/record-duplicate.js`'s `job`: the new-job input for another of
@@ -14124,7 +14136,7 @@ private let NEW_ORDER_SCRIPT = """
 (function () {
   var settings = ARG2;
   var order = KhaytOrderNew.newOrder(ARG0,
-    { settings: settings, orders: ARG1, now: ARG3, tokens: ARG4, consumables: ARG5 });
+    { settings: settings, orders: ARG1, now: ARG3, tokens: ARG4, consumables: ARG5, clients: ARG6 });
   return { order: order, settings: settings };
 })()
 """

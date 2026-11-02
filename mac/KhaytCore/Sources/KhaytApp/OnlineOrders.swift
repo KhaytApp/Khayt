@@ -488,7 +488,7 @@ extension Shop {
         let out = try await engine.newOrder(
             input, orders: orders, settings: settings(root), now: now,
             tokens: (tracking: randomBytes(16), quoteApproval: randomBytes(16)),
-            consumables: rows(root, "consumables"))
+            consumables: rows(root, "consumables"), clients: rows(root, "clients"))
         guard case .object(var record) = out.order,
               case .string(let jobId)? = record["id"] else {
             // NOT "already there": that answer lets the caller drain, which

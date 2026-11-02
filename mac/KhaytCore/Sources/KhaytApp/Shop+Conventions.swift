@@ -286,7 +286,21 @@ extension Shop {
     /// runtime. Pure enough to test: the parts are costed through the same
     /// `jobParts` a product's are.
     func duplicateSeed(of row: JSONValue) async -> JobFromModel? {
-        guard let engine, let input = try? await engine.duplicateJobInput(row) else { return nil }
+        guard let engine else { return nil }
+        // A job saved in a customer's currency holds its shipping, extra lines
+        // and agreed prices in THAT currency; the sheet reads every figure as
+        // the shop's and `newOrder` converts on save. Back into the shop's
+        // currency first (`inShopCurrency`, today's rate), or a euro job's
+        // copy would be converted twice. A job in the shop's currency is
+        // left exactly as it is.
+        var source = row
+        if case .object(var o) = row,
+           let back = try? await engine.inShopCurrency(row, settings: settingsDict),
+           case .number(let fx)? = back["fx"], fx != 1 {
+            for key in ["shippingCost", "extraLines", "parts"] { if let v = back[key] { o[key] = v } }
+            source = .object(o)
+        }
+        guard let input = try? await engine.duplicateJobInput(source) else { return nil }
         var parts: [JSONValue] = []
         if case .array(let rows)? = input["parts"] { parts = rows }
         var seed = JobFromModel(project: Self.plainString(input["project"]) ?? "",

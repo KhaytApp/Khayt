@@ -63,4 +63,51 @@ struct CustomerCurrencyTests {
         #expect(Shop.customerRecord(saving: p, over: padded, opened: p)["currency"] == .string(" eur "))
         #expect(Shop.customerRecord(saving: p.inCurrency("USD"), over: padded, opened: p)["currency"] == .string("USD"))
     }
+
+    // MARK: - Converted when saved (#2148), and back for a copy
+
+    private static let tokens = (tracking: [UInt8](repeating: 1, count: 16),
+                                 quoteApproval: [UInt8](repeating: 2, count: 16))
+
+    @Test("a job for a euro customer is saved in euros at the shop's rate")
+    func newOrderConvertsThroughClients() async throws {
+        let shop = Shop(source: .sample)
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var d = NewJobSheet.Draft()
+        d.name = "Bracket"; d.grams = "40"; d.hours = "3"; d.qty = 1; d.cost = 20
+        let input = shop.newJobInput(parts: [d], project: "Brackets", clientId: "C-EUR", margin: 0,
+                                     discountPct: 0, shippingCost: 40, deposit: 0, rush: false,
+                                     asQuote: false)
+        let settings: [String: JSONValue] = ["currency": .string("SAR"),
+                                             "exchangeRates": .object(["EUR": .number(4)])]
+        let clients: [JSONValue] = [.object(["id": .string("C-EUR"), "currency": .string("EUR")])]
+        let out = try await engine.newOrder(input, orders: [], settings: settings, now: Date(),
+                                            tokens: Self.tokens, clients: clients)
+        guard case .object(let order) = out.order else { Issue.record("no record"); return }
+        #expect(order["currency"] == .string("EUR"))
+        #expect(order["shippingCost"] == .number(10), "40 SAR of shipping at 4 SAR to the euro")
+
+        // Without the customers handed over, nothing says euros.
+        let plain = try await engine.newOrder(input, orders: [], settings: settings, now: Date(),
+                                              tokens: Self.tokens)
+        guard case .object(let p) = plain.order else { Issue.record("no record"); return }
+        #expect(p["shippingCost"] == .number(40))
+    }
+
+    @Test("a euro job comes back in the shop's currency for a copy, and a riyal job untouched")
+    func inShopCurrencyForACopy() async throws {
+        let shop = Shop(source: .sample)
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let settings: [String: JSONValue] = ["currency": .string("SAR"),
+                                             "exchangeRates": .object(["EUR": .number(4)])]
+        let eur = try await engine.inShopCurrency(
+            .object(["currency": .string("EUR"), "shippingCost": .number(10)]), settings: settings)
+        #expect(eur["fx"] == .number(4))
+        #expect(eur["shippingCost"] == .number(40))
+        let sar = try await engine.inShopCurrency(.object(["shippingCost": .number(10)]), settings: settings)
+        #expect(sar["fx"] == .number(1))
+        #expect(sar["shippingCost"] == .number(10))
+    }
 }

@@ -130,7 +130,7 @@ extension Shop {
             let out = try await engine.newOrder(
                 input, orders: orders, settings: Self.settings(root), now: Date(),
                 tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
-                consumables: Self.rows(root, "consumables"))
+                consumables: Self.rows(root, "consumables"), clients: Self.rows(root, "clients"))
             guard case .object(var record) = out.order else { return }
 
             // ALREADY DONE. Nothing about this waits on a machine, so it never
