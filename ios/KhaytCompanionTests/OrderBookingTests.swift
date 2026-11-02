@@ -126,4 +126,59 @@ final class OrderBookingTests: XCTestCase {
         let queue = try await reader.queue()
         XCTAssertTrue(queue.contains { $0.project == "Drone frame" }, "the queue screen shows it straight away")
     }
+
+    // MARK: - The saved customer, and the currency the price is in
+
+    private let saved: [JSONValue] = [
+        .object(["id": .string("C-1"), "name": .string("Faisal"), "currency": .string("USD")]),
+        .object(["id": .string("C-2"), "name": .string("Noura")]),
+        .object(["id": .string("C-3"), "nameEn": .string("Noura")]),
+    ]
+
+    /// A picked customer is linked, and since the price was typed in the
+    /// shop's riyals, the order says so — or the shared rule would read 120.5
+    /// as dollars, the customer's currency.
+    func testAPickedCustomerIsLinkedAndThePriceKeepsTheShopsCurrency() throws {
+        let o = try BookWriter.orderRecord(from: draft { $0.clientId = "C-1" },
+                                           settings: ["currency": .string("SAR")],
+                                           machines: machines, existing: [], clients: saved)
+        XCTAssertEqual(o["clientId"], .string("C-1"))
+        XCTAssertEqual(o["currency"], .string("SAR"))
+    }
+
+    /// A name typed exactly is linked when one saved customer has it, and
+    /// never guessed when two do. A customer in the shop's currency adds none.
+    func testATypedNameLinksOnlyWhenItIsUnambiguous() throws {
+        let faisal = try BookWriter.orderRecord(from: draft { $0.client = "faisal" }, settings: [:],
+                                                machines: machines, existing: [], clients: saved)
+        XCTAssertEqual(faisal["clientId"], .string("C-1"))
+        XCTAssertEqual(faisal["currency"], .string("SAR"), "no shop setting reads as SAR, as lib does")
+        let noura = try BookWriter.orderRecord(from: draft { $0.client = "Noura" }, settings: [:],
+                                               machines: machines, existing: [], clients: saved)
+        XCTAssertEqual(noura["clientId"], .null)
+        XCTAssertNil(noura["currency"])
+        let gone = try BookWriter.orderRecord(from: draft { $0.client = "Someone"; $0.clientId = "C-9" },
+                                              settings: [:], machines: machines, existing: [], clients: saved)
+        XCTAssertEqual(gone["clientId"], .null, "a customer no longer in the book is not linked")
+    }
+
+    /// The order page's currency: the order's own, then its customer's, then the shop's.
+    func testAnOrdersCurrencyFollowsTheSharedRule() async throws {
+        try book.replace(with: [
+            "settings": .object(["currency": .string("SAR")]),
+            "clients": .array(saved),
+            "printLog": .array([
+                .object(["id": .string("A"), "currency": .string("EUR"), "clientId": .string("C-1")]),
+                .object(["id": .string("B"), "clientId": .string("C-1")]),
+                .object(["id": .string("C"), "clientId": .string("C-2")]),
+            ]),
+        ], scope: nil)
+        let reader = BookReader(book: book)
+        let a = try await reader.orderCurrency(orderId: "A")
+        let b = try await reader.orderCurrency(orderId: "B")
+        let c = try await reader.orderCurrency(orderId: "C")
+        XCTAssertEqual(a, "EUR")
+        XCTAssertEqual(b, "USD")
+        XCTAssertEqual(c, "SAR")
+    }
 }

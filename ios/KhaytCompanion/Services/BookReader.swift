@@ -94,6 +94,30 @@ actor BookReader {
         return code
     }
 
+    /// The currency an order's money is in — the shared rule
+    /// (`lib/order-money.js` `orderCurrency`): the order's own, then its
+    /// customer's, then the shop's. Nil only when none of them says.
+    func orderCurrency(orderId: String) throws -> String? {
+        let store = try book.read()
+        func text(_ v: JSONValue?) -> String? {
+            if case .string(let s)? = v, !s.trimmingCharacters(in: .whitespaces).isEmpty { return s }
+            return nil
+        }
+        var order: [String: JSONValue]?
+        if case .array(let rows)? = store["printLog"] {
+            for case .object(let o) in rows where o["id"] == .string(orderId) { order = o; break }
+        }
+        if let code = text(order?["currency"]) { return code }
+        if let clientId = text(order?["clientId"]), case .array(let rows)? = store["clients"] {
+            for case .object(let c) in rows where c["id"] == .string(clientId) {
+                if let code = text(c["currency"]) { return code }
+                break
+            }
+        }
+        if case .object(let settings)? = store["settings"] { return text(settings["currency"]) }
+        return nil
+    }
+
     /// Take a book from upstream — the Mac's `/api/store` or the cloud — without
     /// losing what was changed here and not sent yet.
     ///
