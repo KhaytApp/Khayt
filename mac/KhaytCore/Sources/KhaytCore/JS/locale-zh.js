@@ -896,6 +896,7 @@
   "doc.due_date": "到期日",
   "doc.payment_terms": "付款条件",
   "doc.net_days": "账期 {n} 天",
+  "doc.milestone_of": "{total}的{pct}%",
   "doc.post_checklist": "后处理检查清单",
   "doc.operator": "操作员",
   "doc.reviewed_by": "审核人",

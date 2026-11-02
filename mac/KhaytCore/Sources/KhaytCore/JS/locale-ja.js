@@ -896,6 +896,7 @@
   "doc.due_date": "支払期日",
   "doc.payment_terms": "支払条件",
   "doc.net_days": "請求日から{n}日",
+  "doc.milestone_of": "{total}の{pct}%",
   "doc.post_checklist": "後処理チェックリスト",
   "doc.operator": "作業者",
   "doc.reviewed_by": "確認者",

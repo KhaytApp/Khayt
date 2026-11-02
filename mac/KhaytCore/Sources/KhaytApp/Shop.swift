@@ -2780,6 +2780,9 @@ final class Shop {
     /// dismissed by the same call, so it lives with them.
     var pendingInvoice: PendingHold?
 
+    /// The job whose milestones are being looked at (`Shop+Milestones.swift`).
+    var pendingMilestones: PendingHold?
+
     /// The label sheet waiting to be looked at, as finished HTML.
     ///
     /// Built once when the shop asks rather than per redraw: a QR code per

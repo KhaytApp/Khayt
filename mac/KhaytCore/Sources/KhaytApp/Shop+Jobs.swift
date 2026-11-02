@@ -264,6 +264,9 @@ extension Shop {
         let project: String
         /// For the invoice sheet: show the job's PROFORMA, not its invoice.
         var proforma = false
+        /// With `proforma`: the milestone of the job it asks for
+        /// (`Milestones`), rather than the whole job.
+        var milestone: String? = nil
     }
 
     /// Save a customer — a new one, or changes to one the shop already has.
@@ -1861,6 +1864,7 @@ extension Shop {
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil
+        pendingMilestones = nil
         pendingLabels = nil
         pendingDayReport = nil
     }

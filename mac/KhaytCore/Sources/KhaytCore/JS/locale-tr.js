@@ -896,6 +896,7 @@
   "doc.due_date": "Vade tarihi",
   "doc.payment_terms": "Ödeme koşulları",
   "doc.net_days": "Net {n} gün",
+  "doc.milestone_of": "{total} tutarının %{pct} kısmı",
   "doc.post_checklist": "Son işlem kontrol listesi",
   "doc.operator": "Operatör",
   "doc.reviewed_by": "Kontrol eden",

@@ -26,7 +26,8 @@ enum Invoice {
     /// Gathering and building are separate on purpose: a test can hand this the
     /// awkward shop — no tax registration, a missing ZATCA field, a job with no
     /// parts — without opening a book to get one.
-    static func html(for job: Order, shop: Shop, proforma: Bool = false) async -> InvoiceDocument? {
+    static func html(for job: Order, shop: Shop, proforma: Bool = false,
+                     milestone: Milestone? = nil) async -> InvoiceDocument? {
         guard let engine = shop.engine else { return nil }
         // The tax split, by the shop's own rule. A shop with no tax
         // registration has nothing to split: the whole price is what it keeps,
@@ -57,7 +58,8 @@ enum Invoice {
             taxTotal: money?.taxTotal ?? 0,
             vatRate: await shop.taxPercent(),
             timestamp: stamp,
-            proforma: proforma)
+            proforma: proforma,
+            milestone: proforma ? milestone : nil)
         return await document(paper, engine: engine, words: shop.words)
     }
 
@@ -93,6 +95,9 @@ enum Invoice {
         /// A proforma: titled and watermarked as one, no ZATCA QR, the job's
         /// id for a number (`proforma` in `lib/invoice-document.js`).
         var proforma = false
+        /// With `proforma`: ONE part of the job, printed as a single line at its
+        /// own amount (`milestone` in `lib/invoice-document.js`).
+        var milestone: Milestone? = nil
     }
 
     /// The document itself.
@@ -131,7 +136,7 @@ enum Invoice {
         // printed under them. This printed the whole price there, and a 280
         // job of 225 goods, 25 rush and 30 shipping read Subtotal 280.
         let summary = try? await engine.invoiceSummary(order: paper.row, settings: paper.settings)
-        let money: [String: JSONValue] = [
+        var money: [String: JSONValue] = [
             "qrSvg": .string(qrSvg),
             "qrProblem": qrProblem.map(JSONValue.string) ?? .null,
             "payQrSvg": .string(""),
@@ -145,6 +150,9 @@ enum Invoice {
             "shipping": .number(0),
             "proforma": .bool(paper.proforma),
         ]
+        if let part = paper.milestone, paper.proforma {
+            money["milestone"] = part.document(of: paper.price)
+        }
         return try? await engine.invoiceHtml(
             order: paper.row, settings: paper.settings, clients: paper.clients,
             currencies: paper.currencies, language: paper.language,

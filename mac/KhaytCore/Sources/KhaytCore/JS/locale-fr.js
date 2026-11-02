@@ -896,6 +896,7 @@
   "doc.due_date": "Date d’échéance",
   "doc.payment_terms": "Conditions de paiement",
   "doc.net_days": "Net {n} jours",
+  "doc.milestone_of": "{pct} % de {total}",
   "doc.post_checklist": "Liste de post-traitement",
   "doc.operator": "Opérateur",
   "doc.reviewed_by": "Vérifié par",
