@@ -191,6 +191,13 @@ final class KhaytAPIClient: ObservableObject {
         return try? await reader.shopCurrency()
     }
 
+    /// The currency one order's money is in (its own, its customer's, then
+    /// the shop's). A job priced in dollars must not read, or be paid, as riyals.
+    func orderCurrency(orderId: String) async -> String? {
+        guard let reader, reader.holdsAnyBook else { return nil }
+        return try? await reader.orderCurrency(orderId: orderId)
+    }
+
     /// Shop Pulse, from this phone's book. Nil with no book: the figures are
     /// the book's, and a phone that holds none has only the live counts.
     /// Filament and quantity per order, when this phone holds its book; empty
@@ -272,6 +279,16 @@ final class KhaytAPIClient: ObservableObject {
 
     func fetchMachinesLive() async throws -> [MachineLiveStatus] {
         try await get("/api/machines/live", requiresPin: true, as: [MachineLiveStatus].self)
+    }
+
+    /// One job by id — open or among the recent finished ones — for a screen
+    /// that only knows its id (a tapped alert, a feed line). Nil if gone.
+    func findOrder(id: String) async -> QueueOrder? {
+        if let open = (try? await fetchQueue())?.first(where: { $0.id == id }) { return open }
+        if let done = (try? await fetchRecentOrders(limit: 200))?.first(where: { $0.id == id }) {
+            return QueueOrder(entry: done)
+        }
+        return nil
     }
 
     func fetchClients() async throws -> [Client] {
@@ -1269,6 +1286,7 @@ final class KhaytAPIClient: ObservableObject {
         if let price = SpoolDraft.price(draft.price) { payload["price"] = price }
         if !draft.dueDate.isEmpty { payload["dueDate"] = draft.dueDate }
         if let machineId = draft.machineId, !machineId.isEmpty { payload["machineId"] = machineId }
+        if let clientId = draft.clientId, !clientId.isEmpty { payload["clientId"] = clientId }
 
         let data = try JSONSerialization.data(withJSONObject: payload)
         let (responseData, response) = try await request(

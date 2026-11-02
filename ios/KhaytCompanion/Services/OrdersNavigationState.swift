@@ -22,6 +22,42 @@ final class OrdersNavigationState: ObservableObject {
         pendingStatusFilter = filter
         ordersTabRequest += 1
     }
+
+    /// One job, opened over whatever screen is showing — a tapped alert.
+    @Published var orderToOpen: String?
+    /// The order requests waiting, asked for by a tapped request alert.
+    @Published var intakeAsked = false
+
+    func openOrder(id: String) { orderToOpen = id }
+    func openIntake() { intakeAsked = true }
+    /// The Orders tab on its Late chip, as Home's late figure opens it.
+    func openOverdue() {
+        UserDefaults.standard.set("orders_overdue", forKey: "khayt.orders.filter")
+        openOrders()
+    }
+
+    /// Where a tapped alert goes: its job, the requests, the late jobs or the
+    /// low shelf. Nil when it is about nothing the app can open.
+    enum Destination: Equatable, Sendable { case order(String), intake, overdue, lowStock }
+
+    nonisolated static func destination(identifier: String, thread: String,
+                            userInfo: [AnyHashable: Any]) -> Destination? {
+        if let id = userInfo["orderId"] as? String, !id.isEmpty { return .order(id) }
+        if thread == "khayt.intake" || identifier.hasPrefix("intake.") { return .intake }
+        if let k = userInfo["k"] as? [String: Any], k["kind"] as? String == "intake" { return .intake }
+        if identifier.hasPrefix("khayt.overdue") { return .overdue }
+        if identifier.hasPrefix("khayt.lowstock") { return .lowStock }
+        return nil
+    }
+
+    func go(_ destination: Destination) {
+        switch destination {
+        case .order(let id): openOrder(id: id)
+        case .intake: openIntake()
+        case .overdue: openOverdue()
+        case .lowStock: openLowStock()
+        }
+    }
 }
 
 /// A model file the phone holds a private copy of, to quote.
