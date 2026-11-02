@@ -71,6 +71,10 @@ struct MainTabView: View {
     let tabs: [KhaytTabItem]
     @EnvironmentObject private var health: ConnectionHealth
     @EnvironmentObject private var ordersNav: OrdersNavigationState
+    @EnvironmentObject private var api: KhaytAPIClient
+    /// A job a tapped alert asked for, shown over whichever tab is open.
+    @State private var alertOrder: QueueOrder?
+    @State private var alertIntake = false
 
     var body: some View {
         // The system's TabView, not a bar of our own: on iPhone Duo only
@@ -102,10 +106,44 @@ struct MainTabView: View {
         .onChange(of: ordersNav.ordersTabRequest) { _, _ in
             selectedTab = 1
         }
+        // A tapped alert: its job, or the requests waiting. Checked on appear
+        // too — an alert that launched the app asked before this view existed.
+        .onChange(of: ordersNav.orderToOpen) { _, _ in openAskedOrder() }
+        .onChange(of: ordersNav.intakeAsked) { _, _ in openAskedIntake() }
+        .task {
+            openAskedOrder()
+            openAskedIntake()
+            // The late list or the low shelf, asked for before this view was here.
+            if UserDefaults.standard.string(forKey: "khayt.orders.filter") == "orders_overdue" { selectedTab = 1 }
+            if ordersNav.pendingLowStock { selectedTab = 2 }
+        }
+        .sheet(item: $alertOrder) { order in
+            NavigationStack {
+                OrderDetailPage(order: order, facts: nil) {}
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(L10n.tr("common.close")) { alertOrder = nil }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $alertIntake) { IntakeView() }
         // Folding iPhone Duo with Settings open takes that tab away, and so
         // does asking for it in compact width: Home, rather than a blank page.
         .onChange(of: widthClass) { _, _ in keepSelectionShown() }
         .onChange(of: selectedTab) { _, _ in keepSelectionShown() }
+    }
+
+    private func openAskedIntake() {
+        guard ordersNav.intakeAsked else { return }
+        ordersNav.intakeAsked = false
+        alertIntake = true
+    }
+
+    private func openAskedOrder() {
+        guard let id = ordersNav.orderToOpen else { return }
+        ordersNav.orderToOpen = nil
+        Task { alertOrder = await api.findOrder(id: id) }
     }
 
     private func keepSelectionShown() {

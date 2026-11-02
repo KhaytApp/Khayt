@@ -281,6 +281,16 @@ final class KhaytAPIClient: ObservableObject {
         try await get("/api/machines/live", requiresPin: true, as: [MachineLiveStatus].self)
     }
 
+    /// One job by id — open or among the recent finished ones — for a screen
+    /// that only knows its id (a tapped alert, a feed line). Nil if gone.
+    func findOrder(id: String) async -> QueueOrder? {
+        if let open = (try? await fetchQueue())?.first(where: { $0.id == id }) { return open }
+        if let done = (try? await fetchRecentOrders(limit: 200))?.first(where: { $0.id == id }) {
+            return QueueOrder(entry: done)
+        }
+        return nil
+    }
+
     func fetchClients() async throws -> [Client] {
         if let local = await fromBook({ try await $0.clients() }) { return local }
         return try await get("/api/clients", requiresPin: true, as: [Client].self)

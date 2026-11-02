@@ -54,6 +54,9 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     private var detector = FinishDetector()
     private var watching: AnyCancellable?
     private weak var printers: LivePrinters?
+    /// Where a tapped alert opens. Set by the app as it starts, before any
+    /// alert that launched it is handed over.
+    weak var navigation: OrdersNavigationState?
     /// When each machine last had an alert. One ending can be noticed three
     /// ways — the phone's own readings, the stream's event, Apple's push —
     /// and is said once.
@@ -163,7 +166,16 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
-        let info = response.notification.request.content.userInfo
+        let request = response.notification.request
+        let info = request.content.userInfo
+        // The alert itself tapped, not one of its buttons: open what it is about.
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            guard let to = OrdersNavigationState.destination(identifier: request.identifier,
+                                                             thread: request.content.threadIdentifier,
+                                                             userInfo: info) else { return }
+            await MainActor.run { self.navigation?.go(to) }
+            return
+        }
         guard let action = PrintAlertAction(rawValue: response.actionIdentifier),
               let orderId = info["orderId"] as? String else { return }
         await perform(action, orderId: orderId)
