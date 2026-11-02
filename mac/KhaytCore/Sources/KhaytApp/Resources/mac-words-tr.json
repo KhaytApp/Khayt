@@ -452,6 +452,7 @@
  "mac.creator_show_all": "Bu oluşturanın her şeyini göster",
  "mac.cs_unrecorded": "Hiçbir müşterinin kaynağı kaydedilmemiş — işlerin nereden geldiğini görmek için bir müşteriye kaynak atayın.",
  "mac.cs_unset": "Kaydedilmedi",
+ "mac.currency_default": "Varsayılan ({code})",
  "mac.customer": "Müşteri",
  "mac.customer_has_cards": "Hediye kartları var ({n})",
  "mac.customer_has_jobs": "{n} işi var",

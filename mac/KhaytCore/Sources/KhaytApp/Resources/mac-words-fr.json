@@ -452,6 +452,7 @@
  "mac.creator_show_all": "Tout afficher de ce créateur",
  "mac.cs_unrecorded": "Aucun client n’a encore de source enregistrée — définissez-en une sur un client pour voir d’où vient votre travail.",
  "mac.cs_unset": "Non renseignée",
+ "mac.currency_default": "Par défaut ({code})",
  "mac.customer": "Client",
  "mac.customer_has_cards": "A des cartes cadeaux ({n})",
  "mac.customer_has_jobs": "A {n} commandes",

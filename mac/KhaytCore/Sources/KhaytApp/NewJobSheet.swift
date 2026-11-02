@@ -731,7 +731,7 @@ struct NewJobSheet: View {
                                     if wantsPercent { line.pct = 0; line.amount = 0 }
                                     else { line.pct = nil; line.fee = false }
                                 })) {
-                                    Text(Money.mark(shop.currency)).tag(false)
+                                    Text(Money.mark(priceCurrency)).tag(false)
                                     Text("%").tag(true)
                                 }
                                 .labelsHidden().pickerStyle(.segmented).frame(width: 84)
@@ -967,8 +967,15 @@ struct NewJobSheet: View {
 
     private func percent(_ value: Binding<Double>) -> some View { unit(value, 70, "%") }
 
+    /// What a typed price is in: the chosen customer's own currency when they
+    /// have one (the shared `orderCurrency` reads it), else the shop's.
+    private var priceCurrency: String {
+        let theirs = shop.clients.first { $0.id == clientId }?.currency ?? ""
+        return theirs.isEmpty ? shop.currency : theirs
+    }
+
     private func amount(_ value: Binding<Double>) -> some View {
-        unit(value, 90, Money.mark(shop.currency))
+        unit(value, 90, Money.mark(priceCurrency))
     }
 
     // MARK: - What it costs, and what it comes to

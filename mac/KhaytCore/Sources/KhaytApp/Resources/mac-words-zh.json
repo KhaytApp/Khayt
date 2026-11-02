@@ -452,6 +452,7 @@
  "mac.creator_show_all": "显示此作者的全部内容",
  "mac.cs_unrecorded": "尚无客户记录来源——在客户上设置来源，即可查看业务从何而来。",
  "mac.cs_unset": "未记录",
+ "mac.currency_default": "默认 ({code})",
  "mac.customer": "客户",
  "mac.customer_has_cards": "持有礼品卡（{n}）",
  "mac.customer_has_jobs": "有 {n} 个订单",

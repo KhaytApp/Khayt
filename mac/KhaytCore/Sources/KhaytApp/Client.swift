@@ -86,11 +86,18 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// the terms are: a hand-typed "5000" counts, a negative or unreadable
     /// value is no limit.
     let creditLimit: Double
+    /// The currency this customer is invoiced in — "" is the shop's own, the
+    /// default. The desktop's `currency` field (`renderer/clients.js`); the
+    /// shared `orderCurrency` reads it, so invoices and revenue follow. Read
+    /// leniently: anything that is not a non-empty string is "". The code is
+    /// NOT checked against the catalogue — a code another app stored, that
+    /// this one does not list, must come back out exactly as it went in.
+    let currency: String
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
         case priceList, recurring, commLog, source, marketingOptOut, messageLang, whatsappOptIn
-        case whatsappMarketingOptIn, paymentTermsDays, creditLimit
+        case whatsappMarketingOptIn, paymentTermsDays, creditLimit, currency
     }
 
     /// A stored credit limit as a usable figure: a finite amount above zero,
@@ -169,6 +176,11 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         paymentTermsDays = PaymentTerms.termsDays(
             (try? c.decodeIfPresent(JSONValue.self, forKey: .paymentTermsDays)) ?? nil)
         creditLimit = Self.creditLimit((try? c.decodeIfPresent(JSONValue.self, forKey: .creditLimit)) ?? nil)
+        if case .string(let code)? = (try? c.decodeIfPresent(JSONValue.self, forKey: .currency)) ?? nil {
+            currency = code.trimmingCharacters(in: .whitespaces)
+        } else {
+            currency = ""
+        }
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -182,7 +194,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "",
          whatsappOptIn: [String: JSONValue]? = nil,
          whatsappMarketingOptIn: [String: JSONValue]? = nil,
-         paymentTermsDays: Int = 0, creditLimit: Double = 0) {
+         paymentTermsDays: Int = 0, creditLimit: Double = 0, currency: String = "") {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
@@ -194,6 +206,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         self.whatsappMarketingOptIn = whatsappMarketingOptIn
         self.paymentTermsDays = max(0, min(PaymentTerms.maxDays, paymentTermsDays))
         self.creditLimit = creditLimit.isFinite ? max(0, creditLimit) : 0
+        self.currency = currency
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -236,6 +249,12 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             "paymentTermsDays": .number(Double(paymentTermsDays)),
             // Always written, 0 included, for the same reason as the terms.
             "creditLimit": .number(creditLimit),
+            // Always written, "" included (the shop's own currency): an
+            // omitted key is carried through from disk, so leaving "" out
+            // could never take a currency back off. A save that does not touch
+            // it writes what it read, and `keepUntouched` then keeps the
+            // stored value byte for byte.
+            "currency": .string(currency),
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -279,7 +298,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             messageLang: key == \Client.messageLang ? value : messageLang,
             whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 
     /// The same customer on different payment terms, in whole days.
@@ -290,7 +309,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: days, creditLimit: creditLimit)
+               paymentTermsDays: days, creditLimit: creditLimit, currency: currency)
     }
 
     /// The same customer with a different credit limit (0 for none).
@@ -301,7 +320,18 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: amount)
+               paymentTermsDays: paymentTermsDays, creditLimit: amount, currency: currency)
+    }
+
+    /// The same customer invoiced in another currency ("" for the shop's own).
+    func inCurrency(_ code: String) -> Client {
+        Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+               cr: cr, vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
+               priceList: priceList, recurring: recurring, commLog: commLog,
+               marketingOptOut: marketingOptOut, messageLang: messageLang,
+               whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: code)
     }
 
     /// The same customer, marketed to or not.
@@ -312,7 +342,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 
     /// The same customer, agreeing to WhatsApp updates or not. `at` and `how`
@@ -325,7 +355,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
                       whatsappOptIn: next, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 
     /// The same customer, agreeing to offers on WhatsApp or not — kept the
@@ -338,7 +368,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
                       whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: next,
-                      paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+                      paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 
     /// When they agreed to WhatsApp updates, and how — nil when they have not.
@@ -378,7 +408,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 
     /// The same customer with a different standing order.
@@ -390,7 +420,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
     }
 }
 
