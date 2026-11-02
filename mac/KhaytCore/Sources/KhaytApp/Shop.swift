@@ -1184,6 +1184,7 @@ final class Shop {
             lowSpools = low
             await warnAboutLowStock(inventoryRows, settings: Self.settings(root))
             if overtaken() { return }
+            await checkShopAlerts()
             let runway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
                                                     now: Date())) ?? [:]
             if overtaken() { return }
@@ -1455,6 +1456,7 @@ final class Shop {
         // A phone away from the shop's Wi-Fi asking to pause or stop a print:
         // read on the same sweep that publishes what the printers said.
         await cloudCommands.pollIfDue(shop: self)
+        await checkShopAlerts()
         WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
         let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
@@ -2500,6 +2502,8 @@ final class Shop {
     let livePublisher = LivePrinterPublisher()
     /// Printer commands a phone sent through Khayt Cloud (`CloudPrinterCommands`).
     let cloudCommands = CloudPrinterCommands()
+    /// Morning digests and low-stock alerts for the shop's phones (`ShopAlerts`).
+    let shopAlerts = ShopAlerts()
 
     /// The nightly off-site backup: its settings, when it last ran and
     /// whether it is failing. See `OffsiteBackups.swift`.
