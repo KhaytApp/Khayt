@@ -173,30 +173,6 @@ actor BookReader {
         throw CompanionBook.Failure.busy
     }
 
-    /// Home's figures, as `design/ios-v2/` Shop Pulse draws them.
-    ///
-    /// ── THE ONE RULE ────────────────────────────────────────────────────
-    ///
-    /// The design's: a figure bounded by recency is answerable only when the
-    /// book's window reaches PAST the period's start. The phone holds every
-    /// unfinished order and the newest finished ones, so "owed" (open orders)
-    /// is always answerable, and "this month" only if the oldest finished
-    /// order it holds is older than the 1st. The phone knows its oldest record,
-    /// so this is computed, never assumed — and an unanswerable figure is nil,
-    /// which the screen draws as an em-dash captioned "On the Mac". Never a
-    /// zero: a zero is an answer.
-    ///
-    /// The money is the shop's own rules: `owedByOrder` (credit notes, gift
-    /// cards and foreign currency taken into account) and `pnlByPeriod`, the
-    /// P&L's month rows — not arithmetic done here.
-    ///
-    /// ── THE BOOK'S CALENDAR IS GREGORIAN, WHATEVER THE PHONE'S IS ───────
-    ///
-    /// `pnlByPeriod` keys its rows "2026-09". A phone set to Saudi Arabia runs
-    /// Umm al-Qura, so `Calendar.current` made this month "1448-04" and this
-    /// year "1448-", matched no row, and every Saudi shop read 0 and 0. Only
-    /// the caller's time zone is taken; the calendar is always Gregorian —
-    /// the Mac's `Calendar.book` rule (#1568).
     /// The jobs behind Home's Owed figure, most owed first: the same open
     /// jobs and the same shared rule (`owedByOrder`), so the list adds up to
     /// the figure it was opened from.
@@ -317,6 +293,30 @@ actor BookReader {
             historyWindowed: !book.holdsAll("printLog"))
     }
 
+    /// Home's figures, as `design/ios-v2/` Shop Pulse draws them.
+    ///
+    /// ── THE ONE RULE ────────────────────────────────────────────────────
+    ///
+    /// The design's: a figure bounded by recency is answerable only when the
+    /// book's window reaches PAST the period's start. The phone holds every
+    /// unfinished order and the newest finished ones, so "owed" (open orders)
+    /// is always answerable, and "this month" only if the oldest finished
+    /// order it holds is older than the 1st. The phone knows its oldest record,
+    /// so this is computed, never assumed — and an unanswerable figure is nil,
+    /// which the screen draws as an em-dash captioned "On the Mac". Never a
+    /// zero: a zero is an answer.
+    ///
+    /// The money is the shop's own rules: `owedByOrder` (credit notes, gift
+    /// cards and foreign currency taken into account) and `pnlByPeriod`, the
+    /// P&L's month rows — not arithmetic done here.
+    ///
+    /// ── THE BOOK'S CALENDAR IS GREGORIAN, WHATEVER THE PHONE'S IS ───────
+    ///
+    /// `pnlByPeriod` keys its rows "2026-09". A phone set to Saudi Arabia runs
+    /// Umm al-Qura, so `Calendar.current` made this month "1448-04" and this
+    /// year "1448-", matched no row, and every Saudi shop read 0 and 0. Only
+    /// the caller's time zone is taken; the calendar is always Gregorian —
+    /// the Mac's `Calendar.book` rule (#1568).
     func pulse(now: Date = Date(), calendar callers: Calendar = .current) async throws -> ShopPulse {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = callers.timeZone
