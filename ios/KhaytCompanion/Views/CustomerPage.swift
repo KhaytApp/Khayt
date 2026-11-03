@@ -11,6 +11,7 @@ struct CustomerPage: View {
     @State private var loaded = false
     @State private var openOrder: QueueOrder?
     @State private var newOrder = false
+    @State private var machines: [MachineInfo] = []
 
     var body: some View {
         ScrollView {
@@ -42,9 +43,32 @@ struct CustomerPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task {
+                        if machines.isEmpty { machines = (try? await api.fetchMachines()) ?? [] }
+                        newOrder = true
+                    }
+                } label: { Image(systemName: "plus") }
+                .accessibilityLabel(L10n.tr("customer.new_order"))
+            }
+        }
+        .sheet(isPresented: $newOrder) {
+            NewOrderSheet(machines: machines, onCreated: { Task { await load() } }, initial: draft)
+        }
         .navigationDestination(item: $openOrder) { order in
             OrderDetailPage(order: order, facts: nil) { await load() }
         }
+    }
+
+    /// A new job already made out to this customer, linked by id so the
+    /// book never has to guess from the name.
+    private var draft: NewOrderDraft {
+        var d = NewOrderDraft()
+        d.client = client.displayName
+        d.clientId = client.id
+        return d
     }
 
     private func load() async {
