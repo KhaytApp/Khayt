@@ -1,0 +1,186 @@
+/* Khayt — the 2026 identity, shared with khaytapp.com and the Mac app.
+
+   Values come from the "khaytapp.com — Redesign" Figma library (Khayt / Color,
+   Khayt / Space) and the desktop redesign file built on it
+   (figma.com/design/7Iqw0GcrLLRW7CLDEhTa1P). Three rules carry over:
+
+     1. Navy is the chrome, white is the work. The sidebar is navy; panels are
+        white with a 1px line and a soft shadow.
+     2. Amber is the thread — the active screen, progress, "today" — and never
+        a fill or a status colour.
+     3. Dark mode is the site's deep-navy set, not a grey.
+
+   Status colours are the stage palette agreed with the Mac app so a job reads
+   the same on every device: quote grey, pending steel, printing green, hold /
+   quality-check purple, ready teal, late red. Foregrounds are darkened where
+   the stage hue itself is too light to read as text (green, teal, purple).
+
+   NOTE: --ink-3 (aliased to --text-muted) clears WCAG AA 4.5:1 against BOTH
+   --bg and --surface in both appearances (test/theme-contrast.test.js). */
+
+html[data-design="khayt"] {
+  /* ---- Surfaces: white work on a cool paper ground ---- */
+  --bg:        #f6f8f8;   /* paper-2 */
+  --bg-2:      #eef1f1;   /* paper-3 */
+  --surface:   #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f6f8f8;
+  --surface-3: #eef1f1;
+  --panel:     #ffffff;
+  --panel-2:   #f6f8f8;
+
+  /* ---- Ink ---- */
+  --ink:       #101417;
+  --ink-2:     #3f464d;
+  --ink-3:     #61686f;
+  --ink-4:     #a3a9b0;
+
+  /* ---- Lines ---- */
+  --line:      #e3e6e8;
+  --line-2:    #eef1f1;
+  --line-soft: #eef1f1;
+  --hairline:  rgba(10,26,51,0.06);
+
+  /* ---- Accent: the brand blue #216dca. HSL channels so applyAccent() swaps. ---- */
+  --accent-h: 213;
+  --accent-s: 72%;
+  --accent-l: 46%;
+  --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+  --accent-ink:  #ffffff;
+  --on-accent:   #ffffff;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.10);
+  --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.40);
+  --accent-2:    #11509c;
+
+  /* ---- Brand chrome (the same in both appearances) ---- */
+  --kh-navy:         #0a2a50;
+  --kh-navy-deep:    #061a33;
+  --kh-navy-line:    #1a3d68;
+  --kh-on-dark:      #ffffff;
+  --kh-on-dark-soft: #b9c7d8;
+  --kh-thread:       #f2a541;
+  --kh-live:         #1bb55c;
+
+  /* ---- Stage palette (shared with the Mac). -ink is the readable text form. ---- */
+  --kh-quote:    #697079; --kh-quote-ink:    #4b5259;
+  --kh-pending:  #5e6c84; --kh-pending-ink:  #4a566b;
+  --kh-printing: #1bb55c; --kh-printing-ink: #0d7a3c;
+  --kh-hold:     #8a6fd1; --kh-hold-ink:     #6a4fb5;
+  --kh-ready:    #0e8a7e; --kh-ready-ink:    #0b6e65;
+  --kh-late:     #d6453d; --kh-late-ink:     #b5322b;
+  --kh-warn-ink: #9a5b00; --kh-warn-wash:    #fdf1e2;
+
+  /* The Workbench shell's own screens (dashboard tiles, fleet rows, quick
+     actions) colour themselves from --wb-* pairs; map them onto the palette so
+     those screens speak this theme instead of resolving to nothing. */
+  --wb-blue:   #216dca;            --wb-blue-bg:   #eef4fc;
+  --wb-green:  var(--kh-printing-ink); --wb-green-bg:  #e3f6ea;
+  --wb-red:    var(--kh-late-ink);     --wb-red-bg:    #fbe9e8;
+  --wb-amber:  var(--kh-warn-ink);     --wb-amber-bg:  var(--kh-warn-wash);
+  --wb-purple: var(--kh-hold-ink);     --wb-purple-bg: #f1ecfb;
+  --wb-teal:   var(--kh-ready-ink);    --wb-teal-bg:   #e1f3f1;
+  --wb-pink:   #b8336a;                --wb-pink-bg:   #fbe8f0;
+  --wb-steel:  var(--kh-pending-ink);  --wb-steel-bg:  #eceff3;
+
+  /* ---- Shadows ---- */
+  --shadow-1: 0 1px 2px rgba(10,26,51,.06), 0 8px 24px -4px rgba(10,26,51,.06);
+  --shadow-2: 0 24px 48px -12px rgba(6,16,33,.18), 0 1px 2px rgba(10,26,51,.06);
+  --shadow-pop: var(--shadow-2);
+
+  /* ---- Radii (Khayt / Space radius/sm, md, lg) ---- */
+  --radius:    16px;
+  --radius-sm: 8px;
+  --r-sm: 8px;
+  --r-md: 16px;
+  --r-lg: 24px;
+
+  /* ---- Type: Archivo for display, Hanken Grotesk for UI, JetBrains Mono for
+         every figure and eyebrow. All vendored in renderer/fonts/ (CSP). ---- */
+  --font-display: "Archivo", "Hanken Grotesk", -apple-system, "Segoe UI", sans-serif;
+  --font-ui:   "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-ar:   "IBM Plex Sans Arabic", var(--font-ui);
+  --font-sans: var(--font-ui);
+  --font-num:  var(--font-mono);
+  --mono:      var(--font-mono);
+
+  /* ---- Aliases the shared renderer reads ---- */
+  --text: var(--ink);
+  --text-dim: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --text-faint: var(--ink-4);
+  --border: var(--line);
+  --border-2: #d3d8dc;
+  --border-soft: var(--line-2);
+  --primary: var(--accent);
+  --primary-soft: var(--accent-soft);
+  --success: var(--kh-printing-ink);
+  --warning: var(--kh-warn-ink);
+  --danger: var(--kh-late-ink);
+  --info: var(--kh-hold-ink);
+  --ok: var(--kh-printing-ink);
+  --bg-elev: var(--surface-2);
+  --bg-card: var(--surface);
+
+  --nav-w: 248px;
+}
+
+/* Dark — the site's body.deep: deep navy ground, navy cards, light ink. The
+   accent is lifted so it reads on navy and its ink flips to navy-deep. */
+html[data-design="khayt"][data-theme="dark"] {
+  --bg:        #06182f;
+  --bg-2:      #081e38;
+  --surface:   #0d2444;
+  --surface-1: #0d2444;
+  --surface-2: #081e38;
+  --surface-3: #0a2a50;
+  --panel:     #0d2444;
+  --panel-2:   #081e38;
+
+  --ink:       #eaf2fb;
+  --ink-2:     #b3c8de;
+  --ink-3:     #8aa4c2;
+  --ink-4:     #4f6a8a;
+
+  --line:      rgba(255,255,255,0.11);
+  --line-2:    rgba(255,255,255,0.07);
+  --line-soft: rgba(255,255,255,0.07);
+  --hairline:  rgba(255,255,255,0.06);
+  --border-2:  rgba(255,255,255,0.18);
+
+  --accent-s: 100%;
+  --accent-l: 72%;
+  --accent-ink: #061a33;
+  --on-accent:  #061a33;
+  --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.16);
+
+  --kh-quote-ink:    #b3c8de;
+  --kh-pending-ink:  #a9b8cf;
+  --kh-printing-ink: #2fd07a;
+  --kh-hold-ink:     #b49cf0;
+  --kh-ready-ink:    #3cc7b8;
+  --kh-late-ink:     #ff7a6f;
+  --kh-warn-ink:     #f2a541; --kh-warn-wash: #3a2a14;
+
+  --wb-blue:   #6fb0ff; --wb-blue-bg:   #123056;
+  --wb-green-bg: #0f3a2a; --wb-red-bg: #3d1a22; --wb-purple-bg: #2a2350;
+  --wb-teal-bg: #0d3a3a; --wb-pink: #ef6ba6; --wb-pink-bg: #3a1f2e;
+  --wb-steel-bg: #1b2b44;
+
+  --shadow-1: 0 1px 2px rgba(0,0,0,.35);
+  --shadow-2: 0 24px 48px -12px rgba(0,0,0,.55);
+}
+
+html[data-design="khayt"],
+html[data-design="khayt"] body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html[data-design="khayt"][dir="rtl"],
+html[data-design="khayt"][dir="rtl"] body {
+  font-family: var(--font-ar);
+}

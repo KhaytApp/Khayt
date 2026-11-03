@@ -155,7 +155,7 @@ test('coming-soon cards are labelled with their own theme, not the fallback', ()
     assert.equal(def.labelKey, `theme.design.${id}`, `${id} must be labelled as itself`);
     assert.equal(def.descKey, `theme.design.${id}_desc`, `${id} must describe itself`);
     // And the trap that caused it: the normalising lookup still resolves away.
-    assert.equal(reg.getTheme(id).labelKey, 'theme.design.workbench',
+    assert.equal(reg.getTheme(id).labelKey, 'theme.design.khayt',
       'getTheme() is expected to normalise a disabled theme — that is why the raw lookup exists');
   }
   // The picker must use the raw lookup for these cards.

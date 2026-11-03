@@ -21,7 +21,7 @@ const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'khayt-audit-'));
 
 // Every design a user can pick. This said three for the whole 3.4 line, so an
 // audit meant to cover 'all shipped themes' silently skipped five of them.
-const THEMES = ['workbench', 'command', 'vivid', 'blueprint', 'nocturne', 'meridian', 'foreman', 'flow'];
+const THEMES = ['khayt', 'workbench', 'command', 'vivid', 'blueprint', 'nocturne', 'meridian', 'foreman', 'flow'];
 const TABS = [
   ['dashboard-tab', 'dashboard'],
   ['queue-tab', 'queue'],
