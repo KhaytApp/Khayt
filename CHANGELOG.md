@@ -4,12 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a milestone invoice is a proforma for that part of the job.** Issuing a milestone (Job ▸ Milestones) printed a tax invoice under the job's own number, with every part listed at full price above the smaller milestone total and a ZATCA QR for an amount that was never the invoice's. It now prints a proforma with one line: the milestone's label, "30% of 1,150" under it, and its own amount, with tax worked out on that amount. Shipping, rush, extras and the discount are left off because they're already in the percentage. There's no invoice number and no ZATCA QR, and the bank-transfer QR asks for the milestone's amount. The job's one tax invoice is unchanged. This is the same paper the Mac prints.
-
-- **Desktop: a job from the quote form tells Khayt Cloud which request it came from.** Publishing such a job to its customer page now sends the request's id beside the page (Cloud #157), so Khayt Cloud can email the customer their link once. Jobs that did not come in through the form send nothing new. The id itself comes from `lib/portal-refresh.js` once the Mac's #2171 lands.
-
-- **Desktop: your shop's payment link, in Settings ▸ Khayt Cloud.** Paste the https link from your payment provider (with an optional label) and your customer pages show Pay deposit, Pay balance or Pay beside it; `{amount}` in the link is replaced by what is due (Khayt Cloud #155). It is the shop's, so it is read from the cloud each time the section opens, and only the owner or a manager sees it. Save and Remove say what the cloud answered. The Mac has the same section (Settings ▸ Online).
-
 - **iPhone: proforma invoices, as on the Mac.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has a Proforma invoice card on its page. It opens the shared document with its `proforma` option, ready to share as a PDF: titled and watermarked as a proforma, with no ZATCA QR and the job's own id as its number. Making one numbers nothing, so it works even for a job still waiting for the Mac to give it an invoice number.
 
 - **iPhone: ship a job from its page, and "Remind me" on a request really reminds.** A finished job not yet sent has a Ship card. You pick the carrier (the Mac's list, Manual last) and type the tracking number or scan it off the courier's waybill. It runs the shared `lib/shipment.js` rule, as the Mac's Ship sheet does, so the customer's page shows the carrier and number. On an order request, Remind me asks when (tomorrow morning, in 3 days, in a week), saves that day as the request's `reminderDate` (the day the desktop shows "Reminder due"), and alerts the phone at 9:00 that day. Tapping the alert opens the requests.
@@ -6659,6 +6653,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.2.2] - 2026-11-03
+
+- **Desktop: a milestone invoice is a proforma for that part of the job.** Issuing a milestone (Job ▸ Milestones) printed a tax invoice under the job's own number, with every part listed at full price above the smaller milestone total and a ZATCA QR for an amount that was never the invoice's. It now prints a proforma with one line: the milestone's label, "30% of 1,150" under it, and its own amount, with tax worked out on that amount. Shipping, rush, extras and the discount are left off because they're already in the percentage. There's no invoice number and no ZATCA QR, and the bank-transfer QR asks for the milestone's amount. The job's one tax invoice is unchanged. This is the same paper the Mac prints.
+
+- **Desktop: a job from the quote form tells Khayt Cloud which request it came from.** Publishing such a job to its customer page now sends the request's id beside the page (Cloud #157), so Khayt Cloud can email the customer their link once. Jobs that did not come in through the form send nothing new. The id itself comes from `lib/portal-refresh.js` once the Mac's #2171 lands.
+
+- **Desktop: your shop's payment link, in Settings ▸ Khayt Cloud.** Paste the https link from your payment provider (with an optional label) and your customer pages show Pay deposit, Pay balance or Pay beside it; `{amount}` in the link is replaced by what is due (Khayt Cloud #155). It is the shop's, so it is read from the cloud each time the section opens, and only the owner or a manager sees it. Save and Remove say what the cloud answered. The Mac has the same section (Settings ▸ Online).
 
 ## [4.2.1] - 2026-11-03
 
