@@ -6,6 +6,7 @@ import SwiftUI
 /// job; a customer's order request opens Intake.
 struct NotificationsView: View {
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var ordersNav: OrdersNavigationState
     @ObservedObject private var feed = ShopFeed.shared
     @State private var openOrder: QueueOrder?
     @State private var showIntake = false
@@ -53,12 +54,11 @@ struct NotificationsView: View {
 
     private func open(_ item: FeedItem) async {
         if item.kind == "intake" { showIntake = true; return }
+        // A late job or a low spool: the list it is about, as Home opens it.
+        if item.kind == "khayt.overdue" { ordersNav.openOverdue(); return }
+        if item.kind == "khayt.lowstock" { ordersNav.openLowStock(); return }
         guard let id = item.orderId else { return }
-        if let order = (try? await api.fetchQueue())?.first(where: { $0.id == id }) {
-            openOrder = order
-        } else if let done = (try? await api.fetchRecentOrders(limit: 200))?.first(where: { $0.id == id }) {
-            openOrder = QueueOrder(entry: done)
-        }
+        openOrder = await api.findOrder(id: id)
     }
 }
 

@@ -2169,6 +2169,8 @@
   "calc.client_ref": "Kunden-Bestellnummer / Referenz",
   "calc.currency": "Währung",
   "calc.currency_auto": "Automatisch",
+  "calc.saved_in_currency": "Gespeichert als {amount} ({code}, 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "Kein Kurs für {code} unter Einstellungen ▸ Währung, daher wird dieser Auftrag in {base} gespeichert",
   "calc.client_ref_ph": "z.B. PO-2024-001",
   "oe.internal_notes": "Interne Notizen (nicht für den Kunden sichtbar)",
   "oe.internal_notes_ph": "z.B. besondere Handhabung, Bedienerhinweise…",

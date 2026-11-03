@@ -233,6 +233,8 @@
 "order.new.details" = "Details";
 "order.new.project" = "Project";
 "order.new.client" = "Client";
+"order.new.client.saved" = "Saved customer";
+"order.new.client.pick" = "Links this order to the saved customer.";
 "order.new.material" = "Material";
 "order.new.price" = "Price";
 "order.new.price_in" = "Price (%@)";
@@ -890,3 +892,22 @@
 "proforma.open" = "Proforma invoice";
 "proforma.open.sub" = "Ask for payment before the work is invoiced";
 "proforma.refused" = "A proforma is for a priced job that is accepted and not yet finished.";
+/* Customer page */
+"customer.owes" = "Owes";
+"customer.limit" = "Credit limit %@";
+"customer.over_limit" = "Over their credit limit of %@";
+"customer.terms" = "Pays within %d days";
+"customer.terms.receipt" = "Pays on receipt";
+"customer.open" = "Open jobs";
+"customer.open.none" = "No open jobs.";
+"customer.history" = "Finished jobs";
+"customer.history.none" = "No finished jobs on this phone.";
+"customer.history.window" = "This phone holds the newest finished jobs; the full history is on the Mac.";
+"customer.agreed" = "Agreed prices";
+"customer.messages" = "Messages";
+"customer.messages.none" = "No messages logged yet.";
+"customer.needs_book" = "This customer’s page needs the shop’s book on this phone.";
+"customer.new_order" = "New order for this customer";
+/* Rush, machine job */
+"orders.rush" = "Rush";
+"machines.job" = "Job: %@";

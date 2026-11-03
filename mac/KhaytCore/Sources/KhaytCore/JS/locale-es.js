@@ -2169,6 +2169,8 @@
   "calc.client_ref": "N.º de pedido / referencia del cliente",
   "calc.currency": "Moneda",
   "calc.currency_auto": "Automática",
+  "calc.saved_in_currency": "Se guarda como {amount} ({code}, 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "No hay tipo de cambio para {code} en Ajustes ▸ Moneda, así que este trabajo se guarda en {base}",
   "calc.client_ref_ph": "p.ej. PO-2024-001",
   "oe.internal_notes": "Notas internas (no visibles para el cliente)",
   "oe.internal_notes_ph": "p.ej. manejo especial, recordatorios para el operador…",
