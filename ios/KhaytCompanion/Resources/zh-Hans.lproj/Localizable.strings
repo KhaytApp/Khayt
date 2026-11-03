@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "无法读取二维码中的发票日期。";
 
 "Price a part" = "为零件定价";
-"home.calculator.sub" = "零件的成本以及应收价格";
 
 /* Library */
 "library.title" = "库";
 "library.price" = "按模型库定价";
-"home.library.sub" = "找到你之前打印过的模型并为其定价。";
 "library.search" = "搜索模型、文件夹、标签";
 "library.folders" = "文件夹";
 "library.models" = "模型";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "自定价格";
 "catalogue.price.rounded" = "按计算价格取整";
 "catalogue.price.calculated" = "计算所得";
-"home.catalogue.sub" = "你销售的产品，含价格和库存";
 
 /* Invoices */
 "invoice.title" = "发票";
@@ -998,3 +995,13 @@
 /* Rush, machine job */
 "orders.rush" = "加急";
 "machines.job" = "作业：%@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "新建";
+"new.job.detail" = "客户、零件和价格";
+"new.quote_file.detail" = "3MF 或 STL，直接报价";
+"new.spool.detail" = "扫码、读标签或手动输入";
+"new.calculator.detail" = "手动计算价格";
+"new.expense.detail" = "拍下收据";
+"new.waste.detail" = "打印失败或冲料";
+"new.more" = "更多";

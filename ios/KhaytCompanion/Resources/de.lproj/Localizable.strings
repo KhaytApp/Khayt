@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "Das Rechnungsdatum im Code ist nicht lesbar.";
 
 "Price a part" = "Teil bepreisen";
-"home.calculator.sub" = "Was ein Teil dich kostet und was du dafür verlangen solltest";
 
 /* Library */
 "library.title" = "Bibliothek";
 "library.price" = "Preis aus der Bibliothek";
-"home.library.sub" = "Finde ein bereits gedrucktes Modell und bepreise es.";
 "library.search" = "Modelle, Ordner, Tags suchen";
 "library.folders" = "Ordner";
 "library.models" = "Modelle";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Dein eigener Preis";
 "catalogue.price.rounded" = "Aus dem berechneten Preis gerundet";
 "catalogue.price.calculated" = "Berechnet";
-"home.catalogue.sub" = "Was du verkaufst, mit Preisen und Bestand";
 
 /* Invoices */
 "invoice.title" = "Rechnung";
@@ -998,3 +995,13 @@
 /* Rush, machine job */
 "orders.rush" = "Eilauftrag";
 "machines.job" = "Auftrag: %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "Neu";
+"new.job.detail" = "Kunde, Teile und Preis";
+"new.quote_file.detail" = "3MF oder STL, mit Preis";
+"new.spool.detail" = "Scannen, Tag lesen oder eintippen";
+"new.calculator.detail" = "Druck von Hand kalkulieren";
+"new.expense.detail" = "Foto vom Beleg";
+"new.waste.detail" = "Fehldruck oder Spülung";
+"new.more" = "Mehr";

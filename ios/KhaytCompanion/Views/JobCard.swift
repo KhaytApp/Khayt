@@ -8,9 +8,9 @@ import SwiftUI
 /// is for with its stage beside it. `.full` is the Orders list — the same two
 /// lines, and a third with the stage, a late tag and the due date.
 ///
-/// Only printing and QC earn a rail (`KhaytDesign.isRailed`), and a late job,
-/// whatever its stage. A pending job with no colour is what makes the coloured
-/// ones readable.
+/// The 2026 redesign's row (Figma "Job row"): a stage tile, the id in mono
+/// beside a stage pill, the title, who it is for. Only a late job gets a
+/// coloured outline.
 struct JobCard: View {
     enum Layout { case compact, full }
 
@@ -61,7 +61,7 @@ struct JobCard: View {
                 }
                 .padding(.horizontal, 18)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(past ? KhaytDesign.brand.opacity(0.22) : KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 11))
+                .background(past ? KhaytDesign.brand.opacity(0.22) : KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             card
                 .offset(x: drag)
@@ -95,79 +95,89 @@ struct JobCard: View {
             if isUpdating {
                 ProgressView().controlSize(.mini)
             } else {
-                Text(L10n.tr("stage.short.\(order.status)"))
-                    .font(.khayt(11, .semibold, relativeTo: .caption2))
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .foregroundStyle(tone)
-                    .background(tone.opacity(0.14), in: Capsule())
+                // The redesign's pill: a dot in the stage colour, the words in ink.
+                HStack(spacing: 5) {
+                    Circle().fill(tone).frame(width: 6, height: 6)
+                    Text(chipLabel)
+                        .font(.khayt(11.5, .semibold, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(tone.opacity(0.16), in: Capsule())
             }
         }
     }
 
+    /// "Printing 64%" while the machine reports it, else the stage's word.
+    private var chipLabel: String {
+        let word = L10n.tr("stage.short.\(order.status)")
+        if order.status == "printing", let live, live.isPrinting, let p = live.progress {
+            return word + " " + p.formatted(.number.locale(L10n.locale)) + "%"
+        }
+        return word
+    }
+
+    /// The redesign's job row: a tile in the stage's colour, the id in mono
+    /// with the stage pill beside it, the title, then who it is for. A late job
+    /// is outlined in `late`; nothing else gets a coloured edge.
     private var card: some View {
-        let railed = KhaytDesign.isRailed(order.status) || order.isOverdue
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 9) {
-                Text(order.displayTitle)
-                    .font(.khayt(15, .medium, relativeTo: .body))
-                    .foregroundStyle(KhaytDesign.ink)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Text("#\(order.id)")
-                    .font(.khayt(12, .medium, relativeTo: .caption).monospacedDigit())
-                    .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
-                    .environment(\.layoutDirection, .leftToRight)
-            }
-            HStack(spacing: 9) {
-                Text(subtitle)
-                    .font(.khayt(12.5, relativeTo: .footnote))
-                    .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
-                if layout == .compact {
-                    Spacer(minLength: 0)
-                    stageChip
-                }
-            }
-            if order.status == "printing", let live, live.isPrinting, let progress = live.progress {
-                HStack(spacing: 9) {
-                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread)
-                    Text("\(progress)%")
-                        .font(.khayt(11.5, .medium, relativeTo: .caption2).monospacedDigit())
-                        .foregroundStyle(KhaytDesign.ink)
+        let edge = order.isOverdue ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: CompanionTheme.statusIcon(for: order.status))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(order.isOverdue ? KhaytDesign.late : tone)
+                .frame(width: 46, height: 46)
+                .background((order.isOverdue ? KhaytDesign.late : tone).opacity(0.16),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(order.id)
+                        .font(.khaytMono(11.5, .medium))
+                        .foregroundStyle(KhaytDesign.note)
+                        .lineLimit(1)
                         .environment(\.layoutDirection, .leftToRight)
-                    if let eta = live.etaLocalized {
-                        Text(eta)
-                            .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
-                            .foregroundStyle(KhaytDesign.note)
-                    }
-                }
-                .padding(.top, 2)
-                .animation(.easeOut(duration: 0.45), value: progress)
-            }
-            if layout == .full {
-                HStack(spacing: 7) {
                     stageChip
                     if order.isRush { RushBadge() }
-                    if order.isOverdue { LateBadge() }
                     Spacer(minLength: 0)
-                    if let due = order.formattedDueDate {
-                        Text(due)
-                            .font(.khayt(12, relativeTo: .caption))
-                            .foregroundStyle(KhaytDesign.note)
-                    }
                 }
-                .padding(.top, 2)
+                Text(order.displayTitle)
+                    .font(.khayt(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(subtitle)
+                        .font(.khayt(12.5, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                        .lineLimit(1)
+                    if layout == .full, let due = order.formattedDueDate {
+                        Text("· " + due)
+                            .font(.khayt(12.5, relativeTo: .footnote))
+                            .foregroundStyle(order.isOverdue ? KhaytDesign.late : KhaytDesign.note)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if layout == .full, order.isOverdue { LateBadge() }
+                }
+                if order.status == "printing", let live, live.isPrinting, let progress = live.progress {
+                    HStack(spacing: 9) {
+                        LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread)
+                        if let eta = live.etaLocalized {
+                            Text(eta)
+                                .font(.khaytMono(11, .regular, relativeTo: .caption2))
+                                .foregroundStyle(KhaytDesign.note)
+                        }
+                    }
+                    .padding(.top, 3)
+                    .animation(.easeOut(duration: 0.45), value: progress)
+                }
             }
         }
-        .padding(.vertical, layout == .full ? 12 : 11).padding(.leading, 16).padding(.trailing, 13)
-        .frame(maxWidth: .infinity, minHeight: layout == .full ? 70 : 0, alignment: .leading)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 11))
-        .overlay(alignment: .leading) {
-            if railed { Rectangle().fill(order.isOverdue ? KhaytDesign.late : tone).frame(width: 3) }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 11))
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(edge, lineWidth: 1))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
