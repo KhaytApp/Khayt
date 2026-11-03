@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: clients look like the redesign (phase 6).** Each client in the list has two initials in a brand-blue circle ("NA" for Noura Al-Saud, in the name's own script), the name larger and the order count in mono. A customer's page opens with their initials large and their name in the display face; what they owe is large too, and the card is outlined in red when they are over their limit. The Live Activity took the redesign's colours in phase 1.
+
 - **iPhone: printers and spools look like the redesign (phase 5).** A printer's card has a printer tile, its name and what it is on, and a pill; while it prints, the percentage is large, with the time left and the clock time it ends beside it, over a thicker amber bar and the nozzle and bed temperatures. A printing card is outlined in green, and one in trouble sits on a red wash with its error under the name. Spools are tiles now, two to a row: the colour as a reel, the material and brand over the colour's name, the grams and the share left, and a teal bar (amber and outlined when the spool is low). A spool's number is on its page.
 
 - **iPhone: jobs look like the redesign (phase 4).** A job row has a tile in its stage's colour, the job's number in mono beside a pill (a dot in the stage colour, the words in ink, "Printing 64%" while the machine reports it), the title larger, and who it is for; only a late job gets a coloured outline. Swiping a row forward still moves it on. The Orders filters show their counts. A job's page leads with its number and pill over the title in the display face, and the five stages are now one track of dots, tapped to put the job in any of them.

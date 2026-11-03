@@ -173,20 +173,18 @@ private struct ClientRow: View {
     let open: Int
     let total: Int?
 
-    private var initial: String {
-        client.displayName.first.map { String($0).uppercased() } ?? "?"
-    }
+    private var initial: String { Initials.of(client.displayName) }
 
     var body: some View {
         HStack(spacing: 12) {
             Text(initial)
-                .font(.khayt(15, .semibold, relativeTo: .body))
-                .foregroundStyle(KhaytDesign.note)
-                .frame(width: 38, height: 38)
-                .background(KhaytDesign.sunk, in: Circle())
+                .font(.khayt(14, .bold, relativeTo: .body))
+                .foregroundStyle(KhaytDesign.brand)
+                .frame(width: 42, height: 42)
+                .background(KhaytDesign.brand.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(client.displayName)
-                    .font(.khayt(15, .medium, relativeTo: .body))
+                    .font(.khayt(16, .semibold, relativeTo: .body))
                     .foregroundStyle(KhaytDesign.ink)
                     .lineLimit(1)
                 Text(L10n.format("clients.open", open.formatted(.number.locale(L10n.locale))))
@@ -196,7 +194,7 @@ private struct ClientRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(total.map { $0.formatted(.number.locale(L10n.locale)) } ?? "—")
-                    .font(.khayt(15, .semibold, relativeTo: .body).monospacedDigit())
+                    .font(.khaytMono(15, .medium, relativeTo: .body))
                     .foregroundStyle(total == nil ? KhaytDesign.note : KhaytDesign.ink)
                 Text(L10n.tr(total == nil ? "pulse.on_the_mac" : "clients.orders"))
                     .font(.khayt(10.5, relativeTo: .caption2))
@@ -205,8 +203,9 @@ private struct ClientRow: View {
         }
         .padding(.vertical, 12).padding(.horizontal, 14)
         .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-        .card(radius: 11)
-        .contentShape(RoundedRectangle(cornerRadius: 11))
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -214,5 +213,16 @@ private struct ClientRow: View {
 private extension Client {
     var canBeContacted: Bool {
         dialNumber != nil || whatsappNumber != nil || !(email ?? "").isEmpty
+    }
+}
+
+/// Up to two initials for a person's or a shop's avatar: "Noura Al-Saud" is
+/// "NA", "Acme" is "A". Letters, not punctuation, and in the name's own script.
+enum Initials {
+    static func of(_ name: String) -> String {
+        let words = name.split(whereSeparator: { $0.isWhitespace || $0 == "-" })
+            .compactMap { w in w.first(where: \.isLetter).map { String($0).uppercased() } }
+        guard let first = words.first else { return "?" }
+        return words.count > 1 ? first + words[1] : first
     }
 }
