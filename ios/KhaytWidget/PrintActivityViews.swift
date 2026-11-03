@@ -29,6 +29,8 @@ enum PrintActivityLook {
     static let note = dynamic(light: 0x5A636D, dark: 0x8AA4C2)
     static let surface = dynamic(light: 0xFFFFFF, dark: 0x0D2444)
     static let track = dynamic(light: 0xE3E6E8, dark: 0x1F3A5E)
+    /// Progress only, never text (the redesign's rule): the amber thread.
+    static let thread = dynamic(light: 0xF2A541, dark: 0xF2A541)
 
     static func tone(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
         switch phase {
