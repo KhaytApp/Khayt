@@ -755,6 +755,10 @@ async function renderInvoiceForOrder(order, opts = {}) {
   // auto-submit, and the job's id rather than an invoice number. The document
   // itself titles and watermarks it (`proforma` in lib/invoice-document.js).
   const proforma = opts.proforma === true;
+  // ONE PART OF THE JOB, asked for as a proforma (Turki, Nov 2026): the job's
+  // single tax invoice stays the job's; a milestone never takes an invoice
+  // number or a ZATCA QR. lib/invoice-document.js prints it as one line.
+  const milestone = proforma && opts.milestone ? opts.milestone : null;
   const ts = order.timestamp
     || (order.date && !Number.isNaN(Date.parse(`${order.date}T12:00:00`))
       ? new Date(`${order.date}T12:00:00`).toISOString()
@@ -863,7 +867,11 @@ async function renderInvoiceForOrder(order, opts = {}) {
   if (settings.iban && window.hubAPI?.generateQR) {
     const iban = settings.iban.replace(/\s+/g, '');
     const beneName = shopName() || '';
-    const payAmt = price.toFixed(2);
+    // A milestone asks for its own part, tax worked out on it the way the
+    // document prints it — not the whole job's price.
+    const payAmt = (milestone
+      ? KhaytTax.computeTax(+milestone.amount || 0, _taxProfile).total
+      : price).toFixed(2);
     const payRef = proforma ? String(order.id) : invoiceDocNumber(order);
     // Structured format: BeneficiaryName\nIBAN\nAmount\nRef
     const payText = `${beneName}\n${iban}\n${payAmt}\n${payRef}`;
@@ -871,7 +879,7 @@ async function renderInvoiceForOrder(order, opts = {}) {
     catch (e) { console.warn('Payment QR failed', e); }
   }
 
-  renderInvoice(order, { qrSvg, qrProblem, payQrSvg, total, vatAmount, subtotal, subtotalShown, vatRate: rate, shipping, proforma });
+  renderInvoice(order, { qrSvg, qrProblem, payQrSvg, total, vatAmount, subtotal, subtotalShown, vatRate: rate, shipping, proforma, milestone });
   if (!proforma) maybeAutoSubmitZatca(order);
 }
 
@@ -1422,24 +1430,23 @@ function generateDeliveryNote(id) {
 async function generateMilestoneInvoice(orderId, milestone) {
   const order = printLog.find(o => o.id === orderId);
   if (!order || !milestone) return;
-  // Build a temporary order-like object with the milestone amount
-  const tempOrder = Object.assign({}, order, {
-    price: milestone.amount,
-    // The milestone bills a % of the full total; shipping/rush/extras/discount are
-    // already represented in that %, so don't re-show or re-bill them in full on
-    // top of the (smaller) milestone amount.
-    shippingCost: 0,
-    rushFeeAmount: 0,
-    extraLines: [],
-    discountPct: 0,
-    priceBeforeDiscount: 0,
-    _milestoneLabel: milestone.label,
-    _milestoneTotal: order.price,
-    _milestonePct: milestone.percentage,
-  });
+  // A PROFORMA, one line (Turki, Nov 2026). This printed a tax invoice under
+  // the job's own number, listing every part at full price above the smaller
+  // milestone total, with a ZATCA QR for an amount that was never the
+  // invoice's. The job keeps its one tax invoice; each milestone is a request
+  // for part of the money — the same paper the Mac prints
+  // (lib/invoice-document.js `milestone`).
   milestone.issuedAt = localDateStr();
   saveAll();
-  await renderInvoiceForOrder(tempOrder);
+  await renderInvoiceForOrder(order, {
+    proforma: true,
+    milestone: {
+      label: milestone.label || '',
+      percentage: +milestone.percentage || 0,
+      amount: +milestone.amount || 0,
+      total: +order.price || 0,
+    },
+  });
 }
 
 /* --- extracted 18874-19253 --- */

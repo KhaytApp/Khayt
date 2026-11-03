@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a milestone invoice is a proforma for that part of the job.** Issuing a milestone (Job ▸ Milestones) printed a tax invoice under the job's own number, with every part listed at full price above the smaller milestone total and a ZATCA QR for an amount that was never the invoice's. It now prints a proforma with one line: the milestone's label, "30% of 1,150" under it, and its own amount, with tax worked out on that amount. Shipping, rush, extras and the discount are left off because they're already in the percentage. There's no invoice number and no ZATCA QR, and the bank-transfer QR asks for the milestone's amount. The job's one tax invoice is unchanged. This is the same paper the Mac prints.
+
 - **Desktop: a job from the quote form tells Khayt Cloud which request it came from.** Publishing such a job to its customer page now sends the request's id beside the page (Cloud #157), so Khayt Cloud can email the customer their link once. Jobs that did not come in through the form send nothing new. The id itself comes from `lib/portal-refresh.js` once the Mac's #2171 lands.
 
 - **Desktop: your shop's payment link, in Settings ▸ Khayt Cloud.** Paste the https link from your payment provider (with an optional label) and your customer pages show Pay deposit, Pay balance or Pay beside it; `{amount}` in the link is replaced by what is due (Khayt Cloud #155). It is the shop's, so it is read from the cloud each time the section opens, and only the owner or a manager sees it. Save and Remove say what the cloud answered. The Mac has the same section (Settings ▸ Online).
