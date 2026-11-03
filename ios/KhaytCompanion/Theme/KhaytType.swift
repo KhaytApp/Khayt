@@ -1,29 +1,63 @@
 import SwiftUI
 import UIKit
 
-/// The design's typeface — Space Grotesk (`design/ios-v2/`), bundled and
-/// registered in Info.plist (`UIAppFonts`).
+/// The design's typefaces — the website's three (the 2026 redesign), bundled
+/// and registered in Info.plist (`UIAppFonts`):
 ///
-/// Every size scales with Dynamic Type through `relativeTo:`. Space Grotesk
-/// has no Arabic; iOS falls back to its Arabic system face for those glyphs on
-/// its own, which is what the design's `'Space Grotesk', 'IBM Plex Sans
-/// Arabic', system-ui` stack does on the web.
+/// - **Hanken Grotesk** for text: every `.khayt(size, weight)` below 22 pt.
+/// - **Archivo** for display: large titles, hero numbers, and any `.khayt` of
+///   22 pt or more, so the screens' big figures move with no call site touched.
+/// - **JetBrains Mono** for data and eyebrows: `.khaytMono`.
+///
+/// Every size scales with Dynamic Type through `relativeTo:`. None of the three
+/// has Arabic; iOS falls back to its Arabic system face for those glyphs on its
+/// own, as the website's stack does.
 enum KhaytType {
+    /// The size from which `.khayt` draws in the display face.
+    static let displayFrom: CGFloat = 22
+
+    /// Hanken Grotesk, the text face.
     static func postScriptName(_ weight: Font.Weight) -> String {
         switch weight {
-        case .bold, .heavy, .black: return "SpaceGroteskLight-Bold"
-        case .semibold: return "SpaceGroteskLight-SemiBold"
-        case .medium: return "SpaceGroteskLight-Medium"
-        default: return "SpaceGroteskLight-Regular"
+        case .bold, .heavy, .black: return "HankenGrotesk-Bold"
+        case .semibold: return "HankenGrotesk-SemiBold"
+        case .medium: return "HankenGrotesk-Medium"
+        default: return "HankenGrotesk-Regular"
         }
     }
 
-    /// Navigation titles in the design's face, set once at launch.
+    /// Archivo, the display face: Bold up to semibold, ExtraBold above.
+    static func displayName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .bold, .heavy, .black: return "Archivo-ExtraBold"
+        default: return "Archivo-Bold"
+        }
+    }
+
+    /// JetBrains Mono, the data face.
+    static func monoName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .regular, .light, .thin, .ultraLight: return "JetBrainsMono-Regular"
+        default: return "JetBrainsMono-Medium"
+        }
+    }
+
+    /// Every face the app asks for by name — what Info.plist must register.
+    static var allNames: [String] {
+        let w: [Font.Weight] = [.regular, .medium, .semibold, .bold]
+        return Array(Set(w.map(postScriptName) + w.map(displayName) + w.map(monoName))).sorted()
+    }
+
+    /// Navigation titles in the design's faces, set once at launch: the large
+    /// title in Archivo, the inline title in Hanken Grotesk.
     static func applyNavigationBarAppearance() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
-        if let large = UIFont(name: postScriptName(.bold), size: 32) {
-            appearance.largeTitleTextAttributes = [.font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large)]
+        if let large = UIFont(name: displayName(.semibold), size: 32) {
+            appearance.largeTitleTextAttributes = [
+                .font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large),
+                .kern: -0.6,
+            ]
         }
         if let inline = UIFont(name: postScriptName(.semibold), size: 17) {
             appearance.titleTextAttributes = [.font: UIFontMetrics(forTextStyle: .headline).scaledFont(for: inline)]
@@ -38,9 +72,24 @@ enum KhaytType {
 }
 
 extension Font {
-    /// Space Grotesk at `size`, scaling with Dynamic Type like `style`.
+    /// The design's face at `size`, scaling with Dynamic Type like `style`:
+    /// Hanken Grotesk for text, Archivo from `KhaytType.displayFrom` up.
     static func khayt(_ size: CGFloat, _ weight: Font.Weight = .regular,
                       relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom(KhaytType.postScriptName(weight), size: size, relativeTo: style)
+        size >= KhaytType.displayFrom
+            ? .custom(KhaytType.displayName(weight), size: size, relativeTo: style)
+            : .custom(KhaytType.postScriptName(weight), size: size, relativeTo: style)
+    }
+
+    /// Archivo at any size — a hero number or title below the display cut.
+    static func khaytDisplay(_ size: CGFloat, _ weight: Font.Weight = .bold,
+                             relativeTo style: Font.TextStyle = .title) -> Font {
+        .custom(KhaytType.displayName(weight), size: size, relativeTo: style)
+    }
+
+    /// JetBrains Mono — order numbers, grams, times, eyebrows.
+    static func khaytMono(_ size: CGFloat, _ weight: Font.Weight = .medium,
+                          relativeTo style: Font.TextStyle = .caption) -> Font {
+        .custom(KhaytType.monoName(weight), size: size, relativeTo: style)
     }
 }
