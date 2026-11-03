@@ -886,6 +886,14 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+"PUSH_OVERDUE" = "Jobs are late";
+"PUSH_LOW_STOCK" = "Filament is running low";
+"PUSH_DUE_TODAY" = "Jobs are due today";
+"PUSH_QUOTE_DECISION" = "A customer answered a quote";
+"PUSH_QUOTE_APPROVED" = "A customer approved a quote";
+"PUSH_QUOTE_DECLINED" = "A customer declined a quote";
+"PUSH_MESSAGE" = "A customer sent a message";
+"PUSH_PAYMENT" = "A payment came in";
 
 /* Who owes */
 "owed.title" = "Who owes";

@@ -10,3 +10,11 @@
 "PUSH_TITLE" = "خيط";
 "PUSH_PRINT_FINISHED" = "انتهت طباعة";
 "PUSH_INTAKE" = "طلب جديد";
+"PUSH_OVERDUE" = "هناك طلبات متأخرة";
+"PUSH_LOW_STOCK" = "الخيوط على وشك النفاد";
+"PUSH_DUE_TODAY" = "هناك طلبات مستحقة اليوم";
+"PUSH_QUOTE_DECISION" = "ردّ عميل على عرض سعر";
+"PUSH_QUOTE_APPROVED" = "وافق عميل على عرض سعر";
+"PUSH_QUOTE_DECLINED" = "رفض عميل عرض سعر";
+"PUSH_MESSAGE" = "أرسل عميل رسالة";
+"PUSH_PAYMENT" = "وصلت دفعة";

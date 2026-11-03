@@ -38,13 +38,29 @@ final class OrdersNavigationState: ObservableObject {
 
     /// Where a tapped alert goes: its job, the requests, the late jobs or the
     /// low shelf. Nil when it is about nothing the app can open.
-    enum Destination: Equatable, Sendable { case order(String), intake, overdue, lowStock }
+    /// `published`: the cloud's own alerts about a customer's page (a quote
+    /// answered, a message, a payment) name it by `ref.item`, the first 16
+    /// hex of SHA-256 of its token — the phone matches that to a job.
+    enum Destination: Equatable, Sendable { case order(String), intake, overdue, lowStock, orders, published(String) }
 
     nonisolated static func destination(identifier: String, thread: String,
                             userInfo: [AnyHashable: Any]) -> Destination? {
         if let id = userInfo["orderId"] as? String, !id.isEmpty { return .order(id) }
         if thread == "khayt.intake" || identifier.hasPrefix("intake.") { return .intake }
         if let k = userInfo["k"] as? [String: Any], k["kind"] as? String == "intake" { return .intake }
+        if let k = userInfo["k"] as? [String: Any], let kind = k["kind"] as? String {
+            switch kind {
+            case "overdue": return .overdue
+            case "low-stock": return .lowStock
+            case "due-today": return .orders
+            case "quote-decision", "message", "payment":
+                if let ref = k["ref"] as? [String: Any], let item = ref["item"] as? String, !item.isEmpty {
+                    return .published(item.lowercased())
+                }
+                return .orders
+            default: break
+            }
+        }
         if identifier.hasPrefix("khayt.overdue") { return .overdue }
         if identifier.hasPrefix("khayt.lowstock") { return .lowStock }
         return nil
@@ -83,6 +99,7 @@ final class OrdersNavigationState: ObservableObject {
         case .intake: openIntake()
         case .overdue: openOverdue()
         case .lowStock: openLowStock()
+        case .orders, .published: openOrders()
         }
     }
 }
