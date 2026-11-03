@@ -9,6 +9,7 @@ struct Sidebar: View {
     @Bindable var shop: Shop
     /// "More" opened by hand, remembered per window.
     @SceneStorage("sidebar.more") private var showMore = false
+    @SceneStorage("sidebar.library") private var showLibrary = false
 
     var body: some View {
         // NOTHING behind the lock: the shelves' counts, the pipeline's stage
@@ -73,18 +74,21 @@ struct Sidebar: View {
                     count: shop.orders.count(where: shop.inSite),
                     selected: shop.shelf.sameScreen(as: .jobs(nil)))
                     .tag(Shop.Shelf.jobs(nil))
-                Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
-                    selected: shop.shelf.sameScreen(as: .library(nil)))
-                    .tag(Shop.Shelf.library(nil))
-                // The models, below the work. A group is a set that belongs
-                // together — the seven Saudi Kings, offered as one collection —
-                // so the groups a shop has actually made are named here rather
-                // than hidden behind a filter menu.
-                ClassicSmartFolderRows(shop: shop)  // saved searches
-                ForEach(shop.groups, id: \.self) { group in
-                    Row(title: group, symbol: "square.stack", count: shop.count(group: group),
-                        selected: shop.shelf == .library(group))
-                        .tag(Shop.Shelf.library(group))
+                // The models, below the work, with the saved searches and the
+                // groups folded under them. Folded by default: a Drive library
+                // turns every folder into a group, and beta.18 drew all several
+                // hundred of them open under Library with no way to close it.
+                DisclosureGroup(isExpanded: libraryOpen) {
+                    ClassicSmartFolderRows(shop: shop)  // saved searches
+                    ForEach(shop.groups, id: \.self) { group in
+                        Row(title: group, symbol: "square.stack", count: shop.count(group: group),
+                            selected: shop.shelf == .library(group))
+                            .tag(Shop.Shelf.library(group))
+                    }
+                } label: {
+                    Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
+                        selected: shop.shelf.sameScreen(as: .library(nil)))
+                        .tag(Shop.Shelf.library(nil))
                 }
                 // Only for a shop that has one. A catalogue is a decision a
                 // shop makes, not a screen everybody needs, and an empty row
@@ -170,6 +174,18 @@ struct Sidebar: View {
     }
 
     /// Open when asked, and open whenever the current screen is inside it.
+    /// Opened by hand, or because a group in it is the screen showing.
+    private var libraryOpen: Binding<Bool> {
+        Binding(
+            get: {
+                if showLibrary { return true }
+                if case .library(let group?) = shop.shelf { return shop.groups.contains(group) }
+                return false
+            },
+            set: { showLibrary = $0 }
+        )
+    }
+
     private var moreOpen: Binding<Bool> {
         Binding(
             get: { showMore || moreShelves.contains(shop.shelf) },
