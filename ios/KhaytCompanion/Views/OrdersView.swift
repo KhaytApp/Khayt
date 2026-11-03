@@ -232,14 +232,22 @@ struct OrdersView: View {
                     let on = c == chip
                     let tone = self.tone(c)
                     Button { chip = c } label: {
-                        Text(title(c))
-                            .font(.khayt(13, .semibold, relativeTo: .subheadline))
-                            .lineLimit(1)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 44)
-                            .foregroundStyle(on ? tone : KhaytDesign.note)
-                            .background(on ? tone.opacity(0.16) : .clear, in: Capsule())
-                            .overlay(Capsule().strokeBorder(on ? tone.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
+                        // The redesign's filter pill: a dot in the stage's
+                        // colour, the words and the count in ink.
+                        HStack(spacing: 6) {
+                            Circle().fill(tone).frame(width: 7, height: 7)
+                            Text(title(c))
+                                .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                                .lineLimit(1)
+                            Text(count(c).formatted(.number.locale(L10n.locale)))
+                                .font(.khaytMono(12, .medium, relativeTo: .subheadline))
+                                .foregroundStyle(KhaytDesign.note)
+                        }
+                        .foregroundStyle(KhaytDesign.ink)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(on ? tone.opacity(0.18) : KhaytDesign.surface, in: Capsule())
+                        .overlay(Capsule().strokeBorder(on ? tone.opacity(0.55) : KhaytDesign.hairline, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(on ? .isSelected : [])
@@ -249,6 +257,18 @@ struct OrdersView: View {
         }
         .clipShape(Rectangle())
         .padding(.bottom, 14)
+    }
+
+    /// How many rows a chip would show, from the same pool `rows` filters.
+    private func count(_ c: Chip) -> Int {
+        let pool = segment == .active ? queue
+            : history.filter { Self.finished.contains($0.status) }.map(QueueOrder.init(entry:))
+        switch c {
+        case .all: return pool.count
+        case .stage(let st): return pool.filter { $0.status == st.rawValue }.count
+        case .overdue: return pool.filter(\.isOverdue).count
+        case .rush: return pool.filter(\.isRush).count
+        }
     }
 
     private func title(_ c: Chip) -> String {
