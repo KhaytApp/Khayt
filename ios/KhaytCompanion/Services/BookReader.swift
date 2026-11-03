@@ -677,7 +677,8 @@ struct DayReport: Sendable {
     let report: EndOfDay
     let holdsWaste: Bool
     let holdsTime: Bool
-=======
+}
+
 /// One customer, as the phone's book has them: what they owe, their terms,
 /// their jobs, what they have agreed to pay, and the messages sent them.
 struct CustomerSummary: Sendable {
