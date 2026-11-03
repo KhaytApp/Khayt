@@ -131,7 +131,7 @@ enum Khayt {
     /// Named for its ROLE and not its hue, which the previous name was. An
     /// accent called `cyan` that stops being cyan is a lie in 59 files, and
     /// renaming it was most of what made this change reviewable.
-    static let brand = adaptive(light: 0x0B54AD, dark: 0x4591ED, name: "khaytBrand")
+    static let brand = adaptive(light: 0x216DCA, dark: 0x4C97F0, name: "khaytBrand")
 
     /// The ink that goes ON a `brand` fill.
     ///
@@ -198,6 +198,32 @@ enum Khayt {
     /// threshold is the one that applies. A gold dark enough for 4.5:1 on white
     /// is brown, and a brown star is not a star.
     static let marked = adaptive(light: 0xA6790A, dark: 0xF0C040, name: "khaytMarked")
+
+
+    // ── REDESIGN 2026 (Figma Qqxg4imtKVgC3TfNGcRGOk) ─────────────────────
+    //
+    // Cool paper in light, the website's navy in dark (the surfaces live in
+    // Surface.swift). One amber THREAD for progress and "today" only — a
+    // graphic colour, never text: #F2A541 on white is about 2:1. Every stage
+    // gets one colour that is not the action blue, and a status label is ink
+    // beside a dot of that colour, never text in it.
+
+    /// The thread: progress bars, the "today" chip, the week line, section
+    /// dashes. Graphic only — never text.
+    static let thread = adaptive(light: 0xF2A541, dark: 0xF2A541, name: "khaytThread")
+    /// The thread's wash, behind a "today" chip or a thread-coloured tile.
+    static let threadWash = adaptive(light: 0xFDF1DE, dark: 0x3A2C14, name: "khaytThreadWash")
+    /// A machine printing right now (the stage dot and the live count).
+    static let live = adaptive(light: 0x13803F, dark: 0x34D27A, name: "khaytLive")
+    /// Ready to collect.
+    static let collect = adaptive(light: 0x0E7A70, dark: 0x3FD0C0, name: "khaytCollect")
+    /// On hold and quality check.
+    static let hold = adaptive(light: 0x6B52B5, dark: 0xB49CFF, name: "khaytHold")
+    /// The well a model thumbnail sits in: lighter than the card in dark, so
+    /// a black print does not vanish into navy.
+    static let well = adaptive(light: 0xEEF1F3, dark: 0x2A4670, name: "khaytWell")
+    /// The icon's own navy, for the mark's tile and nothing that is read.
+    static let navy = adaptive(light: 0x0A2A50, dark: 0x0A2A50, name: "khaytNavy")
 
     /// Has this Mac's owner chosen an accent colour of their own?
     ///
