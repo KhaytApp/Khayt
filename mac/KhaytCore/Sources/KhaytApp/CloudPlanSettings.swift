@@ -130,9 +130,10 @@ struct CloudPlanSettings: View {
                 .disabled(busy || (CloudPlans.isUpgrade(plan, from: current) && !upgradesOpen))
                 // Paying is its own button, and it is found out lazily: the
                 // first tap on a cloud with no payment provider hides it for
-                // the session.
+                // the session. Not while the beta's upgrades are free: paying
+                // for what Upgrade gives away would only confuse.
                 if CloudPlans.isUpgrade(plan, from: current), (plan.priceSar ?? 0) > 0,
-                   !Shop.payGate.providerOff {
+                   !upgradesOpen, !Shop.payGate.providerOff {
                     Button(shop.words.callIt("mac.pay_button")) { paying = plan }
                         .disabled(busy)
                 }
