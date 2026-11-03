@@ -26,6 +26,27 @@
       tabs: ['logs-tab', 'analytics-tab', 'expenses-tab'] },
   ];
 
+  // The Khayt design (the 2026 identity) groups by what the shop is doing
+  // rather than by data type, as drawn in the approved redesign: the work in
+  // hand, the shop's stock and catalogue, the money, and the standalone tools.
+  const KHAYT_GROUPS = [
+    { key: 'work', labelKey: 'workbench.group.work', label: 'Work',
+      tabs: ['queue-tab', 'calculator-tab', 'clients-tab'] },
+    { key: 'shop', labelKey: 'workbench.group.shop', label: 'Shop',
+      tabs: ['inventory-tab', 'printfiles-tab', 'catalog-tab', 'portfolio-tab', 'gift-cards-tab'] },
+    { key: 'money', labelKey: 'workbench.group.money', label: 'Money',
+      tabs: ['logs-tab', 'analytics-tab', 'expenses-tab', 'waste-tab'] },
+    { key: 'tools', labelKey: 'workbench.group.tools', label: 'Tools',
+      tabs: ['colorstudio-tab', 'converter-tab', 'hueforge-tab'] },
+  ];
+
+  function activeGroupSet() {
+    return document.body.classList.contains('khayt-2026') ? 'khayt' : 'workbench';
+  }
+  function activeGroups() {
+    return activeGroupSet() === 'khayt' ? KHAYT_GROUPS : GROUPS;
+  }
+
 
 
   function isOn() { return document.body.classList.contains('khayt-workbench'); }
@@ -46,7 +67,15 @@
 
   function buildGroups() {
     const nav = document.querySelector('.khayt-nav');
-    if (!nav || nav.querySelector('[data-wb-group]')) return; // already built
+    if (!nav) return;
+    // Built already: keep it, unless it was built for the other group set (a
+    // switch between Workbench and Khayt keeps the same shell, so teardown never
+    // runs between them).
+    if (nav.querySelector('[data-wb-group]')) {
+      if (nav.dataset.wbGroupSet === activeGroupSet()) return;
+      restoreGroups();
+    }
+    nav.dataset.wbGroupSet = activeGroupSet();
 
     // Remember each button's original parent + position so teardown can restore.
     nav.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
@@ -66,7 +95,7 @@
       }
     });
 
-    GROUPS.forEach((grp) => {
+    activeGroups().forEach((grp) => {
       const wrap = document.createElement('div');
       wrap.className = 'khayt-navsec nav-group';
       wrap.dataset.wbGroup = grp.key;
@@ -135,7 +164,7 @@
 
   function relabelGroups() {
     document.querySelectorAll('[data-wb-group-head]').forEach((head) => {
-      const grp = GROUPS.find((g) => g.key === head.closest('[data-wb-group]')?.dataset.wbGroup);
+      const grp = activeGroups().find((g) => g.key === head.closest('[data-wb-group]')?.dataset.wbGroup);
       if (grp) head.textContent = tr(grp.labelKey, grp.label);
     });
   }
@@ -162,6 +191,7 @@
       delete btn.dataset.wbHomeIdx;
     });
     document.querySelectorAll('[data-wb-group]').forEach((el) => el.remove());
+    delete document.querySelector('.khayt-nav')?.dataset.wbGroupSet;
     document.querySelectorAll('.khayt-navsec').forEach((sec) => {
       sec.classList.remove('wb-nav-empty');
       if (sec.dataset.wbEmptyHidden) { sec.style.display = ''; delete sec.dataset.wbEmptyHidden; }

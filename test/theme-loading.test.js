@@ -198,7 +198,7 @@ test('removing the design in use hands the app back to a built-in', () => {
   const p = picker();
   const remove = p.slice(p.indexOf('.themeRemove'), p.indexOf('function mountSettingsPicker'));
   assert.ok(/settings\.designTheme === `custom:\$\{id\}`/.test(remove), 'notices it was the active one');
-  assert.ok(/settings\.designTheme = 'workbench'/.test(remove), 'falls back to a built-in');
+  assert.ok(/settings\.designTheme = 'khayt'/.test(remove), 'falls back to a built-in');
   assert.ok(/saveAll/.test(remove), 'and persists that');
 });
 

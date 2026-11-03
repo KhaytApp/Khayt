@@ -56,6 +56,8 @@
     purple: { fg: 'var(--wb-purple)', bg: 'var(--wb-purple-bg)' },
     teal: { fg: 'var(--wb-teal)', bg: 'var(--wb-teal-bg)' },
     gray: { fg: 'var(--ink-2)', bg: 'rgba(120,130,150,.14)' },
+    // Only the Khayt theme defines --wb-steel; elsewhere it falls back to gray.
+    steel: { fg: 'var(--wb-steel, var(--ink-2))', bg: 'var(--wb-steel-bg, rgba(120,130,150,.14))' },
   };
 
   function chip(cls, label) {
@@ -80,6 +82,19 @@
 
   // Bucket a queue status into one of the prototype's chip colors.
   function statusChipClass(status) {
+    // The Khayt theme uses the stage palette shared with the Mac and iPhone, so
+    // a job is the same colour on every device: pending steel, printing and
+    // post-processing green, hold and quality check purple, ready teal, quote
+    // grey. The other Workbench-hosted themes keep the prototype's buckets.
+    if (typeof document !== 'undefined' && document.body?.classList.contains('khayt-2026')) {
+      switch (status) {
+        case 'printing': case 'post': return 'green';
+        case 'completed': return 'teal';
+        case 'qc': case 'on_hold': return 'purple';
+        case 'pending': return 'steel';
+        default: return 'gray';
+      }
+    }
     switch (status) {
       case 'printing': return 'blue';
       case 'completed': return 'green';

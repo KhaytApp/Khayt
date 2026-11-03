@@ -4,14 +4,18 @@ const assert = require('node:assert/strict');
 const reg = require('../renderer/themes/registry-core.js');
 
 test('normalizeDesignId falls stale ids back to the default', () => {
-  // 'classic' and the six deleted legacy designs all resolve to workbench now.
-  assert.equal(reg.normalizeDesignId('classic'), 'workbench');
-  assert.equal(reg.normalizeDesignId('unknown'), 'workbench');
+  // The default is Khayt, the 2026 identity, since Nov 2026 (it was Workbench).
+  assert.equal(reg.DEFAULT_DESIGN, 'khayt');
+  assert.equal(reg.normalizeDesignId('classic'), 'khayt');
+  assert.equal(reg.normalizeDesignId('unknown'), 'khayt');
+  assert.equal(reg.normalizeDesignId(''), 'khayt');
   for (const gone of ['ledger', 'console', 'atelier', 'vitrine', 'cockpit', 'atlas']) {
-    assert.equal(reg.normalizeDesignId(gone), 'workbench', `${gone} was deleted`);
+    assert.equal(reg.normalizeDesignId(gone), 'khayt', `${gone} was deleted`);
   }
   // studio left with Bed Ready in 3.3 — it is not a Khayt design any more.
-  assert.equal(reg.normalizeDesignId('studio'), 'workbench');
+  assert.equal(reg.normalizeDesignId('studio'), 'khayt');
+  // Workbench is still a design you can pick; it just is not the default.
+  assert.equal(reg.normalizeDesignId('workbench'), 'workbench');
 });
 
 test('selectable themes are the three 2.6 designs plus the 3.4 additions', () => {
@@ -20,7 +24,7 @@ test('selectable themes are the three 2.6 designs plus the 3.4 additions', () =>
   // the only registry-level signal that they exist and are pickable.
   const selectable = reg.listSelectableThemes();
   assert.deepEqual(selectable.filter((id) => !id.startsWith('custom:')).sort(),
-    ['blueprint', 'command', 'flow', 'foreman', 'meridian', 'nocturne', 'vivid', 'workbench']);
+    ['blueprint', 'command', 'flow', 'foreman', 'khayt', 'meridian', 'nocturne', 'vivid', 'workbench']);
 });
 
 test('the six deleted legacy designs are gone from the registry', () => {
@@ -38,7 +42,7 @@ test('studio is gone from Khayt entirely — Bed Ready owns its UI layer now', (
   assert.equal(reg.registry.studio, undefined);
   assert.equal(reg.STUDIO_ACCENTS, undefined);
   // Its accent table went with it; the fallback is the default theme's.
-  assert.deepEqual(Object.keys(reg.accentsForTheme('nonsense')), Object.keys(reg.accentsForTheme('workbench')));
+  assert.deepEqual(Object.keys(reg.accentsForTheme('nonsense')), Object.keys(reg.accentsForTheme('khayt')));
 });
 
 test('coming soon lists Frontier Pulse and Stream only', () => {
