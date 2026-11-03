@@ -9058,6 +9058,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.18] - 2026-11-03
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **Khayt looks and is laid out differently, and a few things have moved.** The window is a native macOS 26 window again, with a glass sidebar, in the website's colours: cool white in light, navy in dark, and an amber thread for progress and "today". The home screen is now **Today**: what needs you, your four key figures, every machine with its progress, what is due this week and the customers you are waiting on. **Board is no longer in the sidebar**: open **Jobs** and pick **Board** or **List** in the toolbar (old Board links, menu items and shortcuts still take you there). The stages that used to be listed under Jobs in the sidebar are in the **Stage** menu beside it. **Waste, Portfolio, Gift cards and Colour studio** are under **More** at the bottom of the sidebar. The **Today / Ledger** switch and **Record a payment** are in the toolbar. If you would rather keep the previous navy window, Settings ▸ General ▸ Appearance switches it back. Khayt also has a new icon: the same nozzle and thread, now spelling خ. Nothing in your book changes.
+
+### Added
+
+- **Today, the new home screen**, a new window frame and sidebar, and the new icon and wordmark (see above).
+- **A currency per customer.** A customer can be kept in their own currency; their new jobs start in it.
+- **Milestone proformas.** A job can be billed in milestones, each as a proforma, never a tax invoice.
+- **Your iPhone can pause, resume or stop a print**, on the shop's Wi-Fi or through Khayt Cloud, and the shop's phones are told each morning about late and due-today work and when stock first runs low.
+- **The shop's payment link** (Settings ▸ Online): customers see Pay deposit, Pay balance or Pay on their order page.
+- **A customer who asked through the quote form is emailed their order page** when their job is published.
+- **A weekly email switch** for the owner, and **paying for a plan** from Settings (prices shown before VAT; VAT is added at checkout by billing country where it applies — today nowhere). Paying opens once the beta ends.
+
+### Changed
+
+- **Plan prices no longer say "VAT included".**
+- **The Board and the Jobs screen draw sooner** on a big library.
+
+### Fixed
+
+- **An invite another shop already holds is said plainly**, and a key already published by the owner is no longer an error.
+
 ## [4.0.0-beta.17] - 2026-11-02
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
