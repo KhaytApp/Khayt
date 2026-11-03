@@ -175,6 +175,8 @@ def main():
              # apple-touch-icon is 180 and opaque: iOS composites alpha onto black.
              save(sq(180), f'{site}/khayt-apple-icon.png', opaque=True),
              save(sq(256), f'{site}/khayt-icon.png'),
+             # The nav brand on every page (54 references in 30 pages).
+             save(sq(128), f'{site}/khayt-icon-128.png'),
              save(band(lockup, 1200, 630), f'{site}/og-image.png')]
     p = os.path.join(OUT, site, 'favicon.ico')
     os.makedirs(os.path.dirname(p), exist_ok=True)
