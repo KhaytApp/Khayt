@@ -50,6 +50,33 @@ final class OrdersNavigationState: ObservableObject {
         return nil
     }
 
+    /// A `khayt://` link, in the Mac's shapes (`mac/.../DeepLink.swift`):
+    /// `job/<id>`, `machine/<id>`, `screen/<name>`. Navigate only; anything
+    /// else is nothing. Returns the tab to show, if the link names one.
+    enum Link: Equatable { case job(String), tab(Int), orders(OrderStatus?) }
+
+    nonisolated static func link(_ url: URL) -> Link? {
+        guard url.scheme?.lowercased() == "khayt", let host = url.host()?.lowercased() else { return nil }
+        let rest = url.path().split(separator: "/").map { String($0).removingPercentEncoding ?? String($0) }
+        guard let first = rest.first, !first.isEmpty else { return nil }
+        switch host {
+        case "job": return .job(first)
+        case "machine": return .tab(3)
+        case "spool": return .tab(2)
+        case "screen":
+            let parts = first.split(separator: ":", maxSplits: 1).map(String.init)
+            switch parts[0] {
+            case "dashboard": return .tab(0)
+            case "board", "jobs": return .orders(parts.count > 1 ? OrderStatus(rawValue: parts[1]) : nil)
+            case "inventory": return .tab(2)
+            case "machines": return .tab(3)
+            case "customers": return .tab(4)
+            default: return nil
+            }
+        default: return nil
+        }
+    }
+
     func go(_ destination: Destination) {
         switch destination {
         case .order(let id): openOrder(id: id)

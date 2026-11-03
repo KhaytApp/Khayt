@@ -115,6 +115,16 @@ struct PrintActivityLockScreen: View {
                         .fixedSize()
                 }
             }
+            // An ended print's one next step, as its alert offers it.
+            if let move = PrintActivityText.move(state.phase) {
+                Button(intent: PrintActivityMoveIntent(machineId: attributes.machineId, move: move)) {
+                    Text(PrintActivityText.moveTitle(move, bundle: bundle))
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(tone)
+            }
         }
     }
 }
@@ -227,6 +237,22 @@ struct PrintBar: View {
 
 /// Small words and figures the views share.
 enum PrintActivityText {
+    /// The move a Live Activity offers for an ended print: post-processing
+    /// for a finished one, the queue again for one that failed or was
+    /// cancelled — nil while it runs.
+    static func move(_ phase: PrintActivityAttributes.ContentState.Phase) -> String? {
+        switch phase {
+        case .finished: return "post"
+        case .failed, .cancelled: return "reprint"
+        case .printing, .paused: return nil
+        }
+    }
+
+    static func moveTitle(_ move: String, bundle: Bundle = .main) -> String {
+        move == "post" ? String(localized: "Move to post-processing", bundle: bundle)
+                       : String(localized: "Print it again", bundle: bundle)
+    }
+
     /// `base` with 0–9 digits; month names and plural rules stay its own.
     /// The same rule as the app's `L10n.latinDigits`, which the widget cannot see.
     static func latinDigits(_ base: Locale) -> Locale {
