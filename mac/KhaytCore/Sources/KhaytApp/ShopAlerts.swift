@@ -28,6 +28,7 @@ final class ShopAlerts {
     nonisolated static let namedAtMost = 10
     /// At most this many job ids in a digest; the count stays whole.
     nonisolated static let idsAtMost = 40
+    private var checking = false
 
     var defaults: UserDefaults = .standard
     var send: ((_ kind: String, _ payload: [String: JSONValue]) async -> Bool)?
@@ -58,6 +59,12 @@ final class ShopAlerts {
 
     /// Run on every load and printer sweep; cheap when there is nothing due.
     func check(shop: Shop, now: Date = Date()) async {
+        // One check at a time: a load and a printer sweep landing together
+        // would both read what was told before either send came back, and
+        // push the same low spool (or the same morning) twice.
+        guard !checking else { return }
+        checking = true
+        defer { checking = false }
         guard let shopId = shop.cloudShopIdForAlerts, shop.cloudRoleCanWrite, shop.cloudDek != nil,
               let send else { return }
         // ── STOCK ────────────────────────────────────────────────────────

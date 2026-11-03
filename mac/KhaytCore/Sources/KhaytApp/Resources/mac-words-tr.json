@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "Ödeme sağlayıcınızın https bağlantısını yapıştırın. Bağlantıdaki {amount}, ödenecek tutarla doldurulur. Müşteri sayfasında Kapora öde, Bakiyeyi öde veya Öde düğmesi görünür.",
  "mac.paylink_saved": "Kaydedildi.",
  "mac.paylink_removed": "Kaldırıldı.",
+ "mac.paylink_remove_q": "Ödeme bağlantısı kaldırılsın mı?",
+ "mac.paylink_remove_msg": "Müşteriler sipariş sayfalarında artık Öde düğmesini görmez.",
  "mac.plan_paid": "Bu dükkân planı için ödeme yapıyor, bu yüzden ücretsiz beta planına geçemez.",
  "mac.plan_per_month": "ayda {price}",
  "mac.plan_per_year": "yılda {price}",

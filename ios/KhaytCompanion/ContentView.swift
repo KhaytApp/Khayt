@@ -10,8 +10,11 @@ struct ContentView: View {
     private let tabs: [KhaytTabItem] = [
         KhaytTabItem(id: 0, title: L10n.tr("tab.home"), icon: "house.fill"),
         KhaytTabItem(id: 1, title: L10n.tr("tab.orders"), icon: "rectangle.stack.fill"),
-        KhaytTabItem(id: 2, title: L10n.tr("tab.inventory"), icon: "cylinder.split.1x2.fill"),
+        // Printers before spools, as the redesign orders the floor: what is
+        // running, then what it runs on. The ids stay, so every link and
+        // pending-tab key still lands where it did.
         KhaytTabItem(id: 3, title: L10n.tr("tab.machines"), icon: "printer.fill"),
+        KhaytTabItem(id: 2, title: L10n.tr("tab.inventory"), icon: "cylinder.split.1x2.fill"),
         KhaytTabItem(id: 4, title: L10n.tr("tab.clients"), icon: "person.2.fill"),
         KhaytTabItem(id: MainTabView.calculatorTab, title: L10n.tr("tab.calculator"), icon: "function"),
         KhaytTabItem(id: 5, title: L10n.tr("tab.settings"), icon: "gearshape.fill")

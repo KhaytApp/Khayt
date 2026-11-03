@@ -41,8 +41,23 @@ final class CloudPrinterCommands {
     private(set) var since: Date?
     private var lastPoll: Date?
     private var inFlight = false
-    /// Command ids already run (or refused as stale), with when.
+    /// Command ids already run (or refused as stale), with when. Kept in the
+    /// defaults as well, so a Mac restarted inside `maxAge` of a stop does not
+    /// see that stop as new and run it on the next print.
     private(set) var handled: [String: Date] = [:]
+    nonisolated static let handledKey = "cloud.printerCommandsHandled"
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let stored = defaults.dictionary(forKey: Self.handledKey) as? [String: Double] {
+            handled = stored.mapValues { Date(timeIntervalSince1970: $0) }
+        }
+    }
+
+    private func remember() {
+        defaults.set(handled.mapValues(\.timeIntervalSince1970), forKey: Self.handledKey)
+    }
 
     struct Event: Decodable {
         let id: String?
@@ -124,8 +139,10 @@ final class CloudPrinterCommands {
             since = from
         }
         handled = handled.filter { now.timeIntervalSince($0.value) < Self.maxAge * 5 }
-        for command in Self.commands(list.events, dek: dek, now: now, handled: Set(handled.keys)) {
-            handled[command.id] = now
+        let toRun = Self.commands(list.events, dek: dek, now: now, handled: Set(handled.keys))
+        for command in toRun { handled[command.id] = now }
+        remember()
+        for command in toRun {
             let (_, body) = await shop.phonePrinterCommand(command.machineId, command.verb)
             var answer: [String: JSONValue] = [:]
             if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)) { answer = o }

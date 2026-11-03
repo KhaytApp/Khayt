@@ -6,6 +6,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **iPhone: the Home Screen widget in the redesign's colours.** The Khayt Queue widget was still in the 2025 indigo the app dropped. It now sits on the redesign's surface (white, or navy in dark). Counts are bold over small mono labels, and a print's percent is mono ink over the same amber thread bar the app uses for progress. The connection dot is the app's live green, or late red when offline. The lock-screen version is unchanged, since the system draws it in one tint.
 
+- **iPhone: clients look like the redesign (phase 6).** Each client in the list has two initials in a brand-blue circle ("NA" for Noura Al-Saud, in the name's own script), the name larger and the order count in mono. A customer's page opens with their initials large and their name in the display face; what they owe is large too, and the card is outlined in red when they are over their limit. The Live Activity took the redesign's colours in phase 1.
+
+- **iPhone: printers and spools look like the redesign (phase 5).** A printer's card has a printer tile, its name and what it is on, and a pill; while it prints, the percentage is large, with the time left and the clock time it ends beside it, over a thicker amber bar and the nozzle and bed temperatures. A printing card is outlined in green, and one in trouble sits on a red wash with its error under the name. Spools are tiles now, two to a row: the colour as a reel, the material and brand over the colour's name, the grams and the share left, and a teal bar (amber and outlined when the spool is low). A spool's number is on its page.
+
+- **iPhone: jobs look like the redesign (phase 4).** A job row has a tile in its stage's colour, the job's number in mono beside a pill (a dot in the stage colour, the words in ink, "Printing 64%" while the machine reports it), the title larger, and who it is for; only a late job gets a coloured outline. Swiping a row forward still moves it on. The Orders filters show their counts. A job's page leads with its number and pill over the title in the display face, and the five stages are now one track of dots, tapped to put the job in any of them.
+
+- **iPhone: Home looks like the redesign's Today (phase 3).** The header is today's date (Gregorian, whatever the phone's calendar) over the title, with no logo tile. This month's takings are the hero: large, on the brand blue, with this year and what is owed beneath them; Owed still opens who owes it. The three counts follow as plain cards, the printing one outlined in green. Late jobs, low spools and waiting requests are one card of rows, each with its colour in a round icon and its words in ink. Section headers are in the mono face. The Calculator, Library and Catalogue rows leave Home, since the New sheet holds all three. The figures, the pipeline and the jobs are the same as before.
+
+- **iPhone: a New sheet, and Printers before Spools (redesign phase 2).** Home's + is now a brand-blue button that opens New: tiles for a new job, a file to quote, a spool, the calculator, an expense and waste, each with a line saying what it is for, and under them the rest of what the old + menu held (scan a label, price from the library, the catalogue, end of day). Nothing the menu offered is gone. The tab bar now reads Home, Orders, Machines, Inventory, Clients: the printers come before the spools they run on. Links and widgets that open a tab still land on the same one.
+
+- **Mac: four small fixes from the beta.18 review.** A Mac restarted within two minutes of a phone's pause or stop no longer runs that command again, because the ones already run are now remembered across restarts. A low spool is no longer pushed to the phones twice when a load and a printer sweep check at the same moment. Removing the shop's payment link now asks first. The weekly email switch saves only for the owner. Today's greeting also drops the space between sentences in Japanese and Chinese.
+- **Mac: Library's groups fold away in the sidebar.** The saved searches and every library group now sit inside a Library disclosure that starts closed. beta.18 listed them all open under Library, which on a Drive library is several hundred rows with no way to close them. It opens by itself when one of its groups is the screen showing.
 - **iPhone: the redesign's colours and type (phase 1).** The app moves onto the palette the Mac took in #2183 and the website uses: cool paper in light, the website's navy in dark, the brand blue #216DCA / #4C97F0 (the accent colour too). Printing is green, QC and on hold violet, and progress bars are the amber thread, with the percentage beside them in ink; a status badge is a coloured dot with its words in ink. The Live Activity follows. Space Grotesk gives way to the website's faces: Hanken Grotesk for text, Archivo for large titles and big numbers, JetBrains Mono for eyebrows and section headers (Arabic keeps the system's Arabic face). Each font's OFL licence ships beside it. The screens themselves are unchanged; the Figma redesign (Today, Jobs, Printers, Spools, People) follows in later phases.
 
 - **Desktop: a new look, the same as khaytapp.com and the Mac app.** A new built-in design, Khayt, is now the default: a navy sidebar with one set of line icons in place of the emoji, a white work surface with soft cards, pill buttons, Archivo headings and figures in JetBrains Mono, and an amber line that marks the screen you are on and every progress bar. Job statuses use one colour per stage, the same on the Mac and the iPhone: pending steel, printing green, on hold and quality check purple, ready teal, late red, and grey for quotes and paid; amber is never a status colour. Dark mode is the website's deep navy rather than a grey. A shop that was on Workbench only because it was the default moves to Khayt once; a shop that picks Workbench (or chose any other design) keeps it. The sidebar is grouped by what you are doing: Work (queue, calculator, customers), Shop (inventory, print files, catalog, portfolio, gift cards), Money (orders log, analytics, expenses, waste) and Tools (colour studio, converter, HueForge); Workbench keeps its own groups. Settings ▸ Preferences ▸ Design lists Khayt first, with three accents (Khayt Blue, Navy, Teal).
@@ -9065,6 +9077,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.19] - 2026-11-04
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **Library's groups fold away in the sidebar.** The saved searches and every library group now sit inside Library, which starts closed. Open it with its arrow; it also opens by itself while one of its groups is showing.
+- **A phone's pause or stop is never run twice.** That held even if the Mac restarts right after running it.
+- **A low spool is pushed to the phones once**, even when two checks land at the same moment.
+- **Removing the payment link asks first**, and the weekly email switch saves only for the shop's owner.
+- **Today's greeting** has no stray space between its sentences in Japanese and Chinese.
 
 ## [4.0.0-beta.18] - 2026-11-03
 

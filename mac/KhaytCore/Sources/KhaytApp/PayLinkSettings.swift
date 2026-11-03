@@ -21,6 +21,7 @@ struct PayLinkSettings: View {
     @State private var busy = false
     @State private var problem: String?
     @State private var note: String?
+    @State private var confirmRemove = false
 
     private var mayWrite: Bool { shop.cloudCanManageEmbed }
     private var changed: Bool {
@@ -47,8 +48,13 @@ struct PayLinkSettings: View {
                 Button(shop.words.callIt("common.save")) { Task { await save() } }
                     .disabled(!mayWrite || busy || !changed
                               || url.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button(shop.words.callIt("mac.team_remove"), role: .destructive) { Task { await remove() } }
+                Button(shop.words.callIt("mac.team_remove"), role: .destructive) { confirmRemove = true }
                     .disabled(!mayWrite || busy || saved == nil)
+                    .confirmationDialog(shop.words.callIt("mac.paylink_remove_q"), isPresented: $confirmRemove) {
+                        Button(shop.words.callIt("mac.team_remove"), role: .destructive) { Task { await remove() } }
+                    } message: {
+                        Text(shop.words.callIt("mac.paylink_remove_msg"))
+                    }
                 if busy { ProgressView().controlSize(.small) }
             }
             if !mayWrite && loaded {

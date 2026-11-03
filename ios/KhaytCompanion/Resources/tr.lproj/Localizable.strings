@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "Koddaki fatura tarihi okunamıyor.";
 
 "Price a part" = "Bir parçayı fiyatla";
-"home.calculator.sub" = "Bir parçanın size maliyeti ve ne kadar isteyeceğiniz";
 
 /* Library */
 "library.title" = "Kitaplık";
 "library.price" = "Kitaplıktan fiyatla";
-"home.library.sub" = "Daha önce bastığınız bir model bulun ve fiyatlayın.";
 "library.search" = "Model, klasör, etiket ara";
 "library.folders" = "Klasörler";
 "library.models" = "Modeller";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Kendi fiyatınız";
 "catalogue.price.rounded" = "Hesaplanan fiyattan yuvarlandı";
 "catalogue.price.calculated" = "Hesaplanan";
-"home.catalogue.sub" = "Sattıklarınız, fiyat ve stokla";
 
 /* Invoices */
 "invoice.title" = "Fatura";
@@ -998,3 +995,13 @@
 /* Rush, machine job */
 "orders.rush" = "Acele";
 "machines.job" = "İş: %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "Yeni";
+"new.job.detail" = "Müşteri, parçalar ve fiyat";
+"new.quote_file.detail" = "3MF veya STL, fiyatıyla";
+"new.spool.detail" = "Tara, etiketi oku ya da yaz";
+"new.calculator.detail" = "Baskıyı elle fiyatla";
+"new.expense.detail" = "Fişin fotoğrafı";
+"new.waste.detail" = "Başarısız baskı veya tasfiye";
+"new.more" = "Diğer";

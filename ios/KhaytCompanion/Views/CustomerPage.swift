@@ -16,6 +16,7 @@ struct CustomerPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                identity
                 if client.dialNumber != nil || !(client.email ?? "").isEmpty {
                     ContactCard(client: client)
                 }
@@ -39,7 +40,7 @@ struct CustomerPage: View {
             .padding(16)
         }
         .background(KhaytDesign.ground.ignoresSafeArea())
-        .navigationTitle(client.displayName)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
@@ -76,9 +77,30 @@ struct CustomerPage: View {
         loaded = true
     }
 
+    /// The redesign's header: the customer's initials large, the name in
+    /// the display face.
+    private var identity: some View {
+        VStack(spacing: 10) {
+            Text(Initials.of(client.displayName))
+                .font(.khaytDisplay(24, .bold, relativeTo: .title2))
+                .foregroundStyle(KhaytDesign.brand)
+                .frame(width: 76, height: 76)
+                .background(KhaytDesign.brand.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+            Text(client.displayName)
+                .font(.khaytDisplay(26, .bold, relativeTo: .title))
+                .tracking(-0.6)
+                .foregroundStyle(KhaytDesign.ink)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+    }
+
     private func header(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.khayt(10, .bold, relativeTo: .caption2)).tracking(1)
+        Text(L10n.usesArabicLayout ? text : text.uppercased())
+            .font(L10n.usesArabicLayout ? .khayt(11, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
+            .tracking(L10n.usesArabicLayout ? 0 : 0.8)
             .foregroundStyle(KhaytDesign.note)
     }
 
@@ -86,7 +108,8 @@ struct CustomerPage: View {
         VStack(alignment: .leading, spacing: 6) {
             header(L10n.tr("customer.owes"))
             Text(Money.text(s.owed, s.currency))
-                .font(.khayt(26, .semibold, relativeTo: .title).monospacedDigit())
+                .font(.khaytDisplay(34, .bold, relativeTo: .title).monospacedDigit())
+                .tracking(-0.8)
                 .foregroundStyle(s.isOverLimit ? KhaytDesign.late : (s.owed > 0.005 ? KhaytDesign.attention : KhaytDesign.done))
             if s.creditLimit > 0 {
                 Text(L10n.format(s.isOverLimit ? "customer.over_limit" : "customer.limit",
@@ -99,8 +122,12 @@ struct CustomerPage: View {
                 .font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .card()
+        .padding(16)
+        // Outlined in red when the customer is over their limit, as the
+        // redesign draws a debt that needs chasing.
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(s.isOverLimit ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline, lineWidth: 1))
     }
 
     private func jobs(_ title: String, _ list: [CustomerSummary.Job], empty: String) -> some View {
@@ -166,7 +193,9 @@ struct CustomerPage: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Image(systemName: icon(m.kind)).font(.caption).foregroundStyle(KhaytDesign.note)
-                        Text(String(m.at.prefix(10))).font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
+                        // The message's day as the book stamps it (yyyy-MM-dd): a
+                        // date string, not a number to format.
+                        Text(verbatim: String(m.at.prefix(10))).font(.khaytMono(11, .regular, relativeTo: .caption2))
                             .foregroundStyle(KhaytDesign.note)
                         if let order = m.orderId {
                             Text(order).font(.khayt(11.5, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)

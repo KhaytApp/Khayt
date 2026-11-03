@@ -50,4 +50,12 @@ final class DesignV2FoundationTests: XCTestCase {
         // Rails stay rare: only printing and QC.
         XCTAssertEqual(["pending", "printing", "post", "qc", "completed"].filter(KhaytDesign.isRailed), ["printing", "qc"])
     }
+
+    func testInitialsTakeTwoLettersInTheNamesOwnScript() {
+        XCTAssertEqual(Initials.of("Noura Al-Saud"), "NA")
+        XCTAssertEqual(Initials.of("Acme"), "A")
+        XCTAssertEqual(Initials.of("  (Studio) Rawa "), "SR")
+        XCTAssertEqual(Initials.of("نورة السعود"), "نا")
+        XCTAssertEqual(Initials.of(""), "?")
+    }
 }

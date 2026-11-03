@@ -383,11 +383,19 @@ struct OrderDetailContent: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(stageName)
-                    .font(.khayt(12, .semibold, relativeTo: .caption))
-                    .padding(.horizontal, 10).padding(.vertical, 3)
-                    .foregroundStyle(tone)
-                    .background(tone.opacity(0.14), in: Capsule())
+                Text(order.id)
+                    .font(.khaytMono(12, .medium))
+                    .foregroundStyle(KhaytDesign.note)
+                    .environment(\.layoutDirection, .leftToRight)
+                // The redesign's pill: a dot in the stage colour, ink words.
+                HStack(spacing: 5) {
+                    Circle().fill(tone).frame(width: 6, height: 6)
+                    Text(stageName)
+                        .font(.khayt(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.ink)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 3)
+                .background(tone.opacity(0.16), in: Capsule())
                 if order.isRush { RushBadge() }
                 if order.isOverdue {
                     Text(L10n.tr("orders.late"))
@@ -400,8 +408,8 @@ struct OrderDetailContent: View {
             }
             .padding(.bottom, 11)
             Text(order.displayTitle)
-                .font(.khayt(25, .semibold, relativeTo: .title))
-                .tracking(-0.5)
+                .font(.khaytDisplay(26, .semibold, relativeTo: .title))
+                .tracking(-0.6)
                 .foregroundStyle(KhaytDesign.ink)
             Text(order.displayClient)
                 .font(.khayt(14.5, relativeTo: .subheadline))
@@ -411,16 +419,11 @@ struct OrderDetailContent: View {
                 printProgress(live, progress)
             }
         }
-        .padding(.vertical, 16).padding(.leading, 19).padding(.trailing, 16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(KhaytDesign.surface)
-        .overlay(alignment: .leading) {
-            if KhaytDesign.isRailed(order.status) || order.isOverdue {
-                Rectangle().fill(order.isOverdue ? KhaytDesign.late : tone).frame(width: 3)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(order.isOverdue ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline, lineWidth: 1))
     }
 
     /// The design's print progress: the figure, a bar, and how long is left —
@@ -555,7 +558,7 @@ struct OrderDetailContent: View {
                 .tracking(1.05)
                 .foregroundStyle(KhaytDesign.note)
                 .padding(.horizontal, 2)
-            FlowChips(stages: Self.stages, current: current, disabled: isUpdating) { onSetStatus($0.rawValue) }
+            StageStepper(stages: Self.stages, current: current, disabled: isUpdating) { onSetStatus($0.rawValue) }
         }
     }
 
@@ -633,40 +636,59 @@ extension OrderDetailContent {
     }
 }
 
-/// The stage chips, wrapping onto a second line when five do not fit.
-private struct FlowChips: View {
+/// The redesign's stage track: the five stages as dots on one thread, the ones
+/// behind the job filled, the job's own ringed in its colour. Any dot can be
+/// tapped to put the job there directly — for the job sent back from QC.
+private struct StageStepper: View {
     let stages: [OrderStatus]
     let current: OrderStatus?
     let disabled: Bool
     let onPick: (OrderStatus) -> Void
 
+    private var at: Int { current.flatMap { stages.firstIndex(of: $0) } ?? -1 }
+
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 7) { chips }
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 7) { ForEach(stages.prefix(3), id: \.self, content: chip) }
-                HStack(spacing: 7) { ForEach(stages.dropFirst(3), id: \.self, content: chip) }
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(stages.enumerated()), id: \.offset) { i, stage in
+                step(i, stage)
             }
         }
+        .padding(.vertical, 12).padding(.horizontal, 6)
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
     }
 
-    private var chips: some View { ForEach(stages, id: \.self, content: chip) }
-
-    private func chip(_ stage: OrderStatus) -> some View {
-        let on = stage == current
-        let tone = KhaytDesign.statusColor(for: stage.rawValue)
+    private func step(_ i: Int, _ stage: OrderStatus) -> some View {
+        let on = i == at
+        let passed = at >= 0 && i < at
+        let tone = KhaytDesign.statusColor(for: (current ?? stage).rawValue)
         return Button { onPick(stage) } label: {
-            Text(stage.localizedLabel)
-                .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
-                .lineLimit(1)
-                .padding(.horizontal, 15)
-                .frame(minHeight: 44)
-                .foregroundStyle(on ? tone : KhaytDesign.note)
-                .background(on ? tone.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(on ? tone.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
+            VStack(spacing: 7) {
+                ZStack {
+                    // The thread either side of the dot, coloured up to the job.
+                    HStack(spacing: 0) {
+                        Rectangle().fill(i == 0 ? .clear : (i <= at ? tone : KhaytDesign.hairline))
+                        Rectangle().fill(i == stages.count - 1 ? .clear : (i < at ? tone : KhaytDesign.hairline))
+                    }
+                    .frame(height: 2)
+                    Circle()
+                        .fill(on || passed ? tone : KhaytDesign.surface)
+                        .frame(width: on ? 16 : 12, height: on ? 16 : 12)
+                        .overlay(Circle().strokeBorder(on || passed ? tone : KhaytDesign.note.opacity(0.6), lineWidth: 1.5))
+                        .background(Circle().fill(tone.opacity(on ? 0.25 : 0)).frame(width: 26, height: 26))
+                }
+                .frame(height: 26)
+                Text(stage.localizedLabel)
+                    .font(.khayt(11.5, on ? .semibold : .medium, relativeTo: .caption2))
+                    .foregroundStyle(on ? KhaytDesign.ink : KhaytDesign.note)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled || on)
+        .accessibilityLabel(stage.localizedLabel)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

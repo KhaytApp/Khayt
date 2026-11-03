@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "Cole o link https do seu provedor de pagamento. {amount} no link é substituído pelo valor devido. A página do cliente mostra Pagar sinal, Pagar saldo ou Pagar.",
  "mac.paylink_saved": "Salvo.",
  "mac.paylink_removed": "Removido.",
+ "mac.paylink_remove_q": "Remover o link de pagamento?",
+ "mac.paylink_remove_msg": "Os clientes deixam de ver o botão Pagar na página do pedido.",
  "mac.plan_paid": "Esta loja paga pelo plano, então não pode mudar para um plano beta gratuito.",
  "mac.plan_per_month": "{price} por mês",
  "mac.plan_per_year": "{price} por ano",

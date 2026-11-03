@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "تعذّرت قراءة تاريخ الفاتورة في الرمز.";
 
 "Price a part" = "تسعير قطعة";
-"home.calculator.sub" = "تكلفة القطعة عليك، وكم تطلب مقابلها";
 
 /* Library */
 "library.title" = "المكتبة";
 "library.price" = "تسعير من المكتبة";
-"home.library.sub" = "ابحث عن نموذج طبعته من قبل وسعّره.";
 "library.search" = "ابحث في النماذج والمجلدات والوسوم";
 "library.folders" = "المجلدات";
 "library.models" = "النماذج";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "سعرك الخاص";
 "catalogue.price.rounded" = "مقرّب من السعر المحسوب";
 "catalogue.price.calculated" = "محسوب";
-"home.catalogue.sub" = "ما تبيعه، بأسعاره ومخزونه";
 
 /* Invoices */
 "invoice.title" = "الفاتورة";
@@ -998,3 +995,13 @@
 /* Rush, machine job */
 "orders.rush" = "عاجل";
 "machines.job" = "الطلب: %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "جديد";
+"new.job.detail" = "العميل والقطع والسعر";
+"new.quote_file.detail" = "ملف 3MF أو STL مع سعره";
+"new.spool.detail" = "امسح أو اقرأ الوسم أو اكتب";
+"new.calculator.detail" = "سعّر طباعة يدويًا";
+"new.expense.detail" = "صورة الإيصال";
+"new.waste.detail" = "طباعة فاشلة أو تنظيف";
+"new.more" = "المزيد";
