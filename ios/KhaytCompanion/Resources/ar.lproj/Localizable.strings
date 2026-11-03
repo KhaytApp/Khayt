@@ -921,6 +921,18 @@
 "ship.create" = "تم الشحن";
 "ship.open" = "الشحن";
 "ship.open.sub" = "شركة الشحن ورقم التتبع";
+/* End of day */
+"eod.title" = "نهاية اليوم";
+"eod.finished" = "اكتمل اليوم";
+"eod.revenue" = "إيراد اليوم";
+"eod.open" = "ما زال مفتوحًا";
+"eod.overdue" = "متأخر";
+"eod.waste" = "الخيوط المهدرة";
+"eod.grams" = "%@ غ";
+"eod.hours" = "الساعات المسجلة";
+"eod.finished_list" = "اكتمل اليوم";
+"eod.due_list" = "مستحق اليوم ولم يكتمل";
+"eod.nothing" = "لم يكتمل أي طلب اليوم.";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";

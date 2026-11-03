@@ -921,6 +921,18 @@
 "ship.create" = "Mark shipped";
 "ship.open" = "Ship";
 "ship.open.sub" = "Carrier and tracking number";
+/* End of day */
+"eod.title" = "End of day";
+"eod.finished" = "Finished today";
+"eod.revenue" = "Earned today";
+"eod.open" = "Still open";
+"eod.overdue" = "Late";
+"eod.waste" = "Filament wasted";
+"eod.grams" = "%@ g";
+"eod.hours" = "Hours logged";
+"eod.finished_list" = "Finished today";
+"eod.due_list" = "Due today, not done";
+"eod.nothing" = "Nothing was finished today.";
 /* Customer page */
 "customer.owes" = "Owes";
 "customer.limit" = "Credit limit %@";
