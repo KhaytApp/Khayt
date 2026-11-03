@@ -234,7 +234,7 @@ private struct MachineCard: View {
 
     private var tone: Color {
         switch mode {
-        case .printing: return KhaytDesign.hot
+        case .printing: return KhaytDesign.live
         case .idle, .offline: return KhaytDesign.note
         case .error: return KhaytDesign.late
         }
@@ -282,10 +282,10 @@ private struct MachineCard: View {
             }
             if mode == .printing, let progress = live.progress {
                 HStack(spacing: 9) {
-                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot, height: 5)
+                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 5)
                     Text("\(progress)%")
                         .font(.khayt(13, .medium, relativeTo: .footnote).monospacedDigit())
-                        .foregroundStyle(KhaytDesign.hot)
+                        .foregroundStyle(KhaytDesign.ink)
                         .environment(\.layoutDirection, .leftToRight)
                 }
                 .padding(.top, 11)

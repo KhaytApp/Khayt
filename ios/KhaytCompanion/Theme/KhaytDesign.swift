@@ -1,30 +1,46 @@
 import SwiftUI
 
-/// Design tokens — `design/ios-v2/` (Claude Design, v2): the prototype's own
-/// `DARK` and `LIGHT` palettes, warm neutrals with a blue brand.
+/// Design tokens — the 2026 redesign (Figma R9W19Jakt19nKs1yM5GEde), on the
+/// website's published library and the same numbers the Mac's `Palette.swift`
+/// and `Surface.swift` use since #2183: cool paper in light, the website's
+/// navy in dark, the brand blue #216DCA / #4C97F0.
 ///
-/// The names this app already used are kept and mapped onto the design's, so
-/// every screen moves to the new palette at once; the design's own names
-/// (`ground`, `sunk`, `hot`, `attention`, `note`, `late`) are here too, for
-/// the screens rebuilt against it.
+/// The names this app already used are kept and mapped onto these, so every
+/// screen moves to the new palette at once.
 ///
-/// The stage colours are the prototype's `TONE`: printing is `hot`, QC is
-/// `attention`, done is `done`, and pending and post are quiet `note` — only
-/// printing and QC earn a rail ("rails stay rare").
+/// Stages follow the Mac's Today: printing is `live` green, QC and on hold are
+/// `hold` violet, done is `done`, pending and post are quiet `note`. The amber
+/// `thread` is for progress and "today" only — a graphic colour, never text
+/// (#F2A541 on white is about 2:1).
 enum KhaytDesign {
-    // ── The design's palette ────────────────────────────────────────────
-    static let ground = Color(light: 0xEFEBE3, dark: 0x16130F)
-    static let surfaceV2 = Color(light: 0xFBF9F5, dark: 0x201C17)
-    static let sunk = Color(light: 0xE3DED3, dark: 0x2A251E)
-    static let hairlineV2 = Color(light: 0xDCD5C8, dark: 0x3A342C)
-    static let brandV2 = Color(light: 0x0B54AD, dark: 0x4591ED)
+    // ── The palette ─────────────────────────────────────────────────────
+    static let ground = Color(light: 0xF6F8F8, dark: 0x06182F)
+    static let surfaceV2 = Color(light: 0xFFFFFF, dark: 0x0D2444)
+    static let sunk = Color(light: 0xEEF1F1, dark: 0x0A2140)
+    static let hairlineV2 = Color(light: 0xE3E6E8, dark: 0x1F3A5E)
+    static let brandV2 = Color(light: 0x216DCA, dark: 0x4C97F0)
     static let onBrand = Color(light: 0xFFFFFF, dark: 0x0B1622)
     static let hot = Color(light: 0xAF3E18, dark: 0xF0763D)
     static let done = Color(light: 0x1B5E4F, dark: 0x4FBFA0)
     static let attention = Color(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = Color(light: 0xBB2D44, dark: 0xF2564A)
-    static let note = Color(light: 0x4F5B69, dark: 0x9EA7B3)
-    static let ink = Color(light: 0x1E1A15, dark: 0xF2EDE4)
+    static let note = Color(light: 0x5A636D, dark: 0x8AA4C2)
+    static let ink = Color(light: 0x101417, dark: 0xEAF2FB)
+
+    // ── New in the redesign (the Mac's names and values) ───────────────
+    /// Progress bars, the "today" chip, the week line. Graphic only.
+    static let thread = Color(light: 0xF2A541, dark: 0xF2A541)
+    static let threadWash = Color(light: 0xFDF1DE, dark: 0x3A2C14)
+    /// A machine printing right now.
+    static let live = Color(light: 0x13803F, dark: 0x34D27A)
+    /// Ready to collect.
+    static let collect = Color(light: 0x0E7A70, dark: 0x3FD0C0)
+    /// On hold and quality check.
+    static let hold = Color(light: 0x6B52B5, dark: 0xB49CFF)
+    /// The well a thumbnail sits in: lighter than the card in dark.
+    static let well = Color(light: 0xEEF1F3, dark: 0x2A4670)
+    /// The icon's navy, for the mark's tile and nothing that is read.
+    static let navy = Color(light: 0x0A2A50, dark: 0x0A2A50)
 
     // ── The names the app uses, on the design's palette ────────────────
     static let bg = ground
@@ -73,24 +89,23 @@ enum KhaytDesign {
 
     static let pad: CGFloat = 16
 
-    /// The prototype's `TONE`.
+    /// One colour per stage, as on the Mac's Today.
     static func statusColor(for status: String) -> Color {
         switch status.lowercased() {
         case "pending": return note
-        case "printing": return hot
+        case "printing": return live
         case "post": return note
-        case "qc": return attention
+        case "qc", "on_hold": return hold
         case "completed", "delivered", "shipped": return done
-        case "on_hold": return textMuted
         case "idle", "ready": return ok
-        case "busy": return hot
+        case "busy": return live
         case "error": return danger
         default: return textDim
         }
     }
 
-    /// Whether a stage earns a coloured rail on its row — the prototype's
-    /// `RAILED`: printing and QC, and nothing else.
+    /// Whether a stage earns a coloured rail on its row: printing and QC, and
+    /// nothing else ("rails stay rare").
     static func isRailed(_ status: String) -> Bool {
         ["printing", "qc"].contains(status.lowercased())
     }
@@ -160,18 +175,19 @@ struct KhaytStatBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.khaytDisplay(34, .bold, relativeTo: .largeTitle))
+                .monospacedDigit()
                 .foregroundStyle(color)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
             Text(label)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.khayt(12, .semibold, relativeTo: .caption))
                 .foregroundStyle(KhaytDesign.textDim)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(.khayt(10, relativeTo: .caption2))
                     .foregroundStyle(KhaytDesign.textMuted)
             }
         }
@@ -195,13 +211,13 @@ struct KhaytSectionHeader: View {
     var body: some View {
         HStack {
             Text(L10n.usesArabicLayout ? text : text.uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .tracking(0.7)
+                .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11.5, .medium))
+                .tracking(L10n.usesArabicLayout ? 0 : 0.6)
                 .foregroundStyle(KhaytDesign.textDim)
             Spacer()
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.khayt(14, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.brand)
             }
         }
@@ -212,9 +228,9 @@ struct KhaytSectionHeader: View {
 struct KhaytEyebrow: View {
     let text: String
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 10.5, weight: .bold))
-            .tracking(1.3)
+        Text(L10n.usesArabicLayout ? text : text.uppercased())
+            .font(L10n.usesArabicLayout ? .khayt(10.5, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
+            .tracking(L10n.usesArabicLayout ? 0 : 1.0)
             .foregroundStyle(KhaytDesign.textMuted)
     }
 }
@@ -223,7 +239,7 @@ struct KhaytSectionTitle: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 15, weight: .semibold))
+            .font(.khayt(15, .semibold, relativeTo: .headline))
             .foregroundStyle(KhaytDesign.text)
     }
 }
@@ -235,11 +251,12 @@ struct KhaytMetric: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
-                .font(.system(size: 28, weight: .medium, design: .rounded))
+                .font(.khaytDisplay(28, .semibold, relativeTo: .title))
+                .monospacedDigit()
                 .foregroundStyle(KhaytDesign.text)
             if let unit {
                 Text(unit)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.khaytMono(12.5, .medium))
                     .foregroundStyle(KhaytDesign.textMuted)
             }
         }
@@ -251,7 +268,7 @@ struct KhaytPill: View {
     var color: Color = KhaytDesign.brand
     var body: some View {
         Text(text)
-            .font(.caption.bold())
+            .font(.khayt(12, .semibold, relativeTo: .caption))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .foregroundStyle(color)
@@ -274,11 +291,11 @@ struct KhaytPrimaryButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let icon { Image(systemName: icon) }
-                Text(title).fontWeight(.semibold)
+                Text(title).font(.khayt(16, .semibold, relativeTo: .headline))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .foregroundStyle(.white)
+            .padding(.vertical, 13)
+            .foregroundStyle(KhaytDesign.onBrand)
             .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusMD))
         }
     }
@@ -290,7 +307,7 @@ struct KhaytGhostButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.khayt(14, .semibold, relativeTo: .subheadline))
                 .foregroundStyle(KhaytDesign.textDim)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)

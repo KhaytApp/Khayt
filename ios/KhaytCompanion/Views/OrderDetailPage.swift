@@ -436,10 +436,10 @@ struct OrderDetailContent: View {
                 Spacer()
                 Text("\(progress)%")
                     .font(.khayt(17, .semibold, relativeTo: .headline).monospacedDigit())
-                    .foregroundStyle(KhaytDesign.hot)
+                    .foregroundStyle(KhaytDesign.ink)
                     .environment(\.layoutDirection, .leftToRight)
             }
-            LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot, height: 7)
+            LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 7)
                 .animation(.easeOut(duration: 0.45), value: progress)
             if let eta = live.etaLocalized, let done = live.finishesAt() {
                 Text(L10n.format("machines.left_until", eta,

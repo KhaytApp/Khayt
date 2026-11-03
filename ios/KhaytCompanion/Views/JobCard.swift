@@ -131,10 +131,10 @@ struct JobCard: View {
             }
             if order.status == "printing", let live, live.isPrinting, let progress = live.progress {
                 HStack(spacing: 9) {
-                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot)
+                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread)
                     Text("\(progress)%")
                         .font(.khayt(11.5, .medium, relativeTo: .caption2).monospacedDigit())
-                        .foregroundStyle(KhaytDesign.hot)
+                        .foregroundStyle(KhaytDesign.ink)
                         .environment(\.layoutDirection, .leftToRight)
                     if let eta = live.etaLocalized {
                         Text(eta)

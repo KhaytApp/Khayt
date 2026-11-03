@@ -17,22 +17,22 @@ import UIKit
 /// palette (`KhaytDesign`'s v2 values, repeated here because the extension
 /// cannot see the app's theme), the time left is the largest thing on it, the
 /// clock time the print ends sits beside it, and the phase is a coloured pill:
-/// printing is `hot`, paused `attention`, done `done`, failed `late` — the
+/// printing is `live` green (the 2026 redesign), paused `attention`, done `done`, failed `late` — the
 /// app's stage colours, so a glance means the same thing in both places.
 enum PrintActivityLook {
-    static let brand = dynamic(light: 0x0B54AD, dark: 0x4591ED)
-    static let hot = dynamic(light: 0xAF3E18, dark: 0xF0763D)
+    static let brand = dynamic(light: 0x216DCA, dark: 0x4C97F0)
+    static let live = dynamic(light: 0x13803F, dark: 0x34D27A)
     static let done = dynamic(light: 0x1B5E4F, dark: 0x4FBFA0)
     static let attention = dynamic(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = dynamic(light: 0xBB2D44, dark: 0xF2564A)
-    static let ink = dynamic(light: 0x1E1A15, dark: 0xF2EDE4)
-    static let note = dynamic(light: 0x4F5B69, dark: 0x9EA7B3)
-    static let surface = dynamic(light: 0xFBF9F5, dark: 0x201C17)
-    static let track = dynamic(light: 0xE3DED3, dark: 0x3A342C)
+    static let ink = dynamic(light: 0x101417, dark: 0xEAF2FB)
+    static let note = dynamic(light: 0x5A636D, dark: 0x8AA4C2)
+    static let surface = dynamic(light: 0xFFFFFF, dark: 0x0D2444)
+    static let track = dynamic(light: 0xE3E6E8, dark: 0x1F3A5E)
 
     static func tone(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
         switch phase {
-        case .printing: hot
+        case .printing: live
         case .paused: attention
         case .finished: done
         case .failed: late
