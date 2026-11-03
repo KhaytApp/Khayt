@@ -148,9 +148,8 @@ struct DashboardView: View {
 
     /// The shop's numbers: counts, money and the pipeline.
     @ViewBuilder private var figures: some View {
-        counts.padding(.top, 14)
-        section(L10n.tr("pulse.money"))
-        money
+        money.padding(.top, 14)
+        counts.padding(.top, 10)
         if widthClass == .compact { calculatorRow }
         libraryRow
         catalogueRow
@@ -175,25 +174,21 @@ struct DashboardView: View {
 
     private var header: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            HStack(spacing: 11) {
-                Image("KhaytMark")
-                    .resizable().scaledToFit()
-                    .frame(width: 38, height: 38)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text((settings.shopLabel.isEmpty ? "Khayt" : settings.shopLabel).uppercased())
-                        .font(.khayt(11, .bold, relativeTo: .caption2))
-                        .tracking(1.1)
-                        .foregroundStyle(KhaytDesign.note)
-                        .lineLimit(1)
-                    Text(L10n.tr("pulse.title"))
-                        .font(.khayt(27, .semibold, relativeTo: .largeTitle))
-                        .foregroundStyle(KhaytDesign.ink)
-                        // One line beside three buttons: it shrinks a little
-                        // before it would wrap under the mark.
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                }
+            VStack(alignment: .leading, spacing: 5) {
+                // The redesign's header: today's date as a mono eyebrow over
+                // the title, with the shop's name after it when it has one.
+                Text(dateLine)
+                    .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
+                    .tracking(L10n.usesArabicLayout ? 0 : 0.8)
+                    .foregroundStyle(KhaytDesign.note)
+                    .lineLimit(1)
+                Text(L10n.tr("pulse.title"))
+                    .font(.khaytDisplay(30, .bold, relativeTo: .largeTitle))
+                    .tracking(-0.6)
+                    .foregroundStyle(KhaytDesign.ink)
+                    // One line beside the buttons: it shrinks a little
+                    // before it would wrap.
+                    .lineLimit(1).minimumScaleFactor(0.7)
             }
             Spacer(minLength: 8)
             if widthClass == .compact {
@@ -246,6 +241,19 @@ struct DashboardView: View {
         .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
 
+    /// "TUESDAY 3 NOVEMBER · SHOP NAME" — Gregorian whatever the phone's
+    /// calendar, as the book is (see `khayt-ios-calendar-and-digits`).
+    private var dateLine: String {
+        var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: L10n.locale,
+                                     calendar: Calendar(identifier: .gregorian))
+            .weekday(.wide).day().month(.wide)
+        style.timeZone = .current
+        let date = Date().formatted(style)
+        let shop = settings.shopLabel
+        let line = shop.isEmpty ? date : date + " · " + shop
+        return L10n.usesArabicLayout ? line : line.uppercased()
+    }
+
     // MARK: - Counts and money
 
     private var counts: some View {
@@ -263,45 +271,82 @@ struct DashboardView: View {
                 .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())
                 .foregroundStyle(value == nil ? KhaytDesign.note : tint)
                 .environment(\.layoutDirection, .leftToRight)
-            Text(label.uppercased())
-                .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .tracking(1)
+            Text(L10n.usesArabicLayout ? label : label.uppercased())
+                .font(L10n.usesArabicLayout ? .khayt(11, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
+                .tracking(L10n.usesArabicLayout ? 0 : 0.6)
                 .foregroundStyle(labelTint)
                 .lineLimit(1).minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 13).padding(.top, 12).padding(.bottom, 11)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(alignment: .leading) {
-            if let rail { Rectangle().fill(rail).frame(width: 3) }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        // The redesign's tile: a plain card, the live count marked by a
+        // stroke in its colour rather than a rail.
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(rail.map { $0.opacity(0.45) } ?? KhaytDesign.hairline, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 
+    /// The redesign's hero: this month's takings large on the brand blue,
+    /// this year and what is owed beneath it. Owed still opens who owes it.
     private var money: some View {
-        HStack(spacing: 0) {
-            // Owed opens who owes it — a figure with no way to act on it was
-            // the one thing on Home a shop chases every day.
-            NavigationLink { OwedView() } label: {
-                moneyFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
-                            note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "",
-                            tint: KhaytDesign.attention)
-                    .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L10n.usesArabicLayout ? L10n.tr("pulse.this_month") : L10n.tr("pulse.this_month").uppercased())
+                .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
+                .tracking(L10n.usesArabicLayout ? 0 : 0.8)
+                .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(pulse?.thisMonth.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
+                    .font(.khaytDisplay(44, .bold, relativeTo: .largeTitle).monospacedDigit())
+                    .tracking(-1.2)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                Text(pulse?.thisMonth == nil ? L10n.tr("pulse.on_the_mac") : currencyNote)
+                    .font(.khaytMono(13, .medium))
             }
-            .buttonStyle(.plain)
-            .disabled(pulse == nil)
-            .accessibilityHint(L10n.tr("owed.open.hint"))
-            Rectangle().fill(KhaytDesign.hairline).frame(width: 1)
-            moneyFigure(pulse?.thisMonth, L10n.tr("pulse.this_month"), note: currencyNote, tint: KhaytDesign.done)
-            Rectangle().fill(KhaytDesign.hairline).frame(width: 1)
-            moneyFigure(pulse?.thisYear, L10n.tr("pulse.this_year"), note: currencyNote, tint: KhaytDesign.done)
+            .foregroundStyle(KhaytDesign.onBrand)
+            .environment(\.layoutDirection, .leftToRight)
+            .frame(maxWidth: .infinity, alignment: L10n.usesArabicLayout ? .trailing : .leading)
+            .padding(.top, 4)
+            Rectangle().fill(KhaytDesign.onBrand.opacity(0.18)).frame(height: 1).padding(.vertical, 12)
+            HStack(spacing: 0) {
+                heroFigure(pulse?.thisYear, L10n.tr("pulse.this_year"), note: currencyNote)
+                NavigationLink { OwedView() } label: {
+                    heroFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
+                               note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "", chevron: true)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(pulse == nil)
+                .accessibilityHint(L10n.tr("owed.open.hint"))
+            }
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .padding(18)
+        .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.horizontal, 16)
+    }
+
+    private func heroFigure(_ value: Double?, _ label: String, note: String, chevron: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(L10n.usesArabicLayout ? label : label.uppercased())
+                    .font(L10n.usesArabicLayout ? .khayt(11, .semibold, relativeTo: .caption2) : .khaytMono(10, .medium, relativeTo: .caption2))
+                    .tracking(L10n.usesArabicLayout ? 0 : 0.6)
+                if chevron {
+                    Image(systemName: "chevron.forward").font(.system(size: 9, weight: .bold))
+                }
+            }
+            .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
+            Text(value.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
+                .font(.khaytDisplay(20, .semibold, relativeTo: .title3).monospacedDigit())
+                .foregroundStyle(KhaytDesign.onBrand)
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .environment(\.layoutDirection, .leftToRight)
+            Text(value == nil ? L10n.tr("pulse.on_the_mac") : note)
+                .font(.khayt(11.5, relativeTo: .caption2))
+                .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private var currencyNote: String { pulse?.currency.map(Money.mark) ?? "" }
@@ -356,30 +401,6 @@ struct DashboardView: View {
         .padding(.top, 10)
     }
 
-    /// A figure, or the design's deferred figure: an em-dash in quiet ink,
-    /// captioned with where the answer lives. It keeps its slot and size.
-    private func moneyFigure(_ value: Double?, _ label: String, note: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(value.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
-                .font(.khayt(25, .semibold, relativeTo: .title).monospacedDigit())
-                .foregroundStyle(value == nil ? KhaytDesign.note : tint)
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .environment(\.layoutDirection, .leftToRight)
-            Text(label.uppercased())
-                .font(.khayt(9.5, .bold, relativeTo: .caption2))
-                .tracking(1)
-                .foregroundStyle(KhaytDesign.note)
-                .padding(.top, 6)
-            Text(value == nil ? L10n.tr("pulse.on_the_mac") : note)
-                .font(.khayt(11, relativeTo: .caption2))
-                .foregroundStyle(value == nil ? KhaytDesign.attention : KhaytDesign.note)
-                .padding(.top, 3)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12).padding(.vertical, 13)
-        .accessibilityElement(children: .combine)
-    }
-
     // MARK: - Pipeline
 
     private func count(_ stage: String) -> Int {
@@ -432,16 +453,17 @@ struct DashboardView: View {
     private var alerts: some View {
         let late = queue.filter(\.isOverdue)
         if !late.isEmpty || !lowSpools.isEmpty || !waiting.isEmpty {
-            VStack(spacing: 8) {
+            VStack(spacing: 0) {
                 if !late.isEmpty {
-                    alertRail(tone: KhaytDesign.late,
+                    alertRail(tone: KhaytDesign.late, icon: "clock.badge.exclamationmark",
                               title: L10n.count("pulse.late", late.count),
                               sub: late.map(\.displayTitle).joined(separator: " · ")) {
                         ordersNav.openOrders()
                     }
                 }
                 if !lowSpools.isEmpty {
-                    alertRail(tone: KhaytDesign.attention,
+                    if !late.isEmpty { KhaytThreadDivider().padding(.leading, 64) }
+                    alertRail(tone: KhaytDesign.attention, icon: "cylinder.split.1x2",
                               title: L10n.count("pulse.low_stock", lowSpools.count),
                               sub: lowSpools.map { spool in
                                   let grams = Int((spool.remainingGrams ?? 0).rounded())
@@ -451,24 +473,33 @@ struct DashboardView: View {
                     }
                 }
                 if !waiting.isEmpty {
-                    alertRail(tone: KhaytDesign.attention,
+                    if !late.isEmpty || !lowSpools.isEmpty { KhaytThreadDivider().padding(.leading, 64) }
+                    alertRail(tone: KhaytDesign.brand, icon: "tray.and.arrow.down",
                               title: L10n.count("pulse.waiting", waiting.count),
                               sub: waiting.map(\.displayClient).joined(separator: " · ")) {
                         showIntake = true
                     }
                 }
             }
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
             .padding(.horizontal, 16)
         }
     }
 
-    private func alertRail(tone: Color, title: String, sub: String, action: @escaping () -> Void) -> some View {
+    /// A "needs you" row: the tone in a soft tile, the words in ink.
+    private func alertRail(tone: Color, icon: String, title: String, sub: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 11) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tone)
+                    .frame(width: 38, height: 38)
+                    .background(tone.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(tone)
+                        .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(KhaytDesign.ink)
                     Text(sub)
                         .font(.khayt(12.5, relativeTo: .footnote))
                         .foregroundStyle(KhaytDesign.note)
@@ -479,12 +510,9 @@ struct DashboardView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(KhaytDesign.note)
             }
-            .padding(.vertical, 11).padding(.leading, 16).padding(.trailing, 13)
-            .frame(minHeight: 56)
-            .background(tone.opacity(0.11), in: RoundedRectangle(cornerRadius: 11))
-            .overlay(alignment: .leading) { Rectangle().fill(tone).frame(width: 3) }
-            .clipShape(RoundedRectangle(cornerRadius: 11))
-            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(tone.opacity(0.32), lineWidth: 1))
+            .padding(.vertical, 12).padding(.horizontal, 14)
+            .frame(minHeight: 62)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -524,9 +552,9 @@ struct DashboardView: View {
 
     private func section(_ title: String, trailing: String? = nil) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title.uppercased())
-                .font(.khayt(11, .bold, relativeTo: .caption2))
-                .tracking(1.1)
+            Text(L10n.usesArabicLayout ? title : title.uppercased())
+                .font(L10n.usesArabicLayout ? .khayt(12, .bold, relativeTo: .caption2) : .khaytMono(11, .medium, relativeTo: .caption2))
+                .tracking(L10n.usesArabicLayout ? 0 : 0.9)
                 .foregroundStyle(KhaytDesign.note)
             Spacer()
             if let trailing {
