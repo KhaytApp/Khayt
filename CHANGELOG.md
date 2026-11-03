@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a quote-form customer is emailed their tracking link, and the shop's payment link lives in Settings ▸ Online.** Every publish of a job that came from an intake request now sends the request's id beside the payload, so Khayt Cloud emails the customer their link once (the id is never part of the public page). A new Payment link section holds the shop's own https payment link and an optional label; the customer's page shows Pay deposit, Pay balance or Pay beside it, with `{amount}` in the link filled in. The owner or a manager can save or remove it; anyone else sees it read-only, and the cloud's own message is shown when it refuses a link.
+
 - **iPhone: contact the customer from the job, see the job on its printer, and find rush jobs.** A job linked to a saved customer has Call, WhatsApp and Email buttons on its page. A machine printing exactly one job shows a link to that job under its card. Rush jobs (any priority other than normal) carry a Rush badge on their card and page, and Orders shows a Rush chip when there are any.
 
 - **Desktop: the calculator says what a job for a client in another currency will be saved as.** Since the job is converted when it is saved, the calculator's total (in the shop's currency) was no longer what the customer would be asked for. A line under the total now reads, for example, "Saved as € 28.75 (EUR, 1 EUR = 4 SAR)", worked out the same way the saved job is, so the two always agree. With no rate for that currency in Settings ▸ Currency it says so, and that the job will be saved in the shop's currency. Choosing a client now redraws the total.

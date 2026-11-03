@@ -467,11 +467,17 @@ public struct PortalRefresh: Decodable, Sendable, Equatable {
     /// Links the published item to a customer's portal account; empty when the
     /// job has no customer or the customer has no address.
     public let customerEmail: String
+    /// The intake request the job came from (`job.intakeId`), sent top level
+    /// beside the payload so the server can email the customer their link
+    /// once. Nil for a job that did not come from a request.
+    public let intakeId: String?
 
     /// Spelled out for the reason `OrderEmail`'s is: the implicit memberwise
     /// initialiser of a public struct is internal, and `PortalClient`'s tests
     /// build one to prove a refresh that cannot be addressed is reported.
-    public init(kind: String, pubToken: String, payload: JSONValue, customerEmail: String) {
+    public init(kind: String, pubToken: String, payload: JSONValue, customerEmail: String,
+                intakeId: String? = nil) {
+        self.intakeId = intakeId
         self.kind = kind
         self.pubToken = pubToken
         self.payload = payload
