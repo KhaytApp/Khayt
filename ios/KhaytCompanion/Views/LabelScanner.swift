@@ -1,5 +1,6 @@
 import SwiftUI
 import VisionKit
+import Vision
 
 /// Reads a Khayt label — the QR the desktops print on a job's bag or a spool —
 /// and hands back its text. What the text MEANS is `lib/scan.js`, the module
@@ -9,6 +10,8 @@ struct LabelScanner: View {
     /// The receipt scanner reads a different QR with the same camera.
     var title = L10n.tr("scan.label.title")
     var hint = L10n.tr("scan.label.hint")
+    /// QR for Khayt's own labels; a courier's waybill adds its barcodes.
+    var symbologies: [VNBarcodeSymbology] = [.qr]
     let onCode: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -16,7 +19,7 @@ struct LabelScanner: View {
         NavigationStack {
             Group {
                 if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
-                    LiveQRHost { code in
+                    LiveQRHost(symbologies: symbologies) { code in
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         onCode(code)
                         dismiss()
@@ -44,12 +47,13 @@ struct LabelScanner: View {
 }
 
 private struct LiveQRHost: UIViewControllerRepresentable {
+    var symbologies: [VNBarcodeSymbology] = [.qr]
     let onCode: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
-        let scanner = DataScannerViewController(recognizedDataTypes: [.barcode(symbologies: [.qr])],
+        let scanner = DataScannerViewController(recognizedDataTypes: [.barcode(symbologies: symbologies)],
                                                 qualityLevel: .balanced, recognizesMultipleItems: false,
                                                 isHighlightingEnabled: true)
         scanner.delegate = context.coordinator

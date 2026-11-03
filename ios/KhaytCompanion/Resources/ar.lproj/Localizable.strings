@@ -903,6 +903,24 @@
 "proforma.open" = "فاتورة مبدئية";
 "proforma.open.sub" = "اطلب الدفع قبل إصدار الفاتورة";
 "proforma.refused" = "الفاتورة المبدئية لطلب مسعّر ومقبول ولم يكتمل بعد.";
+/* Intake reminder */
+"intake.remind.when" = "ذكّرني";
+"intake.remind.tomorrow" = "صباح الغد";
+"intake.remind.3days" = "بعد 3 أيام";
+"intake.remind.week" = "بعد أسبوع";
+"intake.remind.alert" = "تذكير: تواصل مع %@ بشأن طلبه.";
+
+/* Ship */
+"ship.title" = "الشحن";
+"ship.carrier" = "شركة الشحن";
+"ship.service" = "الخدمة";
+"ship.tracking" = "رقم التتبع";
+"ship.scan" = "امسح بوليصة الشحن";
+"ship.scan.hint" = "وجّه الكاميرا إلى الباركود على إيصال المندوب.";
+"ship.hint" = "من إيصال شركة الشحن، ويظهر في صفحة العميل.";
+"ship.create" = "تم الشحن";
+"ship.open" = "الشحن";
+"ship.open.sub" = "شركة الشحن ورقم التتبع";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";

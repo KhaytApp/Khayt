@@ -34,6 +34,9 @@ struct OrderDetailPage: View {
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
     @State private var showingProforma = false
+    /// The carriers to ship with, when this job is finished and not yet sent.
+    @State private var shipChoices: [KhaytEngine.CarrierChoice]?
+    @State private var shipping = false
     /// The job's saved customer, for Call / WhatsApp / Email.
     @State private var customer: Client?
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
@@ -81,6 +84,16 @@ struct OrderDetailPage: View {
                 Button { showingProforma = true } label: { InvoiceCard(proforma: true) }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            if let shipChoices, !shipChoices.isEmpty {
+                Button { shipping = true } label: { ShipCard() }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+                    .sheet(isPresented: $shipping) {
+                        ShipSheet(orderId: order.id, carriers: shipChoices) {
+                            self.shipChoices = await api.shipChoices(orderId: order.id)
+                        }
+                    }
             }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
@@ -132,6 +145,7 @@ struct OrderDetailPage: View {
             machines = (try? await api.fetchMachines()) ?? []
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
+            shipChoices = await api.shipChoices(orderId: order.id)
             customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
@@ -209,6 +223,28 @@ struct OrderDetailPage: View {
                                machine: machine, machineId: machineId, dueDate: order.dueDate,
                                priority: order.priority)
         }
+    }
+}
+
+/// "Ship it": carrier and tracking number, for a finished job not yet sent.
+struct ShipCard: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shippingbox.fill").foregroundStyle(KhaytDesign.brandV2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.tr("ship.open"))
+                    .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(L10n.tr("ship.open.sub"))
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                .font(.caption).foregroundStyle(KhaytDesign.note)
+        }
+        .padding(14)
+        .card()
     }
 }
 
