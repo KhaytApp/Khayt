@@ -189,6 +189,9 @@ public enum CloudPlans {
         public let status: Int
         public let reason: String
         public let error: String
+        public init(status: Int, reason: String, error: String) {
+            self.status = status; self.reason = reason; self.error = error
+        }
         public var description: String {
             "Khayt Cloud refused (\(status) \(reason.isEmpty ? error : reason))"
         }
