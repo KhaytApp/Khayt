@@ -85,6 +85,13 @@ struct QueueOrder: Codable, Identifiable, Sendable {
         return nil
     }
 
+    /// A rush job: any priority other than normal (the desk writes `true` or
+    /// a word such as "high"; `false`/"normal" is an ordinary job).
+    var isRush: Bool {
+        guard let p = priority?.trimmingCharacters(in: .whitespaces).lowercased(), !p.isEmpty else { return false }
+        return !["normal", "false", "low", "0"].contains(p)
+    }
+
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
             ?? id
