@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: plan prices are shown before VAT, and the payment sheet has a billing country and a total.** Each plan price in Settings ▸ Online and in the payment sheet says "+ VAT where applicable" (in all nine languages). The payment sheet gains a billing-country picker (starting at this Mac's region) and asks Khayt Cloud for the total whenever the plan, the period or the country changes, saying "Total X" or, where Khayt Cloud adds VAT, "Total X (includes Y VAT at Z%)"; the country is sent with the checkout. Today Khayt Cloud adds VAT nowhere, so the total equals the price.
+
 - **Mac: plan prices no longer say "VAT included".** Khayt is not VAT-registered and charges no VAT on its own plans, so the note under the plan list and in the payment sheet is gone (in every language). The shop's own VAT settings are unchanged.
 
 - **Mac: a weekly email switch and a way to pay for a plan, in Settings ▸ Online.** The shop's owner gets a "Weekly email" switch (Sundays: last week's order requests, quotes, messages, payments and reviews); while Khayt Cloud has weekly emails switched off it says plainly that none are being sent yet, and the choice is still saved. Plans that cost money also get a Pay… button: pick a month or a year, finish on the payment page that opens in the browser, and the plan updates here when the payment is confirmed (failed and under-review payments are said too). Prices come from Khayt Cloud, and until Khayt Cloud has a payment provider the Pay… button hides itself for the session. Mac only; the iPhone app shows no pay buttons.
