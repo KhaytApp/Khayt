@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "決済サービスの https リンクを貼り付けてください。リンク内の {amount} は請求額に置き換えられます。お客様のページには「内金を支払う」「残金を支払う」または「支払う」が表示されます。",
  "mac.paylink_saved": "保存しました。",
  "mac.paylink_removed": "削除しました。",
+ "mac.paylink_remove_q": "支払いリンクを削除しますか?",
+ "mac.paylink_remove_msg": "お客様の注文ページに支払いボタンが表示されなくなります。",
  "mac.plan_paid": "このショップはプランの料金を支払っているため、無料のベータプランに変更できません。",
  "mac.plan_per_month": "月額 {price}",
  "mac.plan_per_year": "年額 {price}",

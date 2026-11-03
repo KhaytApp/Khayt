@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "Collez le lien https de votre prestataire de paiement. {amount} dans le lien est remplacé par le montant dû. La page du client affiche Payer l’acompte, Payer le solde ou Payer.",
  "mac.paylink_saved": "Enregistré.",
  "mac.paylink_removed": "Supprimé.",
+ "mac.paylink_remove_q": "Supprimer le lien de paiement ?",
+ "mac.paylink_remove_msg": "Les clients ne verront plus le bouton Payer sur la page de leur commande.",
  "mac.plan_paid": "Cet atelier paie son offre ; il ne peut donc pas passer à une offre bêta gratuite.",
  "mac.plan_per_month": "{price} par mois",
  "mac.plan_per_year": "{price} par an",

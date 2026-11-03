@@ -61,4 +61,16 @@ struct CloudPrinterCommandsTests {
                       CloudPrinterCommands.Event(id: "e", kind: "cmd-printer", at: Self.stamp(5), ciphertext: nil)]
         #expect(CloudPrinterCommands.commands(events, dek: Self.dek, now: Self.now, handled: []).isEmpty)
     }
+
+    @Test("the ids already handled outlive a restart")
+    @MainActor func handledSurvivesRestart() throws {
+        let suite = "khayt.test.cloudcmd.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(["c1": Self.now.timeIntervalSince1970], forKey: CloudPrinterCommands.handledKey)
+        let restarted = CloudPrinterCommands(defaults: defaults)
+        #expect(Set(restarted.handled.keys) == ["c1"])
+        #expect(CloudPrinterCommands.commands([try Self.event("c1", verb: "stop")], dek: Self.dek, now: Self.now,
+                                              handled: Set(restarted.handled.keys)).isEmpty)
+    }
 }

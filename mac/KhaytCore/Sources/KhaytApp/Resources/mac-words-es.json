@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "Pega el enlace https de tu proveedor de pagos. {amount} en el enlace se sustituye por el importe a pagar. La página del cliente muestra Pagar anticipo, Pagar saldo o Pagar.",
  "mac.paylink_saved": "Guardado.",
  "mac.paylink_removed": "Eliminado.",
+ "mac.paylink_remove_q": "¿Quitar el enlace de pago?",
+ "mac.paylink_remove_msg": "Los clientes dejarán de ver el botón Pagar en la página de su pedido.",
  "mac.plan_paid": "Este taller paga su plan, así que no puede pasar a un plan beta gratuito.",
  "mac.plan_per_month": "{price} al mes",
  "mac.plan_per_year": "{price} al año",
