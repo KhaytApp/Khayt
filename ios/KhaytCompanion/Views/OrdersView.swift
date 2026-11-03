@@ -40,6 +40,7 @@ struct OrdersView: View {
         case all
         case stage(OrderStatus)
         case overdue
+        case rush
     }
 
     @State private var segment: Segment = .active
@@ -66,6 +67,8 @@ struct OrdersView: View {
         case .active:
             var ids: [Chip] = [.all] + [OrderStatus.pending, .printing, .post, .qc].map(Chip.stage)
             if chip == .overdue { ids.append(.overdue) }
+            // Only when there is a rush job to find.
+            if chip == .rush || queue.contains(where: \.isRush) { ids.append(.rush) }
             return ids
         case .history:
             return [.all, .stage(.completed)]
@@ -86,6 +89,7 @@ struct OrdersView: View {
         case .all: return pool
         case .stage(let st): return pool.filter { $0.status == st.rawValue }
         case .overdue: return pool.filter(\.isOverdue)
+        case .rush: return pool.filter(\.isRush)
         }
     }
 
@@ -252,6 +256,7 @@ struct OrdersView: View {
         case .all: return L10n.tr("orders.filter.all")
         case .stage(let st): return st.localizedLabel
         case .overdue: return L10n.tr("orders.overdue")
+        case .rush: return L10n.tr("orders.rush")
         }
     }
 
@@ -260,6 +265,7 @@ struct OrdersView: View {
         case .all: return KhaytDesign.brand
         case .stage(let st): return KhaytDesign.statusColor(for: st.rawValue)
         case .overdue: return KhaytDesign.late
+        case .rush: return KhaytDesign.attention
         }
     }
 
@@ -429,6 +435,20 @@ struct OrdersView: View {
 }
 
 /// The red "late" tag beside a job.
+/// "Rush", beside a job that has to jump the queue.
+struct RushBadge: View {
+    var body: some View {
+        Label(L10n.tr("orders.rush"), systemImage: "bolt.fill")
+            .labelStyle(.titleAndIcon)
+            .font(.khayt(10.5, .bold, relativeTo: .caption2))
+            .tracking(0.6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .foregroundStyle(KhaytDesign.attention)
+            .background(KhaytDesign.attention.opacity(0.14), in: Capsule())
+    }
+}
+
 struct LateBadge: View {
     var body: some View {
         Text(L10n.tr("orders.late"))
