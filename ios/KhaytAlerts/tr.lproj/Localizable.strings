@@ -1,0 +1,20 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "Baskı bitti";
+"alert.print.failed" = "Baskı başarısız";
+"alert.print.cancelled" = "Baskı iptal edildi";
+"alert.print.a_job" = "Bir iş";
+"alert.print.move_post" = "Son işleme taşı";
+"alert.print.reprint" = "Sıraya geri koy";
+"alert.print.mark_shipped" = "Gönderildi olarak işaretle";
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "Bir baskı bitti";
+"PUSH_INTAKE" = "Yeni sipariş talebi";
+"PUSH_OVERDUE" = "İşler gecikti";
+"PUSH_LOW_STOCK" = "Filament azalıyor";
+"PUSH_DUE_TODAY" = "İşlerin termini bugün";
+"PUSH_QUOTE_DECISION" = "Bir müşteri teklife yanıt verdi";
+"PUSH_QUOTE_APPROVED" = "Bir müşteri teklifi onayladı";
+"PUSH_QUOTE_DECLINED" = "Bir müşteri teklifi reddetti";
+"PUSH_MESSAGE" = "Bir müşteri mesaj gönderdi";
+"PUSH_PAYMENT" = "Bir ödeme geldi";

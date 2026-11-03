@@ -5,24 +5,37 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case system
     case en
     case ar
+    case de
+    case es
+    case fr
+    case ja
+    case ptBR = "pt-BR"
+    case tr
+    case zhHans = "zh-Hans"
 
     var id: String { rawValue }
 
+    /// Each language in its own words, as the Mac's language menu lists them.
     var label: String {
         switch self {
         case .system: return L10n.tr("lang.system")
         case .en: return "English"
         case .ar: return "العربية"
+        case .de: return "Deutsch"
+        case .es: return "Español"
+        case .fr: return "Français"
+        case .ja: return "日本語"
+        case .ptBR: return "Português (Brasil)"
+        case .tr: return "Türkçe"
+        case .zhHans: return "简体中文"
         }
     }
 
-    var locale: Locale? {
-        switch self {
-        case .system: return nil
-        case .en: return Locale(identifier: "en")
-        case .ar: return Locale(identifier: "ar")
-        }
-    }
+    /// The `.lproj` folder that holds this language's strings; nil follows
+    /// the phone.
+    var bundleCode: String? { self == .system ? nil : rawValue }
+
+    var locale: Locale? { bundleCode.map { Locale(identifier: $0) } }
 
     var layoutDirection: LayoutDirection {
         switch self {
@@ -30,7 +43,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .system:
             if Locale.current.language.languageCode?.identifier == "ar" { return .rightToLeft }
             return .leftToRight
-        case .en: return .leftToRight
+        default: return .leftToRight
         }
     }
 }
@@ -39,25 +52,26 @@ enum L10n {
     private static var bundle: Bundle = .main
     private(set) static var currentLanguage: AppLanguage = .system
 
+    /// English, for a key a translation does not have yet.
+    private static let english: Bundle = bundleFor("en") ?? .main
+
     static var usesArabicLayout: Bool {
         switch currentLanguage {
         case .ar: return true
-        case .en: return false
-        case .system:
-            return Locale.current.language.languageCode?.identifier == "ar"
+        case .system: return Locale.current.language.languageCode?.identifier == "ar"
+        default: return false
         }
     }
 
+    /// The language of what the shop SENDS — invoices, the catalogue, a
+    /// WhatsApp update, a carrier's name. The shared lib/ documents are
+    /// written in English and Arabic only, so every other app language
+    /// sends English, as the Mac does.
+    static var contentLanguage: String { usesArabicLayout ? "ar" : "en" }
+
     static func setLanguage(_ language: AppLanguage) {
         currentLanguage = language
-        switch language {
-        case .system:
-            bundle = .main
-        case .en:
-            bundle = bundleFor("en") ?? .main
-        case .ar:
-            bundle = bundleFor("ar") ?? .main
-        }
+        bundle = language.bundleCode.flatMap(bundleFor) ?? .main
     }
 
     private static func bundleFor(_ code: String) -> Bundle? {
@@ -65,8 +79,14 @@ enum L10n {
         return Bundle(path: path)
     }
 
+    /// The key in the app's language — or in English when that language
+    /// does not have it yet. iOS falls back per FILE, not per key: a
+    /// translation one string short would show the bare key.
     static func tr(_ key: String) -> String {
-        NSLocalizedString(key, bundle: bundle, comment: "")
+        let missing = "\u{1}"
+        let found = bundle.localizedString(forKey: key, value: missing, table: nil)
+        if found != missing { return found }
+        return english.localizedString(forKey: key, value: key, table: nil)
     }
 
     /// A string that counts something, in the chosen language's own plural
