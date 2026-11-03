@@ -231,6 +231,7 @@ function quoteForClient(clientId) {
   const display = localName(c);
   $('#clientInput').value = display;
   switchTab('calculator-tab');
+  if (typeof updateGrandTotal === 'function') updateGrandTotal();
 }
 
 /* Feature 6: Client job intake form (PDF/HTML export) */
