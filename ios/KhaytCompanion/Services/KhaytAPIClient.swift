@@ -1668,6 +1668,12 @@ final class KhaytAPIClient: ObservableObject {
         return url
     }
 
+    /// A signed request to the Mac whose answer the caller reads whatever its
+    /// status — the printer route says why in its body.
+    func lanRequest(path: String, method: String) async throws -> (Data, URLResponse) {
+        try await request(path: path, method: method, body: nil, requiresPin: true)
+    }
+
     @discardableResult
     private func request(path: String, method: String, body: Data?, requiresPin: Bool) async throws -> (Data, URLResponse) {
         let url = try makeURL(path: path)

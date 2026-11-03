@@ -65,6 +65,10 @@ struct KhaytCompanionApp: App {
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
         channel.onEvent = { kind, at, ciphertext, session in
+            if kind == "cmd-result" {
+                await PrinterReplies.shared.receive(ciphertext, dek: session.dek)
+                return
+            }
             await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
         }
         PushTokenDelegate.api = apiClient
