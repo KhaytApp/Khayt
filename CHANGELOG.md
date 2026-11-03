@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: your shop's payment link, in Settings ▸ Khayt Cloud.** Paste the https link from your payment provider (with an optional label) and your customer pages show Pay deposit, Pay balance or Pay beside it; `{amount}` in the link is replaced by what is due (Khayt Cloud #155). It is the shop's, so it is read from the cloud each time the section opens, and only the owner or a manager sees it. Save and Remove say what the cloud answered. The Mac has the same section (Settings ▸ Online).
+
 - **iPhone: a page for each customer.** Tap a customer in Clients to see how to reach them, what they owe (the shop's own rule, in the shop's currency) against their credit limit and payment terms, their open and finished jobs, the prices agreed with them and the messages logged against them. A + button starts a new order already made out to them, linked by id.
 
 - **iPhone: contact the customer from the job, see the job on its printer, and find rush jobs.** A job linked to a saved customer has Call, WhatsApp and Email buttons on its page. A machine printing exactly one job shows a link to that job under its card. Rush jobs (any priority other than normal) carry a Rush badge on their card and page, and Orders shows a Rush chip when there are any.
