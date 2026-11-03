@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A new Khayt icon and wordmark.** The nozzle-and-thread mark, redrawn as clean vector layers for macOS 26: the drop at the nozzle tip is now the dot of the letter, so the icon reads خ — the first letter of Khayt — where it used to read ح. The thread is the website's amber on its navy, and the wordmark is the website's "Khayt" with «خيط», replacing the old raster lockup. Every size (Mac, Windows tiles, iPhone, PWA, favicons) is regenerated from the new masters by `scripts/derive-icons.py`. Printed invoices keep the old mark for now.
+
 - **iPhone: proforma invoices, as on the Mac.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has a Proforma invoice card on its page. It opens the shared document with its `proforma` option, ready to share as a PDF: titled and watermarked as a proforma, with no ZATCA QR and the job's own id as its number. Making one numbers nothing, so it works even for a job still waiting for the Mac to give it an invoice number.
 
 - **iPhone: ship a job from its page, and "Remind me" on a request really reminds.** A finished job not yet sent has a Ship card. You pick the carrier (the Mac's list, Manual last) and type the tracking number or scan it off the courier's waybill. It runs the shared `lib/shipment.js` rule, as the Mac's Ship sheet does, so the customer's page shows the carrier and number. On an order request, Remind me asks when (tomorrow morning, in 3 days, in a week), saves that day as the request's `reminderDate` (the day the desktop shows "Reminder due"), and alerts the phone at 9:00 that day. Tapping the alert opens the requests.

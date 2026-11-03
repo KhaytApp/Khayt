@@ -184,19 +184,19 @@ struct PaletteTests {
     /// part that carries the identity, so the hue is what is pinned — and the
     /// legibility is `contrastHolds` above, which is the other half of the
     /// same claim.
-    @Test("the accent is the icon's navy and the heat colour is its filament")
+    @Test("the accent is the icon's navy and the thread is its filament")
     func paletteCameFromTheIcon() {
         let navy = Self.hue(NSColor(hex: 0x0A2A50))!      // the icon's ground
-        let filament = Self.hue(NSColor(hex: 0xDF6011))!  // the loop leaving the nozzle
+        let filament = Self.hue(NSColor(hex: 0xF2A541))!  // the thread leaving the nozzle (2026 icon)
 
         for dark in [false, true] {
             let where_ = dark ? "dark" : "light"
             let brand = try! #require(Self.hue(Self.resolved(Khayt.brand, dark: dark)))
             #expect(Self.hueGap(brand, navy) <= 6,
                     "the accent is \(Int(brand))° and the icon's navy is \(Int(navy))°, \(where_)")
-            let hot = try! #require(Self.hue(Self.resolved(Khayt.hot, dark: dark)))
-            #expect(Self.hueGap(hot, filament) <= 8,
-                    "the heat colour is \(Int(hot))° and the icon's filament is \(Int(filament))°, \(where_)")
+            let thread = try! #require(Self.hue(Self.resolved(Khayt.thread, dark: dark)))
+            #expect(Self.hueGap(thread, filament) <= 8,
+                    "the thread is \(Int(thread))° and the icon's filament is \(Int(filament))°, \(where_)")
         }
     }
 

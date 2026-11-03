@@ -35,9 +35,9 @@ M = 'masters'
 # survives, which is what the switch is guarding against.
 SMALL_AT_OR_UNDER = 64
 
-TOP = (0x0A, 0x2A, 0x51)   # navy at the top edge
-BOT = (0x30, 0x34, 0x40)   # slate along the bottom
-GLOW = (0x1F, 0x34, 0x53)  # the radial lift behind the mark
+TOP = (0x16, 0x43, 0x7A)   # navy at the top edge (redesign 2026)
+BOT = (0x06, 0x1A, 0x33)   # navy-deep along the bottom
+GLOW = (0x24, 0x5C, 0xA0)  # the radial lift behind the mark
 
 
 def load(name):
