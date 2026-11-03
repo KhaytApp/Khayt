@@ -81,7 +81,11 @@ struct Shell<Content: View>: View {
 ///
 /// A default is a value, so it is written down once and both sides read it.
 enum ShellChoice {
-    static let key = "ui.newShell"
+    /// A NEW key for the 2026 redesign: the system sidebar is the default
+    /// now, and a Mac that once chose the older navy window under
+    /// "ui.newShell" opens in the redesign once; the switch in Settings brings
+    /// the navy window back.
+    static let key = "ui.navyShell2026"
     /// OFF as of the Mac redesign: the window is a `NavigationSplitView` again,
     /// so the sidebar and toolbar are the system's own (the inset Liquid Glass
     /// sidebar and glass toolbar groups of macOS 26) and `Sidebar.swift` is the

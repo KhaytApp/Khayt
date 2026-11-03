@@ -71,7 +71,7 @@ struct Dashboard: View {
             let overdue = shop.invoicesToChase.count
             cards.append(TodayStatCard(
                 label: words.callIt("mac.owed_to_you"),
-                value: facts.owed.map { Money.text($0, shop.currency) } ?? "—",
+                value: shop.owedTotal.map { Money.text($0, shop.currency) } ?? "—",
                 detail: overdue > 0
                     ? words.callIt("mac.today_overdue", ["n": .number(Double(overdue))]) : nil,
                 detailColor: Khayt.late))
@@ -83,10 +83,13 @@ struct Dashboard: View {
                     + words.callIt("mac.today_trend", ["pct": .string(Money.figure(abs(pct)))])
                 changeColor = pct >= 0 ? Khayt.done : Khayt.late
             }
+            _ = range
+            // The month's NET, the figure the money strip has always shown
+            // (`Shop.monthNet`, TriageModel) — not a second calculation.
             cards.append(TodayStatCard(
-                label: words.callIt("mac.gross") + " · " + words.callIt(range),
-                value: shop.kpis.map { Money.text($0.grossProfit, shop.currency) } ?? "—",
-                detail: change, detailColor: changeColor))
+                label: shop.monthNetLabel,
+                value: shop.monthNet.map { Money.text($0, shop.currency) } ?? "—",
+                detail: change ?? shop.monthNetNote, detailColor: change == nil ? .secondary : changeColor))
         }
         cards.append(TodayStatCard(
             label: words.callIt("mac.on_machines"),
