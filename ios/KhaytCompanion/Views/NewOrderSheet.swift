@@ -16,6 +16,21 @@ struct NewOrderSheet: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var currency: String?
+    /// The shop's saved customers, to pick from as the name is typed.
+    @State private var clients: [Client] = []
+
+    /// Saved customers whose name starts a word with what was typed — shown
+    /// until one is picked. A few at most: this is a hint, not a directory.
+    private var clientMatches: [Client] {
+        let typed = draft.client.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard draft.clientId == nil, !typed.isEmpty else { return [] }
+        return Array(clients.filter { c in
+            [c.displayName, c.nameEn ?? "", c.nameAr ?? ""].contains { name in
+                let n = name.lowercased()
+                return n.hasPrefix(typed) || n.contains(" " + typed)
+            }
+        }.prefix(4))
+    }
 
     private var canSave: Bool {
         !draft.project.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving
@@ -44,7 +59,42 @@ struct NewOrderSheet: View {
                     typePicker
                     VStack(spacing: 0) {
                         field(L10n.tr("order.new.client")) {
-                            TextField("", text: $draft.client, prompt: prompt("Acme Robotics"))
+                            HStack(spacing: 8) {
+                                TextField("", text: $draft.client, prompt: prompt("Acme Robotics"))
+                                    .onChange(of: draft.client) { _, typed in
+                                        // Typing over a picked customer unpicks it.
+                                        if let id = draft.clientId,
+                                           clients.first(where: { $0.id == id })?.displayName != typed {
+                                            draft.clientId = nil
+                                        }
+                                    }
+                                if draft.clientId != nil {
+                                    Image(systemName: "person.crop.circle.badge.checkmark")
+                                        .foregroundStyle(KhaytDesign.done)
+                                        .accessibilityLabel(L10n.tr("order.new.client.saved"))
+                                }
+                            }
+                        }
+                        ForEach(clientMatches) { c in
+                            Button {
+                                draft.client = c.displayName
+                                draft.clientId = c.id
+                            } label: {
+                                HStack {
+                                    Image(systemName: "person.crop.circle").foregroundStyle(KhaytDesign.note)
+                                    Text(c.displayName).foregroundStyle(KhaytDesign.ink)
+                                    if let other = c.secondaryName {
+                                        Text(other).foregroundStyle(KhaytDesign.note)
+                                    }
+                                    Spacer()
+                                }
+                                .font(.khayt(15, relativeTo: .body))
+                                .padding(.horizontal, 16).padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(L10n.tr("order.new.client.pick"))
+                            .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
                         }
                         field(L10n.tr("order.new.project")) {
                             TextField("", text: $draft.project, prompt: prompt("Falcon hood"))
@@ -101,7 +151,17 @@ struct NewOrderSheet: View {
                     Button(L10n.tr("common.cancel")) { dismiss() }
                 }
             }
-            .task { currency = await api.shopCurrency() }
+            .task {
+                currency = await api.shopCurrency()
+                clients = (try? await api.fetchClients()) ?? []
+                // A quote that came in with a name: link it when it names one
+                // saved customer exactly.
+                if draft.clientId == nil {
+                    let typed = draft.client.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    let exact = clients.filter { $0.displayName.lowercased() == typed }
+                    if !typed.isEmpty, exact.count == 1 { draft.clientId = exact[0].id }
+                }
+            }
         }
     }
 

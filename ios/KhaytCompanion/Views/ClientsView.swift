@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Read-only client directory with one-tap call / WhatsApp / email.
+/// The client directory. With the shop's book on the phone a client opens
+/// their page (owed, jobs, agreed prices, messages); without one, the
+/// one-tap call / WhatsApp / email it always had.
 struct ClientsView: View {
     @EnvironmentObject private var api: KhaytAPIClient
 
@@ -92,11 +94,19 @@ struct ClientsView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(displayed) { client in
-                    Button { if client.canBeContacted { contactFor = client } } label: {
-                        ClientRow(client: client, open: count(openByName, client),
-                                  total: totalsByName.map { count($0, client) })
+                    if api.holdsBook {
+                        NavigationLink { CustomerPage(client: client) } label: {
+                            ClientRow(client: client, open: count(openByName, client),
+                                      total: totalsByName.map { count($0, client) })
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button { if client.canBeContacted { contactFor = client } } label: {
+                            ClientRow(client: client, open: count(openByName, client),
+                                      total: totalsByName.map { count($0, client) })
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .readsFold($fold)

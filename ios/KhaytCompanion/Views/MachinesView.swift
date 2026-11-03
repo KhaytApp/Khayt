@@ -41,6 +41,35 @@ struct MachinesView: View {
 
     /// Each machine's camera, as `KhaytAPIClient.camera` decided it.
     @State private var cameras: [String: KhaytAPIClient.CameraAnswer] = [:]
+    /// The job printing on each machine — only where there is exactly one, as
+    /// the print alerts decide it: two would be a guess.
+    @State private var jobs: [String: QueueOrder] = [:]
+
+    @ViewBuilder
+    private func jobLink(_ m: MachineLiveStatus) -> some View {
+        if let job = jobs[m.id] {
+            NavigationLink {
+                OrderDetailPage(order: job, facts: nil) { await load() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "shippingbox").foregroundStyle(KhaytDesign.note)
+                    Text(L10n.format("machines.job", job.displayTitle))
+                        .lineLimit(1)
+                        .foregroundStyle(KhaytDesign.ink)
+                    if job.isRush { RushBadge() }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                        .font(.caption).foregroundStyle(KhaytDesign.note)
+                }
+                .font(.khayt(14, .medium, relativeTo: .subheadline))
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
     @ViewBuilder
     private func cameraLink(_ m: MachineLiveStatus) -> some View {
@@ -95,6 +124,7 @@ struct MachinesView: View {
                             ForEach(rows) { m in
                                 VStack(spacing: 10) {
                                     MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
+                                    jobLink(m)
                                     // A print on the bed, on a printer the Mac drives.
                                     if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop {
                                         PrinterControls(machine: m)
@@ -144,6 +174,8 @@ struct MachinesView: View {
             var found: [String: KhaytAPIClient.CameraAnswer] = [:]
             for m in machines { found[m.id] = await api.camera(machineId: m.id) }
             cameras = found
+            let printing = ((try? await api.fetchQueue()) ?? []).filter { $0.status == "printing" && $0.machineId != nil }
+            jobs = Dictionary(grouping: printing, by: { $0.machineId! }).compactMapValues { $0.count == 1 ? $0[0] : nil }
         } catch {
             machines = []
             errorMessage = error.localizedDescription
