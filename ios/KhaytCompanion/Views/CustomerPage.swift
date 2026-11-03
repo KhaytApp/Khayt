@@ -193,7 +193,9 @@ struct CustomerPage: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Image(systemName: icon(m.kind)).font(.caption).foregroundStyle(KhaytDesign.note)
-                        Text(String(m.at.prefix(10))).font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
+                        // The message's day as the book stamps it (yyyy-MM-dd): a
+                        // date string, not a number to format.
+                        Text(verbatim: String(m.at.prefix(10))).font(.khaytMono(11, .regular, relativeTo: .caption2))
                             .foregroundStyle(KhaytDesign.note)
                         if let order = m.orderId {
                             Text(order).font(.khayt(11.5, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)
