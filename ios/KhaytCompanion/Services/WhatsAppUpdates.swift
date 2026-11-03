@@ -94,7 +94,7 @@ extension KhaytAPIClient {
         return try? await engine.whatsAppUpdate(
             order: .object(r.order), client: r.client.map(JSONValue.object), settings: r.settings,
             templates: r.templates, milestone: nil, lang: lang,
-            shopLang: L10n.usesArabicLayout ? "ar" : "en", values: values(r))
+            shopLang: L10n.contentLanguage, values: values(r))
     }
 
     /// The `wa.me` link for this text — built AGAIN from the text as it stands,

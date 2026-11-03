@@ -1106,7 +1106,7 @@ final class KhaytAPIClient: ObservableObject {
     /// the small picture each product carries, and counted stock.
     func fetchCatalogue() async throws -> CataloguePage {
         guard let reader, holdsBook else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
-        return try await reader.catalogue(language: L10n.usesArabicLayout ? "ar" : "en")
+        return try await reader.catalogue(language: L10n.contentLanguage)
     }
 
     // MARK: - Invoices
@@ -1114,7 +1114,7 @@ final class KhaytAPIClient: ObservableObject {
     /// A job's invoice, built from the book this phone keeps — or why not.
     func invoice(orderId: String, proforma: Bool = false) async -> InvoiceBuild {
         guard let reader, holdsBook else { return .refused(.missing) }
-        return (try? await reader.invoice(orderId: orderId, language: L10n.usesArabicLayout ? "ar" : "en",
+        return (try? await reader.invoice(orderId: orderId, language: L10n.contentLanguage,
                                           proforma: proforma))
             ?? .refused(.failed)
     }

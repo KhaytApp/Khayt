@@ -1,0 +1,1000 @@
+/* Tabs */
+"tab.home" = "Ana Sayfa";
+"tab.orders" = "Siparişler";
+"tab.inventory" = "Envanter";
+"tab.machines" = "Yazıcılar";
+"tab.clients" = "Müşteriler";
+"tab.settings" = "Ayarlar";
+
+/* Connection */
+"connection.checking" = "Denetleniyor…";
+"connection.connected" = "Bağlı";
+"connection.unreachable" = "Masaüstüne ulaşılamıyor";
+"connection.moved" = "Mac’iniz yeni bir adresten yanıt verdi";
+"connection.moved.line" = "Yalnızca bu dükkânınızın Mac’iyse %@ adresine geçin. Geçmek PIN’inizi gönderir.";
+"connection.moved.use" = "Geç";
+"connection.moved.not_now" = "Şimdi Değil";
+"connection.unauthorized" = "LAN PIN’i yanlış";
+"connection.banner.unreachable" = "Ağınızdaki Khayt’a ulaşılamıyor. Wi‑Fi’yi ve masaüstü LAN API’sini kontrol edin.";
+"connection.banner.pin" = "LAN PIN’i reddedildi. Ayarlar’da PIN’i masaüstündekiyle eşleşecek şekilde güncelleyin.";
+"sync.pending" = "Bu iPhone’da Mac’i bekleyen %d değişiklik var.";
+"connection.error.reach_status" = "%@ adresine ulaşılamıyor. Aynı Wi‑Fi’de misiniz? Masaüstünde Ayarlar → LAN API: etkin olsun, tüm arayüzlerde dinlesin; IP’yi ve bağlantı noktasını not edin.";
+"settings.host_required" = "Bilgisayarınızın IP adresini girin.";
+"settings.host_invalid" = "Geçersiz adres. Örneğin 192.168.1.42 biçimini kullanın (http:// ile tam URL olmasın).";
+"home.pipeline" = "Üretim Hattı";
+
+/* Home */
+"home.quick_actions" = "Hızlı İşlemler";
+"home.action.add_spool" = "Makara ekle";
+"stat.in_queue" = "Sırada";
+"stat.printing" = "Yazdırılıyor";
+"stat.post" = "Son İşlem";
+"stat.qc" = "Kalite";
+
+/* Orders */
+"orders.active" = "Aktif";
+"orders.filter.all" = "Tümü";
+"orders.overdue" = "Gecikmiş";
+"orders.detail.set_status" = "Durumu ayarla";
+"orders.detail.advance" = "Sonraki aşamaya geçir";
+
+/* Inventory */
+"inventory.filter.all" = "Tümü";
+"inventory.filter.low" = "Az stok";
+
+/* Settings */
+"settings.connection" = "Bağlantı";
+"settings.connection.footer" = "Khayt Ayarlar → LAN API’deki PIN ile aynı. Masaüstü v2.2.1 veya üzeri gerekir.";
+"settings.shop_name" = "Dükkân adı";
+"settings.host" = "Masaüstü IP’si veya ana makine adı";
+"settings.port" = "Bağlantı noktası: %d";
+"settings.pin" = "Sahip LAN PIN’i";
+"settings.retest" = "Eşlemeyi yeniden sına";
+"settings.unpair" = "Bu aygıtın eşlemesini kaldır";
+"settings.unpair.footer" = "Dükkânın defterini ve PIN’i bu telefondan siler.";
+"settings.language" = "Dil";
+"settings.notifications" = "Bildirimler";
+"settings.notify.queue" = "Sıra değişiklikleri";
+"settings.notify.connection" = "Bağlantı kesildi";
+"settings.notify.overdue" = "Geciken siparişler";
+"settings.notify.low_stock" = "Filament azaldı";
+"settings.docs" = "LAN API başvurusu";
+
+/* Status */
+"status.quote" = "Teklif";
+"status.pending" = "Beklemede";
+"status.printing" = "Yazdırılıyor";
+"status.post" = "Son İşlem";
+"status.qc" = "Kalite Kontrol";
+"status.completed" = "Tamamlandı";
+"status.delivered" = "Teslim edildi";
+"status.shipped" = "Gönderildi";
+"status.on_hold" = "Askıda";
+
+/* Lang */
+"lang.system" = "Sistem";
+
+/* Notifications */
+"notify.queue.title" = "Sıra güncellendi";
+"notify.queue.body" = "Sırada %d iş var (%d yazdırılıyor)";
+"notify.offline.title" = "Khayt bağlantısı kesildi";
+"notify.offline.body" = "Masaüstüne LAN üzerinden ulaşılamıyor";
+"notify.overdue.title" = "Geciken siparişler";
+"notify.overdue.body" = "%d siparişin teslim tarihi geçti";
+"notify.low_stock.title" = "Filament azaldı";
+"notify.low_stock.body" = "%d makara 200 g’ın altında";
+
+/* NFC */
+"nfc.unavailable" = "Bu aygıtta NFC kullanılamıyor.";
+"nfc.read.prompt" = "iPhone’unuzu filament makarasının etiketine yaklaştırın.";
+"nfc.read.success" = "Etiket okundu.";
+"nfc.write.title" = "NFC etiketine yaz";
+"nfc.write.intro" = "Bu makara verilerini boş bir NTAG213+ çıkartmasına kodlayın. Yazıcınızın beklediği biçimi seçin.";
+"nfc.write.standard" = "Etiket standardı";
+"nfc.write.preview" = "Yazılacak veri";
+"nfc.write.material" = "Malzeme";
+"nfc.write.brand" = "Marka";
+"nfc.write.weight" = "Ağırlık";
+"nfc.write.print_temp" = "Baskı sıcaklığı";
+"nfc.write.bed_temp" = "Tabla sıcaklığı";
+"nfc.write.tap_blank" = "Yazmak için boş etikete dokunun";
+"nfc.write.scanning" = "Boş etikete yaklaştırın…";
+"nfc.write.prompt" = "iPhone’unuzu yazılabilir boş bir NFC etiketine yaklaştırın.";
+"nfc.write.success" = "Etiket yazıldı.";
+"nfc.write.done" = "Bitti";
+"nfc.write.footer" = "Yazılabilir NTAG213+ etiketler kullanın (OpenSpool için NTAG215/216). Yazıcınızın veya bellenimin beklediği biçimi seçin.";
+"nfc.standard.openspool" = "OpenSpool";
+"nfc.standard.openspool.hint" = "Snapmaker U1 genişletilmiş bellenimi, OpenSpool okuyucusuyla Bambu — application/json";
+"nfc.standard.opentag3d" = "OpenTag3D";
+"nfc.standard.opentag3d.hint" = "Bambu Lab, Creality, genel — application/opentag3d";
+"nfc.standard.openprinttag" = "OpenPrintTag (Prusa)";
+"nfc.standard.openprinttag.hint" = "Prusa MK4 / XL / MINI — application/vnd.openprinttag";
+"nfc.error.missing_material" = "Etiketi kodlamak için malzeme adı gerekir.";
+"nfc.error.payload_large" = "Kodlanan veri (%d bayt) bu etiket için çok büyük.";
+"nfc.error.invalid_color" = "Renk onaltılık değeri geçersiz.";
+"nfc.error.no_tag" = "Etiket algılanmadı.";
+"nfc.error.unsupported_tag" = "Desteklenmeyen etiket türü.";
+"nfc.error.not_ndef" = "Etiket NDEF’i desteklemiyor.";
+"nfc.error.read_only" = "Etiket salt okunur veya kilitli. Yazılabilir boş bir etiket kullanın.";
+"nfc.error.read_failed" = "Etiket okunamadı.";
+
+/* Quick quote */
+"home.action.quote" = "Teklif";
+"quote.title" = "Hızlı teklif";
+"quote.part" = "Parça";
+"quote.rates" = "Oranlar";
+"quote.result" = "Fiyat";
+"quote.cost" = "Size maliyeti";
+"quote.weight" = "Ağırlık";
+"quote.time" = "Baskı süresi";
+"quote.qty" = "Adet";
+"quote.spool_cost" = "Makara maliyeti (1 kg)";
+"quote.labor_rate" = "Saatlik işçilik ücreti";
+"quote.margin" = "Kâr marjı";
+"quote.rush" = "Acele iş";
+"quote.calculate" = "Hesapla";
+"quote.total" = "Toplam";
+"quote.discount" = "İndirim";
+"quote.rush_fee" = "Acele ücreti";
+"quote.tier" = "Kademe fiyatı ({n}+)";
+"quote.unit_cost" = "Birim maliyeti";
+"quote.bd.material" = "Malzeme";
+"quote.bd.machine" = "Makine";
+"quote.bd.labor" = "İşçilik";
+"quote.bd.buffer" = "Hata tamponu";
+"common.close" = "Kapat";
+
+/* Waste */
+"home.action.waste" = "Fire kaydet";
+"waste.title" = "Başarısız baskıyı kaydet";
+"waste.what" = "Ne başarısız oldu";
+"waste.why" = "Neden";
+"waste.material" = "Malzeme";
+"waste.failure_type" = "Hata";
+"waste.weight" = "Harcanan";
+"waste.reason" = "Ne oldu?";
+"waste.save" = "Kaydet";
+"waste.deduct" = "Makaradan düş";
+"waste.deduct.footer" = "Boşa giden gramı eşleşen makaradan düşer. Zaten düzelttiyseniz kapatın.";
+"waste.ft.warping" = "Kıvrılma";
+"waste.ft.adhesion" = "Tabla yapışması";
+"waste.ft.clog" = "Tıkanma";
+"waste.ft.layer_shift" = "Katman kayması";
+"waste.ft.power" = "Elektrik kesintisi";
+"waste.ft.other" = "Diğer";
+
+/* Expenses */
+"home.action.expense" = "Gider";
+"exp.title" = "Yeni gider";
+"exp.what" = "Ne için ödediniz";
+"exp.amount" = "Tutar";
+"exp.category" = "Kategori";
+"exp.note" = "Not";
+"exp.receipt" = "Fiş";
+"exp.photograph" = "Fişin fotoğrafını çek";
+"exp.retake" = "Fotoğrafı kaldır";
+"exp.save" = "Kaydet";
+"exp.no_camera" = "Bu aygıtta kamera yok — gider fişsiz kaydedilecek.";
+"exp.cat.filament" = "Filament";
+"exp.cat.electricity" = "Elektrik";
+"exp.cat.maintenance" = "Bakım";
+"exp.cat.tools" = "Aletler ve Malzemeler";
+"exp.cat.equipment" = "Ekipman (makineler)";
+"exp.cat.shipping" = "Kargo";
+"exp.cat.other" = "Diğer";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "GECİKMİŞ";
+"orders.queue_clear" = "Sıra boş";
+"orders.pick" = "Bir sipariş seçin";
+"orders.pick.sub" = "Sayfası listenin yanında açılır.";
+"inventory.pick" = "Bir makara seçin";
+"inventory.pick.sub" = "Sayfası rafın yanında açılır.";
+"orders.queue_clear.sub" = "Her şey tamam — aktif sipariş yok";
+"orders.no_completed" = "Tamamlanan sipariş yok";
+"orders.no_completed.sub" = "Tamamlanan siparişler burada görünür";
+"inventory.none" = "Henüz makara yok";
+"inventory.none.sub" = "Başlamak için ilk makaranızı ekleyin";
+"inventory.no_results" = "Sonuç yok";
+"inventory.no_results.sub" = "Farklı bir arama deneyin";
+/* Pairing */
+"pair.back" = "Geri";
+"pair.continue" = "Devam";
+"pair.manual" = "Adresi kendim gireyim";
+"pair.browse.failed" = "Khayt bu ağda dükkân arayamıyor.";
+"pair.browse.permission" = "Yerel ağ istemini reddettiyseniz Ayarlar → Khayt → Yerel Ağ bölümünden izin verin.";
+"pair.browse.looking" = "Aranıyor… Mac’te Khayt’ın açık ve LAN API’sinin etkin olduğundan emin olun.";
+"pair.browse.none" = "Henüz bir şey bulunamadı.";
+"pair.shop.offline" = "Bu dükkânla çevrimdışı çalışabilir";
+"pair.manual.host" = "Masaüstü IP’si";
+"pair.verify.ok" = "Bağlandı — sıradaki iş: %d. PIN kabul edildi.";
+
+/* Shared words */
+"common.done" = "Bitti";
+"common.cancel" = "İptal";
+"common.save" = "Kaydet";
+"common.remove" = "Kaldır";
+"common.unassigned" = "Atanmamış";
+"field.project" = "Proje";
+"field.client" = "Müşteri";
+"field.status" = "Durum";
+"field.machine" = "Makine";
+"field.due" = "Termin";
+"field.priority" = "Öncelik";
+"field.material" = "Malzeme";
+"field.brand" = "Marka";
+
+/* New order */
+"order.new.title" = "Yeni sipariş";
+"order.new.title_quote" = "Yeni teklif";
+"order.new.type" = "Tür";
+"order.new.order" = "Sipariş";
+"order.new.quote" = "Teklif";
+"order.new.details" = "Ayrıntılar";
+"order.new.project" = "Proje";
+"order.new.client" = "Müşteri";
+"order.new.client.saved" = "Kayıtlı müşteri";
+"order.new.client.pick" = "Bu siparişi kayıtlı müşteriye bağlar.";
+"order.new.material" = "Malzeme";
+"order.new.price" = "Fiyat";
+"order.new.price_in" = "Fiyat (%@)";
+"order.new.schedule" = "Zamanlama ve makine";
+"order.new.set_due" = "Termin belirle";
+"order.new.due" = "Termin";
+"order.new.machine" = "Makine";
+"order.new.unassigned" = "Atanmamış";
+"order.new.create_quote" = "Teklif oluştur";
+"order.new.add" = "Sıraya ekle";
+
+/* Order detail */
+"order.detail.title" = "Sipariş";
+"order.detail.id" = "Sipariş No";
+"order.detail.assigned" = "Atanan";
+
+/* Spool detail */
+"spool.detail.filament" = "Filament";
+"spool.detail.lot" = "Parti / lot";
+"spool.detail.print_temp" = "Nozul sıcaklığı";
+"spool.detail.bed_temp" = "Tabla sıcaklığı";
+"spool.detail.adjust" = "Kalanı düzelt";
+"spool.detail.adjust.body" = "Bu makaranın kalan filamentini gram cinsinden girin.";
+"spool.detail.grams" = "Gram";
+"spool.detail.grams_error" = "Gram cinsinden bir sayı girin.";
+"spool.detail.remove_q" = "Makara kaldırılsın mı?";
+
+/* Queue, intake, clients, machines */
+"queue.title" = "Üretim sırası";
+"queue.empty" = "Sıra boş";
+"queue.empty.sub" = "Aktif sipariş yok.";
+"intake.title" = "Talepler";
+"intake.empty" = "Gelen kutusu boş";
+"intake.empty.sub" = "Talep formunuzdan, WhatsApp’tan ve diğer kaynaklardan gelen yeni iş talepleri burada görünür.";
+"intake.reminded" = "Hatırlatıldı";
+"intake.call" = "Ara";
+"intake.whatsapp" = "WhatsApp";
+"intake.email" = "E-posta";
+"clients.search" = "Ad, telefon, e-posta";
+"clients.none" = "Müşteri yok";
+"clients.none.sub" = "Müşterileri Khayt masaüstünde ekleyin.";
+"clients.no_match" = "Eşleşme yok";
+"clients.no_match.sub" = "“%@” ile eşleşen müşteri yok.";
+"machines.none" = "Makine yok";
+"machines.none.sub" = "Yazıcıları Khayt masaüstünde ekleyin.";
+"machines.no_live" = "Canlı bağlantı yok";
+
+"spool.detail.remove" = "Makarayı kaldır";
+"intake.decline" = "Reddet";
+"intake.remind" = "Hatırlat";
+
+/* Adding a spool, scanning */
+"barcode.title" = "Barkodu tara";
+"barcode.unavailable" = "Kamerayla tarama kullanılamıyor";
+"barcode.unavailable.sub" = "Bunun yerine barkodun altındaki rakamları yazın.";
+"barcode.type" = "Veya barkodun altındaki rakamları yazın";
+"barcode.placeholder" = "örn. 6938936716785";
+"barcode.look_up" = "Ara";
+"barcode.invalid" = "Bu geçerli bir UPC/EAN değil — son rakamı kontrol edin.";
+"barcode.source.shelf" = "Barkod · rafınızdaki bir rulo ile aynı";
+"barcode.source.database" = "Barkod · %@";
+"barcode.source.code" = "Barkod %1$@ · %2$@";
+"barcode.not_found" = "Ürün veri tabanında yok. Bir kez doldurun, sonraki kutu rafınızdan bulunur.";
+"barcode.unreachable" = "Ürün veri tabanına ulaşılamadı. Bir kez doldurun, sonraki kutu rafınızdan bulunur.";
+"scan.title" = "Etiketi tara";
+"scan.mode" = "Mod";
+"scan.mode.photo" = "Fotoğraf";
+"scan.mode.live" = "Canlı";
+"scan.clear" = "Temizle";
+"scan.live_unavailable" = "Canlı tarama kullanılamıyor";
+"scan.live_unavailable.sub" = "Bu aygıtta Fotoğraf modunu kullanın.";
+"scan.photo.title" = "Etiketin net bir fotoğrafını çekin";
+"scan.photo.body" = "Kadrajı yazıyla doldurun — SKU, parti, sıcaklıklar ve malzeme. Küçük yazılarda canlı taramadan daha iyi çalışır.";
+"scan.photo.take" = "Fotoğraf çek";
+"scan.photo.reading" = "Etiket okunuyor…";
+"scan.photo.none" = "Metin bulunamadı. Daha aydınlık bir ortam deneyin ve kadrajı etiketle doldurun.";
+"scan.live.hint" = "Etiketin üzerinde yavaşça gezdirin. Yakalanan metin kadrajdan çıksa bile saklanır.";
+"scan.use_text" = "Yakalanan metni kullan (%d)";
+"spool.add.title" = "Makara ekle";
+"spool.add.barcode_title" = "Ürün barkodu";
+"spool.add.nfc_title" = "NFC etiketi";
+"spool.add.confirm" = "Makarayı onayla";
+"spool.add.how" = "Bu makarayı nasıl eklemek istersiniz?";
+"spool.add.no_camera" = "Bu aygıtta kamera kullanılamıyor.";
+"spool.add.one" = "Khayt envanterine ekle";
+"spool.add.n" = "%d makara ekle";
+"spool.method.barcode" = "Ürün barkodunu tara";
+"spool.method.barcode.sub" = "Kutudaki UPC/EAN sizin için aranır";
+"spool.method.label.sub" = "Basılı etiketi kamerayla oku";
+"spool.method.nfc" = "NFC etiketine dokun";
+"spool.method.nfc.sub" = "Telefonu makara etiketine tutun";
+"spool.method.manual" = "Elle gir";
+"spool.method.manual.sub" = "Marka, malzeme, renk, ağırlık";
+"spool.source.manual" = "Elle";
+"spool.source.label" = "Taranan etiket";
+"spool.lookup.busy" = "Aranıyor…";
+"spool.lookup.busy.sub" = "Önce rafınız, sonra ürün veri tabanı.";
+"spool.lookup.title" = "Kutudaki barkodu tarayın";
+"spool.lookup.body" = "Daha önce kaydettiğiniz bir filament, fiyatı dahil, kendi rafınızdan doldurulur.";
+"spool.lookup.open" = "Tarayıcıyı aç";
+"spool.label.title" = "Etikete doğrultun";
+"spool.label.body" = "En iyi sonuç için Fotoğraf modunu kullanın — etiketin tamamının net bir fotoğrafını çekin.";
+"spool.label.open" = "Kamerayı aç";
+"spool.nfc.title" = "iPhone’u makaraya yaklaştırın";
+"spool.nfc.unavailable" = "Bu aygıtta NFC kullanılamıyor.";
+"spool.nfc.scan" = "NFC tara";
+"spool.nfc.scanning" = "Taranıyor…";
+"spool.form.required" = "Gerekli";
+"spool.form.material" = "Malzeme adı";
+"spool.form.weight" = "Ağırlık (gram)";
+"spool.form.optional" = "İsteğe bağlı";
+"spool.form.cost" = "Ödenen fiyat";
+"spool.form.cost.footer" = "Rulonun maliyeti. Bundan basılan işlerin fiyatı buna göre hesaplanır.";
+"spool.form.sku" = "SKU";
+"spool.form.barcode" = "Barkod (UPC/EAN)";
+"spool.form.lot" = "Parti / lot no.";
+"spool.form.print_temp" = "Baskı sıcaklığı (°C)";
+"spool.form.bed_temp" = "Tabla sıcaklığı (°C)";
+"spool.quantity" = "Kaç tane";
+"spool.quantity.one" = "Aynı filamentten birkaç kutu mu var? Hepsini tek seferde ekleyin.";
+"spool.quantity.many" = "%d ayrı makara, her biri ayrı takip edilir.";
+"spool.tag.weight" = "Ağırlık";
+"spool.tag.print" = "Baskı";
+"spool.tag.bed" = "Tabla";
+
+/* Errors */
+"error.not_configured" = "Ayarlar’da Khayt masaüstü uygulamanıza bağlanın.";
+"error.invalid_url" = "Geçersiz sunucu adresi.";
+"error.unauthorized" = "LAN PIN’i yanlış. Masaüstünde Ayarlar → LAN API’yi kontrol edin.";
+"error.no_such_machine" = "Bu yazıcı dükkânın listesinde yok.";
+"error.decline_needs_mac" = "Talebi reddetmek için Mac gerekir.";
+"error.material_required" = "Malzeme adı gerekli.";
+"error.record_not_added" = "Bu kayıt deftere eklenemedi.";
+"error.empty_book" = "Mac boş bir defter gönderdi. Bu telefonda hiçbir şey değiştirilmedi.";
+"error.project_required" = "Proje adı gerekli.";
+"error.no_such_spool" = "Bu makara artık bu telefonun rafında değil.";
+"error.amount_required" = "Tutar gerekli.";
+"error.partial_add" = "%2$d makaradan %1$d tanesi eklendi, sonra: %3$@";
+"error.unexpected_spool" = "Makara eklenirken beklenmeyen yanıt alındı";
+"error.invalid_order_id" = "Geçersiz sipariş numarası.";
+"settings.notifications.allow" = "Bildirimlere izin ver";
+"unit.g" = "g";
+"unit.h" = "sa";
+"inventory.remove.body" = "%@ envanterden kaldırılacak.";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "Khayt Cloud’da oturum aç";
+"cloud.sign_out" = "Khayt Cloud oturumunu kapat";
+"cloud.sync_now" = "Şimdi eşitle";
+"cloud.shop" = "Dükkân";
+"cloud.role" = "Rol";
+"cloud.last_sync" = "Son eşitleme";
+"cloud.via_cloud" = "%@ (Khayt Cloud üzerinden)";
+"cloud.via_mac" = "%@ (Mac üzerinden)";
+"cloud.footer.off" = "Mac aynı Wi-Fi’de olmadığında bu telefonu güncel tutar. Mac yanıt verdiği sürece değişiklikler yine doğrudan Mac’e gider.";
+"cloud.footer.on" = "Telefon dükkânı Khayt Cloud’dan okur; değişiklikleri Mac yanıt verirse Mac’e, vermezse bulut üzerinden gönderir.";
+"cloud.needs_mac" = "Khayt Cloud şu anda değişiklikleri tek tek kabul etmiyor. Değişiklikler bu telefonda saklanır; eşitlenmesi için Mac’te Khayt’ı açın.";
+"cloud.signin.email" = "E-posta";
+"cloud.signin.password" = "Parola";
+"cloud.signin.account_footer" = "Dükkânın Khayt Cloud için kullandığı hesap. Bu telefon kendine ait, ayrıca kapatılabilen bir oturum alır.";
+"cloud.signin.passphrase" = "Dükkân parolası";
+"cloud.signin.passphrase_footer" = "Dükkânın bulut kopyasını şifreleyen parola — Mac ilk bağlandığında belirlenen. Bu telefondaki anahtarı açar ve saklanmaz.";
+"cloud.signin.advanced" = "Gelişmiş";
+"cloud.signin.server" = "Sunucu adresi";
+"cloud.signin.action" = "Oturum Aç";
+"cloud.signin.wrong_passphrase" = "Bu parola dükkânın anahtarını açmıyor.";
+
+"pair.use_cloud" = "Bunun yerine Khayt Cloud’u kullan";
+"pair.use_cloud.footer" = "Dükkân Khayt Cloud ile eşitleniyorsa telefon buradan başlayıp Mac ile sonra eşlenebilir.";
+
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "%@ aşamasına taşı";
+"order.detail.complete" = "Sipariş tamamlandı";
+"order.detail.due_date" = "Termin";
+"order.detail.printer" = "Yazıcı";
+
+"stage.short.pending" = "Beklemede";
+"stage.short.printing" = "Baskıda";
+"stage.short.post" = "Son İşlem";
+"stage.short.qc" = "Kalite";
+"stage.short.completed" = "Bitti";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "Defterden çalışılıyor · %@ itibarıyla";
+"connection.live_only" = "Mac’ten canlı · bu telefonda hiçbir şey saklanmıyor";
+"connection.refresh" = "Yenile";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "Dükkân Nabzı";
+"pulse.money" = "Para";
+"pulse.tap_to_filter" = "filtrelemek için dokunun";
+"pulse.jobs" = "%d iş";
+"pulse.swipe_hint" = "İlerletmek için bir işi kaydırın. Açmak için dokunun.";
+"pulse.printing" = "Yazdırılıyor";
+"pulse.done_today" = "Bugün biten";
+"pulse.owed" = "Alacak";
+"pulse.unpaid" = "%d ödenmemiş";
+"pulse.this_month" = "Bu ay";
+"pulse.this_year" = "Bu yıl";
+"pulse.on_the_mac" = "Mac’te";
+"pulse.move_to" = "Taşı:";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "Geçmiş";
+"orders.window.count" = "%1$@ / %2$@ sipariş";
+"orders.window.body" = "Bitmemiş olanların tümü ve bitenlerin en yeni %@ tanesi. Daha eski geçmiş Mac’te kalır.";
+"order.field.filament" = "Filament";
+"order.field.quantity" = "Adet";
+"order.detail.mark_done" = "Bitti olarak işaretle";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "Hangi dükkân?";
+"pair.find.body" = "Khayt çalıştıran Mac’ler bu Wi‑Fi üzerinde kendini duyurur.";
+"pair.searching" = "Aranıyor";
+"pair.shop.needs_mac" = "Mac’in erişilebilir olması gerekir";
+"pair.manual.why" = "Kendini duyurmayan bir Mac veya bunu engelleyen bir ağ için.";
+"pair.manual.title" = "Mac’in adresi";
+"pair.manual.body" = "Khayt her ikisini de masaüstünde Ayarlar → LAN API altında gösterir.";
+"pair.manual.port" = "Bağlantı noktası";
+"pair.signed_out" = "Mac bu telefonun oturumunu kapattı. Sahip PIN’iyle yeniden eşleyin.";
+"pair.pin.title" = "Sahip PIN’i";
+"pair.pin.body" = "Mac veya PC’de Ayarlar → Çevrimiçi bölümündeki, 8 veya daha fazla karakterli sahip PIN’i. Talep PIN’i burada çalışmaz.";
+"pair.pin.foot" = "iPhone Anahtar Zinciri’nde saklanır, bu Mac dışında hiçbir yere gönderilmez.";
+"pair.pin.wrong" = "PIN reddedildi. Mac veya PC’de Ayarlar → Çevrimiçi bölümünü kontrol edin.";
+"pair.window_closed" = "Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) tıklayın, sonra yeniden deneyin.";
+"pair.window_locked" = "Bu telefondan çok fazla yanlış PIN girildi. Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) yeniden tıklayın, sonra doğru PIN ile deneyin.";
+"settings.secure.body" = "Bu telefon hâlâ sahip PIN’iyle oturum açıyor. Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) tıklayın, sonra Bu Telefonu Güvene Al’a dokunun.";
+"settings.secure.button" = "Bu Telefonu Güvene Al";
+"settings.secure.done" = "Tamam. Bu telefon artık kendi anahtarıyla oturum açıyor.";
+"settings.secure.failed" = "Mac yanıt vermedi. Dükkânın Wi-Fi’sinde olduğunuzu kontrol edip yeniden deneyin.";
+"settings.secure.closed" = "Mac şu anda telefon kabul etmiyor. Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) tıklayın, sonra 2 dakika içinde Bu Telefonu Güvene Al’a yeniden dokunun.";
+"pair.connect" = "Bağlan";
+"pair.finish" = "Panoyu aç";
+"pair.pull.title" = "Dükkânın defteri kopyalanıyor";
+"pair.pull.body" = "Hepsi değil, çalışma seti — geçmiş Mac’te kalır.";
+"pair.pull.settings" = "Ayarlar";
+"pair.pull.open_orders" = "Açık siparişler";
+"pair.pull.newest_finished" = "En yeni biten";
+"pair.pull.foot" = "Giderler, baskı dosyaları, ürünler, denetim günlüğü ve defterin geri kalanı gönderilmedi. Telefon bunlara sahip olmadığını bilir.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "g kaldı";
+"spool.detail.low_warn" = "Az stok — yenisini sipariş etmeye değer";
+"inventory.search.v2" = "Marka, malzeme, renk ara…";
+"inventory.whole.count" = "%@ makara";
+"inventory.whole.body" = "Telefon, dükkândaki tüm makaraları tutar.";
+"common.clear" = "Temizle";
+/* Add spool: colour */
+"spool.form.colour" = "Renk";
+"spool.form.colour.other" = "Başka renk";
+"colour.black" = "Siyah";
+"colour.white" = "Beyaz";
+"colour.grey" = "Gri";
+"colour.red" = "Kırmızı";
+"colour.blue" = "Mavi";
+"colour.green" = "Yeşil";
+"colour.orange" = "Turuncu";
+"colour.yellow" = "Sarı";
+"colour.purple" = "Mor";
+"colour.cyan" = "Camgöbeği";
+"spool.method.label" = "Etiketi tara";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "Boşta";
+"machines.error" = "Hata";
+"machines.offline" = "Çevrimdışı";
+"machines.offline.sub" = "Mac’te çevrimdışı olarak işaretlendi";
+"machines.ready" = "Sonraki işe hazır";
+"machines.nozzle" = "Nozul";
+"machines.bed" = "Tabla";
+"machines.stale" = "Canlı sıcaklıklar için Mac gerekir. Bunlar defterdeki son okumalardır.";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ açık";
+"clients.orders" = "sipariş";
+"clients.window.count" = "%@ müşteri";
+"clients.window.body" = "Tüm müşteriler telefona gelir. Sipariş toplamları gelmez — bunlar telefonda olmayan geçmişi gerektirir.";
+"clients.call" = "Ara";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "E-posta";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "Bu telefonda olanlar";
+"settings.mac_in_reach" = "Mac erişilebilir";
+"settings.mac_away" = "Mac uzakta";
+"settings.mac_away_since" = "Mac uzakta · defter %@ itibarıyla";
+"settings.from_book" = "Defterden çalışılıyor";
+"settings.not_sent" = "Gönderilmedi: %@.";
+"book.collection.expenses" = "giderler";
+"book.collection.printFiles" = "baskı dosyaları";
+"book.collection.products" = "ürünler";
+"book.collection.auditLog" = "denetim günlüğü";
+"book.collection.giftCards" = "hediye kartları";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "Doğrudan gelenler ve bekleme listesi. Birini almak, onu beklemede olarak sıraya koyar.";
+"intake.foot.no_book" = "Doğrudan gelenler ve bekleme listesi. Birini sıraya almak için dükkânın defterinin bu telefonda olması gerekir; yok saymak her durumda çalışır.";
+"intake.take" = "Al";
+"intake.dismiss" = "Yok say";
+"intake.take.needs_book" = "Bir talebi sıraya almak için dükkânın defterinin bu telefonda olması gerekir.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "Bu telefona kaydedildi ve şimdi Mac’e gönderildi.";
+"order.new.note.later" = "Mac uzakta. Bu telefona kaydedildi ve Mac erişilebilir olunca ona gönderilecek.";
+"order.new.note.live" = "Doğrudan Mac’e yazıldı.";
+"order.new.note.blocked" = "Mac uzakta ve bu telefonda dükkânın defteri yok, bu yüzden bunu kaydedecek yer henüz yok.";
+
+/* Live printer tracking */
+"machines.live" = "CANLI";
+"machines.live.ago" = "%d sn önce";
+"machines.left_until" = "%1$@ kaldı · %2$@ itibarıyla biter";
+"order.detail.print_progress" = "Baskı ilerlemesi";
+"order.detail.no_estimate" = "Henüz tahmin yok — makine bildirmedi.";
+"machines.not_published" = "Mac yazıcılarını henüz Khayt Cloud’da yayımlamadı.";
+"machines.via_cloud" = "Khayt Cloud üzerinden";
+"machines.reported" = "Mac’in son bildirimi: %@.";
+"cloud.signed_out" = "Bu telefonun Khayt Cloud oturumu kapatıldı — büyük olasılıkla dükkânın aygıt listesinden. Dükkândan uzakken eşitlemeye devam etmek için yeniden oturum açın.";
+"cloud.sign_in_again" = "Yeniden oturum aç";
+"cloud.busy" = "Khayt Cloud meşgul. Telefon kısa süre sonra yeniden deneyecek.";
+
+/* Print alerts */
+"settings.notify.print_done" = "Baskı bitti";
+"settings.live_activities" = "Kilit Ekranı’nda baskılar";
+"settings.count_install.hint" = "Günde bir kez yalnızca uygulamanın platformunu, sürümünü ve sürüm kanalını, bir de bunun bu hafta, bu ay veya şimdiye dek ilk gün olup olmadığını gönderir. Kimlik yok, dükkânınız hakkında hiçbir şey yok.";
+"settings.count_install" = "Bu kurulumu say (anonim)";
+"settings.privacy" = "Gizlilik";
+"settings.privacy_policy" = "Gizlilik politikası";
+"alert.print.finished" = "Baskı bitti";
+"alert.print.failed" = "Baskı başarısız";
+"alert.print.cancelled" = "Baskı iptal edildi";
+"alert.print.a_job" = "Bir iş";
+"alert.print.move_post" = "Son işleme taşı";
+"alert.print.reprint" = "Sıraya geri koy";
+"alert.print.mark_shipped" = "Gönderildi olarak işaretle";
+"alert.print.needs_book" = "Bir işi gönderildi olarak işaretlemek için dükkânın defterinin bu telefonda olması gerekir.";
+"alert.print.no_order" = "Bu iş bu telefonun defterinde yok.";
+"alert.print.not_shippable" = "Yalnızca bitmiş ve teslim edilmemiş bir iş gönderildi olarak işaretlenebilir.";
+
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "Dükkânın kuralları bu taşımaya izin vermiyor.";
+"move.refused.production_paused" = "Üretim duraklatıldı. Baskıya başlamadan önce üretimi sürdürün.";
+"move.refused.wip_blocked" = "%1$@ zaten %2$lld iş sınırında. Önce birini bitirin.";
+"move.refused.assembly_not_assembled" = "Tüm parçalar kalite kontrolden geçti. Bu işi tamamlamadan önce montajı monte edildi olarak işaretleyin.";
+"move.refused.assembly_parts" = "Bu iş parça bekliyor: %@";
+"move.refused.stage_not_a_status" = "Gönderildi, bir işi taşıyabileceğiniz bir aşama değil. Bitmiş bir işte Gönderildi olarak işaretle’yi kullanın.";
+"move.note.due_extended" = "Askıda kalınan süre için termin %1$lld gün ertelendi: yeni termin %2$@.";
+"move.note.filament_deducted" = "%2$lld makaradan %1$@ düşüldü.";
+"move.note.filament_deducted_low" = "%2$lld makaradan %1$@ düşüldü; %3$lld tanesi şimdi azaldı.";
+"move.note.filament_returned" = "%1$@ rafa geri konuldu — iş artık bitmiş olmadığından filamenti henüz kullanılmış sayılmaz.";
+"move.note.packaging_deducted" = "Biten iş için ambalaj raftan düşüldü.";
+"move.note.low" = "Azalıyor: %1$@";
+
+/* Push alerts relayed by Khayt Cloud: the server sends these KEYS
+   (loc-key), never text, so the alert is in the phone's language. */
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "Bir baskı bitti";
+"PUSH_INTAKE" = "Yeni sipariş talebi";
+
+/* Notifications feed */
+"feed.title" = "Bildirimler";
+"feed.empty" = "Henüz bir şey yok";
+"feed.empty.sub" = "Biten baskılar, geciken işler, azalan filament ve yeni sipariş talepleri burada görünür.";
+"feed.unread" = "Okunmamış";
+"feed.unread_count" = "%d okunmamış";
+
+/* Sample shop */
+"pair.sample" = "Örnek bir dükkânla keşfedin";
+"pair.sample.footer" = "Yalnızca bu telefonda duran uydurma bir dükkân — siparişler, makaralar, yazıcılar. Hiçbiri telefondan çıkmaz; istediğiniz zaman Mac’inizle eşleyebilirsiniz.";
+"sample.banner" = "Örnek dükkân";
+"sample.banner.line" = "Buradakilerin hiçbiri gerçek değil ve hiçbiri telefondan çıkmaz.";
+"sample.pair" = "Mac’imle eşle";
+"pair.pin.too_short" = "Mac’inizde Ayarlar → Çevrimiçi bölümünden daha uzun bir PIN (8+ karakter) belirleyin, sonra yeniden bağlanın.";
+"connection.pin_too_short" = "Mac’in daha uzun bir PIN’e ihtiyacı var";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "Ödeme kaydet";
+"pay.amount_paid" = "Ödenen tutar";
+"pay.method" = "Yöntem";
+"pay.method.cash" = "Nakit";
+"pay.method.mada" = "Mada";
+"pay.method.transfer" = "Banka havalesi";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "Kredi kartı";
+"pay.method.other" = "Diğer";
+"pay.section" = "Ödeme";
+"pay.status.paid" = "Ödendi";
+"pay.status.partial" = "Kısmen ödendi";
+"pay.status.unpaid" = "Ödenmedi";
+"pay.owed" = "%@ alacak";
+"pay.billed" = "Faturalanan";
+"pay.total_hint" = "Bu iş için şimdiye kadar ödenen her şey, yalnızca bugünün parası değil.";
+"pay.save" = "Ödemeyi kaydet";
+"pay.refused" = "Bu ödemeyi kaydetmek %@ gönderir; bu telefon bunu yapamaz. Mac’te kaydedin.";
+"pay.reach.email" = "bir makbuz e-postası";
+"pay.reach.webhook" = "bir webhook";
+/* Printer cameras (lib/webcam.js) */
+"camera.open" = "Kamera";
+"camera.at" = "%@ kamerasından kare";
+"camera.offline" = "Kamera yanıt vermedi. Dükkânın Wi-Fi’si üzerinden erişilir.";
+"camera.no_frame" = "Kamera açık ama henüz kare yok.";
+"camera.needs_key" = "Bu kamera yazıcının anahtarını gerektirir; anahtar Mac’te kalır.";
+"camera.rtsp" = "Bu kamera yalnızca RTSP yayını yapıyor; telefon bunu gösteremez.";
+"camera.refused" = "Bu kameranın adresi yazıcınınki değil, bu yüzden telefon onu getirmeyecek.";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "%1$@, %2$@ aşamasına taşındı.";
+"intent.advance.gone" = "Bu iş artık sırada değil.";
+"intent.no_book" = "Khayt’ın bu telefonda henüz bir dükkânı yok.";
+"intent.filament.one" = "%3$d makarada %2$@ için %1$@ kaldı.";
+"intent.filament.none" = "Rafta %@ yok.";
+"intent.filament.empty" = "Raf boş.";
+"Advance a job" = "Bir işi ilerlet";
+"Filament left" = "Kalan filament";
+"Log a failed print" = "Başarısız baskıyı kaydet";
+"Scan a spool" = "Makara tara";
+"Job" = "İş";
+"Material" = "Malzeme";
+/* WhatsApp updates to customers (the Mac's own words) */
+"wa.update" = "WhatsApp bilgilendirmesi";
+"wa.update_due" = "Müşteriye bildirin: %@";
+"wa.update_sent" = "%1$@ güncellemesi %2$@ tarihinde WhatsApp'ta açıldı";
+"wa.m.received" = "Sipariş alındı";
+"wa.m.ready" = "Hazır";
+"wa.m.shipped" = "Gönderildi";
+"wa.m.delivered" = "Teslim edildi";
+"wa.to" = "Alıcı: %@";
+"wa.logged_note" = "WhatsApp’ı açmak bu mesajı müşterinin kaydına yazar. WhatsApp’ta gönder’e basana kadar hiçbir şey gönderilmez.";
+"wa.default_words" = "Khayt’ın varsayılan ifadeleri. Dükkânınızın kendi WhatsApp şablonları Mac’te, Ayarlar › Entegrasyonlar’da.";
+"wa.open" = "WhatsApp’ı aç";
+"wa.language" = "Dil";
+"wa.lang.ar" = "Arapça";
+"wa.lang.en" = "İngilizce";
+"wa.reason.no_phone" = "Bu müşterinin kayıtlı telefon numarası yok.";
+"wa.reason.no_customer" = "Bu işin müşteri kaydı yok, bu yüzden gönderilecek numara yok.";
+"wa.reason.too_short" = "Telefon numarası bir WhatsApp numarası olamayacak kadar kısa.";
+"wa.reason.too_long" = "Telefon numarası bir WhatsApp numarası olamayacak kadar uzun.";
+"wa.reason.no_country_code" = "Bu numaraya ülke kodunu ekleyin (örneğin +971…). Yalnızca Suudi numaraları kodsuz yazılabilir.";
+"wa.reason.bad_saudi_number" = "Bu bir Suudi cep veya sabit hat numarası değil. 800 ve 9200 numaralarında WhatsApp yoktur.";
+"wa.reason.no_milestone" = "Bir teklif veya iptal edilmiş işin gönderilecek bilgilendirmesi yok.";
+"wa.photo.take" = "Fotoğraf çek";
+"wa.photo.pick" = "Fotoğraf seç";
+"wa.photo.remove" = "Fotoğrafı kaldır";
+"wa.share_photo" = "Fotoğrafla paylaş…";
+"wa.share_photo.note" = "Paylaşım sayfasında WhatsApp’ı, sonra müşterinin sohbetini seçin. WhatsApp’a geçtiğinde müşterinin kaydına yazılır.";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "Khayt bildirimleri";
+"Print finished or failed" = "Baskı bitti veya başarısız oldu";
+"New order requests" = "Yeni sipariş talepleri";
+"Queue, late jobs, low filament" = "Sıra, geciken işler, azalan filament";
+"focus.none" = "Dükkân bildirimi yok";
+"focus.kind.print" = "Baskılar";
+"focus.kind.intake" = "Sipariş talepleri";
+"focus.kind.shop" = "Dükkân";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "Etiketi tara";
+"scan.label.hint" = "Bir Khayt iş veya makara etiketine doğrultun.";
+"scan.label.unknown" = "Bu kod bir Khayt etiketi değil.";
+"scan.label.missing" = "Bu etiketin işi veya makarası bu telefonda yok.";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "%@ baskıya başladı";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "Dosya için teklif ver";
+"quote.file.pick" = "Dosya için teklif ver";
+"quote.file.file" = "Dosya";
+"quote.file.hours" = "%@ sa";
+"quote.file.exact" = "Mac’in dilimleyicisiyle ölçüldü.";
+"quote.file.estimated" = "Modelin şeklinden yapılan bir tahmin.";
+"quote.file.make_quote" = "Teklife dönüştür";
+"quote.file.needs_mac" = "Dosya için teklif vermek, dükkânın Wi-Fi’sinde Khayt Mac uygulamasını (alpha.63 veya üzeri) gerektirir.";
+"quote.file.reason.off" = "Mac’te anında teklif kapalı. Ayarlar’da talep formu için açın.";
+"quote.file.reason.unsupported" = "Khayt STL, OBJ, 3MF ve G-code dosyalarını fiyatlayabilir.";
+"quote.file.reason.too-large" = "Dosya 32 MB’tan büyük.";
+"quote.file.reason.no-numbers" = "Dükkânın fiyatları Mac’te henüz ayarlanmamış.";
+"quote.file.reason.no-price" = "Mac bu dosyayı fiyatlayamadı.";
+"quote.file.reason.busy" = "Mac meşgul. Biraz sonra yeniden deneyin.";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "Müşteri sayfasındaki fotoğraflar";
+"photos.none" = "Henüz fotoğraf yok. Bitmiş parçayı ekleyin, müşteri takip sayfasında görsün.";
+"photos.note" = "Siparişin bağlantısına sahip herkes bu fotoğrafları görebilir. Konum verileri saklanmadan önce kaldırılır.";
+"photos.needs_cloud" = "Bu siparişin takip sayfasına fotoğraf eklemek için Ayarlar’da Khayt Cloud’da oturum açın.";
+"photos.one" = "Sipariş fotoğrafı";
+"photos.remove" = "Fotoğrafı kaldır";
+"photos.remove.title" = "Bu fotoğraf kaldırılsın mı?";
+"photos.remove.message" = "Müşterinin takip sayfasından kalkar.";
+"photos.err.full" = "Bu siparişte zaten %lld fotoğraf var. Başka eklemek için birini kaldırın.";
+"photos.err.too_large" = "Bu fotoğraf küçültülse bile göndermek için çok büyük.";
+"photos.err.not_published" = "Bu siparişin henüz takip sayfası yok. Önce Mac’ten yayımlayın.";
+"photos.err.viewer" = "Khayt Cloud oturumunuz bu dükkânı yalnızca görüntüleyebilir, değiştiremez.";
+"photos.err.not_an_image" = "Bu dosya Khayt’ın kullanabileceği bir fotoğraf değil. JPEG veya PNG seçin.";
+"photos.err.http" = "Khayt Cloud fotoğrafı kabul etmedi (hata %lld). Yeniden deneyin.";
+
+/* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
+"settings.live_activities.mac" = "Uygulama kapalıyken baskıları Kilit Ekranı’nda canlı tutmak için Mac’teki Khayt’ta “Baskı ilerlemesini iPhone’uma gönder (Canlı Etkinlikler)” seçeneğini açın (Ayarlar ▸ Entegrasyonlar ▸ iPhone) ve bu telefonda Khayt Cloud’da oturum açın.";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "Hesaplayıcı";
+"home.action.calculator" = "Hesaplayıcı";
+"calc.title" = "Hesaplayıcı";
+"calc.part" = "Parça";
+"calc.printer" = "Yazıcı";
+"calc.pieces" = "Mıknatıslar, ekler ve diğer parçalar";
+"calc.price" = "Marj ve ücretler";
+"calc.charge" = "Ne kadar istenmeli";
+"calc.each" = "tanesi %@";
+"calc.nothing" = "Bir ağırlık veya baskı süresi girin; işin size maliyetini ve ne kadar isteyeceğinizi hesaplar.";
+"calc.cost" = "Size maliyeti";
+"calc.keeps" = "Kalan kâr";
+"calc.overhead" = "Genel gider (sabit maliyetler)";
+"calc.per_piece" = "Bir parçanın maliyeti nereye gidiyor";
+"calc.add_colour" = "Filament / renk ekle";
+"calc.remove_colour" = "Bu rengi kaldır";
+"calc.purge" = "Temizleme ve hazırlık kulesi";
+"calc.colour_n" = "Renk %lld";
+"calc.filament" = "Filament";
+"calc.no_spool" = "Filament yok";
+"calc.no_spool_price" = "Bu makaranın fiyatı yok, bu yüzden plastik hesaba katılmadı. Makaranın sayfasında maliyetini ekleyin.";
+"calc.machine" = "Makine";
+"calc.any_machine" = "Herhangi bir makine";
+"calc.preset" = "Yazıcı ön ayarı";
+"calc.default_rates" = "Khayt varsayılanları";
+"calc.rates" = "Maliyet oranları";
+"calc.rates_edited" = "düzenlendi";
+"calc.rates_reset" = "Ön ayara sıfırla";
+"calc.rate.laborRate" = "İşçilik oranı";
+"calc.rate.prepTime" = "Dilimleme / hazırlık süresi";
+"calc.rate.postTime" = "Son işlem / montaj";
+"calc.rate.wearRate" = "Aşınma";
+"calc.rate.powerDraw" = "Güç tüketimi";
+"calc.rate.elecRate" = "Elektrik";
+"calc.rate.failureRate" = "Hata tamponu";
+"calc.add_piece" = "Parça ekle";
+"calc.remove_piece" = "Bu parçayı kaldır";
+"calc.share" = "Fiyatı gönder";
+"calc.make_order" = "Teklife dönüştür";
+"calc.share.price" = "Fiyat: %@";
+"calc.share.each" = "%lld adet için — tanesi %@";
+"calc.share.rush" = "Acele ücretini içerir.";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "İade alacağınız KDV";
+"exp.qr.scan" = "Fişin QR’ını tara";
+"exp.qr.why" = "Suudi vergi faturasının QR’ı satıcıyı, toplamı ve KDV’yi verir; hiçbir şey yazmanız gerekmez. Fişin fotoğrafı da okunur.";
+"exp.qr.title" = "Fiş QR’ı";
+"exp.qr.hint" = "Vergi faturasındaki QR’a doğrultun";
+"exp.qr.vat_number" = "KDV no. %@";
+"exp.qr.supplier" = "Tedarikçilerinizden biri";
+"exp.qr.new_supplier" = "Henüz tedarikçilerinizden biri değil.";
+"exp.qr.add_supplier" = "Tedarikçi olarak ekle";
+"exp.qr.filled" = "Fişten dolduruldu — kontrol edin, sonra kategoriyi seçin.";
+"exp.qr.photo_stays" = "Rakamlar QR’dan geldiği için bu gider telefona kaydedilir ve fotoğraf gönderilmez.";
+"exp.qr.duplicate" = "Bu fiş zaten giderlerinizde, bu yüzden yeniden önerilmiyor.";
+"exp.qr.note" = "%@ · KDV no. %@";
+"exp.qr.reason.empty" = "Kod boş.";
+"exp.qr.reason.too_long" = "Kod bir vergi faturasınınkinden çok daha uzun.";
+"exp.qr.reason.not_base64" = "Bu kod bir vergi faturasına ait değil — bir bağlantı veya ödeme kodu olabilir.";
+"exp.qr.reason.truncated" = "Kod yarım kalmış.";
+"exp.qr.reason.bad_tag" = "Kod, vergi faturasında bulunmayan bir alan içeriyor.";
+"exp.qr.reason.not_utf8" = "Koddaki satıcı adı okunamıyor.";
+"exp.qr.reason.missing_tag" = "Kodda satıcı, KDV numarası, zaman, toplam veya KDV eksik.";
+"exp.qr.reason.bad_vat_number" = "Satıcının KDV numarası Suudi numarası değil (15 hane, 3 ile başlayıp 3 ile biter).";
+"exp.qr.reason.bad_amount" = "Koddaki toplam veya KDV bir tutar değil.";
+"exp.qr.reason.vat_over_total" = "Kod, KDV’nin toplamdan fazla olduğunu söylüyor.";
+"exp.qr.reason.bad_timestamp" = "Koddaki fatura tarihi okunamıyor.";
+
+"Price a part" = "Bir parçayı fiyatla";
+"home.calculator.sub" = "Bir parçanın size maliyeti ve ne kadar isteyeceğiniz";
+
+/* Library */
+"library.title" = "Kitaplık";
+"library.price" = "Kitaplıktan fiyatla";
+"home.library.sub" = "Daha önce bastığınız bir model bulun ve fiyatlayın.";
+"library.search" = "Model, klasör, etiket ara";
+"library.folders" = "Klasörler";
+"library.models" = "Modeller";
+"library.found" = "%d bulundu";
+"library.more" = "Daha fazla göster";
+"library.empty" = "Bu klasörde model yok.";
+"library.no_match" = "Eşleşen model yok.";
+"library.favorite" = "Favori";
+"library.printed" = "%d kez basıldı";
+"library.plate" = "Plaka";
+"library.plate.all" = "Tüm plakalar";
+"library.plate.n" = "Plaka %d";
+"library.calculator" = "Hesaplayıcıda aç";
+"library.notes" = "Basarken alınan notlar";
+"library.stale" = "Bu modelin Mac’in henüz ölçmediği yeni bir sürümü var. Dükkânın Wi-Fi’sinde fiyatlayın veya hesaplayıcıyı kullanın.";
+"library.not_estimable" = "Mac, STL, OBJ, 3MF ve G-code modellerini fiyatlayabilir. Bu model için hesaplayıcıyı kullanın.";
+"library.needs_mac" = "Kitaplıktan fiyatlamak için Mac’inizin dükkânın Wi-Fi’sinde olması ve bunu destekleyen bir Khayt sürümü gerekir. Hesaplayıcı yine çalışır.";
+"library.reason.no-file" = "Mac bu modeli listeliyor ama dosyası yok.";
+"library.reason.not-found" = "Bu model artık kitaplıkta değil.";
+"quote.file.unreliable" = "Bu model, tahminin güvenilir olduğu aralığın dışında. Göndermeden önce rakamı kontrol edin.";
+"library.reason.not-configured" = "Önce bilgisayarda anında teklifi ayarlayın: tahmin için bir yazıcı ve bir filament.";
+"library.sample" = "Örnek dükkânda modelleri ölçecek bir Mac yok. Kayıtlı ağırlık ve süreden fiyatlamak için hesaplayıcıda açın.";
+"library.from_copy" = "Dükkândan uzakta: bu, kitaplığınızın son Khayt Cloud eşitlemesindeki hâli ve fiyatlar bu telefonda hesaplanıyor.";
+"library.priced_here" = "Fiyatlarınızla bu telefonda hesaplandı. Birden çok renkli bir model tek makaradan maliyetlendirilir, bu yüzden Mac’in rakamı biraz farklı olabilir.";
+"library.no_copy" = "Mac’e ulaşılamıyor. Ayarlar’da Khayt Cloud’da oturum açıp bir kez eşitleyin, kitaplığınız yanınızda olsun.";
+
+/* Catalogue */
+"catalogue.title" = "Ürün Kataloğu";
+"catalogue.search" = "Ürün ara";
+"catalogue.ungrouped" = "Diğer";
+"catalogue.empty" = "Henüz ürün yok. Mac’inizdeki Ürün Kataloğu’ndan ekleyin.";
+"catalogue.no_match" = "Buna uyan ürün yok.";
+"catalogue.partial" = "%2$lld üründen %1$lld tanesi gösteriliyor. Diğerleri için Mac’inizde arayın.";
+"catalogue.no_book" = "Katalog dükkânın defteriyle birlikte gelir. Önce Khayt Cloud veya Mac’inizle eşitleyin.";
+"catalogue.in_stock" = "%lld stokta";
+"catalogue.out_of_stock" = "Stokta yok";
+"catalogue.description" = "Açıklama";
+"catalogue.price.override" = "Kendi fiyatınız";
+"catalogue.price.rounded" = "Hesaplanan fiyattan yuvarlandı";
+"catalogue.price.calculated" = "Hesaplanan";
+"home.catalogue.sub" = "Sattıklarınız, fiyat ve stokla";
+
+/* Invoices */
+"invoice.title" = "Fatura";
+"invoice.open" = "Fatura";
+"invoice.open.sub" = "Görüntüleyin ve PDF olarak gönderin";
+"invoice.share" = "Paylaş";
+"invoice.refused.missing" = "Bu iş telefondaki defter kopyasında yok. Dükkânın Wi-Fi’sinde defteri yeniden çekin.";
+"invoice.refused.quote" = "Bu hâlâ bir teklif. Müşteri kabul edince fatura oluşur.";
+"invoice.refused.cancelled" = "İptal edilen işin faturası olmaz.";
+"invoice.refused.not_numbered" = "Bu faturanın önce numarası olmalı. Numara veren Mac veya PC’de bir kez açın, sonra burada görünür.";
+"invoice.refused.failed" = "Fatura oluşturulamadı. Yeniden deneyin veya Mac ya da PC’de açın.";
+
+"api.request_failed" = "İstek başarısız (HTTP %lld)";
+"order.untitled" = "Talep %@";
+"orders.quotes" = "Teklifler";
+"orders.no_quotes" = "Açık teklif yok";
+"orders.no_quotes.sub" = "Burada veya Mac’te hazırlanan teklifler müşterinin yanıtını burada bekler.";
+"orders.quotes_on_mac" = "Teklifler Mac’te";
+"orders.quotes_on_mac.sub" = "Bu telefonda dükkânın defteri yok, açık teklifleri Mac’te görün.";
+"status.cancelled" = "İptal edildi";
+"stage.short.quote" = "Teklif";
+"stage.short.cancelled" = "İptal";
+"quote.made_on" = "Hazırlandı: %@";
+"quote.valid_until" = "Geçerlilik: %@";
+"quote.expired" = "SÜRESİ DOLDU";
+"quote.expired_on" = "Süresi doldu: %@";
+"quote.field.made" = "Hazırlanma";
+"quote.field.valid_until" = "Geçerlilik";
+"quote.approve" = "Onayla";
+"quote.approve_note" = "Müşteri evet dediğinde onaylayın: teklif Beklemede bir işe dönüşür.";
+"quote.decline" = "Reddet";
+"quote.decline_q" = "Bu teklif reddedilsin mi?";
+"quote.decline_body" = "Tekliflerden çıkar ve iptal edilmiş olarak Geçmiş’te kalır.";
+"licence.not_for_sale" = "Satış lisansı yok";
+"licence.nc_line" = "%1$@: lisansı baskıların satılmasına izin vermiyor.";
+"licence.expired_line" = "%1$@: satın alınan lisans %2$@ tarihinde sona erdi.";
+"PUSH_OVERDUE" = "İşler gecikti";
+"PUSH_LOW_STOCK" = "Filament azalıyor";
+"PUSH_DUE_TODAY" = "İşlerin termini bugün";
+"PUSH_QUOTE_DECISION" = "Bir müşteri teklife yanıt verdi";
+"PUSH_QUOTE_APPROVED" = "Bir müşteri teklifi onayladı";
+"PUSH_QUOTE_DECLINED" = "Bir müşteri teklifi reddetti";
+"PUSH_MESSAGE" = "Bir müşteri mesaj gönderdi";
+"PUSH_PAYMENT" = "Bir ödeme geldi";
+
+/* Who owes */
+"owed.title" = "Kim borçlu";
+"owed.empty" = "Açık işlerde alacak yok.";
+"owed.total" = "%2$d işte %1$@ alacak";
+"owed.due" = "Vade: %@";
+"owed.remind" = "WhatsApp’tan hatırlat";
+"owed.remind.a11y" = "%@ kişisine WhatsApp’tan hatırlat";
+"owed.remind.text" = "Merhaba, %1$@ için %2$@ tutarının hâlâ ödenmediğini nazikçe hatırlatmak isteriz. Teşekkürler!";
+"owed.remind.no_phone" = "Bu müşterinin kayıtlı telefon numarası yok.";
+"owed.remind.no_customer" = "Bu iş kayıtlı bir müşteriye bağlı değil.";
+"owed.open.hint" = "Alacağı olan işleri gösterir.";
+/* Proforma */
+"proforma.title" = "Proforma fatura";
+"proforma.open" = "Proforma fatura";
+"proforma.open.sub" = "İş faturalanmadan önce ödeme isteyin";
+"proforma.refused" = "Proforma, fiyatı belirlenmiş, kabul edilmiş ve henüz bitmemiş bir iş içindir.";
+/* Intake reminder */
+"intake.remind.when" = "Bana hatırlat";
+"intake.remind.tomorrow" = "Yarın sabah";
+"intake.remind.3days" = "3 gün sonra";
+"intake.remind.week" = "1 hafta sonra";
+"intake.remind.alert" = "Hatırlatma: %@ kişisine talebiyle ilgili geri dönün.";
+
+/* Ship */
+"ship.title" = "Gönder";
+"ship.carrier" = "Kargo firması";
+"ship.service" = "Hizmet";
+"ship.tracking" = "Takip numarası";
+"ship.scan" = "İrsaliyeyi tara";
+"ship.scan.hint" = "Kuryenin fişindeki barkoda doğrultun.";
+"ship.hint" = "Kuryenin fişinden. Müşterinin sayfasında görünür.";
+"ship.create" = "Gönderildi olarak işaretle";
+"ship.open" = "Gönder";
+"ship.open.sub" = "Kargo firması ve takip numarası";
+/* End of day */
+"eod.title" = "Gün sonu";
+"eod.finished" = "Bugün biten";
+"eod.revenue" = "Bugün kazanılan";
+"eod.open" = "Hâlâ açık";
+"eod.overdue" = "Geciken";
+"eod.waste" = "Boşa giden filament";
+"eod.grams" = "%@ g";
+"eod.hours" = "Kaydedilen saat";
+"eod.finished_list" = "Bugün biten";
+"eod.due_list" = "Bugün termini olan, bitmeyen";
+"eod.nothing" = "Bugün hiçbir şey bitmedi.";
+/* Edit order */
+"edit.title" = "Düzenle";
+"edit.due" = "Termin";
+"edit.priority" = "Öncelik";
+"edit.priority.normal" = "Normal";
+"edit.priority.high" = "Yüksek";
+"edit.priority.urgent" = "Acil";
+"edit.price.note" = "Yeni fiyat, müşterinin ödeyeceği toplamdır. Önceden ödenen tutar, yeni toplama kadar korunur.";
+/* Printer control */
+"printer.pause" = "Duraklat";
+"printer.resume" = "Sürdür";
+"printer.stop" = "Durdur";
+"printer.stop.confirm" = "%@ üzerindeki baskı durdurulsun mu?";
+"printer.stop.message" = "Durdurulan baskı sürdürülemez.";
+"printer.sending" = "Mac’e soruluyor…";
+"printer.sending.cloud" = "Mac’e Khayt Cloud üzerinden soruluyor…";
+"printer.done.pause" = "Duraklatıldı.";
+"printer.done.resume" = "Sürdürüldü.";
+"printer.done.stop" = "Durduruldu.";
+"printer.refused" = "Yazıcı şunu söyledi: %@";
+"printer.why.device" = "Bu telefonun yazıcıları denetleyebilmesi için Mac ile yeniden eşlenmesi gerekir.";
+"printer.why.not_found" = "Mac’te bu makine yok.";
+"printer.why.not_connected" = "Mac şu anda bu yazıcıya bağlı değil.";
+"printer.why.unsupported" = "Bu yazıcı Khayt’tan denetlenemez.";
+"printer.why.no_job" = "Üzerinde yazdırılan bir şey yok.";
+"printer.why.busy" = "Mac bu yazıcıyla meşgul. Biraz sonra yeniden deneyin.";
+"printer.why.old_mac" = "Yazıcıları telefondan denetlemek için Mac’teki Khayt’ı güncelleyin.";
+"printer.why.no_answer" = "Mac yanıt vermedi. Uykuda veya çevrimdışı olabilir.";
+"printer.why.unreachable" = "Ne Mac’e ne de Khayt Cloud’a ulaşılabildi.";
+/* Customer page messages */
+"portal.title" = "Müşteri sayfası";
+"portal.share" = "Bağlantıyı paylaş";
+"portal.none" = "Bu sayfada henüz mesaj yok.";
+"portal.reply" = "Müşteriye yanıt ver";
+"portal.send" = "Gönder";
+"portal.messages.failed" = "Mesajlar yüklenemedi.";
+"portal.reply.failed" = "Yanıt gönderilemedi.";
+"portal.reply.viewer" = "Bu oturum dükkânı yalnızca görüntüleyebilir.";
+/* Customer page */
+"customer.owes" = "Borcu";
+"customer.limit" = "Kredi limiti %@";
+"customer.over_limit" = "%@ kredi limitini aştı";
+"customer.terms" = "%d gün içinde öder";
+"customer.terms.receipt" = "Teslimde öder";
+"customer.open" = "Açık işler";
+"customer.open.none" = "Açık iş yok.";
+"customer.history" = "Biten işler";
+"customer.history.none" = "Bu telefonda biten iş yok.";
+"customer.history.window" = "Bu telefon en yeni biten işleri tutar; tüm geçmiş Mac’te.";
+"customer.agreed" = "Anlaşılan fiyatlar";
+"customer.messages" = "Mesajlar";
+"customer.messages.none" = "Henüz kayıtlı mesaj yok.";
+"customer.needs_book" = "Bu müşterinin sayfası için dükkânın defterinin bu telefonda olması gerekir.";
+"customer.new_order" = "Bu müşteri için yeni sipariş";
+/* Rush, machine job */
+"orders.rush" = "Acele";
+"machines.job" = "İş: %@";

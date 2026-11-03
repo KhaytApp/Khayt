@@ -113,6 +113,48 @@ final class LocalizationCompletenessTests: XCTestCase {
         XCTAssertEqual(mismatched.sorted(), [])
     }
 
+    /// The Mac's other seven languages. Each holds every English key (a
+    /// key it lacks would read in English, through `L10n.tr`'s fallback, but
+    /// the table is meant to be whole) and asks for the same arguments: a
+    /// translation that takes different ones is a crash, not a wrong word.
+    func testEveryOtherLanguageIsWholeAndTakesTheSameArguments() throws {
+        let en = try table("en")
+        let spec = try NSRegularExpression(pattern: #"%(\d+\$)?(@|ld|lld|d|f|s)"#)
+        func specs(_ s: String) -> [String] {
+            spec.matches(in: s, range: NSRange(s.startIndex..., in: s))
+                .map { String(s[Range($0.range, in: s)!]).replacingOccurrences(of: #"\d+\$"#, with: "", options: .regularExpression) }
+                .sorted()
+        }
+        for language in AppLanguage.allCases.compactMap(\.bundleCode) where !["en", "ar"].contains(language) {
+            let other = try table(language)
+            XCTAssertEqual(Set(en.keys).subtracting(other.keys).sorted(), [], "in English, missing from \(language)")
+            XCTAssertEqual(Set(other.keys).subtracting(en.keys).sorted(), [], "in \(language), not in English")
+            let mismatched = en.keys.filter { key in other[key].map { specs($0) != specs(en[key]!) } ?? false }
+            XCTAssertEqual(mismatched.sorted(), [], "\(language) takes different arguments")
+        }
+    }
+
+    /// A key a language does not hold reads in English, never as the key.
+    func testAMissingKeyFallsBackToEnglish() {
+        let before = L10n.currentLanguage
+        defer { L10n.setLanguage(before) }
+        L10n.setLanguage(.de)
+        XCTAssertEqual(L10n.tr("no.such.key.anywhere"), "no.such.key.anywhere")
+        XCTAssertFalse(L10n.tr("tab.orders").isEmpty)
+        XCTAssertNotEqual(L10n.tr("tab.orders"), "tab.orders")
+    }
+
+    /// What the shop sends stays in the two languages its documents are
+    /// written in.
+    func testDocumentsGoOutInEnglishOrArabic() {
+        let before = L10n.currentLanguage
+        defer { L10n.setLanguage(before) }
+        L10n.setLanguage(.ja)
+        XCTAssertEqual(L10n.contentLanguage, "en")
+        L10n.setLanguage(.ar)
+        XCTAssertEqual(L10n.contentLanguage, "ar")
+    }
+
     /// Screens that are fully translated, and must stay so. A literal English
     /// label added to one of these fails here, by file and by line. Add a
     /// screen to the list when it is done; never take one off.

@@ -1,0 +1,1000 @@
+/* Tabs */
+"tab.home" = "Inicio";
+"tab.orders" = "Pedidos";
+"tab.inventory" = "Inventario";
+"tab.machines" = "Impresoras";
+"tab.clients" = "Clientes";
+"tab.settings" = "Ajustes";
+
+/* Connection */
+"connection.checking" = "Comprobando…";
+"connection.connected" = "Conectado";
+"connection.unreachable" = "Ordenador no disponible";
+"connection.moved" = "Tu Mac ha respondido desde una dirección nueva";
+"connection.moved.line" = "Cambia a %@ solo si es el Mac de tu taller. Al cambiar, se le envía tu PIN.";
+"connection.moved.use" = "Cambiar";
+"connection.moved.not_now" = "Ahora no";
+"connection.unauthorized" = "PIN de red local incorrecto";
+"connection.banner.unreachable" = "No se puede acceder a Khayt en tu red. Revisa el Wi‑Fi y la API de red local del ordenador.";
+"connection.banner.pin" = "PIN de red local rechazado. Actualiza el PIN en Ajustes para que coincida con el del ordenador.";
+"sync.pending" = "%d cambio(s) en este iPhone en espera del Mac.";
+"connection.error.reach_status" = "No se puede acceder a %@. ¿Misma red Wi‑Fi? Ordenador → Ajustes → API de red local: activada, escuchando en todas las interfaces; anota la IP y el puerto.";
+"settings.host_required" = "Introduce la dirección IP de tu ordenador.";
+"settings.host_invalid" = "Dirección no válida. Usa, por ejemplo, 192.168.1.42 (no una URL completa con http://).";
+"home.pipeline" = "Flujo de producción";
+
+/* Home */
+"home.quick_actions" = "Acciones rápidas";
+"home.action.add_spool" = "Añadir bobina";
+"stat.in_queue" = "En cola";
+"stat.printing" = "Imprimiendo";
+"stat.post" = "Postproc.";
+"stat.qc" = "QC";
+
+/* Orders */
+"orders.active" = "Activos";
+"orders.filter.all" = "Todos";
+"orders.overdue" = "Atrasados";
+"orders.detail.set_status" = "Definir estado";
+"orders.detail.advance" = "Pasar a la siguiente fase";
+
+/* Inventory */
+"inventory.filter.all" = "Todo";
+"inventory.filter.low" = "Poco stock";
+
+/* Settings */
+"settings.connection" = "Conexión";
+"settings.connection.footer" = "Mismo PIN que en Khayt, Ajustes → API de red local. Requiere la versión 2.2.1 o posterior del ordenador.";
+"settings.shop_name" = "Nombre del taller";
+"settings.host" = "IP o nombre de host del ordenador";
+"settings.port" = "Puerto: %d";
+"settings.pin" = "PIN de red local del propietario";
+"settings.retest" = "Volver a probar el emparejamiento";
+"settings.unpair" = "Desemparejar este dispositivo";
+"settings.unpair.footer" = "Elimina de este iPhone el libro del taller y el PIN.";
+"settings.language" = "Idioma";
+"settings.notifications" = "Notificaciones";
+"settings.notify.queue" = "Cambios en la cola";
+"settings.notify.connection" = "Conexión perdida";
+"settings.notify.overdue" = "Pedidos atrasados";
+"settings.notify.low_stock" = "Poco filamento";
+"settings.docs" = "Referencia de la API de red local";
+
+/* Status */
+"status.quote" = "Presupuesto";
+"status.pending" = "Pendiente";
+"status.printing" = "Imprimiendo";
+"status.post" = "Postprocesado";
+"status.qc" = "Control de calidad";
+"status.completed" = "Completado";
+"status.delivered" = "Entregado";
+"status.shipped" = "Enviado";
+"status.on_hold" = "En espera";
+
+/* Lang */
+"lang.system" = "Sistema";
+
+/* Notifications */
+"notify.queue.title" = "Cola actualizada";
+"notify.queue.body" = "%d trabajos en cola (%d imprimiendo)";
+"notify.offline.title" = "Khayt desconectado";
+"notify.offline.body" = "Ordenador no disponible en la red local";
+"notify.overdue.title" = "Pedidos atrasados";
+"notify.overdue.body" = "%d pedido(s) fuera de plazo";
+"notify.low_stock.title" = "Poco filamento";
+"notify.low_stock.body" = "%d bobina(s) con menos de 200 g";
+
+/* NFC */
+"nfc.unavailable" = "NFC no está disponible en este dispositivo.";
+"nfc.read.prompt" = "Acerca el iPhone a la etiqueta de la bobina de filamento.";
+"nfc.read.success" = "Etiqueta leída correctamente.";
+"nfc.write.title" = "Escribir en etiqueta NFC";
+"nfc.write.intro" = "Codifica los datos de esta bobina en una pegatina NTAG213+ en blanco. Elige el formato que espera tu impresora.";
+"nfc.write.standard" = "Estándar de etiqueta";
+"nfc.write.preview" = "Datos que escribir";
+"nfc.write.material" = "Material";
+"nfc.write.brand" = "Marca";
+"nfc.write.weight" = "Peso";
+"nfc.write.print_temp" = "Temp. de impresión";
+"nfc.write.bed_temp" = "Temp. de la cama";
+"nfc.write.tap_blank" = "Toca una etiqueta en blanco para escribir";
+"nfc.write.scanning" = "Acerca a una etiqueta en blanco…";
+"nfc.write.prompt" = "Acerca el iPhone a una etiqueta NFC en blanco y regrabable.";
+"nfc.write.success" = "Etiqueta escrita correctamente.";
+"nfc.write.done" = "OK";
+"nfc.write.footer" = "Usa etiquetas NTAG213+ regrabables (NTAG215/216 para OpenSpool). Elige el formato que espera tu impresora o su firmware.";
+"nfc.standard.openspool" = "OpenSpool";
+"nfc.standard.openspool.hint" = "Firmware extendido de Snapmaker U1, Bambu mediante lector OpenSpool — application/json";
+"nfc.standard.opentag3d" = "OpenTag3D";
+"nfc.standard.opentag3d.hint" = "Bambu Lab, Creality, genérico — application/opentag3d";
+"nfc.standard.openprinttag" = "OpenPrintTag (Prusa)";
+"nfc.standard.openprinttag.hint" = "Prusa MK4 / XL / MINI — application/vnd.openprinttag";
+"nfc.error.missing_material" = "Se necesita el nombre del material para codificar una etiqueta.";
+"nfc.error.payload_large" = "Los datos codificados son demasiado grandes (%d bytes) para esta etiqueta.";
+"nfc.error.invalid_color" = "El color hexadecimal no es válido.";
+"nfc.error.no_tag" = "No se ha detectado ninguna etiqueta.";
+"nfc.error.unsupported_tag" = "Tipo de etiqueta no compatible.";
+"nfc.error.not_ndef" = "La etiqueta no admite NDEF.";
+"nfc.error.read_only" = "La etiqueta es de solo lectura o está bloqueada. Usa una etiqueta en blanco y regrabable.";
+"nfc.error.read_failed" = "No se pudo leer la etiqueta.";
+
+/* Quick quote */
+"home.action.quote" = "Presupuesto";
+"quote.title" = "Presupuesto rápido";
+"quote.part" = "Pieza";
+"quote.rates" = "Tarifas";
+"quote.result" = "Precio";
+"quote.cost" = "Lo que te cuesta";
+"quote.weight" = "Peso";
+"quote.time" = "Tiempo de impresión";
+"quote.qty" = "Cantidad";
+"quote.spool_cost" = "Coste de la bobina (1 kg)";
+"quote.labor_rate" = "Tarifa de mano de obra por hora";
+"quote.margin" = "Margen";
+"quote.rush" = "Trabajo urgente";
+"quote.calculate" = "Calcular";
+"quote.total" = "Total";
+"quote.discount" = "Descuento";
+"quote.rush_fee" = "Recargo por urgencia";
+"quote.tier" = "Precio por volumen ({n}+)";
+"quote.unit_cost" = "Coste por unidad";
+"quote.bd.material" = "Material";
+"quote.bd.machine" = "Máquina";
+"quote.bd.labor" = "Mano de obra";
+"quote.bd.buffer" = "Margen de fallos";
+"common.close" = "Cerrar";
+
+/* Waste */
+"home.action.waste" = "Registrar desperdicio";
+"waste.title" = "Registrar una impresión fallida";
+"waste.what" = "Qué falló";
+"waste.why" = "Por qué";
+"waste.material" = "Material";
+"waste.failure_type" = "Fallo";
+"waste.weight" = "Desperdiciado";
+"waste.reason" = "¿Qué pasó?";
+"waste.save" = "Registrar";
+"waste.deduct" = "Descontar de la bobina";
+"waste.deduct.footer" = "Resta los gramos desperdiciados de la bobina correspondiente. Desactívalo si ya la has ajustado.";
+"waste.ft.warping" = "Deformación";
+"waste.ft.adhesion" = "Adherencia a la cama";
+"waste.ft.clog" = "Obstrucción";
+"waste.ft.layer_shift" = "Desplazamiento de capa";
+"waste.ft.power" = "Corte de energía";
+"waste.ft.other" = "Otro";
+
+/* Expenses */
+"home.action.expense" = "Gasto";
+"exp.title" = "Nuevo gasto";
+"exp.what" = "Qué pagaste";
+"exp.amount" = "Importe";
+"exp.category" = "Categoría";
+"exp.note" = "Nota";
+"exp.receipt" = "Recibo";
+"exp.photograph" = "Fotografiar el recibo";
+"exp.retake" = "Eliminar foto";
+"exp.save" = "Guardar";
+"exp.no_camera" = "Este dispositivo no tiene cámara: el gasto se guardará sin recibo.";
+"exp.cat.filament" = "Filamento";
+"exp.cat.electricity" = "Electricidad";
+"exp.cat.maintenance" = "Mantenimiento";
+"exp.cat.tools" = "Herramientas y suministros";
+"exp.cat.equipment" = "Equipamiento (máquinas)";
+"exp.cat.shipping" = "Envío";
+"exp.cat.other" = "Otro";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "ATRASADO";
+"orders.queue_clear" = "La cola está vacía";
+"orders.pick" = "Elige un pedido";
+"orders.pick.sub" = "Su ficha se abre aquí, junto a la lista.";
+"inventory.pick" = "Elige una bobina";
+"inventory.pick.sub" = "Su ficha se abre aquí, junto a la estantería.";
+"orders.queue_clear.sub" = "Todo al día: no hay pedidos activos";
+"orders.no_completed" = "No hay pedidos completados";
+"orders.no_completed.sub" = "Los pedidos completados aparecerán aquí";
+"inventory.none" = "Aún no hay bobinas";
+"inventory.none.sub" = "Añade tu primera bobina para empezar";
+"inventory.no_results" = "Sin resultados";
+"inventory.no_results.sub" = "Prueba con otra búsqueda";
+/* Pairing */
+"pair.back" = "Atrás";
+"pair.continue" = "Continuar";
+"pair.manual" = "Introducir la dirección manualmente";
+"pair.browse.failed" = "Khayt no puede buscar talleres en esta red.";
+"pair.browse.permission" = "Si rechazaste la solicitud de red local, permítela en Ajustes → Khayt → Red local.";
+"pair.browse.looking" = "Buscando… asegúrate de que Khayt esté abierto en el Mac con su API de red local activada.";
+"pair.browse.none" = "Aún no se ha encontrado nada.";
+"pair.shop.offline" = "Puede funcionar sin conexión con este taller";
+"pair.manual.host" = "IP del ordenador";
+"pair.verify.ok" = "Conectado: trabajos en cola: %d. PIN aceptado.";
+
+/* Shared words */
+"common.done" = "OK";
+"common.cancel" = "Cancelar";
+"common.save" = "Guardar";
+"common.remove" = "Eliminar";
+"common.unassigned" = "Sin asignar";
+"field.project" = "Proyecto";
+"field.client" = "Cliente";
+"field.status" = "Estado";
+"field.machine" = "Máquina";
+"field.due" = "Vencimiento";
+"field.priority" = "Prioridad";
+"field.material" = "Material";
+"field.brand" = "Marca";
+
+/* New order */
+"order.new.title" = "Nuevo pedido";
+"order.new.title_quote" = "Nuevo presupuesto";
+"order.new.type" = "Tipo";
+"order.new.order" = "Pedido";
+"order.new.quote" = "Presupuesto";
+"order.new.details" = "Detalles";
+"order.new.project" = "Proyecto";
+"order.new.client" = "Cliente";
+"order.new.client.saved" = "Cliente guardado";
+"order.new.client.pick" = "Vincula este pedido con el cliente guardado.";
+"order.new.material" = "Material";
+"order.new.price" = "Precio";
+"order.new.price_in" = "Precio (%@)";
+"order.new.schedule" = "Calendario y máquina";
+"order.new.set_due" = "Definir fecha de vencimiento";
+"order.new.due" = "Vencimiento";
+"order.new.machine" = "Máquina";
+"order.new.unassigned" = "Sin asignar";
+"order.new.create_quote" = "Crear presupuesto";
+"order.new.add" = "Añadir a la cola";
+
+/* Order detail */
+"order.detail.title" = "Pedido";
+"order.detail.id" = "ID del pedido";
+"order.detail.assigned" = "Asignado a";
+
+/* Spool detail */
+"spool.detail.filament" = "Filamento";
+"spool.detail.lot" = "Lote";
+"spool.detail.print_temp" = "Temp. de la boquilla";
+"spool.detail.bed_temp" = "Temp. de la cama";
+"spool.detail.adjust" = "Ajustar restante";
+"spool.detail.adjust.body" = "Indica en gramos el filamento que queda en esta bobina.";
+"spool.detail.grams" = "Gramos";
+"spool.detail.grams_error" = "Introduce un número en gramos.";
+"spool.detail.remove_q" = "¿Eliminar la bobina?";
+
+/* Queue, intake, clients, machines */
+"queue.title" = "Cola de producción";
+"queue.empty" = "Cola vacía";
+"queue.empty.sub" = "No hay pedidos activos.";
+"intake.title" = "Solicitudes";
+"intake.empty" = "Bandeja vacía";
+"intake.empty.sub" = "Aquí aparecen las nuevas solicitudes de trabajo de tu formulario, WhatsApp y más.";
+"intake.reminded" = "Recordatorio fijado";
+"intake.call" = "Llamar";
+"intake.whatsapp" = "WhatsApp";
+"intake.email" = "Correo";
+"clients.search" = "Nombre, teléfono, correo";
+"clients.none" = "Sin clientes";
+"clients.none.sub" = "Añade clientes en Khayt para ordenador.";
+"clients.no_match" = "Sin coincidencias";
+"clients.no_match.sub" = "Ningún cliente coincide con «%@».";
+"machines.none" = "Sin máquinas";
+"machines.none.sub" = "Añade impresoras en Khayt para ordenador.";
+"machines.no_live" = "Sin conexión en directo";
+
+"spool.detail.remove" = "Eliminar bobina";
+"intake.decline" = "Rechazar";
+"intake.remind" = "Recordar";
+
+/* Adding a spool, scanning */
+"barcode.title" = "Escanear código de barras";
+"barcode.unavailable" = "Escaneo con cámara no disponible";
+"barcode.unavailable.sub" = "Introduce en su lugar los números bajo el código de barras.";
+"barcode.type" = "O introduce los números bajo el código de barras";
+"barcode.placeholder" = "p. ej. 6938936716785";
+"barcode.look_up" = "Buscar";
+"barcode.invalid" = "No es un UPC/EAN válido: revisa el último dígito.";
+"barcode.source.shelf" = "Código de barras · igual que un rollo que ya tienes en la estantería";
+"barcode.source.database" = "Código de barras · %@";
+"barcode.source.code" = "Código de barras %1$@ · %2$@";
+"barcode.not_found" = "No está en la base de datos de productos. Rellénalo una vez y la próxima caja se encontrará en tu estantería.";
+"barcode.unreachable" = "No se pudo acceder a la base de datos de productos. Rellénalo una vez y la próxima caja se encontrará en tu estantería.";
+"scan.title" = "Escanear etiqueta";
+"scan.mode" = "Modo";
+"scan.mode.photo" = "Foto";
+"scan.mode.live" = "En directo";
+"scan.clear" = "Borrar";
+"scan.live_unavailable" = "Escaneo en directo no disponible";
+"scan.live_unavailable.sub" = "Usa el modo Foto en este dispositivo.";
+"scan.photo.title" = "Haz una foto nítida de la etiqueta";
+"scan.photo.body" = "Llena el encuadre con texto: SKU, lote, temperaturas y material. Funciona mejor que el escaneo en directo con letra pequeña.";
+"scan.photo.take" = "Hacer foto";
+"scan.photo.reading" = "Leyendo etiqueta…";
+"scan.photo.none" = "No se encontró texto. Prueba con más luz y llena el encuadre con la etiqueta.";
+"scan.live.hint" = "Recorre la etiqueta despacio. El texto capturado se conserva aunque salga del encuadre.";
+"scan.use_text" = "Usar texto capturado (%d)";
+"spool.add.title" = "Añadir bobina";
+"spool.add.barcode_title" = "Código de barras del producto";
+"spool.add.nfc_title" = "Etiqueta NFC";
+"spool.add.confirm" = "Confirmar bobina";
+"spool.add.how" = "¿Cómo quieres añadir esta bobina?";
+"spool.add.no_camera" = "Cámara no disponible en este dispositivo.";
+"spool.add.one" = "Añadir al inventario de Khayt";
+"spool.add.n" = "Añadir %d bobinas";
+"spool.method.barcode" = "Escanear código de barras del producto";
+"spool.method.barcode.sub" = "El UPC/EAN de la caja, buscado por ti";
+"spool.method.label.sub" = "Leer la etiqueta impresa con la cámara";
+"spool.method.nfc" = "Tocar una etiqueta NFC";
+"spool.method.nfc.sub" = "Acerca el teléfono a la etiqueta de la bobina";
+"spool.method.manual" = "Escribirlo a mano";
+"spool.method.manual.sub" = "Marca, material, color, peso";
+"spool.source.manual" = "Manual";
+"spool.source.label" = "Etiqueta escaneada";
+"spool.lookup.busy" = "Buscando…";
+"spool.lookup.busy.sub" = "Primero tu estantería, luego la base de datos de productos.";
+"spool.lookup.title" = "Escanea el código de barras de la caja";
+"spool.lookup.body" = "Un filamento que ya has dado de alta se rellena desde tu propia estantería, con el precio incluido.";
+"spool.lookup.open" = "Abrir escáner";
+"spool.label.title" = "Apunta a la etiqueta";
+"spool.label.body" = "Usa el modo Foto para mejores resultados: haz una foto nítida de toda la etiqueta.";
+"spool.label.open" = "Abrir cámara";
+"spool.nfc.title" = "Acerca el iPhone a la bobina";
+"spool.nfc.unavailable" = "NFC no está disponible en este dispositivo.";
+"spool.nfc.scan" = "Escanear NFC";
+"spool.nfc.scanning" = "Escaneando…";
+"spool.form.required" = "Obligatorio";
+"spool.form.material" = "Nombre del material";
+"spool.form.weight" = "Peso (gramos)";
+"spool.form.optional" = "Opcional";
+"spool.form.cost" = "Precio pagado";
+"spool.form.cost.footer" = "Lo que costó el rollo. Los trabajos impresos con él se presupuestan a partir de este precio.";
+"spool.form.sku" = "SKU";
+"spool.form.barcode" = "Código de barras (UPC/EAN)";
+"spool.form.lot" = "N.º de lote";
+"spool.form.print_temp" = "Temp. de impresión (°C)";
+"spool.form.bed_temp" = "Temp. de la cama (°C)";
+"spool.quantity" = "Cuántas";
+"spool.quantity.one" = "¿Varias cajas del mismo filamento? Añádelas de una vez.";
+"spool.quantity.many" = "%d bobinas independientes, cada una con su propio seguimiento.";
+"spool.tag.weight" = "Peso";
+"spool.tag.print" = "Impr.";
+"spool.tag.bed" = "Cama";
+
+/* Errors */
+"error.not_configured" = "Conéctate a tu app de Khayt para ordenador en Ajustes.";
+"error.invalid_url" = "Dirección de servidor no válida.";
+"error.unauthorized" = "PIN de red local incorrecto. Revisa Ajustes → API de red local en el ordenador.";
+"error.no_such_machine" = "Esa impresora no está en la lista del taller.";
+"error.decline_needs_mac" = "Rechazar una solicitud requiere el Mac.";
+"error.material_required" = "El nombre del material es obligatorio.";
+"error.record_not_added" = "No se pudo añadir ese registro al libro.";
+"error.empty_book" = "El Mac envió un libro vacío. No se cambió nada en este iPhone.";
+"error.project_required" = "El nombre del proyecto es obligatorio.";
+"error.no_such_spool" = "Esa bobina ya no está en la estantería de este iPhone.";
+"error.amount_required" = "El importe es obligatorio.";
+"error.partial_add" = "Se añadieron %1$d de %2$d bobinas y luego: %3$@";
+"error.unexpected_spool" = "Respuesta inesperada al añadir la bobina";
+"error.invalid_order_id" = "ID de pedido no válido.";
+"settings.notifications.allow" = "Permitir notificaciones";
+"unit.g" = "g";
+"unit.h" = "h";
+"inventory.remove.body" = "%@ se eliminará del inventario.";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "Iniciar sesión en Khayt Cloud";
+"cloud.sign_out" = "Cerrar sesión en Khayt Cloud";
+"cloud.sync_now" = "Sincronizar ahora";
+"cloud.shop" = "Taller";
+"cloud.role" = "Rol";
+"cloud.last_sync" = "Última sincronización";
+"cloud.via_cloud" = "%@ mediante Khayt Cloud";
+"cloud.via_mac" = "%@ mediante el Mac";
+"cloud.footer.off" = "Mantiene este iPhone al día cuando el Mac no está en la misma red Wi‑Fi. Los cambios siguen yendo directamente al Mac siempre que responda.";
+"cloud.footer.on" = "El iPhone lee el taller desde Khayt Cloud y envía los cambios al Mac cuando responde, o a través de la nube si no.";
+"cloud.needs_mac" = "Khayt Cloud no acepta cambios de uno en uno ahora mismo. Se guardan en este iPhone; abre Khayt en el Mac para que se sincronicen.";
+"cloud.signin.email" = "Correo";
+"cloud.signin.password" = "Contraseña";
+"cloud.signin.account_footer" = "La cuenta que el taller usa para Khayt Cloud. Este iPhone recibe un inicio de sesión propio que se puede cerrar por separado.";
+"cloud.signin.passphrase" = "Frase de contraseña del taller";
+"cloud.signin.passphrase_footer" = "La frase de contraseña con la que se cifra la copia en la nube del taller, la que se definió en el Mac al conectarse por primera vez. Abre la clave en este iPhone y no se guarda.";
+"cloud.signin.advanced" = "Avanzado";
+"cloud.signin.server" = "Dirección del servidor";
+"cloud.signin.action" = "Iniciar sesión";
+"cloud.signin.wrong_passphrase" = "Esa frase de contraseña no abre la clave de este taller.";
+
+"pair.use_cloud" = "Usar Khayt Cloud en su lugar";
+"pair.use_cloud.footer" = "Si el taller se sincroniza con Khayt Cloud, el iPhone puede empezar desde allí y emparejarse con el Mac más tarde.";
+
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "Mover a %@";
+"order.detail.complete" = "Pedido completado";
+"order.detail.due_date" = "Fecha de vencimiento";
+"order.detail.printer" = "Impresora";
+
+"stage.short.pending" = "Pendiente";
+"stage.short.printing" = "Imprimiendo";
+"stage.short.post" = "Post";
+"stage.short.qc" = "QC";
+"stage.short.completed" = "Hecho";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "Trabajando desde el libro · a fecha de %@";
+"connection.live_only" = "En directo desde el Mac · no se guarda nada en este iPhone";
+"connection.refresh" = "Actualizar";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "Pulso del taller";
+"pulse.money" = "Dinero";
+"pulse.tap_to_filter" = "toca para filtrar";
+"pulse.jobs" = "%d trabajos";
+"pulse.swipe_hint" = "Desliza un trabajo hacia delante para avanzarlo. Toca para abrirlo.";
+"pulse.printing" = "Imprimiendo";
+"pulse.done_today" = "Hechos hoy";
+"pulse.owed" = "Pendiente de cobro";
+"pulse.unpaid" = "%d sin pagar";
+"pulse.this_month" = "Este mes";
+"pulse.this_year" = "Este año";
+"pulse.on_the_mac" = "En el Mac";
+"pulse.move_to" = "Mover a";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "Historial";
+"orders.window.count" = "%1$@ / %2$@ pedidos";
+"orders.window.body" = "Todos los pendientes y los %@ terminados más recientes. El historial anterior se queda en el Mac.";
+"order.field.filament" = "Filamento";
+"order.field.quantity" = "Cantidad";
+"order.detail.mark_done" = "Marcar como hecho";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "¿Qué taller?";
+"pair.find.body" = "Los Mac con Khayt se anuncian en esta red Wi‑Fi.";
+"pair.searching" = "Buscando";
+"pair.shop.needs_mac" = "Requiere el Mac al alcance";
+"pair.manual.why" = "Para un Mac que no se anuncia, o una red que lo bloquea.";
+"pair.manual.title" = "La dirección del Mac";
+"pair.manual.body" = "Khayt muestra ambos datos en el ordenador, en Ajustes → API de red local.";
+"pair.manual.port" = "Puerto";
+"pair.signed_out" = "El Mac cerró la sesión de este iPhone. Vuelve a emparejarlo con el PIN del propietario.";
+"pair.pin.title" = "El PIN del propietario";
+"pair.pin.body" = "El PIN del propietario de Ajustes → En línea en el Mac o PC, de 8 caracteres o más. El PIN de solicitudes no funciona aquí.";
+"pair.pin.foot" = "Se guarda en el llavero del iPhone y solo se envía a este Mac.";
+"pair.pin.wrong" = "Se rechazó ese PIN. Revisa Ajustes → En línea en el Mac o PC.";
+"pair.window_closed" = "En el Mac, haz clic en Emparejar un teléfono (Ajustes → En línea) y vuelve a intentarlo.";
+"pair.window_locked" = "Demasiados PIN incorrectos desde este iPhone. En el Mac, haz clic otra vez en Emparejar un teléfono (Ajustes → En línea) y prueba con el PIN correcto.";
+"settings.secure.body" = "Este iPhone aún inicia sesión con el PIN del propietario. En el Mac, haz clic en Emparejar un teléfono (Ajustes → En línea) y toca Proteger este iPhone.";
+"settings.secure.button" = "Proteger este iPhone";
+"settings.secure.done" = "Listo. Este iPhone ahora inicia sesión con su propia clave.";
+"settings.secure.failed" = "El Mac no respondió. Comprueba que estás en la red Wi‑Fi del taller e inténtalo de nuevo.";
+"settings.secure.closed" = "El Mac no acepta teléfonos ahora mismo. En el Mac, haz clic en Emparejar un teléfono (Ajustes → En línea) y vuelve a tocar Proteger este iPhone antes de 2 minutos.";
+"pair.connect" = "Conectar";
+"pair.finish" = "Abrir el tablero";
+"pair.pull.title" = "Copiando el libro del taller";
+"pair.pull.body" = "Un conjunto de trabajo, no todo: el historial se queda en el Mac.";
+"pair.pull.settings" = "Ajustes";
+"pair.pull.open_orders" = "Pedidos abiertos";
+"pair.pull.newest_finished" = "Últimos terminados";
+"pair.pull.foot" = "No se enviaron los gastos, archivos de impresión, productos, registro de auditoría ni el resto del libro. El iPhone sabe que no los tiene.";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "g restantes";
+"spool.detail.low_warn" = "Poco stock: conviene pedir una bobina de repuesto";
+"inventory.search.v2" = "Buscar marca, material, color…";
+"inventory.whole.count" = "%@ bobinas";
+"inventory.whole.body" = "El iPhone guarda todas las bobinas del taller.";
+"common.clear" = "Borrar";
+/* Add spool: colour */
+"spool.form.colour" = "Color";
+"spool.form.colour.other" = "Otro color";
+"colour.black" = "Negro";
+"colour.white" = "Blanco";
+"colour.grey" = "Gris";
+"colour.red" = "Rojo";
+"colour.blue" = "Azul";
+"colour.green" = "Verde";
+"colour.orange" = "Naranja";
+"colour.yellow" = "Amarillo";
+"colour.purple" = "Morado";
+"colour.cyan" = "Cian";
+"spool.method.label" = "Escanear la etiqueta";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "Inactiva";
+"machines.error" = "Error";
+"machines.offline" = "Sin conexión";
+"machines.offline.sub" = "Marcada como sin conexión en el Mac";
+"machines.ready" = "Lista para el siguiente trabajo";
+"machines.nozzle" = "Boquilla";
+"machines.bed" = "Cama";
+"machines.stale" = "Las temperaturas en directo requieren el Mac. Estas son las últimas lecturas del libro.";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ abiertos";
+"clients.orders" = "pedidos";
+"clients.window.count" = "%@ clientes";
+"clients.window.body" = "Todos los clientes se transfieren. Sus totales de pedidos no: requieren un historial que el iPhone no guarda.";
+"clients.call" = "Llamar";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "Correo";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "Lo que guarda este iPhone";
+"settings.mac_in_reach" = "Mac al alcance";
+"settings.mac_away" = "Mac ausente";
+"settings.mac_away_since" = "Mac ausente · el libro está a fecha de %@";
+"settings.from_book" = "Trabajando desde el libro";
+"settings.not_sent" = "No enviado: %@.";
+"book.collection.expenses" = "gastos";
+"book.collection.printFiles" = "archivos de impresión";
+"book.collection.products" = "productos";
+"book.collection.auditLog" = "el registro de auditoría";
+"book.collection.giftCards" = "tarjetas regalo";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "Clientes sin cita y lista de espera. Al aceptar una, pasa a la cola como pendiente.";
+"intake.foot.no_book" = "Clientes sin cita y lista de espera. Aceptar una en la cola requiere el libro del taller en este iPhone; descartarla funciona siempre.";
+"intake.take" = "Aceptar";
+"intake.dismiss" = "Descartar";
+"intake.take.needs_book" = "Aceptar una solicitud en la cola requiere el libro del taller en este iPhone.";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "Guardado en este iPhone y enviado ahora al Mac.";
+"order.new.note.later" = "El Mac está ausente. Esto se guarda en este iPhone y llegará al Mac cuando vuelva a estar al alcance.";
+"order.new.note.live" = "Escrito directamente en el Mac.";
+"order.new.note.blocked" = "El Mac está ausente y este iPhone no guarda el libro del taller, así que aún no hay dónde guardar esto.";
+
+/* Live printer tracking */
+"machines.live" = "EN DIRECTO";
+"machines.live.ago" = "hace %d s";
+"machines.left_until" = "quedan %1$@ · termina a las %2$@";
+"order.detail.print_progress" = "Progreso de impresión";
+"order.detail.no_estimate" = "Aún no hay estimación: la máquina no ha informado de ninguna.";
+"machines.not_published" = "El Mac aún no ha publicado sus impresoras en Khayt Cloud.";
+"machines.via_cloud" = "mediante Khayt Cloud";
+"machines.reported" = "Último informe del Mac: %@.";
+"cloud.signed_out" = "Se cerró la sesión de este iPhone en Khayt Cloud, probablemente desde la lista de dispositivos del taller. Inicia sesión de nuevo para seguir sincronizando fuera del taller.";
+"cloud.sign_in_again" = "Iniciar sesión de nuevo";
+"cloud.busy" = "Khayt Cloud está ocupado. El iPhone lo intentará de nuevo en breve.";
+
+/* Print alerts */
+"settings.notify.print_done" = "Impresión terminada";
+"settings.live_activities" = "Impresiones en la pantalla de bloqueo";
+"settings.count_install.hint" = "Una vez al día, envía solo la plataforma, la versión y el canal de publicación de la app, y si es su primer día de esta semana, este mes o en total. Sin ID, nada sobre tu taller.";
+"settings.count_install" = "Contar esta instalación (anónimo)";
+"settings.privacy" = "Privacidad";
+"settings.privacy_policy" = "Política de privacidad";
+"alert.print.finished" = "Impresión terminada";
+"alert.print.failed" = "Impresión fallida";
+"alert.print.cancelled" = "Impresión cancelada";
+"alert.print.a_job" = "Un trabajo";
+"alert.print.move_post" = "Pasar a postprocesado";
+"alert.print.reprint" = "Devolver a la cola";
+"alert.print.mark_shipped" = "Marcar como enviado";
+"alert.print.needs_book" = "Marcar un trabajo como enviado requiere el libro del taller en este iPhone.";
+"alert.print.no_order" = "Ese trabajo no está en el libro de este iPhone.";
+"alert.print.not_shippable" = "Solo un trabajo terminado y aún no entregado se puede marcar como enviado.";
+
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "Las reglas del taller no permiten ese movimiento.";
+"move.refused.production_paused" = "La producción está en pausa. Reanúdala antes de iniciar una impresión.";
+"move.refused.wip_blocked" = "%1$@ ya tiene su límite de %2$lld trabajos. Termina uno primero.";
+"move.refused.assembly_not_assembled" = "Todas las piezas pasaron el control de calidad. Marca el ensamblaje como ensamblado antes de completar este trabajo.";
+"move.refused.assembly_parts" = "Este trabajo está esperando piezas: %@";
+"move.refused.stage_not_a_status" = "«Enviado» no es una fase a la que se pueda mover un trabajo. Usa Marcar como enviado en un trabajo terminado.";
+"move.note.due_extended" = "Fecha de vencimiento aplazada %1$lld días por el tiempo en espera: ahora %2$@.";
+"move.note.filament_deducted" = "Se descontaron %1$@ de %2$lld bobina(s).";
+"move.note.filament_deducted_low" = "Se descontaron %1$@ de %2$lld bobina(s); %3$lld con poco stock ahora.";
+"move.note.filament_returned" = "Se devolvieron %1$@ a la estantería: el trabajo ya no está terminado, así que su filamento aún no se ha usado.";
+"move.note.packaging_deducted" = "Embalaje retirado de la estantería para el trabajo terminado.";
+"move.note.low" = "Se está acabando: %1$@";
+
+/* Push alerts relayed by Khayt Cloud: the server sends these KEYS
+   (loc-key), never text, so the alert is in the phone's language. */
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "Terminó una impresión";
+"PUSH_INTAKE" = "Nueva solicitud de pedido";
+
+/* Notifications feed */
+"feed.title" = "Notificaciones";
+"feed.empty" = "Nada todavía";
+"feed.empty.sub" = "Aquí llegan las impresiones terminadas, los trabajos atrasados, el poco filamento y las nuevas solicitudes de pedido.";
+"feed.unread" = "Sin leer";
+"feed.unread_count" = "%d sin leer";
+
+/* Sample shop */
+"pair.sample" = "Explorar con un taller de ejemplo";
+"pair.sample.footer" = "Un taller inventado solo en este iPhone: pedidos, bobinas, impresoras. Nada sale del iPhone; empareja tu Mac cuando quieras.";
+"sample.banner" = "Taller de ejemplo";
+"sample.banner.line" = "Nada de esto es real y nada sale de este iPhone.";
+"sample.pair" = "Emparejar con mi Mac";
+"pair.pin.too_short" = "Define un PIN más largo en tu Mac (8 o más caracteres) en Ajustes → En línea y vuelve a conectar.";
+"connection.pin_too_short" = "El Mac necesita un PIN más largo";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "Registrar pago";
+"pay.amount_paid" = "Importe pagado";
+"pay.method" = "Método";
+"pay.method.cash" = "Efectivo";
+"pay.method.mada" = "Mada";
+"pay.method.transfer" = "Transferencia bancaria";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "Tarjeta de crédito";
+"pay.method.other" = "Otro";
+"pay.section" = "Pago";
+"pay.status.paid" = "Pagado";
+"pay.status.partial" = "Pago parcial";
+"pay.status.unpaid" = "Sin pagar";
+"pay.owed" = "%@ pendientes";
+"pay.billed" = "Facturado";
+"pay.total_hint" = "Todo lo pagado en este trabajo hasta ahora, no solo el dinero de hoy.";
+"pay.save" = "Guardar pago";
+"pay.refused" = "Registrar este pago enviaría %@, algo que este iPhone no puede hacer. Regístralo en el Mac.";
+"pay.reach.email" = "un correo con el recibo";
+"pay.reach.webhook" = "un webhook";
+/* Printer cameras (lib/webcam.js) */
+"camera.open" = "Cámara";
+"camera.at" = "Imagen de %@";
+"camera.offline" = "La cámara no respondió. Se accede a ella en la red Wi‑Fi del taller.";
+"camera.no_frame" = "La cámara está encendida pero aún no tiene imagen.";
+"camera.needs_key" = "Esta cámara necesita la clave de la impresora, que se queda en el Mac.";
+"camera.rtsp" = "Esta cámara solo transmite por RTSP, que el iPhone no puede mostrar.";
+"camera.refused" = "La dirección de esta cámara no es la de la impresora, así que el iPhone no la descargará.";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "%1$@ movido a %2$@.";
+"intent.advance.gone" = "Ese trabajo ya no está en la cola.";
+"intent.no_book" = "Khayt aún no tiene ningún taller en este iPhone.";
+"intent.filament.one" = "Quedan %1$@ de %2$@, en %3$d bobina(s).";
+"intent.filament.none" = "No hay %@ en la estantería.";
+"intent.filament.empty" = "La estantería está vacía.";
+"Advance a job" = "Avanzar un trabajo";
+"Filament left" = "Filamento restante";
+"Log a failed print" = "Registrar una impresión fallida";
+"Scan a spool" = "Escanear una bobina";
+"Job" = "Trabajo";
+"Material" = "Material";
+/* WhatsApp updates to customers (the Mac's own words) */
+"wa.update" = "Aviso por WhatsApp";
+"wa.update_due" = "Avisa al cliente: %@";
+"wa.update_sent" = "Aviso de %1$@ abierto en WhatsApp el %2$@";
+"wa.m.received" = "Pedido recibido";
+"wa.m.ready" = "Listo";
+"wa.m.shipped" = "Enviado";
+"wa.m.delivered" = "Entregado";
+"wa.to" = "Para %@";
+"wa.logged_note" = "Al abrir WhatsApp, este mensaje se anota en el registro del cliente. WhatsApp no envía nada hasta que pulses enviar allí.";
+"wa.default_words" = "Textos predeterminados de Khayt. Las plantillas de WhatsApp de tu taller están en el Mac, en Ajustes › Integraciones.";
+"wa.open" = "Abrir WhatsApp";
+"wa.language" = "Idioma";
+"wa.lang.ar" = "Árabe";
+"wa.lang.en" = "Inglés";
+"wa.reason.no_phone" = "Este cliente no tiene número de teléfono registrado.";
+"wa.reason.no_customer" = "Este trabajo no tiene ficha de cliente, así que no hay número al que enviar.";
+"wa.reason.too_short" = "El número de teléfono es demasiado corto para ser un número de WhatsApp.";
+"wa.reason.too_long" = "El número de teléfono es demasiado largo para ser un número de WhatsApp.";
+"wa.reason.no_country_code" = "Añade el prefijo del país a este número (por ejemplo +971…). Solo los números saudíes pueden escribirse sin él.";
+"wa.reason.bad_saudi_number" = "No es un número móvil ni fijo saudí. Los números 800 y 9200 no tienen WhatsApp.";
+"wa.reason.no_milestone" = "Un presupuesto o un trabajo cancelado no tiene aviso que enviar.";
+"wa.photo.take" = "Hacer una foto";
+"wa.photo.pick" = "Elegir una foto";
+"wa.photo.remove" = "Eliminar foto";
+"wa.share_photo" = "Compartir con foto…";
+"wa.share_photo.note" = "Elige WhatsApp en la hoja para compartir y luego el chat del cliente. Se anota en el registro del cliente cuando pasa a WhatsApp.";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "Notificaciones de Khayt";
+"Print finished or failed" = "Impresión terminada o fallida";
+"New order requests" = "Nuevas solicitudes de pedido";
+"Queue, late jobs, low filament" = "Cola, trabajos atrasados, poco filamento";
+"focus.none" = "Sin notificaciones del taller";
+"focus.kind.print" = "Impresiones";
+"focus.kind.intake" = "Solicitudes de pedido";
+"focus.kind.shop" = "Taller";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "Escanear una etiqueta";
+"scan.label.hint" = "Apunta a una etiqueta de trabajo o de bobina de Khayt.";
+"scan.label.unknown" = "Ese código no es una etiqueta de Khayt.";
+"scan.label.missing" = "El trabajo o la bobina de esa etiqueta no está en este iPhone.";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "%@ empezó a imprimir";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "Presupuestar un archivo";
+"quote.file.pick" = "Presupuestar un archivo";
+"quote.file.file" = "Archivo";
+"quote.file.hours" = "%@ h";
+"quote.file.exact" = "Medido por el slicer del Mac.";
+"quote.file.estimated" = "Una estimación a partir de la forma del modelo.";
+"quote.file.make_quote" = "Convertir en presupuesto";
+"quote.file.needs_mac" = "Presupuestar un archivo requiere la app Khayt para Mac (alpha.63 o posterior) en la red Wi‑Fi del taller.";
+"quote.file.reason.off" = "Los presupuestos instantáneos están desactivados en el Mac. Actívalos para el formulario de solicitudes en Ajustes.";
+"quote.file.reason.unsupported" = "Khayt puede presupuestar archivos STL, OBJ, 3MF y G-code.";
+"quote.file.reason.too-large" = "El archivo supera los 32 MB.";
+"quote.file.reason.no-numbers" = "Los precios del taller aún no están configurados en el Mac.";
+"quote.file.reason.no-price" = "El Mac no pudo presupuestar este archivo.";
+"quote.file.reason.busy" = "El Mac está ocupado. Inténtalo de nuevo en un momento.";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "Fotos en la página del cliente";
+"photos.none" = "Aún no hay fotos. Añade la pieza terminada y el cliente la verá en su página de seguimiento.";
+"photos.note" = "Cualquiera con el enlace del pedido puede ver estas fotos. Los datos de ubicación se eliminan antes de guardarlas.";
+"photos.needs_cloud" = "Inicia sesión en Khayt Cloud en Ajustes para añadir fotos a la página de seguimiento de este pedido.";
+"photos.one" = "Foto del pedido";
+"photos.remove" = "Eliminar foto";
+"photos.remove.title" = "¿Eliminar esta foto?";
+"photos.remove.message" = "Desaparece de la página de seguimiento del cliente.";
+"photos.err.full" = "Este pedido ya tiene %lld fotos. Elimina una para añadir otra.";
+"photos.err.too_large" = "Esa foto es demasiado grande para enviarla, incluso reducida.";
+"photos.err.not_published" = "Este pedido aún no tiene página de seguimiento. Publícalo primero desde el Mac.";
+"photos.err.viewer" = "Tu inicio de sesión de Khayt Cloud puede ver este taller pero no cambiarlo.";
+"photos.err.not_an_image" = "Ese archivo no es una foto que Khayt pueda usar. Elige un JPEG o PNG.";
+"photos.err.http" = "Khayt Cloud no aceptó la foto (error %lld). Inténtalo de nuevo.";
+
+/* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
+"settings.live_activities.mac" = "Para que las impresiones sigan en la pantalla de bloqueo con la app cerrada, activa «Enviar el progreso de impresión a mi iPhone (Actividades en directo)» en Khayt en el Mac (Ajustes ▸ Integraciones ▸ iPhone) e inicia sesión en Khayt Cloud en este iPhone.";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "Calculadora";
+"home.action.calculator" = "Calculadora";
+"calc.title" = "Calculadora";
+"calc.part" = "La pieza";
+"calc.printer" = "Impresora";
+"calc.pieces" = "Imanes, insertos y otras piezas";
+"calc.price" = "Margen y comisiones";
+"calc.charge" = "Qué cobrar";
+"calc.each" = "%@ cada una";
+"calc.nothing" = "Introduce un peso o un tiempo de impresión y aquí se calcula lo que te cuesta el trabajo y qué cobrar por él.";
+"calc.cost" = "Te cuesta";
+"calc.keeps" = "Te queda";
+"calc.overhead" = "Gastos generales (costes fijos)";
+"calc.per_piece" = "Adónde va el coste de una pieza";
+"calc.add_colour" = "Añadir filamento / color";
+"calc.remove_colour" = "Eliminar este color";
+"calc.purge" = "Purga y torre de cebado";
+"calc.colour_n" = "Color %lld";
+"calc.filament" = "Filamento";
+"calc.no_spool" = "Sin filamento";
+"calc.no_spool_price" = "Esa bobina no tiene precio, así que no se cuenta el plástico. Añade lo que costó en la ficha de la bobina.";
+"calc.machine" = "Máquina";
+"calc.any_machine" = "Cualquier máquina";
+"calc.preset" = "Perfil de impresora";
+"calc.default_rates" = "Valores predeterminados de Khayt";
+"calc.rates" = "Tarifas de coste";
+"calc.rates_edited" = "editado";
+"calc.rates_reset" = "Restablecer al perfil";
+"calc.rate.laborRate" = "Tarifa de mano de obra";
+"calc.rate.prepTime" = "Tiempo de slicer / preparación";
+"calc.rate.postTime" = "Postprocesado / montaje";
+"calc.rate.wearRate" = "Desgaste";
+"calc.rate.powerDraw" = "Consumo eléctrico";
+"calc.rate.elecRate" = "Electricidad";
+"calc.rate.failureRate" = "Margen de fallos";
+"calc.add_piece" = "Añadir una pieza";
+"calc.remove_piece" = "Eliminar esta pieza";
+"calc.share" = "Enviar el precio";
+"calc.make_order" = "Convertir en presupuesto";
+"calc.share.price" = "Precio: %@";
+"calc.share.each" = "Para %lld piezas — %@ cada una";
+"calc.share.rush" = "Incluye el recargo por urgencia.";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "IVA que recuperas";
+"exp.qr.scan" = "Escanear el QR del recibo";
+"exp.qr.why" = "El QR de una factura fiscal saudí indica el vendedor, el total y el IVA, así que no hay que escribir nada. También se lee una foto del recibo.";
+"exp.qr.title" = "QR del recibo";
+"exp.qr.hint" = "Apunta al QR de la factura fiscal";
+"exp.qr.vat_number" = "N.º de IVA %@";
+"exp.qr.supplier" = "Uno de tus proveedores";
+"exp.qr.new_supplier" = "Aún no es uno de tus proveedores.";
+"exp.qr.add_supplier" = "Añadir como proveedor";
+"exp.qr.filled" = "Rellenado a partir de un recibo: revísalo y elige la categoría.";
+"exp.qr.photo_stays" = "Las cifras proceden del QR, así que este gasto se guarda en el iPhone y la foto no se envía.";
+"exp.qr.duplicate" = "Este recibo ya está en tus gastos, por lo que no se ofrece de nuevo.";
+"exp.qr.note" = "%@ · N.º de IVA %@";
+"exp.qr.reason.empty" = "El código está vacío.";
+"exp.qr.reason.too_long" = "El código es mucho más largo que el de una factura fiscal.";
+"exp.qr.reason.not_base64" = "Este código no es de una factura fiscal: puede ser un enlace o un código de pago.";
+"exp.qr.reason.truncated" = "El código está cortado.";
+"exp.qr.reason.bad_tag" = "El código contiene un campo que una factura fiscal no tiene.";
+"exp.qr.reason.not_utf8" = "No se puede leer el nombre del vendedor en el código.";
+"exp.qr.reason.missing_tag" = "Al código le falta el vendedor, el n.º de IVA, la hora, el total o el IVA.";
+"exp.qr.reason.bad_vat_number" = "El n.º de IVA del vendedor no es saudí (15 dígitos, empieza y termina en 3).";
+"exp.qr.reason.bad_amount" = "El total o el IVA del código no es un importe.";
+"exp.qr.reason.vat_over_total" = "El código indica un IVA mayor que el total.";
+"exp.qr.reason.bad_timestamp" = "No se puede leer la fecha de la factura en el código.";
+
+"Price a part" = "Presupuestar una pieza";
+"home.calculator.sub" = "Lo que te cuesta una pieza y qué cobrar por ella";
+
+/* Library */
+"library.title" = "Biblioteca";
+"library.price" = "Precio desde la biblioteca";
+"home.library.sub" = "Busca un modelo que ya hayas impreso y ponle precio.";
+"library.search" = "Buscar modelos, carpetas, etiquetas";
+"library.folders" = "Carpetas";
+"library.models" = "Modelos";
+"library.found" = "%d encontrados";
+"library.more" = "Mostrar más";
+"library.empty" = "No hay modelos en esta carpeta.";
+"library.no_match" = "Ningún modelo coincide.";
+"library.favorite" = "Favorito";
+"library.printed" = "Impreso %d veces";
+"library.plate" = "Placa";
+"library.plate.all" = "Todas las placas";
+"library.plate.n" = "Placa %d";
+"library.calculator" = "Abrir en la calculadora";
+"library.notes" = "Notas de impresión";
+"library.stale" = "Este modelo tiene una versión nueva que el Mac aún no ha medido. Ponle precio en la red Wi‑Fi del taller o usa la calculadora.";
+"library.not_estimable" = "El Mac puede presupuestar modelos STL, OBJ, 3MF y G-code. Usa la calculadora para este.";
+"library.needs_mac" = "Poner precio desde la biblioteca requiere tu Mac en la red Wi‑Fi del taller, con una versión de Khayt que lo admita. La calculadora sigue funcionando.";
+"library.reason.no-file" = "El Mac tiene este modelo en la lista pero no su archivo.";
+"library.reason.not-found" = "Este modelo ya no está en la biblioteca.";
+"quote.file.unreliable" = "Este modelo queda fuera del rango en que la estimación es fiable. Revisa la cifra antes de enviarla.";
+"library.reason.not-configured" = "Configura primero los presupuestos instantáneos en el ordenador: una impresora y un filamento para la estimación.";
+"library.sample" = "El taller de ejemplo no tiene un Mac con el que medir modelos. Ábrelo en la calculadora para ponerle precio con su peso y tiempo registrados.";
+"library.from_copy" = "Fuera del taller: esta es tu biblioteca a fecha de la última sincronización con Khayt Cloud, y los precios se calculan en este iPhone.";
+"library.priced_here" = "Calculado en este iPhone con tus precios. Un modelo de varios colores se calcula con una sola bobina, así que la cifra del Mac puede variar un poco.";
+"library.no_copy" = "No se puede acceder al Mac. Inicia sesión en Khayt Cloud en Ajustes y sincroniza una vez, y tu biblioteca te acompañará.";
+
+/* Catalogue */
+"catalogue.title" = "Catálogo";
+"catalogue.search" = "Buscar productos";
+"catalogue.ungrouped" = "Otro";
+"catalogue.empty" = "Aún no hay productos. Añádelos en el Catálogo de tu Mac.";
+"catalogue.no_match" = "Ningún producto coincide.";
+"catalogue.partial" = "Mostrando %1$lld de %2$lld productos. Busca los demás en tu Mac.";
+"catalogue.no_book" = "El catálogo viene con el libro del taller. Sincroniza primero con Khayt Cloud o tu Mac.";
+"catalogue.in_stock" = "%lld en stock";
+"catalogue.out_of_stock" = "Agotado";
+"catalogue.description" = "Descripción";
+"catalogue.price.override" = "Tu propio precio";
+"catalogue.price.rounded" = "Redondeado a partir del precio calculado";
+"catalogue.price.calculated" = "Calculado";
+"home.catalogue.sub" = "Lo que vendes, con precios y stock";
+
+/* Invoices */
+"invoice.title" = "Factura";
+"invoice.open" = "Factura";
+"invoice.open.sub" = "Verla y enviarla en PDF";
+"invoice.share" = "Compartir";
+"invoice.refused.missing" = "Este trabajo no está en la copia del libro del iPhone. Vuelve a descargar el libro en la red Wi‑Fi del taller.";
+"invoice.refused.quote" = "Todavía es un presupuesto. Tendrá factura cuando el cliente lo acepte.";
+"invoice.refused.cancelled" = "Un trabajo cancelado no tiene factura.";
+"invoice.refused.not_numbered" = "Esta factura necesita primero su número. Ábrela una vez en el Mac o PC, que la numera, y aparecerá aquí.";
+"invoice.refused.failed" = "No se pudo crear la factura. Inténtalo de nuevo o ábrela en el Mac o PC.";
+
+"api.request_failed" = "Solicitud fallida (HTTP %lld)";
+"order.untitled" = "Solicitud %@";
+"orders.quotes" = "Presupuestos";
+"orders.no_quotes" = "No hay presupuestos abiertos";
+"orders.no_quotes.sub" = "Los presupuestos creados aquí o en el Mac esperan aquí la respuesta del cliente.";
+"orders.quotes_on_mac" = "Los presupuestos están en el Mac";
+"orders.quotes_on_mac.sub" = "Este iPhone no guarda el libro del taller; consulta los presupuestos abiertos en el Mac.";
+"status.cancelled" = "Cancelado";
+"stage.short.quote" = "Presupuesto";
+"stage.short.cancelled" = "Cancelado";
+"quote.made_on" = "Creado %@";
+"quote.valid_until" = "Válido hasta %@";
+"quote.expired" = "CADUCADO";
+"quote.expired_on" = "Caducó %@";
+"quote.field.made" = "Creado";
+"quote.field.valid_until" = "Válido hasta";
+"quote.approve" = "Aprobar";
+"quote.approve_note" = "Aprueba cuando el cliente diga que sí: el presupuesto pasa a ser un trabajo en Pendiente.";
+"quote.decline" = "Rechazar";
+"quote.decline_q" = "¿Rechazar este presupuesto?";
+"quote.decline_body" = "Sale de Presupuestos y queda en el Historial como cancelado.";
+"licence.not_for_sale" = "Sin licencia para la venta";
+"licence.nc_line" = "%1$@: su licencia no permite vender impresiones.";
+"licence.expired_line" = "%1$@: la licencia comprada caducó el %2$@.";
+"PUSH_OVERDUE" = "Hay trabajos atrasados";
+"PUSH_LOW_STOCK" = "Se está acabando el filamento";
+"PUSH_DUE_TODAY" = "Hay trabajos que vencen hoy";
+"PUSH_QUOTE_DECISION" = "Un cliente respondió a un presupuesto";
+"PUSH_QUOTE_APPROVED" = "Un cliente aprobó un presupuesto";
+"PUSH_QUOTE_DECLINED" = "Un cliente rechazó un presupuesto";
+"PUSH_MESSAGE" = "Un cliente envió un mensaje";
+"PUSH_PAYMENT" = "Llegó un pago";
+
+/* Who owes */
+"owed.title" = "Quién debe";
+"owed.empty" = "No se debe nada en los trabajos abiertos.";
+"owed.total" = "%@ pendientes en %d trabajos";
+"owed.due" = "Vence %@";
+"owed.remind" = "Recordar por WhatsApp";
+"owed.remind.a11y" = "Recordar a %@ por WhatsApp";
+"owed.remind.text" = "Hola, un recordatorio amistoso: aún está pendiente %2$@ por %1$@. ¡Gracias!";
+"owed.remind.no_phone" = "Este cliente no tiene número de teléfono guardado.";
+"owed.remind.no_customer" = "Este trabajo no está vinculado a un cliente guardado.";
+"owed.open.hint" = "Muestra los trabajos con dinero pendiente.";
+/* Proforma */
+"proforma.title" = "Factura proforma";
+"proforma.open" = "Factura proforma";
+"proforma.open.sub" = "Pide el pago antes de facturar el trabajo";
+"proforma.refused" = "Una proforma es para un trabajo con precio, aceptado y aún sin terminar.";
+/* Intake reminder */
+"intake.remind.when" = "Recuérdamelo";
+"intake.remind.tomorrow" = "Mañana por la mañana";
+"intake.remind.3days" = "En 3 días";
+"intake.remind.week" = "En una semana";
+"intake.remind.alert" = "Recordatorio: contacta con %@ sobre su solicitud.";
+
+/* Ship */
+"ship.title" = "Enviar";
+"ship.carrier" = "Transportista";
+"ship.service" = "Servicio";
+"ship.tracking" = "Número de seguimiento";
+"ship.scan" = "Escanear la guía de envío";
+"ship.scan.hint" = "Apunta al código de barras del recibo del mensajero.";
+"ship.hint" = "Del recibo del mensajero. La página del cliente lo muestra.";
+"ship.create" = "Marcar como enviado";
+"ship.open" = "Enviar";
+"ship.open.sub" = "Transportista y número de seguimiento";
+/* End of day */
+"eod.title" = "Cierre del día";
+"eod.finished" = "Terminados hoy";
+"eod.revenue" = "Ingresado hoy";
+"eod.open" = "Aún abiertos";
+"eod.overdue" = "Atrasados";
+"eod.waste" = "Filamento desperdiciado";
+"eod.grams" = "%@ g";
+"eod.hours" = "Horas registradas";
+"eod.finished_list" = "Terminados hoy";
+"eod.due_list" = "Vencen hoy, sin terminar";
+"eod.nothing" = "Hoy no se terminó nada.";
+/* Edit order */
+"edit.title" = "Editar";
+"edit.due" = "Fecha de vencimiento";
+"edit.priority" = "Prioridad";
+"edit.priority.normal" = "Normal";
+"edit.priority.high" = "Alta";
+"edit.priority.urgent" = "Urgente";
+"edit.price.note" = "Un precio nuevo es el total que paga el cliente. Lo que ya se pagó se mantiene, hasta el nuevo total.";
+/* Printer control */
+"printer.pause" = "Pausar";
+"printer.resume" = "Reanudar";
+"printer.stop" = "Detener";
+"printer.stop.confirm" = "¿Detener la impresión en %@?";
+"printer.stop.message" = "Una impresión detenida no se puede reanudar.";
+"printer.sending" = "Consultando al Mac…";
+"printer.sending.cloud" = "Consultando al Mac mediante Khayt Cloud…";
+"printer.done.pause" = "En pausa.";
+"printer.done.resume" = "Reanudada.";
+"printer.done.stop" = "Detenida.";
+"printer.refused" = "La impresora dijo: %@";
+"printer.why.device" = "Este iPhone debe emparejarse de nuevo con el Mac antes de poder controlar impresoras.";
+"printer.why.not_found" = "El Mac no tiene esta máquina.";
+"printer.why.not_connected" = "El Mac no está conectado a esta impresora ahora mismo.";
+"printer.why.unsupported" = "Esta impresora no se puede controlar desde Khayt.";
+"printer.why.no_job" = "No se está imprimiendo nada en ella.";
+"printer.why.busy" = "El Mac está ocupado con esta impresora. Inténtalo de nuevo en un momento.";
+"printer.why.old_mac" = "Actualiza Khayt en el Mac para controlar impresoras desde el iPhone.";
+"printer.why.no_answer" = "El Mac no respondió. Puede estar en reposo o sin conexión.";
+"printer.why.unreachable" = "No se pudo acceder ni al Mac ni a Khayt Cloud.";
+/* Customer page messages */
+"portal.title" = "Página del cliente";
+"portal.share" = "Compartir enlace";
+"portal.none" = "Aún no hay mensajes en esta página.";
+"portal.reply" = "Responder al cliente";
+"portal.send" = "Enviar";
+"portal.messages.failed" = "No se pudieron cargar los mensajes.";
+"portal.reply.failed" = "No se envió la respuesta.";
+"portal.reply.viewer" = "Este inicio de sesión solo puede ver el taller.";
+/* Customer page */
+"customer.owes" = "Debe";
+"customer.limit" = "Límite de crédito %@";
+"customer.over_limit" = "Por encima de su límite de crédito de %@";
+"customer.terms" = "Paga en %d días";
+"customer.terms.receipt" = "Paga al recibir";
+"customer.open" = "Trabajos abiertos";
+"customer.open.none" = "No hay trabajos abiertos.";
+"customer.history" = "Trabajos terminados";
+"customer.history.none" = "No hay trabajos terminados en este iPhone.";
+"customer.history.window" = "Este iPhone guarda los trabajos terminados más recientes; el historial completo está en el Mac.";
+"customer.agreed" = "Precios acordados";
+"customer.messages" = "Mensajes";
+"customer.messages.none" = "Aún no hay mensajes registrados.";
+"customer.needs_book" = "La página de este cliente requiere el libro del taller en este iPhone.";
+"customer.new_order" = "Nuevo pedido para este cliente";
+/* Rush, machine job */
+"orders.rush" = "Urgente";
+"machines.job" = "Trabajo: %@";
