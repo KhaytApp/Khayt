@@ -35,9 +35,9 @@ M = 'masters'
 # survives, which is what the switch is guarding against.
 SMALL_AT_OR_UNDER = 64
 
-TOP = (0x0A, 0x2A, 0x51)   # navy at the top edge
-BOT = (0x30, 0x34, 0x40)   # slate along the bottom
-GLOW = (0x1F, 0x34, 0x53)  # the radial lift behind the mark
+TOP = (0x16, 0x43, 0x7A)   # navy at the top edge (redesign 2026)
+BOT = (0x06, 0x1A, 0x33)   # navy-deep along the bottom
+GLOW = (0x24, 0x5C, 0xA0)  # the radial lift behind the mark
 
 
 def load(name):
@@ -175,6 +175,8 @@ def main():
              # apple-touch-icon is 180 and opaque: iOS composites alpha onto black.
              save(sq(180), f'{site}/khayt-apple-icon.png', opaque=True),
              save(sq(256), f'{site}/khayt-icon.png'),
+             # The nav brand on every page (54 references in 30 pages).
+             save(sq(128), f'{site}/khayt-icon-128.png'),
              save(band(lockup, 1200, 630), f'{site}/og-image.png')]
     p = os.path.join(OUT, site, 'favicon.ico')
     os.makedirs(os.path.dirname(p), exist_ok=True)

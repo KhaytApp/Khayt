@@ -1,0 +1,1000 @@
+/* Tabs */
+"tab.home" = "首页";
+"tab.orders" = "订单";
+"tab.inventory" = "库存";
+"tab.machines" = "打印机";
+"tab.clients" = "客户";
+"tab.settings" = "设置";
+
+/* Connection */
+"connection.checking" = "正在检查…";
+"connection.connected" = "已连接";
+"connection.unreachable" = "无法连接桌面端";
+"connection.moved" = "你的 Mac 在新地址上响应";
+"connection.moved.line" = "仅当这是你店里的 Mac 时才切换到 %@。切换会发送你的 PIN。";
+"connection.moved.use" = "切换";
+"connection.moved.not_now" = "暂不";
+"connection.unauthorized" = "LAN PIN 错误";
+"connection.banner.unreachable" = "无法在你的网络上连接 Khayt。请检查 Wi‑Fi 和桌面端的局域网 API。";
+"connection.banner.pin" = "LAN PIN 被拒绝。请在设置中更新 PIN，使其与桌面端一致。";
+"sync.pending" = "此 iPhone 上有 %d 项更改，正在等待同步到 Mac。";
+"connection.error.reach_status" = "无法连接 %@。是否在同一 Wi‑Fi 下？请在桌面端“设置”→“LAN API”中启用，设为监听所有接口，并记下 IP 和端口。";
+"settings.host_required" = "请输入电脑的 IP 地址。";
+"settings.host_invalid" = "地址无效。请使用如 192.168.1.42 的格式（不要输入带 http:// 的完整网址）。";
+"home.pipeline" = "生产线";
+
+/* Home */
+"home.quick_actions" = "快捷操作";
+"home.action.add_spool" = "添加线轴";
+"stat.in_queue" = "排队中";
+"stat.printing" = "打印中";
+"stat.post" = "后处理";
+"stat.qc" = "质检";
+
+/* Orders */
+"orders.active" = "进行中";
+"orders.filter.all" = "全部";
+"orders.overdue" = "已逾期";
+"orders.detail.set_status" = "设置状态";
+"orders.detail.advance" = "推进到下一阶段";
+
+/* Inventory */
+"inventory.filter.all" = "全部";
+"inventory.filter.low" = "库存不足";
+
+/* Settings */
+"settings.connection" = "连接";
+"settings.connection.footer" = "与 Khayt“设置”→“LAN API”中的 PIN 相同。需要桌面端 v2.2.1 或更高版本。";
+"settings.shop_name" = "店铺名称";
+"settings.host" = "桌面端 IP 或主机名";
+"settings.port" = "端口：%d";
+"settings.pin" = "店主 LAN PIN";
+"settings.retest" = "重新测试配对";
+"settings.unpair" = "取消配对此设备";
+"settings.unpair.footer" = "将从此 iPhone 删除店铺账本及 PIN。";
+"settings.language" = "语言";
+"settings.notifications" = "通知";
+"settings.notify.queue" = "队列变化";
+"settings.notify.connection" = "连接中断";
+"settings.notify.overdue" = "逾期订单";
+"settings.notify.low_stock" = "耗材不足";
+"settings.docs" = "LAN API 参考";
+
+/* Status */
+"status.quote" = "报价";
+"status.pending" = "待处理";
+"status.printing" = "打印中";
+"status.post" = "后处理";
+"status.qc" = "质检";
+"status.completed" = "已完成";
+"status.delivered" = "已送达";
+"status.shipped" = "已发货";
+"status.on_hold" = "暂停";
+
+/* Lang */
+"lang.system" = "系统";
+
+/* Notifications */
+"notify.queue.title" = "队列已更新";
+"notify.queue.body" = "队列中有 %d 个作业（%d 个正在打印）";
+"notify.offline.title" = "Khayt 已断开连接";
+"notify.offline.body" = "无法在局域网中连接桌面端";
+"notify.overdue.title" = "逾期订单";
+"notify.overdue.body" = "有 %d 个订单已超过截止日期";
+"notify.low_stock.title" = "耗材不足";
+"notify.low_stock.body" = "有 %d 卷线轴不足 200g";
+
+/* NFC */
+"nfc.unavailable" = "此设备不支持 NFC。";
+"nfc.read.prompt" = "请将 iPhone 靠近耗材线轴标签。";
+"nfc.read.success" = "已成功读取标签。";
+"nfc.write.title" = "写入 NFC 标签";
+"nfc.write.intro" = "将此线轴数据编码写入空白的 NTAG213 及以上贴纸。请选择打印机所需的格式。";
+"nfc.write.standard" = "标签标准";
+"nfc.write.preview" = "待写入数据";
+"nfc.write.material" = "材料";
+"nfc.write.brand" = "品牌";
+"nfc.write.weight" = "重量";
+"nfc.write.print_temp" = "打印温度";
+"nfc.write.bed_temp" = "热床温度";
+"nfc.write.tap_blank" = "轻触空白标签以写入";
+"nfc.write.scanning" = "请靠近空白标签…";
+"nfc.write.prompt" = "请将 iPhone 靠近可写入的空白 NFC 标签。";
+"nfc.write.success" = "已成功写入标签。";
+"nfc.write.done" = "完成";
+"nfc.write.footer" = "请使用可写入的 NTAG213 及以上标签（OpenSpool 需用 NTAG215/216）。请选择打印机或固件所需的格式。";
+"nfc.standard.openspool" = "OpenSpool";
+"nfc.standard.openspool.hint" = "Snapmaker U1 扩展固件、通过 OpenSpool 读卡器的 Bambu — application/json";
+"nfc.standard.opentag3d" = "OpenTag3D";
+"nfc.standard.opentag3d.hint" = "Bambu Lab、Creality、通用 — application/opentag3d";
+"nfc.standard.openprinttag" = "OpenPrintTag (Prusa)";
+"nfc.standard.openprinttag.hint" = "Prusa MK4 / XL / MINI — application/vnd.openprinttag";
+"nfc.error.missing_material" = "编码标签需要材料名称。";
+"nfc.error.payload_large" = "编码后的数据（%d 字节）对此标签来说太大。";
+"nfc.error.invalid_color" = "颜色十六进制值无效。";
+"nfc.error.no_tag" = "未检测到标签。";
+"nfc.error.unsupported_tag" = "不支持的标签类型。";
+"nfc.error.not_ndef" = "标签不支持 NDEF。";
+"nfc.error.read_only" = "标签为只读或已锁定。请使用可写入的空白标签。";
+"nfc.error.read_failed" = "无法读取标签。";
+
+/* Quick quote */
+"home.action.quote" = "报价";
+"quote.title" = "快速报价";
+"quote.part" = "零件";
+"quote.rates" = "费率";
+"quote.result" = "价格";
+"quote.cost" = "你的成本";
+"quote.weight" = "重量";
+"quote.time" = "打印时间";
+"quote.qty" = "数量";
+"quote.spool_cost" = "线轴成本（1 kg）";
+"quote.labor_rate" = "每小时人工费率";
+"quote.margin" = "利润率";
+"quote.rush" = "加急作业";
+"quote.calculate" = "计算";
+"quote.total" = "总计";
+"quote.discount" = "折扣";
+"quote.rush_fee" = "加急费";
+"quote.tier" = "阶梯价（{n}+）";
+"quote.unit_cost" = "单件成本";
+"quote.bd.material" = "材料";
+"quote.bd.machine" = "设备";
+"quote.bd.labor" = "人工";
+"quote.bd.buffer" = "失败缓冲";
+"common.close" = "关闭";
+
+/* Waste */
+"home.action.waste" = "记录废料";
+"waste.title" = "记录打印失败";
+"waste.what" = "失败的内容";
+"waste.why" = "原因";
+"waste.material" = "材料";
+"waste.failure_type" = "失败类型";
+"waste.weight" = "浪费量";
+"waste.reason" = "发生了什么？";
+"waste.save" = "记录";
+"waste.deduct" = "从线轴中扣除";
+"waste.deduct.footer" = "从匹配的线轴中扣除浪费的克数。如果你已手动调整过，请关闭此项。";
+"waste.ft.warping" = "翘曲";
+"waste.ft.adhesion" = "热床附着不良";
+"waste.ft.clog" = "堵料";
+"waste.ft.layer_shift" = "层偏移";
+"waste.ft.power" = "断电";
+"waste.ft.other" = "其他";
+
+/* Expenses */
+"home.action.expense" = "支出";
+"exp.title" = "新建支出";
+"exp.what" = "支付内容";
+"exp.amount" = "金额";
+"exp.category" = "类别";
+"exp.note" = "备注";
+"exp.receipt" = "收据";
+"exp.photograph" = "拍摄收据";
+"exp.retake" = "移除照片";
+"exp.save" = "存储";
+"exp.no_camera" = "此设备没有相机——支出将不带收据保存。";
+"exp.cat.filament" = "耗材";
+"exp.cat.electricity" = "电费";
+"exp.cat.maintenance" = "维护";
+"exp.cat.tools" = "工具与耗品";
+"exp.cat.equipment" = "设备（打印机）";
+"exp.cat.shipping" = "运费";
+"exp.cat.other" = "其他";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "逾期";
+"orders.queue_clear" = "队列已清空";
+"orders.pick" = "选择订单";
+"orders.pick.sub" = "订单详情将显示在列表旁边。";
+"inventory.pick" = "选择线轴";
+"inventory.pick.sub" = "线轴详情将显示在货架旁边。";
+"orders.queue_clear.sub" = "已全部处理——没有进行中的订单";
+"orders.no_completed" = "没有已完成的订单";
+"orders.no_completed.sub" = "已完成的订单将显示在这里";
+"inventory.none" = "还没有线轴";
+"inventory.none.sub" = "添加你的第一卷线轴以开始使用";
+"inventory.no_results" = "无结果";
+"inventory.no_results.sub" = "请尝试其他搜索词";
+/* Pairing */
+"pair.back" = "返回";
+"pair.continue" = "继续";
+"pair.manual" = "手动输入地址";
+"pair.browse.failed" = "Khayt 无法在此网络上查找店铺。";
+"pair.browse.permission" = "如果你拒绝了本地网络提示，请前往“设置”→“Khayt”→“本地网络”中允许。";
+"pair.browse.looking" = "正在查找…请确保 Mac 上已打开 Khayt 并启用了 LAN API。";
+"pair.browse.none" = "暂未找到。";
+"pair.shop.offline" = "可与此店铺离线使用";
+"pair.manual.host" = "桌面端 IP";
+"pair.verify.ok" = "已连接——队列中的作业：%d。PIN 已通过。";
+
+/* Shared words */
+"common.done" = "完成";
+"common.cancel" = "取消";
+"common.save" = "存储";
+"common.remove" = "移除";
+"common.unassigned" = "未分配";
+"field.project" = "项目";
+"field.client" = "客户";
+"field.status" = "状态";
+"field.machine" = "设备";
+"field.due" = "截止";
+"field.priority" = "优先级";
+"field.material" = "材料";
+"field.brand" = "品牌";
+
+/* New order */
+"order.new.title" = "新建订单";
+"order.new.title_quote" = "新建报价";
+"order.new.type" = "类型";
+"order.new.order" = "订单";
+"order.new.quote" = "报价";
+"order.new.details" = "详细信息";
+"order.new.project" = "项目";
+"order.new.client" = "客户";
+"order.new.client.saved" = "已存客户";
+"order.new.client.pick" = "将此订单关联到已存客户。";
+"order.new.material" = "材料";
+"order.new.price" = "价格";
+"order.new.price_in" = "价格（%@）";
+"order.new.schedule" = "排期与设备";
+"order.new.set_due" = "设置截止日期";
+"order.new.due" = "截止";
+"order.new.machine" = "设备";
+"order.new.unassigned" = "未分配";
+"order.new.create_quote" = "创建报价";
+"order.new.add" = "加入队列";
+
+/* Order detail */
+"order.detail.title" = "订单";
+"order.detail.id" = "订单号";
+"order.detail.assigned" = "分配给";
+
+/* Spool detail */
+"spool.detail.filament" = "耗材";
+"spool.detail.lot" = "批次";
+"spool.detail.print_temp" = "喷嘴温度";
+"spool.detail.bed_temp" = "热床温度";
+"spool.detail.adjust" = "调整剩余量";
+"spool.detail.adjust.body" = "设置此线轴的剩余耗材量，单位为克。";
+"spool.detail.grams" = "克";
+"spool.detail.grams_error" = "请输入以克为单位的数字。";
+"spool.detail.remove_q" = "移除线轴？";
+
+/* Queue, intake, clients, machines */
+"queue.title" = "生产队列";
+"queue.empty" = "队列为空";
+"queue.empty.sub" = "没有进行中的订单。";
+"intake.title" = "受理";
+"intake.empty" = "收件箱已清空";
+"intake.empty.sub" = "来自受理表单、WhatsApp 等渠道的新作业请求会显示在这里。";
+"intake.reminded" = "已提醒";
+"intake.call" = "致电";
+"intake.whatsapp" = "WhatsApp";
+"intake.email" = "邮件";
+"clients.search" = "姓名、电话、邮箱";
+"clients.none" = "没有客户";
+"clients.none.sub" = "请在 Khayt 桌面端添加客户。";
+"clients.no_match" = "无匹配";
+"clients.no_match.sub" = "没有与“%@”匹配的客户。";
+"machines.none" = "没有打印机";
+"machines.none.sub" = "请在 Khayt 桌面端添加打印机。";
+"machines.no_live" = "无实时连接";
+
+"spool.detail.remove" = "移除线轴";
+"intake.decline" = "拒绝";
+"intake.remind" = "提醒";
+
+/* Adding a spool, scanning */
+"barcode.title" = "扫描条形码";
+"barcode.unavailable" = "无法使用相机扫描";
+"barcode.unavailable.sub" = "请改为输入条形码下方的数字。";
+"barcode.type" = "或输入条形码下方的数字";
+"barcode.placeholder" = "例如 6938936716785";
+"barcode.look_up" = "查找";
+"barcode.invalid" = "这不是有效的 UPC/EAN——请检查最后一位数字。";
+"barcode.source.shelf" = "条形码 · 与货架上已有的一卷相同";
+"barcode.source.database" = "条形码 · %@";
+"barcode.source.code" = "条形码 %1$@ · %2$@";
+"barcode.not_found" = "产品数据库中没有。填写一次后，下次同款会在你的货架中找到。";
+"barcode.unreachable" = "无法连接产品数据库。填写一次后，下次同款会在你的货架中找到。";
+"scan.title" = "扫描标签";
+"scan.mode" = "模式";
+"scan.mode.photo" = "照片";
+"scan.mode.live" = "实时";
+"scan.clear" = "清除";
+"scan.live_unavailable" = "无法使用实时扫描";
+"scan.live_unavailable.sub" = "请在此设备上使用照片模式。";
+"scan.photo.title" = "请清晰拍摄标签";
+"scan.photo.body" = "让文字充满取景框——SKU、批次、温度和材料。对于小字，效果优于实时扫描。";
+"scan.photo.take" = "拍照";
+"scan.photo.reading" = "正在读取标签…";
+"scan.photo.none" = "未找到文字。请在更明亮的光线下拍摄，并让标签充满取景框。";
+"scan.live.hint" = "请缓慢移动并扫过标签。已捕获的文字即使离开取景框也会保留。";
+"scan.use_text" = "使用已捕获的文字（%d）";
+"spool.add.title" = "添加线轴";
+"spool.add.barcode_title" = "产品条形码";
+"spool.add.nfc_title" = "NFC 标签";
+"spool.add.confirm" = "确认线轴";
+"spool.add.how" = "你想如何添加此线轴？";
+"spool.add.no_camera" = "此设备无法使用相机。";
+"spool.add.one" = "添加到 Khayt 库存";
+"spool.add.n" = "添加 %d 卷线轴";
+"spool.method.barcode" = "扫描产品条形码";
+"spool.method.barcode.sub" = "自动查找包装盒上的 UPC/EAN";
+"spool.method.label.sub" = "用相机读取印刷标签";
+"spool.method.nfc" = "轻触 NFC 标签";
+"spool.method.nfc.sub" = "将 iPhone 靠近线轴标签";
+"spool.method.manual" = "手动输入";
+"spool.method.manual.sub" = "品牌、材料、颜色、重量";
+"spool.source.manual" = "手动";
+"spool.source.label" = "已扫描标签";
+"spool.lookup.busy" = "正在查找…";
+"spool.lookup.busy.sub" = "先查你的货架，再查产品数据库。";
+"spool.lookup.title" = "扫描包装盒上的条形码";
+"spool.lookup.body" = "之前入库过的耗材会根据你自己的货架自动填写，包括价格。";
+"spool.lookup.open" = "打开扫描器";
+"spool.label.title" = "对准标签";
+"spool.label.body" = "建议使用照片模式——清晰拍下整张标签。";
+"spool.label.open" = "打开相机";
+"spool.nfc.title" = "将 iPhone 靠近线轴";
+"spool.nfc.unavailable" = "此设备不支持 NFC。";
+"spool.nfc.scan" = "扫描 NFC";
+"spool.nfc.scanning" = "正在扫描…";
+"spool.form.required" = "必填";
+"spool.form.material" = "材料名称";
+"spool.form.weight" = "重量（克）";
+"spool.form.optional" = "选填";
+"spool.form.cost" = "购入价格";
+"spool.form.cost.footer" = "这一卷的购入成本。用它打印的作业将据此定价。";
+"spool.form.sku" = "SKU";
+"spool.form.barcode" = "条形码（UPC/EAN）";
+"spool.form.lot" = "批次号";
+"spool.form.print_temp" = "打印温度（°C）";
+"spool.form.bed_temp" = "热床温度（°C）";
+"spool.quantity" = "数量";
+"spool.quantity.one" = "同款耗材有好几盒？可以一次性添加。";
+"spool.quantity.many" = "%d 个独立线轴，各自单独追踪。";
+"spool.tag.weight" = "重量";
+"spool.tag.print" = "打印";
+"spool.tag.bed" = "热床";
+
+/* Errors */
+"error.not_configured" = "请在“设置”中连接 Khayt 桌面端。";
+"error.invalid_url" = "服务器地址无效。";
+"error.unauthorized" = "LAN PIN 错误。请检查桌面端“设置”→“LAN API”。";
+"error.no_such_machine" = "该打印机不在店铺的列表中。";
+"error.decline_needs_mac" = "拒绝请求需要使用 Mac。";
+"error.material_required" = "材料名称为必填项。";
+"error.record_not_added" = "无法将该记录添加到账本。";
+"error.empty_book" = "Mac 发送了空账本。此 iPhone 上未做任何更改。";
+"error.project_required" = "项目名称为必填项。";
+"error.no_such_spool" = "该线轴已不在此 iPhone 的货架上。";
+"error.amount_required" = "金额为必填项。";
+"error.partial_add" = "已添加 %2$d 卷中的 %1$d 卷，随后出错：%3$@";
+"error.unexpected_spool" = "添加线轴时收到意外响应";
+"error.invalid_order_id" = "订单号无效。";
+"settings.notifications.allow" = "允许通知";
+"unit.g" = "克";
+"unit.h" = "小时";
+"inventory.remove.body" = "%@ 将从库存中移除。";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "登录 Khayt Cloud";
+"cloud.sign_out" = "退出 Khayt Cloud";
+"cloud.sync_now" = "立即同步";
+"cloud.shop" = "店铺";
+"cloud.role" = "角色";
+"cloud.last_sync" = "上次同步";
+"cloud.via_cloud" = "%@（经由 Khayt Cloud）";
+"cloud.via_mac" = "%@（经由 Mac）";
+"cloud.footer.off" = "当 Mac 不在同一 Wi-Fi 下时，保持此 iPhone 的数据同步。只要 Mac 有响应，更改仍会直接发送到 Mac。";
+"cloud.footer.on" = "iPhone 从 Khayt Cloud 读取店铺数据；Mac 有响应时将更改发送到 Mac，否则通过云端发送。";
+"cloud.needs_mac" = "Khayt Cloud 目前不逐条接收更改。更改会保留在此 iPhone 上；请在 Mac 上打开 Khayt 以进行同步。";
+"cloud.signin.email" = "邮箱";
+"cloud.signin.password" = "密码";
+"cloud.signin.account_footer" = "店铺用于 Khayt Cloud 的账户。此 iPhone 会获得独立的登录，可单独退出。";
+"cloud.signin.passphrase" = "店铺口令";
+"cloud.signin.passphrase_footer" = "用于加密店铺云端副本的口令——即 Mac 首次连接时设置的那个。它用于在此 iPhone 上解开密钥，不会被存储。";
+"cloud.signin.advanced" = "高级";
+"cloud.signin.server" = "服务器地址";
+"cloud.signin.action" = "登录";
+"cloud.signin.wrong_passphrase" = "该口令无法解开此店铺的密钥。";
+
+"pair.use_cloud" = "改用 Khayt Cloud";
+"pair.use_cloud.footer" = "如果店铺已同步到 Khayt Cloud，iPhone 可以从云端开始，稍后再与 Mac 配对。";
+
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "移至%@";
+"order.detail.complete" = "订单完成";
+"order.detail.due_date" = "截止日期";
+"order.detail.printer" = "打印机";
+
+"stage.short.pending" = "待处理";
+"stage.short.printing" = "打印中";
+"stage.short.post" = "后处理";
+"stage.short.qc" = "质检";
+"stage.short.completed" = "完成";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "使用账本中的数据 · 截至 %@";
+"connection.live_only" = "来自 Mac 的实时数据 · 此 iPhone 上不保存任何内容";
+"connection.refresh" = "刷新";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "店铺动态";
+"pulse.money" = "资金";
+"pulse.tap_to_filter" = "轻点筛选";
+"pulse.jobs" = "%d 个作业";
+"pulse.swipe_hint" = "向前滑动作业可推进一步。轻点可打开。";
+"pulse.printing" = "打印中";
+"pulse.done_today" = "今日完成";
+"pulse.owed" = "待收款";
+"pulse.unpaid" = "%d 笔未付款";
+"pulse.this_month" = "本月";
+"pulse.this_year" = "今年";
+"pulse.on_the_mac" = "在 Mac 上";
+"pulse.move_to" = "移至";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "历史";
+"orders.window.count" = "%1$@ / %2$@ 个订单";
+"orders.window.body" = "所有未完成的订单，以及最新的 %@ 个已完成订单。更早的历史保留在 Mac 上。";
+"order.field.filament" = "耗材";
+"order.field.quantity" = "数量";
+"order.detail.mark_done" = "标记完成";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "是哪家店铺？";
+"pair.find.body" = "运行 Khayt 的 Mac 会在此 Wi‑Fi 上显示出来。";
+"pair.searching" = "正在搜索";
+"pair.shop.needs_mac" = "需要 Mac 在附近";
+"pair.manual.why" = "适用于未广播的 Mac，或屏蔽广播的网络。";
+"pair.manual.title" = "Mac 的地址";
+"pair.manual.body" = "Khayt 会在桌面端“设置”→“LAN API”下显示地址和端口。";
+"pair.manual.port" = "端口";
+"pair.signed_out" = "Mac 已将此 iPhone 退出登录。请使用店主 PIN 重新配对。";
+"pair.pin.title" = "店主 PIN";
+"pair.pin.body" = "Mac 或 PC 上“设置”→“在线”中的店主 PIN，至少 8 个字符。此处无法使用受理 PIN。";
+"pair.pin.foot" = "存储在 iPhone 钥匙串中，仅发送给这台 Mac。";
+"pair.pin.wrong" = "PIN 被拒绝。请检查 Mac 或 PC 上的“设置”→“在线”。";
+"pair.window_closed" = "请在 Mac 上点按“配对手机”（“设置”→“在线”），然后重试。";
+"pair.window_locked" = "此 iPhone 输入错误 PIN 的次数过多。请在 Mac 上再次点按“配对手机”（“设置”→“在线”），然后使用正确的 PIN 重试。";
+"settings.secure.body" = "此 iPhone 仍在使用店主 PIN 登录。请在 Mac 上点按“配对手机”（“设置”→“在线”），然后轻点“保护此 iPhone”。";
+"settings.secure.button" = "保护此 iPhone";
+"settings.secure.done" = "完成。此 iPhone 现在使用自己的密钥登录。";
+"settings.secure.failed" = "Mac 没有响应。请确认你已连接到店铺的 Wi-Fi，然后重试。";
+"settings.secure.closed" = "Mac 目前不接受手机。请在 Mac 上点按“配对手机”（“设置”→“在线”），然后在 2 分钟内再次轻点“保护此 iPhone”。";
+"pair.connect" = "连接";
+"pair.finish" = "打开看板";
+"pair.pull.title" = "正在复制店铺账本";
+"pair.pull.body" = "只是一部分数据，而非全部——历史保留在 Mac 上。";
+"pair.pull.settings" = "设置";
+"pair.pull.open_orders" = "未完成订单";
+"pair.pull.newest_finished" = "最新已完成";
+"pair.pull.foot" = "支出、打印文件、产品、审计日志及账本的其余部分未被发送。iPhone 知道自己没有这些数据。";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "克 剩余";
+"spool.detail.low_warn" = "库存不足——建议订购补货";
+"inventory.search.v2" = "搜索品牌、材料、颜色…";
+"inventory.whole.count" = "%@ 卷线轴";
+"inventory.whole.body" = "iPhone 保存了店铺的所有线轴。";
+"common.clear" = "清除";
+/* Add spool: colour */
+"spool.form.colour" = "颜色";
+"spool.form.colour.other" = "其他颜色";
+"colour.black" = "黑色";
+"colour.white" = "白色";
+"colour.grey" = "灰色";
+"colour.red" = "红色";
+"colour.blue" = "蓝色";
+"colour.green" = "绿色";
+"colour.orange" = "橙色";
+"colour.yellow" = "黄色";
+"colour.purple" = "紫色";
+"colour.cyan" = "青色";
+"spool.method.label" = "扫描标签";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "空闲";
+"machines.error" = "错误";
+"machines.offline" = "离线";
+"machines.offline.sub" = "已在 Mac 上标记为离线";
+"machines.ready" = "可开始下一个作业";
+"machines.nozzle" = "喷嘴";
+"machines.bed" = "热床";
+"machines.stale" = "实时温度需要 Mac。以下是账本中最近一次的读数。";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "%@ 个进行中";
+"clients.orders" = "订单";
+"clients.window.count" = "%@ 位客户";
+"clients.window.body" = "所有客户都会同步，但其订单总额不会——那需要手机上没有的历史数据。";
+"clients.call" = "致电";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "邮件";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "此 iPhone 保存的内容";
+"settings.mac_in_reach" = "Mac 在附近";
+"settings.mac_away" = "Mac 不在附近";
+"settings.mac_away_since" = "Mac 不在附近 · 账本截至 %@";
+"settings.from_book" = "使用账本中的数据";
+"settings.not_sent" = "未发送：%@。";
+"book.collection.expenses" = "支出";
+"book.collection.printFiles" = "打印文件";
+"book.collection.products" = "产品";
+"book.collection.auditLog" = "审计日志";
+"book.collection.giftCards" = "礼品卡";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "上门客户和等候名单。受理后会以待处理状态加入队列。";
+"intake.foot.no_book" = "上门客户和等候名单。将请求加入队列需要此 iPhone 上有店铺账本；忽略则无此要求。";
+"intake.take" = "受理";
+"intake.dismiss" = "忽略";
+"intake.take.needs_book" = "将请求加入队列需要此 iPhone 上有店铺账本。";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "已存储在此 iPhone 上，并已发送到 Mac。";
+"order.new.note.later" = "Mac 不在附近。已存储在此 iPhone 上，待 Mac 可连接时发送。";
+"order.new.note.live" = "已直接写入 Mac。";
+"order.new.note.blocked" = "Mac 不在附近，且此 iPhone 没有店铺账本，因此暂时无处保存。";
+
+/* Live printer tracking */
+"machines.live" = "实时";
+"machines.live.ago" = "%d 秒前";
+"machines.left_until" = "剩余 %1$@ · %2$@ 完成";
+"order.detail.print_progress" = "打印进度";
+"order.detail.no_estimate" = "暂无预估——设备尚未上报。";
+"machines.not_published" = "Mac 尚未将其打印机发布到 Khayt Cloud。";
+"machines.via_cloud" = "经由 Khayt Cloud";
+"machines.reported" = "Mac 上次上报时间：%@。";
+"cloud.signed_out" = "此 iPhone 已退出 Khayt Cloud——很可能是在店铺的设备列表中操作的。请重新登录，以便在店外继续同步。";
+"cloud.sign_in_again" = "重新登录";
+"cloud.busy" = "Khayt Cloud 繁忙。iPhone 稍后会重试。";
+
+/* Print alerts */
+"settings.notify.print_done" = "打印完成";
+"settings.live_activities" = "锁定屏幕上的打印";
+"settings.count_install.hint" = "每天一次，仅发送 App 的平台、版本和发布渠道，以及这是否是本周、本月或有史以来的第一天。不含 ID，也不含任何店铺信息。";
+"settings.count_install" = "统计此次安装（匿名）";
+"settings.privacy" = "隐私";
+"settings.privacy_policy" = "隐私政策";
+"alert.print.finished" = "打印完成";
+"alert.print.failed" = "打印失败";
+"alert.print.cancelled" = "打印已取消";
+"alert.print.a_job" = "一个作业";
+"alert.print.move_post" = "移至后处理";
+"alert.print.reprint" = "放回队列";
+"alert.print.mark_shipped" = "标记已发货";
+"alert.print.needs_book" = "标记作业已发货需要此 iPhone 上有店铺账本。";
+"alert.print.no_order" = "该作业不在此 iPhone 的账本中。";
+"alert.print.not_shippable" = "只有已完成且尚未送达的作业才能标记为已发货。";
+
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "店铺规则不允许这样移动。";
+"move.refused.production_paused" = "生产已暂停。请先恢复生产再开始打印。";
+"move.refused.wip_blocked" = "%1$@ 已达到 %2$lld 个作业的上限。请先完成一个。";
+"move.refused.assembly_not_assembled" = "所有零件均已通过质检。请先将组装标记为已组装，再完成此作业。";
+"move.refused.assembly_parts" = "此作业正在等待零件：%@";
+"move.refused.stage_not_a_status" = "“已发货”不是可移入的阶段。请对已完成的作业使用“标记已发货”。";
+"move.note.due_extended" = "因暂停期间，截止日期已推迟 %1$lld 天：现为 %2$@。";
+"move.note.filament_deducted" = "已从 %2$lld 卷线轴中扣除 %1$@。";
+"move.note.filament_deducted_low" = "已从 %2$lld 卷线轴中扣除 %1$@；现有 %3$lld 卷不足。";
+"move.note.filament_returned" = "已将 %1$@ 放回货架——作业不再是已完成状态，因此尚未使用其耗材。";
+"move.note.packaging_deducted" = "已为完成的作业从货架扣除包装材料。";
+"move.note.low" = "库存不足：%1$@";
+
+/* Push alerts relayed by Khayt Cloud: the server sends these KEYS
+   (loc-key), never text, so the alert is in the phone's language. */
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "有一个打印已完成";
+"PUSH_INTAKE" = "新的订单请求";
+
+/* Notifications feed */
+"feed.title" = "通知";
+"feed.empty" = "暂无内容";
+"feed.empty.sub" = "已完成的打印、逾期作业、耗材不足和新的订单请求会显示在这里。";
+"feed.unread" = "未读";
+"feed.unread_count" = "%d 条未读";
+
+/* Sample shop */
+"pair.sample" = "通过示例店铺体验";
+"pair.sample.footer" = "仅存在于此 iPhone 上的虚拟店铺——订单、线轴、打印机。所有数据都不会离开 iPhone；你随时可以与 Mac 配对。";
+"sample.banner" = "示例店铺";
+"sample.banner.line" = "此处内容均为虚构，且不会离开此 iPhone。";
+"sample.pair" = "与我的 Mac 配对";
+"pair.pin.too_short" = "请在 Mac 的“设置”→“在线”中设置更长的 PIN（8 个以上字符），然后重新连接。";
+"connection.pin_too_short" = "Mac 需要更长的 PIN";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "记录付款";
+"pay.amount_paid" = "已付金额";
+"pay.method" = "付款方式";
+"pay.method.cash" = "现金";
+"pay.method.mada" = "Mada";
+"pay.method.transfer" = "银行转账";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "信用卡";
+"pay.method.other" = "其他";
+"pay.section" = "付款";
+"pay.status.paid" = "已付款";
+"pay.status.partial" = "部分付款";
+"pay.status.unpaid" = "未付款";
+"pay.owed" = "待收 %@";
+"pay.billed" = "已开账";
+"pay.total_hint" = "此作业迄今为止已付的全部款项，而不仅是今天的。";
+"pay.save" = "存储付款";
+"pay.refused" = "记录这笔付款会发送%@，而此 iPhone 无法完成。请在 Mac 上记录。";
+"pay.reach.email" = "一封收据邮件";
+"pay.reach.webhook" = "一个 Webhook";
+/* Printer cameras (lib/webcam.js) */
+"camera.open" = "相机";
+"camera.at" = "来自 %@ 的画面";
+"camera.offline" = "相机没有响应。需要通过店铺的 Wi-Fi 连接。";
+"camera.no_frame" = "相机已开启，但暂无画面。";
+"camera.needs_key" = "此相机需要打印机的密钥，而密钥仅保存在 Mac 上。";
+"camera.rtsp" = "此相机仅支持 RTSP 推流，iPhone 无法显示。";
+"camera.refused" = "此相机的地址与打印机的不一致，因此 iPhone 不会获取。";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "已将%1$@移至%2$@。";
+"intent.advance.gone" = "该作业已不在队列中。";
+"intent.no_book" = "Khayt 在此 iPhone 上还没有店铺。";
+"intent.filament.one" = "%2$@ 剩余 %1$@，共 %3$d 卷线轴。";
+"intent.filament.none" = "货架上没有%@。";
+"intent.filament.empty" = "货架是空的。";
+"Advance a job" = "推进作业";
+"Filament left" = "剩余耗材";
+"Log a failed print" = "记录打印失败";
+"Scan a spool" = "扫描线轴";
+"Job" = "作业";
+"Material" = "材料";
+/* WhatsApp updates to customers (the Mac's own words) */
+"wa.update" = "WhatsApp 通知";
+"wa.update_due" = "通知客户：%@";
+"wa.update_sent" = "已于 %2$@ 在 WhatsApp 中打开%1$@更新";
+"wa.m.received" = "订单已收到";
+"wa.m.ready" = "已就绪";
+"wa.m.shipped" = "已发货";
+"wa.m.delivered" = "已送达";
+"wa.to" = "收件人：%@";
+"wa.logged_note" = "打开 WhatsApp 会将此消息写入客户记录。在 WhatsApp 中点按发送之前不会发送任何内容。";
+"wa.default_words" = "Khayt 的默认文案。店铺自己的 WhatsApp 模板在 Mac 的“设置”›“集成”中。";
+"wa.open" = "打开 WhatsApp";
+"wa.language" = "语言";
+"wa.lang.ar" = "阿拉伯语";
+"wa.lang.en" = "英语";
+"wa.reason.no_phone" = "该客户没有登记电话号码。";
+"wa.reason.no_customer" = "此作业没有客户记录，因此没有可发送的号码。";
+"wa.reason.too_short" = "电话号码太短，不是有效的 WhatsApp 号码。";
+"wa.reason.too_long" = "电话号码太长，不是有效的 WhatsApp 号码。";
+"wa.reason.no_country_code" = "请为此号码添加国家/地区代码（例如 +971…）。只有沙特号码可以不带代码。";
+"wa.reason.bad_saudi_number" = "这不是沙特的手机或座机号码。800 和 9200 开头的号码无法使用 WhatsApp。";
+"wa.reason.no_milestone" = "报价或已取消的作业没有可发送的通知。";
+"wa.photo.take" = "拍照";
+"wa.photo.pick" = "选取照片";
+"wa.photo.remove" = "移除照片";
+"wa.share_photo" = "连同照片分享…";
+"wa.share_photo.note" = "在分享菜单中选取 WhatsApp，然后选择客户的聊天。内容发送到 WhatsApp 后会写入客户记录。";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "Khayt 通知";
+"Print finished or failed" = "打印完成或失败";
+"New order requests" = "新的订单请求";
+"Queue, late jobs, low filament" = "队列、逾期作业、耗材不足";
+"focus.none" = "无店铺通知";
+"focus.kind.print" = "打印";
+"focus.kind.intake" = "订单请求";
+"focus.kind.shop" = "店铺";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "扫描标签";
+"scan.label.hint" = "请对准 Khayt 作业或线轴标签。";
+"scan.label.unknown" = "该代码不是 Khayt 标签。";
+"scan.label.missing" = "该标签对应的作业或线轴不在此 iPhone 上。";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "%@ 已开始打印";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "为文件报价";
+"quote.file.pick" = "为文件报价";
+"quote.file.file" = "文件";
+"quote.file.hours" = "%@ 小时";
+"quote.file.exact" = "由 Mac 的切片软件测得。";
+"quote.file.estimated" = "根据模型形状估算。";
+"quote.file.make_quote" = "生成报价";
+"quote.file.needs_mac" = "为文件报价需要在店铺的 Wi-Fi 下使用 Khayt Mac 版（alpha.63 或更高版本）。";
+"quote.file.reason.off" = "Mac 上已关闭即时报价。请在“设置”中为受理表单开启。";
+"quote.file.reason.unsupported" = "Khayt 可为 STL、OBJ、3MF 和 G-code 文件定价。";
+"quote.file.reason.too-large" = "文件超过 32 MB。";
+"quote.file.reason.no-numbers" = "Mac 上尚未设置店铺价格。";
+"quote.file.reason.no-price" = "Mac 无法为此文件定价。";
+"quote.file.reason.busy" = "Mac 正忙。请稍后重试。";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "客户页面上的照片";
+"photos.none" = "还没有照片。添加成品照片，客户即可在其跟踪页面上看到。";
+"photos.note" = "任何拥有订单链接的人都能看到这些照片。保存前会移除位置信息。";
+"photos.needs_cloud" = "请在“设置”中登录 Khayt Cloud，以便向此订单的跟踪页面添加照片。";
+"photos.one" = "订单照片";
+"photos.remove" = "移除照片";
+"photos.remove.title" = "移除此照片？";
+"photos.remove.message" = "它将从客户的跟踪页面上消失。";
+"photos.err.full" = "此订单已有 %lld 张照片。请先移除一张再添加。";
+"photos.err.too_large" = "即使缩小，该照片仍然太大，无法发送。";
+"photos.err.not_published" = "此订单还没有跟踪页面。请先在 Mac 上发布。";
+"photos.err.viewer" = "你的 Khayt Cloud 登录只能查看此店铺，无法更改。";
+"photos.err.not_an_image" = "Khayt 无法使用该文件。请选择 JPEG 或 PNG。";
+"photos.err.http" = "Khayt Cloud 未接收该照片（错误 %lld）。请重试。";
+
+/* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
+"settings.live_activities.mac" = "若要在 App 关闭时仍在锁定屏幕上更新打印进度，请在 Mac 版 Khayt 中开启“将打印进度发送到我的 iPhone（实时活动）”（“设置”▸“集成”▸“iPhone”），并在此 iPhone 上登录 Khayt Cloud。";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "计算器";
+"home.action.calculator" = "计算器";
+"calc.title" = "计算器";
+"calc.part" = "零件";
+"calc.printer" = "打印机";
+"calc.pieces" = "磁铁、嵌件及其他配件";
+"calc.price" = "利润率与费用";
+"calc.charge" = "应收价格";
+"calc.each" = "每件 %@";
+"calc.nothing" = "输入重量或打印时间，即可算出作业的成本以及应收价格。";
+"calc.cost" = "你的成本";
+"calc.keeps" = "你的利润";
+"calc.overhead" = "间接费用（固定成本）";
+"calc.per_piece" = "单件成本构成";
+"calc.add_colour" = "添加耗材/颜色";
+"calc.remove_colour" = "移除此颜色";
+"calc.purge" = "冲洗料与擦拭塔";
+"calc.colour_n" = "颜色 %lld";
+"calc.filament" = "耗材";
+"calc.no_spool" = "无耗材";
+"calc.no_spool_price" = "该线轴没有价格，因此未计入塑料成本。请在线轴页面添加购入价格。";
+"calc.machine" = "设备";
+"calc.any_machine" = "任意设备";
+"calc.preset" = "打印机预设";
+"calc.default_rates" = "Khayt 默认值";
+"calc.rates" = "成本费率";
+"calc.rates_edited" = "已编辑";
+"calc.rates_reset" = "恢复为预设";
+"calc.rate.laborRate" = "人工费率";
+"calc.rate.prepTime" = "切片/准备时间";
+"calc.rate.postTime" = "后处理/组装";
+"calc.rate.wearRate" = "损耗";
+"calc.rate.powerDraw" = "功耗";
+"calc.rate.elecRate" = "电费";
+"calc.rate.failureRate" = "失败缓冲";
+"calc.add_piece" = "添加配件";
+"calc.remove_piece" = "移除此配件";
+"calc.share" = "发送价格";
+"calc.make_order" = "生成报价";
+"calc.share.price" = "价格：%@";
+"calc.share.each" = "共 %lld 件——每件 %@";
+"calc.share.rush" = "含加急费。";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "可抵扣的增值税";
+"exp.qr.scan" = "扫描收据二维码";
+"exp.qr.why" = "沙特税务发票的二维码包含卖方、总额和增值税，无需手动输入。收据照片也能识别。";
+"exp.qr.title" = "收据二维码";
+"exp.qr.hint" = "请对准税务发票上的二维码";
+"exp.qr.vat_number" = "增值税号 %@";
+"exp.qr.supplier" = "你的供应商之一";
+"exp.qr.new_supplier" = "还不是你的供应商。";
+"exp.qr.add_supplier" = "添加为供应商";
+"exp.qr.filled" = "已根据收据填写——请检查，然后选择类别。";
+"exp.qr.photo_stays" = "数据来自二维码，因此此支出保存在 iPhone 上，照片不会发送。";
+"exp.qr.duplicate" = "此收据已在你的支出中，因此不再提供。";
+"exp.qr.note" = "%@ · 增值税号 %@";
+"exp.qr.reason.empty" = "二维码内容为空。";
+"exp.qr.reason.too_long" = "二维码内容远长于税务发票。";
+"exp.qr.reason.not_base64" = "这不是税务发票的二维码——可能是链接或付款码。";
+"exp.qr.reason.truncated" = "二维码内容不完整。";
+"exp.qr.reason.bad_tag" = "二维码包含税务发票没有的字段。";
+"exp.qr.reason.not_utf8" = "无法读取二维码中的卖方名称。";
+"exp.qr.reason.missing_tag" = "二维码缺少卖方、增值税号、时间、总额或增值税。";
+"exp.qr.reason.bad_vat_number" = "卖方的增值税号不是沙特的（15 位数字，以 3 开头并以 3 结尾）。";
+"exp.qr.reason.bad_amount" = "二维码中的总额或增值税不是金额。";
+"exp.qr.reason.vat_over_total" = "二维码显示的增值税超过了总额。";
+"exp.qr.reason.bad_timestamp" = "无法读取二维码中的发票日期。";
+
+"Price a part" = "为零件定价";
+"home.calculator.sub" = "零件的成本以及应收价格";
+
+/* Library */
+"library.title" = "库";
+"library.price" = "按模型库定价";
+"home.library.sub" = "找到你之前打印过的模型并为其定价。";
+"library.search" = "搜索模型、文件夹、标签";
+"library.folders" = "文件夹";
+"library.models" = "模型";
+"library.found" = "找到 %d 个";
+"library.more" = "显示更多";
+"library.empty" = "此文件夹中没有模型。";
+"library.no_match" = "没有匹配的模型。";
+"library.favorite" = "收藏";
+"library.printed" = "已打印 %d 次";
+"library.plate" = "打印板";
+"library.plate.all" = "所有打印板";
+"library.plate.n" = "打印板 %d";
+"library.calculator" = "在计算器中打开";
+"library.notes" = "打印时的备注";
+"library.stale" = "此模型有新版本，Mac 尚未测量。请在店铺 Wi-Fi 下定价，或使用计算器。";
+"library.not_estimable" = "Mac 可为 STL、OBJ、3MF 和 G-code 模型定价。此模型请使用计算器。";
+"library.needs_mac" = "按模型库定价需要你的 Mac 在店铺 Wi-Fi 下，且 Khayt 版本支持此功能。计算器仍可使用。";
+"library.reason.no-file" = "Mac 上列有此模型，但没有对应文件。";
+"library.reason.not-found" = "此模型已不在库中。";
+"quote.file.unreliable" = "此模型超出了估算的可靠范围。发送前请核对数字。";
+"library.reason.not-configured" = "请先在电脑上设置即时报价：为估算选定一台打印机和一种耗材。";
+"library.sample" = "示例店铺没有可测量模型的 Mac。请在计算器中打开，根据记录的重量和时间定价。";
+"library.from_copy" = "不在店内：这是你的模型库在上次 Khayt Cloud 同步时的状态，价格在此 iPhone 上计算。";
+"library.priced_here" = "已在此 iPhone 上按你的价格计算。多色模型按一卷线轴计算成本，因此可能与 Mac 上的数字略有差异。";
+"library.no_copy" = "无法连接 Mac。请在“设置”中登录 Khayt Cloud 并同步一次，你的模型库就会随身携带。";
+
+/* Catalogue */
+"catalogue.title" = "产品目录";
+"catalogue.search" = "搜索产品";
+"catalogue.ungrouped" = "其他";
+"catalogue.empty" = "还没有产品。请在 Mac 的产品目录中添加。";
+"catalogue.no_match" = "没有匹配的产品。";
+"catalogue.partial" = "显示 %2$lld 个产品中的 %1$lld 个。其余请在 Mac 上搜索。";
+"catalogue.no_book" = "产品目录随店铺账本一起同步。请先与 Khayt Cloud 或 Mac 同步。";
+"catalogue.in_stock" = "库存 %lld";
+"catalogue.out_of_stock" = "缺货";
+"catalogue.description" = "说明";
+"catalogue.price.override" = "自定价格";
+"catalogue.price.rounded" = "按计算价格取整";
+"catalogue.price.calculated" = "计算所得";
+"home.catalogue.sub" = "你销售的产品，含价格和库存";
+
+/* Invoices */
+"invoice.title" = "发票";
+"invoice.open" = "发票";
+"invoice.open.sub" = "查看并以 PDF 发送";
+"invoice.share" = "分享";
+"invoice.refused.missing" = "此作业不在 iPhone 的账本副本中。请在店铺 Wi-Fi 下重新拉取账本。";
+"invoice.refused.quote" = "这仍是报价。客户接受后才会生成发票。";
+"invoice.refused.cancelled" = "已取消的作业没有发票。";
+"invoice.refused.not_numbered" = "此发票需要先有编号。请先在 Mac 或 PC 上打开一次以生成编号，之后便会显示在这里。";
+"invoice.refused.failed" = "无法生成发票。请重试，或在 Mac 或 PC 上打开。";
+
+"api.request_failed" = "请求失败（HTTP %lld）";
+"order.untitled" = "请求 %@";
+"orders.quotes" = "报价";
+"orders.no_quotes" = "没有待答复的报价";
+"orders.no_quotes.sub" = "在此处或 Mac 上创建的报价会在这里等待客户答复。";
+"orders.quotes_on_mac" = "报价在 Mac 上";
+"orders.quotes_on_mac.sub" = "此 iPhone 没有店铺账本，请在 Mac 上查看待答复的报价。";
+"status.cancelled" = "已取消";
+"stage.short.quote" = "报价";
+"stage.short.cancelled" = "已取消";
+"quote.made_on" = "创建于 %@";
+"quote.valid_until" = "有效期至 %@";
+"quote.expired" = "已过期";
+"quote.expired_on" = "%@ 已过期";
+"quote.field.made" = "创建于";
+"quote.field.valid_until" = "有效期至";
+"quote.approve" = "批准";
+"quote.approve_note" = "客户答应后再批准：报价将变为“待处理”状态的作业。";
+"quote.decline" = "拒绝";
+"quote.decline_q" = "拒绝此报价？";
+"quote.decline_body" = "它将从“报价”中移出，并以已取消状态保留在历史中。";
+"licence.not_for_sale" = "无销售授权";
+"licence.nc_line" = "%1$@：其许可不允许销售打印件。";
+"licence.expired_line" = "%1$@：购买的许可已于 %2$@ 到期。";
+"PUSH_OVERDUE" = "有作业已逾期";
+"PUSH_LOW_STOCK" = "耗材不足";
+"PUSH_DUE_TODAY" = "有作业今天到期";
+"PUSH_QUOTE_DECISION" = "客户已答复报价";
+"PUSH_QUOTE_APPROVED" = "客户已批准报价";
+"PUSH_QUOTE_DECLINED" = "客户已拒绝报价";
+"PUSH_MESSAGE" = "客户发来一条消息";
+"PUSH_PAYMENT" = "收到一笔付款";
+
+/* Who owes */
+"owed.title" = "欠款";
+"owed.empty" = "进行中的作业没有欠款。";
+"owed.total" = "%2$d 个作业共欠 %1$@";
+"owed.due" = "截止 %@";
+"owed.remind" = "通过 WhatsApp 提醒";
+"owed.remind.a11y" = "通过 WhatsApp 提醒%@";
+"owed.remind.text" = "您好，温馨提醒：%1$@ 的 %2$@ 尚未支付。谢谢！";
+"owed.remind.no_phone" = "该客户没有保存电话号码。";
+"owed.remind.no_customer" = "此作业未关联已存客户。";
+"owed.open.hint" = "显示有欠款的作业。";
+/* Proforma */
+"proforma.title" = "形式发票";
+"proforma.open" = "形式发票";
+"proforma.open.sub" = "在开具正式发票前请求付款";
+"proforma.refused" = "形式发票适用于已定价、已接受且尚未完成的作业。";
+/* Intake reminder */
+"intake.remind.when" = "提醒我";
+"intake.remind.tomorrow" = "明天早上";
+"intake.remind.3days" = "3 天后";
+"intake.remind.week" = "1 周后";
+"intake.remind.alert" = "提醒：请就 %@ 的请求回复对方。";
+
+/* Ship */
+"ship.title" = "发货";
+"ship.carrier" = "承运商";
+"ship.service" = "服务";
+"ship.tracking" = "运单号";
+"ship.scan" = "扫描运单";
+"ship.scan.hint" = "请对准快递收据上的条形码。";
+"ship.hint" = "来自快递收据。客户页面会显示该号码。";
+"ship.create" = "标记已发货";
+"ship.open" = "发货";
+"ship.open.sub" = "承运商和运单号";
+/* End of day */
+"eod.title" = "日结";
+"eod.finished" = "今日完成";
+"eod.revenue" = "今日收入";
+"eod.open" = "仍在进行";
+"eod.overdue" = "逾期";
+"eod.waste" = "浪费的耗材";
+"eod.grams" = "%@ g";
+"eod.hours" = "已记录工时";
+"eod.finished_list" = "今日完成";
+"eod.due_list" = "今日到期，未完成";
+"eod.nothing" = "今天没有完成任何作业。";
+/* Edit order */
+"edit.title" = "编辑";
+"edit.due" = "截止日期";
+"edit.priority" = "优先级";
+"edit.priority.normal" = "普通";
+"edit.priority.high" = "高";
+"edit.priority.urgent" = "紧急";
+"edit.price.note" = "新价格是客户支付的总额。已付款项保留，最多不超过新总额。";
+/* Printer control */
+"printer.pause" = "暂停";
+"printer.resume" = "继续";
+"printer.stop" = "停止";
+"printer.stop.confirm" = "停止 %@ 上的打印？";
+"printer.stop.message" = "已停止的打印无法继续。";
+"printer.sending" = "正在询问 Mac…";
+"printer.sending.cloud" = "正在通过 Khayt Cloud 询问 Mac…";
+"printer.done.pause" = "已暂停。";
+"printer.done.resume" = "已继续。";
+"printer.done.stop" = "已停止。";
+"printer.refused" = "打印机回复：%@";
+"printer.why.device" = "此 iPhone 需要重新与 Mac 配对，才能控制打印机。";
+"printer.why.not_found" = "Mac 上没有这台设备。";
+"printer.why.not_connected" = "Mac 目前未连接到这台打印机。";
+"printer.why.unsupported" = "这台打印机无法通过 Khayt 控制。";
+"printer.why.no_job" = "它当前没有在打印。";
+"printer.why.busy" = "Mac 正忙于处理这台打印机。请稍后重试。";
+"printer.why.old_mac" = "请更新 Mac 上的 Khayt，以便用 iPhone 控制打印机。";
+"printer.why.no_answer" = "Mac 没有响应。它可能已进入睡眠或处于离线状态。";
+"printer.why.unreachable" = "既无法连接 Mac，也无法连接 Khayt Cloud。";
+/* Customer page messages */
+"portal.title" = "客户页面";
+"portal.share" = "分享链接";
+"portal.none" = "此页面上还没有消息。";
+"portal.reply" = "回复客户";
+"portal.send" = "发送";
+"portal.messages.failed" = "无法载入消息。";
+"portal.reply.failed" = "回复未发送。";
+"portal.reply.viewer" = "此登录只能查看店铺。";
+/* Customer page */
+"customer.owes" = "欠款";
+"customer.limit" = "信用额度 %@";
+"customer.over_limit" = "已超过其 %@ 的信用额度";
+"customer.terms" = "%d 天内付款";
+"customer.terms.receipt" = "收货时付款";
+"customer.open" = "进行中的作业";
+"customer.open.none" = "没有进行中的作业。";
+"customer.history" = "已完成的作业";
+"customer.history.none" = "此 iPhone 上没有已完成的作业。";
+"customer.history.window" = "此 iPhone 保存了最新已完成的作业；完整历史在 Mac 上。";
+"customer.agreed" = "约定价格";
+"customer.messages" = "消息";
+"customer.messages.none" = "还没有记录任何消息。";
+"customer.needs_book" = "查看此客户的页面需要此 iPhone 上有店铺账本。";
+"customer.new_order" = "为此客户新建订单";
+/* Rush, machine job */
+"orders.rush" = "加急";
+"machines.job" = "作业：%@";

@@ -325,7 +325,7 @@ private struct GoMenu: View {
             .keyboardShortcut("j")
             .disabled(!shop.canJumpInLibrary)
         Divider()
-        Button(Words.upfront("mac.dashboard")) { shop.shelf = .dashboard }
+        Button(Words.upfront("mac.nav_today")) { shop.shelf = .dashboard }
             .keyboardShortcut("1", modifiers: .command)
         Button(Words.upfront("mac.all_jobs")) { shop.shelf = .jobs(nil) }
             .keyboardShortcut("2", modifiers: .command)

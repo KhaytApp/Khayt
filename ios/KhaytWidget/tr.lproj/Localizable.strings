@@ -1,0 +1,34 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "Sıra";
+"Print" = "Baskı";
+"Printing" = "Yazdırılıyor";
+"QC" = "Kalite";
+"Done" = "Bitti";
+"Nothing printing right now" = "Şu anda yazdırılan bir şey yok";
+"Offline" = "Çevrimdışı";
+"LAN connected" = "Bağlı";
+"%lld queued · %lld printing" = "%lld sırada · %lld yazdırılıyor";
+"ETA %@" = "%@ sonra biter";
+"Open app on shop Wi‑Fi" = "Khayt’ı dükkânın Wi‑Fi’sinde açın";
+"%lld%%" = "%lld%%";
+"Paused" = "Duraklatıldı";
+"Failed" = "Başarısız";
+"Cancelled" = "İptal edildi";
+"Paused at %@" = "%@ konumunda duraklatıldı";
+"Ready to collect" = "Teslim almaya hazır";
+"Print failed" = "Baskı başarısız";
+"Print stopped" = "Baskı durduruldu";
+"Ends %@" = "Bitiş: %@";
+"Log a failed print" = "Başarısız baskıyı kaydet";
+"Scan a spool" = "Makara tara";
+"Opens Khayt on the failed-print form." = "Khayt’ı başarısız baskı formunda açar.";
+"Opens Khayt on booking in a spool." = "Khayt’ı makara girişi ekranında açar.";
+
+"Price a part" = "Bir parçayı fiyatla";
+"Opens Khayt on the calculator." = "Khayt’ı hesaplayıcıda açar.";
+
+/* Live Activity buttons */
+"Move to post-processing" = "Son işleme taşı";
+"Print it again" = "Yeniden yazdır";

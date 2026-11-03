@@ -327,6 +327,13 @@
 				en,
 				Base,
 				ar,
+				de,
+				es,
+				fr,
+				ja,
+				"pt-BR",
+				tr,
+				"zh-Hans",
 			);
 			mainGroup = G10000000000000000000001;
 			packageReferences = (

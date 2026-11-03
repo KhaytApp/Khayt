@@ -107,7 +107,9 @@ struct CopyFixTests {
     func dashboardCounts() {
         let dashboard = EmptyStateTests.source("Dashboard.swift")
         #expect(!dashboard.contains("value: \"\\("), "a Stat value interpolates a raw number")
-        #expect(dashboard.contains("value: Money.quantity(Double(facts.printingCount), decimals: 0)"))
+        // Today (2026): the machines figure goes through Words, which groups
+        // and writes the shop's digits.
+        #expect(dashboard.contains("\"mac.n_of_m\", [\"n\": .number(Double(facts.printingCount))"))
     }
 
     @Test("one word for the person a job is for: Customer, not Client")

@@ -59,7 +59,7 @@ struct CloudPlanSettings: View {
         }
         .task { if !preloaded { await load() } }
         .shopSheet(item: $paying) { plan in
-            PlanPaySheet(shop: shop, plan: plan) { Task { await load() } }
+            PlanPaySheet(shop: shop, plan: plan, vatNote: catalogue?.vatAddedAtCheckout == true) { Task { await load() } }
         }
         .alert(asking.map { shop.words.callIt("mac.plan_move_title", ["plan": .string(Self.planName($0.name, $0.label, shop.words))]) } ?? "",
                isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
@@ -118,7 +118,12 @@ struct CloudPlanSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Text(priceText(plan)).monospacedDigit()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(priceText(plan)).monospacedDigit()
+                if catalogue?.vatAddedAtCheckout == true, (plan.priceSar ?? 0) > 0 || (plan.priceUsd ?? 0) > 0 {
+                    Text(shop.words.callIt("mac.plan_vat_note")).font(.caption).foregroundStyle(.secondary)
+                }
+            }
             if shop.cloudIsOwner && plan.name != currentName {
                 Button(shop.words.callIt(CloudPlans.isUpgrade(plan, from: current) ? "mac.plan_upgrade" : "mac.plan_move")) {
                     asking = plan

@@ -40,6 +40,8 @@ struct ShopWindow: View {
     /// A request from the menu bar to put the caret in the search field.
     @State private var searchWanted = false
     @SceneStorage("shelf") private var storedShelf = ""
+    /// Board or List for Jobs, remembered per window like the shelf is.
+    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.list.rawValue
     // A new key: under the old one every window remembered "Khayt's order",
     // and the new default (newest first) would never have been seen.
     @SceneStorage("library.sort.v2") private var storedSort = LibrarySort.added.rawValue
@@ -178,10 +180,9 @@ struct ShopWindow: View {
             // narrows carries the banner (SiteFilter.swift); it draws nothing
             // when no site is chosen.
             if shop.showingDashboard {
-                VStack(spacing: 0) {
-                    SiteScopeBanner(shop: shop, counting: .none)
-                    Dashboard(shop: shop)
-                }
+                // Triage draws Today (with its site banner) and puts the
+                // Today/Ledger switch and Record a payment in the toolbar.
+                Triage(shop: shop)
             } else if shop.showingLibrary {
                 LibraryGrid(shop: shop)
             } else if shop.showingBoard {
@@ -230,22 +231,9 @@ struct ShopWindow: View {
     }
 
     @ToolbarContentBuilder private var classicToolbar: some ToolbarContent {
-            ToolbarItem(placement: .navigation) {
-                // Which book is open, always visible. Mistaking the sample for
-                // the shop's real position is the one error this app must not
-                // allow, so it is stated rather than implied.
-                Menu {
-                    ForEach(Shop.available) { source in
-                        Button {
-                            Task { await shop.load(source) }
-                        } label: {
-                            Label(source.title(shop.words), systemImage: source.symbol)
-                        }
-                    }
-                } label: {
-                    Label(shop.source.title(shop.words), systemImage: shop.source.symbol)
-                }
-            }
+            // WHICH BOOK IS OPEN lives at the top of the sidebar now (the shop
+            // card, `ShopCard`), where the shop's name already is, so the
+            // toolbar no longer carries a second copy of the switcher.
             ToolbarItem(placement: .principal) {
                 // Two menus in one item rather than two items: the three axes
                 // belong together, and a toolbar that collapses them apart when
@@ -267,12 +255,19 @@ struct ShopWindow: View {
                     OwedSummary(shop: shop)
                 }
             }
-            // IMPORT, ON THE SCREEN IT IMPORTS INTO.
-            //
-            // It existed only as "Add model" in the Book menu — the wrong name
-            // in the wrong menu — and the library itself offered nothing, so a
-            // shop with a folder of models had no way in that it could see.
-            ToolbarItem {
+            // ONE GROUP FOR THE SCREEN'S OWN CONTROLS, so macOS 26 draws them
+            // as a single glass capsule: the view of Jobs, Import on the
+            // library, and the switch for the details panel.
+            ToolbarItemGroup(placement: .primaryAction) {
+                if shop.showingJobs {
+                    JobsLayoutPicker(shop: shop)
+                    if !shop.showingBoard { JobsStageMenu(shop: shop) }
+                }
+                // IMPORT, ON THE SCREEN IT IMPORTS INTO.
+                //
+                // It existed only as "Add model" in the Book menu — the wrong name
+                // in the wrong menu — and the library itself offered nothing, so a
+                // shop with a folder of models had no way in that it could see.
                 if shop.showingLibrary {
                     Button {
                         Task { await shop.addModelToLibrary() }
@@ -283,8 +278,6 @@ struct ShopWindow: View {
                     .disabled(!shop.canMoveJobs || shop.importing)
                     .help(shop.words.callIt("mac.import_models_hint"))
                 }
-            }
-            ToolbarItem {
                 Button {
                     showInspector.toggle()
                 } label: {
@@ -355,6 +348,7 @@ struct ShopWindow: View {
         // hand out a different manager than the one at first launch.
         .task(id: ObjectIdentifier(undoManager ?? UndoManager())) { shop.undoManager = undoManager }
         .task(id: shop.shelf) { storedShelf = Shelves.name(shop.shelf) }
+        .task(id: shop.jobsLayout) { storedJobsLayout = shop.jobsLayout.rawValue }
         .task(id: shop.librarySort) { storedSort = shop.librarySort.rawValue }
         .task { shop.librarySort = LibrarySort(rawValue: storedSort) ?? .added }
         .task(id: shop.libraryFlat) { storedFlat = shop.libraryFlat }
@@ -367,9 +361,12 @@ struct ShopWindow: View {
             // Only after the book has loaded: a group shelf means nothing until
             // the groups are known, and restoring one that no longer exists
             // would open on an empty screen with no way to tell why.
+            // The view first, then the shelf: a window saved on the old Board
+            // screen restores to "board", which sets the layout itself.
+            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .list
             if let restored = Shelves.shelf(storedShelf, in: shop) { shop.shelf = restored }
         }
-        .navigationTitle(shop.shopName)
+        .navigationTitle(shop.shelfTitle)
         .navigationSubtitle(subtitle)
     }
 
@@ -383,6 +380,12 @@ struct ShopWindow: View {
         let provenance = shop.source.isReal
             ? shop.words.callIt(shop.canWrite ? "mac.yours" : "mac.read_only")
             : shop.words.callIt("mac.not_real_shop")
+        // The title names the screen (or the folder, or the stage); the shop's
+        // name moved to the subtitle, as it is also on the sidebar's card.
+        return shop.shopName + " \u{00B7} " + screenSubtitle(provenance)
+    }
+
+    private func screenSubtitle(_ provenance: String) -> String {
         if shop.showingLibrary {
             let n = shop.shownFiles.count
             return shop.words.counting(n, "mac.models_count") + " · " + provenance
