@@ -21,6 +21,7 @@ const THEME_CASES = [
   // body class asserted is the theme's own hook — that pairing is the thing
   // worth pinning, because it is what proves the identity layer actually
   // attached on top of an inherited layout.
+  { id: 'khayt', bodyClass: 'khayt-2026', appearance: 'light', dashSel: '.wb-dash', dashMin: 80 },
   { id: 'blueprint', bodyClass: 'khayt-blueprint', appearance: 'light', dashSel: '.wb-dash', dashMin: 80 },
   { id: 'nocturne', bodyClass: 'khayt-nocturne', appearance: 'dark', dashSel: '.cmd-dash', dashMin: 80 },
   // Meridian is the one theme with a shell of its OWN — no borrowed layout, and
@@ -362,6 +363,7 @@ async function assertEnthusiastThemesNoMoney(window) {
     { id: 'command', sel: '.cmd-dash', extra: '#commandStatusBar' },
     { id: 'workbench', sel: '.wb-dash', extra: null },
     { id: 'vivid', sel: '.vv-dash', extra: null },
+    { id: 'khayt', sel: '.wb-dash', extra: null },
     { id: 'blueprint', sel: '.wb-dash', extra: null },
     { id: 'nocturne', sel: '.cmd-dash', extra: '#commandStatusBar' },
     { id: 'meridian', sel: '.mrd-dash', extra: '#meridianTopbar' },

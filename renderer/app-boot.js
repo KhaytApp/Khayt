@@ -74,7 +74,7 @@ function initWizard() {
   // (Bed Ready returned above — the wizard below only runs for Khayt.)
   let selectedMode = 'simple';
   let selectedBizType = 'solo';
-  let selectedDesign = settings.designTheme || 'workbench';
+  let selectedDesign = settings.designTheme || 'khayt';
   let pendingPin = null;
   let pendingRecoveryCode = null;
   let securitySkipped = true;

@@ -51,6 +51,7 @@ const ALL_THEMES = [
   { id: 'workbench', appearance: 'light', dir: '' },              // flat set
   { id: 'command',   appearance: 'light', dir: 'themes/command' },
   { id: 'vivid',     appearance: 'light', dir: 'themes/vivid' },
+  { id: 'khayt', appearance: 'light', dir: 'themes/khayt' },
   { id: 'blueprint', appearance: 'light', dir: 'themes/blueprint' },
   { id: 'nocturne',  appearance: 'dark',  dir: 'themes/nocturne' },
   { id: 'meridian',  appearance: 'light', dir: 'themes/meridian' },

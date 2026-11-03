@@ -30,4 +30,13 @@ struct TodayLockTests {
         #expect(tail.contains("Triage(shop: shop)"))
         #expect(!tail.contains("Dashboard(shop: shop)"))
     }
+
+    @Test("Due this week leaves shipped and delivered jobs out and names every open stage")
+    func dueKnowsEveryStage() throws {
+        let pieces = try Self.source("TodayPieces.swift")
+        #expect(pieces.contains(#"static let closed: Set<String> = ["completed", "shipped", "delivered", "cancelled"]"#))
+        for stage in ["on_hold", "post", "qc"] {
+            #expect(pieces.contains(#"w.callIt("queue.\#(stage)")"#))
+        }
+    }
 }

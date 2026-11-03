@@ -88,6 +88,22 @@ function migrateLegacyDesignTheme() {
   if (cur && map[cur]) settings.designTheme = map[cur];
   settings.__designV26Migrated = true;
 }
+/**
+ * One-time move to the 2026 identity (approved by the owner, Nov 2026).
+ *
+ * Workbench was the default, so almost every shop has 'workbench' on disk only
+ * because it was the default, not because anyone chose it. Those shops move to
+ * Khayt once; the flag means a shop that switches back to Workbench afterwards
+ * stays there. Any other saved design — a deliberate choice — is left alone.
+ */
+function migrateDesign2026() {
+  if (!settings || settings.__design2026Migrated) return;
+  if (!settings.designTheme || settings.designTheme === 'workbench') {
+    settings.designTheme = 'khayt';
+    settings.accent = 'brand';
+  }
+  settings.__design2026Migrated = true;
+}
 function sanitizePrintHtml(html) {
   return String(html || '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -111,7 +127,7 @@ function defaultSettings() {
     addrAr:    (typeof document !== 'undefined' && document.documentElement?.dataset.app === 'bedready') ? '' : 'الرياض، المملكة العربية السعودية',
     lang:      'en',
     theme:         'light',
-    designTheme:   'workbench',
+    designTheme:   'khayt',
     // The board is what the product is sold on, so it is what a shop gets.
     // `queueViewChosen` is only ever written when someone works the toggle, which
     // is what separates "never expressed a view" from "asked for the list" — the
@@ -705,6 +721,7 @@ function applyStoreFromSnapshot(store) {
   if (store.settings)            settings            = Object.assign({}, defaultSettings(), sanitiseForAssign(store.settings));
   migrateLanApiSettings();
   migrateLegacyDesignTheme();
+  migrateDesign2026();
   if (store.settings) {
     const nested = ['emailDigest', 'emailConfig', 'smsConfig', 'accountingSync', 'zatcaPhase2', 'bnpl', 'lanApi', 'exchangeRates', 'printerApi', 'quoteFollowUp', 'paymentReminder', 'eventWebhooks'];
     const isPlainObj = (v) => v && typeof v === 'object' && !Array.isArray(v);

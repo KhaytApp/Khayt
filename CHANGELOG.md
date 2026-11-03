@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a new look, the same as khaytapp.com and the Mac app.** A new built-in design, Khayt, is now the default: a navy sidebar with one set of line icons in place of the emoji, a white work surface with soft cards, pill buttons, Archivo headings and figures in JetBrains Mono, and an amber line that marks the screen you are on and every progress bar. Job statuses use one colour per stage, the same on the Mac and the iPhone: pending steel, printing green, on hold and quality check purple, ready teal, late red, and grey for quotes and paid; amber is never a status colour. Dark mode is the website's deep navy rather than a grey. A shop that was on Workbench only because it was the default moves to Khayt once; a shop that picks Workbench (or chose any other design) keeps it. The sidebar is grouped by what you are doing: Work (queue, calculator, customers), Shop (inventory, print files, catalog, portfolio, gift cards), Money (orders log, analytics, expenses, waste) and Tools (colour studio, converter, HueForge); Workbench keeps its own groups. Settings ▸ Preferences ▸ Design lists Khayt first, with three accents (Khayt Blue, Navy, Teal).
+
+- **Desktop: a milestone invoice is a proforma for that part of the job.** Issuing a milestone (Job ▸ Milestones) printed a tax invoice under the job's own number, with every part listed at full price above the smaller milestone total and a ZATCA QR for an amount that was never the invoice's. It now prints a proforma with one line: the milestone's label, "30% of 1,150" under it, and its own amount, with tax worked out on that amount. Shipping, rush, extras and the discount are left off because they're already in the percentage. There's no invoice number and no ZATCA QR, and the bank-transfer QR asks for the milestone's amount. The job's one tax invoice is unchanged. This is the same paper the Mac prints.
+
 - **A new Khayt icon and wordmark.** The nozzle-and-thread mark, redrawn as clean vector layers for macOS 26: the drop at the nozzle tip is now the dot of the letter, so the icon reads خ — the first letter of Khayt — where it used to read ح. The thread is the website's amber on its navy, and the wordmark is the website's "Khayt" with «خيط», replacing the old raster lockup. Every size (Mac, Windows tiles, iPhone, PWA, favicons) is regenerated from the new masters by `scripts/derive-icons.py`. Printed invoices, quotes and the desktop dashboard (when the shop has no logo of its own) carry the new mark too, in one colour so it prints cleanly in black and white and on thermal printers.
 
 - **Mac: the dashboard is now Today.** In the new window the front door opens on a header that says what needs you ("Good morning. 3 things need you.") with a one-line summary of open, printing and due-today jobs, then four figure cards (owed to you, the month's net income, the same figure the money strip shows, with its change on last month, machines printing, filament on the shelf with how much is low). Needs attention became rows with a tile, the detail and the same action buttons; every machine is a card with a status pill, the job and customer, an amber progress bar, time left and the loaded colours; a right-hand column lists the jobs due this week and, when the shop has chasing turned on, the customers it is waiting on. A reusable status pill carries the stage colour as a dot and tint with the label in ordinary ink. Light, navy dark and Arabic right-to-left; nine languages.
@@ -9057,6 +9061,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.18] - 2026-11-03
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **Khayt looks and is laid out differently, and a few things have moved.** The window is a native macOS 26 window again, with a glass sidebar, in the website's colours: cool white in light, navy in dark, and an amber thread for progress and "today". The home screen is now **Today**: what needs you, your four key figures, every machine with its progress, what is due this week and the customers you are waiting on. **Board is no longer in the sidebar**: open **Jobs** and pick **Board** or **List** in the toolbar (old Board links, menu items and shortcuts still take you there). The stages that used to be listed under Jobs in the sidebar are in the **Stage** menu beside it. **Waste, Portfolio, Gift cards and Colour studio** are under **More** at the bottom of the sidebar. The **Today / Ledger** switch and **Record a payment** are in the toolbar. If you would rather keep the previous navy window, Settings ▸ General ▸ Appearance switches it back. Khayt also has a new icon: the same nozzle and thread, now spelling خ. Nothing in your book changes.
+
+### Added
+
+- **Today, the new home screen**, a new window frame and sidebar, and the new icon and wordmark (see above).
+- **A currency per customer.** A customer can be kept in their own currency; their new jobs start in it.
+- **Milestone proformas.** A job can be billed in milestones, each as a proforma, never a tax invoice.
+- **Your iPhone can pause, resume or stop a print**, on the shop's Wi-Fi or through Khayt Cloud, and the shop's phones are told each morning about late and due-today work and when stock first runs low.
+- **The shop's payment link** (Settings ▸ Online): customers see Pay deposit, Pay balance or Pay on their order page.
+- **A customer who asked through the quote form is emailed their order page** when their job is published.
+- **A weekly email switch** for the owner, and **paying for a plan** from Settings (prices shown before VAT; VAT is added at checkout by billing country where it applies — today nowhere). Paying opens once the beta ends.
+
+### Changed
+
+- **Plan prices no longer say "VAT included".**
+- **The Board and the Jobs screen draw sooner** on a big library.
+
+### Fixed
+
+- **An invite another shop already holds is said plainly**, and a key already published by the owner is no longer an error.
 
 ## [4.0.0-beta.17] - 2026-11-02
 

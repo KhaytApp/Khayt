@@ -20,7 +20,7 @@
 
   function applyAccent(accentId, accentSet) {
     const root = document.documentElement;
-    const design = reg()?.normalizeDesignId(root.dataset.design || 'workbench') || 'workbench';
+    const design = reg()?.normalizeDesignId(root.dataset.design || 'khayt') || 'khayt';
     const set = accentSet || reg()?.accentsForTheme(design) || {};
     const preset = set[accentId] || set[reg()?.defaultAccentForTheme(design)];
     if (!preset) return;
@@ -153,7 +153,7 @@
   }
 
   function applyDesignTheme(designId) {
-    const id = reg()?.normalizeDesignId(designId) || 'workbench';
+    const id = reg()?.normalizeDesignId(designId) || 'khayt';
     const theme = reg()?.getTheme(id);
     const root = document.documentElement;
     const wasWorkbench = document.body.classList.contains('khayt-workbench');
@@ -204,7 +204,7 @@
     // Bed Ready ships ONE bespoke look (renderer/bedready/ + bedready-theme.css)
     // and no design picker. It no longer borrows a Khayt theme id to get there —
     // applyBodyClasses keys off the html marker — so there is nothing to pin.
-    const design = reg()?.normalizeDesignId(settings?.designTheme || 'workbench') || 'workbench';
+    const design = reg()?.normalizeDesignId(settings?.designTheme || 'khayt') || 'khayt';
     const accent = reg()?.normalizeAccent(design, settings?.accent) || 'cyan';
     if (settings && settings.accent !== accent) settings.accent = accent;
     applyDesignTheme(design);
@@ -256,7 +256,7 @@
     const accentEl = document.getElementById('set_accent');
     const accentWrap = document.getElementById('set_accent_wrap');
     const comingSoonEl = document.getElementById('set_designTheme_coming_soon');
-    const design = reg()?.normalizeDesignId(settings?.designTheme || 'workbench') || 'workbench';
+    const design = reg()?.normalizeDesignId(settings?.designTheme || 'khayt') || 'khayt';
     if (designEl) designEl.value = design;
     if (document.getElementById('set_designThemePicker')) {
       global.KhaytThemePicker?.mountSettingsPicker?.();
@@ -282,7 +282,7 @@
   function populateDesignSelects() {
     if (!reg()) return;
     global.KhaytThemePicker?.mountSettingsPicker?.();
-    populateAccentSelect(reg().normalizeDesignId(settings?.designTheme || 'workbench'));
+    populateAccentSelect(reg().normalizeDesignId(settings?.designTheme || 'khayt'));
   }
 
   function populateAccentSelect(designId) {
@@ -303,7 +303,7 @@
     syncDesignSettingsUi,
     populateDesignSelects,
     populateAccentSelect,
-    normalizeDesign: (id) => reg()?.normalizeDesignId(id) || 'workbench',
+    normalizeDesign: (id) => reg()?.normalizeDesignId(id) || 'khayt',
     accentsForDesign: (id) => reg()?.accentsForTheme(id) || {},
     syncSidebarSubtitle,
     DESIGNS: reg()?.BUILTIN_THEMES,

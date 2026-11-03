@@ -8,6 +8,19 @@
 
 
 
+  /* The 2026 identity's accents. Brand is #216dca, the website's own blue.
+     Amber is deliberately absent: in this design it is the thread (progress,
+     the active screen), and an amber accent would make every button look like
+     a progress mark. */
+  const KHAYT_ACCENTS = {
+    brand: { h: 213, s: '72%', l: '46%', labelKey: 'theme.accent.khayt_brand' },
+    navy:  { h: 213, s: '78%', l: '25%', labelKey: 'theme.accent.khayt_navy' },
+    teal:  { h: 174, s: '82%', l: '30%', labelKey: 'theme.accent.khayt_teal' },
+  };
+
+  // The theme a fresh install gets, and where a stale or deleted id lands.
+  const DEFAULT_DESIGN = 'khayt';
+
   const WORKBENCH_ACCENTS = {
     indigo:  { h: 236, s: '86%', l: '63%', labelKey: 'theme.accent.indigo' },
     blue:    { h: 220, s: '100%', l: '59%', labelKey: 'theme.accent.workbench_blue' },
@@ -109,6 +122,25 @@
   };
 
   const BUILTIN_THEMES = {
+    /* Khayt — the 2026 identity shared with khaytapp.com and the Mac app:
+       navy chrome, white work surface, amber as the thread, deep-navy dark
+       mode. Hosted on the Workbench shell like Blueprint, so the layout is
+       inherited and only the identity layer (themes/khayt/) is new. */
+    khayt: {
+      labelKey: 'theme.design.khayt',
+      descKey: 'theme.design.khayt_desc',
+      preview: 'themes/previews/khayt.png',
+      shell: 'workbench',
+      enabled: true,
+      defaultAccent: 'brand',
+      accents: KHAYT_ACCENTS,
+      defaultAppearance: 'light',
+      bodyClass: 'khayt-2026',
+      stylesheets: [
+        'themes/khayt/tokens.css',
+        'themes/khayt/shell.css',
+      ],
+    },
     workbench: {
       labelKey: 'theme.design.workbench',
       descKey: 'theme.design.workbench_desc',
@@ -266,16 +298,16 @@
   }
 
   function normalizeDesignId(designId) {
-    if (!designId) return 'workbench';
+    if (!designId) return DEFAULT_DESIGN;
     // 'classic' was the pre-2.6 name for ledger, which the legacy-theme
     // deletion removed; its users land on the default like any other stale id.
-    if (designId === 'classic') return 'workbench';
+    if (designId === 'classic') return DEFAULT_DESIGN;
     if (isCustomThemeId(designId)) {
       const id = customIdFromTheme(designId);
-      return customThemes[id] ? designId : 'workbench';
+      return customThemes[id] ? designId : DEFAULT_DESIGN;
     }
     const theme = registry[designId];
-    if (!theme || theme.enabled === false) return 'workbench';
+    if (!theme || theme.enabled === false) return DEFAULT_DESIGN;
     return designId;
   }
 
@@ -283,7 +315,7 @@
     const id = normalizeDesignId(designId);
     if (isCustomThemeId(id)) return customThemes[customIdFromTheme(id)];
     // Bed Ready left with the studio theme in 3.3; the default is the fallback now.
-    return registry[id] || registry.workbench;
+    return registry[id] || registry[DEFAULT_DESIGN];
   }
 
   /**
@@ -433,6 +465,8 @@
   }
 
   const api = {
+    DEFAULT_DESIGN,
+    KHAYT_ACCENTS,
     WORKBENCH_ACCENTS,
     VIVID_ACCENTS,
     COMMAND_ACCENTS,
