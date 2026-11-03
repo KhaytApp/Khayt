@@ -36,6 +36,8 @@ struct OrderDetailPage: View {
     /// The carriers to ship with, when this job is finished and not yet sent.
     @State private var shipChoices: [KhaytEngine.CarrierChoice]?
     @State private var shipping = false
+    /// The job's saved customer, for Call / WhatsApp / Email.
+    @State private var customer: Client?
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
     @State private var moveNotes: [String] = []
 
@@ -90,6 +92,10 @@ struct OrderDetailPage: View {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            if let customer, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
+                ContactCard(client: customer)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
             // Only an order the Mac has published has a page to put a photo on.
             if let photoAccess, photoAccess != .notPublished {
                 OrderPhotosCard(access: photoAccess)
@@ -132,6 +138,7 @@ struct OrderDetailPage: View {
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
             shipChoices = await api.shipChoices(orderId: order.id)
+            customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             #if DEBUG
@@ -145,7 +152,7 @@ struct OrderDetailPage: View {
     }
 
     private func loadPayment() async {
-        currency = await api.shopCurrency()
+        currency = await api.orderCurrency(orderId: order.id)
         payment = await api.paymentState(orderId: order.id)
         #if DEBUG
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
@@ -211,7 +218,6 @@ struct OrderDetailPage: View {
     }
 }
 
-/// The way into a job's invoice.
 /// "Ship it": carrier and tracking number, for a finished job not yet sent.
 struct ShipCard: View {
     var body: some View {
@@ -234,6 +240,46 @@ struct ShipCard: View {
     }
 }
 
+/// Call, WhatsApp or email the job's customer, straight from the job.
+struct ContactCard: View {
+    let client: Client
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(client.displayName)
+                .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.ink)
+            HStack(spacing: 10) {
+                if let dial = client.dialNumber, let url = URL(string: "tel:\(dial)") {
+                    button(L10n.tr("clients.call"), "phone.fill") { openURL(url) }
+                }
+                if let wa = client.whatsappNumber, let url = URL(string: "https://wa.me/\(wa)") {
+                    button(L10n.tr("clients.whatsapp"), "message.fill") { openURL(url) }
+                }
+                if let email = client.email, !email.isEmpty, let url = URL(string: "mailto:\(email)") {
+                    button(L10n.tr("clients.email"), "envelope.fill") { openURL(url) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .card()
+    }
+
+    private func button(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(KhaytDesign.brand)
+                .background(KhaytDesign.brand.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The way into a job's invoice.
 struct InvoiceCard: View {
     var body: some View {
         HStack(spacing: 10) {
@@ -317,6 +363,7 @@ struct OrderDetailContent: View {
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .foregroundStyle(tone)
                     .background(tone.opacity(0.14), in: Capsule())
+                if order.isRush { RushBadge() }
                 if order.isOverdue {
                     Text(L10n.tr("orders.late"))
                         .font(.khayt(11, .bold, relativeTo: .caption2))

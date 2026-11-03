@@ -809,17 +809,48 @@ struct BookWriter {
     func addOrder(_ draft: NewOrderDraft, machines: [MachineInfo], now: Date = Date()) throws -> [String: JSONValue] {
         var made: [String: JSONValue] = [:]
         var settings: [String: JSONValue] = [:]
-        if case .object(let s)? = try book.read()["settings"] { settings = s }
+        var clients: [JSONValue] = []
+        let store = try book.read()
+        if case .object(let s)? = store["settings"] { settings = s }
+        if case .array(let c)? = store["clients"] { clients = c }
         try book.insertRecord(collection: "printLog", atFront: true) { rows in
             made = try Self.orderRecord(from: draft, settings: settings, machines: machines,
-                                        existing: rows, now: now)
+                                        existing: rows, clients: clients, now: now)
             return made
         }
         return made
     }
 
+    /// The saved customer an order is for: the one picked, if the book still
+    /// has it; else the one whose name was typed exactly, when only one has
+    /// it. Returns its id and its own currency, if it keeps one.
+    static func savedClient(for draft: NewOrderDraft, named name: String,
+                            in clients: [JSONValue]) -> (String?, String?) {
+        func text(_ v: JSONValue?) -> String? {
+            if case .string(let s)? = v {
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            }
+            return nil
+        }
+        let rows = clients.compactMap { row -> [String: JSONValue]? in
+            if case .object(let o) = row, text(o["id"]) != nil { return o }
+            return nil
+        }
+        if let wanted = draft.clientId, let c = rows.first(where: { text($0["id"]) == wanted }) {
+            return (wanted, text(c["currency"]))
+        }
+        guard !name.isEmpty else { return (nil, nil) }
+        let key = name.lowercased()
+        let named = rows.filter { c in
+            ["name", "nameEn", "nameAr"].contains { text(c[$0])?.lowercased() == key }
+        }
+        guard named.count == 1 else { return (nil, nil) }
+        return (text(named[0]["id"]), text(named[0]["currency"]))
+    }
+
     static func orderRecord(from draft: NewOrderDraft, settings: [String: JSONValue],
-                            machines: [MachineInfo], existing: [JSONValue],
+                            machines: [MachineInfo], existing: [JSONValue], clients: [JSONValue] = [],
                             now: Date = Date(), zone: TimeZone = .current) throws -> [String: JSONValue] {
         let project = String(draft.project.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         guard !project.isEmpty else { throw Refusal.noProject }
@@ -849,6 +880,8 @@ struct BookWriter {
         }
 
         let client = String(draft.client.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        let (linked, linkedCurrency) = Self.savedClient(for: draft, named: client, in: clients)
+        let shopCurrency = setting("currency") ?? "SAR"
         let material = String(draft.material.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         let price = ((SpoolDraft.price(draft.price) ?? 0) * 100).rounded() / 100
         let pending = existing.filter {
@@ -864,7 +897,7 @@ struct BookWriter {
             "timestamp": .string(stamp),
             "project": .string(project),
             "client": client.isEmpty ? .null : .string(client),
-            "clientId": .null,
+            "clientId": linked.map(JSONValue.string) ?? .null,
             "material": material.isEmpty ? .null : .string(material),
             "price": .number(price),
             "status": .string(status),
@@ -877,6 +910,22 @@ struct BookWriter {
             "paymentStatus": .string("unpaid"),
             "parts": .array([]),
         ]
+        // The price was typed in the shop's currency (the sheet says so). For
+        // a customer kept in another one, the shared rule (`lib/order-new.js`
+        // `jobCurrency`, Turki's "convert at save"): with a rate in Settings
+        // the price is converted and the job stamped with their currency; with
+        // none it is stamped with the shop's — an honest SAR price beats a SAR
+        // number wearing EUR.
+        if let code = linkedCurrency, code != shopCurrency {
+            var rate = 0.0
+            if case .object(let rates)? = settings["exchangeRates"], case .number(let r)? = rates[code] { rate = r }
+            if rate > 0 {
+                order["price"] = .number((price / rate * 100).rounded() / 100)
+                order["currency"] = .string(code)
+            } else {
+                order["currency"] = .string(shopCurrency)
+            }
+        }
         if asQuote {
             var days = 7.0
             if case .number(let n)? = settings["quoteValidityDays"], n > 0 { days = n }

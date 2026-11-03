@@ -233,6 +233,8 @@
 "order.new.details" = "التفاصيل";
 "order.new.project" = "المشروع";
 "order.new.client" = "العميل";
+"order.new.client.saved" = "عميل محفوظ";
+"order.new.client.pick" = "يربط الطلب بالعميل المحفوظ.";
 "order.new.material" = "المادة";
 "order.new.price" = "السعر";
 "order.new.price_in" = "السعر (%@)";
@@ -903,3 +905,22 @@
 "ship.create" = "تم الشحن";
 "ship.open" = "الشحن";
 "ship.open.sub" = "شركة الشحن ورقم التتبع";
+/* Customer page */
+"customer.owes" = "المستحق";
+"customer.limit" = "حد الائتمان %@";
+"customer.over_limit" = "تجاوز حد الائتمان %@";
+"customer.terms" = "يدفع خلال %d يومًا";
+"customer.terms.receipt" = "يدفع عند الاستلام";
+"customer.open" = "الطلبات المفتوحة";
+"customer.open.none" = "لا توجد طلبات مفتوحة.";
+"customer.history" = "الطلبات المكتملة";
+"customer.history.none" = "لا توجد طلبات مكتملة على هذا الهاتف.";
+"customer.history.window" = "يحمل هذا الهاتف أحدث الطلبات المكتملة فقط؛ السجل الكامل على الماك.";
+"customer.agreed" = "الأسعار المتفق عليها";
+"customer.messages" = "الرسائل";
+"customer.messages.none" = "لا توجد رسائل مسجلة بعد.";
+"customer.needs_book" = "تحتاج صفحة العميل إلى دفتر المتجر على هذا الهاتف.";
+"customer.new_order" = "طلب جديد لهذا العميل";
+/* Rush, machine job */
+"orders.rush" = "عاجل";
+"machines.job" = "الطلب: %@";
