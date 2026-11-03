@@ -1,10 +1,10 @@
 import WidgetKit
 import SwiftUI
 
-private extension Color {
-    /// Khayt indigo brand (matches the app AccentColor).
-    static let khaytBrand = Color(red: 0.31, green: 0.357, blue: 0.949)
-}
+/// The redesign's palette (Nov 2026), from `PrintActivityLook` because the
+/// extension cannot see the app's `KhaytDesign`. It was the 2025 indigo
+/// (0x4F5BF2) until then, a brand the app no longer has.
+private typealias Look = PrintActivityLook
 
 struct KhaytQueueEntry: TimelineEntry {
     let date: Date
@@ -73,8 +73,8 @@ struct KhaytQueueWidgetView: View {
                     }
                     Spacer(minLength: 0)
                     Text(statusLine(s))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Look.note)
                 }
             } else {
                 empty
@@ -95,12 +95,12 @@ struct KhaytQueueWidgetView: View {
                         metric("QC", s.qc)
                         metric("Done", s.completedToday)
                     }
-                    Divider()
+                    Rectangle().fill(Look.track).frame(height: 1)
                     let prints = s.prints ?? []
                     if prints.isEmpty {
                         Text(s.connected ? "Nothing printing right now" : "Offline")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Look.note)
                     } else {
                         ForEach(prints.prefix(2)) { printRow($0, compact: false) }
                     }
@@ -138,10 +138,10 @@ struct KhaytQueueWidgetView: View {
 
     private func header(_ s: WidgetSnapshot) -> some View {
         HStack {
-            Text(s.shopName).font(.caption.bold()).lineLimit(1)
+            Text(s.shopName).font(.caption.weight(.semibold)).foregroundStyle(Look.ink).lineLimit(1)
             Spacer()
             Circle()
-                .fill(s.connected ? Color.green : Color.red)
+                .fill(s.connected ? Look.live : Look.late)
                 .frame(width: 8, height: 8)
         }
     }
@@ -150,19 +150,19 @@ struct KhaytQueueWidgetView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(p.name)
-                    .font(compact ? .caption2.bold() : .caption.bold())
+                    .font(compact ? .caption2.weight(.semibold) : .caption.weight(.semibold))
+                    .foregroundStyle(Look.ink)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text("\(p.progress)%")
-                    .font(.caption2.bold().monospacedDigit())
-                    .foregroundStyle(Color.khaytBrand)
+                    .font(.system(size: compact ? 11 : 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Look.ink)
             }
-            ProgressView(value: Double(min(100, max(0, p.progress))), total: 100)
-                .tint(.khaytBrand)
+            threadBar(p.progress)
             if !compact, let eta = p.eta {
                 Text("ETA \(eta)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .foregroundStyle(Look.note)
             }
         }
     }
@@ -171,9 +171,25 @@ struct KhaytQueueWidgetView: View {
     /// and these labels were English on an Arabic phone.
     private func metric(_ label: LocalizedStringKey, _ value: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(value)").font(.title3.bold())
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text("\(value)").font(.title3.bold().monospacedDigit()).foregroundStyle(Look.ink)
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .textCase(.uppercase)
+                .foregroundStyle(Look.note)
         }
+    }
+
+    /// The app's level bar: a hairline track and the amber thread, never
+    /// the system's tinted ProgressView (which the lock screen keeps).
+    private func threadBar(_ progress: Int) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Look.track)
+                Capsule().fill(Look.thread)
+                    .frame(width: geo.size.width * CGFloat(min(100, max(0, progress))) / 100)
+            }
+        }
+        .frame(height: 6)
     }
 
     private func statusLine(_ s: WidgetSnapshot) -> LocalizedStringKey {
@@ -185,7 +201,7 @@ struct KhaytQueueWidgetView: View {
             Text("Khayt").font(.headline)
             Text("Open app on shop Wi‑Fi")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Look.note)
         }
     }
 }
@@ -196,7 +212,7 @@ struct KhaytQueueWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: KhaytQueueProvider()) { entry in
             KhaytQueueWidgetView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) { Look.surface }
                 .widgetURL(URL(string: "khayt://screen/jobs"))
         }
         .configurationDisplayName("Khayt Queue")

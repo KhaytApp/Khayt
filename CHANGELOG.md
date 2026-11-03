@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the Home Screen widget in the redesign's colours.** The Khayt Queue widget was still in the 2025 indigo the app dropped. It now sits on the redesign's surface (white, or navy in dark). Counts are bold over small mono labels, and a print's percent is mono ink over the same amber thread bar the app uses for progress. The connection dot is the app's live green, or late red when offline. The lock-screen version is unchanged, since the system draws it in one tint.
+
 - **iPhone: clients look like the redesign (phase 6).** Each client in the list has two initials in a brand-blue circle ("NA" for Noura Al-Saud, in the name's own script), the name larger and the order count in mono. A customer's page opens with their initials large and their name in the display face; what they owe is large too, and the card is outlined in red when they are over their limit. The Live Activity took the redesign's colours in phase 1.
 
 - **iPhone: printers and spools look like the redesign (phase 5).** A printer's card has a printer tile, its name and what it is on, and a pill; while it prints, the percentage is large, with the time left and the clock time it ends beside it, over a thicker amber bar and the nozzle and bed temperatures. A printing card is outlined in green, and one in trouble sits on a red wash with its error under the name. Spools are tiles now, two to a row: the colour as a reel, the material and brand over the colour's name, the grams and the share left, and a teal bar (amber and outlined when the spool is low). A spool's number is on its page.
