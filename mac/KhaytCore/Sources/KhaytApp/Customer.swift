@@ -39,6 +39,10 @@ struct Customer: Identifiable, Hashable, Sendable {
     /// The most they may owe — 0, no limit, for someone with no record.
     var creditLimit: Double { record?.creditLimit ?? 0 }
 
+    /// The currency they are invoiced in; "" is the shop's own (and for
+    /// someone with no record).
+    var currency: String { record?.currency ?? "" }
+
     /// Owing more than their credit limit, as the desktop's customer list
     /// flags it (`renderer/clients.js`: outstanding balance over the limit).
     var isOverLimit: Bool { creditLimit > 0 && owed > creditLimit + 0.005 }

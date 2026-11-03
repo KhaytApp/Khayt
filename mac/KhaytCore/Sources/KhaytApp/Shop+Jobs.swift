@@ -264,6 +264,9 @@ extension Shop {
         let project: String
         /// For the invoice sheet: show the job's PROFORMA, not its invoice.
         var proforma = false
+        /// With `proforma`: the milestone of the job it asks for
+        /// (`Milestones`), rather than the whole job.
+        var milestone: String? = nil
     }
 
     /// Save a customer — a new one, or changes to one the shop already has.
@@ -1620,7 +1623,7 @@ extension Shop {
         guard let uri = made ?? snap.thumb, uri.hasPrefix("data:image/") else {
             writeProblem = words.callIt("pe.upload_failed"); return .failed
         }
-        if files.first(where: { $0.id == modelId })?.userPhoto == uri { return .already }
+        if libraryFile(id: modelId)?.userPhoto == uri { return .already }
         let wrote = editFiles([modelId], named: words.callIt("mac.lp_action")) { record in
             record["userPhoto"] = .string(uri)
             record.removeValue(forKey: "userPhotoRemoved")
@@ -1861,6 +1864,7 @@ extension Shop {
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil
+        pendingMilestones = nil
         pendingLabels = nil
         pendingDayReport = nil
     }

@@ -181,6 +181,10 @@ final class LanServer {
         /// Every machine with its latest printer reading — `/api/machines/live`.
         /// From memory, never a poll: the phone asks every few seconds.
         var machinesLive: @MainActor () -> [JSONValue] = { [] }
+        /// Pause, resume or stop a print for a paired phone —
+        /// `Shop.phonePrinterCommand`. Unset, the route is not here and the
+        /// phone reads the 404 as "this Mac predates it".
+        var printerCommand: (@MainActor (_ machineId: String, _ verb: PrinterVerb) async -> (Int, String))? = nil
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -1142,6 +1146,22 @@ final class LanServer {
                                      Int(request.query["offset"] ?? "") ?? 0, Int(request.query["limit"] ?? "") ?? 50)
             let body = (try? String(decoding: JSONEncoder().encode(page), as: UTF8.self)) ?? "{}"
             return .json(200, body)
+
+        // ── A PHONE TELLS A PRINTER WHAT TO DO ───────────────────────────
+        //
+        // SIGNED PHONES ONLY. Every other phone route also opens to the owner
+        // PIN sent bare; this one moves a machine mid-print, so it takes the
+        // enrolled device's signature (`LanDevices`) and nothing less. The
+        // gate still runs first, for the host check and the PIN being set.
+        case (_, false) where request.method == "POST" && host.printerCommand != nil
+                && Self.printerPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (id, verb) = Self.printerPath(path)!
+            let (status, body) = await host.printerCommand!(id, verb)
+            return .json(status, body)
 
         case (_, true) where host.libraryThumb != nil && Self.libraryPath(path)?.action == "thumb":
             if let refused = await pinGate(request) { return refused }
@@ -2717,6 +2737,9 @@ extension Shop {
         host.storefrontSecrets = secrets
         host.pricing = { [weak self] in self?.pricingBook ?? [:] }
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
+        host.printerCommand = { [weak self] id, verb in
+            await self?.phonePrinterCommand(id, verb) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
         host.failed = { [weak self] said in
             guard let self else { return }
             self.lanPairing.serverStopped()
