@@ -898,6 +898,11 @@
 "owed.remind.no_phone" = "لا يوجد رقم هاتف محفوظ لهذا العميل.";
 "owed.remind.no_customer" = "هذا الطلب غير مرتبط بعميل محفوظ.";
 "owed.open.hint" = "يعرض الطلبات التي عليها مبالغ مستحقة.";
+/* Proforma */
+"proforma.title" = "فاتورة مبدئية";
+"proforma.open" = "فاتورة مبدئية";
+"proforma.open.sub" = "اطلب الدفع قبل إصدار الفاتورة";
+"proforma.refused" = "الفاتورة المبدئية لطلب مسعّر ومقبول ولم يكتمل بعد.";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";

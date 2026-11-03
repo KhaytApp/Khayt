@@ -1003,9 +1003,10 @@ final class KhaytAPIClient: ObservableObject {
     // MARK: - Invoices
 
     /// A job's invoice, built from the book this phone keeps — or why not.
-    func invoice(orderId: String) async -> InvoiceBuild {
+    func invoice(orderId: String, proforma: Bool = false) async -> InvoiceBuild {
         guard let reader, holdsBook else { return .refused(.missing) }
-        return (try? await reader.invoice(orderId: orderId, language: L10n.usesArabicLayout ? "ar" : "en"))
+        return (try? await reader.invoice(orderId: orderId, language: L10n.usesArabicLayout ? "ar" : "en",
+                                          proforma: proforma))
             ?? .refused(.failed)
     }
 

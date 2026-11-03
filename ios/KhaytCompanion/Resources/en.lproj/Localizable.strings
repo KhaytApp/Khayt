@@ -898,6 +898,11 @@
 "owed.remind.no_phone" = "This customer has no phone number saved.";
 "owed.remind.no_customer" = "This job is not linked to a saved customer.";
 "owed.open.hint" = "Shows the jobs with money owed.";
+/* Proforma */
+"proforma.title" = "Proforma invoice";
+"proforma.open" = "Proforma invoice";
+"proforma.open.sub" = "Ask for payment before the work is invoiced";
+"proforma.refused" = "A proforma is for a priced job that is accepted and not yet finished.";
 /* Customer page */
 "customer.owes" = "Owes";
 "customer.limit" = "Credit limit %@";
