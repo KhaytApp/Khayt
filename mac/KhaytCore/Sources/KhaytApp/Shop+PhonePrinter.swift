@@ -18,6 +18,7 @@ extension Shop {
     /// The phone's answer: an HTTP status and a JSON body,
     /// `{"ok":true,"state":…}` or `{"ok":false,"reason":…,"message":…}`.
     func phonePrinterCommand(_ machineId: String, _ verb: PrinterVerb) async -> (Int, String) {
+        // lock: system — a paired phone's printer command; the LAN route takes a signed enrolled device only, and the cloud relay a sealed command from a write-role member holding the shop key.
         func refuse(_ status: Int, _ reason: String, _ message: String? = nil) -> (Int, String) {
             var body: [String: JSONValue] = ["ok": .bool(false), "reason": .string(reason)]
             if let message { body["message"] = .string(message) }
