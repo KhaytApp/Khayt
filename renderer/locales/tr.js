@@ -2170,6 +2170,8 @@
   "calc.client_ref": "Müşteri SAS / referans",
   "calc.currency": "Para birimi",
   "calc.currency_auto": "Otomatik",
+  "calc.saved_in_currency": "{amount} olarak kaydedilir ({code}, 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "Ayarlar ▸ Para birimi'nde {code} kuru yok, bu iş {base} olarak kaydedilir",
   "calc.client_ref_ph": "ör. PO-2024-001",
   "oe.internal_notes": "Dahili notlar (müşteriye gösterilmez)",
   "oe.internal_notes_ph": "ör. özel işlem, operatör hatırlatmaları…",

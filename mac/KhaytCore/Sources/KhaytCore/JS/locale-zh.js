@@ -2170,6 +2170,8 @@
   "calc.client_ref": "客户采购单 / 参考编号",
   "calc.currency": "货币",
   "calc.currency_auto": "自动",
+  "calc.saved_in_currency": "保存为 {amount}（{code}，1 {code} = {rate} {base}）",
+  "calc.no_rate_for_currency": "设置 ▸ 货币 中没有 {code} 的汇率，因此此作业以 {base} 保存",
   "calc.client_ref_ph": "例如 PO-2024-001",
   "oe.internal_notes": "内部备注（客户不可见）",
   "oe.internal_notes_ph": "例如 特殊处理、操作员提醒…",

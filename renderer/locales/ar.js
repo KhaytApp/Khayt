@@ -2192,6 +2192,8 @@
   "calc.client_ref": "رقم أمر الشراء / المرجع",
   "calc.currency": "العملة",
   "calc.currency_auto": "تلقائي",
+  "calc.saved_in_currency": "يُحفظ بمبلغ {amount} ({code}، 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "لا يوجد سعر صرف لـ {code} في الإعدادات ▸ العملة، لذا تُحفظ هذه المهمة بـ {base}",
   "calc.client_ref_ph": "مثال: PO-2024-001",
   "oe.internal_notes": "ملاحظات داخلية (لا تظهر للعميل)",
   "oe.internal_notes_ph": "مثال: تعليمات خاصة، تذكيرات…",

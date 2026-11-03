@@ -272,6 +272,47 @@ async function testHueForge(window) {
   if (bad.length) throw new Error(`HueForge checks failed: ${bad.join(', ')} — ${JSON.stringify(r)}`);
 }
 
+// Convert at save (Nov 2 2026): a quote for a client who pays in another
+// currency says under the total what it will be saved as, and is saved in it.
+async function testClientCurrencyQuote(window) {
+  const r = await window.evaluate(() => {
+    const out = {};
+    settings.mode = 'professional'; applyMode();
+    settings.currency = 'SAR';
+    settings.exchangeRates = Object.assign({}, settings.exchangeRates, { EUR: 4 });
+    clients.push({ id: 'C-E2E-EUR', nameEn: 'Euro Client', currency: 'EUR' });
+    switchTab('calculator-tab');
+    currentBuild = [{ id: 'PRT-E2E-FX', name: 'fx part', material: 'PLA', baseCost: 100, printTime: 1, qty: 1, printWeight: 10 }];
+    currentClientId = 'C-E2E-EUR';
+    $('#margin').value = '15';
+    ['#discountPct', '#shippingCost', '#priceOverride', '#priceRoundStep'].forEach((s) => { const e = $(s); if (e) e.value = ''; });
+    currentExtraLines = [];
+    renderBuild(); updateGrandTotal();
+    const line = $('#priceCurrencyLine');
+    out.lineShown = !!line && line.style.display !== 'none';
+    out.lineText = line ? line.textContent : '';
+    out.sarTotal = lastQuote ? lastQuote.total : null;
+    const before = printLog.length;
+    logPrint(true);
+    const job = printLog[0];
+    out.saved = printLog.length === before + 1;
+    out.currency = job && job.currency;
+    out.price = job && job.price;
+    // What the line promised is what was saved.
+    out.lineMatches = !!job && out.lineText.includes(fmtMoneyIn(job.price, 'EUR'));
+    // Clean up so later checks see the book they expect.
+    if (out.saved) printLog.shift();
+    clients = clients.filter((c) => c.id !== 'C-E2E-EUR');
+    currentClientId = null; currentBuild = [];
+    saveAll();
+    return out;
+  });
+  // The saved price is the shop-currency total at 4 SAR to the euro.
+  const ok = r.lineShown && r.lineMatches && r.saved && r.currency === 'EUR'
+    && r.sarTotal > 0 && Math.abs(r.price - r.sarTotal / 4) < 0.02;
+  if (!ok) throw new Error(`client-currency quote failed: ${JSON.stringify(r)}`);
+}
+
 // 3.2 (Bed Ready split): "enthusiast" is RETIRED as a Khayt-selectable mode — its maker
 // tools (converter / Colour Studio / print-file library) are now core Simple/Pro features.
 // Verify the retirement (no switcher pill + stored enthusiast migrates to Simple), that the
@@ -611,6 +652,7 @@ try {
   await testHueForge(window);
   await testIndexes(window);
   await testPruneArchived(window);
+  await testClientCurrencyQuote(window);
   const owner = testStoreOwnership();
 
   console.log(
