@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the shop's payment link lives in Settings ▸ Online.** A new Payment link section holds the shop's own https payment link and an optional label; the customer's page shows Pay deposit, Pay balance or Pay beside it, with `{amount}` in the link filled in. The owner or a manager can save or remove it; anyone else sees it read-only, and the cloud's own message is shown when it refuses a link.
+
 - **iPhone: contact the customer from the job, see the job on its printer, and find rush jobs.** A job linked to a saved customer has Call, WhatsApp and Email buttons on its page. A machine printing exactly one job shows a link to that job under its card. Rush jobs (any priority other than normal) carry a Rush badge on their card and page, and Orders shows a Rush chip when there are any.
 
 - **iPhone: a job's money is in the job's currency, and a new order can be for a saved customer.** The job page and Record payment used the shop's currency for every job, so a job priced in dollars read and was paid as riyals. They now follow the shared rule: the job's own currency, then its customer's, then the shop's. New Order suggests saved customers as you type and links the one you pick (or the one whose name you typed exactly, if only one has it), so the order carries `clientId`. The price is typed in the shop's currency; for a customer kept in another currency it follows the shared convert-at-save rule (`lib/order-new.js` `jobCurrency`): converted at the Settings rate and stamped with the customer's currency, or stamped with the shop's currency when there is no rate.
