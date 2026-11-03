@@ -55,6 +55,14 @@ extension KhaytAPIClient {
         return Rows(order: order, client: client, settings: settings, templates: templates)
     }
 
+    /// The saved customer a job is for, to call or message from the job.
+    /// Nil when the job is not linked to one.
+    func customer(orderId: String) -> Client? {
+        guard let c = rows(for: orderId)?.client,
+              let data = try? JSONEncoder().encode(JSONValue.object(c)) else { return nil }
+        return try? JSONDecoder().decode(Client.self, from: data)
+    }
+
     /// What only this app formats — the Mac's own split: the price as a figure,
     /// the currency as its CODE (the riyal sign may not exist on a customer's
     /// phone yet), the due date as the book has it.

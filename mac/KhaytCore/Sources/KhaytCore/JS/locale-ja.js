@@ -2169,6 +2169,8 @@
   "calc.client_ref": "クライアントPO / 参照番号",
   "calc.currency": "通貨",
   "calc.currency_auto": "自動",
+  "calc.saved_in_currency": "{amount} として保存されます（{code}、1 {code} = {rate} {base}）",
+  "calc.no_rate_for_currency": "設定 ▸ 通貨 に {code} のレートがないため、このジョブは {base} で保存されます",
   "calc.client_ref_ph": "例：PO-2024-001",
   "oe.internal_notes": "内部メモ（クライアントには非表示）",
   "oe.internal_notes_ph": "例：特別な取り扱い、オペレーターへの注意…",

@@ -191,6 +191,13 @@ final class KhaytAPIClient: ObservableObject {
         return try? await reader.shopCurrency()
     }
 
+    /// The currency one order's money is in (its own, its customer's, then
+    /// the shop's). A job priced in dollars must not read, or be paid, as riyals.
+    func orderCurrency(orderId: String) async -> String? {
+        guard let reader, reader.holdsAnyBook else { return nil }
+        return try? await reader.orderCurrency(orderId: orderId)
+    }
+
     /// Shop Pulse, from this phone's book. Nil with no book: the figures are
     /// the book's, and a phone that holds none has only the live counts.
     /// Filament and quantity per order, when this phone holds its book; empty
@@ -202,6 +209,11 @@ final class KhaytAPIClient: ObservableObject {
     /// What the book just copied holds, for pairing's last step.
     func fetchPairingSummary() async -> PairingSummary? {
         await fromBook { try await $0.pairingSummary() }
+    }
+
+    /// One customer's page, from this phone's book; nil with no book.
+    func fetchCustomer(id: String) async -> CustomerSummary? {
+        await fromBook { try await $0.customer(id: id) } ?? nil
     }
 
     func fetchPulse() async -> ShopPulse? {
@@ -1335,6 +1347,7 @@ final class KhaytAPIClient: ObservableObject {
         if let price = SpoolDraft.price(draft.price) { payload["price"] = price }
         if !draft.dueDate.isEmpty { payload["dueDate"] = draft.dueDate }
         if let machineId = draft.machineId, !machineId.isEmpty { payload["machineId"] = machineId }
+        if let clientId = draft.clientId, !clientId.isEmpty { payload["clientId"] = clientId }
 
         let data = try JSONSerialization.data(withJSONObject: payload)
         let (responseData, response) = try await request(

@@ -2170,6 +2170,8 @@
   "calc.client_ref": "Client PO / reference",
   "calc.currency": "Currency",
   "calc.currency_auto": "Auto",
+  "calc.saved_in_currency": "Saved as {amount} ({code}, 1 {code} = {rate} {base})",
+  "calc.no_rate_for_currency": "No {code} rate in Settings ▸ Currency, so this job is saved in {base}",
   "calc.client_ref_ph": "e.g. PO-2024-001",
   "oe.internal_notes": "Internal notes (not shown to client)",
   "oe.internal_notes_ph": "e.g. special handling, operator reminders…",
