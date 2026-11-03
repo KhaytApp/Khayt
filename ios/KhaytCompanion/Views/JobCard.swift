@@ -148,6 +148,7 @@ struct JobCard: View {
             if layout == .full {
                 HStack(spacing: 7) {
                     stageChip
+                    if order.isRush { RushBadge() }
                     if order.isOverdue { LateBadge() }
                     Spacer(minLength: 0)
                     if let due = order.formattedDueDate {
