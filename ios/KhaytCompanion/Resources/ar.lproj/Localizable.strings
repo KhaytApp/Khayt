@@ -233,6 +233,8 @@
 "order.new.details" = "التفاصيل";
 "order.new.project" = "المشروع";
 "order.new.client" = "العميل";
+"order.new.client.saved" = "عميل محفوظ";
+"order.new.client.pick" = "يربط الطلب بالعميل المحفوظ.";
 "order.new.material" = "المادة";
 "order.new.price" = "السعر";
 "order.new.price_in" = "السعر (%@)";
@@ -896,3 +898,6 @@
 "owed.remind.no_phone" = "لا يوجد رقم هاتف محفوظ لهذا العميل.";
 "owed.remind.no_customer" = "هذا الطلب غير مرتبط بعميل محفوظ.";
 "owed.open.hint" = "يعرض الطلبات التي عليها مبالغ مستحقة.";
+/* Rush, machine job */
+"orders.rush" = "عاجل";
+"machines.job" = "الطلب: %@";

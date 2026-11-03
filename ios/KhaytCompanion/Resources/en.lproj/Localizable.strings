@@ -233,6 +233,8 @@
 "order.new.details" = "Details";
 "order.new.project" = "Project";
 "order.new.client" = "Client";
+"order.new.client.saved" = "Saved customer";
+"order.new.client.pick" = "Links this order to the saved customer.";
 "order.new.material" = "Material";
 "order.new.price" = "Price";
 "order.new.price_in" = "Price (%@)";
@@ -896,3 +898,6 @@
 "owed.remind.no_phone" = "This customer has no phone number saved.";
 "owed.remind.no_customer" = "This job is not linked to a saved customer.";
 "owed.open.hint" = "Shows the jobs with money owed.";
+/* Rush, machine job */
+"orders.rush" = "Rush";
+"machines.job" = "Job: %@";
