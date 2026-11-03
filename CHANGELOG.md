@@ -9065,6 +9065,20 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.19] - 2026-11-04
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Fixed
+
+- **Library's groups fold away in the sidebar.** The saved searches and every library group now sit inside Library, which starts closed. Open it with its arrow; it also opens by itself while one of its groups is showing.
+- **Due this week** on Today no longer lists shipped or delivered jobs, and it names on-hold, post-processing and QC jobs by their stage.
+- **A phone's pause or stop is never run twice.** That held even if the Mac restarts right after running it.
+- **A low spool is pushed to the phones once**, even when two checks land at the same moment.
+- **Removing the payment link asks first**, and the weekly email switch saves only for the shop's owner.
+- **Today's greeting** has no stray space between its sentences in Japanese and Chinese.
+
 ## [4.0.0-beta.18] - 2026-11-03
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
