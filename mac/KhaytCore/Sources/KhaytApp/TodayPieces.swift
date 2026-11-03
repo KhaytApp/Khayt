@@ -177,6 +177,10 @@ struct TodayDue {
     let week: [Order]
     let today: Int
 
+    /// Stages a job is no longer due in. `shipped` and `delivered` are date
+    /// stamps on a completed job, but an older book can carry them as the status.
+    static let closed: Set<String> = ["completed", "shipped", "delivered", "cancelled"]
+
     /// Open jobs only: a finished, cancelled or voided one is not due.
     init(shop: Shop, now: Date = Date()) {
         let cal = Calendar.book
@@ -185,7 +189,7 @@ struct TodayDue {
         var picked: [(Date, Order)] = []
         var dueToday = 0
         for order in shop.orders {
-            guard order.status != "completed", order.status != "cancelled", !order.voided,
+            guard !Self.closed.contains(order.status), !order.voided,
                   let due = Order.day(order.dueDate), due >= start, due < end,
                   shop.inSite(order) else { continue }
             picked.append((due, order))
@@ -243,6 +247,9 @@ struct DueThisWeek: View {
             switch order.status {
             case "printing": return (.printing, w.callIt("queue.printing"))
             case "quote": return (.quote, w.callIt("queue.quote"))
+            case "on_hold": return (.hold, w.callIt("queue.on_hold"))
+            case "post": return (.pending, w.callIt("queue.post"))
+            case "qc": return (.pending, w.callIt("queue.qc"))
             default: return (.pending, w.callIt("queue.pending"))
             }
         }
