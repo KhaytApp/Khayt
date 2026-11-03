@@ -1,0 +1,34 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "队列";
+"Print" = "打印";
+"Printing" = "打印中";
+"QC" = "质检";
+"Done" = "完成";
+"Nothing printing right now" = "当前没有正在打印的作业";
+"Offline" = "离线";
+"LAN connected" = "已连接";
+"%lld queued · %lld printing" = "%lld 个排队 · %lld 个打印中";
+"ETA %@" = "还需 %@";
+"Open app on shop Wi‑Fi" = "请在店铺 Wi‑Fi 下打开 Khayt";
+"%lld%%" = "%lld%%";
+"Paused" = "已暂停";
+"Failed" = "失败";
+"Cancelled" = "已取消";
+"Paused at %@" = "在 %@ 暂停";
+"Ready to collect" = "可取件";
+"Print failed" = "打印失败";
+"Print stopped" = "打印已停止";
+"Ends %@" = "%@ 结束";
+"Log a failed print" = "记录打印失败";
+"Scan a spool" = "扫描线轴";
+"Opens Khayt on the failed-print form." = "在 Khayt 中打开打印失败记录表单。";
+"Opens Khayt on booking in a spool." = "在 Khayt 中打开线轴入库页面。";
+
+"Price a part" = "为零件定价";
+"Opens Khayt on the calculator." = "在 Khayt 中打开计算器。";
+
+/* Live Activity buttons */
+"Move to post-processing" = "移至后处理";
+"Print it again" = "重新打印";

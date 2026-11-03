@@ -20,7 +20,7 @@ struct ShipSheet: View {
     @State private var saving = false
     @State private var problem: String?
 
-    private var language: String { L10n.usesArabicLayout ? "ar" : "en" }
+    private var language: String { L10n.contentLanguage }
     private var chosen: KhaytEngine.CarrierChoice? { carriers.first { $0.id == carrier } }
 
     var body: some View {
