@@ -143,4 +143,100 @@ struct CloudCheckoutTests {
             _ = try await CloudCheckout.digest(Self.connection, token: "t", fetch: cloud.fetch)
         }
     }
+
+    // MARK: - VAT by billing country
+
+    static let priceNet = #"{"plan":"maker","period":"month","country":"SA","netSar":"25.00","vatSar":"0.00","vatRate":0,"totalSar":"25.00","currency":"SAR","vatAdded":false}"#
+    static let priceVat = #"{"plan":"maker","period":"year","country":"DE","netSar":"100.00","vatSar":"19.00","vatRate":0.19,"totalSar":"119.00","currency":"SAR","vatAdded":true}"#
+
+    @Test("the price lookup asks for plan, period and an upper-cased country, with no token")
+    func priceQuery() async throws {
+        let cloud = Cloud()
+        cloud.routes = [("GET /v1/billing/price", { _ in (200, Self.priceNet) })]
+        let q = try await CloudCheckout.quote(plan: "maker", period: .month, country: "sa",
+                                              baseURL: Self.connection.url, fetch: cloud.fetch)
+        let url = try #require(cloud.requests.first?.url)
+        let items = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+            .map { ($0.name, $0.value ?? "") })
+        #expect(url.path == "/v1/billing/price")
+        #expect(items == ["plan": "maker", "period": "month", "country": "SA"])
+        #expect(cloud.requests[0].value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(q.totalSar == 25 && q.netSar == 25 && !q.vatAdded)
+    }
+
+    @Test("the answer is read with VAT added and without")
+    func priceFormatted() async throws {
+        let cloud = Cloud()
+        cloud.routes = [("GET /v1/billing/price", { r in
+            (200, r.url?.query?.contains("country=DE") == true ? Self.priceVat : Self.priceNet) })]
+        let de = try await CloudCheckout.quote(plan: "maker", period: .year, country: "DE",
+                                               baseURL: Self.connection.url, fetch: cloud.fetch)
+        #expect(de.vatAdded && de.vatSar == 19 && de.totalSar == 119 && de.ratePercent == 19)
+        let sa = try await CloudCheckout.quote(plan: "maker", period: .month, country: "SA",
+                                               baseURL: Self.connection.url, fetch: cloud.fetch)
+        #expect(!sa.vatAdded && sa.vatSar == 0 && sa.totalSar == 25)
+        let half = CloudCheckout.Quote(plan: "p", period: "month", country: "XX", netSar: 100, vatSar: 7.5,
+                                       vatRate: 0.075, totalSar: 107.5, currency: "SAR", vatAdded: true)
+        #expect(half.ratePercent == 7.5)
+    }
+
+    @Test("a lookup without a country code makes no request; the cloud's 400 is a refusal")
+    func priceRefusals() async {
+        let cloud = Cloud()
+        cloud.routes = [("GET /v1/billing/price", { _ in (400, #"{"reason":"country-required"}"#) })]
+        for country in ["", "Germany"] {
+            await #expect(throws: CloudPlans.Refusal.self) {
+                _ = try await CloudCheckout.quote(plan: "maker", period: .month, country: country,
+                                                  baseURL: Self.connection.url, fetch: cloud.fetch)
+            }
+        }
+        #expect(cloud.requests.isEmpty, "no request for a country that is not a code")
+        do {
+            _ = try await CloudCheckout.quote(plan: "maker", period: .month, country: "SA",
+                                              baseURL: Self.connection.url, fetch: cloud.fetch)
+            Issue.record("expected a refusal")
+        } catch let r as CloudPlans.Refusal {
+            #expect(r.status == 400 && r.reason == "country-required")
+        } catch { Issue.record("\(error)") }
+    }
+
+    @Test("checkout sends the country, and reads the new 201 and poll fields")
+    func countrySent() async throws {
+        let cloud = Cloud()
+        cloud.routes = [("POST /v1/billing/checkout", { _ in (201, #"{"id":"bco_2","url":"https://pay.example.com/c/2","plan":"maker","period":"year","amountSar":"119.00","country":"DE","netSar":"100.00","vatSar":"19.00","vatRate":0.19,"totalSar":"119.00","currency":"SAR","vatAdded":true}"#) }),
+                        ("GET /v1/billing/checkout/bco_2", { _ in (200, #"{"id":"bco_2","status":"pending","country":"DE","netSar":"100.00","vatSar":"19.00","vatRate":0.19}"#) })]
+        let s = try await CloudCheckout.start(plan: "maker", period: .year, country: "de", Self.connection, token: "t", fetch: cloud.fetch)
+        let body = try JSONSerialization.jsonObject(with: #require(cloud.requests[0].httpBody)) as? [String: String]
+        #expect(body == ["shopId": "shop_ab", "plan": "maker", "period": "year", "country": "DE"])
+        #expect(s.total == 119 && s.vatAdded == true && s.vatSar == 19 && s.country == "DE")
+        let st = try await CloudCheckout.status(id: "bco_2", Self.connection, token: "t", fetch: cloud.fetch)
+        #expect(st.state == .pending && st.vatSar == 19 && st.vatRate == 0.19 && st.country == "DE")
+        // An older cloud: the new fields are simply absent.
+        let old = Cloud()
+        old.routes = [("POST /v1/billing/checkout", { _ in (201, Self.created) })]
+        let o = try await CloudCheckout.start(plan: "maker", period: .month, country: "SA", Self.connection, token: "t", fetch: old.fetch)
+        #expect(o.total == 25 && o.vatAdded == nil && o.netSar == nil)
+    }
+
+    @Test("400 country-required becomes its own outcome and does not hide the button")
+    func countryRequired() async {
+        let cloud = Cloud()
+        cloud.routes = [("POST /v1/billing/checkout", { _ in (400, #"{"reason":"country-required"}"#) })]
+        let gate = CloudCheckout.Gate()
+        let out = await CloudCheckout.run(plan: "maker", period: .month, Self.connection, token: "t", fetch: cloud.fetch,
+                                          gate: gate, open: { _ in true }, sleep: { _ in })
+        #expect(out == .countryRequired && !gate.providerOff)
+    }
+
+    @Test("the catalogue's note shows for added-by-country or prices that are not inclusive")
+    func vatNote() throws {
+        func cat(_ extra: String) throws -> CloudPlans.Catalogue {
+            try JSONDecoder().decode(CloudPlans.Catalogue.self, from: Data(("{\"plans\":[]" + extra + "}").utf8))
+        }
+        #expect(try cat(#","vat":"added-by-country","pricesInclusive":false"#).vatAddedAtCheckout)
+        #expect(try cat(#","vat":"added-by-country""#).vatAddedAtCheckout)
+        #expect(try cat(#","pricesInclusive":false"#).vatAddedAtCheckout)
+        #expect(try !cat("").vatAddedAtCheckout)
+        #expect(try !cat(#","pricesInclusive":true"#).vatAddedAtCheckout)
+    }
 }
