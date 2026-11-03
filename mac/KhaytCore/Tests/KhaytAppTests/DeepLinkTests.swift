@@ -54,7 +54,8 @@ struct DeepLinkTests {
         #expect(shop.follow(.spool(spool.id)))
         #expect(shop.shelf == .inventory)
         #expect(shop.follow(.screen("board")))
-        #expect(shop.shelf == .board)
+        #expect(shop.shelf == .jobs(nil), "Board is a view of Jobs now")
+        #expect(shop.showingBoard)
     }
 
     @Test("every link a widget draws is one the app can follow")

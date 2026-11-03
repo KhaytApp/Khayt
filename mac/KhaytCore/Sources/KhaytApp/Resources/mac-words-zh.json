@@ -3475,5 +3475,9 @@
  "unit.per_kg": "kg",
  "unit.per_sheet": "张",
  "unit.prints": "次打印",
- "unit.sheet": "张"
+ "unit.sheet": "张",
+ "mac.nav_today": "今天",
+ "mac.nav_more": "更多",
+ "mac.nav_saved": "已保存",
+ "mac.jobs_layout": "任务视图"
 }

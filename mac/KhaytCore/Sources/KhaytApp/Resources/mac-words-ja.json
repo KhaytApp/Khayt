@@ -3475,5 +3475,9 @@
  "unit.per_kg": "kg",
  "unit.per_sheet": "枚",
  "unit.prints": "回の印刷",
- "unit.sheet": "枚"
+ "unit.sheet": "枚",
+ "mac.nav_today": "今日",
+ "mac.nav_more": "その他",
+ "mac.nav_saved": "保存済み",
+ "mac.jobs_layout": "ジョブの表示"
 }

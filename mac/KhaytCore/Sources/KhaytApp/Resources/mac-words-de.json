@@ -3475,5 +3475,9 @@
  "unit.per_kg": "kg",
  "unit.per_sheet": "Bogen",
  "unit.prints": "Drucke",
- "unit.sheet": "Bögen"
+ "unit.sheet": "Bögen",
+ "mac.nav_today": "Heute",
+ "mac.nav_more": "Mehr",
+ "mac.nav_saved": "Gespeichert",
+ "mac.jobs_layout": "Ansicht der Aufträge"
 }

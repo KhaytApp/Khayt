@@ -3475,5 +3475,9 @@
  "unit.per_kg": "kg",
  "unit.per_sheet": "levha",
  "unit.prints": "baskı",
- "unit.sheet": "levha"
+ "unit.sheet": "levha",
+ "mac.nav_today": "Bugün",
+ "mac.nav_more": "Diğer",
+ "mac.nav_saved": "Kaydedildi",
+ "mac.jobs_layout": "İş görünümü"
 }

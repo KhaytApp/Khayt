@@ -112,7 +112,8 @@ struct GoToTests {
 
         let screens = shop.goToScreens()
         shop.goTo(try #require(screens.entries.first { $0.id == "screen:board" }))
-        #expect(shop.shelf == .board)
+        #expect(shop.shelf == .jobs(nil))
+        #expect(shop.showingBoard)
     }
 
     // MARK: - Permissions

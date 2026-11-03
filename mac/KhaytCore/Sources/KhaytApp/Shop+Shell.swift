@@ -96,7 +96,7 @@ extension Shop {
     /// The word for a screen — the sidebar's, and ⌘K's for the same row.
     static func titleKey(of shelf: Shelf) -> String {
         switch shelf {
-        case .dashboard:  "mac.dashboard"
+        case .dashboard:  "mac.nav_today"
         case .jobs:       "mac.all_jobs"
         case .board:      "mac.board"
         case .library:    "mac.all_models"

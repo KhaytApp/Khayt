@@ -2706,6 +2706,13 @@ final class Words {
         "mac.group_shop":    ["en": "Shop",         "ar": "المتجر"],
         "mac.group_floor":   ["en": "Floor",        "ar": "الورشة"],
         "mac.group_money":   ["en": "Money",        "ar": "المال"],
+        // The redesigned sidebar: the dashboard is "Today", the groups that
+        // are rarely opened sit under "More", and the footer says "Saved".
+        "mac.nav_today":     ["en": "Today",        "ar": "اليوم"],
+        "mac.nav_more":      ["en": "More",         "ar": "المزيد"],
+        "mac.nav_saved":     ["en": "Saved",        "ar": "تم الحفظ"],
+        // The label (tooltip and VoiceOver) of the Board / List switch on Jobs.
+        "mac.jobs_layout":   ["en": "Jobs view",    "ar": "عرض الأعمال"],
         "mac.book":          ["en": "Book",         "ar": "الدفتر"],
         "mac.synced":        ["en": "synced",       "ar": "متزامن"],
         "mac.offline":       ["en": "offline",      "ar": "غير متصل"],

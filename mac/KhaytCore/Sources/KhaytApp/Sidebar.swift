@@ -7,6 +7,8 @@ import SwiftUI
 /// way work actually flows — quotes at the top, delivered at the bottom.
 struct Sidebar: View {
     @Bindable var shop: Shop
+    /// "More" opened by hand, remembered per window.
+    @SceneStorage("sidebar.more") private var showMore = false
 
     var body: some View {
         // NOTHING behind the lock: the shelves' counts, the pipeline's stage
@@ -20,6 +22,24 @@ struct Sidebar: View {
         }
     }
 
+    /// The eyebrow over a group: small, monospaced, tracked, in the secondary
+    /// ink. No rule or dash beside it — the grouping is the spacing.
+    ///
+    /// Tracking is off in Arabic: spacing out joined letters pulls a word apart
+    /// into its isolated forms, which is a different (and unreadable) word.
+    private func eyebrow(_ key: String) -> some View {
+        Text(shop.words.callIt(key))
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .tracking(shop.words.isRTL ? 0 : 1.2)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+    }
+
+    /// Waste, the portfolio, gift cards and the colour studio sit behind
+    /// "More". Open by itself when the screen you are on is inside it, so the
+    /// selected row is never hidden.
+    private var moreShelves: [Shop.Shelf] { [.waste, .portfolio, .giftCards, .colour] }
+
     private var shelves: some View {
         List(selection: $shop.shelf) {
             Section {
@@ -29,6 +49,9 @@ struct Sidebar: View {
                 // so it is never a selectable row.
                 SitePicker(shop: shop)
                 SignedInRow(shop: shop)
+            }
+            // ── SHOP: what it sells ───────────────────────────────────
+            Section {
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
                 // Nothing at all when nothing needs a person, rather than a
@@ -37,48 +60,32 @@ struct Sidebar: View {
                 // quantity worth printing. Seen in the running app — the row
                 // read "Dashboard 0" on a book with nothing late, which is the
                 // same thing that made Colour Studio look unfinished.
-                Row(title: shop.words.callIt("mac.dashboard"), mark: .dashboard,
+                Row(title: shop.words.callIt("mac.nav_today"), mark: .dashboard,
                     count: shop.attention.map(\.count).flatMap { $0 == 0 ? nil : $0 },
                     selected: shop.shelf == .dashboard,
                     tint: Khayt.attention)
                     .tag(Shop.Shelf.dashboard)
+                // ONE ROW FOR JOBS AND THE BOARD. Board / List is a choice in
+                // the toolbar of this screen (`JobsLayoutPicker`), and the
+                // pipeline's stage rows are the table's own stage filter, so
+                // neither is a place of its own to go to.
                 Row(title: shop.words.callIt("mac.all_jobs"), mark: .jobs,
                     count: shop.orders.count(where: shop.inSite),
-                    selected: shop.shelf == .jobs(nil))
+                    selected: shop.shelf.sameScreen(as: .jobs(nil)))
                     .tag(Shop.Shelf.jobs(nil))
-            }
-            Section(shop.words.callIt("mac.pipeline")) {
-                Row(title: shop.words.callIt("mac.board"), mark: .board,
-                    count: shop.orders.count { Stage.of($0).map { $0 != .delivered && $0 != .cancelled } ?? false },
-                    selected: shop.shelf == .board)
-                    .tag(Shop.Shelf.board)
-                ForEach(Stage.allCases) { stage in
-                    let n = shop.count(stage)
-                    // A DOT, NOT A SYMBOL — twice over.
-                    //
-                    // These nine are sub-rows under "Pipeline", and giving them
-                    // the same 16pt mark as the shelves above made them read as
-                    // nine more shelves. A dot in the stage's own colour is
-                    // both the right weight for a sub-item and the same device
-                    // the jobs table uses in its Stage column, so the two
-                    // screens agree about what a stage looks like.
-                    Row(title: shop.words.callIt(stage.key), dot: stage.tint ?? .secondary,
-                        count: n, selected: shop.shelf == .jobs(stage))
-                        .tag(Shop.Shelf.jobs(stage))
-                        // An empty stage stays visible and dimmed rather than
-                        // disappearing: a sidebar that changes shape as work
-                        // moves through it is a sidebar you cannot learn.
-                        .foregroundStyle(n == 0 ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
+                    selected: shop.shelf.sameScreen(as: .library(nil)))
+                    .tag(Shop.Shelf.library(nil))
+                // The models, below the work. A group is a set that belongs
+                // together — the seven Saudi Kings, offered as one collection —
+                // so the groups a shop has actually made are named here rather
+                // than hidden behind a filter menu.
+                ClassicSmartFolderRows(shop: shop)  // saved searches
+                ForEach(shop.groups, id: \.self) { group in
+                    Row(title: group, symbol: "square.stack", count: shop.count(group: group),
+                        selected: shop.shelf == .library(group))
+                        .tag(Shop.Shelf.library(group))
                 }
-            }
-            // The floor: what the shop prints with and prints on.
-            Section(shop.words.callIt("mac.the_floor")) {
-                Row(title: shop.words.callIt("mac.machines"), mark: .machines,
-                    count: shop.machinesInUse.count, selected: shop.shelf == .machines)
-                    .tag(Shop.Shelf.machines)
-                Row(title: shop.words.callIt("mac.inventory"), mark: .filament,
-                    count: shop.spools.count, selected: shop.shelf == .inventory)
-                    .tag(Shop.Shelf.inventory)
                 // Only for a shop that has one. A catalogue is a decision a
                 // shop makes, not a screen everybody needs, and an empty row
                 // on every launch is a row people stop seeing.
@@ -87,83 +94,87 @@ struct Sidebar: View {
                         count: shop.catalogueRows.count, selected: shop.shelf == .catalogue)
                         .tag(Shop.Shelf.catalogue)
                 }
-                // No count: "how many colours" is not a thing a shop has a
-                // number of, and the row is about the spools listed above it.
-                // No count: "how many quotes" is not a thing a shop has a
-                // number of, and this screen keeps nothing.
-                Row(title: shop.words.callIt("mac.calc_title"), mark: .calculator,
-                    count: nil, selected: shop.shelf == .calculator)
-                    .tag(Shop.Shelf.calculator)
-                Row(title: shop.words.callIt("cmix.title"), mark: .colour,
-                    count: nil, selected: shop.shelf == .colour)
-                    .tag(Shop.Shelf.colour)
-                // Cards a shop has issued. Unlike the portfolio below, the row
-                // shows even at zero: this screen has an Issue button on it, so
-                // an empty one is where you go to make the first card rather
-                // than a dead end.
-                Row(title: shop.words.callIt("giftCards"), mark: .giftCards,
-                    count: shop.giftCards.count, selected: shop.shelf == .giftCards)
-                    .tag(Shop.Shelf.giftCards)
-                // Only for a shop that has photographed something. A portfolio
-                // with nothing in it is a row that teaches people the app has
-                // an empty screen.
-                if !shop.snapshots.isEmpty {
-                    Row(title: shop.words.callIt("pf.title"), mark: .portfolio,
-                        count: shop.snapshots.count, selected: shop.shelf == .portfolio)
-                        .tag(Shop.Shelf.portfolio)
+                if shop.canShow(.customers) {
+                    Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,
+                        selected: shop.shelf == .customers)
+                        .tag(Shop.Shelf.customers)
                 }
-            }
-            // What the shop spends and what it throws away. Below the floor,
-            // because both are read at the end of a month rather than during a
-            // day's work.
-            // ── WHAT THE SHOP'S MODE INCLUDES ─────────────────────────
-            //
-            // Expense tracking and full analytics are Professional features in
-            // `lib/feature-tiers.js`, and the other app hides both from a
-            // Simple shop. This one showed them to everybody, which is two
-            // apps disagreeing about what a shop has. The waste log is not
-            // gated anywhere and stays.
-            Section(shop.words.callIt("mac.money")) {
+            } header: { eyebrow("mac.group_shop") }
+            // ── FLOOR: what the shop prints with and prints on ────────
+            Section {
+                Row(title: shop.words.callIt("mac.machines"), mark: .machines,
+                    count: shop.machinesInUse.count, selected: shop.shelf == .machines,
+                    live: shop.anySiteMachineRunning)
+                    .tag(Shop.Shelf.machines)
+                // A low-stock count replaces the total while there is one: the
+                // total is on the screen, and "2 low" is news.
+                let low = shop.lowSpools.count
+                Row(title: shop.words.callIt("mac.inventory"), mark: .filament,
+                    count: low > 0 ? low : shop.spools.count, selected: shop.shelf == .inventory,
+                    tint: low > 0 ? Khayt.late : nil)
+                    .tag(Shop.Shelf.inventory)
+                // ── WHAT THE SHOP'S MODE INCLUDES ─────────────────────
+                //
+                // Expense tracking and full analytics are Professional features in
+                // `lib/feature-tiers.js`, and the other app hides both from a
+                // Simple shop. This one showed them to everybody, which is two
+                // apps disagreeing about what a shop has.
                 if shop.has("expenses") {
                     Row(title: shop.words.callIt("mac.nav_expenses"), mark: .expenses,
                         count: shop.expenses.count, selected: shop.shelf == .expenses)
                         .tag(Shop.Shelf.expenses)
                 }
-                Row(title: shop.words.callIt("mac.nav_waste"), mark: .waste,
-                    count: shop.wasteLog.count, selected: shop.shelf == .waste)
-                    .tag(Shop.Shelf.waste)
+            } header: { eyebrow("mac.group_floor") }
+            // ── MONEY: what it is worth ───────────────────────────────
+            Section {
                 // No count: a quarter is not a thing a shop has a number of.
                 if shop.canShow(.reports) {
                     Row(title: shop.words.callIt("mac.nav_reports"), mark: .reports,
                         count: nil, selected: shop.shelf == .reports)
                         .tag(Shop.Shelf.reports)
                 }
-            }
-            if shop.canShow(.customers) {
-                Section(shop.words.callIt("mac.people")) {
-                    Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,
-                        selected: shop.shelf == .customers)
-                        .tag(Shop.Shelf.customers)
+                // No count: "how many quotes" is not a thing a shop has a
+                // number of, and this screen keeps nothing.
+                Row(title: shop.words.callIt("mac.calc_title"), mark: .calculator,
+                    count: nil, selected: shop.shelf == .calculator)
+                    .tag(Shop.Shelf.calculator)
+                DisclosureGroup(isExpanded: moreOpen) {
+                    Row(title: shop.words.callIt("mac.nav_waste"), mark: .waste,
+                        count: shop.wasteLog.count, selected: shop.shelf == .waste)
+                        .tag(Shop.Shelf.waste)
+                    // Only for a shop that has photographed something. A
+                    // portfolio with nothing in it is a row that teaches people
+                    // the app has an empty screen.
+                    if !shop.snapshots.isEmpty {
+                        Row(title: shop.words.callIt("pf.title"), mark: .portfolio,
+                            count: shop.snapshots.count, selected: shop.shelf == .portfolio)
+                            .tag(Shop.Shelf.portfolio)
+                    }
+                    // Unlike the portfolio, shown even at zero: this screen has
+                    // an Issue button on it, so an empty one is where you go
+                    // to make the first card rather than a dead end.
+                    Row(title: shop.words.callIt("giftCards"), mark: .giftCards,
+                        count: shop.giftCards.count, selected: shop.shelf == .giftCards)
+                        .tag(Shop.Shelf.giftCards)
+                    Row(title: shop.words.callIt("cmix.title"), mark: .colour,
+                        count: nil, selected: shop.shelf == .colour)
+                        .tag(Shop.Shelf.colour)
+                } label: {
+                    Text(shop.words.callIt("mac.nav_more"))
                 }
-            }
-            // The models, below the work. A group is a set that belongs
-            // together — the seven Saudi Kings, offered as one collection —
-            // so the groups a shop has actually made are named here rather
-            // than hidden behind a filter menu.
-            Section(shop.words.callIt("mac.library")) {
-                Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
-                    selected: shop.shelf == .library(nil))
-                    .tag(Shop.Shelf.library(nil))
-                ClassicSmartFolderRows(shop: shop)  // saved searches
-                ForEach(shop.groups, id: \.self) { group in
-                    Row(title: group, symbol: "square.stack", count: shop.count(group: group),
-                        selected: shop.shelf == .library(group))
-                        .tag(Shop.Shelf.library(group))
-                }
-            }
+            } header: { eyebrow("mac.group_money") }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .top, spacing: 0) { ShopCard(shop: shop) }
         .safeAreaInset(edge: .bottom) { Provenance(shop: shop) }
+    }
+
+    /// Open when asked, and open whenever the current screen is inside it.
+    private var moreOpen: Binding<Bool> {
+        Binding(
+            get: { showMore || moreShelves.contains(shop.shelf) },
+            set: { showMore = $0 }
+        )
     }
 
     private struct Row: View {
@@ -189,25 +200,25 @@ struct Sidebar: View {
         /// The colour of the count, where the count is news. Only the
         /// dashboard's is: it is how many things want a person today.
         var tint: Color?
+        /// Something is running on this screen right now: a dot in the live
+        /// colour before the count.
+        var live = false
         @Environment(\.accessibilityReduceMotion) private var reduced
 
         var body: some View {
             HStack {
-                // Deliberately NOT tinted when selected. A macOS sidebar draws
-                // its own selection as a filled accent rounded rect with white
-                // content on it; a colour set here would be that colour on top
-                // of the accent fill, which is the one place in the app where
-                // the palette cannot be checked — the snapshot runner captures
-                // this pane as a vibrancy alpha mask, so every pixel comes back
-                // black and no screenshot could show the mistake.
+                // The selected row's icon and label take the brand colour; the
+                // system draws the selection itself (an inset glass capsule on
+                // macOS 26) and this is the only ink the app adds to it.
                 // The app's own mark where it has one. `Label` is kept for the
-                // stages, so the two kinds of row still line up: a drawn mark
-                // is given the same 16pt box a symbol takes.
+                // group rows, so the two kinds of row still line up: a drawn
+                // mark is given the same 16pt box a symbol takes.
                 if let mark {
                     HStack(spacing: 6) {
                         Drawn(mark: mark, size: 16).frame(width: 18, alignment: .center)
                         Text(title)
                     }
+                    .foregroundStyle(selected ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
                 } else if let dot {
                     HStack(spacing: 6) {
                         Circle().fill(dot).frame(width: 6, height: 6)
@@ -216,14 +227,16 @@ struct Sidebar: View {
                     }
                 } else {
                     Label(title, systemImage: symbol)
+                        .foregroundStyle(selected ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
                 }
                 Spacer(minLength: 8)
+                if live {
+                    Circle().fill(Khayt.live).frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                }
                 if let count {
-                    // The coloured badge stands down on the selected row, for
-                    // the same reason the label above is not tinted: that row
-                    // is a filled accent rectangle and amber on it is a guess
-                    // nobody can check. Nothing is lost — the badge says "there
-                    // is something over there", and you are already there.
+                    // The coloured badge stands down on the selected row: it says
+                    // "there is something over there", and you are already there.
                     if let tint, count > 0, !selected {
                         Chip(text: "\(count)", tint: tint)
                     } else {
@@ -244,6 +257,73 @@ struct Sidebar: View {
             // dashboard and the floor strip.
             .animation(Motion.of(Motion.figure, unless: reduced), value: count)
         }
+    }
+}
+
+/// Which shop this is, at the top of the sidebar — and the switch between
+/// books.
+///
+/// A 32pt navy tile with the nozzle mark, the shop's name, and what is in it.
+/// It is the menu the window's toolbar used to carry (the source of the book,
+/// and Lock now while the operator lock is on), moved to where the shop's name
+/// already is. Mistaking the sample for the shop's real position is the one
+/// error this app must not allow, so when the book is not the shop's own the
+/// card says which it is.
+///
+/// Every line is one line: this is the sidebar's top inset, and a height that
+/// depended on the column's width is the loop `Provenance` explains.
+private struct ShopCard: View {
+    let shop: Shop
+
+    var body: some View {
+        if shop.needsSignIn {
+            EmptyView()
+        } else {
+            Menu {
+                if shop.lockInForce, shop.signedIn != nil {
+                    Button {
+                        shop.lockNow()
+                    } label: {
+                        Label(shop.words.callIt("mac.lock_now"), systemImage: "lock")
+                    }
+                    Divider()
+                }
+                ForEach(Shop.available) { source in
+                    Button {
+                        Task { await shop.load(source) }
+                    } label: {
+                        Label(source.title(shop.words), systemImage: source.symbol)
+                    }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Drawn(mark: .nozzle, size: 18)
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Khayt.navy, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(shop.shopName).font(.headline).lineLimit(1)
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .help(shop.source.title(shop.words))
+        }
+    }
+
+    /// "5 machines · 12 people", with the book's source in front of it when it
+    /// is not the shop's own.
+    private var subtitle: String {
+        let counts = shop.words.counting(shop.machinesInUse.count, "mac.n_machines")
+            + " \u{00B7} " + shop.words.counting(shop.customers.count, "mac.n_people")
+        return shop.source.isReal ? counts : shop.source.title(shop.words) + " \u{00B7} " + counts
     }
 }
 
@@ -271,6 +351,19 @@ private struct Provenance: View {
     private var footerLabel: String {
         guard shop.source.isReal else { return shop.words.callIt("mac.sample") }
         return shop.words.callIt(shop.canWrite ? "mac.writable" : "mac.read_only")
+    }
+    /// Green when the book is as safe as it can be told to be; amber when sync
+    /// wants a person.
+    private var saveDot: Color {
+        if shop.cloudConnected, shop.syncLine.tone == .attention { return Khayt.attention }
+        return Khayt.live
+    }
+    private var saveHelp: String {
+        var lines: [String] = []
+        lines.append(shop.lastSavedLabel)
+        lines.append(shop.words.callIt("mac.book") + " " + shop.bookFileName)
+        lines.append(shop.words.callIt("mac.sync_auto_why"))
+        return lines.joined(separator: "\n")
     }
     private var footerSymbol: String {
         guard shop.source.isReal else { return "theatermasks" }
@@ -302,6 +395,18 @@ private struct Provenance: View {
                 // resizable, so without this its height depends on the width.
                 Label(tax, systemImage: "percent").lineLimit(1).help(tax)
             }
+            if shop.productionPaused {
+                // THE ONE NOTICE THAT IS ALSO A DEAD END. The shared rule
+                // refuses a move to printing while this is set, so the notice
+                // says the floor is stopped and tapping it starts it again.
+                Label(shop.pauseReason.isEmpty
+                        ? shop.words.callIt("prod.paused_banner")
+                        : shop.words.callIt("prod.paused_banner") + " \u{2014} " + shop.pauseReason,
+                      systemImage: "pause.circle")
+                    .foregroundStyle(Khayt.attention).lineLimit(1)
+                    .help(shop.words.callIt("prod.resume"))
+                    .onTapGesture { Task { await shop.resumeProduction() } }
+            }
             if !shop.skipped.isEmpty {
                 Label(shop.words.callIt("mac.unreadable_records",
                                         ["n": .number(Double(shop.skipped.count))]),
@@ -314,23 +419,6 @@ private struct Provenance: View {
                 Label(shop.words.callIt("mac.backup_failed"), systemImage: "exclamationmark.triangle")
                     .foregroundStyle(Khayt.attention).font(.caption).lineLimit(1)
                     .help(backupProblem)
-            } else if let day = shop.lastBackup {
-                // Quiet, and always there. A shop should be able to answer
-                // "when was this last backed up" by looking, not by trusting.
-                Label(shop.words.callIt("set.last_backup") + " " + day, systemImage: "clock.arrow.circlepath")
-                    .foregroundStyle(.tertiary).font(.caption).lineLimit(1)
-            }
-            // Only for a book that expects to be in step with somewhere else.
-            // A shop that has never connected to the cloud is not missing
-            // anything, and a line telling it so is a line people stop reading.
-            // This line used to read "Not synced automatically" and never
-            // changed. It is now what sync is actually doing, because the
-            // sentence it replaced was a standing apology rather than a status.
-            if shop.cloudConnected {
-                let line = shop.syncLine
-                Label(line.text, systemImage: line.symbol)
-                    .foregroundStyle(Self.tint(line.tone)).font(.caption).lineLimit(1)
-                    .help(shop.words.callIt("mac.sync_auto_why"))
             }
             // What the app said as it died last time. One line, like every
             // other line here; the reason is in the tooltip, and clicking it
@@ -340,6 +428,12 @@ private struct Provenance: View {
                     .foregroundStyle(Khayt.attention).font(.caption).lineLimit(1)
                     .help(shop.lastCrash ?? "")
                     .onTapGesture { shop.forgetLastCrash() }
+                    // A crash is what a report is for — see `Feedback`. Not
+                    // from behind the lock: a report can carry the book.
+                    .contextMenu {
+                        Button(shop.words.callIt("mac.feedback_menu")) { shop.askForFeedback() }
+                            .disabled(shop.needsSignIn)
+                    }
             }
             if let engineProblem = shop.engineProblem {
                 // Above everything, in the one place that is on every screen.
@@ -349,7 +443,51 @@ private struct Provenance: View {
                     .lineLimit(1)
                     .help(engineProblem)
             }
-            Label(footerLabel, systemImage: footerSymbol).lineLimit(1)
+            // SAVED, AND WHERE. A green dot, the word, and what the book is
+            // saved to — the cloud's own sentence for a connected book, which
+            // says what sync is doing and carries the tone (amber when it needs
+            // a person), and otherwise whether this book can be written to.
+            // The backup date is the tooltip: "when" is for the curious, and
+            // "is it safe" is the dot.
+            if shop.backupProblem == nil {
+                HStack(spacing: 6) {
+                    Circle().fill(saveDot).frame(width: 7, height: 7)
+                    Text(shop.words.callIt("mac.nav_saved"))
+                        .foregroundStyle(.primary).lineLimit(1)
+                    Text(shop.cloudConnected ? shop.syncLine.text : footerLabel)
+                        .foregroundStyle(shop.cloudConnected ? Self.tint(shop.syncLine.tone) : AnyShapeStyle(.secondary))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .help(saveHelp)
+                .contentShape(Rectangle())
+                // Where people look for the cloud, so it is where the cloud can
+                // be handled: a click unlocks it (or checks it once it is
+                // unlocked), and a right-click has every cloud action.
+                .onTapGesture {
+                    // The cloud is the owner's (`cloud` in lib/rbac.js).
+                    guard shop.cloudConnected, shop.lockAllows("cloud", "edit") else { return }
+                    if shop.cloudUnlocked { shop.checkingCloud = true } else { shop.signingIntoCloud = true }
+                }
+                .contextMenu {
+                    if shop.cloudConnected {
+                        Button(shop.words.callIt("mac.cloud_sign_in") + "\u{2026}") { shop.signingIntoCloud = true }
+                        Button(shop.words.callIt("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
+                        Button(shop.words.callIt("mac.lock_cloud")) { shop.forgetCloudKey() }
+                            .disabled(!shop.cloudUnlocked)
+                        Divider()
+                        Button(shop.words.callIt("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
+                    }
+                }
+                .disabled(shop.cloudConnected && !shop.lockAllows("cloud", "edit"))
+            }
+            // The book's mode, on its own line where the line above is busy
+            // saying something else (the cloud's state, or a failed backup).
+            if shop.cloudConnected {
+                Label(footerLabel, systemImage: footerSymbol).lineLimit(1)
+            } else if shop.backupProblem != nil {
+                Label(footerLabel, systemImage: footerSymbol).lineLimit(1)
+            }
             // Who else has it open. Only shown when somebody does — a line that
             // says "nobody else is using this" on every ordinary launch is a
             // line people stop reading.
