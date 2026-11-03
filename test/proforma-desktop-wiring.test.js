@@ -26,7 +26,7 @@ test('a proforma draws no ZATCA QR, is not auto-submitted, and reaches the docum
   const body = fn(read('renderer/invoicing.js'), 'async function renderInvoiceForOrder(');
   assert.match(body, /settings\.enableZatca && !proforma/);
   assert.match(body, /if \(!proforma\) maybeAutoSubmitZatca\(order\)/);
-  assert.match(body, /renderInvoice\(order, \{[^}]*\bproforma \}\)/);
+  assert.match(body, /renderInvoice\(order, \{[^}]*\bproforma(, milestone)? \}\)/);
   assert.match(body, /proforma \? String\(order\.id\) : invoiceDocNumber\(order\)/);
 });
 
@@ -34,4 +34,14 @@ test('no stylesheet rule fights the document\'s own watermark', () => {
   // The document's watermark is inline-styled; the old rule's transform moved
   // its full-page overlay off the paper.
   assert.doesNotMatch(read('renderer/styles.css'), /\.proforma-watermark/);
+});
+
+test('a milestone reaches the document as a proforma, never on its own', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '../renderer/invoicing.js'), 'utf8');
+  assert.match(src, /const milestone = proforma && opts\.milestone \? opts\.milestone : null;/);
+  assert.match(src, /renderInvoice\(order, \{[^}]*\bproforma, milestone \}\)/);
+  const gen = src.slice(src.indexOf('async function generateMilestoneInvoice'));
+  assert.match(gen.slice(0, 1500), /renderInvoiceForOrder\(order, \{\s*proforma: true,\s*milestone:/);
 });
