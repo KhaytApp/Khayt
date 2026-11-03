@@ -847,7 +847,9 @@ function wireEvents() {
   const clientInput = $('#clientInput');
   clientInput.addEventListener('focus', renderClientSuggestions);
   clientInput.addEventListener('input', () => {
+    const hadClient = currentClientId !== null;
     currentClientId = null; // typing implies new/different client
+    if (hadClient) updateGrandTotal();
     renderClientSuggestions();
   });
   clientInput.addEventListener('blur', hideClientSuggestions);
@@ -872,6 +874,9 @@ function wireEvents() {
             && KhaytPriceAgreements.apply(currentBuild, c.priceList) > 0) {
           renderBuild(); updateGrandTotal(); toast(t('ce.pl_autofill'), 'info', 2000);
         }
+        // The client's currency changes what the job is saved as (the line
+        // under the total), so the total is redrawn for every client picked.
+        updateGrandTotal();
       }
     } else if (item.dataset.act === 'cl-new') {
       // Open client editor with name pre-filled
