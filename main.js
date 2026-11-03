@@ -6351,10 +6351,10 @@ ipcMain.handle('hub:cloud-verify-email', async (_e, { url, email, code } = {}) =
 });
 
 // Customer portal: publish/unpublish an owner-curated (plaintext) item; list actions.
-ipcMain.handle('hub:cloud-publish', async (_e, { url, shopId, token, pubToken, kind, payload, customerEmail } = {}) => {
+ipcMain.handle('hub:cloud-publish', async (_e, { url, shopId, token, pubToken, kind, payload, customerEmail, intakeId } = {}) => {
   try {
     token = cloudToken(token, url);
-    return { ok: true, ...(await cloudClient.publishPortal(url, shopId, token, pubToken, kind, payload, customerEmail)) };
+    return { ok: true, ...(await cloudClient.publishPortal(url, shopId, token, pubToken, kind, payload, customerEmail, intakeId)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 

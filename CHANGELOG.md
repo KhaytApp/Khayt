@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a job from the quote form tells Khayt Cloud which request it came from.** Publishing such a job to its customer page now sends the request's id beside the page (Cloud #157), so Khayt Cloud can email the customer their link once. Jobs that did not come in through the form send nothing new. The id itself comes from `lib/portal-refresh.js` once the Mac's #2171 lands.
+
 - **Desktop: your shop's payment link, in Settings ▸ Khayt Cloud.** Paste the https link from your payment provider (with an optional label) and your customer pages show Pay deposit, Pay balance or Pay beside it; `{amount}` in the link is replaced by what is due (Khayt Cloud #155). It is the shop's, so it is read from the cloud each time the section opens, and only the owner or a manager sees it. Save and Remove say what the cloud answered. The Mac has the same section (Settings ▸ Online).
 
 - **iPhone: proforma invoices, as on the Mac.** A priced job that is accepted and not yet finished (pending, on hold, printing, post-processing or inspection) has a Proforma invoice card on its page. It opens the shared document with its `proforma` option, ready to share as a PDF: titled and watermarked as a proforma, with no ZATCA QR and the job's own id as its number. Making one numbers nothing, so it works even for a job still waiting for the Mac to give it an invoice number.
