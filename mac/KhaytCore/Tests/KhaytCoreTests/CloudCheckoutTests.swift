@@ -28,10 +28,11 @@ struct CloudCheckoutTests {
 
     final class Opened: @unchecked Sendable { var urls: [URL] = [] }
 
-    @Test("billing-provider-off hides the pay button for the session and is not asked again")
-    func providerOffHides() async {
+    @Test("billing-provider-off and beta-running hide the pay button for the session and are not asked again",
+          arguments: ["billing-provider-off", "beta-running"])
+    func providerOffHides(reason: String) async {
         let cloud = Cloud()
-        cloud.routes = [("POST /v1/billing/checkout", { _ in (409, #"{"reason":"billing-provider-off"}"#) })]
+        cloud.routes = [("POST /v1/billing/checkout", { _ in (409, #"{"reason":""# + reason + #""}"#) })]
         let gate = CloudCheckout.Gate()
         let opened = Opened()
         #expect(!gate.providerOff)

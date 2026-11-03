@@ -97,6 +97,10 @@ public enum CloudCheckout {
     }
 
     /// Whether the pay button is on offer. Starts true; one 409
+    /// The 409 reasons that hide the pay button until the app is quit: no
+    /// payment provider, or the beta still running (khayt-cloud #163).
+    public static let hidesPay: Set<String> = ["billing-provider-off", "beta-running"]
+
     /// `billing-provider-off` turns it off until the app is quit.
     public final class Gate: @unchecked Sendable {
         private let lock = NSLock()
@@ -161,7 +165,7 @@ public enum CloudCheckout {
         do {
             started = try await start(plan: plan, period: period, connection, token: token, fetch: fetch)
         } catch let r as CloudPlans.Refusal {
-            if r.status == 409 && r.reason == "billing-provider-off" { gate.noteProviderOff(); return .providerOff }
+            if r.status == 409, Self.hidesPay.contains(r.reason ?? "") { gate.noteProviderOff(); return .providerOff }
             return .refused(r)
         } catch {
             return Task.isCancelled ? .cancelled : .unreachable
