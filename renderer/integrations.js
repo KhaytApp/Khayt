@@ -1273,7 +1273,7 @@ function republishPortalIfPublished(orderId) {
   Promise.resolve(window.hubAPI.cloudPublish({
     url: c.url, shopId: c.shopId, token: c.token,
     pubToken: req.pubToken, kind: req.kind, payload: req.payload,
-    customerEmail: req.customerEmail,
+    customerEmail: req.customerEmail, intakeId: req.intakeId,
   })).catch((e) => console.error('portal auto-refresh:', e));
 }
 
@@ -1421,13 +1421,13 @@ async function publishOrderToCloudPortal(orderId) {
     return;
   }
 
-  const { kind, payload, customerEmail } = buildPortalPayload(order);
+  const { kind, payload, customerEmail, intakeId } = buildPortalPayload(order);
   // The dialog below speaks of a quote or an order in several places; the
   // module already decided which this is, so read it from there rather than
   // testing the status a second time.
   const isQuote = kind === 'quote';
 
-  const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail });
+  const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail, intakeId });
   if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 

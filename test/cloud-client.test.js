@@ -525,3 +525,28 @@ test('injected separators are percent-encoded on the wire, not real slashes', as
   }
 });
 
+
+test('publishing a job from the quote form names its request top level, never in the payload (Cloud #157)', async () => {
+  const bodies = [];
+  const srv = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      bodies.push(JSON.parse(raw || '{}'));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true}');
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    await cc.publishPortal(url, 'SHOP', 'tok', 'trk_1', 'order', { id: 'o1' }, 'a@b.co', 'in_42');
+    await cc.publishPortal(url, 'SHOP', 'tok', 'trk_2', 'order', { id: 'o2' }, 'a@b.co');
+    assert.equal(bodies[0].intakeId, 'in_42');
+    assert.equal(bodies[0].payload.intakeId, undefined, 'never inside the payload');
+    assert.equal(bodies[0].customerEmail, 'a@b.co');
+    assert.ok(!('intakeId' in bodies[1]), 'absent on a job that did not come in through the form');
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
