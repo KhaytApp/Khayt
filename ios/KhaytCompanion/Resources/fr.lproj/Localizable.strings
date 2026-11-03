@@ -998,3 +998,13 @@
 /* Rush, machine job */
 "orders.rush" = "Urgent";
 "machines.job" = "Tâche : %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "Nouveau";
+"new.job.detail" = "Client, pièces et prix";
+"new.quote_file.detail" = "Un 3MF ou STL, chiffré";
+"new.spool.detail" = "Scanner, lire la puce ou saisir";
+"new.calculator.detail" = "Chiffrer une impression à la main";
+"new.expense.detail" = "Photo du reçu";
+"new.waste.detail" = "Impression ratée ou purge";
+"new.more" = "Plus";

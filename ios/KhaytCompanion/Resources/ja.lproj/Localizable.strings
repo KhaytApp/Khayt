@@ -998,3 +998,13 @@
 /* Rush, machine job */
 "orders.rush" = "特急";
 "machines.job" = "ジョブ: %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "新規";
+"new.job.detail" = "顧客・パーツ・価格";
+"new.quote_file.detail" = "3MF・STLから見積もり";
+"new.spool.detail" = "スキャン・タグ・手入力";
+"new.calculator.detail" = "手入力で見積もり";
+"new.expense.detail" = "レシートを撮影";
+"new.waste.detail" = "失敗した印刷やパージ";
+"new.more" = "その他";

@@ -998,3 +998,13 @@
 /* Rush, machine job */
 "orders.rush" = "Acele";
 "machines.job" = "İş: %@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "Yeni";
+"new.job.detail" = "Müşteri, parçalar ve fiyat";
+"new.quote_file.detail" = "3MF veya STL, fiyatıyla";
+"new.spool.detail" = "Tara, etiketi oku ya da yaz";
+"new.calculator.detail" = "Baskıyı elle fiyatla";
+"new.expense.detail" = "Fişin fotoğrafı";
+"new.waste.detail" = "Başarısız baskı veya tasfiye";
+"new.more" = "Diğer";

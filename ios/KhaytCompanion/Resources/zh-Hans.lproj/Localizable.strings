@@ -998,3 +998,13 @@
 /* Rush, machine job */
 "orders.rush" = "加急";
 "machines.job" = "作业：%@";
+
+/* The New sheet (redesign phase 2). */
+"new.title" = "新建";
+"new.job.detail" = "客户、零件和价格";
+"new.quote_file.detail" = "3MF 或 STL，直接报价";
+"new.spool.detail" = "扫码、读标签或手动输入";
+"new.calculator.detail" = "手动计算价格";
+"new.expense.detail" = "拍下收据";
+"new.waste.detail" = "打印失败或冲料";
+"new.more" = "更多";

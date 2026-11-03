@@ -7,11 +7,9 @@ import SwiftUI
 /// the book cannot answer is an em-dash captioned "On the Mac" (see
 /// `BookReader.pulse`), never a zero.
 ///
-/// One departure from the prototype, on purpose: the header keeps a **+** menu
-/// for Quote, Waste, Expense and Add spool. Those ship today and the prototype
-/// has not placed them yet ("Left: waste, expense, quote" in its own notes);
-/// dropping them from home would take features away to match a design that has
-/// not got to them.
+/// The header's **+** opens the redesign's New sheet (`NewSheet`): a new job,
+/// a file to quote, a spool, the calculator, an expense, waste, and below them
+/// the rest of what the old + menu held.
 struct DashboardView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
@@ -44,6 +42,11 @@ struct DashboardView: View {
     @State private var scannedSpool: InventorySpool?
     @State private var labelProblem: String?
     @State private var showSettings = false
+    /// The New sheet, and what was picked in it — presented once it closes.
+    @State private var showNew = false
+    @State private var newChoice: NewSheet.Choice?
+    @State private var showNewOrder = false
+    @State private var machines: [MachineInfo] = []
     /// Settings is a sidebar-only tab (see `MainTabView`). Where there is no
     /// sidebar — compact width: an iPhone, iPhone Duo's outer display — it
     /// opens from here.
@@ -87,6 +90,12 @@ struct DashboardView: View {
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showNew, onDismiss: openNewChoice) {
+                NewSheet(holdsBook: api.holdsBook) { newChoice = $0 }
+            }
+            .sheet(isPresented: $showNewOrder) {
+                NewOrderSheet(machines: machines) { Task { await load() } }
+            }
             .sheet(isPresented: $showAddSpool) { AddSpoolSheet { Task { await load() } } }
             .sheet(isPresented: $showQuote) { CalculatorScreen(asSheet: true) }
             .sheet(isPresented: $showLibrary) { LibraryView() }
@@ -110,6 +119,28 @@ struct DashboardView: View {
             .navigationDestination(item: $openOrder) { order in
                 OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
             }
+        }
+    }
+
+    /// What the New sheet chose, once it has closed.
+    private func openNewChoice() {
+        guard let choice = newChoice else { return }
+        newChoice = nil
+        switch choice {
+        case .job:
+            Task {
+                if machines.isEmpty { machines = (try? await api.fetchMachines()) ?? [] }
+                showNewOrder = true
+            }
+        case .quoteFile: pickingModel = true
+        case .spool: showAddSpool = true
+        case .calculator: showQuote = true
+        case .expense: showExpense = true
+        case .waste: showWaste = true
+        case .scanLabel: scanningLabel = true
+        case .library: showLibrary = true
+        case .catalogue: showCatalogue = true
+        case .endOfDay: showEndOfDay = true
         }
     }
 
@@ -200,27 +231,14 @@ struct DashboardView: View {
             }
             .accessibilityLabel(L10n.tr("feed.title"))
             .accessibilityValue(feed.unreadCount > 0 ? L10n.format("feed.unread_count", feed.unreadCount) : "")
-            Menu {
-                Button { showQuote = true } label: { Label(L10n.tr("home.action.calculator"), systemImage: "function") }
-                Button { showWaste = true } label: { Label(L10n.tr("home.action.waste"), systemImage: "trash") }
-                Button { showExpense = true } label: { Label(L10n.tr("home.action.expense"), systemImage: "doc.text.viewfinder") }
-                Button { showAddSpool = true } label: { Label(L10n.tr("home.action.add_spool"), systemImage: "cylinder") }
-                Button { scanningLabel = true } label: { Label(L10n.tr("scan.label.title"), systemImage: "qrcode.viewfinder") }
-                Button { pickingModel = true } label: { Label(L10n.tr("quote.file.pick"), systemImage: "cube") }
-                Button { showLibrary = true } label: { Label(L10n.tr("library.price"), systemImage: "books.vertical") }
-                Button { showCatalogue = true } label: { Label(L10n.tr("catalogue.title"), systemImage: "shippingbox") }
-                if api.holdsBook {
-                    Button { showEndOfDay = true } label: { Label(L10n.tr("eod.title"), systemImage: "moon.stars") }
-                }
-            } label: {
+            Button { showNew = true } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(KhaytDesign.ink)
+                    .foregroundStyle(KhaytDesign.onBrand)
                     .frame(width: 44, height: 44)
-                    .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+                    .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 12))
             }
-            .accessibilityLabel(L10n.tr("home.quick_actions"))
+            .accessibilityLabel(L10n.tr("new.title"))
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
