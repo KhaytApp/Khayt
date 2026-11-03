@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "La date de facture dans le code est illisible.";
 
 "Price a part" = "Chiffrer une pièce";
-"home.calculator.sub" = "Ce qu’une pièce vous coûte et ce qu’il faut facturer";
 
 /* Library */
 "library.title" = "Bibliothèque";
 "library.price" = "Prix depuis la bibliothèque";
-"home.library.sub" = "Retrouvez un modèle déjà imprimé et chiffrez-le.";
 "library.search" = "Rechercher modèles, dossiers, tags";
 "library.folders" = "Dossiers";
 "library.models" = "Modèles";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Votre propre prix";
 "catalogue.price.rounded" = "Arrondi à partir du prix calculé";
 "catalogue.price.calculated" = "Calculé";
-"home.catalogue.sub" = "Ce que vous vendez, avec prix et stock";
 
 /* Invoices */
 "invoice.title" = "Facture";

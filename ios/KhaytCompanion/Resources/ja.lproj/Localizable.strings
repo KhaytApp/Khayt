@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "コード内の請求書日付を読み取れません。";
 
 "Price a part" = "パーツの価格を計算";
-"home.calculator.sub" = "パーツの原価と請求額";
 
 /* Library */
 "library.title" = "ライブラリ";
 "library.price" = "ライブラリから価格を計算";
-"home.library.sub" = "過去に印刷したモデルを探して価格を計算します。";
 "library.search" = "モデル、フォルダ、タグを検索";
 "library.folders" = "フォルダ";
 "library.models" = "モデル";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "独自価格";
 "catalogue.price.rounded" = "計算価格から端数処理";
 "catalogue.price.calculated" = "計算価格";
-"home.catalogue.sub" = "販売する製品と価格・在庫";
 
 /* Invoices */
 "invoice.title" = "請求書";

@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "تعذّرت قراءة تاريخ الفاتورة في الرمز.";
 
 "Price a part" = "تسعير قطعة";
-"home.calculator.sub" = "تكلفة القطعة عليك، وكم تطلب مقابلها";
 
 /* Library */
 "library.title" = "المكتبة";
 "library.price" = "تسعير من المكتبة";
-"home.library.sub" = "ابحث عن نموذج طبعته من قبل وسعّره.";
 "library.search" = "ابحث في النماذج والمجلدات والوسوم";
 "library.folders" = "المجلدات";
 "library.models" = "النماذج";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "سعرك الخاص";
 "catalogue.price.rounded" = "مقرّب من السعر المحسوب";
 "catalogue.price.calculated" = "محسوب";
-"home.catalogue.sub" = "ما تبيعه، بأسعاره ومخزونه";
 
 /* Invoices */
 "invoice.title" = "الفاتورة";

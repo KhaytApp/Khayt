@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "Não é possível ler a data da nota no código.";
 
 "Price a part" = "Orçar uma peça";
-"home.calculator.sub" = "Quanto uma peça custa para você e quanto cobrar por ela";
 
 /* Library */
 "library.title" = "Biblioteca";
 "library.price" = "Preço pela biblioteca";
-"home.library.sub" = "Encontre um modelo que você já imprimiu e dê um preço a ele.";
 "library.search" = "Buscar modelos, pastas, tags";
 "library.folders" = "Pastas";
 "library.models" = "Modelos";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Seu próprio preço";
 "catalogue.price.rounded" = "Arredondado a partir do preço calculado";
 "catalogue.price.calculated" = "Calculado";
-"home.catalogue.sub" = "O que você vende, com preços e estoque";
 
 /* Invoices */
 "invoice.title" = "Fatura";

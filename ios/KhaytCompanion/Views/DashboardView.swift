@@ -150,9 +150,6 @@ struct DashboardView: View {
     @ViewBuilder private var figures: some View {
         money.padding(.top, 14)
         counts.padding(.top, 10)
-        if widthClass == .compact { calculatorRow }
-        libraryRow
-        catalogueRow
         section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
         lanes
     }
@@ -241,17 +238,16 @@ struct DashboardView: View {
         .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
 
-    /// "TUESDAY 3 NOVEMBER · SHOP NAME" — Gregorian whatever the phone's
-    /// calendar, as the book is (see `khayt-ios-calendar-and-digits`).
+    /// "TUESDAY 3 NOVEMBER" — Gregorian whatever the phone's calendar, as the
+    /// book is. The shop's name stays off it: beside three buttons it cut the
+    /// date short.
     private var dateLine: String {
         var style = Date.FormatStyle(date: .omitted, time: .omitted, locale: L10n.locale,
                                      calendar: Calendar(identifier: .gregorian))
             .weekday(.wide).day().month(.wide)
         style.timeZone = .current
         let date = Date().formatted(style)
-        let shop = settings.shopLabel
-        let line = shop.isEmpty ? date : date + " · " + shop
-        return L10n.usesArabicLayout ? line : line.uppercased()
+        return L10n.usesArabicLayout ? date : date.uppercased()
     }
 
     // MARK: - Counts and money
@@ -350,56 +346,6 @@ struct DashboardView: View {
     }
 
     private var currencyNote: String { pulse?.currency.map(Money.mark) ?? "" }
-
-    /// The calculator, one tap from Home: a shop asked "what would this cost?"
-    /// over the counter reaches for it daily, and the header has no room left
-    /// (a fourth button cut the shop's name to "Shop…"). In regular width it
-    /// is a tab of its own (`MainTabView.calculatorTab`).
-    private var calculatorRow: some View {
-        shortcutRow(icon: "function", title: L10n.tr("tab.calculator"), sub: L10n.tr("home.calculator.sub")) { showQuote = true }
-    }
-
-    /// The library, one tap from Home: "what would that model cost?" is the
-    /// same counter question, about something the shop has printed before.
-    private var libraryRow: some View {
-        shortcutRow(icon: "books.vertical", title: L10n.tr("library.title"), sub: L10n.tr("home.library.sub")) { showLibrary = true }
-    }
-
-    private var catalogueRow: some View {
-        shortcutRow(icon: "shippingbox", title: L10n.tr("catalogue.title"), sub: L10n.tr("home.catalogue.sub")) { showCatalogue = true }
-    }
-
-    private func shortcutRow(icon: String, title: String, sub: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(KhaytDesign.brand)
-                    .frame(width: 36, height: 36)
-                    .background(KhaytDesign.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.khayt(15, .semibold, relativeTo: .body))
-                        .foregroundStyle(KhaytDesign.ink)
-                    Text(sub)
-                        .font(.khayt(12.5, relativeTo: .footnote))
-                        .foregroundStyle(KhaytDesign.note)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(KhaytDesign.note)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-    }
 
     // MARK: - Pipeline
 
@@ -595,7 +541,7 @@ struct DashboardView: View {
         #if DEBUG
         for (name, show) in [("quote", { showQuote = true }), ("waste", { showWaste = true }),
                              ("expense", { showExpense = true }), ("addspool", { showAddSpool = true }),
-                             ("intake", { showIntake = true }), ("settings", { showSettings = true }),
+                             ("intake", { showIntake = true }), ("settings", { showSettings = true }), ("new", { showNew = true }),
                              ("library", { showLibrary = true }), ("catalogue", { showCatalogue = true })] as [(String, () -> Void)] {
             if KhaytCompanionApp.ScreenshotOpen.take(name) != nil { show() }
         }

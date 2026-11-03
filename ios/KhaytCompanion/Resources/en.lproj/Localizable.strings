@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "The invoice date in the code cannot be read.";
 
 "Price a part" = "Price a part";
-"home.calculator.sub" = "What a part costs you, and what to charge for it";
 
 /* Library */
 "library.title" = "Library";
 "library.price" = "Price from the library";
-"home.library.sub" = "Find a model you've printed before and price it.";
 "library.search" = "Search models, folders, tags";
 "library.folders" = "Folders";
 "library.models" = "Models";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Your own price";
 "catalogue.price.rounded" = "Rounded from the calculated price";
 "catalogue.price.calculated" = "Calculated";
-"home.catalogue.sub" = "What you sell, with prices and stock";
 
 /* Invoices */
 "invoice.title" = "Invoice";

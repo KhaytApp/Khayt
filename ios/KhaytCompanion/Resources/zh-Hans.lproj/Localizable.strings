@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "无法读取二维码中的发票日期。";
 
 "Price a part" = "为零件定价";
-"home.calculator.sub" = "零件的成本以及应收价格";
 
 /* Library */
 "library.title" = "库";
 "library.price" = "按模型库定价";
-"home.library.sub" = "找到你之前打印过的模型并为其定价。";
 "library.search" = "搜索模型、文件夹、标签";
 "library.folders" = "文件夹";
 "library.models" = "模型";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "自定价格";
 "catalogue.price.rounded" = "按计算价格取整";
 "catalogue.price.calculated" = "计算所得";
-"home.catalogue.sub" = "你销售的产品，含价格和库存";
 
 /* Invoices */
 "invoice.title" = "发票";

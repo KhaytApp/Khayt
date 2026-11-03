@@ -803,12 +803,10 @@
 "exp.qr.reason.bad_timestamp" = "Koddaki fatura tarihi okunamıyor.";
 
 "Price a part" = "Bir parçayı fiyatla";
-"home.calculator.sub" = "Bir parçanın size maliyeti ve ne kadar isteyeceğiniz";
 
 /* Library */
 "library.title" = "Kitaplık";
 "library.price" = "Kitaplıktan fiyatla";
-"home.library.sub" = "Daha önce bastığınız bir model bulun ve fiyatlayın.";
 "library.search" = "Model, klasör, etiket ara";
 "library.folders" = "Klasörler";
 "library.models" = "Modeller";
@@ -849,7 +847,6 @@
 "catalogue.price.override" = "Kendi fiyatınız";
 "catalogue.price.rounded" = "Hesaplanan fiyattan yuvarlandı";
 "catalogue.price.calculated" = "Hesaplanan";
-"home.catalogue.sub" = "Sattıklarınız, fiyat ve stokla";
 
 /* Invoices */
 "invoice.title" = "Fatura";
