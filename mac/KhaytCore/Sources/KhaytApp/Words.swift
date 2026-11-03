@@ -1710,7 +1710,6 @@ final class Words {
         "mac.plan_name_free": ["en": "Free", "ar": "المجانية"],
         "mac.plan_per_month": ["en": "{price} a month", "ar": "{price} شهرياً"],
         "mac.plan_per_year": ["en": "{price} a year", "ar": "{price} سنوياً"],
-        "mac.plan_vat_included": ["en": "Prices include VAT.", "ar": "الأسعار شاملة ضريبة القيمة المضافة."],
         "mac.plan_vault": ["en": "Vault {size}", "ar": "خزنة \u{2068}{size}\u{2069}"],
         "mac.plan_links": ["en": "{n} share links", "ar": "\u{2068}{n}\u{2069} رابط مشاركة"],
         "mac.plan_links_one": ["en": "{n} share link", "ar": "رابط مشاركة واحد"],

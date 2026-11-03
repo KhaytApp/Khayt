@@ -1998,7 +1998,6 @@
  "mac.plan_title": "Plan de Khayt Cloud",
  "mac.plan_unavailable": "Khayt Cloud no puede cambiar de plan para este taller ahora mismo.",
  "mac.plan_upgrade": "Mejorar",
- "mac.plan_vat_included": "Los precios incluyen VAT.",
  "mac.plan_vault": "Vault {size}",
  "mac.plate_chip": "{n} · {time} · {grams} g",
  "mac.plate_n": "Placa {n}",

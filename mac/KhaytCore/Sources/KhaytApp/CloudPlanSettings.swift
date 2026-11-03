@@ -89,9 +89,6 @@ struct CloudPlanSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(catalogue.plans) { plan in row(plan) }
-                if catalogue.pricesInclusive == true {
-                    Text(shop.words.callIt("mac.plan_vat_included")).font(.caption).foregroundStyle(.secondary)
-                }
                 if !shop.cloudIsOwner {
                     Text(shop.words.callIt("mac.plan_owner_only")).font(.caption).foregroundStyle(.secondary)
                 } else if !upgradesOpen {

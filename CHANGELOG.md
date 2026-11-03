@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: plan prices no longer say "VAT included".** Khayt is not VAT-registered and charges no VAT on its own plans, so the note under the plan list and in the payment sheet is gone (in every language). The shop's own VAT settings are unchanged.
+
 - **Mac: a weekly email switch and a way to pay for a plan, in Settings ▸ Online.** The shop's owner gets a "Weekly email" switch (Sundays: last week's order requests, quotes, messages, payments and reviews); while Khayt Cloud has weekly emails switched off it says plainly that none are being sent yet, and the choice is still saved. Plans that cost money also get a Pay… button: pick a month or a year, finish on the payment page that opens in the browser, and the plan updates here when the payment is confirmed (failed and under-review payments are said too). Prices come from Khayt Cloud, and until Khayt Cloud has a payment provider the Pay… button hides itself for the session. Mac only; the iPhone app shows no pay buttons.
 
 - **Mac: a quote-form customer is emailed their tracking link, and the shop's payment link lives in Settings ▸ Online.** Every publish of a job that came from an intake request now sends the request's id beside the payload, so Khayt Cloud emails the customer their link once (the id is never part of the public page). A new Payment link section holds the shop's own https payment link and an optional label; the customer's page shows Pay deposit, Pay balance or Pay beside it, with `{amount}` in the link filled in. The owner or a manager can save or remove it; anyone else sees it read-only, and the cloud's own message is shown when it refuses a link.

@@ -140,7 +140,6 @@ struct PlanPaySheet: View {
             } else if let line = priceLine(period) {
                 Text(line)
             }
-            Text(shop.words.callIt("mac.plan_vat_included")).font(.caption).foregroundStyle(.secondary)
             if waiting {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
