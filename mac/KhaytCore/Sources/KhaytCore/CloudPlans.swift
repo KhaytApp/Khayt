@@ -37,7 +37,7 @@ public enum CloudPlans {
     public struct Plan: Decodable, Sendable, Equatable, Identifiable {
         public let name: String
         public let label: String
-        /// VAT included (`pricesInclusive`). nil when the plan has no price.
+        /// Net of VAT. nil when the plan has no price.
         public let priceSar: Double?
         public let priceUsd: Double?
         public let annualSar: Double?
@@ -74,7 +74,12 @@ public enum CloudPlans {
         public let plans: [Plan]
         public let defaultPlan: String?
         public let pricesInclusive: Bool?
+        /// `added-by-country`: prices are net and VAT is added at checkout where due.
+        public let vat: String?
         public let beta: Beta?
+
+        /// Prices are before VAT, with VAT added at checkout by billing country.
+        public var vatAddedAtCheckout: Bool { vat == "added-by-country" || pricesInclusive == false }
 
         public var freePlan: String { defaultPlan ?? "free" }
     }

@@ -64,8 +64,71 @@ public enum CloudCheckout {
         public let url: URL
         public let plan: String
         public let period: String
+        /// What the cloud charges: the total, VAT in when it is added.
         public let amountSar: String
         public let currency: String
+        /// The billing country and the split the checkout was quoted at. nil
+        /// from a cloud that does not send them yet.
+        public let country: String?
+        public let netSar: Double?
+        public let vatSar: Double?
+        public let vatRate: Double?
+        public let totalSar: Double?
+        public let vatAdded: Bool?
+
+        /// The charge to say: `totalSar`, else the `amountSar` the cloud sent.
+        public var total: Double? { totalSar ?? Double(amountSar) }
+    }
+
+    /// `GET /v1/billing/price`: what one period costs a buyer in one country.
+    /// Prices are net; `vatAdded` is true only where Khayt is registered.
+    public struct Quote: Equatable, Sendable {
+        public let plan: String
+        public let period: String
+        public let country: String
+        public let netSar: Double
+        public let vatSar: Double
+        /// A fraction: 0.15 is 15%.
+        public let vatRate: Double
+        public let totalSar: Double
+        public let currency: String
+        public let vatAdded: Bool
+
+        /// The rate as a percentage figure without a stray zero: 15, 7.5.
+        public var ratePercent: Double { (vatRate * 1000).rounded() / 10 }
+    }
+
+    /// Reads a SAR figure the cloud may send as "25.00" or as 25.
+    static func number(_ v: Any?) -> Double? {
+        if let d = v as? Double { return d }
+        if let s = v as? String { return Double(s) }
+        return nil
+    }
+
+    /// An ISO 3166 alpha-2 code, upper-cased; nil for anything else.
+    public static func countryCode(_ text: String?) -> String? {
+        guard let t = text?.trimmingCharacters(in: .whitespaces).uppercased(), t.count == 2,
+              t.unicodeScalars.allSatisfy({ ("A"..."Z").contains($0) }) else { return nil }
+        return t
+    }
+
+    /// The public price lookup: no token.
+    public static func quote(plan: String, period: Period, country: String, baseURL: String,
+                             fetch: S3.Fetch) async throws -> Quote {
+        guard let cc = countryCode(country) else {
+            throw CloudPlans.Refusal(status: 400, reason: "country-required", error: "")
+        }
+        let request = try CloudPlans.plain(baseURL, "/v1/billing/price?plan=" + plan.uriComponent
+                                           + "&period=" + period.rawValue + "&country=" + cc)
+        let (data, response) = try await fetch(request)
+        try CloudPlans.check(S3.status(response), data)
+        guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let total = number(o["totalSar"]) else { throw VaultClient.Failure.badReply("price") }
+        return Quote(plan: (o["plan"] as? String) ?? plan, period: (o["period"] as? String) ?? period.rawValue,
+                     country: (o["country"] as? String) ?? cc,
+                     netSar: number(o["netSar"]) ?? total, vatSar: number(o["vatSar"]) ?? 0,
+                     vatRate: number(o["vatRate"]) ?? 0, totalSar: total,
+                     currency: (o["currency"] as? String) ?? "SAR", vatAdded: (o["vatAdded"] as? Bool) ?? false)
     }
 
     public enum State: String, Sendable { case pending, paid, failed, mismatch, error }
@@ -74,6 +137,10 @@ public enum CloudCheckout {
         public let state: State
         public let periodEnd: String?
         public let receiptNo: String?
+        public let country: String?
+        public let netSar: Double?
+        public let vatSar: Double?
+        public let vatRate: Double?
     }
 
     /// How an attempt ended, for the sheet to say.
@@ -85,6 +152,8 @@ public enum CloudCheckout {
         case mismatch(id: String)
         /// The cloud has no payment provider yet: hide the pay button.
         case providerOff
+        /// The cloud wants a billing country (400 `country-required`).
+        case countryRequired
         /// `billing-off` / `not-for-sale` / `no-account`, or any other refusal.
         case refused(CloudPlans.Refusal)
         /// The browser would not open.
@@ -118,14 +187,15 @@ public enum CloudCheckout {
     public static let defaultDelays: [Duration] = [.seconds(3), .seconds(3), .seconds(4)]
         + Array(repeating: .seconds(5), count: 117)
 
-    public static func start(plan: String, period: Period, _ connection: CloudReader.Connection,
+    public static func start(plan: String, period: Period, country: String? = nil, _ connection: CloudReader.Connection,
                              token: String, fetch: S3.Fetch) async throws -> Started {
         var request = try CloudPlans.plain(connection.url, "/v1/billing/checkout")
         request.httpMethod = "POST"
         request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject:
-            ["shopId": connection.shopId, "plan": plan, "period": period.rawValue])
+        var body = ["shopId": connection.shopId, "plan": plan, "period": period.rawValue]
+        if let cc = countryCode(country) { body["country"] = cc }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await fetch(request)
         try CloudPlans.check(S3.status(response), data)
         guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -135,7 +205,9 @@ public enum CloudCheckout {
         }
         return Started(id: id, url: url, plan: (o["plan"] as? String) ?? plan,
                        period: (o["period"] as? String) ?? period.rawValue,
-                       amountSar: (o["amountSar"] as? String) ?? "", currency: (o["currency"] as? String) ?? "SAR")
+                       amountSar: (o["amountSar"] as? String) ?? "", currency: (o["currency"] as? String) ?? "SAR",
+                       country: o["country"] as? String, netSar: number(o["netSar"]), vatSar: number(o["vatSar"]),
+                       vatRate: number(o["vatRate"]), totalSar: number(o["totalSar"]), vatAdded: o["vatAdded"] as? Bool)
     }
 
     public static func status(id: String, _ connection: CloudReader.Connection, token: String,
@@ -148,13 +220,14 @@ public enum CloudCheckout {
         guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let s = o["status"] as? String else { throw VaultClient.Failure.badReply("checkout") }
         return Status(state: State(rawValue: s) ?? .pending, periodEnd: o["periodEnd"] as? String,
-                      receiptNo: o["receiptNo"] as? String)
+                      receiptNo: o["receiptNo"] as? String, country: o["country"] as? String,
+                      netSar: number(o["netSar"]), vatSar: number(o["vatSar"]), vatRate: number(o["vatRate"]))
     }
 
     /// The whole attempt: start, open the page, ask until it ends, then read
     /// `billing/me`. `open` and `sleep` are injected so a test needs no browser
     /// and no waiting; `sleep` throws when the sheet's task is cancelled.
-    public static func run(plan: String, period: Period, _ connection: CloudReader.Connection,
+    public static func run(plan: String, period: Period, country: String? = nil, _ connection: CloudReader.Connection,
                            token: String, fetch: @escaping S3.Fetch, gate: Gate = .shared,
                            delays: [Duration] = defaultDelays,
                            open: @Sendable (URL) async -> Bool,
@@ -163,9 +236,10 @@ public enum CloudCheckout {
         if gate.providerOff { return .providerOff }
         let started: Started
         do {
-            started = try await start(plan: plan, period: period, connection, token: token, fetch: fetch)
+            started = try await start(plan: plan, period: period, country: country, connection, token: token, fetch: fetch)
         } catch let r as CloudPlans.Refusal {
             if r.status == 409, Self.hidesPay.contains(r.reason ?? "") { gate.noteProviderOff(); return .providerOff }
+            if r.status == 400, r.reason == "country-required" { return .countryRequired }
             return .refused(r)
         } catch {
             return Task.isCancelled ? .cancelled : .unreachable
