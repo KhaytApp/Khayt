@@ -1643,6 +1643,8 @@
   "workbench.group.work": "作業",
   "workbench.group.catalog": "カタログ",
   "workbench.group.money": "会計",
+  "workbench.group.shop": "ショップ",
+  "workbench.group.tools": "ツール",
   "workbench.status.orders": "注文",
   "workbench.status.printing": "印刷中",
   "workbench.status.today": "今日",

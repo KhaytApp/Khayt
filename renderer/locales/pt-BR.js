@@ -1644,6 +1644,8 @@
   "workbench.group.work": "Trabalho",
   "workbench.group.catalog": "Catálogo",
   "workbench.group.money": "Financeiro",
+  "workbench.group.shop": "Loja",
+  "workbench.group.tools": "Ferramentas",
   "workbench.status.orders": "pedidos",
   "workbench.status.printing": "imprimindo",
   "workbench.status.today": "hoje",

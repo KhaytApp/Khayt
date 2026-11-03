@@ -1643,6 +1643,8 @@
   "workbench.group.work": "Arbeit",
   "workbench.group.catalog": "Katalog",
   "workbench.group.money": "Finanzen",
+  "workbench.group.shop": "Laden",
+  "workbench.group.tools": "Werkzeuge",
   "workbench.status.orders": "Aufträge",
   "workbench.status.printing": "druckt",
   "workbench.status.today": "heute",

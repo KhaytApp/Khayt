@@ -1712,6 +1712,8 @@
   "workbench.group.work": "العمل",
   "workbench.group.catalog": "الكتالوج",
   "workbench.group.money": "المال",
+  "workbench.group.shop": "المتجر",
+  "workbench.group.tools": "الأدوات",
   "workbench.status.orders": "طلبات",
   "workbench.status.printing": "قيد الطباعة",
   "workbench.status.today": "اليوم",

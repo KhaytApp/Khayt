@@ -1643,6 +1643,8 @@
   "workbench.group.work": "工作",
   "workbench.group.catalog": "目录",
   "workbench.group.money": "财务",
+  "workbench.group.shop": "店铺",
+  "workbench.group.tools": "工具",
   "workbench.status.orders": "订单",
   "workbench.status.printing": "打印中",
   "workbench.status.today": "今天",

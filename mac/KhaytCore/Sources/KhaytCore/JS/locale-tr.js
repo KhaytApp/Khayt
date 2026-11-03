@@ -1643,6 +1643,8 @@
   "workbench.group.work": "İş",
   "workbench.group.catalog": "Katalog",
   "workbench.group.money": "Para",
+  "workbench.group.shop": "Dükkân",
+  "workbench.group.tools": "Araçlar",
   "workbench.status.orders": "sipariş",
   "workbench.status.printing": "yazdırılıyor",
   "workbench.status.today": "bugün",

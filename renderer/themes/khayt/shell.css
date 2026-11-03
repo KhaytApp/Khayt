@@ -51,13 +51,13 @@ body.khayt-2026 .khayt-navhead {
   letter-spacing: 1.5px;
   color: var(--kh-on-dark-soft);
   opacity: 0.72;
-  padding: 12px 12px 4px;
+  padding: 10px 12px 2px;
 }
 
 body.khayt-2026 .khayt-navitem {
   color: var(--kh-on-dark-soft);
   font-weight: 600;
-  padding: 7px 12px;
+  padding: 5px 12px;
   gap: 12px;
 }
 body.khayt-2026 .khayt-navitem:hover { background: var(--kh-navy-deep); color: var(--kh-on-dark); }
