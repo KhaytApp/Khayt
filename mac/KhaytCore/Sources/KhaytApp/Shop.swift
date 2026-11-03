@@ -475,6 +475,16 @@ final class Shop {
     /// is here rather than at each of them.
     var shelf: Shelf = .dashboard {
         didSet {
+            // BOARD IS A VIEW OF JOBS NOW, NOT A SCREEN OF ITS OWN. Every
+            // entry point that still says `.board` — the Board menu command,
+            // a `khayt://…?screen=board` link, a restored window, ⌘K — lands
+            // on Jobs with the Board layout chosen. Done here, in the one
+            // place every assignment passes through, rather than at each of
+            // them, so a new caller cannot bring the old screen back.
+            if shelf == .board {
+                jobsLayout = .board
+                shelf = .jobs(nil)
+            }
             guard shelf != oldValue else { return }
             // A selection belongs to the view it was made in. Carried into
             // another folder — or out of one — it holds models that are not on
@@ -537,6 +547,20 @@ final class Shop {
         }
     }
 
+    /// How Jobs is drawn: the table, or the board of the same jobs.
+    ///
+    /// Remembered per window (`ShopWindow` stores it with the window's other
+    /// scene state). Only the board needs the whole book, so choosing a stage
+    /// from a link or ⌘K shows the table for that stage whatever this says —
+    /// see `showingBoard`.
+    enum JobsLayout: String, CaseIterable, Identifiable {
+        case board, list
+        var id: String { rawValue }
+        /// The word for its place in the picker.
+        var titleKey: String { self == .board ? "mac.board" : "mac.view_list" }
+    }
+    var jobsLayout: JobsLayout = .list
+
     var stage: Stage? { if case .jobs(let s) = shelf { s } else { nil } }
     var showingLibrary: Bool { if case .library = shelf { true } else { false } }
     var showingCustomers: Bool { shelf == .customers }
@@ -544,7 +568,9 @@ final class Shop {
     var showingMachines: Bool { shelf == .machines }
     var showingInventory: Bool { shelf == .inventory }
     var showingCatalogue: Bool { shelf == .catalogue }
-    var showingBoard: Bool { shelf == .board }
+    /// Jobs, drawn as a board. Never true for a single stage: that is a filter
+    /// of the table, and the board already shows every stage.
+    var showingBoard: Bool { shelf == .jobs(nil) && jobsLayout == .board }
     var showingExpenses: Bool { shelf == .expenses }
     var showingWaste: Bool { shelf == .waste }
     var showingReports: Bool { shelf == .reports }

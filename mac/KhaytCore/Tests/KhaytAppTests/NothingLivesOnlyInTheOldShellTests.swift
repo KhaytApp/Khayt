@@ -6,8 +6,11 @@ import Testing
 ///
 /// ── THE BUG THIS EXISTS FOR ───────────────────────────────────────────────
 ///
-/// `ShellChoice.byDefault` has been true since 4.0.0-alpha.12, so `Shell.swift`
-/// is the window that ships and `Sidebar.swift` is the one being retired.
+/// `ShellChoice.byDefault` was true from 4.0.0-alpha.12 until the Mac redesign
+/// put the window back on a `NavigationSplitView`, so `Sidebar.swift` is the
+/// window that ships again and `Shell.swift` (the navy strip) is the one behind
+/// the Appearance switch. The test is pointed the other way round; the lesson
+/// is unchanged.
 /// Anything written into the old one after that date shipped in no window at
 /// all — and nothing said so, because the code was there, correct, and tested.
 ///
@@ -41,18 +44,20 @@ struct NothingLivesOnlyInTheOldShellTests {
     /// `count` is not a property of `Shop` at all — it is the tail of
     /// `shop.customers.count` and friends, which the scan cannot tell apart.
     /// `wasteLog` is read by the Waste screen through `Spending.swift`.
-    static let allowed: Set<String> = ["count", "wasteLog"]
+    /// `isCloudLinked` is an alias of `cloudConnected`, which the shipping
+    /// sidebar reads directly.
+    static let allowed: Set<String> = ["count", "wasteLog", "isCloudLinked"]
 
-    @Test("the old shell is still the one being retired, not the one that ships")
-    func theShippingShellIsTheNewOne() {
+    @Test("the navy shell is the one behind the switch, not the one that ships")
+    func theShippingShellIsTheSplitView() {
         // If this ever flips, the whole test is pointed at the wrong file.
-        #expect(ShellChoice.byDefault,
-                "the app opens with Sidebar.swift again — swap the two files here")
+        #expect(!ShellChoice.byDefault,
+                "the app opens with Shell.swift again — swap the two files here")
     }
 
     @Test("everything the retired shell reads is read somewhere that ships")
     func nothingIsStrandedInTheOldShell() throws {
-        let old = Self.text("Sidebar.swift")
+        let old = Self.text("Shell.swift")
         guard !old.isEmpty else { return }   // when it goes, so does this
 
         var read: Set<String> = []
@@ -67,7 +72,7 @@ struct NothingLivesOnlyInTheOldShellTests {
         let walker = FileManager.default.enumerator(at: Self.sources, includingPropertiesForKeys: nil)
         while let url = walker?.nextObject() as? URL {
             guard url.pathExtension == "swift",
-                  url.lastPathComponent != "Sidebar.swift" else { continue }
+                  url.lastPathComponent != "Shell.swift" else { continue }
             elsewhere += (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         }
         #expect(elsewhere.count > 100_000, "the walk read almost nothing")
@@ -90,8 +95,8 @@ struct NothingLivesOnlyInTheOldShellTests {
     func theKnownThreeAreShown() {
         // Named individually as well as caught by the sweep, so a rename
         // cannot quietly take one out of both.
-        let shell = Self.text("Shell.swift")
-        #expect(!shell.isEmpty, "Shell.swift moved")
+        let shell = Self.text("Sidebar.swift")
+        #expect(!shell.isEmpty, "Sidebar.swift moved")
         for name in ["shop.skipped", "shop.lastCrash", "shop.syncLine"] {
             #expect(shell.contains(name), Comment(rawValue: """
                 the shipping window stopped reading \(name). A shop is not being \
@@ -105,7 +110,7 @@ struct NothingLivesOnlyInTheOldShellTests {
         // It was private to a type inside the retired shell. Two copies of
         // "what sync is doing" is how the two windows start telling a shop
         // different things.
-        let old = Self.text("Sidebar.swift")
+        let old = Self.text("Shell.swift") + Self.text("Sidebar.swift")
         guard !old.isEmpty else { return }
         #expect(!old.contains("func syncLine(_ shop: Shop)"),
                 "syncLine is back inside the retired shell")

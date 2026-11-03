@@ -3457,5 +3457,9 @@
  "unit.per_kg": "kg",
  "unit.per_sheet": "hoja",
  "unit.prints": "impresiones",
- "unit.sheet": "hojas"
+ "unit.sheet": "hojas",
+ "mac.nav_today": "Hoy",
+ "mac.nav_more": "Más",
+ "mac.nav_saved": "Guardado",
+ "mac.jobs_layout": "Vista de trabajos"
 }

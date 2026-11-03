@@ -54,7 +54,7 @@ struct GoToModelTests {
         #expect(!model.loading)
         // Nothing typed: every screen, one heading.
         #expect(model.sections.map(\.kind) == [.screen])
-        #expect(Self.titles(model, .screen).contains("Dashboard"))
+        #expect(Self.titles(model, .screen).contains("Today"))
         Self.expectAligned(model, shop)
 
         // Each keystroke in turn — the narrowing path, each query extending
@@ -66,7 +66,7 @@ struct GoToModelTests {
             Self.expectAligned(model, shop)
         }
         #expect(Self.titles(model, .job).contains("Dental model set"))
-        #expect(!Self.titles(model, .screen).contains("Dashboard"), "a screen that does not match \"dent\" was listed")
+        #expect(!Self.titles(model, .screen).contains("Today"), "a screen that does not match \"dent\" was listed")
         #expect(model.sections.first?.kind != .screen)
         #expect(model.cursor == 0)
 
@@ -80,7 +80,7 @@ struct GoToModelTests {
         model.query = "dash"
         await model.search()
         #expect(model.sections.first?.kind == .screen)
-        #expect(Self.titles(model, .screen).first == "Dashboard")
+        #expect(Self.titles(model, .screen).first == "Today")
         #expect(!Self.titles(model, .screen).contains("Board"))
         Self.expectAligned(model, shop)
     }
@@ -105,7 +105,7 @@ struct GoToModelTests {
         #expect(!model.loading)
         #expect(model.answer.query == "dent")
         #expect(Self.titles(model, .job).contains("Dental model set"))
-        #expect(!Self.titles(model, .screen).contains("Dashboard"))
+        #expect(!Self.titles(model, .screen).contains("Today"))
         Self.expectAligned(model, shop)
     }
 
@@ -142,7 +142,7 @@ struct GoToModelTests {
         }
         #expect(model.answer.query == "dent")
         #expect(Self.titles(model, .job).contains("Dental model set"))
-        #expect(!Self.titles(model, .screen).contains("Dashboard"))
+        #expect(!Self.titles(model, .screen).contains("Today"))
         Self.expectAligned(model, shop)
     }
 

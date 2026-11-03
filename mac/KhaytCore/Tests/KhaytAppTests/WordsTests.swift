@@ -166,7 +166,7 @@ struct MenuWordsTests {
     static let menuKeys = [
         "mac.menu_book", "mac.menu_go", "mac.menu_job", "mac.menu_model",
         "mac.reload", "mac.open_book",
-        "mac.dashboard", "mac.all_jobs", "mac.board", "mac.customers",
+        "mac.nav_today", "mac.all_jobs", "mac.board", "mac.customers",
         "mac.library", "mac.machines", "mac.inventory",
         "mac.favourite", "mac.reveal_in_finder", "mac.open",
         "mac.sort_by", "ord.hold_btn", "pay.modal_title", "queue.delivered", "mac.edit_job", "mac.new_job", "mac.new_customer",
@@ -194,7 +194,7 @@ struct MenuWordsTests {
         // with no book on it yet.
         let ownOnly = ["mac.menu_book", "mac.menu_go", "mac.menu_job", "mac.menu_model",
                        "mac.reload", "mac.open_book", "mac.favourite",
-                       "mac.reveal_in_finder", "mac.open", "mac.dashboard",
+                       "mac.reveal_in_finder", "mac.open", "mac.nav_today",
                        "mac.all_jobs", "mac.board", "mac.customers", "mac.library",
                        "mac.machines", "mac.inventory", "mac.sort_by"]
         for key in ownOnly {

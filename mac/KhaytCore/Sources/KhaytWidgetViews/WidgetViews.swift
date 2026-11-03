@@ -641,7 +641,7 @@ struct Ink {
     let light: UInt32
     let dark: UInt32
 
-    static let brand = Ink(light: 0x0B54AD, dark: 0x4591ED)
+    static let brand = Ink(light: 0x216DCA, dark: 0x4C97F0)
     static let hot = Ink(light: 0xAF3E18, dark: 0xF0763D)
     static let attention = Ink(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = Ink(light: 0xBB2D44, dark: 0xF2564A)

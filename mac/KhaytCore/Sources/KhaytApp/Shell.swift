@@ -82,8 +82,13 @@ struct Shell<Content: View>: View {
 /// A default is a value, so it is written down once and both sides read it.
 enum ShellChoice {
     static let key = "ui.newShell"
-    /// ON as of 4.0.0-alpha.12 — see `ShopWindow.newShell` for why.
-    static let byDefault = true
+    /// OFF as of the Mac redesign: the window is a `NavigationSplitView` again,
+    /// so the sidebar and toolbar are the system's own (the inset Liquid Glass
+    /// sidebar and glass toolbar groups of macOS 26) and `Sidebar.swift` is the
+    /// shipping sidebar. The navy strip and `ShellSidebar` stay behind the
+    /// Appearance switch for a shop that wants them. It was ON from
+    /// 4.0.0-alpha.12 — see `ShopWindow.newShell`.
+    static let byDefault = false
 }
 
 /// The 40px navy strip.
@@ -307,11 +312,11 @@ struct ShellSidebar: View {
             SitePicker(shop: shop)
             SignedInRow(shop: shop)
             group("mac.group_shop", [
-                .init(.dashboard, "mac.dashboard"),
+                .init(.dashboard, "mac.nav_today"),
                 // The site's count when narrowed — the picker directly above
                 // says which site, so the number is never a mystery.
                 .init(.jobs(nil), "mac.all_jobs", count: shop.orders.count(where: shop.inSite)),
-                .init(.board, "mac.board"),
+                // No Board row: Board is a view of Jobs (`JobsLayoutPicker`).
                 .init(.library(nil), "mac.all_models", count: shop.files.count),
                 .init(.catalogue, "cat.title", count: shop.catalogueRows.count),
                 .init(.customers, "tab.clients", count: shop.customers.count),
@@ -323,12 +328,12 @@ struct ShellSidebar: View {
                 .init(.machines, "mac.machines", dot: shop.anySiteMachineRunning ? Role.ok : nil),
                 .init(.inventory, "mac.inventory", alarm: shop.lowSpools.filter { shop.inSite(spool: $0) }.count),
                 .init(.expenses, "mac.nav_expenses"),
-                .init(.waste, "mac.nav_waste"),
             ])
             group("mac.group_money", [
                 .init(.reports, "mac.nav_reports"),
-                .init(.portfolio, "pf.title"),
                 .init(.calculator, "mac.calc_title"),
+                .init(.waste, "mac.nav_waste"),
+                .init(.portfolio, "pf.title"),
                 .init(.colour, "cmix.title"),
                 .init(.giftCards, "giftCards"),
             ])

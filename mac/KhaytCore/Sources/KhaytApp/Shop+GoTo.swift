@@ -68,9 +68,11 @@ extension Shop {
         guard goToKinds.contains(.screen) else { return GoToIndex([]) }
         for shelf in Self.goToShelves where canShow(shelf) {
             let title = words.callIt(Self.titleKey(of: shelf))
+            // Today is still what people type "dash" to find.
+            let fields = shelf == .dashboard ? [title, words.callIt("mac.dashboard")] : [title]
             entries.append(.init(kind: .screen, id: "screen:" + Shelves.name(shelf),
                                  title: title, subtitle: words.callIt("mac.goto_screen"),
-                                 fields: [title]))
+                                 fields: fields))
         }
         let facts = GoToCommand.Facts(shop: self)
         for command in GoToCommand.allCases where command.isEnabled(facts) {
