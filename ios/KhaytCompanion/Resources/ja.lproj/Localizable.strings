@@ -1,0 +1,1000 @@
+/* Tabs */
+"tab.home" = "ホーム";
+"tab.orders" = "注文";
+"tab.inventory" = "在庫";
+"tab.machines" = "プリンター";
+"tab.clients" = "クライアント";
+"tab.settings" = "設定";
+
+/* Connection */
+"connection.checking" = "確認中…";
+"connection.connected" = "接続済み";
+"connection.unreachable" = "デスクトップに接続できません";
+"connection.moved" = "Macが新しいアドレスで応答しました";
+"connection.moved.line" = "%@ に移動するのは、お店のMacである場合のみにしてください。移動するとPINが送信されます。";
+"connection.moved.use" = "移動";
+"connection.moved.not_now" = "今はしない";
+"connection.unauthorized" = "LAN PINが正しくありません";
+"connection.banner.unreachable" = "ネットワーク上のKhaytに接続できません。Wi‑Fiとデスクトップ版のLAN APIを確認してください。";
+"connection.banner.pin" = "LAN PINが拒否されました。設定でデスクトップ版と同じPINに更新してください。";
+"sync.pending" = "このiPhoneにある%d件の変更がMacへの送信待ちです。";
+"connection.error.reach_status" = "%@ に接続できません。同じWi‑Fiですか？デスクトップ版の「設定」→「LAN API」で、有効にし、すべてのインターフェースで待ち受けるよう設定して、IPアドレスとポートを確認してください。";
+"settings.host_required" = "コンピュータのIPアドレスを入力してください。";
+"settings.host_invalid" = "アドレスが正しくありません。192.168.1.42 のように入力してください(http:// 付きのURLは不可)。";
+"home.pipeline" = "パイプライン";
+
+/* Home */
+"home.quick_actions" = "クイックアクション";
+"home.action.add_spool" = "スプールを追加";
+"stat.in_queue" = "待機中";
+"stat.printing" = "印刷中";
+"stat.post" = "後処理";
+"stat.qc" = "品質検査";
+
+/* Orders */
+"orders.active" = "進行中";
+"orders.filter.all" = "すべて";
+"orders.overdue" = "期限超過";
+"orders.detail.set_status" = "ステータスを設定";
+"orders.detail.advance" = "次の工程へ進める";
+
+/* Inventory */
+"inventory.filter.all" = "すべて";
+"inventory.filter.low" = "在庫僅少";
+
+/* Settings */
+"settings.connection" = "接続";
+"settings.connection.footer" = "Khaytの「設定」→「LAN API」と同じPINです。デスクトップ版v2.2.1以降が必要です。";
+"settings.shop_name" = "店名";
+"settings.host" = "デスクトップのIPまたはホスト名";
+"settings.port" = "ポート: %d";
+"settings.pin" = "オーナー用LAN PIN";
+"settings.retest" = "ペアリングを再テスト";
+"settings.unpair" = "このデバイスのペアリングを解除";
+"settings.unpair.footer" = "お店の帳簿とPINをこのiPhoneから削除します。";
+"settings.language" = "言語";
+"settings.notifications" = "通知";
+"settings.notify.queue" = "キューの変更";
+"settings.notify.connection" = "接続の切断";
+"settings.notify.overdue" = "期限超過の注文";
+"settings.notify.low_stock" = "フィラメント残量低下";
+"settings.docs" = "LAN APIリファレンス";
+
+/* Status */
+"status.quote" = "見積";
+"status.pending" = "保留中";
+"status.printing" = "印刷中";
+"status.post" = "後処理";
+"status.qc" = "品質検査";
+"status.completed" = "完了";
+"status.delivered" = "配達済み";
+"status.shipped" = "発送済み";
+"status.on_hold" = "一時停止";
+
+/* Lang */
+"lang.system" = "システム";
+
+/* Notifications */
+"notify.queue.title" = "キューを更新しました";
+"notify.queue.body" = "キューに%d件のジョブ(印刷中%d件)";
+"notify.offline.title" = "Khaytが切断されました";
+"notify.offline.body" = "LAN上でデスクトップに接続できません";
+"notify.overdue.title" = "期限超過の注文";
+"notify.overdue.body" = "期限を過ぎた注文が%d件あります";
+"notify.low_stock.title" = "フィラメント残量低下";
+"notify.low_stock.body" = "200g未満のスプールが%d個あります";
+
+/* NFC */
+"nfc.unavailable" = "このデバイスではNFCを使用できません。";
+"nfc.read.prompt" = "iPhoneをフィラメントスプールのタグに近づけてください。";
+"nfc.read.success" = "タグを読み取りました。";
+"nfc.write.title" = "NFCタグに書き込む";
+"nfc.write.intro" = "このスプールのデータを空のNTAG213以上のステッカーに書き込みます。プリンターが対応する形式を選んでください。";
+"nfc.write.standard" = "タグ規格";
+"nfc.write.preview" = "書き込むデータ";
+"nfc.write.material" = "材料";
+"nfc.write.brand" = "ブランド";
+"nfc.write.weight" = "重量";
+"nfc.write.print_temp" = "印刷温度";
+"nfc.write.bed_temp" = "ベッド温度";
+"nfc.write.tap_blank" = "空のタグにタッチして書き込む";
+"nfc.write.scanning" = "空のタグに近づけてください…";
+"nfc.write.prompt" = "iPhoneを書き込み可能な空のNFCタグに近づけてください。";
+"nfc.write.success" = "タグに書き込みました。";
+"nfc.write.done" = "完了";
+"nfc.write.footer" = "書き込み可能なNTAG213以上のタグを使用してください(OpenSpoolにはNTAG215/216)。プリンターまたはファームウェアが対応する形式を選んでください。";
+"nfc.standard.openspool" = "OpenSpool";
+"nfc.standard.openspool.hint" = "Snapmaker U1拡張ファームウェア、OpenSpoolリーダー経由のBambu — application/json";
+"nfc.standard.opentag3d" = "OpenTag3D";
+"nfc.standard.opentag3d.hint" = "Bambu Lab、Creality、汎用 — application/opentag3d";
+"nfc.standard.openprinttag" = "OpenPrintTag (Prusa)";
+"nfc.standard.openprinttag.hint" = "Prusa MK4 / XL / MINI — application/vnd.openprinttag";
+"nfc.error.missing_material" = "タグに書き込むには材料名が必要です。";
+"nfc.error.payload_large" = "エンコードしたデータ(%dバイト)がこのタグには大きすぎます。";
+"nfc.error.invalid_color" = "色のHEX値が正しくありません。";
+"nfc.error.no_tag" = "タグが検出されませんでした。";
+"nfc.error.unsupported_tag" = "未対応のタグ種類です。";
+"nfc.error.not_ndef" = "このタグはNDEFに対応していません。";
+"nfc.error.read_only" = "タグが読み取り専用またはロックされています。書き込み可能な空のタグを使用してください。";
+"nfc.error.read_failed" = "タグを読み取れませんでした。";
+
+/* Quick quote */
+"home.action.quote" = "見積";
+"quote.title" = "クイック見積";
+"quote.part" = "パーツ";
+"quote.rates" = "料金設定";
+"quote.result" = "価格";
+"quote.cost" = "原価";
+"quote.weight" = "重量";
+"quote.time" = "印刷時間";
+"quote.qty" = "数量";
+"quote.spool_cost" = "スプール価格(1 kg)";
+"quote.labor_rate" = "1時間あたりの人件費";
+"quote.margin" = "マージン";
+"quote.rush" = "特急ジョブ";
+"quote.calculate" = "計算";
+"quote.total" = "合計";
+"quote.discount" = "割引";
+"quote.rush_fee" = "特急料金";
+"quote.tier" = "段階価格({n}個以上)";
+"quote.unit_cost" = "単価原価";
+"quote.bd.material" = "材料";
+"quote.bd.machine" = "装置";
+"quote.bd.labor" = "人件費";
+"quote.bd.buffer" = "失敗バッファ";
+"common.close" = "閉じる";
+
+/* Waste */
+"home.action.waste" = "廃棄を記録";
+"waste.title" = "失敗した印刷を記録";
+"waste.what" = "失敗したもの";
+"waste.why" = "理由";
+"waste.material" = "材料";
+"waste.failure_type" = "失敗の種類";
+"waste.weight" = "廃棄量";
+"waste.reason" = "何が起きましたか？";
+"waste.save" = "記録";
+"waste.deduct" = "スプールから差し引く";
+"waste.deduct.footer" = "廃棄したグラム数を該当するスプールから差し引きます。すでに調整済みの場合はオフにしてください。";
+"waste.ft.warping" = "反り";
+"waste.ft.adhesion" = "ベッド密着不良";
+"waste.ft.clog" = "ノズル詰まり";
+"waste.ft.layer_shift" = "レイヤーずれ";
+"waste.ft.power" = "停電";
+"waste.ft.other" = "その他";
+
+/* Expenses */
+"home.action.expense" = "経費";
+"exp.title" = "新規経費";
+"exp.what" = "支払い内容";
+"exp.amount" = "金額";
+"exp.category" = "カテゴリ";
+"exp.note" = "メモ";
+"exp.receipt" = "レシート";
+"exp.photograph" = "レシートを撮影";
+"exp.retake" = "写真を削除";
+"exp.save" = "保存";
+"exp.no_camera" = "このデバイスにはカメラがありません。レシートなしで経費を保存します。";
+"exp.cat.filament" = "フィラメント";
+"exp.cat.electricity" = "電気代";
+"exp.cat.maintenance" = "メンテナンス";
+"exp.cat.tools" = "工具・消耗品";
+"exp.cat.equipment" = "設備(プリンター)";
+"exp.cat.shipping" = "送料";
+"exp.cat.other" = "その他";
+
+/* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
+"orders.late" = "遅延";
+"orders.queue_clear" = "キューは空です";
+"orders.pick" = "注文を選択";
+"orders.pick.sub" = "詳細はリストの横に表示されます。";
+"inventory.pick" = "スプールを選択";
+"inventory.pick.sub" = "詳細は棚の横に表示されます。";
+"orders.queue_clear.sub" = "すべて完了 — 進行中の注文はありません";
+"orders.no_completed" = "完了した注文はありません";
+"orders.no_completed.sub" = "完了した注文はここに表示されます";
+"inventory.none" = "スプールがありません";
+"inventory.none.sub" = "最初のスプールを追加しましょう";
+"inventory.no_results" = "結果なし";
+"inventory.no_results.sub" = "別のキーワードをお試しください";
+/* Pairing */
+"pair.back" = "戻る";
+"pair.continue" = "続ける";
+"pair.manual" = "アドレスを手動で入力";
+"pair.browse.failed" = "Khaytはこのネットワーク上のお店を検索できません。";
+"pair.browse.permission" = "ローカルネットワークの許可を拒否した場合は、「設定」→「Khayt」→「ローカルネットワーク」で許可してください。";
+"pair.browse.looking" = "検索中…MacでKhaytを開き、LAN APIをオンにしてください。";
+"pair.browse.none" = "まだ見つかりません。";
+"pair.shop.offline" = "このお店はオフラインで使用できます";
+"pair.manual.host" = "デスクトップのIP";
+"pair.verify.ok" = "接続しました — キュー内のジョブ: %d件。PINが承認されました。";
+
+/* Shared words */
+"common.done" = "完了";
+"common.cancel" = "キャンセル";
+"common.save" = "保存";
+"common.remove" = "削除";
+"common.unassigned" = "未割り当て";
+"field.project" = "プロジェクト";
+"field.client" = "クライアント";
+"field.status" = "ステータス";
+"field.machine" = "装置";
+"field.due" = "納期";
+"field.priority" = "優先度";
+"field.material" = "材料";
+"field.brand" = "ブランド";
+
+/* New order */
+"order.new.title" = "新規注文";
+"order.new.title_quote" = "新規見積";
+"order.new.type" = "種類";
+"order.new.order" = "注文";
+"order.new.quote" = "見積";
+"order.new.details" = "詳細";
+"order.new.project" = "プロジェクト";
+"order.new.client" = "クライアント";
+"order.new.client.saved" = "保存済みの顧客";
+"order.new.client.pick" = "この注文を保存済みの顧客に紐づけます。";
+"order.new.material" = "材料";
+"order.new.price" = "価格";
+"order.new.price_in" = "価格(%@)";
+"order.new.schedule" = "スケジュールと装置";
+"order.new.set_due" = "納期を設定";
+"order.new.due" = "納期";
+"order.new.machine" = "装置";
+"order.new.unassigned" = "未割り当て";
+"order.new.create_quote" = "見積を作成";
+"order.new.add" = "キューに追加";
+
+/* Order detail */
+"order.detail.title" = "注文";
+"order.detail.id" = "注文ID";
+"order.detail.assigned" = "担当装置";
+
+/* Spool detail */
+"spool.detail.filament" = "フィラメント";
+"spool.detail.lot" = "バッチ/ロット";
+"spool.detail.print_temp" = "ノズル温度";
+"spool.detail.bed_temp" = "ベッド温度";
+"spool.detail.adjust" = "残量を調整";
+"spool.detail.adjust.body" = "このスプールの残量をグラム単位で設定します。";
+"spool.detail.grams" = "グラム";
+"spool.detail.grams_error" = "グラム数を数字で入力してください。";
+"spool.detail.remove_q" = "スプールを削除しますか？";
+
+/* Queue, intake, clients, machines */
+"queue.title" = "生産キュー";
+"queue.empty" = "キューは空です";
+"queue.empty.sub" = "進行中の注文はありません。";
+"intake.title" = "受付";
+"intake.empty" = "受信箱は空です";
+"intake.empty.sub" = "受付フォームやWhatsAppなどからの新しい依頼がここに表示されます。";
+"intake.reminded" = "リマインド済み";
+"intake.call" = "電話";
+"intake.whatsapp" = "WhatsApp";
+"intake.email" = "メール";
+"clients.search" = "名前、電話番号、メール";
+"clients.none" = "クライアントがありません";
+"clients.none.sub" = "クライアントはKhaytデスクトップ版で追加してください。";
+"clients.no_match" = "一致なし";
+"clients.no_match.sub" = "「%@」に一致するクライアントはいません。";
+"machines.none" = "プリンターがありません";
+"machines.none.sub" = "プリンターはKhaytデスクトップ版で追加してください。";
+"machines.no_live" = "ライブ接続なし";
+
+"spool.detail.remove" = "スプールを削除";
+"intake.decline" = "辞退";
+"intake.remind" = "リマインド";
+
+/* Adding a spool, scanning */
+"barcode.title" = "バーコードをスキャン";
+"barcode.unavailable" = "カメラでスキャンできません";
+"barcode.unavailable.sub" = "代わりにバーコード下の数字を入力してください。";
+"barcode.type" = "またはバーコード下の数字を入力";
+"barcode.placeholder" = "例: 6938936716785";
+"barcode.look_up" = "検索";
+"barcode.invalid" = "有効なUPC/EANではありません。チェックディジットを確認してください。";
+"barcode.source.shelf" = "バーコード · 棚にあるロールと同じ";
+"barcode.source.database" = "バーコード · %@";
+"barcode.source.code" = "バーコード %1$@ · %2$@";
+"barcode.not_found" = "製品データベースにありません。一度入力すると、次回からは棚から見つかります。";
+"barcode.unreachable" = "製品データベースに接続できませんでした。一度入力すると、次回からは棚から見つかります。";
+"scan.title" = "ラベルをスキャン";
+"scan.mode" = "モード";
+"scan.mode.photo" = "写真";
+"scan.mode.live" = "ライブ";
+"scan.clear" = "消去";
+"scan.live_unavailable" = "ライブスキャンは使用できません";
+"scan.live_unavailable.sub" = "このデバイスでは写真モードを使用してください。";
+"scan.photo.title" = "ラベルをはっきり撮影してください";
+"scan.photo.body" = "SKU、バッチ、温度、材料などの文字がフレームいっぱいに写るようにしてください。小さな文字はライブスキャンより写真のほうが読み取りやすくなります。";
+"scan.photo.take" = "写真を撮る";
+"scan.photo.reading" = "ラベルを読み取り中…";
+"scan.photo.none" = "文字が見つかりません。明るい場所で、ラベルがフレームいっぱいになるように撮影してください。";
+"scan.live.hint" = "ラベル全体をゆっくり動かしてください。読み取った文字は、フレームから外れても保持されます。";
+"scan.use_text" = "読み取ったテキストを使用(%d)";
+"spool.add.title" = "スプールを追加";
+"spool.add.barcode_title" = "製品バーコード";
+"spool.add.nfc_title" = "NFCタグ";
+"spool.add.confirm" = "スプールを確認";
+"spool.add.how" = "このスプールをどの方法で追加しますか？";
+"spool.add.no_camera" = "このデバイスではカメラを使用できません。";
+"spool.add.one" = "Khaytの在庫に追加";
+"spool.add.n" = "%d個のスプールを追加";
+"spool.method.barcode" = "製品バーコードをスキャン";
+"spool.method.barcode.sub" = "箱のUPC/EANを検索します";
+"spool.method.label.sub" = "カメラで印刷されたラベルを読み取ります";
+"spool.method.nfc" = "NFCタグにタッチ";
+"spool.method.nfc.sub" = "iPhoneをスプールのタグに近づけます";
+"spool.method.manual" = "手動で入力";
+"spool.method.manual.sub" = "ブランド、材料、色、重量";
+"spool.source.manual" = "手動";
+"spool.source.label" = "スキャンしたラベル";
+"spool.lookup.busy" = "検索中…";
+"spool.lookup.busy.sub" = "まず棚、次に製品データベースを検索します。";
+"spool.lookup.title" = "箱のバーコードをスキャン";
+"spool.lookup.body" = "以前に登録したフィラメントは、価格も含めて棚の情報から自動入力されます。";
+"spool.lookup.open" = "スキャナを開く";
+"spool.label.title" = "ラベルに向けてください";
+"spool.label.body" = "最適な結果を得るには写真モードを使用し、ラベル全体をはっきり撮影してください。";
+"spool.label.open" = "カメラを開く";
+"spool.nfc.title" = "iPhoneをスプールに近づけてください";
+"spool.nfc.unavailable" = "このデバイスではNFCを使用できません。";
+"spool.nfc.scan" = "NFCをスキャン";
+"spool.nfc.scanning" = "スキャン中…";
+"spool.form.required" = "必須";
+"spool.form.material" = "材料名";
+"spool.form.weight" = "重量(グラム)";
+"spool.form.optional" = "任意";
+"spool.form.cost" = "購入価格";
+"spool.form.cost.footer" = "ロールの購入価格です。このロールで印刷するジョブの価格はこれを基に計算されます。";
+"spool.form.sku" = "SKU";
+"spool.form.barcode" = "バーコード(UPC/EAN)";
+"spool.form.lot" = "バッチ/ロット番号";
+"spool.form.print_temp" = "印刷温度(°C)";
+"spool.form.bed_temp" = "ベッド温度(°C)";
+"spool.quantity" = "個数";
+"spool.quantity.one" = "同じフィラメントが複数ありますか？まとめて追加できます。";
+"spool.quantity.many" = "%d個の個別のスプール。それぞれ別に管理されます。";
+"spool.tag.weight" = "重量";
+"spool.tag.print" = "印刷";
+"spool.tag.bed" = "ベッド";
+
+/* Errors */
+"error.not_configured" = "「設定」でKhaytデスクトップ版に接続してください。";
+"error.invalid_url" = "サーバのアドレスが正しくありません。";
+"error.unauthorized" = "LAN PINが正しくありません。デスクトップ版の「設定」→「LAN API」を確認してください。";
+"error.no_such_machine" = "そのプリンターはお店のリストにありません。";
+"error.decline_needs_mac" = "依頼の辞退にはMacが必要です。";
+"error.material_required" = "材料名は必須です。";
+"error.record_not_added" = "そのレコードを帳簿に追加できませんでした。";
+"error.empty_book" = "Macから空の帳簿が送られました。このiPhoneは変更されていません。";
+"error.project_required" = "プロジェクト名は必須です。";
+"error.no_such_spool" = "そのスプールはこのiPhoneの棚にありません。";
+"error.amount_required" = "金額は必須です。";
+"error.partial_add" = "%2$d個中%1$d個のスプールを追加後、エラーが発生しました: %3$@";
+"error.unexpected_spool" = "スプール追加で予期しない応答がありました";
+"error.invalid_order_id" = "注文IDが正しくありません。";
+"settings.notifications.allow" = "通知を許可";
+"unit.g" = "g";
+"unit.h" = "時間";
+"inventory.remove.body" = "%@ を在庫から削除します。";
+
+/* Khayt Cloud */
+"cloud.title" = "Khayt Cloud";
+"cloud.sign_in" = "Khayt Cloudにサインイン";
+"cloud.sign_out" = "Khayt Cloudからサインアウト";
+"cloud.sync_now" = "今すぐ同期";
+"cloud.shop" = "店舗";
+"cloud.role" = "役割";
+"cloud.last_sync" = "最終同期";
+"cloud.via_cloud" = "Khayt Cloud経由の%@";
+"cloud.via_mac" = "Mac経由の%@";
+"cloud.footer.off" = "MacとWi-Fiが異なる場合でもこのiPhoneを最新に保ちます。Macが応答するときは、変更はこれまでどおり直接Macに送られます。";
+"cloud.footer.on" = "iPhoneはKhayt Cloudからお店の情報を読み込みます。変更は、Macが応答するときはMacへ、応答しないときはクラウド経由で送られます。";
+"cloud.needs_mac" = "Khayt Cloudは現在、変更を1件ずつ受け付けていません。変更はこのiPhoneに保持されます。MacでKhaytを開いて同期してください。";
+"cloud.signin.email" = "メール";
+"cloud.signin.password" = "パスワード";
+"cloud.signin.account_footer" = "お店がKhayt Cloudで使用しているアカウントです。このiPhoneには専用のサインインが作成され、個別にサインアウトできます。";
+"cloud.signin.passphrase" = "お店のパスフレーズ";
+"cloud.signin.passphrase_footer" = "お店のクラウド上のコピーを暗号化しているパスフレーズです。Macで最初に接続したときに設定したものです。このiPhone上で鍵を開くために使用され、保存はされません。";
+"cloud.signin.advanced" = "詳細";
+"cloud.signin.server" = "サーバのアドレス";
+"cloud.signin.action" = "サインイン";
+"cloud.signin.wrong_passphrase" = "このパスフレーズではお店の鍵を開けません。";
+
+"pair.use_cloud" = "代わりにKhayt Cloudを使用";
+"pair.use_cloud.footer" = "お店がKhayt Cloudと同期している場合は、iPhoneをここから開始し、後でMacとペアリングできます。";
+
+
+/* Order detail sheet (khayt-orders.jsx) */
+"order.detail.move_to" = "%@ に移動";
+"order.detail.complete" = "注文を完了";
+"order.detail.due_date" = "納期";
+"order.detail.printer" = "プリンター";
+
+"stage.short.pending" = "保留中";
+"stage.short.printing" = "印刷中";
+"stage.short.post" = "後処理";
+"stage.short.qc" = "検査";
+"stage.short.completed" = "完了";
+
+/* Connection strip (design v2) */
+"connection.as_of" = "帳簿で作業中 · %@ 時点";
+"connection.live_only" = "Macからライブ表示 · このiPhoneには何も保存されません";
+"connection.refresh" = "更新";
+
+/* Shop Pulse (design v2) */
+"pulse.title" = "ショップパルス";
+"pulse.money" = "お金";
+"pulse.tap_to_filter" = "タップで絞り込み";
+"pulse.jobs" = "%d件のジョブ";
+"pulse.swipe_hint" = "ジョブを横にスワイプすると次の工程へ進みます。タップで開きます。";
+"pulse.printing" = "印刷中";
+"pulse.done_today" = "本日完了";
+"pulse.owed" = "未収金";
+"pulse.unpaid" = "未払い%d件";
+"pulse.this_month" = "今月";
+"pulse.this_year" = "今年";
+"pulse.on_the_mac" = "Macで";
+"pulse.move_to" = "移動先";
+
+/* Orders, as design/ios-v2 draws them */
+"orders.history" = "履歴";
+"orders.window.count" = "%1$@ / %2$@件の注文";
+"orders.window.body" = "未完了のすべてと、完了済みの最新%@件を表示しています。それ以前の履歴はMacにあります。";
+"order.field.filament" = "フィラメント";
+"order.field.quantity" = "数量";
+"order.detail.mark_done" = "完了にする";
+
+/* Pairing, as design/ios-v2 draws it */
+"pair.find.title" = "どのお店ですか？";
+"pair.find.body" = "Khaytを実行中のMacが、このWi‑Fi上に表示されます。";
+"pair.searching" = "検索中";
+"pair.shop.needs_mac" = "Macが近くにある必要があります";
+"pair.manual.why" = "検索に表示されないMacや、検索をブロックするネットワーク向けです。";
+"pair.manual.title" = "Macのアドレス";
+"pair.manual.body" = "デスクトップ版の「設定」→「LAN API」に、アドレスとポートの両方が表示されています。";
+"pair.manual.port" = "ポート";
+"pair.signed_out" = "MacからこのiPhoneがサインアウトされました。オーナーPINでもう一度ペアリングしてください。";
+"pair.pin.title" = "オーナーPIN";
+"pair.pin.body" = "MacまたはPCの「設定」→「オンライン」にあるオーナーPIN(8文字以上)です。受付用PINは使用できません。";
+"pair.pin.foot" = "iPhoneのキーチェーンに保存され、このMac以外には送信されません。";
+"pair.pin.wrong" = "PINが拒否されました。MacまたはPCの「設定」→「オンライン」を確認してください。";
+"pair.window_closed" = "Macで「iPhoneをペアリング」(「設定」→「オンライン」)をクリックしてから、もう一度お試しください。";
+"pair.window_locked" = "このiPhoneから誤ったPINが何度も入力されました。Macで「iPhoneをペアリング」(「設定」→「オンライン」)をもう一度クリックし、正しいPINで試してください。";
+"settings.secure.body" = "このiPhoneは現在もオーナーPINでサインインしています。Macで「iPhoneをペアリング」(「設定」→「オンライン」)をクリックしてから、「このiPhoneを保護」をタップしてください。";
+"settings.secure.button" = "このiPhoneを保護";
+"settings.secure.done" = "完了しました。このiPhoneは専用の鍵でサインインするようになりました。";
+"settings.secure.failed" = "Macが応答しませんでした。お店のWi-Fiに接続していることを確認して、もう一度お試しください。";
+"settings.secure.closed" = "Macは現在iPhoneを受け付けていません。Macで「iPhoneをペアリング」(「設定」→「オンライン」)をクリックし、2分以内に「このiPhoneを保護」をもう一度タップしてください。";
+"pair.connect" = "接続";
+"pair.finish" = "ボードを開く";
+"pair.pull.title" = "お店の帳簿をコピー中";
+"pair.pull.body" = "すべてではなく必要な分だけです。履歴はMacに残ります。";
+"pair.pull.settings" = "設定";
+"pair.pull.open_orders" = "進行中の注文";
+"pair.pull.newest_finished" = "最新の完了分";
+"pair.pull.foot" = "経費、プリントファイル、製品、監査ログなど帳簿のその他の内容は送信されていません。iPhoneはそれらを持っていないことを認識しています。";
+
+/* Inventory, as design/ios-v2 draws it */
+"spool.detail.g_remaining" = "g 残り";
+"spool.detail.low_warn" = "在庫僅少 — 交換品の発注をおすすめします";
+"inventory.search.v2" = "ブランド、材料、色を検索…";
+"inventory.whole.count" = "%@個のスプール";
+"inventory.whole.body" = "お店のスプールはすべてiPhoneに保存されています。";
+"common.clear" = "消去";
+/* Add spool: colour */
+"spool.form.colour" = "色";
+"spool.form.colour.other" = "その他の色";
+"colour.black" = "黒";
+"colour.white" = "白";
+"colour.grey" = "グレー";
+"colour.red" = "赤";
+"colour.blue" = "青";
+"colour.green" = "緑";
+"colour.orange" = "オレンジ";
+"colour.yellow" = "黄";
+"colour.purple" = "紫";
+"colour.cyan" = "シアン";
+"spool.method.label" = "ラベルをスキャン";
+
+/* Machines, as design/ios-v2 draws them */
+"machines.idle" = "待機中";
+"machines.error" = "エラー";
+"machines.offline" = "オフライン";
+"machines.offline.sub" = "Macでオフラインに設定されています";
+"machines.ready" = "次のジョブの準備完了";
+"machines.nozzle" = "ノズル";
+"machines.bed" = "ベッド";
+"machines.stale" = "リアルタイムの温度表示にはMacが必要です。ここには帳簿に残っている最後の値が表示されています。";
+
+/* Clients, as design/ios-v2 draws them */
+"clients.open" = "進行中%@件";
+"clients.orders" = "注文";
+"clients.window.count" = "%@件のクライアント";
+"clients.window.body" = "クライアントはすべて同期されますが、注文の合計額は履歴がないため表示されません。";
+"clients.call" = "電話";
+"clients.whatsapp" = "WhatsApp";
+"clients.email" = "メール";
+
+/* Settings, as design/ios-v2 draws it */
+"settings.holds" = "このiPhoneに保存されている内容";
+"settings.mac_in_reach" = "Macに接続可能";
+"settings.mac_away" = "Macに接続できません";
+"settings.mac_away_since" = "Macに接続できません · 帳簿は%@時点のものです";
+"settings.from_book" = "帳簿で作業中";
+"settings.not_sent" = "未送信: %@。";
+"book.collection.expenses" = "経費";
+"book.collection.printFiles" = "プリントファイル";
+"book.collection.products" = "製品";
+"book.collection.auditLog" = "監査ログ";
+"book.collection.giftCards" = "ギフトカード";
+
+/* Intake, as design/ios-v2 draws it */
+"intake.foot" = "ウォークインと待機リストです。受け付けると、保留中としてキューに入ります。";
+"intake.foot.no_book" = "ウォークインと待機リストです。キューに入れるには、お店の帳簿がこのiPhoneにある必要があります。却下はどちらの場合でも可能です。";
+"intake.take" = "受け付ける";
+"intake.dismiss" = "却下";
+"intake.take.needs_book" = "依頼をキューに入れるには、お店の帳簿がこのiPhoneにある必要があります。";
+
+/* New order, as design/ios-v2 draws it */
+"order.new.note.sent" = "このiPhoneに保存し、Macに送信しました。";
+"order.new.note.later" = "Macに接続できません。このiPhoneに保存し、Macに接続できるようになったら送信します。";
+"order.new.note.live" = "Macに直接書き込みました。";
+"order.new.note.blocked" = "Macに接続できず、このiPhoneにはお店の帳簿もないため、まだ保存先がありません。";
+
+/* Live printer tracking */
+"machines.live" = "ライブ";
+"machines.live.ago" = "%d秒前";
+"machines.left_until" = "残り%1$@ · %2$@に完了";
+"order.detail.print_progress" = "印刷の進捗";
+"order.detail.no_estimate" = "まだ見積がありません — 装置から報告されていません。";
+"machines.not_published" = "MacはまだプリンターをKhayt Cloudに公開していません。";
+"machines.via_cloud" = "Khayt Cloud経由";
+"machines.reported" = "Macの最終報告: %@。";
+"cloud.signed_out" = "このiPhoneはKhayt Cloudからサインアウトされました。お店のデバイスリストからの操作が原因と思われます。お店の外でも同期を続けるには、もう一度サインインしてください。";
+"cloud.sign_in_again" = "もう一度サインイン";
+"cloud.busy" = "Khayt Cloudは混み合っています。iPhoneはしばらくしてからもう一度試します。";
+
+/* Print alerts */
+"settings.notify.print_done" = "印刷完了";
+"settings.live_activities" = "ロック画面の印刷状況";
+"settings.count_install.hint" = "1日1回、アプリのプラットフォーム、バージョン、リリースチャンネルと、今週・今月・初めての初日かどうかだけを送信します。IDやお店に関する情報は含まれません。";
+"settings.count_install" = "このインストールをカウント(匿名)";
+"settings.privacy" = "プライバシー";
+"settings.privacy_policy" = "プライバシーポリシー";
+"alert.print.finished" = "印刷完了";
+"alert.print.failed" = "印刷失敗";
+"alert.print.cancelled" = "印刷キャンセル";
+"alert.print.a_job" = "ジョブ";
+"alert.print.move_post" = "後処理へ移動";
+"alert.print.reprint" = "キューに戻す";
+"alert.print.mark_shipped" = "発送済みにする";
+"alert.print.needs_book" = "発送済みにするには、お店の帳簿がこのiPhoneにある必要があります。";
+"alert.print.no_order" = "そのジョブはこのiPhoneの帳簿にありません。";
+"alert.print.not_shippable" = "発送済みにできるのは、完了済みで未配達のジョブのみです。";
+
+/* A status move the shop’s rule (lib/order-status.js gate) refused */
+"move.refused" = "お店のルールではその移動はできません。";
+"move.refused.production_paused" = "生産が一時停止中です。印刷を開始する前に生産を再開してください。";
+"move.refused.wip_blocked" = "%1$@ はすでに上限の%2$lld件に達しています。先に1件を完了してください。";
+"move.refused.assembly_not_assembled" = "すべてのパーツが品質検査に合格しました。このジョブを完了する前に、アセンブリを組立済みにしてください。";
+"move.refused.assembly_parts" = "このジョブはパーツ待ちです: %@";
+"move.refused.stage_not_a_status" = "「発送済み」は移動先の工程として選べません。完了済みのジョブで「発送済みにする」を使用してください。";
+"move.note.due_extended" = "保留していた期間分、納期を%1$lld日延ばしました: 新しい納期は%2$@。";
+"move.note.filament_deducted" = "%2$lld個のスプールから%1$@を差し引きました。";
+"move.note.filament_deducted_low" = "%2$lld個のスプールから%1$@を差し引きました。%3$lld個が残量僅少です。";
+"move.note.filament_returned" = "%1$@を棚に戻しました — ジョブが完了ではなくなったため、フィラメントはまだ使用されていません。";
+"move.note.packaging_deducted" = "完了したジョブの梱包材を棚から差し引きました。";
+"move.note.low" = "残量僅少: %1$@";
+
+/* Push alerts relayed by Khayt Cloud: the server sends these KEYS
+   (loc-key), never text, so the alert is in the phone's language. */
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "印刷が完了しました";
+"PUSH_INTAKE" = "新しい注文リクエスト";
+
+/* Notifications feed */
+"feed.title" = "通知";
+"feed.empty" = "まだありません";
+"feed.empty.sub" = "完了した印刷、遅延中のジョブ、フィラメント残量低下、新しい注文リクエストがここに表示されます。";
+"feed.unread" = "未読";
+"feed.unread_count" = "未読%d件";
+
+/* Sample shop */
+"pair.sample" = "サンプルショップで試す";
+"pair.sample.footer" = "このiPhone内だけの架空のお店です(注文、スプール、プリンター)。データはiPhoneの外に出ません。いつでもMacとペアリングできます。";
+"sample.banner" = "サンプルショップ";
+"sample.banner.line" = "ここにあるものはすべて架空で、iPhoneの外には送信されません。";
+"sample.pair" = "自分のMacとペアリング";
+"pair.pin.too_short" = "Macの「設定」→「オンライン」でより長いPIN(8文字以上)を設定してから、もう一度接続してください。";
+"connection.pin_too_short" = "Macにはより長いPINが必要です";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "支払いを記録";
+"pay.amount_paid" = "支払額";
+"pay.method" = "支払い方法";
+"pay.method.cash" = "現金";
+"pay.method.mada" = "Mada";
+"pay.method.transfer" = "銀行振込";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "クレジットカード";
+"pay.method.other" = "その他";
+"pay.section" = "支払い";
+"pay.status.paid" = "支払済";
+"pay.status.partial" = "一部支払い";
+"pay.status.unpaid" = "未払い";
+"pay.owed" = "未収%@";
+"pay.billed" = "請求額";
+"pay.total_hint" = "本日分だけでなく、このジョブでこれまでに支払われた総額です。";
+"pay.save" = "支払いを保存";
+"pay.refused" = "この支払いを記録すると%@が送信されますが、iPhoneでは対応できません。Macで記録してください。";
+"pay.reach.email" = "領収書メール";
+"pay.reach.webhook" = "Webhook";
+/* Printer cameras (lib/webcam.js) */
+"camera.open" = "カメラ";
+"camera.at" = "%@ のフレーム";
+"camera.offline" = "カメラが応答しませんでした。お店のWi-Fi経由で接続します。";
+"camera.no_frame" = "カメラはオンですが、まだフレームがありません。";
+"camera.needs_key" = "このカメラにはプリンターのキーが必要ですが、キーはMacにのみ保存されています。";
+"camera.rtsp" = "このカメラはRTSPのみで配信しており、iPhoneでは表示できません。";
+"camera.refused" = "このカメラのアドレスはプリンターのものではないため、iPhoneでは取得しません。";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "%1$@を%2$@に進めました。";
+"intent.advance.gone" = "そのジョブはキューにありません。";
+"intent.no_book" = "このiPhoneにはまだKhaytのお店がありません。";
+"intent.filament.one" = "%2$@は%3$d個のスプールで%1$@残っています。";
+"intent.filament.none" = "棚に%@はありません。";
+"intent.filament.empty" = "棚は空です。";
+"Advance a job" = "ジョブを進める";
+"Filament left" = "フィラメント残量";
+"Log a failed print" = "失敗した印刷を記録";
+"Scan a spool" = "スプールをスキャン";
+"Job" = "ジョブ";
+"Material" = "材料";
+/* WhatsApp updates to customers (the Mac's own words) */
+"wa.update" = "WhatsApp連絡";
+"wa.update_due" = "お客様に連絡: %@";
+"wa.update_sent" = "%2$@に%1$@の連絡をWhatsAppで開きました";
+"wa.m.received" = "注文受付";
+"wa.m.ready" = "準備完了";
+"wa.m.shipped" = "発送済み";
+"wa.m.delivered" = "配達済み";
+"wa.to" = "宛先: %@";
+"wa.logged_note" = "WhatsAppを開くと、このメッセージが顧客の履歴に記録されます。WhatsAppで送信するまでは何も送られません。";
+"wa.default_words" = "Khaytの既定の文面です。お店独自のWhatsAppテンプレートはMacの「設定」›「連携」にあります。";
+"wa.open" = "WhatsAppを開く";
+"wa.language" = "言語";
+"wa.lang.ar" = "アラビア語";
+"wa.lang.en" = "英語";
+"wa.reason.no_phone" = "この顧客の電話番号が登録されていません。";
+"wa.reason.no_customer" = "このジョブには顧客情報がないため、送信先の番号がありません。";
+"wa.reason.too_short" = "電話番号が短すぎてWhatsApp番号になりません。";
+"wa.reason.too_long" = "電話番号が長すぎてWhatsApp番号になりません。";
+"wa.reason.no_country_code" = "この番号に国番号を追加してください(例: +971…)。国番号なしで入力できるのはサウジアラビアの番号のみです。";
+"wa.reason.bad_saudi_number" = "サウジアラビアの携帯電話または固定電話の番号ではありません。800番と9200番はWhatsAppを使用できません。";
+"wa.reason.no_milestone" = "見積またはキャンセルされたジョブには送信する連絡がありません。";
+"wa.photo.take" = "写真を撮る";
+"wa.photo.pick" = "写真を選択";
+"wa.photo.remove" = "写真を削除";
+"wa.share_photo" = "写真付きで共有…";
+"wa.share_photo.note" = "共有シートでWhatsAppを選び、お客様のチャットを選んでください。WhatsAppに渡された時点で顧客の履歴に記録されます。";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "Khayt通知";
+"Print finished or failed" = "印刷の完了または失敗";
+"New order requests" = "新しい注文リクエスト";
+"Queue, late jobs, low filament" = "キュー、遅延ジョブ、フィラメント残量低下";
+"focus.none" = "お店の通知なし";
+"focus.kind.print" = "印刷";
+"focus.kind.intake" = "注文リクエスト";
+"focus.kind.shop" = "お店";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "ラベルをスキャン";
+"scan.label.hint" = "Khaytのジョブまたはスプールのラベルに向けてください。";
+"scan.label.unknown" = "Khaytのラベルではありません。";
+"scan.label.missing" = "そのラベルのジョブまたはスプールはこのiPhoneにありません。";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "%@ が印刷を開始しました";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "ファイルを見積";
+"quote.file.pick" = "ファイルを見積";
+"quote.file.file" = "ファイル";
+"quote.file.hours" = "%@時間";
+"quote.file.exact" = "Macのスライサーによる実測値です。";
+"quote.file.estimated" = "モデルの形状に基づく概算です。";
+"quote.file.make_quote" = "見積にする";
+"quote.file.needs_mac" = "ファイルの見積には、お店のWi-Fi上でKhaytのMacアプリ(alpha.63以降)が必要です。";
+"quote.file.reason.off" = "Macでインスタント見積がオフになっています。「設定」で受付フォーム用にオンにしてください。";
+"quote.file.reason.unsupported" = "KhaytはSTL、OBJ、3MF、G-codeファイルの価格を計算できます。";
+"quote.file.reason.too-large" = "ファイルが32 MBを超えています。";
+"quote.file.reason.no-numbers" = "お店の価格がMacにまだ設定されていません。";
+"quote.file.reason.no-price" = "Macがこのファイルの価格を計算できませんでした。";
+"quote.file.reason.busy" = "Macがビジー状態です。しばらくしてからもう一度お試しください。";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "お客様ページの写真";
+"photos.none" = "写真がありません。完成品を追加すると、お客様の追跡ページに表示されます。";
+"photos.note" = "注文のリンクを知っている人は誰でもこれらの写真を見られます。位置情報は保存前に削除されます。";
+"photos.needs_cloud" = "この注文の追跡ページに写真を追加するには、「設定」でKhayt Cloudにサインインしてください。";
+"photos.one" = "注文の写真";
+"photos.remove" = "写真を削除";
+"photos.remove.title" = "この写真を削除しますか？";
+"photos.remove.message" = "お客様の追跡ページから表示されなくなります。";
+"photos.err.full" = "この注文にはすでに%lld枚の写真があります。追加するには1枚削除してください。";
+"photos.err.too_large" = "縮小しても写真が大きすぎて送信できません。";
+"photos.err.not_published" = "この注文にはまだ追跡ページがありません。先にMacで公開してください。";
+"photos.err.viewer" = "お使いのKhayt Cloudのサインインでは、このお店の閲覧のみ可能で、変更はできません。";
+"photos.err.not_an_image" = "Khaytで使用できる写真ではありません。JPEGまたはPNGを選んでください。";
+"photos.err.http" = "Khayt Cloudが写真を受け付けませんでした(エラー%lld)。もう一度お試しください。";
+
+/* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
+"settings.live_activities.mac" = "アプリを閉じている間もロック画面で印刷状況を更新するには、MacのKhayt(「設定」▸「連携」▸「iPhone」)で「印刷の進捗をiPhoneに送信(ライブアクティビティ)」をオンにし、このiPhoneでKhayt Cloudにサインインしてください。";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "計算機";
+"home.action.calculator" = "計算機";
+"calc.title" = "計算機";
+"calc.part" = "パーツ";
+"calc.printer" = "プリンター";
+"calc.pieces" = "マグネット、インサートなどの部品";
+"calc.price" = "マージンと手数料";
+"calc.charge" = "請求額";
+"calc.each" = "1個あたり%@";
+"calc.nothing" = "重量または印刷時間を入力すると、ジョブの原価と請求額が計算されます。";
+"calc.cost" = "原価";
+"calc.keeps" = "利益";
+"calc.overhead" = "間接費(固定費)";
+"calc.per_piece" = "1個あたりの原価の内訳";
+"calc.add_colour" = "フィラメント/色を追加";
+"calc.remove_colour" = "この色を削除";
+"calc.purge" = "パージ・プライムタワー";
+"calc.colour_n" = "色 %lld";
+"calc.filament" = "フィラメント";
+"calc.no_spool" = "フィラメントなし";
+"calc.no_spool_price" = "このスプールには価格がないため、樹脂代は計上されません。スプールのページで購入価格を追加してください。";
+"calc.machine" = "装置";
+"calc.any_machine" = "すべての装置";
+"calc.preset" = "プリンタープリセット";
+"calc.default_rates" = "Khaytの既定値";
+"calc.rates" = "原価レート";
+"calc.rates_edited" = "編集済み";
+"calc.rates_reset" = "プリセットに戻す";
+"calc.rate.laborRate" = "人件費レート";
+"calc.rate.prepTime" = "スライス/準備時間";
+"calc.rate.postTime" = "後処理/組立";
+"calc.rate.wearRate" = "消耗";
+"calc.rate.powerDraw" = "消費電力";
+"calc.rate.elecRate" = "電気代";
+"calc.rate.failureRate" = "失敗バッファ";
+"calc.add_piece" = "部品を追加";
+"calc.remove_piece" = "この部品を削除";
+"calc.share" = "価格を送信";
+"calc.make_order" = "見積にする";
+"calc.share.price" = "価格: %@";
+"calc.share.each" = "%lld個分 — 1個あたり%@";
+"calc.share.rush" = "特急料金を含みます。";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "還付対象のVAT";
+"exp.qr.scan" = "レシートのQRをスキャン";
+"exp.qr.why" = "サウジの税務請求書のQRには販売者、合計、VATが含まれるため、入力は不要です。レシートの写真も読み取れます。";
+"exp.qr.title" = "レシートQR";
+"exp.qr.hint" = "税務請求書のQRに向けてください";
+"exp.qr.vat_number" = "VAT番号 %@";
+"exp.qr.supplier" = "登録済みのサプライヤー";
+"exp.qr.new_supplier" = "まだ登録されていないサプライヤーです。";
+"exp.qr.add_supplier" = "サプライヤーとして追加";
+"exp.qr.filled" = "レシートから入力しました — 内容を確認し、カテゴリを選んでください。";
+"exp.qr.photo_stays" = "金額はQRから取得したため、この経費はiPhoneに保存され、写真は送信されません。";
+"exp.qr.duplicate" = "このレシートはすでに経費に登録されているため、再度は表示されません。";
+"exp.qr.note" = "%@ · VAT番号 %@";
+"exp.qr.reason.empty" = "コードが空です。";
+"exp.qr.reason.too_long" = "コードが税務請求書のものよりはるかに長いです。";
+"exp.qr.reason.not_base64" = "税務請求書のコードではありません。リンクまたは支払いコードの可能性があります。";
+"exp.qr.reason.truncated" = "コードが途中で切れています。";
+"exp.qr.reason.bad_tag" = "税務請求書にない項目がコードに含まれています。";
+"exp.qr.reason.not_utf8" = "コード内の販売者名を読み取れません。";
+"exp.qr.reason.missing_tag" = "コードに販売者、VAT番号、日時、合計、またはVATがありません。";
+"exp.qr.reason.bad_vat_number" = "販売者のVAT番号がサウジのものではありません(15桁で、先頭と末尾が3)。";
+"exp.qr.reason.bad_amount" = "コード内の合計またはVATが金額ではありません。";
+"exp.qr.reason.vat_over_total" = "コードのVATが合計より大きくなっています。";
+"exp.qr.reason.bad_timestamp" = "コード内の請求書日付を読み取れません。";
+
+"Price a part" = "パーツの価格を計算";
+"home.calculator.sub" = "パーツの原価と請求額";
+
+/* Library */
+"library.title" = "ライブラリ";
+"library.price" = "ライブラリから価格を計算";
+"home.library.sub" = "過去に印刷したモデルを探して価格を計算します。";
+"library.search" = "モデル、フォルダ、タグを検索";
+"library.folders" = "フォルダ";
+"library.models" = "モデル";
+"library.found" = "%d件見つかりました";
+"library.more" = "さらに表示";
+"library.empty" = "このフォルダにモデルはありません。";
+"library.no_match" = "一致するモデルはありません。";
+"library.favorite" = "お気に入り";
+"library.printed" = "%d回印刷";
+"library.plate" = "プレート";
+"library.plate.all" = "すべてのプレート";
+"library.plate.n" = "プレート %d";
+"library.calculator" = "計算機で開く";
+"library.notes" = "印刷時のメモ";
+"library.stale" = "このモデルには、Macがまだ計測していない新しいバージョンがあります。お店のWi-Fiで価格を計算するか、計算機を使用してください。";
+"library.not_estimable" = "MacではSTL、OBJ、3MF、G-codeモデルの価格を計算できます。このモデルには計算機を使用してください。";
+"library.needs_mac" = "ライブラリからの価格計算には、この機能に対応したKhaytバージョンのMacがお店のWi-Fi上にある必要があります。計算機は引き続き使用できます。";
+"library.reason.no-file" = "Macにはこのモデルが登録されていますが、ファイルがありません。";
+"library.reason.not-found" = "このモデルはライブラリにありません。";
+"quote.file.unreliable" = "このモデルは見積の精度が保証される範囲外です。送信前に金額を確認してください。";
+"library.reason.not-configured" = "先にコンピュータでインスタント見積を設定してください。見積用のプリンターとフィラメントが必要です。";
+"library.sample" = "サンプルショップにはモデルを計測するMacがありません。計算機で開き、記録された重量と時間から価格を計算してください。";
+"library.from_copy" = "お店の外にいます: これは最後のKhayt Cloud同期時点のライブラリで、価格はこのiPhoneで計算されます。";
+"library.priced_here" = "お店の価格を使用してこのiPhoneで計算しました。複数色のモデルは1つのスプールで原価計算されるため、Macの金額と少し異なる場合があります。";
+"library.no_copy" = "Macに接続できません。「設定」でKhayt Cloudにサインインして一度同期すると、ライブラリを持ち出せます。";
+
+/* Catalogue */
+"catalogue.title" = "製品カタログ";
+"catalogue.search" = "製品を検索";
+"catalogue.ungrouped" = "その他";
+"catalogue.empty" = "製品がありません。Macのカタログに追加してください。";
+"catalogue.no_match" = "一致する製品はありません。";
+"catalogue.partial" = "%2$lld個中%1$lld個の製品を表示しています。残りはMacで検索してください。";
+"catalogue.no_book" = "カタログはお店の帳簿とともに取得されます。先にKhayt CloudまたはMacと同期してください。";
+"catalogue.in_stock" = "在庫%lld個";
+"catalogue.out_of_stock" = "在庫切れ";
+"catalogue.description" = "説明";
+"catalogue.price.override" = "独自価格";
+"catalogue.price.rounded" = "計算価格から端数処理";
+"catalogue.price.calculated" = "計算価格";
+"home.catalogue.sub" = "販売する製品と価格・在庫";
+
+/* Invoices */
+"invoice.title" = "請求書";
+"invoice.open" = "請求書";
+"invoice.open.sub" = "PDFで表示して送信";
+"invoice.share" = "共有";
+"invoice.refused.missing" = "このジョブはiPhoneの帳簿のコピーにありません。お店のWi-Fiで帳簿を再取得してください。";
+"invoice.refused.quote" = "まだ見積の状態です。お客様が承諾すると請求書が作成されます。";
+"invoice.refused.cancelled" = "キャンセルされたジョブには請求書がありません。";
+"invoice.refused.not_numbered" = "この請求書にはまず番号が必要です。MacまたはPCで一度開くと番号が付き、ここに表示されます。";
+"invoice.refused.failed" = "請求書を作成できませんでした。もう一度お試しいただくか、MacまたはPCで開いてください。";
+
+"api.request_failed" = "リクエストに失敗しました(HTTP %lld)";
+"order.untitled" = "リクエスト %@";
+"orders.quotes" = "見積";
+"orders.no_quotes" = "未決の見積はありません";
+"orders.no_quotes.sub" = "ここまたはMacで作成した見積は、お客様の返答を待つ間ここに表示されます。";
+"orders.quotes_on_mac" = "見積はMacにあります";
+"orders.quotes_on_mac.sub" = "このiPhoneにはお店の帳簿がないため、未決の見積はMacで開いてください。";
+"status.cancelled" = "キャンセル";
+"stage.short.quote" = "見積";
+"stage.short.cancelled" = "キャンセル";
+"quote.made_on" = "作成日 %@";
+"quote.valid_until" = "有効期限 %@";
+"quote.expired" = "期限切れ";
+"quote.expired_on" = "%@に期限切れ";
+"quote.field.made" = "作成日";
+"quote.field.valid_until" = "有効期限";
+"quote.approve" = "承認";
+"quote.approve_note" = "お客様が承諾したら承認してください。見積が保留中のジョブになります。";
+"quote.decline" = "辞退";
+"quote.decline_q" = "この見積を辞退しますか？";
+"quote.decline_body" = "見積から外れ、キャンセル済みとして履歴に残ります。";
+"licence.not_for_sale" = "販売ライセンスなし";
+"licence.nc_line" = "%1$@: ライセンス上、印刷物の販売は許可されていません。";
+"licence.expired_line" = "%1$@: 購入したライセンスは%2$@に終了しました。";
+"PUSH_OVERDUE" = "期限を過ぎたジョブがあります";
+"PUSH_LOW_STOCK" = "フィラメントが残り少なくなっています";
+"PUSH_DUE_TODAY" = "本日納期のジョブがあります";
+"PUSH_QUOTE_DECISION" = "お客様が見積に回答しました";
+"PUSH_QUOTE_APPROVED" = "お客様が見積を承認しました";
+"PUSH_QUOTE_DECLINED" = "お客様が見積を辞退しました";
+"PUSH_MESSAGE" = "お客様からメッセージが届きました";
+"PUSH_PAYMENT" = "入金がありました";
+
+/* Who owes */
+"owed.title" = "未収金";
+"owed.empty" = "進行中のジョブに未収金はありません。";
+"owed.total" = "%2$d件のジョブで%1$@の未収";
+"owed.due" = "期限 %@";
+"owed.remind" = "WhatsAppでリマインド";
+"owed.remind.a11y" = "%@にWhatsAppでリマインド";
+"owed.remind.text" = "こんにちは。%1$@の%2$@が未払いです。ご確認をお願いいたします。";
+"owed.remind.no_phone" = "この顧客の電話番号が保存されていません。";
+"owed.remind.no_customer" = "このジョブは保存済みの顧客に紐づいていません。";
+"owed.open.hint" = "未収金のあるジョブを表示します。";
+/* Proforma */
+"proforma.title" = "見積請求書";
+"proforma.open" = "見積請求書";
+"proforma.open.sub" = "請求書発行前に支払いを依頼";
+"proforma.refused" = "見積請求書は、承諾済みで未完了の、価格が設定されたジョブ向けです。";
+/* Intake reminder */
+"intake.remind.when" = "リマインドする日時";
+"intake.remind.tomorrow" = "明日の朝";
+"intake.remind.3days" = "3日後";
+"intake.remind.week" = "1週間後";
+"intake.remind.alert" = "リマインダー: %@さんの依頼に返信してください。";
+
+/* Ship */
+"ship.title" = "発送";
+"ship.carrier" = "配送業者";
+"ship.service" = "サービス";
+"ship.tracking" = "追跡番号";
+"ship.scan" = "送り状をスキャン";
+"ship.scan.hint" = "配送業者の控えのバーコードに向けてください。";
+"ship.hint" = "配送業者の控えの番号です。お客様のページに表示されます。";
+"ship.create" = "発送済みにする";
+"ship.open" = "発送";
+"ship.open.sub" = "配送業者と追跡番号";
+/* End of day */
+"eod.title" = "日次レポート";
+"eod.finished" = "本日完了";
+"eod.revenue" = "本日の売上";
+"eod.open" = "未完了";
+"eod.overdue" = "遅延";
+"eod.waste" = "廃棄フィラメント";
+"eod.grams" = "%@ g";
+"eod.hours" = "記録した時間";
+"eod.finished_list" = "本日完了";
+"eod.due_list" = "本日納期・未完了";
+"eod.nothing" = "本日完了したものはありません。";
+/* Edit order */
+"edit.title" = "編集";
+"edit.due" = "納期";
+"edit.priority" = "優先度";
+"edit.priority.normal" = "通常";
+"edit.priority.high" = "高";
+"edit.priority.urgent" = "緊急";
+"edit.price.note" = "新しい価格は、お客様が支払う合計額です。支払い済みの金額は、新しい合計額を上限としてそのまま残ります。";
+/* Printer control */
+"printer.pause" = "一時停止";
+"printer.resume" = "再開";
+"printer.stop" = "停止";
+"printer.stop.confirm" = "%@の印刷を停止しますか？";
+"printer.stop.message" = "停止した印刷は再開できません。";
+"printer.sending" = "Macに送信中…";
+"printer.sending.cloud" = "Khayt Cloud経由でMacに送信中…";
+"printer.done.pause" = "一時停止しました。";
+"printer.done.resume" = "再開しました。";
+"printer.done.stop" = "停止しました。";
+"printer.refused" = "プリンターの応答: %@";
+"printer.why.device" = "プリンターを操作するには、このiPhoneをMacともう一度ペアリングする必要があります。";
+"printer.why.not_found" = "Macにこの装置がありません。";
+"printer.why.not_connected" = "Macは現在このプリンターに接続されていません。";
+"printer.why.unsupported" = "このプリンターはKhaytから操作できません。";
+"printer.why.no_job" = "印刷中のものがありません。";
+"printer.why.busy" = "Macはこのプリンターの処理中です。しばらくしてからもう一度お試しください。";
+"printer.why.old_mac" = "iPhoneからプリンターを操作するには、MacのKhaytをアップデートしてください。";
+"printer.why.no_answer" = "Macが応答しませんでした。スリープ中またはオフラインの可能性があります。";
+"printer.why.unreachable" = "MacにもKhayt Cloudにも接続できませんでした。";
+/* Customer page messages */
+"portal.title" = "お客様ページ";
+"portal.share" = "リンクを共有";
+"portal.none" = "このページにメッセージはまだありません。";
+"portal.reply" = "お客様に返信";
+"portal.send" = "送信";
+"portal.messages.failed" = "メッセージを読み込めませんでした。";
+"portal.reply.failed" = "返信を送信できませんでした。";
+"portal.reply.viewer" = "このサインインではお店の閲覧のみ可能です。";
+/* Customer page */
+"customer.owes" = "未払い";
+"customer.limit" = "与信限度額 %@";
+"customer.over_limit" = "与信限度額%@を超えています";
+"customer.terms" = "%d日以内に支払い";
+"customer.terms.receipt" = "受領時に支払い";
+"customer.open" = "進行中のジョブ";
+"customer.open.none" = "進行中のジョブはありません。";
+"customer.history" = "完了したジョブ";
+"customer.history.none" = "このiPhoneに完了したジョブはありません。";
+"customer.history.window" = "このiPhoneには最新の完了済みジョブが保存されています。全履歴はMacにあります。";
+"customer.agreed" = "合意価格";
+"customer.messages" = "メッセージ";
+"customer.messages.none" = "記録されたメッセージはまだありません。";
+"customer.needs_book" = "この顧客のページを表示するには、お店の帳簿がこのiPhoneにある必要があります。";
+"customer.new_order" = "この顧客の新規注文";
+/* Rush, machine job */
+"orders.rush" = "特急";
+"machines.job" = "ジョブ: %@";

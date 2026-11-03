@@ -1,0 +1,20 @@
+/* The notification service extension's own copy of the alert words.
+   Held to the app's by NotificationStringsTests. */
+"alert.print.finished" = "印刷完了";
+"alert.print.failed" = "印刷失敗";
+"alert.print.cancelled" = "印刷キャンセル";
+"alert.print.a_job" = "ジョブ";
+"alert.print.move_post" = "後処理へ移動";
+"alert.print.reprint" = "キューに戻す";
+"alert.print.mark_shipped" = "発送済みにする";
+"PUSH_TITLE" = "Khayt";
+"PUSH_PRINT_FINISHED" = "印刷が完了しました";
+"PUSH_INTAKE" = "新しい注文リクエスト";
+"PUSH_OVERDUE" = "期限を過ぎたジョブがあります";
+"PUSH_LOW_STOCK" = "フィラメントが残り少なくなっています";
+"PUSH_DUE_TODAY" = "本日納期のジョブがあります";
+"PUSH_QUOTE_DECISION" = "お客様が見積に回答しました";
+"PUSH_QUOTE_APPROVED" = "お客様が見積を承認しました";
+"PUSH_QUOTE_DECLINED" = "お客様が見積を辞退しました";
+"PUSH_MESSAGE" = "お客様からメッセージが届きました";
+"PUSH_PAYMENT" = "入金がありました";

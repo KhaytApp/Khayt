@@ -1,0 +1,34 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "Cola";
+"Print" = "Impresión";
+"Printing" = "Imprimiendo";
+"QC" = "QC";
+"Done" = "Hecho";
+"Nothing printing right now" = "Nada imprimiéndose ahora";
+"Offline" = "Sin conexión";
+"LAN connected" = "Conectado";
+"%lld queued · %lld printing" = "%lld en cola · %lld imprimiendo";
+"ETA %@" = "Listo en %@";
+"Open app on shop Wi‑Fi" = "Abre Khayt en la red Wi‑Fi del taller";
+"%lld%%" = "%lld%%";
+"Paused" = "En pausa";
+"Failed" = "Fallida";
+"Cancelled" = "Cancelada";
+"Paused at %@" = "En pausa a las %@";
+"Ready to collect" = "Lista para recoger";
+"Print failed" = "Impresión fallida";
+"Print stopped" = "Impresión detenida";
+"Ends %@" = "Termina %@";
+"Log a failed print" = "Registrar una impresión fallida";
+"Scan a spool" = "Escanear una bobina";
+"Opens Khayt on the failed-print form." = "Abre Khayt en el formulario de impresión fallida.";
+"Opens Khayt on booking in a spool." = "Abre Khayt para dar de alta una bobina.";
+
+"Price a part" = "Presupuestar una pieza";
+"Opens Khayt on the calculator." = "Abre Khayt en la calculadora.";
+
+/* Live Activity buttons */
+"Move to post-processing" = "Pasar a postprocesado";
+"Print it again" = "Volver a imprimir";

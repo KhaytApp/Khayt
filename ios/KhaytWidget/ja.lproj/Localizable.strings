@@ -1,0 +1,34 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "キュー";
+"Print" = "印刷";
+"Printing" = "印刷中";
+"QC" = "検査";
+"Done" = "完了";
+"Nothing printing right now" = "現在印刷中のものはありません";
+"Offline" = "オフライン";
+"LAN connected" = "接続済み";
+"%lld queued · %lld printing" = "待機%lld件 · 印刷中%lld件";
+"ETA %@" = "あと%@";
+"Open app on shop Wi‑Fi" = "お店のWi‑FiでKhaytを開く";
+"%lld%%" = "%lld%%";
+"Paused" = "一時停止中";
+"Failed" = "失敗";
+"Cancelled" = "キャンセル";
+"Paused at %@" = "%@で一時停止";
+"Ready to collect" = "受け取り可能";
+"Print failed" = "印刷失敗";
+"Print stopped" = "印刷停止";
+"Ends %@" = "%@に終了";
+"Log a failed print" = "失敗した印刷を記録";
+"Scan a spool" = "スプールをスキャン";
+"Opens Khayt on the failed-print form." = "Khaytで失敗印刷の記録フォームを開きます。";
+"Opens Khayt on booking in a spool." = "Khaytでスプールの登録画面を開きます。";
+
+"Price a part" = "パーツの価格を計算";
+"Opens Khayt on the calculator." = "Khaytで計算機を開きます。";
+
+/* Live Activity buttons */
+"Move to post-processing" = "後処理へ移動";
+"Print it again" = "もう一度印刷";
