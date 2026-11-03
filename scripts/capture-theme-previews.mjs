@@ -22,6 +22,7 @@ const DEFAULT_THEMES = [
   { id: 'workbench', appearance: 'light', file: 'workbench.png' },
   { id: 'command', appearance: 'light', file: 'command.png' },
   { id: 'vivid', appearance: 'light', file: 'vivid.png' },
+  { id: 'khayt', appearance: 'light', file: 'khayt.png' },
   { id: 'blueprint', appearance: 'light', file: 'blueprint.png' },
   // Captured DARK on purpose: Nocturne's defaultAppearance is dark, and a light
   // thumbnail would sell the one theme built for a dim workshop as another

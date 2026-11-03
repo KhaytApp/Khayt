@@ -222,7 +222,7 @@
         // Removing the design in use would leave the app styled by a theme that
         // no longer exists, so hand it back to the default first.
         if (typeof settings !== 'undefined' && settings.designTheme === `custom:${id}`) {
-          settings.designTheme = 'workbench';
+          settings.designTheme = 'khayt';
           if (typeof saveAll === 'function') saveAll();
         }
         say(tr('theme.design.removed', 'Removed.'));

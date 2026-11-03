@@ -60,7 +60,7 @@ try {
   const colour = await window.evaluate(() => {
     const read = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
     const rows = [];
-    for (const id of ['workbench', 'blueprint', 'command', 'foreman', 'meridian', 'nocturne', 'vivid']) {
+    for (const id of ['khayt', 'workbench', 'blueprint', 'command', 'foreman', 'meridian', 'nocturne', 'vivid']) {
       for (const appearance of ['light', 'dark']) {
         settings.designTheme = id;
         settings.theme = appearance;
@@ -81,7 +81,7 @@ try {
     return rows;
   });
 
-  ok(colour.length === 14, `checked every theme in both appearances (${colour.length})`);
+  ok(colour.length === 16, `checked every theme in both appearances (${colour.length})`);
   ok(colour.every((r) => r.lowStock === r.warning),
     'an untouched shop gets the THEME\'s low-stock colour, not a fixed amber');
   ok(colour.every((r) => r.swatch === r.lowStock),
