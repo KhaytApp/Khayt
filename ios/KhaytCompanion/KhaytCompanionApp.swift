@@ -60,6 +60,7 @@ struct KhaytCompanionApp: App {
         PrintActivityActions.handler = { machineId, move in
             await center.perform(move: move, machineId: machineId)
         }
+        JobSearch.open = { id in nav.openOrder(id: id) }
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
