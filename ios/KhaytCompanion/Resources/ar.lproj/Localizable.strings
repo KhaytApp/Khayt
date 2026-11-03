@@ -933,6 +933,14 @@
 "eod.finished_list" = "اكتمل اليوم";
 "eod.due_list" = "مستحق اليوم ولم يكتمل";
 "eod.nothing" = "لم يكتمل أي طلب اليوم.";
+/* Edit order */
+"edit.title" = "تعديل";
+"edit.due" = "تاريخ التسليم";
+"edit.priority" = "الأولوية";
+"edit.priority.normal" = "عادية";
+"edit.priority.high" = "عالية";
+"edit.priority.urgent" = "عاجلة";
+"edit.price.note" = "السعر الجديد هو الإجمالي الذي يدفعه العميل. يبقى المدفوع كما هو حتى الإجمالي الجديد.";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";

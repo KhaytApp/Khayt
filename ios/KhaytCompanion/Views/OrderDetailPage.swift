@@ -37,6 +37,7 @@ struct OrderDetailPage: View {
     /// The carriers to ship with, when this job is finished and not yet sent.
     @State private var shipChoices: [KhaytEngine.CarrierChoice]?
     @State private var shipping = false
+    @State private var editing: KhaytAPIClient.OrderEditState?
     /// The job's saved customer, for Call / WhatsApp / Email.
     @State private var customer: Client?
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
@@ -138,6 +139,14 @@ struct OrderDetailPage: View {
                         .lineLimit(1)
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                if api.holdsBook, order.status != "cancelled" {
+                    Button(L10n.tr("edit.title")) { Task { editing = await api.editState(orderId: order.id) } }
+                }
+            }
+        }
+        .sheet(item: Binding(get: { editing.map(EditingJob.init) }, set: { if $0 == nil { editing = nil } })) { e in
+            EditOrderSheet(orderId: order.id, start: e.state, currency: currency) { await onChanged() }
         }
         .moveNotes($moveNotes)
         .navigationBarTitleDisplayMode(.inline)
@@ -654,4 +663,10 @@ private struct FlowChips: View {
         .disabled(disabled || on)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
+}
+
+/// The Edit sheet's subject, identified for `.sheet(item:)`.
+private struct EditingJob: Identifiable {
+    let state: KhaytAPIClient.OrderEditState
+    var id: String { "\(state.dueDate ?? "")|\(state.priorityLevel)|\(state.price)" }
 }

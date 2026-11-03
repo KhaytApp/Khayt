@@ -933,6 +933,14 @@
 "eod.finished_list" = "Finished today";
 "eod.due_list" = "Due today, not done";
 "eod.nothing" = "Nothing was finished today.";
+/* Edit order */
+"edit.title" = "Edit";
+"edit.due" = "Due date";
+"edit.priority" = "Priority";
+"edit.priority.normal" = "Normal";
+"edit.priority.high" = "High";
+"edit.priority.urgent" = "Urgent";
+"edit.price.note" = "A new price is the total the customer pays. What was already paid stays, up to the new total.";
 /* Customer page */
 "customer.owes" = "Owes";
 "customer.limit" = "Credit limit %@";

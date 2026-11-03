@@ -799,6 +799,62 @@ final class KhaytAPIClient: ObservableObject {
         await deliverPending()
     }
 
+    /// What the Edit sheet starts from: the job's due day, priority level and
+    /// price, as the shared rule reads them. Nil without a book, or for a
+    /// cancelled job.
+    struct OrderEditState: Equatable {
+        var dueDate: String?
+        var priorityLevel: String
+        var price: Double
+    }
+
+    func editState(orderId: String) async -> OrderEditState? {
+        guard let book, book.exists, let reader, let store = try? book.read(),
+              case .array(let rows)? = store["printLog"],
+              let row = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }), case .object(let o) = row, o["status"] != .string("cancelled"),
+              let engine = try? await reader.sharedEngine() else { return nil }
+        var due: String?
+        if case .string(let d)? = o["dueDate"], !d.isEmpty { due = String(d.prefix(10)) }
+        var price = 0.0
+        if case .number(let n)? = o["price"] { price = n }
+        let level = (try? await engine.priority(of: row)) ?? "normal"
+        return OrderEditState(dueDate: due, priorityLevel: level, price: price)
+    }
+
+    /// An edit to a job — `lib/order-edit.js` `applyEdit` through KhaytCore,
+    /// as the Mac's Edit sheet: only the fields named, the edit written down
+    /// in the job's history, the money following a typed price. Returns
+    /// whether anything changed.
+    @discardableResult
+    func editOrder(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Bool {
+        guard let book, book.exists, let reader else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.needs_book"))
+        }
+        let store = try book.read()
+        guard case .array(let rows)? = store["printLog"],
+              let row = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }), case .object(let before) = row else {
+            throw KhaytAPIError.server(L10n.tr("alert.print.no_order"))
+        }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = store["settings"] { settings = s }
+        let edited = try await reader.sharedEngine().editJob(order: row, fields: fields, settings: settings,
+                                                            now: now, editId: BookWriter.lanId("edit", now: now))
+        guard edited.changed, case .object(let after) = edited.order else { return false }
+        try book.updateRecord(collection: "printLog", id: orderId) { record in
+            for (key, value) in after where before[key] != value { record[key] = value }
+            for key in before.keys where after[key] == nil { record[key] = nil }
+        }
+        await refreshPendingCount()
+        await deliverPending()
+        return true
+    }
+
     /// The carriers to ship a job with — the Mac's Ship sheet list (Manual
     /// last, always there) — or nil when the job is not one to ship now:
     /// unfinished, already sent or already delivered.
