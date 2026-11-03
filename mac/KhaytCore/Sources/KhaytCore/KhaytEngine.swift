@@ -9175,7 +9175,7 @@ public actor KhaytEngine {
             (function (o, ctx) {
               if (!o || !o.trackingToken) return null;
               var built = KhaytPortalRefresh.payloadFor(o, ctx);
-              return { kind: built.kind, payload: built.payload,
+              return { kind: built.kind, payload: built.payload, intakeId: built.intakeId,
                        customerEmail: built.customerEmail, pubToken: String(o.trackingToken) };
             })(ARG0, { settings: ARG1, clients: ARG2, shopName: ARG3, shopAddress: ARG4, stages: ARG5 })
             """,

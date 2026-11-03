@@ -124,6 +124,8 @@ struct OnlinePane: View {
                 // the Save bar below is not its business.
                 CloudLibrarySettings(shop: shop)
                 CloudPlanSettings(shop: shop)
+                PayLinkSettings(shop: shop)
+                DigestSettings(shop: shop)
                 TeamSettings(shop: shop)
                 Section(shop.words.callIt("mac.online_title")) {
                     Text(shop.words.callIt("mac.online_desc"))
