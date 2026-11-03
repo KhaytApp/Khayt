@@ -74,7 +74,8 @@ final class LiveChannel: ObservableObject {
     private var task: Task<Void, Never>?
     private var pulling = false
     /// Where a shop event off the stream goes — the print alerts.
-    var onEvent: ((_ kind: String, _ at: String, _ ciphertext: Data?, _ session: CloudSession) async -> Void)?
+    var onEvent: ((_ kind: String, _ at: String, _ ciphertext: Data?, _ session: CloudSession,
+                   _ ref: [String: String]?) async -> Void)?
 
     init(api: KhaytAPIClient, printers: LivePrinters) {
         self.api = api
@@ -181,7 +182,12 @@ final class LiveChannel: ObservableObject {
                 if let ct = o["ciphertext"], ct != .null { sealed = try? JSONEncoder().encode(ct) }
                 var at = ""
                 if case .string(let a)? = o["at"] { at = a }
-                await onEvent?(kind, at, sealed, session)
+                // The cloud's own alerts name a customer page by `ref.item`.
+                var ref: [String: String]?
+                if case .object(let r)? = o["ref"] {
+                    ref = r.compactMapValues { if case .string(let v) = $0 { return v }; return nil }
+                }
+                await onEvent?(kind, at, sealed, session, ref)
             }
         default:
             break                                   // `intake` and whatever comes next
