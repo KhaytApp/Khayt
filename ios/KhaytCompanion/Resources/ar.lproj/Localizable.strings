@@ -898,6 +898,22 @@
 "owed.remind.no_phone" = "لا يوجد رقم هاتف محفوظ لهذا العميل.";
 "owed.remind.no_customer" = "هذا الطلب غير مرتبط بعميل محفوظ.";
 "owed.open.hint" = "يعرض الطلبات التي عليها مبالغ مستحقة.";
+/* Customer page */
+"customer.owes" = "المستحق";
+"customer.limit" = "حد الائتمان %@";
+"customer.over_limit" = "تجاوز حد الائتمان %@";
+"customer.terms" = "يدفع خلال %d يومًا";
+"customer.terms.receipt" = "يدفع عند الاستلام";
+"customer.open" = "الطلبات المفتوحة";
+"customer.open.none" = "لا توجد طلبات مفتوحة.";
+"customer.history" = "الطلبات المكتملة";
+"customer.history.none" = "لا توجد طلبات مكتملة على هذا الهاتف.";
+"customer.history.window" = "يحمل هذا الهاتف أحدث الطلبات المكتملة فقط؛ السجل الكامل على الماك.";
+"customer.agreed" = "الأسعار المتفق عليها";
+"customer.messages" = "الرسائل";
+"customer.messages.none" = "لا توجد رسائل مسجلة بعد.";
+"customer.needs_book" = "تحتاج صفحة العميل إلى دفتر المتجر على هذا الهاتف.";
+"customer.new_order" = "طلب جديد لهذا العميل";
 /* Rush, machine job */
 "orders.rush" = "عاجل";
 "machines.job" = "الطلب: %@";
