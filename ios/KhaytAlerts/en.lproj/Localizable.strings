@@ -10,3 +10,11 @@
 "PUSH_TITLE" = "Khayt";
 "PUSH_PRINT_FINISHED" = "A print finished";
 "PUSH_INTAKE" = "New order request";
+"PUSH_OVERDUE" = "Jobs are late";
+"PUSH_LOW_STOCK" = "Filament is running low";
+"PUSH_DUE_TODAY" = "Jobs are due today";
+"PUSH_QUOTE_DECISION" = "A customer answered a quote";
+"PUSH_QUOTE_APPROVED" = "A customer approved a quote";
+"PUSH_QUOTE_DECLINED" = "A customer declined a quote";
+"PUSH_MESSAGE" = "A customer sent a message";
+"PUSH_PAYMENT" = "A payment came in";

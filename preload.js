@@ -245,6 +245,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudMembersList: (opts) => ipcRenderer.invoke('hub:cloud-members-list', opts),
   cloudGetSlug:    (opts) => ipcRenderer.invoke('hub:cloud-get-slug', opts),
   cloudSetSlug:    (opts) => ipcRenderer.invoke('hub:cloud-set-slug', opts),
+  cloudPayLink:    (opts) => ipcRenderer.invoke('hub:cloud-paylink', opts),
   cloudMemberRemove: (opts) => ipcRenderer.invoke('hub:cloud-member-remove', opts),
   cloudCatalogPublish: (opts) => ipcRenderer.invoke('hub:cloud-catalog-publish', opts),
   cloudReviewSummary: (opts) => ipcRenderer.invoke('hub:cloud-review-summary', opts),

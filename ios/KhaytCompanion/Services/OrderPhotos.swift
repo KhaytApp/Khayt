@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import UIKit
 import KhaytCore
 
@@ -70,6 +71,25 @@ extension KhaytAPIClient {
             guard case .object(let o) = row, o["id"] == .string(orderId) else { continue }
             if case .string(let t)? = o["trackingToken"], !t.isEmpty { return t }
             return nil
+        }
+        return nil
+    }
+
+    /// The job whose customer page the cloud names by `ref.item`: the first
+    /// 16 hex of SHA-256 of its tracking token (the token itself never
+    /// travels through Apple).
+    func orderId(publishedItem item: String) -> String? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return Self.orderId(publishedItem: item, in: store)
+    }
+
+    nonisolated static func orderId(publishedItem item: String, in store: [String: JSONValue]) -> String? {
+        guard case .array(let rows)? = store["printLog"] else { return nil }
+        for row in rows {
+            guard case .object(let o) = row, case .string(let t)? = o["trackingToken"], !t.isEmpty,
+                  case .string(let id)? = o["id"] else { continue }
+            let digest = SHA256.hash(data: Data(t.utf8)).map { String(format: "%02x", $0) }.joined()
+            if digest.prefix(16) == item.lowercased().prefix(16) { return id }
         }
         return nil
     }
