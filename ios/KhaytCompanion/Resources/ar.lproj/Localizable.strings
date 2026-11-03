@@ -692,8 +692,8 @@
 "focus.kind.shop" = "الورشة";
 /* Scanning a Khayt label (lib/scan.js) */
 "scan.label.title" = "مسح ملصق";
-"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من خيط.";
-"scan.label.unknown" = "هذا الرمز ليس ملصقًا من خيط.";
+"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من Khayt.";
+"scan.label.unknown" = "هذا الرمز ليس ملصقًا من Khayt.";
 "scan.label.missing" = "الطلب أو البكرة في هذا الملصق غير موجودة على هذا الهاتف.";
 
 /* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
@@ -886,7 +886,99 @@
 "licence.not_for_sale" = "غير مرخّص للبيع";
 "licence.nc_line" = "%1$@: ترخيصه لا يسمح ببيع المطبوعات.";
 "licence.expired_line" = "%1$@: انتهى الترخيص المشترى في %2$@.";
+"PUSH_OVERDUE" = "هناك طلبات متأخرة";
+"PUSH_LOW_STOCK" = "الخيوط على وشك النفاد";
+"PUSH_DUE_TODAY" = "هناك طلبات مستحقة اليوم";
+"PUSH_QUOTE_DECISION" = "ردّ عميل على عرض سعر";
+"PUSH_QUOTE_APPROVED" = "وافق عميل على عرض سعر";
+"PUSH_QUOTE_DECLINED" = "رفض عميل عرض سعر";
+"PUSH_MESSAGE" = "أرسل عميل رسالة";
+"PUSH_PAYMENT" = "وصلت دفعة";
 
+/* Who owes */
+"owed.title" = "المستحقات";
+"owed.empty" = "لا توجد مبالغ مستحقة على الطلبات المفتوحة.";
+"owed.total" = "%@ مستحقة على %d طلبات";
+"owed.due" = "الاستحقاق %@";
+"owed.remind" = "تذكير عبر واتساب";
+"owed.remind.a11y" = "تذكير %@ عبر واتساب";
+"owed.remind.text" = "مرحبًا، نذكّركم بلطف بأن مبلغ %2$@ ما زال مستحقًا مقابل %1$@. شكرًا لكم!";
+"owed.remind.no_phone" = "لا يوجد رقم هاتف محفوظ لهذا العميل.";
+"owed.remind.no_customer" = "هذا الطلب غير مرتبط بعميل محفوظ.";
+"owed.open.hint" = "يعرض الطلبات التي عليها مبالغ مستحقة.";
+/* Proforma */
+"proforma.title" = "فاتورة مبدئية";
+"proforma.open" = "فاتورة مبدئية";
+"proforma.open.sub" = "اطلب الدفع قبل إصدار الفاتورة";
+"proforma.refused" = "الفاتورة المبدئية لطلب مسعّر ومقبول ولم يكتمل بعد.";
+/* Intake reminder */
+"intake.remind.when" = "ذكّرني";
+"intake.remind.tomorrow" = "صباح الغد";
+"intake.remind.3days" = "بعد 3 أيام";
+"intake.remind.week" = "بعد أسبوع";
+"intake.remind.alert" = "تذكير: تواصل مع %@ بشأن طلبه.";
+
+/* Ship */
+"ship.title" = "الشحن";
+"ship.carrier" = "شركة الشحن";
+"ship.service" = "الخدمة";
+"ship.tracking" = "رقم التتبع";
+"ship.scan" = "امسح بوليصة الشحن";
+"ship.scan.hint" = "وجّه الكاميرا إلى الباركود على إيصال المندوب.";
+"ship.hint" = "من إيصال شركة الشحن، ويظهر في صفحة العميل.";
+"ship.create" = "تم الشحن";
+"ship.open" = "الشحن";
+"ship.open.sub" = "شركة الشحن ورقم التتبع";
+/* End of day */
+"eod.title" = "نهاية اليوم";
+"eod.finished" = "اكتمل اليوم";
+"eod.revenue" = "إيراد اليوم";
+"eod.open" = "ما زال مفتوحًا";
+"eod.overdue" = "متأخر";
+"eod.waste" = "الخيوط المهدرة";
+"eod.grams" = "%@ غ";
+"eod.hours" = "الساعات المسجلة";
+"eod.finished_list" = "اكتمل اليوم";
+"eod.due_list" = "مستحق اليوم ولم يكتمل";
+"eod.nothing" = "لم يكتمل أي طلب اليوم.";
+/* Edit order */
+"edit.title" = "تعديل";
+"edit.due" = "تاريخ التسليم";
+"edit.priority" = "الأولوية";
+"edit.priority.normal" = "عادية";
+"edit.priority.high" = "عالية";
+"edit.priority.urgent" = "عاجلة";
+"edit.price.note" = "السعر الجديد هو الإجمالي الذي يدفعه العميل. يبقى المدفوع كما هو حتى الإجمالي الجديد.";
+/* Printer control */
+"printer.pause" = "إيقاف مؤقت";
+"printer.resume" = "استئناف";
+"printer.stop" = "إيقاف";
+"printer.stop.confirm" = "إيقاف الطباعة على %@؟";
+"printer.stop.message" = "لا يمكن استئناف الطباعة بعد إيقافها.";
+"printer.sending" = "جارٍ سؤال الماك…";
+"printer.sending.cloud" = "جارٍ سؤال الماك عبر Khayt Cloud…";
+"printer.done.pause" = "أُوقفت مؤقتًا.";
+"printer.done.resume" = "استُؤنفت.";
+"printer.done.stop" = "أُوقفت.";
+"printer.refused" = "قالت الطابعة: %@";
+"printer.why.device" = "يحتاج هذا الهاتف إلى الاقتران بالماك من جديد قبل التحكم بالطابعات.";
+"printer.why.not_found" = "هذه الآلة غير موجودة على الماك.";
+"printer.why.not_connected" = "الماك غير متصل بهذه الطابعة الآن.";
+"printer.why.unsupported" = "لا يمكن التحكم بهذه الطابعة من Khayt.";
+"printer.why.no_job" = "لا شيء قيد الطباعة عليها.";
+"printer.why.busy" = "الماك مشغول بهذه الطابعة. حاول بعد لحظة.";
+"printer.why.old_mac" = "حدّث Khayt على الماك للتحكم بالطابعات من الهاتف.";
+"printer.why.no_answer" = "لم يُجب الماك. ربما هو في وضع السكون أو غير متصل.";
+"printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى Khayt Cloud.";
+/* Customer page messages */
+"portal.title" = "صفحة العميل";
+"portal.share" = "مشاركة الرابط";
+"portal.none" = "لا توجد رسائل على هذه الصفحة بعد.";
+"portal.reply" = "الرد على العميل";
+"portal.send" = "إرسال";
+"portal.messages.failed" = "تعذّر تحميل الرسائل.";
+"portal.reply.failed" = "لم يُرسل الرد.";
+"portal.reply.viewer" = "هذا الحساب للعرض فقط.";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";

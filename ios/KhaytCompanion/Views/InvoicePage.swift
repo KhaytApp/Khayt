@@ -8,6 +8,10 @@ import KhaytCore
 struct InvoicePage: View {
     @EnvironmentObject private var api: KhaytAPIClient
     let orderId: String
+    /// The proforma rather than the invoice.
+    var proforma = false
+
+    private var title: String { L10n.tr(proforma ? "proforma.title" : "invoice.title") }
 
     @StateObject private var paper = InvoicePaper()
     @State private var refusal: String?
@@ -18,7 +22,7 @@ struct InvoicePage: View {
         ZStack {
             KhaytDesign.ground.ignoresSafeArea()
             if let refusal {
-                ContentUnavailableView(L10n.tr("invoice.title"), systemImage: "doc.text",
+                ContentUnavailableView(title, systemImage: "doc.text",
                                        description: Text(refusal))
             } else {
                 InvoiceWebView(paper: paper)
@@ -26,7 +30,7 @@ struct InvoicePage: View {
                 if !paper.drawn { ProgressView() }
             }
         }
-        .navigationTitle(L10n.tr("invoice.title"))
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -44,7 +48,7 @@ struct InvoicePage: View {
     }
 
     private func load() async {
-        switch await api.invoice(orderId: orderId) {
+        switch await api.invoice(orderId: orderId, proforma: proforma) {
         case .refused(let why):
             refusal = why.message
         case .paper(let doc, let filename):

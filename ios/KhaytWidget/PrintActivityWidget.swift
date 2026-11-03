@@ -14,6 +14,7 @@ struct PrintActivityWidget: Widget {
                 .padding(.vertical, 16)
                 .activityBackgroundTint(PrintActivityLook.surface.opacity(0.92))
                 .activitySystemActionForegroundColor(PrintActivityLook.ink)
+                .widgetURL(URL(string: "khayt://machine/\(context.attributes.machineId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")"))
         } dynamicIsland: { context in
             let state = context.state
             let tone = PrintActivityLook.tone(state.phase)
@@ -83,6 +84,7 @@ struct PrintActivityWidget: Widget {
                 }
             }
             .keylineTint(tone)
+            .widgetURL(URL(string: "khayt://machine/\(context.attributes.machineId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "")"))
         }
     }
 }

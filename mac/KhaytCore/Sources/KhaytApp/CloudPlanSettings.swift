@@ -25,6 +25,7 @@ struct CloudPlanSettings: View {
     @State private var loaded = false
     @State private var asking: CloudPlans.Plan?
     @State private var busy = false
+    @State private var paying: CloudPlans.Plan?
     private let preloaded: Bool
     /// The section's rows in a plain stack, for a photograph: `ImageRenderer`
     /// cannot draw a `Form`.
@@ -57,6 +58,9 @@ struct CloudPlanSettings: View {
             }
         }
         .task { if !preloaded { await load() } }
+        .shopSheet(item: $paying) { plan in
+            PlanPaySheet(shop: shop, plan: plan) { Task { await load() } }
+        }
         .alert(asking.map { shop.words.callIt("mac.plan_move_title", ["plan": .string(Self.planName($0.name, $0.label, shop.words))]) } ?? "",
                isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
                presenting: asking) { plan in
@@ -85,9 +89,6 @@ struct CloudPlanSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(catalogue.plans) { plan in row(plan) }
-                if catalogue.pricesInclusive == true {
-                    Text(shop.words.callIt("mac.plan_vat_included")).font(.caption).foregroundStyle(.secondary)
-                }
                 if !shop.cloudIsOwner {
                     Text(shop.words.callIt("mac.plan_owner_only")).font(.caption).foregroundStyle(.secondary)
                 } else if !upgradesOpen {
@@ -124,6 +125,15 @@ struct CloudPlanSettings: View {
                 }
                 // Moving back to Free is always allowed; moving up needs the beta open.
                 .disabled(busy || (CloudPlans.isUpgrade(plan, from: current) && !upgradesOpen))
+                // Paying is its own button, and it is found out lazily: the
+                // first tap on a cloud with no payment provider hides it for
+                // the session. Not while the beta's upgrades are free: paying
+                // for what Upgrade gives away would only confuse.
+                if CloudPlans.isUpgrade(plan, from: current), (plan.priceSar ?? 0) > 0,
+                   !upgradesOpen, !Shop.payGate.providerOff {
+                    Button(shop.words.callIt("mac.pay_button")) { paying = plan }
+                        .disabled(busy)
+                }
             }
         }
     }

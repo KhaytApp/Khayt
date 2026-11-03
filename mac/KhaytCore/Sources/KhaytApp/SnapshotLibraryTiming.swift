@@ -38,6 +38,46 @@ extension Snapshot {
             say("libtime round \(round): board → library \(ms(t))")
             await settle()
         }
+        // Every other screen, the same way: one switch from the Board, timed
+        // through its layout and drawing, twice (the first pays for anything
+        // made once).
+        let screens: [(String, Shop.Shelf)] = [
+            ("dashboard", .dashboard), ("jobs", .jobs(nil)), ("customers", .customers),
+            ("machines", .machines), ("inventory", .inventory), ("expenses", .expenses),
+            ("waste", .waste), ("reports", .reports), ("catalogue", .catalogue),
+            ("colour", .colour), ("calculator", .calculator), ("portfolio", .portfolio),
+            ("giftCards", .giftCards)]
+        for (name, shelf) in screens {
+            for round in 1...2 {
+                shop.shelf = .board
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                await settle()
+                let t = ContinuousClock.now
+                shop.shelf = shelf
+                window.contentView?.layoutSubtreeIfNeeded()
+                window.displayIfNeeded()
+                say("libtime screen \(name) round \(round): \(ms(t))")
+                await settle()
+            }
+        }
+        // `KHAYT_SNAPSHOT_SCREENLOOP=jobs:n`: switch to that screen n times
+        // over, for a `sample` of where the switch spends its time.
+        if let spec = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SCREENLOOP"],
+           let colon = spec.firstIndex(of: ":"), let n = Int(spec[spec.index(after: colon)...]),
+           let shelf = screens.first(where: { $0.0 == String(spec[..<colon]) })?.1 {
+            say("libtime: screen loop start")
+            let loopStart = ContinuousClock.now
+            for _ in 0..<n {
+                shop.shelf = .board
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                shop.shelf = shelf
+                window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                await Task.yield()
+            }
+            say("libtime: screen loop end, \(n) in \(ms(loopStart))")
+        }
+        shop.shelf = .library(nil)
+        await settle()
         // The figures the screen reads, each alone, after it has drawn once.
         var t = ContinuousClock.now
         _ = shop.groups; say("libtime   groups \(ms(t))")
@@ -72,6 +112,22 @@ extension Snapshot {
             }
             shop.clearLibrarySelection()
             await settle()
+            // `KHAYT_SNAPSHOT_SELLOOP=n`: choose models n times over, so a
+            // `sample` of the process sees where choosing spends its time.
+            if let n = Int(ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SELLOOP"] ?? "") {
+                say("libtime: selection loop start")
+                let loopStart = ContinuousClock.now
+                // From nothing chosen to one model each time: that is when the
+                // inspector and the selection menus appear.
+                for i in 0..<n {
+                    shop.clearLibrarySelection()
+                    window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                    shop.select(tiles[i % tiles.count], modifiers: .replace)
+                    window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+                    await Task.yield()
+                }
+                say("libtime: selection loop end, \(n) in \(ms(loopStart))")
+            }
         }
         // The filter bar at a wide and a narrow window: how many axis menus
         // it chose to draw inline is visible in the picture.

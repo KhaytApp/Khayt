@@ -65,7 +65,7 @@ extension Shop {
     func webRecordForDownload(page: String, now: Date = Date()) -> (id: String, title: String)? {
         let probe = WebSave.Page(url: page, site: .of(host: URL(string: page)?.host), title: "-")
         guard let id = WebSaveRecord.existing(probe, in: libraryRows),
-              let file = files.first(where: { $0.id == id }), file.isFromWeb,
+              let file = libraryFile(id: id), file.isFromWeb,
               let at = file.savedFromWebAt.flatMap(Calendar.instant) else { return nil }
         // The extension's window, and a little more for the browser's clock.
         guard now.timeIntervalSince(at) <= WebSave.attachWindow + 300, at.timeIntervalSince(now) < 300 else { return nil }

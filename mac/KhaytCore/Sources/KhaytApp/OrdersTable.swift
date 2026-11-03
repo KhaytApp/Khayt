@@ -543,6 +543,8 @@ struct JobActions: View {
         Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
         if Shop.offersProforma(job) {
             Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
+            Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
+                .disabled(!shop.canMoveJobs)
         }
         Divider()
         JobDeleteItems(shop: shop, ids: [job.id])

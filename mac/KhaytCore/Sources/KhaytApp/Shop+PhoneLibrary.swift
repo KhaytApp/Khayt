@@ -163,7 +163,7 @@ extension Shop {
 
     /// `GET /api/library/{id}/thumb`: the picture's bytes and type, or nil.
     func phoneLibraryThumb(_ id: String) async -> (Data, String)? {
-        guard let file = files.first(where: { $0.id == id }), let source = thumbnail(for: file) else { return nil }
+        guard let file = libraryFile(id: id), let source = thumbnail(for: file) else { return nil }
         switch source {
         case .inlineData(let uri):
             // `data:image/jpeg;base64,…`
@@ -191,7 +191,7 @@ extension Shop {
         func refuse(_ status: Int, _ reason: String) -> (Int, String) {
             (status, #"{"ok":false,"reason":"\#(reason)"}"#)
         }
-        guard let file = files.first(where: { $0.id == id && !$0.isArchived }) else { return refuse(404, "not-found") }
+        guard let file = libraryFile(id: id), !file.isArchived else { return refuse(404, "not-found") }
         if let plate, !plates(of: file).contains(where: { $0.index == plate }) { return refuse(404, "not-found") }
         // The calculator path says what went wrong on the window. A phone's
         // question is not the shop's screen: put back what it showed.

@@ -148,5 +148,7 @@ enum PrintAlertText {
     /// and a test holds the two copies to the same words.
     static let keys = ["alert.print.finished", "alert.print.failed", "alert.print.cancelled",
                        "alert.print.a_job", "alert.print.move_post", "alert.print.reprint",
-                       "alert.print.mark_shipped", "PUSH_TITLE", "PUSH_PRINT_FINISHED", "PUSH_INTAKE"]
+                       "alert.print.mark_shipped", "PUSH_TITLE", "PUSH_PRINT_FINISHED", "PUSH_INTAKE",
+                       "PUSH_OVERDUE", "PUSH_LOW_STOCK", "PUSH_DUE_TODAY", "PUSH_QUOTE_DECISION",
+                       "PUSH_QUOTE_APPROVED", "PUSH_QUOTE_DECLINED", "PUSH_MESSAGE", "PUSH_PAYMENT"]
 }

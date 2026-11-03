@@ -896,6 +896,7 @@
   "doc.due_date": "Due date",
   "doc.payment_terms": "Payment terms",
   "doc.net_days": "Net {n}",
+  "doc.milestone_of": "{pct}% of {total}",
   "doc.post_checklist": "Post-Processing Checklist",
   "doc.operator": "Operator",
   "doc.reviewed_by": "Reviewed by",

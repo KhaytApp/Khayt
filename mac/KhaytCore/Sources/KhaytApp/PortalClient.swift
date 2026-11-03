@@ -52,14 +52,25 @@ enum PortalClient {
 
     // MARK: - The owner calls
 
+    /// The body of `PUT /published/{token}`: kind, payload, and — only when
+    /// present — `customerEmail` (omitted rather than "", the server reads its
+    /// presence as "link this to an account") and `intakeId`, TOP LEVEL and
+    /// never inside the public payload, so the server can email the customer
+    /// their link once.
+    static func publishBody(_ r: PortalRefresh) -> [String: JSONValue] {
+        var body: [String: JSONValue] = ["kind": .string(r.kind), "payload": r.payload]
+        if !r.customerEmail.isEmpty { body["customerEmail"] = .string(r.customerEmail) }
+        if let id = r.intakeId, !id.isEmpty { body["intakeId"] = .string(id) }
+        return body
+    }
+
     /// Publish a job's link for the first time — the same PUT a republish
     /// sends. Returns the note when the link went up but the customer's
     /// address was not linked (the shop's daily allowance of new addresses).
     static func publish(_ request: PortalRefresh, baseUrl: String, shopId: String,
                         token: String, engine: KhaytEngine,
                         session: URLSession? = nil) async throws -> String? {
-        var body: [String: JSONValue] = ["kind": .string(request.kind), "payload": request.payload]
-        if !request.customerEmail.isEmpty { body["customerEmail"] = .string(request.customerEmail) }
+        let body = publishBody(request)
         let path = try await engine.portalOwnerPath("item", shopId: shopId, pubToken: request.pubToken)
         let reply = try await send("PUT", path, body: .object(body), baseUrl: baseUrl, token: token,
                                    engine: engine, session: session)
@@ -183,13 +194,7 @@ enum PortalClient {
         // payload, and the customer's address only when there is one. An empty
         // `customerEmail` is OMITTED rather than sent as "", because the server
         // reads its presence as "link this to an account".
-        var body: [String: JSONValue] = [
-            "kind": .string(refresh.kind),
-            "payload": refresh.payload,
-        ]
-        if !refresh.customerEmail.isEmpty {
-            body["customerEmail"] = .string(refresh.customerEmail)
-        }
+        let body = publishBody(refresh)
         request.httpBody = try JSONEncoder().encode(JSONValue.object(body))
 
         let data: Data

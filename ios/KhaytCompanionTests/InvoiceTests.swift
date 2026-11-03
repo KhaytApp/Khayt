@@ -102,6 +102,37 @@ final class InvoiceTests: XCTestCase {
         XCTAssertEqual(filename, "INV-2026-0042.pdf")
     }
 
+    /// A proforma asks for payment before the work is invoiced: the shared
+    /// paper with its proforma option, under the job's own id, no ZATCA QR,
+    /// and nothing numbered — so even a job still owed a number has one.
+    func testAProformaIsTheSharedPaperAndNumbersNothing() async throws {
+        let r = try reader { store in
+            guard case .object(var s)? = store["settings"] else { return }
+            s["enableZatca"] = .bool(true)
+            store["settings"] = .object(s)
+            self.addOrder(&store, ["id": .string("QUO-8"), "status": .string("pending"),
+                                   "quoteAcceptedAt": .string("2026-10-21")])
+            self.addOrder(&store, ["id": .string("S-3001"), "status": .string("completed")])
+            self.addOrder(&store, ["id": .string("S-3002"), "status": .string("printing"), "price": .number(0)])
+        }
+        guard case .paper(let doc, let filename) = try await r.invoice(orderId: "QUO-8", language: "en",
+                                                                       proforma: true) else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertTrue(doc.html.lowercased().contains("proforma"))
+        XCTAssertTrue(doc.html.contains("QUO-8"))
+        XCTAssertFalse(doc.html.contains("alt=\"ZATCA\""), "a proforma is not a tax invoice")
+        XCTAssertEqual(filename, "Proforma-QUO-8.pdf")
+        let book = try await r.wholeBook()
+        guard case .object(let settings)? = book["settings"] else { return XCTFail() }
+        XCTAssertNil(settings["invNumNext"], "the counter is untouched")
+
+        for refused in ["S-3001", "S-3002"] {
+            let build = try await r.invoice(orderId: refused, language: "en", proforma: true)
+            guard case .refused(.noProforma) = build else { return XCTFail("\(refused): \(build)") }
+        }
+    }
+
     func testAPartialHistoryPrintsNoLoyaltyBadge() async throws {
         let base = SampleShop.scope()
         var held = base.collections

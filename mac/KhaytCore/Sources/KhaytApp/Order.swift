@@ -488,7 +488,31 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         if s.count > 10, let instant = instant(s) {
             return Calendar.book.startOfDay(for: instant)
         }
-        return dayFormatter.date(from: String(s.prefix(10)))
+        let head = s.prefix(10)
+        if let fast = plainDay(head) { return fast }
+        return dayFormatter.date(from: String(head))
+    }
+
+    /// "2026-08-08" as the shop's local midnight, read by hand. The same
+    /// answer as `dayFormatter`, which goes through ICU on every call: the
+    /// board sorted by due date read two of these per comparison, and that
+    /// parse was most of the time it took to draw (Nov 2026). Anything not
+    /// exactly that shape, or a day that does not exist (Feb 31), is nil here
+    /// and left to the formatter.
+    static func plainDay(_ s: Substring) -> Date? {
+        let u = Array(s.utf8)
+        guard u.count == 10, u[4] == 45, u[7] == 45 else { return nil }
+        func number(_ r: Range<Int>) -> Int? {
+            var v = 0
+            for i in r { let c = u[i]; guard c >= 48, c <= 57 else { return nil }; v = v * 10 + Int(c - 48) }
+            return v
+        }
+        guard let y = number(0..<4), let m = number(5..<7), let d = number(8..<10),
+              (1...12).contains(m), (1...31).contains(d) else { return nil }
+        let date = Calendar.book.date(from: DateComponents(year: y, month: m, day: d))
+        // A day the calendar rolled over (Feb 31 → Mar 3) is not this day.
+        guard let date, Calendar.book.component(.day, from: date) == d else { return nil }
+        return date
     }
 
     /// A full ISO timestamp — the shared, made-once formatters.
