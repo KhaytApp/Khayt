@@ -103,7 +103,8 @@ extension Shop {
     /// numbered first (`issueInvoiceNumberIfOwed`), and one still owed a
     /// number after that — this viewer could not give it one — is refused
     /// with the reason rather than drawn.
-    func invoiceDocument(for id: Order.ID, proforma: Bool = false) async -> InvoiceBuild {
+    func invoiceDocument(for id: Order.ID, proforma: Bool = false,
+                         milestone milestoneId: String? = nil) async -> InvoiceBuild {
         guard orders.contains(where: { $0.id == id }) else {
             return .refused(words.callIt("mac.move_gone"))
         }
@@ -114,7 +115,13 @@ extension Shop {
             guard let job = orders.first(where: { $0.id == id }) else {
                 return .refused(words.callIt("mac.move_gone"))
             }
-            guard let doc = await Invoice.html(for: job, shop: self, proforma: true) else {
+            // One part of the job, asked for on its own (`Milestones`).
+            var part: Milestone?
+            if let milestoneId {
+                part = milestones(of: id).first { $0.id == milestoneId }
+                if part == nil { return .refused(words.callIt("mac.move_gone")) }
+            }
+            guard let doc = await Invoice.html(for: job, shop: self, proforma: true, milestone: part) else {
                 return .refused(words.callIt("mac.no_document"))
             }
             return .paper(doc, number: job.id)
@@ -286,7 +293,21 @@ extension Shop {
     /// runtime. Pure enough to test: the parts are costed through the same
     /// `jobParts` a product's are.
     func duplicateSeed(of row: JSONValue) async -> JobFromModel? {
-        guard let engine, let input = try? await engine.duplicateJobInput(row) else { return nil }
+        guard let engine else { return nil }
+        // A job saved in a customer's currency holds its shipping, extra lines
+        // and agreed prices in THAT currency; the sheet reads every figure as
+        // the shop's and `newOrder` converts on save. Back into the shop's
+        // currency first (`inShopCurrency`, today's rate), or a euro job's
+        // copy would be converted twice. A job in the shop's currency is
+        // left exactly as it is.
+        var source = row
+        if case .object(var o) = row,
+           let back = try? await engine.inShopCurrency(row, settings: settingsDict),
+           case .number(let fx)? = back["fx"], fx != 1 {
+            for key in ["shippingCost", "extraLines", "parts"] { if let v = back[key] { o[key] = v } }
+            source = .object(o)
+        }
+        guard let input = try? await engine.duplicateJobInput(source) else { return nil }
         var parts: [JSONValue] = []
         if case .array(let rows)? = input["parts"] { parts = rows }
         var seed = JobFromModel(project: Self.plainString(input["project"]) ?? "",

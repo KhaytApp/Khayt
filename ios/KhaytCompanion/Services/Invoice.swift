@@ -39,6 +39,8 @@ enum InvoiceRefusal: Equatable {
     case notNumbered
     /// The shared document could not be built.
     case failed
+    /// A proforma is for priced work accepted and not yet finished.
+    case noProforma
 
     var message: String {
         switch self {
@@ -47,6 +49,7 @@ enum InvoiceRefusal: Equatable {
         case .cancelled: return L10n.tr("invoice.refused.cancelled")
         case .notNumbered: return L10n.tr("invoice.refused.not_numbered")
         case .failed: return L10n.tr("invoice.refused.failed")
+        case .noProforma: return L10n.tr("proforma.refused")
         }
     }
 }
@@ -54,7 +57,13 @@ enum InvoiceRefusal: Equatable {
 extension BookReader {
 
     /// The invoice for `orderId`, in `language` — or why there is none.
-    func invoice(orderId: String, language: String) async throws -> InvoiceBuild {
+    ///
+    /// `proforma`: the same paper as a request for payment before the work is
+    /// invoiced (`proforma` in `lib/invoice-document.js`, as the Mac's
+    /// `Invoice.html(for:shop:proforma:)`): titled and watermarked as one, no
+    /// ZATCA QR, the job's own id for a number — and never numbered, so the
+    /// phone's no-numbering rule is not in its way.
+    func invoice(orderId: String, language: String, proforma: Bool = false) async throws -> InvoiceBuild {
         let store = try wholeBook()
         var orders: [JSONValue] = []
         if case .array(let rows)? = store["printLog"] { orders = rows }
@@ -63,13 +72,20 @@ extension BookReader {
             return false
         }), case .object(let order) = row else { return .refused(.missing) }
 
-        if let refusal = Self.invoiceRefusal(order) { return .refused(refusal) }
+        if proforma {
+            guard Self.offersProforma(order) else { return .refused(.noProforma) }
+        } else if let refusal = Self.invoiceRefusal(order) { return .refused(refusal) }
 
         var settings = Self.settings(store)
         let engine = try sharedEngine()
         // The counter is the Mac's — see the type's note.
-        if try await engine.invoiceNumberOwed(order: row, settings: settings) { return .refused(.notNumbered) }
-        let number = try await engine.documentNumber(order: row, settings: settings)
+        let number: String
+        if proforma {
+            number = orderId
+        } else {
+            if try await engine.invoiceNumberOwed(order: row, settings: settings) { return .refused(.notNumbered) }
+            number = try await engine.documentNumber(order: row, settings: settings)
+        }
 
         let price = Self.number(order["price"])
         let profile = try? await engine.taxProfile(settings: settings)
@@ -96,7 +112,7 @@ extension BookReader {
         let taxTotal = split?.taxTotal ?? 0
         var qrSvg = ""
         var qrProblem: String?
-        if case .bool(true)? = settings["enableZatca"] {
+        if !proforma, case .bool(true)? = settings["enableZatca"] {
             let words = (try? await engine.translations(language: language)) ?? [:]
             let refusal = (try? await engine.zatcaReadiness(settings: settings, sellerName: sellerName)).flatMap { $0 }
             if let refusal {
@@ -124,6 +140,7 @@ extension BookReader {
             "subtotalShown": .string(Self.amount(summary?.itemsSubtotal ?? price)),
             "vatRate": .number(registered ? profile!.totalPercent : 0),
             "shipping": .number(0),
+            "proforma": .bool(proforma),
         ]
         let currencies = ((try? await engine.currencies()) ?? [:]).mapValues {
             JSONValue.object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
@@ -133,7 +150,8 @@ extension BookReader {
             language: language, money: money, sellerFields: fields, orders: orders) else {
             return .refused(.failed)
         }
-        return .paper(doc, filename: Self.invoiceFilename(number: number, project: Self.text(order["project"])))
+        return .paper(doc, filename: Self.invoiceFilename(number: proforma ? "Proforma-" + number : number,
+                                                          project: Self.text(order["project"])))
     }
 
     /// The rules that hold before any engine is asked: a cancelled job and a
@@ -147,6 +165,18 @@ extension BookReader {
         if status == "on_hold", truthy(order["hasQuote"]),
            !truthy(order["quoteAcceptedAt"]), !truthy(order["clientApprovedAt"]) { return .quote }
         return nil
+    }
+
+    /// Whether a job has a proforma to give — the Mac's `Shop.offersProforma`:
+    /// priced, accepted and not yet finished. A quote already is the paper for
+    /// asking; a finished job gets its invoice.
+    nonisolated static func offersProforma(_ order: [String: JSONValue]) -> Bool {
+        guard number(order["price"]) > 0 else { return false }
+        return offersProforma(status: text(order["status"]) ?? "")
+    }
+
+    nonisolated static func offersProforma(status: String) -> Bool {
+        ["pending", "on_hold", "printing", "post", "qc"].contains(status)
     }
 
     /// JavaScript's truthiness, for the fields the rule above reads.

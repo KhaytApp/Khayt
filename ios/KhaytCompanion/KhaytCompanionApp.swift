@@ -57,11 +57,19 @@ struct KhaytCompanionApp: App {
         let nav = OrdersNavigationState()
         _ordersNav = StateObject(wrappedValue: nav)
         center.navigation = nav
+        PrintActivityActions.handler = { machineId, move in
+            await center.perform(move: move, machineId: machineId)
+        }
+        JobSearch.open = { id in nav.openOrder(id: id) }
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         activeCount = ActiveCountSender(settings: s)
-        channel.onEvent = { kind, at, ciphertext, session in
-            await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
+        channel.onEvent = { kind, at, ciphertext, session, ref in
+            if kind == "cmd-result" {
+                await PrinterReplies.shared.receive(ciphertext, dek: session.dek)
+                return
+            }
+            await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at, ref: ref)
         }
         PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()

@@ -886,7 +886,115 @@
 "licence.not_for_sale" = "Not licensed for sale";
 "licence.nc_line" = "%1$@: its licence does not allow selling prints.";
 "licence.expired_line" = "%1$@: the bought licence ended on %2$@.";
+"PUSH_OVERDUE" = "Jobs are late";
+"PUSH_LOW_STOCK" = "Filament is running low";
+"PUSH_DUE_TODAY" = "Jobs are due today";
+"PUSH_QUOTE_DECISION" = "A customer answered a quote";
+"PUSH_QUOTE_APPROVED" = "A customer approved a quote";
+"PUSH_QUOTE_DECLINED" = "A customer declined a quote";
+"PUSH_MESSAGE" = "A customer sent a message";
+"PUSH_PAYMENT" = "A payment came in";
 
+/* Who owes */
+"owed.title" = "Who owes";
+"owed.empty" = "Nothing is owed on open jobs.";
+"owed.total" = "%@ owed on %d jobs";
+"owed.due" = "Due %@";
+"owed.remind" = "Remind on WhatsApp";
+"owed.remind.a11y" = "Remind %@ on WhatsApp";
+"owed.remind.text" = "Hello, a friendly reminder that %2$@ is still due for %1$@. Thank you!";
+"owed.remind.no_phone" = "This customer has no phone number saved.";
+"owed.remind.no_customer" = "This job is not linked to a saved customer.";
+"owed.open.hint" = "Shows the jobs with money owed.";
+/* Proforma */
+"proforma.title" = "Proforma invoice";
+"proforma.open" = "Proforma invoice";
+"proforma.open.sub" = "Ask for payment before the work is invoiced";
+"proforma.refused" = "A proforma is for a priced job that is accepted and not yet finished.";
+/* Intake reminder */
+"intake.remind.when" = "Remind me";
+"intake.remind.tomorrow" = "Tomorrow morning";
+"intake.remind.3days" = "In 3 days";
+"intake.remind.week" = "In a week";
+"intake.remind.alert" = "Reminder: get back to %@ about their request.";
+
+/* Ship */
+"ship.title" = "Ship";
+"ship.carrier" = "Carrier";
+"ship.service" = "Service";
+"ship.tracking" = "Tracking number";
+"ship.scan" = "Scan the waybill";
+"ship.scan.hint" = "Point at the barcode on the courier’s receipt.";
+"ship.hint" = "From the courier’s receipt. The customer’s page shows it.";
+"ship.create" = "Mark shipped";
+"ship.open" = "Ship";
+"ship.open.sub" = "Carrier and tracking number";
+/* End of day */
+"eod.title" = "End of day";
+"eod.finished" = "Finished today";
+"eod.revenue" = "Earned today";
+"eod.open" = "Still open";
+"eod.overdue" = "Late";
+"eod.waste" = "Filament wasted";
+"eod.grams" = "%@ g";
+"eod.hours" = "Hours logged";
+"eod.finished_list" = "Finished today";
+"eod.due_list" = "Due today, not done";
+"eod.nothing" = "Nothing was finished today.";
+/* Edit order */
+"edit.title" = "Edit";
+"edit.due" = "Due date";
+"edit.priority" = "Priority";
+"edit.priority.normal" = "Normal";
+"edit.priority.high" = "High";
+"edit.priority.urgent" = "Urgent";
+"edit.price.note" = "A new price is the total the customer pays. What was already paid stays, up to the new total.";
+/* Printer control */
+"printer.pause" = "Pause";
+"printer.resume" = "Resume";
+"printer.stop" = "Stop";
+"printer.stop.confirm" = "Stop the print on %@?";
+"printer.stop.message" = "A stopped print cannot be resumed.";
+"printer.sending" = "Asking the Mac…";
+"printer.sending.cloud" = "Asking the Mac through Khayt Cloud…";
+"printer.done.pause" = "Paused.";
+"printer.done.resume" = "Resumed.";
+"printer.done.stop" = "Stopped.";
+"printer.refused" = "The printer said: %@";
+"printer.why.device" = "This phone needs to pair with the Mac again before it can control printers.";
+"printer.why.not_found" = "The Mac doesn’t have this machine.";
+"printer.why.not_connected" = "The Mac isn’t connected to this printer right now.";
+"printer.why.unsupported" = "This printer can’t be controlled from Khayt.";
+"printer.why.no_job" = "Nothing is printing on it.";
+"printer.why.busy" = "The Mac is busy with this printer. Try again in a moment.";
+"printer.why.old_mac" = "Update Khayt on the Mac to control printers from the phone.";
+"printer.why.no_answer" = "The Mac didn’t answer. It may be asleep or offline.";
+"printer.why.unreachable" = "Neither the Mac nor Khayt Cloud could be reached.";
+/* Customer page messages */
+"portal.title" = "Customer page";
+"portal.share" = "Share link";
+"portal.none" = "No messages on this page yet.";
+"portal.reply" = "Reply to the customer";
+"portal.send" = "Send";
+"portal.messages.failed" = "The messages could not be loaded.";
+"portal.reply.failed" = "The reply was not sent.";
+"portal.reply.viewer" = "This sign-in can only view the shop.";
+/* Customer page */
+"customer.owes" = "Owes";
+"customer.limit" = "Credit limit %@";
+"customer.over_limit" = "Over their credit limit of %@";
+"customer.terms" = "Pays within %d days";
+"customer.terms.receipt" = "Pays on receipt";
+"customer.open" = "Open jobs";
+"customer.open.none" = "No open jobs.";
+"customer.history" = "Finished jobs";
+"customer.history.none" = "No finished jobs on this phone.";
+"customer.history.window" = "This phone holds the newest finished jobs; the full history is on the Mac.";
+"customer.agreed" = "Agreed prices";
+"customer.messages" = "Messages";
+"customer.messages.none" = "No messages logged yet.";
+"customer.needs_book" = "This customer’s page needs the shop’s book on this phone.";
+"customer.new_order" = "New order for this customer";
 /* Rush, machine job */
 "orders.rush" = "Rush";
 "machines.job" = "Job: %@";

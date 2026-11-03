@@ -818,7 +818,7 @@ struct ProductSheet: View {
     private var multiPlateFiles: [LibraryFile] {
         var seen: [String] = []
         for part in parts { if let id = part.printFileId, !seen.contains(id) { seen.append(id) } }
-        return seen.compactMap { id in shop.files.first { $0.id == id } }
+        return seen.compactMap { id in shop.libraryFile(id: id) }
             .filter { !shop.plates(of: $0).isEmpty }
     }
 

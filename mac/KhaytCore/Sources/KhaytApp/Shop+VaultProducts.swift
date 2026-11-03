@@ -71,8 +71,11 @@ extension Shop {
                                          files: [LibraryFile]) -> [String] {
         let free: Set<String> = ["own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd"]
         var byFile: [String: LibraryFile] = [:]
+        // Indexed once: a release of many files looked each one up by walking
+        // the whole library.
+        let byId = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for (recordId, fileId) in records {
-            if let f = files.first(where: { $0.id == recordId }) { byFile[fileId] = f }
+            if let f = byId[recordId] { byFile[fileId] = f }
         }
         return fileIds.compactMap { fid in
             guard let f = byFile[fid] else { return nil }

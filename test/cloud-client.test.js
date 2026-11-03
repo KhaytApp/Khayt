@@ -526,6 +526,44 @@ test('injected separators are percent-encoded on the wire, not real slashes', as
 });
 
 
+test('the shop payment link: read, set with an optional label, remove (Cloud #155)', async () => {
+  const calls = [];
+  let stored = null;
+  const srv = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      const body = raw ? JSON.parse(raw) : null;
+      calls.push({ method: req.method, path: req.url, body, auth: req.headers.authorization });
+      const send = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+      if (req.method === 'GET') return send(200, stored || {});
+      if (req.method === 'PUT') {
+        if (!/^https:\/\//.test(body.url)) return send(400, { reason: 'bad-pay-link', error: 'The payment link must be https.' });
+        stored = Object.assign({ updatedAt: '2026-11-03T08:00:00Z' }, body); return send(200, stored);
+      }
+      if (req.method === 'DELETE') { stored = null; return send(200, { ok: true }); }
+      send(405, {});
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    assert.deepEqual(await cc.getPayLink(url, 'shop_1', 'tok'), { url: null, label: null, updatedAt: null });
+    const set = await cc.setPayLink(url, 'shop_1', 'tok', '  https://pay.example/k?amt={amount} ', '  ');
+    assert.equal(set.url, 'https://pay.example/k?amt={amount}');
+    assert.ok(!('label' in calls[1].body), 'a blank label is not sent');
+    assert.equal(calls[1].path, '/v1/shops/shop_1/payment-link');
+    assert.equal(calls[1].auth, 'Bearer tok');
+    await cc.setPayLink(url, 'shop_1', 'tok', 'https://pay.example/k', 'Mada');
+    assert.equal((await cc.getPayLink(url, 'shop_1', 'tok')).label, 'Mada');
+    await assert.rejects(cc.setPayLink(url, 'shop_1', 'tok', 'http://pay.example', ''), /must be https/);
+    await cc.deletePayLink(url, 'shop_1', 'tok');
+    assert.equal((await cc.getPayLink(url, 'shop_1', 'tok')).url, null);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
 test('publishing a job from the quote form names its request top level, never in the payload (Cloud #157)', async () => {
   const bodies = [];
   const srv = http.createServer((req, res) => {

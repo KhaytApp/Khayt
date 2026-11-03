@@ -28,6 +28,15 @@ struct ContentView: View {
         .onAppear { applyPendingTab() }
         // "Open in Khayt" from WhatsApp, Mail or Files: a model to quote.
         .onOpenURL { url in
+            // A widget, a Live Activity or a shared link: khayt://, the Mac's shapes.
+            if let link = OrdersNavigationState.link(url) {
+                switch link {
+                case .job(let id): ordersNav.openOrder(id: id)
+                case .tab(let tab): selectedTab = tab
+                case .orders(let stage): ordersNav.openOrders(filter: stage)
+                }
+                return
+            }
             guard url.isFileURL, KhaytAPIClient.modelExtensions.contains(url.pathExtension.lowercased()),
                   let copy = QuotedFile.copy(url) else { return }
             selectedTab = 0

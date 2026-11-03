@@ -5922,6 +5922,15 @@ ipcMain.handle('hub:cloud-get-slug', async (_e, { url, shopId, token } = {}) => 
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+ipcMain.handle('hub:cloud-paylink', async (_e, { url, shopId, token, op, link, label } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    if (op === 'set') return { ok: true, ...(await cloudClient.setPayLink(url, shopId, token, link, label)) };
+    if (op === 'delete') return { ok: true, ...(await cloudClient.deletePayLink(url, shopId, token)) };
+    return { ok: true, ...(await cloudClient.getPayLink(url, shopId, token)) };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('hub:cloud-set-slug', async (_e, { url, shopId, token, slug } = {}) => {
   try {
     token = cloudToken(token, url);

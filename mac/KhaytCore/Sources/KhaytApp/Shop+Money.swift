@@ -663,7 +663,7 @@ extension Shop {
                 let out = try await engine.newOrder(
                     input, orders: orders, settings: Self.settings(root), now: Date(),
                     tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
-                    consumables: Self.rows(root, "consumables"))
+                    consumables: Self.rows(root, "consumables"), clients: Self.rows(root, "clients"))
 
                 guard case .object(let record) = out.order,
                       case .string(let id)? = record["id"] else {

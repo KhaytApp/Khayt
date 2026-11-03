@@ -2298,7 +2298,7 @@ extension Shop {
     /// nobody sees. False when refused.
     @discardableResult
     func setPrintNextNote(_ id: LibraryFile.ID, _ typed: String) -> Bool {
-        guard files.first(where: { $0.id == id })?.isPrintNext == true else { return false }
+        guard libraryFile(id: id)?.isPrintNext == true else { return false }
         let note = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         return editFiles([id], named: words.callIt("mac.print_next_for")) { record in
             guard record["printNextAt"] != nil else { return }
@@ -2566,7 +2566,7 @@ extension Shop {
     /// needs to know rather than leave the window sitting on an empty library.
     @discardableResult
     func reveal(fileId: String) -> Bool {
-        guard let file = files.first(where: { $0.id == fileId }) else { return false }
+        guard let file = libraryFile(id: fileId) else { return false }
         search = ""
         // Every axis, not some: a filter left on (ready on a machine, a
         // creator, Print next, duplicates) can hide the model, and a model not
@@ -3459,7 +3459,7 @@ extension Shop {
     func modelThumbnail(for job: Order) -> ThumbnailSource? {
         for part in job.parts {
             guard let id = part.printFileId,
-                  let file = files.first(where: { $0.id == id }) else { continue }
+                  let file = libraryFile(id: id) else { continue }
             if let source = thumbnail(for: file) { return source }
         }
         return nil

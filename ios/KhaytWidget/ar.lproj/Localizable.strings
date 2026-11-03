@@ -26,3 +26,7 @@
 
 "Price a part" = "تسعير قطعة";
 "Opens Khayt on the calculator." = "يفتح خيط على الحاسبة.";
+
+/* Live Activity buttons */
+"Move to post-processing" = "انقل إلى المعالجة اللاحقة";
+"Print it again" = "اطبعه مرة أخرى";

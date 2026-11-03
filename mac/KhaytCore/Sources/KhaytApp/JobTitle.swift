@@ -88,7 +88,7 @@ extension Shop {
     /// A job's title as the screens draw it — see `JobTitle`. Display only.
     func shownTitle(of job: Order) -> String {
         JobTitle.shown(project: job.project, parts: job.parts,
-                       fileTitle: { id in self.files.first { $0.id == id }?.title },
+                       fileTitle: { id in self.libraryFile(id: id)?.title },
                        untitled: words.callIt("mac.untitled_print"))
     }
 }

@@ -81,9 +81,13 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
 
     /// A shop event off Khayt Cloud's stream: opened with the shop's key,
     /// and said if it is one this phone knows. Unknown kinds are ignored.
-    func receive(kind: String, ciphertext: Data?, dek: Data, at: String = "") async {
+    func receive(kind: String, ciphertext: Data?, dek: Data, at: String = "", ref: [String: String]? = nil) async {
         if kind == "intake" {
             await announceIntake(at: at)
+            return
+        }
+        if let key = Self.shopAlertKeys[kind] {
+            await announceShop(kind: kind, key: key, at: at, ref: ref)
             return
         }
         guard let ciphertext, let event = Self.open(kind: kind, ciphertext: ciphertext, dek: dek) else { return }
@@ -104,6 +108,37 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         c.sound = .default
         c.threadIdentifier = "khayt.intake"
         c.filterCriteria = NotificationKind.intake
+        try? await UNUserNotificationCenter.current()
+            .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
+    }
+
+    /// The kinds the stream carries that Apple would otherwise say — while
+    /// the stream is open Apple's copy is held back (see `willPresent`), so
+    /// the app says each itself, in the same words, routed the same way.
+    nonisolated static let shopAlertKeys: [String: String] = [
+        "overdue": "PUSH_OVERDUE", "low-stock": "PUSH_LOW_STOCK", "due-today": "PUSH_DUE_TODAY",
+        "quote-decision": "PUSH_QUOTE_DECISION", "message": "PUSH_MESSAGE", "payment": "PUSH_PAYMENT",
+    ]
+
+    func announceShop(kind: String, key: String, at: String, ref: [String: String]?) async {
+        let id = kind + "." + (at.isEmpty ? ISO8601DateFormatter().string(from: Date()) : at)
+        var body = L10n.tr(key)
+        if kind == "quote-decision", let d = ref?["decision"] {
+            body = L10n.tr(d == "approve" ? "PUSH_QUOTE_APPROVED" : "PUSH_QUOTE_DECLINED")
+        }
+        let tone: FeedItem.Tone = ["overdue"].contains(kind) ? .late : (kind == "low-stock" ? .attention : .none)
+        ShopFeed.shared.add(FeedItem(id: id, kind: kind, title: body,
+                                     at: ISO8601DateFormatter().date(from: at) ?? Date(), tone: tone,
+                                     unread: true, orderId: nil))
+        let c = UNMutableNotificationContent()
+        c.title = L10n.tr("PUSH_TITLE")
+        c.body = body
+        c.sound = .default
+        c.threadIdentifier = "khayt.shop"
+        c.filterCriteria = NotificationKind.shop
+        var k: [String: Any] = ["kind": kind, "at": at]
+        if let ref { k["ref"] = ref }
+        c.userInfo = ["k": k]
         try? await UNUserNotificationCenter.current()
             .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
     }
@@ -170,10 +205,14 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         let info = request.content.userInfo
         // The alert itself tapped, not one of its buttons: open what it is about.
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-            guard let to = OrdersNavigationState.destination(identifier: request.identifier,
+            guard var to = OrdersNavigationState.destination(identifier: request.identifier,
                                                              thread: request.content.threadIdentifier,
                                                              userInfo: info) else { return }
-            await MainActor.run { self.navigation?.go(to) }
+            if case .published(let item) = to {
+                to = await api.orderId(publishedItem: item).map { .order($0) } ?? .orders
+            }
+            let target = to
+            await MainActor.run { self.navigation?.go(target) }
             return
         }
         guard let action = PrintAlertAction(rawValue: response.actionIdentifier),
@@ -185,6 +224,15 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     /// into the book, offline-safe, sent on like any edit. Checked against
     /// the job as it is NOW: an alert tapped an hour later must not move a
     /// job someone has already moved.
+    /// A Live Activity's button: the same move, for the one job printing on
+    /// that machine — none when there is not exactly one, as the alert's rule.
+    func perform(move: String, machineId: String) async {
+        let onMachine = ((try? await api.fetchQueue()) ?? [])
+            .filter { $0.machineId == machineId && $0.status == "printing" }
+        guard onMachine.count == 1 else { return }
+        await perform(move == "post" ? .moveToPost : .reprint, orderId: onMachine[0].id)
+    }
+
     func perform(_ action: PrintAlertAction, orderId: String) async {
         let status = ((try? await api.fetchQueue()) ?? []).first { $0.id == orderId }?.status
         var notes: [String] = []

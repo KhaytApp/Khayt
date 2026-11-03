@@ -303,7 +303,16 @@ function invoiceHtml(order, ctx) {
     // tax point (VAT is due on issued invoices). It prints the job's id,
     // the proforma title, and a watermark saying so.
     proforma = false,
+    // ONE PART OF A JOB, asked for on its own: `{ label, percentage, amount,
+    // total }`. Only meaningful with `proforma` — a milestone is a request for
+    // part of the money, never a tax invoice, so the job's single real invoice
+    // is untouched. With it the table is ONE line (the label and "N% of
+    // total") priced at `amount`, shipping/rush/extras/discount are left off,
+    // and the tax breakdown is worked out on `amount` by the same engine as
+    // the whole job. Without it the document is byte for byte what it was.
+    milestone = null,
   } = ctx || {};
+  const ms = (proforma && milestone && typeof milestone === 'object') ? milestone : null;
   const issuedDate = formatPrintDate(order.date);
   const issuedTime = order.timestamp ? new Date(order.timestamp).toTimeString().slice(0, 5) : '';
   // Feature 1: use the order's currency (per-order override, else client, else base)
@@ -454,7 +463,7 @@ function invoiceHtml(order, ctx) {
   const projectRef = (clientName && project && project !== clientName) ? project : '';
 
   // Lines
-  const orderExtraLines = order.extraLines || [];
+  const orderExtraLines = ms ? [] : (order.extraLines || []);
   const orderExtraTotal = orderExtraLines.reduce((s, l) => s + (+l.amount || 0), 0);
   const lines = (order.parts && order.parts.length > 0)
     ? order.parts
@@ -480,7 +489,29 @@ function invoiceHtml(order, ctx) {
   const costedLines = lines.filter(p => !isAgreed(p));
   const totalBase = costedLines.reduce((s, p) => s + (+p.baseCost || 0), 0);
   const costedPool = partsPool - lines.reduce((s, p) => s + (isAgreed(p) ? agreedLine(p) : 0), 0);
-  const linesHtml = lines.map(p => {
+  const msAmount = ms ? (+ms.amount || 0) : 0;
+  const msTax = (() => {
+    // The same engine, the same profile, applied to the milestone's amount —
+    // which is in the job's tax mode, inclusive or exclusive, like its price.
+    const T = global.KhaytTax;
+    if (T && typeof T.computeTax === 'function' && typeof T.profileFromSettings === 'function') {
+      return T.computeTax(msAmount, T.profileFromSettings(settings || {}));
+    }
+    return { subtotal: msAmount, taxTotal: 0, total: msAmount };
+  })();
+  const msMeta = ms ? num(t("doc.milestone_of", {
+    pct: String(+ms.percentage || 0),
+    total: `${fmtMoney(+ms.total || 0)} ${invCurrencyCode || settings.currency || ''}`.trim(),
+  })) : '';
+  const linesHtml = ms ? `
+      <tr>
+        <td>
+          <div class="desc-en">${escapeHtml(ms.label || '')}</div>
+          <div class="meta">${escapeHtml(msMeta)}</div>
+        </td>
+        <td class="center">${num('1')}</td>
+        <td class="amount">${fmtMoney(msAmount)} <span style="color:var(--ink-mute); font-weight:500;">${invCurrSym}</span></td>
+      </tr>` : lines.map(p => {
     const share = isAgreed(p) ? agreedLine(p)
       : totalBase > 0 ? (p.baseCost / totalBase) * costedPool : costedPool / costedLines.length;
     const meta = [
@@ -724,19 +755,19 @@ function invoiceHtml(order, ctx) {
         <div class="summary">
           <div class="row">
             <span class="label-en">${escapeHtml(L.subtotal[0])}</span>
-            <span class="v">${subtotalShown} ${invCurrSym}</span>
+            <span class="v">${ms ? fmtMoney(msAmount) : subtotalShown} ${invCurrSym}</span>
           </div>
-          ${order.discountPct > 0 ? `
+          ${!ms && order.discountPct > 0 ? `
           <div class="row" style="color:#22c55e;">
             <span class="label-en">${escapeHtml(isAr ? `خصم (${order.discountPct}%)` : `Discount (${order.discountPct}%)`)}</span>
             <span class="v">−${fmtMoney(Math.max(0, (+order.priceBeforeDiscount || 0) * (+order.discountPct || 0) / 100))} ${invCurrSym}</span>
           </div>` : ''}
-          ${(+order.rushFeeAmount || 0) > 0 ? `
+          ${!ms && (+order.rushFeeAmount || 0) > 0 ? `
           <div class="row">
             <span class="label-en">${escapeHtml(t("doc.rush_fee"))}</span>
             <span class="v">${fmtMoney(+order.rushFeeAmount)} ${invCurrSym}</span>
           </div>` : ''}
-          ${(+order.shippingCost || 0) > 0 ? `
+          ${!ms && (+order.shippingCost || 0) > 0 ? `
           <div class="row">
             <span class="label-en">${escapeHtml(t("doc.shipping"))}</span>
             <span class="v">${fmtMoney(+order.shippingCost)} ${invCurrSym}</span>
@@ -744,21 +775,21 @@ function invoiceHtml(order, ctx) {
           ${vatRate > 0 ? `
           <div class="row">
             <span class="label-en">${escapeHtml(L.vat[0])}${taxAdded ? '' : ` ${t("doc.incl")}`}</span>
-            <span class="v">${vatAmount} ${invCurrSym}</span>
+            <span class="v">${ms ? fmtMoney(msTax.taxTotal) : vatAmount} ${invCurrSym}</span>
           </div>` : ''}
           <div class="row grand">
             <span>
               <span class="label-en">${escapeHtml(L.totalDue[0])}</span>
               ${bi ? `<span class="label-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(L.totalDue[1])}</span>` : ''}
             </span>
-            <span class="v">${total}<span class="unit">${invCurrSym}</span></span>
+            <span class="v">${ms ? fmtMoney(msTax.total) : total}<span class="unit">${invCurrSym}</span></span>
           </div>
           ${(() => {
             const orderCur = invCurrencyCode;
             const baseCur = settings.currency || 'SAR';
             const xrate = (settings.exchangeRates || {})[orderCur];
             if (orderCur && orderCur !== baseCur && xrate && xrate > 0) {
-              const convertedAmt = fmtMoney((+order.price || 0) * xrate);
+              const convertedAmt = fmtMoney((ms ? msAmount : (+order.price || 0)) * xrate);
               const baseSym = currencyMarkHtml(baseCur,
                                 (CURRENCIES[baseCur] || CURRENCIES.SAR).symbol, escapeHtml);
               return `<div class="row" style="opacity:0.65;font-size:11px;border-top:1px dashed rgba(0,0,0,0.1);padding-top:4px;margin-top:4px;">
@@ -773,7 +804,7 @@ function invoiceHtml(order, ctx) {
 
       ${bankSectionHtml}
 
-      ${(order.instalments && order.instalments.length > 0) ? `
+      ${(!ms && order.instalments && order.instalments.length > 0) ? `
       <div class="inv-notes-section" style="margin-top:12px;">
         <div class="label-strip">
           <span>${escapeHtml(t("doc.payment_schedule"))}</span>

@@ -173,6 +173,145 @@ actor BookReader {
         throw CompanionBook.Failure.busy
     }
 
+    /// The jobs behind Home's Owed figure, most owed first: the same open
+    /// jobs and the same shared rule (`owedByOrder`), so the list adds up to
+    /// the figure it was opened from.
+    func owing() async throws -> [OwedLine] {
+        let store = try book.read()
+        let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r }; return [] }()
+        let clients: [JSONValue] = { if case .array(let r)? = store["clients"] { return r }; return [] }()
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let engine = try engine()
+        let currencies: [String: JSONValue] = ((try? await engine.currencies()) ?? [:]).mapValues {
+            .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
+        }
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        let open: [[String: JSONValue]] = orders.compactMap { row in
+            guard case .object(let o) = row, case .string(let st)? = o["status"],
+                  !finished.contains(st), st != "quote" else { return nil }
+            return o
+        }
+        let owedBy = try await engine.owedByOrder(open.map(JSONValue.object), settings: settings,
+                                                  clients: clients, currencies: currencies)
+        func text(_ v: JSONValue?) -> String {
+            if case .string(let s)? = v { return s }
+            return ""
+        }
+        return open.compactMap { o -> OwedLine? in
+            let id = text(o["id"])
+            guard let owed = owedBy[id], owed > 0.005 else { return nil }
+            let due = text(o["dueDate"])
+            return OwedLine(id: id, project: text(o["project"]), client: text(o["client"]),
+                            owed: owed, dueDate: due.isEmpty ? nil : due)
+        }.sorted { $0.owed > $1.owed }
+    }
+
+    /// Today's End of Day figures, by the Mac's own `EndOfDay.report` and the
+    /// shared per-order facts (`endOfDayFacts`): the same day (the shop's
+    /// local Gregorian day), the same revenue rule.
+    func endOfDay(now: Date = Date()) async throws -> DayReport {
+        let store = try book.read()
+        func rows(_ key: String) -> [JSONValue]? {
+            if case .array(let r)? = store[key] { return r }
+            return nil
+        }
+        let orders = rows("printLog") ?? []
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let facts = try await engine().endOfDayFacts(orders: orders, settings: settings, clients: rows("clients") ?? [])
+        let report = EndOfDay.report(day: Calendar.book.dayString(now), orders: orders, facts: facts,
+                                     waste: rows("wasteLog") ?? [], time: rows("timeEntries") ?? [],
+                                     dayOf: { Calendar.localDay(ofInstant: $0) })
+        return DayReport(report: report, holdsWaste: rows("wasteLog") != nil, holdsTime: rows("timeEntries") != nil)
+    }
+
+    /// One customer's page. Their jobs are those linked by `clientId`, and
+    /// unlinked ones under exactly their name — the desktop's own match.
+    /// Owed is the shared `owedByOrder` on every job that can owe.
+    func customer(id: String) async throws -> CustomerSummary? {
+        let store = try book.read()
+        func rows(_ key: String) -> [JSONValue] {
+            if case .array(let r)? = store[key] { return r }
+            return []
+        }
+        func text(_ v: JSONValue?) -> String {
+            if case .string(let s)? = v { return s.trimmingCharacters(in: .whitespacesAndNewlines) }
+            return ""
+        }
+        func number(_ v: JSONValue?) -> Double {
+            switch v {
+            case .number(let n)?: return n.isFinite ? n : 0
+            case .string(let s)?: return Double(s) ?? 0
+            default: return 0
+            }
+        }
+        let clients = rows("clients")
+        guard case .object(let client)? = clients.first(where: {
+            if case .object(let o) = $0, o["id"] == .string(id) { return true }
+            return false
+        }) else { return nil }
+        let names = Set(["name", "nameEn", "nameAr"].map { text(client[$0]).lowercased() }.filter { !$0.isEmpty })
+        let theirs: [[String: JSONValue]] = rows("printLog").compactMap { row in
+            guard case .object(let o) = row else { return nil }
+            let cid = text(o["clientId"])
+            if cid == id { return o }
+            if cid.isEmpty, names.contains(text(o["client"]).lowercased()) { return o }
+            return nil
+        }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        let engine = try engine()
+        let currencies: [String: JSONValue] = ((try? await engine.currencies()) ?? [:]).mapValues {
+            .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
+        }
+        let canOwe = theirs.filter { !["quote", "cancelled"].contains(text($0["status"])) }
+        let owedBy = try await engine.owedByOrder(canOwe.map(JSONValue.object), settings: settings,
+                                                  clients: clients, currencies: currencies)
+        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
+        func job(_ o: [String: JSONValue]) -> CustomerSummary.Job {
+            let jid = text(o["id"])
+            let due = text(o["dueDate"])
+            return .init(id: jid, title: text(o["project"]).isEmpty ? jid : text(o["project"]),
+                         status: text(o["status"]), dueDate: due.isEmpty ? nil : due,
+                         owed: max(0, owedBy[jid] ?? 0))
+        }
+        let open = theirs.filter { !finished.contains(text($0["status"])) && text($0["status"]) != "quote" }
+            .map(job).sorted { ($0.dueDate ?? "9999") < ($1.dueDate ?? "9999") }
+        let done = theirs.filter { finished.contains(text($0["status"])) }
+            .sorted { text($0["date"]) > text($1["date"]) }.prefix(15).map(job)
+        let agreements: [CustomerSummary.Agreement] = {
+            guard case .array(let list)? = client["priceList"] else { return [] }
+            return list.compactMap { row in
+                guard case .object(let a) = row else { return nil }
+                return .init(product: text(a["product"]), price: number(a["price"]), note: text(a["note"]))
+            }
+        }()
+        let messages: [CustomerSummary.Message] = {
+            guard case .array(let log)? = client["commLog"] else { return [] }
+            return log.enumerated().compactMap { i, row -> CustomerSummary.Message? in
+                guard case .object(let m) = row else { return nil }
+                let note = text(m["note"]).isEmpty ? text(m["text"]) : text(m["note"])
+                let at = text(m["at"]).isEmpty ? text(m["date"]) : text(m["at"])
+                let mid = text(m["id"])
+                let order = text(m["orderId"])
+                return .init(id: mid.isEmpty ? "\(i)-\(at)" : mid, kind: text(m["type"]), note: note, at: at,
+                             orderId: order.isEmpty ? nil : order)
+            }.sorted { $0.at > $1.at }.prefix(30).map { $0 }
+        }()
+        let terms = Int(number(client["paymentTermsDays"]))
+        // Owed is `owedByOrder`'s, in the shop's currency.
+        let code = text(settings["currency"])
+        return CustomerSummary(
+            id: id,
+            owed: owedBy.values.filter { $0 > 0.005 }.reduce(0, +),
+            creditLimit: max(0, number(client["creditLimit"])),
+            paymentTermsDays: max(0, terms),
+            currency: code.isEmpty ? nil : code,
+            openJobs: open, finishedJobs: Array(done), agreements: agreements, messages: messages,
+            historyWindowed: !book.holdsAll("printLog"))
+    }
+
     /// Home's figures, as `design/ios-v2/` Shop Pulse draws them.
     ///
     /// ── THE ONE RULE ────────────────────────────────────────────────────
@@ -565,6 +704,53 @@ struct OrderFacts: Equatable, Sendable {
     var quantity: Int?
 }
 
+/// Today, closed — the Mac's End of Day Report (`EndOfDay` in KhaytCore),
+/// with whether the phone holds the waste log and the time entries (it does
+/// not today: those figures are the Mac's).
+struct DayReport: Sendable {
+    let report: EndOfDay
+    let holdsWaste: Bool
+    let holdsTime: Bool
+}
+
+/// One customer, as the phone's book has them: what they owe, their terms,
+/// their jobs, what they have agreed to pay, and the messages sent them.
+struct CustomerSummary: Sendable {
+    struct Job: Identifiable, Sendable, Equatable {
+        let id: String
+        let title: String
+        let status: String
+        let dueDate: String?
+        let owed: Double
+    }
+    struct Agreement: Sendable, Equatable {
+        let product: String
+        let price: Double
+        let note: String
+    }
+    struct Message: Identifiable, Sendable, Equatable {
+        let id: String
+        let kind: String
+        let note: String
+        let at: String
+        let orderId: String?
+    }
+    let id: String
+    let owed: Double
+    let creditLimit: Double
+    let paymentTermsDays: Int
+    let currency: String?
+    let openJobs: [Job]
+    let finishedJobs: [Job]
+    let agreements: [Agreement]
+    let messages: [Message]
+    /// The phone holds the newest finished jobs, not all: the history and
+    /// any figure over it may be short.
+    let historyWindowed: Bool
+
+    var isOverLimit: Bool { creditLimit > 0 && owed > creditLimit + 0.005 }
+}
+
 struct ShopPulse: Equatable, Sendable {
     var inQueue: Int
     var printing: Int
@@ -576,4 +762,14 @@ struct ShopPulse: Equatable, Sendable {
     var thisMonth: Double?
     var thisYear: Double?
     var currency: String?
+}
+
+/// One open job with money still owed on it — a line of "Who owes".
+struct OwedLine: Identifiable, Equatable, Sendable {
+    let id: String
+    let project: String
+    let client: String
+    /// In the shop's currency, by the shared rule (`owedByOrder`).
+    let owed: Double
+    let dueDate: String?
 }
