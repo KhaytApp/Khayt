@@ -970,6 +970,15 @@
 "printer.why.old_mac" = "Update Khayt on the Mac to control printers from the phone.";
 "printer.why.no_answer" = "The Mac didn’t answer. It may be asleep or offline.";
 "printer.why.unreachable" = "Neither the Mac nor Khayt Cloud could be reached.";
+/* Customer page messages */
+"portal.title" = "Customer page";
+"portal.share" = "Share link";
+"portal.none" = "No messages on this page yet.";
+"portal.reply" = "Reply to the customer";
+"portal.send" = "Send";
+"portal.messages.failed" = "The messages could not be loaded.";
+"portal.reply.failed" = "The reply was not sent.";
+"portal.reply.viewer" = "This sign-in can only view the shop.";
 /* Customer page */
 "customer.owes" = "Owes";
 "customer.limit" = "Credit limit %@";

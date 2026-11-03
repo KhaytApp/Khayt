@@ -970,6 +970,15 @@
 "printer.why.old_mac" = "حدّث Khayt على الماك للتحكم بالطابعات من الهاتف.";
 "printer.why.no_answer" = "لم يُجب الماك. ربما هو في وضع السكون أو غير متصل.";
 "printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى Khayt Cloud.";
+/* Customer page messages */
+"portal.title" = "صفحة العميل";
+"portal.share" = "مشاركة الرابط";
+"portal.none" = "لا توجد رسائل على هذه الصفحة بعد.";
+"portal.reply" = "الرد على العميل";
+"portal.send" = "إرسال";
+"portal.messages.failed" = "تعذّر تحميل الرسائل.";
+"portal.reply.failed" = "لم يُرسل الرد.";
+"portal.reply.viewer" = "هذا الحساب للعرض فقط.";
 /* Customer page */
 "customer.owes" = "المستحق";
 "customer.limit" = "حد الائتمان %@";
