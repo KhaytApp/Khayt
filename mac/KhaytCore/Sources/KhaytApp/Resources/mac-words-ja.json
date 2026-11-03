@@ -472,7 +472,7 @@
  "mac.today_afternoon": "こんにちは。",
  "mac.today_evening": "こんばんは。",
  "mac.today_needs": "対応が必要なものが {n} 件あります。",
- "mac.today_needs_one": "対応が必要なものが 1 件あります。",
+ "mac.today_needs_one": "対応が必要なものが {n} 件あります。",
  "mac.today_clear": "今は対応が必要なものはありません。",
  "mac.today_summary": "未完了 {open} · 印刷中 {printing} · 本日期限 {due}",
  "mac.owed_to_you": "未回収の入金",

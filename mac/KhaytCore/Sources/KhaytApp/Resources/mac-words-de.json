@@ -472,7 +472,7 @@
  "mac.today_afternoon": "Guten Tag.",
  "mac.today_evening": "Guten Abend.",
  "mac.today_needs": "{n} Dinge brauchen Sie.",
- "mac.today_needs_one": "1 Ding braucht Sie.",
+ "mac.today_needs_one": "{n} Ding braucht Sie.",
  "mac.today_clear": "Gerade braucht Sie nichts.",
  "mac.today_summary": "{open} offen · {printing} im Druck · {due} heute fällig",
  "mac.owed_to_you": "Offen für Sie",

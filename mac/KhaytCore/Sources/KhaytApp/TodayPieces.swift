@@ -152,6 +152,7 @@ struct ThreadBar: View {
                 GeometryReader { geo in
                     Capsule().fill(Khayt.thread)
                         .frame(width: geo.size.width * min(1, max(0, progress)))
+                        .growsToItsReading(progress, from: .leading)
                 }
             }
             .accessibilityHidden(true)

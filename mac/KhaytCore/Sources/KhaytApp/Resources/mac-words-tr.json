@@ -472,7 +472,7 @@
  "mac.today_afternoon": "İyi günler.",
  "mac.today_evening": "İyi akşamlar.",
  "mac.today_needs": "{n} şey sizi bekliyor.",
- "mac.today_needs_one": "1 şey sizi bekliyor.",
+ "mac.today_needs_one": "{n} şey sizi bekliyor.",
  "mac.today_clear": "Şu an sizi bekleyen bir şey yok.",
  "mac.today_summary": "{open} açık · {printing} baskıda · {due} bugün teslim",
  "mac.owed_to_you": "Size borçlu olunan",

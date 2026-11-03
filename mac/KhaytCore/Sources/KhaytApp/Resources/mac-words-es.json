@@ -472,7 +472,7 @@
  "mac.today_afternoon": "Buenas tardes.",
  "mac.today_evening": "Buenas noches.",
  "mac.today_needs": "{n} cosas te necesitan.",
- "mac.today_needs_one": "1 cosa te necesita.",
+ "mac.today_needs_one": "{n} cosa te necesita.",
  "mac.today_clear": "Nada te necesita ahora mismo.",
  "mac.today_summary": "{open} abiertos · {printing} imprimiendo · {due} vencen hoy",
  "mac.owed_to_you": "Te deben",

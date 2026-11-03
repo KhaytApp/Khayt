@@ -472,7 +472,7 @@
  "mac.today_afternoon": "下午好。",
  "mac.today_evening": "晚上好。",
  "mac.today_needs": "有 {n} 件事需要您处理。",
- "mac.today_needs_one": "有 1 件事需要您处理。",
+ "mac.today_needs_one": "有 {n} 件事需要您处理。",
  "mac.today_clear": "目前没有需要您处理的事。",
  "mac.today_summary": "{open} 个进行中 · {printing} 个打印中 · {due} 个今日到期",
  "mac.owed_to_you": "应收款",
