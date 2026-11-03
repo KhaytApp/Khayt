@@ -218,7 +218,9 @@ private struct TodayHeader: View {
                                     : hour < 18 ? "mac.today_afternoon" : "mac.today_evening")
         let rest = attention > 0 ? words.counting(attention, "mac.today_needs")
                                  : words.callIt("mac.today_clear")
-        return greeting + " " + rest
+        // Japanese and Chinese put no space between sentences.
+        let gap = ["ja", "zh"].contains(words.language) ? "" : " "
+        return greeting + gap + rest
     }
 }
 
