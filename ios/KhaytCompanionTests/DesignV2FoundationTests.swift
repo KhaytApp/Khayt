@@ -5,12 +5,19 @@ import SwiftUI
 /// The design's foundation (`design/ios-v2/`) is in the app, not only in the doc.
 final class DesignV2FoundationTests: XCTestCase {
 
-    func testSpaceGroteskIsBundledAndRegistered() {
+    func testTheWebsiteFacesAreBundledAndRegistered() {
         // UIAppFonts names the files; a missing or misnamed one fails silently
         // at runtime, falling back to the system face everywhere.
-        for w in [Font.Weight.regular, .medium, .semibold, .bold] {
-            XCTAssertNotNil(UIFont(name: KhaytType.postScriptName(w), size: 17), KhaytType.postScriptName(w))
+        for name in KhaytType.allNames {
+            XCTAssertNotNil(UIFont(name: name, size: 17), name)
         }
+        XCTAssertEqual(KhaytType.allNames.count, 8)
+    }
+
+    func testBigSizesDrawInTheDisplayFace() {
+        XCTAssertEqual(KhaytType.displayName(.bold), "Archivo-ExtraBold")
+        XCTAssertEqual(KhaytType.postScriptName(.medium), "HankenGrotesk-Medium")
+        XCTAssertEqual(KhaytType.monoName(.regular), "JetBrainsMono-Regular")
     }
 
     private func hex(_ c: Color, _ style: UIUserInterfaceStyle) -> String {
@@ -20,24 +27,27 @@ final class DesignV2FoundationTests: XCTestCase {
         return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
 
-    func testThePaletteIsTheDesignsDarkAndLight() {
-        // The prototype's own DARK / LIGHT.
-        XCTAssertEqual(hex(KhaytDesign.ground, .dark), "16130F")
-        XCTAssertEqual(hex(KhaytDesign.ground, .light), "EFEBE3")
-        XCTAssertEqual(hex(KhaytDesign.brand, .dark), "4591ED")
-        XCTAssertEqual(hex(KhaytDesign.brand, .light), "0B54AD")
-        XCTAssertEqual(hex(KhaytDesign.surface, .dark), "201C17")
-        XCTAssertEqual(hex(KhaytDesign.text, .dark), "F2EDE4")
+    func testThePaletteIsTheRedesignsAndTheMacs() {
+        // The same numbers as the Mac's Palette.swift / Surface.swift (#2183).
+        XCTAssertEqual(hex(KhaytDesign.ground, .dark), "06182F")
+        XCTAssertEqual(hex(KhaytDesign.ground, .light), "F6F8F8")
+        XCTAssertEqual(hex(KhaytDesign.brand, .dark), "4C97F0")
+        XCTAssertEqual(hex(KhaytDesign.brand, .light), "216DCA")
+        XCTAssertEqual(hex(KhaytDesign.surface, .dark), "0D2444")
+        XCTAssertEqual(hex(KhaytDesign.surface, .light), "FFFFFF")
+        XCTAssertEqual(hex(KhaytDesign.text, .dark), "EAF2FB")
+        XCTAssertEqual(hex(KhaytDesign.thread, .light), "F2A541")
     }
 
-    func testStagesTakeTheDesignsTone() {
-        // TONE: printing hot, QC attention, done done, pending and post quiet.
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "F0763D")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "qc"), .dark), "E0A73C")
+    func testStagesTakeTheMacsTodayColours() {
+        // Printing live green, QC and hold violet, done done, pending and post quiet.
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "34D27A")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "qc"), .dark), "B49CFF")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "on_hold"), .dark), "B49CFF")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "4FBFA0")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "9EA7B3")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "post"), .dark), "9EA7B3")
-        // RAILED: only printing and QC.
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "8AA4C2")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "post"), .dark), "8AA4C2")
+        // Rails stay rare: only printing and QC.
         XCTAssertEqual(["pending", "printing", "post", "qc", "completed"].filter(KhaytDesign.isRailed), ["printing", "qc"])
     }
 }

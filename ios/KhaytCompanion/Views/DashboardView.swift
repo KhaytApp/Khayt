@@ -233,7 +233,7 @@ struct DashboardView: View {
     private var counts: some View {
         HStack(spacing: 8) {
             countTile(pulse?.inQueue ?? status?.pending, L10n.tr("stat.in_queue"), tint: KhaytDesign.ink, label: KhaytDesign.note, rail: nil)
-            countTile(pulse?.printing ?? status?.printing, L10n.tr("pulse.printing"), tint: KhaytDesign.hot, label: KhaytDesign.hot, rail: KhaytDesign.hot)
+            countTile(pulse?.printing ?? status?.printing, L10n.tr("pulse.printing"), tint: KhaytDesign.live, label: KhaytDesign.live, rail: KhaytDesign.live)
             countTile(pulse?.doneToday ?? status?.completedToday, L10n.tr("pulse.done_today"), tint: KhaytDesign.done, label: KhaytDesign.note, rail: nil)
         }
         .padding(.horizontal, 16)
