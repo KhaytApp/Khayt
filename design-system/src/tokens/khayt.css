@@ -12,7 +12,7 @@
   /* Semantic colour. Each is a sentence in Palette.swift — read it there
      before reaching for one: `attention` means "wants a person", `late`
      means "late, failed, refused". They are not a rainbow to pick from. */
-  --khayt-brand: #0b54ad;
+  --khayt-brand: #216dca;
   --khayt-on-brand: #ffffff;
   --khayt-hot: #af3e18;
   --khayt-done: #1b5e4f;
@@ -20,9 +20,9 @@
   --khayt-late: #bb2d44;
   --khayt-note: #4f5b69;
   --khayt-marked: #a6790a;
-  --khayt-surface: #fbf9f5;
-  --khayt-ground: #efebe3;
-  --khayt-hairline: #dcd5c8;
+  --khayt-surface: #ffffff;
+  --khayt-ground: #f6f8f8;
+  --khayt-hairline: #e3e6e8;
 
   /* The card, from the one modifier the whole app draws through. */
   --khayt-radius: 10px;
@@ -73,7 +73,7 @@
 /* Dark. Only the colours change — the geometry and the type scale are one
    set of numbers in the Mac app and stay one set here. */
 [data-theme="dark"] {
-  --khayt-brand: #4591ed;
+  --khayt-brand: #4c97f0;
   --khayt-on-brand: #0b1622;
   --khayt-hot: #f0763d;
   --khayt-done: #4fbfa0;
@@ -81,9 +81,9 @@
   --khayt-late: #f2564a;
   --khayt-note: #9ea7b3;
   --khayt-marked: #f0c040;
-  --khayt-surface: #201c17;
-  --khayt-ground: #16130f;
-  --khayt-hairline: #3a342c;
+  --khayt-surface: #0d2444;
+  --khayt-ground: #06182f;
+  --khayt-hairline: #1f3a5e;
 }
 
 /* REDUCE MOTION TAKES EVERYTHING TO ZERO, and that is not a nicety.
@@ -107,7 +107,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --khayt-brand: #4591ed;
+    --khayt-brand: #4c97f0;
     --khayt-on-brand: #0b1622;
     --khayt-hot: #f0763d;
     --khayt-done: #4fbfa0;
@@ -115,8 +115,8 @@
     --khayt-late: #f2564a;
     --khayt-note: #9ea7b3;
     --khayt-marked: #f0c040;
-    --khayt-surface: #201c17;
-    --khayt-ground: #16130f;
-    --khayt-hairline: #3a342c;
+    --khayt-surface: #0d2444;
+    --khayt-ground: #06182f;
+    --khayt-hairline: #1f3a5e;
   }
 }

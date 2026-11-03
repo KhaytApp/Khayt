@@ -26,6 +26,8 @@ final class ShopAlerts {
     nonisolated static let digestHour = 8
     /// At most this many names in a low-stock event (the payload is 3 KB).
     nonisolated static let namedAtMost = 10
+    /// At most this many job ids in a digest; the count stays whole.
+    nonisolated static let idsAtMost = 40
 
     var defaults: UserDefaults = .standard
     var send: ((_ kind: String, _ payload: [String: JSONValue]) async -> Bool)?
@@ -70,9 +72,10 @@ final class ShopAlerts {
         let fresh = Self.newlyLow(lowNow, told: told)
         if !fresh.isEmpty {
             let names = fresh.prefix(Self.namedAtMost).map { JSONValue.string($0.name) }
-            if await send("low-stock", ["count": .number(Double(fresh.count)), "names": .array(Array(names))]) {
-                told.formUnion(fresh.map(\.id))
-            }
+            // Told after one attempt, sent or not — like the morning digest. A
+            // cloud refusing it would otherwise be asked again on every sweep.
+            _ = await send("low-stock", ["count": .number(Double(fresh.count)), "names": .array(Array(names))])
+            told.formUnion(fresh.map(\.id))
         }
         // Recovered items are forgotten, so the next drop is told again.
         told.formIntersection(lowNow.keys)
@@ -89,10 +92,12 @@ final class ShopAlerts {
         defaults.set(day, forKey: dayKey)
         let (late, due) = Self.digest(shop.orders, today: calendar.startOfDay(for: now), now: now)
         if !late.isEmpty {
-            _ = await send("overdue", ["count": .number(Double(late.count)), "ids": .array(late.map(JSONValue.string))])
+            _ = await send("overdue", ["count": .number(Double(late.count)),
+                                       "ids": .array(late.prefix(Self.idsAtMost).map(JSONValue.string))])
         }
         if !due.isEmpty {
-            _ = await send("due-today", ["count": .number(Double(due.count)), "ids": .array(due.map(JSONValue.string))])
+            _ = await send("due-today", ["count": .number(Double(due.count)),
+                                         "ids": .array(due.prefix(Self.idsAtMost).map(JSONValue.string))])
         }
     }
 }

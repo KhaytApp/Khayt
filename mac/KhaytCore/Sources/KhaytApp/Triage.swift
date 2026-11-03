@@ -21,7 +21,41 @@ struct Triage: View {
     enum Mode: String, CaseIterable { case triage, ledger }
     @SceneStorage("dashboard.mode") private var mode: Mode = .triage
 
+    @Environment(\.classicShell) private var classic
+
     var body: some View {
+        // THE 2026 REDESIGN, in the system-sidebar window: the home screen is
+        // TODAY (Dashboard.swift) and the Today/Ledger switch and "Record a
+        // payment" sit in the toolbar. The navy strip stays for the Ledger and
+        // for the older navy window, which draws no toolbar.
+        if classic && Self.shownMode(mode, shop: shop) == .triage
+            && !(shop.orders.isEmpty && shop.machines.isEmpty) {
+            VStack(spacing: 0) {
+                SiteScopeBanner(shop: shop, counting: .none)
+                Dashboard(shop: shop)
+            }
+            .screenToolbar { homeToolbar }
+        } else {
+            mastheadBody.screenToolbar { homeToolbar }
+        }
+    }
+
+    @ToolbarContentBuilder private var homeToolbar: some ToolbarContent {
+        if shop.lockAllows("analytics", "view") {
+            ToolbarItemGroup {
+                Picker(shop.words.callIt("mac.nav_today"), selection: $mode) {
+                    Text(shop.words.callIt("mac.nav_today")).tag(Mode.triage)
+                    Text(shop.words.callIt("mac.ledger")).tag(Mode.ledger)
+                }
+                .pickerStyle(.segmented)
+                Button(shop.words.callIt("mac.record_a_payment")) { shop.shelf = .jobs(nil) }
+                    .disabled(!shop.canMoveJobs)
+                    .help(shop.canMoveJobs ? "" : shop.words.callIt("mac.read_only"))
+            }
+        }
+    }
+
+    private var mastheadBody: some View {
         VStack(spacing: 0) {
             // THE MONEY — what is owed, the month's net, gross, cost of goods,
             // and the Ledger of every payment — only for a level that may see

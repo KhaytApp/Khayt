@@ -45,7 +45,8 @@ struct MacConventionsTests {
         #expect(shop.printTarget == nil, "nothing selected, nothing to print")
         shop.selection = job.id
         #expect(shop.printTarget == .invoice(job.id))
-        shop.shelf = .board
+        shop.shelf = .board   // lands on Jobs, drawn as the board
+        #expect(shop.showingBoard)
         #expect(shop.printTarget == .invoice(job.id), "the board selects jobs too")
 
         shop.shelf = .reports

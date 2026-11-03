@@ -72,6 +72,8 @@ struct ProductionPauseTests {
         // and something written only into that one ships in no window.
         #expect(try read("Shell.swift").contains("shop.resumeProduction()"),
                 "the shipping shell has no paused banner")
+        #expect(try read("Sidebar.swift").contains("shop.resumeProduction()"),
+                "the sidebar the app opens with has no paused notice")
         #expect(try read("Menus.swift").contains("shop.pausingProduction = true"),
                 "no menu can pause production")
         #expect(try read("Menus.swift").contains("shop.resumeProduction()"),

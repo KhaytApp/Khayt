@@ -79,6 +79,8 @@ struct ScreenActions: View {
     private var actions: some View {
         HStack(spacing: Space.sm) {
             if shop.showingBoard || isJobs {
+                JobsLayoutPicker(shop: shop).navyMenu()
+                if !shop.showingBoard { JobsStageMenu(shop: shop).navyMenu() }
                 plus("mac.new_job", enabled: shop.canMoveJobs) { shop.takingAJob = true }
             } else if shop.showingLibrary {
                 // IMPORT, ON THE SCREEN IT IMPORTS INTO — the reason the old

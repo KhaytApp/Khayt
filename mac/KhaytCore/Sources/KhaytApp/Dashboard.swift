@@ -19,125 +19,145 @@ struct Dashboard: View {
 
 
 
-    /// What the shop is doing and what wants a person. The left column when
-    /// there are two, and the top of the screen when there is one.
-    @ViewBuilder private var theWork: some View {
-        // ── THE FLOOR, FIRST AND DRAWN ────────────────────────────────────
-        //
-        // The dashboard opened on four stacked lists of words, and the first
-        // question a shop has walking in is not a question about words: it is
-        // "what is running". `RunningNow` below answers it — but only for the
-        // machines that ARE running, so a floor with nothing on it drew
-        // nothing at all, and a floor with one printer going said nothing
-        // about the other four.
-        //
-        // This is every machine, always, one tile each, and the state is the
-        // drawing rather than the caption.
-        // The site's rows when narrowed, as the desktop's attention bar is.
-        if let attention = shop.attention,
-           case let items = attention.items.filter(shop.inSite(attention:)), !items.isEmpty {
-            // First, and above the figures. A shop that opens this app is
-            // asking "is anything wrong" before it asks "how are we doing", and
-            // a late job under a revenue tile is a late job nobody sees.
-            NeedsAttention(items: items, shop: shop)
-        }
-        if let facts = shop.facts {
-            // The floor leads when nothing is wrong — which is most mornings.
-            Work(facts: facts, shop: shop,
-                 leads: (shop.attention?.items.filter(shop.inSite(attention:)).isEmpty ?? true))
-        }
-        // What the machines are ACTUALLY doing, under the count of how many the
-        // book thinks are busy. The tile above is the book's answer; this is
-        // the printers'. A shop opening this app to ask "is it still going"
-        // should not have to change screens.
-        RunningNow(shop: shop)
-        // What the queue is about to make late. UNDER the attention panel and
-        // above the invoices: "this is already wrong" outranks "this is going
-        // to be", which outranks "somebody owes us money".
-        RunningOut(shop: shop)
-        // And what went wrong while nobody was looking. A notification
-        // dismissed while the shop was making coffee is a notification it never
-        // had, so the alerts are on the screen as well.
-        WentWrong(shop: shop)
-        // Money to go after, which is a different question from "is anything
-        // wrong" and belongs under it. Both lists are opt-in — the two switches
-        // are in Settings → Operations — and the section is absent when neither
-        // has anything.
-        ToChase(shop: shop)
+    /// The attention items the screen shows: the site's rows when narrowed.
+    private var attentionItems: [DashboardFacts.Item] {
+        shop.attention?.items.filter(shop.inSite(attention:)) ?? []
     }
 
-    /// How the shop is doing. The right column when there are two.
-    ///
-    /// The split falls exactly where the code already had a seam: these three
-    /// were the only sections inside `showsMoney`, so a shop that has turned
-    /// the money off loses the whole column rather than half of each screen.
+    /// What the shop is doing and what wants a person. The left column when
+    /// there are two, and the top of the screen when there is one.
+    @ViewBuilder private func theWork(items: [DashboardFacts.Item]) -> some View {
+        // First, and above the figures: a late job under a revenue tile is a
+        // late job nobody sees.
+        if !items.isEmpty { NeedsAttention(items: items, shop: shop) }
+        // Every machine on the floor, with what the printing ones are making.
+        MachineCards(shop: shop)
+        // What the queue is about to make late: under "this is already wrong".
+        RunningOut(shop: shop)
+        // And what went wrong while nobody was looking.
+        WentWrong(shop: shop)
+    }
+
+    /// How the shop is doing. Inside `showsMoney`, so a shop that has turned
+    /// the money off loses all of it.
     @ViewBuilder private var theMoney: some View {
         MoneyTiles(shop: shop)
         Goal(shop: shop)
-        // After the tiles, because the tiles answer "what is it now" and this
-        // answers "is that good" — which is the second question, not the first.
         if let outlook = shop.outlook, outlook.method != "none" {
             Takings(outlook: outlook, shop: shop)
         }
     }
 
-    /// The width at which the screen stops being a column and becomes two.
-    ///
-    /// Chosen so that each column is still wide enough to be worth having:
-    /// below this a split would give the money side about 700 points, and five
-    /// tiles across 700 is five tiles nobody can read. A 16-inch laptop
-    /// (roughly 1470 points of pane) stays one column deliberately — it is not
-    /// a big display, it is a full one.
-    private static let twoColumnFrom: CGFloat = 1800
+    /// The width from which the right column (372 pt) sits beside the work.
+    private static let twoColumnFrom: CGFloat = 1120
+    /// Below this the four figures wrap to two rows of two.
+    private static let fourAcrossFrom: CGFloat = 900
+
+    /// The longest time left on any machine that is printing, if one reports.
+    private var latestFinish: Double? {
+        shop.siteMachinesInUse.compactMap { machine -> Double? in
+            guard let status = shop.printers.readings[machine.id]?.status,
+                  PrinterWatch.isPrinting(status.state),
+                  let left = status.timeRemaining, left > 0 else { return nil }
+            return left
+        }.max()
+    }
+
+    private func statCards(_ facts: DashboardFacts, showsMoney: Bool,
+                           items: [DashboardFacts.Item]) -> [TodayStatCard] {
+        let words = shop.words
+        var cards: [TodayStatCard] = []
+        if showsMoney {
+            let overdue = shop.invoicesToChase.count
+            cards.append(TodayStatCard(
+                label: words.callIt("mac.owed_to_you"),
+                value: shop.owedTotal.map { Money.text($0, shop.currency) } ?? "—",
+                detail: overdue > 0
+                    ? words.callIt("mac.today_overdue", ["n": .number(Double(overdue))]) : nil,
+                detailColor: Khayt.late))
+            let range = Self.ranges.first { $0.0 == shop.kpiRange }?.1 ?? "an.range.month"
+            var change: String?
+            var changeColor = Color.secondary
+            if let outlook = shop.outlook, outlook.method == "trend", let pct = outlook.trendPct {
+                change = (pct >= 0 ? "▲ " : "▼ ")
+                    + words.callIt("mac.today_trend", ["pct": .string(Money.figure(abs(pct)))])
+                changeColor = pct >= 0 ? Khayt.done : Khayt.late
+            }
+            _ = range
+            // The month's NET, the figure the money strip has always shown
+            // (`Shop.monthNet`, TriageModel) — not a second calculation.
+            cards.append(TodayStatCard(
+                label: shop.monthNetLabel,
+                value: shop.monthNet.map { Money.text($0, shop.currency) } ?? "—",
+                detail: change ?? shop.monthNetNote, detailColor: change == nil ? .secondary : changeColor))
+        }
+        cards.append(TodayStatCard(
+            label: words.callIt("mac.on_machines"),
+            value: words.callIt("mac.n_of_m", ["n": .number(Double(facts.printingCount)),
+                                               "m": .number(Double(facts.fleet.total))]),
+            detail: latestFinish.map { words.callIt("mac.eta") + " " + PrinterWatch.spell($0, words) }
+                ?? (facts.fleet.offline > 0
+                    ? words.callIt("mac.fleet_offline", ["n": .number(Double(facts.fleet.offline))])
+                    : nil)))
+        let low = items.filter { $0.kind == "stock" }.count
+        cards.append(TodayStatCard(
+            label: words.callIt("mac.filament_shelf"),
+            value: words.numeral(shop.siteSpools.count),
+            detail: low > 0 ? words.callIt("mac.today_low", ["n": .number(Double(low))]) : nil,
+            detailColor: Khayt.attention))
+        return cards
+    }
 
     var body: some View {
         GeometryReader { geo in
-            // Money hidden means the right-hand column is empty, and two
-            // columns with nothing in one of them is worse than one.
-            let showsMoney = shop.facts?.showsMoney != false
-            let twoUp = geo.size.width >= Self.twoColumnFrom && showsMoney
-            let content = geo.size.width - Metric.screen * 2
-            // 58/42. The work side carries the lists — a name at one end and
-            // how late it is at the other — and needs the room; the money side
-            // is tiles and one big figure, which do not.
-            let leftW = (content - 24) * 0.58
+            // The shop's figures only for a level that may see them (`analytics`
+            // in lib/rbac.js: owner, manager) — what the navy strip always did.
+            let showsMoney = shop.facts?.showsMoney != false && shop.lockAllows("analytics", "view")
+            let wide = geo.size.width >= Self.twoColumnFrom
+            let items = attentionItems
+            let due = TodayDue(shop: shop)
 
             ScrollView {
-                Group {
-                    if twoUp {
+                VStack(alignment: .leading, spacing: 22) {
+                    if let facts = shop.facts {
+                        TodayHeader(shop: shop, facts: facts, attention: items.count, dueToday: due.today)
+                        let cards = statCards(facts, showsMoney: showsMoney, items: items)
+                        if geo.size.width >= Self.fourAcrossFrom || cards.count < 3 {
+                            HStack(alignment: .top, spacing: 14) {
+                                ForEach(Array(cards.enumerated()), id: \.offset) { $1 }
+                            }
+                        } else {
+                            let half = (cards.count + 1) / 2
+                            VStack(spacing: 14) {
+                                HStack(alignment: .top, spacing: 14) {
+                                    ForEach(Array(cards.prefix(half).enumerated()), id: \.offset) { $1 }
+                                }
+                                HStack(alignment: .top, spacing: 14) {
+                                    ForEach(Array(cards.dropFirst(half).enumerated()), id: \.offset) { $1 }
+                                }
+                            }
+                        }
+                    }
+                    if wide {
                         HStack(alignment: .top, spacing: 24) {
-                            VStack(alignment: .leading, spacing: 22) { theWork }
-                                .frame(width: leftW, alignment: .leading)
-                            VStack(alignment: .leading, spacing: 22) { theMoney }
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 22) {
+                                theWork(items: items)
+                                if showsMoney { theMoney }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 22) { sideColumn(due) }
+                                .frame(width: 372, alignment: .leading)
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 22) {
-                            theWork
+                            theWork(items: items)
+                            sideColumn(due)
                             if showsMoney { theMoney }
                         }
                     }
                 }
-                .padding(Metric.screen)
-                // ── ONE COLUMN, OR TWO ────────────────────────────────────
-                //
-                // These sections are lists with a name at one end and a figure
-                // at the other, and across a whole wide window that put "Souq
-                // stall sign" and "13 days late" fifteen hundred points apart —
-                // two halves of one fact, too far apart to read as one. The
-                // revenue card had the matching problem from the other side: a
-                // figure at the left edge of an otherwise empty panel.
-                //
-                // A capped column fixes both and then wastes the display, which
-                // is its own fault: at 2560 points the dashboard sat in a
-                // column with an empty field beside it. So past a point the
-                // screen stops being a column and becomes two, and the width a
-                // desk display has is spent on showing MORE of the shop at once
-                // rather than on stretching the same rows wider.
-                //
-                // Below that point the cap and the centring still apply, so a
-                // laptop is unchanged.
-                .frame(maxWidth: twoUp ? .infinity : 1280, alignment: .leading)
+                .padding(Metric.screen + 10)
+                .frame(maxWidth: 1680, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             .background(Khayt.ground)
@@ -148,207 +168,66 @@ struct Dashboard: View {
             }
         }
     }
+
+    /// Due this week, and the customers it is waiting on.
+    @ViewBuilder private func sideColumn(_ due: TodayDue) -> some View {
+        DueThisWeek(shop: shop, due: due)
+        // Quotes sent and not approved, invoices past their grace: the shop's
+        // own chase lists, which are opt-in and absent when empty.
+        if shop.lockAllows("analytics", "view"), ToChase(shop: shop).hasRows {
+            TodaySection(shop.words.callIt("mac.waiting_customers")) { ToChase(shop: shop) }
+        }
+    }
 }
 
-/// Every machine on the floor, drawn, in one band across the top.
-///
-/// The layer stack IS the state: laid down and warm while a machine is
-/// printing, ghosted while it is idle. A machine Khayt has no protocol for
-/// gets its bed drawn instead — a progress bar for a laser cutter would be a
-/// picture of something the machine does not do, and `lib/machine-kinds.js`
-/// is where that is decided rather than here.
-private struct FloorStrip: View {
+/// The top of the screen: the day, what needs the owner, and the shop in a line.
+private struct TodayHeader: View {
     let shop: Shop
+    let facts: DashboardFacts
+    let attention: Int
+    let dueToday: Int
 
     var body: some View {
-        // The site's machines when narrowed — every machine, always, at it.
-        if !shop.siteMachinesInUse.isEmpty {
-            Group {
-                // ── AN HStack, NOT A LazyVGrid ────────────────────────────
-                //
-                // The first version used `LazyVGrid(.adaptive(minimum:
-                // maximum:))`, and an adaptive grid inside this screen's
-                // width-capped ScrollView is a sizing loop: the grid asks how
-                // wide it may be, the answer depends on how many columns it
-                // chose, and AppKit never settles. It rendered — the dashboard
-                // photographed fine — and then hung the app on the NEXT heavy
-                // screen, which is the part that made it hard to see.
-                //
-                // `StatStrip` in Surface.swift has solved this shape already:
-                // one HStack, a rule between each pair, no grid. A shop has a
-                // handful of machines, not forty, so there is nothing here a
-                // grid was buying.
-                HStack(spacing: 0) {
-                    ForEach(Array(shop.siteMachinesInUse.enumerated()), id: \.element.id) { index, machine in
-                        if index > 0 {
-                            Rectangle().fill(Khayt.layerLine)
-                                .frame(width: 1).padding(.vertical, 6)
-                        }
-                        Tile(machine: machine, shop: shop)
-                            .padding(.horizontal, 12)
-                    }
-                    // A shop with one printer got one tile the width of the
-                    // window, and a layer stack sixteen hundred points wide
-                    // reads as faint stripes rather than as a print. The
-                    // tiles stay tile-sized and the row starts at the left.
-                    Spacer(minLength: 0)
+        let words = shop.words
+        HeaderLine {
+            VStack(alignment: .leading, spacing: 10) {
+                // Weekday and time, re-read each minute.
+                TimelineView(.everyMinute) { context in
+                    TodayEyebrow(words.say(context.date, .dateTime.weekday(.wide))
+                                 + " · " + words.say(context.date, Date.FormatStyle(date: .omitted, time: .shortened)))
                 }
-                .card(padding: 12)
+                Text(title)
+                    .font(.system(size: 30, weight: .bold)).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 16)
+            Text(words.callIt("mac.today_summary", [
+                "open": .number(Double(facts.activeCount)),
+                "printing": .number(Double(facts.printingCount)),
+                "due": .number(Double(dueToday)),
+            ]))
+            .font(.system(size: 13)).foregroundStyle(.secondary)
+            .multilineTextAlignment(.trailing)
         }
     }
 
-    private struct Tile: View {
-        let machine: Machine
-        let shop: Shop
-        @State private var hovering = false
+    private var title: String {
+        let words = shop.words
+        let hour = Calendar.book.component(.hour, from: Date())
+        let greeting = words.callIt(hour < 12 ? "mac.today_morning"
+                                    : hour < 18 ? "mac.today_afternoon" : "mac.today_evening")
+        let rest = attention > 0 ? words.counting(attention, "mac.today_needs")
+                                 : words.callIt("mac.today_clear")
+        return greeting + " " + rest
+    }
+}
 
-        private var status: KhaytEngine.PrinterStatus? { shop.printers.readings[machine.id]?.status }
-        private var printing: Bool { PrinterWatch.isPrinting(status?.state ?? "") }
-        /// Can a machine of this KIND be asked anything at all?
-        ///
-        /// ── NOT THE SAME QUESTION AS "IS IT CONFIGURED" ───────────────────
-        ///
-        /// The first version asked `PrinterWatch.notWatched(machine)`, which
-        /// answers "has somebody given this machine an address" — and the
-        /// sample shop has given none of them one. So all five tiles said
-        /// "Khayt cannot ask this machine", including three filament printers
-        /// that Khayt speaks four protocols for.
-        ///
-        /// `lib/machine-kinds.js` answers the question actually being asked:
-        /// a laser cutter and a UV flatbed have no protocol in this repo at
-        /// all, and that is a fact about the KIND. A filament printer with no
-        /// address is simply not set up yet, which is a different sentence and
-        /// a fixable one.
-        private var askable: Bool { shop.kind(of: machine)?.polled ?? true }
-        /// Set up to be asked — an address, and a protocol Khayt speaks.
-        private var connected: Bool { PrinterWatch.notWatched(machine) == nil }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(swatch)
-                        .frame(width: 3, height: 15)
-                    Text(machine.name)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .lineLimit(1).truncationMode(.tail)
-                    Spacer(minLength: 0)
-                }
-                // ── AN EMPTY PROGRESS BAR READS AS A SCREEN STILL LOADING ──
-                //
-                // A machine with no address is not printing and never will be
-                // until somebody sets it up, so `LayerProgress` drew its ghost
-                // layers at zero: ragged LEFT-ALIGNED lines, which is exactly
-                // what `Craft.swift` says reads as a paragraph rather than as a
-                // printed object — "centre for art, align for a progress bar".
-                // At zero it is not a bar, it is decoration, and on the front
-                // door three of them sat under the words "No connection set up"
-                // looking like a dashboard that had not finished drawing.
-                //
-                // A machine Khayt cannot see gets its BED instead: a real
-                // drawing of the thing, at its real size against the biggest on
-                // the floor. The two sentences stay different — one is not set
-                // up yet and the other cannot be asked at all — because those
-                // are different facts and only one of them is fixable.
-                // ── AND AN IDLE MACHINE IS NOT PRINTING EITHER ─────────────
-                //
-                // The condition above used to be `!askable || !connected`,
-                // which fixed the ghost layers for a machine Khayt cannot see
-                // and left them drawn for one it CAN see that simply is not
-                // printing. On the real shop's front door that is both
-                // machines: two tiles of pale ragged lines under the word
-                // "Idle", which is the loading-skeleton look this whole
-                // comment was written to get rid of.
-                //
-                // The bar is only about a print IN PROGRESS. Whether Khayt can
-                // reach the machine has nothing to do with it — an idle
-                // printer has no progress to draw whether it answers or not.
-                // So the test is `printing`, and the three sentences below say
-                // WHICH kind of not-printing this is.
-                if !printing, let x = machine.bed?.x, let y = machine.bed?.y {
-                    BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed,
-                            box: CGSize(width: 74, height: 38))
-                    // Three sentences here and two in the other branch, from
-                    // two different expressions — which is how "set up, asked,
-                    // silent" came to be missing from both. `Shop.quiet` says
-                    // it once. `mac.cannot_ask` is the long form of the same
-                    // fact `Quiet.noProtocol` names, and this tile has the
-                    // room for it.
-                    Text(shop.words.callIt(shop.quiet(machine) == .noProtocol
-                                           ? "mac.cannot_ask" : shop.quiet(machine).wordKey))
-                        .font(.caption2).foregroundStyle(.tertiary)
-                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                } else {
-                    LayerProgress(progress: printing ? Double(status?.progress ?? 0) / 100 : 0,
-                                  tint: printing ? Khayt.hot : Khayt.brand,
-                                  height: 34)
-                    if printing {
-                        HStack(spacing: 5) {
-                            // The one moving thing on a still floor, and only
-                            // when something is actually being made.
-                            Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
-                            Text(verbatim: shop.words.numeral(status?.progress ?? 0))
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                                .foregroundStyle(Khayt.hot)
-                            Text("%").font(.caption).foregroundStyle(Khayt.hot.opacity(0.7))
-                            Spacer(minLength: 0)
-                            // The time left is what a shop actually plans
-                            // around, so it is beside the figure rather than
-                            // on a line of its own to be read.
-                            if let left = status?.timeRemaining, left > 0 {
-                                Text(PrinterWatch.spell(left, shop.words))
-                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                            }
-                        }
-                        Text(status?.filename.isEmpty == false
-                             ? status!.filename : shop.words.callIt("mac.live"))
-                            .font(.caption2).foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
-                    } else {
-                        // ONE RULE, ASKED. This tile used to choose between
-                        // two sentences from its own `connected`, which made
-                        // it the second view in the app deciding why a machine
-                        // is quiet — and the two disagreed. `Shop.quiet` is
-                        // that decision, in one place, with the case both
-                        // tiles were missing: set up, asked, and silent.
-                        Text(shop.words.callIt(shop.quiet(machine).wordKey))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxWidth: 260, alignment: .leading)
-            .contentShape(Rectangle())
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(hovering ? Khayt.ground : .clear)
-            )
-            .liftsOnHover(hovering)
-            .onHover { hovering = $0 }
-            // ── A TILE THAT LOOKS PRESSABLE HAS TO BE ─────────────────────
-            //
-            // Every one of these names a machine the shop can open, and until
-            // now the only way there was the sidebar. A drawing of a printer
-            // that does nothing when clicked teaches people that the drawings
-            // are decoration.
-            .onTapGesture { shop.shelf = .machines }
-            .help(machine.name)
-        }
-
-        private var swatch: Color {
-            guard var hex = machine.color?.trimmingCharacters(in: .whitespaces), !hex.isEmpty else {
-                return .secondary
-            }
-            if hex.hasPrefix("#") { hex.removeFirst() }
-            guard hex.count == 6, let v = Int(hex, radix: 16) else { return .secondary }
-            return Color(red: Double((v >> 16) & 0xFF) / 255,
-                         green: Double((v >> 8) & 0xFF) / 255,
-                         blue: Double(v & 0xFF) / 255)
-        }
+/// A leading block and a trailing one on a line, bottom-aligned. A plain
+/// HStack: `ViewThatFits` would build both candidates on every draw.
+private struct HeaderLine<Content: View>: View {
+    @ViewBuilder let content: Content
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 0) { content }
     }
 }
 
@@ -388,8 +267,7 @@ struct RunningOut: View {
 
     var body: some View {
         if !late.isEmpty {
-            DetailSection(shop.words.callIt("mac.will_be_late"),
-                          accent: Khayt.attention, count: late.count) {
+            TodaySection(shop.words.callIt("mac.will_be_late") + " · " + shop.words.numeral(late.count)) {
                 VStack(spacing: 0) {
                     ForEach(shown) { job in
                         row(job)
@@ -479,8 +357,11 @@ struct ToChase: View {
     private var invoices: [Chase] { shop.invoicesToChase.filter { !alreadyShown.contains($0.id) } }
     private var quotes: [Chase] { shop.quotesToChase.filter { !alreadyShown.contains($0.id) } }
 
+    /// Whether there is anything to chase, so a caller can leave out its heading.
+    var hasRows: Bool { !invoices.isEmpty || !quotes.isEmpty }
+
     var body: some View {
-        if !invoices.isEmpty || !quotes.isEmpty {
+        if hasRows {
             VStack(alignment: .leading, spacing: 12) {
                 if !invoices.isEmpty {
                     list(shop.words.callIt("mac.chase_invoices"),
@@ -497,7 +378,7 @@ struct ToChase: View {
     @ViewBuilder
     private func list(_ title: String, _ symbol: String,
                       _ rows: [Chase], overdue: Bool) -> some View {
-        DetailSection(title) {
+        TodaySection(title) {
             VStack(spacing: 0) {
                 ForEach(rows) { row in
                     HStack(spacing: 10) {
@@ -554,7 +435,7 @@ private struct Goal: View {
         let goal = Shop.plainNumber(shop.settingsDict["monthlyGoal"]) ?? 0
         if goal > 0 {
             let done = shop.thisMonthRevenue
-            DetailSection(shop.words.callIt("dash.goal")) {
+            TodaySection(shop.words.callIt("dash.goal")) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(Money.text(done, shop.currency)).monospacedDigit()
@@ -637,38 +518,17 @@ private struct NeedsAttention: View {
     let shop: Shop
 
     /// How many rows before the panel stops being a list and becomes a wall.
-    ///
-    /// The module returns everything, correctly — it is a selector, not a
-    /// display. On the sample shop that is eight rows, and a shop with twenty
-    /// late jobs would get a dashboard that is nothing but this panel, which is
-    /// the same failure as a band with twenty machines on it. Six fit above the
-    /// fold on the smallest window this app opens at; the rest are counted and
-    /// one press away.
+    /// The rest are counted and one press away.
     private static let atMost = 6
 
     private var shown: ArraySlice<DashboardFacts.Item> { items.prefix(Self.atMost) }
     private var hidden: Int { max(0, items.count - Self.atMost) }
 
-    /// Red when something has actually failed, amber when something merely
-    /// wants a person. The severity is the module's own — this is not a second
-    /// opinion about how worried to be.
-    private var worst: Color {
-        items.contains { $0.severity == NeedsAttentionSeverity.critical }
-            ? Khayt.late : Khayt.attention
-    }
-
     var body: some View {
-        // THE LEAD, whenever there is anything in it. This is the reason
-        // somebody opened the screen, and it used to say so in the same 10pt
-        // grey as "MONEY".
-        DetailSection(shop.words.callIt("mac.needs_attention"),
-                      accent: worst, symbol: "exclamationmark.triangle.fill",
-                      lead: true, count: items.count) {
+        TodaySection(shop.words.callIt("mac.needs_attention") + " · " + shop.words.numeral(items.count)) {
             VStack(spacing: 0) {
                 ForEach(shown) { item in
-                    Row(item: item, shop: shop,
-                        ink: item.severity == NeedsAttentionSeverity.critical
-                             ? Khayt.late : Khayt.attention)
+                    Row(item: item, shop: shop)
                     if item.id != shown.last?.id || hidden > 0 { LayerRule() }
                 }
                 if hidden > 0 {
@@ -683,64 +543,58 @@ private struct NeedsAttention: View {
                         }
                         .buttonStyle(.borderless).font(.callout)
                     }
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 8)
                 }
             }
-            .padding(.horizontal, 12)
-            .card(rail: worst, padding: 0)
+            .todayCard(padding: 12)
         }
     }
 
     private struct Row: View {
         let item: DashboardFacts.Item
         let shop: Shop
-        let ink: Color
+
+        /// The tile's colour by KIND: a late job is late, a thin shelf wants
+        /// attention, a machine is the shop's own business.
+        private var tint: Color {
+            switch item.kind {
+            case "stock": Khayt.attention
+            case "machine", "nozzle": Khayt.brand
+            default: Khayt.late
+            }
+        }
+
+        /// The text colour of the figure that says how bad: the module's own
+        /// severity, not a second opinion.
+        private var ink: Color {
+            item.severity == NeedsAttentionSeverity.critical ? Khayt.late : Khayt.attention
+        }
 
         var body: some View {
-            HStack(spacing: 10) {
-                Image(systemName: NeedsAttentionAction.symbol(item.kind))
-                    .foregroundStyle(ink)
-                    .frame(width: 18)
-                // ONE LINE, not two. This list is read at a glance and its job
-                // is to be complete on the screen: stacking the order number
-                // under the name doubled the height of every row, so six late
-                // jobs filled the window and a seventh was below the fold —
-                // which is the one thing a list of what is wrong must not do.
-                Text(item.name ?? item.id).lineLimit(1)
-                Text(subtitle).font(.caption2).monospacedDigit()
-                    .foregroundStyle(.tertiary).lineLimit(1)
-                Spacer(minLength: 8)
-                if let late = item.daysLate, late > 0 {
-                    // Said in words, not by colour alone. This is the line that
-                    // decides whether someone gets a phone call today.
-                    Text(shop.words.counting(late, "mac.days_late"))
-                        .font(.callout).monospacedDigit().foregroundStyle(ink)
-                } else if let grams = item.grams {
-                    // In the item's OWN unit. The shelf learned to count in
-                    // sheets and millilitres; this screen was still writing the
-                    // gram after everything.
-                    Text(Quantity.say(grams, shop.inventoryUnits[item.id], shop.words))
-                        .font(.callout).monospacedDigit().foregroundStyle(ink)
+            HStack(spacing: 12) {
+                TodayTile(symbol: NeedsAttentionAction.symbol(item.kind), tint: tint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name ?? item.id)
+                        .font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(subtitle).monospacedDigit().foregroundStyle(.secondary)
+                        if let late = item.daysLate, late > 0 {
+                            // Said in words, not by colour alone.
+                            Text(shop.words.counting(late, "mac.days_late"))
+                                .monospacedDigit().foregroundStyle(ink)
+                        } else if let grams = item.grams {
+                            Text(Quantity.say(grams, shop.inventoryUnits[item.id], shop.words))
+                                .monospacedDigit().foregroundStyle(ink)
+                        }
+                    }
+                    .font(.system(size: 12.5)).lineLimit(1)
                 }
-                // ── AND THE THING THAT FIXES IT ───────────────────────────
-                //
-                // A list of problems with nothing to press is a list you read
-                // and then go looking for the screen it is about. Every row
-                // knows which screen that is, so it takes you there.
-                // `.borderless`, not `.link`: a link button paints itself
-                // `NSColor.linkColor` and ignores the environment tint, so
-                // every one of these came out system blue in an app whose own
-                // colour is its own — and would have stayed blue for someone who
-                // had chosen a different accent in System Settings, which is
-                // the one case the tint exists to honour.
+                Spacer(minLength: 8)
+                // And the thing that fixes it: every row knows which screen.
                 Button(shop.words.callIt(NeedsAttentionAction.forKind(item.kind))) { go() }
-                    .buttonStyle(.borderless)
-                    .font(.callout)
+                    .buttonStyle(.bordered).controlSize(.small)
             }
-            // 28pt rows. A ruled list can be this tight; a striped one cannot,
-            // which is half the reason the rules are lines.
-            .padding(.vertical, 3)
-            .frame(minHeight: Metric.row)
+            .padding(.vertical, 8)
             .contentShape(Rectangle())
             .onTapGesture { go() }
         }
@@ -772,138 +626,6 @@ private struct NeedsAttention: View {
     }
 }
 
-/// What the shop is doing.
-private struct Work: View {
-    let facts: DashboardFacts
-    let shop: Shop
-
-    /// The floor leads on a morning when nothing is wrong.
-    ///
-    /// A screen answers "what should I look at" by saying one thing louder than
-    /// the rest, and which thing that is depends on the day. With something in
-    /// the attention panel, this is supporting; with nothing there, this is the
-    /// answer and it says so.
-    let leads: Bool
-
-    var body: some View {
-        DetailSection(shop.words.callIt("mac.the_floor"),
-                      accent: leads ? Khayt.brand : nil,
-                      symbol: leads ? "printer.fill" : nil,
-                      lead: leads) {
-            // ONE CARD, RULED — not four. These four figures are one thing: the
-            // state of the floor right now. Drawn as four separate cards they
-            // spent almost all their ink on borders.
-            // The machines themselves, above the count of them. "Printing 0"
-            // is the book's answer; the tiles are the printers'.
-            FloorStrip(shop: shop)
-            // Every count through `Money.quantity`: grouped, and in the
-            // digits the shop chose — a bare "\(n)" was neither.
-            StatStrip(stats: [
-                // Amber only when something IS printing. A colour that means
-                // "being made right now" sitting on a zero says the opposite of
-                // what it means, and a dashboard where the warm colour is
-                // always on is a dashboard where it stops being noticed.
-                Stat(label: shop.words.callIt("queue.printing"),
-                     value: Money.quantity(Double(facts.printingCount), decimals: 0),
-                     symbol: "printer",
-                     tint: facts.printingCount > 0 ? Khayt.hot : Color.secondary,
-                     alive: facts.printingCount > 0),
-                Stat(label: shop.words.callIt("mac.open_count"),
-                     value: Money.quantity(Double(facts.activeCount), decimals: 0), mark: .jobs),
-                Stat(label: shop.words.callIt("mac.late_tile"),
-                     value: Money.quantity(Double(facts.lateCount), decimals: 0),
-                     mark: .clock,
-                     tint: facts.lateCount > 0 ? Khayt.attention : Color.secondary),
-                Stat(label: shop.words.callIt("mac.machines_online"),
-                     value: Money.quantity(Double(facts.fleet.live), decimals: 0) + "/"
-                         + Money.quantity(Double(facts.fleet.total), decimals: 0),
-                     working: facts.fleet.offline > 0
-                         ? shop.words.callIt("mac.fleet_offline",
-                                             ["n": .number(Double(facts.fleet.offline))]) : nil,
-                     mark: .machines),
-            ])
-        }
-    }
-}
-
-/// What the printers are doing, in one line each.
-///
-/// Only the ones that are actually running: a list of idle machines is the
-/// machines screen, and this is the answer to "is it still going". Nothing at
-/// all when nothing is printing, because an empty section under a heading reads
-/// as a screen that failed to load.
-private struct RunningNow: View {
-    let shop: Shop
-
-    private var running: [(Machine, KhaytEngine.PrinterStatus)] {
-        shop.siteMachinesInUse.compactMap { machine in
-            // The one predicate, not a fourth spelling of it. This file, the
-            // machine card and two properties on `Shop` each had their own,
-            // and two of the four forgot to lowercase.
-            guard let status = shop.printers.readings[machine.id]?.status,
-                  PrinterWatch.isPrinting(status.state) else { return nil }
-            return (machine, status)
-        }
-    }
-
-    var body: some View {
-        if !running.isEmpty {
-            DetailSection(shop.words.callIt("mac.live")) {
-                VStack(spacing: 10) {
-                    ForEach(running, id: \.0.id) { machine, status in
-                        Line(machine: machine, status: status, shop: shop)
-                    }
-                }
-            }
-        }
-    }
-
-    private struct Line: View {
-        let machine: Machine
-        let status: KhaytEngine.PrinterStatus
-        let shop: Shop
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text(machine.name).font(.body.weight(.semibold)).lineLimit(1)
-                    if !status.filename.isEmpty {
-                        Text(status.filename)
-                            .font(.caption).foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
-                    Spacer(minLength: 12)
-                    if let left = status.timeRemaining, left > 0 {
-                        Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
-                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                    }
-                    Text(verbatim: shop.words.numeral(status.progress) + "%")
-                        // The tile on the floor strip already rolls this
-                        // figure; this one snapped. Two screens showing the
-                        // same reading, disagreeing about whether it moved.
-                        .contentTransition(.numericText())
-                        .font(.callout.weight(.semibold)).monospacedDigit()
-                        .foregroundStyle(Khayt.hot)
-                        .frame(width: 46, alignment: .trailing)
-                }
-                // THE ONE WARM THING ON THE SCREEN, and the app's own reason
-                // for having a warm colour at all: the icon's drop of filament
-                // is exactly this moment. Everything else on the dashboard is a
-                // number about the past; this is the machine, now.
-                //
-                // Drawn as the LAYERS it has laid, not as a capsule filling up.
-                // The shape has been in `Craft.swift` for months and appeared on
-                // exactly one surface — a picture in the snapshot runner that
-                // nothing shipped — while the screen a shop actually leaves open
-                // used the stock bar, which is the same bar as every other app
-                // on the machine.
-                LayerProgress(progress: Double(status.progress) / 100)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
 /// What has gone wrong with a printer, since the app opened.
 ///
 /// The alerts are `lib/printer-alerts.js`'s — its thresholds, its cooldowns,
@@ -915,7 +637,7 @@ private struct WentWrong: View {
     var body: some View {
         let notices = shop.printers.notices.raised
         if !notices.isEmpty {
-            DetailSection(shop.words.callIt("mac.printer_trouble")) {
+            TodaySection(shop.words.callIt("mac.printer_trouble")) {
                 VStack(spacing: 0) {
                     ForEach(notices.prefix(5)) { notice in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -956,7 +678,7 @@ private struct MoneyTiles: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        DetailSection(shop.words.callIt("mac.money"), accent: Khayt.brand, symbol: "banknote.fill") {
+        TodaySection(shop.words.callIt("mac.money"), accent: Khayt.brand, symbol: "banknote.fill") {
             // Which period, said next to the figures rather than assumed. An
             // owner reading "revenue" needs to know whether that is this month
             // or all time before the number means anything.
@@ -1083,65 +805,6 @@ private struct MoneyTiles: View {
     }
 }
 
-/// A figure worth reading from across the room.
-private struct Tile: View {
-    let value: String
-    let label: String
-    /// The arithmetic that produced the value, on the tiles where there is
-    /// one. A shop that can check one derived figure trusts the other forty.
-    var working: String?
-    let symbol: String
-    let tint: Color
-    /// Set on the one tile that is describing something happening RIGHT NOW.
-    var alive = false
-
-    /// Somebody who has asked the system for less movement gets none.
-    ///
-    /// The HIG: "Make motion optional. Not everyone can or wants to experience
-    /// the motion in your app." The symbol still turns amber and the number
-    /// still counts, so nothing is only said by the movement.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Label(label, systemImage: symbol)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
-                .lineLimit(1)
-                // ONE piece of motion in the whole app, on the one thing that
-                // is actually moving. The HIG asks for motion that is
-                // purposeful and brief and warns against adding it to anything
-                // frequent; a printer laying down plastic is neither frequent
-                // nor decorative, and a shop glancing across the room should be
-                // able to tell from here that the machine is still going.
-                .symbolEffect(.variableColor.iterative.dimInactiveLayers,
-                              isActive: alive && !reduceMotion)
-            Text(value)
-                // Rounded to match `BigFigure`, and stepped down from it: the
-                // hero above is 34pt, so a supporting tile at the old 24 was
-                // close enough to argue with it. 19 reads as "also a number,
-                // and not the one".
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(tint == .secondary ? AnyShapeStyle(.primary) : AnyShapeStyle(tint))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            // The arithmetic, tied to the figure by a tick the way a dimension
-            // on a drawing is tied to what it measures.
-            if let working {
-                HStack(spacing: 5) {
-                    Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
-                    Text(working).font(.caption2).monospacedDigit()
-                        .foregroundStyle(.tertiary).lineLimit(1)
-                }
-            }
-        }
-        .card(rail: alive ? Khayt.hot : nil, padding: 10)
-    }
-}
-
-
 /// Six months of takings, and a sentence saying what they add up to.
 ///
 /// ── WHY A CHART AT ALL ────────────────────────────────────────────────────
@@ -1175,7 +838,7 @@ private struct Takings: View {
     private var last: KhaytEngine.RevenueMonth? { outlook.history.last }
 
     var body: some View {
-        DetailSection(shop.words.callIt("mac.takings")) {
+        TodaySection(shop.words.callIt("mac.takings")) {
             VStack(alignment: .leading, spacing: 10) {
                 headline
                 chart

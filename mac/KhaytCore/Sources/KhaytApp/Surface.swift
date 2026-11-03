@@ -196,7 +196,7 @@ extension Khayt {
     /// thing a coloured label sits on — and the dark ramp against this, the
     /// lightest. Anything that moves either has to be measured again, and the
     /// test will say so.
-    static let surface = adaptive(light: 0xFBF9F5, dark: 0x201C17, name: "khaytSurface")
+    static let surface = adaptive(light: 0xFFFFFF, dark: 0x0D2444, name: "khaytSurface")
 
     /// The ground a screen is drawn on, and the reason the two above work.
     ///
@@ -216,7 +216,7 @@ extension Khayt {
     ///
     /// Dark barely moves — `#1E1E1E` is already a ground and only needs to be
     /// a shade below `surface`.
-    static let ground = adaptive(light: 0xEFEBE3, dark: 0x16130F, name: "khaytGround")
+    static let ground = adaptive(light: 0xF6F8F8, dark: 0x06182F, name: "khaytGround")
 
     /// The line around a card: low contrast on purpose, there to say where the
     /// card ends rather than to be seen.
@@ -227,7 +227,7 @@ extension Khayt {
     /// line on every card edge in the app is most of what "it looks washed out"
     /// was. This is a colour of its own, from the same family as the surfaces
     /// it separates.
-    static let hairline = adaptive(light: 0xDCD5C8, dark: 0x3A342C, name: "khaytHairline")
+    static let hairline = adaptive(light: 0xE3E6E8, dark: 0x1F3A5E, name: "khaytHairline")
 
     /// The rule between two rows of a list.
     ///
@@ -243,7 +243,7 @@ extension Khayt {
     /// It is also the denser of the two. A ruled row can be 28pt; a striped one
     /// needs padding above and below the fill or the stripe looks like a
     /// selection.
-    static let layerLine = adaptive(light: 0xEAE4D9, dark: 0x2E2822, name: "khaytLayerLine")
+    static let layerLine = adaptive(light: 0xEEF1F3, dark: 0x16304F, name: "khaytLayerLine")
 
     /// The bare part of a spool, where the filament no longer reaches.
     ///
@@ -260,7 +260,7 @@ extension Khayt {
     /// So this one goes the OTHER way in dark: an empty spool is a lighter
     /// object than the card it sits on, because that is the only direction
     /// with room in it.
-    static let bareSpool = adaptive(light: 0xE3DCCD, dark: 0x35302A, name: "khaytBareSpool")
+    static let bareSpool = adaptive(light: 0xE6EAEE, dark: 0x24406A, name: "khaytBareSpool")
 
     /// The edge of a drawn object, as opposed to the edge of a card.
     ///
@@ -371,7 +371,7 @@ extension Khayt {
     /// rather than assumed: in dark appearance "further away" is DARKER, so
     /// this goes down from the window while `surface` goes up from it. A lane
     /// lightened in dark would come forward and swap the two depths over.
-    static let recessed = adaptive(light: 0xE7E1D7, dark: 0x0E0C09, name: "khaytRecessed")
+    static let recessed = adaptive(light: 0xEEF1F1, dark: 0x0A2140, name: "khaytRecessed")
 }
 
 extension View {
