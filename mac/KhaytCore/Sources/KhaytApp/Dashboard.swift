@@ -110,7 +110,9 @@ struct Dashboard: View {
 
     var body: some View {
         GeometryReader { geo in
-            let showsMoney = shop.facts?.showsMoney != false
+            // The shop's figures only for a level that may see them (`analytics`
+            // in lib/rbac.js: owner, manager) — what the navy strip always did.
+            let showsMoney = shop.facts?.showsMoney != false && shop.lockAllows("analytics", "view")
             let wide = geo.size.width >= Self.twoColumnFrom
             let items = attentionItems
             let due = TodayDue(shop: shop)
@@ -172,7 +174,7 @@ struct Dashboard: View {
         DueThisWeek(shop: shop, due: due)
         // Quotes sent and not approved, invoices past their grace: the shop's
         // own chase lists, which are opt-in and absent when empty.
-        if ToChase(shop: shop).hasRows {
+        if shop.lockAllows("analytics", "view"), ToChase(shop: shop).hasRows {
             TodaySection(shop.words.callIt("mac.waiting_customers")) { ToChase(shop: shop) }
         }
     }

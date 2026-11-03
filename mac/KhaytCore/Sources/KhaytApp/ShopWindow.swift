@@ -180,10 +180,9 @@ struct ShopWindow: View {
             // narrows carries the banner (SiteFilter.swift); it draws nothing
             // when no site is chosen.
             if shop.showingDashboard {
-                VStack(spacing: 0) {
-                    SiteScopeBanner(shop: shop, counting: .none)
-                    Dashboard(shop: shop)
-                }
+                // Triage draws Today (with its site banner) and puts the
+                // Today/Ledger switch and Record a payment in the toolbar.
+                Triage(shop: shop)
             } else if shop.showingLibrary {
                 LibraryGrid(shop: shop)
             } else if shop.showingBoard {
@@ -262,6 +261,7 @@ struct ShopWindow: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if shop.showingJobs {
                     JobsLayoutPicker(shop: shop)
+                    if !shop.showingBoard { JobsStageMenu(shop: shop) }
                 }
                 // IMPORT, ON THE SCREEN IT IMPORTS INTO.
                 //

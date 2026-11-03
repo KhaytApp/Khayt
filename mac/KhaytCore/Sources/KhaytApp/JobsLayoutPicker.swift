@@ -44,3 +44,31 @@ extension Shop {
         if layout == .board { shelf = .jobs(nil) }
     }
 }
+
+
+/// One stage of the pipeline as a table — what the nine sidebar rows were
+/// before the redesign folded them away.
+struct JobsStageMenu: View {
+    @Bindable var shop: Shop
+
+    var body: some View {
+        Menu {
+            Button(shop.words.callIt("mac.all_jobs")) { shop.shelf = .jobs(nil) }
+            Divider()
+            ForEach(Stage.allCases) { stage in
+                Button("\(shop.words.callIt(stage.key))  \(shop.words.numeral(shop.count(stage)))") {
+                    shop.shelf = .jobs(stage)
+                }
+            }
+        } label: {
+            Text(currentTitle)
+        }
+        .fixedSize()
+        .help(shop.words.callIt("mac.stage"))
+    }
+
+    private var currentTitle: String {
+        if case .jobs(let stage?) = shop.shelf { return shop.words.callIt(stage.key) }
+        return shop.words.callIt("mac.all_jobs")
+    }
+}

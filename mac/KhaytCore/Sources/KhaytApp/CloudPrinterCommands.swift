@@ -115,8 +115,11 @@ final class CloudPrinterCommands {
         // `since` is "after", at second precision: step back one second so a
         // second event in the same second as the last is not skipped. The
         // handled ids keep it from running twice.
+        // Capped at now + skew: one event stamped in the future (a wrong
+        // clock anywhere in the shop) must not move `since` past every later
+        // command and silence the relay until the app restarts.
         if let newest = list.events.compactMap({ Calendar.instant($0.at) }).max() {
-            since = max(from, newest.addingTimeInterval(-1))
+            since = max(from, min(newest, now.addingTimeInterval(Self.skew)).addingTimeInterval(-1))
         } else {
             since = from
         }
@@ -126,6 +129,12 @@ final class CloudPrinterCommands {
             let (_, body) = await shop.phonePrinterCommand(command.machineId, command.verb)
             var answer: [String: JSONValue] = [:]
             if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: Data(body.utf8)) { answer = o }
+            // Not this Mac's printer to answer for: with two Macs in a shop the
+            // phone keeps the first answer, and "not connected" from the Mac
+            // that cannot see the printer must not beat "stopped" from the one
+            // that can. Stay quiet and let the other answer.
+            if case .string(let reason)? = answer["reason"],
+               ["not-found", "not-connected", "not-watched"].contains(reason) { continue }
             answer["id"] = .string(command.id)
             _ = try? await ShopEventPublisher.send(connection, token: token, dek: dek, kind: "cmd-result",
                                                    at: ShopEventPublisher.stamp(Date()), payload: answer,
