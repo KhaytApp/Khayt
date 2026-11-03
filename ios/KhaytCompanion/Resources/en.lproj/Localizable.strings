@@ -903,3 +903,6 @@
 "customer.messages.none" = "No messages logged yet.";
 "customer.needs_book" = "This customer’s page needs the shop’s book on this phone.";
 "customer.new_order" = "New order for this customer";
+/* Rush, machine job */
+"orders.rush" = "Rush";
+"machines.job" = "Job: %@";

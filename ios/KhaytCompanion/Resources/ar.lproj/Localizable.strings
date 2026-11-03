@@ -903,3 +903,6 @@
 "customer.messages.none" = "لا توجد رسائل مسجلة بعد.";
 "customer.needs_book" = "تحتاج صفحة العميل إلى دفتر المتجر على هذا الهاتف.";
 "customer.new_order" = "طلب جديد لهذا العميل";
+/* Rush, machine job */
+"orders.rush" = "عاجل";
+"machines.job" = "الطلب: %@";

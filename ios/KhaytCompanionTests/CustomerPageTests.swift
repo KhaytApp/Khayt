@@ -57,11 +57,13 @@ final class CustomerPageTests: XCTestCase {
     }
 
     func testWhatTheyOweIsTheShopsRuleAndTheLimitShows() async throws {
-        let page = try XCTUnwrap(try await BookReader(book: book).customer(id: "C-1"))
+        let found = try await BookReader(book: book).customer(id: "C-1")
+        let page = try XCTUnwrap(found)
         XCTAssertEqual(page.owed, 150, accuracy: 0.01, "the unpaid open job; the quote owes nothing")
         XCTAssertEqual(page.openJobs.first?.owed ?? 0, 150, accuracy: 0.01)
         XCTAssertTrue(page.isOverLimit)
-        let fahad = try XCTUnwrap(try await BookReader(book: book).customer(id: "C-2"))
+        let other = try await BookReader(book: book).customer(id: "C-2")
+        let fahad = try XCTUnwrap(other)
         XCTAssertFalse(fahad.isOverLimit, "no limit set means never over it")
     }
 
