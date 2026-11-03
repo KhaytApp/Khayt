@@ -313,6 +313,38 @@ async function testClientCurrencyQuote(window) {
   if (!ok) throw new Error(`client-currency quote failed: ${JSON.stringify(r)}`);
 }
 
+// A milestone is a PROFORMA for its part of the job (Nov 2026): one line, its
+// own amount, no ZATCA QR, nothing of the job's parts or shipping — the job's
+// one tax invoice stays the job's.
+async function testMilestoneProforma(window) {
+  const r = await window.evaluate(async () => {
+    const zatca = settings.enableZatca, vat = settings.vat;
+    settings.enableZatca = true; settings.vat = '300000000000003';
+    const o = { id: 'E2E-MS-1', invoiceNum: 'INV-E2E-77', date: localDateStr(), timestamp: new Date().toISOString(),
+      project: 'Milestone job', price: 1150, shippingCost: 50, rushFeeAmount: 0, status: 'printing',
+      parts: [{ name: 'Part Alpha', material: 'PLA', baseCost: 300, qty: 2, printTime: 3 }],
+      milestoneInvoices: [{ id: 'm1', label: 'Deposit', percentage: 30, amount: 345 }] };
+    printLog.unshift(o);
+    try {
+      await generateMilestoneInvoice(o.id, o.milestoneInvoices[0]);
+      const area = document.querySelector('#invoice-print-area');
+      const text = area.innerText.replace(/\s+/g, ' ');
+      return {
+        rows: area.querySelectorAll('tbody tr').length,
+        label: text.includes('Deposit'),
+        noParts: !text.includes('Part Alpha'),
+        noInvoiceNumber: !text.includes('INV-E2E-77'),
+        issued: !!o.milestoneInvoices[0].issuedAt,
+        total345: /345[.,]00/.test(text),
+      };
+    } finally {
+      printLog.shift(); settings.enableZatca = zatca; settings.vat = vat; saveAll();
+    }
+  });
+  const bad = Object.entries(r).filter(([k, v]) => (k === 'rows' ? v !== 1 : v !== true)).map(([k]) => k);
+  if (bad.length) throw new Error(`milestone proforma failed: ${bad.join(', ')} — ${JSON.stringify(r)}`);
+}
+
 // 3.2 (Bed Ready split): "enthusiast" is RETIRED as a Khayt-selectable mode — its maker
 // tools (converter / Colour Studio / print-file library) are now core Simple/Pro features.
 // Verify the retirement (no switcher pill + stored enthusiast migrates to Simple), that the
@@ -652,6 +684,7 @@ try {
   await testHueForge(window);
   await testIndexes(window);
   await testPruneArchived(window);
+  await testMilestoneProforma(window);
   await testClientCurrencyQuote(window);
   const owner = testStoreOwnership();
 
