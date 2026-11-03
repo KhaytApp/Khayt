@@ -23,7 +23,9 @@ extension Shop {
     /// Saves the choice; answers what the cloud now holds, or nil when it
     /// refused (the switch is put back).
     func setCloudDigest(_ enabled: Bool) async -> CloudCheckout.Digest? {
-        guard let (connection, token) = await vaultSession() else { return nil }
+        // The same gate as reading it: the switch is the owner's, and a sign-in
+        // changed under an open Settings window must not flip it for them.
+        guard cloudIsOwner, let (connection, token) = await vaultSession() else { return nil }
         return try? await CloudCheckout.setDigest(enabled, connection, token: token, fetch: Self.plansFetch)
     }
 

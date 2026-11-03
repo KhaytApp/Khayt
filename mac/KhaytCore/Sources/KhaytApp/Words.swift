@@ -1770,6 +1770,8 @@ final class Words {
         "mac.paylink_note": ["en": "Paste your payment provider’s https link. {amount} in the link is filled in with the amount due. The customer’s page shows Pay deposit, Pay balance or Pay beside it.", "ar": "الصق رابط مزوّد الدفع الذي تستخدمه (https). يُستبدل {amount} في الرابط بالمبلغ المستحق، وتعرض صفحة العميل زر «ادفع العربون» أو «ادفع المتبقي» أو «ادفع»."],
         "mac.paylink_saved": ["en": "Saved.", "ar": "تم الحفظ."],
         "mac.paylink_removed": ["en": "Removed.", "ar": "تمت الإزالة."],
+        "mac.paylink_remove_q": ["en": "Remove the payment link?", "ar": "إزالة رابط الدفع؟"],
+        "mac.paylink_remove_msg": ["en": "Customers stop seeing a Pay button on their order page.", "ar": "لن يرى العملاء زر الدفع في صفحة طلبهم بعد الآن."],
         "mac.digest_title": ["en": "Weekly email", "ar": "البريد الأسبوعي"],
         "mac.digest_toggle": ["en": "Email me a weekly summary", "ar": "أرسل لي ملخصاً أسبوعياً"],
         "mac.digest_hint": ["en": "Every Sunday morning: last week’s order requests, quotes, customer messages, payments and reviews, sent to the owner’s email.", "ar": "كل صباح أحد: طلبات الأسبوع الماضي وعروض الأسعار ورسائل العملاء والمدفوعات والتقييمات، إلى بريد المالك."],

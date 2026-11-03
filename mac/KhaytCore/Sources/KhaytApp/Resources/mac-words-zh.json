@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "粘贴您的支付服务商的 https 链接。链接中的 {amount} 会替换为应付金额。客户页面会显示“支付定金”“支付余款”或“支付”。",
  "mac.paylink_saved": "已保存。",
  "mac.paylink_removed": "已移除。",
+ "mac.paylink_remove_q": "移除付款链接？",
+ "mac.paylink_remove_msg": "客户将不会再在订单页面上看到付款按钮。",
  "mac.plan_paid": "此店铺已为其套餐付费，因此无法切换到免费测试套餐。",
  "mac.plan_per_month": "每月 {price}",
  "mac.plan_per_year": "每年 {price}",

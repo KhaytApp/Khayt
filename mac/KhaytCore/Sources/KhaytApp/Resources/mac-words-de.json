@@ -2014,6 +2014,8 @@
  "mac.paylink_note": "Füge den https-Link deines Zahlungsanbieters ein. {amount} im Link wird durch den fälligen Betrag ersetzt. Die Kundenseite zeigt daneben Anzahlung zahlen, Restbetrag zahlen oder Bezahlen.",
  "mac.paylink_saved": "Gespeichert.",
  "mac.paylink_removed": "Entfernt.",
+ "mac.paylink_remove_q": "Zahlungslink entfernen?",
+ "mac.paylink_remove_msg": "Kunden sehen auf ihrer Auftragsseite dann keine Bezahlen-Schaltfläche mehr.",
  "mac.plan_paid": "Dieser Shop bezahlt seinen Tarif und kann daher nicht auf einen kostenlosen Beta-Tarif wechseln.",
  "mac.plan_per_month": "{price} pro Monat",
  "mac.plan_per_year": "{price} pro Jahr",
