@@ -306,6 +306,12 @@ private struct Detail: View {
                 Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
                     .buttonStyle(.link)
                     .font(.callout)
+                // Part of the price asked for on its own — each prints as a
+                // proforma too. Writes the job, so it needs a book we hold.
+                Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .disabled(!shop.canMoveJobs)
             }
             // The customer's way to say yes. Only on a quote, only on a real
             // book (the link is minted into the job), and only while the

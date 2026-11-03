@@ -85,7 +85,7 @@ struct InvoiceSheet: View {
     /// and File ▸ Share… take as well, so the three cannot disagree about
     /// which number a document carries or when it may not be drawn.
     private func build() async {
-        switch await shop.invoiceDocument(for: subject.id, proforma: subject.proforma) {
+        switch await shop.invoiceDocument(for: subject.id, proforma: subject.proforma, milestone: subject.milestone) {
         case .refused(let why):
             problem = why
         case .paper(let doc, let n):
@@ -103,7 +103,14 @@ struct InvoiceSheet: View {
         guard let paper else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = (subject.proforma ? "Proforma-" : "") + Self.filename(job, words: shop.words, number: number)
+        var name = (subject.proforma ? "Proforma-" : "") + Self.filename(job, words: shop.words, number: number)
+        // Each milestone of a job is its own paper: one name apiece, so saving the
+        // second does not offer to replace the first.
+        if let part = subject.milestone.flatMap({ id in shop.milestones(of: subject.id).first { $0.id == id } }) {
+            let tail = part.label.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            name = String(name.dropLast(4)) + "-" + tail + ".pdf"
+        }
+        panel.nameFieldStringValue = name
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             do {

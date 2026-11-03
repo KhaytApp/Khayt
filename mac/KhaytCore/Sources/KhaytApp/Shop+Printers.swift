@@ -296,7 +296,7 @@ extension Shop {
     func slicedFiles(for job: Order) -> [URL] {
         var out: [URL] = []
         for part in job.parts {
-            guard let id = part.printFileId, let file = files.first(where: { $0.id == id }) else { continue }
+            guard let id = part.printFileId, let file = libraryFile(id: id) else { continue }
             if let dir = directory(for: file) {
                 for url in PrinterSend.slicedFiles(in: dir) where !out.contains(url) { out.append(url) }
             }

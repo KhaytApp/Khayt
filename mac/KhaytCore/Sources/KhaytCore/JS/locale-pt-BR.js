@@ -897,6 +897,7 @@
   "doc.due_date": "Data de vencimento",
   "doc.payment_terms": "Condições de pagamento",
   "doc.net_days": "Líquido {n} dias",
+  "doc.milestone_of": "{pct}% de {total}",
   "doc.post_checklist": "Checklist de pós-processamento",
   "doc.operator": "Operador",
   "doc.reviewed_by": "Revisado por",

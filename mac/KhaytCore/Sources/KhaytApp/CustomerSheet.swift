@@ -347,6 +347,29 @@ struct CustomerSheet: View {
                 }
             }
             GridRow {
+                // The currency this customer is invoiced in; "Default" is the
+                // shop's own and is stored as "". A code the shop does not
+                // list but the book holds stays in the menu, so opening and
+                // saving never replaces it.
+                Text(shop.words.callIt("ce.currency")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker("", selection: Binding(get: { draft.currency },
+                                                  set: { draft = draft.inCurrency($0) })) {
+                        Text(shop.words.callIt("mac.currency_default",
+                                               ["code": .string(shop.currency)])).tag("")
+                        ForEach(shop.words.currencyChoices(shop.currencies.mapValues(\.label),
+                                                           current: draft.currency), id: \.code) {
+                            Text($0.label).tag($0.code)
+                        }
+                    }
+                    .labelsHidden().frame(maxWidth: 300, alignment: .leading)
+                    Text(shop.words.callIt("ce.currency_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            GridRow {
                 Text(shop.words.callIt("ce.notes")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 TextField("", text: binding(\.notes), axis: .vertical)

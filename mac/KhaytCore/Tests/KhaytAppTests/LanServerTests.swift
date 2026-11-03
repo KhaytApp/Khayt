@@ -19,6 +19,8 @@ import KhaytCore
 struct LanServerTests {
 
     /// A server on loopback, an ephemeral port, the sample book, a fixed clock.
+    @MainActor final class PrinterCalls { var calls: [String] = [] }
+
     @MainActor final class Bench {
         let shop: Shop
         let engine: KhaytEngine
@@ -33,6 +35,8 @@ struct LanServerTests {
         let book = Book()
         /// How many times the delta writer was actually entered.
         let foldCalls = Counter()
+        /// What `/api/printer/…` asked the stubbed printer hook, in order.
+        let printerCalls = PrinterCalls()
         var tokens = 0
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
@@ -122,6 +126,13 @@ struct LanServerTests {
                     book.value = folded.store
                     return folded
                 }
+            }
+            // Stubbed: the ROUTE is under test, and no test should reach a
+            // printer. `printerCalls` says whether the hook was reached at all.
+            let printerCalls = self.printerCalls
+            host.printerCommand = { id, verb in
+                printerCalls.calls.append("\(id) \(verb.rawValue)")
+                return (200, #"{"ok":true,"state":"paused"}"#)
             }
             let server = LanServer(host: host)
             self.server = server
