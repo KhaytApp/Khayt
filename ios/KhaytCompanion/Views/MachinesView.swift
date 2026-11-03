@@ -258,45 +258,65 @@ private struct MachineCard: View {
         }
     }
 
+    /// The redesign's printer card (Figma "Printer card"): a printer tile, the
+    /// name and what it is on, a pill; while printing, the percentage large
+    /// with the time left and the clock time it ends, over the thread bar.
+    /// The card is outlined in its state's colour — green printing, red in
+    /// trouble — and a printer in trouble sits on that red's wash.
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(live.displayName)
-                    .font(.khayt(16, .medium, relativeTo: .body))
-                    .foregroundStyle(KhaytDesign.ink)
-                    .lineLimit(1)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: mode == .error ? "exclamationmark.triangle" : "printer")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(mode == .idle || mode == .offline ? KhaytDesign.ink : tone)
+                    .frame(width: 42, height: 42)
+                    .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(live.displayName)
+                        .font(.khayt(17, .semibold, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .lineLimit(1)
+                    if let sub {
+                        Text(sub)
+                            .font(.khayt(13, relativeTo: .footnote))
+                            .foregroundStyle(mode == .error ? KhaytDesign.late : KhaytDesign.note)
+                            .lineLimit(mode == .error ? 2 : 1)
+                            .truncationMode(.middle)
+                    }
+                }
                 Spacer(minLength: 0)
-                Text(statusLabel)
-                    .font(.khayt(11.5, .semibold, relativeTo: .caption))
-                    .padding(.horizontal, 9).padding(.vertical, 2)
-                    .foregroundStyle(tone)
-                    .background(tone.opacity(0.14), in: Capsule())
-            }
-            if let sub {
-                Text(sub)
-                    .font(.khayt(13, relativeTo: .footnote))
-                    .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .padding(.top, 5)
+                HStack(spacing: 5) {
+                    Circle().fill(tone).frame(width: 6, height: 6)
+                    Text(statusLabel)
+                        .font(.khayt(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.ink)
+                }
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(tone.opacity(0.16), in: Capsule())
             }
             if mode == .printing, let progress = live.progress {
-                HStack(spacing: 9) {
-                    LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 5)
-                    Text("\(progress)%")
-                        .font(.khayt(13, .medium, relativeTo: .footnote).monospacedDigit())
+                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                    Text(progress.formatted(.number.locale(L10n.locale)) + "%")
+                        .font(.khaytDisplay(42, .bold, relativeTo: .largeTitle).monospacedDigit())
+                        .tracking(-1.2)
                         .foregroundStyle(KhaytDesign.ink)
                         .environment(\.layoutDirection, .leftToRight)
+                    Spacer(minLength: 0)
+                    // What a shop plans by: how long, and what time on the clock.
+                    if let eta = live.etaLocalized, let done = live.finishesAt() {
+                        Text(L10n.format("machines.left_until", eta,
+                                    done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
+                            .font(.khaytMono(12, .medium))
+                            .foregroundStyle(KhaytDesign.note)
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
+                    }
                 }
-                .padding(.top, 11)
-                // What a shop plans by: how long, and what time on the clock.
-                if let eta = live.etaLocalized, let done = live.finishesAt() {
-                    Text(L10n.format("machines.left_until", eta,
-                                done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
-                        .font(.khayt(12.5, relativeTo: .caption).monospacedDigit())
-                        .foregroundStyle(KhaytDesign.note)
-                        .padding(.top, 7)
-                }
+                .padding(.top, 12)
+                LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 8)
+                    .padding(.top, 8)
+                    .animation(.easeOut(duration: 0.45), value: progress)
             }
             if mode == .printing, live.tempNozzle != nil || live.tempBed != nil {
                 HStack(spacing: 16) {
@@ -304,19 +324,16 @@ private struct MachineCard: View {
                     temp(L10n.tr("machines.bed"), live.tempBed)
                     Spacer(minLength: 0)
                 }
-                .padding(.top, 11)
-                .overlay(alignment: .top) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
-                .padding(.top, 11)
+                .padding(.top, 12)
             }
         }
-        .padding(.vertical, 14).padding(.leading, 18).padding(.trailing, 15)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(mode == .error ? KhaytDesign.late.opacity(0.12) : .clear)
         .background(KhaytDesign.surface)
-        .overlay(alignment: .leading) {
-            if mode != .idle { Rectangle().fill(tone).frame(width: 3) }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(mode == .printing || mode == .error ? tone.opacity(0.6) : KhaytDesign.hairline, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 
@@ -326,7 +343,7 @@ private struct MachineCard: View {
                 .font(.khayt(12.5, relativeTo: .caption))
                 .foregroundStyle(KhaytDesign.note)
             Text(value.map { "\($0) °C" } ?? "—")
-                .font(.khayt(13, .medium, relativeTo: .caption).monospacedDigit())
+                .font(.khaytMono(12.5, .medium, relativeTo: .caption))
                 .foregroundStyle(KhaytDesign.ink)
                 .environment(\.layoutDirection, .leftToRight)
         }

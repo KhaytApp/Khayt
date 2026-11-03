@@ -146,8 +146,8 @@ struct InventoryView: View {
                 .font(.khayt(13, .semibold, relativeTo: .subheadline))
                 .padding(.horizontal, 16)
                 .frame(minHeight: 44)
-                .foregroundStyle(on ? KhaytDesign.brand : KhaytDesign.note)
-                .background(on ? KhaytDesign.brand.opacity(0.16) : .clear, in: Capsule())
+                .foregroundStyle(KhaytDesign.ink)
+                .background(on ? KhaytDesign.brand.opacity(0.18) : KhaytDesign.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder(on ? KhaytDesign.brand.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -172,11 +172,13 @@ struct InventoryView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 44).padding(.horizontal, 16)
         } else {
-            LazyVStack(spacing: 8) {
+            // The redesign's shelf: spools as tiles, two to a row on a
+            // phone and as many as fit where there is room.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 10)], spacing: 10) {
                 ForEach(displayed) { spool in
                     Button { openSpool = spool } label: { SpoolRow(spool: spool) }
                         .buttonStyle(.plain)
-                        .overlay(RoundedRectangle(cornerRadius: 11)
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .strokeBorder(KhaytDesign.brand, lineWidth: 2)
                             .opacity(isSplit && openSpool?.id == spool.id ? 1 : 0))
                 }
@@ -219,8 +221,9 @@ struct InventoryView: View {
     }
 }
 
-/// A spool in the list: its colour, what it is, and how much is left. A roll
-/// running low earns the amber rail — the design's only colour on this screen.
+/// A spool on the shelf — the redesign's spool tile: its colour as a reel,
+/// what it is, how much is left in grams and as a share, and a bar in the
+/// collect teal, amber when it is running low.
 private struct SpoolRow: View {
     let spool: InventorySpool
 
@@ -232,49 +235,68 @@ private struct SpoolRow: View {
         return min(1, max(0, left / full))
     }
 
-    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.note }
+    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.collect }
+
+    /// The colour's own name when it has one ("Galaxy Black"), else the label.
+    private var title: String {
+        let c = spool.color?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return c.isEmpty || c.hasPrefix("#") ? spool.displayLabel : c
+    }
+
+    /// "PLA Matte · Bambu" above the title, when the title is the colour.
+    private var meta: String? {
+        let c = spool.color?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !c.isEmpty, !c.hasPrefix("#") else { return nil }
+        let parts = [spool.material, spool.brand].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            SpoolSwatch(hex: spool.colorHex)
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(spool.displayLabel)
-                        .font(.khayt(15, .medium, relativeTo: .body))
-                        .foregroundStyle(KhaytDesign.ink)
-                        .lineLimit(1)
-                    Text(spool.id)
-                        .font(.khayt(11.5, .medium, relativeTo: .caption2))
-                        .foregroundStyle(KhaytDesign.note)
-                        .lineLimit(1)
-                        .layoutPriority(-1)
-                        .environment(\.layoutDirection, .leftToRight)
+        VStack(alignment: .leading, spacing: 0) {
+            // The reel: the colour with the ground showing through its hub.
+            SpoolSwatch(hex: spool.colorHex, size: 48)
+                .overlay(Circle().fill(KhaytDesign.surface).frame(width: 14, height: 14))
+                .overlay(Circle().strokeBorder(KhaytDesign.ink.opacity(0.22), lineWidth: 1).frame(width: 14, height: 14))
+            if let meta {
+                Text(meta)
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+                    .lineLimit(1)
+                    .padding(.top, 12)
+            }
+            Text(title)
+                .font(.khayt(16, .semibold, relativeTo: .body))
+                .foregroundStyle(KhaytDesign.ink)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, meta == nil ? 12 : 2)
+            Spacer(minLength: 10)
+            HStack(alignment: .firstTextBaseline) {
+                if let left = spool.remainingGrams {
+                    // Not forced left-to-right: in Arabic the unit is
+                    // a word, "١٢٠ غ", and reads in the line's own direction.
+                    Text(L10n.grams(Int(left.rounded())))
+                        .font(.khaytMono(13, .medium, relativeTo: .caption))
+                        .foregroundStyle(spool.isLowStock ? KhaytDesign.attention : KhaytDesign.ink)
                 }
-                HStack(spacing: 9) {
-                    if let fraction {
-                        LevelBar(fraction: fraction, color: tone)
-                    } else {
-                        Spacer(minLength: 0)
-                    }
-                    if let left = spool.remainingGrams {
-                        // Not forced left-to-right: in Arabic the unit is
-                        // a word, "١٢٠ غ", and reads in the line's own direction.
-                        Text(L10n.grams(Int(left.rounded())))
-                            .font(.khayt(12.5, .medium, relativeTo: .caption).monospacedDigit())
-                            .foregroundStyle(tone)
-                    }
+                Spacer(minLength: 0)
+                if let fraction {
+                    Text((fraction * 100).rounded().formatted(.number.locale(L10n.locale)) + "%")
+                        .font(.khaytMono(11, .regular, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.note)
                 }
             }
+            if let fraction {
+                LevelBar(fraction: fraction, color: tone)
+                    .padding(.top, 7)
+            }
         }
-        .padding(.vertical, 12).padding(.leading, 16).padding(.trailing, 13)
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .background(KhaytDesign.surface)
-        .overlay(alignment: .leading) {
-            if spool.isLowStock { Rectangle().fill(KhaytDesign.attention).frame(width: 3) }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 11))
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 168, alignment: .topLeading)
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(spool.isLowStock ? KhaytDesign.attention.opacity(0.55) : KhaytDesign.hairline, lineWidth: 1))
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
