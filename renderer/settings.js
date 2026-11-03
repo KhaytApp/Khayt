@@ -3224,7 +3224,20 @@ function renderCloudSettings() {
         <button id="btnCloudSlug" class="btn small">${escapeHtml(t('common.save') || 'Save')}</button>
         <span id="cloudSlugResult" style="font-size:12px;"></span>
       </div>
-      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.slug_hint') || 'Lower case letters, numbers and hyphens. Your old address keeps working for 90 days if you change it, and the original link never stops working.')}</p>` : ''}`}
+      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.slug_hint') || 'Lower case letters, numbers and hyphens. Your old address keeps working for 90 days if you change it, and the original link never stops working.')}</p>` : ''}
+      ${['owner', 'manager'].includes(settings.cloud?.role || 'owner') ? `
+      <!-- Cloud #155: the shop's own payment link, shown on its customer pages. -->
+      <label style="margin-top:12px;">${escapeHtml(t('cloud.paylink_title'))}</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="url" id="cloudPayLink" dir="ltr" spellcheck="false" maxlength="500" style="flex:1 1 260px;min-width:0;"
+               placeholder="https://" aria-label="${escapeHtml(t('cloud.paylink_url'))}">
+        <input type="text" id="cloudPayLabel" maxlength="40" style="width:160px;"
+               placeholder="${escapeHtml(t('cloud.paylink_label'))}" aria-label="${escapeHtml(t('cloud.paylink_label'))}">
+        <button id="btnCloudPayLink" class="btn small">${escapeHtml(t('common.save'))}</button>
+        <button id="btnCloudPayLinkRemove" class="btn ghost small" style="display:none;">${escapeHtml(t('cloud.paylink_remove'))}</button>
+        <span id="cloudPayLinkResult" style="font-size:12px;"></span>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.paylink_note'))}</p>` : ''}`}
     ${cloudPlansHtml()}`;
 
   const result = (msg, color) => { const r = el.querySelector('#cloudResult'); if (r) { r.textContent = msg; r.style.color = color || 'var(--text-muted)'; } };
@@ -3502,6 +3515,50 @@ function renderCloudSettings() {
       if (!r?.ok) { say(r?.error || (t('cloud.slug_failed') || 'Could not save that name.'), 'var(--danger)'); return; }
       slugInput.value = r.slug;
       say(t('cloud.slug_saved') || 'Saved — your shop is reachable at that address.', 'var(--success)');
+    });
+  })();
+
+  /* The shop's payment link (Cloud #155). Read from the server each time the
+   * section opens: it is the shop's, not this device's, and another member
+   * may have changed it. */
+  (async () => {
+    const linkInput = el.querySelector('#cloudPayLink');
+    if (!linkInput) return;
+    const labelInput = el.querySelector('#cloudPayLabel');
+    const removeBtn = el.querySelector('#btnCloudPayLinkRemove');
+    const c = settings.cloud || {};
+    const conn = { url: c.url, shopId: c.shopId, token: c.token };
+    const say = (msg, color) => {
+      const r = el.querySelector('#cloudPayLinkResult');
+      if (r) { r.textContent = msg || ''; r.style.color = color || 'var(--text-muted)'; }
+    };
+    const show = (link) => {
+      linkInput.value = (link && link.url) || '';
+      labelInput.value = (link && link.label) || '';
+      removeBtn.style.display = link && link.url ? '' : 'none';
+    };
+    try {
+      const r = await window.hubAPI.cloudPayLink(conn);
+      if (r?.ok) show(r);
+    } catch (e) { /* not fatal: the fields simply start empty */ }
+
+    el.querySelector('#btnCloudPayLink')?.addEventListener('click', async () => {
+      const link = linkInput.value.trim();
+      if (!/^https:\/\//i.test(link)) { say(t('cloud.paylink_https'), 'var(--danger)'); return; }
+      say(t('common.saving'));
+      const r = await window.hubAPI.cloudPayLink(Object.assign({ op: 'set', link, label: labelInput.value }, conn));
+      // The server owns the rules (https, length, who may write), so its
+      // words are the ones worth showing.
+      if (!r?.ok) { say(r?.error || t('cloud.paylink_failed'), 'var(--danger)'); return; }
+      show(r);
+      say(t('cloud.paylink_saved'), 'var(--success)');
+    });
+    removeBtn?.addEventListener('click', async () => {
+      say(t('common.saving'));
+      const r = await window.hubAPI.cloudPayLink(Object.assign({ op: 'delete' }, conn));
+      if (!r?.ok) { say(r?.error || t('cloud.paylink_failed'), 'var(--danger)'); return; }
+      show(null);
+      say(t('cloud.paylink_removed'), 'var(--success)');
     });
   })();
 

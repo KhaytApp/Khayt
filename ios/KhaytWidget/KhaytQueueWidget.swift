@@ -197,6 +197,7 @@ struct KhaytQueueWidget: Widget {
         StaticConfiguration(kind: kind, provider: KhaytQueueProvider()) { entry in
             KhaytQueueWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
+                .widgetURL(URL(string: "khayt://screen/jobs"))
         }
         .configurationDisplayName("Khayt Queue")
         .description("Queue counts and live print progress from your desktop.")

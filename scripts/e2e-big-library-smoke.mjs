@@ -70,9 +70,26 @@ async function testScrollingGrowsThePageWithoutPressingAnything(window) {
   }
 }
 
+/* Press "Show more" the way a person does: where it is, without scrolling.
+ *
+ * `window.click` scrolls the button into view first. That brings it within
+ * the auto-load observer's 600px margin, which grows the page and redraws
+ * the list, so the button Playwright is about to press is detached. It retries,
+ * scrolls again, the observer fires again — and once the whole library is
+ * painted there is no button at all, and the click waits out its two minutes
+ * (CI, Nov 3 2026, an iOS-only PR). The observer has its own test above. */
+async function pressMore(window) {
+  return window.evaluate(() => {
+    const b = document.querySelector('[data-act="pf-more"]');
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+}
+
 async function testTheRestArrivesWhenAskedFor(window) {
   const before = await painted(window);
-  await window.click('[data-act="pf-more"]');
+  if (!(await pressMore(window))) throw new Error('no "Show more" button on a 1200-file library');
   await window.waitForTimeout(120);
   const after = await painted(window);
   if (after <= before) throw new Error(`asking for more painted ${after}, was ${before}`);
@@ -96,7 +113,7 @@ async function testANewQuestionStartsAtTheTop(window) {
   // Page deep into the library, then narrow. A shop that picks a filter is
   // asking something new, and should not land nine hundred cards down — nor
   // should nine hundred cards be PAINTED for a question just asked.
-  for (let i = 0; i < 6; i++) { await window.click('[data-act="pf-more"]'); await window.waitForTimeout(60); }
+  for (let i = 0; i < 6; i++) { if (!(await pressMore(window))) break; await window.waitForTimeout(60); }
   const deep = await painted(window);
   if (deep < 500) throw new Error(`paging six times only reached ${deep} cards`);
   await window.click('.pf-folderbar [data-cat="Busts"]');   // 600 of the 1200
@@ -155,7 +172,7 @@ async function testTheGalleryIsPagedToo(window) {
   if (shots >= N) throw new Error(`the gallery painted all ${shots} photos`);
   const label = await moreLabel(window);
   if (!label.includes(String(N))) throw new Error(`the gallery count does not speak for all of it: "${label}"`);
-  await window.click('[data-act="pf-more"]');
+  if (!(await pressMore(window))) throw new Error('no "Show more" button in the gallery');
   await window.waitForTimeout(150);
   const after = await window.evaluate(() => document.querySelectorAll('.pf-shot').length);
   if (after <= shots) throw new Error(`the gallery did not grow: ${after} was ${shots}`);

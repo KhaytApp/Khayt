@@ -33,6 +33,11 @@ struct OrderDetailPage: View {
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     @State private var showingInvoice = false
+    @State private var showingProforma = false
+    /// The carriers to ship with, when this job is finished and not yet sent.
+    @State private var shipChoices: [KhaytEngine.CarrierChoice]?
+    @State private var shipping = false
+    @State private var editing: KhaytAPIClient.OrderEditState?
     /// The job's saved customer, for Call / WhatsApp / Email.
     @State private var customer: Client?
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
@@ -75,6 +80,22 @@ struct OrderDetailPage: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            // Accepted, not yet finished: a proforma to ask for payment with.
+            if BookReader.offersProforma(status: order.status) {
+                Button { showingProforma = true } label: { InvoiceCard(proforma: true) }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            if let shipChoices, !shipChoices.isEmpty {
+                Button { shipping = true } label: { ShipCard() }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+                    .sheet(isPresented: $shipping) {
+                        ShipSheet(orderId: order.id, carriers: shipChoices) {
+                            self.shipChoices = await api.shipChoices(orderId: order.id)
+                        }
+                    }
+            }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
@@ -87,6 +108,12 @@ struct OrderDetailPage: View {
             if let photoAccess, photoAccess != .notPublished {
                 OrderPhotosCard(access: photoAccess)
                     .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            // The customer's page: its link, and the messages on it.
+            if case .ready(let token)? = photoAccess {
+                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
+            } else if case .viewOnly(let token)? = photoAccess {
+                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
             }
         }
         .sheet(isPresented: $recordingPayment) {
@@ -101,6 +128,7 @@ struct OrderDetailPage: View {
             WhatsAppSheet(orderId: order.id)
         }
         .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
+        .navigationDestination(isPresented: $showingProforma) { InvoicePage(orderId: order.id, proforma: true) }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -117,6 +145,14 @@ struct OrderDetailPage: View {
                         .lineLimit(1)
                 }
             }
+            ToolbarItem(placement: .primaryAction) {
+                if api.holdsBook, order.status != "cancelled" {
+                    Button(L10n.tr("edit.title")) { Task { editing = await api.editState(orderId: order.id) } }
+                }
+            }
+        }
+        .sheet(item: Binding(get: { editing.map(EditingJob.init) }, set: { if $0 == nil { editing = nil } })) { e in
+            EditOrderSheet(orderId: order.id, start: e.state, currency: currency) { await onChanged() }
         }
         .moveNotes($moveNotes)
         .navigationBarTitleDisplayMode(.inline)
@@ -124,6 +160,7 @@ struct OrderDetailPage: View {
             machines = (try? await api.fetchMachines()) ?? []
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
+            shipChoices = await api.shipChoices(orderId: order.id)
             customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
@@ -204,7 +241,28 @@ struct OrderDetailPage: View {
     }
 }
 
-/// The way into a job's invoice.
+/// "Ship it": carrier and tracking number, for a finished job not yet sent.
+struct ShipCard: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "shippingbox.fill").foregroundStyle(KhaytDesign.brandV2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.tr("ship.open"))
+                    .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(L10n.tr("ship.open.sub"))
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                .font(.caption).foregroundStyle(KhaytDesign.note)
+        }
+        .padding(14)
+        .card()
+    }
+}
+
 /// Call, WhatsApp or email the job's customer, straight from the job.
 struct ContactCard: View {
     let client: Client
@@ -244,15 +302,18 @@ struct ContactCard: View {
     }
 }
 
+/// The way into a job's invoice.
 struct InvoiceCard: View {
+    var proforma = false
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "doc.text.fill").foregroundStyle(KhaytDesign.brandV2)
             VStack(alignment: .leading, spacing: 2) {
-                Text(L10n.tr("invoice.open"))
+                Text(L10n.tr(proforma ? "proforma.open" : "invoice.open"))
                     .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(L10n.tr("invoice.open.sub"))
+                Text(L10n.tr(proforma ? "proforma.open.sub" : "invoice.open.sub"))
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.note)
             }
@@ -608,4 +669,10 @@ private struct FlowChips: View {
         .disabled(disabled || on)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
+}
+
+/// The Edit sheet's subject, identified for `.sheet(item:)`.
+private struct EditingJob: Identifiable {
+    let state: KhaytAPIClient.OrderEditState
+    var id: String { "\(state.dueDate ?? "")|\(state.priorityLevel)|\(state.price)" }
 }
