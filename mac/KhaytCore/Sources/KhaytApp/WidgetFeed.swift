@@ -110,7 +110,7 @@ final class WidgetFeed {
     /// board's order (`Shop.boardOrder`). Title only: never the customer.
     static func upNext(_ orders: [Order], now: Date) -> [ShopWidgetSnapshot.QueuedJob] {
         orders.filter { Stage.of($0) == .pending }
-            .sorted(by: Shop.boardOrder)
+            .sorted(by: Shop.boardOrder) // few jobs; `boardSorted` reads each once
             .map { o in
                 ShopWidgetSnapshot.QueuedJob(id: o.id, title: o.project.isEmpty ? o.id : o.project,
                                              due: Order.day(o.dueDate), late: o.isOverdue(now: now),

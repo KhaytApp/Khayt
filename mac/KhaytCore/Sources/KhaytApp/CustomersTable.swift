@@ -26,6 +26,15 @@ struct CustomersTable: View {
                                             ["n": .number(Double(person.overdueCount))]))
                     }
                     Text(person.name).lineLimit(1)
+                    if !person.currency.isEmpty, person.currency != shop.currency {
+                        // The desktop's small currency badge: this customer is
+                        // invoiced in something other than the shop's own.
+                        Text(person.currency)
+                            .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(.quaternary, in: Capsule())
+                            .help(shop.words.callIt("ce.currency"))
+                    }
                     if person.isOverLimit {
                         // The desktop's "Over credit limit" badge, as a mark
                         // that says it on hover: a row has no room for words.
