@@ -21,6 +21,10 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// asked for it and never read it back, so every edit on this Mac wrote
     /// it over with nothing.
     let targetHoursPerDay: Double?
+    /// The shop says this printer clears its own plate (a belt printer, a
+    /// plate changer, a push-off end routine). `lib/auto-dispatch.js` then
+    /// offers it work without waiting for "Bed is clear".
+    var clearsOwnBed: Bool? = nil
     let bed: Bed?
     let nozzle: Nozzle?
     let printerApi: PrinterApi?

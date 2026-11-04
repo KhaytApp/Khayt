@@ -73,7 +73,7 @@ struct KhaytQueueWidgetView: View {
                     }
                     Spacer(minLength: 0)
                     Text(statusLine(s))
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(Look.text(10, .medium))
                         .foregroundStyle(Look.note)
                 }
             } else {
@@ -99,7 +99,7 @@ struct KhaytQueueWidgetView: View {
                     let prints = s.prints ?? []
                     if prints.isEmpty {
                         Text(s.connected ? "Nothing printing right now" : "Offline")
-                            .font(.caption)
+                            .font(Look.text(12))
                             .foregroundStyle(Look.note)
                     } else {
                         ForEach(prints.prefix(2)) { printRow($0, compact: false) }
@@ -138,7 +138,7 @@ struct KhaytQueueWidgetView: View {
 
     private func header(_ s: WidgetSnapshot) -> some View {
         HStack {
-            Text(s.shopName).font(.caption.weight(.semibold)).foregroundStyle(Look.ink).lineLimit(1)
+            Text(s.shopName).font(Look.text(12, .semibold)).foregroundStyle(Look.ink).lineLimit(1)
             Spacer()
             Circle()
                 .fill(s.connected ? Look.live : Look.late)
@@ -150,18 +150,18 @@ struct KhaytQueueWidgetView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(p.name)
-                    .font(compact ? .caption2.weight(.semibold) : .caption.weight(.semibold))
+                    .font(Look.text(compact ? 11 : 12, .semibold))
                     .foregroundStyle(Look.ink)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text("\(p.progress)%")
-                    .font(.system(size: compact ? 11 : 12, weight: .bold, design: .monospaced))
+                    .font(Look.mono(compact ? 11 : 12))
                     .foregroundStyle(Look.ink)
             }
             threadBar(p.progress)
             if !compact, let eta = p.eta {
                 Text("ETA \(eta)")
-                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .font(Look.text(10, .medium).monospacedDigit())
                     .foregroundStyle(Look.note)
             }
         }
@@ -171,10 +171,12 @@ struct KhaytQueueWidgetView: View {
     /// and these labels were English on an Arabic phone.
     private func metric(_ label: LocalizedStringKey, _ value: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(value)").font(.title3.bold().monospacedDigit()).foregroundStyle(Look.ink)
+            Text("\(value)").font(Look.display(22)).foregroundStyle(Look.ink)
+            // Words, so the text face: a mono one has no Arabic.
             Text(label)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(Look.text(10, .semibold))
                 .textCase(.uppercase)
+                .tracking(0.4)
                 .foregroundStyle(Look.note)
         }
     }
@@ -198,9 +200,9 @@ struct KhaytQueueWidgetView: View {
 
     private var empty: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Khayt").font(.headline)
+            Text("Khayt").font(Look.display(17))
             Text("Open app on shop Wi‑Fi")
-                .font(.caption)
+                .font(Look.text(12))
                 .foregroundStyle(Look.note)
         }
     }

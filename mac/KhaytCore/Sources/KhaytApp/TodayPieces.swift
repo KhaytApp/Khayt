@@ -33,10 +33,14 @@ struct StatusPill: View {
     let label: String
     let stage: TodayStage
     var alive = false
+    /// A job stage's own colour (`Stage.dot`), over the Today family's.
+    var tint: Color? = nil
+
+    private var color: Color { tint ?? stage.color }
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle().fill(stage.color).frame(width: 6, height: 6)
+            Circle().fill(color).frame(width: 6, height: 6)
                 .alive(alive)
             Text(verbatim: label)
                 .font(.system(size: 11.5, weight: .medium))
@@ -44,8 +48,23 @@ struct StatusPill: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(stage.color.opacity(0.14), in: Capsule())
+        .background(color.opacity(0.14), in: Capsule())
         .fixedSize()
+    }
+}
+
+extension Stage {
+    /// The redesign's colour for each stage, as the Board's column dots and
+    /// the Jobs table's pills draw it: one per stage family.
+    var dot: Color {
+        switch self {
+        case .quote, .pending: Khayt.note
+        case .on_hold, .post, .qc: Khayt.hold
+        case .printing: Khayt.live
+        case .completed: Khayt.collect
+        case .shipped, .delivered: Khayt.done
+        case .cancelled: Khayt.late
+        }
     }
 }
 

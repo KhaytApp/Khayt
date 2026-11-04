@@ -32,6 +32,35 @@ enum PrintActivityLook {
     /// Progress only, never text (the redesign's rule): the amber thread.
     static let thread = dynamic(light: 0xF2A541, dark: 0xF2A541)
 
+    // ── Type (Nov 2026) ── the website's faces, bundled in the extension
+    // (ios/KhaytWidget/Fonts, UIAppFonts in its Info.plist) because a widget
+    // cannot use the fonts the app registers. Fixed sizes, as the system
+    // ones they replace were. A face that fails to load falls back to the
+    // system font, so nothing goes blank.
+
+    /// Hanken Grotesk: names, labels, pills. Regular, Medium or SemiBold
+    /// (bolder asks get SemiBold, the heaviest the extension carries).
+    static func text(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        let name = switch weight {
+        case .regular, .light, .thin, .ultraLight: "HankenGrotesk-Regular"
+        case .medium: "HankenGrotesk-Medium"
+        default: "HankenGrotesk-SemiBold"
+        }
+        return .custom(name, fixedSize: size)
+    }
+
+    /// Archivo Bold: the big figure (time left, counts).
+    static func display(_ size: CGFloat) -> Font { .custom("Archivo-Bold", fixedSize: size) }
+
+    /// JetBrains Mono Medium: figures only (percents, counts' labels in
+    /// Latin). It has no Arabic, and Arabic set in a mono fallback is spaced
+    /// letter by letter, so anything with words ("Ends 9:18") is `text`.
+    static func mono(_ size: CGFloat) -> Font { .custom("JetBrainsMono-Medium", fixedSize: size) }
+
+    /// The faces the extension bundles, by PostScript name.
+    static let faces = ["Archivo-Bold", "HankenGrotesk-Regular", "HankenGrotesk-Medium",
+                        "HankenGrotesk-SemiBold", "JetBrainsMono-Medium"]
+
     static func tone(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
         switch phase {
         case .printing: live
@@ -81,12 +110,12 @@ struct PrintActivityLockScreen: View {
                     .background(PrintActivityLook.brand, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(attributes.machineName)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(PrintActivityLook.text(15, .semibold))
                         .foregroundStyle(PrintActivityLook.ink)
                         .lineLimit(1)
                     if let job = state.job {
                         Text(PrintActivityText.jobTitle(job))
-                            .font(.system(size: 12.5))
+                            .font(PrintActivityLook.text(12.5))
                             .foregroundStyle(PrintActivityLook.note)
                             .lineLimit(1)
                     }
@@ -97,13 +126,13 @@ struct PrintActivityLockScreen: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 PrintHeadline(state: state, bundle: bundle)
-                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(PrintActivityLook.display(34).monospacedDigit())
                     .foregroundStyle(PrintActivityLook.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 4)
                 PrintEnds(state: state, bundle: bundle)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(PrintActivityLook.text(13, .medium).monospacedDigit())
                     .foregroundStyle(PrintActivityLook.note)
                     .lineLimit(1)
             }
@@ -112,7 +141,7 @@ struct PrintActivityLockScreen: View {
                 PrintBar(state: state)
                 if PrintActivityText.showsPercent(state.phase) {
                     Text(verbatim: PrintActivityText.percent(state.progress))
-                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                        .font(PrintActivityLook.mono(13))
                         .foregroundStyle(tone)
                         .fixedSize()
                 }
@@ -121,7 +150,7 @@ struct PrintActivityLockScreen: View {
             if let move = PrintActivityText.move(state.phase) {
                 Button(intent: PrintActivityMoveIntent(machineId: attributes.machineId, move: move)) {
                     Text(PrintActivityText.moveTitle(move, bundle: bundle))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(PrintActivityLook.text(14, .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -141,7 +170,7 @@ struct PrintPhasePill: View {
         HStack(spacing: 4) {
             Image(systemName: PrintActivityLook.symbol(phase)).font(.system(size: 10, weight: .bold))
             PrintActivityText.phase(phase, bundle: bundle)
-                .font(.system(size: 12, weight: .semibold))
+                .font(PrintActivityLook.text(12, .semibold))
         }
         .foregroundStyle(tone)
         .padding(.horizontal, 9)

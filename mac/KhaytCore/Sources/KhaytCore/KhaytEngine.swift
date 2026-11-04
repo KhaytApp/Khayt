@@ -5770,6 +5770,18 @@ public actor KhaytEngine {
         public static let empty = MaintenanceCard(hours: 0, tasks: [])
     }
 
+    /// A task a shop can start from (`KhaytMaintenance.starterTasks`).
+    public struct MaintenanceStarter: Decodable, Hashable, Sendable {
+        public let id: String
+        public let intervalHours: Double
+        public let intervalDays: Double
+    }
+
+    /// The starter tasks for a machine of `kind`, from the shared list.
+    public func maintenanceStarters(kind: String) throws -> [MaintenanceStarter] {
+        try runtime.call2("KhaytMaintenance.starterTasks(ARG0)", [.string(kind)], as: [MaintenanceStarter].self)
+    }
+
     /// Every task on one machine, with the hour meter it is measured against.
     ///
     /// `jobs` is the whole print log rather than the machine's slice of it:

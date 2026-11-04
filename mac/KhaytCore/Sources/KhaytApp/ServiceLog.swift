@@ -465,6 +465,7 @@ struct MaintenanceTaskSheet: View {
     @State private var hours: Double = 0
     @State private var days: Double = 0
     @State private var started = false
+    @State private var starters: [KhaytEngine.MaintenanceStarter] = []
 
     static let width: CGFloat = 400
 
@@ -477,6 +478,24 @@ struct MaintenanceTaskSheet: View {
         SheetFrame(width: Self.width) {
             Text(words.callIt(existing == nil ? "mac.mt_new" : "mac.mt_edit")).font(.headline)
             Text(machine.name).font(.callout).foregroundStyle(.secondary)
+            // A new shop starts from the usual dozen rather than a blank form.
+            // Picking one fills the three fields, which stay editable — the
+            // intervals are starting points and the maker's manual wins.
+            if existing == nil, !starters.isEmpty {
+                Menu(words.callIt("mac.mt_common")) {
+                    ForEach(starters, id: \.id) { t in
+                        Button(words.callIt("mac.mt_t_" + t.id)) {
+                            name = words.callIt("mac.mt_t_" + t.id)
+                            hours = t.intervalHours
+                            days = t.intervalDays
+                        }
+                    }
+                }
+                .fixedSize()
+                Text(words.callIt("mac.mt_common_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     Text(words.callIt("maint.task_name")).foregroundStyle(.secondary)
@@ -539,6 +558,9 @@ struct MaintenanceTaskSheet: View {
         .onAppear {
             guard !started else { return }
             started = true
+            if existing == nil {
+                starters = (try? shop.engine?.maintenanceStarters(kind: shop.kind(of: machine)?.kind ?? "fdm")) ?? []
+            }
             guard let existing else { return }
             let opened = MaintenanceTaskEdit.opening(existing)
             name = opened.name
