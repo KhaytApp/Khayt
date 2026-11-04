@@ -228,6 +228,18 @@ actor ThumbnailStore {
             cache[bigger.key] = (bigger.value.image, clock, bigger.value.bytes)
             return bigger.value.image
         }
+        // At most `decodeWidth` at once. A fast scroll through a dense grid
+        // asked for hundreds of pictures in a moment, each one a decode on
+        // its own dispatch thread — a thread per tile, every one of them
+        // reading a disk (a cloud drive's, sometimes) for a tile already
+        // scrolled away. A tile that went away while waiting is not decoded.
+        await takeDecodeSlot()
+        defer { giveBackDecodeSlot() }
+        if Task.isCancelled { return nil }
+        // Decoded by another tile while this one waited.
+        if let hit = cache[key] ?? cache.first(where: { $0.key.source == source && $0.key.pixels > size })?.value {
+            return hit.image
+        }
         decodes += 1
         // Decoded on a global queue, never on the actor's thread or the
         // main one: a JPEG is real work, and blocking work inside a Swift
@@ -243,6 +255,27 @@ actor ThumbnailStore {
             if cache.count > Self.limit || bytes > Self.byteLimit { evict() }
         }
         return made
+    }
+
+    /// How many pictures are decoded at once, at most.
+    static let decodeWidth = 4
+    private var decoding = 0
+    private var waitingToDecode: [CheckedContinuation<Void, Never>] = []
+    /// The most decoding at once so far — for the test of the bound.
+    private(set) var mostDecodingAtOnce = 0
+
+    private func takeDecodeSlot() async {
+        if decoding < Self.decodeWidth {
+            decoding += 1
+        } else {
+            // The slot is handed over by `giveBackDecodeSlot`, already taken.
+            await withCheckedContinuation { waitingToDecode.append($0) }
+        }
+        mostDecodingAtOnce = max(mostDecodingAtOnce, decoding)
+    }
+
+    private func giveBackDecodeSlot() {
+        if waitingToDecode.isEmpty { decoding -= 1 } else { waitingToDecode.removeFirst().resume() }
     }
 
     /// Drop the least recently used quarter, so eviction is not paid on
