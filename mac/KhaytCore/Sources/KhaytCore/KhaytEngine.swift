@@ -2209,19 +2209,27 @@ public actor KhaytEngine {
         // each order's currency, and what one unit of each currency is worth
         // in the base (`convertToBase` is a multiplication — or the amount
         // itself, for the base and for a currency with no usable rate).
-        struct Money: Decodable { let currencyById: [String: String]; let rates: [String: Double] }
+        // Each ORDER's rate too (`rateById`, `orderToBase`): a job saved in a
+        // client's currency keeps the rate it was converted at, and the
+        // export states it at that rate as every report does.
+        struct Money: Decodable {
+            let currencyById: [String: String]
+            let rates: [String: Double]
+            let rateById: [String: Double]
+        }
         let money = try? runtime.call2(#"""
             (function (rows, ctx, known) {
               var M = globalThis.KhaytOrderMoney;
-              var byId = {}, rates = {};
+              var byId = {}, rates = {}, rateById = {};
               for (var i = 0; i < rows.length; i++) {
                 var o = rows[i];
                 if (!o || typeof o !== 'object' || o.id == null) continue;
                 var cur = M.orderCurrency(o, ctx, known || undefined);
                 byId[String(o.id)] = cur;
                 if (!(cur in rates)) rates[cur] = M.convertToBase(1, cur, ctx);
+                rateById[String(o.id)] = M.orderToBase(1, o, ctx, known || undefined);
               }
-              return { currencyById: byId, rates: rates };
+              return { currencyById: byId, rates: rates, rateById: rateById };
             })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
             """#, [.array(orders), .object(settings), .array(clients),
                    currencies.flatMap { $0.isEmpty ? nil : .object($0) } ?? .null],
@@ -2243,7 +2251,15 @@ public actor KhaytEngine {
                     return cur
                 }
             },
-            toBase: money.map { m in { amount, currency in amount * (m.rates[currency] ?? 1) } },
+            toBase: money.map { m in
+                { amount, currency, order in
+                    if case .object(let o) = order, let id = o["id"],
+                       let rate = m.rateById[JSSemantics.text(id)] {
+                        return amount * rate
+                    }
+                    return amount * (m.rates[currency] ?? 1)
+                }
+            },
             localName: nameById.isEmpty ? nil : { client in
                 guard case .object(let c) = client, let id = c["id"] else { return "" }
                 return nameById[JSSemantics.text(id)] ?? ""
@@ -7815,6 +7831,34 @@ public actor KhaytEngine {
                                  params: ["missing": .array(r.missing.map(JSONValue.string))])
     }
 
+    /// The total and VAT a ZATCA QR states, in riyals — `KhaytZatcaQr.qrAmounts`.
+    ///
+    /// Tags 4 and 5 carry a bare number that a scanner reads as SAR. A job
+    /// saved in a client's currency is converted at the rate stored on it
+    /// (`fxRate`); with none there is no honest figure, and the answer is the
+    /// refusal the document prints in the QR's place.
+    public enum ZatcaAmounts: Sendable, Equatable {
+        case amounts(total: Double, vatAmount: Double)
+        case refused(StatusGate.Reason)
+    }
+
+    public func zatcaAmounts(order: JSONValue, settings: [String: JSONValue],
+                             total: Double, vatAmount: Double) throws -> ZatcaAmounts {
+        struct Answer: Decodable {
+            let ok: Bool
+            let total: Double?
+            let vatAmount: Double?
+            let missing: [String]?
+        }
+        let r = try runtime.call2(
+            "KhaytZatcaQr.qrAmounts(ARG0, ARG1, {total: ARG2, vatAmount: ARG3})",
+            [order, .object(settings), .number(total), .number(vatAmount)], as: Answer.self)
+        if r.ok, let t = r.total, let v = r.vatAmount { return .amounts(total: t, vatAmount: v) }
+        return .refused(StatusGate.Reason(
+            code: "zatca_not_ready",
+            params: ["missing": .array((r.missing ?? []).map(JSONValue.string))]))
+    }
+
     /// The QR payload: five BER-TLV tags, base64'd.
     public func zatcaPayload(sellerName: String, vatNumber: String, timestamp: String,
                              total: String, vatAmount: String) throws -> String {
@@ -11474,10 +11518,11 @@ public actor KhaytEngine {
                 var o = rows[i];
                 if (!o || !o.id) continue;
                 if (!M.owesAtAll(o)) { out[o.id] = { billed: 0, paid: 0 }; continue; }
-                var cur = M.orderCurrency(o, ctx, known);
+                // At the order's saved rate when it has one (orderToBase), the
+                // rate orderOwedBase uses, so Billed − Paid stays its Owed.
                 out[o.id] = {
-                  billed: M.convertToBase(Math.max(0, M.orderDueRaw(o, ctx) - M.orderCreditedDueRaw(o, ctx)), cur, ctx),
-                  paid: M.convertToBase((+o.paidAmount || 0) + (+o.giftCardDiscount || 0), cur, ctx),
+                  billed: M.orderToBase(Math.max(0, M.orderDueRaw(o, ctx) - M.orderCreditedDueRaw(o, ctx)), o, ctx, known),
+                  paid: M.orderToBase((+o.paidAmount || 0) + (+o.giftCardDiscount || 0), o, ctx, known),
                 };
               }
               return out;

@@ -60,22 +60,22 @@ function generateClientStatement(clientId) {
   const bizPrimary = shopName() || 'Khayt';
 
   // All statement figures are in the shop's BASE currency so multi-currency
-  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert).
-  const curOf = (o) => (typeof orderCurrency === 'function') ? orderCurrency(o) : (settings.currency || 'SAR');
+  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert),
+  // every figure at the order's saved rate when it has one (orderToBase).
   // Cash actually received (base). Falls back to price ONLY for legacy fully-paid
   // orders with no recorded amount AND no gift settlement — otherwise a gift-card
   // -settled order would be counted as both "paid" (price) and "gift".
   const cashPaidBase = (o) => {
     const recorded = +o.paidAmount || 0;
-    if (recorded > 0) return convertToBase(recorded, curOf(o));
-    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? convertToBase(+o.price || 0, curOf(o)) : 0;
+    if (recorded > 0) return orderToBase(recorded, o);
+    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? orderToBase(+o.price || 0, o) : 0;
   };
   const totalCharges = orders.reduce((s, o) => s + orderRevenueBase(o), 0);
   const totalPaid    = orders.reduce((s, o) => s + cashPaidBase(o), 0);
   // Gift-card redemptions settle part of the balance just like a payment.
-  const totalGift    = orders.reduce((s, o) => s + convertToBase(+o.giftCardDiscount || 0, curOf(o)), 0);
+  const totalGift    = orders.reduce((s, o) => s + orderToBase(+o.giftCardDiscount || 0, o), 0);
   const totalCredit  = orders.reduce((s, o) =>
-    s + convertToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), curOf(o)), 0);
+    s + orderToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), o), 0);
   const outstanding  = orders.reduce((s, o) => s + orderOwedBase(o), 0);
 
   const rowsHtml = orders.map(o => {
@@ -470,7 +470,12 @@ async function sendPaymentReminder(orderId) {
   const tpl = waTemplates.find(w => w.id === 'tpl-payment') || waTemplates[0];
   const message = tpl
     ? fillWaTemplate(tpl.body, order, client)
-    : t('pay.remind_default', { name: localName(client), id: order.id, price: fmtPrice(order.price), currency: currencySymbol() });
+    // In the job's own currency. The sentence asks for {amount}; it was handed
+    // `price` (with the SHOP's mark) and `currency`, so it went out reading
+    // "for {amount}". Both names are passed so a translation using either reads.
+    : t('pay.remind_default', { name: localName(client), id: order.id,
+      amount: fmtOrderPrice(order.price, order), price: fmtOrderPrice(order.price, order),
+      currency: orderCurrencySymbol(order) });
   if (window.hubAPI?.shareWhatsApp) {
     await window.hubAPI.shareWhatsApp({ phone: client.phone, message, pdfPath: null });
   } else {
@@ -798,6 +803,19 @@ async function renderInvoiceForOrder(order, opts = {}) {
     // A QR missing a required tag SCANS and is invalid, which is worse than an
     // empty box: a code that reads invites no question. Refuse to draw one.
     const ready = zatcaQrReadiness(settings);
+    // Tags 4 and 5 are riyals. A job saved in a client's currency is converted
+    // at the rate stored on it; with none, there is no honest figure to state
+    // and the QR is refused like a missing VAT number (lib/zatca-qr.js qrAmounts).
+    const qrMoney = ZatcaQr().qrAmounts(order, settings, { total: _tax.total, vatAmount: vatAmt });
+    if (!qrMoney.ok) ready.missing = ready.missing.concat(qrMoney.missing);
+    ready.ok = ready.ok && qrMoney.ok;
+    // Phase 2 signs the job's own figures into the XML and the QR. Converting
+    // the whole document belongs with the Phase 2 work, so until then a job in
+    // another currency gets no Phase 2 QR rather than a EUR figure signed as
+    // riyals (lib/zatca-qr.js phase2Currency).
+    const z2on = !!(settings.zatcaPhase2?.enabled && (settings.zatcaPhase2.csid || settings.zatcaPhase2.pcsid));
+    const z2cur = z2on ? ZatcaQr().phase2Currency(order, settings) : { ok: true, missing: [] };
+    if (!z2cur.ok) { ready.missing = ready.missing.concat(z2cur.missing); ready.ok = false; }
     if (!ready.ok) {
       qrProblem = ready.missing.map((k) => t(k)).join(' · ');
       if (typeof toast === 'function') toast(t('inv.qr_not_compliant') + ' — ' + qrProblem, 'error', 12000);
@@ -848,7 +866,8 @@ async function renderInvoiceForOrder(order, opts = {}) {
         }
       } else {
         // Phase 1 fallback
-        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts, total, vatAmount });
+        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts,
+          total: fmtMoney(qrMoney.total), vatAmount: fmtMoney(qrMoney.vatAmount) });
       }
       qrSvg = await window.hubAPI.generateQR(tlvB64, { width: 140, margin: 1 });
     } catch (e) {
@@ -1202,9 +1221,9 @@ function openCreditNoteModal(orderId) {
 
   const bodyHtml = `
     <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">
-      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtPrice(order.price)} ${currencySymbol()}
+      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtOrderPrice(order.price, order)}
     </p>
-    <label>${escapeHtml(t('cn.credit_amount'))} (${currencySymbol()})</label>
+    <label>${escapeHtml(t('cn.credit_amount'))} (${escapeHtml(orderCurrencySymbol(order))})</label>
     <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
     <label style="margin-top:14px;">${escapeHtml(t('cn.reason'))}</label>
     <textarea id="cnReasonInput" rows="3" style="resize:vertical;" placeholder="${escapeHtml(t('cn.reason_ph'))}">${escapeHtml(reason)}</textarea>`;

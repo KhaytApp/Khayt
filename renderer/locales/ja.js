@@ -650,6 +650,8 @@
   "common.delete": "削除",
   "inv.qr_not_compliant": "この請求書には ZATCA の QR コードがありません",
   "inv.qr_missing_vat": "設定で VAT 番号を入力してください",
+  "inv.qr_foreign_currency": "このジョブは別の通貨で、SAR で表示するための保存済みレートがありません",
+  "inv.qr_phase2_foreign_currency": "SAR 以外の通貨でのフェーズ 2 請求書にはまだ対応していません",
   "inv.qr_missing_seller": "設定で事業者名を入力してください",
   "inv.qr_failed": "コードを生成できませんでした",
   "cal.model_saved": "モデルを保存しました",

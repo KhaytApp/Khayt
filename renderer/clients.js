@@ -379,7 +379,7 @@ function openClientHistory(clientId) {
                 <td style="font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(o.date)}</td>
                 <td><strong>${escapeHtml(o.project || o.id)}</strong><div style="font-size:11px; color:var(--text-muted);">${escapeHtml(o.id)}</div></td>
                 <td><span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></td>
-                <td style="font-weight:600; color:var(--success); font-variant-numeric:tabular-nums; white-space:nowrap;">${fmtPrice(o.price)}</td>
+                <td style="font-weight:600; color:var(--success); font-variant-numeric:tabular-nums; white-space:nowrap;">${fmtOrderPrice(o.price, o)}</td>
                 <td>${paymentBadge(o)}</td>
               </tr>`).join('')}
           </tbody>
@@ -998,7 +998,7 @@ function openClientEditor(clientId = null) {
                   <span class="ch-date">${escapeHtml(o.date)}</span>
                   <span class="ch-name">${escapeHtml(o.project)}</span>
                   <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span>
-                  <span class="ch-price">${fmtPrice(o.price)}</span>
+                  <span class="ch-price">${fmtOrderPrice(o.price, o)}</span>
                 </div>`).join('')}
             </div>
             ${clientOrders.length > 30 ? `<p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">+${clientOrders.length - 30} more — see Orders log</p>` : ''}`;
@@ -1446,7 +1446,7 @@ function exportClientPortal(clientId) {
         ${KhaytOrderStatus.isOpen(o) ? stepperHtml(o) : ''}
       </td>
       <td style="padding:8px;"><span style="background:${statusColors[o.status]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${escapeHtml(o.status)}</span></td>
-      <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtPrice(o.price)}</td>
+      <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtOrderPrice(o.price, o)}</td>
       <td style="padding:8px;text-align:center;font-size:11px;color:${isPaid?'#4ade80':'#f87171'};">${isPaid ? PL.paid : PL.outstanding}</td>
     </tr>`;
   }).join('');

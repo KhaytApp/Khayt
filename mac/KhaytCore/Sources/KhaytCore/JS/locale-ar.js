@@ -743,6 +743,8 @@
   "common.delete": "حذف",
   "inv.qr_not_compliant": "هذه الفاتورة بلا رمز QR الخاص بهيئة الزكاة والضريبة",
   "inv.qr_missing_vat": "أضف رقم الضريبة في الإعدادات",
+  "inv.qr_foreign_currency": "هذا الطلب بعملة أخرى ولا يوجد له سعر صرف محفوظ لذكر المبلغ بالريال",
+  "inv.qr_phase2_foreign_currency": "فاتورة المرحلة الثانية بعملة غير الريال غير مدعومة بعد",
   "inv.qr_missing_seller": "أضف اسم النشاط في الإعدادات",
   "inv.qr_failed": "تعذّر إنشاء الرمز",
   "cal.model_saved": "تم حفظ النموذج",

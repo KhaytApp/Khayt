@@ -416,7 +416,8 @@ struct CustomerInspector: View {
                                 }
                                 Spacer(minLength: 8)
                                 Text(job.price > 0
-                                     ? Money.figure(job.isSettled ? job.price : job.owedInOwnCurrency)
+                                     ? Money.figure(job.isSettled ? job.price : job.owedInOwnCurrency,
+                                                    currency: job.currency, shop: shop.currency)
                                      : "—")
                                     .font(.callout)
                                     .monospacedDigit()

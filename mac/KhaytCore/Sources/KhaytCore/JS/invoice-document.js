@@ -787,7 +787,11 @@ function invoiceHtml(order, ctx) {
           ${(() => {
             const orderCur = invCurrencyCode;
             const baseCur = settings.currency || 'SAR';
-            const xrate = (settings.exchangeRates || {})[orderCur];
+            // The rate the job was SAVED at (lib/order-new.js `fxRate`), not
+            // today's from Settings: a reprint must state the same amount the
+            // customer was first invoiced. A job with no stored rate has no
+            // honest figure in the shop's currency, so the line is left out.
+            const xrate = +order.fxRate || 0;
             if (orderCur && orderCur !== baseCur && xrate && xrate > 0) {
               const convertedAmt = fmtMoney((ms ? msAmount : (+order.price || 0)) * xrate);
               const baseSym = currencyMarkHtml(baseCur,

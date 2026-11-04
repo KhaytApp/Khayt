@@ -258,7 +258,7 @@ function renderStudioKanbanCard(b) {
     ? `<hr class="thread" style="margin:11px 0 9px" />
       <div class="row between" style="align-items:center">
         <span style="font-size:11px;color:var(--text-muted)">${log.printTime || 0} ${escapeHtml(t('common.hours'))}</span>
-        ${biz ? `<span class="metric" style="font-size:12.5px">${fmtPrice(log.price)}</span>` : ''}
+        ${biz ? `<span class="metric" style="font-size:12.5px">${fmtOrderPrice(log.price, log)}</span>` : ''}
       </div>
       <div class="row gap6 khayt-kcard-pills" style="margin-top:8px;flex-wrap:wrap">
         ${duePill}${unassignedPill}${biz ? paymentBadge(log) : ''}${timerBadge}${etaBadge}
@@ -267,7 +267,7 @@ function renderStudioKanbanCard(b) {
         ? `<div class="khayt-kcard-badges">${machineBadge}${operatorBadge}${kanbanSplitBadge}${kanbanSubBadge}${qcBadge}</div>` : ''}`
     : `
       <div class="meta">
-        ${biz ? `<span class="price">${fmtPrice(log.price)}</span><span>·</span>` : ''}
+        ${biz ? `<span class="price">${fmtOrderPrice(log.price, log)}</span><span>·</span>` : ''}
         <span>${log.printTime} ${escapeHtml(t('common.hours'))}</span><span>·</span>
         <span>${escapeHtml(partsLabel)}</span>
       </div>
@@ -418,7 +418,7 @@ function renderKanban() {
           <div class="quote-card">
             <div class="quote-main">
               <div class="quote-title">${getPriorityLevel(q) !== 'normal' ? priorityBadgeHtml(q) + ' ' : ''}${escapeHtml(q.project || q.id)}</div>
-              <div class="quote-meta">${escapeHtml(q.id)} · ${fmtPrice(q.price)} ${expiryHtml}</div>
+              <div class="quote-meta">${escapeHtml(q.id)} · ${fmtOrderPrice(q.price, q)} ${expiryHtml}</div>
             </div>
             <!-- Approving is the answer this row is waiting for. Rejecting sat
                  next to it in red; it is under the rule in the menu now, where
@@ -533,21 +533,22 @@ function renderKanban() {
           foot.className = 'khayt-kcol-foot';
           colEl.appendChild(foot);
         }
-        const totalValFoot = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+        // At each job's SAVED rate; a job with none is left out and the total says so.
+        const totalValFoot = fmtJobsTotal(sorted);
         // Enthusiast/maker mode has no commerce — omit the per-column money total.
         const showColMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${fmtPrice(totalValFoot)}</span>` : ''}`;
+        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(totalValFoot)}</span>` : ''}`;
       }
     }
 
     // Column totals meta line
     const totalHrs = sorted.reduce((s, o) => s + (+o.printTime || 0), 0);
-    const totalVal = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+    const totalVal = fmtJobsTotal(sorted);   // saved rates; partial when a job has none
     const metaEl = $('#meta-' + status);
     if (metaEl) {
       const showMetaMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
       metaEl.textContent = sorted.length > 0
-        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${fmtPrice(totalVal)}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
+        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${totalVal}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
         : '';
     }
 

@@ -175,7 +175,7 @@ struct OrdersTable: View {
             .alignment(.trailing)
 
             TableColumn(shop.words.callIt("flow.owed"), value: \.owed) { job in
-                Owed(job: job, words: shop.words)
+                Owed(job: job, words: shop.words, shopCurrency: shop.currency)
             }
             .width(min: 92, ideal: 92)
             .alignment(.trailing)
@@ -615,13 +615,12 @@ private struct Owed: View {
     let words: Words
     @Environment(\.accessibilityReduceMotion) private var reduced
 
-    private var paidFraction: Double {
-        // Against what the job is settled against — price + tax on an
-        // exclusive shop, the price on one settled before that (`due`).
-        let billed = job.figures?.due ?? job.price
-        guard billed > 0 else { return 0 }
-        return min(1, max(0, job.paidAmount / billed))
-    }
+    /// The shop's own currency, so a job in another one carries its mark.
+    let shopCurrency: String
+
+    // By the same owed figure printed above the meter (`settledFraction`),
+    // so credit notes and gift cards move both.
+    private var paidFraction: Double { job.settledFraction }
 
     var body: some View {
         // ── "SETTLED" IS A CLAIM THAT MONEY CHANGED HANDS ─────────────────
@@ -645,7 +644,7 @@ private struct Owed: View {
         } else {
             VStack(alignment: .trailing, spacing: 3) {
                 // The job's OWN currency, like the Price column beside it.
-                Text(Money.figure(job.owedInOwnCurrency))
+                Text(Money.figure(job.owedInOwnCurrency, currency: job.currency, shop: shopCurrency))
                     .monospacedDigit()
                     // Recording a payment changes this number and the meter
                     // below it, and both used to simply BE different.

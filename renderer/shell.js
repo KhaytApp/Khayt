@@ -654,7 +654,7 @@ function renderGlobalResults(term) {
       <div class="gs-result" data-gs-action="order" data-gs-id="${escapeHtml(o.id)}">
         <span class="gs-icon">📋</span>
         <span class="gs-title">${escapeHtml(o.project || o.id)}</span>
-        <span class="gs-meta">${escapeHtml(o.id)} · ${fmtPrice(o.price)} · <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></span>
+        <span class="gs-meta">${escapeHtml(o.id)} · ${fmtOrderPrice(o.price, o)} · <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></span>
       </div>`).join(''));
   }
 

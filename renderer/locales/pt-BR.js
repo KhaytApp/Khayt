@@ -651,6 +651,8 @@
   "common.delete": "Excluir",
   "inv.qr_not_compliant": "Esta fatura não tem código QR da ZATCA",
   "inv.qr_missing_vat": "adicione seu número de IVA nas Configurações",
+  "inv.qr_foreign_currency": "este trabalho está em outra moeda e não tem uma taxa salva para indicá-lo em SAR",
+  "inv.qr_phase2_foreign_currency": "uma fatura da Fase 2 em moeda diferente de SAR ainda não é suportada",
   "inv.qr_missing_seller": "adicione o nome da sua empresa nas Configurações",
   "inv.qr_failed": "não foi possível gerar o código",
   "cal.model_saved": "Modelo salvo",

@@ -87,7 +87,9 @@ struct EditJobSheet: View {
                         .fixedSize()
                     HStack(spacing: 8) {
                         if let job {
-                            Text(Money.text(job.price, shop.currency)).monospacedDigit()
+                            // The job's own currency: the price is stored in it.
+                            Text(Money.text(job.price, job.currency.isEmpty ? shop.currency : job.currency))
+                                .monospacedDigit()
                         }
                         Text(shop.words.callIt("pe.price_override")).foregroundStyle(.secondary)
                         TextField(shop.words.callIt("pe.price_override_ph"), text: $priceText)

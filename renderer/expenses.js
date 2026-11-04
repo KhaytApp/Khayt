@@ -321,8 +321,8 @@ async function emailOrderToClient(orderId, isQuote = false) {
       <h2 style="color:${safeCssColor(settings.invAccentColor, '#5E2E14')};">${escapeHtml(shop)}</h2>
       <p>Dear ${escapeHtml(clientName)},</p>
       <p>${isQuote
-        ? `Please find below your quote <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtPrice(order.price)}</strong>.`
-        : `Please find below your invoice <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtPrice(order.price)}</strong>.`
+        ? `Please find below your quote <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
+        : `Please find below your invoice <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
       }</p>
       <p>Project: ${escapeHtml(order.project || '')}</p>
       <p>Date: ${escapeHtml(order.date || '')}</p>
@@ -353,8 +353,8 @@ async function emailOrderToClient(orderId, isQuote = false) {
   const bodyLines = [
     `Dear ${clientName},`, '',
     isQuote
-      ? `Please find attached your quote #${order.id} for ${fmtPrice(order.price)}.`
-      : `Please find attached your invoice #${order.id} for ${fmtPrice(order.price)}.`,
+      ? `Please find attached your quote #${order.id} for ${fmtOrderPrice(order.price, order)}.`
+      : `Please find attached your invoice #${order.id} for ${fmtOrderPrice(order.price, order)}.`,
     `Order: ${order.project}`, `Date: ${order.date}`,
   ];
   if (!isQuote && settings.paymentInstructions) bodyLines.push('', settings.paymentInstructions);
@@ -617,7 +617,7 @@ function ordersToInvoiceRows() {
     currencyOf: (o) => ((typeof clientCurrency === 'function')
       ? orderCurrency(o) : (settings.currency || 'SAR')),
     toBase: (typeof convertToBase === 'function')
-      ? ((amt, cur) => convertToBase(amt, cur)) : ((amt) => amt),
+      ? ((amt, cur, o) => (o && typeof orderToBase === 'function' ? orderToBase(amt, o) : convertToBase(amt, cur))) : ((amt) => amt),
   });
 }
 
@@ -638,7 +638,7 @@ function orderToInvoiceRow(o) {
     vatRate: rate,
     taxMode: _tp.mode,
     baseCurrency,
-    baseAmount: (typeof convertToBase === 'function') ? convertToBase(+o.price || 0, cur) : (+o.price || 0),
+    baseAmount: (typeof orderToBase === 'function') ? orderToBase(+o.price || 0, o) : (+o.price || 0),
   };
 }
 
@@ -864,7 +864,7 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     if (!monthMap[month]) monthMap[month] = { orders: 0, revenue: 0, vatCollected: 0, taxableSales: 0, shipping: 0 };
     monthMap[month].orders++;
     monthMap[month].revenue += orderNetRevenueBase(o);
-    monthMap[month].shipping += convertToBase(+o.shippingCost || 0, orderCurrency(o));
+    monthMap[month].shipping += orderToBase(+o.shippingCost || 0, o);
   }
   // VAT FOLLOWS THE INVOICE, NOT THE FINISHED JOB. The tax point is the issued
   // invoice, so a job still printing owes its VAT in the month it is dated —

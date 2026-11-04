@@ -471,7 +471,7 @@ function fillWaTemplate(body, order, client) {
     client:   name,
     id:       order.id,
     price:    fmtMoney(order.price),
-    currency: currencySymbol(),
+    currency: (typeof orderCurrencySymbol === 'function' ? orderCurrencySymbol(order) : currencySymbol()),
     due:      order.dueDate,
     status:   t('queue.' + order.status),
   });

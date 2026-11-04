@@ -485,6 +485,13 @@
       clientId: i.clientId || null,
       productId: i.productId || null,
       currency: cur.currency,
+      // The rate the price was converted at (shop currency per one unit of
+      // `currency`), kept so a document that must state the amount in the
+      // shop's currency — the ZATCA QR's total and VAT are riyals
+      // (lib/zatca-qr.js qrAmounts) — uses the rate the customer was quoted
+      // at, not whatever Settings holds on the day it is reprinted. Only on a
+      // converted job, so an ordinary job's shape is unchanged.
+      ...(cur.fx !== 1 ? { fxRate: cur.fx } : {}),
       // NOT filtered for blanks. A part with no filament chosen contributes an
       // empty string, so a two-part job can read "PLA, " with a dangling comma.
       // That is what every record already in a shop's book carries, and a lift

@@ -60,7 +60,7 @@ test('the P&L and VAT summary put an accepted quote\'s VAT in its acceptance mon
 const sandboxBase = (orders) => ({
   KhaytTax, KhaytOrderStatus, KhaytPnl, settings: VAT15, clients: [], printLog: orders, expenses: [],
   console, orderNetRevenueBase: (o) => money.orderNetRevenueBase(o, { settings: VAT15, clients: [] }),
-  orderCurrency: () => 'SAR', convertToBase: (v) => v, fmtMoney: (v) => Number(v).toFixed(2),
+  orderCurrency: () => 'SAR', convertToBase: (v) => v, orderToBase: (v) => v, fmtMoney: (v) => Number(v).toFixed(2),
   currencySymbol: () => 'SAR', shopName: () => 'Shop', t: (k) => k, toast: () => {},
   escapeHtml: (x) => String(x), localDateStr: () => '2026-10-16', window: {},
 });

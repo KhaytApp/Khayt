@@ -124,7 +124,7 @@ test('all four strings exist in every locale', () => {
   assert.equal(files.length, 9);
   for (const f of files) {
     const s2 = read(path.join('renderer', 'locales', f));
-    for (const k of ['inv.qr_not_compliant', 'inv.qr_missing_vat', 'inv.qr_missing_seller', 'inv.qr_failed']) {
+    for (const k of ['inv.qr_not_compliant', 'inv.qr_missing_vat', 'inv.qr_missing_seller', 'inv.qr_failed', 'inv.qr_foreign_currency']) {
       assert.ok(s2.includes(`"${k}"`), `${f} is missing ${k}`);
     }
   }
