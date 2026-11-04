@@ -96,54 +96,73 @@ extension Shop {
     func libraryMatcher(_ q: LibraryQuery, group: String?,
                         skipping axis: LibraryAxis? = nil,
                         focus: Set<String>? = nil) -> (LibraryFile) -> Bool {
+        let misses = libraryAxisMisses(q, group: group, focus: focus)
+        let allowed = axis?.bit ?? 0
+        return { f in
+            guard let missed = misses(f) else { return false }
+            return missed & ~allowed == 0
+        }
+    }
+
+    /// `libraryMatcher`, answered for every axis at once: nil when the model
+    /// is out whatever axis is left out (the open folder, a Health focus, a
+    /// range), else the axes it fails (`LibraryAxis.bit`). A model is in the
+    /// pool that leaves out axis A when it fails nothing but A — so the facet
+    /// recount puts each model to the test ONCE, not once per chip
+    /// (`readLibraryFacets`; it was ~15 passes over the book per keystroke).
+    func libraryAxisMisses(_ q: LibraryQuery, group: String?,
+                           focus: Set<String>? = nil) -> (LibraryFile) -> UInt32? {
         let ready: Set<String>? = {
-            guard axis != .ready else { return nil }
             if let machine = q.readyOn { return readyByMachine[machine] ?? [] }
             if q.readyAnywhere { return readyByMachine.values.reduce(into: Set<String>()) { $0.formUnion($1) } }
             return nil
         }()
         // Fits one machine: its chip is on the tile. The whole book's sets,
         // once per change (`libraryFitSets`), never a fit worked out here.
-        let fits: Set<String>? = axis == .fits ? nil : q.fitsOn.map { libraryFitSets()[$0] ?? [] }
+        let fits: Set<String>? = q.fitsOn.map { libraryFitSets()[$0] ?? [] }
         let dupes = duplicateOf
-        let storage: LibraryStorageFilter? = axis == .storage ? nil
-            : q.storage.map { $0 == .onlineOnly ? .onlineOnly : .thisMacOnly }
+        let storage: LibraryStorageFilter? = q.storage.map { $0 == .onlineOnly ? .onlineOnly : .thisMacOnly }
         let index = syncIndex, remote = libraryRemoteId
-        let sells: Set<String>? = q.inCatalogue && axis != .inCatalogue ? catalogueFileIds() : nil
-        let noFigures = q.noFigures && axis != .noFigures
-        let fromWeb = q.fromWeb && axis != .fromWeb
+        let sells: Set<String>? = q.inCatalogue ? catalogueFileIds() : nil
+        let noFigures = q.noFigures
+        let fromWeb = q.fromWeb
         let ranges = q.ranges.isActive ? q.ranges : nil
         let today = Calendar.book.dayString(Date())
-        let category: FilterChoice? = axis == .category ? nil
-            : (q.category.map { .named($0) } ?? (q.uncategorised ? .unfiled : nil))
-        let tag = axis == .tag ? nil : q.tag?.lowercased()
-        let creator = axis == .creator ? nil : q.creator?.lowercased()
+        let category: FilterChoice? = q.category.map { .named($0) } ?? (q.uncategorised ? .unfiled : nil)
+        let tag = q.tag?.lowercased()
+        let creator = q.creator?.lowercased()
         return { [self] f in
+            // Never left out: the frame every count is made inside.
+            if let focus, !focus.contains(f.id) { return nil }
+            if let group, !Self.isUnder(f.groupName, group) { return nil }
+            var missed: UInt32 = 0
             // A model a conversion has replaced is put aside rather than
             // deleted (`LibraryFile.archivedAt`): it is still in the book and
             // still what a past job was printed from, but not one of the
             // things the shop is choosing between today. The Archived view is
             // ONLY those, so a shop looking for something to restore is not
             // looking through everything else.
-            if axis != .archived, f.isArchived != q.archived { return false }
-            if let focus, !focus.contains(f.id) { return false }
-            if let group, !Self.isUnder(f.groupName, group) { return false }
-            if axis != .unfiled, q.unfiled, !(f.groupName ?? "").isEmpty { return false }
-            if axis != .neverPrinted, q.neverPrinted, f.printCount != 0 { return false }
-            if let ready, !ready.contains(f.id) { return false }
-            if let fits, !fits.contains(f.id) { return false }
-            if let category, !category.matches(f.category) { return false }
-            if let tag, !(f.tags ?? []).contains(where: { $0.lowercased() == tag }) { return false }
-            if let creator, f.creator?.lowercased() != creator { return false }
-            if axis != .printNext, q.printNext, !f.isPrintNext { return false }
-            if axis != .duplicates, q.duplicates, dupes[f.id] == nil { return false }
+            if f.isArchived != q.archived { missed |= LibraryAxis.archived.bit }
+            if q.unfiled, !(f.groupName ?? "").isEmpty { missed |= LibraryAxis.unfiled.bit }
+            if q.neverPrinted, f.printCount != 0 { missed |= LibraryAxis.neverPrinted.bit }
+            if let ready, !ready.contains(f.id) { missed |= LibraryAxis.ready.bit }
+            if let fits, !fits.contains(f.id) { missed |= LibraryAxis.fits.bit }
+            if let category, !category.matches(f.category) { missed |= LibraryAxis.category.bit }
+            if let tag, !(f.tags ?? []).contains(where: { $0.lowercased() == tag }) { missed |= LibraryAxis.tag.bit }
+            if let creator, f.creator?.lowercased() != creator { missed |= LibraryAxis.creator.bit }
+            if q.printNext, !f.isPrintNext { missed |= LibraryAxis.printNext.bit }
+            if q.duplicates, dupes[f.id] == nil { missed |= LibraryAxis.duplicates.bit }
             // Where the bytes are, from the index — one lookup a model.
-            if let storage, !storage.matches(index?.state(f.id, remote: remote)) { return false }
-            if let sells, !sells.contains(f.id) { return false }
-            if noFigures, !libraryHasNoFigures(f) { return false }
-            if fromWeb, !f.isFromWeb { return false }
-            if let ranges, !ranges.matches(libraryFigures(f), today: today) { return false }
-            return true
+            if let storage, !storage.matches(index?.state(f.id, remote: remote)) { missed |= LibraryAxis.storage.bit }
+            if let sells, !sells.contains(f.id) { missed |= LibraryAxis.inCatalogue.bit }
+            if noFigures, !libraryHasNoFigures(f) { missed |= LibraryAxis.noFigures.bit }
+            if fromWeb, !f.isFromWeb { missed |= LibraryAxis.fromWeb.bit }
+            // Two axes failed: out of every pool, so the range (the dearest
+            // test, the tile facts) need not be asked.
+            if missed & (missed &- 1) != 0 { return missed }
+            // Ranges are never left out — they narrow every count.
+            if let ranges, !ranges.matches(libraryFigures(f), today: today) { return nil }
+            return missed
         }
     }
 
@@ -400,5 +419,34 @@ extension Shop {
             writeProblem = self.said(error)
             return false
         }
+    }
+}
+
+extension Shop.LibraryAxis {
+    /// This axis as one bit of `Shop.libraryAxisMisses`'s answer.
+    var bit: UInt32 {
+        switch self {
+        case .unfiled: 1 << 0
+        case .category: 1 << 1
+        case .tag: 1 << 2
+        case .neverPrinted: 1 << 3
+        case .ready: 1 << 4
+        case .creator: 1 << 5
+        case .printNext: 1 << 6
+        case .duplicates: 1 << 7
+        case .archived: 1 << 8
+        case .storage: 1 << 9
+        case .noFigures: 1 << 10
+        case .inCatalogue: 1 << 11
+        case .fromWeb: 1 << 12
+        case .fits: 1 << 13
+        }
+    }
+
+    /// The axes a model is in the pool of, from what it failed: every one
+    /// when it failed none, only that one when it failed one, else none.
+    static func pools(missing missed: UInt32) -> UInt32 {
+        if missed == 0 { return ~0 }
+        return missed & (missed &- 1) == 0 ? missed : 0
     }
 }

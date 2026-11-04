@@ -1064,7 +1064,15 @@ extension Shop {
         // and only copies of the models inside are moved into the vault.
         // Linked folders too: their files are indexed WHERE THEY ARE, and an
         // import from inside one would pull a file out from under its record.
-        var files = Self.modelsUnder(chosen, skippingAll: roots.roots + [roots.primary] + linkedFolders)
+        //
+        // The walk (and each model's photo search) OFF the main actor, and
+        // under the import banner: a pack dropped from a Drive folder is a
+        // network round trip per directory, and on the main actor that was a
+        // window frozen with nothing on it saying why (Nov 2026 review).
+        importing = true
+        defer { importing = false; importProgress = nil }
+        let skipping = (roots.roots + [roots.primary] + linkedFolders)
+        var files = await PinWork.run { Self.modelsUnder(chosen, skippingAll: skipping) }
         var scratches: [URL] = []
         var refusals: [String] = []
         for url in chosen where ArchiveImport.kinds.contains(url.pathExtension.lowercased()) {
@@ -1098,9 +1106,6 @@ extension Shop {
             return
         }
         if !refusals.isEmpty { importProblem = refusals.joined(separator: "\n") }
-
-        importing = true
-        defer { importing = false; importProgress = nil }
 
         let titles = Dictionary(self.files.compactMap { f in
             f.contentHash.map { ($0, f.title) }
@@ -1918,27 +1923,6 @@ extension Shop {
         case noFigures, inCatalogue, fromWeb, fits
     }
 
-    /// What one axis counts: the shelf, the search, and the other chips.
-    ///
-    /// `searched` is the ids the search box finds, worked out ONCE per
-    /// recount (`readLibraryFacets`) — it was run again inside every pool,
-    /// ten times a recount. Nil: no search.
-    ///
-    /// The test each model is put to is `libraryMatcher` — the grid's own,
-    /// with this axis left out — so a count and the grid it describes are
-    /// answered by one rule (they were two: one over the decoded models, one
-    /// over the raw rows, each with its own copy of every axis).
-    private func libraryPool(skipping axis: LibraryAxis, searched: Set<String>?) -> [JSONValue] {
-        var group: String?
-        if case .library(let g) = shelf { group = g }
-        let match = libraryMatcher(libraryQuery, group: group, skipping: axis,
-                                  focus: libraryHealthFocus.map { Set($0.ids) })
-        var ids: Set<String> = []
-        ids.reserveCapacity(files.count)
-        for f in files where (searched?.contains(f.id) ?? true) && match(f) { ids.insert(f.id) }
-        return libraryRows.filter { ids.contains(Self.rowText($0, "id")) }
-    }
-
     /// The group a record is in, by the rule the grid files it under —
     /// `folder` if the key is there at all, then `group`. Splitting on `group`
     /// alone would count a model under one project and draw it in another.
@@ -1981,31 +1965,6 @@ extension Shop {
             return Set(files.lazy.filter(matches).map(\.id))
         }()
         guard !Task.isCancelled else { return }
-        // The engine is asked only when the rows it would count changed: the
-        // same pool, of the same book, has the same counts. Typing a search
-        // that leaves the pool as it was, or a recount the index started,
-        // crossed the bridge with the whole book twice for nothing.
-        func counted(_ axis: LibraryAxis, _ name: String,
-                     _ ask: ([JSONValue]) async throws -> [KhaytEngine.GroupCount]) async -> [KhaytEngine.GroupCount] {
-            let pool = libraryPool(skipping: axis, searched: searched)
-            var h = Hasher()
-            h.combine(libraryRowsRevision)
-            for row in pool { h.combine(Self.rowText(row, "id")) }
-            let key = h.finalize()
-            if let held = facetCountMemo[name], held.key == key { return held.rows }
-            let rows = (try? await ask(pool)) ?? []
-            facetCountMemo[name] = (key, rows)
-            return rows
-        }
-        let categories = await counted(.category, "category") { try await engine.categoryCounts($0) }
-        let tags = await counted(.tag, "tag") { try await engine.tagCounts($0) }
-        guard mine == libraryRecount, !Task.isCancelled else { return }
-        let unfiled = libraryPool(skipping: .unfiled, searched: searched).count { Self.rowGroup($0) == nil }
-        // Off the models, not the rows: a record's own `timesPrinted` is only
-        // the desktop's manual log, and the jobs' answer is on `LibraryFile`.
-        let printedIds = Set(files.lazy.filter { $0.printCount > 0 }.map(\.id))
-        let never = libraryPool(skipping: .neverPrinted, searched: searched)
-            .count { !printedIds.contains(Self.rowText($0, "id")) }
         // Across the whole book, once per machine that reports what it has
         // loaded; the chip's count is that set within what the other chips and
         // the search have left.
@@ -2013,73 +1972,141 @@ extension Shop {
         // whether or not this screen is up; only the count inside the pool is
         // the recount's.
         let sets = await readinessSets()
+        guard mine == libraryRecount, !Task.isCancelled else { return }
         let byMachine = sets.onBed, spoolsByMachine = sets.spools
-        var ready: [LibraryFacets.Ready] = []
-        for machine in machinesInUse {
-            guard let onBed = byMachine[machine.id] else { continue }
-            let count = libraryPool(skipping: .ready, searched: searched).count { onBed.contains(Self.rowText($0, "id")) }
-            ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
-        }
-        guard mine == libraryRecount else { return }
         // Only when they moved: each is observed and in the library's memo
         // key, so writing the same answer back redrew the grid and rebuilt
         // its lists after every key typed.
         if byMachine != readyByMachine { readyByMachine = byMachine }
         if spoolsByMachine != spoolReadyByMachine { spoolReadyByMachine = spoolsByMachine }
-        // The three counted in Swift, over the same pool: the ids the other
-        // axes leave, each skipping its own.
         let copies = Self.duplicateGroups(files)
         if copies != duplicateOf { duplicateOf = copies }
-        func ids(_ axis: LibraryAxis) -> Set<String> {
-            Set(libraryPool(skipping: axis, searched: searched).map { Self.rowText($0, "id") })
+
+        // ── EVERY POOL IN ONE PASS ──────────────────────────────────────────
+        //
+        // Each axis is counted over what the OTHERS leave: the shelf, the
+        // search, and every chip but its own — the grid's own test
+        // (`libraryMatcher`), with that axis left out. That was one pass over
+        // the book per axis, and another over the rows to pick each pool out:
+        // about fifteen of each per keystroke, ~30 passes over ten thousand
+        // models. Now each model is put to the test once, which says every
+        // axis it fails (`libraryAxisMisses`); it is in the pool that leaves
+        // out A when A is all it fails. Then one pass over the rows counts
+        // every chip at once.
+        var group: String?
+        if case .library(let g) = shelf { group = g }
+        let misses = libraryAxisMisses(libraryQuery, group: group,
+                                       focus: libraryHealthFocus.map { Set($0.ids) })
+        var poolsOf: [String: UInt32] = [:]
+        poolsOf.reserveCapacity(files.count)
+        for f in files where searched?.contains(f.id) ?? true {
+            guard let missed = misses(f) else { continue }
+            let pools = LibraryAxis.pools(missing: missed)
+            if pools != 0 { poolsOf[f.id, default: 0] |= pools }
         }
-        let byId = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        guard !Task.isCancelled else { return }
+
+        let readyOn: [(machine: Machine, onBed: Set<String>)] = machinesInUse.compactMap { m in
+            byMachine[m.id].map { (m, $0) }
+        }
+        let anywhere = byMachine.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let index = syncIndex, remote = libraryRemoteId
+        var categoryPool: [JSONValue] = [], tagPool: [JSONValue] = []
+        // The engine is asked only when the rows it would count changed: the
+        // same pool, of the same book, has the same counts. Typing a search
+        // that leaves the pool as it was, or a recount the index started,
+        // crossed the bridge with the whole book twice for nothing.
+        var categoryKey = Hasher(), tagKey = Hasher()
+        categoryKey.combine(libraryRowsRevision)
+        tagKey.combine(libraryRowsRevision)
+        var unfiled = 0, never = 0, archived = 0, readyAnywhere = 0
+        var readyCounts = [Int](repeating: 0, count: readyOn.count)
+        var onlineOnly = 0, thisMacOnly = 0
+        // The ids in each pool the Swift-side counts read, as sets: a record
+        // twice in the book is one model there.
+        var creatorIds = Set<String>(), printNextIds = Set<String>(), dupeIds = Set<String>()
+        var noFigureIds = Set<String>(), catalogueIds = Set<String>(), webIds = Set<String>()
+        var fitIds = Set<String>()
+        // Off the models, not the rows: a record's own `timesPrinted` is only
+        // the desktop's manual log, and the jobs' answer is on `LibraryFile`.
+        let printedIds = Set(files.lazy.filter { $0.printCount > 0 }.map(\.id))
+        for row in libraryRows {
+            let id = Self.rowText(row, "id")
+            guard let pools = poolsOf[id] else { continue }
+            func on(_ axis: LibraryAxis) -> Bool { pools & axis.bit != 0 }
+            if on(.category) { categoryPool.append(row); categoryKey.combine(id) }
+            if on(.tag) { tagPool.append(row); tagKey.combine(id) }
+            if on(.unfiled), Self.rowGroup(row) == nil { unfiled += 1 }
+            if on(.neverPrinted), !printedIds.contains(id) { never += 1 }
+            if on(.ready) {
+                for (k, r) in readyOn.enumerated() where r.onBed.contains(id) { readyCounts[k] += 1 }
+                if anywhere.contains(id) { readyAnywhere += 1 }
+            }
+            if on(.archived), !Self.rowText(row, "archivedAt").isEmpty { archived += 1 }
+            // Only once there is an index to read: before it, every model would
+            // count as "on this Mac only", which is a guess.
+            if let index, on(.storage) {
+                let state = index.state(id, remote: remote)
+                if LibraryStorageFilter.onlineOnly.matches(state) { onlineOnly += 1 }
+                else if LibraryStorageFilter.thisMacOnly.matches(state) { thisMacOnly += 1 }
+            }
+            if on(.creator) { creatorIds.insert(id) }
+            if on(.printNext) { printNextIds.insert(id) }
+            if on(.duplicates) { dupeIds.insert(id) }
+            if on(.noFigures) { noFigureIds.insert(id) }
+            if on(.inCatalogue) { catalogueIds.insert(id) }
+            if on(.fromWeb) { webIds.insert(id) }
+            if on(.fits) { fitIds.insert(id) }
+        }
+        // "On this Mac only" says something only beside somewhere else.
+        if index != nil, !libraryHasRemote && onlineOnly == 0 { thisMacOnly = 0 }
+
+        func counted(_ name: String, _ pool: [JSONValue], _ key: Int,
+                     _ ask: ([JSONValue]) async throws -> [KhaytEngine.GroupCount]) async -> [KhaytEngine.GroupCount] {
+            if let held = facetCountMemo[name], held.key == key { return held.rows }
+            let rows = (try? await ask(pool)) ?? []
+            facetCountMemo[name] = (key, rows)
+            return rows
+        }
+        let categories = await counted("category", categoryPool, categoryKey.finalize()) {
+            try await engine.categoryCounts($0)
+        }
+        let tags = await counted("tag", tagPool, tagKey.finalize()) { try await engine.tagCounts($0) }
+        guard mine == libraryRecount, !Task.isCancelled else { return }
+
+        var ready: [LibraryFacets.Ready] = []
+        for (k, r) in readyOn.enumerated() {
+            ready.append(.init(machineId: r.machine.id, machineName: r.machine.name, count: readyCounts[k]))
+        }
+        // The rest counted in Swift, over the same pools.
         var creatorCounts: [String: (name: String, n: Int)] = [:]
-        for id in ids(.creator) {
-            guard let c = byId[id]?.creator else { continue }
+        for id in creatorIds {
+            guard let c = libraryFile(id: id)?.creator else { continue }
             creatorCounts[c.lowercased(), default: (c, 0)].n += 1
         }
         let creators = creatorCounts.values.map { CreatorCount(name: $0.name, count: $0.n) }
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
-        let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
-        let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
-        let archived = libraryPool(skipping: .archived, searched: searched).count { !Self.rowText($0, "archivedAt").isEmpty }
-        // Only once there is an index to read: before it, every model would
-        // count as "on this Mac only", which is a guess.
-        var onlineOnly = 0, thisMacOnly = 0
-        if let index = syncIndex {
-            for row in libraryPool(skipping: .storage, searched: searched) {
-                let state = index.state(Self.rowText(row, "id"), remote: libraryRemoteId)
-                if LibraryStorageFilter.onlineOnly.matches(state) { onlineOnly += 1 }
-                else if LibraryStorageFilter.thisMacOnly.matches(state) { thisMacOnly += 1 }
-            }
-            // "On this Mac only" says something only beside somewhere else.
-            if !libraryHasRemote && onlineOnly == 0 { thisMacOnly = 0 }
-        }
-        // Ready on any machine: the union, over what the others leave.
-        let anywhere = byMachine.values.reduce(into: Set<String>()) { $0.formUnion($1) }
-        let readyAnywhere = anywhere.isEmpty ? 0
-            : libraryPool(skipping: .ready, searched: searched).count { anywhere.contains(Self.rowText($0, "id")) }
-        let noFigures = ids(.noFigures).count { id in byId[id].map(libraryHasNoFigures) ?? false }
+        let printNext = printNextIds.count { libraryFile(id: $0)?.isPrintNext == true }
+        let dupes = dupeIds.count { duplicateOf[$0] != nil }
+        let noFigures = noFigureIds.count { id in libraryFile(id: id).map(libraryHasNoFigures) ?? false }
         let sells = catalogueFileIds()
-        let inCatalogue = sells.isEmpty ? 0 : ids(.inCatalogue).count { sells.contains($0) }
+        let inCatalogue = sells.isEmpty ? 0 : catalogueIds.count { sells.contains($0) }
         var facets = LibraryFacets(categories: categories, tags: tags,
                                    unfiled: unfiled, neverPrinted: never, ready: ready,
                                    creators: creators, printNext: printNext, duplicates: dupes,
                                    archived: archived, onlineOnly: onlineOnly, thisMacOnly: thisMacOnly)
-        facets.readyAnywhere = readyAnywhere
+        facets.readyAnywhere = anywhere.isEmpty ? 0 : readyAnywhere
         facets.noFigures = noFigures
         facets.inCatalogue = inCatalogue
-        facets.fromWeb = ids(.fromWeb).count { byId[$0]?.isFromWeb == true }
+        facets.fromWeb = webIds.count { libraryFile(id: $0)?.isFromWeb == true }
         // Fits, per machine: the sets are the book's, once per change
         // (`libraryFitSets`); only the count inside the pool is per recount.
         let fitSets = libraryFitSets()
-        let fitPool = ids(.fits)
         facets.fits = modelMachines.compactMap { machine in
             let set = fitSets[machine.id] ?? []
             guard !set.isEmpty || libraryFitsOn == machine.id else { return nil }
             return .init(machineId: machine.id, machineName: machine.name,
-                         count: fitPool.count { set.contains($0) })
+                         count: fitIds.count { set.contains($0) })
         }
         if facets != libraryFacets { libraryFacets = facets }
         // Taken AFTER the run: writing `readyByMachine` and `duplicateOf`
@@ -2090,10 +2117,26 @@ extension Shop {
 
     /// A newer recount makes the one in flight pointless: it is cancelled,
     /// and stops at its next step rather than finishing work nobody will see.
+    ///
+    /// A recount asked for within `recountPause` of the last one waits that
+    /// long first, so typing a word recounts once, after it, rather than once
+    /// per letter; a single click is counted at once.
     func recountLibrarySoon() {
         libraryRecountTask?.cancel()
-        libraryRecountTask = Task { await readLibraryFacets() }
+        let now = ContinuousClock.now
+        let memo = libraryMemo
+        let pause = memo.recountAskedAt.map { now - $0 < Self.recountPause } ?? false
+        memo.recountAskedAt = now
+        libraryRecountTask = Task {
+            if pause {
+                try? await Task.sleep(for: Self.recountPause)
+                if Task.isCancelled { return }
+            }
+            await readLibraryFacets()
+        }
     }
+
+    nonisolated static let recountPause: Duration = .milliseconds(120)
 
     /// Wait for the chips to catch up with what was last asked of them.
     ///
@@ -2169,8 +2212,9 @@ extension Shop {
         var spoolsByMachine: [String: Set<String>] = [:]
         // The beds, once: a model loaded for a machine it does not fit on is
         // not ready there (`ModelReadiness`).
-        let meshes = Dictionary(files.compactMap { f in f.mesh.map { (f.id, $0) } },
-                                uniquingKeysWith: { a, _ in a })
+        // Unpacked once per change to the files, not per recount: it is a
+        // string parsed per model (`LibraryFile.mesh`), ten thousand of them.
+        let meshes = libraryMeshes()
         for machine in machinesInUse {
             let loaded = loadedSlots(for: machine.id)
             guard !loaded.isEmpty else { continue }
@@ -2195,6 +2239,17 @@ extension Shop {
             }
         }
         return (byMachine, spoolsByMachine)
+    }
+
+    /// Every model's mesh by id, for the `filesRevision` it was made at.
+    func libraryMeshes() -> [LibraryFile.ID: LibraryFile.Mesh] {
+        let memo = libraryMemo
+        if memo.meshesRevision != filesRevision {
+            memo.meshesRevision = filesRevision
+            memo.meshes = Dictionary(files.compactMap { f in f.mesh.map { (f.id, $0) } },
+                                     uniquingKeysWith: { a, _ in a })
+        }
+        return memo.meshes
     }
 
     /// Put the ready sets right, whatever is on screen. Written only when
@@ -3247,11 +3302,28 @@ extension Shop {
 
     /// One print file's raw record, for the rules that read more of it than
     /// `LibraryFile` models.
+    ///
+    /// By an index made once per change to `fileRows` (`LibraryMemo.rowIndex`)
+    /// rather than a walk of the whole library per question: the inspector
+    /// asks on every draw, and the phone's library pages asked once per model
+    /// on a page — ten thousand records walked for each (Nov 2026 review).
+    /// The FIRST record with the id, as the walk found.
     func row(for id: LibraryFile.ID) -> JSONValue? {
-        fileRows.first {
-            if case .object(let rec) = $0, case .string(let known)? = rec["id"] { return known == id }
-            return false
+        let rows = fileRows
+        let memo = libraryMemo
+        if memo.rowIndexRevision != fileRowsRevision {
+            memo.rowIndexRevision = fileRowsRevision
+            var index: [String: Int] = [:]
+            index.reserveCapacity(rows.count)
+            for (i, row) in rows.enumerated() {
+                if case .object(let rec) = row, case .string(let known)? = rec["id"], index[known] == nil {
+                    index[known] = i
+                }
+            }
+            memo.rowIndex = index
         }
+        guard let i = memo.rowIndex[id], rows.indices.contains(i) else { return nil }
+        return rows[i]
     }
 
     /// The files this print is made of.
@@ -3417,8 +3489,10 @@ extension Shop {
             // The zip is read off the main thread; the RULE runs on the engine's
             // own actor, which is where the one JavaScriptCore context lives.
             // What goes to a background thread is the file, not the interpreter.
-            let configs = await Task.detached(priority: .userInitiated) {
-                () -> (project: String, model: String, prusa: String)? in
+            // A DISPATCH thread, not `Task.detached`: unzipping blocks, and
+            // blocking holds one of the cooperative pool's few threads — the
+            // swift-pool-starvation trap (`PinWork`, `SlicerFigures.offPool`).
+            let configs: (project: String, model: String, prusa: String)? = await PinWork.run {
                 guard let entries = try? Zip.entries(of: url) else { return nil }
                 func text(_ name: String) -> String {
                     guard let e = entries.first(where: { $0.name.lowercased() == name.lowercased() }),
@@ -3432,7 +3506,7 @@ extension Shop {
                 if prusa.isEmpty { prusa = text("Metadata/Prusa_Slicer.config") }
                 if project.isEmpty && model.isEmpty && prusa.isEmpty { return nil }
                 return (project, model, prusa)
-            }.value
+            }
             guard let self else { return }
             self.factsInFlight.remove(id)
             guard let configs else { self.factsByFile[id] = .some(nil); return }
