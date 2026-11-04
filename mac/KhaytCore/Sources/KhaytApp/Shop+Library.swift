@@ -1865,10 +1865,14 @@ extension Shop {
         /// Models this shop has never actually made.
         ///
         /// The other library tools in this category carry a printed FLAG a
-        /// person ticks. Khayt has the real answer — `timesPrinted` is written
-        /// by the jobs — so this is a fact rather than a reminder, and the
-        /// question it answers is the one a shop with a big library asks:
-        /// what have I collected and never printed.
+        /// person ticks. Khayt has the real answer — its finished jobs name
+        /// the model they made (`parts[].printFileId`), and `PrintHistory`
+        /// (`lib/print-history.js`) counts them, merged with the record's own
+        /// `timesPrinted` (which only the desktop's manual "log a print" ever
+        /// wrote, and NO job does) into `LibraryFile.printCount` — so this is
+        /// a fact rather than a reminder, and the question it answers is the
+        /// one a shop with a big library asks: what have I collected and never
+        /// printed.
         var neverPrinted = 0
         /// Per machine that says what it has loaded: how many models could
         /// start on it now, without a spool swap.
@@ -1935,15 +1939,6 @@ extension Shop {
         return libraryRows.filter { ids.contains(Self.rowText($0, "id")) }
     }
 
-    /// How many times a record says it has been printed.
-    ///
-    /// `timesPrinted` is the field; absent means none, which is the same
-    /// answer a record written before the field existed gives.
-    private static func rowPrintCount(_ row: JSONValue) -> Int {
-        guard case .object(let o) = row, case .number(let n)? = o["timesPrinted"] else { return 0 }
-        return Int(saturating: n)
-    }
-
     /// The group a record is in, by the rule the grid files it under —
     /// `folder` if the key is there at all, then `group`. Splitting on `group`
     /// alone would count a model under one project and draw it in another.
@@ -2006,7 +2001,11 @@ extension Shop {
         let tags = await counted(.tag, "tag") { try await engine.tagCounts($0) }
         guard mine == libraryRecount, !Task.isCancelled else { return }
         let unfiled = libraryPool(skipping: .unfiled, searched: searched).count { Self.rowGroup($0) == nil }
-        let never = libraryPool(skipping: .neverPrinted, searched: searched).count { Self.rowPrintCount($0) == 0 }
+        // Off the models, not the rows: a record's own `timesPrinted` is only
+        // the desktop's manual log, and the jobs' answer is on `LibraryFile`.
+        let printedIds = Set(files.lazy.filter { $0.printCount > 0 }.map(\.id))
+        let never = libraryPool(skipping: .neverPrinted, searched: searched)
+            .count { !printedIds.contains(Self.rowText($0, "id")) }
         // Across the whole book, once per machine that reports what it has
         // loaded; the chip's count is that set within what the other chips and
         // the search have left.
@@ -2269,8 +2268,8 @@ extension Shop {
     /// Put these models on the Print next list, or take them off.
     ///
     /// The ONE mark for "I mean to print this": Printventory's Want/Queued,
-    /// which Khayt does not need the rest of — a job is the queue, and
-    /// `timesPrinted` is Printed. On the record (`printNextAt`, and its
+    /// which Khayt does not need the rest of — a job is the queue, and a
+    /// finished job is Printed (`LibraryFile.printCount`). On the record (`printNextAt`, and its
     /// optional `printNextFor`), so it syncs with the model, through
     /// `editFiles` — on the write chain, gated by `permitted`, undoable.
     /// Taking a model off takes its note with it. False when refused.
