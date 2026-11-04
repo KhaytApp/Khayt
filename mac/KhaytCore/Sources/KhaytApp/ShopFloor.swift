@@ -97,14 +97,14 @@ struct Machines: View {
                 // nowhere in this app.
                 if !shop.machinesInUse.isEmpty {
                     CapacityCard(shop: shop, report: load)
-                        .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.brand,
+                        .card(rail: load?.totals.overbooked == true ? Khayt.late : nil,
                               padding: 14)
                     // Capacity says whether a machine is busy; this says
                     // whether being busy is worth it. The pair is the case for
                     // servicing one printer and selling another.
                     MachineReliabilityCard(shop: shop, report: scrap)
                         .card(rail: (scrap?.totals.scrapRate ?? 0) >= 0.05
-                                    ? Khayt.attention : Khayt.brand,
+                                    ? Khayt.attention : nil,
                               padding: 14)
                 }
                 // Retired printers are not on the floor: they are listed below,
@@ -830,7 +830,7 @@ struct Inventory: View {
                                 .padding(.horizontal, Metric.screen)
                         } else {
                             MaterialCostCard(shop: shop, report: prices)
-                                .card(rail: Khayt.brand, padding: 14)
+                                .card(padding: 14)
                                 .padding(.bottom, 14)
                                 .padding(.horizontal, Metric.screen)
                         }
@@ -847,7 +847,7 @@ struct Inventory: View {
                     if !supplierPrices.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         SupplierPricesCard(shop: shop, groups: supplierPrices)
-                            .card(rail: Khayt.brand, padding: 14)
+                            .card(padding: 14)
                             .padding(.bottom, 14)
                     }
                     // ── WHAT IS COMING, BESIDE WHAT IS HERE ───────────────

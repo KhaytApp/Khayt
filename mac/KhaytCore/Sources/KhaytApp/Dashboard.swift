@@ -748,7 +748,7 @@ private struct MoneyTiles: View {
                     Text(shop.words.callIt("mac.revenue"))
                         .font(.system(size: 10, weight: .semibold))
                         .textCase(.uppercase).tracking(0.6)
-                        .foregroundStyle(Khayt.brand)
+                        .foregroundStyle(.secondary)
                     BigFigure(value: Money.figure(k.revenue), unit: Money.mark(shop.currency))
                     HStack(spacing: 5) {
                         Text(Money.short(k.grossProfit, shop.currency))
@@ -780,7 +780,7 @@ private struct MoneyTiles: View {
                     .font(.callout)
                     .lineLimit(1)
                 }
-                .card(rail: Khayt.brand, padding: 14)
+                .card(padding: 14)
 
                 // ONE CARD, RULED. Five separate cards for five figures is
                 // five borders, five corner radii and five paddings carrying

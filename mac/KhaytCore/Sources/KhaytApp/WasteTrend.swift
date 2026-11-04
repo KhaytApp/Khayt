@@ -41,7 +41,7 @@ struct WasteTrendCard: View {
                 Text(words.callIt("an.waste_trend"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let trend, trend.total > 0 {
                     Text(Money.grams(month?.total ?? trend.total) + " " + words.callIt("common.grams"))

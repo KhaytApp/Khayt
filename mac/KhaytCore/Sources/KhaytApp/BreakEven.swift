@@ -26,7 +26,7 @@ struct BreakEvenCard: View {
             Text(words.callIt("an.be_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, !report.costs.isEmpty {
                 body(for: report, words)

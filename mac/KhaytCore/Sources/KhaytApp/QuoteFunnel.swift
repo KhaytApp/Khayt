@@ -36,7 +36,7 @@ struct QuoteFunnelCard: View {
             Text(words.callIt("an.funnel_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, let byCount = report.totals.winRateByCount {
                 HStack(alignment: .top, spacing: 22) {
