@@ -23,6 +23,8 @@ const NOW = new Date('2026-09-04T09:15:00.000Z');
 const TOKENS = {
   tracking: new Uint8Array(16).fill(0xab),
   quoteApproval: new Uint8Array(16).fill(0xcd),
+  // The id's random tag (`mintOrderId`): bytes 0,1,2,3 spell "0123".
+  id: new Uint8Array([0, 1, 2, 3]),
 };
 
 /* ── The original, copied from renderer/order-flows.js before the move ────────
@@ -281,6 +283,11 @@ test('the lifted record and the original agree, all forty-five fields', () => {
       // And the deposit stored is the one taken (alpha.82 review).
       recordA.depositAmount = recordA.paidAmount;
     }
+    // AND A SECOND: the id carries a random tag, so two computers on one book
+    // can never key two jobs alike; the number the original made it from is
+    // kept whole as `jobNumber` (see test/order-ids-across-devices.test.js).
+    recordA.jobNumber = recordA.id;
+    recordA.id = `${recordA.id}-0123`;
 
     const b = JSON.parse(JSON.stringify(shop));
     const recordB = N.newOrder(form, {
@@ -310,14 +317,16 @@ test('a quote does not consume an invoice number', () => {
   assert.equal(quote.invoiceNumber, null);
   assert.equal(settings.invNumNext, 5, 'untouched');
   assert.equal(settings.quoteNumNext, 3, 'its own counter moved');
-  assert.equal(quote.id, 'QUO-2026-0002');
+  assert.equal(quote.id, 'QUO-2026-0002-0123');
+  assert.equal(quote.jobNumber, 'QUO-2026-0002');
 });
 
 test('an order takes the next invoice number and advances it', () => {
   const settings = { invNumNext: 5 };
   const order = N.newOrder(base(), ctx(settings));
   assert.equal(order.invoiceNumber, 'INV-2026-0005');
-  assert.equal(order.id, 'INV-2026-0005');
+  assert.equal(order.id, 'INV-2026-0005-0123');
+  assert.equal(order.jobNumber, 'INV-2026-0005');
   assert.equal(settings.invNumNext, 6, 'or the next job takes the same number');
 });
 

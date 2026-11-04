@@ -228,13 +228,13 @@ function renderStudioKanbanCard(b) {
   const headBlock = useStudio
     ? `
       <div class="row between" style="align-items:center">
-        <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml(log.id)}</span>
+        <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml(jobRef(log))}</span>
         <span class="row gap6" style="align-items:center">
           <span class="dot" style="background:${prioColor};width:7px;height:7px" title="${escapeHtml(_pl)}"></span>
           <span class="khayt-kcard-grip" aria-hidden="true">⋮⋮</span>
         </span>
       </div>
-      <strong class="khayt-kcard-title">${priBadge}${escapeHtml(log.project || log.id)}${splitSpan}</strong>
+      <strong class="khayt-kcard-title">${priBadge}${escapeHtml(log.project || jobRef(log))}${splitSpan}</strong>
       ${clientLine ? `<span class="khayt-kcard-client">${escapeHtml(clientLine)}</span>` : ''}
       <div class="row gap8 khayt-kcard-mat" style="margin-top:8px;align-items:center;flex-wrap:wrap">
         ${swatchLabel ? `<span class="khayt-swatch" style="background:${safeCssColor(swatchHex)}"></span><span class="khayt-cname">${escapeHtml(swatchLabel)}</span>` : ''}
@@ -258,7 +258,7 @@ function renderStudioKanbanCard(b) {
     ? `<hr class="thread" style="margin:11px 0 9px" />
       <div class="row between" style="align-items:center">
         <span style="font-size:11px;color:var(--text-muted)">${log.printTime || 0} ${escapeHtml(t('common.hours'))}</span>
-        ${biz ? `<span class="metric" style="font-size:12.5px">${fmtPrice(log.price)}</span>` : ''}
+        ${biz ? `<span class="metric" style="font-size:12.5px">${fmtOrderPrice(log.price, log)}</span>` : ''}
       </div>
       <div class="row gap6 khayt-kcard-pills" style="margin-top:8px;flex-wrap:wrap">
         ${duePill}${unassignedPill}${biz ? paymentBadge(log) : ''}${timerBadge}${etaBadge}
@@ -267,7 +267,7 @@ function renderStudioKanbanCard(b) {
         ? `<div class="khayt-kcard-badges">${machineBadge}${operatorBadge}${kanbanSplitBadge}${kanbanSubBadge}${qcBadge}</div>` : ''}`
     : `
       <div class="meta">
-        ${biz ? `<span class="price">${fmtPrice(log.price)}</span><span>·</span>` : ''}
+        ${biz ? `<span class="price">${fmtOrderPrice(log.price, log)}</span><span>·</span>` : ''}
         <span>${log.printTime} ${escapeHtml(t('common.hours'))}</span><span>·</span>
         <span>${escapeHtml(partsLabel)}</span>
       </div>
@@ -417,8 +417,8 @@ function renderKanban() {
         return `
           <div class="quote-card">
             <div class="quote-main">
-              <div class="quote-title">${getPriorityLevel(q) !== 'normal' ? priorityBadgeHtml(q) + ' ' : ''}${escapeHtml(q.project || q.id)}</div>
-              <div class="quote-meta">${escapeHtml(q.id)} · ${fmtPrice(q.price)} ${expiryHtml}</div>
+              <div class="quote-title">${getPriorityLevel(q) !== 'normal' ? priorityBadgeHtml(q) + ' ' : ''}${escapeHtml(q.project || jobRef(q))}</div>
+              <div class="quote-meta">${escapeHtml(jobRef(q))} · ${fmtOrderPrice(q.price, q)} ${expiryHtml}</div>
             </div>
             <!-- Approving is the answer this row is waiting for. Rejecting sat
                  next to it in red; it is under the rule in the menu now, where
@@ -533,21 +533,22 @@ function renderKanban() {
           foot.className = 'khayt-kcol-foot';
           colEl.appendChild(foot);
         }
-        const totalValFoot = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+        // At each job's SAVED rate; a job with none is left out and the total says so.
+        const totalValFoot = fmtJobsTotal(sorted);
         // Enthusiast/maker mode has no commerce — omit the per-column money total.
         const showColMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${fmtPrice(totalValFoot)}</span>` : ''}`;
+        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(totalValFoot)}</span>` : ''}`;
       }
     }
 
     // Column totals meta line
     const totalHrs = sorted.reduce((s, o) => s + (+o.printTime || 0), 0);
-    const totalVal = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+    const totalVal = fmtJobsTotal(sorted);   // saved rates; partial when a job has none
     const metaEl = $('#meta-' + status);
     if (metaEl) {
       const showMetaMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
       metaEl.textContent = sorted.length > 0
-        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${fmtPrice(totalVal)}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
+        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${totalVal}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
         : '';
     }
 
@@ -768,10 +769,21 @@ function renderKanban() {
       // Split/sub-order badges
       const kanbanSplitBadge = log.splitInto && log.splitInto.length > 0 ? `<span class="split-badge">${_kBdr ? '' : '🔀 '}${escapeHtml(t('ord.split_badge', { n: log.splitInto.length }))}</span>` : '';
       const kanbanSubBadge = log.parentOrderId
-        ? `<span class="sub-order-badge">↳ #${escapeHtml(log.parentOrderId)}</span>`
+        ? `<span class="sub-order-badge">↳ #${escapeHtml(jobRef(log.parentOrderId))}</span>`
         : log.reprintOf
-          ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(log.reprintOf)}</span>`
+          ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(jobRef(log.reprintOf))}</span>`
           : '';
+      // A store order line nothing in the catalogue matched — the way to pick
+      // its product (lib/store-order-job.js keeps it on the job for this).
+      // Business only: a store order is a sale, and Bed Ready has no catalogue to pick from.
+      const _storeBiz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
+      const _unplaced = (_storeBiz && typeof KhaytStoreOrderJob !== 'undefined') ? KhaytStoreOrderJob.unmatched(log).length : 0;
+      const storeLinesBadge = _unplaced
+        ? `<button type="button" class="sub-order-badge" style="cursor:pointer;" data-act="store-lines" data-id="${escapeHtml(log.id)}" title="${escapeHtml(t('store.pick_title'))}">${escapeHtml(t('store.unmatched_badge', { n: _unplaced }))} · <u>${escapeHtml(t('store.pick_short'))}</u></button>`
+        : '';
+      const reprintedBadge = Array.isArray(log.reprintedInto) && log.reprintedInto.length
+        ? `<span class="sub-order-badge">↪ ${escapeHtml(t('qc.reprinted_as'))} #${escapeHtml(jobRef(log.reprintedInto[log.reprintedInto.length - 1]))}</span>`
+        : '';
       // QC badge — reflects qcStatus (pass / fail / awaiting), with inspector
       // initials when an inspector is required. Derives from legacy fields too.
       const _qcSt = (typeof qcStatusOf === 'function') ? qcStatusOf(log) : (log.qcPassedAt ? 'pass' : null);
@@ -803,7 +815,8 @@ function renderKanban() {
         : '';
       return renderStudioKanbanCard({
         log, status, _pl, pausedClass, cardClientAccent, partColourHtml, partsLabel,
-        machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge, qcBadge,
+        machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge: kanbanSubBadge + reprintedBadge,
+        qcBadge: qcBadge + storeLinesBadge,
         postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions,
       });
     }).join('');
@@ -911,7 +924,7 @@ function renderMachineQueues() {
       ? queue.map((o, i) => `
           <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border-soft);">
             <span style="font-size:11px;color:var(--text-muted);min-width:16px;">${i + 1}.</span>
-            <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(o.project || o.id)}</span>
+            <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(o.project || jobRef(o))}</span>
             ${priorityBadgeHtml(o)}
           </div>`).join('')
       : `<div style="font-size:11px;color:var(--text-muted);">${t('queue.no_pending') || 'No pending jobs'}</div>`;

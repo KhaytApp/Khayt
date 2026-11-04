@@ -170,6 +170,9 @@ struct CustomerLinkSection: View {
         default: line = words.callIt(r.paid ? "cloud.portal_deposit_paid" : "cloud.portal_no_response")
         }
         if r.paid, r.response != "none" { line += " · " + words.callIt("cloud.portal_deposit_paid") }
+        // What became of the money: recorded, or why not. Nothing when it was
+        // recorded on an earlier look.
+        if let deposit = checked.deposit { line += " · " + deposit }
         said = line
     }
 }

@@ -835,6 +835,13 @@ instead.
   `sourceOrderId`, the platform's total as `price` — and, for items the shop
   already has on the shelf, takes them off `settings.storefront.stockQty`. An
   order the shelf covers in full is written `completed` and `fromStock`.
+  Each item is matched to a catalogue product by `lib/store-order-job.js` —
+  its `sku` against the product's `sku` and its variants' SKUs, then its exact
+  normalised name, else unmatched — and the row carries `storeLines` (one per
+  item, with `productId` or null), the matched products' `parts` (per-piece
+  counts times what is still to print), and `productId` / `components` when
+  the whole basket is one product. An unmatched item gets a "Not matched to a
+  product" line in `notes` and is left for the shop to place.
 
 ### `POST /api/webhook/smsa`, `/aramex`, `/spl`
 

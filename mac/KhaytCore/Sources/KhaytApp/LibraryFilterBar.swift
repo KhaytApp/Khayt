@@ -362,7 +362,7 @@ struct LibraryFilterBar: View {
     /// The axes the row draws, in order — every one of them, always.
     static let axes: [Axis] = [
         Axis(key: "mac.lib_show", ids: ["health", "print-next", "duplicates", "unfiled", "never-printed", "archived",
-                                        "no-figures", "in-catalogue", "online-only", "this-mac-only"]),
+                                        "no-figures", "in-catalogue", "online-only", "this-mac-only", "from-web"]),
         Axis(key: "mac.lib_printer", prefix: "ready:", alsoPrefix: "fits:"),
         Axis(key: "mac.lib_creator", prefix: "creator:"),
         Axis(key: "mac.category", prefix: "category:"),

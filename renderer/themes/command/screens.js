@@ -234,7 +234,7 @@
       const pct = jobProgress(o) ?? 0;
       const client = biz ? findClient(o.clientId) : null;
       const title = o.project || tr('inv.walk_in', 'Walk-in');
-      const sub = `${o.id}${client ? ' · ' + esc(clientName(client)) : ''}`;
+      const sub = `${esc(jobRef(o))}${client ? ' · ' + esc(clientName(client)) : ''}`;
       return `<button type="button" class="cmd-lrow" data-cmd-order="${esc(o.id)}">
         <span class="cmd-dotc" style="background:var(--cmd-queue)"></span>
         <span class="cmd-grow"><span class="cmd-lrow-t">${esc(title)}</span><span class="cmd-sub">${sub}</span></span>
@@ -251,7 +251,7 @@
       const stc = state === 'printing' ? 'var(--cmd-ok)'
         : (state === 'idle' || state === 'reconnecting') ? 'var(--ink-3)'
         : 'var(--cmd-danger)';
-      const jobName = job ? (job.project || job.id) : tr('mach.status_idle', 'idle');
+      const jobName = job ? (job.project || jobRef(job)) : tr('mach.status_idle', 'idle');
       const tail = state === 'printing'
         ? `<span class="cmd-gauge" style="width:70px;--gc:var(--cmd-fleet)"><i style="width:${pct}%"></i></span><span class="cmd-pct">${pct}%</span>`
         : `<span class="cmd-badge cmd-b-gray">${esc(state === 'offline' ? tr('mach.offline', 'offline')
@@ -299,14 +299,14 @@
     const followUps = (biz && typeof KhaytQuoteFollowUp !== 'undefined')
       ? KhaytQuoteFollowUp.selectQuotesDueForFollowUp(log, cfg, Date.now()) : [];
     followUps.slice(0, 2).forEach((q) => {
-      const qName = esc(q.project || q.id);
+      const qName = esc(q.project || jobRef(q));
       alerts.push({ cls: 'cmd-b-amber', ico: '◷',
         text: tr('command.alert.quote_due', `${qName} quote follow-up due`).replace('{name}', qName),
         act: tr('command.alert.open', 'Open'), tab: 'logs-tab' });
     });
     if (biz) {
       unpaidOrders.filter((o) => KhaytOrderStatus.isFinished(o)).slice(0, Math.max(0, 5 - alerts.length)).forEach((o) => {
-        const oid = esc(o.id);
+        const oid = esc(jobRef(o));
         const amt = `${esc(fmtMoneyVal(owedBase(o)))} ${esc(ccy())}`;
         alerts.push({ cls: 'cmd-b-blue', ico: '❖',
           text: tr('command.alert.unpaid', `${oid} unpaid — ${amt}`)
@@ -332,7 +332,7 @@
       const client = biz ? findClient(o.clientId) : null;
       const subText = biz ? (client ? clientName(client) : o.id) : (o.printTime ? `${(+o.printTime).toFixed(1)}h` : o.id);
       return `<div class="cmd-lrow">
-        <span class="cmd-grow"><span class="cmd-lrow-t">${esc(o.project || o.id)}</span><span class="cmd-sub">${esc(subText)}</span></span>
+        <span class="cmd-grow"><span class="cmd-lrow-t">${esc(o.project || jobRef(o))}</span><span class="cmd-sub">${esc(subText)}</span></span>
         ${biz ? `<span class="cmd-money">${esc(fmtMoneyVal(revBase(o)))} ${esc(ccy())}</span>` : ''}
       </div>`;
     }).join('') || `<div class="cmd-empty">${esc(tr('command.activity.none', 'No activity yet today'))}</div>`;
@@ -405,7 +405,7 @@
       ${o.machineId ? kv(tr('command.insp.printer', 'Printer'), (typeof machines !== 'undefined' && machines.find((m) => m.id === o.machineId)?.name) || o.machineId) : ''}
       ${biz ? `<div class="cmd-insp-sec">${esc(tr('command.insp.pricing', 'Pricing'))}</div>
       ${kv(tr('command.insp.total', 'Total'), `${fmtMoneyVal(revBase)} ${ccy()}`, true)}` : ''}`;
-    const title = `${esc(o.project || tr('inv.walk_in', 'Walk-in'))}<span class="cmd-insp-sub">${esc(o.id)}${client ? ' · ' + esc(clientName(client)) : ''}</span>`;
+    const title = `${esc(o.project || tr('inv.walk_in', 'Walk-in'))}<span class="cmd-insp-sub">${esc(jobRef(o))}${client ? ' · ' + esc(clientName(client)) : ''}</span>`;
     shell.openInspector(body, title);
   }
 
@@ -427,7 +427,7 @@
         : tr('mach.status_idle', 'idle'))}
       <div class="cmd-insp-prog"><span class="cmd-gauge" style="--gc:var(--cmd-fleet)"><i style="width:${pct}%"></i></span><span class="cmd-pct">${pct}%</span></div>
       <div class="cmd-insp-sec">${esc(tr('command.insp.current_job', 'Current job'))}</div>
-      ${kv(tr('command.insp.job', 'Job'), job ? (job.project || job.id) : '—')}
+      ${kv(tr('command.insp.job', 'Job'), job ? (job.project || jobRef(job)) : '—')}
       ${m.model ? kv(tr('command.insp.model', 'Model'), m.model) : ''}`;
     const title = `${esc(m.name)}<span class="cmd-insp-sub">${esc(m.model || tr('dash.wb_fleet', 'Fleet'))}</span>`;
     shell.openInspector(body, title);

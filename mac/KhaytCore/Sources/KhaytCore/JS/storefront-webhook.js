@@ -145,11 +145,36 @@
     const log = [...((cur && cur.printLog) || [])];
     if (alreadyRecorded(source, parsed, log)) return { store: cur, order: null, duplicate: true };
     const taken = takeOffTheShelf(source, parsed, cur, newOrder(source, parsed, ctx), ctx.at);
-    log.unshift(taken.order);
-    return { store: { ...taken.store, printLog: log }, order: taken.order, duplicate: false };
+    const order = asJob(source, parsed, cur, taken.order, ctx);
+    log.unshift(order);
+    return { store: { ...taken.store, printLog: log }, order, duplicate: false };
   }
 
-  const api = { PLATFORMS, takeOffTheShelf, newOrder, alreadyRecorded, record };
+  /**
+   * The order as a real job: each line matched to a catalogue product (SKU,
+   * then exact name, else left unmatched with a note) and the parts it has to
+   * print built from the product — `lib/store-order-job.js`, the rule the
+   * cloud queue reads lines by too.
+   *
+   * Read against the shelf as it was BEFORE this order came off it, so each
+   * line prints what the shelf did not cover — the same reading
+   * `takeOffTheShelf` acted on.
+   */
+  function asJob(source, parsed, cur, order, ctx) {
+    const Job = global.KhaytStoreOrderJob
+      || (typeof require === 'function' ? require('./store-order-job.js') : null);
+    if (!Job) return order;
+    const book = cur || {};
+    const basket = ShelfSale.itemLines(StorefrontOrders.orderObject(source, parsed).items);
+    if (!basket.length) return order;
+    const reading = ShelfSale.readLines(basket, {
+      products: book.products || [],
+      stock: ((book.settings || {}).storefront || {}).stockQty || {},
+    });
+    return Job.apply(order, Job.build(reading, book, ctx.id));
+  }
+
+  const api = { PLATFORMS, takeOffTheShelf, newOrder, alreadyRecorded, record, asJob };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytStorefrontWebhook = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

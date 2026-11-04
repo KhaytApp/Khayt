@@ -34,7 +34,11 @@ extension Shop {
     /// `Money.mark`: the new riyal sign is a character a customer's phone may
     /// not have yet, and a box where the currency should be is worse than SAR.
     func whatsAppValues(for job: Order) -> [String: String] {
-        ["price": Money.figure(job.price), "currency": currency, "due": job.dueDate ?? ""]
+        // The JOB's currency: `price` is in it, and since a job is converted
+        // into the client's currency when it is saved, a EUR job's message
+        // read "100.00 SAR" with the shop's code here.
+        ["price": Money.figure(job.price), "currency": job.currency.isEmpty ? currency : job.currency,
+         "due": job.dueDate ?? ""]
     }
 
     /// The update for a job, at its own milestone and the customer's language

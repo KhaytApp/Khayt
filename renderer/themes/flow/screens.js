@@ -121,8 +121,8 @@
 
     return `<article class="flow-card" draggable="true" tabindex="0"
         data-order-id="${esc(o.id)}" data-status="${esc(o.status || '')}"
-        aria-label="${esc(o.project || o.id)}">
-      <div class="flow-card-title">${esc(o.project || o.id)}</div>
+        aria-label="${esc(o.project || jobRef(o))}">
+      <div class="flow-card-title">${esc(o.project || jobRef(o))}</div>
       ${meta.length ? `<div class="flow-card-meta">${meta.map((m) => `<span>${m}</span>`).join('')}</div>` : ''}
       ${chips.length ? `<div class="flow-card-meta">${chips.join('')}</div>` : ''}
     </article>`;

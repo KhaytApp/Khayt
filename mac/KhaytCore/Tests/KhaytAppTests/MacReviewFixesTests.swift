@@ -114,6 +114,33 @@ struct MacReviewFixesTests {
         #expect(number == .string("INV-2026-0012"))
         guard case .object(let settings)? = result.settings else { Issue.record("no settings back"); return }
         #expect(settings["invNumNext"] == .number(13))
+        // And the move goes on the job's trail, as Electron's renderer writes it.
+        guard case .array(let trail)? = order["statusHistory"], case .object(let last)? = trail.last else {
+            Issue.record("no status history"); return
+        }
+        #expect(last["status"] == .string("pending"))
+        #expect(last["at"] == .string("2026-10-15T09:00:00.000Z"))
+    }
+
+    @Test("a LAN approval owes the quote_approved webhook in the desktop's shape")
+    func lanApprovalOwesItsWebhook() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("QUO-2026-0007"), "project": .string("Bracket"),
+                                      "client": .string("Acme"), "status": .string("pending")])
+        let settings: [String: JSONValue] = ["webhooks": .object([
+            "enabled": .bool(true),
+            "subscriptions": .array([.object(["id": .string("s1"), "url": .string("https://example.com/h"),
+                                              "events": .array([.string("quote_approved")])])]),
+        ])]
+        let owed = try await engine.webhookDeliveries(
+            order: job, effects: [WebhookEffect(kind: "webhook", event: "quote_approved", newStatus: nil)],
+            settings: settings, shopName: "Khayt", clientName: "Acme", currency: "SAR",
+            at: "2026-10-15T09:00:00.000Z", nowMs: 0)
+        #expect(owed.count == 1)
+        guard case .object(let wire)? = owed.first?.body, case .object(let body)? = wire["payload"],
+              case .object(let payload)? = body["payload"] else { Issue.record("no payload"); return }
+        #expect(payload["orderId"] == .string("QUO-2026-0007"))
+        #expect(payload["newStatus"] == nil)
     }
 
     @Test("an approval refused hands back no settings to write")

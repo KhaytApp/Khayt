@@ -74,7 +74,7 @@ function openEndOfDayReport() {
   const overdueHtml = overdueOrders.length > 0 ? `
     <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
       <strong style="font-size:12px;color:var(--warning);">Due Today — Not Completed</strong>
-      ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || o.id)}</div>`).join('')}
+      ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || jobRef(o))}</div>`).join('')}
     </div>` : '';
 
   const bodyHtml = `
@@ -111,7 +111,7 @@ function openEndOfDayReport() {
     <tr><td>In Progress</td><td>${inProgress.length}</td></tr>
     <tr><td>Filament Wasted</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
     <tr><td>Time Logged</td><td>${timeTotal} min</td></tr>
-    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || o.id)}</li>`).join('') + '</ul>' : ''}
+    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || jobRef(o))}</li>`).join('') + '</ul>' : ''}
     </body></html>`;
 
   openFormModal({
@@ -272,20 +272,27 @@ function fireQcWebhook(eventName, order) {
   } catch (e) { /* events must never break the action */ }
 }
 
-/** Flag overdue unpaid invoices for a payment reminder (opt-in). Marks them
- *  (dedup/cooldown/cap via the pure lib) and surfaces a single prompt; the owner
- *  sends with the existing one-tap 💰 reminder. Does not auto-message customers. */
+/** Flag overdue unpaid invoices for a payment reminder (opt-in): selects them
+ *  (cooldown/cap via the pure lib) and surfaces a single prompt; the owner
+ *  sends with the one-tap 💰 reminder, which records it. Marks nothing and
+ *  does not auto-message customers. */
 function processPaymentReminders() {
   if (typeof KhaytPaymentReminder === 'undefined') return;
   const cfg = KhaytPaymentReminder.reminderConfig(settings);
   if (!cfg.enabled) return;
   const owedOf = (o) => (typeof orderOwedBase === 'function' ? orderOwedBase(o) : (+o.price || 0) - (+o.paidAmount || 0));
   const due = KhaytPaymentReminder.selectInvoicesDueForReminder(printLog, settings, owedOf, Date.now(), clients);
-  if (due.length === 0) return;
-  for (const o of due) Object.assign(o, KhaytPaymentReminder.markReminderPatch(o, Date.now()));
-  saveAll();
+  // FLAG ONLY. This used to stamp every selected invoice as reminded, so the
+  // 💰 send that followed counted the same reminder a second time and the
+  // three-reminder cap was reached after one and a half. The record is the
+  // send's (`sendPaymentReminder`, after it goes out). Without a stamp the same
+  // invoices are selected every 6 hours, so each is flagged once per session.
+  const flagged = processPaymentReminders.flagged || (processPaymentReminders.flagged = new Set());
+  const fresh = due.filter((o) => !flagged.has(o.id));
+  if (fresh.length === 0) return;
+  for (const o of fresh) flagged.add(o.id);
   if (typeof renderDashboard === 'function') renderDashboard();
-  setTimeout(() => toast(t('pay.reminder_auto', { n: due.length }) || `${due.length} invoice(s) overdue — send a payment reminder`, 'info', 5000), 800);
+  setTimeout(() => toast(t('pay.reminder_auto', { n: fresh.length }) || `${fresh.length} invoice(s) overdue — send a payment reminder`, 'info', 5000), 800);
 }
 
 /** Periodic overdue-invoice check (~6h). Idempotent. */

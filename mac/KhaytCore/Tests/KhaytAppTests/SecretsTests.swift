@@ -35,6 +35,8 @@ struct SecretsTests {
     init() {
         Secrets.forget()
         Secrets.keySource = { _ in Self.key }
+        // `seal` uses the OTHER seam, and its default is the real Keychain.
+        Secrets.keyMaker = { _ in Self.key }
     }
 
     @Test("a token stored in the clear is a token, not a Keychain question")
@@ -102,6 +104,68 @@ struct SecretsTests {
         let sealed = try SafeStorage.seal("secret", key: Self.key)
         for _ in 0..<5 { _ = try await Secrets.open(sealed, for: .development) }
         #expect(asked.count == 1)
+    }
+
+    @Test("a refused Keychain is not asked again every time a printer polls")
+    func aDenialIsRemembered() async throws {
+        // The printer poll opens an access code every ~10 s per machine. A
+        // Deny that is not remembered is a fresh SecurityAgent prompt each
+        // time, in front of the shop that has just said no.
+        Secrets.forget()
+        let asked = Counter()
+        Secrets.keySource = { _ in asked.bump(); return nil }
+        let sealed = try SafeStorage.seal("secret", key: Self.key)
+        for _ in 0..<4 {
+            await #expect(throws: Secrets.Failure.self) {
+                try await Secrets.open(sealed, for: .development)
+            }
+        }
+        #expect(asked.count == 1, "a refusal was put to the shop again")
+
+        // Typing a credential into Settings IS asking again — it takes the
+        // making path, which a remembered refusal does not stand in front of.
+        let made = Counter()
+        Secrets.keyMaker = { _ in made.bump(); return Self.key }
+        let resealed = try await Secrets.seal("typed", for: .development)
+        #expect(made.count == 1, "a seal was refused on the strength of an earlier read")
+        #expect(try await Secrets.open(resealed, for: .development) == "typed")
+        #expect(asked.count == 1, "the key the seal found was not kept")
+    }
+
+    @Test("concurrent cache misses share one Keychain lookup")
+    func missesAreCoalesced() async throws {
+        // While a prompt waits, every caller that misses the cache used to
+        // start its own lookup — and with it its own prompt and its own
+        // blocked thread. They wait on the one in flight now.
+        Secrets.forget()
+        let asked = Counter()
+        let gate = DispatchSemaphore(value: 0)
+        Secrets.keySource = { _ in asked.bump(); gate.wait(); return Self.key }
+        let sealed = try SafeStorage.seal("secret", key: Self.key)
+
+        let opens = (0..<5).map { _ in Task { try await Secrets.open(sealed, for: .development) } }
+        // Let every caller reach the lookup while the first is still held.
+        for _ in 0..<200 where asked.count == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        try await Task.sleep(for: .milliseconds(100))
+        let whileHeld = asked.count
+        // Release however many there are, so a failure cannot strand a thread.
+        for _ in 0..<5 { gate.signal() }
+        for open in opens { #expect(try await open.value == "secret") }
+        #expect(whileHeld == 1, "\(whileHeld) Keychain lookups were started for one item")
+        #expect(asked.count == 1)
+    }
+
+    @Test("the Keychain is waited on by a Dispatch thread, not the cooperative pool")
+    func theLookupIsOffThePool() throws {
+        // `Task.detached` is off the main actor but ON the pool, and a prompt
+        // can sit for twenty minutes with that thread blocked inside
+        // `SecItemCopyMatching` — the starvation `PinWork` exists to avoid.
+        let src = try ShopSources.read(URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Secrets.swift"))
+        #expect(src.contains("await PinWork.run { source(build) }"))
+        #expect(!src.contains("await Task.detached"), "the Keychain read is inside Task.detached again")
     }
 
     /// THE PROPERTY, NOT THE INTENTION.

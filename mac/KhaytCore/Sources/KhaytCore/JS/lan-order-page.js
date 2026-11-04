@@ -35,7 +35,7 @@
   function trackingPage(order, store) {
     const settings = (store && store.settings) || {};
     const shopName = lanEscapeHtml(settings.shopName || 'Khayt');
-    const projectName = lanEscapeHtml(order.project || order.id);
+    const projectName = lanEscapeHtml(order.project || order.jobNumber || order.id);
     const clientName = order.client ? lanEscapeHtml(order.client) : null;
     const material = order.material ? lanEscapeHtml(order.material) : null;
     const dueDate = order.dueDate ? lanEscapeHtml(order.dueDate) : null;

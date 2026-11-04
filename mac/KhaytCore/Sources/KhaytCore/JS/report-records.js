@@ -106,7 +106,7 @@ function reportRecords(orders, deps = {}) {
         // with 23 credited read Price 115 beside Balance 92 and agreed with
         // neither the P&L (80) nor the receivables (beta.1 review).
         price: Math.round(money.orderEarnedBase(o, ctx)),
-        paidAmount: Math.round(money.convertToBase(+o.paidAmount || 0, money.orderCurrency(o, ctx), ctx)),
+        paidAmount: Math.round(money.orderToBase(+o.paidAmount || 0, o, ctx)),
         balance: Math.round(money.orderOwedBase(o, ctx)),
         paymentStatus: payment.statusOf(o, ctx),
         dueDate: o.dueDate || '',

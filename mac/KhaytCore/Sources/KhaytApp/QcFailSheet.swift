@@ -25,6 +25,9 @@ struct QcFailSheet: View {
     @State private var failureType = "other"
     @State private var reason = ""
     @State private var wasted = ""
+    /// Who pays for a reprint, when QC is on: the shop (our defect — no
+    /// charge) by default, as on the desktop.
+    @State private var reprintCost = "shop"
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -47,7 +50,7 @@ struct QcFailSheet: View {
                     TextField("", text: $reason)
                         .textFieldStyle(.roundedBorder)
                         .focused($focused)
-                        .onSubmit(commit)
+                        .onSubmit { commit(shop.qcReprintFlow ? .reprint(cost: reprintCost) : nil) }
                 }
                 GridRow {
                     Text(shop.words.callIt("mac.wasted")).foregroundStyle(.secondary)
@@ -71,12 +74,35 @@ struct QcFailSheet: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            // ── SCRAP OR REPRINT, WITH QC ON ──────────────────────────────
+            //
+            // The desktop's flow: the failed job is kept as a scrapped record
+            // and a reprint is a NEW job linked to it, so the first-pass and
+            // RMA figures can tell a reprint from a job right first time. With
+            // QC off the job goes back to Pending, as it always has.
+            if shop.qcReprintFlow {
+                Divider()
+                Text(shop.words.callIt("qc.after_fail_hint"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Picker(shop.words.callIt("qc.reprint_cost"), selection: $reprintCost) {
+                    Text(shop.words.callIt("qc.cost_shop")).tag("shop")
+                    Text(shop.words.callIt("qc.cost_billable")).tag("billable")
+                }
+            }
+
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
-                Button(shop.words.callIt("ord.qc_fail"), role: .destructive, action: commit)
-                    .keyboardShortcut(.defaultAction)
+                if shop.qcReprintFlow {
+                    Button(shop.words.callIt("mac.qc_scrap"), role: .destructive) { commit(.scrap) }
+                    Button(shop.words.callIt("qc.reprint")) { commit(.reprint(cost: reprintCost)) }
+                        .keyboardShortcut(.defaultAction)
+                } else {
+                    Button(shop.words.callIt("ord.qc_fail"), role: .destructive) { commit(nil) }
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(18)
@@ -84,12 +110,12 @@ struct QcFailSheet: View {
         .onAppear { focused = true }
     }
 
-    private func commit() {
+    private func commit(_ next: Shop.QcNext?) {
         let id = subject.id
         let type = failureType
         let note = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         let grams = Double(wasted.trimmingCharacters(in: .whitespaces)) ?? 0
         shop.clearQuestion()
-        Task { await shop.recordQcFailure(id, failureType: type, reason: note, weight: grams) }
+        Task { await shop.recordQcFailure(id, failureType: type, reason: note, weight: grams, next: next) }
     }
 }

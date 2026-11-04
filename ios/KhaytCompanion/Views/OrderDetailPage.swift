@@ -139,7 +139,7 @@ struct OrderDetailPage: View {
                         .font(.khayt(16, .semibold, relativeTo: .headline))
                         .lineLimit(1)
                         .foregroundStyle(KhaytDesign.ink)
-                    Text("#\(order.id) · \(order.displayClient)")
+                    Text("#\(order.reference) · \(order.displayClient)")
                         .font(.khayt(11.5, relativeTo: .caption))
                         .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)
@@ -236,7 +236,7 @@ struct OrderDetailPage: View {
         } else {
             order = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
                                machine: machine, machineId: machineId, dueDate: order.dueDate,
-                               priority: order.priority)
+                               priority: order.priority, jobNumber: order.jobNumber)
         }
     }
 }
@@ -383,7 +383,7 @@ struct OrderDetailContent: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(order.id)
+                Text(order.reference)
                     .font(.khaytMono(12, .medium))
                     .foregroundStyle(KhaytDesign.note)
                     .environment(\.layoutDirection, .leftToRight)

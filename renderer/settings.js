@@ -1981,6 +1981,13 @@ function reportSyncConflicts(conflicts) {
   const { count, firstName } = (typeof KhaytSync !== 'undefined' && KhaytSync.summarizeDiscardedEdits)
     ? KhaytSync.summarizeDiscardedEdits(conflicts)
     : { count: 0, firstName: '' };
+  // Two different jobs that arrived under one id (lib/sync.js "TWO RECORDS,
+  // ONE ID"). Both are in the book now — the other computer's under the
+  // collision id — so the job list shows them; this is the trace of why.
+  try {
+    const twins = (conflicts || []).filter((c) => c && c.kind === 'id_collision');
+    if (twins.length) console.warn('[sync] two jobs shared one id; kept both:', twins.map((c) => `${c.collection}/${c.id} → ${c.storedAs}`).join(', '));
+  } catch (e) { /* noop */ }
   if (!count) return;
   const msg = count === 1
     ? (t('sync.discarded_one') || 'An edit was discarded — “{name}” was deleted on another device.').replace('{name}', firstName)
@@ -2030,6 +2037,96 @@ function reportOverwrittenEdits(conflicts) {
  * the owner to dismiss it; announcing once ever is missed by anyone who was not
  * looking that day.
  */
+/**
+ * Documents in the book that print the same number, and a way to fix one.
+ *
+ * Two computers on one book can both issue the next number while they are
+ * out of sync: each counter reads the book (lib/order-new.js
+ * `allocateInvoiceNumber`), but a job the other made offline is not in it yet.
+ * No job is lost to that any more; two papers with one number is what is
+ * left, and `KhaytInvoiceDocument.duplicateNumbers` names them. Which one the
+ * customer already holds only the shop knows, so nothing is renumbered unasked:
+ * the warning opens a list with "New number" on every job (`KhaytOrderNew.renumber`).
+ *
+ * Announced when the set CHANGES, as reportResurrectedRecords is.
+ */
+function reportDuplicateNumbers({ force = false } = {}) {
+  const Doc = (typeof KhaytInvoiceDocument !== 'undefined') ? KhaytInvoiceDocument : null;
+  if (!Doc || typeof Doc.duplicateNumbers !== 'function' || typeof printLog === 'undefined') return [];
+  let dups = [];
+  try { dups = Doc.duplicateNumbers(printLog, settings); } catch (e) { return []; }
+  const KEY = 'hub_dup_numbers_seen_v1';
+  const signature = dups.map((g) => `${g.kind}|${g.year}|${g.number}:${g.jobs.map((j) => j.id).join('+')}`).sort().join(',');
+  if (dups.length) {
+    try { console.warn('[numbers] documents sharing a number:', signature); } catch (e) { /* noop */ }
+  }
+  let lastSeen = '';
+  try { lastSeen = localStorage.getItem(KEY) || ''; } catch (e) { /* private mode */ }
+  try { localStorage.setItem(KEY, signature); } catch (e) { /* non-fatal */ }
+  if (!dups.length || (!force && signature === lastSeen)) return dups;
+  const msg = dups.length === 1
+    ? t('dupnum.toast_one').replace('{number}', dups[0].number)
+    : t('dupnum.toast_many').replace('{n}', String(dups.length));
+  if (typeof toast === 'function') {
+    toast(msg, 'warning', 15000, { action: { label: t('dupnum.review'), run: openDuplicateNumbers } });
+  }
+  return dups;
+}
+
+/** The list behind the warning: each number, its jobs, and "New number". */
+function openDuplicateNumbers() {
+  const Doc = KhaytInvoiceDocument;
+  const dups = Doc.duplicateNumbers(printLog, settings);
+  const rows = dups.map((g) => `
+      <div style="margin:10px 0;">
+        <div style="font-weight:600;font-family:var(--font-num);">${escapeHtml(g.number)}</div>
+        ${g.jobs.map((j) => `
+          <div style="display:flex;gap:8px;align-items:center;padding:3px 0;">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(j.project || j.ref)}</span>
+            <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(j.date)}</span>
+            <button type="button" class="btn ghost small dupRenumber" data-id="${escapeHtml(j.id)}" data-number="${escapeHtml(g.number)}" data-year="${escapeHtml(g.year)}">${escapeHtml(t('dupnum.renumber'))}</button>
+          </div>`).join('')}
+      </div>`).join('');
+  const overlay = appendStackedModal(`
+      <div class="modal modal-form" role="dialog" aria-modal="true" aria-labelledby="dupNumbersTitle">
+        <div class="modal-header">
+          <h3 id="dupNumbersTitle">${escapeHtml(t('dupnum.title'))}</h3>
+          <button class="btn ghost small" id="dupNumbersClose" aria-label="Close" title="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:12.5px;color:var(--text-muted);margin-top:0;">${escapeHtml(t('dupnum.why'))}</p>
+          ${rows}
+        </div>
+      </div>`);
+  overlay.querySelector('#dupNumbersClose').addEventListener('click', () => overlay.remove());
+  overlay.querySelectorAll('.dupRenumber').forEach((btn) => btn.addEventListener('click', () => {
+    const order = printLog.find((o) => o && o.id === btn.dataset.id);
+    if (!order) return;
+    // The pair's OWN year: a 2025 pair gets a free 2025 number, and this
+    // year's counter is left alone (lib/order-new.js `renumber`).
+    const year = parseInt(btn.dataset.year, 10) || new Date().getFullYear();
+    const before = KhaytOrderNew.renumberSnapshot(order, settings);
+    const given = KhaytOrderNew.renumber(order, settings, printLog, year);
+    if (!given) return;
+    const after = KhaytOrderNew.renumberSnapshot(order, settings);
+    saveAll();
+    overlay.remove();
+    // A misclick is one Undo away — the old number may be the one already on
+    // a customer's paper.
+    toast(t('dupnum.renumbered').replace(/\{old\}/g, btn.dataset.number).replace('{new}', given), 'success', 12000, {
+      undo: () => {
+        KhaytOrderNew.undoRenumber(order, settings, before, after);
+        saveAll();
+        if (typeof renderLogs === 'function') renderLogs();
+        if (typeof renderKanban === 'function') renderKanban();
+      },
+    });
+    if (typeof renderLogs === 'function') renderLogs();
+    if (typeof renderKanban === 'function') renderKanban();
+    if (KhaytInvoiceDocument.duplicateNumbers(printLog, settings).length) openDuplicateNumbers();
+  }));
+}
+
 function reportResurrectedRecords() {
   if (typeof KhaytSync === 'undefined' || !KhaytSync.findResurrected) return;
   let found = [];
@@ -2180,7 +2277,7 @@ function cloudSyncDeps() {
     save: () => saveAll(),
     push: (snap) => window.hubAPI.cloudPush(snap),
     pull: () => window.hubAPI.cloudPull(),
-    onConflicts: (conflicts) => { reportSyncConflicts(conflicts); reportOverwrittenEdits(conflicts); },
+    onConflicts: (conflicts) => { reportSyncConflicts(conflicts); reportOverwrittenEdits(conflicts); reportDuplicateNumbers(); },
   };
 }
 
@@ -3935,6 +4032,8 @@ function renderWebhookSettings() {
     { key: 'payment_received', label: 'Payment received' },
     { key: 'quote_approved',   label: 'Quote approved' },
     { key: 'order_delivered',  label: 'Order delivered' },
+    { key: 'qc_failed',        label: 'QC failed' },
+    { key: 'rma_opened',       label: 'RMA opened' },
   ];
   el.innerHTML = `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;">
@@ -5671,6 +5770,9 @@ function loadSettingsIntoForm() {
   if (prEnEl) prEnEl.checked = !!(settings.paymentReminder && settings.paymentReminder.enabled);
   const prGrEl = $('#set_payReminderGrace');
   if (prGrEl) prGrEl.value = (settings.paymentReminder && settings.paymentReminder.graceDays != null) ? settings.paymentReminder.graceDays : 3;
+  const prChEl = $('#set_payReminderChannel');
+  if (prChEl) prChEl.value = ['whatsapp', 'email'].includes(settings.paymentReminder && settings.paymentReminder.channel)
+    ? settings.paymentReminder.channel : 'auto';
   const moEl = $('#set_minOrderAmount');
   if (moEl) moEl.value = settings.minOrderAmount ?? 0;
   const rfEl = $('#set_rushFeeEnabled');
@@ -5987,7 +6089,8 @@ function readSettingsForm() {
       ['safetyDays', '#set_leadSafetyDays'], ['publishToCloud', '#set_leadPublish', 'tick'],
     ]),
     quoteFollowUp: group([['enabled', '#set_quoteFollowUpEnabled', 'tick'], ['windowDays', '#set_quoteFollowUpWindow']]),
-    paymentReminder: group([['enabled', '#set_payReminderEnabled', 'tick'], ['graceDays', '#set_payReminderGrace']]),
+    paymentReminder: group([['enabled', '#set_payReminderEnabled', 'tick'], ['graceDays', '#set_payReminderGrace'],
+      ['channel', '#set_payReminderChannel']]),
     minOrderAmount: opt('#set_minOrderAmount'), rushFeeEnabled: tick('#set_rushFeeEnabled'),
     rushFeePct: opt('#set_rushFeePct'), defaultPackagingCost: opt('#set_defaultPackagingCost'),
     wip: Object.fromEntries(['pending', 'printing', 'post', 'qc'].map(col => [col, opt(`#set_wip_${col}`)])),
@@ -6801,6 +6904,8 @@ function renderTelegramSettings() {
     // this line the typeof check there just sees undefined and the whole thing
     // silently never runs — which is the failure the four names above document.
     reportResurrectedRecords,
+    reportDuplicateNumbers,
+    openDuplicateNumbers,
     reportLegacyMoneyState,
     // The organisation overview's three line builders. Pure string in, string
     // out, and the only place money is put in front of a chain owner — so they

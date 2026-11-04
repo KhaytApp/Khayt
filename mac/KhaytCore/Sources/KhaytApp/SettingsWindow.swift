@@ -832,6 +832,8 @@ struct OperationsPane: View {
         /// could turn on or off.
         var autoDraftPo = false
         var payReminderEnabled = false, payReminderGrace = 3.0
+        /// `auto` | `whatsapp` | `email` (`lib/payment-reminder.js reminderChannel`).
+        var payReminderChannel = "auto"
         var quoteFollowUpEnabled = false, quoteFollowUpWindow = 2.0
         /// Minutes one spool change takes — an ESTIMATE, used only to say what
         /// grouping the queue by colour saves (`lib/swap-queue.js`).
@@ -868,6 +870,10 @@ struct OperationsPane: View {
             for category in Shop.expenseCategories {
                 d.budgets[category] = Shop.plainNumber(budgets[category]) ?? 0
             }
+            if case .string(let channel)? = r.object("paymentReminder")["channel"],
+               ["whatsapp", "email"].contains(channel) {
+                d.payReminderChannel = channel
+            }
             // Eight hours a day is what the working-week rule assumes when a
             // shop has never set them, so that is what the fields show.
             for day in days { d.hours[day] = Shop.plainNumber(hours[day]) ?? (hours.isEmpty ? 8 : 0) }
@@ -894,7 +900,8 @@ struct OperationsPane: View {
              // `Shop.expenseCategories` is the same seven.
              "budgets": .object(budgets.mapValues(JSONValue.number)),
              "paymentReminder": .object(["enabled": .bool(payReminderEnabled),
-                                         "graceDays": .number(payReminderGrace)]),
+                                         "graceDays": .number(payReminderGrace),
+                                         "channel": .string(payReminderChannel)]),
              "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
                                        "windowDays": .number(quoteFollowUpWindow)]),
              "swapMinutes": .number(swapMinutes)]
@@ -1011,6 +1018,14 @@ struct OperationsPane: View {
                     Toggle(shop.words.callIt("set.pay_reminder_enabled"), isOn: $draft.payReminderEnabled)
                     numberRow("set.pay_reminder_grace", $draft.payReminderGrace)
                         .disabled(!draft.payReminderEnabled)
+                    // How "Send reminder" goes out. Not behind the switch: the
+                    // switch is Today's list, and a reminder can be sent from a
+                    // job whether or not the list is shown.
+                    Picker(shop.words.callIt("set.pay_reminder_channel"), selection: $draft.payReminderChannel) {
+                        Text(shop.words.callIt("set.pay_reminder_channel_auto")).tag("auto")
+                        Text(shop.words.callIt("set.pay_reminder_channel_whatsapp")).tag("whatsapp")
+                        Text(shop.words.callIt("set.pay_reminder_channel_email")).tag("email")
+                    }
                 } footer: {
                     Text(shop.words.callIt("set.pay_reminder_hint"))
                 }

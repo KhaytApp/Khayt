@@ -2497,6 +2497,8 @@
   }
  ],
  "settings": {
+   "paymentReminder" : { "enabled" : true, "graceDays" : 3, "cooldownDays" : 3, "maxCount" : 3 },
+   "quoteFollowUp" : { "enabled" : true },
    "libraryGroups" : {
      "Saudi Kings" : { "kind" : "collection" },
      "Dental" : { "kind" : "parts" }

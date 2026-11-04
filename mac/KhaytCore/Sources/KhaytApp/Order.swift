@@ -30,6 +30,13 @@ extension DateFormatter {
 
 struct Order: Identifiable, Decodable, Hashable, Sendable {
     let id: String
+    /// The readable half of a job's id. Since ids became unique across
+    /// computers (lib/order-new.js `mintOrderId`) a new job's id is
+    /// `INV-2026-0042-k7qx` and this is `INV-2026-0042`; older jobs have none.
+    let jobNumber: String?
+    /// The reference a PERSON reads: the job number, else the id. Every
+    /// screen that shows a job's reference shows this; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let date: String
     let status: String
     let project: String
@@ -128,6 +135,36 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// section, and finding a job by the lot it drew from); never written
     /// from here. Absent on a job not finished, or finished before the record.
     let materialDrawn: MaterialDrawn?
+    /// The lines of the store order this job came from, each with the
+    /// catalogue product it matched (`lib/store-order-job.js`) — or none, for a
+    /// line the shop still has to pick a product for. Empty on every job that
+    /// did not come from a store.
+    let storeLines: [StoreLine]
+    /// The job this one reprints, and the jobs that reprint this one
+    /// (`lib/reprint.js`). Nil and empty on almost every job.
+    let reprintOf: String?
+    let reprintedInto: [String]
+
+    struct StoreLine: Decodable, Hashable, Sendable {
+        let name: String
+        let qty: Int
+        let productId: String?
+        let sku: String?
+
+        private enum CodingKeys: String, CodingKey { case name, qty, productId, sku }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = ((try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil) ?? ""
+            let n = ((try? c.decodeIfPresent(Double.self, forKey: .qty)) ?? nil) ?? 1
+            // A count off the wire, never a trap — clamped as `lib/shelf-sale.js` clamps it.
+            qty = n.isFinite ? Int(max(1, min(100_000, n.rounded(.down)))) : 1
+            productId = ((try? c.decodeIfPresent(String.self, forKey: .productId)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+            sku = ((try? c.decodeIfPresent(String.self, forKey: .sku)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+        }
+    }
 
     struct MaterialDrawn: Decodable, Hashable, Sendable {
         let spools: [Draw]
@@ -162,7 +199,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
+        case id, jobNumber, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
@@ -172,6 +209,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case instalments, instalmentBase
         case invoiceNumber, invoiceNum
         case materialDrawn
+        case storeLines, reprintOf, reprintedInto
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -248,6 +286,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // record by it, so a row with no id is skipped and counted (`Shop.skipped`,
         // which the sidebar and the status line both report).
         id = try c.decode(String.self, forKey: .id)
+        jobNumber = try? c.decodeIfPresent(String.self, forKey: .jobNumber)
         // Everything below reads the way `lib/` reads it — see "NINE FIELDS THE
         // OTHER APP DOES NOT REQUIRE" above.
         date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
@@ -299,6 +338,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         invoiceNumber = Self.lenientText(c, .invoiceNumber) ?? Self.lenientText(c, .invoiceNum)
         // Lenient: a record this app only DISPLAYS must never make a job unreadable.
         materialDrawn = (try? c.decodeIfPresent(MaterialDrawn.self, forKey: .materialDrawn)) ?? nil
+        // Lenient, like everything above: a stray value here must not take
+        // the job off the board.
+        storeLines = ((try? c.decodeIfPresent([StoreLine].self, forKey: .storeLines)) ?? nil) ?? []
+        reprintOf = Self.lenientText(c, .reprintOf)
+        reprintedInto = ((try? c.decodeIfPresent([String].self, forKey: .reprintedInto)) ?? nil) ?? []
     }
 
     /// One payment of a plan, as Khayt writes it.
@@ -439,6 +483,20 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     var owedInOwnCurrency: Double {
         guard owesAtAll else { return 0 }
         return figures?.owed ?? max(0, price - paidAmount)
+    }
+
+    /// How far through settling this job is, 0…1 — the Owed meter under the
+    /// figure in the jobs table.
+    ///
+    /// The share of what the job is settled against (`due`) that is no longer
+    /// owed, read off `owedInOwnCurrency` — the figure printed above the meter
+    /// — so the two cannot disagree. It was `paidAmount / due`, which ignores
+    /// credit notes and gift cards: a 1,000 job with 500 paid and a 300 credit
+    /// note read "200" owed over a half-full bar.
+    var settledFraction: Double {
+        let billed = figures?.due ?? price
+        guard billed > 0 else { return 0 }
+        return min(1, max(0, 1 - owedInOwnCurrency / billed))
     }
 
     /// Whether the attention engine calls this job late, resolved once per

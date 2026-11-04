@@ -263,7 +263,7 @@ function openTimeEntryModal(orderId) {
     title: t('time.log_title') || 'Log Work Time',
     sizeLg: false,
     bodyHtml: `
-      ${order ? `<p style="font-size:13px;color:var(--text-muted);margin-top:0;">Order: <strong>${escapeHtml(order.project || order.id)}</strong></p>` : ''}
+      ${order ? `<p style="font-size:13px;color:var(--text-muted);margin-top:0;">Order: <strong>${escapeHtml(order.project || jobRef(order))}</strong></p>` : ''}
       <label>${escapeHtml(t('time.operator') || 'Operator')}</label>
       <select id="teOperator">${opOpts}</select>
       <div style="display:flex;gap:12px;margin-top:10px;">

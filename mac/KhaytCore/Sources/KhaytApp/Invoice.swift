@@ -116,14 +116,23 @@ enum Invoice {
             // ready" are not the same value.
             let refusal = (try? await engine.zatcaReadiness(
                 settings: paper.settings, sellerName: paper.sellerName)).flatMap { $0 }
+            // Tags 4 and 5 are RIYALS. A job saved in a client's currency is
+            // converted at the rate stored on it when it was saved; with no
+            // rate there is no honest figure and no QR (`qrAmounts`).
+            let riyals = try? await engine.zatcaAmounts(
+                order: paper.row, settings: paper.settings,
+                total: paper.subtotal + paper.taxTotal, vatAmount: paper.taxTotal)
             if let refusal {
                 qrProblem = words.zatcaRefusal(refusal)
-            } else if let payload = try? await engine.zatcaPayload(
+            } else if case .refused(let why)? = riyals {
+                qrProblem = words.zatcaRefusal(why)
+            } else if case .amounts(let total, let vat)? = riyals,
+                let payload = try? await engine.zatcaPayload(
                 sellerName: paper.sellerName,
                 vatNumber: Shop.plainString(paper.settings["vat"]) ?? "",
                 timestamp: paper.timestamp,
-                total: Self.amount(paper.subtotal + paper.taxTotal),
-                vatAmount: Self.amount(paper.taxTotal)),
+                total: Self.amount(total),
+                vatAmount: Self.amount(vat)),
                 let image = qrImage(payload) {
                 qrSvg = "<img src=\"\(image)\" width=\"120\" height=\"120\" alt=\"ZATCA\">"
             } else {

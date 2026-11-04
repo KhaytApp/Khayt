@@ -240,9 +240,33 @@ extension Shop {
             writeProblem = words.callIt("mac.group_unknown")
             return
         }
+        // The editor showed only the tags EVERY selected model shares, so it
+        // changes only those: a tag taken out comes off each model, a tag typed
+        // in goes on each, and a tag only some of them carried stays where it
+        // was. Replacing the whole list dropped those quietly.
+        let shown = ids.count == 1 ? nil : tagsOnSelection
         editFiles(ids, named: words.callIt("mac.tag_models")) { record in
-            record["tags"] = .array(tags.map { .string($0) })
+            record["tags"] = .array(Self.editedTags(record["tags"], shown: shown, typed: tags).map { .string($0) })
         }
+    }
+
+    /// One model's tags after the shared-tags editor: `shown` was what it
+    /// offered (nil for a single model, which takes exactly what was typed).
+    nonisolated static func editedTags(_ current: JSONValue?, shown: [String]?, typed: [String]) -> [String] {
+        guard let shown else { return typed }
+        var had: [String] = []
+        if case .array(let list)? = current {
+            for case .string(let tag) in list { had.append(tag) }
+        }
+        let typedKeys = Set(typed.map { $0.lowercased() })
+        let removed = Set(shown.map { $0.lowercased() }).subtracting(typedKeys)
+        var out = had.filter { !removed.contains($0.lowercased()) }
+        var seen = Set(out.map { $0.lowercased() })
+        for tag in typed where !seen.contains(tag.lowercased()) {
+            out.append(tag)
+            seen.insert(tag.lowercased())
+        }
+        return out
     }
 
     /// Attach a photograph of the finished print to a model.

@@ -536,7 +536,7 @@ function renderAnalytics() {
               ${withActuals.slice(0, 8).map(o => {
                 const diff = o.printTime > 0 ? (o.actualPrintTime - o.printTime) / o.printTime * 100 : 0;
                 return `<tr>
-                  <td>${escapeHtml(o.project || o.id)}</td>
+                  <td>${escapeHtml(o.project || jobRef(o))}</td>
                   <td style="color:var(--text-dim);">${o.printTime} ${escapeHtml(t('common.hours'))}</td>
                   <td style="color:var(--text-dim);">${o.actualPrintTime} ${escapeHtml(t('common.hours'))}</td>
                   <td style="font-weight:600; color:${col(diff)};">${sign(diff)}</td>
@@ -3286,7 +3286,7 @@ function renderAgedReceivables() {
           <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_days'))}</th>
         </tr></thead>
         <tbody>${items.map(i => `<tr style="border-top:1px solid var(--border);">
-          <td style="padding:5px 6px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(i.id)}</td>
+          <td style="padding:5px 6px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(jobRef(i.id))}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.project||'—')}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.client||'—')}</td>
           <td style="padding:5px 6px;text-align:right;color:var(--danger);font-weight:600;">${fmtPrice(i.owed)}</td>

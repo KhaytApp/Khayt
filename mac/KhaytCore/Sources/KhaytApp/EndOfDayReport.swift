@@ -57,7 +57,7 @@ enum EndOfDayPage {
         } else {
             lists += "<h2>\(e(w.callIt("mac.eod_finished_list")))</h2><table>"
             for job in r.finished {
-                lists += "<tr><td>\(e(job.title))</td><td class=\"id\">\(e(job.id))</td>"
+                lists += "<tr><td>\(e(job.title))</td><td class=\"id\">\(e(job.reference.isEmpty ? job.id : job.reference))</td>"
                     + "<td class=\"n\">\(money(job.revenue))</td></tr>"
             }
             lists += "</table>"
@@ -65,7 +65,7 @@ enum EndOfDayPage {
         if !r.dueNotDone.isEmpty {
             lists += "<h2 class=\"warn\">\(e(w.callIt("mac.eod_due_today")))</h2><table>"
             for job in r.dueNotDone {
-                lists += "<tr><td>\(e(job.title))</td><td class=\"id\">\(e(job.id))</td></tr>"
+                lists += "<tr><td>\(e(job.title))</td><td class=\"id\">\(e(job.reference.isEmpty ? job.id : job.reference))</td></tr>"
             }
             lists += "</table>"
         }

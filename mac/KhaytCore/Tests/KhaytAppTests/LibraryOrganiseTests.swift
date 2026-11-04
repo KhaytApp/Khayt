@@ -45,6 +45,36 @@ struct LibraryOrganiseTests {
         #expect(groups["f"] == nil && groups["g"] == nil, "two unmeasured models are not the same model")
     }
 
+    @Test("duplicates join into one set: two copies of a file and a re-save of its mesh")
+    func duplicatesJoin() throws {
+        let files = [
+            try Self.file("a", hash: "h1", geometry: "100:5.0:1x2x3"),
+            try Self.file("b", hash: "h1", geometry: "100:5.0:1x2x3"),
+            try Self.file("c", hash: "h2", geometry: "100:5.0:1x2x3"),     // the mesh again, re-saved
+        ]
+        let groups = Shop.duplicateGroups(files)
+        #expect(groups["a"] == "file:h1" && groups["b"] == "file:h1")
+        #expect(groups["c"] == "file:h1", "c is a copy of the set, not of a key nobody else holds")
+    }
+
+    @Test("tagging several models changes only the shared tags it showed")
+    func sharedTagEdit() {
+        func tags(_ t: [String]) -> JSONValue { .array(t.map { .string($0) }) }
+        // Shown the shared "relief"; the shop removed it and typed "gift".
+        #expect(Shop.editedTags(tags(["relief", "king"]), shown: ["relief"], typed: ["gift"]) == ["king", "gift"])
+        #expect(Shop.editedTags(tags(["Relief"]), shown: ["relief"], typed: ["relief", "gift"]) == ["Relief", "gift"],
+                "kept as spelled, nothing doubled")
+        #expect(Shop.editedTags(nil, shown: [], typed: ["gift"]) == ["gift"])
+        #expect(Shop.editedTags(tags(["a", "b"]), shown: nil, typed: ["c"]) == ["c"], "one model takes what was typed")
+    }
+
+    @Test("the new job and quote sheet asks whether its models may be sold")
+    func quoteSheetLicence() throws {
+        let sheet = try QuoteSheetStatusTests.source("NewJobSheet.swift")
+        #expect(sheet.contains("shop.saleProblems(parts.compactMap"))
+        #expect(sheet.contains("LicenceWarning(shop: shop, problems: problems)"))
+    }
+
     @Test("Print next is a mark with a date, read as a list oldest first")
     func printNext() throws {
         #expect(try Self.file("a", printNext: "2026-09-25T01:00:00.000Z").isPrintNext)

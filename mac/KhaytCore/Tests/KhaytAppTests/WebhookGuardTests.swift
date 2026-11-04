@@ -352,6 +352,21 @@ struct WebhookWiringTests {
                 "the client carries its own copy of the blocked ranges")
     }
 
+    @Test("DNS is waited on by a Dispatch thread, not a cooperative-pool one")
+    func resolverIsOffThePool() async throws {
+        // `getaddrinfo` blocks until DNS answers or gives up — seconds, on a
+        // bad network. Inside `Task.detached` that held a pool thread the LAN
+        // server, sync and the JS engine also need; the comment above it said
+        // the opposite. `PinWork.run` parks it on a Dispatch queue instead.
+        let client = try Self.code("WebhookClient.swift")
+        #expect(client.contains("await PinWork.run { resolve(host) }"),
+                "the resolver is no longer on a Dispatch queue")
+        #expect(!client.contains("Task.detached"),
+                "a blocking call in WebhookClient runs inside Task.detached again")
+        // And it still answers: a name every machine resolves without a network.
+        #expect(!(await WebhookClient.addresses(of: "localhost")).isEmpty)
+    }
+
     @Test("the deliveries a move owes are actually sent")
     func theyAreSent() throws {
         // ── THE BUG THIS CATCHES IS A CORRECT MODULE WITH NO CALLER ───────
@@ -366,8 +381,14 @@ struct WebhookWiringTests {
                 "nothing in the app posts a webhook")
         // AFTER the write. A consumer told about a job that was not saved is
         // worse than a consumer told nothing.
-        guard let wrote = shop.range(of: "registerMoveUndo("),
-              let sent = shop.range(of: "await fire(owed)") else {
+        // Inside `moveJob`, its write against its send. This compared the first
+        // `registerMoveUndo(` in the file with the first send, which matched an
+        // unrelated function's undo and passed by accident; once other paths (a
+        // QC failure, a LAN approval) fired their own webhooks — after their own
+        // writes — earlier in the file, it compared the wrong two lines.
+        guard let move = shop.range(of: "func moveJob("),
+              let wrote = shop.range(of: "StoreWriter.update(", range: move.upperBound..<shop.endIndex),
+              let sent = shop.range(of: "await fire(owed)", range: move.upperBound..<shop.endIndex) else {
             Issue.record("the move no longer writes or no longer sends"); return
         }
         #expect(wrote.lowerBound < sent.lowerBound,

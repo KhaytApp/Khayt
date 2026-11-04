@@ -234,6 +234,24 @@ struct LibraryGridRedesignTests {
         }
     }
 
+    @Test("every chip the row builds has a menu that holds it")
+    func everyChipHasAnAxis() throws {
+        // The "Saved from web" chip was built and counted but no axis held its
+        // id, so with that smart folder open nothing on the row said it was on.
+        let bar = try QuoteSheetStatusTests.source("LibraryFilterBar.swift")
+        let ids = Set(bar.components(separatedBy: "FilterChipModel(id: \"").dropFirst()
+            .compactMap { $0.split(separator: "\"").first.map(String.init) })
+        #expect(ids.contains("from-web"))
+        for id in ids {
+            let held = LibraryFilterBar.axes.contains { axis in
+                if let p = axis.prefix, id.hasPrefix(p) { return true }
+                if let p = axis.alsoPrefix, id.hasPrefix(p) { return true }
+                return axis.prefix == nil && axis.alsoPrefix == nil && axis.ids.contains(id)
+            }
+            #expect(held, "chip \(id) is built but no filter menu holds it")
+        }
+    }
+
     @Test("the strip has one Edit menu, not three that look like filters")
     func oneEditMenu() throws {
         let strip = try QuoteSheetStatusTests.source("ScreenActions.swift")

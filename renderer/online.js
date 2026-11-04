@@ -125,12 +125,12 @@
 
     html += `<div style="margin-bottom:10px;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:4px;" data-i18n="online.hub_quotes">Open quotes (approve online)</div>
-      ${quotes.length ? quotes.map((o) => linkRow(o.project || o.id, buildLanQuoteApprovalUrl(base, o), o.id, 'quote')).join('') : `<p style="font-size:12px;color:var(--text-muted);margin:0;">${escapeHtml(t('online.hub_no_quotes') || 'No open quotes yet.')}</p>`}
+      ${quotes.length ? quotes.map((o) => linkRow(o.project || jobRef(o), buildLanQuoteApprovalUrl(base, o), o.id, 'quote')).join('') : `<p style="font-size:12px;color:var(--text-muted);margin:0;">${escapeHtml(t('online.hub_no_quotes') || 'No open quotes yet.')}</p>`}
     </div>`;
 
     html += `<div>
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:4px;" data-i18n="online.hub_tracking">Active orders (live tracking)</div>
-      ${trackable.length ? trackable.map((o) => linkRow(o.project || o.id, buildLanOrderTrackingUrl(base, o), o.id, 'track')).join('') : `<p style="font-size:12px;color:var(--text-muted);margin:0;">${escapeHtml(t('online.hub_no_active') || 'No active orders to track.')}</p>`}
+      ${trackable.length ? trackable.map((o) => linkRow(o.project || jobRef(o), buildLanOrderTrackingUrl(base, o), o.id, 'track')).join('') : `<p style="font-size:12px;color:var(--text-muted);margin:0;">${escapeHtml(t('online.hub_no_active') || 'No active orders to track.')}</p>`}
     </div>`;
 
     el.innerHTML = html;

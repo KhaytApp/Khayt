@@ -1288,6 +1288,7 @@ extension Shop {
     /// half of them asked nothing — a viewer could clear a payment.
     @discardableResult
     func writeToOneOrder(_ id: Order.ID, named actionName: String, as gate: LockGate,
+                                 undoable: Bool = true,
                                  change: @escaping (JSONValue, KhaytEngine, [String: JSONValue])
                                  async throws -> OneOrderEdit) async -> Bool {
         moveProblem = nil
@@ -1323,7 +1324,10 @@ extension Shop {
                                         settings: Self.settings(root), root: root)
                 }
             }
-            registerMoveUndo(undo, named: actionName)
+            // `undoable: false` for a write whose undo would do harm: putting
+            // back a portal payment's record without its key has the next
+            // check record the payment all over again.
+            if undoable { registerMoveUndo(undo, named: actionName) }
             await load(source)
             return true
         } catch let refusal as MoveRefused {

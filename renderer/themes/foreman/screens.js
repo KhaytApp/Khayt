@@ -150,7 +150,7 @@
         if (!(owed > 0)) continue;
         rows.push({
           key: `p:${o.id}`, sev: 'cash', orderId: o.id, amount: owed,
-          title: o.project || o.id,
+          title: o.project || jobRef(o),
           detail: tr('fm.owes', '{amt} outstanding').replace('{amt}', money(owed)),
           action: { label: tr('fm.go_orders', 'Orders'), tab: 'logs-tab' },
         });

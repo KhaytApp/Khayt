@@ -157,7 +157,7 @@
     const shopName = String(c.shopName || 'Khayt');
     const statusLabel = String(c.statusLabel || newStatus);
     const greeting = String(c.clientName || decision.to);
-    const subject = `${shopName} — Order ${o.id} Update: ${statusLabel}`;
+    const subject = `${shopName} — Order ${o.jobNumber || o.id} Update: ${statusLabel}`;
     const html = `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;">
     <h2 style="color:#5E2E14;">${esc(shopName)}</h2>
     <p>Dear ${esc(greeting)},</p>

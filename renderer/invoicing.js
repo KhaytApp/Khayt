@@ -11,7 +11,10 @@
 const OrderNew = () => global.KhaytOrderNew
   || (typeof require === 'function' ? require('../lib/order-new.js') : null);
 function nextInvoiceNumber() {
-  const result = OrderNew().allocateInvoiceNumber(settings, new Date().getFullYear());
+  // The book goes in so the counter moves past numbers another computer on
+  // this book already issued — settings, where the counter lives, never sync.
+  const result = OrderNew().allocateInvoiceNumber(settings, new Date().getFullYear(),
+    typeof printLog !== 'undefined' ? printLog : undefined);
   saveAll();
   return result;
 }
@@ -37,14 +40,10 @@ function ensureOrderInvoiceNumber(order, newStatus) {
    Quotes intentionally do NOT advance the invoice counter, but they still
    need their own monotonic number or back-to-back quotes share an id. */
 function nextQuoteSeq() {
-  const currentYear = new Date().getFullYear();
-  if ((settings.quoteNumYear || currentYear) !== currentYear) {
-    settings.quoteNumYear = currentYear;
-    settings.quoteNumNext = 1;
-  }
-  const seq4 = String(settings.quoteNumNext || 1).padStart(4, '0');
-  settings.quoteNumNext = (settings.quoteNumNext || 1) + 1;
-  settings.quoteNumYear = currentYear;
+  // lib/order-new.js `allocateQuoteSeq` — the rule the Mac numbers quotes with,
+  // reading the book so a quote number another computer used is skipped.
+  const seq4 = OrderNew().allocateQuoteSeq(settings, new Date().getFullYear(),
+    typeof printLog !== 'undefined' ? printLog : undefined);
   saveAll();
   return seq4;
 }
@@ -60,22 +59,22 @@ function generateClientStatement(clientId) {
   const bizPrimary = shopName() || 'Khayt';
 
   // All statement figures are in the shop's BASE currency so multi-currency
-  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert).
-  const curOf = (o) => (typeof orderCurrency === 'function') ? orderCurrency(o) : (settings.currency || 'SAR');
+  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert),
+  // every figure at the order's saved rate when it has one (orderToBase).
   // Cash actually received (base). Falls back to price ONLY for legacy fully-paid
   // orders with no recorded amount AND no gift settlement — otherwise a gift-card
   // -settled order would be counted as both "paid" (price) and "gift".
   const cashPaidBase = (o) => {
     const recorded = +o.paidAmount || 0;
-    if (recorded > 0) return convertToBase(recorded, curOf(o));
-    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? convertToBase(+o.price || 0, curOf(o)) : 0;
+    if (recorded > 0) return orderToBase(recorded, o);
+    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? orderToBase(+o.price || 0, o) : 0;
   };
   const totalCharges = orders.reduce((s, o) => s + orderRevenueBase(o), 0);
   const totalPaid    = orders.reduce((s, o) => s + cashPaidBase(o), 0);
   // Gift-card redemptions settle part of the balance just like a payment.
-  const totalGift    = orders.reduce((s, o) => s + convertToBase(+o.giftCardDiscount || 0, curOf(o)), 0);
+  const totalGift    = orders.reduce((s, o) => s + orderToBase(+o.giftCardDiscount || 0, o), 0);
   const totalCredit  = orders.reduce((s, o) =>
-    s + convertToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), curOf(o)), 0);
+    s + orderToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), o), 0);
   const outstanding  = orders.reduce((s, o) => s + orderOwedBase(o), 0);
 
   const rowsHtml = orders.map(o => {
@@ -83,7 +82,7 @@ function generateClientStatement(clientId) {
     const bal   = orderOwedBase(o);
     return `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:6px 8px; font-size:12px; white-space:nowrap;">${escapeHtml(o.date || '')}</td>
-      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(o.id)}</td>
+      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(jobRef(o))}</td>
       <td style="padding:6px 8px; font-size:12px;">${escapeHtml(o.project || '')}</td>
       <td style="padding:6px 8px; font-size:12px; text-align:end;">${fmtPrice(orderRevenueBase(o))}</td>
       <td style="padding:6px 8px; font-size:12px; text-align:end; color:#2a9d8f;">${fmtPrice(paid)}</td>
@@ -388,7 +387,7 @@ function openQuoteRevisionsModal(orderId) {
       </table></div>`;
 
   openFormModal({
-    title: `📋 ${t('ord.quote_revisions')} — ${escapeHtml(order.project || order.id)} (${t('ord.quote_version', { n: order.quoteVersion || 1 })})`,
+    title: `📋 ${t('ord.quote_revisions')} — ${escapeHtml(order.project || jobRef(order))} (${t('ord.quote_version', { n: order.quoteVersion || 1 })})`,
     noSave: true,
     bodyHtml: revsHtml,
   });
@@ -407,7 +406,7 @@ async function exportInvoicePDF(orderId, { askWhere = true, openAfter = true } =
     if (!window.hubAPI?.exportPDF) return null;
     const finalPath = await window.hubAPI.exportPDF({
       askWhere,
-      defaultName: `${order.id}.pdf`
+      defaultName: `${jobRef(order)}.pdf`
     });
     if (!finalPath) return null;
     toast(t('inv.saved'), 'success');
@@ -431,7 +430,7 @@ async function shareInvoiceWhatsApp(orderId) {
   await new Promise(r => setTimeout(r, 60));
   let pdfPath = null;
   if (window.hubAPI?.exportPDF) {
-    try { pdfPath = await window.hubAPI.exportPDF({ askWhere: false, defaultName: `${order.id}.pdf` }); }
+    try { pdfPath = await window.hubAPI.exportPDF({ askWhere: false, defaultName: `${jobRef(order)}.pdf` }); }
     catch (e) { console.error(e); }
   }
   const displayName = client ? (localName(client))
@@ -461,27 +460,86 @@ async function sendStatusWhatsApp(orderId) {
   }
 }
 
+/**
+ * Send one payment reminder the shop's way, and record it once it has gone.
+ *
+ * The rules are `lib/payment-reminder.js`, the Mac's too: which way it goes
+ * (`reminderChannel`: the shop's choice in Settings, else WhatsApp when the
+ * customer has a number, else email), how much it asks for (`reminderAmount`:
+ * the unpaid part of the milestones that are due, else what is owed, in the
+ * job's own currency), the shop's pay link, and the record
+ * (`markReminderPatch`), written HERE, after the send, and nowhere else, so
+ * one reminder is one mark. The 6-hour timer only flags.
+ *
+ * Returns true when a reminder went out (and was recorded).
+ */
 async function sendPaymentReminder(orderId) {
   const order = printLog.find(o => o.id === orderId);
-  if (!order) return;
+  if (!order) return false;
+  const R = typeof KhaytPaymentReminder !== 'undefined' ? KhaytPaymentReminder : null;
   const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  if (!client?.phone) { toast(t('pay.remind_no_phone'), 'info', 3200); return; }
-  // Use the payment-reminder WA template if available, otherwise a default
-  const tpl = waTemplates.find(w => w.id === 'tpl-payment') || waTemplates[0];
-  const message = tpl
-    ? fillWaTemplate(tpl.body, order, client)
-    : t('pay.remind_default', { name: localName(client), id: order.id, price: fmtPrice(order.price), currency: currencySymbol() });
-  if (window.hubAPI?.shareWhatsApp) {
-    await window.hubAPI.shareWhatsApp({ phone: client.phone, message, pdfPath: null });
-  } else {
-    // Fallback: open WhatsApp web
-    const encodedMsg = encodeURIComponent(message);
-    const phone = (client.phone || '').replace(/\D/g, '');
-    window.hubAPI?.openExternal?.(`https://wa.me/${phone}?text=${encodedMsg}`);
-    if (!window.hubAPI?.openExternal) {
+  const channel = R ? R.reminderChannel(settings, client) : (client?.phone ? 'whatsapp' : 'none');
+  if (channel === 'none') { toast(t('pay.remind_no_phone'), 'info', 3200); return false; }
+
+  const text = reminderMessage(order, client);
+  let sent = false;
+  try {
+    if (channel === 'email') {
+      const name = (typeof shopName === 'function' && shopName()) || 'Khayt';
+      const mail = R.reminderEmail({ settings, client, text, shopName: name,
+        subject: t('pay.remind_subject', { shop: name }) });
+      const result = mail && await window.hubAPI?.sendEmail?.({ to: mail.to, subject: mail.subject,
+        body: mail.html, smtpConfig: settings.emailConfig });
+      // A mailto fallback opened the shop's mail app with it written: as sent as
+      // WhatsApp opened with it typed in.
+      sent = !!(result && (result.ok || (result.fallback && result.mailtoUrl)));
+      if (!sent) toast((result && result.error) || t('notify.email_failed') || 'Email failed', 'warning', 4000);
+    } else if (window.hubAPI?.shareWhatsApp) {
+      await window.hubAPI.shareWhatsApp({ phone: client.phone, message: text, pdfPath: null });
+      sent = true;
+    } else if (window.hubAPI?.openExternal) {
+      const phone = (client.phone || '').replace(/\D/g, '');
+      window.hubAPI.openExternal(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
+      sent = true;
+    } else {
       toast(t('pay.remind_sent') || 'Open WhatsApp manually to send the reminder', 'info');
     }
+  } catch (e) {
+    console.warn('sendPaymentReminder:', e);
+    toast(t('notify.email_failed') || 'The reminder did not go out', 'warning', 4000);
+    sent = false;
   }
+  if (!sent) return false;
+  if (R) Object.assign(order, R.markReminderPatch(order, Date.now()));
+  saveAll();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  return true;
+}
+
+/**
+ * The reminder's words: the shop's `tpl-payment`, else Khayt's default, asking
+ * for what the reminder is FOR (`reminderAmount`) in the job's own currency,
+ * with the shop's pay link after (`payLinkFor`, converted into the shop's
+ * currency at the job's saved rate, or left out when there is none).
+ */
+function reminderMessage(order, client) {
+  const R = typeof KhaytPaymentReminder !== 'undefined' ? KhaytPaymentReminder : null;
+  const code = typeof orderCurrency === 'function' ? orderCurrency(order) : settings.currency;
+  const owed = typeof orderOwedRaw === 'function'
+    ? orderOwedRaw(order) : Math.max(0, (+order.price || 0) - (+order.paidAmount || 0));
+  const asked = R ? R.reminderAmount(order, owed, settings, Date.now(), client) : { amount: owed };
+  const symbol = ((typeof CURRENCIES !== 'undefined' && CURRENCIES[code]) || {}).symbol || code;
+  const name = client ? localName(client) : (order.project || '');
+  const tpl = waTemplates.find(w => w.id === 'tpl-payment');
+  const message = tpl
+    ? KhaytWaTemplate.fillTemplate(tpl.body, {
+        client: name, id: jobRef(order), price: fmtMoney(asked.amount), currency: symbol,
+        due: order.dueDate, status: t('queue.' + order.status),
+      })
+    : t('pay.remind_default', { name, id: jobRef(order), amount: fmtMoneyIn(asked.amount, code) });
+  if (!R) return message;
+  const link = R.payLinkFor(settings, asked.amount, { order, currency: code });
+  return R.reminderText({ body: message, values: null, payLink: link, payLabel: t('pay.remind_pay_here') });
 }
 
 /**
@@ -501,11 +559,11 @@ async function sendQuoteFollowUp(orderId, opts = {}) {
     if (!opts.silent) toast(t('quote.followup_no_phone'), 'info', 3200);
     return false;
   }
-  const name = client ? localName(client) : (order.project || order.id);
+  const name = client ? localName(client) : (order.project || jobRef(order));
   const message = t('quote.followup_msg', {
     name,
     id: order.id,
-    project: order.project || order.id,
+    project: order.project || jobRef(order),
     total: fmtPrice(order.price),
     expires: order.quoteExpiresAt || '',
   });
@@ -536,7 +594,7 @@ async function shareTrackingWhatsApp(orderId) {
   const phone = client?.phone;
   if (!phone) { toast(t('pay.remind_no_phone'), 'info'); return; }
   const msg = t('ship.tracking_msg', {
-    project: order.project || order.id,
+    project: order.project || jobRef(order),
     courier: order.courierName || '',
     tracking: order.trackingNumber,
   });
@@ -624,7 +682,7 @@ async function prepareZatcaPhase2Payload(order) {
     subtotal: exVat,
     vatAmount: vatAmt,
     vatRate: settings.enableVat ? rate : 0,
-    itemName: order.project || order.id,
+    itemName: order.project || jobRef(order),
     invoiceCounter: icv,
     pih: z2.lastInvoiceHash || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI4NjJhNGRhNjM3NWQ2OGM5',
   });
@@ -734,8 +792,8 @@ function maybeAutoSubmitZatca(order) {
   if (order.zatcaSubmission?.status === 'accepted') return;
   submitOrderToZatca(order.id, { silent: true })
     .then((r) => {
-      if (r?.ok && !r.skipped) toast(t('zatca2.auto_submitted', { id: order.id }) || `Invoice ${order.id} submitted to ZATCA`, 'success', 4000);
-      else if (r?.ok === false && !r.skipped) toast(t('zatca2.auto_submit_failed', { id: order.id }) || `ZATCA auto-submit failed for ${order.id}`, 'warning', 5000);
+      if (r?.ok && !r.skipped) toast(t('zatca2.auto_submitted', { id: jobRef(order) }) || `Invoice ${jobRef(order)} submitted to ZATCA`, 'success', 4000);
+      else if (r?.ok === false && !r.skipped) toast(t('zatca2.auto_submit_failed', { id: jobRef(order) }) || `ZATCA auto-submit failed for ${jobRef(order)}`, 'warning', 5000);
     })
     .catch((e) => console.error('ZATCA auto-submit:', e));
 }
@@ -798,6 +856,19 @@ async function renderInvoiceForOrder(order, opts = {}) {
     // A QR missing a required tag SCANS and is invalid, which is worse than an
     // empty box: a code that reads invites no question. Refuse to draw one.
     const ready = zatcaQrReadiness(settings);
+    // Tags 4 and 5 are riyals. A job saved in a client's currency is converted
+    // at the rate stored on it; with none, there is no honest figure to state
+    // and the QR is refused like a missing VAT number (lib/zatca-qr.js qrAmounts).
+    const qrMoney = ZatcaQr().qrAmounts(order, settings, { total: _tax.total, vatAmount: vatAmt });
+    if (!qrMoney.ok) ready.missing = ready.missing.concat(qrMoney.missing);
+    ready.ok = ready.ok && qrMoney.ok;
+    // Phase 2 signs the job's own figures into the XML and the QR. Converting
+    // the whole document belongs with the Phase 2 work, so until then a job in
+    // another currency gets no Phase 2 QR rather than a EUR figure signed as
+    // riyals (lib/zatca-qr.js phase2Currency).
+    const z2on = !!(settings.zatcaPhase2?.enabled && (settings.zatcaPhase2.csid || settings.zatcaPhase2.pcsid));
+    const z2cur = z2on ? ZatcaQr().phase2Currency(order, settings) : { ok: true, missing: [] };
+    if (!z2cur.ok) { ready.missing = ready.missing.concat(z2cur.missing); ready.ok = false; }
     if (!ready.ok) {
       qrProblem = ready.missing.map((k) => t(k)).join(' · ');
       if (typeof toast === 'function') toast(t('inv.qr_not_compliant') + ' — ' + qrProblem, 'error', 12000);
@@ -829,7 +900,7 @@ async function renderInvoiceForOrder(order, opts = {}) {
           subtotal:      _z2tax.subtotal,
           vatAmount:     _z2tax.taxTotal,
           vatRate:       _z2profile.rates.reduce((sum, r) => sum + r.percent, 0),
-          itemName:      order.project || order.id,
+          itemName:      order.project || jobRef(order),
           invoiceCounter: (z2.invoiceCounter || 0) + 1,
           pih:           z2.lastInvoiceHash || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI4NjJhNGRhNjM3NWQ2OGM5',
         });
@@ -848,7 +919,8 @@ async function renderInvoiceForOrder(order, opts = {}) {
         }
       } else {
         // Phase 1 fallback
-        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts, total, vatAmount });
+        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts,
+          total: fmtMoney(qrMoney.total), vatAmount: fmtMoney(qrMoney.vatAmount) });
       }
       qrSvg = await window.hubAPI.generateQR(tlvB64, { width: 140, margin: 1 });
     } catch (e) {
@@ -1202,9 +1274,9 @@ function openCreditNoteModal(orderId) {
 
   const bodyHtml = `
     <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">
-      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtPrice(order.price)} ${currencySymbol()}
+      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(jobRef(order))}</strong> · ${fmtOrderPrice(order.price, order)}
     </p>
-    <label>${escapeHtml(t('cn.credit_amount'))} (${currencySymbol()})</label>
+    <label>${escapeHtml(t('cn.credit_amount'))} (${escapeHtml(orderCurrencySymbol(order))})</label>
     <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
     <label style="margin-top:14px;">${escapeHtml(t('cn.reason'))}</label>
     <textarea id="cnReasonInput" rows="3" style="resize:vertical;" placeholder="${escapeHtml(t('cn.reason_ph'))}">${escapeHtml(reason)}</textarea>`;
@@ -1274,7 +1346,7 @@ function generateCreditNote(order, creditAmount, reason) {
           <div class="meta">
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.no"))}</span><span class="v">${escapeHtml(cnId)}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(today))}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(order.id)}</span></div>
+            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
           </div>
         </div>
       </div>
@@ -1303,7 +1375,7 @@ function generateCreditNote(order, creditAmount, reason) {
         <tbody>
           <tr>
             <td>
-              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || order.id)}</div>
+              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || jobRef(order))}</div>
               ${reason ? `<div class="meta">${escapeHtml(reason)}</div>` : ''}
             </td>
             <td class="center">1</td>
@@ -1367,7 +1439,7 @@ function generateDeliveryNote(id) {
           <div class="title">${escapeHtml(t("doc.delivery_note"))}</div>
           ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(secondLang, "doc.delivery_note"))}</div>` : ''}
           <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(order.id)}</span></div>
+            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(order.date))}</span></div>
           </div>
         </div>

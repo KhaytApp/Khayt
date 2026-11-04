@@ -377,9 +377,9 @@ function openClientHistory(clientId) {
             ${orders.map(o => `
               <tr>
                 <td style="font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(o.date)}</td>
-                <td><strong>${escapeHtml(o.project || o.id)}</strong><div style="font-size:11px; color:var(--text-muted);">${escapeHtml(o.id)}</div></td>
+                <td><strong>${escapeHtml(o.project || jobRef(o))}</strong><div style="font-size:11px; color:var(--text-muted);">${escapeHtml(jobRef(o))}</div></td>
                 <td><span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></td>
-                <td style="font-weight:600; color:var(--success); font-variant-numeric:tabular-nums; white-space:nowrap;">${fmtPrice(o.price)}</td>
+                <td style="font-weight:600; color:var(--success); font-variant-numeric:tabular-nums; white-space:nowrap;">${fmtOrderPrice(o.price, o)}</td>
                 <td>${paymentBadge(o)}</td>
               </tr>`).join('')}
           </tbody>
@@ -998,7 +998,7 @@ function openClientEditor(clientId = null) {
                   <span class="ch-date">${escapeHtml(o.date)}</span>
                   <span class="ch-name">${escapeHtml(o.project)}</span>
                   <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span>
-                  <span class="ch-price">${fmtPrice(o.price)}</span>
+                  <span class="ch-price">${fmtOrderPrice(o.price, o)}</span>
                 </div>`).join('')}
             </div>
             ${clientOrders.length > 30 ? `<p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">+${clientOrders.length - 30} more — see Orders log</p>` : ''}`;
@@ -1095,11 +1095,18 @@ function checkSubscriptionBilling() {
       const already = printLog.some(o => o.subscriptionId === sub.id && o.recurringCycle === cycle);
       if (!already) {
         const nowD = new Date();
-        const invoiceNum = nextInvoiceNumber();
-        const seq = String(settings.invNumNext - 1).padStart(4, '0');
+        // The number and the id as lib/order-new.js makes them for every job:
+        // the counter reads the book, and the id carries a random tag so two
+        // computers on one book can never give two jobs the same key.
+        const ON = window.KhaytOrderNew;
+        const invoice = ON.allocateInvoice(settings, nowD.getFullYear(), printLog);
+        saveAll();
+        const invoiceNum = invoice.number;
+        const jobNumber = `${settings.invPrefix || 'INV'}-${nowD.getFullYear()}-${invoice.seq4}`;
         const client = clients.find(c => c.id === sub.clientId);
         printLog.unshift({
-          id: `${settings.invPrefix || 'INV'}-${nowD.getFullYear()}-${seq}`,
+          id: ON.mintOrderId(jobNumber, crypto.getRandomValues(new Uint8Array(4))),
+          jobNumber,
           invoiceNum, invoiceNumber: invoiceNum,
           date: cycle, timestamp: nowD.toISOString(),
           project: sub.planName || (t('subs.plan') || 'Subscription'),
@@ -1442,11 +1449,11 @@ function exportClientPortal(clientId) {
     const isPaid = payStatus(o) === 'paid';
     return `<tr style="border-bottom:1px solid #2a2a2a;">
       <td style="padding:8px;font-size:12px;white-space:nowrap;color:#888;">${escapeHtml(o.date || '')}</td>
-      <td style="padding:8px;font-size:12px;"><strong style="color:#e2e8f0;">${escapeHtml(o.project || o.id)}</strong><div style="font-size:10px;color:#666;">${escapeHtml(o.id)}</div>
+      <td style="padding:8px;font-size:12px;"><strong style="color:#e2e8f0;">${escapeHtml(o.project || jobRef(o))}</strong><div style="font-size:10px;color:#666;">${escapeHtml(jobRef(o))}</div>
         ${KhaytOrderStatus.isOpen(o) ? stepperHtml(o) : ''}
       </td>
       <td style="padding:8px;"><span style="background:${statusColors[o.status]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${escapeHtml(o.status)}</span></td>
-      <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtPrice(o.price)}</td>
+      <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtOrderPrice(o.price, o)}</td>
       <td style="padding:8px;text-align:center;font-size:11px;color:${isPaid?'#4ade80':'#f87171'};">${isPaid ? PL.paid : PL.outstanding}</td>
     </tr>`;
   }).join('');
