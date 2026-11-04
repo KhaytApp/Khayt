@@ -37,7 +37,8 @@ test('a shop-cost reprint is a new job through newOrder, free, linked both ways'
     inventory: [], consumables: [], clients: [], reason: 'qc_fail', cost: 'shop', partIdBase: 'PRT-R',
   });
   const job = out.order;
-  assert.equal(job.id, 'INV-2026-0008', 'the shared id rule: the next invoice number');
+  assert.equal(job.jobNumber, 'INV-2026-0008', 'the shared id rule: the next invoice number');
+  assert.match(job.id, /^INV-2026-0008-[a-z0-9]{4}$/, 'collision-free id (#2210)');
   assert.equal(out.settings.invNumNext, 9, 'the counter advanced, for the caller to write back');
   assert.equal(job.status, 'pending');
   assert.equal(job.reprintOf, 'INV-2026-0007');
@@ -51,7 +52,7 @@ test('a shop-cost reprint is a new job through newOrder, free, linked both ways'
   assert.ok(job.parts[0].baseCost > 1, 'costed again as a line total, not copied');
   assert.equal(out.printLog[0], job, 'newest first');
   const orig = out.printLog.find((o) => o.id === 'INV-2026-0007');
-  assert.deepEqual(orig.reprintedInto, ['INV-2026-0008']);
+  assert.deepEqual(orig.reprintedInto, [job.id], 'linked by id, which carries the #2210 tag');
   assert.equal(orig.materialDeducted, true, 'the failed job\'s material is never touched');
   assert.deepEqual(log[0].reprintedInto, undefined, 'the log handed in is not changed');
 });

@@ -220,8 +220,9 @@ test('Phase 2 refuses a job that is not in SAR; SAR passes', () => {
 
 test('the reminder, the credit-note reference and the change-price dialog wear the job currency', () => {
   const inv = read('renderer/invoicing.js');
-  assert.match(inv, /amount: fmtOrderPrice\(order\.price, order\)/);
-  assert.match(inv, /<strong>\$\{escapeHtml\(order\.id\)\}<\/strong> · \$\{fmtOrderPrice\(order\.price, order\)\}\n/);
+  // The reminder's text is reminderMessage (#2213), in the job's currency.
+  assert.match(inv, /function reminderMessage\(order, client\)/);
+  assert.match(inv, /<strong>\$\{escapeHtml\(jobRef\(order\)\)\}<\/strong> · \$\{fmtOrderPrice\(order\.price, order\)\}\n/);
   assert.match(inv, /cn\.credit_amount'\)\)\} \(\$\{escapeHtml\(orderCurrencySymbol\(order\)\)\}\)/);
   assert.match(read('renderer/order-flows.js'), /Current Price:<\/strong> \$\{fmtOrderPrice\(order\.price, order\)\}/);
   assert.match(read('renderer/app-state.js'), /currency: \(typeof orderCurrencySymbol === 'function' \? orderCurrencySymbol\(order\)/);

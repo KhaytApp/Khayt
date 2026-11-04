@@ -32,6 +32,7 @@ function setup({ phone = '+966500000000', share = async () => true } = {}) {
   global.saveAll = () => {};
   global.renderDashboard = () => {};
   global.localName = (c) => c.name;
+  global.jobRef = (o) => String((o && o.jobNumber) || (o && o.id) || o || '');
   global.fmtMoney = (n) => (+n).toFixed(2);
   global.fmtMoneyIn = (n, c) => (+n).toFixed(2) + ' ' + c;
   global.orderCurrency = (o) => o.currency || 'SAR';

@@ -769,10 +769,9 @@ function renderKanban() {
       // Split/sub-order badges
       const kanbanSplitBadge = log.splitInto && log.splitInto.length > 0 ? `<span class="split-badge">${_kBdr ? '' : '🔀 '}${escapeHtml(t('ord.split_badge', { n: log.splitInto.length }))}</span>` : '';
       const kanbanSubBadge = log.parentOrderId
-        ? `<span class="sub-order-badge">↳ #${escapeHtml(log.parentOrderId)}</span>`
+        ? `<span class="sub-order-badge">↳ #${escapeHtml(jobRef(log.parentOrderId))}</span>`
         : log.reprintOf
-          // TODO(#2210): jobRef — the raw id until the readable ref lands.
-          ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(log.reprintOf)}</span>`
+          ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(jobRef(log.reprintOf))}</span>`
           : '';
       // A store order line nothing in the catalogue matched — the way to pick
       // its product (lib/store-order-job.js keeps it on the job for this).
@@ -782,9 +781,8 @@ function renderKanban() {
       const storeLinesBadge = _unplaced
         ? `<button type="button" class="sub-order-badge" style="cursor:pointer;" data-act="store-lines" data-id="${escapeHtml(log.id)}" title="${escapeHtml(t('store.pick_title'))}">${escapeHtml(t('store.unmatched_badge', { n: _unplaced }))} · <u>${escapeHtml(t('store.pick_short'))}</u></button>`
         : '';
-      // TODO(#2210): jobRef — the raw id until the readable ref lands.
       const reprintedBadge = Array.isArray(log.reprintedInto) && log.reprintedInto.length
-        ? `<span class="sub-order-badge">↪ ${escapeHtml(t('qc.reprinted_as'))} #${escapeHtml(log.reprintedInto[log.reprintedInto.length - 1])}</span>`
+        ? `<span class="sub-order-badge">↪ ${escapeHtml(t('qc.reprinted_as'))} #${escapeHtml(jobRef(log.reprintedInto[log.reprintedInto.length - 1]))}</span>`
         : '';
       // QC badge — reflects qcStatus (pass / fail / awaiting), with inspector
       // initials when an inspector is required. Derives from legacy fields too.

@@ -68,8 +68,7 @@ struct ReprintLinks: View {
     private func link(_ label: String, _ id: String) -> some View {
         HStack(spacing: 4) {
             Text(label).foregroundStyle(.secondary)
-            // TODO(#2210): jobRef — the raw id until the readable ref lands.
-            Button("#" + id) { shop.goToJob(id) }
+            Button("#" + shop.reference(ofJob: id)) { shop.goToJob(id) }
                 .buttonStyle(.link)
         }
     }
