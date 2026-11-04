@@ -9093,6 +9093,33 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.20] - 2026-11-04
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A printer can be marked "Clears its own plate"** in its machine sheet: a belt printer, a plate changer, or a slicer profile that pushes each part off. Khayt then offers it the next job without waiting for Bed is clear. Off unless the shop turns it on.
+- **Start a maintenance task from a common one.** The new-task sheet offers thirteen usual tasks, from the build plate and belts to the resin vat film, with starting intervals to adjust to the maker's manual.
+- **Bambu jobs fill in their own time**: Khayt times a print it watched from start to finish, pauses taken off. Grams come from the sliced file when the desktop app sent the job, labelled "Sliced", never "measured".
+
+### Changed
+
+- **The Board in the redesign.** Each card is a picture tile with the title and customer, a red pill when the job is late, and the amber thread with the machine and time left while it prints. Each column is headed by its stage's dot.
+- **The Jobs table's Stage column is a status pill**, the same as on Today.
+- **The remaining screens take the redesign's quieter style.** Section headings are grey rather than blue, and a coloured stripe on a card now always means something: late, needs attention, running or done.
+- **Every screen has its name in the toolbar.** Library, Catalogue, Customers, Expenses, the Calculator and Gift cards had none.
+
+### Fixed
+
+- **The selected row in the sidebar is readable again.** While the sidebar had focus it was blue text on a blue selection.
+- **The site picker at the top of the sidebar** no longer nearly vanishes.
+- **A machine you put under service** is no longer listed on Today as "not answering". Today says "1 under service", and the Machines screen no longer asks you to check that it is switched on.
+- **Reports** names Expenses and Monthly costs apart in the side panel, as the chart does, and the top bar's figure is no longer cut off.
+- **The Inventory cards** no longer run from the sidebar to the window's edge.
+- **Smaller fixes**: Library's sidebar count leaves out archived models, as the screen does; the kits above the Jobs table are headed Kits; the Calculator's quantity lines up with its fields; and Today's net income card no longer shows a change beside a figure it does not have.
+
 ## [4.0.0-beta.19] - 2026-11-04
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
