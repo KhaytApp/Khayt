@@ -115,7 +115,7 @@
     // The row paints a hover highlight; it now honours it by opening the order.
     return `<div class="ql-row ${sev} is-openable" data-order-id="${esc(o.id)}" tabindex="0" role="button">
       <span class="ql-stripe" aria-hidden="true"></span>
-      <span class="ql-name">${esc(o.project || o.id)} <em>— ${esc(sub)}</em></span>
+      <span class="ql-name">${esc(o.project || jobRef(o))} <em>— ${esc(sub)}</em></span>
       <span class="ql-meta">${esc(meta.join(' · '))}</span>
       <span class="ql-state">${esc(tr('queue.' + o.status, o.status))}</span>
       <span class="ql-actions">${action}</span>

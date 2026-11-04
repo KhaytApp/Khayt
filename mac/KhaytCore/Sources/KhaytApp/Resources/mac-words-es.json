@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "Sesión iniciada, pero la clave de este taller no se pudo poner en Khayt Cloud, así que otros dispositivos aún no pueden sincronizar. Vuelve a iniciar sesión para reintentarlo.",
  "mac.cloud_key_published": "La clave de este taller ya está en Khayt Cloud y el libro se ha enviado, así que tus otros dispositivos pueden iniciar sesión y sincronizar.",
  "mac.cloud_line_hint": "Haz clic para iniciar sesión o comprobar la nube; clic derecho para más opciones.",
+ "mac.cloud_twin_jobs": "{n} trabajos de otro ordenador tenían una referencia que ya se usaba aquí. Se conservan ambos; la suya queda marcada.",
+ "mac.cloud_twin_jobs_one": "{n} trabajo de otro ordenador tenía una referencia que ya se usaba aquí. Se conservan ambos; la suya queda marcada.",
  "mac.cloud_lost_edits": "Se descartaron {n} cambios hechos aquí: el registro se había eliminado en otro dispositivo.",
  "mac.cloud_lost_edits_one": "Se descartó {n} cambio hecho aquí: el registro se había eliminado en otro dispositivo.",
  "mac.cloud_nothing_to_send": "No queda nada por enviar: la nube ya lo tiene.",

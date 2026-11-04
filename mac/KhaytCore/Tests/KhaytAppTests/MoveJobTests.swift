@@ -1622,7 +1622,9 @@ struct NewJobTests {
             now: Date(), tokens: (tracking: Shop.randomBytes(16), quoteApproval: Shop.randomBytes(16)))
 
         guard case .object(let order) = out.order else { Issue.record("not an order"); return }
-        #expect(MoveJobTests.string(order["id"]) == "INV-2026-0012")
+        // The id is the number plus a random tag (lib/order-new.js `mintOrderId`).
+        #expect(MoveJobTests.string(order["jobNumber"]) == "INV-2026-0012")
+        #expect(MoveJobTests.string(order["id"])?.hasPrefix("INV-2026-0012-") == true)
         #expect(MoveJobTests.string(order["status"]) == "pending")
         #expect(MoveJobTests.number(order["price"]) == 140)
         // The counter came back advanced. Writing the order without it hands the
@@ -1736,7 +1738,7 @@ struct NewJobOnDiskTests {
                                              from: Data(contentsOf: url))
         let jobs = MoveJobTests.rows(after, "printLog")
         #expect(jobs.count == 2)
-        #expect(MoveJobTests.string(jobs[0]["id"]) == "INV-2026-0021", "newest first")
+        #expect(MoveJobTests.string(jobs[0]["jobNumber"]) == "INV-2026-0021", "newest first")
         #expect(MoveJobTests.string(jobs[1]["id"]) == "OLD", "and the older one is still there")
         // The counter, in the same file, advanced exactly once.
         guard case .object(let settings)? = after["settings"] else { Issue.record("no settings"); return }
@@ -1763,7 +1765,8 @@ struct NewJobOnDiskTests {
         let after = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
         let ids = MoveJobTests.rows(after, "printLog").compactMap { MoveJobTests.string($0["id"]) }
         #expect(Set(ids).count == ids.count, "the id is the primary key — a collision overwrites a job")
-        #expect(ids.prefix(3) == ["INV-2026-0023", "INV-2026-0022", "INV-2026-0021"])
+        let numbers = MoveJobTests.rows(after, "printLog").compactMap { MoveJobTests.string($0["jobNumber"]) }
+        #expect(numbers.prefix(3) == ["INV-2026-0023", "INV-2026-0022", "INV-2026-0021"])
     }
 
     @Test("every job written is a job the table can show")

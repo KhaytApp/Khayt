@@ -228,13 +228,13 @@ function renderStudioKanbanCard(b) {
   const headBlock = useStudio
     ? `
       <div class="row between" style="align-items:center">
-        <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml(log.id)}</span>
+        <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-dim)">${escapeHtml(jobRef(log))}</span>
         <span class="row gap6" style="align-items:center">
           <span class="dot" style="background:${prioColor};width:7px;height:7px" title="${escapeHtml(_pl)}"></span>
           <span class="khayt-kcard-grip" aria-hidden="true">⋮⋮</span>
         </span>
       </div>
-      <strong class="khayt-kcard-title">${priBadge}${escapeHtml(log.project || log.id)}${splitSpan}</strong>
+      <strong class="khayt-kcard-title">${priBadge}${escapeHtml(log.project || jobRef(log))}${splitSpan}</strong>
       ${clientLine ? `<span class="khayt-kcard-client">${escapeHtml(clientLine)}</span>` : ''}
       <div class="row gap8 khayt-kcard-mat" style="margin-top:8px;align-items:center;flex-wrap:wrap">
         ${swatchLabel ? `<span class="khayt-swatch" style="background:${safeCssColor(swatchHex)}"></span><span class="khayt-cname">${escapeHtml(swatchLabel)}</span>` : ''}
@@ -417,8 +417,8 @@ function renderKanban() {
         return `
           <div class="quote-card">
             <div class="quote-main">
-              <div class="quote-title">${getPriorityLevel(q) !== 'normal' ? priorityBadgeHtml(q) + ' ' : ''}${escapeHtml(q.project || q.id)}</div>
-              <div class="quote-meta">${escapeHtml(q.id)} · ${fmtOrderPrice(q.price, q)} ${expiryHtml}</div>
+              <div class="quote-title">${getPriorityLevel(q) !== 'normal' ? priorityBadgeHtml(q) + ' ' : ''}${escapeHtml(q.project || jobRef(q))}</div>
+              <div class="quote-meta">${escapeHtml(jobRef(q))} · ${fmtOrderPrice(q.price, q)} ${expiryHtml}</div>
             </div>
             <!-- Approving is the answer this row is waiting for. Rejecting sat
                  next to it in red; it is under the rule in the menu now, where
@@ -912,7 +912,7 @@ function renderMachineQueues() {
       ? queue.map((o, i) => `
           <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border-soft);">
             <span style="font-size:11px;color:var(--text-muted);min-width:16px;">${i + 1}.</span>
-            <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(o.project || o.id)}</span>
+            <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(o.project || jobRef(o))}</span>
             ${priorityBadgeHtml(o)}
           </div>`).join('')
       : `<div style="font-size:11px;color:var(--text-muted);">${t('queue.no_pending') || 'No pending jobs'}</div>`;

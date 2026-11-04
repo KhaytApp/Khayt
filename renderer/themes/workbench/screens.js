@@ -181,7 +181,7 @@
       pct = est != null ? est : 0;
       state = 'printing';
     }
-    const jobName = order ? (order.project || order.id) : tr('dash.idle_dash', '— idle —');
+    const jobName = order ? (order.project || jobRef(order)) : tr('dash.idle_dash', '— idle —');
     let cls = 'blue';
     if (state === 'error') cls = 'red';
     else if (state === 'idle' || state === 'stale') cls = 'gray';
@@ -366,7 +366,7 @@
             : tr('dash.wb_unpaid', 'unpaid');
           attention.push({
             icon: ICON.money, fg: 'var(--wb-blue)', bg: 'var(--wb-blue-bg)',
-            title: `${tr('dash.wb_invoice', 'Invoice')} ${o.id} ${payLbl}`,
+            title: `${tr('dash.wb_invoice', 'Invoice')} ${jobRef(o)} ${payLbl}`,
             sub: bits.join(' · '),
             chip: 'blue', chipLabel: tr('dash.wb_due', 'Due'),
           });

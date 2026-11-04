@@ -30,6 +30,13 @@ extension DateFormatter {
 
 struct Order: Identifiable, Decodable, Hashable, Sendable {
     let id: String
+    /// The readable half of a job's id. Since ids became unique across
+    /// computers (lib/order-new.js `mintOrderId`) a new job's id is
+    /// `INV-2026-0042-k7qx` and this is `INV-2026-0042`; older jobs have none.
+    let jobNumber: String?
+    /// The reference a PERSON reads: the job number, else the id. Every
+    /// screen that shows a job's reference shows this; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let date: String
     let status: String
     let project: String
@@ -162,7 +169,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
+        case id, jobNumber, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
@@ -248,6 +255,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // record by it, so a row with no id is skipped and counted (`Shop.skipped`,
         // which the sidebar and the status line both report).
         id = try c.decode(String.self, forKey: .id)
+        jobNumber = try? c.decodeIfPresent(String.self, forKey: .jobNumber)
         // Everything below reads the way `lib/` reads it — see "NINE FIELDS THE
         // OTHER APP DOES NOT REQUIRE" above.
         date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""

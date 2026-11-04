@@ -122,7 +122,8 @@ test('through newOrder: a fresh id and number, nothing paid, no history', () => 
   const ctx = { settings, orders: [ORIGINAL], now, tokens: {} };
   const copy = N.newOrder({ ...D.job(ORIGINAL), margin: 40 }, ctx);
   assert.notEqual(copy.id, ORIGINAL.id);
-  assert.equal(copy.id, 'INV-2026-0043');
+  assert.match(copy.id, /^INV-2026-0043-[0-9a-z]{4}$/);
+  assert.equal(copy.jobNumber, 'INV-2026-0043');
   assert.equal(copy.invoiceNumber, 'INV-2026-0043');
   assert.equal(copy.status, 'pending');
   assert.equal(copy.paidAmount, 0);

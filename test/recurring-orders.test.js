@@ -297,6 +297,16 @@ function original(b) {
 function lifted(b) {
   const cl = deep(b.clients), orders = deep(b.orders), st = deep(b.settings);
   const out = R.run(cl, orders, { settings: st, now: new Date() });
+  // The one deliberate change since the originals: a new job's id carries a
+  // random tag after the number they made it from (lib/order-new.js
+  // `mintOrderId`), and that number is kept as `jobNumber`. Folded back so
+  // everything else is still compared exactly.
+  for (const o of out.created) {
+    assert.match(o.id, /-[0-9a-z]{4}$/);
+    assert.equal(o.id.slice(0, -5), o.jobNumber);
+    o.id = o.jobNumber;
+    delete o.jobNumber;
+  }
   return { clients: cl, printLog: orders, settings: st, created: out.created };
 }
 
@@ -394,7 +404,8 @@ test('the job is the template with the last run taken off it', () => {
   };
   const settings = { invNumNext: 12, invNumYear: 2026, invPrefix: 'INV' };
   const job = R.clone(template, { settings, now: new Date(), recurring: { nextDue: TODAY }, cycle: TODAY });
-  assert.equal(job.id, 'INV-2026-0012');
+  assert.match(job.id, /^INV-2026-0012-[0-9a-z]{4}$/);
+  assert.equal(job.jobNumber, 'INV-2026-0012');
   assert.equal(job.invoiceNum, 'INV-2026-0012');
   assert.equal(job.invoiceNumber, 'INV-2026-0012');
   assert.equal(settings.invNumNext, 13, 'the counter moved, and the caller must save it');
@@ -432,7 +443,7 @@ test('the job is the template with the last run taken off it', () => {
 test('the year rolls the counter, as the invoice rule says it does', () => {
   const settings = { invNumNext: 40, invNumYear: 2025 };
   const job = R.clone({ id: 'x', parts: [] }, { settings, now: new Date(), cycle: TODAY });
-  assert.equal(job.id, 'INV-2026-0001');
+  assert.equal(job.jobNumber, 'INV-2026-0001');
   assert.equal(settings.invNumYear, 2026);
 });
 

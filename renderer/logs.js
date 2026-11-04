@@ -116,7 +116,7 @@ function renderDepositAuditBanner() {
   const money = (n) => `${(typeof fmtMoney === 'function' ? fmtMoney(n) : Math.round(n))}${cur ? ' ' + cur : ''}`;
   const rows = hits.map((e) => `
     <div class="dep-audit-row">
-      <span class="dep-audit-name">${escapeHtml(e.order.project || e.order.id)}</span>
+      <span class="dep-audit-name">${escapeHtml(e.order.project || jobRef(e.order))}</span>
       <span class="dep-audit-gap">${escapeHtml(money(e.currentPaid))}</span>
       <span class="dep-audit-arrow" aria-hidden="true">→</span>
       <span class="dep-audit-fixed">${escapeHtml(money(e.recovered))}</span>
@@ -245,7 +245,7 @@ function renderLogs() {
         ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && !KhaytOrderStatus.isFinished(log) ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
         ${logOperator ? `<span class="operator-badge">👤 ${escapeHtml(logOperator.name)}</span>` : ''}
         ${(log.tags && log.tags.length > 0) ? `<div style="margin-top:3px;">${renderTagChips(log.tags, true)}</div>` : ''}
-        <div style="font-family: var(--font-num); font-size: 11.5px; color: var(--text-muted);">${escapeHtml(log.id)}${photoCount ? ` · ${photoCount}📷` : ''}${fileCount ? ` · ${fileCount}📎` : ''}${log.notes ? ' · 📝' : ''}</div>
+        <div style="font-family: var(--font-num); font-size: 11.5px; color: var(--text-muted);">${escapeHtml(jobRef(log))}${photoCount ? ` · ${photoCount}📷` : ''}${fileCount ? ` · ${fileCount}📎` : ''}${log.notes ? ' · 📝' : ''}</div>
       </td>
       <td>
         <span class="badge ${escapeHtml(log.status)}">${escapeHtml(t('queue.' + log.status))}</span>${log.deliveredAt ? ` <span style="font-size:10px; color:var(--success);">✓ ${escapeHtml(t('queue.delivered'))}</span>` : ''}
@@ -439,7 +439,7 @@ function batchWaSend() {
     if (!o) return '';
     const client = o.clientId ? clientById(o.clientId) : null;
     const name = client ? (localName(client)) : (o.project || '');
-    return `<div style="font-size:12px;color:var(--text-dim);padding:2px 0;">${escapeHtml(o.id)} — ${escapeHtml(name)} — ${fmtOrderPrice(o.price, o)}</div>`;
+    return `<div style="font-size:12px;color:var(--text-dim);padding:2px 0;">${escapeHtml(jobRef(o))} — ${escapeHtml(name)} — ${fmtOrderPrice(o.price, o)}</div>`;
   }).join('');
   openFormModal({
     title: `${t('batch.wa_all')} (${ids.length})`,

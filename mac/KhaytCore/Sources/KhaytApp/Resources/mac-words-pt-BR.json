@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "Conectado, mas a chave desta loja não pôde ser colocada no Khayt Cloud, então os outros dispositivos ainda não podem sincronizar. Entre novamente para tentar de novo.",
  "mac.cloud_key_published": "A chave desta loja já está no Khayt Cloud e o livro foi enviado, então seus outros dispositivos podem entrar e sincronizar.",
  "mac.cloud_line_hint": "Clique para entrar ou verificar a nuvem; clique com o botão direito para mais opções.",
+ "mac.cloud_twin_jobs": "{n} trabalhos de outro computador tinham uma referência já usada aqui. Os dois foram mantidos; a deles está marcada.",
+ "mac.cloud_twin_jobs_one": "{n} trabalho de outro computador tinha uma referência já usada aqui. Os dois foram mantidos; a dele está marcada.",
  "mac.cloud_lost_edits": "{n} alterações feitas aqui foram descartadas: o registro havia sido excluído em outro dispositivo.",
  "mac.cloud_lost_edits_one": "{n} alteração feita aqui foi descartada: o registro havia sido excluído em outro dispositivo.",
  "mac.cloud_nothing_to_send": "Nada mais a enviar — a nuvem já tem tudo.",

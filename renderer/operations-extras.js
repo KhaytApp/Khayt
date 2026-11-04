@@ -74,7 +74,7 @@ function openEndOfDayReport() {
   const overdueHtml = overdueOrders.length > 0 ? `
     <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
       <strong style="font-size:12px;color:var(--warning);">Due Today — Not Completed</strong>
-      ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || o.id)}</div>`).join('')}
+      ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || jobRef(o))}</div>`).join('')}
     </div>` : '';
 
   const bodyHtml = `
@@ -111,7 +111,7 @@ function openEndOfDayReport() {
     <tr><td>In Progress</td><td>${inProgress.length}</td></tr>
     <tr><td>Filament Wasted</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
     <tr><td>Time Logged</td><td>${timeTotal} min</td></tr>
-    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || o.id)}</li>`).join('') + '</ul>' : ''}
+    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || jobRef(o))}</li>`).join('') + '</ul>' : ''}
     </body></html>`;
 
   openFormModal({

@@ -40,7 +40,7 @@ async function checkBnplLinks() {
         // which is money waiting on the shop, not a quiet network blip.
         if (r && r.remoteStatus) {
           const name = link.provider === 'tamara' ? 'Tamara' : 'Tabby';
-          toast(t('bnpl.confirm_failed', { service: name, project: order.project || order.id, error: r.error || '' }), 'warning', 8000);
+          toast(t('bnpl.confirm_failed', { service: name, project: order.project || jobRef(order), error: r.error || '' }), 'warning', 8000);
         }
         console.warn('[bnpl] check failed', link.provider, link.id, r && r.error);
         continue;
@@ -53,7 +53,7 @@ async function checkBnplLinks() {
           { today: localDateStr(), settings });
         runPaymentEffects(order, out.effects);   // saves, renders, receipt email, webhooks, accounting
         const name = link.provider === 'tamara' ? 'Tamara' : 'Tabby';
-        toast(t('bnpl.confirmed', { service: name, project: order.project || order.id }), 'success', 6000);
+        toast(t('bnpl.confirmed', { service: name, project: order.project || jobRef(order) }), 'success', 6000);
       } else if (r.state === 'closed') {
         KhaytBnplConfirm.settle(live, 'closed', r.remoteStatus);
         saveAll();
@@ -97,7 +97,7 @@ async function captureShippedTamara() {
     if (r && r.remoteStatus && live.captureError !== err) {
       live.captureError = err;
       saveAll();
-      toast(t('bnpl.capture_failed', { project: order.project || order.id, error: err }), 'warning', 8000);
+      toast(t('bnpl.capture_failed', { project: order.project || jobRef(order), error: err }), 'warning', 8000);
     }
     console.warn('[bnpl] capture failed', link.id, err);
   }

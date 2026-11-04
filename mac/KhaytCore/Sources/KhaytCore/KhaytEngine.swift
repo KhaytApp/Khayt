@@ -7378,7 +7378,7 @@ public actor KhaytEngine {
               // given here — inside the write, on the newest settings.
               var settings = Object.assign({}, s.settings || {});
               var given = globalThis.KhaytOrderNew.ensureInvoiceNumber(
-                r.order, settings, new Date(now).getFullYear());
+                r.order, settings, new Date(now).getFullYear(), data.printLog);
               return { found: true, error: null, order: r.order, printLog: data.printLog,
                        settings: given ? settings : null };
             })(ARG0, ARG1, ARG2)
@@ -7396,15 +7396,82 @@ public actor KhaytEngine {
     /// `lib/order-new.js`'s `ensureInvoiceNumber`: give a job that began as a
     /// quote the invoice number it is owed, advancing the shop's counter.
     /// Pure — the caller runs it INSIDE the store write and writes both back.
+    ///
+    /// `orders`, the book, moves the counter past every number already in
+    /// it — settings do not sync, so a number another computer issued is only
+    /// known from the jobs it wrote.
     public func ensureInvoiceNumber(order: JSONValue, settings: [String: JSONValue],
-                                    year: Int) throws -> InvoiceNumbered {
+                                    year: Int, orders: [JSONValue] = []) throws -> InvoiceNumbered {
         try runtime.call2("""
-            (function (o, s, y) {
+            (function (o, s, y, book) {
               var order = Object.assign({}, o), settings = Object.assign({}, s);
-              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y);
+              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y, book);
               return { order: order, settings: settings, number: n };
-            })(ARG0, ARG1, ARG2)
-            """, [order, .object(settings), .number(Double(year))], as: InvoiceNumbered.self)
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .number(Double(year)), .array(orders)], as: InvoiceNumbered.self)
+    }
+
+    /// Documents in the book that print one number
+    /// (`KhaytInvoiceDocument.duplicateNumbers`): what two computers offline
+    /// at the same moment can still make. Each group lists its jobs oldest first.
+    public struct DuplicateNumber: Decodable, Sendable, Identifiable, Hashable {
+        public struct Job: Decodable, Sendable, Identifiable, Hashable {
+            public let id: String
+            public let ref: String
+            public let project: String
+            public let date: String
+        }
+        public let number: String
+        public let kind: String
+        public let year: String
+        public let jobs: [Job]
+        public var id: String { kind + "|" + year + "|" + number }
+    }
+
+    public func duplicateNumbers(orders: [JSONValue], settings: [String: JSONValue]) throws -> [DuplicateNumber] {
+        try runtime.call2("KhaytInvoiceDocument.duplicateNumbers(ARG0, ARG1)",
+                          [.array(orders), .object(settings)], as: [DuplicateNumber].self)
+    }
+
+    /// `lib/order-new.js`'s `renumber`: the job with the next free number,
+    /// the counters it advanced, and the number given. Pure — the caller runs
+    /// it INSIDE the store write and writes both back.
+    ///
+    /// `year` is the duplicate pair's own year: a past year's pair gets a free
+    /// number in that year and the shop's counter is left alone. `before` and
+    /// `after` are what `undoRenumber` needs to take it back.
+    public func renumber(order: JSONValue, settings: [String: JSONValue],
+                         orders: [JSONValue], year: Int) throws -> Renumbered {
+        try runtime.call2("""
+            (function (o, s, book, y) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              var before = KhaytOrderNew.renumberSnapshot(order, settings);
+              var n = KhaytOrderNew.renumber(order, settings, book, y);
+              var after = KhaytOrderNew.renumberSnapshot(order, settings);
+              return { order: order, settings: settings, number: n, before: before, after: after };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .array(orders), .number(Double(year))], as: Renumbered.self)
+    }
+
+    public struct Renumbered: Decodable, Sendable {
+        public let order: JSONValue
+        public let settings: JSONValue
+        public let number: String?
+        public let before: JSONValue
+        public let after: JSONValue
+    }
+
+    /// `lib/order-new.js`'s `undoRenumber`: the job's number fields back as
+    /// they were, and a counter back only if nothing has used it since.
+    public func undoRenumber(order: JSONValue, settings: [String: JSONValue],
+                             before: JSONValue, after: JSONValue) throws -> InvoiceNumbered {
+        try runtime.call2("""
+            (function (o, s, b, a) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              KhaytOrderNew.undoRenumber(order, settings, b, a);
+              return { order: order, settings: settings, number: null };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), before, after], as: InvoiceNumbered.self)
     }
 
     /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.
@@ -12134,8 +12201,11 @@ public actor KhaytEngine {
         return try runtime.call2(NEW_ORDER_SCRIPT,
                                  [.object(input), .array(orders), .object(settings),
                                   .number(now.timeIntervalSince1970 * 1000),
+                                  // `id`: the random tag that keeps the job's id
+                                  // unique across computers (`mintOrderId`).
                                   .object(["tracking": bytes(tokens.tracking),
-                                           "quoteApproval": bytes(tokens.quoteApproval)]),
+                                           "quoteApproval": bytes(tokens.quoteApproval),
+                                           "id": bytes((0..<4).map { _ in UInt8.random(in: .min ... .max) })]),
                                   .array(consumables), .array(clients)],
                                  as: NewOrder.self)
     }

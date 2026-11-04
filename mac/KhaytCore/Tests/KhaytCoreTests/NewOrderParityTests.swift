@@ -36,7 +36,7 @@ struct NewOrderParityTests {
 
     /// A frozen clock and fixed tokens, so two runtimes can be compared at all.
     static let NOW = "1757063700000"
-    static let TOKENS = "{tracking:new Array(16).fill(171), quoteApproval:new Array(16).fill(205)}"
+    static let TOKENS = "{tracking:new Array(16).fill(171), quoteApproval:new Array(16).fill(205), id:[0,1,2,3]}"
 
     static let CART = """
     [{name:'Bracket',material:'PLA',baseCost:120.5,printTime:4.25,qty:2,printWeight:180},

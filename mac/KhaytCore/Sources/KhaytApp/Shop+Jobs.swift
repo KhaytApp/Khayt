@@ -1099,10 +1099,18 @@ extension Shop {
     /// job's parts name, which is the other app's reading too: a plate cannot
     /// mix filaments, so a job printed in two is planned by the first and the
     /// shop sees the rest on the row.
+    /// The reference a person reads for the job with this id — its job
+    /// number, else the id (`Order.reference`). For rows that carry only an
+    /// id (reports, the chase list); an id the book does not hold is shown
+    /// as it is.
+    func reference(ofJob id: String) -> String {
+        orders.first(where: { $0.id == id })?.reference ?? id
+    }
+
     static func plateJob(_ job: Order) -> KhaytEngine.PlateJob {
         let grams = job.parts.reduce(0.0) { $0 + $1.printWeight * Double(max(1, $1.qty)) }
         let material = job.parts.first(where: { !$0.material.isEmpty })?.material ?? ""
-        return KhaytEngine.PlateJob(id: job.id, project: job.project.isEmpty ? job.id : job.project,
+        return KhaytEngine.PlateJob(id: job.id, project: job.project.isEmpty ? job.reference : job.project,
                                     hours: job.printTime, grams: grams, material: material)
     }
 
@@ -1802,7 +1810,7 @@ extension Shop {
                 guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
                 let numbered = try await engine.ensureInvoiceNumber(
                     order: orders[at], settings: Self.settings(root),
-                    year: Calendar.book.component(.year, from: Date()))
+                    year: Calendar.book.component(.year, from: Date()), orders: orders)
                 guard numbered.number != nil, case .object(var o) = numbered.order else { return }
                 StoreWriter.stamp(&o)
                 orders[at] = .object(o)
@@ -1812,6 +1820,78 @@ extension Shop {
             await load(source)
         } catch {
             // The document still draws, under the job's id, as it always has.
+        }
+    }
+
+    /// Give this job the next free number, because another document in the
+    /// book already prints its number (`duplicateNumbers`). The id never
+    /// changes. Done inside the write on the book as it is on disk, because
+    /// the counter is a read-modify-write. Returns the number given.
+    ///
+    /// `year` is the duplicate pair's own year (a 2025 pair stays in 2025, and
+    /// this year's counter does not move). The renumber goes on the undo stack:
+    /// the old number may be the one already on a customer's paper.
+    @discardableResult
+    func renumberJob(_ id: Order.ID, year: Int? = nil) async -> String? {
+        guard canMoveJobs, permitted("orders", "edit"),
+              let build = source.build, let engine else { return nil }
+        var given: String?
+        var snapshots: (before: JSONValue, after: JSONValue)?
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "printLog")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
+                let out = try await engine.renumber(
+                    order: orders[at], settings: Self.settings(root), orders: orders,
+                    year: year ?? Calendar.book.component(.year, from: Date()))
+                guard let number = out.number, case .object(var o) = out.order else { return }
+                StoreWriter.stamp(&o)
+                orders[at] = .object(o)
+                root["printLog"] = .array(orders)
+                root["settings"] = out.settings
+                given = number
+                snapshots = (out.before, out.after)
+            }
+            await load(source)
+        } catch {
+            return nil
+        }
+        if let snapshots, let undoManager {
+            let name = words.callIt("dupnum.renumber")
+            undoManager.setActionName(name)
+            undoManager.registerUndo(withTarget: self) { shop in
+                Task { await shop.undoRenumber(id, before: snapshots.before, after: snapshots.after) }
+            }
+        }
+        return given
+    }
+
+    /// Take a renumber back (`renumberJob`'s undo), inside the write.
+    func undoRenumber(_ id: Order.ID, before: JSONValue, after: JSONValue) async {
+        guard let build = source.build, let engine else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "printLog")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
+                let out = try await engine.undoRenumber(order: orders[at], settings: Self.settings(root),
+                                                        before: before, after: after)
+                guard case .object(var o) = out.order else { return }
+                StoreWriter.stamp(&o)
+                orders[at] = .object(o)
+                root["printLog"] = .array(orders)
+                root["settings"] = out.settings
+            }
+            await load(source)
+        } catch {
+            // The renumbered job stays as it is; nothing half-written.
         }
     }
 
@@ -2456,7 +2536,7 @@ extension Shop {
            stage != .quote, stage != .cancelled {
             let numbered = try await engine.ensureInvoiceNumber(
                 order: .object(changedOrder), settings: settings,
-                year: Calendar.book.component(.year, from: Date()))
+                year: Calendar.book.component(.year, from: Date()), orders: Self.rows(root, "printLog"))
             if numbered.number != nil, case .object(let o) = numbered.order,
                case .object(let s) = numbered.settings {
                 changedOrder = o

@@ -288,7 +288,7 @@ function showLinkedExpenses(orderId) {
         ${escapeHtml(t('exp.sum.expenses'))}: ${fmtPrice(total)}
       </div>`;
   openFormModal({
-    title: `${t('exp.linked_expenses')} — ${escapeHtml(order.id)}`,
+    title: `${t('exp.linked_expenses')} — ${escapeHtml(jobRef(order))}`,
     noSave: true,
     sizeLg: true,
     bodyHtml: tableHtml,
@@ -321,8 +321,8 @@ async function emailOrderToClient(orderId, isQuote = false) {
       <h2 style="color:${safeCssColor(settings.invAccentColor, '#5E2E14')};">${escapeHtml(shop)}</h2>
       <p>Dear ${escapeHtml(clientName)},</p>
       <p>${isQuote
-        ? `Please find below your quote <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
-        : `Please find below your invoice <strong>${escapeHtml(order.id)}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
+        ? `Please find below your quote <strong>${escapeHtml(jobRef(order))}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
+        : `Please find below your invoice <strong>${escapeHtml(jobRef(order))}</strong> for <strong>${fmtOrderPrice(order.price, order)}</strong>.`
       }</p>
       <p>Project: ${escapeHtml(order.project || '')}</p>
       <p>Date: ${escapeHtml(order.date || '')}</p>
@@ -369,7 +369,7 @@ function populateExpOrderDatalist() {
   const dl = $('#expOrderList');
   if (!dl) return;
   dl.innerHTML = printLog.slice(0, 50).map(o =>
-    `<option value="${escapeHtml(o.id)}">${escapeHtml(o.id)} — ${escapeHtml(o.project || '')}</option>`
+    `<option value="${escapeHtml(o.id)}">${escapeHtml(jobRef(o))} — ${escapeHtml(o.project || '')}</option>`
   ).join('');
 }
 

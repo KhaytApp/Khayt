@@ -149,14 +149,14 @@ struct GoToBook: Sendable {
         // Newest first, so of two equally good hits the recent job wins —
         // the one a shop is far likelier to be looking for.
         for job in orders.sorted(by: { $0.date > $1.date }) {
-            var fields = [job.id, Self.number(job.id)]
+            var fields = [job.id, Self.number(job.id), job.reference, Self.number(job.reference)]
             if let invoice = job.invoiceNumber { fields += [invoice, Self.number(invoice)] }
             fields += [job.client, job.project]
             fields += job.parts.map(\.name)
-            let subtitle = [job.id, job.invoiceNumber ?? "", job.client]
+            let subtitle = [job.reference, job.invoiceNumber ?? "", job.client]
                 .filter { !$0.isEmpty }.map { Figure.isolated($0) }.joined(separator: " · ")
             entries.append(.init(kind: .job, id: job.id,
-                                 title: job.project.isEmpty ? job.id : job.project,
+                                 title: job.project.isEmpty ? job.reference : job.project,
                                  subtitle: subtitle, fields: fields))
         }
         for customer in customers {

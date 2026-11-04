@@ -202,8 +202,8 @@ actor BookReader {
             let id = text(o["id"])
             guard let owed = owedBy[id], owed > 0.005 else { return nil }
             let due = text(o["dueDate"])
-            return OwedLine(id: id, project: text(o["project"]), client: text(o["client"]),
-                            owed: owed, dueDate: due.isEmpty ? nil : due)
+            return OwedLine(id: id, reference: JobReference.of(o), project: text(o["project"]),
+                            client: text(o["client"]), owed: owed, dueDate: due.isEmpty ? nil : due)
         }.sorted { $0.owed > $1.owed }
     }
 
@@ -767,6 +767,8 @@ struct ShopPulse: Equatable, Sendable {
 /// One open job with money still owed on it — a line of "Who owes".
 struct OwedLine: Identifiable, Equatable, Sendable {
     let id: String
+    /// What a person reads for the job (`JobReference`); `id` stays the key.
+    var reference: String = ""
     let project: String
     let client: String
     /// In the shop's currency, by the shared rule (`owedByOrder`).

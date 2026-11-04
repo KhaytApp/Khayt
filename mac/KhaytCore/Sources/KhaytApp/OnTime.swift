@@ -57,7 +57,7 @@ struct OnTimeCard: View {
                     ForEach(report.lateJobs.prefix(5)) { job in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(job.project.isEmpty ? job.id : job.project).lineLimit(1)
+                                Text(job.project.isEmpty ? shop.reference(ofJob: job.id) : job.project).lineLimit(1)
                                 // Due, then finished: dates in the shop's own
                                 // words, and an arrow that turns in Arabic.
                                 (Text(Self.day(job.dueDate, words)) + Text(" ")

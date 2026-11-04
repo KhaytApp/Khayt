@@ -289,7 +289,7 @@ struct JobTitleCell: View {
             // number. A reference is either readable or left out; the row
             // still opens the job either way.
             ViewThatFits(in: .horizontal) {
-                Text(job.id)
+                Text(job.reference)
                     .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                     .lineLimit(1).fixedSize()
                 Color.clear.frame(width: 0, height: 0)

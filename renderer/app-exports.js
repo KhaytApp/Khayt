@@ -130,7 +130,7 @@ async function exportQuoteApprovalPage(orderId) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quote ${escapeHtml(order.id)} — ${escapeHtml(bizName)}</title>
+  <title>Quote ${escapeHtml(jobRef(order))} — ${escapeHtml(bizName)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; background: #f8f9fa; padding: 20px; }
@@ -158,13 +158,13 @@ async function exportQuoteApprovalPage(orderId) {
   <div class="container">
     <div class="header">
       <h1>${escapeHtml(bizName)}</h1>
-      <p>${escapeHtml(t('ord.quote_approval_page'))} · ${escapeHtml(order.id)}</p>
+      <p>${escapeHtml(t('ord.quote_approval_page'))} · ${escapeHtml(jobRef(order))}</p>
     </div>
     <div class="body">
       <div class="meta">
         <div class="meta-block">
           <h3>${escapeHtml(t('inv.invoice_no') || 'Quote #')}</h3>
-          <p>${escapeHtml(order.id)}</p>
+          <p>${escapeHtml(jobRef(order))}</p>
         </div>
         <div class="meta-block">
           <h3>${escapeHtml(t('inv.date'))}</h3>
@@ -258,7 +258,7 @@ function openMilestoneInvoices(orderId) {
   }
 
   openFormModal({
-    title: `${t('ord.milestone_invoices')} — ${escapeHtml(order.id)}`,
+    title: `${t('ord.milestone_invoices')} — ${escapeHtml(jobRef(order))}`,
     sizeLg: true,
     noSave: true,
     bodyHtml: `
@@ -342,7 +342,7 @@ function generateWorkOrder(id) {
   const linkedClient = order.clientId ? clients.find(c => c.id === order.clientId) : null;
   const clientName = (order.project || '').trim() || (linkedClient ? localName(linkedClient) : t('inv.walk_in'));
   const lines = (order.parts && order.parts.length > 0) ? order.parts
-    : [{ name: order.project || order.id, qty: 1, material: '', weight: '', printTime: order.printTime || 0 }];
+    : [{ name: order.project || jobRef(order), qty: 1, material: '', weight: '', printTime: order.printTime || 0 }];
   const machine = order.machineId ? machines.find(m => m.id === order.machineId) : null;
   const customDataHtml = (settings.customFields || []).length > 0 && order.customData
     ? (settings.customFields || []).map(f => {
@@ -364,7 +364,7 @@ function generateWorkOrder(id) {
           <div class="title">${escapeHtml(t("doc.work_order"))}</div>
           ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(_dl.secondary, "doc.work_order"))}</div>` : ''}
           <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.wo_no"))}</span><span class="v">WO-${escapeHtml(order.id)}</span></div>
+            <div class="meta-row"><span class="k">${escapeHtml(t("doc.wo_no"))}</span><span class="v">WO-${escapeHtml(jobRef(order))}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(today))}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.due"))}</span><span class="v">${order.dueDate ? escapeHtml(formatPrintDate(order.dueDate)) : '—'}</span></div>
             ${machine ? `<div class="meta-row"><span class="k">${escapeHtml(t("doc.machine"))}</span><span class="v">${escapeHtml(machine.name)}</span></div>` : ''}

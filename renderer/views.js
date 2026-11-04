@@ -62,8 +62,8 @@ function renderScheduleView() {
       const etaTip = eta ? ` · ${t('sched.ready_by') || 'ready'} ${fmtDay(eta.etaDate)}${late ? ' ⚠' : ''}` : '';
       const blockHtml = `<div class="schedule-block status-${escapeHtml(o.status)}"
         style="flex: 0 0 ${pct.toFixed(2)}%; background:${escapeHtml(dotColor)};${late ? 'outline:2px solid #f87171;outline-offset:-2px;' : ''}"
-        title="${escapeHtml((o.invoiceNum || o.id) + ' · ' + (o.project || '') + etaTip)}">
-        ${pct > 5 ? escapeHtml((o.invoiceNum || o.id).slice(-6)) : ''}
+        title="${escapeHtml((o.invoiceNum || jobRef(o)) + ' · ' + (o.project || '') + etaTip)}">
+        ${pct > 5 ? escapeHtml((o.invoiceNum || jobRef(o)).slice(-6)) : ''}
       </div>`;
       offset += pct;
       return blockHtml;
@@ -166,8 +166,8 @@ function renderCalendarView() {
       // BACKGROUND COLOUR ALONE — invisible to anyone who cannot distinguish those colours
       // and to a screen reader. Put both into the tooltip and the accessible name.
       const who = mc ? (mc.name || mc.id) : '';
-      const detail = [o.project || o.id, who, o.status].filter(Boolean).join(' · ');
-      return `<div class="cal-chip" style="background:${escapeHtml(bg)};" title="${escapeHtml(detail)}" aria-label="${escapeHtml(detail)}">${escapeHtml((o.project || o.id).slice(0, 18))}</div>`;
+      const detail = [o.project || jobRef(o), who, o.status].filter(Boolean).join(' · ');
+      return `<div class="cal-chip" style="background:${escapeHtml(bg)};" title="${escapeHtml(detail)}" aria-label="${escapeHtml(detail)}">${escapeHtml((o.project || jobRef(o)).slice(0, 18))}</div>`;
     }).join('');
 
     const overflow = orders.length > 3 ? `<div class="cal-chip-more">+${orders.length - 3}</div>` : '';
@@ -211,7 +211,7 @@ function renderCalendarView() {
       const body = orders.map(o => {
         const mc = machines.find(x => x.id === o.machineId);
         return `<div style="padding:8px 0; border-bottom:1px solid var(--border-soft); font-size:13px;">
-          <strong>${escapeHtml(o.project || o.id)}</strong>
+          <strong>${escapeHtml(o.project || jobRef(o))}</strong>
           <span style="margin-inline-start:8px; font-size:11px; color:var(--text-muted);">${escapeHtml(o.status)}</span>
           ${mc ? `<span style="margin-inline-start:6px; font-size:11px; color:var(--primary);">🖨 ${escapeHtml(mc.name)}</span>` : ''}
         </div>`;

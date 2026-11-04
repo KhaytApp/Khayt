@@ -5084,6 +5084,15 @@ final class Words {
                                "ar": "يغيّر هذا الدفتر على هذا الماك. السجل الأحدث في السحابة يحل محل "
                              + "النسخة هنا؛ والسجل الموجود على هذا الماك وحده يُترك كما هو. "
                              + "لا تُنزَّل الإعدادات أبدًا، والسجلات — الهدر والصيانة والوقت — يُضاف إليها فقط."],
+        "mac.cloud_twin_jobs": ["en": "{n} jobs from another computer had a reference already used here. "
+                              + "Both are kept, and theirs has a marked reference.",
+                                "ar": "{n} أعمال من جهاز آخر حملت مرجعًا مستخدمًا هنا. احتُفظ بالاثنين، ومرجعها مُعلَّم."],
+        "mac.cloud_twin_jobs_one": ["en": "{n} job from another computer had a reference already used here. "
+                                  + "Both are kept, and theirs has a marked reference.",
+                                    "ar": "عمل واحد من جهاز آخر حمل مرجعًا مستخدمًا هنا. احتُفظ بالاثنين، ومرجعه مُعلَّم."],
+        "mac.cloud_twin_jobs_two": ["en": "2 jobs from another computer had a reference already used here. "
+                                  + "All are kept, and theirs have a marked reference.",
+                                    "ar": "عملان من جهاز آخر حملا مرجعًا مستخدمًا هنا. احتُفظ بالجميع، ومرجعاهما مُعلَّمان."],
         "mac.cloud_lost_edits": ["en": "{n} changes made here were discarded: the record had been "
                                + "deleted on another device.",
                                  "ar": "أُلغي {n} تغييرًا أُجري هنا: كان السجل قد حُذف على جهاز آخر."],

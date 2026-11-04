@@ -48,7 +48,9 @@ struct RecurringOrdersTests {
         let now = Date()
         let out = try await RecurringOrders.run(&root, engine: engine, now: now)
         #expect(out.changed)
-        #expect(out.created == ["INV-\(Calendar.book.component(.year, from: now))-0012"])
+        // The number plus a random tag (lib/order-new.js `mintOrderId`).
+        #expect(out.created.count == 1)
+        #expect(out.created.first?.hasPrefix("INV-\(Calendar.book.component(.year, from: now))-0012-") == true)
 
         let orders = Self.objects(root, "printLog")
         #expect(orders.count == 3)

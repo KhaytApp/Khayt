@@ -156,7 +156,7 @@ function openWasteForm() {
     `<option value="${ft}">${escapeHtml(t('waste.ft.' + ft))}</option>`
   ).join('');
   const recentOrderOptions = printLog.slice(0, 60).map(o =>
-    `<option value="${escapeHtml(o.id)}">${escapeHtml(o.id)} — ${escapeHtml(o.project || '')}</option>`
+    `<option value="${escapeHtml(o.id)}">${escapeHtml(jobRef(o))} — ${escapeHtml(o.project || '')}</option>`
   ).join('');
 
   openFormModal({
@@ -267,7 +267,7 @@ function openLogWasteFromCard(orderId) {
     saveLabel: t('waste.log_btn'),
     sizeLg: false,
     bodyHtml: `
-      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px;">${escapeHtml(order.id)} — ${escapeHtml(order.project || '')}</p>
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px;">${escapeHtml(jobRef(order))} — ${escapeHtml(order.project || '')}</p>
       <label>${escapeHtml(t('waste.material'))}</label>
       <select id="wfc_material">${invOptions || `<option value="">${escapeHtml(defaultMaterial)}</option>`}</select>
       <label style="margin-top:12px;">${escapeHtml(t('waste.weight_g'))}</label>

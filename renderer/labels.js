@@ -36,7 +36,7 @@
     for (const o of orders) {
       const client = o.clientId ? clients.find((c) => c.id === o.clientId) : null;
       labels.push({
-        title: o.project || o.id,
+        title: o.project || jobRef(o),
         lines: [
           client ? localName(client) : (o.client || ''),
           o.material || '',

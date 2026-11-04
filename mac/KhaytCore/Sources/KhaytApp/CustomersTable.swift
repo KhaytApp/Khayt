@@ -409,7 +409,7 @@ struct CustomerInspector: View {
                                             Text(shop.words.callIt(stage.key))
                                         }
                                         Text("·")
-                                        Text(job.id)
+                                        Text(job.reference)
                                     }
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
