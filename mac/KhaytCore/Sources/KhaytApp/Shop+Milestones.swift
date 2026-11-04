@@ -39,6 +39,17 @@ extension Shop {
         }
     }
 
+    /// Give a milestone a due date, or take it away (`day` nil). The payment
+    /// reminder chases a milestone that is past it and not yet paid.
+    @discardableResult
+    func setMilestoneDue(on id: Order.ID, milestone: String, day: Date?) async -> Bool {
+        let stamp = day.map { Calendar.book.dayString($0) }
+        return await writeToOneOrder(id, named: words.callIt("ord.milestone_due"),
+                                     as: .person("orders", "edit")) { order, _, _ in
+            OneOrderEdit(order: Milestones.settingDue(milestone, to: stamp, in: order))
+        }
+    }
+
     @discardableResult
     func deleteMilestone(from id: Order.ID, milestone: String) async -> Bool {
         await writeToOneOrder(id, named: words.callIt("mac.milestone_removed"),

@@ -1014,10 +1014,10 @@
       // in the ORDER's currency by `order-new`, beside the price it pairs with.
       const cost = (+o.costBasis || 0) * stockShare(o, c);
       row.cogs += money
-        ? money.convertToBase(cost, money.orderCurrency(o, moneyCtx, known), moneyCtx)
+        ? money.orderToBase(cost, o, moneyCtx, known)
         : cost;
       row.shipping += money
-        ? money.convertToBase(+o.shippingCost || 0, money.orderCurrency(o, moneyCtx, known), moneyCtx)
+        ? money.orderToBase(+o.shippingCost || 0, o, moneyCtx, known)
         : (+o.shippingCost || 0);
     }
     // A FILED RETURN IS NOT REWRITTEN: the corrections that hold each filed

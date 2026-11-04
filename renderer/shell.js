@@ -85,6 +85,18 @@ function toast(msg, kind = 'info', ms = 2800, opts = {}) {
     });
     el.appendChild(btn);
   }
+  // A named action other than Undo — "Review" on a warning that opens the
+  // place to deal with it.
+  if (opts.action && typeof opts.action.run === 'function') {
+    const btn = document.createElement('button');
+    btn.className = 'undo-btn';
+    btn.textContent = opts.action.label || '';
+    btn.addEventListener('click', () => {
+      try { opts.action.run(); } catch (e) { console.error(e); }
+      el.remove();
+    });
+    el.appendChild(btn);
+  }
   c.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .2s'; }, ms - 250);
   setTimeout(() => el.remove(), ms);
@@ -653,8 +665,8 @@ function renderGlobalResults(term) {
     sections.push(matchOrders.map(o => `
       <div class="gs-result" data-gs-action="order" data-gs-id="${escapeHtml(o.id)}">
         <span class="gs-icon">📋</span>
-        <span class="gs-title">${escapeHtml(o.project || o.id)}</span>
-        <span class="gs-meta">${escapeHtml(o.id)} · ${fmtPrice(o.price)} · <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></span>
+        <span class="gs-title">${escapeHtml(o.project || jobRef(o))}</span>
+        <span class="gs-meta">${escapeHtml(jobRef(o))} · ${fmtOrderPrice(o.price, o)} · <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span></span>
       </div>`).join(''));
   }
 

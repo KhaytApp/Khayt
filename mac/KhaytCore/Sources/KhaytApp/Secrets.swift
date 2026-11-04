@@ -30,6 +30,24 @@ enum Secrets {
     /// of them.
     private static var keys: [StoreReader.Build: Data?] = [:]
 
+    /// Books whose Keychain READ came back empty this session — a Deny, a
+    /// dismissed prompt, or no item at all.
+    ///
+    /// Remembered, because a Deny that is not remembered is asked again: the
+    /// printer poll opens an access code every ~10 s per machine, and each of
+    /// those put a fresh SecurityAgent prompt in front of the shop that had
+    /// just said no. Cleared by a relaunch, by `forget()`, and by a successful
+    /// `seal` — typing a credential into Settings is the shop asking again, and
+    /// that path (`making: true`) never consults this set.
+    private static var denied: Set<StoreReader.Build> = []
+
+    /// One Keychain lookup per item at a time. A second caller for the same
+    /// book (and direction) awaits the first instead of starting its own —
+    /// otherwise six cache misses at launch are six prompts queued behind one
+    /// another, and six waits.
+    private struct Lookup: Hashable { let build: StoreReader.Build; let making: Bool }
+    private static var inFlight: [Lookup: Task<Data?, Never>] = [:]
+
     /// Where a book's key comes from.
     ///
     /// A seam, and not a decorative one: **a test that reads the login Keychain
@@ -134,14 +152,38 @@ enum Secrets {
     ///
     /// The cache above still means one ASK per book per session; this means the
     /// window stays alive while it is being answered.
+    ///
+    /// ── ON A DISPATCH QUEUE, NOT `Task.detached` ──────────────────────────
+    ///
+    /// It used to be `Task.detached`, which is off the main actor but ON the
+    /// cooperative pool — and the prompt can sit unanswered for twenty minutes
+    /// with that pool thread blocked inside `SecItemCopyMatching` the whole
+    /// time. Each concurrent miss (printer polls, auto-sync, cloud commands,
+    /// webhooks) held another, and the pool is only as wide as the CPU count:
+    /// the LAN server, sync and the JS engine queue behind threads that are
+    /// doing nothing but waiting for a click. `PinWork.run` parks on a Dispatch
+    /// thread and holds no pool thread while it waits.
     private static func key(for build: StoreReader.Build,
                             making: Bool = false) async -> Data? {
         if let cached = keys[build] { return cached }
+        // A read the shop has already refused is not put to them again.
+        if !making, denied.contains(build) { return nil }
+        let lookup = Lookup(build: build, making: making)
+        if let running = inFlight[lookup] { return await running.value }
         let source = making ? keyMaker : keySource
-        let key = await Task.detached(priority: .userInitiated) { source(build) }.value
-        // Only a real key is remembered. Caching a nil from a READ would stop
-        // a later seal from ever creating one.
-        if key != nil { keys[build] = key }
+        let task = Task { await PinWork.run { source(build) } }
+        inFlight[lookup] = task
+        let key = await task.value
+        if inFlight[lookup] == task { inFlight[lookup] = nil }
+        // A real key is remembered for the book. A nil from a READ is
+        // remembered only as "refused" — never as the key — so a later seal,
+        // which may CREATE the item, still gets to ask.
+        if let key {
+            keys[build] = key
+            denied.remove(build)
+        } else if !making {
+            denied.insert(build)
+        }
         return key
     }
 
@@ -175,8 +217,9 @@ enum Secrets {
         catch { throw Failure.unreadable(ErrorText.plain(error)) }
     }
 
-    /// Forget the session's key — for a test, and for a book being closed.
-    static func forget() { keys = [:] }
+    /// Forget the session's key and any remembered refusal — for a test, and
+    /// for a book being closed. A lookup already in flight finishes on its own.
+    static func forget() { keys = [:]; denied = []; inFlight = [:] }
 
     /// Which books the Keychain has already been asked about this session.
     static func cachedBuilds() -> [StoreReader.Build] { Array(keys.keys) }

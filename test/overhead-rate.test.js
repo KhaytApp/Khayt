@@ -180,7 +180,7 @@ test('quoteTotal: ON, the overhead is a cost under the margin', () => {
 });
 
 const NOW = new Date('2026-10-15T09:00:00Z');
-const TOKENS = { tracking: new Uint8Array(16).fill(1), quoteApproval: new Uint8Array(16).fill(2) };
+const TOKENS = { tracking: new Uint8Array(16).fill(1), quoteApproval: new Uint8Array(16).fill(2), id: new Uint8Array(4) };
 const PART = (over = {}) => ({ name: 'Bracket', printWeight: 40, printTime: 3, qty: 2, unitCost: 20, baseCost: 40, ...over });
 const job = (input) => N.newOrder({ parts: [PART()], margin: 50, ...input },
   { settings: { invNumNext: 1 }, orders: [], now: NOW, tokens: TOKENS });

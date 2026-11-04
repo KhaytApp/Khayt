@@ -274,6 +274,13 @@ struct MoveBanners: View {
         Group {
             ForEach(Array(shop.moveNotices.enumerated()), id: \.offset) { index, notice in
                 Banner(text: notice, symbol: "info.circle", tint: .secondary) {
+                    // "Deposit received through the portal" can be taken back
+                    // here, for a deposit the shop had already typed in.
+                    if let undo = shop.portalDepositUndo, undo.notice == notice {
+                        Button(shop.words.callIt("oe.undo")) {
+                            Task { await shop.undoPortalDeposit(undo.id, key: undo.key) }
+                        }
+                    }
                     BannerClose(words: shop.words) { shop.dismissNotice(at: index) }
                 }
             }

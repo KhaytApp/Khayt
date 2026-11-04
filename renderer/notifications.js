@@ -65,7 +65,7 @@ function buildNotifications() {
         key,
         type: 'overdue', icon: '🔴',
         title: escapeHtml(t('notif.overdue') || 'Overdue'),
-        body:  escapeHtml(o.project || o.id),
+        body:  escapeHtml(o.project || jobRef(o)),
         action() { switchTab('queue-tab'); }
       });
     }
@@ -86,7 +86,7 @@ function buildNotifications() {
           key,
           type: 'quote', icon: '📋',
           title: escapeHtml(t('notif.quote_expiring') || 'Quote expiring'),
-          body:  `${escapeHtml(o.project || o.id)} — ${d <= 0 ? (t('oe.due_overdue', {n: Math.abs(d)}) || 'expired') : d + 'd left'}`,
+          body:  `${escapeHtml(o.project || jobRef(o))} — ${d <= 0 ? (t('oe.due_overdue', {n: Math.abs(d)}) || 'expired') : d + 'd left'}`,
           action() { switchTab('logs-tab'); }
         });
       }
@@ -180,7 +180,7 @@ function buildNotifications() {
       alerts.push({
         key, type: 'overdue', icon: '💸',
         title: escapeHtml(t('notif.installment_due') || 'Installment due'),
-        body: escapeHtml((o.orderName || o.project || o.id) + ' · ' + due.length),
+        body: escapeHtml((o.orderName || o.project || jobRef(o)) + ' · ' + due.length),
         action() { switchTab('logs-tab'); },
       });
     }
@@ -195,7 +195,7 @@ function buildNotifications() {
         key,
         type: 'stale', icon: '⚠️',
         title: escapeHtml(t('notif.stale_order') || 'Order stalled'),
-        body:  `${escapeHtml(o.project || o.id)} — ${escapeHtml(t('queue.' + o.status) || o.status)}`,
+        body:  `${escapeHtml(o.project || jobRef(o))} — ${escapeHtml(t('queue.' + o.status) || o.status)}`,
         action() { switchTab('queue-tab'); }
       });
     }
@@ -436,19 +436,19 @@ async function checkDueDateNotifications() {
 
   if (overdue.length > 0) {
     new Notification(t('notif.overdue_title', { n: overdue.length }), {
-      body: overdue.slice(0, 3).map(o => o.project || o.id).join(', ') + (overdue.length > 3 ? ` +${overdue.length - 3}` : ''),
+      body: overdue.slice(0, 3).map(o => o.project || jobRef(o)).join(', ') + (overdue.length > 3 ? ` +${overdue.length - 3}` : ''),
       tag:  'hub-overdue'
     });
   }
   if (dueToday.length > 0) {
     new Notification(t('notif.due_today_title', { n: dueToday.length }), {
-      body: dueToday.map(o => o.project || o.id).join(', '),
+      body: dueToday.map(o => o.project || jobRef(o)).join(', '),
       tag:  'hub-due-today'
     });
   }
   if (dueTomorrow.length > 0) {
     new Notification(t('notif.due_tomorrow_title', { n: dueTomorrow.length }), {
-      body: dueTomorrow.map(o => o.project || o.id).join(', '),
+      body: dueTomorrow.map(o => o.project || jobRef(o)).join(', '),
       tag:  'hub-due-tomorrow'
     });
   }
@@ -465,8 +465,8 @@ async function checkDueDateNotifications() {
     checkDueDateNotifications._quotesReminded.add(q.id);
     const daysLeft = Math.round((new Date(q.quoteExpiresAt + 'T00:00:00') - today) / 86400000);
     const msg = daysLeft < 0
-      ? `Quote ${q.id} for "${q.project}" expired ${Math.abs(daysLeft)} day(s) ago`
-      : `Quote ${q.id} for "${q.project}" expires ${daysLeft === 0 ? 'today' : 'tomorrow'}`;
+      ? `Quote ${jobRef(q)} for "${q.project}" expired ${Math.abs(daysLeft)} day(s) ago`
+      : `Quote ${jobRef(q)} for "${q.project}" expires ${daysLeft === 0 ? 'today' : 'tomorrow'}`;
     toast(msg, 'warning', 6000);
   }
 }

@@ -1410,11 +1410,13 @@ function wireEvents() {
     const shareTrackBtn = e.target.closest('[data-act="share-tracking-link"]');
     const printLabelBtn = e.target.closest('[data-act="print-label"]');
     const kanbanSliceBtn = e.target.closest('[data-act="kanban-slice-print"]');
+    const storeLinesBtn = e.target.closest('[data-act="store-lines"]');
     const pauseTimerBtn = e.target.closest('[data-act="pause-timer"]');
     const resumeTimerBtn = e.target.closest('[data-act="resume-timer"]');
     if (s)  updateStatus(s.dataset.id, s.dataset.to);
     if (printLabelBtn) { generateOrderLabel(printLabelBtn.dataset.id); return; }
     if (kanbanSliceBtn) { kanbanSlicePrint(kanbanSliceBtn.dataset.id); return; }
+    if (storeLinesBtn && typeof openStoreLinesModal === 'function') { openStoreLinesModal(storeLinesBtn.dataset.id); return; }
     if (pauseTimerBtn) {
       const ord = printLog.find(o => o.id === pauseTimerBtn.dataset.id);
       if (ord && ord.timerStart && !ord.timerPausedAt) {
@@ -1877,7 +1879,7 @@ function wireEvents() {
       const inst = (order.instalments || [])[instIdx];
       if (!inst) return;
       const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-      const clientName = client ? localName(client) : (order.project || order.id);
+      const clientName = client ? localName(client) : (order.project || jobRef(order));
       const msg = `Hi ${clientName}! A payment of ${fmtMoney(inst.amount || 0)} ${currencySymbol()} for order #${order.id} (${inst.note || ''}) is due on ${inst.dueDate || ''}. Please let us know if you have any questions.`;
       const phone = client?.phone || '';
       if (window.hubAPI?.shareWhatsApp) {

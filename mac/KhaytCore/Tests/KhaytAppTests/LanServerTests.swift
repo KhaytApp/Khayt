@@ -433,6 +433,38 @@ struct LanServerTests {
         #expect(sent.store == expected)
     }
 
+    @Test("/api/store is cut and encoded off the main actor, byte for byte as before")
+    func storeBodyOffMain() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // The reply as the route built it inline on the main actor, before the
+        // cut and the encode moved to a Dispatch thread. The phone's wire
+        // contract (scripts/ios-contract-capture.mjs) is this exact text.
+        let masked = try await bench.engine.storeForPhone(bench.book.value)
+        let now = bench.box.now
+        for whole in [false, true] {
+            let cut = whole
+                ? (store: masked, taken: BookScope.Taken(
+                    collections: [:], omitted: [], takenAt: StoreWriter.iso(now)))
+                : BookScope.take(from: masked, now: now)
+            let before = try #require(LanServer.envelope(store: cut.store, taken: cut.taken, whole: whole))
+            let reply = try await bench.get(whole ? "/api/store?scope=whole" : "/api/store",
+                                            headers: ["x-khayt-pin": "24682468"])
+            #expect(reply.status == 200)
+            #expect(reply.text == before, "the /api/store reply changed shape (whole: \(whole))")
+        }
+        // And the heavy half really is off the main actor: a 15 MB book with
+        // `?scope=whole` froze the window for seconds, repeatable by any phone.
+        let src = try ShopSources.read(URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/LanServer.swift"))
+        let route = try #require(src.range(of: #"case ("/api/store", true):"#))
+        let body = String(src[route.lowerBound...].prefix(1800))
+        #expect(body.contains("await PinWork.run({ Self.storeBody("), "the book is cut on the main actor again")
+        #expect(!body.contains("BookScope.take("), "the cut is back inline in the route")
+    }
+
     @Test("the shop is advertised under its own name, and an Arabic one is not cut in half")
     func advertisedName() {
         // What somebody standing in the shop recognises in a list.

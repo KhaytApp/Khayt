@@ -108,7 +108,7 @@ function renderLanQuoteApprovalPage({
   // Shows the number bare when the shop's currency is not known.
   currencyLabel = '',
 }) {
-  const project = lanEscapeHtml(order.project || order.id);
+  const project = lanEscapeHtml(order.project || order.jobNumber || order.id);
   const id = lanEscapeHtml(order.id);
   const price = lanEscapeHtml(String(+order.price || 0));
   const parts = order.parts || [];

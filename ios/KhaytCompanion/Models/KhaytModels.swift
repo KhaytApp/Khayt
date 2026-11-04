@@ -16,6 +16,11 @@ struct ShopStatus: Codable, Sendable {
 
 struct QueueOrder: Codable, Identifiable, Sendable {
     let id: String
+    /// The readable half of a new job's id (lib/order-new.js `mintOrderId`):
+    /// `INV-2026-0042` for an id `INV-2026-0042-k7qx`. Absent on older jobs.
+    var jobNumber: String? = nil
+    /// What a person reads for the job; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let project: String?
     let client: String?
     let status: String
@@ -50,14 +55,20 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     let priority: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, project, client, status, machine, machineId, dueDate, priority
+        case id, jobNumber, project, client, status, machine, machineId, dueDate, priority
     }
 
     /// Spelled out because `init(from:)` above suppresses the synthesized one,
     /// and the tests build these directly.
+    ///
+    /// `jobNumber` is last and defaulted so the tests' rows still read, but every
+    /// rebuild of a real job passes it on — a rebuild that drops it shows the
+    /// person the id's random tag (test/job-reference-display.test.js checks).
     init(id: String, project: String?, client: String?, status: String,
-         machine: String?, machineId: String?, dueDate: String?, priority: String?) {
+         machine: String?, machineId: String?, dueDate: String?, priority: String?,
+         jobNumber: String? = nil) {
         self.id = id; self.project = project; self.client = client; self.status = status
+        self.jobNumber = jobNumber
         self.machine = machine; self.machineId = machineId
         self.dueDate = dueDate; self.priority = priority
     }
@@ -65,6 +76,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
+        jobNumber = try? c.decodeIfPresent(String.self, forKey: .jobNumber)
         project = try c.decodeIfPresent(String.self, forKey: .project)
         client = try c.decodeIfPresent(String.self, forKey: .client)
         status = try c.decode(String.self, forKey: .status)
@@ -94,7 +106,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
-            ?? id
+            ?? reference
     }
 
     var displayClient: String {
@@ -127,7 +139,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
               !named.isEmpty else { return self }
         return QueueOrder(id: id, project: project, client: client, status: status,
                           machine: named, machineId: machineId,
-                          dueDate: dueDate, priority: priority)
+                          dueDate: dueDate, priority: priority, jobNumber: jobNumber)
     }
 }
 
@@ -536,6 +548,10 @@ struct InventorySpool: Codable, Identifiable, Sendable {
 
 struct OrderLogEntry: Codable, Identifiable, Sendable {
     let id: String
+    /// The readable half of a new job's id — see `QueueOrder.jobNumber`.
+    var jobNumber: String? = nil
+    /// What a person reads for the job; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let project: String?
     let client: String?
     let status: String
@@ -550,7 +566,7 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     let quoteExpiresAt: String?
 
     var displayTitle: String {
-        (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? id
+        (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference
     }
 
     var displayClient: String {

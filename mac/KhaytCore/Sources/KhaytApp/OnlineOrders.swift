@@ -520,6 +520,19 @@ extension Shop {
         if !order.item.reference.isEmpty {
             record["sourceOrderId"] = .string(order.item.reference)
         }
+        // WHICH PRODUCT EACH LINE IS, as the webhook's job keeps it
+        // (`lib/store-order-job.js`): the reading matched by SKU, then exact
+        // name, and a line it could not place is noted and left for the shop
+        // to pick in the job inspector. A quote-form request is one model, not
+        // a basket, and is left as it was.
+        if !order.item.isQuoteForm, let lines = try? await engine.storeOrderLines(reading: fresh.reading),
+           case .array(let rows) = lines.storeLines, !rows.isEmpty {
+            record["storeLines"] = lines.storeLines
+            if !lines.notes.isEmpty {
+                let was = Shop.plainString(record["notes"]) ?? ""
+                record["notes"] = .string(([was] + lines.notes).filter { !$0.isEmpty }.joined(separator: "\n"))
+            }
+        }
         if allFromShelf {
             // Nothing about this waits on a machine. A shelf sale under
             // Pending is a job somebody goes looking for a free printer to

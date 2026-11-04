@@ -81,7 +81,9 @@ extension BookReader {
         // The counter is the Mac's — see the type's note.
         let number: String
         if proforma {
-            number = orderId
+            // The number a person reads, as lib/invoice-document.js prints it:
+            // the job number, not the id's random tag.
+            number = Self.text(order["jobNumber"]).flatMap { $0.isEmpty ? nil : $0 } ?? orderId
         } else {
             if try await engine.invoiceNumberOwed(order: row, settings: settings) { return .refused(.notNumbered) }
             number = try await engine.documentNumber(order: row, settings: settings)

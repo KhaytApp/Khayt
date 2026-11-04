@@ -331,7 +331,7 @@ async function generateSurveyPage(orderId) {
 </style></head>
 <body><div class="card">
   <h1>📦 ${shopName}</h1>
-  <p>Order <strong>${escapeHtml(order.id)}</strong>${order.project ? ' — ' + escapeHtml(order.project) : ''}</p>
+  <p>Order <strong>${escapeHtml(jobRef(order))}</strong>${order.project ? ' — ' + escapeHtml(order.project) : ''}</p>
   <p>How would you rate your experience?</p>
   <div class="stars" id="stars">
     <span class="star" data-v="1">⭐</span>
@@ -486,7 +486,7 @@ async function openBnplModal(orderId) {
   ).join('');
 
   openFormModal({
-    title: `💳 ${t('bnpl.payment_modal')} — ${escapeHtml(order.project || order.id)}`,
+    title: `💳 ${t('bnpl.payment_modal')} — ${escapeHtml(order.project || jobRef(order))}`,
     fields: [],
     extraHtml: `
       <div style="margin-bottom:6px;font-size:12px;color:var(--text-muted);">${t('bnpl.amount_label')}: <strong>${fmtPrice(amount)} ${currencySymbol()}</strong></div>
@@ -507,7 +507,7 @@ async function openBnplModal(orderId) {
       if (btn) { btn.disabled = true; btn.textContent = t('bnpl.generating'); }
       let result;
       const cfg = b[svc.id];
-      const commonArgs = { amount, currency: cfg.currency || 'SAR', description: order.project || order.id, buyer, orderId: KhaytInvoiceDocument.documentNumber(order, settings), itemName: order.project || order.id };
+      const commonArgs = { amount, currency: cfg.currency || 'SAR', description: order.project || jobRef(order), buyer, orderId: KhaytInvoiceDocument.documentNumber(order, settings), itemName: order.project || jobRef(order) };
       if (svc.id === 'tabby')  result = await window.hubAPI?.bnplTabby?.({ ...commonArgs, apiKey: cfg.apiKey, merchantCode: cfg.merchantCode });
       if (svc.id === 'tamara') result = await window.hubAPI?.bnplTamara?.({ ...commonArgs, apiKey: cfg.apiKey, country: cfg.country || 'SA' });
       if (svc.id === 'stripe') result = await window.hubAPI?.bnplStripe?.({ ...commonArgs, apiKey: cfg.apiKey, successUrl: cfg.successUrl, cancelUrl: cfg.cancelUrl, customerEmail: buyer.email });
@@ -801,15 +801,15 @@ function exportAccountingCSV() {
     }
     // Payment entries
     if (o.paidAmount > 0) {
-      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Payment for ${escapeHtml(o.id)}`, 'Cash / Bank', (+o.paidAmount||0).toFixed(2), '', '', oc]);
-      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Payment for ${escapeHtml(o.id)}`, 'Accounts Receivable', '', (+o.paidAmount||0).toFixed(2), '', oc]);
+      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Payment for ${escapeHtml(jobRef(o))}`, 'Cash / Bank', (+o.paidAmount||0).toFixed(2), '', '', oc]);
+      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Payment for ${escapeHtml(jobRef(o))}`, 'Accounts Receivable', '', (+o.paidAmount||0).toFixed(2), '', oc]);
     }
     if ((+o.giftCardDiscount || 0) > 0) {
       // Clear the gift-card-settled portion from A/R against the gift-card liability,
       // otherwise the exported ledger leaves that portion open forever.
       const gd = (+o.giftCardDiscount).toFixed(2);
-      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Gift card redeemed for ${escapeHtml(o.id)}`, 'Gift Card Liability', gd, '', '', oc]);
-      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Gift card redeemed for ${escapeHtml(o.id)}`, 'Accounts Receivable', '', gd, '', oc]);
+      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Gift card redeemed for ${escapeHtml(jobRef(o))}`, 'Gift Card Liability', gd, '', '', oc]);
+      rows.push([o.paidAt?.split('T')[0]||o.date||'', o.id, 'Payment', `Gift card redeemed for ${escapeHtml(jobRef(o))}`, 'Accounts Receivable', '', gd, '', oc]);
     }
   });
 
@@ -939,7 +939,7 @@ async function exportOrderStatusPage(orderId) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Status — ${escapeHtml(order.id)}</title>
+  <title>Order Status — ${escapeHtml(jobRef(order))}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }
@@ -965,7 +965,7 @@ async function exportOrderStatusPage(orderId) {
     </div>
     <div class="body">
       <div class="stepper">${connectors}</div>
-      <div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(order.id)}</span></div>
+      <div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(jobRef(order))}</span></div>
       <div class="info-row"><span class="info-label">Project</span><span class="info-value">${escapeHtml(order.project || '—')}</span></div>
       <div class="info-row"><span class="info-label">Status</span><span class="info-value">${escapeHtml(STATUS_LABELS[order.status] || order.status)}</span></div>
       ${order.dueDate ? `<div class="info-row"><span class="info-label">Estimated completion</span><span class="info-value">${escapeHtml(order.dueDate)}</span></div>` : ''}
@@ -1026,11 +1026,11 @@ async function autoExportStatusPage(order) {
       : order.status === 'on_hold'
         ? `Your order is temporarily on hold.${order.holdReason ? ' Reason: ' + escapeHtml(order.holdReason) : ''}`
         : 'Your order is being processed. We\'ll notify you when it\'s ready.';
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Order Status — ${escapeHtml(order.id)}</title>
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Order Status — ${escapeHtml(jobRef(order))}</title>
 <style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
 <div class="card"><div class="header"><h1>${escapeHtml(bizName)}</h1><p>Order Status Update</p></div>
 <div class="body"><div class="stepper">${connectors}</div>
-<div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(order.id)}</span></div>
+<div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(jobRef(order))}</span></div>
 <div class="info-row"><span class="info-label">Project</span><span class="info-value">${escapeHtml(order.project || '—')}</span></div>
 <div class="info-row"><span class="info-label">Status</span><span class="info-value">${escapeHtml(order.status)}</span></div>
 ${order.dueDate ? `<div class="info-row"><span class="info-label">Due</span><span class="info-value">${escapeHtml(order.dueDate)}</span></div>` : ''}
@@ -1191,7 +1191,7 @@ async function aiDraftReply(orderId) {
         else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
       });
       modal.querySelector('#arEmail')?.addEventListener('click', () => {
-        const subj = (shopField('biz') || 'Khayt') + ' — ' + (order.project || order.id);
+        const subj = (shopField('biz') || 'Khayt') + ' — ' + (order.project || jobRef(order));
         // encodeURIComponent the ADDRESS too. A client's email is not the shop's
         // text: the LAN intake form accepts one from anyone who can reach it and
         // stores it after nothing but trim+slice(500). An address ending
@@ -1319,7 +1319,7 @@ async function openPortalMessages(orderId) {
   };
 
   openFormModal({
-    title: '💬 ' + (t('pm.title') || 'Portal messages') + ' · ' + escapeHtml(order.id),
+    title: '💬 ' + (t('pm.title') || 'Portal messages') + ' · ' + escapeHtml(jobRef(order)),
     noSave: true,
     bodyHtml: `<div id="pmBody"><p style="color:var(--text-muted);">${escapeHtml(t('common.loading') || '…')}</p></div>`,
     onMount(modal) { render(modal); },
@@ -1474,6 +1474,10 @@ async function publishOrderToCloudPortal(orderId) {
         // `lib/portal-owner.js responseFor` reads the customer's answer.
         const said = KhaytPortalOwner.responseFor(lst.items, pubToken, order);
         const paid = said.paid;
+        // A paid deposit is RECORDED, once (`recordPortalPayment` keys it on the
+        // provider's reference), through the shop's own payment rule — not only
+        // said here and then typed in again by hand.
+        if (paid) recordPortalDepositFrom(lst.items, pubToken, order);
         const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
         if (said.response === 'none') {
           resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
@@ -1497,6 +1501,44 @@ async function publishOrderToCloudPortal(orderId) {
       });
     },
   });
+}
+
+/**
+ * Record a deposit the customer paid through the portal, and say what
+ * happened. `lib/portal-owner.js recordPortalPayment` decides; a second check,
+ * or the Mac having recorded it already, changes nothing and says nothing.
+ */
+function recordPortalDepositFrom(items, pubToken, order) {
+  if (typeof KhaytPortalOwner === 'undefined' || !KhaytPortalOwner.recordPortalPayment) return;
+  const out = KhaytPortalOwner.recordPortalPayment(items, pubToken, order,
+    { today: localDateStr(), settings, clients });
+  if (out.outcome === 'none' || out.outcome === 'already') return;
+  // In the job's own currency: the portal asked for the job's own figures.
+  const code = (typeof KhaytOrderMoney !== 'undefined' && KhaytOrderMoney.orderCurrency)
+    ? KhaytOrderMoney.orderCurrency(order, { settings, clients }) : settings.currency;
+  const amount = fmtMoneyIn(out.amount, code);
+  if (out.outcome === 'recorded') {
+    runPaymentEffects(order, out.effects.filter((e) => e.type !== 'toast_saved'));
+    // Undo for the one case the rule cannot see: the same deposit typed in by
+    // hand more than a few days apart. The note stays, marked undone, so no
+    // later check records it again.
+    toast(t('cloud.portal_deposit_recorded', { amount }), 'success', 10000, {
+      undo: () => {
+        const back = KhaytPortalOwner.undoPortalPayment(order, out.key,
+          { settings, clients, now: new Date().toISOString() });
+        if (!back.ok) return;
+        saveAll();
+        if (typeof renderLogs === 'function') renderLogs();
+        if (typeof renderKanban === 'function') renderKanban();
+        toast(t('cloud.portal_deposit_undone', { amount }), 'info', 5000);
+      },
+    });
+  } else {
+    saveAll();
+    const key = out.outcome === 'matched' ? 'cloud.portal_deposit_matched'
+      : out.outcome === 'settled' ? 'cloud.portal_deposit_settled' : 'cloud.portal_deposit_no_amount';
+    toast(t(key, { amount }), 'info', 7000);
+  }
 }
 
 async function openQuoteApprovalLinkModal(orderId) {
@@ -2035,12 +2077,32 @@ function trackShipment(trackingNumber, carrier) {
     } catch (_) { return 0; }
   }
 
+  function intakeStoreJob(p, orderId) {
+    const S = global.KhaytShelfSale, J = global.KhaytStoreOrderJob;
+    if (!S || !J) return null;
+    const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    const reading = S.read(p, { products: list, stock: {} });
+    if (!reading.lines.length) return null;
+    const job = J.build(reading, {
+      products: list,
+      inventory: (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [],
+      consumables: (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [],
+      settings,
+    }, orderId);
+    return Object.assign(job, { reading });
+  }
+
   async function importIntakeAsQuote(it, c) {
     const p = it.payload || {};
     const now = new Date();
     const seq = (typeof nextQuoteSeq === 'function') ? nextQuoteSeq() : String(now.getTime()).slice(-4);
     const prefix = (settings.quotePrefix || 'QUO');
-    const orderId = `${prefix}-${now.getFullYear()}-${seq}`;
+    // A readable number plus a random tag (lib/order-new.js `mintOrderId`), so a
+    // quote taken in here cannot share an id with one another computer made.
+    const jobNumber = `${prefix}-${now.getFullYear()}-${seq}`;
+    const orderId = window.KhaytOrderNew
+      ? window.KhaytOrderNew.mintOrderId(jobNumber, crypto.getRandomValues(new Uint8Array(4)))
+      : jobNumber;
     // Deleting the request below deletes its kept model file on the server, so
     // the file is saved with the quote first. If that fails, nothing is created
     // and the request stays in the list to try again.
@@ -2067,8 +2129,14 @@ function trackShipment(trackingNumber, carrier) {
       intakeQuoteNote(p.quote),
     ].filter(Boolean).join('\n');
     const quotedPart = intakeQuotePart(p);
+    // NOT a quote-form request: read its lines with the one matching rule
+    // (lib/shelf-sale.js — SKU, then exact name, else unmatched) and build the
+    // matched products' parts the way a job from the catalogue does
+    // (lib/store-order-job.js), as both webhook paths and the Mac's queue do.
+    const storeJob = quotedPart ? null : intakeStoreJob(p, orderId);
     const order = {
       id: orderId,
+      ...(orderId !== jobNumber ? { jobNumber } : {}),
       date: localDateStr(now),
       timestamp: now.toISOString(),
       project: p.title || p.description?.slice(0, 60) || t('intake.requests'),
@@ -2093,6 +2161,20 @@ function trackShipment(trackingNumber, carrier) {
       source: 'online',
       trackingToken: (() => { const b = new Uint8Array(16); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); })(),
     };
+    if (storeJob && storeJob.storeLines.length) {
+      const J = global.KhaytStoreOrderJob;
+      Object.assign(order, J.apply(order, storeJob));
+      // AT THE MONEY THAT MOVED: each line at the price it came with (else
+      // its product's catalogue price), or the order's own total — the rule
+      // the Mac's queue prices with. Cost plus margin only when the order
+      // carried no price at all.
+      const paid = J.orderPrice(storeJob.reading, p,
+        { products: (typeof products !== 'undefined' && Array.isArray(products)) ? products : [], settings });
+      if (paid !== null) order.price = paid;
+      else if (storeJob.parts.length) {
+        order.price = intakeQuotePrice({ baseCost: storeJob.parts.reduce((s2, x) => s2 + (+x.baseCost || 0), 0) });
+      }
+    }
     printLog.unshift(order);
     await dismissIntake(it.id, c, true); // remove from the cloud inbox (best-effort)
     saveAll();
@@ -2108,8 +2190,50 @@ function trackShipment(trackingNumber, carrier) {
     } catch (e) { if (!silent) toast(e.message, 'error'); }
   }
 
+  /* A store order line nothing in the catalogue matched (lib/store-order-job.js
+   * keeps it on the job as `storeLines[i]` with no productId). The shop picks
+   * the product here; its parts are added and reserve their filament like any
+   * other open job's. Never guessed for them. */
+  function openStoreLinesModal(orderId) {
+    const J = global.KhaytStoreOrderJob;
+    const order = printLog.find((o) => o && o.id === orderId);
+    if (!J || !order) return;
+    const waiting = J.unmatched(order);
+    if (!waiting.length) return;
+    const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    const name = (pr) => (typeof localName === 'function' ? localName(pr) : String(pr.id));
+    const options = `<option value="">${escapeHtml(t('store.pick_none'))}</option>`
+      + list.map((pr) => `<option value="${escapeHtml(pr.id)}">${escapeHtml(name(pr))}${pr.sku ? ` (${escapeHtml(pr.sku)})` : ''}</option>`).join('');
+    openFormModal({
+      title: t('store.pick_title'),
+      sizeLg: false,
+      bodyHtml: `<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">${escapeHtml(t('store.pick_hint'))}</p>`
+        + waiting.map(({ index, line }) => `
+          <label for="storeLine${index}">${escapeHtml(line.name)} × ${escapeHtml(String(line.qty))}${line.sku ? ` · SKU ${escapeHtml(line.sku)}` : ''}</label>
+          <select id="storeLine${index}" data-line="${index}" style="margin-bottom:10px;">${options}</select>`).join(''),
+      onSave(modal) {
+        let next = order;
+        for (const sel of modal.querySelectorAll('select[data-line]')) {
+          const product = list.find((pr) => pr.id === sel.value);
+          if (!product) continue;
+          const placed = J.assignLine(next, +sel.dataset.line, product,
+            { settings, inventory, consumables: (typeof consumables !== 'undefined' ? consumables : []) });
+          if (placed) next = placed;
+        }
+        if (next === order) return true;
+        Object.assign(order, next);
+        saveAll();
+        if (typeof renderKanban === 'function') renderKanban();
+        if (typeof renderLogs === 'function') renderLogs();
+        toast(t('store.placed'), 'success');
+        return true;
+      },
+    });
+  }
+
   global.BNPL_CATALOG = BNPL_CATALOG;
   const api = {
+    openStoreLinesModal,
     openOrderRequestsModal,
     importIntakeAsQuote,
     copyIntakeLink,

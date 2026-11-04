@@ -59,7 +59,7 @@ struct BidiLineTests {
         #expect(EmptyStateTests.source("SupplierSheet.swift").contains("parts.append(Figure.isolated(supplier.phone))"))
         let goTo = EmptyStateTests.source("Shop+GoTo.swift")
         #expect(goTo.contains("[phone, email].filter { !$0.isEmpty }.map { Figure.isolated($0) }"))
-        #expect(goTo.contains("[job.id, job.invoiceNumber ?? \"\", job.client]\n                .filter { !$0.isEmpty }.map { Figure.isolated($0) }"))
+        #expect(goTo.contains("[job.reference, job.invoiceNumber ?? \"\", job.client]\n                .filter { !$0.isEmpty }.map { Figure.isolated($0) }"))
     }
 
     @Test("a narrow strip says Group and Category with their symbols, as Provenance does")

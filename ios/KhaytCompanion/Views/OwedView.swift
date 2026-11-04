@@ -63,7 +63,7 @@ struct OwedView: View {
         HStack(spacing: 12) {
             Button { Task { openOrder = await order(line.id) } } label: {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(line.project.isEmpty ? line.id : line.project)
+                    Text(line.project.isEmpty ? (line.reference.isEmpty ? line.id : line.reference) : line.project)
                         .font(.khayt(15, .semibold, relativeTo: .body))
                         .foregroundStyle(KhaytDesign.ink)
                     Text([line.client, line.dueDate.map { L10n.format("owed.due", $0) } ?? ""]
@@ -96,7 +96,7 @@ struct OwedView: View {
     /// The reminder, in the shop's words, through the shared WhatsApp rule —
     /// then written to the customer's message log, as every send is.
     private func remind(_ line: OwedLine) async {
-        let text = L10n.format("owed.remind.text", line.project.isEmpty ? line.id : line.project,
+        let text = L10n.format("owed.remind.text", line.project.isEmpty ? (line.reference.isEmpty ? line.id : line.reference) : line.project,
                                Money.text(line.owed, currency))
         let (url, reason) = await api.whatsAppLink(orderId: line.id, text: text)
         guard let url else {

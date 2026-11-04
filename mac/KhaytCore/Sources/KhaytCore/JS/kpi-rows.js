@@ -258,7 +258,7 @@
         onTime: onTime(o),
         outstanding: +m.outstanding || 0,
         clientName: clientName(o) || unassigned,
-        productName: o.project || o.id,
+        productName: o.project || o.jobNumber || o.id,
       };
     });
   }

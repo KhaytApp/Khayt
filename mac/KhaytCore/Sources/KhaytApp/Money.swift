@@ -167,6 +167,19 @@ enum Money {
         return held(f.string(from: amount as NSNumber) ?? "\(amount)")
     }
 
+    /// A JOB's figure in a list that does not repeat the shop's currency on
+    /// every row: bare when the job is in the shop's currency, with the job's
+    /// own mark when it is not.
+    ///
+    /// Since a job is converted into the client's currency when it is saved
+    /// (#2148), one customer's list can hold SAR and EUR jobs side by side,
+    /// and bare figures read as one currency. `currency` is the job's own
+    /// (`Order.currency`, empty for the shop's).
+    static func figure(_ amount: Double, currency: String, shop: String) -> String {
+        currency.isEmpty || currency.uppercased() == shop.uppercased()
+            ? figure(amount) : text(amount, currency)
+    }
+
     /// Grams, as a shop says them: whole numbers, and a half when there is one.
     ///
     /// For anything on a shelf prefer `Quantity.say`, which asks the item what

@@ -409,14 +409,15 @@ struct CustomerInspector: View {
                                             Text(shop.words.callIt(stage.key))
                                         }
                                         Text("·")
-                                        Text(job.id)
+                                        Text(job.reference)
                                     }
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                                 }
                                 Spacer(minLength: 8)
                                 Text(job.price > 0
-                                     ? Money.figure(job.isSettled ? job.price : job.owedInOwnCurrency)
+                                     ? Money.figure(job.isSettled ? job.price : job.owedInOwnCurrency,
+                                                    currency: job.currency, shop: shop.currency)
                                      : "—")
                                     .font(.callout)
                                     .monospacedDigit()

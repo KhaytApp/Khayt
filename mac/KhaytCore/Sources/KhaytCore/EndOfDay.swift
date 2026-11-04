@@ -24,6 +24,8 @@ public struct EndOfDay: Sendable, Equatable {
         public let id: String
         public let title: String
         public let revenue: Double
+        /// What the page prints for it (`JobReference`); `id` stays the key.
+        public var reference: String = ""
     }
 
     /// What the shared rules say about one order, in the same order as the
@@ -61,21 +63,22 @@ public struct EndOfDay: Sendable, Equatable {
         for (row, fact) in zip(orders, facts) {
             guard case .object(let o) = row else { continue }
             let id = text(o["id"])
-            let title = text(o["project"]).isEmpty ? id : text(o["project"])
+            let reference = JobReference.of(o)
+            let title = text(o["project"]).isEmpty ? reference : text(o["project"])
             let earned = BusinessScope.countsForBusiness(row) && fact.revenue.isFinite ? fact.revenue : 0
             if fact.finished {
                 // `completedAt`, else the job's own `date`: the desktop's rule
                 // (#2146), for jobs finished before either app stamped it.
                 let stamp = text(o["completedAt"]).isEmpty ? text(o["date"]) : text(o["completedAt"])
                 if !stamp.isEmpty, dayOf(stamp) == day {
-                    finished.append((stamp, Job(id: id, title: title, revenue: earned)))
+                    finished.append((stamp, Job(id: id, title: title, revenue: earned, reference: reference)))
                     revenue += earned
                 }
             }
             if fact.open {
                 inProgress += 1
                 let dueDay = String(text(o["dueDate"]).prefix(10))
-                if dueDay == day { due.append(Job(id: id, title: title, revenue: earned)) }
+                if dueDay == day { due.append(Job(id: id, title: title, revenue: earned, reference: reference)) }
                 else if !dueDay.isEmpty, dueDay < day { overdue += 1 }
             }
         }

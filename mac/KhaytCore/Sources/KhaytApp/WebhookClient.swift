@@ -290,9 +290,15 @@ enum WebhookClient {
     /// blocking call was responsible. It was not. It is fixed because a
     /// main-actor type must not wait on DNS, which is true on its own.
     ///
-    /// `Task.detached` runs it on a thread that is allowed to block.
+    /// `PinWork.run` runs it on a Dispatch thread, which IS allowed to block.
+    ///
+    /// It used to be `Task.detached`, and this comment used to say that was a
+    /// thread allowed to block. It is not: `Task.detached` leaves the main
+    /// actor but runs on the same cooperative pool described above, so a slow
+    /// name still held one of its few threads for as long as DNS took. A
+    /// Dispatch queue and a continuation hold no pool thread while they wait.
     static func addresses(of host: String) async -> [String] {
-        await Task.detached(priority: .userInitiated) { resolve(host) }.value
+        await PinWork.run { resolve(host) }
     }
 
     /// Every address a host resolves to, as text the shared rule can read.

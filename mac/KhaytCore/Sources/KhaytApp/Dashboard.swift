@@ -186,11 +186,75 @@ struct Dashboard: View {
 
     /// Due this week, and the customers it is waiting on.
     @ViewBuilder private func sideColumn(_ due: TodayDue) -> some View {
+        // Two papers carrying one number: first, because one of them may be
+        // about to go to a customer.
+        if !shop.duplicateNumbers.isEmpty {
+            TodaySection(shop.words.callIt("dupnum.title"), accent: Khayt.attention,
+                         symbol: "exclamationmark.triangle") { DuplicateNumbers(shop: shop) }
+        }
         DueThisWeek(shop: shop, due: due)
         // Quotes sent and not approved, invoices past their grace: the shop's
         // own chase lists, which are opt-in and absent when empty.
         if shop.lockAllows("analytics", "view"), ToChase(shop: shop).hasRows {
             TodaySection(shop.words.callIt("mac.waiting_customers")) { ToChase(shop: shop) }
+        }
+    }
+}
+
+/// Documents that print one number, and a way to give one a new number.
+///
+/// Two computers on one book can both issue the next number while they are
+/// out of sync (lib/order-new.js `allocateInvoiceNumber`). Which one the
+/// customer already holds is something only the shop knows, so every job has
+/// the button and nothing is renumbered unasked.
+private struct DuplicateNumbers: View {
+    let shop: Shop
+    @State private var done: String?
+    /// The job about to be renumbered, while the shop confirms it.
+    @State private var asking: (job: KhaytEngine.DuplicateNumber.Job, group: KhaytEngine.DuplicateNumber)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shop.words.callIt("dupnum.why"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(shop.duplicateNumbers) { group in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(group.number).font(.callout.weight(.semibold)).monospacedDigit()
+                    ForEach(group.jobs) { job in
+                        HStack(spacing: 8) {
+                            Text(job.project.isEmpty ? job.ref : job.project).lineLimit(1)
+                            Text(job.date).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                            Spacer(minLength: 8)
+                            Button(shop.words.callIt("dupnum.renumber")) { asking = (job, group) }
+                                .controlSize(.small)
+                                .disabled(!shop.canMoveJobs)
+                        }
+                    }
+                }
+            }
+            if let done {
+                Text(done).font(.caption).foregroundStyle(Khayt.done)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 12)
+        // Asked first, and undoable after (Edit ▸ Undo): the number being
+        // replaced may already be on a customer's paper.
+        .confirmationDialog(shop.words.callIt("dupnum.renumber"),
+                            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
+            Button(shop.words.callIt("dupnum.renumber")) {
+                guard let asking else { return }
+                let group = asking.group, job = asking.job
+                Task {
+                    if let n = await shop.renumberJob(job.id, year: Int(group.year)) {
+                        done = shop.words.callIt("dupnum.renumbered",
+                                                 ["old": .string(group.number), "new": .string(n)])
+                    }
+                }
+            }
+        } message: {
+            Text(shop.words.callIt("dupnum.why"))
         }
     }
 }
@@ -308,14 +372,14 @@ struct RunningOut: View {
     @ViewBuilder
     private func row(_ job: Order) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(job.project.isEmpty ? job.id : job.project)
+            Text(job.project.isEmpty ? job.reference : job.project)
                 .font(.callout).lineLimit(1)
             // The order number, as the attention list and the chase list both
             // show it. Not decoration: the sample book has two jobs called
             // "HVAC duct adapter" — one finished and unpaid, one pending and
             // about to be late — and without the number this section and the
             // chase list below it read as the same job written twice.
-            Text(job.id)
+            Text(job.reference)
                 .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
             Spacer(minLength: 12)
             // Both dates, because the gap is the point: "due the 12th, expected
@@ -405,15 +469,37 @@ struct ToChase: View {
                         // One line, as the attention list above it. Two lists
                         // of the same shape reading differently is the reader
                         // wondering what the difference means.
-                        Text(row.name?.isEmpty == false ? row.name! : row.id).lineLimit(1)
-                        Text(row.id).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                        Text(row.name?.isEmpty == false ? row.name! : shop.reference(ofJob: row.id)).lineLimit(1)
+                        Text(shop.reference(ofJob: row.id)).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                         Spacer(minLength: 8)
                         Text(age(row, overdue: overdue))
                             .font(.callout).monospacedDigit()
                             .foregroundStyle(Khayt.attention)
+                        // Chase it from here: the reminder goes the shop's way
+                        // and is recorded, so the row leaves the list for the
+                        // cooldown (`Shop.sendPaymentReminder`).
+                        if overdue, shop.canMoveJobs {
+                            Button {
+                                Task { await shop.sendPaymentReminder(row.id) }
+                            } label: {
+                                Image(systemName: "paperplane")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(shop.words.callIt("mac.send_reminder"))
+                            .accessibilityLabel(shop.words.callIt("mac.send_reminder"))
+                        }
                     }
                     .padding(.vertical, 3)
                     .frame(minHeight: Metric.row)
+                    .contentShape(Rectangle())
+                    // Open the job, as every other row on Today does. A row
+                    // that says "chase this" and cannot be opened left the
+                    // shop searching for the job to message the customer
+                    // from.
+                    .onTapGesture {
+                        shop.shelf = .jobs(nil)
+                        shop.selection = row.id
+                    }
                     if row.id != rows.last?.id { LayerRule() }
                 }
             }

@@ -45,6 +45,12 @@ public actor KhaytEngine {
         // it reads.
         "storefront-orders",
         "storefront-webhook",
+        // A store order as a real job: each line matched to a catalogue
+        // product (SKU, then exact name, else left for the shop to pick) and
+        // the product's parts built the way a job from the catalogue has them.
+        // `storefront-webhook` reaches it at call time, so its place before
+        // the costing modules below does not matter.
+        "store-order-job",
         // The warning a shop gets when filament runs out. It was twelve lines
         // inside the renderer, so this app drew the switch that turns it on
         // and had nothing to send.
@@ -448,6 +454,10 @@ public actor KhaytEngine {
         // A failure allowance learned from the shop's own QC fails and waste.
         "failure-rate",
         "order-new",
+        // A linked reprint after a QC failure — the desktop's rule, so a Mac
+        // reprint reaches the first-pass and RMA figures. After `order-new`,
+        // which makes the new job.
+        "reprint",
         // A customer's standing order and their agreed prices. The recurrence
         // engine is what the schedule advances by (the 31st of January to the
         // 28th of February, not the 3rd of March), and the recurring rule
@@ -2209,19 +2219,27 @@ public actor KhaytEngine {
         // each order's currency, and what one unit of each currency is worth
         // in the base (`convertToBase` is a multiplication — or the amount
         // itself, for the base and for a currency with no usable rate).
-        struct Money: Decodable { let currencyById: [String: String]; let rates: [String: Double] }
+        // Each ORDER's rate too (`rateById`, `orderToBase`): a job saved in a
+        // client's currency keeps the rate it was converted at, and the
+        // export states it at that rate as every report does.
+        struct Money: Decodable {
+            let currencyById: [String: String]
+            let rates: [String: Double]
+            let rateById: [String: Double]
+        }
         let money = try? runtime.call2(#"""
             (function (rows, ctx, known) {
               var M = globalThis.KhaytOrderMoney;
-              var byId = {}, rates = {};
+              var byId = {}, rates = {}, rateById = {};
               for (var i = 0; i < rows.length; i++) {
                 var o = rows[i];
                 if (!o || typeof o !== 'object' || o.id == null) continue;
                 var cur = M.orderCurrency(o, ctx, known || undefined);
                 byId[String(o.id)] = cur;
                 if (!(cur in rates)) rates[cur] = M.convertToBase(1, cur, ctx);
+                rateById[String(o.id)] = M.orderToBase(1, o, ctx, known || undefined);
               }
-              return { currencyById: byId, rates: rates };
+              return { currencyById: byId, rates: rates, rateById: rateById };
             })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
             """#, [.array(orders), .object(settings), .array(clients),
                    currencies.flatMap { $0.isEmpty ? nil : .object($0) } ?? .null],
@@ -2243,7 +2261,15 @@ public actor KhaytEngine {
                     return cur
                 }
             },
-            toBase: money.map { m in { amount, currency in amount * (m.rates[currency] ?? 1) } },
+            toBase: money.map { m in
+                { amount, currency, order in
+                    if case .object(let o) = order, let id = o["id"],
+                       let rate = m.rateById[JSSemantics.text(id)] {
+                        return amount * rate
+                    }
+                    return amount * (m.rates[currency] ?? 1)
+                }
+            },
             localName: nameById.isEmpty ? nil : { client in
                 guard case .object(let c) = client, let id = c["id"] else { return "" }
                 return nameById[JSSemantics.text(id)] ?? ""
@@ -3555,12 +3581,86 @@ public actor KhaytEngine {
             "KhaytPaymentReminder.selectInvoicesDueForReminder(ARG0, ARG1,"
           + " function (o) { return ARG2[o.id] || 0; }, ARG3, ARG4)"
           + ".map(function (o) { return {id: o.id, name: o.project || '',"
-          + " days: KhaytPaymentReminder.daysOverdue(o, ARG3,"
-          + " KhaytPaymentTerms.customerOf(o, ARG4))}; })",
+          + " days: KhaytPaymentReminder.reminderDaysOverdue(o, ARG3,"
+          + " KhaytPaymentTerms.customerOf(o, ARG4), ARG1)}; })",
             [.array(orders), .object(settings),
              .object(owed.mapValues(JSONValue.number)),
              .number(now.timeIntervalSince1970 * 1000), .array(clients)],
             as: [Chase].self)
+    }
+
+    /// The shop's two chase switches, as the shared rules read them:
+    /// `settings.paymentReminder.enabled` and `settings.quoteFollowUp.enabled`.
+    public func chaseSwitches(settings: [String: JSONValue]) throws -> ChaseSwitches {
+        try runtime.call2(
+            "({ invoices: KhaytPaymentReminder.reminderConfig(ARG0).enabled,"
+          + " quotes: KhaytQuoteFollowUp.followUpConfig(ARG0).enabled })",
+            [.object(settings)], as: ChaseSwitches.self)
+    }
+
+    public struct ChaseSwitches: Decodable, Sendable, Equatable {
+        public let invoices: Bool
+        public let quotes: Bool
+
+        public init(invoices: Bool, quotes: Bool) {
+            self.invoices = invoices; self.quotes = quotes
+        }
+    }
+
+    /// What one payment reminder would be: how it goes, what it asks for, the
+    /// milestones it covers and the shop's pay link with the amount in it
+    /// (`lib/payment-reminder.js`). `owed` is in the job's OWN currency.
+    public struct ReminderPlan: Decodable, Sendable, Equatable {
+        /// `whatsapp` | `email` | `none`
+        public let channel: String
+        public let amount: Double
+        public let milestones: [String]
+        public let payLink: String
+    }
+
+    public func reminderPlan(order: JSONValue, owed: Double, settings: [String: JSONValue],
+                             client: JSONValue?, now: Date = Date()) throws -> ReminderPlan {
+        try runtime.call2("""
+            (function (o, owed, settings, client, now) {
+              var R = KhaytPaymentReminder;
+              var asked = R.reminderAmount(o, owed, settings, now, client);
+              // The link is the shop's, in the shop's currency: the job's
+              // currency and saved rate say how to convert (or to leave it out).
+              var code = KhaytOrderMoney.orderCurrency(o, { settings: settings, clients: client ? [client] : [] });
+              return { channel: R.reminderChannel(settings, client), amount: asked.amount,
+                milestones: asked.milestones.map(function (m) { return m.label || m.id; }),
+                payLink: R.payLinkFor(settings, asked.amount, { order: o, currency: code }) };
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """,
+            [order, .number(owed), .object(settings), client ?? .null,
+             .number(now.timeIntervalSince1970 * 1000)],
+            as: ReminderPlan.self)
+    }
+
+    /// The reminder's words: `body` filled with `values`, the pay link after.
+    public func reminderText(body: String, values: [String: String], payLink: String,
+                             payLabel: String) throws -> String {
+        try runtime.call2(
+            "KhaytPaymentReminder.reminderText({ body: ARG0, values: ARG1, payLink: ARG2, payLabel: ARG3 })",
+            [.string(body), .object(values.mapValues(JSONValue.string)), .string(payLink), .string(payLabel)],
+            as: String.self)
+    }
+
+    /// The reminder as an email, or nil when the shop or the customer has no way.
+    public func reminderEmail(settings: [String: JSONValue], client: JSONValue?, text: String,
+                              subject: String, shopName: String) throws -> OrderEmail? {
+        try runtime.call2(
+            "KhaytPaymentReminder.reminderEmail({ settings: ARG0, client: ARG1, text: ARG2, subject: ARG3, shopName: ARG4 })",
+            [.object(settings), client ?? .null, .string(text), .string(subject), .string(shopName)],
+            as: OrderEmail?.self)
+    }
+
+    /// The job with a sent reminder recorded on it (`markReminderPatch`):
+    /// `payRemindedAt` and `payReminderCount`, which the cooldown and the cap read.
+    public func markReminder(order: JSONValue, now: Date = Date()) throws -> JSONValue {
+        try runtime.call2(
+            "Object.assign(ARG0, KhaytPaymentReminder.markReminderPatch(ARG0, ARG1))",
+            [order, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
     }
 
     /// Quotes about to expire without an answer.
@@ -7355,6 +7455,13 @@ public actor KhaytEngine {
               var r = globalThis.KhaytLanQuotePage.applyQuoteApprovalToStore(data, id, now);
               if (!r) return { found: false, error: null, order: null, printLog: null, settings: null };
               if (r.error) return { found: true, error: r.error, order: r.order || null, printLog: null, settings: null };
+              // The move into Pending goes on the job's trail, as Electron's
+              // renderer writes it when its LAN server reports the approval
+              // (`renderer/app-boot.js`), capped at the same 200. Without it
+              // a customer-approved job's history began at its next move.
+              var trail = Array.isArray(r.order.statusHistory) ? r.order.statusHistory.slice() : [];
+              trail.push({ status: r.order.status, at: r.order.clientApprovedAt || now });
+              r.order.statusHistory = trail.length > 200 ? trail.slice(-200) : trail;
               // An accepted quote is an invoice now, and an invoice has a
               // number: `KhaytOrderNew.ensureInvoiceNumber`, the counter a new
               // order takes from. Electron gives it one in the renderer when
@@ -7362,7 +7469,7 @@ public actor KhaytEngine {
               // given here — inside the write, on the newest settings.
               var settings = Object.assign({}, s.settings || {});
               var given = globalThis.KhaytOrderNew.ensureInvoiceNumber(
-                r.order, settings, new Date(now).getFullYear());
+                r.order, settings, new Date(now).getFullYear(), data.printLog);
               return { found: true, error: null, order: r.order, printLog: data.printLog,
                        settings: given ? settings : null };
             })(ARG0, ARG1, ARG2)
@@ -7380,15 +7487,82 @@ public actor KhaytEngine {
     /// `lib/order-new.js`'s `ensureInvoiceNumber`: give a job that began as a
     /// quote the invoice number it is owed, advancing the shop's counter.
     /// Pure — the caller runs it INSIDE the store write and writes both back.
+    ///
+    /// `orders`, the book, moves the counter past every number already in
+    /// it — settings do not sync, so a number another computer issued is only
+    /// known from the jobs it wrote.
     public func ensureInvoiceNumber(order: JSONValue, settings: [String: JSONValue],
-                                    year: Int) throws -> InvoiceNumbered {
+                                    year: Int, orders: [JSONValue] = []) throws -> InvoiceNumbered {
         try runtime.call2("""
-            (function (o, s, y) {
+            (function (o, s, y, book) {
               var order = Object.assign({}, o), settings = Object.assign({}, s);
-              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y);
+              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y, book);
               return { order: order, settings: settings, number: n };
-            })(ARG0, ARG1, ARG2)
-            """, [order, .object(settings), .number(Double(year))], as: InvoiceNumbered.self)
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .number(Double(year)), .array(orders)], as: InvoiceNumbered.self)
+    }
+
+    /// Documents in the book that print one number
+    /// (`KhaytInvoiceDocument.duplicateNumbers`): what two computers offline
+    /// at the same moment can still make. Each group lists its jobs oldest first.
+    public struct DuplicateNumber: Decodable, Sendable, Identifiable, Hashable {
+        public struct Job: Decodable, Sendable, Identifiable, Hashable {
+            public let id: String
+            public let ref: String
+            public let project: String
+            public let date: String
+        }
+        public let number: String
+        public let kind: String
+        public let year: String
+        public let jobs: [Job]
+        public var id: String { kind + "|" + year + "|" + number }
+    }
+
+    public func duplicateNumbers(orders: [JSONValue], settings: [String: JSONValue]) throws -> [DuplicateNumber] {
+        try runtime.call2("KhaytInvoiceDocument.duplicateNumbers(ARG0, ARG1)",
+                          [.array(orders), .object(settings)], as: [DuplicateNumber].self)
+    }
+
+    /// `lib/order-new.js`'s `renumber`: the job with the next free number,
+    /// the counters it advanced, and the number given. Pure — the caller runs
+    /// it INSIDE the store write and writes both back.
+    ///
+    /// `year` is the duplicate pair's own year: a past year's pair gets a free
+    /// number in that year and the shop's counter is left alone. `before` and
+    /// `after` are what `undoRenumber` needs to take it back.
+    public func renumber(order: JSONValue, settings: [String: JSONValue],
+                         orders: [JSONValue], year: Int) throws -> Renumbered {
+        try runtime.call2("""
+            (function (o, s, book, y) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              var before = KhaytOrderNew.renumberSnapshot(order, settings);
+              var n = KhaytOrderNew.renumber(order, settings, book, y);
+              var after = KhaytOrderNew.renumberSnapshot(order, settings);
+              return { order: order, settings: settings, number: n, before: before, after: after };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .array(orders), .number(Double(year))], as: Renumbered.self)
+    }
+
+    public struct Renumbered: Decodable, Sendable {
+        public let order: JSONValue
+        public let settings: JSONValue
+        public let number: String?
+        public let before: JSONValue
+        public let after: JSONValue
+    }
+
+    /// `lib/order-new.js`'s `undoRenumber`: the job's number fields back as
+    /// they were, and a counter back only if nothing has used it since.
+    public func undoRenumber(order: JSONValue, settings: [String: JSONValue],
+                             before: JSONValue, after: JSONValue) throws -> InvoiceNumbered {
+        try runtime.call2("""
+            (function (o, s, b, a) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              KhaytOrderNew.undoRenumber(order, settings, b, a);
+              return { order: order, settings: settings, number: null };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), before, after], as: InvoiceNumbered.self)
     }
 
     /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.
@@ -7429,6 +7603,29 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytStorefrontWebhook.record(ARG0, ARG1, ARG2, { id: ARG3, day: ARG4, at: ARG5 })",
                           [.string(source), payload, store, .string(id), .string(day), .string(at)],
                           as: StorefrontRecorded.self)
+    }
+
+    /// A store order's lines as its job keeps them, and the notes for the
+    /// ones nothing matched — `lib/store-order-job.js linesOf`, over a
+    /// `lib/shelf-sale.js` reading. The cloud queue's job carries them, as the
+    /// webhook's does, so the shop can pick a product for a line later.
+    public struct StoreLines: Decodable, Sendable {
+        public let storeLines: JSONValue
+        public let notes: [String]
+    }
+
+    public func storeOrderLines(reading: JSONValue) throws -> StoreLines {
+        try runtime.call2("globalThis.KhaytStoreOrderJob.linesOf(ARG0)", [reading], as: StoreLines.self)
+    }
+
+    /// The shop picked `product` for the store line at `index` that nothing
+    /// matched: the job with that line placed and the product's parts added
+    /// (`lib/store-order-job.js assignLine`). `.null` when there was nothing
+    /// to do. `book` is `{ settings, inventory, consumables }`.
+    public func storeOrderAssign(order: JSONValue, index: Int, product: JSONValue,
+                                 book: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytStoreOrderJob.assignLine(ARG0, ARG1, ARG2, ARG3)",
+                          [order, .number(Double(index)), product, book], as: JSONValue.self)
     }
 
     /// Whether the book already holds this delivery's order — the early
@@ -7813,6 +8010,34 @@ public actor KhaytEngine {
         guard !r.ok else { return nil }
         return StatusGate.Reason(code: "zatca_not_ready",
                                  params: ["missing": .array(r.missing.map(JSONValue.string))])
+    }
+
+    /// The total and VAT a ZATCA QR states, in riyals — `KhaytZatcaQr.qrAmounts`.
+    ///
+    /// Tags 4 and 5 carry a bare number that a scanner reads as SAR. A job
+    /// saved in a client's currency is converted at the rate stored on it
+    /// (`fxRate`); with none there is no honest figure, and the answer is the
+    /// refusal the document prints in the QR's place.
+    public enum ZatcaAmounts: Sendable, Equatable {
+        case amounts(total: Double, vatAmount: Double)
+        case refused(StatusGate.Reason)
+    }
+
+    public func zatcaAmounts(order: JSONValue, settings: [String: JSONValue],
+                             total: Double, vatAmount: Double) throws -> ZatcaAmounts {
+        struct Answer: Decodable {
+            let ok: Bool
+            let total: Double?
+            let vatAmount: Double?
+            let missing: [String]?
+        }
+        let r = try runtime.call2(
+            "KhaytZatcaQr.qrAmounts(ARG0, ARG1, {total: ARG2, vatAmount: ARG3})",
+            [order, .object(settings), .number(total), .number(vatAmount)], as: Answer.self)
+        if r.ok, let t = r.total, let v = r.vatAmount { return .amounts(total: t, vatAmount: v) }
+        return .refused(StatusGate.Reason(
+            code: "zatca_not_ready",
+            params: ["missing": .array((r.missing ?? []).map(JSONValue.string))]))
     }
 
     /// The QR payload: five BER-TLV tags, base64'd.
@@ -9153,6 +9378,78 @@ public actor KhaytEngine {
     public func portalResponse(items: JSONValue, pubToken: String, order: JSONValue) throws -> PortalResponse {
         try runtime.call2("KhaytPortalOwner.responseFor(ARG0, ARG1, ARG2)",
                           [items, .string(pubToken), order], as: PortalResponse.self)
+    }
+
+    /// A payment the customer made through the portal, and what recording it
+    /// once did to the job (`lib/portal-owner.js recordPortalPayment`).
+    public struct PortalPayment: Decodable, Sendable {
+        /// `none` | `already` | `recorded` | `matched` | `settled` | `no_amount`
+        public let outcome: String
+        /// In the job's own currency: what was added, or what the portal said.
+        public let amount: Double
+        /// The job's own currency, for saying the amount.
+        public let currency: String
+        /// What this payment is recorded under on the job (`portalPayments`).
+        public let key: String
+        public let order: JSONValue
+        public let effects: [String]
+        public let webhookEffects: [WebhookEffect]?
+
+        /// The book changed: anything but `none` and `already`.
+        public var changesTheJob: Bool { outcome != "none" && outcome != "already" }
+
+        /// As a recorded payment, for the receipt email a payment owes.
+        public var asPayment: PaymentRecorded {
+            PaymentRecorded(order: order, effects: effects, webhookEffects: webhookEffects, refused: nil)
+        }
+    }
+
+    /// A recorded portal payment taken back (`undoPortalPayment`): the job
+    /// as it is after, and how much came off it. The note stays, `undone`.
+    public struct PortalUndo: Decodable, Sendable {
+        public let ok: Bool
+        public let amount: Double
+        public let currency: String
+        public let order: JSONValue
+    }
+
+    public func portalUndoPayment(order: JSONValue, key: String, settings: [String: JSONValue],
+                                  now: Date = Date()) throws -> PortalUndo {
+        try runtime.call2("""
+            (function () {
+              var order = ARG0, ctx = { settings: ARG2 || {}, now: ARG3 };
+              var r = KhaytPortalOwner.undoPortalPayment(order, ARG1, ctx);
+              return { ok: !!r.ok, amount: r.amount || 0,
+                currency: KhaytOrderMoney.orderCurrency(order, ctx), order: order };
+            })()
+            """,
+            [order, .string(key), .object(settings), .string(ISO8601DateFormatter().string(from: now))],
+            as: PortalUndo.self)
+    }
+
+    public func portalRecordPayment(items: JSONValue, pubToken: String, order: JSONValue,
+                                    today: String, settings: [String: JSONValue],
+                                    clients: [JSONValue]) throws -> PortalPayment {
+        try runtime.call2("""
+            (function () {
+              var order = ARG2;
+              var ctx = { today: ARG3, settings: ARG4 || {}, clients: ARG5 || [] };
+              var r = KhaytPortalOwner.recordPortalPayment(ARG0, ARG1, order, ctx);
+              var webhookEffects = [];
+              (r.effects || []).forEach(function (e) {
+                if (e.type === 'webhook' || e.type === 'order_webhook') {
+                  webhookEffects.push({ kind: e.type, event: e.event,
+                    newStatus: typeof e.newStatus === 'string' ? e.newStatus : null });
+                }
+              });
+              return { outcome: r.outcome, amount: r.amount || 0, key: r.key || '',
+                currency: KhaytOrderMoney.orderCurrency(order, ctx),
+                order: order, effects: (r.effects || []).map(function (e) { return e.type; }),
+                webhookEffects: webhookEffects };
+            })()
+            """,
+            [items, .string(pubToken), order, .string(today), .object(settings), .array(clients)],
+            as: PortalPayment.self)
     }
 
     public struct PortalError: Decodable, Sendable, Equatable {
@@ -11474,10 +11771,11 @@ public actor KhaytEngine {
                 var o = rows[i];
                 if (!o || !o.id) continue;
                 if (!M.owesAtAll(o)) { out[o.id] = { billed: 0, paid: 0 }; continue; }
-                var cur = M.orderCurrency(o, ctx, known);
+                // At the order's saved rate when it has one (orderToBase), the
+                // rate orderOwedBase uses, so Billed − Paid stays its Owed.
                 out[o.id] = {
-                  billed: M.convertToBase(Math.max(0, M.orderDueRaw(o, ctx) - M.orderCreditedDueRaw(o, ctx)), cur, ctx),
-                  paid: M.convertToBase((+o.paidAmount || 0) + (+o.giftCardDiscount || 0), cur, ctx),
+                  billed: M.orderToBase(Math.max(0, M.orderDueRaw(o, ctx) - M.orderCreditedDueRaw(o, ctx)), o, ctx, known),
+                  paid: M.orderToBase((+o.paidAmount || 0) + (+o.giftCardDiscount || 0), o, ctx, known),
                 };
               }
               return out;
@@ -12089,10 +12387,50 @@ public actor KhaytEngine {
         return try runtime.call2(NEW_ORDER_SCRIPT,
                                  [.object(input), .array(orders), .object(settings),
                                   .number(now.timeIntervalSince1970 * 1000),
+                                  // `id`: the random tag that keeps the job's id
+                                  // unique across computers (`mintOrderId`).
                                   .object(["tracking": bytes(tokens.tracking),
-                                           "quoteApproval": bytes(tokens.quoteApproval)]),
+                                           "quoteApproval": bytes(tokens.quoteApproval),
+                                           "id": bytes((0..<4).map { _ in UInt8.random(in: .min ... .max) })]),
                                   .array(consumables), .array(clients)],
                                  as: NewOrder.self)
+    }
+
+    /// A job that failed inspection with QC switched on, kept as a scrapped
+    /// record in the QC stage — `lib/reprint.js markScrapped`.
+    public func qcMarkScrapped(_ order: JSONValue, at: String) throws -> JSONValue {
+        try runtime.call2("KhaytReprint.markScrapped(ARG0, ARG1)", [order, .string(at)], as: JSONValue.self)
+    }
+
+    /// What `linkedReprint` made: the new job, the log with it first and the
+    /// original carrying `reprintedInto`, and the settings with the invoice
+    /// counter advanced — all three written in the same write.
+    public struct LinkedReprint: Decodable, Sendable {
+        public let order: JSONValue
+        public let printLog: [JSONValue]
+        public let settings: [String: JSONValue]
+    }
+
+    /// A linked reprint of `originalId` through the shared `newOrder`, as the
+    /// desktop makes one after a QC failure (`lib/reprint.js create`). `cost`
+    /// is `shop` (no charge) or `billable`. Nil when the job is not in the log.
+    public func linkedReprint(of originalId: String, printLog: [JSONValue],
+                              settings: [String: JSONValue], now: Date,
+                              tokens: (tracking: [UInt8], quoteApproval: [UInt8]),
+                              inventory: [JSONValue], consumables: [JSONValue], clients: [JSONValue],
+                              reason: String, cost: String, partIdBase: String) throws -> LinkedReprint? {
+        let bytes = { (b: [UInt8]) in JSONValue.array(b.map { .number(Double($0)) }) }
+        return try runtime.call2("""
+            KhaytReprint.create(ARG0, ARG1, {
+              settings: ARG2, now: ARG3, tokens: ARG4, inventory: ARG5, consumables: ARG6,
+              clients: ARG7, reason: ARG8, cost: ARG9, partIdBase: ARG10 })
+            """,
+            [.string(originalId), .array(printLog), .object(settings),
+             .number(now.timeIntervalSince1970 * 1000),
+             .object(["tracking": bytes(tokens.tracking), "quoteApproval": bytes(tokens.quoteApproval)]),
+             .array(inventory), .array(consumables), .array(clients),
+             .string(reason), .string(cost), .string(partIdBase)],
+            as: LinkedReprint?.self)
     }
 
     /// `lib/order-new.js`'s `inShopCurrency`: a saved job's shipping, extra

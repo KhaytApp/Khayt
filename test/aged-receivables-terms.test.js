@@ -22,9 +22,11 @@ function render(printLog, clients, now) {
   const t = (k, p) => k + (p ? JSON.stringify(p) : '');
   const realAged = Rec.aged;
   const R = { ...Rec, aged: (o, ctx) => realAged(o, { ...ctx, now }) };
-  const fn = new Function('$', 't', 'escapeHtml', 'fmtPrice', 'printLog', 'settings', 'clients', 'CURRENCIES', 'globalThis', 'require',
+  // `jobRef` is renderer/util.js's: the job number a person reads, else the id.
+  const jobRef = (o) => (typeof o === 'string' ? o : String((o && (o.jobNumber || o.id)) || ''));
+  const fn = new Function('$', 't', 'escapeHtml', 'fmtPrice', 'printLog', 'settings', 'clients', 'CURRENCIES', 'globalThis', 'require', 'jobRef',
     body + '\nreturn renderAgedReceivables;')(
-    () => el, t, (s) => String(s), (n) => n.toFixed(2), printLog, {}, clients, null, { KhaytReceivables: R }, require);
+    () => el, t, (s) => String(s), (n) => n.toFixed(2), printLog, {}, clients, null, { KhaytReceivables: R }, require, jobRef);
   fn();
   return el.innerHTML;
 }

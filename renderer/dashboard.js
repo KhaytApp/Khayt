@@ -377,12 +377,12 @@ function renderDashboard() {
     <div class="dash-order-row">
       <div class="dash-order-info">
         <strong>${escapeHtml(o.project || t('inv.walk_in'))}</strong>
-        <span class="dash-order-id">${escapeHtml(o.id)}</span>
+        <span class="dash-order-id">${escapeHtml(jobRef(o))}</span>
       </div>
       <div class="dash-order-meta">
         ${badge}
         <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span>
-        <span class="dash-price">${fmtPrice(o.price)}</span>
+        <span class="dash-price">${fmtOrderPrice(o.price, o)}</span>
         ${reminderBtn}
         <button class="btn small" data-act="edit-log" data-id="${o.id}">${escapeHtml(t('common.edit'))}</button>
       </div>
@@ -414,7 +414,7 @@ function renderDashboard() {
         return `<div class="dash-order-row">
           <div class="dash-order-info">
             <strong>${escapeHtml(o.project || t('inv.walk_in'))}</strong>
-            <span class="dash-order-id">${escapeHtml(o.id)}</span>
+            <span class="dash-order-id">${escapeHtml(jobRef(o))}</span>
           </div>
           <div class="dash-order-meta">
             <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span>
@@ -496,7 +496,7 @@ function renderDashboard() {
       ${biz && todayDone.length > 0 ? `<div style="margin-top:10px;border-top:1px solid var(--border-soft);padding-top:8px;">${
         todayDone.slice(0, 5).map(o => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12.5px;">
           <span style="color:var(--text);">${escapeHtml(o.project || t('inv.walk_in'))}</span>
-          <span style="color:var(--success);font-weight:600;">${fmtPrice(o.price)}</span>
+          <span style="color:var(--success);font-weight:600;">${fmtOrderPrice(o.price, o)}</span>
         </div>`).join('')
       }${todayDone.length > 5 ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">+${todayDone.length - 5} more</div>` : ''}</div>` : ''}
     </div>` : ''}
@@ -722,12 +722,12 @@ function renderDashboard() {
         return `<div class="dash-order-row">
           <div class="dash-order-info">
             <strong>${escapeHtml(q.project || t('inv.walk_in'))}</strong>
-            <span class="dash-order-id">${escapeHtml(q.id)}${client ? ' · ' + escapeHtml(localName(client)) : ''}</span>
+            <span class="dash-order-id">${escapeHtml(jobRef(q))}${client ? ' · ' + escapeHtml(localName(client)) : ''}</span>
           </div>
           <div class="dash-order-meta">
             ${badge}
             ${sentChip}
-            <span class="dash-price">${fmtPrice(q.price)}</span>
+            <span class="dash-price">${fmtOrderPrice(q.price, q)}</span>
             ${followBtn}
             <button class="btn small" data-act="edit-log" data-id="${q.id}">${escapeHtml(t('common.edit'))}</button>
           </div>
@@ -751,7 +751,7 @@ function renderDashboard() {
       return `<div class="dash-section pro-only" style="border-inline-start:3px solid var(--primary); padding-inline-start:12px; margin-bottom:14px;">
         <h3 class="dash-section-head" style="color:var(--primary);">💳 ${escapeHtml(t('dash.payments_due'))} (${paymentsDue.length})</h3>
         ${paymentsDue.map(({ order: o, inst, instIndex, client }) => {
-          const clientName = client ? localName(client) : (o.project || o.id);
+          const clientName = client ? localName(client) : (o.project || jobRef(o));
           const daysUntil = Math.round((new Date(inst.dueDate + 'T00:00:00') - new Date(new Date().setHours(0,0,0,0))) / 86400000);
           const badge = daysUntil < 0
             ? `<span class="due-badge overdue">${Math.abs(daysUntil)}d overdue</span>`
@@ -761,7 +761,7 @@ function renderDashboard() {
           return `<div class="dash-order-row">
             <div class="dash-order-info">
               <strong>${escapeHtml(clientName)}</strong>
-              <span class="dash-order-id">${escapeHtml(o.id)} · ${escapeHtml(inst.note || '')} · ${fmtPrice(inst.amount || 0)}</span>
+              <span class="dash-order-id">${escapeHtml(jobRef(o))} · ${escapeHtml(inst.note || '')} · ${fmtPrice(inst.amount || 0)}</span>
             </div>
             <div class="dash-order-meta">
               ${badge}

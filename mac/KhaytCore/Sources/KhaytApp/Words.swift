@@ -805,6 +805,10 @@ final class Words {
                               "ar": "دورك في خيط السحابي للعرض فقط، فلا يمكن تغيير هذا من هنا."],
         "mac.portal_other_shop": ["en": "That link belongs to another shop.", "ar": "هذا الرابط يخص متجرًا آخر."],
         "mac.portal_rate": ["en": "Khayt Cloud is busy. Try again in a minute.", "ar": "خيط السحابي مشغول. أعد المحاولة بعد دقيقة."],
+        "mac.send_reminder": ["en": "Send reminder", "ar": "أرسل تذكيرًا"],
+        "mac.reminder_sent": ["en": "Payment reminder sent for {id}.", "ar": "أُرسل تذكير بالدفع للطلب {id}."],
+        "mac.reminder_no_way": ["en": "This customer has no phone number for WhatsApp, and no email address the shop can send to.", "ar": "لا يوجد لهذا العميل رقم واتساب، ولا بريد إلكتروني يمكن للمتجر الإرسال إليه."],
+        "mac.undo_portal_deposit": ["en": "Undo portal deposit", "ar": "تراجع عن عربون البوابة"],
         "mac.portal_not_here": ["en": "This job's link is not on this Khayt Cloud server, or the server is older than this Khayt.",
                                 "ar": "رابط هذا العمل غير موجود على خادم خيط السحابي هذا، أو أن الخادم أقدم من هذا الإصدار."],
         "mac.move_gone":     ["en": "That job is no longer in the book.",
@@ -1097,6 +1101,9 @@ final class Words {
                               "ar": "{n} عادت تحت الضمان بتكلفة {amount} لإصلاحها."],
         "mac.qc_none":       ["en": "Nothing has been through inspection yet.",
                               "ar": "لم يمر أي عمل بالفحص بعد."],
+        // With QC on, a failed job is kept as a scrapped record or reprinted
+        // as a new linked job — the button that keeps it and makes nothing.
+        "mac.qc_scrap":      ["en": "Scrap", "ar": "إتلاف"],
         // What the shelf costs.
         "mac.mc_title":      ["en": "Price on the shelf", "ar": "السعر على الرف"],
         "mac.mc_sub":        ["en": "Per unit, from the most recent spool of each material.",
@@ -5084,6 +5091,15 @@ final class Words {
                                "ar": "يغيّر هذا الدفتر على هذا الماك. السجل الأحدث في السحابة يحل محل "
                              + "النسخة هنا؛ والسجل الموجود على هذا الماك وحده يُترك كما هو. "
                              + "لا تُنزَّل الإعدادات أبدًا، والسجلات — الهدر والصيانة والوقت — يُضاف إليها فقط."],
+        "mac.cloud_twin_jobs": ["en": "{n} jobs from another computer had a reference already used here. "
+                              + "Both are kept, and theirs has a marked reference.",
+                                "ar": "{n} أعمال من جهاز آخر حملت مرجعًا مستخدمًا هنا. احتُفظ بالاثنين، ومرجعها مُعلَّم."],
+        "mac.cloud_twin_jobs_one": ["en": "{n} job from another computer had a reference already used here. "
+                                  + "Both are kept, and theirs has a marked reference.",
+                                    "ar": "عمل واحد من جهاز آخر حمل مرجعًا مستخدمًا هنا. احتُفظ بالاثنين، ومرجعه مُعلَّم."],
+        "mac.cloud_twin_jobs_two": ["en": "2 jobs from another computer had a reference already used here. "
+                                  + "All are kept, and theirs have a marked reference.",
+                                    "ar": "عملان من جهاز آخر حملا مرجعًا مستخدمًا هنا. احتُفظ بالجميع، ومرجعاهما مُعلَّمان."],
         "mac.cloud_lost_edits": ["en": "{n} changes made here were discarded: the record had been "
                                + "deleted on another device.",
                                  "ar": "أُلغي {n} تغييرًا أُجري هنا: كان السجل قد حُذف على جهاز آخر."],

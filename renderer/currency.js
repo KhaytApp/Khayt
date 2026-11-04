@@ -22,7 +22,9 @@
   function fmtMoneyIn(n, currencyCode) {
     const cur = CURRENCIES[currencyCode] || CURRENCIES[global.settings?.currency] || CURRENCIES.SAR;
     const val = fmtMoney(n);
-    return cur.pos === 'before' ? `${cur.symbol} ${val}` : `${val} ${cur.symbol}`;
+    // U+202F, as `fmtPrice` joins them: a plain space let "€ 100.00" wrap
+    // between the mark and the figure in a narrow cell.
+    return cur.pos === 'before' ? `${cur.symbol} ${val}` : `${val} ${cur.symbol}`;
   }
 
   /* The rules moved to lib/order-money.js so the Mac app could use the same
@@ -54,8 +56,45 @@
     return M().orderCurrency(o, ctx(), CURRENCIES);
   }
 
+  /**
+   * One of a JOB's own figures (its price, what it still owes), written in
+   * the job's currency. `fmtPrice` puts the SHOP's mark on whatever it is
+   * handed, and since a job is converted into the client's currency when it
+   * is saved (lib/order-new.js jobCurrency) a EUR job's 100 read "100.00 SAR"
+   * in the orders log, on the board and in a customer's history. The shop's
+   * own currency still goes through `fmtPrice`, so those rows are unchanged.
+   */
+  function fmtOrderPrice(n, o) {
+    const code = orderCurrency(o || {});
+    const base = global.settings?.currency || 'SAR';
+    return !code || code === base ? fmtPrice(n) : fmtMoneyIn(n, code);
+  }
+
+  /** The mark a job's own figures are written in — for a label beside a
+   *  field that takes an amount in the job's currency (a credit note). */
+  function orderCurrencySymbol(o) {
+    const code = orderCurrency(o || {});
+    return (CURRENCIES[code] || CURRENCIES[global.settings?.currency] || CURRENCIES.SAR).symbol;
+  }
+
+  /**
+   * A total across jobs in the shop's currency — the reports' own figure
+   * (lib/order-money.js earnedTotalBase): each job at the rate it was saved
+   * at, one saved before rates were kept at today's.
+   */
+  function fmtJobsTotal(orders) {
+    return fmtPrice(M().earnedTotalBase(orders, ctx(), CURRENCIES));
+  }
+
   function convertToBase(amount, fromCurrency) {
     return M().convertToBase(amount, fromCurrency, ctx());
+  }
+
+  /** One of an ORDER's amounts in the shop's currency, at its saved rate when
+   *  it has one (lib/order-money.js orderToBase). Prefer this to
+   *  `convertToBase` whenever the amount belongs to an order. */
+  function orderToBase(amount, o) {
+    return M().orderToBase(amount, o, ctx(), CURRENCIES);
   }
 
   function orderRevenueBase(o) {
@@ -140,9 +179,13 @@
     fmtPrice,
     currencySymbol,
     fmtMoneyIn,
+    fmtOrderPrice,
+    orderCurrencySymbol,
+    fmtJobsTotal,
     clientCurrency,
     orderCurrency,
     convertToBase,
+    orderToBase,
     orderRevenueBase,
     orderCreditedRaw,
     orderCreditedBase,
