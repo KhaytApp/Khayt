@@ -398,15 +398,10 @@ private struct StageCell: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(shop.words.callIt(stage.key) + " · " + shop.words.numeral(live.progress) + "%")
         } else if let stage {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(stage.tint ?? Color.secondary)
-                    .frame(width: 6, height: 6)
-                Text(shop.words.callIt(stage.key))
-                    .foregroundStyle(stage.tint.map(AnyShapeStyle.init)
-                                     ?? AnyShapeStyle(.secondary))
-                    .lineLimit(1)
-            }
+            // The redesign's pill: the stage's tint, its dot, the word in
+            // ordinary ink — a coloured word on a tint of itself fails
+            // contrast in half the palette.
+            StatusPill(label: shop.words.callIt(stage.key), stage: .pending, tint: stage.dot)
             // MOVING A JOB ALONG IS THE COMMONEST THING A SHOP DOES HERE, and
             // the row simply WAS a different stage afterwards — the same
             // complaint `Motion` opens with, about figures, applied to the
