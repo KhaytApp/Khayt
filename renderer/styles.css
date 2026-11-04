@@ -852,6 +852,11 @@ tbody tr:hover { background: var(--surface-2); }
   align-items: center;
   gap: 10px;
   animation: toastIn 0.2s ease-out;
+  /* The container lets clicks through to the page (pointer-events: none) so the
+     empty corner it covers stays usable; each toast takes them back, or its
+     Undo / Review button is drawn but cannot be clicked. That was the case from
+     v1.0.0 until 4.3.x: scripts/e2e-smoke.mjs testToastButtonClickable. */
+  pointer-events: auto;
 }
 .toast.success { border-inline-start: 3px solid var(--success); }
 .toast.error   { border-inline-start: 3px solid var(--danger); }
