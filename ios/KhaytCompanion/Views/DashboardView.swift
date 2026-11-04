@@ -178,7 +178,8 @@ struct DashboardView: View {
                     .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
                     .khaytTracking(0.8)
                     .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
+                    // At the largest text sizes it shrank to "WEDNESDAY, 4 NOV…".
+                    .lineLimit(1).minimumScaleFactor(0.7)
                 Text(L10n.tr("pulse.title"))
                     .font(.khaytDisplay(30, .bold, relativeTo: .largeTitle))
                     .tracking(-0.6)
