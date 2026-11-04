@@ -244,7 +244,7 @@ struct LibraryInspector: View {
             }
             DetailLine(shop.words.callIt("mac.printed"), file.printCount == 0 ? shop.words.callIt("mac.never") : "\(file.printCount)×",
                        dim: file.printCount == 0)
-            if let last = file.lastPrinted, let day = Order.day(last) {
+            if let last = file.printedLast, let day = Order.day(last) {
                 DetailLine(shop.words.callIt("mac.last_run"), shop.words.say(day, Date.FormatStyle(date: .abbreviated, time: .omitted)))
             }
             // Where the bytes are is worth stating plainly. "On this Mac" and
@@ -1476,7 +1476,7 @@ private struct StorageSection: View {
 ///
 /// The mark that says "I mean to print this" — Printventory's Want, which is
 /// the one state of theirs Khayt did not already know (a job is Queued and
-/// Printing, `timesPrinted` is Printed). Toggled here, from the right-click
+/// Printing, a finished job is Printed — `LibraryFile.printCount`). Toggled here, from the right-click
 /// menu, the multi-select pane and Model ▸ Print Next (⌘B); a note says who
 /// or what it is for. Starting a JOB from the model takes it off the list
 /// (`Shop.clearPrintNext`); a quote leaves it.

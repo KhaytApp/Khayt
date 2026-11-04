@@ -6,7 +6,7 @@ import KhaytCore
 /// Decoded leniently, like `Order`, and for the same reason: this store is
 /// written by the Electron app and a newer build will add fields. It is also
 /// loose in its own right — `timesPrinted` and `lastPrinted` are absent on a
-/// model that has never run, `setups` on most, `slicerProfileId` is null
+/// model nobody logged a print of (the jobs' answer is `printed`), `setups` on most, `slicerProfileId` is null
 /// throughout, and `createdAt` is a number on some records and a string on
 /// others — read through `LenientInstant`, which takes either.
 struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
@@ -194,8 +194,16 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let licenceCode: String?
     let licenceUrl: String?
     let licenceExpires: String?
+    /// The RECORD'S OWN counter and date — written only by the desktop's
+    /// manual "log a print" button, never by a job. Read `printCount` and
+    /// `printedLast`, which take the jobs into account; these two alone say
+    /// "never printed" about a model made a hundred times.
     let timesPrinted: Int?
     let lastPrinted: String?
+    /// What the jobs say, merged with the two above (`PrintHistory.merge`):
+    /// put on by `Shop.withPrintHistory` when the library is shown, never read
+    /// from the book (no record carries this key) and never written to it.
+    var printed: PrintHistory.Merged?
 
     struct SourceFile: Decodable, Hashable, Sendable {
         let filename: String?
@@ -309,7 +317,12 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
         return fields
     }
 
-    var printCount: Int { timesPrinted ?? 0 }
+    /// Times printed: the larger of the record's counter and its finished
+    /// jobs (`lib/print-history.js`).
+    var printCount: Int { printed?.timesPrinted ?? timesPrinted ?? 0 }
+    /// When last printed, as stored: the later of the record's date and its
+    /// newest finished job's.
+    var printedLast: String? { printed == nil ? lastPrinted : printed?.lastPrinted }
     var swaps: Int { swapCount ?? 0 }
     var palette: [Colour] { colors ?? [] }
 
@@ -560,7 +573,7 @@ struct LenientInstant: Decodable, Hashable, Sendable {
 
 extension LibraryFile {
     var updatedAtDate: Date? { Order.day(updatedAt) }
-    var lastPrintedDate: Date? { Order.day(lastPrinted) }
+    var lastPrintedDate: Date? { Order.day(printedLast) }
 }
 
 extension LibraryFile.Colour {

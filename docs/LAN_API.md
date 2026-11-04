@@ -247,7 +247,10 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
 `count` is every model at or under that folder. `printTimeMins`/`grams` are
 what a slicer recorded, or null. `estimable` means the computer has the file and
 can measure it (`stl`, `obj`, `3mf`, `gcode`). Leave out anything the book does
-not have; send null rather than a made-up 0.
+not have; send null rather than a made-up 0. `timesPrinted`/`lastPrinted` count
+the finished jobs made from the model as well as the record's own counter — the
+larger of the two, and the later date (`lib/print-history.js`; one job is one
+print, whatever its quantity). Both servers answer the same.
 
 **`GET /api/library/{id}/thumb`** → the thumbnail (`image/jpeg`, `image/png` or
 `image/webp`) with `Cache-Control: private, max-age=86400`; **404** when there is none.

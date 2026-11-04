@@ -75,10 +75,18 @@ struct Library: Sendable {
               let rows = book["printFiles"] as? [[String: Any]] else {
             return Library(models: [])
         }
-        return Library(models: rows.compactMap(Self.model(from:)))
+        // Times printed and last printed come from the JOBS as well as the
+        // record (`PrintHistory`, `lib/print-history.js`): the record's own
+        // counter is only the desktop's manual log, so on its own it called a
+        // Mac shop's whole library never printed. Only the jobs' part ids,
+        // statuses and dates are read; nothing else of a job leaves here.
+        let log = (book["printLog"] as? [Any]).map { JSONValue.from($0) }
+        var history: [String: PrintHistory.Entry] = [:]
+        if case .array(let jobs)? = log { history = PrintHistory.byFile(jobs) }
+        return Library(models: rows.compactMap { Self.model(from: $0, history: history) })
     }
 
-    private static func model(from row: [String: Any]) -> Model? {
+    private static func model(from row: [String: Any], history: [String: PrintHistory.Entry]) -> Model? {
         guard let id = row["id"] as? String, !id.isEmpty else { return nil }
         // A model a conversion replaced is put aside rather than deleted. It is
         // not one of the things a shop is choosing between today, so it is not
@@ -92,6 +100,9 @@ struct Library: Sendable {
         }
         let source = row["sourceFile"] as? [String: Any]
         let licence = text("licence")
+        let printed = PrintHistory.merge(timesPrinted: (row["timesPrinted"] as? Int).map { .number(Double($0)) },
+                                         timesFailed: nil, lastPrinted: text("lastPrinted").map(JSONValue.string),
+                                         entry: history[id])
         return Model(
             id: id,
             title: text("name") ?? text("originalName") ?? id,
@@ -105,8 +116,8 @@ struct Library: Sendable {
             designer: text("source"),
             licence: licence,
             sellable: ModelLicence.sellable(licence),
-            timesPrinted: (row["timesPrinted"] as? Int) ?? 0,
-            lastPrinted: text("lastPrinted"),
+            timesPrinted: printed.timesPrinted,
+            lastPrinted: printed.lastPrinted,
             sizeBytes: source?["size"] as? Int,
             fileKind: (source?["ext"] as? String).flatMap { $0.isEmpty ? nil : $0.lowercased() })
     }

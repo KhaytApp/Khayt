@@ -116,9 +116,10 @@ extension Shop {
     /// The day a model was last used: printed, or added if it never was —
     /// in the book's calendar.
     nonisolated static func jumpDay(_ file: LibraryFile) -> String {
-        // `lastPrinted` is an instant: its BOOK day, not its UTC one (a print
-        // logged in Riyadh before 03:00 was dated the day before).
-        let printed = LibraryJump.day(file.lastPrinted.map { Calendar.localDay(ofInstant: $0) })
+        // `printedLast` (the record's date or its newest finished job's) is
+        // an instant: its BOOK day, not its UTC one (a print logged in Riyadh
+        // before 03:00 was dated the day before).
+        let printed = LibraryJump.day(file.printedLast.map { Calendar.localDay(ofInstant: $0) })
         if !printed.isEmpty { return printed }
         return file.createdAt?.date.map { Calendar.book.dayString($0) } ?? ""
     }
