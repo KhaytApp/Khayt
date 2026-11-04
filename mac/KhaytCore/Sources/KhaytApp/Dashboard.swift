@@ -475,6 +475,19 @@ struct ToChase: View {
                         Text(age(row, overdue: overdue))
                             .font(.callout).monospacedDigit()
                             .foregroundStyle(Khayt.attention)
+                        // Chase it from here: the reminder goes the shop's way
+                        // and is recorded, so the row leaves the list for the
+                        // cooldown (`Shop.sendPaymentReminder`).
+                        if overdue, shop.canMoveJobs {
+                            Button {
+                                Task { await shop.sendPaymentReminder(row.id) }
+                            } label: {
+                                Image(systemName: "paperplane")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(shop.words.callIt("mac.send_reminder"))
+                            .accessibilityLabel(shop.words.callIt("mac.send_reminder"))
+                        }
                     }
                     .padding(.vertical, 3)
                     .frame(minHeight: Metric.row)

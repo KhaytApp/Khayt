@@ -229,6 +229,14 @@ function openMilestoneInvoices(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
   if (!order.milestoneInvoices) order.milestoneInvoices = [];
+  // A milestone's amount is in the JOB's currency (the same units as its
+  // price), so it is shown and typed in that currency, not the shop's.
+  const jobCurrency = typeof orderCurrency === 'function' ? orderCurrency(order) : settings.currency;
+  const jobMark = ((typeof CURRENCIES !== 'undefined' && CURRENCIES[jobCurrency]) || {}).symbol || jobCurrency;
+  // A date field drawn like the text and number fields beside it (styles.css
+  // has no rule for `type=date`), so the row lines up and reads as one form.
+  const dateStyle = 'width:100%;padding:9px 11px;font:inherit;font-size:12.5px;color:var(--text);'
+    + 'background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius-sm);';
 
   function listHtml() {
     if (order.milestoneInvoices.length === 0) {
@@ -240,14 +248,16 @@ function openMilestoneInvoices(orderId) {
         <th style="padding:5px 8px;text-align:right;">${escapeHtml(t('ord.milestone_pct'))}</th>
         <th style="padding:5px 8px;text-align:right;">${escapeHtml(t('ord.milestone_amount'))}</th>
         <th style="padding:5px 8px;">${escapeHtml(t('ord.milestone_issued'))}</th>
+        <th style="padding:5px 8px;">${escapeHtml(t('ord.milestone_due'))}</th>
         <th></th>
       </tr></thead>
       <tbody>
         ${order.milestoneInvoices.map((m, i) => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
           <td style="padding:6px 8px;">${escapeHtml(m.label)}</td>
           <td style="padding:6px 8px;text-align:right;">${escapeHtml(String(m.percentage))}%</td>
-          <td style="padding:6px 8px;text-align:right;">${fmtPrice(m.amount)}</td>
+          <td style="padding:6px 8px;text-align:right;">${fmtMoneyIn(m.amount, jobCurrency)}</td>
           <td style="padding:6px 8px;color:var(--text-muted);">${m.issuedAt ? escapeHtml(m.issuedAt) : '—'}</td>
+          <td style="padding:6px 8px;"><input type="date" data-mi-due="${i}" value="${escapeHtml(m.dueDate || '')}" aria-label="${escapeHtml(t('ord.milestone_due'))}" style="${dateStyle}padding:4px 8px;font-size:12px;"></td>
           <td style="padding:6px 8px;">
             <button class="btn small" data-mi="${i}">${escapeHtml(t('ord.milestone_issue'))}</button>
             <button class="btn danger small" data-mi-del="${i}" style="margin-inline-start:4px;" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
@@ -264,7 +274,7 @@ function openMilestoneInvoices(orderId) {
     bodyHtml: `
       <div id="milestoneListWrap">${listHtml()}</div>
       <hr class="divider" style="margin:16px 0;">
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;align-items:end;">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;align-items:end;">
         <div>
           <label style="margin:0;">${escapeHtml(t('ord.milestone_label'))}</label>
           <input type="text" id="msLabel" placeholder="e.g. Deposit" style="font-size:12.5px;">
@@ -274,8 +284,12 @@ function openMilestoneInvoices(orderId) {
           <input type="number" id="msPct" min="1" max="100" step="1" placeholder="50" style="font-size:12.5px;">
         </div>
         <div>
-          <label style="margin:0;">${escapeHtml(t('ord.milestone_amount'))} (${currencySymbol()})</label>
+          <label style="margin:0;">${escapeHtml(t('ord.milestone_amount'))} (${escapeHtml(jobMark)})</label>
           <input type="number" id="msAmount" min="0" step="0.01" placeholder="0.00" style="font-size:12.5px;">
+        </div>
+        <div>
+          <label style="margin:0;" for="msDue">${escapeHtml(t('ord.milestone_due'))}</label>
+          <input type="date" id="msDue" style="${dateStyle}">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;">
@@ -288,6 +302,17 @@ function openMilestoneInvoices(orderId) {
         wrap.querySelectorAll('[data-mi]').forEach(btn => {
           btn.addEventListener('click', () => {
             generateMilestoneInvoice(orderId, order.milestoneInvoices[+btn.dataset.mi]);
+          });
+        });
+        // A milestone's optional due date: what the payment reminder chases it by
+        // (lib/payment-reminder.js milestonesDue). Set on the row in place, so any
+        // other key the row carries stays as it was.
+        wrap.querySelectorAll('[data-mi-due]').forEach(input => {
+          input.addEventListener('change', () => {
+            const m = order.milestoneInvoices[+input.dataset.miDue];
+            if (!m) return;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(input.value)) m.dueDate = input.value; else delete m.dueDate;
+            saveAll();
           });
         });
         wrap.querySelectorAll('[data-mi-del]').forEach(btn => {
@@ -308,8 +333,12 @@ function openMilestoneInvoices(orderId) {
         const label = modal.querySelector('#msLabel').value.trim() || 'Milestone';
         const pct = parseFloat(modal.querySelector('#msPct').value) || 0;
         const amount = parseFloat(modal.querySelector('#msAmount').value) || 0;
-        order.milestoneInvoices.push({ id: uid('MS'), label, percentage: pct, amount, issuedAt: null });
+        const due = modal.querySelector('#msDue').value;
+        const row = { id: uid('MS'), label, percentage: pct, amount, issuedAt: null };
+        if (/^\d{4}-\d{2}-\d{2}$/.test(due)) row.dueDate = due;
+        order.milestoneInvoices.push(row);
         saveAll(); refresh();
+        modal.querySelector('#msDue').value = '';
         modal.querySelector('#msLabel').value = '';
         modal.querySelector('#msPct').value = '';
         modal.querySelector('#msAmount').value = '';

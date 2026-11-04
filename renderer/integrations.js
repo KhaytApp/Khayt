@@ -1474,6 +1474,10 @@ async function publishOrderToCloudPortal(orderId) {
         // `lib/portal-owner.js responseFor` reads the customer's answer.
         const said = KhaytPortalOwner.responseFor(lst.items, pubToken, order);
         const paid = said.paid;
+        // A paid deposit is RECORDED, once (`recordPortalPayment` keys it on the
+        // provider's reference), through the shop's own payment rule — not only
+        // said here and then typed in again by hand.
+        if (paid) recordPortalDepositFrom(lst.items, pubToken, order);
         const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
         if (said.response === 'none') {
           resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
@@ -1497,6 +1501,44 @@ async function publishOrderToCloudPortal(orderId) {
       });
     },
   });
+}
+
+/**
+ * Record a deposit the customer paid through the portal, and say what
+ * happened. `lib/portal-owner.js recordPortalPayment` decides; a second check,
+ * or the Mac having recorded it already, changes nothing and says nothing.
+ */
+function recordPortalDepositFrom(items, pubToken, order) {
+  if (typeof KhaytPortalOwner === 'undefined' || !KhaytPortalOwner.recordPortalPayment) return;
+  const out = KhaytPortalOwner.recordPortalPayment(items, pubToken, order,
+    { today: localDateStr(), settings, clients });
+  if (out.outcome === 'none' || out.outcome === 'already') return;
+  // In the job's own currency: the portal asked for the job's own figures.
+  const code = (typeof KhaytOrderMoney !== 'undefined' && KhaytOrderMoney.orderCurrency)
+    ? KhaytOrderMoney.orderCurrency(order, { settings, clients }) : settings.currency;
+  const amount = fmtMoneyIn(out.amount, code);
+  if (out.outcome === 'recorded') {
+    runPaymentEffects(order, out.effects.filter((e) => e.type !== 'toast_saved'));
+    // Undo for the one case the rule cannot see: the same deposit typed in by
+    // hand more than a few days apart. The note stays, marked undone, so no
+    // later check records it again.
+    toast(t('cloud.portal_deposit_recorded', { amount }), 'success', 10000, {
+      undo: () => {
+        const back = KhaytPortalOwner.undoPortalPayment(order, out.key,
+          { settings, clients, now: new Date().toISOString() });
+        if (!back.ok) return;
+        saveAll();
+        if (typeof renderLogs === 'function') renderLogs();
+        if (typeof renderKanban === 'function') renderKanban();
+        toast(t('cloud.portal_deposit_undone', { amount }), 'info', 5000);
+      },
+    });
+  } else {
+    saveAll();
+    const key = out.outcome === 'matched' ? 'cloud.portal_deposit_matched'
+      : out.outcome === 'settled' ? 'cloud.portal_deposit_settled' : 'cloud.portal_deposit_no_amount';
+    toast(t(key, { amount }), 'info', 7000);
+  }
 }
 
 async function openQuoteApprovalLinkModal(orderId) {

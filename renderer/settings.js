@@ -5770,6 +5770,9 @@ function loadSettingsIntoForm() {
   if (prEnEl) prEnEl.checked = !!(settings.paymentReminder && settings.paymentReminder.enabled);
   const prGrEl = $('#set_payReminderGrace');
   if (prGrEl) prGrEl.value = (settings.paymentReminder && settings.paymentReminder.graceDays != null) ? settings.paymentReminder.graceDays : 3;
+  const prChEl = $('#set_payReminderChannel');
+  if (prChEl) prChEl.value = ['whatsapp', 'email'].includes(settings.paymentReminder && settings.paymentReminder.channel)
+    ? settings.paymentReminder.channel : 'auto';
   const moEl = $('#set_minOrderAmount');
   if (moEl) moEl.value = settings.minOrderAmount ?? 0;
   const rfEl = $('#set_rushFeeEnabled');
@@ -6086,7 +6089,8 @@ function readSettingsForm() {
       ['safetyDays', '#set_leadSafetyDays'], ['publishToCloud', '#set_leadPublish', 'tick'],
     ]),
     quoteFollowUp: group([['enabled', '#set_quoteFollowUpEnabled', 'tick'], ['windowDays', '#set_quoteFollowUpWindow']]),
-    paymentReminder: group([['enabled', '#set_payReminderEnabled', 'tick'], ['graceDays', '#set_payReminderGrace']]),
+    paymentReminder: group([['enabled', '#set_payReminderEnabled', 'tick'], ['graceDays', '#set_payReminderGrace'],
+      ['channel', '#set_payReminderChannel']]),
     minOrderAmount: opt('#set_minOrderAmount'), rushFeeEnabled: tick('#set_rushFeeEnabled'),
     rushFeePct: opt('#set_rushFeePct'), defaultPackagingCost: opt('#set_defaultPackagingCost'),
     wip: Object.fromEntries(['pending', 'printing', 'post', 'qc'].map(col => [col, opt(`#set_wip_${col}`)])),

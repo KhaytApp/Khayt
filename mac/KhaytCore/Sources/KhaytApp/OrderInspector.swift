@@ -299,6 +299,24 @@ private struct Detail: View {
                 .buttonStyle(.link)
                 .font(.callout)
                 .padding(.top, 2)
+                // A reminder for money still owed on real work — never a
+                // quote, which is chased by its own follow-up.
+                if job.status != "quote", !job.isSettled {
+                    Button(shop.words.callIt("mac.send_reminder")) {
+                        Task { await shop.sendPaymentReminder(job.id) }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
+                // A deposit the portal recorded, for the shop that had typed it
+                // in by hand already: taken back, and never recorded again.
+                if let key = shop.undoablePortalDeposit(job.id) {
+                    Button(shop.words.callIt("mac.undo_portal_deposit")) {
+                        Task { await shop.undoPortalDeposit(job.id, key: key) }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
             }
             // Beside the figures it states. Not behind `canMoveJobs`: showing
             // the document writes nothing, and the sample shop is the one book

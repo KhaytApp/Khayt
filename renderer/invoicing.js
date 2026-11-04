@@ -460,32 +460,86 @@ async function sendStatusWhatsApp(orderId) {
   }
 }
 
+/**
+ * Send one payment reminder the shop's way, and record it once it has gone.
+ *
+ * The rules are `lib/payment-reminder.js`, the Mac's too: which way it goes
+ * (`reminderChannel`: the shop's choice in Settings, else WhatsApp when the
+ * customer has a number, else email), how much it asks for (`reminderAmount`:
+ * the unpaid part of the milestones that are due, else what is owed, in the
+ * job's own currency), the shop's pay link, and the record
+ * (`markReminderPatch`), written HERE, after the send, and nowhere else, so
+ * one reminder is one mark. The 6-hour timer only flags.
+ *
+ * Returns true when a reminder went out (and was recorded).
+ */
 async function sendPaymentReminder(orderId) {
   const order = printLog.find(o => o.id === orderId);
-  if (!order) return;
+  if (!order) return false;
+  const R = typeof KhaytPaymentReminder !== 'undefined' ? KhaytPaymentReminder : null;
   const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  if (!client?.phone) { toast(t('pay.remind_no_phone'), 'info', 3200); return; }
-  // Use the payment-reminder WA template if available, otherwise a default
-  const tpl = waTemplates.find(w => w.id === 'tpl-payment') || waTemplates[0];
-  const message = tpl
-    ? fillWaTemplate(tpl.body, order, client)
-    // In the job's own currency. The sentence asks for {amount}; it was handed
-    // `price` (with the SHOP's mark) and `currency`, so it went out reading
-    // "for {amount}". Both names are passed so a translation using either reads.
-    : t('pay.remind_default', { name: localName(client), id: order.id,
-      amount: fmtOrderPrice(order.price, order), price: fmtOrderPrice(order.price, order),
-      currency: orderCurrencySymbol(order) });
-  if (window.hubAPI?.shareWhatsApp) {
-    await window.hubAPI.shareWhatsApp({ phone: client.phone, message, pdfPath: null });
-  } else {
-    // Fallback: open WhatsApp web
-    const encodedMsg = encodeURIComponent(message);
-    const phone = (client.phone || '').replace(/\D/g, '');
-    window.hubAPI?.openExternal?.(`https://wa.me/${phone}?text=${encodedMsg}`);
-    if (!window.hubAPI?.openExternal) {
+  const channel = R ? R.reminderChannel(settings, client) : (client?.phone ? 'whatsapp' : 'none');
+  if (channel === 'none') { toast(t('pay.remind_no_phone'), 'info', 3200); return false; }
+
+  const text = reminderMessage(order, client);
+  let sent = false;
+  try {
+    if (channel === 'email') {
+      const name = (typeof shopName === 'function' && shopName()) || 'Khayt';
+      const mail = R.reminderEmail({ settings, client, text, shopName: name,
+        subject: t('pay.remind_subject', { shop: name }) });
+      const result = mail && await window.hubAPI?.sendEmail?.({ to: mail.to, subject: mail.subject,
+        body: mail.html, smtpConfig: settings.emailConfig });
+      // A mailto fallback opened the shop's mail app with it written: as sent as
+      // WhatsApp opened with it typed in.
+      sent = !!(result && (result.ok || (result.fallback && result.mailtoUrl)));
+      if (!sent) toast((result && result.error) || t('notify.email_failed') || 'Email failed', 'warning', 4000);
+    } else if (window.hubAPI?.shareWhatsApp) {
+      await window.hubAPI.shareWhatsApp({ phone: client.phone, message: text, pdfPath: null });
+      sent = true;
+    } else if (window.hubAPI?.openExternal) {
+      const phone = (client.phone || '').replace(/\D/g, '');
+      window.hubAPI.openExternal(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
+      sent = true;
+    } else {
       toast(t('pay.remind_sent') || 'Open WhatsApp manually to send the reminder', 'info');
     }
+  } catch (e) {
+    console.warn('sendPaymentReminder:', e);
+    toast(t('notify.email_failed') || 'The reminder did not go out', 'warning', 4000);
+    sent = false;
   }
+  if (!sent) return false;
+  if (R) Object.assign(order, R.markReminderPatch(order, Date.now()));
+  saveAll();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  return true;
+}
+
+/**
+ * The reminder's words: the shop's `tpl-payment`, else Khayt's default, asking
+ * for what the reminder is FOR (`reminderAmount`) in the job's own currency,
+ * with the shop's pay link after (`payLinkFor`, converted into the shop's
+ * currency at the job's saved rate, or left out when there is none).
+ */
+function reminderMessage(order, client) {
+  const R = typeof KhaytPaymentReminder !== 'undefined' ? KhaytPaymentReminder : null;
+  const code = typeof orderCurrency === 'function' ? orderCurrency(order) : settings.currency;
+  const owed = typeof orderOwedRaw === 'function'
+    ? orderOwedRaw(order) : Math.max(0, (+order.price || 0) - (+order.paidAmount || 0));
+  const asked = R ? R.reminderAmount(order, owed, settings, Date.now(), client) : { amount: owed };
+  const symbol = ((typeof CURRENCIES !== 'undefined' && CURRENCIES[code]) || {}).symbol || code;
+  const name = client ? localName(client) : (order.project || '');
+  const tpl = waTemplates.find(w => w.id === 'tpl-payment');
+  const message = tpl
+    ? KhaytWaTemplate.fillTemplate(tpl.body, {
+        client: name, id: jobRef(order), price: fmtMoney(asked.amount), currency: symbol,
+        due: order.dueDate, status: t('queue.' + order.status),
+      })
+    : t('pay.remind_default', { name, id: jobRef(order), amount: fmtMoneyIn(asked.amount, code) });
+  if (!R) return message;
+  const link = R.payLinkFor(settings, asked.amount, { order, currency: code });
+  return R.reminderText({ body: message, values: null, payLink: link, payLabel: t('pay.remind_pay_here') });
 }
 
 /**

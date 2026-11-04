@@ -3581,12 +3581,86 @@ public actor KhaytEngine {
             "KhaytPaymentReminder.selectInvoicesDueForReminder(ARG0, ARG1,"
           + " function (o) { return ARG2[o.id] || 0; }, ARG3, ARG4)"
           + ".map(function (o) { return {id: o.id, name: o.project || '',"
-          + " days: KhaytPaymentReminder.daysOverdue(o, ARG3,"
-          + " KhaytPaymentTerms.customerOf(o, ARG4))}; })",
+          + " days: KhaytPaymentReminder.reminderDaysOverdue(o, ARG3,"
+          + " KhaytPaymentTerms.customerOf(o, ARG4), ARG1)}; })",
             [.array(orders), .object(settings),
              .object(owed.mapValues(JSONValue.number)),
              .number(now.timeIntervalSince1970 * 1000), .array(clients)],
             as: [Chase].self)
+    }
+
+    /// The shop's two chase switches, as the shared rules read them:
+    /// `settings.paymentReminder.enabled` and `settings.quoteFollowUp.enabled`.
+    public func chaseSwitches(settings: [String: JSONValue]) throws -> ChaseSwitches {
+        try runtime.call2(
+            "({ invoices: KhaytPaymentReminder.reminderConfig(ARG0).enabled,"
+          + " quotes: KhaytQuoteFollowUp.followUpConfig(ARG0).enabled })",
+            [.object(settings)], as: ChaseSwitches.self)
+    }
+
+    public struct ChaseSwitches: Decodable, Sendable, Equatable {
+        public let invoices: Bool
+        public let quotes: Bool
+
+        public init(invoices: Bool, quotes: Bool) {
+            self.invoices = invoices; self.quotes = quotes
+        }
+    }
+
+    /// What one payment reminder would be: how it goes, what it asks for, the
+    /// milestones it covers and the shop's pay link with the amount in it
+    /// (`lib/payment-reminder.js`). `owed` is in the job's OWN currency.
+    public struct ReminderPlan: Decodable, Sendable, Equatable {
+        /// `whatsapp` | `email` | `none`
+        public let channel: String
+        public let amount: Double
+        public let milestones: [String]
+        public let payLink: String
+    }
+
+    public func reminderPlan(order: JSONValue, owed: Double, settings: [String: JSONValue],
+                             client: JSONValue?, now: Date = Date()) throws -> ReminderPlan {
+        try runtime.call2("""
+            (function (o, owed, settings, client, now) {
+              var R = KhaytPaymentReminder;
+              var asked = R.reminderAmount(o, owed, settings, now, client);
+              // The link is the shop's, in the shop's currency: the job's
+              // currency and saved rate say how to convert (or to leave it out).
+              var code = KhaytOrderMoney.orderCurrency(o, { settings: settings, clients: client ? [client] : [] });
+              return { channel: R.reminderChannel(settings, client), amount: asked.amount,
+                milestones: asked.milestones.map(function (m) { return m.label || m.id; }),
+                payLink: R.payLinkFor(settings, asked.amount, { order: o, currency: code }) };
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """,
+            [order, .number(owed), .object(settings), client ?? .null,
+             .number(now.timeIntervalSince1970 * 1000)],
+            as: ReminderPlan.self)
+    }
+
+    /// The reminder's words: `body` filled with `values`, the pay link after.
+    public func reminderText(body: String, values: [String: String], payLink: String,
+                             payLabel: String) throws -> String {
+        try runtime.call2(
+            "KhaytPaymentReminder.reminderText({ body: ARG0, values: ARG1, payLink: ARG2, payLabel: ARG3 })",
+            [.string(body), .object(values.mapValues(JSONValue.string)), .string(payLink), .string(payLabel)],
+            as: String.self)
+    }
+
+    /// The reminder as an email, or nil when the shop or the customer has no way.
+    public func reminderEmail(settings: [String: JSONValue], client: JSONValue?, text: String,
+                              subject: String, shopName: String) throws -> OrderEmail? {
+        try runtime.call2(
+            "KhaytPaymentReminder.reminderEmail({ settings: ARG0, client: ARG1, text: ARG2, subject: ARG3, shopName: ARG4 })",
+            [.object(settings), client ?? .null, .string(text), .string(subject), .string(shopName)],
+            as: OrderEmail?.self)
+    }
+
+    /// The job with a sent reminder recorded on it (`markReminderPatch`):
+    /// `payRemindedAt` and `payReminderCount`, which the cooldown and the cap read.
+    public func markReminder(order: JSONValue, now: Date = Date()) throws -> JSONValue {
+        try runtime.call2(
+            "Object.assign(ARG0, KhaytPaymentReminder.markReminderPatch(ARG0, ARG1))",
+            [order, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
     }
 
     /// Quotes about to expire without an answer.
@@ -9304,6 +9378,78 @@ public actor KhaytEngine {
     public func portalResponse(items: JSONValue, pubToken: String, order: JSONValue) throws -> PortalResponse {
         try runtime.call2("KhaytPortalOwner.responseFor(ARG0, ARG1, ARG2)",
                           [items, .string(pubToken), order], as: PortalResponse.self)
+    }
+
+    /// A payment the customer made through the portal, and what recording it
+    /// once did to the job (`lib/portal-owner.js recordPortalPayment`).
+    public struct PortalPayment: Decodable, Sendable {
+        /// `none` | `already` | `recorded` | `matched` | `settled` | `no_amount`
+        public let outcome: String
+        /// In the job's own currency: what was added, or what the portal said.
+        public let amount: Double
+        /// The job's own currency, for saying the amount.
+        public let currency: String
+        /// What this payment is recorded under on the job (`portalPayments`).
+        public let key: String
+        public let order: JSONValue
+        public let effects: [String]
+        public let webhookEffects: [WebhookEffect]?
+
+        /// The book changed: anything but `none` and `already`.
+        public var changesTheJob: Bool { outcome != "none" && outcome != "already" }
+
+        /// As a recorded payment, for the receipt email a payment owes.
+        public var asPayment: PaymentRecorded {
+            PaymentRecorded(order: order, effects: effects, webhookEffects: webhookEffects, refused: nil)
+        }
+    }
+
+    /// A recorded portal payment taken back (`undoPortalPayment`): the job
+    /// as it is after, and how much came off it. The note stays, `undone`.
+    public struct PortalUndo: Decodable, Sendable {
+        public let ok: Bool
+        public let amount: Double
+        public let currency: String
+        public let order: JSONValue
+    }
+
+    public func portalUndoPayment(order: JSONValue, key: String, settings: [String: JSONValue],
+                                  now: Date = Date()) throws -> PortalUndo {
+        try runtime.call2("""
+            (function () {
+              var order = ARG0, ctx = { settings: ARG2 || {}, now: ARG3 };
+              var r = KhaytPortalOwner.undoPortalPayment(order, ARG1, ctx);
+              return { ok: !!r.ok, amount: r.amount || 0,
+                currency: KhaytOrderMoney.orderCurrency(order, ctx), order: order };
+            })()
+            """,
+            [order, .string(key), .object(settings), .string(ISO8601DateFormatter().string(from: now))],
+            as: PortalUndo.self)
+    }
+
+    public func portalRecordPayment(items: JSONValue, pubToken: String, order: JSONValue,
+                                    today: String, settings: [String: JSONValue],
+                                    clients: [JSONValue]) throws -> PortalPayment {
+        try runtime.call2("""
+            (function () {
+              var order = ARG2;
+              var ctx = { today: ARG3, settings: ARG4 || {}, clients: ARG5 || [] };
+              var r = KhaytPortalOwner.recordPortalPayment(ARG0, ARG1, order, ctx);
+              var webhookEffects = [];
+              (r.effects || []).forEach(function (e) {
+                if (e.type === 'webhook' || e.type === 'order_webhook') {
+                  webhookEffects.push({ kind: e.type, event: e.event,
+                    newStatus: typeof e.newStatus === 'string' ? e.newStatus : null });
+                }
+              });
+              return { outcome: r.outcome, amount: r.amount || 0, key: r.key || '',
+                currency: KhaytOrderMoney.orderCurrency(order, ctx),
+                order: order, effects: (r.effects || []).map(function (e) { return e.type; }),
+                webhookEffects: webhookEffects };
+            })()
+            """,
+            [items, .string(pubToken), order, .string(today), .object(settings), .array(clients)],
+            as: PortalPayment.self)
     }
 
     public struct PortalError: Decodable, Sendable, Equatable {
