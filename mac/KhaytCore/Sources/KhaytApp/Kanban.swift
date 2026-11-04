@@ -253,27 +253,21 @@ private struct Column: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // The stage's own colour, and only when the column has something
-            // in it: a warm heading over an empty column says a machine is
-            // working when none is, and a green one over no delivered jobs
-            // says work went out that did not.
-            //
-            // This asked `stage == .printing` before, so the board knew about
-            // exactly one of the nine states it draws. `Stage.tint` answers for
-            // all of them and returns nil for the five that are simply the
-            // ordinary course of a job.
-            let tint: Color? = jobs.isEmpty ? nil : stage.tint
-            let style = tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary)
-            HStack(spacing: 6) {
-                Image(systemName: stage.symbol).foregroundStyle(style)
-                Text(shop.words.callIt(stage.key)).font(.headline)
-                Spacer(minLength: 6)
-                Text("\(jobs.count)")
-                    .font(.caption)
+            // The redesign's column head: the stage's dot, its name, the count
+            // beside it. The dot is the stage colour the Today pills use, and
+            // only when the column has something in it: a green dot over an
+            // empty Printing column says a machine is working when none is.
+            HStack(spacing: 7) {
+                Circle().fill(jobs.isEmpty ? Color.secondary.opacity(0.5) : stage.dot)
+                    .frame(width: 7, height: 7)
+                Text(shop.words.callIt(stage.key)).font(.system(size: 13, weight: .semibold))
+                Text(verbatim: shop.words.numeral(jobs.count))
+                    .font(.system(size: 12))
                     .monospacedDigit()
-                    .foregroundStyle(style)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 6)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 6).padding(.top, 2)
 
             if jobs.isEmpty {
                 // An empty column keeps its width and says so. A board whose
@@ -315,7 +309,7 @@ private struct Column: View {
         .animation(Motion.of(Motion.figure, unless: reduced), value: jobs.map(\.id))
         // Narrow enough that seven columns are a short scroll rather than a
         // long one, wide enough for a two-line job name.
-        .frame(width: 196, alignment: .leading)
+        .frame(width: 212, alignment: .leading)
         .lane()
         // WHERE THE CARD IN THE AIR MAY GO — shown positively.
         //
@@ -386,6 +380,19 @@ private struct Column: View {
 }
 
 private extension Stage {
+    /// The column head's dot: the stage colours of the redesign (Today's
+    /// pills), one per stage family.
+    var dot: Color {
+        switch self {
+        case .quote, .pending: Khayt.note
+        case .on_hold, .post, .qc: Khayt.hold
+        case .printing: Khayt.live
+        case .completed: Khayt.collect
+        case .shipped, .delivered: Khayt.done
+        case .cancelled: Khayt.late
+        }
+    }
+
     /// The stage a job is in right now, by id.
     @MainActor
     static func of(job id: String, in shop: Shop) -> Stage? {
@@ -406,17 +413,24 @@ private struct JobCard: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .top, spacing: 7) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
                 // The board is the screen people stand in front of, and a
                 // column of cards is scanned rather than read. A picture of the
                 // thing is found faster than its name — and the picture is
                 // already in the library, on a job that says which model it is.
-                if let thumb = shop.modelThumbnail(for: job) {
-                    Thumbnail(source: thumb)
-                        .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                // A job with no model keeps the tile, so every card's title
+                // starts at the same place.
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Khayt.recessed)
+                    if let thumb = shop.modelThumbnail(for: job) {
+                        Thumbnail(source: thumb).padding(3)
+                    } else {
+                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(.tertiary)
+                    }
                 }
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     // Baseline-aligned, so the flag sits beside the first word
                     // rather than floating at the middle of a title that wrapped.
@@ -425,11 +439,11 @@ private struct JobCard: View {
                             Image(systemName: "flag.fill").font(.caption2)
                                 .foregroundStyle(Khayt.attention)
                         }
-                        Text(shop.shownTitle(of: job)).font(.callout.weight(.medium)).lineLimit(2)
+                        Text(shop.shownTitle(of: job)).font(.system(size: 13, weight: .semibold)).lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if !job.client.isEmpty {
-                        Text(job.client).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(job.client).font(.system(size: 11.5)).foregroundStyle(.secondary).lineLimit(1)
                     }
                     if let matchedLot {
                         Label(shop.words.callIt("mac.lot_label", ["lot": .string(matchedLot)]),
@@ -442,39 +456,48 @@ private struct JobCard: View {
                         Label(who, systemImage: "person.badge.clock")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    // What it is being printed in, in the shop's own words.
-                    let colours = shop.partColours(of: job)
-                    if !colours.isEmpty {
-                        Text(colours.prefix(2).joined(separator: " · "))
-                            .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
+            // A job on a machine that is printing it: the amber thread, then
+            // which machine and how long is left.
+            if let live = shop.livePrint(for: job), let machineId = job.machineId {
+                VStack(alignment: .leading, spacing: 5) {
+                    ThreadBar(progress: Double(live.progress) / 100)
+                    HStack(spacing: 4) {
+                        Image(systemName: "printer").foregroundStyle(Khayt.live)
+                        Text(verbatim: shop.machineName(forId: machineId)
+                             + ((live.timeRemaining ?? 0) > 0
+                                ? " · " + PrinterWatch.spell(live.timeRemaining ?? 0, shop.words) : ""))
+                            .lineLimit(1).truncationMode(.middle)
                     }
+                    .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             HStack(spacing: 6) {
                 if let due = Order.day(job.dueDate) {
+                    let date = shop.words.say(due, .dateTime.day().month(.abbreviated))
                     // Said in words as well as colour — this is the line that
                     // decides whether someone gets a phone call today.
-                    Label(shop.words.say(due, .dateTime.day().month(.abbreviated)),
-                          systemImage: job.isOverdue() ? "exclamationmark.triangle" : "calendar")
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundStyle(job.isOverdue() ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
+                    if job.isOverdue() {
+                        StatusPill(label: date, stage: .late)
+                            .help(shop.words.callIt("mac.late_tile"))
+                    } else {
+                        Label(date, systemImage: "clock")
+                            .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                    }
                 }
                 Spacer(minLength: 4)
                 if !job.isSettled {
                     Text(Money.figure(job.owedInOwnCurrency))
-                        .font(.caption2)
+                        .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
                 }
             }
         }
-        // Late first, then flagged — a job can be both, and "late" is the one
-        // that decides what happens next. Neither is said by colour alone: the
-        // date already wears a warning triangle and the flag is a flag.
-        .card(rail: job.isOverdue() ? Khayt.late : (job.priority ? Khayt.attention : nil),
-              padding: 9)
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        // Late is said by the pill on the date and flagged by the flag, so
+        // the card itself carries no rail.
+        .todayCard(padding: 11)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .liftsOnHover(hovering)
         .onHover { hovering = $0 }
         .onTapGesture {
