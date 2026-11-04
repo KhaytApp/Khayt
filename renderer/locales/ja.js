@@ -4645,6 +4645,8 @@
   "act.from_printer": "これらの数値は {source} から取得したもので、見積もりではなく実際に消費した量です。",
   "act.from_printer_file": "この数値は {source} から、{file} を印刷したときに実測したものです（見積もりではありません）。",
   "act.your_printer": "お使いのプリンター",
+  "act.sliced": "スライス値",
+  "act.sliced_note": "印刷したプレート（プレート {plate}）のスライス値です。Khayt が送ったファイルから読み取ったもので、プリンターの実測ではありません。",
   "setup.title": "うまくいった設定",
   "setup.add": "＋ 設定を追加",
   "setup.add_title": "設定を追加",
