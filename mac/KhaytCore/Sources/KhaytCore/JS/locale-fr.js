@@ -4261,7 +4261,7 @@
   "dupnum.title": "Documents portant le même numéro",
   "dupnum.why": "Deux ordinateurs sur ce registre ont attribué le même numéro alors qu’ils n’étaient pas synchronisés. Gardez celui que le client a déjà et donnez à l’autre le prochain numéro libre.",
   "dupnum.renumber": "Nouveau numéro",
-  "dupnum.renumbered": "{old} est désormais {new}.",
+  "dupnum.renumbered": "{old} est désormais {new}. Si {old} figure déjà sur un document remis au client, cliquez sur Annuler.",
   "sync.overwritten_many": "{n} de vos modifications ont été remplacées par des versions plus récentes venant d'un autre appareil — à vérifier.",
   "set.ai_master": "Assistance IA",
   "set.ai_pii_badge": "Données client",

@@ -4261,7 +4261,7 @@
   "dupnum.title": "Belege mit derselben Nummer",
   "dupnum.why": "Zwei Computer an diesem Buch haben dieselbe Nummer vergeben, während sie nicht synchron waren. Behalten Sie den Beleg, den der Kunde schon hat, und geben Sie dem anderen die nächste freie Nummer.",
   "dupnum.renumber": "Neue Nummer",
-  "dupnum.renumbered": "{old} ist jetzt {new}.",
+  "dupnum.renumbered": "{old} ist jetzt {new}. Wenn {old} schon auf einem Beleg beim Kunden steht, klicken Sie auf Rückgängig.",
   "sync.overwritten_many": "{n} Ihrer Änderungen wurden durch neuere Versionen von einem anderen Gerät ersetzt — sehen Sie sie sich an.",
   "set.ai_master": "KI-Assistenz",
   "set.ai_pii_badge": "Kundendaten",

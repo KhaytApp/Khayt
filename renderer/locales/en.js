@@ -4262,7 +4262,7 @@
   "dupnum.title": "Documents that share a number",
   "dupnum.why": "Two computers on this book gave out the same number while they were not in sync. Keep the one the customer already has, and give the other the next free number.",
   "dupnum.renumber": "New number",
-  "dupnum.renumbered": "{old} is now {new}.",
+  "dupnum.renumbered": "{old} is now {new}. If {old} is already on a paper the customer has, press Undo.",
   "sync.overwritten_many": "{n} of your edits were replaced by newer versions from another device — worth a look.",
   "set.ai_master": "AI assist",
   "set.ai_pii_badge": "Customer data",

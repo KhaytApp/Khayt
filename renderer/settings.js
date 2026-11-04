@@ -2084,7 +2084,7 @@ function openDuplicateNumbers() {
           <div style="display:flex;gap:8px;align-items:center;padding:3px 0;">
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(j.project || j.ref)}</span>
             <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(j.date)}</span>
-            <button type="button" class="btn ghost small dupRenumber" data-id="${escapeHtml(j.id)}" data-number="${escapeHtml(g.number)}">${escapeHtml(t('dupnum.renumber'))}</button>
+            <button type="button" class="btn ghost small dupRenumber" data-id="${escapeHtml(j.id)}" data-number="${escapeHtml(g.number)}" data-year="${escapeHtml(g.year)}">${escapeHtml(t('dupnum.renumber'))}</button>
           </div>`).join('')}
       </div>`).join('');
   const overlay = appendStackedModal(`
@@ -2102,11 +2102,25 @@ function openDuplicateNumbers() {
   overlay.querySelectorAll('.dupRenumber').forEach((btn) => btn.addEventListener('click', () => {
     const order = printLog.find((o) => o && o.id === btn.dataset.id);
     if (!order) return;
-    const given = KhaytOrderNew.renumber(order, settings, printLog, new Date().getFullYear());
+    // The pair's OWN year: a 2025 pair gets a free 2025 number, and this
+    // year's counter is left alone (lib/order-new.js `renumber`).
+    const year = parseInt(btn.dataset.year, 10) || new Date().getFullYear();
+    const before = KhaytOrderNew.renumberSnapshot(order, settings);
+    const given = KhaytOrderNew.renumber(order, settings, printLog, year);
     if (!given) return;
+    const after = KhaytOrderNew.renumberSnapshot(order, settings);
     saveAll();
     overlay.remove();
-    toast(t('dupnum.renumbered').replace('{old}', btn.dataset.number).replace('{new}', given), 'success', 5000);
+    // A misclick is one Undo away — the old number may be the one already on
+    // a customer's paper.
+    toast(t('dupnum.renumbered').replace(/\{old\}/g, btn.dataset.number).replace('{new}', given), 'success', 12000, {
+      undo: () => {
+        KhaytOrderNew.undoRenumber(order, settings, before, after);
+        saveAll();
+        if (typeof renderLogs === 'function') renderLogs();
+        if (typeof renderKanban === 'function') renderKanban();
+      },
+    });
     if (typeof renderLogs === 'function') renderLogs();
     if (typeof renderKanban === 'function') renderKanban();
     if (KhaytInvoiceDocument.duplicateNumbers(printLog, settings).length) openDuplicateNumbers();

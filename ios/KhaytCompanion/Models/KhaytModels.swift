@@ -60,9 +60,15 @@ struct QueueOrder: Codable, Identifiable, Sendable {
 
     /// Spelled out because `init(from:)` above suppresses the synthesized one,
     /// and the tests build these directly.
+    ///
+    /// `jobNumber` is last and defaulted so the tests' rows still read, but every
+    /// rebuild of a real job passes it on — a rebuild that drops it shows the
+    /// person the id's random tag (test/job-reference-display.test.js checks).
     init(id: String, project: String?, client: String?, status: String,
-         machine: String?, machineId: String?, dueDate: String?, priority: String?) {
+         machine: String?, machineId: String?, dueDate: String?, priority: String?,
+         jobNumber: String? = nil) {
         self.id = id; self.project = project; self.client = client; self.status = status
+        self.jobNumber = jobNumber
         self.machine = machine; self.machineId = machineId
         self.dueDate = dueDate; self.priority = priority
     }
@@ -133,7 +139,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
               !named.isEmpty else { return self }
         return QueueOrder(id: id, project: project, client: client, status: status,
                           machine: named, machineId: machineId,
-                          dueDate: dueDate, priority: priority)
+                          dueDate: dueDate, priority: priority, jobNumber: jobNumber)
     }
 }
 

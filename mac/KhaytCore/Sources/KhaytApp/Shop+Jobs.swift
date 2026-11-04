@@ -1827,11 +1827,16 @@ extension Shop {
     /// book already prints its number (`duplicateNumbers`). The id never
     /// changes. Done inside the write on the book as it is on disk, because
     /// the counter is a read-modify-write. Returns the number given.
+    ///
+    /// `year` is the duplicate pair's own year (a 2025 pair stays in 2025, and
+    /// this year's counter does not move). The renumber goes on the undo stack:
+    /// the old number may be the one already on a customer's paper.
     @discardableResult
-    func renumberJob(_ id: Order.ID) async -> String? {
+    func renumberJob(_ id: Order.ID, year: Int? = nil) async -> String? {
         guard canMoveJobs, permitted("orders", "edit"),
               let build = source.build, let engine else { return nil }
         var given: String?
+        var snapshots: (before: JSONValue, after: JSONValue)?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -1842,19 +1847,52 @@ extension Shop {
                 guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
                 let out = try await engine.renumber(
                     order: orders[at], settings: Self.settings(root), orders: orders,
-                    year: Calendar.book.component(.year, from: Date()))
+                    year: year ?? Calendar.book.component(.year, from: Date()))
                 guard let number = out.number, case .object(var o) = out.order else { return }
                 StoreWriter.stamp(&o)
                 orders[at] = .object(o)
                 root["printLog"] = .array(orders)
                 root["settings"] = out.settings
                 given = number
+                snapshots = (out.before, out.after)
             }
             await load(source)
         } catch {
             return nil
         }
+        if let snapshots, let undoManager {
+            let name = words.callIt("dupnum.renumber")
+            undoManager.setActionName(name)
+            undoManager.registerUndo(withTarget: self) { shop in
+                Task { await shop.undoRenumber(id, before: snapshots.before, after: snapshots.after) }
+            }
+        }
         return given
+    }
+
+    /// Take a renumber back (`renumberJob`'s undo), inside the write.
+    func undoRenumber(_ id: Order.ID, before: JSONValue, after: JSONValue) async {
+        guard let build = source.build, let engine else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "printLog")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
+                let out = try await engine.undoRenumber(order: orders[at], settings: Self.settings(root),
+                                                        before: before, after: after)
+                guard case .object(var o) = out.order else { return }
+                StoreWriter.stamp(&o)
+                orders[at] = .object(o)
+                root["printLog"] = .array(orders)
+                root["settings"] = out.settings
+            }
+            await load(source)
+        } catch {
+            // The renumbered job stays as it is; nothing half-written.
+        }
     }
 
     /// What an invoice may print under "No.".

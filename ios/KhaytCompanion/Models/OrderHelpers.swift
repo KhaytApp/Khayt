@@ -129,7 +129,8 @@ extension QueueOrder {
     /// shape is what the page draws; history simply has no printer to show.
     init(entry: OrderLogEntry) {
         self.init(id: entry.id, project: entry.project, client: entry.client, status: entry.status,
-                  machine: nil, machineId: nil, dueDate: entry.dueDate, priority: nil)
+                  machine: nil, machineId: nil, dueDate: entry.dueDate, priority: nil,
+                  jobNumber: entry.jobNumber)
     }
 }
 

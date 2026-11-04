@@ -7420,15 +7420,42 @@ public actor KhaytEngine {
     /// `lib/order-new.js`'s `renumber`: the job with the next free number,
     /// the counters it advanced, and the number given. Pure — the caller runs
     /// it INSIDE the store write and writes both back.
+    ///
+    /// `year` is the duplicate pair's own year: a past year's pair gets a free
+    /// number in that year and the shop's counter is left alone. `before` and
+    /// `after` are what `undoRenumber` needs to take it back.
     public func renumber(order: JSONValue, settings: [String: JSONValue],
-                         orders: [JSONValue], year: Int) throws -> InvoiceNumbered {
+                         orders: [JSONValue], year: Int) throws -> Renumbered {
         try runtime.call2("""
             (function (o, s, book, y) {
               var order = Object.assign({}, o), settings = Object.assign({}, s);
+              var before = KhaytOrderNew.renumberSnapshot(order, settings);
               var n = KhaytOrderNew.renumber(order, settings, book, y);
-              return { order: order, settings: settings, number: n };
+              var after = KhaytOrderNew.renumberSnapshot(order, settings);
+              return { order: order, settings: settings, number: n, before: before, after: after };
             })(ARG0, ARG1, ARG2, ARG3)
-            """, [order, .object(settings), .array(orders), .number(Double(year))], as: InvoiceNumbered.self)
+            """, [order, .object(settings), .array(orders), .number(Double(year))], as: Renumbered.self)
+    }
+
+    public struct Renumbered: Decodable, Sendable {
+        public let order: JSONValue
+        public let settings: JSONValue
+        public let number: String?
+        public let before: JSONValue
+        public let after: JSONValue
+    }
+
+    /// `lib/order-new.js`'s `undoRenumber`: the job's number fields back as
+    /// they were, and a counter back only if nothing has used it since.
+    public func undoRenumber(order: JSONValue, settings: [String: JSONValue],
+                             before: JSONValue, after: JSONValue) throws -> InvoiceNumbered {
+        try runtime.call2("""
+            (function (o, s, b, a) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              KhaytOrderNew.undoRenumber(order, settings, b, a);
+              return { order: order, settings: settings, number: null };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), before, after], as: InvoiceNumbered.self)
     }
 
     /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.

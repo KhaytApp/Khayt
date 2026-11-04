@@ -236,7 +236,7 @@ struct OrderDetailPage: View {
         } else {
             order = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
                                machine: machine, machineId: machineId, dueDate: order.dueDate,
-                               priority: order.priority)
+                               priority: order.priority, jobNumber: order.jobNumber)
         }
     }
 }

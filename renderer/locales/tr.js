@@ -4261,7 +4261,7 @@
   "dupnum.title": "Aynı numarayı taşıyan belgeler",
   "dupnum.why": "Bu defteri kullanan iki bilgisayar, eşitlenmemişken aynı numarayı verdi. Müşterinin elindekini tutun, diğerine sıradaki boş numarayı verin.",
   "dupnum.renumber": "Yeni numara",
-  "dupnum.renumbered": "{old} artık {new}.",
+  "dupnum.renumbered": "{old} artık {new}. {old} müşterinin elindeki bir belgede zaten yazılıysa Geri Al'a basın.",
   "sync.overwritten_many": "{n} değişikliğiniz, başka bir cihazdaki daha yeni sürümlerle değiştirildi — gözden geçirin.",
   "set.ai_master": "Yapay zekâ desteği",
   "set.ai_pii_badge": "Müşteri verisi",

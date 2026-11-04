@@ -4262,7 +4262,7 @@
   "dupnum.title": "Documentos com o mesmo número",
   "dupnum.why": "Dois computadores com este livro deram o mesmo número enquanto não estavam sincronizados. Mantenha o que o cliente já recebeu e dê ao outro o próximo número livre.",
   "dupnum.renumber": "Número novo",
-  "dupnum.renumbered": "{old} agora é {new}.",
+  "dupnum.renumbered": "{old} agora é {new}. Se {old} já está em um papel que o cliente tem, toque em Desfazer.",
   "sync.overwritten_many": "{n} das suas alterações foram substituídas por versões mais recentes de outro dispositivo — vale conferir.",
   "set.ai_master": "Assistência de IA",
   "set.ai_pii_badge": "Dados de clientes",

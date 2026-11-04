@@ -82,9 +82,55 @@ test('the Mac and the phone show Order.reference, not the id', () => {
   const found = hits(files, [
     /Text\((?:job|order|quote)\.id\)/,
     /Text\("#\\\((?:job|order|quote)\.id\)/,
-    /(?:job|order|o)\.project\.isEmpty \? (?:job|order|o)\.id :/,
+    /\b\w+\.project\.isEmpty \? \w+\.id :/,
   ], ALLOWED);
   assert.deepEqual(found, [], 'show `.reference`:\n' + found.join('\n'));
+});
+
+/**
+ * Every whole call `Name(` … `)` in `src` starting at a match of `start`,
+ * balanced on parentheses — a rebuild spread over several lines.
+ */
+function calls(src, start) {
+  const out = [];
+  let m;
+  const re = new RegExp(start.source, 'g');
+  while ((m = re.exec(src))) {
+    let depth = 0, i = m.index + m[0].length - 1;
+    for (; i < src.length; i++) {
+      if (src[i] === '(') depth++;
+      else if (src[i] === ')' && --depth === 0) break;
+    }
+    out.push({ at: src.slice(0, m.index).split('\n').length, text: src.slice(m.index, i + 1) });
+  }
+  return out;
+}
+
+test('a phone job rebuilt from another carries its job number with it', () => {
+  // The memberwise rebuilds (`namingMachine`, the order page after a status
+  // change, a history entry opened as a job) each dropped `jobNumber`, and the
+  // job they made showed the tag. Every QueueOrder built in the app passes it.
+  const files = walk(path.join(ROOT, 'ios/KhaytCompanion'), '.swift');
+  const found = [];
+  for (const f of files) {
+    const src = fs.readFileSync(f, 'utf8');
+    for (const c of [...calls(src, /QueueOrder\(id:/), ...calls(src, /self\.init\(id: entry\.id/)]) {
+      if (!/jobNumber:/.test(c.text)) found.push(`${path.relative(ROOT, f)}:${c.at}`);
+    }
+  }
+  assert.deepEqual(found, [], 'pass `jobNumber:` on:\n' + found.join('\n'));
+});
+
+test('the LAN lists a phone reads carry the job number', () => {
+  const P = require('../lib/lan-pages.js');
+  const q = P.queueJson({ printLog: [{ id: 'INV-2026-0042-k7qx', jobNumber: 'INV-2026-0042', status: 'pending' }] });
+  assert.equal(q[0].jobNumber, 'INV-2026-0042');
+  const old = P.queueJson({ printLog: [{ id: 'INV-2026-0041', status: 'pending' }] });
+  assert.equal('jobNumber' in old[0], false, 'an older job is sent as it always was');
+  // GET /api/orders is inline in the server; its map must pass the field on.
+  const server = fs.readFileSync(path.join(ROOT, 'lib/lan-server.js'), 'utf8');
+  const route = server.slice(server.indexOf("pathname === '/api/orders' && req.method === 'GET'"));
+  assert.match(route.slice(0, 1500), /jobNumber: o\.jobNumber/);
 });
 
 test('jobRef: the number when there is one, else the id', () => {

@@ -4261,7 +4261,7 @@
   "dupnum.title": "同じ番号の書類",
   "dupnum.why": "このブックを使う2台のコンピューターが、同期していない間に同じ番号を発行しました。お客様がすでに受け取った方を残し、もう一方に次の空き番号を付けてください。",
   "dupnum.renumber": "新しい番号",
-  "dupnum.renumbered": "{old} は {new} になりました。",
+  "dupnum.renumbered": "{old} は {new} になりました。{old} がすでにお客様の書類に印字されている場合は、元に戻すを押してください。",
   "sync.overwritten_many": "{n} 件の変更が、別の端末の新しいバージョンで置き換えられました — ご確認ください。",
   "set.ai_master": "AI アシスト",
   "set.ai_pii_badge": "顧客データ",

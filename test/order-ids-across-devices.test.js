@@ -292,6 +292,51 @@ test('renumbering gives the newer job the next free number and keeps its id', ()
   assert.equal(s.invNumNext, 45);
 });
 
+test('a past year\'s pair is renumbered inside that year, and this year\'s counter does not move', () => {
+  // This year's counter is at 12. The duplicate pair is from 2025, whose
+  // highest number in the book is 0300.
+  const s = { invNumNext: 12, invNumYear: 2026, quoteNumNext: 4, quoteNumYear: 2026 };
+  const num = 'INV-2025-0299';
+  const a = { id: `${num}-aaaa`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'completed', date: '2025-12-20' };
+  const b = { id: `${num}-bbbb`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'completed', date: '2025-12-21' };
+  const top = { id: 'INV-2025-0300', invoiceNumber: 'INV-2025-0300', status: 'completed', date: '2025-12-30' };
+  const now = { id: 'INV-2026-0011-cccc', jobNumber: 'INV-2026-0011', invoiceNumber: 'INV-2026-0011', status: 'pending', date: '2026-01-05' };
+  const book = [a, b, top, now];
+  const given = N.renumber(b, s, book, 2025);
+  assert.equal(given, 'INV-2025-0301', 'the highest 2025 number in the book, plus one');
+  assert.equal(b.invoiceNumber, 'INV-2025-0301');
+  assert.deepEqual(s, { invNumNext: 12, invNumYear: 2026, quoteNumNext: 4, quoteNumYear: 2026 },
+    'this year\'s counters are exactly as they were');
+  const q = { id: 'QUO-2025-0007-dddd', jobNumber: 'QUO-2025-0007', status: 'quote', date: '2025-11-02' };
+  assert.equal(N.renumber(q, s, [q], 2025), 'QUO-2025-0008');
+  assert.equal(s.quoteNumNext, 4, 'nor the quote counter');
+});
+
+test('a renumber can be undone, and the counter comes back only if nothing used it since', () => {
+  const s = { invNumNext: 42, invNumYear: 2026 };
+  const num = 'INV-2026-0042';
+  const job = { id: `${num}-ab12`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'pending', date: '2026-09-04' };
+  const twin = { id: `${num}-cd34`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'pending', date: '2026-09-04' };
+  const before = N.renumberSnapshot(job, s);
+  N.renumber(job, s, [job, twin], 2026);
+  const after = N.renumberSnapshot(job, s);
+  assert.equal(job.jobNumber, 'INV-2026-0043');
+  N.undoRenumber(job, s, before, after);
+  assert.equal(job.jobNumber, num);
+  assert.equal(job.invoiceNumber, num);
+  assert.equal('renumberedFrom' in job, false, 'no trace of a renumber that was taken back');
+  assert.equal(s.invNumNext, 42, 'the number it used is free again');
+
+  // Something else took a number in between: that one is kept, and so is the counter.
+  const before2 = N.renumberSnapshot(job, s);
+  N.renumber(job, s, [job, twin], 2026);
+  const after2 = N.renumberSnapshot(job, s);
+  N.allocateInvoiceNumber(s, 2026);
+  N.undoRenumber(job, s, before2, after2);
+  assert.equal(job.jobNumber, num);
+  assert.equal(s.invNumNext, 45, 'never rolled back under a number another job now has');
+});
+
 test('renumbering a quote moves its quote number; an approved quote its invoice number', () => {
   const s = { quoteNumNext: 3, quoteNumYear: 2026, invNumNext: 10, invNumYear: 2026 };
   const q = { id: 'QUO-2026-0003-aaaa', jobNumber: 'QUO-2026-0003', status: 'quote', date: '2026-09-04' };

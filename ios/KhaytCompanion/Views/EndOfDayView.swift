@@ -91,7 +91,7 @@ struct EndOfDayView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(job.title).font(.khayt(14.5, .medium, relativeTo: .body)).foregroundStyle(KhaytDesign.ink)
-                        Text(job.reference.isEmpty ? job.id : job.reference).font(.khayt(11.5, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)
+                        Text(job.reference).font(.khayt(11.5, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)
                     }
                     Spacer()
                     if money {

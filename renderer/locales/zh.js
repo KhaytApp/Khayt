@@ -4261,7 +4261,7 @@
   "dupnum.title": "编号相同的单据",
   "dupnum.why": "使用此账本的两台电脑在未同步时发出了相同的编号。保留客户已收到的那份，给另一份下一个空闲编号。",
   "dupnum.renumber": "新编号",
-  "dupnum.renumbered": "{old} 现在是 {new}。",
+  "dupnum.renumbered": "{old} 现在是 {new}。如果 {old} 已印在客户手中的单据上，请点“撤销”。",
   "sync.overwritten_many": "您的 {n} 处修改已被另一台设备上更新的版本覆盖 — 建议查看。",
   "set.ai_master": "AI 辅助",
   "set.ai_pii_badge": "客户数据",

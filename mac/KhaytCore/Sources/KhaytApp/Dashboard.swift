@@ -210,6 +210,8 @@ struct Dashboard: View {
 private struct DuplicateNumbers: View {
     let shop: Shop
     @State private var done: String?
+    /// The job about to be renumbered, while the shop confirms it.
+    @State private var asking: (job: KhaytEngine.DuplicateNumber.Job, group: KhaytEngine.DuplicateNumber)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -224,25 +226,36 @@ private struct DuplicateNumbers: View {
                             Text(job.project.isEmpty ? job.ref : job.project).lineLimit(1)
                             Text(job.date).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                             Spacer(minLength: 8)
-                            Button(shop.words.callIt("dupnum.renumber")) {
-                                Task {
-                                    if let n = await shop.renumberJob(job.id) {
-                                        done = shop.words.callIt("dupnum.renumbered",
-                                                                 ["old": .string(group.number), "new": .string(n)])
-                                    }
-                                }
-                            }
-                            .controlSize(.small)
-                            .disabled(!shop.canMoveJobs)
+                            Button(shop.words.callIt("dupnum.renumber")) { asking = (job, group) }
+                                .controlSize(.small)
+                                .disabled(!shop.canMoveJobs)
                         }
                     }
                 }
             }
             if let done {
                 Text(done).font(.caption).foregroundStyle(Khayt.done)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 12)
+        // Asked first, and undoable after (Edit ▸ Undo): the number being
+        // replaced may already be on a customer's paper.
+        .confirmationDialog(shop.words.callIt("dupnum.renumber"),
+                            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
+            Button(shop.words.callIt("dupnum.renumber")) {
+                guard let asking else { return }
+                let group = asking.group, job = asking.job
+                Task {
+                    if let n = await shop.renumberJob(job.id, year: Int(group.year)) {
+                        done = shop.words.callIt("dupnum.renumbered",
+                                                 ["old": .string(group.number), "new": .string(n)])
+                    }
+                }
+            }
+        } message: {
+            Text(shop.words.callIt("dupnum.why"))
+        }
     }
 }
 
