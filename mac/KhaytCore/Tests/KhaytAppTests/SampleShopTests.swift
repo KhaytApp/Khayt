@@ -822,12 +822,18 @@ extension SampleShopTests {
     @Test("the sample ratings reach a rated month, an unrated one, and both ends of the scale")
     func ratingSpan() async throws {
         let engine = try KhaytEngine()
-        let orders = Shop.rows(try Self.book(), "printLog")
+        // At the sample's own anchor day. The book is moved by whole DAYS to sit
+        // around today, so which ratings share a month changes from one day to
+        // the next: on Nov 5 2026 a 5 and the 3 joined the 2 in one month
+        // (3.3) and no month read poor, though nothing in the sample changed.
+        // The spread is authored at the anchor, so that is where it is checked.
+        let asOf = SampleBook.anchor ?? Date()
+        let orders = Shop.rows(try Self.book(asOf: asOf), "printLog")
         // The same six months `Reports.recomputeRatings` asks for.
         var months: [String] = []
         let calendar = Calendar.book
         for back in stride(from: 5, through: 0, by: -1) {
-            guard let month = calendar.date(byAdding: .month, value: -back, to: Date()),
+            guard let month = calendar.date(byAdding: .month, value: -back, to: asOf),
                   let year = calendar.dateComponents([.year], from: month).year,
                   let m = calendar.dateComponents([.month], from: month).month
             else { continue }

@@ -41,13 +41,13 @@ struct StoreOrdersAndReprintsAppTests {
         ]
         let made = try await Shop.applyQcNext(.reprint(cost: "billable"), failedId: "INV-2026-0003",
                                               root: &root, engine: engine, now: Date())
-        #expect(made == "INV-2026-0004")
+        #expect(made?.hasPrefix("INV-2026-0004-") == true, "the new job's id carries #2210's tag")
         let log = Shop.rows(root, "printLog")
         #expect(log.count == 2)
         let original = Shop.asObject(log[1]) ?? [:]
         #expect(original["scrapped"] == .bool(true))
         #expect(original["status"] == .string("qc"), "not sent back to Pending")
-        #expect(original["reprintedInto"] == .array([.string("INV-2026-0004")]))
+        #expect(original["reprintedInto"] == .array([.string(made ?? "")]))
         #expect(Shop.asObject(log[0])?["reprintCost"] == .string("billable"))
 
         var other: [String: JSONValue] = ["printLog": .array([failed]), "settings": .object([:])]

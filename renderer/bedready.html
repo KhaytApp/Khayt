@@ -2104,6 +2104,12 @@
 <script src="../lib/nozzle-wear.js"></script>
 <script src="../lib/queue-groups.js"></script>
 <script src="../lib/print-kits.js"></script>
+<!-- Read by kanban.js only behind its business-mode check, so Bed Ready never
+     calls it; loaded so the read is a real one (check-globals-loaded). -->
+<script src="../lib/shelf-sale.js"></script>
+<script src="../lib/carriers.js"></script>
+<script src="../lib/webstore-order.js"></script>
+<script src="../lib/store-order-job.js"></script>
 <script src="kanban.js"></script>
 <!-- Bed Ready's real queue transitions. Must come after bedready-shim.js (which
      no-ops updateStatus) and after the views that render the controls. -->
