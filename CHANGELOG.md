@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: every figure on a printed invoice is in the invoice's own ink.** The quantity column and the payment-schedule rows took the app's text colour, so under a dark theme they printed (and saved to PDF) pale grey on the white page, and the schedule's header picked up the app's grey header fill and capitals. A document's cells now always use the paper's ink, the same as the Mac prints.
+
 - **Desktop: the Undo button on a notice works again.** The notices that pop up in the corner ("Job deleted", "Client deleted", a part removed, a price changed) showed an Undo button that did nothing when clicked, and had since the first release: the corner they sit in let clicks pass through to the page underneath, and the notices themselves did too. They now take the click, so Undo undoes, and the corner around them still lets clicks through.
 
 - **Mac: the library stays responsive with very large books.** With ten thousand models, the chips over the grid are counted in one pass over the library instead of about fifteen, and only once you pause typing rather than after every letter. The inspector, the catalogue and the iPhone's library pages find a model's record straight away instead of looking through the whole library each time. Adding a folder of models (from a Google Drive folder, say) no longer freezes the window while it is looked through: the import banner shows at once. Asking to delete models reads their folders in the background too. Scrolling quickly through the grid decodes at most four thumbnails at a time and skips the ones already scrolled past, and reading a 3MF's print settings no longer holds up the app's other background work.
