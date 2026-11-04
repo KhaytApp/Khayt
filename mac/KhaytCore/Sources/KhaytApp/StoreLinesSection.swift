@@ -23,7 +23,8 @@ struct StoreLinesSection: View {
                 ForEach(Array(job.storeLines.enumerated()), id: \.offset) { index, line in
                     if line.productId == nil {
                         HStack(spacing: 8) {
-                            Text("\(line.name) × \(line.qty)" + (line.sku.map { " · SKU \($0)" } ?? ""))
+                            Text("\(line.name) × \(line.qty)"
+                                 + (line.sku.map { " · " + shop.words.callIt("cat.sku") + " " + $0 } ?? ""))
                                 .lineLimit(2)
                             Spacer()
                             if shop.canMoveJobs, !shop.catalogueRows.isEmpty {
