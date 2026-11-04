@@ -808,6 +808,7 @@ final class Words {
         "mac.send_reminder": ["en": "Send reminder", "ar": "أرسل تذكيرًا"],
         "mac.reminder_sent": ["en": "Payment reminder sent for {id}.", "ar": "أُرسل تذكير بالدفع للطلب {id}."],
         "mac.reminder_no_way": ["en": "This customer has no phone number for WhatsApp, and no email address the shop can send to.", "ar": "لا يوجد لهذا العميل رقم واتساب، ولا بريد إلكتروني يمكن للمتجر الإرسال إليه."],
+        "mac.undo_portal_deposit": ["en": "Undo portal deposit", "ar": "تراجع عن عربون البوابة"],
         "mac.portal_not_here": ["en": "This job's link is not on this Khayt Cloud server, or the server is older than this Khayt.",
                                 "ar": "رابط هذا العمل غير موجود على خادم خيط السحابي هذا، أو أن الخادم أقدم من هذا الإصدار."],
         "mac.move_gone":     ["en": "That job is no longer in the book.",

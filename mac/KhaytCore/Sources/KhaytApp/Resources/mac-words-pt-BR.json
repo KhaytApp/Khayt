@@ -2079,6 +2079,7 @@
  "mac.send_reminder": "Enviar lembrete",
  "mac.reminder_sent": "Lembrete de pagamento enviado para {id}.",
  "mac.reminder_no_way": "Este cliente não tem número para WhatsApp nem um e-mail para o qual a loja possa enviar.",
+ "mac.undo_portal_deposit": "Desfazer sinal do portal",
  "mac.portal_refreshed": "O link de rastreamento do cliente foi atualizado.",
  "mac.portal_takedown_pending": "Este cliente foi apagado e o link dele ainda está no Khayt Cloud. O Khayt continua tentando removê-lo; você pode tentar agora.",
  "mac.portal_unpublish_q": "Remover o link do cliente de {job}?",

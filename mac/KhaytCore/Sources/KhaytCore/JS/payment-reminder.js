@@ -228,9 +228,24 @@ function reminderAmount(order, owed, settings, now = Date.now(), client) {
  * `{amount}` and `{total}` (the storefront's spelling) both take the figure,
  * as plain digits with two decimals. Only an http(s) address is used.
  */
-function payLinkFor(settings, amount) {
+//
+// THE LINK IS IN THE SHOP'S CURRENCY. A provider's pay link is the shop's
+// account, charging in the shop's currency, while the reminder's amount is the
+// job's own. `job` (`{ order, currency }`) says which currency the amount is
+// in: when it is not the shop's, the amount is converted at the rate the job
+// was saved at (`order.fxRate`, 1 job-currency = fxRate shop-currency), and
+// with no saved rate there is no honest figure, so no link.
+function payLinkFor(settings, amount, job) {
   const providers = (settings && settings.paymentProviders) || {};
-  const figure = (Math.round(Math.max(0, +amount || 0) * 100) / 100).toFixed(2);
+  const base = String((settings && settings.currency) || 'SAR');
+  const code = job && job.currency ? String(job.currency) : base;
+  let inShop = Math.max(0, +amount || 0);
+  if (code !== base) {
+    const rate = Number(job && job.order && job.order.fxRate);
+    if (!(Number.isFinite(rate) && rate > 0)) return '';
+    inShop *= rate;
+  }
+  const figure = (Math.round(inShop * 100) / 100).toFixed(2);
   for (const id of Object.keys(providers)) {
     const p = providers[id];
     if (!p || !p.enabled) continue;
@@ -272,17 +287,22 @@ function reminderText({ body, values, payLink, payLabel } = {}) {
 /**
  * How this reminder goes out: 'whatsapp', 'email' or 'none'.
  *
- * `settings.paymentReminder.channel` when the shop has chosen one and it can
- * be used for this customer; otherwise WhatsApp when the customer has a
- * number (every shop can open WhatsApp), else email when the shop has an
- * email provider and the customer an address.
+ * `settings.paymentReminder.channel` (Settings → Payment reminders): `whatsapp`
+ * or `email` when the shop has chosen one — 'none' for a customer that way
+ * cannot reach — else `auto`: WhatsApp when the customer has a number (every
+ * shop can open WhatsApp), else email when the shop has an email provider and
+ * the customer an address.
  */
 function reminderChannel(settings, client) {
   const pref = String(((settings && settings.paymentReminder) || {}).channel || '');
   const phone = String((client && client.phone) || '').replace(/\D/g, '');
   const provider = String(((settings && settings.emailConfig) || {}).provider || '');
   const canEmail = !!(client && client.email) && !!provider && provider !== 'none';
-  if (pref === 'email' && canEmail) return 'email';
+  // A channel the shop CHOSE is kept to: a customer it cannot reach that way
+  // is 'none', said as such, rather than written to some other way.
+  if (pref === 'email') return canEmail ? 'email' : 'none';
+  if (pref === 'whatsapp') return phone ? 'whatsapp' : 'none';
+  // Automatic: WhatsApp when there is a number, else email.
   if (phone) return 'whatsapp';
   return canEmail ? 'email' : 'none';
 }

@@ -3598,9 +3598,12 @@ public actor KhaytEngine {
             (function (o, owed, settings, client, now) {
               var R = KhaytPaymentReminder;
               var asked = R.reminderAmount(o, owed, settings, now, client);
+              // The link is the shop's, in the shop's currency: the job's
+              // currency and saved rate say how to convert (or to leave it out).
+              var code = KhaytOrderMoney.orderCurrency(o, { settings: settings, clients: client ? [client] : [] });
               return { channel: R.reminderChannel(settings, client), amount: asked.amount,
                 milestones: asked.milestones.map(function (m) { return m.label || m.id; }),
-                payLink: R.payLinkFor(settings, asked.amount) };
+                payLink: R.payLinkFor(settings, asked.amount, { order: o, currency: code }) };
             })(ARG0, ARG1, ARG2, ARG3, ARG4)
             """,
             [order, .number(owed), .object(settings), client ?? .null,
@@ -9235,6 +9238,8 @@ public actor KhaytEngine {
         public let amount: Double
         /// The job's own currency, for saying the amount.
         public let currency: String
+        /// What this payment is recorded under on the job (`portalPayments`).
+        public let key: String
         public let order: JSONValue
         public let effects: [String]
         public let webhookEffects: [WebhookEffect]?
@@ -9246,6 +9251,29 @@ public actor KhaytEngine {
         public var asPayment: PaymentRecorded {
             PaymentRecorded(order: order, effects: effects, webhookEffects: webhookEffects, refused: nil)
         }
+    }
+
+    /// A recorded portal payment taken back (`undoPortalPayment`): the job
+    /// as it is after, and how much came off it. The note stays, `undone`.
+    public struct PortalUndo: Decodable, Sendable {
+        public let ok: Bool
+        public let amount: Double
+        public let currency: String
+        public let order: JSONValue
+    }
+
+    public func portalUndoPayment(order: JSONValue, key: String, settings: [String: JSONValue],
+                                  now: Date = Date()) throws -> PortalUndo {
+        try runtime.call2("""
+            (function () {
+              var order = ARG0, ctx = { settings: ARG2 || {}, now: ARG3 };
+              var r = KhaytPortalOwner.undoPortalPayment(order, ARG1, ctx);
+              return { ok: !!r.ok, amount: r.amount || 0,
+                currency: KhaytOrderMoney.orderCurrency(order, ctx), order: order };
+            })()
+            """,
+            [order, .string(key), .object(settings), .string(ISO8601DateFormatter().string(from: now))],
+            as: PortalUndo.self)
     }
 
     public func portalRecordPayment(items: JSONValue, pubToken: String, order: JSONValue,
@@ -9263,7 +9291,7 @@ public actor KhaytEngine {
                     newStatus: typeof e.newStatus === 'string' ? e.newStatus : null });
                 }
               });
-              return { outcome: r.outcome, amount: r.amount || 0,
+              return { outcome: r.outcome, amount: r.amount || 0, key: r.key || '',
                 currency: KhaytOrderMoney.orderCurrency(order, ctx),
                 order: order, effects: (r.effects || []).map(function (e) { return e.type; }),
                 webhookEffects: webhookEffects };

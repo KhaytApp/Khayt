@@ -108,7 +108,10 @@ test('the channel:the shop\'s choice when it can be used, else WhatsApp, else em
   const both = { phone: '+966500000000', email: 'a@b.co' };
   assert.equal(R.reminderChannel(mail, both), 'whatsapp');
   assert.equal(R.reminderChannel({ ...mail, paymentReminder: { channel: 'email' } }, both), 'email');
-  assert.equal(R.reminderChannel({ paymentReminder: { channel: 'email' } }, both), 'whatsapp', 'no provider');
+  assert.equal(R.reminderChannel({ paymentReminder: { channel: 'email' } }, both), 'none',
+    'email chosen and no provider: not sent some other way');
+  assert.equal(R.reminderChannel({ ...mail, paymentReminder: { channel: 'whatsapp' } }, { email: 'a@b.co' }), 'none');
+  assert.equal(R.reminderChannel({ ...mail, paymentReminder: { channel: 'auto' } }, { email: 'a@b.co' }), 'email');
   assert.equal(R.reminderChannel(mail, { email: 'a@b.co' }), 'email');
   assert.equal(R.reminderChannel({}, { email: 'a@b.co' }), 'none');
   assert.equal(R.reminderChannel(mail, null), 'none');
@@ -122,4 +125,23 @@ test('the email: addressed, escaped, the link made clickable', () => {
   assert.match(m.html, /Pay &lt;now&gt;<br><a href="https:\/\/p.example\/1">/);
   assert.match(m.html, /Shop &amp; Co/);
   assert.equal(R.reminderEmail({ settings: {}, client: { email: 'a@b.co' }, text: 'x' }), null);
+});
+
+test('the pay link charges the shop currency: a job in another one is converted at its saved rate', () => {
+  const settings = { currency: 'SAR', paymentProviders: { m: { enabled: true, payLink: 'https://p.example/?amt={amount}' } } };
+  // A 300 EUR milestone was linked as amt=300.00 riyals before this.
+  assert.equal(R.payLinkFor(settings, 300, { order: { fxRate: 4.1 }, currency: 'EUR' }), 'https://p.example/?amt=1230.00');
+  assert.equal(R.payLinkFor(settings, 300, { order: {}, currency: 'EUR' }), '', 'no saved rate: no link');
+  assert.equal(R.payLinkFor(settings, 300, { order: {}, currency: 'SAR' }), 'https://p.example/?amt=300.00');
+});
+
+test('the reminder channel the shop picks in Settings is kept by the settings rule', () => {
+  const E = require('../lib/settings-edit.js');
+  const before = { paymentReminder: { enabled: true, graceDays: 3, cooldownDays: 3, maxCount: 3, channel: 'email' } };
+  assert.equal(E.apply(before, { paymentReminder: { enabled: true, graceDays: 3 } }).paymentReminder.channel, 'email',
+    'a form without the control keeps it');
+  assert.equal(E.apply(before, { paymentReminder: { enabled: true, graceDays: 3, channel: 'whatsapp' } })
+    .paymentReminder.channel, 'whatsapp');
+  assert.equal(E.apply(before, { paymentReminder: { enabled: true, graceDays: 3, channel: 'fax' } })
+    .paymentReminder.channel, 'auto');
 });

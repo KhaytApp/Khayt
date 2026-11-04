@@ -2057,6 +2057,14 @@
             <label data-i18n="set.pay_reminder_grace" for="set_payReminderGrace">Remind days after due</label>
             <input type="number" id="set_payReminderGrace" min="0" max="90" step="1" placeholder="3">
           </div>
+          <div>
+            <label data-i18n="set.pay_reminder_channel" for="set_payReminderChannel">Send reminders by</label>
+            <select id="set_payReminderChannel">
+              <option value="auto" data-i18n="set.pay_reminder_channel_auto">Automatic (WhatsApp, else email)</option>
+              <option value="whatsapp" data-i18n="set.pay_reminder_channel_whatsapp">WhatsApp</option>
+              <option value="email" data-i18n="set.pay_reminder_channel_email">Email</option>
+            </select>
+          </div>
         </div>
 
         <div class="inline-pair" style="align-items:flex-end; margin-top:12px; flex-wrap:wrap;">

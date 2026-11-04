@@ -2745,6 +2745,8 @@ final class Shop {
     var portalWatchedAt: Date?
     /// After a 429: nothing is asked before this.
     var portalWatchNotBefore: Date?
+    /// The last portal deposit recorded, while its notice can still undo it.
+    var portalDepositUndo: PortalDepositUndo?
 
     // "Customer records for your web store" (CustomerRecords.swift).
     var customerRecordsTask: Task<Void, Never>?

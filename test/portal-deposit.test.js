@@ -126,3 +126,19 @@ test('another link\'s payment is not this job\'s', () => {
   const list = [{ token: 'other', payment: { status: 'paid', amount: '300', ref: 'q' } }];
   assert.equal(P.recordPortalPayment(list, 'tok1', o, ctx).outcome, 'none');
 });
+
+test('undo takes the payment back and keeps the note, so it is never recorded again', () => {
+  const o = quote({ paidAmount: 300, paidAt: '2026-10-01', paymentStatus: 'partial', paidGross: true });
+  const list = items({ status: 'paid', amount: '300', ref: 'dup', at: AT });
+  const r = P.recordPortalPayment(list, 'tok1', o, ctx);
+  assert.equal(r.outcome, 'recorded', 'typed in more than 3 days before: the rule cannot tell');
+  assert.equal(o.paidAmount, 600);
+  const back = P.undoPortalPayment(o, r.key, { settings, now: '2026-11-04T10:00:00Z' });
+  assert.deepEqual(back, { ok: true, amount: 300 });
+  assert.equal(o.paidAmount, 300);
+  assert.equal(o.paymentStatus, 'partial');
+  assert.equal(o.portalPayments.length, 1, 'the note stays');
+  assert.equal(o.portalPayments[0].outcome, 'undone');
+  assert.equal(P.recordPortalPayment(list, 'tok1', o, ctx).outcome, 'already', 'and a later check records nothing');
+  assert.equal(P.undoPortalPayment(o, r.key, { settings }).ok, false, 'undone once');
+});

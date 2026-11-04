@@ -337,8 +337,12 @@ extension Shop {
         var result: KhaytEngine.PortalPayment?
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
+        // Not on Edit ▸ Undo: putting the record back WITHOUT its key would
+        // have the next check record the payment again. The way back is
+        // `undoPortalDeposit`, offered on the notice and in the inspector.
         let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title"),
-                                          as: .system("a payment the provider confirmed through the customer portal")) {
+                                          as: .system("a payment the provider confirmed through the customer portal"),
+                                          undoable: false) {
             order, engine, root in
             let settings = Self.settings(root)
             let clients = Self.rows(root, "clients")
@@ -378,10 +382,51 @@ extension Shop {
         }
         let said = portalDepositSentence(done)
         moveNotices = (quiet ? keptNotices : []) + [said]
+        // Undo for the one case the rule cannot see: the same deposit typed in
+        // by hand further apart than its matching window.
+        if done.outcome == "recorded" { portalDepositUndo = PortalDepositUndo(id: id, key: done.key, notice: said) }
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
         if done.outcome == "recorded" { await republishPortalIfPublished(id) }
         return said
+    }
+
+    /// The undo a "Deposit received through the portal" notice offers.
+    struct PortalDepositUndo: Equatable {
+        let id: Order.ID
+        let key: String
+        let notice: String
+    }
+
+    /// The portal payment recorded on job `id` most recently and not yet
+    /// taken back, by its key — what the inspector's undo link acts on.
+    func undoablePortalDeposit(_ id: Order.ID) -> String? {
+        guard case .array(let log)? = portalRecord(id)?["portalPayments"] else { return nil }
+        for entry in log.reversed() {
+            guard case .object(let o) = entry else { continue }
+            if o["outcome"] == .string("recorded"), let key = Self.plainString(o["key"]) { return key }
+        }
+        return nil
+    }
+
+    /// Take a portal payment back off the job (`undoPortalPayment`): what it
+    /// added comes off the paid figure, and its note stays, marked undone, so
+    /// no later check — this Mac's or the other app's — records it again.
+    func undoPortalDeposit(_ id: Order.ID, key: String) async {
+        var back: KhaytEngine.PortalUndo?
+        let wrote = await writeToOneOrder(id, named: words.callIt("mac.undo_portal_deposit"),
+                                          as: .person("invoicing", "edit")) { order, engine, root in
+            let out = try await engine.portalUndoPayment(order: order, key: key, settings: Self.settings(root))
+            guard out.ok else { throw MoveRefused(sentence: self.words.callIt("mac.move_gone")) }
+            back = out
+            return OneOrderEdit(order: out.order,
+                                activity: "\(id) → " + self.words.callIt("mac.undo_portal_deposit"))
+        }
+        if portalDepositUndo?.key == key { portalDepositUndo = nil }
+        guard wrote, let back else { return }
+        moveNotices = [words.callIt("cloud.portal_deposit_undone",
+                                    ["amount": .string(Money.text(back.amount, back.currency))])]
+        await republishPortalIfPublished(id)
     }
 
     /// What happened to a portal payment, in the shop's words.

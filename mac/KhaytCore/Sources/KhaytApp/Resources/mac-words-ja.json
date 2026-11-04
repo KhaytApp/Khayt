@@ -2079,6 +2079,7 @@
  "mac.send_reminder": "リマインダーを送信",
  "mac.reminder_sent": "{id}の支払いリマインダーを送信しました。",
  "mac.reminder_no_way": "この顧客にはWhatsAppの電話番号も、ショップが送信できるメールアドレスもありません。",
+ "mac.undo_portal_deposit": "ポータルの手付金を取り消す",
  "mac.portal_refreshed": "顧客の追跡リンクを更新しました。",
  "mac.portal_takedown_pending": "この顧客は消去されましたが、そのリンクがまだKhayt Cloudに残っています。Khaytは取り下げを試み続けます。今すぐ試すこともできます。",
  "mac.portal_unpublish_q": "{job} の顧客向けリンクを取り下げますか？",

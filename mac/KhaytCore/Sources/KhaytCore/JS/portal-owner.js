@@ -334,8 +334,38 @@
       effects: r.effects, notices: r.notices || [] };
   }
 
+  /**
+   * Take back a portal payment that was recorded — the shop had typed the same
+   * deposit in by hand, further apart than `MATCH_DAYS`, so it was counted
+   * twice.
+   *
+   * What was ADDED comes off the job's paid figure and the status is derived
+   * again. The note STAYS, with `outcome: 'undone'`: its key is what tells a
+   * later check (this app's timer, the other app) that this payment has been
+   * seen, so removing it would have the next look record it all over again.
+   * No webhook or email: nothing new was received.
+   *
+   * MUTATES `order`. `{ ok, amount }` — `ok:false` when there is no recorded
+   * payment under `key` (already undone, or never recorded).
+   */
+  function undoPortalPayment(order, key, ctx) {
+    const c = ctx || {};
+    const seen = order && Array.isArray(order.portalPayments) ? order.portalPayments : [];
+    const entry = seen.find((p) => p && p.key === key && p.outcome === 'recorded');
+    if (!entry) return { ok: false, amount: 0 };
+    const back = cents(entry.recorded);
+    const paid = Math.max(0, cents((+order.paidAmount || 0) - back));
+    order.paidAmount = paid;
+    if (!(paid > 0)) { order.paidAt = null; order.paymentMethod = null; }
+    const Pay = sibling('KhaytOrderPayment');
+    if (Pay && typeof Pay.statusOf === 'function') order.paymentStatus = Pay.statusOf(order, c);
+    entry.outcome = 'undone';
+    if (c.now) entry.undoneAt = String(c.now);
+    return { ok: true, amount: back };
+  }
+
   const api = { portalUrl, paths, trialGate, depositForm, responseFor, errorFor, linkNote, threadFrom, httpUrl,
-    recordPortalPayment, paymentKey, paymentAmount, MATCH_DAYS };
+    recordPortalPayment, undoPortalPayment, paymentKey, paymentAmount, MATCH_DAYS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytPortalOwner = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

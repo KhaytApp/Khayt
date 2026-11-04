@@ -229,6 +229,14 @@ function openMilestoneInvoices(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
   if (!order.milestoneInvoices) order.milestoneInvoices = [];
+  // A milestone's amount is in the JOB's currency (the same units as its
+  // price), so it is shown and typed in that currency, not the shop's.
+  const jobCurrency = typeof orderCurrency === 'function' ? orderCurrency(order) : settings.currency;
+  const jobMark = ((typeof CURRENCIES !== 'undefined' && CURRENCIES[jobCurrency]) || {}).symbol || jobCurrency;
+  // A date field drawn like the text and number fields beside it (styles.css
+  // has no rule for `type=date`), so the row lines up and reads as one form.
+  const dateStyle = 'width:100%;padding:9px 11px;font:inherit;font-size:12.5px;color:var(--text);'
+    + 'background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius-sm);';
 
   function listHtml() {
     if (order.milestoneInvoices.length === 0) {
@@ -247,9 +255,9 @@ function openMilestoneInvoices(orderId) {
         ${order.milestoneInvoices.map((m, i) => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
           <td style="padding:6px 8px;">${escapeHtml(m.label)}</td>
           <td style="padding:6px 8px;text-align:right;">${escapeHtml(String(m.percentage))}%</td>
-          <td style="padding:6px 8px;text-align:right;">${fmtPrice(m.amount)}</td>
+          <td style="padding:6px 8px;text-align:right;">${fmtMoneyIn(m.amount, jobCurrency)}</td>
           <td style="padding:6px 8px;color:var(--text-muted);">${m.issuedAt ? escapeHtml(m.issuedAt) : '—'}</td>
-          <td style="padding:6px 8px;"><input type="date" data-mi-due="${i}" value="${escapeHtml(m.dueDate || '')}" aria-label="${escapeHtml(t('ord.milestone_due'))}" style="font-size:12px;"></td>
+          <td style="padding:6px 8px;"><input type="date" data-mi-due="${i}" value="${escapeHtml(m.dueDate || '')}" aria-label="${escapeHtml(t('ord.milestone_due'))}" style="${dateStyle}padding:4px 8px;font-size:12px;"></td>
           <td style="padding:6px 8px;">
             <button class="btn small" data-mi="${i}">${escapeHtml(t('ord.milestone_issue'))}</button>
             <button class="btn danger small" data-mi-del="${i}" style="margin-inline-start:4px;" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
@@ -276,12 +284,12 @@ function openMilestoneInvoices(orderId) {
           <input type="number" id="msPct" min="1" max="100" step="1" placeholder="50" style="font-size:12.5px;">
         </div>
         <div>
-          <label style="margin:0;">${escapeHtml(t('ord.milestone_amount'))} (${currencySymbol()})</label>
+          <label style="margin:0;">${escapeHtml(t('ord.milestone_amount'))} (${escapeHtml(jobMark)})</label>
           <input type="number" id="msAmount" min="0" step="0.01" placeholder="0.00" style="font-size:12.5px;">
         </div>
         <div>
           <label style="margin:0;" for="msDue">${escapeHtml(t('ord.milestone_due'))}</label>
-          <input type="date" id="msDue" style="font-size:12.5px;">
+          <input type="date" id="msDue" style="${dateStyle}">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;">

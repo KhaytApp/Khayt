@@ -2079,6 +2079,7 @@
  "mac.send_reminder": "Envoyer un rappel",
  "mac.reminder_sent": "Rappel de paiement envoyé pour {id}.",
  "mac.reminder_no_way": "Ce client n'a pas de numéro pour WhatsApp, ni d'adresse e-mail à laquelle la boutique peut écrire.",
+ "mac.undo_portal_deposit": "Annuler l'acompte du portail",
  "mac.portal_refreshed": "Le lien de suivi du client a été mis à jour.",
  "mac.portal_takedown_pending": "Ce client a été effacé et son lien est toujours sur Khayt Cloud. Khayt continue d’essayer de le retirer ; vous pouvez essayer maintenant.",
  "mac.portal_unpublish_q": "Retirer le lien client de {job} ?",

@@ -1519,7 +1519,20 @@ function recordPortalDepositFrom(items, pubToken, order) {
   const amount = fmtMoneyIn(out.amount, code);
   if (out.outcome === 'recorded') {
     runPaymentEffects(order, out.effects.filter((e) => e.type !== 'toast_saved'));
-    toast(t('cloud.portal_deposit_recorded', { amount }), 'success', 6000);
+    // Undo for the one case the rule cannot see: the same deposit typed in by
+    // hand more than a few days apart. The note stays, marked undone, so no
+    // later check records it again.
+    toast(t('cloud.portal_deposit_recorded', { amount }), 'success', 10000, {
+      undo: () => {
+        const back = KhaytPortalOwner.undoPortalPayment(order, out.key,
+          { settings, clients, now: new Date().toISOString() });
+        if (!back.ok) return;
+        saveAll();
+        if (typeof renderLogs === 'function') renderLogs();
+        if (typeof renderKanban === 'function') renderKanban();
+        toast(t('cloud.portal_deposit_undone', { amount }), 'info', 5000);
+      },
+    });
   } else {
     saveAll();
     const key = out.outcome === 'matched' ? 'cloud.portal_deposit_matched'

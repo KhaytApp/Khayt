@@ -96,6 +96,18 @@ struct DepositsAndRemindersTests {
             values: ["client": "Acme", "price": "500.00", "currency": "EUR", "id": "J1"],
             payLink: plan.payLink, payLabel: "Pay here:")
         #expect(text == "Hi Acme, 500.00 EUR for J1.\nPay here: https://pay.example/500.00")
+        // A job in euros: the link is the shop's, so it charges riyals at the
+        // job's saved rate, and with no saved rate there is no link.
+        var euro = Self.overdue()
+        euro["currency"] = .string("EUR")
+        euro["fxRate"] = .number(4)
+        let converted = try await engine.reminderPlan(order: .object(euro), owed: 500,
+                                                      settings: settings, client: client)
+        #expect(converted.payLink == "https://pay.example/2000.00")
+        euro["fxRate"] = nil
+        let unrated = try await engine.reminderPlan(order: .object(euro), owed: 500,
+                                                    settings: settings, client: client)
+        #expect(unrated.payLink.isEmpty)
         let marked = try await engine.markReminder(order: .object(Self.overdue()))
         guard case .object(let o) = marked else { Issue.record("not an order"); return }
         #expect(o["payReminderCount"] == .number(1))
@@ -124,6 +136,32 @@ extension LibraryEditPerfTests {
             #expect(again == nil)
             disk = try DepositsAndRemindersTests.onDisk(url, "Q1")
             #expect(disk["paidAmount"] == .number(300), "not doubled")
+        }
+    }
+
+    @Test("a recorded portal deposit can be undone, and is never recorded again")
+    func deposits_undoKeepsTheKey() async throws {
+        var job = DepositsAndRemindersTests.quote()
+        // Typed in by hand a month ago: outside the matching window.
+        job["paidAmount"] = .number(300)
+        job["paidAt"] = .string("2026-10-01")
+        job["paymentStatus"] = .string("partial")
+        try await withPerfBook(DepositsAndRemindersTests.book([job])) { shop, url in
+            let items = DepositsAndRemindersTests.paid(ref: "pay_dup")
+            #expect(await shop.recordPortalDeposit("Q1", items: items, token: "tokQ1", quiet: false) != nil)
+            #expect(try DepositsAndRemindersTests.onDisk(url, "Q1")["paidAmount"] == .number(600))
+            guard let undo = shop.portalDepositUndo else { Issue.record("no undo offered"); return }
+            #expect(shop.undoablePortalDeposit("Q1") == undo.key)
+            await shop.undoPortalDeposit("Q1", key: undo.key)
+            let disk = try DepositsAndRemindersTests.onDisk(url, "Q1")
+            #expect(disk["paidAmount"] == .number(300))
+            guard case .array(let log)? = disk["portalPayments"], case .object(let note)? = log.first else {
+                Issue.record("the note went"); return
+            }
+            #expect(note["outcome"] == .string("undone"))
+            #expect(shop.undoablePortalDeposit("Q1") == nil)
+            #expect(await shop.recordPortalDeposit("Q1", items: items, token: "tokQ1", quiet: true) == nil)
+            #expect(try DepositsAndRemindersTests.onDisk(url, "Q1")["paidAmount"] == .number(300))
         }
     }
 

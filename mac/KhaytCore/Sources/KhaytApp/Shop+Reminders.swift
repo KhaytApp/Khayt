@@ -67,6 +67,9 @@ extension Shop {
     func reminderText(for job: Order, plan: KhaytEngine.ReminderPlan) async -> String {
         let name = job.client.isEmpty ? job.project : job.client
         var values = whatsAppValues(for: job)
+        // The amount asked for, in the JOB's currency — the one it is owed in
+        // (as its code: see `whatsAppValues`).
+        values["currency"] = job.currency.isEmpty ? currency : job.currency
         values["price"] = Money.figure(plan.amount)
         values["client"] = name
         values["id"] = job.id

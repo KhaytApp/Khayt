@@ -2079,6 +2079,7 @@
  "mac.send_reminder": "发送提醒",
  "mac.reminder_sent": "已为 {id} 发送付款提醒。",
  "mac.reminder_no_way": "该客户没有可用于 WhatsApp 的电话号码，也没有店铺可以发送的电子邮件地址。",
+ "mac.undo_portal_deposit": "撤销门户定金",
  "mac.portal_refreshed": "客户的追踪链接已更新。",
  "mac.portal_takedown_pending": "此客户已被抹除，其链接仍在 Khayt Cloud 上。Khayt 会持续尝试撤下它；你也可以现在尝试。",
  "mac.portal_unpublish_q": "要撤下 {job} 的客户链接吗？",
