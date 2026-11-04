@@ -168,8 +168,30 @@ function extractActuals(type, raw, opts = {}) {
   } else if (kind === 'bambu') {
     // Bambu's MQTT report carries no cumulative extrusion, and deriving elapsed
     // time from "remaining ÷ percent" is badly behaved at both ends of a job.
-    // So nothing is claimed here — the shop types these, as they did before.
+    // So the REPORT is never read for figures here.
+    //
+    // What can be said comes from elsewhere, and says so:
+    //
+    //   opts.sliced  the plate's figures out of the 3MF Khayt itself sent
+    //                (`lib/bambu-sliced.js`) — what that plate was SLICED to
+    //                use. `gramsBasis: 'sliced'`, never a measurement. Its
+    //                prediction stands in for the time, `timeBasis: 'sliced'`,
+    //                until `printer-poll-cache` replaces it with the time Khayt
+    //                watched the job run (`timeBasis: 'observed'`).
+    //
+    // Without either, nothing is claimed — the shop types these, as before.
     out.source = 'bambu';
+    const sl = opts && opts.sliced;
+    if (sl && typeof sl === 'object') {
+      const g = num(sl.grams);
+      const s = num(sl.predictionS);
+      if (g !== null && g > 0) { out.filamentGrams = g; out.gramsBasis = 'sliced'; }
+      if (s !== null && s > 0) { out.durationS = s; out.timeBasis = 'sliced'; }
+      if (out.gramsBasis || out.timeBasis) {
+        out.source = 'bambu-sliced';
+        if (Number.isInteger(sl.plate) && sl.plate >= 1) out.plate = sl.plate;
+      }
+    }
   } else {
     return out;
   }
@@ -254,7 +276,9 @@ const COMPLETION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * @returns {{
  *   timeH: number|null, weightG: number|null,
  *   timeMeasured: boolean, weightMeasured: boolean,
- *   measured: boolean, source: string|null, filename: string|null,
+ *   timeSliced: boolean, weightSliced: boolean,
+ *   measured: boolean, sliced: boolean, plate: number|null,
+ *   source: string|null, filename: string|null,
  *   staleReason: 'too-old'|'nothing-measured'|null
  * }}
  */
@@ -267,7 +291,8 @@ function prefillActuals(input) {
   const base = {
     timeH: estH, weightG: estG,
     timeMeasured: false, weightMeasured: false,
-    measured: false, source: null, filename: null,
+    timeSliced: false, weightSliced: false,
+    measured: false, sliced: false, plate: null, source: null, filename: null,
     staleReason: null,
   };
 
@@ -279,15 +304,33 @@ function prefillActuals(input) {
   const a = completion.actuals;
   if (!hasActuals(a)) return { ...base, staleReason: 'nothing-measured' };
 
-  const measuredH = a.durationS > 0 ? a.durationS / 3600 : null;
-  const measuredG = a.filamentGrams > 0 ? a.filamentGrams : null;
+  const readH = a.durationS > 0 ? a.durationS / 3600 : null;
+  const readG = a.filamentGrams > 0 ? a.filamentGrams : null;
+  // A SLICED axis is offered and is never called measured. Bambu's grams come
+  // out of the file it was sent (`gramsBasis: 'sliced'`), and its time is the
+  // file's prediction until Khayt has watched a whole job run. Both are better
+  // than the order's quote figure — they are the plate that actually ran — and
+  // both are still the slicer's word. `weightMeasured` false is what keeps them
+  // out of every measured-only report, because the sheets record an unmeasured
+  // axis as 'manual'.
+  const timeSliced = readH !== null && a.timeBasis === 'sliced';
+  const weightSliced = readG !== null && a.gramsBasis === 'sliced';
+  const timeMeasured = readH !== null && !timeSliced;
+  const weightMeasured = readG !== null && !weightSliced;
 
   return {
-    timeH: measuredH !== null ? Math.round(measuredH * 100) / 100 : estH,
-    weightG: measuredG !== null ? Math.round(measuredG * 10) / 10 : estG,
-    timeMeasured: measuredH !== null,
-    weightMeasured: measuredG !== null,
-    measured: true,
+    timeH: readH !== null ? Math.round(readH * 100) / 100 : estH,
+    weightG: readG !== null ? Math.round(readG * 10) / 10 : estG,
+    timeMeasured,
+    weightMeasured,
+    timeSliced,
+    weightSliced,
+    // True only when a printer really measured an axis — the flag the sheets
+    // use to say "measured". A completion that is ALL sliced is offered with
+    // `sliced` and `measured: false`.
+    measured: timeMeasured || weightMeasured,
+    sliced: timeSliced || weightSliced,
+    plate: Number.isInteger(a.plate) ? a.plate : null,
     source: a.source || null,
     filename: completion.filename || null,
     staleReason: null,

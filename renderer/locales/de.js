@@ -4645,6 +4645,8 @@
   "act.from_printer": "Diese Werte stammen von {source} — was der Auftrag tatsächlich verbraucht hat, nicht die Schätzung.",
   "act.from_printer_file": "Diese Werte stammen von {source}, gemessen an {file} — was dieser Auftrag tatsächlich verbraucht hat, nicht die Schätzung.",
   "act.your_printer": "deinem Drucker",
+  "act.sliced": "Gesliced",
+  "act.sliced_note": "Slicer-Wert für die gedruckte Platte (Platte {plate}), aus der von Khayt gesendeten Datei — nicht vom Drucker gemessen.",
   "setup.title": "Einstellungen, die funktioniert haben",
   "setup.add": "＋ Setup hinzufügen",
   "setup.add_title": "Setup hinzufügen",

@@ -200,6 +200,19 @@ test('an edit changes only what it was given', () => {
   assert.equal(machine.name, 'Bench 2', 'and a refused edit changes nothing');
 });
 
+test('clearsOwnBed is set only by a real true, and removed by anything else', () => {
+  const machine = { id: 'M1', name: 'Belt' };
+  M.applyEdit(machine, { clearsOwnBed: true }, {});
+  assert.equal(machine.clearsOwnBed, true);
+  M.applyEdit(machine, { name: 'Belt 2' }, {});
+  assert.equal(machine.clearsOwnBed, true, 'an edit that does not mention it keeps it');
+  M.applyEdit(machine, { clearsOwnBed: 'true' }, {});
+  assert.equal('clearsOwnBed' in machine, false);
+  M.applyEdit(machine, { clearsOwnBed: true }, {});
+  M.applyEdit(machine, { clearsOwnBed: false }, {});
+  assert.equal('clearsOwnBed' in machine, false);
+});
+
 test('a bed needs all three dimensions, or it is not a bed', () => {
   const machine = { id: 'M1', name: 'B', bed: { x: 256, y: 256, z: 256 } };
   M.applyEdit(machine, { bed: { x: 220, y: 220, z: 250 } }, {});

@@ -60,7 +60,20 @@
     const usable = (a) => !!(a && (a.filamentGrams > 0 || a.durationS > 0));
     const finished = status && status.actuals;
     const during = p.actuals;
-    const actuals = usable(finished) ? finished : (usable(during) ? during : null);
+    let actuals = usable(finished) ? finished : (usable(during) ? during : null);
+    // A Bambu reports no duration of its own, so the time is the one Khayt
+    // watched it take — when it watched the whole job (see `tickJobClock`).
+    // That replaces a slice prediction, never a printer's own reading.
+    if (isBambu(prev, status)) {
+      const observed = observedDurationS(p.jobClock, now);
+      if (observed !== null && !(actuals && actuals.durationS > 0 && !actuals.timeBasis)) {
+        const base = actuals || { filamentMm: null, filamentGrams: null, durationS: null, source: 'bambu' };
+        // The time is now the watch's own reading, so the source is the
+        // printer ('bambu'), not the sliced file: the completion records
+        // `actualsSource.time` from it. The grams keep `gramsBasis: 'sliced'`.
+        actuals = { ...base, durationS: observed, timeBasis: 'observed', source: 'bambu' };
+      }
+    }
     if (!actuals) return p.lastCompleted || null;
 
     return {
@@ -70,6 +83,79 @@
       filename: (status && status.filename) || p.filename || '',
       actuals,
     };
+  }
+
+  /* ── HOW LONG A BAMBU JOB TOOK, BY WATCHING IT ───────────────────────────
+   *
+   * Bambu's report has `mc_remaining_time` and `mc_percent` and no elapsed
+   * time, and "remaining ÷ percent" is badly behaved at both ends of a job —
+   * which is why `printer-actuals` refuses it. What Khayt CAN know is when it
+   * saw the job start printing and when it saw it stop: the poll that first
+   * read RUNNING, the poll that first read FINISH (or FAILED, or IDLE), and
+   * the polls in between that read PAUSE, whose time is taken off — the same
+   * rule as Moonraker's `print_duration`, which excludes pauses because a
+   * slicer never predicts somebody swapping a spool.
+   *
+   * Accurate to the poll interval at each end (30 s on the desktop, 10 s on
+   * the Mac), and only claimed when the watch was unbroken:
+   *   - Khayt saw the poll before the job say it was not printing, and the
+   *     job was at ≤ CLOCK_START_MAX_PCT — it saw the start rather than
+   *     opening on a job already running;
+   *   - no gap between answered polls longer than CLOCK_MAX_GAP_MS, because a
+   *     pause that began and ended inside a gap is a pause nobody counted;
+   *   - the printer's job name did not change underneath.
+   * Anything else is no observation at all, and the slice prediction (labelled
+   * sliced) or the shop's own figure stands instead.
+   *
+   * Bambu only, deliberately. Every other protocol Khayt speaks reports its
+   * own duration, and a printer's reading beats Khayt's watching. */
+  const CLOCK_START_MAX_PCT = 2;
+  const CLOCK_MAX_GAP_MS = 10 * 60 * 1000;
+
+  function isBambu(prev, status) {
+    const t = (status && status.type) || (prev && prev.type) || '';
+    return String(t).toLowerCase() === 'bambu';
+  }
+
+  function tickJobClock(prev, status, now) {
+    const p = prev || {};
+    const st = status || {};
+    if (!isInJob(st.state)) return null;
+    const paused = !isPrintingState(st.state);
+    const c = p.jobClock;
+    const fresh = () => ({
+      startedAt: now,
+      // Watched from the start only if Khayt SAW the edge into the job — the
+      // poll before this one answered with a state that was not a job (Idle,
+      // Preparing, Finished) — and the job is at its beginning. A first poll
+      // after launch has no state before it, so a job Khayt opened on is
+      // clocked (to keep the edges consistent) and never trusted.
+      watched: typeof p.state === 'string' && p.state !== '' && !isInJob(p.state)
+        && !paused && !(Number(st.progress) > CLOCK_START_MAX_PCT),
+      pausedMs: 0,
+      pausedSince: paused ? now : null,
+      lastSeenAt: now,
+      filename: String(st.filename || ''),
+    });
+    if (!isInJob(p.state) || !c || typeof c !== 'object') return fresh();
+    let watched = !!c.watched;
+    if (!(now - c.lastSeenAt <= CLOCK_MAX_GAP_MS)) watched = false;
+    if (String(st.filename || '') !== String(c.filename || '')) watched = false;
+    let pausedMs = Number(c.pausedMs) || 0;
+    let pausedSince = c.pausedSince;
+    if (paused && pausedSince == null) pausedSince = now;
+    if (!paused && pausedSince != null) { pausedMs += now - pausedSince; pausedSince = null; }
+    return { ...c, watched, pausedMs, pausedSince, lastSeenAt: now };
+  }
+
+  /** Seconds the job spent printing, or null when the watch was not unbroken. */
+  function observedDurationS(clock, now) {
+    const c = clock;
+    if (!c || typeof c !== 'object' || !c.watched) return null;
+    if (!(now - c.lastSeenAt <= CLOCK_MAX_GAP_MS)) return null;
+    const paused = (Number(c.pausedMs) || 0) + (c.pausedSince != null ? now - c.pausedSince : 0);
+    const ms = now - c.startedAt - paused;
+    return ms > 0 ? Math.round(ms / 1000) : null;
   }
 
   /**
@@ -104,10 +190,13 @@
       ? pushCompletion(p.completions, lastCompleted)
       : (Array.isArray(p.completions) ? p.completions : []);
 
+    const jobClock = isBambu(prev, status) ? tickJobClock(prev, status, now) : null;
+
     return {
       ...(status || {}),
       ...(lastCompleted ? { lastCompleted } : {}),
       ...(completions.length ? { completions } : {}),
+      ...(jobClock ? { jobClock } : {}),
       consecutiveFailures: 0,
       lastOkAt: now,
       lastUpdated: now,
@@ -292,6 +381,7 @@
     mergePollSuccess, mergePollFailure, isOffline, captureCompletion,
     isPrintingState, isInJob, findCompletion, mergePersisted, COMPLETIONS_KEPT,
     completionsToPersist, restoreCompletions, completionIsNew,
+    tickJobClock, observedDurationS, CLOCK_START_MAX_PCT, CLOCK_MAX_GAP_MS,
   };
 
   // Dual export. This runs in main.js as a CommonJS module AND as a plain <script>

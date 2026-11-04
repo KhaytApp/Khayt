@@ -34,6 +34,25 @@ test('a machine whose bed has not been cleared since its last print is not offer
   assert.deepEqual(out.waiting, [{ machineId: 'M1', blocked: 'ad.bed_not_clear' }]);
 });
 
+/// A printer the shop says clears its own plate (belt, plate changer, push-off
+/// end routine) is offered without anybody saying the bed is clear — and only
+/// for a real `true`.
+test('a machine marked clearsOwnBed is offered without a bed-clear stamp', () => {
+  const dirty = machine({ bedClearedAt: '2026-09-11T08:00:00Z', clearsOwnBed: true });
+  assert.equal(ad.machineBlocked(dirty, ready), null);
+  const never = machine({ bedClearedAt: undefined, clearsOwnBed: true });
+  assert.equal(ad.machineBlocked(never, ready), null);
+  const out = ad.plan({ orders: [job()], machines: [dirty], live: { M1: ready } });
+  assert.equal(out.proposals.length, 1);
+  // Anything but `true` is not the shop saying it.
+  for (const v of ['true', 1, 'yes', {}]) {
+    assert.equal(ad.machineBlocked(machine({ bedClearedAt: undefined, clearsOwnBed: v }), ready), 'ad.bed_unknown');
+  }
+  // And it never overrides a printer that is busy, faulted or held.
+  assert.equal(ad.machineBlocked(dirty, { state: 'printing' }), 'ad.busy');
+  assert.equal(ad.machineBlocked(dirty, { state: 'error' }), 'ad.printer_error');
+});
+
 /// Reported, never silently dropped: a farm tool that quietly stops offering a
 /// printer is one nobody trusts.
 test('a machine nobody has ever marked clear says so rather than vanishing', () => {

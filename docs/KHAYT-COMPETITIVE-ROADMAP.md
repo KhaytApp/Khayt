@@ -388,7 +388,7 @@ nothing is currently wrong.
 community database. Wants a decision first on whether Khayt queries it live,
 ships a snapshot, or contributes back.
 
-**R10 — decide the automation line, in writing.** Khayt now finds printers,
+**R10 — decide the automation line, in writing.** *(Written 2026-11-04: [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).)* Khayt now finds printers,
 controls them and proposes dispatch. It is not going to do cloud slicing or
 lights-out production. Saying where the line falls stops it being redecided one
 feature at a time.
@@ -522,6 +522,10 @@ written automation line, is **still unwritten**. No document in `docs/` states i
   printer history), the Spool app (Bambu cloud import) and 3D Print Manager (AMS usage)
   all fill them in. This is the one place where R3's differentiator does not reach the
   most common printer brand.
+  *(Partly closed, Nov 2026: a job Khayt sends now carries the plate's **sliced** grams
+  from `slice_info.config` (`lib/bambu-sliced.js`), and its time is how long Khayt
+  watched it print (`printer-poll-cache` job clock). A job started elsewhere still
+  needs an FTPS RETR. Not yet verified on a real Bambu.)*
 - **Scanning a supplier receipt.** Stimalo (AI invoice scanning) and Daedalus (receipt
   OCR) both read supplier documents. In Khayt, `lib/expense-book.js` stores a
   `receiptPath` and the receipt's VAT, but someone has to type it. iOS OCR exists only
@@ -687,6 +691,10 @@ product API.
 | [FlowForgeStudio](https://apps.microsoft.com/detail/9NLN89XTDLLK) | Windows price calculator and manager from a Dutch developer (publisher "FlowForgeStudio", support address at ziggo.nl). It computes cost from material, machine wear, electricity, labour and a failure margin, and suggests a price at a chosen margin. Runs locally with no account. Pro adds materials with multicolour costing, a file library, sending phone photos to the PC over home Wi-Fi, and an AI listing writer (MakerWorld titles and tags) with your own key. Dutch and English. | **Quoting / cost calculator.** Khayt's calculator already covers these inputs (`lib/calculator-cost.js`, `lib/depreciation.js`), and Khayt also has the job, invoice and VAT layer FlowForge lacks. | Free; Pro is a one-time in-app purchase (price not shown). Released 2026-09-29, no ratings yet. | ✅ Store product API |
 | [Print Planner](https://print-planner-rho.vercel.app) | Small React + Firebase web app: a print queue with priorities, customers (including "VIP"), printers, a "Printer Performance" analytics page, alerts for job added/finished/failed and low filament, an API key, and a guest mode with demo data. | **Job queue / customers.** All of it is already in Khayt. | No price, no maker named. On a default `*.vercel.app` address: an early project. | ⚠️ bundle strings only, page renders empty |
 | [FilAccount](https://github.com/CrashTestBrummy/filaccount) | Local-first filament inventory for Windows. The PC holds a SQLite database. A phone pairs over home Wi-Fi with a rotating code and works as the UPC/EAN label scanner, looking spools up in the bundled Open Filament Database. Manual usage and confirmed OrcaSlicer jobs deduct from stock. JSON backups include label photos. | **Filament accounting.** Khayt already has all of it: a barcode on the iPhone (`ios/KhaytCompanion/Models/ProductBarcode.swift`), the bundled OFD catalogue, and grams deducted from print actuals. | "Private beta, proprietary, all rights reserved" (no licence file). 0 stars, created and last pushed 2026-09-22. | ✅ README |
+| [PrintTender](https://github.com/frankt2012/PrintTender) | Local-first printer maintenance tracker in Flutter, for macOS (not notarized) and Android, stored in SQLite. Printer inventory with a print-hour odometer, a seeded library of 58 tasks in nine categories, schedules every N print hours and/or every N months graded OK → due soon (85%) → overdue, a daily reminder notification, a maintenance log with parts and cost, JSON backup, and a year board of what was done and what is coming. | **Machine maintenance.** Khayt already schedules by print hours and/or days with a due-soon threshold (`lib/maintenance.js`) and logs maintenance cost per machine (`lib/maintenance-cost.js`). Khayt has no seeded task library and no year-board view. | MIT. 0 stars, created 2026-10-19, last pushed 2026-11-02. | ✅ README |
+| [Printforge](https://crm.printforge.com.au/) | **Re-read; already in §7** (2026-10-10), and Turki heard of it as "coming". Unchanged in scope: an Australian web app (NSW, founder Daniel Scott) with STL/G-code costing, numbered quotes, GST/ABN invoices, a 7-stage kanban and farm calendar, a CRM, stock, and Shopify/Etsy/Xero/Stripe/Bambu/Home Assistant integrations. New since §7: cookie-cutter and clicker generators on paid plans, and prices offered in AUD, USD, EUR and GBP. | **The whole shop**, as §7 says. No ZATCA, EN only. Khayt's Xero support is a CSV export (`lib/accounting-export.js`), not a live sync. | Prices unchanged: free, then A$4 / 9 / 18 / 39 a month; 14-day Pro trial. | ⚠️ marketing page only |
+| [FilaStash](https://littlecreative.agency/filastash/) | iPhone filament inventory from Little Inspiration Limited. Remaining weight from logged usage or a scale reading, a camera scan of the spool label to fill in its details, storage boxes, spending and colour insights, spools drawn in 3D, backup to Files or iCloud, and iCloud sync on Pro. No printer connection: usage is logged by hand. | **Filament inventory on the phone.** Khayt's iPhone companion already keeps spools, with barcode scanning and grams deducted from print actuals rather than logged by hand. FilaStash's 3D spool view and box locations are presentation Khayt does not have. | Free up to 20 spools; Pro US$4.99 once. v1.2.4 on 2026-10-23, 10 updates since 2026-09-15. | ⚠️ marketing page only |
+| [3DPrinterOS](https://www.3dprinteros.com/) | Cloud fleet platform from 3D Control Systems Ltd for schools, universities, makerspaces, enterprises and farms. 200+ printer models (Bambu, Prusa, Ultimaker, Creality, Formlabs, MakerBot, Klipper) through a client on a PC or Raspberry Pi, shared queues with approvals, AutoQueue to free printers, cloud slicing in the browser, per-user and group permissions with quotas and hour or material limits, charging per gram, per job or flat through PaperCut, Stripe or CBORD with refunds for failed prints, "AI Print Guardian" camera failure detection that can pause, SSO, audit log, private-cloud and air-gapped installs. | **Fleet control and charging users for prints**, aimed at institutions rather than shops selling to customers. Khayt relays Bambu's own AI print-monitoring faults (`lib/bambu-faults.js`) but has no camera failure detection of its own, no cloud slicing and no per-user quotas. It has the customer, quote, invoice and VAT layer 3DPrinterOS lacks. | 14-day trial; plans for makers, schools, farms and enterprise, no prices published. Claims 2.5M+ users and 100K+ printers (the page also says 300K+ users). | ⚠️ marketing page only |
 
 ### Worth acting on
 
@@ -710,3 +718,13 @@ product API.
 
 *Caveat, as §5–§7: listing/marketing pages, READMEs and app-bundle strings, not hands-on
 evaluations. They are enough to place a product, not to trust a feature matrix.*
+
+### Follow-up, 2026-11-04
+
+Turki asked for the five recommendations from this reading to be done:
+
+1. **Bambu actuals** — in progress on its own branch; grams from the sliced 3MF, labelled as sliced, unverified on real hardware.
+2. **"Clears its own plate"** — `clearsOwnBed` on a machine (lib/auto-dispatch.js, lib/machine-edit.js, the Mac machine sheet).
+3. **A starter maintenance list** — 13 tasks in `lib/maintenance.js` (`STARTER_TASKS`), offered on the Mac's new-task sheet.
+4. **R10 written** — [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).
+5. **Qoyod export — still blocked.** Qoyod's help centre publishes no invoice-import columns: the invoice import takes only the Excel template downloaded from the shop's own Qoyod account, with locked headers and account-filled dropdowns ([sales](https://www.qoyod.com/en/knowledge-base/how-to-import-sales-invoices-via-excel/), [purchases](https://www.qoyod.com/en/knowledge-base/how-to-import-purchase-invoices-via-excel/)). The journal-entry import lists its fields but needs the shop's own account codes and would land sales as entries, not invoices. `lib/accounting-export.js` already says so ("QOYOD IS DELIBERATELY ABSENT"). Unblocking it needs someone with a Qoyod account to download the templates.
