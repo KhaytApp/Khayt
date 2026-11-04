@@ -17,6 +17,10 @@
     // (`fireQcWebhook('qc_failed')`) and no subscription could list it, so it
     // never left the building; the Mac fires it too now.
     'qc_failed',
+    // A customer reported a defect on a delivered job. Fired by the desktop's
+    // RMA sheet (`fireQcWebhook('rma_opened')`) and dead the same way; the Mac
+    // has no RMA flow yet, so only the desktop sends it.
+    'rma_opened',
   ];
 
   const MAX_ATTEMPTS = 5;
@@ -80,10 +84,10 @@
     // their order are the ones Khayt's Ship dialog has always sent
     // (`renderer/order-flows.js`), so a consumer's parser — and the HMAC over
     // the bytes — does not change with the app that shipped it.
-    // A failed inspection: the keys, in order, that the desktop's
+    // A failed inspection, or a warranty claim opened: the keys, in order, that the desktop's
     // `fireQcWebhook` sends (renderer/operations-extras.js), so the two apps
     // sign the same bytes for the same event.
-    if (event === 'qc_failed') {
+    if (event === 'qc_failed' || event === 'rma_opened') {
       return { orderId: o.id, project: o.project, status: o.status,
                qcStatus: o.qcStatus || null, reprintOf: o.reprintOf || null, client: o.client || null };
     }

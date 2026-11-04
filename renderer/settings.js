@@ -3936,6 +3936,7 @@ function renderWebhookSettings() {
     { key: 'quote_approved',   label: 'Quote approved' },
     { key: 'order_delivered',  label: 'Order delivered' },
     { key: 'qc_failed',        label: 'QC failed' },
+    { key: 'rma_opened',       label: 'RMA opened' },
   ];
   el.innerHTML = `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;">

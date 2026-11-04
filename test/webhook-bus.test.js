@@ -211,3 +211,40 @@ test('qc_failed is an event a subscription can list, carrying the desktop QC she
   assert.deepEqual(Object.keys(payload), ['orderId', 'project', 'status', 'qcStatus', 'reprintOf', 'client']);
   assert.deepEqual(payload, { orderId: 'INV-1', project: 'Hood', status: 'qc', qcStatus: 'fail', reprintOf: null, client: 'Nora' });
 });
+
+test('every event name either app hands the subscription bus is one a subscription can list', () => {
+  // A name fired but missing from EVENTS is a webhook nobody can ever receive:
+  // `qc_failed` and `rma_opened` were both fired by the desktop for months and
+  // never left the building. Read every literal call site, in both apps.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const files = (dir, ext) => fs.readdirSync(path.join(root, dir))
+    .filter((f) => f.endsWith(ext)).map((f) => path.join(dir, f));
+  const sources = [
+    ...files('renderer', '.js'), ...files('lib', '.js'), ...files('lib/main', '.js'), 'main.js',
+    ...files('mac/KhaytCore/Sources/KhaytApp', '.swift'),
+  ];
+  const patterns = [
+    /\bfire(?:Qc|Status)?Webhook\(\s*'([a-z_]+)'/g,                 // renderer
+    /\{\s*type:\s*'webhook',\s*event:\s*'([a-z_]+)'/g,               // lib/ effects lists
+    /WebhookEffect\(kind:\s*"webhook",\s*event:\s*"([a-z_]+)"/g,     // the Mac
+  ];
+  const fired = new Map();
+  for (const rel of sources) {
+    const text = fs.readFileSync(path.join(root, rel), 'utf8');
+    for (const re of patterns) {
+      for (const m of text.matchAll(re)) if (!fired.has(m[1])) fired.set(m[1], rel);
+    }
+  }
+  assert.ok(fired.size >= 8, `the scan found too few call sites (${fired.size}) — it is reading the wrong place`);
+  const missing = [...fired].filter(([name]) => !B.EVENTS.includes(name)).map(([n, f]) => `${n} (${f})`);
+  assert.deepEqual(missing, [], 'fired but not in webhook-bus EVENTS');
+});
+
+test('rma_opened carries the desktop RMA sheet\'s keys, like qc_failed', () => {
+  assert.ok(B.EVENTS.includes('rma_opened'));
+  const p = B.statusPayload('rma_opened', { id: 'D1', project: 'Hood', status: 'completed', client: 'Nora' });
+  assert.deepEqual(Object.keys(p), ['orderId', 'project', 'status', 'qcStatus', 'reprintOf', 'client']);
+  assert.deepEqual(B.migrateLegacyWebhooks({ events: { rma_opened: 'https://h.example/r' } })[0].events, ['rma_opened']);
+});
