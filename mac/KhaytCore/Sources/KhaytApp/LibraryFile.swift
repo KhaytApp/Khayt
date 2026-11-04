@@ -285,7 +285,14 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
 
     /// `matches(search:)` for a query `SearchText.fold` has already folded.
     func matches(folded q: String) -> Bool {
-        searchFields.contains { !$0.isEmpty && SearchText.containsFolded($0, q) }
+        // Word by word, and with file-name separators read as spaces — the
+        // same answer as the memoised `Shop.searchMatcher`.
+        func spaced(_ s: String) -> String {
+            String(s.map { "_-.+".contains($0) ? " " : $0 })
+        }
+        let words = spaced(q).split(separator: " ").map(String.init)
+        let fields = searchFields.filter { !$0.isEmpty }.map(spaced)
+        return words.allSatisfy { w in fields.contains { SearchText.containsFolded($0, w) } }
     }
 
     /// What the search reads, unfolded. One list, so the library's memoised

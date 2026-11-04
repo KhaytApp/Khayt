@@ -152,9 +152,25 @@ final class LibraryMemo {
             creators = f([file.creator ?? "", file.source ?? ""])
         }
 
-        /// Text as the matcher compares it.
+        /// Text as the matcher compares it. The separators file names use for
+        /// spaces (`flexi_dragon-v2.3mf`) read AS spaces, on both sides, so a
+        /// shop that types "flexi dragon" finds the file that says it with
+        /// underscores.
         static func bytes(_ text: String) -> [UInt8] {
-            Array(SearchText.fold(text).precomposedStringWithCanonicalMapping.utf8)
+            Array(SearchText.fold(text).precomposedStringWithCanonicalMapping.utf8).map {
+                separators.contains($0) ? 0x20 : $0
+            }
+        }
+
+        /// `_ - . +` — every one an ASCII byte, so mapping them byte by byte
+        /// never cuts a multi-byte letter.
+        static let separators: Set<UInt8> = [0x5F, 0x2D, 0x2E, 0x2B]
+
+        /// The query's words. Each must be found somewhere in the model's text,
+        /// in any order and any field: "dragon pla" is the dragon in PLA, not
+        /// the phrase "dragon pla".
+        static func words(_ text: String) -> [[UInt8]] {
+            bytes(text).split(separator: 0x20).map(Array.init)
         }
 
         /// Does any of `fields` hold `needle`?
@@ -336,12 +352,12 @@ extension Shop {
             }
             return ids
         }
-        let text = LibraryMemo.Folded.bytes(query.text)
+        let words = LibraryMemo.Folded.words(query.text)
         let tokens = query.tokens.map { ($0.field, LibraryMemo.Folded.bytes($0.folded)) }
         let any = LibraryMemo.Folded.any
         return { [self] file in
             let f = foldedText(file)
-            if !text.isEmpty, !any(f.free, text) { return false }
+            for word in words where !any(f.free, word) { return false }
             var printer = 0
             for (field, v) in tokens {
                 let ok: Bool

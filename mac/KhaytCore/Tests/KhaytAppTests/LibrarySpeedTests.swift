@@ -105,7 +105,11 @@ struct LibrarySpeedTests {
             #expect(shop.shownFiles.count <= previous)
             previous = shop.shownFiles.count
         }
-        #expect(previous == 111, "Model 12, 120–129, 1200–1299 and 12000+ — 1 + 10 + 100")
+        // Word by word since Nov 2026: "model 12" is every model with "model"
+        // and "12" anywhere in its text — the titles 12, 120–129 and 1200–1299,
+        // and the models filed under "Collection 12" or tagged "tag 12" — not
+        // only the phrase. `fresh` above holds the answer to a whole-book search.
+        #expect(previous == 547)
         // Every model's text folded once, however many keys were typed.
         #expect(shop.libraryMemo.work.folds == 5_000)
 
@@ -113,7 +117,7 @@ struct LibrarySpeedTests {
         shop.search = "model 1"
         Self.draw(shop)
         #expect(shop.libraryMemo.work.builds == start.builds + 2)
-        #expect(shop.shownFiles.count == 1_111)
+        #expect(shop.shownFiles.count == 4_198)
     }
 
     @Test("narrowing folds Arabic as the search always has")

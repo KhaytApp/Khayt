@@ -2798,7 +2798,7 @@
  "mac.tag_example": "relief, portrait",
  "mac.tag_models": "Étiqueter les modèles",
  "mac.tags": "Étiquettes",
- "mac.tags_replaced": "Celles-ci deviennent les étiquettes de chaque modèle sélectionné.",
+ "mac.tags_replaced": "Seules les étiquettes communes à tous les modèles sélectionnés sont affichées. Celles que vous ajoutez ou retirez changent sur chacun ; les autres restent.",
  "mac.take_a_job": "Prenez votre première commande",
  "mac.take_a_job_why": "Ou chiffrez-en une dans le calculateur sans l’enregistrer.",
  "mac.take_the_job": "Prendre la commande",

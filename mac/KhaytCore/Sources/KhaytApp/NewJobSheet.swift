@@ -35,6 +35,16 @@ struct NewJobSheet: View {
             if let agreementNote {
                 Text(agreementNote).font(.caption).foregroundStyle(.secondary)
             }
+            // ── MAY THIS BE SOLD? — asked before the quote or job exists ──
+            //
+            // The job's inspector and the product sheet already said so; a
+            // quote made from the library said nothing until the job was
+            // made. A non-commercial model, or a bought licence that has run
+            // out, is named here where the price is being agreed.
+            let problems = shop.saleProblems(parts.compactMap { Shop.plainString($0.raw["printFileId"]) })
+            if !problems.isEmpty {
+                LicenceWarning(shop: shop, problems: problems)
+            }
             cart
             money
             total

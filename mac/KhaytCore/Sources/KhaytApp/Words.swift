@@ -2782,8 +2782,8 @@ final class Words {
         "mac.tag_example":   ["en": "relief, portrait", "ar": "نقش، صورة"],
         // Said out loud because it is the surprising half: tagging several at
         // once REPLACES what each carried rather than adding to it.
-        "mac.tags_replaced": ["en": "These become the tags on every model selected.",
-                              "ar": "تصبح هذه وسوم كل نموذج مختار."],
+        "mac.tags_replaced": ["en": "Only the tags every selected model shares are shown. Tags you add or remove change on each of them; the rest stay.",
+                              "ar": "تظهر هنا الوسوم المشتركة بين كل النماذج المختارة فقط. ما تضيفه أو تحذفه يتغير في كل نموذج، ويبقى الباقي."],
         // Where a model came from. The licence's own names come from Khayt's
         // shared catalogue (`plib.licence_*`); these are the few sentences this
         // app needs around them.

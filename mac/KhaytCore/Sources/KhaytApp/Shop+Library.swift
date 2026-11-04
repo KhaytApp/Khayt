@@ -2250,10 +2250,36 @@ extension Shop {
                 byKey["mesh:" + g, default: []].append(f.id)
             }
         }
-        var out: [String: String] = [:]
-        for (key, ids) in byKey where Set(ids).count > 1 {
-            for id in ids where out[id] == nil || key.hasPrefix("file:") { out[id] = key }
+        // Joined as connected sets, the way Library Health groups them: A and B
+        // the same bytes and C the same mesh as A are ONE set of three. Giving
+        // each id its strongest key instead left C under a mesh key nobody else
+        // still held — counted as a copy, shown with no partner.
+        var parent: [String: String] = [:]
+        func root(_ id: String) -> String {
+            var r = id
+            while let p = parent[r], p != r { r = p }
+            var n = id
+            while let p = parent[n], p != r { parent[n] = r; n = p }
+            return r
         }
+        var shared: [(key: String, ids: [String])] = []
+        for (key, ids) in byKey where Set(ids).count > 1 {
+            shared.append((key, ids))
+            for id in ids where parent[id] == nil { parent[id] = id }
+            for id in ids.dropFirst() {
+                let a = root(ids[0]), b = root(id)
+                if a != b { parent[max(a, b)] = min(a, b) }
+            }
+        }
+        // A set's key: its smallest "file:" key when any two of it are the same
+        // file ("file:" sorts before "mesh:"), else its smallest mesh key.
+        var keyOf: [String: String] = [:]
+        for (key, ids) in shared {
+            let r = root(ids[0])
+            if keyOf[r].map({ key < $0 }) ?? true { keyOf[r] = key }
+        }
+        var out: [String: String] = [:]
+        for id in parent.keys { out[id] = keyOf[root(id)] }
         return out
     }
 

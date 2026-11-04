@@ -2798,7 +2798,7 @@
  "mac.tag_example": "kabartma, portre",
  "mac.tag_models": "Modelleri Etiketle",
  "mac.tags": "Etiketler",
- "mac.tags_replaced": "Bunlar, seçili her modeldeki etiketler olur.",
+ "mac.tags_replaced": "Yalnızca seçili tüm modellerin ortak etiketleri gösterilir. Eklediğiniz veya kaldırdığınız etiketler her birinde değişir; diğerleri kalır.",
  "mac.take_a_job": "İlk işinizi alın",
  "mac.take_a_job_why": "Veya kaydetmeden Hesaplayıcı'da birini fiyatlandırın.",
  "mac.take_the_job": "İşi al",
