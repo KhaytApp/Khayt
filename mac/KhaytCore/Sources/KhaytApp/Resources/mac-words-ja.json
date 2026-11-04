@@ -2195,6 +2195,7 @@
  "mac.qc_none": "まだ検品を通ったものはありません。",
  "mac.qc_passed": "検品合格",
  "mac.qc_rma": "{n} 件が保証対応で戻り、修正に {amount} かかりました。",
+ "mac.qc_scrap": "廃棄",
  "mac.qc_title": "品質",
  "mac.qc_worst": "最も多いもの：{fault}。",
  "mac.qf_by_count": "見積の件数ベース",

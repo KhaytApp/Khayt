@@ -135,6 +135,36 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// section, and finding a job by the lot it drew from); never written
     /// from here. Absent on a job not finished, or finished before the record.
     let materialDrawn: MaterialDrawn?
+    /// The lines of the store order this job came from, each with the
+    /// catalogue product it matched (`lib/store-order-job.js`) — or none, for a
+    /// line the shop still has to pick a product for. Empty on every job that
+    /// did not come from a store.
+    let storeLines: [StoreLine]
+    /// The job this one reprints, and the jobs that reprint this one
+    /// (`lib/reprint.js`). Nil and empty on almost every job.
+    let reprintOf: String?
+    let reprintedInto: [String]
+
+    struct StoreLine: Decodable, Hashable, Sendable {
+        let name: String
+        let qty: Int
+        let productId: String?
+        let sku: String?
+
+        private enum CodingKeys: String, CodingKey { case name, qty, productId, sku }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = ((try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil) ?? ""
+            let n = ((try? c.decodeIfPresent(Double.self, forKey: .qty)) ?? nil) ?? 1
+            // A count off the wire, never a trap — clamped as `lib/shelf-sale.js` clamps it.
+            qty = n.isFinite ? Int(max(1, min(100_000, n.rounded(.down)))) : 1
+            productId = ((try? c.decodeIfPresent(String.self, forKey: .productId)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+            sku = ((try? c.decodeIfPresent(String.self, forKey: .sku)) ?? nil)
+                .flatMap { $0.isEmpty ? nil : $0 }
+        }
+    }
 
     struct MaterialDrawn: Decodable, Hashable, Sendable {
         let spools: [Draw]
@@ -179,6 +209,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case instalments, instalmentBase
         case invoiceNumber, invoiceNum
         case materialDrawn
+        case storeLines, reprintOf, reprintedInto
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -307,6 +338,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         invoiceNumber = Self.lenientText(c, .invoiceNumber) ?? Self.lenientText(c, .invoiceNum)
         // Lenient: a record this app only DISPLAYS must never make a job unreadable.
         materialDrawn = (try? c.decodeIfPresent(MaterialDrawn.self, forKey: .materialDrawn)) ?? nil
+        // Lenient, like everything above: a stray value here must not take
+        // the job off the board.
+        storeLines = ((try? c.decodeIfPresent([StoreLine].self, forKey: .storeLines)) ?? nil) ?? []
+        reprintOf = Self.lenientText(c, .reprintOf)
+        reprintedInto = ((try? c.decodeIfPresent([String].self, forKey: .reprintedInto)) ?? nil) ?? []
     }
 
     /// One payment of a plan, as Khayt writes it.

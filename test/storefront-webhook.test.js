@@ -54,8 +54,12 @@ test('an order for nothing on the shelf is pending work, priced, and carries its
     notes: r.order.notes,
     source: 'salla',
     sourceOrderId: 'SL-1',
+    // Nothing in the catalogue is called that: the line stays on the job,
+    // unmatched, for the shop to place — never guessed into a product.
+    storeLines: [{ name: 'Custom bracket', qty: 1, productId: null, matchedBy: null }],
   });
   assert.match(r.order.notes, /SL-1/);
+  assert.match(r.order.notes, /Not matched to a product: Custom bracket × 1$/);
   assert.equal(r.store.settings, cur.settings, 'a basket off nothing on the shelf touched the settings');
   assert.equal(cur.printLog.length, 1, 'the book it was handed was changed in place');
 });

@@ -2195,6 +2195,7 @@
  "mac.qc_none": "Henüz hiçbir şey denetimden geçmedi.",
  "mac.qc_passed": "denetimden geçti",
  "mac.qc_rma": "{n} tanesi garanti kapsamında geri geldi ve düzeltmek {amount} tuttu.",
+ "mac.qc_scrap": "Hurdaya ayır",
  "mac.qc_title": "Kalite",
  "mac.qc_worst": "En sık: {fault}.",
  "mac.qf_by_count": "tekliflerin",

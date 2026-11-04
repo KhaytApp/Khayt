@@ -2195,6 +2195,7 @@
  "mac.qc_none": "尚无任何内容经过检验。",
  "mac.qc_passed": "通过检验",
  "mac.qc_rma": "有 {n} 个因保修退回，修复花费 {amount}。",
+ "mac.qc_scrap": "报废",
  "mac.qc_title": "质量",
  "mac.qc_worst": "最常见：{fault}。",
  "mac.qf_by_count": "占报价数",

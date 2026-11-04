@@ -2035,6 +2035,21 @@ function trackShipment(trackingNumber, carrier) {
     } catch (_) { return 0; }
   }
 
+  function intakeStoreJob(p, orderId) {
+    const S = global.KhaytShelfSale, J = global.KhaytStoreOrderJob;
+    if (!S || !J) return null;
+    const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    const reading = S.read(p, { products: list, stock: {} });
+    if (!reading.lines.length) return null;
+    const job = J.build(reading, {
+      products: list,
+      inventory: (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [],
+      consumables: (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [],
+      settings,
+    }, orderId);
+    return Object.assign(job, { reading });
+  }
+
   async function importIntakeAsQuote(it, c) {
     const p = it.payload || {};
     const now = new Date();
@@ -2072,6 +2087,11 @@ function trackShipment(trackingNumber, carrier) {
       intakeQuoteNote(p.quote),
     ].filter(Boolean).join('\n');
     const quotedPart = intakeQuotePart(p);
+    // NOT a quote-form request: read its lines with the one matching rule
+    // (lib/shelf-sale.js — SKU, then exact name, else unmatched) and build the
+    // matched products' parts the way a job from the catalogue does
+    // (lib/store-order-job.js), as both webhook paths and the Mac's queue do.
+    const storeJob = quotedPart ? null : intakeStoreJob(p, orderId);
     const order = {
       id: orderId,
       ...(orderId !== jobNumber ? { jobNumber } : {}),
@@ -2099,6 +2119,20 @@ function trackShipment(trackingNumber, carrier) {
       source: 'online',
       trackingToken: (() => { const b = new Uint8Array(16); crypto.getRandomValues(b); return Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); })(),
     };
+    if (storeJob && storeJob.storeLines.length) {
+      const J = global.KhaytStoreOrderJob;
+      Object.assign(order, J.apply(order, storeJob));
+      // AT THE MONEY THAT MOVED: each line at the price it came with (else
+      // its product's catalogue price), or the order's own total — the rule
+      // the Mac's queue prices with. Cost plus margin only when the order
+      // carried no price at all.
+      const paid = J.orderPrice(storeJob.reading, p,
+        { products: (typeof products !== 'undefined' && Array.isArray(products)) ? products : [], settings });
+      if (paid !== null) order.price = paid;
+      else if (storeJob.parts.length) {
+        order.price = intakeQuotePrice({ baseCost: storeJob.parts.reduce((s2, x) => s2 + (+x.baseCost || 0), 0) });
+      }
+    }
     printLog.unshift(order);
     await dismissIntake(it.id, c, true); // remove from the cloud inbox (best-effort)
     saveAll();
@@ -2114,8 +2148,50 @@ function trackShipment(trackingNumber, carrier) {
     } catch (e) { if (!silent) toast(e.message, 'error'); }
   }
 
+  /* A store order line nothing in the catalogue matched (lib/store-order-job.js
+   * keeps it on the job as `storeLines[i]` with no productId). The shop picks
+   * the product here; its parts are added and reserve their filament like any
+   * other open job's. Never guessed for them. */
+  function openStoreLinesModal(orderId) {
+    const J = global.KhaytStoreOrderJob;
+    const order = printLog.find((o) => o && o.id === orderId);
+    if (!J || !order) return;
+    const waiting = J.unmatched(order);
+    if (!waiting.length) return;
+    const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    const name = (pr) => (typeof localName === 'function' ? localName(pr) : String(pr.id));
+    const options = `<option value="">${escapeHtml(t('store.pick_none'))}</option>`
+      + list.map((pr) => `<option value="${escapeHtml(pr.id)}">${escapeHtml(name(pr))}${pr.sku ? ` (${escapeHtml(pr.sku)})` : ''}</option>`).join('');
+    openFormModal({
+      title: t('store.pick_title'),
+      sizeLg: false,
+      bodyHtml: `<p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">${escapeHtml(t('store.pick_hint'))}</p>`
+        + waiting.map(({ index, line }) => `
+          <label for="storeLine${index}">${escapeHtml(line.name)} × ${escapeHtml(String(line.qty))}${line.sku ? ` · SKU ${escapeHtml(line.sku)}` : ''}</label>
+          <select id="storeLine${index}" data-line="${index}" style="margin-bottom:10px;">${options}</select>`).join(''),
+      onSave(modal) {
+        let next = order;
+        for (const sel of modal.querySelectorAll('select[data-line]')) {
+          const product = list.find((pr) => pr.id === sel.value);
+          if (!product) continue;
+          const placed = J.assignLine(next, +sel.dataset.line, product,
+            { settings, inventory, consumables: (typeof consumables !== 'undefined' ? consumables : []) });
+          if (placed) next = placed;
+        }
+        if (next === order) return true;
+        Object.assign(order, next);
+        saveAll();
+        if (typeof renderKanban === 'function') renderKanban();
+        if (typeof renderLogs === 'function') renderLogs();
+        toast(t('store.placed'), 'success');
+        return true;
+      },
+    });
+  }
+
   global.BNPL_CATALOG = BNPL_CATALOG;
   const api = {
+    openStoreLinesModal,
     openOrderRequestsModal,
     importIntakeAsQuote,
     copyIntakeLink,

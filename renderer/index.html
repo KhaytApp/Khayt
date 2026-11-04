@@ -2924,6 +2924,13 @@
 <script src="../lib/client-retention.js"></script>
 <script src="../lib/throughput.js"></script>
 <script src="../lib/qc-metrics.js"></script>
+<!-- A linked reprint after a QC failure (scrap or reprint) — the rule the Mac
+     runs too, so its reprints reach the first-pass and RMA figures. -->
+<script src="../lib/reprint.js"></script>
+<!-- A store order line matched to a catalogue product (SKU, then exact name,
+     else unmatched) and the parts built from it — shared with both LAN servers. -->
+<script src="../lib/shelf-sale.js"></script>
+<script src="../lib/store-order-job.js"></script>
 <script src="../lib/expense-categorize.js"></script>
 <script src="../lib/integrations-registry.js"></script>
 <script src="../lib/medusa-subscriber.js"></script>
@@ -3000,6 +3007,9 @@
 <script src="ops-locations.js"></script>
 <script src="integrations.js"></script>
 <script src="../lib/carriers.js"></script>
+<!-- What an online order's customer paid, line by line (linePrices) — after
+     carriers.js, which it reads at load. -->
+<script src="../lib/webstore-order.js"></script>
 <script src="../lib/shipment.js"></script>
 <script src="order-flows.js"></script>
 <!-- Finishes Tabby/Tamara payments the shop sent links for; needs order-flows above. -->

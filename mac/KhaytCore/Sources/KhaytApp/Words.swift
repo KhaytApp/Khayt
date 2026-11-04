@@ -1097,6 +1097,9 @@ final class Words {
                               "ar": "{n} عادت تحت الضمان بتكلفة {amount} لإصلاحها."],
         "mac.qc_none":       ["en": "Nothing has been through inspection yet.",
                               "ar": "لم يمر أي عمل بالفحص بعد."],
+        // With QC on, a failed job is kept as a scrapped record or reprinted
+        // as a new linked job — the button that keeps it and makes nothing.
+        "mac.qc_scrap":      ["en": "Scrap", "ar": "إتلاف"],
         // What the shelf costs.
         "mac.mc_title":      ["en": "Price on the shelf", "ar": "السعر على الرف"],
         "mac.mc_sub":        ["en": "Per unit, from the most recent spool of each material.",

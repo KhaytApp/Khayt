@@ -20,8 +20,14 @@ extension Shop {
     /// the defect the analytics table is built from, and the waste row. A book
     /// where the job says it failed and the waste log has never heard of it is
     /// a shop whose scrap costs are quietly understated.
+    ///
+    /// `next` is the shop's choice when QC is switched on (`qcReprintFlow`):
+    /// the failed job is kept as a scrapped record and, for a reprint, a NEW
+    /// linked job is made in the same write (`lib/reprint.js`) — what the
+    /// desktop does, and what the first-pass and RMA figures count. Nil (QC
+    /// off) sends the same job back to Pending, as it always has.
     func recordQcFailure(_ id: Order.ID, failureType: String, reason: String,
-                         weight: Double) async {
+                         weight: Double, next: QcNext? = nil) async {
         moveProblem = nil
         guard permitted("orders", "edit") else { return }
         moveNotices = []
@@ -34,6 +40,8 @@ extension Shop {
 
         var spentAttempt: String?
         var undo: [ChangedRecord] = []
+        var reprintId: String?
+        var failedRecord: JSONValue?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -62,11 +70,29 @@ extension Shop {
                 undo = Self.writeQcFailure(&root, order: out.order, waste: out.waste,
                                            inventory: out.inventory,
                                            ordersBefore: orders, shelfBefore: shelfBefore)
+                reprintId = nil
+                if let next {
+                    reprintId = try await Self.applyQcNext(next, failedId: id, root: &root,
+                                                           engine: engine, now: Date())
+                }
+                failedRecord = Self.rows(root, "printLog").first { Self.recordId($0) == id }
             }
             // The waste row is saved: a kept meter reading it used is spent.
             if let spentAttempt { energyMeter()?.consumeAttempt(for: spentAttempt) }
-            registerMoveUndo(undo, named: words.callIt("ord.qc_fail"))
+            // Undo is offered only for the plain failure: a scrapped job with
+            // a reprint made from it is two jobs, and taking back one of them
+            // would leave the other pointing at nothing.
+            if next == nil { registerMoveUndo(undo, named: words.callIt("ord.qc_fail")) }
             await load(source)
+            // The desktop's QC sheet fires `qc_failed`; so does this one.
+            if let failedRecord {
+                let owed = await qcFailedDeliveries(failedRecord)
+                if !owed.isEmpty { await fire(owed) }
+            }
+            guard next == nil else {
+                if let reprintId { goToJob(reprintId) }
+                return
+            }
             // Back to be printed again — the move Khayt and Bed Ready both make
             // after a failure, and it carries its own gate and effects.
             await moveJob(id, to: .pending)

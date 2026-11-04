@@ -2195,6 +2195,7 @@
  "mac.qc_none": "Noch nichts wurde geprüft.",
  "mac.qc_passed": "Prüfung bestanden",
  "mac.qc_rma": "{n} kamen unter Garantie zurück und kosteten {amount} zur Behebung.",
+ "mac.qc_scrap": "Verwerfen",
  "mac.qc_title": "Qualität",
  "mac.qc_worst": "Am häufigsten: {fault}.",
  "mac.qf_by_count": "der Angebote",

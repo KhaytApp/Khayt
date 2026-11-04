@@ -45,6 +45,12 @@ public actor KhaytEngine {
         // it reads.
         "storefront-orders",
         "storefront-webhook",
+        // A store order as a real job: each line matched to a catalogue
+        // product (SKU, then exact name, else left for the shop to pick) and
+        // the product's parts built the way a job from the catalogue has them.
+        // `storefront-webhook` reaches it at call time, so its place before
+        // the costing modules below does not matter.
+        "store-order-job",
         // The warning a shop gets when filament runs out. It was twelve lines
         // inside the renderer, so this app drew the switch that turns it on
         // and had nothing to send.
@@ -448,6 +454,10 @@ public actor KhaytEngine {
         // A failure allowance learned from the shop's own QC fails and waste.
         "failure-rate",
         "order-new",
+        // A linked reprint after a QC failure — the desktop's rule, so a Mac
+        // reprint reaches the first-pass and RMA figures. After `order-new`,
+        // which makes the new job.
+        "reprint",
         // A customer's standing order and their agreed prices. The recurrence
         // engine is what the schedule advances by (the 31st of January to the
         // 28th of February, not the 3rd of March), and the recurring rule
@@ -7521,6 +7531,29 @@ public actor KhaytEngine {
                           as: StorefrontRecorded.self)
     }
 
+    /// A store order's lines as its job keeps them, and the notes for the
+    /// ones nothing matched — `lib/store-order-job.js linesOf`, over a
+    /// `lib/shelf-sale.js` reading. The cloud queue's job carries them, as the
+    /// webhook's does, so the shop can pick a product for a line later.
+    public struct StoreLines: Decodable, Sendable {
+        public let storeLines: JSONValue
+        public let notes: [String]
+    }
+
+    public func storeOrderLines(reading: JSONValue) throws -> StoreLines {
+        try runtime.call2("globalThis.KhaytStoreOrderJob.linesOf(ARG0)", [reading], as: StoreLines.self)
+    }
+
+    /// The shop picked `product` for the store line at `index` that nothing
+    /// matched: the job with that line placed and the product's parts added
+    /// (`lib/store-order-job.js assignLine`). `.null` when there was nothing
+    /// to do. `book` is `{ settings, inventory, consumables }`.
+    public func storeOrderAssign(order: JSONValue, index: Int, product: JSONValue,
+                                 book: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytStoreOrderJob.assignLine(ARG0, ARG1, ARG2, ARG3)",
+                          [order, .number(Double(index)), product, book], as: JSONValue.self)
+    }
+
     /// Whether the book already holds this delivery's order — the early
     /// answer, asked before any write so a provider's retry costs nothing.
     public func storefrontAlreadyRecorded(source: String, payload: JSONValue, printLog: JSONValue) throws -> Bool {
@@ -12215,6 +12248,43 @@ public actor KhaytEngine {
                                            "id": bytes((0..<4).map { _ in UInt8.random(in: .min ... .max) })]),
                                   .array(consumables), .array(clients)],
                                  as: NewOrder.self)
+    }
+
+    /// A job that failed inspection with QC switched on, kept as a scrapped
+    /// record in the QC stage — `lib/reprint.js markScrapped`.
+    public func qcMarkScrapped(_ order: JSONValue, at: String) throws -> JSONValue {
+        try runtime.call2("KhaytReprint.markScrapped(ARG0, ARG1)", [order, .string(at)], as: JSONValue.self)
+    }
+
+    /// What `linkedReprint` made: the new job, the log with it first and the
+    /// original carrying `reprintedInto`, and the settings with the invoice
+    /// counter advanced — all three written in the same write.
+    public struct LinkedReprint: Decodable, Sendable {
+        public let order: JSONValue
+        public let printLog: [JSONValue]
+        public let settings: [String: JSONValue]
+    }
+
+    /// A linked reprint of `originalId` through the shared `newOrder`, as the
+    /// desktop makes one after a QC failure (`lib/reprint.js create`). `cost`
+    /// is `shop` (no charge) or `billable`. Nil when the job is not in the log.
+    public func linkedReprint(of originalId: String, printLog: [JSONValue],
+                              settings: [String: JSONValue], now: Date,
+                              tokens: (tracking: [UInt8], quoteApproval: [UInt8]),
+                              inventory: [JSONValue], consumables: [JSONValue], clients: [JSONValue],
+                              reason: String, cost: String, partIdBase: String) throws -> LinkedReprint? {
+        let bytes = { (b: [UInt8]) in JSONValue.array(b.map { .number(Double($0)) }) }
+        return try runtime.call2("""
+            KhaytReprint.create(ARG0, ARG1, {
+              settings: ARG2, now: ARG3, tokens: ARG4, inventory: ARG5, consumables: ARG6,
+              clients: ARG7, reason: ARG8, cost: ARG9, partIdBase: ARG10 })
+            """,
+            [.string(originalId), .array(printLog), .object(settings),
+             .number(now.timeIntervalSince1970 * 1000),
+             .object(["tracking": bytes(tokens.tracking), "quoteApproval": bytes(tokens.quoteApproval)]),
+             .array(inventory), .array(consumables), .array(clients),
+             .string(reason), .string(cost), .string(partIdBase)],
+            as: LinkedReprint?.self)
     }
 
     /// `lib/order-new.js`'s `inShopCurrency`: a saved job's shipping, extra
