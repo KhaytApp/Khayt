@@ -68,6 +68,26 @@
     return !code || code === base ? fmtPrice(n) : fmtMoneyIn(n, code);
   }
 
+  /** The mark a job's own figures are written in — for a label beside a
+   *  field that takes an amount in the job's currency (a credit note). */
+  function orderCurrencySymbol(o) {
+    const code = orderCurrency(o || {});
+    return (CURRENCIES[code] || CURRENCIES[global.settings?.currency] || CURRENCIES.SAR).symbol;
+  }
+
+  /**
+   * A total across jobs in the shop's currency, each job at the rate it was
+   * saved at (lib/order-money.js earnedTotalAtSavedRates). A job with no saved
+   * rate is left out, and the figure says so rather than passing for whole.
+   */
+  function fmtJobsTotal(orders) {
+    const r = M().earnedTotalAtSavedRates(orders, ctx(), CURRENCIES);
+    if (!r.partial) return fmtPrice(r.total);
+    const tr = typeof global.t === 'function' ? global.t : null;
+    const said = tr ? tr('kan.total_partial', { total: fmtPrice(r.total), n: r.left }) : '';
+    return said && said !== 'kan.total_partial' ? said : `${fmtPrice(r.total)} + ${r.left}`;
+  }
+
   function convertToBase(amount, fromCurrency) {
     return M().convertToBase(amount, fromCurrency, ctx());
   }
@@ -155,6 +175,8 @@
     currencySymbol,
     fmtMoneyIn,
     fmtOrderPrice,
+    orderCurrencySymbol,
+    fmtJobsTotal,
     clientCurrency,
     orderCurrency,
     convertToBase,

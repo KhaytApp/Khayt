@@ -470,7 +470,12 @@ async function sendPaymentReminder(orderId) {
   const tpl = waTemplates.find(w => w.id === 'tpl-payment') || waTemplates[0];
   const message = tpl
     ? fillWaTemplate(tpl.body, order, client)
-    : t('pay.remind_default', { name: localName(client), id: order.id, price: fmtPrice(order.price), currency: currencySymbol() });
+    // In the job's own currency. The sentence asks for {amount}; it was handed
+    // `price` (with the SHOP's mark) and `currency`, so it went out reading
+    // "for {amount}". Both names are passed so a translation using either reads.
+    : t('pay.remind_default', { name: localName(client), id: order.id,
+      amount: fmtOrderPrice(order.price, order), price: fmtOrderPrice(order.price, order),
+      currency: orderCurrencySymbol(order) });
   if (window.hubAPI?.shareWhatsApp) {
     await window.hubAPI.shareWhatsApp({ phone: client.phone, message, pdfPath: null });
   } else {
@@ -804,6 +809,13 @@ async function renderInvoiceForOrder(order, opts = {}) {
     const qrMoney = ZatcaQr().qrAmounts(order, settings, { total: _tax.total, vatAmount: vatAmt });
     if (!qrMoney.ok) ready.missing = ready.missing.concat(qrMoney.missing);
     ready.ok = ready.ok && qrMoney.ok;
+    // Phase 2 signs the job's own figures into the XML and the QR. Converting
+    // the whole document belongs with the Phase 2 work, so until then a job in
+    // another currency gets no Phase 2 QR rather than a EUR figure signed as
+    // riyals (lib/zatca-qr.js phase2Currency).
+    const z2on = !!(settings.zatcaPhase2?.enabled && (settings.zatcaPhase2.csid || settings.zatcaPhase2.pcsid));
+    const z2cur = z2on ? ZatcaQr().phase2Currency(order, settings) : { ok: true, missing: [] };
+    if (!z2cur.ok) { ready.missing = ready.missing.concat(z2cur.missing); ready.ok = false; }
     if (!ready.ok) {
       qrProblem = ready.missing.map((k) => t(k)).join(' · ');
       if (typeof toast === 'function') toast(t('inv.qr_not_compliant') + ' — ' + qrProblem, 'error', 12000);
@@ -1209,9 +1221,9 @@ function openCreditNoteModal(orderId) {
 
   const bodyHtml = `
     <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">
-      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtPrice(order.price)} ${currencySymbol()}
+      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtOrderPrice(order.price, order)}
     </p>
-    <label>${escapeHtml(t('cn.credit_amount'))} (${currencySymbol()})</label>
+    <label>${escapeHtml(t('cn.credit_amount'))} (${escapeHtml(orderCurrencySymbol(order))})</label>
     <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
     <label style="margin-top:14px;">${escapeHtml(t('cn.reason'))}</label>
     <textarea id="cnReasonInput" rows="3" style="resize:vertical;" placeholder="${escapeHtml(t('cn.reason_ph'))}">${escapeHtml(reason)}</textarea>`;

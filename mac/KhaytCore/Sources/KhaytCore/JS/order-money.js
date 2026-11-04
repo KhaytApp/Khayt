@@ -106,6 +106,34 @@
   }
 
   /**
+   * What a set of jobs earned (`orderNetRevenueBase`'s figure), in the shop's
+   * currency at each job's STORED rate — for a total across jobs that may be
+   * in different currencies, such as a board column.
+   *
+   * A job in another currency counts at the rate it was saved at (`fxRate`,
+   * lib/order-new.js), never today's: the column must not move because
+   * Settings did. One with no stored rate has no honest figure in the shop's
+   * currency, so it is LEFT OUT and the total says it is partial.
+   *
+   * Returns `{ total, partial, left }` — `left` is how many were left out.
+   */
+  function earnedTotalAtSavedRates(orders, ctx, known) {
+    const base = settingsOf(ctx).currency || 'SAR';
+    let total = 0;
+    let left = 0;
+    for (const o of Array.isArray(orders) ? orders : []) {
+      if (!earns(o)) continue;
+      const net = Math.max(0, (+((o && o.price)) || 0) - orderCreditedRaw(o));
+      const code = orderCurrency(o, ctx, known);
+      if (!code || code === base) { total += net; continue; }
+      const rate = Number(o && o.fxRate);
+      if (Number.isFinite(rate) && rate > 0) total += net * rate;
+      else if (net > 0) left++;
+    }
+    return { total: Math.round(total * 100) / 100, partial: left > 0, left };
+  }
+
+  /**
    * What is still outstanding, in the order's OWN currency.
    *
    * `ctx` is optional and carries the settings: given them, an exclusive shop
@@ -278,7 +306,7 @@
     orderRevenueBase, orderCreditedRaw, orderCreditedBase,
     orderNetRevenueBase, orderOwedRaw, orderOwedBase,
     orderGrossRaw, orderDueRaw, settledBeforeTaxOnTop, orderEarnedBase,
-    owesAtAll, orderCreditedDueRaw,
+    owesAtAll, orderCreditedDueRaw, earnedTotalAtSavedRates,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderMoney = api;

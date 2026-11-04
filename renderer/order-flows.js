@@ -3163,7 +3163,7 @@ function openChangeOrderModal(orderId) {
       <div style="background:var(--surface-2);border-radius:6px;padding:10px;font-size:12px;margin-bottom:12px;color:var(--text-muted);">
         <strong>Order:</strong> ${escapeHtml(order.id)}<br>
         <strong>Project:</strong> ${escapeHtml(order.project || '—')}<br>
-        <strong>Current Price:</strong> ${fmtPrice(order.price)}<br>
+        <strong>Current Price:</strong> ${fmtOrderPrice(order.price, order)}<br>
         <strong>Current Due Date:</strong> ${escapeHtml(order.dueDate || '—')}
       </div>
       <label>What changed?</label>

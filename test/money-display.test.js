@@ -129,3 +129,87 @@ test('the job lists format a job price through fmtOrderPrice', () => {
     assert.doesNotMatch(src, /fmtPrice\((o|log|q)\.price\)/, `${file} still puts the shop's mark on a job price`);
   }
 });
+
+/* ── Follow-ups: the rest of the duplicates ────────────────────────────────── */
+
+const M = require('../lib/order-money.js');
+
+test('a column total counts each job at its SAVED rate, and says when one is left out', () => {
+  const ctx = { settings: { currency: 'SAR', exchangeRates: { EUR: 9 } }, clients: [] };
+  const done = { status: 'completed' };
+  const r = M.earnedTotalAtSavedRates([
+    Object.assign({ price: 100 }, done),
+    Object.assign({ price: 25, currency: 'EUR', fxRate: 4 }, done),   // 100 SAR, not 225
+    Object.assign({ price: 50, currency: 'SAR', creditNotes: [{ amount: 10 }] }, done),
+  ], ctx);
+  assert.deepEqual(r, { total: 240, partial: false, left: 0 });
+  const p = M.earnedTotalAtSavedRates([
+    Object.assign({ price: 100 }, done),
+    Object.assign({ price: 25, currency: 'EUR' }, done),   // no saved rate: left out
+  ], ctx);
+  assert.deepEqual(p, { total: 100, partial: true, left: 1 });
+});
+
+test('the board totals go through the saved-rate rule, and partial reads in every language', () => {
+  const kan = read('renderer/kanban.js');
+  assert.match(kan, /const totalValFoot = fmtJobsTotal\(sorted\);/);
+  assert.match(kan, /const totalVal = fmtJobsTotal\(sorted\);/);
+  assert.doesNotMatch(kan, /sorted\.reduce\(\(s, o\) => s \+ orderNetRevenueBase\(o\), 0\)/);
+  const dir = path.join(ROOT, 'renderer', 'locales');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+    const s = read(path.join('renderer', 'locales', f));
+    assert.match(s, /"kan\.total_partial": "[^"]*\{total\}[^"]*\{n\}[^"]*"/, f);
+    assert.match(s, /"inv\.qr_phase2_foreign_currency": "[^"]+"/, f);
+  }
+});
+
+test('fmtJobsTotal: whole in SAR, partial when a job has no saved rate', () => {
+  require('../renderer/format.js');
+  const C = require('../renderer/currency.js');
+  global.settings = { currency: 'SAR', exchangeRates: { EUR: 9 } };
+  global.clients = [];
+  global.t = (k, v) => (k === 'kan.total_partial' ? `${v.total} + ${v.n} not converted` : k);
+  const done = { status: 'completed' };
+  assert.equal(C.fmtJobsTotal([Object.assign({ price: 25, currency: 'EUR', fxRate: 4 }, done)]), C.fmtPrice(100));
+  assert.equal(C.fmtJobsTotal([Object.assign({ price: 100 }, done), Object.assign({ price: 25, currency: 'EUR' }, done)]),
+    `${C.fmtPrice(100)} + 1 not converted`);
+  delete global.t;
+});
+
+test('Phase 2 refuses a job that is not in SAR; SAR passes', () => {
+  assert.deepEqual(QR.phase2Currency({}, { currency: 'SAR' }), { ok: true, missing: [] });
+  assert.deepEqual(QR.phase2Currency({ currency: 'SAR' }, { currency: 'SAR' }), { ok: true, missing: [] });
+  // A stored rate does NOT make it safe: the signed XML would still carry euros.
+  assert.deepEqual(QR.phase2Currency({ currency: 'EUR', fxRate: 4 }, { currency: 'SAR' }),
+    { ok: false, missing: ['inv.qr_phase2_foreign_currency'] });
+  const inv = read('renderer/invoicing.js');
+  assert.match(inv, /const z2cur = z2on \? ZatcaQr\(\)\.phase2Currency\(order, settings\)/);
+  // The refusal joins the readiness check that throws before the Phase 2 build.
+  const at = inv.indexOf('const z2cur');
+  assert.ok(at > 0 && at < inv.indexOf("throw new Error('zatca-qr-not-ready')"));
+});
+
+test('the reminder, the credit-note reference and the change-price dialog wear the job currency', () => {
+  const inv = read('renderer/invoicing.js');
+  assert.match(inv, /amount: fmtOrderPrice\(order\.price, order\)/);
+  assert.match(inv, /<strong>\$\{escapeHtml\(order\.id\)\}<\/strong> · \$\{fmtOrderPrice\(order\.price, order\)\}\n/);
+  assert.match(inv, /cn\.credit_amount'\)\)\} \(\$\{escapeHtml\(orderCurrencySymbol\(order\)\)\}\)/);
+  assert.match(read('renderer/order-flows.js'), /Current Price:<\/strong> \$\{fmtOrderPrice\(order\.price, order\)\}/);
+  assert.match(read('renderer/app-state.js'), /currency: \(typeof orderCurrencySymbol === 'function' \? orderCurrencySymbol\(order\)/);
+  const mac = read('mac/KhaytCore/Sources/KhaytApp/WhatsApp.swift');
+  assert.match(mac, /"currency": job\.currency\.isEmpty \? currency : job\.currency/);
+  assert.match(read('mac/KhaytCore/Sources/KhaytApp/EditJobSheet.swift'),
+    /Money\.text\(job\.price, job\.currency\.isEmpty \? shop\.currency : job\.currency\)/);
+});
+
+test('"Amount in SAR" on the invoice uses the saved rate, not today\'s', () => {
+  const { render } = require('./helpers/invoice-harness.js');
+  const settings = { currency: 'SAR', exchangeRates: { EUR: 9 } };
+  const base = { id: 'INV-1', date: '2026-09-01', project: 'P', price: 100, currency: 'EUR', status: 'completed' };
+  const saved = render(Object.assign({ fxRate: 4 }, base), { settings });
+  assert.match(saved, /Amount in SAR/);
+  assert.match(saved, /400\.00/);
+  assert.doesNotMatch(saved, /900\.00/);
+  const unsaved = render(base, { settings });
+  assert.doesNotMatch(unsaved, /Amount in SAR/);
+});

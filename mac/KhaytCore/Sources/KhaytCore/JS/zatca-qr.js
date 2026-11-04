@@ -159,6 +159,22 @@ function qrAmounts(order, settings, amounts) {
   return { ok: false, missing: ['inv.qr_foreign_currency'] };
 }
 
+/**
+ * May this job have a PHASE 2 (signed) QR? Only in SAR, for now.
+ *
+ * Phase 2 signs the job's own figures into the UBL XML and the QR. `qrAmounts`
+ * can convert the two QR tags, but the signed XML would still state the euro
+ * figures as riyals, and converting the whole document is Phase 2 work
+ * (deferred). So a job in another currency gets no Phase 2 QR:
+ * `{ ok: false, missing: ['inv.qr_phase2_foreign_currency'] }`.
+ */
+function phase2Currency(order, settings) {
+  const base = String((settings && settings.currency) || 'SAR');
+  const code = String((order && order.currency) || base);
+  return code === 'SAR' ? { ok: true, missing: [] }
+    : { ok: false, missing: ['inv.qr_phase2_foreign_currency'] };
+}
+
 function buildTLV({ sellerName, vatNumber, timestamp, total, vatAmount }, ctx) {
   function tlv(tag, value) {
     const bytes = utf8(value);
@@ -428,7 +444,7 @@ function receiptToExpenseDraft(receipt, ctx) {
   };
 }
 
-  const api = { readiness, qrAmounts, buildTLV, issueTimestamp, utf8, base64,
+  const api = { readiness, qrAmounts, phase2Currency, buildTLV, issueTimestamp, utf8, base64,
                 decodeTLV, receiptToExpenseDraft, receiptRef, receiptDay, cleanSellerName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytZatcaQr = api;

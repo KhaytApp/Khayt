@@ -533,21 +533,22 @@ function renderKanban() {
           foot.className = 'khayt-kcol-foot';
           colEl.appendChild(foot);
         }
-        const totalValFoot = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+        // At each job's SAVED rate; a job with none is left out and the total says so.
+        const totalValFoot = fmtJobsTotal(sorted);
         // Enthusiast/maker mode has no commerce — omit the per-column money total.
         const showColMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${fmtPrice(totalValFoot)}</span>` : ''}`;
+        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(totalValFoot)}</span>` : ''}`;
       }
     }
 
     // Column totals meta line
     const totalHrs = sorted.reduce((s, o) => s + (+o.printTime || 0), 0);
-    const totalVal = sorted.reduce((s, o) => s + orderNetRevenueBase(o), 0);
+    const totalVal = fmtJobsTotal(sorted);   // saved rates; partial when a job has none
     const metaEl = $('#meta-' + status);
     if (metaEl) {
       const showMetaMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
       metaEl.textContent = sorted.length > 0
-        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${fmtPrice(totalVal)}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
+        ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${totalVal}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
         : '';
     }
 
