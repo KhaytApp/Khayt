@@ -14,7 +14,7 @@ struct WhatsAppCard: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(L10n.tr("wa.update").uppercased())
                 .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .tracking(1.05)
+                .khaytTracking(1.05)
                 .foregroundStyle(KhaytDesign.note)
             Button(action: onOpen) {
                 HStack(spacing: 10) {

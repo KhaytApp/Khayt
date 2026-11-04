@@ -101,7 +101,7 @@ struct QuoteSheet: View {
     private func eyebrow(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-            .tracking(1.05)
+            .khaytTracking(1.05)
             .foregroundStyle(KhaytDesign.note)
             .padding(.horizontal, 2)
             .padding(.top, 8)
@@ -112,7 +112,7 @@ struct QuoteSheet: View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label.uppercased())
                 .font(.khayt(10, .bold, relativeTo: .caption2))
-                .tracking(1)
+                .khaytTracking(1)
                 .foregroundStyle(KhaytDesign.note)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -140,7 +140,7 @@ struct QuoteSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.tr("quote.total").uppercased())
                     .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                    .tracking(1.05)
+                    .khaytTracking(1.05)
                     .foregroundStyle(KhaytDesign.note)
                 Text(money(r.price.total))
                     .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())

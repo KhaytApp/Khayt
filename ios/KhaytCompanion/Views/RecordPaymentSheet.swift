@@ -102,7 +102,7 @@ struct PaymentCard: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(L10n.tr("pay.section").uppercased())
                 .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .tracking(1.05)
+                .khaytTracking(1.05)
                 .foregroundStyle(KhaytDesign.note)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(L10n.tr("pay.status.\(state.status)"))

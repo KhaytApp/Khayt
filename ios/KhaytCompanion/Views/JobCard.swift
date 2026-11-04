@@ -55,7 +55,7 @@ struct JobCard: View {
                 HStack {
                     Text((past ? L10n.tr("stage.short.\(next.rawValue)") : L10n.tr("pulse.move_to")).uppercased())
                         .font(.khayt(11.5, .bold, relativeTo: .caption))
-                        .tracking(0.9)
+                        .khaytTracking(0.9)
                         .foregroundStyle(past ? KhaytDesign.brand : KhaytDesign.note)
                     Spacer()
                 }

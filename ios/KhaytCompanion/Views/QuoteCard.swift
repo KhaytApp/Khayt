@@ -50,7 +50,7 @@ struct QuoteCard: View {
                     if expired {
                         Text(L10n.tr("quote.expired"))
                             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                            .tracking(0.6)
+                            .khaytTracking(0.6)
                             .padding(.horizontal, 8).padding(.vertical, 2)
                             .foregroundStyle(KhaytDesign.late)
                             .background(KhaytDesign.late.opacity(0.14), in: Capsule())
