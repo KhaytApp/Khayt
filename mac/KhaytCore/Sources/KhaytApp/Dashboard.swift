@@ -78,7 +78,10 @@ struct Dashboard: View {
             let range = Self.ranges.first { $0.0 == shop.kpiRange }?.1 ?? "an.range.month"
             var change: String?
             var changeColor = Color.secondary
-            if let outlook = shop.outlook, outlook.method == "trend", let pct = outlook.trendPct {
+            // Only beside a figure: "—" over "▲ 203% vs last month" was a
+            // change on a number the card does not show (beta.19 review).
+            if shop.monthNet != nil, let outlook = shop.outlook, outlook.method == "trend",
+               let pct = outlook.trendPct {
                 change = (pct >= 0 ? "▲ " : "▼ ")
                     + words.callIt("mac.today_trend", ["pct": .string(Money.figure(abs(pct)))])
                 changeColor = pct >= 0 ? Khayt.done : Khayt.late
