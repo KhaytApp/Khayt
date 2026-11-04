@@ -25,7 +25,7 @@
   --khayt-hairline: #e3e6e8;
 
   /* The card, from the one modifier the whole app draws through. */
-  --khayt-radius: 10px;
+  --khayt-radius: 14px;
   --khayt-card-padding: 12px;
   --khayt-rail-width: 3px;
   --khayt-rail-inset: 5px;
