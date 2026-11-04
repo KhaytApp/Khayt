@@ -172,6 +172,15 @@
     if (has('maxColors')) m.maxColors = Math.max(1, Math.round(num(i.maxColors, 1)));
     if (has('targetHoursPerDay')) m.targetHoursPerDay = Math.max(0, num(i.targetHoursPerDay, 0)) || null;
     if (has('locationId')) m.locationId = trim(i.locationId) || '';
+    /* The shop says this printer clears its own plate: a belt printer, a plate
+     * changer, or an end routine that pushes the part off. lib/auto-dispatch.js
+     * then offers it work without waiting for "Bed is clear". Only a real
+     * `true` sets it, and anything else REMOVES it, so a machine never ends up
+     * self-clearing by a value nobody chose. */
+    if (has('clearsOwnBed')) {
+      if (i.clearsOwnBed === true) m.clearsOwnBed = true;
+      else delete m.clearsOwnBed;
+    }
     /* ── WHEN THIS MACHINE IS OUT OF ACTION ──────────────────────────────
      *
      * `downtimeBlocks` is `[{ from, to, reason }]`, and it is no longer a note

@@ -388,7 +388,7 @@ nothing is currently wrong.
 community database. Wants a decision first on whether Khayt queries it live,
 ships a snapshot, or contributes back.
 
-**R10 — decide the automation line, in writing.** Khayt now finds printers,
+**R10 — decide the automation line, in writing.** *(Written 2026-11-04: [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).)* Khayt now finds printers,
 controls them and proposes dispatch. It is not going to do cloud slicing or
 lights-out production. Saying where the line falls stops it being redecided one
 feature at a time.
@@ -714,3 +714,13 @@ product API.
 
 *Caveat, as §5–§7: listing/marketing pages, READMEs and app-bundle strings, not hands-on
 evaluations. They are enough to place a product, not to trust a feature matrix.*
+
+### Follow-up, 2026-11-04
+
+Turki asked for the five recommendations from this reading to be done:
+
+1. **Bambu actuals** — in progress on its own branch; grams from the sliced 3MF, labelled as sliced, unverified on real hardware.
+2. **"Clears its own plate"** — `clearsOwnBed` on a machine (lib/auto-dispatch.js, lib/machine-edit.js, the Mac machine sheet).
+3. **A starter maintenance list** — 13 tasks in `lib/maintenance.js` (`STARTER_TASKS`), offered on the Mac's new-task sheet.
+4. **R10 written** — [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).
+5. **Qoyod export — still blocked.** Qoyod's help centre publishes no invoice-import columns: the invoice import takes only the Excel template downloaded from the shop's own Qoyod account, with locked headers and account-filled dropdowns ([sales](https://www.qoyod.com/en/knowledge-base/how-to-import-sales-invoices-via-excel/), [purchases](https://www.qoyod.com/en/knowledge-base/how-to-import-purchase-invoices-via-excel/)). The journal-entry import lists its fields but needs the shop's own account codes and would land sales as entries, not invoices. `lib/accounting-export.js` already says so ("QOYOD IS DELIBERATELY ABSENT"). Unblocking it needs someone with a Qoyod account to download the templates.

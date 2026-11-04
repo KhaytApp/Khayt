@@ -243,7 +243,42 @@ function hoursMeter(jobs, machineId) {
   return Math.max(0, hours);
 }
 
+/**
+ * Tasks a new shop can start from instead of a blank form (PrintTender ships 58;
+ * these are the dozen nearly every shop needs). Ids, not words: each app names
+ * them in the shop's language (the Mac as `mac.mt_t_<id>`). The intervals are
+ * STARTING POINTS a shop is told to adjust to its manufacturer's manual — a
+ * maker's number always beats this list.
+ *
+ * `kinds` is the machine kind it applies to (lib/machine-kinds.js).
+ */
+const STARTER_TASKS = Object.freeze([
+  { id: 'plate',     kinds: ['fdm'],   intervalHours: 50,   intervalDays: 0 },
+  { id: 'belts',     kinds: ['fdm'],   intervalHours: 200,  intervalDays: 30 },
+  { id: 'rods',      kinds: ['fdm'],   intervalHours: 200,  intervalDays: 90 },
+  { id: 'leadscrew', kinds: ['fdm'],   intervalHours: 300,  intervalDays: 90 },
+  { id: 'extruder',  kinds: ['fdm'],   intervalHours: 200,  intervalDays: 0 },
+  { id: 'nozzle',    kinds: ['fdm'],   intervalHours: 500,  intervalDays: 0 },
+  { id: 'ptfe',      kinds: ['fdm'],   intervalHours: 1000, intervalDays: 180 },
+  { id: 'fans',      kinds: ['fdm'],   intervalHours: 300,  intervalDays: 90 },
+  { id: 'wiring',    kinds: ['fdm', 'resin'], intervalHours: 0, intervalDays: 90 },
+  { id: 'filter',    kinds: ['fdm', 'resin'], intervalHours: 0, intervalDays: 180 },
+  { id: 'fep',       kinds: ['resin'], intervalHours: 100,  intervalDays: 0 },
+  { id: 'vat',       kinds: ['resin'], intervalHours: 0,    intervalDays: 7 },
+  { id: 'ipa',       kinds: ['resin'], intervalHours: 0,    intervalDays: 14 },
+]);
+
+/** The starter tasks for a machine of `kind` (unknown kinds read as fdm). */
+function starterTasks(kind) {
+  const k = String(kind || 'fdm').trim().toLowerCase() || 'fdm';
+  return STARTER_TASKS.filter((t) => t.kinds.includes(k)).map((t) => ({
+    id: t.id, intervalHours: t.intervalHours, intervalDays: t.intervalDays,
+  }));
+}
+
 const api = {
+  STARTER_TASKS,
+  starterTasks,
   WARN_FRACTION,
   DUE_FRACTION,
   OVERDUE_FRACTION,
