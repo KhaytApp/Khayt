@@ -2798,7 +2798,7 @@
  "mac.tag_example": "Relief, Porträt",
  "mac.tag_models": "Schlagwörter zuweisen",
  "mac.tags": "Schlagwörter",
- "mac.tags_replaced": "Diese werden zu den Schlagwörtern bei jedem gewählten Modell.",
+ "mac.tags_replaced": "Angezeigt werden nur die Schlagwörter, die alle gewählten Modelle gemeinsam haben. Was Sie hinzufügen oder entfernen, ändert sich bei jedem; die übrigen bleiben.",
  "mac.take_a_job": "Nehmen Sie Ihren ersten Auftrag an",
  "mac.take_a_job_why": "Oder bepreisen Sie einen im Rechner, ohne ihn zu speichern.",
  "mac.take_the_job": "Auftrag annehmen",

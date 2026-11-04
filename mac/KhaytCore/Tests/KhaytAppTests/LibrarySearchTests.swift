@@ -103,6 +103,27 @@ struct LibrarySearchTests {
         #expect(ids("dragon") == ["A", "B"], "a tag and a title, as before")
     }
 
+    @Test("words are found in any order and any field, and file-name separators read as spaces")
+    func wordsAnyOrder() async {
+        let shop = await Self.shop()
+        shop.pretendLibrary([
+            Self.row("A", name: "Falcon", tags: ["dragon"], material: "PLA"),
+            Self.row("B", name: "Dragon egg", material: "PETG"),
+            Self.row("D", name: "flexi_dragon-v2.3mf", material: "PLA"),
+        ])
+        shop.clearLibraryFilter()
+        func ids(_ q: String) -> [String] { shop.search = q; return shop.shownFiles.map(\.id).sorted() }
+        #expect(ids("dragon flexi") == ["D"])
+        #expect(ids("flexi dragon") == ["D"])
+        #expect(ids("flexi_dragon") == ["D"])
+        #expect(ids("dragon pla") == ["A", "D"], "a word in the tags, a word in the material")
+        #expect(ids("v2 3mf") == ["D"])
+        #expect(ids("dragon zebra").isEmpty)
+        let d = shop.files.first { $0.id == "D" }!
+        #expect(d.matches(search: "Dragon Flexi"), "the unmemoised check agrees")
+        #expect(!d.matches(search: "dragon petg"))
+    }
+
     @Test("each token narrows on its own field")
     func tokensFilter() async {
         let shop = await Self.shop()

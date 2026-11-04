@@ -2798,7 +2798,7 @@
  "mac.tag_example": "浮雕、肖像",
  "mac.tag_models": "为模型添加标签",
  "mac.tags": "标签",
- "mac.tags_replaced": "这些将成为所有所选模型的标签。",
+ "mac.tags_replaced": "这里只显示所有所选模型共有的标签。你添加或删除的标签会在每个模型上更改，其余标签保持不变。",
  "mac.take_a_job": "接下第一个订单",
  "mac.take_a_job_why": "或在“计算器”中为其定价而不保存。",
  "mac.take_the_job": "接下订单",

@@ -2798,7 +2798,7 @@
  "mac.tag_example": "relieve, retrato",
  "mac.tag_models": "Etiquetar modelos",
  "mac.tags": "Etiquetas",
- "mac.tags_replaced": "Estas pasan a ser las etiquetas de cada modelo seleccionado.",
+ "mac.tags_replaced": "Solo se muestran las etiquetas que comparten todos los modelos seleccionados. Las que añadas o quites cambian en cada uno; las demás se quedan.",
  "mac.take_a_job": "Acepta tu primer trabajo",
  "mac.take_a_job_why": "O valora uno en la calculadora sin guardarlo.",
  "mac.take_the_job": "Aceptar el trabajo",

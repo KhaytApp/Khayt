@@ -357,7 +357,7 @@ struct LibrarySyncIndexTests {
         let inspector = try src("LibraryInspector.swift")
         #expect(inspector.contains("StorageSection(shop: shop, file: file)"))
         #expect(inspector.contains("shop.freeUpSpace(model: file, anyway: true)"), "an open job is not asked about")
-        #expect(try src("LibraryFilterBar.swift").contains("\"online-only\", \"this-mac-only\"]"))
+        #expect(try src("LibraryFilterBar.swift").contains("\"online-only\", \"this-mac-only\""))
         let cloud = try src("CloudLibrary.swift")
         #expect(cloud.contains("await notKept(plan.candidates)"))
         #expect(cloud.contains("defer { recordSync(sync) }"), "a bulk pass records model by model")
