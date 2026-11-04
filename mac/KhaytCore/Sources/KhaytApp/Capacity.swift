@@ -29,7 +29,7 @@ struct CapacityCard: View {
                 Text(words.callIt("dash.capacity_title"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let pct = report?.totals.loadPct {
                     Text(words.callIt("dash.capacity_booked", ["pct": .number(pct.rounded())]))

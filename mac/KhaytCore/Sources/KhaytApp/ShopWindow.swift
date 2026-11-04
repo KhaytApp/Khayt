@@ -234,6 +234,20 @@ struct ShopWindow: View {
             // WHICH BOOK IS OPEN lives at the top of the sidebar now (the shop
             // card, `ShopCard`), where the shop's name already is, so the
             // toolbar no longer carries a second copy of the switcher.
+            // THE SCREEN'S NAME, on every screen. The system title collapsed
+            // on six of thirteen screens with nothing to say why; drawn here it
+            // is the same everywhere: the title, and under it the shop and what
+            // this session may do.
+            ToolbarItem(placement: .navigation) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(shop.shelfTitle).font(.system(size: 13, weight: .semibold))
+                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .lineLimit(1)
+                .padding(.leading, 4)
+                .accessibilityElement(children: .combine)
+            }
+            .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .principal) {
                 // Two menus in one item rather than two items: the three axes
                 // belong together, and a toolbar that collapses them apart when
@@ -366,8 +380,13 @@ struct ShopWindow: View {
             shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .list
             if let restored = Shelves.shelf(storedShelf, in: shop) { shop.shelf = restored }
         }
+        // Kept for the Window menu, Mission Control and VoiceOver; the toolbar
+        // draws its own copy (`ScreenTitle`) because the system's came and went
+        // by screen — Library, Catalogue, Customers, Expenses, Calculator and
+        // Gift cards had none in beta.19, the other seven did.
         .navigationTitle(shop.shelfTitle)
         .navigationSubtitle(subtitle)
+        .toolbar(removing: .title)
     }
 
 

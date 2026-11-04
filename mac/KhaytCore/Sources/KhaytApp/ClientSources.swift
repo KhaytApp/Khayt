@@ -30,7 +30,7 @@ struct ClientSourcesCard: View {
             Text(words.callIt("an.source_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, !report.rows.isEmpty {
                 // ── WHEN THE ONLY ANSWER IS "OTHER" ───────────────────────

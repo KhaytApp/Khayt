@@ -192,9 +192,12 @@ struct Calculator: View {
     var content: some View {
             VStack(alignment: .leading, spacing: 22) {
                 DetailSection(shop.words.callIt("mac.calc_part"),
-                              accent: Khayt.brand, symbol: "wrench.and.screwdriver.fill") {
+                              accent: Color.secondary, symbol: "wrench.and.screwdriver.fill") {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
+                        // Bottom-aligned: the two fields carry a label above
+                        // them, and the centred stepper floated between the
+                        // label and the box (beta.19 review).
+                        HStack(alignment: .bottom, spacing: 10) {
                             firstLineField
                             field(shop.words.callIt("mac.calc_time"), $model.hours,
                                   unit: shop.words.callIt("common.hours"))
@@ -207,6 +210,7 @@ struct Calculator: View {
                                 .font(.callout)
                             }
                             .fixedSize()
+                            .padding(.bottom, 3)
                             Spacer(minLength: 0)
                         }
                         // Weight and time from a library model — the whole
@@ -319,7 +323,7 @@ struct Calculator: View {
     /// What the price is, and where it went.
     @ViewBuilder private var answer: some View {
         DetailSection(shop.words.callIt("mac.calc_price"),
-                      accent: Khayt.brand, symbol: "banknote.fill") {
+                      accent: Color.secondary, symbol: "banknote.fill") {
             VStack(alignment: .leading, spacing: 10) {
                 BigFigure(value: Money.figure(quoted?.total ?? 0),
                           unit: Money.mark(shop.currency))
@@ -364,7 +368,7 @@ struct Calculator: View {
                 }
                 makeIt
             }
-            .card(rail: Khayt.brand, padding: 14)
+            .card(padding: 14)
         }
 
         // The four buckets, which is the thing a shop argues with. Same figures

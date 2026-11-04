@@ -137,6 +137,11 @@ function selectAttention(input) {
   // 'reconnecting' is excluded by design: see rule 1 in the module header.
   for (const m of machines) {
     if (!m) continue;
+    // Taken out of service BY THE SHOP (the manual flag, or status 'offline'):
+    // that is the shop's own decision, already said on the machine, and not
+    // something that "needs you". Listing it as "not answering" put a machine
+    // marked Under service on Today twice, once in each word (beta.19).
+    if (m.isOffline === true || String(m.status || '') === 'offline') continue;
     const state = machineState(m, cache[m.id], { offlineAfter: inp.offlineAfter });
     if (state !== 'offline' && state !== 'error') continue;
     items.push({

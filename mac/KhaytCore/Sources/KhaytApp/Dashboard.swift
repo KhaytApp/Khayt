@@ -78,7 +78,10 @@ struct Dashboard: View {
             let range = Self.ranges.first { $0.0 == shop.kpiRange }?.1 ?? "an.range.month"
             var change: String?
             var changeColor = Color.secondary
-            if let outlook = shop.outlook, outlook.method == "trend", let pct = outlook.trendPct {
+            // Only beside a figure: "—" over "▲ 203% vs last month" was a
+            // change on a number the card does not show (beta.19 review).
+            if shop.monthNet != nil, let outlook = shop.outlook, outlook.method == "trend",
+               let pct = outlook.trendPct {
                 change = (pct >= 0 ? "▲ " : "▼ ")
                     + words.callIt("mac.today_trend", ["pct": .string(Money.figure(abs(pct)))])
                 changeColor = pct >= 0 ? Khayt.done : Khayt.late
@@ -96,9 +99,7 @@ struct Dashboard: View {
             value: words.callIt("mac.n_of_m", ["n": .number(Double(facts.printingCount)),
                                                "m": .number(Double(facts.fleet.total))]),
             detail: latestFinish.map { words.callIt("mac.eta") + " " + PrinterWatch.spell($0, words) }
-                ?? (facts.fleet.offline > 0
-                    ? words.callIt("mac.fleet_offline", ["n": .number(Double(facts.fleet.offline))])
-                    : nil)))
+                ?? fleetNote(facts)))
         let low = items.filter { $0.kind == "stock" }.count
         cards.append(TodayStatCard(
             label: words.callIt("mac.filament_shelf"),
@@ -106,6 +107,20 @@ struct Dashboard: View {
             detail: low > 0 ? words.callIt("mac.today_low", ["n": .number(Double(low))]) : nil,
             detailColor: Khayt.attention))
         return cards
+    }
+
+    /// Why machines are not printing: the shop's own Under service, said as
+    /// that, apart from the ones that have stopped answering. The fleet count
+    /// hands an under-service machine to the shared rule as down
+    /// (`Shop.machineFleet`), so "1 not answering" was said of a printer the
+    /// shop had switched off on purpose.
+    private func fleetNote(_ facts: DashboardFacts) -> String? {
+        let words = shop.words
+        let service = shop.machines.filter { $0.isUnderService && shop.inSite(machine: $0.id) }.count
+        let silent = max(0, facts.fleet.offline - service)
+        if silent > 0 { return words.callIt("mac.fleet_offline", ["n": .number(Double(silent))]) }
+        if service > 0 { return words.callIt("mac.fleet_service", ["n": .number(Double(service))]) }
+        return nil
     }
 
     var body: some View {
@@ -736,7 +751,7 @@ private struct MoneyTiles: View {
                     Text(shop.words.callIt("mac.revenue"))
                         .font(.system(size: 10, weight: .semibold))
                         .textCase(.uppercase).tracking(0.6)
-                        .foregroundStyle(Khayt.brand)
+                        .foregroundStyle(.secondary)
                     BigFigure(value: Money.figure(k.revenue), unit: Money.mark(shop.currency))
                     HStack(spacing: 5) {
                         Text(Money.short(k.grossProfit, shop.currency))
@@ -768,7 +783,7 @@ private struct MoneyTiles: View {
                     .font(.callout)
                     .lineLimit(1)
                 }
-                .card(rail: Khayt.brand, padding: 14)
+                .card(padding: 14)
 
                 // ONE CARD, RULED. Five separate cards for five figures is
                 // five borders, five corner radii and five paddings carrying

@@ -781,6 +781,7 @@
  "mac.fixed_remove": "このコストを削除",
  "mac.fixed_section": "毎月のコスト",
  "mac.fixed_total": "毎月：",
+ "mac.fleet_service": "{n} 台がメンテナンス中",
  "mac.fleet_offline": "{n} 台が応答なし",
  "mac.flow_factor": "フロー（100%でスライス通り）",
  "mac.full_spool": "未使用のスプール",

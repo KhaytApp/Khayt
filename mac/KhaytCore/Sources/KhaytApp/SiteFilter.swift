@@ -97,6 +97,9 @@ extension Shop {
 /// that has sites: a menu with one entry is a control that does nothing.
 struct SitePicker: View {
     @Bindable var shop: Shop
+    /// The system-sidebar window (the default since beta.18) is light glass,
+    /// not navy: the navy strip's on-navy inks there were near-invisible.
+    @Environment(\.classicShell) private var systemSidebar
 
     var body: some View {
         if !shop.locations.isEmpty {
@@ -133,11 +136,14 @@ struct SitePicker: View {
                 }
                 // Lit when narrowed: a sidebar that looks the same filtered
                 // and not is how a shop forgets it filtered.
-                .foregroundStyle(shop.siteName == nil ? Role.onNavy3 : Role.onNavy)
+                .foregroundStyle(systemSidebar
+                                 ? (shop.siteName == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                                 : (shop.siteName == nil ? AnyShapeStyle(Role.onNavy3) : AnyShapeStyle(Role.onNavy)))
                 .padding(.horizontal, Space.md)
                 .padding(.vertical, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(shop.siteName == nil ? Color.clear : Role.onNavy.opacity(0.10),
+                .background(shop.siteName == nil ? Color.clear
+                            : (systemSidebar ? Khayt.brand.opacity(0.12) : Role.onNavy.opacity(0.10)),
                             in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .contentShape(Rectangle())
             }

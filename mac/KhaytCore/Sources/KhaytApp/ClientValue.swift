@@ -25,7 +25,7 @@ struct ClientValueTable: View {
             Text(words.callIt("an.client_ltv"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, !report.rows.isEmpty {
                 // Stated, not inferred. And coloured only past the point where

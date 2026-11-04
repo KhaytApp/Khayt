@@ -21,7 +21,7 @@ struct LocationPlCard: View {
             Text(words.callIt("an.location_pl"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
             Text(words.callIt("mac.location_pl_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

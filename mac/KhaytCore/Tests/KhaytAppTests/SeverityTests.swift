@@ -30,8 +30,15 @@ struct SeverityTests {
     }
 
     static let downMachine = JSONValue.object([
-        "id": .string("M1"), "name": .string("Bambu X1C"), "isOffline": .bool(true),
+        "id": .string("M1"), "name": .string("Bambu X1C"),
+        "printerApi": .object(["type": .string("bambu"), "host": .string("10.0.0.9")]),
     ])
+    /// What makes `downMachine` down: it stopped answering. It used to be
+    /// down by the shop's own under-service flag, which since the beta.19
+    /// review is the shop's decision and not an attention item.
+    static let downCache: [String: JSONValue] = [
+        "M1": .object(["error": .string("timeout"), "consecutiveFailures": .number(5)]),
+    ]
     static let lowSpool = JSONValue.object([
         "id": .string("s1"), "material": .string("PA-CF"),
         "colourVariant": .string("Carbon Grey"), "weight": .number(120),
@@ -40,7 +47,7 @@ struct SeverityTests {
     /// The test the old code needed and did not have.
     @Test("a stopped machine is CRITICAL, and the screen knows that word")
     func criticalIsTheModulesWord() async throws {
-        let f = try await Self.facts(machines: [Self.downMachine])
+        let f = try await Self.facts(machines: [Self.downMachine], statusCache: Self.downCache)
         let item = try #require(f.attn.items.first { $0.kind == "machine" })
         #expect(item.severity == NeedsAttentionSeverity.critical,
                 "the module says '\(item.severity)', the screen looks for '\(NeedsAttentionSeverity.critical)'")
@@ -67,7 +74,7 @@ struct SeverityTests {
                 "id": .string("J1"), "status": .string("pending"),
                 "project": .string("Souq stall sign"), "dueDate": .string("2020-01-01"),
             ])],
-            inventory: [Self.lowSpool])
+            inventory: [Self.lowSpool], statusCache: Self.downCache)
         #expect(f.attn.items.count >= 3, "a machine, a spool and a late job")
         let known: Set<String> = [NeedsAttentionSeverity.critical, NeedsAttentionSeverity.warning]
         for item in f.attn.items {
@@ -86,7 +93,7 @@ struct SeverityTests {
                 "id": .string("J1"), "status": .string("pending"),
                 "project": .string("Late job"), "dueDate": .string("2020-01-01"),
             ])],
-            inventory: [Self.lowSpool])
+            inventory: [Self.lowSpool], statusCache: Self.downCache)
         #expect(f.attn.items.first?.kind == "machine")
     }
 
@@ -192,7 +199,7 @@ struct AttentionCapTests {
         ]))
         let f = try await SeverityTests.facts(
             machines: [SeverityTests.downMachine], orders: orders,
-            inventory: [SeverityTests.lowSpool])
+            inventory: [SeverityTests.lowSpool], statusCache: SeverityTests.downCache)
         let shown = f.attn.items.prefix(6)
         #expect(shown.first?.kind == "machine", "the machine that stopped is never cut")
         #expect(shown.contains { $0.kind == "stock" }, "nor the spool about to stop the next job")

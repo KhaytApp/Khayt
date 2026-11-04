@@ -781,6 +781,7 @@
  "mac.fixed_remove": "Retirer ce coût",
  "mac.fixed_section": "Coûts mensuels",
  "mac.fixed_total": "Chaque mois :",
+ "mac.fleet_service": "{n} en maintenance",
  "mac.fleet_offline": "{n} ne répondent pas",
  "mac.flow_factor": "Débit (100 % = comme tranché)",
  "mac.full_spool": "Bobine pleine",
