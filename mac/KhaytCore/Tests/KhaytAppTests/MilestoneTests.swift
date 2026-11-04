@@ -205,8 +205,8 @@ struct MilestoneTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
         let writes = try String(contentsOf: app.appending(path: "Shop+Milestones.swift"), encoding: .utf8)
-        #expect(writes.components(separatedBy: "writeToOneOrder(").count - 1 == 3,
-                "add, delete and stamp each go through the store chain")
+        #expect(writes.components(separatedBy: "writeToOneOrder(").count - 1 == 4,
+                "add, delete, stamp and the due date each go through the store chain")
         #expect(writes.contains("Calendar.book.dayString"))
         #expect(!writes.contains("Calendar.current"))
         for menu in ["OrdersTable.swift", "OrderInspector.swift"] {

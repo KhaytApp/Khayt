@@ -178,7 +178,164 @@
       .sort((a, b) => a.at - b.at);
   }
 
-  const api = { portalUrl, paths, trialGate, depositForm, responseFor, errorFor, linkNote, threadFrom, httpUrl };
+  // ── A PORTAL PAYMENT, RECORDED ON THE JOB ONCE ────────────────────────────
+  //
+  // `responseFor(...).paid` was only ever SAID: "deposit paid" on the sheet,
+  // and the shop then typed the same money in by hand. This writes it, through
+  // the shop's own payment rule (`KhaytOrderPayment.recordPayment`), so the
+  // status, the cap at what was billed and every effect a payment owes are the
+  // ones a payment typed in gets.
+  //
+  // EXACTLY ONCE. Each payment is keyed — the provider's reference when it
+  // gave one, else the moment the cloud took it — and the key goes on the job
+  // (`portalPayments`) in the same write as the money. A second "Check
+  // response", the Mac's own timer, or the other app reading the same item
+  // after a sync all find the key and change nothing.
+  //
+  // NOT TWICE WHEN THE SHOP GOT THERE FIRST. A deposit already typed in by
+  // hand — same amount, dated within `MATCH_DAYS` of the portal's — is noted
+  // against the key and not added again. The job's paid figure is a running
+  // total, not a list of payments, so the amount and the date are what can be
+  // matched.
+  //
+  // THE JOB'S OWN CURRENCY. The portal asks for the job's own figures
+  // (`portal-refresh.js` builds `depositAmount` from `cloudDeposit` and
+  // `amount` from the job's gross), so the payment is in them too and goes
+  // onto `paidAmount` as it is. The stored `fxRate` is copied onto the note so
+  // the base-currency figure is the one the job was saved at. Revenue is never
+  // touched here: it is read net of tax from the job by the reports, as for
+  // any payment.
+
+  /** Two payments this many days apart, of one amount, are the same one. */
+  const MATCH_DAYS = 3;
+  /** How many portal payments a job remembers. */
+  const KEEP_PAYMENTS = 50;
+
+  const cents = (n) => Math.round((+n || 0) * 100) / 100;
+
+  /** `YYYY-MM-DD`, local, of a time in milliseconds; '' for none. */
+  function localDay(ms) {
+    const n = Number(ms);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const d = new Date(n);
+    const p = (v) => String(v).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  /** Whole days between two `YYYY-MM-DD` days, or null. */
+  function daysApart(a, b) {
+    const da = Date.parse(String(a || '').slice(0, 10) + 'T00:00:00');
+    const db = Date.parse(String(b || '').slice(0, 10) + 'T00:00:00');
+    if (!Number.isFinite(da) || !Number.isFinite(db)) return null;
+    return Math.abs(Math.round((da - db) / 86400000));
+  }
+
+  /**
+   * The key one portal payment is recorded under: the provider's reference,
+   * else the moment the cloud took it, else the link itself.
+   */
+  function paymentKey(pubToken, payment) {
+    const p = payment || {};
+    const ref = String(p.ref == null ? '' : p.ref).trim();
+    if (ref) return 'ref:' + ref;
+    if (Number(p.at) > 0) return 'at:' + String(pubToken || '') + ':' + Number(p.at);
+    return 'tok:' + String(pubToken || '');
+  }
+
+  /**
+   * The amount a portal payment was for: the provider's figure when it gave
+   * one, else the deposit the link asked for. 0 when neither says.
+   */
+  function paymentAmount(payment, order) {
+    const said = String(payment && payment.amount != null ? payment.amount : '').trim().replace(/,/g, '');
+    const n = /^\d+(\.\d+)?$/.test(said) ? Number(said) : NaN;
+    if (Number.isFinite(n) && n > 0) return cents(n);
+    const asked = +(order && order.cloudDeposit);
+    return Number.isFinite(asked) && asked > 0 ? cents(asked) : 0;
+  }
+
+  /**
+   * Record a payment the customer made through the portal, once.
+   *
+   * `items`/`pubToken` as for `responseFor`. `ctx`: `{ today, settings }` —
+   * `today` the local `YYYY-MM-DD` for a payment with no time of its own.
+   *
+   * MUTATES `order` (as `recordPayment` does) for every outcome but `none`
+   * and `already`. Returns `{ outcome, amount, key, effects, notices }`:
+   *
+   *   none       nothing paid on this link
+   *   already    this payment is on the job; nothing changed
+   *   recorded   the payment was added; `effects` are recordPayment's
+   *   matched    the shop had typed it in by hand; noted, not added
+   *   settled    the job owed nothing more; noted, not added
+   *   no_amount  paid, but neither the provider nor the link says how much;
+   *              noted, so it is said once and not on every look
+   *
+   * `amount` is in the job's own currency. `effects` is empty except for
+   * `recorded`, where the caller performs them as for any payment; for the
+   * other noted outcomes the caller saves.
+   */
+  function recordPortalPayment(items, pubToken, order, ctx) {
+    const c = ctx || {};
+    const none = { outcome: 'none', amount: 0, key: '', effects: [], notices: [] };
+    if (!order || typeof order !== 'object') return none;
+    const list = Array.isArray(items) ? items : [];
+    const item = list.find((x) => x && String(x.token) === String(pubToken || '')) || null;
+    const payment = item && item.payment && typeof item.payment === 'object' ? item.payment : null;
+    if (!payment || payment.status !== 'paid') return none;
+
+    const key = paymentKey(pubToken, payment);
+    const seen = Array.isArray(order.portalPayments) ? order.portalPayments : [];
+    if (seen.some((p) => p && p.key === key)) {
+      return { outcome: 'already', amount: 0, key, effects: [], notices: [] };
+    }
+
+    const amount = paymentAmount(payment, order);
+    const day = localDay(payment.at) || c.today || '';
+    const note = (outcome, recorded) => {
+      const entry = { key, outcome, amount, recorded: cents(recorded), day };
+      const Money = sibling('KhaytOrderMoney');
+      const code = Money && typeof Money.orderCurrency === 'function'
+        ? Money.orderCurrency(order, { settings: c.settings || {}, clients: c.clients || [] })
+        : order.currency;
+      if (code) entry.currency = String(code);
+      if (order.fxRate != null && Number.isFinite(+order.fxRate)) entry.fxRate = +order.fxRate;
+      if (payment.ref) entry.ref = String(payment.ref).slice(0, 120);
+      order.portalPayments = seen.concat([entry]).slice(-KEEP_PAYMENTS);
+    };
+
+    if (!(amount > 0)) {
+      note('no_amount', 0);
+      return { outcome: 'no_amount', amount: 0, key, effects: [], notices: [] };
+    }
+
+    const Pay = sibling('KhaytOrderPayment');
+    const paid = +order.paidAmount || 0;
+    const byHand = [+order.paidAmount, +order.depositAmount]
+      .some((v) => Number.isFinite(v) && v > 0 && Math.abs(v - amount) <= 0.01);
+    const apart = daysApart(order.paidAt, day);
+    if (paid > 0 && byHand && apart != null && apart <= MATCH_DAYS) {
+      note('matched', 0);
+      return { outcome: 'matched', amount, key, effects: [], notices: [] };
+    }
+
+    // `cashDue(...).cash` is the most the job's paid figure can reach (billed,
+    // less credit notes and gift cards); what is left is that, less what is in.
+    const room = Pay && typeof Pay.cashDue === 'function' ? Pay.cashDue(order, c).cash - paid : Infinity;
+    if (!Pay || !(room > 0.005)) {
+      note('settled', 0);
+      return { outcome: 'settled', amount, key, effects: [], notices: [] };
+    }
+
+    const r = Pay.recordPayment(order, { amount: cents(paid + amount), method: 'other', paidAt: day || null },
+      { today: c.today, settings: c.settings });
+    note('recorded', (+order.paidAmount || 0) - paid);
+    return { outcome: 'recorded', amount: cents((+order.paidAmount || 0) - paid), key,
+      effects: r.effects, notices: r.notices || [] };
+  }
+
+  const api = { portalUrl, paths, trialGate, depositForm, responseFor, errorFor, linkNote, threadFrom, httpUrl,
+    recordPortalPayment, paymentKey, paymentAmount, MATCH_DAYS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytPortalOwner = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

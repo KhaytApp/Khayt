@@ -25,10 +25,15 @@ struct Milestone: Identifiable, Equatable, Sendable {
     var amount: Double
     /// The day a proforma for it was last produced, or nil if never.
     var issuedAt: String?
+    /// The day this part should be paid by (`YYYY-MM-DD`), or nil. What the
+    /// payment reminder chases a milestone by (`lib/payment-reminder.js
+    /// milestonesDue`). Optional, and a proforma all the same.
+    var dueDate: String?
 
-    init(id: String, label: String, percentage: Double, amount: Double, issuedAt: String? = nil) {
+    init(id: String, label: String, percentage: Double, amount: Double, issuedAt: String? = nil,
+         dueDate: String? = nil) {
         self.id = id; self.label = label; self.percentage = percentage
-        self.amount = amount; self.issuedAt = issuedAt
+        self.amount = amount; self.issuedAt = issuedAt; self.dueDate = dueDate
     }
 
     /// An entry as stored. Nil for one with no id — it cannot be addressed, so
@@ -41,6 +46,8 @@ struct Milestone: Identifiable, Equatable, Sendable {
         amount = Milestones.number(o["amount"])
         let day = Shop.plainString(o["issuedAt"]) ?? ""
         issuedAt = day.isEmpty ? nil : day
+        let due = Shop.plainString(o["dueDate"]) ?? ""
+        dueDate = Milestones.isDay(due) ? due : nil
     }
 
     /// What the document is handed: `milestone` in `lib/invoice-document.js`.
@@ -85,6 +92,7 @@ enum Milestones {
             "percentage": .number(milestone.percentage), "amount": .number(milestone.amount),
         ]
         if let day = milestone.issuedAt { entry["issuedAt"] = .string(day) }
+        if let due = milestone.dueDate, isDay(due) { entry["dueDate"] = .string(due) }
         list.append(.object(entry))
         o[key] = .array(list)
         return .object(o)
@@ -108,6 +116,24 @@ enum Milestones {
         }
         o[key] = .array(list)
         return .object(o)
+    }
+
+    /// The job with milestone `id` due on `day`, or with no due date when
+    /// `day` is nil. One key on one entry, as `stamping`.
+    static func settingDue(_ id: String, to day: String?, in order: JSONValue) -> JSONValue {
+        guard case .object(var o) = order, case .array(var list)? = o[key] else { return order }
+        for i in list.indices {
+            guard case .object(var entry) = list[i], Milestone(list[i])?.id == id else { continue }
+            if let day, isDay(day) { entry["dueDate"] = .string(day) } else { entry["dueDate"] = nil }
+            list[i] = .object(entry)
+        }
+        o[key] = .array(list)
+        return .object(o)
+    }
+
+    /// A book-calendar day, `YYYY-MM-DD`.
+    static func isDay(_ s: String) -> Bool {
+        s.count == 10 && s.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil
     }
 
     /// A number the way the book may spell it: a number, or a numeral string.

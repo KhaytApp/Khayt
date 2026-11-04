@@ -25,6 +25,9 @@ struct MilestonesSheet: View {
     @State private var amount: Double = 0
     /// The milestone a Delete was clicked on, held until it is answered.
     @State private var deleting: Milestone?
+    /// The milestone whose due date is being chosen, and the day on the picker.
+    @State private var dating: Milestone?
+    @State private var dueDay = Date()
 
     private var canAdd: Bool {
         shop.canMoveJobs && !label.trimmingCharacters(in: .whitespaces).isEmpty
@@ -89,6 +92,10 @@ struct MilestonesSheet: View {
                     Text(shop.words.callIt("mac.milestone_not_printed"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                if let due = row.dueDate {
+                    Text(shop.words.callIt("ord.milestone_due") + ": " + due)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             Text(shop.words.callIt("mac.milestone_pct_value", ["pct": .string(Self.plain(row.percentage))]))
@@ -99,6 +106,43 @@ struct MilestonesSheet: View {
             }
             .controlSize(.small)
             .disabled(!shop.canMoveJobs)
+            // When this part should be paid: what the payment reminder chases.
+            Button {
+                dueDay = row.dueDate.flatMap { Calendar.book.date(from: Self.parts($0)) } ?? Date()
+                dating = row
+            } label: {
+                Image(systemName: "calendar")
+            }
+            .buttonStyle(.borderless)
+            .help(shop.words.callIt("ord.milestone_due"))
+            .accessibilityLabel(shop.words.callIt("ord.milestone_due"))
+            .disabled(!shop.canMoveJobs)
+            .popover(isPresented: Binding(get: { dating?.id == row.id },
+                                          set: { if !$0 { dating = nil } })) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(shop.words.callIt("ord.milestone_due")).font(.headline)
+                    DatePicker("", selection: $dueDay, displayedComponents: .date)
+                        .labelsHidden()
+                        .environment(\.calendar, .book)
+                    HStack {
+                        if row.dueDate != nil {
+                            Button(shop.words.callIt("common.clear")) {
+                                dating = nil
+                                Task { await shop.setMilestoneDue(on: subject.id, milestone: row.id, day: nil) }
+                            }
+                        }
+                        Spacer()
+                        Button(shop.words.callIt("common.save")) {
+                            let day = dueDay
+                            dating = nil
+                            Task { await shop.setMilestoneDue(on: subject.id, milestone: row.id, day: day) }
+                        }
+                        .keyboardShortcut(.defaultAction)
+                    }
+                }
+                .padding(14)
+                .frame(width: 240)
+            }
             Button(role: .destructive) {
                 deleting = row
             } label: {
@@ -152,6 +196,13 @@ struct MilestonesSheet: View {
                 .disabled(!canAdd)
             }
         }
+    }
+
+    /// A stored `YYYY-MM-DD` as the parts of a book-calendar day.
+    static func parts(_ day: String) -> DateComponents {
+        let bits = day.split(separator: "-").compactMap { Int($0) }
+        guard bits.count == 3 else { return DateComponents() }
+        return DateComponents(year: bits[0], month: bits[1], day: bits[2])
     }
 
     /// 50, not 50.0 — a percentage the way a person writes it.

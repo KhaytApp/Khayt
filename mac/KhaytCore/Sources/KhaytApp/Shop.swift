@@ -1407,6 +1407,8 @@ final class Shop {
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
             if next.build != nil { startPublishingCustomerRecords() } else { stopPublishingCustomerRecords() }
+            // What customers did with their portal links: approvals and deposits.
+            if next.build != nil { startWatchingPortal() } else { stopWatchingPortal() }
             if next.build != nil { startPollingWhatsAppReports() } else { stopPollingWhatsAppReports() }
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
@@ -1672,14 +1674,20 @@ final class Shop {
         }
         guard ticket == loadGeneration else { return }
         wear = perMachine
-        // What to chase. Both selectors are off unless the shop has switched
-        // them on, and both return nothing on a book with no due dates — so
-        // the section they feed simply does not appear.
-        let invoices = (try? await engine.invoicesToChase(
-            orders: orders, settings: settings, owed: owedByOrderId, clients: clients)) ?? []
+        // What to chase — each list only when the shop has switched it on
+        // (Settings → Payment reminders, Quote follow-ups). The selectors
+        // themselves never read `enabled`, so this comment used to say they
+        // were off by default while Today listed every overdue invoice with
+        // the switch off. Both also return nothing on a book with no due
+        // dates, so the section they feed simply does not appear.
+        let switches = (try? await engine.chaseSwitches(settings: settings))
+            ?? KhaytEngine.ChaseSwitches(invoices: false, quotes: false)
+        let invoices = switches.invoices ? ((try? await engine.invoicesToChase(
+            orders: orders, settings: settings, owed: owedByOrderId, clients: clients)) ?? []) : []
         guard ticket == loadGeneration else { return }
         invoicesToChase = invoices
-        let quotes = (try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []
+        let quotes = switches.quotes
+            ? ((try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []) : []
         guard ticket == loadGeneration else { return }
         quotesToChase = quotes
         let monthKpis = try? await engine.kpis(orders: orders, clients: clients,
@@ -2729,6 +2737,14 @@ final class Shop {
     var webStoreExplicitPrices: [String: String] = [:]
     /// Web-sized pictures already made, by file name and the file's date.
     var webStoreHeroes: [String: (Date, String)] = [:]
+
+    // "Check portal" on its own (Shop+PortalWatch.swift).
+    var portalWatchTask: Task<Void, Never>?
+    var portalWatchObserver: NSObjectProtocol?
+    var portalWatchBusy = false
+    var portalWatchedAt: Date?
+    /// After a 429: nothing is asked before this.
+    var portalWatchNotBefore: Date?
 
     // "Customer records for your web store" (CustomerRecords.swift).
     var customerRecordsTask: Task<Void, Never>?

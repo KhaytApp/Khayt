@@ -471,17 +471,36 @@ async function sendPaymentReminder(orderId) {
   const message = tpl
     ? fillWaTemplate(tpl.body, order, client)
     : t('pay.remind_default', { name: localName(client), id: order.id, price: fmtPrice(order.price), currency: currencySymbol() });
+  const text = withReminderPayLink(message, order);
   if (window.hubAPI?.shareWhatsApp) {
-    await window.hubAPI.shareWhatsApp({ phone: client.phone, message, pdfPath: null });
+    await window.hubAPI.shareWhatsApp({ phone: client.phone, message: text, pdfPath: null });
   } else {
     // Fallback: open WhatsApp web
-    const encodedMsg = encodeURIComponent(message);
+    const encodedMsg = encodeURIComponent(text);
     const phone = (client.phone || '').replace(/\D/g, '');
     window.hubAPI?.openExternal?.(`https://wa.me/${phone}?text=${encodedMsg}`);
     if (!window.hubAPI?.openExternal) {
       toast(t('pay.remind_sent') || 'Open WhatsApp manually to send the reminder', 'info');
     }
   }
+}
+
+/**
+ * The reminder with the shop's own pay link on it, when one is set
+ * (`settings.paymentProviders[*].payLink`, `{amount}` filled with what the
+ * reminder asks for — the due milestones, or the balance). The same rule the
+ * Mac's reminder uses (`lib/payment-reminder.js`).
+ */
+function withReminderPayLink(message, order) {
+  if (typeof KhaytPaymentReminder === 'undefined' || !KhaytPaymentReminder.payLinkFor) return message;
+  const ctx = { settings, clients };
+  const owed = (typeof KhaytOrderMoney !== 'undefined' && KhaytOrderMoney.orderOwedRaw)
+    ? KhaytOrderMoney.orderOwedRaw(order, ctx) : Math.max(0, (+order.price || 0) - (+order.paidAmount || 0));
+  const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
+  const asked = KhaytPaymentReminder.reminderAmount(order, owed, settings, Date.now(), client);
+  const link = KhaytPaymentReminder.payLinkFor(settings, asked.amount);
+  return KhaytPaymentReminder.reminderText({ body: message, values: null, payLink: link,
+    payLabel: t('pay.remind_pay_here') });
 }
 
 /**

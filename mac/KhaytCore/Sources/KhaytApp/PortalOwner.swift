@@ -22,7 +22,7 @@ extension Shop {
     /// The connection, with the bearer opened at the point of use (it is a
     /// sealed path; ciphertext as a bearer reads as an account that stopped
     /// working). Never stored.
-    private func portalCredentials() async throws -> (url: String, shopId: String, token: String) {
+    func portalCredentials() async throws -> (url: String, shopId: String, token: String) {
         var cloud: [String: JSONValue] = [:]
         if case .object(let c)? = settingsDict["cloud"] { cloud = c }
         let token = try await Secrets.open(Self.plainString(cloud["token"]) ?? "", for: source)
@@ -283,7 +283,11 @@ extension Shop {
     /// rule said it should. A view-only cloud role, the staff lock or the
     /// status rule itself can each refuse the move, and the sheet said
     /// "moved to Pending" regardless (alpha.62 review).
-    func checkPortalResponse(_ id: Order.ID) async -> (said: KhaytEngine.PortalResponse, moved: Bool)? {
+    ///
+    /// A deposit the customer paid is RECORDED on the job, once
+    /// (`recordPortalDeposit`); `deposit` is the sentence saying what happened
+    /// to it, nil when nothing did (nothing paid, or recorded before).
+    func checkPortalResponse(_ id: Order.ID) async -> (said: KhaytEngine.PortalResponse, moved: Bool, deposit: String?)? {
         moveProblem = nil
         guard let engine, let tok = portalToken(id), let raw = portalRecord(id) else { return nil }
         do {
@@ -291,14 +295,103 @@ extension Shop {
             let items = try await PortalClient.listPublished(baseUrl: creds.url, shopId: creds.shopId,
                                                              token: creds.token, engine: engine)
             let said = try await engine.portalResponse(items: items, pubToken: tok, order: .object(raw))
+            // The money first: a deposit paid with the approval is on the job
+            // before the move, so the move's own messages see it paid.
+            let deposit = said.paid ? await recordPortalDeposit(id, items: items, token: tok, quiet: false) : nil
             var moved = false
             if said.advance, cloudRoleCanWrite {
                 await moveJob(id, to: .pending)
                 moved = orders.first(where: { $0.id == id })?.status == "pending"
             }
-            return (said, moved)
+            return (said, moved, deposit)
         } catch {
             moveProblem = portalSentence(error); return nil
+        }
+    }
+
+    /// Record a payment the customer made through the portal on job `id` —
+    /// once, through the shop's payment rule (`lib/portal-owner.js
+    /// recordPortalPayment`) — and say what happened, on screen and in the
+    /// activity log. Returns that sentence, or nil when nothing changed: not
+    /// paid, or recorded already (by this Mac, a second look, or the other app
+    /// after a sync).
+    ///
+    /// A `.system` write: the payment provider confirmed it, no person at this
+    /// Mac did anything. Otherwise exactly a recorded payment — the webhooks,
+    /// the receipt email and the portal republish a typed-in payment owes, and
+    /// the same refusal when one of them is a channel this app cannot carry.
+    ///
+    /// `quiet` is the timer: a refusal is not put on screen every fifteen
+    /// minutes; "Check portal" says it.
+    @discardableResult
+    func recordPortalDeposit(_ id: Order.ID, items: JSONValue, token: String, quiet: Bool) async -> String? {
+        guard let engine, let raw = portalRecord(id), source.build != nil else { return nil }
+        // A look before the write: almost every check finds nothing new, and
+        // a write that changes nothing still takes the book's lock.
+        guard let peek = try? await engine.portalRecordPayment(
+            items: items, pubToken: token, order: .object(raw), today: Self.localDay(),
+            settings: settingsDict, clients: clientRows), peek.changesTheJob else { return nil }
+
+        let keptProblem = moveProblem
+        let keptNotices = moveNotices
+        var result: KhaytEngine.PortalPayment?
+        var owed: [KhaytEngine.WebhookDelivery] = []
+        var mail: OrderEmail?
+        let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title"),
+                                          as: .system("a payment the provider confirmed through the customer portal")) {
+            order, engine, root in
+            let settings = Self.settings(root)
+            let clients = Self.rows(root, "clients")
+            let done = try await engine.portalRecordPayment(
+                items: items, pubToken: token, order: order, today: Self.localDay(),
+                settings: settings, clients: clients)
+            result = done
+            guard done.changesTheJob else { return OneOrderEdit(order: order) }
+            if done.outcome == "recorded" {
+                // The same question `recordPayment` asks before keeping money.
+                let reaches = (try? await engine.paymentOutbound(
+                    order: order, settings: settings, clients: clients)) ?? []
+                let cannotSend = await Self.channelsThisAppCannotSend(reaches, settings: settings, engine: engine)
+                if !cannotSend.isEmpty {
+                    throw MoveRefused(sentence: self.words.outboundRefusal(cannotSend))
+                }
+                if let asked = done.webhookEffects, !asked.isEmpty {
+                    owed = (try? await engine.webhookDeliveries(
+                        order: done.order, effects: asked, settings: settings,
+                        shopName: Self.plainString(settings["bizEn"])
+                            ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
+                        clientName: Self.emailClientName(for: Self.asObject(done.order) ?? [:], in: clients),
+                        currency: Self.shopCurrencyOf(settings),
+                        at: ISO8601DateFormatter().string(from: Date()),
+                        nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
+                }
+                mail = await Self.paymentEmail(
+                    after: done.asPayment, settings: settings, clients: clients, engine: engine,
+                    statusLabel: self.words.callIt("mac.payment_received_label"))
+            }
+            return OneOrderEdit(order: done.order,
+                                activity: "\(id) → " + self.portalDepositSentence(done))
+        }
+        guard wrote, let done = result, done.changesTheJob else {
+            if quiet { moveProblem = keptProblem; moveNotices = keptNotices }
+            return nil
+        }
+        let said = portalDepositSentence(done)
+        moveNotices = (quiet ? keptNotices : []) + [said]
+        if let mail { await post(mail) }
+        if !owed.isEmpty { await fire(owed) }
+        if done.outcome == "recorded" { await republishPortalIfPublished(id) }
+        return said
+    }
+
+    /// What happened to a portal payment, in the shop's words.
+    func portalDepositSentence(_ done: KhaytEngine.PortalPayment) -> String {
+        let amount: [String: JSONValue] = ["amount": .string(Money.text(done.amount, done.currency))]
+        switch done.outcome {
+        case "recorded": return words.callIt("cloud.portal_deposit_recorded", amount)
+        case "matched": return words.callIt("cloud.portal_deposit_matched", amount)
+        case "settled": return words.callIt("cloud.portal_deposit_settled", amount)
+        default: return words.callIt("cloud.portal_deposit_no_amount")
         }
     }
 
