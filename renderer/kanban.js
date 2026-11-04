@@ -772,6 +772,17 @@ function renderKanban() {
         : log.reprintOf
           ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(log.reprintOf)}</span>`
           : '';
+      // A store order line nothing in the catalogue matched — the way to pick
+      // its product (lib/store-order-job.js keeps it on the job for this).
+      // Business only: a store order is a sale, and Bed Ready has no catalogue to pick from.
+      const _storeBiz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
+      const _unplaced = (_storeBiz && typeof KhaytStoreOrderJob !== 'undefined') ? KhaytStoreOrderJob.unmatched(log).length : 0;
+      const storeLinesBadge = _unplaced
+        ? `<button type="button" class="sub-order-badge" data-act="store-lines" data-id="${escapeHtml(log.id)}">${escapeHtml(t('store.unmatched_badge', { n: _unplaced }))}</button>`
+        : '';
+      const reprintedBadge = Array.isArray(log.reprintedInto) && log.reprintedInto.length
+        ? `<span class="sub-order-badge">↪ ${escapeHtml(t('qc.reprinted_as'))} #${escapeHtml(log.reprintedInto[log.reprintedInto.length - 1])}</span>`
+        : '';
       // QC badge — reflects qcStatus (pass / fail / awaiting), with inspector
       // initials when an inspector is required. Derives from legacy fields too.
       const _qcSt = (typeof qcStatusOf === 'function') ? qcStatusOf(log) : (log.qcPassedAt ? 'pass' : null);
@@ -803,7 +814,8 @@ function renderKanban() {
         : '';
       return renderStudioKanbanCard({
         log, status, _pl, pausedClass, cardClientAccent, partColourHtml, partsLabel,
-        machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge, qcBadge,
+        machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge: kanbanSubBadge + reprintedBadge,
+        qcBadge: qcBadge + storeLinesBadge,
         postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions,
       });
     }).join('');

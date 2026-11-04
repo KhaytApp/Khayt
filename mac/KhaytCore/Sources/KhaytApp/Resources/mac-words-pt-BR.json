@@ -2193,6 +2193,7 @@
  "mac.qc_none": "Nada passou por inspeção ainda.",
  "mac.qc_passed": "passaram na inspeção",
  "mac.qc_rma": "{n} voltaram pela garantia, custando {amount} para corrigir.",
+ "mac.qc_scrap": "Descartar",
  "mac.qc_title": "Qualidade",
  "mac.qc_worst": "Mais frequente: {fault}.",
  "mac.qf_by_count": "dos orçamentos",

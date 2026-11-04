@@ -44,26 +44,15 @@ function reprintChainRoot(order) {
 // reprint deducts its OWN filament when it later passes QC. shop-cost reprints
 // carry no charge; billable reprints keep their calculator price.
 function applyReprintMeta(newOrder, meta, log) {
-  if (!newOrder || !meta) return newOrder;
-  newOrder.reprintOf = meta.of || null;
-  newOrder.reprintReason = meta.reason || 'manual';
-  newOrder.reprintCost = meta.cost || 'billable';
-  newOrder.reprintChain = meta.chain || meta.of || newOrder.id;
-  if (meta.cost === 'shop') {
-    newOrder.price = 0;
-    newOrder.priceBeforeDiscount = null;
-    newOrder.reprintNoCharge = true;
-    newOrder.paymentStatus = 'paid';
-    newOrder.paidAmount = 0;
-  }
-  const orig = (log || []).find(o => o && o.id === meta.of);
-  if (orig) {
-    if (!Array.isArray(orig.reprintedInto)) orig.reprintedInto = [];
-    if (!orig.reprintedInto.includes(newOrder.id)) orig.reprintedInto.push(newOrder.id);
-    // RMA reprint: link the warranty record to the replacement order.
-    if (meta.reason === 'rma' && orig.rma && !orig.rma.reprintId) orig.rma.reprintId = newOrder.id;
-  }
-  return newOrder;
+  // `lib/reprint.js` holds the rule now, so the Mac's reprint is the same record.
+  return ReprintRules().apply(newOrder, meta, log);
+}
+
+/** The linked-reprint rules, however this file happens to be loaded. */
+function ReprintRules() {
+  return (typeof globalThis !== 'undefined' && globalThis.KhaytReprint)
+    ? globalThis.KhaytReprint
+    : require('../lib/reprint.js');
 }
 
 // QC / warranty analytics live in `lib/qc-metrics.js` now — the Mac app cannot
@@ -844,10 +833,7 @@ function qcFailOrder(orderId) {
 
       // QC enabled: the failed job is terminal (its filament is already booked as
       // waste). Offer Scrap (stop here) or Reprint (spin off a linked new order).
-      order.scrapped = true;
-      if (!order.statusHistory) order.statusHistory = [];
-      order.statusHistory.push({ status: 'qc', at: new Date().toISOString(), note: 'QC failed' });
-      if (order.statusHistory.length > 200) order.statusHistory = order.statusHistory.slice(-200);
+      ReprintRules().markScrapped(order, new Date().toISOString());
       saveAll();
       renderKanban(); renderLogs(); renderAnalytics();
       toast(t('qc.failed_recorded') || 'QC failure recorded', 'warning');

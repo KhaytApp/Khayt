@@ -114,6 +114,8 @@ const KANBAN_ACTS = {
   'mark-shipped': 'biz',
   'approve-quote': 'biz', 'reject-quote': 'biz', 'share-quote': 'biz',
   'quote-approval-link': 'biz', 'share-tracking-link': 'biz',
+  // A store order line nothing matched: pick its product. Store orders are sales.
+  'store-lines': 'biz',
   // Resin post-processing: rendered only for resin jobs, and still on the shim. Recorded
   // so it is a known gap rather than a surprise — see the review notes.
   'resin-log-wash': 'known-gap', 'resin-log-cure': 'known-gap', 'resin-complete': 'known-gap',

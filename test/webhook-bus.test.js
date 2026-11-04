@@ -199,3 +199,15 @@ test('order_shipped carries the carrier and tracking number, in the Ship dialog\
     JSON.stringify({ orderId: 'O-9', project: 'Lamp', carrier: 'aramex', trackingNumber: 'TRK1' })
   );
 });
+
+test('qc_failed is an event a subscription can list, carrying the desktop QC sheet\'s keys in order', () => {
+  const Bus = require('../lib/webhook-bus.js');
+  assert.ok(Bus.EVENTS.includes('qc_failed'));
+  const subs = Bus.migrateLegacyWebhooks({ events: { qc_failed: 'https://hooks.example/qc' } });
+  assert.deepEqual(subs[0].events, ['qc_failed'], 'a legacy per-event URL for it migrates');
+  assert.equal(Bus.matchSubscriptions(subs, 'qc_failed').length, 1);
+  const payload = Bus.statusPayload('qc_failed',
+    { id: 'INV-1', project: 'Hood', status: 'qc', qcStatus: 'fail', client: 'Nora', price: 9 });
+  assert.deepEqual(Object.keys(payload), ['orderId', 'project', 'status', 'qcStatus', 'reprintOf', 'client']);
+  assert.deepEqual(payload, { orderId: 'INV-1', project: 'Hood', status: 'qc', qcStatus: 'fail', reprintOf: null, client: 'Nora' });
+});

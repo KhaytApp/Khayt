@@ -44,6 +44,12 @@ private struct Detail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if ReprintLinks.shows(job) {
+                    ReprintLinks(shop: shop, job: job)
+                }
+                if StoreLinesSection.shows(job) {
+                    StoreLinesSection(shop: shop, job: job)
+                }
                 // ── MAY THIS BE SOLD? ─────────────────────────────────────
                 //
                 // Asked where the sale is, not only where the model is. A

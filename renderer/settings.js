@@ -3935,6 +3935,7 @@ function renderWebhookSettings() {
     { key: 'payment_received', label: 'Payment received' },
     { key: 'quote_approved',   label: 'Quote approved' },
     { key: 'order_delivered',  label: 'Order delivered' },
+    { key: 'qc_failed',        label: 'QC failed' },
   ];
   el.innerHTML = `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;">

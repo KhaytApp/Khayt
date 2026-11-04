@@ -2193,6 +2193,7 @@
  "mac.qc_none": "Rien n’est encore passé en contrôle.",
  "mac.qc_passed": "ont passé le contrôle",
  "mac.qc_rma": "{n} sont revenues sous garantie, coûtant {amount} à remettre en état.",
+ "mac.qc_scrap": "Mettre au rebut",
  "mac.qc_title": "Qualité",
  "mac.qc_worst": "Le plus souvent : {fault}.",
  "mac.qf_by_count": "des devis",
