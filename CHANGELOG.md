@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the last screens in the old type.** Adding a spool (barcode, label and NFC steps, the review form, a tag's details), the two barcode scanners and the cloud sign-in error now use the redesign's text face and colours instead of the system font with plain grey, red and orange. The connection badge in the navigation bar is the same face, and it shows connected in the live green the Home Screen widget uses.
+
 - **iPhone: the Home Screen widget in the redesign's colours.** The Khayt Queue widget was still in the 2025 indigo the app dropped. It now sits on the redesign's surface (white, or navy in dark). Counts are bold over small mono labels, and a print's percent is mono ink over the same amber thread bar the app uses for progress. The connection dot is the app's live green, or late red when offline. The lock-screen version is unchanged, since the system draws it in one tint.
 
 - **iPhone: clients look like the redesign (phase 6).** Each client in the list has two initials in a brand-blue circle ("NA" for Noura Al-Saud, in the name's own script), the name larger and the order count in mono. A customer's page opens with their initials large and their name in the display face; what they owe is large too, and the card is outlined in red when they are over their limit. The Live Activity took the redesign's colours in phase 1.

@@ -77,12 +77,12 @@ struct BarcodeScannerView: View {
             Spacer()
             Image(systemName: "camera.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(KhaytDesign.brand)
             Text(L10n.tr("scan.photo.title"))
-                .font(.title3.bold())
+                .font(.khayt(20, .bold, relativeTo: .title3))
             Text(L10n.tr("scan.photo.body"))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.khayt(15, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.note)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
             Button {
@@ -121,16 +121,16 @@ struct BarcodeScannerView: View {
                 .padding(.horizontal)
             } else {
                 Text(L10n.tr("scan.live.hint"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.khayt(11, relativeTo: .caption2))
+                    .foregroundStyle(KhaytDesign.note)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
 
             if let photoError {
                 Text(photoError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.danger)
                     .padding(.horizontal)
             }
 
@@ -139,12 +139,12 @@ struct BarcodeScannerView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(capturedLines.prefix(12), id: \.self) { line in
                             Text(line)
-                                .font(.caption)
+                                .font(.khayt(12, relativeTo: .caption))
                                 .foregroundStyle(.primary)
                         }
                         if capturedLines.count > 12 {
                             Text("+\(capturedLines.count - 12) more…")
-                                .font(.caption2)
+                                .font(.khayt(11, relativeTo: .caption2))
                                 .foregroundStyle(.tertiary)
                         }
                     }
