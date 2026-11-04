@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the Jobs table's Stage column is the redesign's status pill**: the stage's tint and dot, with the word in ordinary ink. PrintTender, a printer maintenance tracker, is added to the competitive watch list.
+
 - **Mac: the Board in the redesign.** Each card is a thumbnail tile with the title and customer beside it, and a footer with the due date (a red pill when late) and what is owed. A job printing now shows the amber thread with its machine and time left. The red left edge and the colour-names line are gone, and the flag and the person it is assigned to stay. Each column head is the stage's dot, its name and its count.
 - **Docs: eight more products on the competitive watch list.** FARMONE 3D, SnapCon, FlowQ, FoxTrack (re-read), Printlooper, FlowForgeStudio, Print Planner and FilAccount are now in `docs/KHAYT-COMPETITIVE-ROADMAP.md`, each with what it overlaps and whether Khayt already has it; the two worth acting on are files that eject their own part, and SnapCon as the U1 fleet tool to watch.
 - **iPhone: the last screens in the old type.** Adding a spool (barcode, label and NFC steps, the review form, a tag's details), the two barcode scanners and the cloud sign-in error now use the redesign's text face and colours instead of the system font with plain grey, red and orange. The connection badge in the navigation bar is the same face, and it shows connected in the live green the Home Screen widget uses. Settings → Language is one row that opens a menu of the ten choices. Since the app gained seven languages, the old strip had wrapped every name across three lines.
