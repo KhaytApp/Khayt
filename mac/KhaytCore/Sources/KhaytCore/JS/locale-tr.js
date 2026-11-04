@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "yeniden basıldı:",
   "store.unmatched_badge": "{n} satır bir ürünle eşleşmedi",
   "store.pick_title": "Ürünü seçin",
+  "store.pick_short": "Seç…",
   "store.pick_hint": "Aşağıdaki her satır bir mağaza siparişinden geldi ve kataloğunuzdaki hiçbir ürünle SKU veya adla eşleşmedi. Ürünü seçin, parçaları işe eklensin.",
   "store.pick_none": "Şimdi değil",
   "store.placed": "Ürün işe eklendi",

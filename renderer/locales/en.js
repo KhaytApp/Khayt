@@ -3086,6 +3086,7 @@
   "qc.reprinted_as": "reprinted as",
   "store.unmatched_badge": "{n} not matched to a product",
   "store.pick_title": "Pick the product",
+  "store.pick_short": "Pick…",
   "store.pick_hint": "Each line below came from a store order and matched nothing in your catalogue by SKU or name. Pick the product it is, and its parts are added to the job.",
   "store.pick_none": "Not this time",
   "store.placed": "Product added to the job",

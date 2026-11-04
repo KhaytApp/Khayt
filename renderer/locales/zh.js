@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "已重印为",
   "store.unmatched_badge": "{n} 项未匹配到商品",
   "store.pick_title": "选择商品",
+  "store.pick_short": "选择…",
   "store.pick_hint": "以下每一行来自店铺订单，按SKU和名称都未匹配到目录中的商品。选择对应的商品后，其部件会加入该任务。",
   "store.pick_none": "暂不选择",
   "store.placed": "已将商品加入任务",

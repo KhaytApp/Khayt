@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "réimprimé en",
   "store.unmatched_badge": "{n} sans produit associé",
   "store.pick_title": "Choisir le produit",
+  "store.pick_short": "Choisir…",
   "store.pick_hint": "Chaque ligne ci-dessous vient d’une commande de la boutique et ne correspond à aucun produit de votre catalogue, ni par SKU ni par nom. Choisissez le produit et ses pièces seront ajoutées au travail.",
   "store.pick_none": "Pas maintenant",
   "store.placed": "Produit ajouté au travail",

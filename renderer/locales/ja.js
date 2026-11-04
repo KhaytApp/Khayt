@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "再印刷先",
   "store.unmatched_badge": "{n} 件が商品と一致しません",
   "store.pick_title": "商品を選択",
+  "store.pick_short": "選択…",
   "store.pick_hint": "以下の各行はストアの注文から来たもので、SKUでも名前でもカタログの商品と一致しませんでした。商品を選ぶと、その部品がジョブに追加されます。",
   "store.pick_none": "今はしない",
   "store.placed": "商品をジョブに追加しました",

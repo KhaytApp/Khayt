@@ -261,13 +261,42 @@
     return next;
   }
 
+  /**
+   * What the customer paid for this order, or null when the order carried no
+   * price — `lib/webstore-order.js linePrices`, the rule the Mac's cloud queue
+   * prices with (`onlinePricing`): each line at its own `unitPrice` when it
+   * came with one, else the product's catalogue price; and when no line
+   * carried a price, the payload's `paidTotal` if there is one. Null means the
+   * caller falls back to costing the job (cost plus margin).
+   *
+   * Tax: a line's `unitPrice` is the catalogue's price, which is what the
+   * book's `price` holds (pre-tax on a shop that adds tax on top), so it is
+   * taken as it stands — the same as the Mac. A webhook order is not priced
+   * here at all: its price is the platform's own total (`storefront-webhook`).
+   */
+  function orderPrice(reading, payload, book) {
+    const W = sibling('KhaytWebstoreOrder', './webstore-order.js');
+    const b = book || {};
+    const lines = (reading && Array.isArray(reading.lines)) ? reading.lines : [];
+    const anyPaid = lines.some((l) => l && typeof l.unitPrice === 'number');
+    if (W && typeof W.linePrices === 'function' && anyPaid) {
+      const r = W.linePrices(lines.map((l) => ({
+        qty: l.qty, productId: l.productId || null,
+        ...(typeof l.unitPrice === 'number' ? { unitPrice: l.unitPrice } : {}),
+      })), { products: b.products || [], settings: b.settings || {} });
+      if (r.priced) return r.total;
+    }
+    const said = num((payload || {}).paidTotal, NaN);
+    return Number.isFinite(said) && said >= 0 ? +said.toFixed(2) : null;
+  }
+
   /** The lines on a job that still want a product. */
   function unmatched(order) {
     const lines = order && Array.isArray(order.storeLines) ? order.storeLines : [];
     return lines.map((l, index) => ({ index, line: l })).filter((x) => x.line && !x.line.productId);
   }
 
-  const api = { NOT_MATCHED, unmatchedNote, productParts, summary, linesOf, build, apply, assignLine, unmatched };
+  const api = { NOT_MATCHED, unmatchedNote, productParts, summary, linesOf, build, apply, assignLine, unmatched, orderPrice };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytStoreOrderJob = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

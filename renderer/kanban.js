@@ -770,6 +770,7 @@ function renderKanban() {
       const kanbanSubBadge = log.parentOrderId
         ? `<span class="sub-order-badge">↳ #${escapeHtml(log.parentOrderId)}</span>`
         : log.reprintOf
+          // TODO(#2210): jobRef — the raw id until the readable ref lands.
           ? `<span class="sub-order-badge">↳ ${escapeHtml(t('qc.reprint_of') || 'reprint of')} #${escapeHtml(log.reprintOf)}</span>`
           : '';
       // A store order line nothing in the catalogue matched — the way to pick
@@ -778,8 +779,9 @@ function renderKanban() {
       const _storeBiz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
       const _unplaced = (_storeBiz && typeof KhaytStoreOrderJob !== 'undefined') ? KhaytStoreOrderJob.unmatched(log).length : 0;
       const storeLinesBadge = _unplaced
-        ? `<button type="button" class="sub-order-badge" data-act="store-lines" data-id="${escapeHtml(log.id)}">${escapeHtml(t('store.unmatched_badge', { n: _unplaced }))}</button>`
+        ? `<button type="button" class="sub-order-badge" style="cursor:pointer;" data-act="store-lines" data-id="${escapeHtml(log.id)}" title="${escapeHtml(t('store.pick_title'))}">${escapeHtml(t('store.unmatched_badge', { n: _unplaced }))} · <u>${escapeHtml(t('store.pick_short'))}</u></button>`
         : '';
+      // TODO(#2210): jobRef — the raw id until the readable ref lands.
       const reprintedBadge = Array.isArray(log.reprintedInto) && log.reprintedInto.length
         ? `<span class="sub-order-badge">↪ ${escapeHtml(t('qc.reprinted_as'))} #${escapeHtml(log.reprintedInto[log.reprintedInto.length - 1])}</span>`
         : '';

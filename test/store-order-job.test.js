@@ -158,3 +158,36 @@ test('placing a cloud-queue line replaces its bare stand-in part rather than pri
   assert.deepEqual(placed.parts.map((p) => p.name), ['Shell', 'Strap']);
   assert.equal(placed.notes, '');
 });
+
+test('a store order is priced at the money that moved, not at cost plus margin', () => {
+  const lines = S.structuredLines([
+    { name: 'Hood', sku: 'FH-01', qty: 2, unitPrice: 45 },
+    { name: 'Flexi Dragon', qty: 1, unitPrice: 30 },
+  ]);
+  const reading = S.readLines(lines, { products: [hood, dragon], stock: {} });
+  assert.equal(J.orderPrice(reading, {}, { products: [hood, dragon], settings: {} }), 120,
+    '2 × 45 + 30, what the customer paid');
+  // No line carried a price: the order's own total, when it has one.
+  const bare = S.readLines(S.structuredLines([{ name: 'Hood', qty: 1 }]), { products: [hood], stock: {} });
+  assert.equal(J.orderPrice(bare, { paidTotal: 99.5 }, { products: [hood] }), 99.5);
+  // Nothing came with the order: null, and the caller costs the job instead.
+  assert.equal(J.orderPrice(bare, {}, { products: [hood] }), null);
+});
+
+test('a line price is the book\'s price as it stands, whatever the tax mode (the Mac queue\'s rule)', () => {
+  require('../lib/tax.js');
+  require('../lib/order-money.js');
+  const salesTax = { currency: 'USD', tax: { name: 'Sales Tax', mode: 'exclusive',
+    rates: [{ id: 'st', label: 'Sales tax', percent: 8.25 }] } };
+  const reading = S.readLines(S.structuredLines([{ name: 'Hood', qty: 2, unitPrice: 50 }]),
+    { products: [hood], stock: {} });
+  assert.equal(J.orderPrice(reading, {}, { products: [hood], settings: salesTax }), 100,
+    'pre-tax on a tax-on-top shop: the tax is added on the invoice, not baked into price');
+});
+
+test('a webhook order keeps the platform\'s total as its price, parts or not, in any tax mode', () => {
+  const b = Object.assign(book(), { settings: { currency: 'SAR', enableVat: true, vatRate: 15, storefront: { stockQty: {} } } });
+  const r = W.record('salla', salla('S-9', [{ name: 'Hood', sku: 'FH-01', quantity: 3, price: { amount: 10 } }]), b, CTX);
+  assert.equal(r.order.price, 200, 'the total Salla says was paid, not cost plus margin and not a line sum');
+  assert.ok(r.order.parts.length > 0);
+});

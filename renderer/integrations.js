@@ -2041,12 +2041,13 @@ function trackShipment(trackingNumber, carrier) {
     const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
     const reading = S.read(p, { products: list, stock: {} });
     if (!reading.lines.length) return null;
-    return J.build(reading, {
+    const job = J.build(reading, {
       products: list,
       inventory: (typeof inventory !== 'undefined' && Array.isArray(inventory)) ? inventory : [],
       consumables: (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [],
       settings,
     }, orderId);
+    return Object.assign(job, { reading });
   }
 
   async function importIntakeAsQuote(it, c) {
@@ -2115,7 +2116,14 @@ function trackShipment(trackingNumber, carrier) {
     if (storeJob && storeJob.storeLines.length) {
       const J = global.KhaytStoreOrderJob;
       Object.assign(order, J.apply(order, storeJob));
-      if (storeJob.parts.length) {
+      // AT THE MONEY THAT MOVED: each line at the price it came with (else
+      // its product's catalogue price), or the order's own total — the rule
+      // the Mac's queue prices with. Cost plus margin only when the order
+      // carried no price at all.
+      const paid = J.orderPrice(storeJob.reading, p,
+        { products: (typeof products !== 'undefined' && Array.isArray(products)) ? products : [], settings });
+      if (paid !== null) order.price = paid;
+      else if (storeJob.parts.length) {
         order.price = intakeQuotePrice({ baseCost: storeJob.parts.reduce((s2, x) => s2 + (+x.baseCost || 0), 0) });
       }
     }

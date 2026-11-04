@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "reimpreso como",
   "store.unmatched_badge": "{n} sin producto asociado",
   "store.pick_title": "Elige el producto",
+  "store.pick_short": "Elegir…",
   "store.pick_hint": "Cada línea de abajo viene de un pedido de la tienda y no coincidió con nada de tu catálogo por SKU ni por nombre. Elige el producto y sus piezas se añadirán al trabajo.",
   "store.pick_none": "Ahora no",
   "store.placed": "Producto añadido al trabajo",

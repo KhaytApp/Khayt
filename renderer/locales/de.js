@@ -3085,6 +3085,7 @@
   "qc.reprinted_as": "nachgedruckt als",
   "store.unmatched_badge": "{n} keinem Produkt zugeordnet",
   "store.pick_title": "Produkt wählen",
+  "store.pick_short": "Wählen…",
   "store.pick_hint": "Jede Zeile unten stammt aus einer Shop-Bestellung und passte weder per SKU noch per Name zu einem Produkt in Ihrem Katalog. Wählen Sie das Produkt, dann werden seine Teile dem Auftrag hinzugefügt.",
   "store.pick_none": "Diesmal nicht",
   "store.placed": "Produkt zum Auftrag hinzugefügt",
