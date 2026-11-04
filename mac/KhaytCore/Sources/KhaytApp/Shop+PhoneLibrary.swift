@@ -121,8 +121,11 @@ extension Shop {
             let ext = Self.libraryExt(file)
             if !ext.isEmpty { o["ext"] = .string(ext) }
             if let size = file.sourceFile?.size, size > 0 { o["size"] = .number(size) }
-            if let n = file.timesPrinted { o["timesPrinted"] = .number(Double(n)) }
-            if let d = file.lastPrinted, !d.isEmpty { o["lastPrinted"] = .string(d) }
+            // With what the jobs say (`LibraryFile.printed`), as
+            // `lib/lan-library.js` itemOf sends it; a model no job names is
+            // sent exactly as its record stands.
+            if file.printed != nil || file.timesPrinted != nil { o["timesPrinted"] = .number(Double(file.printCount)) }
+            if let d = file.printedLast, !d.isEmpty { o["lastPrinted"] = .string(d) }
             if let notes = file.testedNotes, !notes.isEmpty { o["testedNotes"] = .string(notes) }
             // Figures from an older version's bytes are not sent as this
             // model's (beta.8 review M1): the phone asks for an estimate,
