@@ -27,7 +27,7 @@ struct PrintActivityWidget: Widget {
                             .frame(width: 28, height: 28)
                             .background(PrintActivityLook.brand, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         Text(context.attributes.machineName)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(PrintActivityLook.text(14, .semibold))
                             .lineLimit(1)
                     }
                     .padding(.leading, 4)
@@ -39,26 +39,26 @@ struct PrintActivityWidget: Widget {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline) {
                             PrintHeadline(state: state)
-                                .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                                .font(PrintActivityLook.display(26).monospacedDigit())
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                             Spacer(minLength: 4)
                             PrintEnds(state: state)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(PrintActivityLook.text(12, .medium).monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
                         HStack(spacing: 8) {
                             PrintBar(state: state)
                             if PrintActivityText.showsPercent(state.phase) {
                                 Text(verbatim: PrintActivityText.percent(state.progress))
-                                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                                    .font(PrintActivityLook.mono(12))
                                     .foregroundStyle(tone)
                                     .fixedSize()
                             }
                         }
                         if let job = state.job {
                             Text(PrintActivityText.jobTitle(job))
-                                .font(.system(size: 12))
+                                .font(PrintActivityLook.text(12))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
@@ -70,7 +70,7 @@ struct PrintActivityWidget: Widget {
                     .foregroundStyle(tone)
             } compactTrailing: {
                 CompactRemaining(state: state)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(PrintActivityLook.display(14).monospacedDigit())
                     .foregroundStyle(tone)
             } minimal: {
                 if let range = PrintActivityText.barRange(state) {
