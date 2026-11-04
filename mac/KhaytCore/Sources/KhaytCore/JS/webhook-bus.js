@@ -69,7 +69,10 @@
    */
   function statusPayload(event, order, newStatus) {
     const o = order || {};
-    if (event === 'order_delivered') {
+    // `quote_approved` is the desktop's own shape too (renderer/app-boot.js,
+    // the LAN approval): who approved what, and no status — the approval is
+    // the event, and the Pending it moves the job to is `status_changed`'s.
+    if (event === 'order_delivered' || event === 'quote_approved') {
       return { orderId: o.id, project: o.project, client: o.client };
     }
     // A parcel leaving: who carries it and how to follow it. The keys and
