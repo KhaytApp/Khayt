@@ -662,3 +662,51 @@ Re-read the §0/§6/§7 products from an environment where the fetches resolve, 
 the Meshory price change on 28 Oct and the Stimalo free period ending 31 Dec.
 
 *Caveat, as §5–§7: marketing pages and listing snippets, not hands-on evaluations.*
+
+## Watch list additions — 2026-11-04 (Turki's links)
+
+Turki sent eight links with the instruction "add any potential competition to the list even
+if it's limited to a specific aspect". Most are not shop managers. Each one overlaps Khayt in
+one narrow place: plate cycling, U1 fleet control, a farm queue, a cost calculator, spool
+counting or order routing. Every claim about Khayt below was checked in `lib/` and
+`mac/KhaytCore/Sources` before it was written down.
+
+Three of the sites are single-page apps that render nothing without JavaScript (FlowQ, Print
+Planner, and the Microsoft Store page as fetched). For FlowQ and Print Planner the text below
+comes from **the strings in the app's own JavaScript bundle**. That shows what the app has
+screens for, but not how well any of them work. The Store listing came from the Store's
+product API.
+
+| Product | What it is | Overlap with Khayt | Price / licence / maturity | Read? |
+|---|---|---|---|---|
+| [FARMONE 3D](https://farmone-cwu.pages.dev) | Italian browser tool. It merges several G-code files into one "farm file" that repeats each part N times, with a cooldown and a push-off ejection per part. Cooling waits are set by material and bed area. Profiles for Klipper, Marlin, Prusa and Bambu, plus custom ones. Runs only in the browser, has a safety checklist, and has a page of printer offers (no commission). | **Plate cycling / auto-eject.** Khayt has nothing like it. `lib/auto-dispatch.js` assumes that "none of the printers Khayt talks to can clear their own plate" and waits for a person to press *Bed is clear* (`bedClearedAt`). | No price shown. Licensed for personal use, including your own business. v1.0.0-alpha.2. | ✅ |
+| [SnapCon](https://github.com/ezeitoun/SnapCon) | Local-first fleet manager built by someone running **25 Snapmaker U1s**. It has four dashboard views (cards, compact, camera grid, sortable list), a plate map for skipping objects mid-print, bulk bed heating with a stagger so a shared circuit doesn't trip, maintenance schedules with cost and warranty, Telegram/ntfy alerts, user roles with one-time codes, a Cloudflare-tunnel remote access option, an audit log, and Home Assistant. Its queue uses printer pools and can send N copies to every printer or spread them round-robin, with auto-balance between printers in a pool. A Bambu connector arrived in beta in 0.7.2. FlashForge, Creality and generic Moonraker connectors are experimental. | **U1 fleet monitoring and queue**, on the same printer Khayt has on the bench. Khayt already has object exclusion (`lib/exclude-object.js`), maintenance (`lib/maintenance.js`), Telegram/ntfy alerts (`lib/alert-routes.js`), an audit log (`lib/audit-log.js`), Home Assistant smart plugs (`lib/smart-plug.js`) and dispatch proposals (`lib/auto-dispatch.js`). **Not found in Khayt:** staggered bulk bed heating, and spreading N copies across a printer pool in one action. No invoices, quotes or customers. | Free, MIT, JavaScript. 19 stars, created 2026-07-08, pushed 2026-11-03, latest release v0.7.2 (2026-09-16). Buy-me-a-coffee. | ✅ README |
+| [FlowQ](https://flowq.infinityflow3d.com/) (Infinity Flow 3D) | Cloud print-farm queue. Printers connect through Infinity Flow's own "tunnel" hardware (Hub, S1+) or a FlowQ Connect agent for Mac and Windows (Linux "coming soon"). Bundle strings include: an **auto-ejection G-code sequence builder**, Shopify and Etsy orders auto-queued through product/listing mappings, filament inventory and usage tracking, AMS tray mapping, Bambu and custom Klipper printers, maintenance windows, Zapier/Make/Open API, and a partner discount programme for paid plans. | **Queue plus auto-eject plus store-to-queue.** Khayt takes Shopify and Etsy orders through the import link (`lib/webstore-order.js`, `CloudIntake.swift`) and proposes dispatch, but has no ejection sequences. | Has "Plans & billing" and plan limits. **No price was visible.** Version unknown. | ⚠️ bundle strings only, page renders empty |
+| [FoxTrack](https://foxtrack.studio/) | Re-read. It **resolved this time**; on 2026-10-11 it did not. Shop operations web app: quotes priced from costs that turn into orders and invoices, an order board and fulfilment queue, packing slips, spools with QR labels and automatic deduction, print hours and maintenance, live progress and cameras through the open-source FoxTrack Bridge (Bambu, Klipper, PrusaLink, OctoPrint), Telegram/Discord/email alerts, imports from CloudSlicer3D, Shopify, Etsy and WooCommerce, an AI assistant with your own key, and multi-currency tax labels. Founded by Caleb and Clarissa Ellis of the Fox & Train print shop, made in Singapore. | **The whole shop.** Still Khayt's closest direct competitor, as §0 and §7 say. Still no tax compliance (a tax label, not ZATCA). | Free (1 printer) / Pro $12/mo / Farm $39/mo, the same as §7. Some features are marked beta. | ✅ |
+| [Printlooper](https://printlooper.com) | A marketplace with three sides. Designers upload STL/3MF files and earn royalties. Sellers list products (including through Shopify) without holding stock. Suppliers (print farms) declare their materials and lead times and get routed orders. It pays out through Stripe Connect and makes labels through Shippo. | **Order routing to print farms.** A Khayt shop could be a supplier on it. Khayt is not a marketplace. Khayt Vault and makerrun cover the designer side for Khayt's own users. | It links to a pricing page, but no figures were shown. Stage unknown. Stripe Connect is not available in Saudi Arabia. | ✅ home page only |
+| [FlowForgeStudio](https://apps.microsoft.com/detail/9NLN89XTDLLK) | Windows price calculator and manager from a Dutch developer (publisher "FlowForgeStudio", support address at ziggo.nl). It computes cost from material, machine wear, electricity, labour and a failure margin, and suggests a price at a chosen margin. Runs locally with no account. Pro adds materials with multicolour costing, a file library, sending phone photos to the PC over home Wi-Fi, and an AI listing writer (MakerWorld titles and tags) with your own key. Dutch and English. | **Quoting / cost calculator.** Khayt's calculator already covers these inputs (`lib/calculator-cost.js`, `lib/depreciation.js`), and Khayt also has the job, invoice and VAT layer FlowForge lacks. | Free; Pro is a one-time in-app purchase (price not shown). Released 2026-09-29, no ratings yet. | ✅ Store product API |
+| [Print Planner](https://print-planner-rho.vercel.app) | Small React + Firebase web app: a print queue with priorities, customers (including "VIP"), printers, a "Printer Performance" analytics page, alerts for job added/finished/failed and low filament, an API key, and a guest mode with demo data. | **Job queue / customers.** All of it is already in Khayt. | No price, no maker named. On a default `*.vercel.app` address: an early project. | ⚠️ bundle strings only, page renders empty |
+| [FilAccount](https://github.com/CrashTestBrummy/filaccount) | Local-first filament inventory for Windows. The PC holds a SQLite database. A phone pairs over home Wi-Fi with a rotating code and works as the UPC/EAN label scanner, looking spools up in the bundled Open Filament Database. Manual usage and confirmed OrcaSlicer jobs deduct from stock. JSON backups include label photos. | **Filament accounting.** Khayt already has all of it: a barcode on the iPhone (`ios/KhaytCompanion/Models/ProductBarcode.swift`), the bundled OFD catalogue, and grams deducted from print actuals. | "Private beta, proprietary, all rights reserved" (no licence file). 0 stars, created and last pushed 2026-09-22. | ✅ README |
+
+### Worth acting on
+
+1. **Files that clear their own bed (FARMONE, FlowQ).** Two separate tools now ship
+   push-off ejection G-code, so `auto-dispatch.js` is wrong to assume that *no* printer clears
+   its plate. The small, safe step: let a job or file be marked "ejects itself", so that
+   after it finishes, dispatch does not wait for a person to confirm the bed is clear.
+   Writing ejection G-code inside Khayt is much bigger and riskier, because a bad push-off
+   sequence damages a machine. Leave that to the tools above. Worth a ticket. It only
+   matters to shops that run sweep sequences, and none of Khayt's known users do yet.
+2. **SnapCon, as the U1 peer to watch.** It is free, MIT-licensed, local, and built on a
+   25-printer U1 farm, the same printer Khayt treats as its bench. It has no shop layer, so it
+   is a complement more than a rival. But a U1 farm choosing a dashboard will find it first.
+   Two small ideas from it that Khayt lacks: **staggered bulk bed heating** (it keeps a shared
+   circuit from tripping) and **N copies spread over a printer group in one action**. Neither
+   is urgent.
+3. Nothing else. FoxTrack is unchanged since §7. FlowForgeStudio, Print Planner and FilAccount
+   are a subset of what Khayt already has. Printlooper is a marketplace that a Khayt shop
+   would sell *through*, not a replacement for Khayt, and its payouts depend on Stripe, which
+   is unavailable in Saudi Arabia.
+
+*Caveat, as §5–§7: listing/marketing pages, READMEs and app-bundle strings, not hands-on
+evaluations. They are enough to place a product, not to trust a feature matrix.*

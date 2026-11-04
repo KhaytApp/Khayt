@@ -5,6 +5,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **Mac: the Board in the redesign.** Each card is a thumbnail tile with the title and customer beside it, and a footer with the due date (a red pill when late) and what is owed. A job printing now shows the amber thread with its machine and time left. The red left edge and the colour-names line are gone, and the flag and the person it is assigned to stay. Each column head is the stage's dot, its name and its count.
+- **Docs: eight more products on the competitive watch list.** FARMONE 3D, SnapCon, FlowQ, FoxTrack (re-read), Printlooper, FlowForgeStudio, Print Planner and FilAccount are now in `docs/KHAYT-COMPETITIVE-ROADMAP.md`, each with what it overlaps and whether Khayt already has it; the two worth acting on are files that eject their own part, and SnapCon as the U1 fleet tool to watch.
 
 - **iPhone: the Home Screen widget in the redesign's colours.** The Khayt Queue widget was still in the 2025 indigo the app dropped. It now sits on the redesign's surface (white, or navy in dark). Counts are bold over small mono labels, and a print's percent is mono ink over the same amber thread bar the app uses for progress. The connection dot is the app's live green, or late red when offline. The lock-screen version is unchanged, since the system draws it in one tint.
 
