@@ -650,6 +650,7 @@
   "common.delete": "删除",
   "inv.qr_not_compliant": "此发票没有 ZATCA 二维码",
   "inv.qr_missing_vat": "请在设置中填写您的税号",
+  "inv.qr_foreign_currency": "此订单使用其他货币，且没有保存的汇率可换算为 SAR",
   "inv.qr_missing_seller": "请在设置中填写您的企业名称",
   "inv.qr_failed": "无法生成该二维码",
   "cal.model_saved": "模型已保存",

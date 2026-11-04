@@ -2282,7 +2282,7 @@ function openBatchPlannerModal() {
         <div style="font-weight:600;font-size:13px;">${escapeHtml(o.project || o.id)}</div>
         <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(o.id)} · ${o.printTime}h · ${Math.round(totalWeight)}g${matNames ? ' · ' + escapeHtml(matNames) : ''}${machine ? ' · <span style="color:' + safeCssColor(machine.color) + ';">' + escapeHtml(machine.name) + '</span>' : ''}</div>
       </div>
-      <span style="font-weight:600;color:var(--success);white-space:nowrap;">${fmtPrice(o.price)}</span>
+      <span style="font-weight:600;color:var(--success);white-space:nowrap;">${fmtOrderPrice(o.price, o)}</span>
     </label>`;
   }).join('');
 

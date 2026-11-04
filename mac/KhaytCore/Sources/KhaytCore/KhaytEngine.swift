@@ -7815,6 +7815,34 @@ public actor KhaytEngine {
                                  params: ["missing": .array(r.missing.map(JSONValue.string))])
     }
 
+    /// The total and VAT a ZATCA QR states, in riyals — `KhaytZatcaQr.qrAmounts`.
+    ///
+    /// Tags 4 and 5 carry a bare number that a scanner reads as SAR. A job
+    /// saved in a client's currency is converted at the rate stored on it
+    /// (`fxRate`); with none there is no honest figure, and the answer is the
+    /// refusal the document prints in the QR's place.
+    public enum ZatcaAmounts: Sendable, Equatable {
+        case amounts(total: Double, vatAmount: Double)
+        case refused(StatusGate.Reason)
+    }
+
+    public func zatcaAmounts(order: JSONValue, settings: [String: JSONValue],
+                             total: Double, vatAmount: Double) throws -> ZatcaAmounts {
+        struct Answer: Decodable {
+            let ok: Bool
+            let total: Double?
+            let vatAmount: Double?
+            let missing: [String]?
+        }
+        let r = try runtime.call2(
+            "KhaytZatcaQr.qrAmounts(ARG0, ARG1, {total: ARG2, vatAmount: ARG3})",
+            [order, .object(settings), .number(total), .number(vatAmount)], as: Answer.self)
+        if r.ok, let t = r.total, let v = r.vatAmount { return .amounts(total: t, vatAmount: v) }
+        return .refused(StatusGate.Reason(
+            code: "zatca_not_ready",
+            params: ["missing": .array((r.missing ?? []).map(JSONValue.string))]))
+    }
+
     /// The QR payload: five BER-TLV tags, base64'd.
     public func zatcaPayload(sellerName: String, vatNumber: String, timestamp: String,
                              total: String, vatAmount: String) throws -> String {

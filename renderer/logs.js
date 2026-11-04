@@ -274,7 +274,7 @@ function renderLogs() {
       </td>
       <td>${paymentBadge(log)}</td>
       <td style="font-size: 12.5px; color: var(--text-dim);">${escapeHtml(log.material)}</td>
-      <td style="color: var(--success); font-weight: 600; font-variant-numeric: tabular-nums; white-space:nowrap;">${fmtPrice(log.price)}</td>
+      <td style="color: var(--success); font-weight: 600; font-variant-numeric: tabular-nums; white-space:nowrap;">${fmtOrderPrice(log.price, log)}</td>
       <td style="text-align:center;">${marginHtml}</td>
       <td class="log-actions-td">
         <div class="row-actions-wrap">
@@ -439,7 +439,7 @@ function batchWaSend() {
     if (!o) return '';
     const client = o.clientId ? clientById(o.clientId) : null;
     const name = client ? (localName(client)) : (o.project || '');
-    return `<div style="font-size:12px;color:var(--text-dim);padding:2px 0;">${escapeHtml(o.id)} — ${escapeHtml(name)} — ${fmtPrice(o.price)}</div>`;
+    return `<div style="font-size:12px;color:var(--text-dim);padding:2px 0;">${escapeHtml(o.id)} — ${escapeHtml(name)} — ${fmtOrderPrice(o.price, o)}</div>`;
   }).join('');
   openFormModal({
     title: `${t('batch.wa_all')} (${ids.length})`,

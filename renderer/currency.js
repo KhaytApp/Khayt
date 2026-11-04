@@ -54,6 +54,20 @@
     return M().orderCurrency(o, ctx(), CURRENCIES);
   }
 
+  /**
+   * One of a JOB's own figures (its price, what it still owes), written in
+   * the job's currency. `fmtPrice` puts the SHOP's mark on whatever it is
+   * handed, and since a job is converted into the client's currency when it
+   * is saved (lib/order-new.js jobCurrency) a EUR job's 100 read "100.00 SAR"
+   * in the orders log, on the board and in a customer's history. The shop's
+   * own currency still goes through `fmtPrice`, so those rows are unchanged.
+   */
+  function fmtOrderPrice(n, o) {
+    const code = orderCurrency(o || {});
+    const base = global.settings?.currency || 'SAR';
+    return !code || code === base ? fmtPrice(n) : fmtMoneyIn(n, code);
+  }
+
   function convertToBase(amount, fromCurrency) {
     return M().convertToBase(amount, fromCurrency, ctx());
   }
@@ -140,6 +154,7 @@
     fmtPrice,
     currencySymbol,
     fmtMoneyIn,
+    fmtOrderPrice,
     clientCurrency,
     orderCurrency,
     convertToBase,

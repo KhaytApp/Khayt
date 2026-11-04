@@ -441,6 +441,20 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         return figures?.owed ?? max(0, price - paidAmount)
     }
 
+    /// How far through settling this job is, 0…1 — the Owed meter under the
+    /// figure in the jobs table.
+    ///
+    /// The share of what the job is settled against (`due`) that is no longer
+    /// owed, read off `owedInOwnCurrency` — the figure printed above the meter
+    /// — so the two cannot disagree. It was `paidAmount / due`, which ignores
+    /// credit notes and gift cards: a 1,000 job with 500 paid and a 300 credit
+    /// note read "200" owed over a half-full bar.
+    var settledFraction: Double {
+        let billed = figures?.due ?? price
+        guard billed > 0 else { return 0 }
+        return min(1, max(0, 1 - owedInOwnCurrency / billed))
+    }
+
     /// Whether the attention engine calls this job late, resolved once per
     /// load by `Shop` — the same answer the dashboard's Late tile shows.
     var isLateResolved: Bool?

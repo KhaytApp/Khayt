@@ -798,6 +798,12 @@ async function renderInvoiceForOrder(order, opts = {}) {
     // A QR missing a required tag SCANS and is invalid, which is worse than an
     // empty box: a code that reads invites no question. Refuse to draw one.
     const ready = zatcaQrReadiness(settings);
+    // Tags 4 and 5 are riyals. A job saved in a client's currency is converted
+    // at the rate stored on it; with none, there is no honest figure to state
+    // and the QR is refused like a missing VAT number (lib/zatca-qr.js qrAmounts).
+    const qrMoney = ZatcaQr().qrAmounts(order, settings, { total: _tax.total, vatAmount: vatAmt });
+    if (!qrMoney.ok) ready.missing = ready.missing.concat(qrMoney.missing);
+    ready.ok = ready.ok && qrMoney.ok;
     if (!ready.ok) {
       qrProblem = ready.missing.map((k) => t(k)).join(' · ');
       if (typeof toast === 'function') toast(t('inv.qr_not_compliant') + ' — ' + qrProblem, 'error', 12000);
@@ -848,7 +854,8 @@ async function renderInvoiceForOrder(order, opts = {}) {
         }
       } else {
         // Phase 1 fallback
-        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts, total, vatAmount });
+        tlvB64 = buildZatcaTLV({ sellerName: shopName() || '', vatNumber: settings.vat || '', timestamp: ts,
+          total: fmtMoney(qrMoney.total), vatAmount: fmtMoney(qrMoney.vatAmount) });
       }
       qrSvg = await window.hubAPI.generateQR(tlvB64, { width: 140, margin: 1 });
     } catch (e) {

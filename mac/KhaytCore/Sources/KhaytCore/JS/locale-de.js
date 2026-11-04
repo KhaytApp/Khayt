@@ -650,6 +650,7 @@
   "common.delete": "Löschen",
   "inv.qr_not_compliant": "Diese Rechnung hat keinen ZATCA-QR-Code",
   "inv.qr_missing_vat": "Umsatzsteuer-Nummer in den Einstellungen eintragen",
+  "inv.qr_foreign_currency": "dieser Auftrag ist in einer anderen Währung und hat keinen gespeicherten Kurs, um ihn in SAR anzugeben",
   "inv.qr_missing_seller": "Firmennamen in den Einstellungen eintragen",
   "inv.qr_failed": "Der Code konnte nicht erzeugt werden",
   "cal.model_saved": "Modell gespeichert",

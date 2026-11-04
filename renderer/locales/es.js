@@ -650,6 +650,7 @@
   "common.delete": "Eliminar",
   "inv.qr_not_compliant": "Esta factura no tiene código QR de ZATCA",
   "inv.qr_missing_vat": "añade tu número de IVA en Ajustes",
+  "inv.qr_foreign_currency": "este trabajo está en otra moneda y no tiene un tipo de cambio guardado para expresarlo en SAR",
   "inv.qr_missing_seller": "añade el nombre de tu negocio en Ajustes",
   "inv.qr_failed": "no se pudo generar el código",
   "cal.model_saved": "Modelo guardado",

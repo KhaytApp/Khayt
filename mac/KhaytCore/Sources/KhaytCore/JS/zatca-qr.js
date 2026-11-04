@@ -123,6 +123,42 @@ function issueTimestamp(input) {
   return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/**
+ * The total and VAT that tags 4 and 5 carry, in RIYALS — or why they cannot be.
+ *
+ * The tags hold a bare number with no currency, and a scanner reads it as SAR;
+ * the VAT Implementing Regulations (art. 53(5)(j)) want the VAT amount stated
+ * in SAR whatever currency the invoice is written in. Since a job is converted
+ * into the client's currency when it is saved (lib/order-new.js jobCurrency),
+ * a EUR client's 100 EUR job put "100" into a Saudi tax QR.
+ *
+ * - a job in SAR (its own `currency`, else the shop's) passes as it is;
+ * - a job in another currency is converted at the rate STORED on it when it
+ *   was saved (`fxRate`, shop currency per one unit), and only when the shop's
+ *   currency is SAR, because that is what the rate is in. Never today's rate
+ *   from Settings: the QR must agree with the invoice the customer was given;
+ * - with no stored rate there is no honest riyal figure, so no QR:
+ *   `{ ok: false, missing: ['inv.qr_foreign_currency'] }`, which the document
+ *   prints in the QR's place as it does a missing VAT number.
+ *
+ * `amounts` is `{ total, vatAmount }` in the job's own currency. Returns
+ * `{ ok: true, total, vatAmount }` (numbers, to the halala) or the refusal.
+ */
+function qrAmounts(order, settings, amounts) {
+  const o = order || {};
+  const base = String((settings && settings.currency) || 'SAR');
+  const code = String(o.currency || base);
+  const a = amounts || {};
+  const total = Number(a.total) || 0;
+  const vat = Number(a.vatAmount) || 0;
+  if (code === 'SAR') return { ok: true, total: toHalala(total), vatAmount: toHalala(vat) };
+  const rate = Number(o.fxRate);
+  if (base === 'SAR' && Number.isFinite(rate) && rate > 0) {
+    return { ok: true, total: toHalala(total * rate), vatAmount: toHalala(vat * rate) };
+  }
+  return { ok: false, missing: ['inv.qr_foreign_currency'] };
+}
+
 function buildTLV({ sellerName, vatNumber, timestamp, total, vatAmount }, ctx) {
   function tlv(tag, value) {
     const bytes = utf8(value);
@@ -392,7 +428,7 @@ function receiptToExpenseDraft(receipt, ctx) {
   };
 }
 
-  const api = { readiness, buildTLV, issueTimestamp, utf8, base64,
+  const api = { readiness, qrAmounts, buildTLV, issueTimestamp, utf8, base64,
                 decodeTLV, receiptToExpenseDraft, receiptRef, receiptDay, cleanSellerName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytZatcaQr = api;

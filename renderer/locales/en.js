@@ -650,6 +650,7 @@
   "common.delete": "Delete",
   "inv.qr_not_compliant": "This invoice has no ZATCA QR code",
   "inv.qr_missing_vat": "add your VAT number in Settings",
+  "inv.qr_foreign_currency": "this job is in another currency and has no saved rate to state it in SAR",
   "inv.qr_missing_seller": "add your business name in Settings",
   "inv.qr_failed": "the code could not be generated",
   "cal.model_saved": "Model saved",

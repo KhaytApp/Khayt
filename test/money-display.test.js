@@ -1,0 +1,131 @@
+'use strict';
+/**
+ * Three money-display faults found in review (Nov 2026), all of them a job in
+ * a client's currency since convert-at-save (#2148):
+ *
+ *  1. The ZATCA QR stated a EUR job's total and VAT as bare numbers, which a
+ *     scanner reads as riyals. Tags 4 and 5 are SAR; the rate the job was
+ *     converted at is now stored on it (`fxRate`) and the QR uses that, or
+ *     refuses (lib/zatca-qr.js qrAmounts).
+ *  2. (Mac only — the desktop draws no Owed meter.)
+ *  3. The desktop put the SHOP's mark on a job's own-currency price in the
+ *     orders log, the board and a customer's history (`fmtOrderPrice`).
+ */
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.join(__dirname, '..');
+const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+require('../lib/pricing.js');
+const N = require('../lib/order-new.js');
+const QR = require('../lib/zatca-qr.js');
+
+const NOW = new Date('2026-09-04T09:15:00.000Z');
+const TOKENS = { tracking: new Uint8Array(16).fill(0xab), quoteApproval: new Uint8Array(16).fill(0xcd) };
+const shop = (extra) => Object.assign({
+  currency: 'SAR', invNumNext: 5, invNumYear: 2026, quoteNumNext: 1, quoteNumYear: 2026,
+  exchangeRates: { EUR: 4 },
+}, extra || {});
+const job = (input, settings, clients) => N.newOrder(Object.assign({
+  parts: [{ name: 'p', material: 'PLA', baseCost: 100, printTime: 2, qty: 1 }],
+  margin: 15,
+}, input), { settings: settings || shop(), orders: [], now: NOW, tokens: TOKENS, clients: clients || [] });
+
+/* ── 1. The rate is kept on the job ───────────────────────────────────────── */
+
+test('a converted job keeps the rate it was converted at; an ordinary one does not', () => {
+  const eur = job({ clientId: 'C1' }, shop(), [{ id: 'C1', currency: 'EUR' }]);
+  assert.equal(eur.currency, 'EUR');
+  assert.equal(eur.fxRate, 4);
+  const sar = job({});
+  assert.equal('fxRate' in sar, false, 'a job in the shop currency keeps its shape');
+  // No rate in Settings: the job is stamped in the shop's currency, unconverted.
+  const none = job({ clientId: 'C1' }, shop({ exchangeRates: {} }), [{ id: 'C1', currency: 'EUR' }]);
+  assert.equal(none.currency, 'SAR');
+  assert.equal('fxRate' in none, false);
+});
+
+/* ── 1. The QR states riyals ──────────────────────────────────────────────── */
+
+test('qrAmounts: SAR passes, a foreign job converts at its STORED rate', () => {
+  const s = { currency: 'SAR', exchangeRates: { EUR: 9 } };   // today's rate is NOT used
+  assert.deepEqual(QR.qrAmounts({}, s, { total: 115, vatAmount: 15 }),
+    { ok: true, total: 115, vatAmount: 15 });
+  assert.deepEqual(QR.qrAmounts({ currency: 'SAR' }, s, { total: 115, vatAmount: 15 }),
+    { ok: true, total: 115, vatAmount: 15 });
+  assert.deepEqual(QR.qrAmounts({ currency: 'EUR', fxRate: 4 }, s, { total: 28.75, vatAmount: 3.75 }),
+    { ok: true, total: 115, vatAmount: 15 });
+});
+
+test('qrAmounts: a foreign job with no stored rate gets no QR, and says why', () => {
+  const s = { currency: 'SAR', exchangeRates: { EUR: 4 } };
+  const r = QR.qrAmounts({ currency: 'EUR' }, s, { total: 28.75, vatAmount: 3.75 });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.missing, ['inv.qr_foreign_currency']);
+  // A rate is shop-currency per unit; on a shop that is not in SAR it is no
+  // riyal figure, so a foreign job there is refused too.
+  assert.equal(QR.qrAmounts({ currency: 'EUR', fxRate: 1.1 }, { currency: 'USD' },
+    { total: 10, vatAmount: 1 }).ok, false);
+});
+
+test('a EUR job saved today puts its riyal value in tags 4 and 5', () => {
+  const eur = job({ clientId: 'C1' }, shop(), [{ id: 'C1', currency: 'EUR' }]);
+  const vat = +(eur.price * 15 / 115).toFixed(2);
+  const m = QR.qrAmounts(eur, shop(), { total: eur.price, vatAmount: vat });
+  assert.equal(m.ok, true);
+  const tlv = QR.buildTLV({ sellerName: 'Shop', vatNumber: '300000000000003',
+    timestamp: eur.timestamp, total: m.total.toFixed(2), vatAmount: m.vatAmount.toFixed(2) }, {});
+  const back = QR.decodeTLV(tlv);
+  assert.equal(back.ok, true);
+  assert.equal(back.receipt.total, 115);
+  assert.equal(back.receipt.vatAmount, 15);
+});
+
+test('both apps build the QR from qrAmounts, not from the job-currency figures', () => {
+  const inv = read('renderer/invoicing.js');
+  assert.match(inv, /ZatcaQr\(\)\.qrAmounts\(order, settings, \{ total: _tax\.total, vatAmount: vatAmt \}\)/);
+  assert.match(inv, /total: fmtMoney\(qrMoney\.total\), vatAmount: fmtMoney\(qrMoney\.vatAmount\)/);
+  const mac = read('mac/KhaytCore/Sources/KhaytApp/Invoice.swift');
+  assert.match(mac, /engine\.zatcaAmounts\(/);
+  assert.match(mac, /total: Self\.amount\(total\),\s+vatAmount: Self\.amount\(vat\)\)/);
+  assert.match(read('mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift'), /KhaytZatcaQr\.qrAmounts\(ARG0, ARG1/);
+});
+
+test('the refusal reads in every desktop language', () => {
+  const dir = path.join(ROOT, 'renderer', 'locales');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+    assert.match(read(path.join('renderer', 'locales', f)), /"inv\.qr_foreign_currency": "[^"]+"/, f);
+  }
+});
+
+/* ── 3. A job's price wears the job's currency ────────────────────────────── */
+
+test('fmtOrderPrice: the shop currency is unchanged, a foreign job carries its own mark', () => {
+  require('../renderer/format.js');
+  const { fmtOrderPrice, fmtPrice } = require('../renderer/currency.js');
+  global.settings = { currency: 'SAR', exchangeRates: { EUR: 4 } };
+  global.clients = [{ id: 'C1', currency: 'EUR' }];
+  assert.equal(fmtOrderPrice(115, {}), fmtPrice(115));
+  assert.equal(fmtOrderPrice(115, { currency: 'SAR' }), fmtPrice(115));
+  const eur = fmtOrderPrice(28.75, { currency: 'EUR' });
+  assert.match(eur, /28\.75/);
+  assert.match(eur, /€/);
+  assert.doesNotMatch(eur, /SAR|⃁|ر\.س/);
+});
+
+test('the job lists format a job price through fmtOrderPrice', () => {
+  const sites = {
+    'renderer/logs.js': /fmtOrderPrice\(log\.price, log\)/,
+    'renderer/kanban.js': /fmtOrderPrice\(log\.price, log\)/,
+    'renderer/clients.js': /fmtOrderPrice\(o\.price, o\)/,
+    'renderer/dashboard.js': /fmtOrderPrice\(o\.price, o\)/,
+    'renderer/expenses.js': /fmtOrderPrice\(order\.price, order\)/,
+  };
+  for (const [file, re] of Object.entries(sites)) {
+    const src = read(file);
+    assert.match(src, re, file);
+    assert.doesNotMatch(src, /fmtPrice\((o|log|q)\.price\)/, `${file} still puts the shop's mark on a job price`);
+  }
+});

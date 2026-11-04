@@ -650,6 +650,7 @@
   "common.delete": "Sil",
   "inv.qr_not_compliant": "Bu faturada ZATCA QR kodu yok",
   "inv.qr_missing_vat": "Ayarlar’da vergi numaranızı girin",
+  "inv.qr_foreign_currency": "bu iş başka bir para biriminde ve SAR olarak göstermek için kayıtlı bir kuru yok",
   "inv.qr_missing_seller": "Ayarlar’da işletme adınızı girin",
   "inv.qr_failed": "kod oluşturulamadı",
   "cal.model_saved": "Model kaydedildi",
