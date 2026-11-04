@@ -663,6 +663,29 @@ function testStoreOwnership() {
   return record;
 }
 
+/**
+ * A toast's Undo button takes a REAL click. The container is pointer-events:
+ * none so its corner stays usable, and no toast took them back, so every Undo
+ * (delete a job, a part, a client, a portal deposit…) was drawn and inert from
+ * v1.0.0 on. A scripted el.click() never noticed: only a mouse at the button's
+ * coordinates goes through hit-testing, which is what a person does.
+ */
+async function testToastButtonClickable(window) {
+  await window.evaluate(() => {
+    window.__e2eUndo = 0;
+    toast('e2e undo', 'info', 20000, { undo: () => { window.__e2eUndo++; } });
+  });
+  await window.waitForSelector('.toast .undo-btn');
+  await window.waitForTimeout(300); // past the toastIn animation
+  const at = await window.evaluate(() => {
+    const r = document.querySelector('.toast .undo-btn').getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  await window.mouse.click(at.x, at.y);
+  const ran = await window.evaluate(() => window.__e2eUndo);
+  if (ran !== 1) throw new Error(`a toast's Undo did not take a real click (ran ${ran} times)`);
+}
+
 try {
   ({ electronApp } = await launchApp(userData));
   const window = await electronApp.firstWindow();
@@ -686,6 +709,7 @@ try {
   await testPruneArchived(window);
   await testMilestoneProforma(window);
   await testClientCurrencyQuote(window);
+  await testToastButtonClickable(window);
   const owner = testStoreOwnership();
 
   console.log(
