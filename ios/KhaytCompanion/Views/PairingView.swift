@@ -241,7 +241,7 @@ struct PairingView: View {
                 .textContentType(.password)
                 .focused($pinFocused)
                 .font(.khayt(26, .semibold, relativeTo: .title))
-                .tracking(8)
+                .khaytTracking(8)
                 .padding(.horizontal, 18)
                 .frame(minHeight: 64)
                 .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
@@ -421,7 +421,7 @@ struct PairingView: View {
     private func eyebrow(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-            .tracking(1.05)
+            .khaytTracking(1.05)
             .foregroundStyle(KhaytDesign.note)
     }
 

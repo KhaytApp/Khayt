@@ -55,7 +55,7 @@ struct EndOfDayView: View {
                             .foregroundStyle(value == "—" ? KhaytDesign.note : tint)
                             .lineLimit(1).minimumScaleFactor(0.6)
                         Text(label.uppercased())
-                            .font(.khayt(9.5, .bold, relativeTo: .caption2)).tracking(1)
+                            .font(.khayt(9.5, .bold, relativeTo: .caption2)).khaytTracking(1)
                             .foregroundStyle(KhaytDesign.note)
                         if value == "—" {
                             Text(L10n.tr("pulse.on_the_mac"))
@@ -81,7 +81,7 @@ struct EndOfDayView: View {
     private func list(_ title: String, _ jobs: [EndOfDay.Job], empty: String, money: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title.uppercased())
-                .font(.khayt(10, .bold, relativeTo: .caption2)).tracking(1)
+                .font(.khayt(10, .bold, relativeTo: .caption2)).khaytTracking(1)
                 .foregroundStyle(KhaytDesign.note)
                 .padding(.bottom, 8)
             if jobs.isEmpty {

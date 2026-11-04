@@ -400,7 +400,7 @@ struct OrderDetailContent: View {
                 if order.isOverdue {
                     Text(L10n.tr("orders.late"))
                         .font(.khayt(11, .bold, relativeTo: .caption2))
-                        .tracking(0.6)
+                        .khaytTracking(0.6)
                         .padding(.horizontal, 10).padding(.vertical, 3)
                         .foregroundStyle(KhaytDesign.late)
                         .background(KhaytDesign.late.opacity(0.14), in: Capsule())
@@ -434,7 +434,7 @@ struct OrderDetailContent: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(L10n.tr("order.detail.print_progress").uppercased())
                     .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                    .tracking(1.05)
+                    .khaytTracking(1.05)
                     .foregroundStyle(KhaytDesign.note)
                 Spacer()
                 Text("\(progress)%")
@@ -555,7 +555,7 @@ struct OrderDetailContent: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(L10n.tr("pulse.move_to").uppercased())
                 .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .tracking(1.05)
+                .khaytTracking(1.05)
                 .foregroundStyle(KhaytDesign.note)
                 .padding(.horizontal, 2)
             StageStepper(stages: Self.stages, current: current, disabled: isUpdating) { onSetStatus($0.rawValue) }

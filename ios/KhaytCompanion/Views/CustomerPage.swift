@@ -100,7 +100,7 @@ struct CustomerPage: View {
     private func header(_ text: String) -> some View {
         Text(L10n.usesArabicLayout ? text : text.uppercased())
             .font(L10n.usesArabicLayout ? .khayt(11, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
-            .tracking(L10n.usesArabicLayout ? 0 : 0.8)
+            .khaytTracking(0.8)
             .foregroundStyle(KhaytDesign.note)
     }
 

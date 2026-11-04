@@ -114,7 +114,7 @@ struct CalculatorView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.tr("calc.charge").uppercased())
                     .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                    .tracking(1.05)
+                    .khaytTracking(1.05)
                     .foregroundStyle(KhaytDesign.note)
                 Text(model.answer.map { Money.text($0.quoted.total, currency) } ?? "—")
                     .font(.khayt(36, .semibold, relativeTo: .largeTitle).monospacedDigit())
@@ -162,7 +162,7 @@ struct CalculatorView: View {
         let total = max(0.0001, p.total)
         return VStack(alignment: .leading, spacing: 10) {
             Text(L10n.tr("calc.per_piece").uppercased())
-                .font(.khayt(10, .bold, relativeTo: .caption2)).tracking(1)
+                .font(.khayt(10, .bold, relativeTo: .caption2)).khaytTracking(1)
                 .foregroundStyle(KhaytDesign.note)
             GeometryReader { geo in
                 HStack(spacing: 2) {
@@ -469,7 +469,7 @@ struct CalculatorView: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.khayt(10, .bold, relativeTo: .caption2))
-            .tracking(1)
+            .khaytTracking(1)
             .foregroundStyle(KhaytDesign.note)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -478,7 +478,7 @@ struct CalculatorView: View {
     private func eyebrow(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-            .tracking(1.05)
+            .khaytTracking(1.05)
             .foregroundStyle(KhaytDesign.note)
             .padding(.horizontal, 2)
             .padding(.top, 8)
