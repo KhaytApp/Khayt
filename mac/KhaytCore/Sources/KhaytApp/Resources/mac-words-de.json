@@ -781,6 +781,7 @@
  "mac.fixed_remove": "Diese Kosten entfernen",
  "mac.fixed_section": "Monatliche Kosten",
  "mac.fixed_total": "Jeden Monat:",
+ "mac.fleet_service": "{n} in Wartung",
  "mac.fleet_offline": "{n} antworten nicht",
  "mac.flow_factor": "Fluss (100 % = wie im Slicer)",
  "mac.full_spool": "Volle Spule",

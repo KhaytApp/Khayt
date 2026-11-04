@@ -60,7 +60,16 @@ struct MachineBandView: View {
     private var hasSomethingToShow: Bool { band.countedMachines > 0 }
 
     /// Nothing can be timed and at least one printer is simply not answering.
-    private var noneAnswering: Bool { band.rows.contains { $0.state == "offline" } }
+    /// A printer the shop put under service is "offline" to the band too, but
+    /// it is not one that stopped answering: telling the shop to "check that
+    /// it is switched on" about a machine they switched off on purpose was the
+    /// beta.19 review's Machines screen.
+    private var noneAnswering: Bool {
+        band.rows.contains { row in
+            row.state == "offline"
+                && shop.machines.first(where: { $0.id == row.machineId })?.isUnderService != true
+        }
+    }
 
     var body: some View {
         if hasSomethingToShow { full } else { nothingYet }

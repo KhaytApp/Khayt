@@ -358,9 +358,12 @@ struct MachineCards: View {
                                 .font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary)
                         }
                     }
-                } else {
-                    // Why it is quiet, in the one rule's words (`Shop.quiet`).
-                    Text(words.callIt(quiet == .noProtocol ? "mac.cannot_ask" : quiet.wordKey))
+                } else if let line = quietLine(quiet) {
+                    // Why it is quiet, in the one rule's words (`Shop.quiet`) —
+                    // but not the pill's word again: "Under service" sat in the
+                    // pill and on the line below it (beta.19). Under service
+                    // says the shop's own reason instead, when it gave one.
+                    Text(line)
                         .font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
@@ -372,6 +375,22 @@ struct MachineCards: View {
             .onHover { hovering = $0 }
             .onTapGesture { shop.shelf = .machines }
             .help(machine.name)
+        }
+
+        /// The line under a quiet machine's name, or nil when the pill has
+        /// already said all there is.
+        private func quietLine(_ quiet: Shop.Quiet) -> String? {
+            let words = shop.words
+            switch quiet {
+            case .underService:
+                return machine.underServiceReason
+            case .idle, .notAnswering:
+                return nil
+            case .noProtocol:
+                return words.callIt("mac.cannot_ask")
+            default:
+                return words.callIt(quiet.wordKey)
+            }
         }
 
         @ViewBuilder private func pill(_ quiet: Shop.Quiet) -> some View {

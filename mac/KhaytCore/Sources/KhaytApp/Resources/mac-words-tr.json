@@ -781,6 +781,7 @@
  "mac.fixed_remove": "Bu maliyeti kaldır",
  "mac.fixed_section": "Aylık maliyetler",
  "mac.fixed_total": "Her ay:",
+ "mac.fleet_service": "{n} bakımda",
  "mac.fleet_offline": "{n} yanıt vermiyor",
  "mac.flow_factor": "Akış (%100 dilimlendiği gibi)",
  "mac.full_spool": "Dolu makara",

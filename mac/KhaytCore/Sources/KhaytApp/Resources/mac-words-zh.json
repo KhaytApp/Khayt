@@ -781,6 +781,7 @@
  "mac.fixed_remove": "移除此成本",
  "mac.fixed_section": "每月成本",
  "mac.fixed_total": "每月合计：",
+ "mac.fleet_service": "{n} 台维护中",
  "mac.fleet_offline": "{n} 台无响应",
  "mac.flow_factor": "流量（100% 为切片值）",
  "mac.full_spool": "满盘",

@@ -200,7 +200,8 @@ test('no inventory means no stock warnings, not an error', () => {
 
 test('a spool warning never outranks a machine that has stopped', () => {
   const { items } = selectAttention({
-    machines: [{ id: 'M1', name: 'X1C', isOffline: true }],
+    machines: [{ id: 'M1', name: 'X1C' }],
+    statusCache: { M1: { state: 'error' } },
     inventory: [{ id: 's1', material: 'PA-CF', weight: 40 }],
     lowStock, now: Date.UTC(2026, 8, 8),
   });
@@ -251,4 +252,14 @@ test('selectUnpricedFinished: the shop\'s real book, nineteen tests beside one p
 test('selectUnpricedFinished stays out of selectAttention, which the desktop themes list line by line', () => {
   const r = selectAttention({ orders: [{ id: 'zero', status: 'completed', price: 0 }], now: NOW });
   assert.equal(r.count, 0);
+});
+
+test('a machine the shop put under service is not something that needs them', () => {
+  const now = Date.UTC(2026, 10, 4);
+  for (const m of [{ id: 'M1', name: 'U1', isOffline: true }, { id: 'M1', name: 'U1', status: 'offline' }]) {
+    const { items } = selectAttention({ machines: [m], statusCache: { M1: { state: 'error' } }, now });
+    assert.equal(items.filter(i => i.kind === 'machine').length, 0, JSON.stringify(m));
+  }
+  // The rule for the machine itself is unchanged: it still reads as offline.
+  assert.equal(machineState({ id: 'M1', isOffline: true }, null), 'offline');
 });

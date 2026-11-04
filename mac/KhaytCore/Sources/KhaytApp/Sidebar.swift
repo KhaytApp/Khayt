@@ -220,6 +220,16 @@ struct Sidebar: View {
         /// colour before the count.
         var live = false
         @Environment(\.accessibilityReduceMotion) private var reduced
+        /// `.increased` while the system draws the selection FILLED in the
+        /// accent (the sidebar has focus). Its text is white then; forcing the
+        /// brand blue on top of a blue capsule made the selected row unreadable
+        /// (beta.19, every screen, whenever the sidebar was clicked).
+        @Environment(\.backgroundProminence) private var prominence
+
+        /// The brand ink on a quiet selection, the system's own on a filled one.
+        private var ink: AnyShapeStyle {
+            selected && prominence != .increased ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary)
+        }
 
         var body: some View {
             HStack {
@@ -234,7 +244,7 @@ struct Sidebar: View {
                         Drawn(mark: mark, size: 16).frame(width: 18, alignment: .center)
                         Text(title)
                     }
-                    .foregroundStyle(selected ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
+                    .foregroundStyle(ink)
                 } else if let dot {
                     HStack(spacing: 6) {
                         Circle().fill(dot).frame(width: 6, height: 6)
@@ -243,7 +253,7 @@ struct Sidebar: View {
                     }
                 } else {
                     Label(title, systemImage: symbol)
-                        .foregroundStyle(selected ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
+                        .foregroundStyle(ink)
                 }
                 Spacer(minLength: 8)
                 if live {

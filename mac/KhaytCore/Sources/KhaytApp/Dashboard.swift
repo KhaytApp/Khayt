@@ -96,9 +96,7 @@ struct Dashboard: View {
             value: words.callIt("mac.n_of_m", ["n": .number(Double(facts.printingCount)),
                                                "m": .number(Double(facts.fleet.total))]),
             detail: latestFinish.map { words.callIt("mac.eta") + " " + PrinterWatch.spell($0, words) }
-                ?? (facts.fleet.offline > 0
-                    ? words.callIt("mac.fleet_offline", ["n": .number(Double(facts.fleet.offline))])
-                    : nil)))
+                ?? fleetNote(facts)))
         let low = items.filter { $0.kind == "stock" }.count
         cards.append(TodayStatCard(
             label: words.callIt("mac.filament_shelf"),
@@ -106,6 +104,20 @@ struct Dashboard: View {
             detail: low > 0 ? words.callIt("mac.today_low", ["n": .number(Double(low))]) : nil,
             detailColor: Khayt.attention))
         return cards
+    }
+
+    /// Why machines are not printing: the shop's own Under service, said as
+    /// that, apart from the ones that have stopped answering. The fleet count
+    /// hands an under-service machine to the shared rule as down
+    /// (`Shop.machineFleet`), so "1 not answering" was said of a printer the
+    /// shop had switched off on purpose.
+    private func fleetNote(_ facts: DashboardFacts) -> String? {
+        let words = shop.words
+        let service = shop.machines.filter { $0.isUnderService && shop.inSite(machine: $0.id) }.count
+        let silent = max(0, facts.fleet.offline - service)
+        if silent > 0 { return words.callIt("mac.fleet_offline", ["n": .number(Double(silent))]) }
+        if service > 0 { return words.callIt("mac.fleet_service", ["n": .number(Double(service))]) }
+        return nil
     }
 
     var body: some View {

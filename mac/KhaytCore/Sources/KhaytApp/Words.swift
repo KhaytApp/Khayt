@@ -702,6 +702,7 @@ final class Words {
         "mac.attn_nozzle_of":  ["en": "past {n} g",    "ar": "تجاوزت {n} غ"],
         "mac.attn_more":       ["en": "and {n} more",  "ar": "و{n} أخرى"],
         "mac.attn_see_all":    ["en": "See all",       "ar": "اعرض الكل"],
+        "mac.fleet_service": ["en": "{n} under service", "ar": "{n} قيد الصيانة"],
         "mac.fleet_offline": ["en": "{n} not answering", "ar": "{n} لا تجيب"],
         // The band: the next two days on the machines
         "mac.band_title":    ["en": "The next 48 hours",  "ar": "الـ 48 ساعة القادمة"],

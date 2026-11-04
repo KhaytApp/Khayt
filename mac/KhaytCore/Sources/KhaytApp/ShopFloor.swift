@@ -773,6 +773,7 @@ struct Inventory: View {
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ToOrderRow(shop: shop)
                             .padding(.bottom, 14)
+                            .padding([.horizontal, .top], Metric.screen)
                     }
                     // The WHOLE shelf now, not only what is urgent on it —
                     // see `ConsumablesCard`. Still only when nothing is being
@@ -796,6 +797,11 @@ struct Inventory: View {
                                   ? Khayt.attention : nil,
                                   padding: 14)
                             .padding(.bottom, 14)
+                            // In from the edges like the spool grid under it:
+                            // the cards above and below the grid ran from the
+                            // sidebar to the window edge (beta.19 review).
+                            .padding(.horizontal, Metric.screen)
+                            .padding(.top, Metric.screen)
                     }
                     // ── WHAT IT COSTS, ABOVE WHAT IS ON IT ────────────────
                     //
@@ -821,10 +827,12 @@ struct Inventory: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 14)
                                 .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
                         } else {
                             MaterialCostCard(shop: shop, report: prices)
                                 .card(rail: Khayt.brand, padding: 14)
                                 .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
                         }
                     }
                     // ── WHAT WAS PAID, UNDER WHAT IT COSTS ────────────────
@@ -961,6 +969,7 @@ struct Inventory: View {
                         SuppliersCard(shop: shop)
                             .card(padding: 14)
                             .padding(.bottom, 14)
+                            .padding(.horizontal, Metric.screen)
                     }
                 }
                 .background(Khayt.ground)

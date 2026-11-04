@@ -781,6 +781,7 @@
  "mac.fixed_remove": "Quitar este costo",
  "mac.fixed_section": "Costos mensuales",
  "mac.fixed_total": "Cada mes:",
+ "mac.fleet_service": "{n} en mantenimiento",
  "mac.fleet_offline": "{n} sin responder",
  "mac.flow_factor": "Flujo (100 % es como se laminó)",
  "mac.full_spool": "Bobina completa",
