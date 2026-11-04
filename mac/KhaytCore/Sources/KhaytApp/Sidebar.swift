@@ -86,7 +86,11 @@ struct Sidebar: View {
                             .tag(Shop.Shelf.library(group))
                     }
                 } label: {
-                    Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
+                    // What All models shows: an archived model is still in the
+                    // book but not on the shelf, and counting it made the row
+                    // say 14,343 over a screen of 14,307 (beta.19 review).
+                    Row(title: shop.words.callIt("mac.all_models"), mark: .library,
+                        count: shop.files.count { !$0.isArchived },
                         selected: shop.shelf.sameScreen(as: .library(nil)))
                         .tag(Shop.Shelf.library(nil))
                 }

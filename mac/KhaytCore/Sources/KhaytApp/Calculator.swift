@@ -194,7 +194,10 @@ struct Calculator: View {
                 DetailSection(shop.words.callIt("mac.calc_part"),
                               accent: Color.secondary, symbol: "wrench.and.screwdriver.fill") {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
+                        // Bottom-aligned: the two fields carry a label above
+                        // them, and the centred stepper floated between the
+                        // label and the box (beta.19 review).
+                        HStack(alignment: .bottom, spacing: 10) {
                             firstLineField
                             field(shop.words.callIt("mac.calc_time"), $model.hours,
                                   unit: shop.words.callIt("common.hours"))
@@ -207,6 +210,7 @@ struct Calculator: View {
                                 .font(.callout)
                             }
                             .fixedSize()
+                            .padding(.bottom, 3)
                             Spacer(minLength: 0)
                         }
                         // Weight and time from a library model — the whole
