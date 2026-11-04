@@ -61,7 +61,7 @@ struct LibraryDeleteChoiceTests {
     func plan(_ f: Fixture) async throws -> LibraryDeletePlan {
         await Shop.planDelete(f.files, roots: [f.root.path], remote: .bucket(config), prefix: "",
                               remoteTag: "bucket:", engine: try KhaytEngine(), fetch: f.bucket.fetch,
-                              modelFile: { f.paths[$0.id] })
+                              modelFile: { [paths = f.paths] in paths[$0.id] })
     }
 
     @Test("each model is counted for what deleting it means: kept online, only here, the shop's own, online-only")
@@ -110,8 +110,8 @@ struct LibraryDeleteChoiceTests {
         let p = await Shop.planDelete(many, roots: [f.root.path], remote: .bucket(config), prefix: "",
                                       remoteTag: "bucket:", engine: try KhaytEngine(), fetch: hangs,
                                       patience: .milliseconds(400),
-                                      modelFile: { file in
-                                          f.paths[file.id] ?? f.root.appending(path: "\(file.id)/x.stl")
+                                      modelFile: { [paths = f.paths, root = f.root] file in
+                                          paths[file.id] ?? root.appending(path: "\(file.id)/x.stl")
                                       })
         // Each remote hangs for 60 s; a plan that waited on one would take a
         // minute. 30 s, not 10: under the whole suite's load the 400 ms

@@ -70,39 +70,23 @@ extension Shop {
     static func planDelete(_ files: [LibraryFile], roots: [String], remote: LibraryRemote?, prefix: String,
                            remoteTag: String, engine: KhaytEngine, fetch: @escaping S3.Fetch,
                            patience: Duration = deleteCheckPatience,
-                           modelFile: (LibraryFile) -> URL?) async -> LibraryDeletePlan {
-        var plan = LibraryDeletePlan()
-        let fm = FileManager.default
+                           modelFile: @escaping @Sendable (LibraryFile) -> URL?) async -> LibraryDeletePlan {
         // What is on this Mac first, model by model: names in its folder and
         // where its file is. Then the remote is asked about every backup at
         // once (`checkBackups`), rather than one model after another.
-        var keysOf: [[String]] = [], markers: [Bool] = [], models: [URL?] = []
-        var asks: [BackupAsk] = []
-        for (i, file) in files.enumerated() {
-            plan.ids.append(file.id)
-            let dir = LibraryLocation.directory(for: file.id, roots: roots)
-            let names = dir.map { (try? fm.contentsOfDirectory(atPath: $0.path)) ?? [] } ?? []
-            var keys: [String] = []
-            var marker = false
-            for name in names where name.hasSuffix(".cloud") || name.hasSuffix(Shop.onlineExt) {
-                guard let dir, let data = fm.contents(atPath: dir.appending(path: name).path),
-                      let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let key = o["key"] as? String, !key.isEmpty else { continue }
-                if name.hasSuffix(Shop.onlineExt) {
-                    marker = true
-                    keys.append("bucket:" + key)
-                    if let b = o["bucket"] as? String, !b.isEmpty { plan.markerBuckets["bucket:" + key] = b }
-                } else { keys.append(remoteTag + key) }
-            }
-            let model = modelFile(file)
-            // The library's own backup of the file, where it would be.
-            if let model, remote != nil {
-                let key = S3.objectKey(prefix: prefix, id: LibraryLocation.itemDirName(file.id),
-                                       filename: model.lastPathComponent)
-                asks.append(BackupAsk(index: i, key: key, model: model, linked: file.isLinked))
-            }
-            keysOf.append(keys); markers.append(marker); models.append(model)
+        //
+        // The local half OFF the main actor and off the cooperative pool: a
+        // folder listing, a sidecar read and a stat or two per model, and on
+        // a NAS or a File Provider drive each one a round trip — a selection
+        // of a few hundred froze the window before the question opened.
+        let hasRemote = remote != nil
+        let local = await PinWork.run {
+            planDeleteLocally(files, roots: roots, hasRemote: hasRemote, prefix: prefix,
+                              remoteTag: remoteTag, modelFile: modelFile)
         }
+        var plan = local.plan
+        let keysOf = local.keysOf, markers = local.markers, models = local.models
+        let asks = local.asks
         var answers: [Int: BackupAnswer] = [:]
         if let remote, !asks.isEmpty {
             answers = await checkBackups(asks, remote: remote, engine: engine, fetch: fetch, patience: patience)
@@ -132,6 +116,50 @@ extension Shop {
             }
         }
         return plan
+    }
+
+    /// `planDelete`'s look at this Mac: each model's sidecars and its file,
+    /// and the backups to ask the remote about. Blocking file IO — run it in
+    /// `PinWork`, never on the main actor.
+    struct LocalDeleteLook: Sendable {
+        var plan = LibraryDeletePlan()
+        var keysOf: [[String]] = []
+        var markers: [Bool] = []
+        var models: [URL?] = []
+        var asks: [BackupAsk] = []
+    }
+
+    nonisolated static func planDeleteLocally(_ files: [LibraryFile], roots: [String], hasRemote: Bool,
+                                              prefix: String, remoteTag: String,
+                                              modelFile: (LibraryFile) -> URL?) -> LocalDeleteLook {
+        var look = LocalDeleteLook()
+        let fm = FileManager.default
+        for (i, file) in files.enumerated() {
+            look.plan.ids.append(file.id)
+            let dir = LibraryLocation.directory(for: file.id, roots: roots)
+            let names = dir.map { (try? fm.contentsOfDirectory(atPath: $0.path)) ?? [] } ?? []
+            var keys: [String] = []
+            var marker = false
+            for name in names where name.hasSuffix(".cloud") || name.hasSuffix(Shop.onlineExt) {
+                guard let dir, let data = fm.contents(atPath: dir.appending(path: name).path),
+                      let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let key = o["key"] as? String, !key.isEmpty else { continue }
+                if name.hasSuffix(Shop.onlineExt) {
+                    marker = true
+                    keys.append("bucket:" + key)
+                    if let b = o["bucket"] as? String, !b.isEmpty { look.plan.markerBuckets["bucket:" + key] = b }
+                } else { keys.append(remoteTag + key) }
+            }
+            let model = modelFile(file)
+            // The library's own backup of the file, where it would be.
+            if let model, hasRemote {
+                let key = S3.objectKey(prefix: prefix, id: LibraryLocation.itemDirName(file.id),
+                                       filename: model.lastPathComponent)
+                look.asks.append(BackupAsk(index: i, key: key, model: model, linked: file.isLinked))
+            }
+            look.keysOf.append(keys); look.markers.append(marker); look.models.append(model)
+        }
+        return look
     }
 
     /// How many models' backups are asked about at once, and how long the
@@ -375,7 +403,7 @@ extension Shop {
         let r = await deleteRemotes()
         let plan = await Self.planDelete(chosen, roots: roots.roots, remote: r.remote, prefix: r.prefix,
                                          remoteTag: r.tag, engine: engine, fetch: quick,
-                                         modelFile: { [weak self] in self?.modelFile(for: $0) })
+                                         modelFile: { [libraryRoot = roots.roots] in Shop.modelFile(for: $0, roots: libraryRoot) })
         // Still the question on screen?
         let open = pendingLibraryDelete.map { [$0.id] } ?? pendingLibraryDeletes.map(\.id)
         if open == plan.ids { deletePlan = plan }

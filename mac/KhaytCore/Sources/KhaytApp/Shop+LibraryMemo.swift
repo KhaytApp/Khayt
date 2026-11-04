@@ -174,6 +174,17 @@ final class LibraryMemo {
     var byIdRevision = -1
     var byId: [LibraryFile.ID: LibraryFile] = [:]
 
+    /// `fileRows` position by record id, for the `fileRowsRevision` it was
+    /// made at (`Shop.row(for:)`).
+    var rowIndexRevision = -1
+    var rowIndex: [String: Int] = [:]
+
+    /// `Shop.libraryMeshes`, for the `filesRevision` it was made at.
+    var meshesRevision = -1
+    var meshes: [LibraryFile.ID: LibraryFile.Mesh] = [:]
+    /// When the chips were last asked to recount (`recountLibrarySoon`).
+    var recountAskedAt: ContinuousClock.Instant?
+
     /// The thumbnail answer per model, and the record it was worked out for:
     /// a record that changed (a new `thumbFile`) is asked again.
     var thumbRoots: [String]?

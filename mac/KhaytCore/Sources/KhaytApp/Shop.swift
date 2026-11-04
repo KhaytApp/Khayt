@@ -2084,7 +2084,9 @@ final class Shop {
     private(set) var presetRows: [JSONValue] = []
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
-    internal(set) var fileRows: [JSONValue] = []
+    internal(set) var fileRows: [JSONValue] = [] { didSet { fileRowsRevision &+= 1 } }
+    /// Bumped with every change to `fileRows` — what `row(for:)`'s index keys on.
+    @ObservationIgnored private(set) var fileRowsRevision = 0
 
     /// The book as the LAN server's shared pages read it — `printLog`,
     /// `waitingList`, `settings` and `machines`, raw. See `LanServer`.
