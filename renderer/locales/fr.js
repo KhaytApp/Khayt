@@ -4645,6 +4645,8 @@
   "act.from_printer": "Ces chiffres viennent de {source} — ce que le travail a réellement consommé, pas l’estimation.",
   "act.from_printer_file": "Ces chiffres viennent de {source}, mesurés sur {file} — ce que ce travail a réellement consommé, pas l'estimation.",
   "act.your_printer": "ton imprimante",
+  "act.sliced": "Tranché",
+  "act.sliced_note": "Valeur du trancheur pour le plateau imprimé (plateau {plate}), lue dans le fichier envoyé par Khayt — non mesurée par l’imprimante.",
   "setup.title": "Réglages qui ont marché",
   "setup.add": "＋ Ajouter un réglage",
   "setup.add_title": "Ajouter un réglage",

@@ -4498,6 +4498,16 @@ public actor KhaytEngine {
         public let timeMeasured: Bool
         public let weightMeasured: Bool
         public let measured: Bool
+        /// THE SLICER'S WORD, axis by axis — offered, never called measured.
+        /// A Bambu reports no extrusion, so its grams (and its time, until
+        /// Khayt has watched a whole job) are the sent file's figure for the
+        /// plate that ran (`printer-actuals.prefillActuals`). Optional so a
+        /// bundle older than the field still decodes.
+        public var timeSliced: Bool? = nil
+        public var weightSliced: Bool? = nil
+        public var sliced: Bool? = nil
+        /// Which plate the sliced figures are for.
+        public var plate: Int? = nil
         /// Which instrument read them — `moonraker`, `octoprint`, `prusalink`.
         public let source: String?
         /// The job the figures belong to. Shown, not just carried: a completion
@@ -10098,6 +10108,16 @@ public actor KhaytEngine {
             public let filamentMm: Double?
             /// Which instrument read it.
             public let source: String?
+            /// `sliced` when the grams are the print file's own figure for the
+            /// plate that ran rather than a reading (a Bambu, sent by the
+            /// desktop app — `lib/bambu-sliced.js`). Nil is a measurement.
+            public var gramsBasis: String? = nil
+            /// `sliced` (the file's prediction) or `observed` (Khayt watched
+            /// the job from start to finish — `printer-poll-cache`'s job
+            /// clock). Nil is the printer's own reading.
+            public var timeBasis: String? = nil
+            /// The plate those sliced figures are for.
+            public var plate: Int? = nil
         }
 
         /// Public so a caller with no printer on the network can stand one up —

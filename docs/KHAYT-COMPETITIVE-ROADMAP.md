@@ -522,6 +522,10 @@ written automation line, is **still unwritten**. No document in `docs/` states i
   printer history), the Spool app (Bambu cloud import) and 3D Print Manager (AMS usage)
   all fill them in. This is the one place where R3's differentiator does not reach the
   most common printer brand.
+  *(Partly closed, Nov 2026: a job Khayt sends now carries the plate's **sliced** grams
+  from `slice_info.config` (`lib/bambu-sliced.js`), and its time is how long Khayt
+  watched it print (`printer-poll-cache` job clock). A job started elsewhere still
+  needs an FTPS RETR. Not yet verified on a real Bambu.)*
 - **Scanning a supplier receipt.** Stimalo (AI invoice scanning) and Daedalus (receipt
   OCR) both read supplier documents. In Khayt, `lib/expense-book.js` stores a
   `receiptPath` and the receipt's VAT, but someone has to type it. iOS OCR exists only

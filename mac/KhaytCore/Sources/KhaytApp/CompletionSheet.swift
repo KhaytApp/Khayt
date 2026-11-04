@@ -43,14 +43,18 @@ struct CompletionSheet: View {
                        unit: words.callIt("common.hours"), quoted: words.callIt("act.est"),
                        estimate: subject.estHours, decimals: 1, text: $hours,
                        measured: subject.measured?.timeMeasured == true,
-                       measuredWord: words.callIt("act.measured"))
+                       sliced: subject.measured?.timeSliced == true,
+                       measuredWord: words.callIt("act.measured"),
+                       slicedWord: words.callIt("act.sliced"))
                     .focused($focused, equals: .hours)
                     .onChange(of: hours) { _, _ in touched.insert(.hours) }
                 Figure(label: words.callIt("act.weight"),
                        unit: words.callIt("common.grams"), quoted: words.callIt("act.est"),
                        estimate: subject.estGrams, decimals: 0, text: $grams,
                        measured: subject.measured?.weightMeasured == true,
-                       measuredWord: words.callIt("act.measured"))
+                       sliced: subject.measured?.weightSliced == true,
+                       measuredWord: words.callIt("act.measured"),
+                       slicedWord: words.callIt("act.sliced"))
                     .focused($focused, equals: .grams)
                     .onChange(of: grams) { _, _ in touched.insert(.grams) }
             }
@@ -68,6 +72,19 @@ struct CompletionSheet: View {
             // the sentence is false: the boxes hold a measurement, the note
             // below says exactly that, and two lines contradicting each other
             // is worse than one missing.
+            // SLICED IS SAID, NOT HIDDEN. A Bambu reports no extrusion, so its
+            // grams are the sent file's figure for the plate that ran — better
+            // than the quote, and still the slicer's word. Recorded as
+            // `manual` on commit (the axis is not `…Measured`), so nothing
+            // that needs a measurement counts it.
+            if let pre = subject.measured, pre.sliced == true {
+                Text(words.callIt("act.sliced_note", ["plate": .string(String(pre.plate ?? 1))]))
+                    .font(.caption)
+                    .padding(.horizontal, 8).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if subject.measured?.measured != true {
                 Text(words.callIt("act.hint"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -196,7 +213,11 @@ struct CompletionSheet: View {
         /// once for the sheet, because a mixed answer is the normal one: a
         /// PrusaLink box measures the duration and never the filament.
         let measured: Bool
+        /// The slicer's figure for the plate that ran — said as that, never
+        /// as a measurement.
+        var sliced: Bool = false
         let measuredWord: String
+        var slicedWord: String = ""
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
@@ -211,6 +232,10 @@ struct CompletionSheet: View {
                         Text(measuredWord)
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(Khayt.done)
+                    } else if sliced {
+                        Text(slicedWord)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
                     }
                     Text(verbatim: "\(quoted): \(Money.quantity(estimate, decimals: decimals))")
                         .font(.caption2.monospacedDigit())
