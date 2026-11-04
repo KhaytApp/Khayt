@@ -107,14 +107,14 @@ import Testing
             Issue.record("no reprint made"); return
         }
         let job = Self.object(made.order)
-        #expect(job["id"] == .string("INV-2026-0004"))
+        #expect(job["jobNumber"] == .string("INV-2026-0004"))
         #expect(job["reprintOf"] == .string("INV-2026-0003"))
         #expect(job["reprintReason"] == .string("qc_fail"))
         #expect(job["price"] == .number(0))
         #expect(job["status"] == .string("pending"))
         #expect(made.printLog.count == 2)
         let original = Self.object(made.printLog[1])
-        #expect(original["reprintedInto"] == .array([.string("INV-2026-0004")]))
+        #expect(original["reprintedInto"] == .array([job["id"] ?? .null]))
         #expect(made.settings["invNumNext"] == .number(5))
 
         let none = try await engine.linkedReprint(

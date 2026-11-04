@@ -1898,7 +1898,9 @@ extension Shop {
 
     /// Take a renumber back (`renumberJob`'s undo), inside the write.
     func undoRenumber(_ id: Order.ID, before: JSONValue, after: JSONValue) async {
-        guard let build = source.build, let engine else { return }
+        // The same gate as the renumber it takes back.
+        guard canMoveJobs, permitted("orders", "edit"),
+              let build = source.build, let engine else { return }
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,

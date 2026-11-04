@@ -117,8 +117,8 @@ struct MilestonesSheet: View {
             .help(shop.words.callIt("ord.milestone_due"))
             .accessibilityLabel(shop.words.callIt("ord.milestone_due"))
             .disabled(!shop.canMoveJobs)
-            .popover(isPresented: Binding(get: { dating?.id == row.id },
-                                          set: { if !$0 { dating = nil } })) {
+            .shopPopover(isPresented: Binding(get: { dating?.id == row.id },
+                                              set: { if !$0 { dating = nil } })) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(shop.words.callIt("ord.milestone_due")).font(.headline)
                     DatePicker("", selection: $dueDay, displayedComponents: .date)

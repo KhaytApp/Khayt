@@ -191,7 +191,7 @@ struct Alpha58ReviewTests {
         let part = UI57FixTests.part(["fileRef": .string("/sd/" + hash + "_PLA_4h29m.gcode")])
         #expect(JobTitle.shown(project: hash, parts: [part], fileTitle: { _ in nil }, untitled: "U")
                 == "PLA_4h29m")
-        #expect(Self.source("OrdersTable.swift").contains("ViewThatFits(in: .horizontal) {\n                Text(job.id)"))
+        #expect(Self.source("OrdersTable.swift").contains("ViewThatFits(in: .horizontal) {\n                Text(job.reference)"))
     }
 
     // MARK: 10. A narrow strip

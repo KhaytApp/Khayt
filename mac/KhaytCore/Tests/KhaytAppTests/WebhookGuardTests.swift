@@ -381,8 +381,14 @@ struct WebhookWiringTests {
                 "nothing in the app posts a webhook")
         // AFTER the write. A consumer told about a job that was not saved is
         // worse than a consumer told nothing.
-        guard let wrote = shop.range(of: "registerMoveUndo("),
-              let sent = shop.range(of: "await fire(owed)") else {
+        // Inside `moveJob`, its write against its send. This compared the first
+        // `registerMoveUndo(` in the file with the first send, which matched an
+        // unrelated function's undo and passed by accident; once other paths (a
+        // QC failure, a LAN approval) fired their own webhooks — after their own
+        // writes — earlier in the file, it compared the wrong two lines.
+        guard let move = shop.range(of: "func moveJob("),
+              let wrote = shop.range(of: "StoreWriter.update(", range: move.upperBound..<shop.endIndex),
+              let sent = shop.range(of: "await fire(owed)", range: move.upperBound..<shop.endIndex) else {
             Issue.record("the move no longer writes or no longer sends"); return
         }
         #expect(wrote.lowerBound < sent.lowerBound,
