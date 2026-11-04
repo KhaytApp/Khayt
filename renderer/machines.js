@@ -552,6 +552,14 @@ function openMachineEditor(machineId = null) {
         <span data-i18n="mach.mark_offline">${escapeHtml(t('mach.mark_offline'))}</span>
       </label>
 
+      <label style="margin-top:10px; display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="machClearsOwnBed" style="width:auto; margin:0;" ${draft.clearsOwnBed === true ? 'checked' : ''}>
+        <span>${escapeHtml(t('mach.clears_own_bed'))}</span>
+      </label>
+      <div style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0 24px; line-height:1.45;">
+        ${escapeHtml(t('mach.clears_own_bed_hint'))} ${escapeHtml(t('mach.clears_own_bed_mac'))}
+      </div>
+
       <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
         <label style="font-size:12.5px; font-weight:600; margin-bottom:8px;">${escapeHtml(t('mach.compat_materials'))}</label>
         <div id="machCompatMaterialsSection" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
@@ -1076,6 +1084,12 @@ function openMachineEditor(machineId = null) {
         });
       });
       modal.querySelector('#machOffline').addEventListener('change', e => { draft.isOffline = e.target.checked; });
+      // Only a real true is kept, and unticking REMOVES the field — the rule
+      // lib/machine-edit.js applies on the Mac, so the two never disagree on
+      // whether a machine clears its own plate (lib/auto-dispatch.js reads it).
+      modal.querySelector('#machClearsOwnBed').addEventListener('change', e => {
+        if (e.target.checked) draft.clearsOwnBed = true; else delete draft.clearsOwnBed;
+      });
       modal.querySelector('#machTargetHours').addEventListener('input', e => { draft.targetHoursPerDay = Math.max(0, +e.target.value || 0) || null; });
       modal.querySelector('#machServiceInterval').addEventListener('input', e => { draft.serviceInterval = parseFloat(e.target.value) || 0; });
       modal.querySelector('#machLastServiceHours').addEventListener('input', e => { draft.lastServiceHours = parseFloat(e.target.value) || 0; });
@@ -1373,6 +1387,25 @@ function openMaintLog(machineId) {
     }).join('')}</tbody></table></div>`;
   }
 
+  // Common tasks a shop can start from instead of a blank form
+  // (lib/maintenance.js starterTasks, the list the Mac offers). The intervals
+  // are starting points; a click only fills the form, so the shop still reads
+  // and adjusts them before adding. A task already on this machine by the same
+  // name is not offered again.
+  function starterHtml() {
+    const M = (typeof KhaytMaintenance !== 'undefined') ? KhaytMaintenance : null;
+    if (!M || typeof M.starterTasks !== 'function') return '';
+    const have = new Set((typeof machMaintTasks !== 'undefined' ? machMaintTasks : [])
+      .filter(tk => tk.machineId === machineId).map(tk => String(tk.name || '').trim().toLowerCase()));
+    const list = M.starterTasks(machine.kind).filter(st => !have.has(t('maint.t_' + st.id).trim().toLowerCase()));
+    if (!list.length) return '';
+    return `<div style="margin-bottom:10px;">
+      <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(t('maint.common'))}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${list.map(st =>
+        `<button type="button" class="btn small" data-act="mt-starter" data-id="${escapeHtml(st.id)}" data-h="${st.intervalHours || ''}" data-d="${st.intervalDays || ''}">${escapeHtml(t('maint.t_' + st.id))}</button>`).join('')}</div>
+    </div>`;
+  }
+
   openFormModal({
     title: `${machine.name} — ${t('maint.title')}`,
     noSave: true,
@@ -1403,6 +1436,7 @@ function openMaintLog(machineId) {
       </div>
       <div style="margin-bottom:6px;font-weight:600;font-size:13px;">${escapeHtml(t('maint.recurring') || 'Recurring maintenance')}</div>
       <div style="background:var(--surface-2);padding:12px;border-radius:var(--radius);margin-bottom:8px;">
+        <div id="mtStarters">${starterHtml()}</div>
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">
           <div><label style="margin:0;">${escapeHtml(t('maint.task_name') || 'Task')}</label><input type="text" id="mtName" placeholder="${escapeHtml(t('maint.task_ph') || 'e.g. Replace nozzle')}"></div>
           <div><label style="margin:0;">${escapeHtml(t('maint.every_hours') || 'Every (hours)')}</label><input type="number" id="mtHours" min="0" step="1"></div>
@@ -1420,7 +1454,17 @@ function openMaintLog(machineId) {
       const refreshTasks = () => {
         const el = modal.querySelector('#maintTasksList');
         if (el) el.innerHTML = taskListHtml();
+        const st = modal.querySelector('#mtStarters');
+        if (st) st.innerHTML = starterHtml();
       };
+      modal.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-act="mt-starter"]');
+        if (!b) return;
+        modal.querySelector('#mtName').value = t('maint.t_' + b.dataset.id);
+        modal.querySelector('#mtHours').value = b.dataset.h || '';
+        modal.querySelector('#mtDays').value = b.dataset.d || '';
+        modal.querySelector('#mtName').focus();
+      });
       modal.querySelector('#btnAddMaintTask')?.addEventListener('click', () => {
         const name = modal.querySelector('#mtName').value.trim();
         const intervalHours = Math.max(0, +(modal.querySelector('#mtHours').value) || 0);
