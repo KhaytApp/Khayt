@@ -1095,11 +1095,18 @@ function checkSubscriptionBilling() {
       const already = printLog.some(o => o.subscriptionId === sub.id && o.recurringCycle === cycle);
       if (!already) {
         const nowD = new Date();
-        const invoiceNum = nextInvoiceNumber();
-        const seq = String(settings.invNumNext - 1).padStart(4, '0');
+        // The number and the id as lib/order-new.js makes them for every job:
+        // the counter reads the book, and the id carries a random tag so two
+        // computers on one book can never give two jobs the same key.
+        const ON = window.KhaytOrderNew;
+        const invoice = ON.allocateInvoice(settings, nowD.getFullYear(), printLog);
+        saveAll();
+        const invoiceNum = invoice.number;
+        const jobNumber = `${settings.invPrefix || 'INV'}-${nowD.getFullYear()}-${invoice.seq4}`;
         const client = clients.find(c => c.id === sub.clientId);
         printLog.unshift({
-          id: `${settings.invPrefix || 'INV'}-${nowD.getFullYear()}-${seq}`,
+          id: ON.mintOrderId(jobNumber, crypto.getRandomValues(new Uint8Array(4))),
+          jobNumber,
           invoiceNum, invoiceNumber: invoiceNum,
           date: cycle, timestamp: nowD.toISOString(),
           project: sub.planName || (t('subs.plan') || 'Subscription'),

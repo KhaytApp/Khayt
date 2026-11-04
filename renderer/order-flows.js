@@ -152,7 +152,7 @@ function logPrint(asQuote = false) {
     // the price is converted into it at save (lib/order-new.js jobCurrency).
     clients: (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [],
     now: new Date(),
-    tokens: { tracking: bytes(N.TOKEN_BYTES), quoteApproval: bytes(N.TOKEN_BYTES) },
+    tokens: { tracking: bytes(N.TOKEN_BYTES), quoteApproval: bytes(N.TOKEN_BYTES), id: bytes(4) },
   });
   // The counters it advanced are the shop's, and an allocation nobody wrote
   // down hands the same invoice number to the next job.

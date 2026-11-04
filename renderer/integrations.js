@@ -2040,7 +2040,12 @@ function trackShipment(trackingNumber, carrier) {
     const now = new Date();
     const seq = (typeof nextQuoteSeq === 'function') ? nextQuoteSeq() : String(now.getTime()).slice(-4);
     const prefix = (settings.quotePrefix || 'QUO');
-    const orderId = `${prefix}-${now.getFullYear()}-${seq}`;
+    // A readable number plus a random tag (lib/order-new.js `mintOrderId`), so a
+    // quote taken in here cannot share an id with one another computer made.
+    const jobNumber = `${prefix}-${now.getFullYear()}-${seq}`;
+    const orderId = window.KhaytOrderNew
+      ? window.KhaytOrderNew.mintOrderId(jobNumber, crypto.getRandomValues(new Uint8Array(4)))
+      : jobNumber;
     // Deleting the request below deletes its kept model file on the server, so
     // the file is saved with the quote first. If that fails, nothing is created
     // and the request stays in the list to try again.
@@ -2069,6 +2074,7 @@ function trackShipment(trackingNumber, carrier) {
     const quotedPart = intakeQuotePart(p);
     const order = {
       id: orderId,
+      ...(orderId !== jobNumber ? { jobNumber } : {}),
       date: localDateStr(now),
       timestamp: now.toISOString(),
       project: p.title || p.description?.slice(0, 60) || t('intake.requests'),

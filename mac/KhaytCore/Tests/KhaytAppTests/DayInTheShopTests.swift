@@ -209,7 +209,10 @@ struct DayInTheShopTests {
         #expect(document.html.contains("Turbine bracket"), "the invoice names the job")
         #expect(document.html.contains(Money.figure(price)), "and what was charged")
         #expect(document.html.contains("alt=\"ZATCA\""), "and carries the QR a Saudi tax invoice must")
-        #expect(document.html.contains(jobId), "under the number the book gave it")
+        // The paper prints the job's number, which is its id without the random
+        // tag (lib/order-new.js `mintOrderId`).
+        #expect(document.html.contains(Self.string(paid["jobNumber"]) ?? jobId), "under the number the book gave it")
+        #expect(!document.html.contains(jobId), "and not the tag that keeps the id unique")
 
         // ── What the day cost, and putting the shelf right ─────────────────
         try await write { root in

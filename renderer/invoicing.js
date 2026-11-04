@@ -11,7 +11,10 @@
 const OrderNew = () => global.KhaytOrderNew
   || (typeof require === 'function' ? require('../lib/order-new.js') : null);
 function nextInvoiceNumber() {
-  const result = OrderNew().allocateInvoiceNumber(settings, new Date().getFullYear());
+  // The book goes in so the counter moves past numbers another computer on
+  // this book already issued — settings, where the counter lives, never sync.
+  const result = OrderNew().allocateInvoiceNumber(settings, new Date().getFullYear(),
+    typeof printLog !== 'undefined' ? printLog : undefined);
   saveAll();
   return result;
 }
@@ -37,14 +40,10 @@ function ensureOrderInvoiceNumber(order, newStatus) {
    Quotes intentionally do NOT advance the invoice counter, but they still
    need their own monotonic number or back-to-back quotes share an id. */
 function nextQuoteSeq() {
-  const currentYear = new Date().getFullYear();
-  if ((settings.quoteNumYear || currentYear) !== currentYear) {
-    settings.quoteNumYear = currentYear;
-    settings.quoteNumNext = 1;
-  }
-  const seq4 = String(settings.quoteNumNext || 1).padStart(4, '0');
-  settings.quoteNumNext = (settings.quoteNumNext || 1) + 1;
-  settings.quoteNumYear = currentYear;
+  // lib/order-new.js `allocateQuoteSeq` — the rule the Mac numbers quotes with,
+  // reading the book so a quote number another computer used is skipped.
+  const seq4 = OrderNew().allocateQuoteSeq(settings, new Date().getFullYear(),
+    typeof printLog !== 'undefined' ? printLog : undefined);
   saveAll();
   return seq4;
 }

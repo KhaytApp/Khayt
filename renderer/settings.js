@@ -1981,6 +1981,13 @@ function reportSyncConflicts(conflicts) {
   const { count, firstName } = (typeof KhaytSync !== 'undefined' && KhaytSync.summarizeDiscardedEdits)
     ? KhaytSync.summarizeDiscardedEdits(conflicts)
     : { count: 0, firstName: '' };
+  // Two different jobs that arrived under one id (lib/sync.js "TWO RECORDS,
+  // ONE ID"). Both are in the book now — the other computer's under the
+  // collision id — so the job list shows them; this is the trace of why.
+  try {
+    const twins = (conflicts || []).filter((c) => c && c.kind === 'id_collision');
+    if (twins.length) console.warn('[sync] two jobs shared one id; kept both:', twins.map((c) => `${c.collection}/${c.id} → ${c.storedAs}`).join(', '));
+  } catch (e) { /* noop */ }
   if (!count) return;
   const msg = count === 1
     ? (t('sync.discarded_one') || 'An edit was discarded — “{name}” was deleted on another device.').replace('{name}', firstName)

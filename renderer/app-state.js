@@ -895,7 +895,9 @@ async function loadAll() {
     const qPrefix = settings.quotePrefix || 'QUO';
     let maxQ = 0;
     for (const o of printLog) {
-      const m = (o.id || '').match(new RegExp('^' + qPrefix + '-' + yr + '-(\\d+)'));
+      // 1–6 digits and then the end or a tag: a phone-made quote's id carries a
+      // 13-digit millisecond count there, which is no quote number.
+      const m = (o.id || '').match(new RegExp('^' + qPrefix + '-' + yr + '-(\\d{1,6})(?:-|$)'));
       if (m) maxQ = Math.max(maxQ, parseInt(m[1], 10) || 0);
     }
     if (settings.quoteNumNext === undefined || (settings.quoteNumYear === yr && settings.quoteNumNext <= maxQ)) {

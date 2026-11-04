@@ -7362,7 +7362,7 @@ public actor KhaytEngine {
               // given here — inside the write, on the newest settings.
               var settings = Object.assign({}, s.settings || {});
               var given = globalThis.KhaytOrderNew.ensureInvoiceNumber(
-                r.order, settings, new Date(now).getFullYear());
+                r.order, settings, new Date(now).getFullYear(), data.printLog);
               return { found: true, error: null, order: r.order, printLog: data.printLog,
                        settings: given ? settings : null };
             })(ARG0, ARG1, ARG2)
@@ -7380,15 +7380,19 @@ public actor KhaytEngine {
     /// `lib/order-new.js`'s `ensureInvoiceNumber`: give a job that began as a
     /// quote the invoice number it is owed, advancing the shop's counter.
     /// Pure — the caller runs it INSIDE the store write and writes both back.
+    ///
+    /// `orders`, the book, moves the counter past every number already in
+    /// it — settings do not sync, so a number another computer issued is only
+    /// known from the jobs it wrote.
     public func ensureInvoiceNumber(order: JSONValue, settings: [String: JSONValue],
-                                    year: Int) throws -> InvoiceNumbered {
+                                    year: Int, orders: [JSONValue] = []) throws -> InvoiceNumbered {
         try runtime.call2("""
-            (function (o, s, y) {
+            (function (o, s, y, book) {
               var order = Object.assign({}, o), settings = Object.assign({}, s);
-              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y);
+              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y, book);
               return { order: order, settings: settings, number: n };
-            })(ARG0, ARG1, ARG2)
-            """, [order, .object(settings), .number(Double(year))], as: InvoiceNumbered.self)
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .number(Double(year)), .array(orders)], as: InvoiceNumbered.self)
     }
 
     /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.
@@ -12089,8 +12093,11 @@ public actor KhaytEngine {
         return try runtime.call2(NEW_ORDER_SCRIPT,
                                  [.object(input), .array(orders), .object(settings),
                                   .number(now.timeIntervalSince1970 * 1000),
+                                  // `id`: the random tag that keeps the job's id
+                                  // unique across computers (`mintOrderId`).
                                   .object(["tracking": bytes(tokens.tracking),
-                                           "quoteApproval": bytes(tokens.quoteApproval)]),
+                                           "quoteApproval": bytes(tokens.quoteApproval),
+                                           "id": bytes((0..<4).map { _ in UInt8.random(in: .min ... .max) })]),
                                   .array(consumables), .array(clients)],
                                  as: NewOrder.self)
     }

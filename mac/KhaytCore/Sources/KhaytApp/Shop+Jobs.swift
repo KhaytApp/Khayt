@@ -1802,7 +1802,7 @@ extension Shop {
                 guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
                 let numbered = try await engine.ensureInvoiceNumber(
                     order: orders[at], settings: Self.settings(root),
-                    year: Calendar.book.component(.year, from: Date()))
+                    year: Calendar.book.component(.year, from: Date()), orders: orders)
                 guard numbered.number != nil, case .object(var o) = numbered.order else { return }
                 StoreWriter.stamp(&o)
                 orders[at] = .object(o)
@@ -2456,7 +2456,7 @@ extension Shop {
            stage != .quote, stage != .cancelled {
             let numbered = try await engine.ensureInvoiceNumber(
                 order: .object(changedOrder), settings: settings,
-                year: Calendar.book.component(.year, from: Date()))
+                year: Calendar.book.component(.year, from: Date()), orders: Self.rows(root, "printLog"))
             if numbered.number != nil, case .object(let o) = numbered.order,
                case .object(let s) = numbered.settings {
                 changedOrder = o

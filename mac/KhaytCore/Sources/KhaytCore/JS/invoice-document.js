@@ -58,7 +58,9 @@
    *     `hasQuote` alone) prints its invoice number, `invoiceNumber`, else the
    *     older `invoiceNum`, else its id — because its id is still `QUO-…`, and
    *     that is no number for a tax invoice;
-   *   - anything else prints its id, as it always has.
+   *   - anything else prints its id, as it always has — or, for a job made
+   *     since ids carry a random tag, its `jobNumber`, which is that id
+   *     without the tag.
    *
    * The last is the one that matters most. A plain job's id is built from
    * `settings.invPrefix` (`newOrder`), the "Invoice prefix" the shop sets,
@@ -73,7 +75,14 @@
    */
   function documentNumber(order, settings) {
     if (!order || typeof order !== 'object') return '';
-    const id = order.id == null ? '' : String(order.id);
+    // A job made since ids became unique across computers carries its
+    // readable number apart from its id (`KhaytOrderNew.mintOrderId`): the id
+    // is `INV-2026-0042-k7qx`, the number `INV-2026-0042`. The number is what
+    // the paper has always printed, so it stands in for the id below. Older
+    // jobs have no `jobNumber` and their id IS the number, as before.
+    const id = typeof order.jobNumber === 'string' && order.jobNumber
+      ? order.jobNumber
+      : (order.id == null ? '' : String(order.id));
     if (order.status === 'quote') return id;
     const O = orderNew();
     if (!O || typeof O.beganAsQuote !== 'function') {
