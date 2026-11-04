@@ -380,19 +380,6 @@ private struct Column: View {
 }
 
 private extension Stage {
-    /// The column head's dot: the stage colours of the redesign (Today's
-    /// pills), one per stage family.
-    var dot: Color {
-        switch self {
-        case .quote, .pending: Khayt.note
-        case .on_hold, .post, .qc: Khayt.hold
-        case .printing: Khayt.live
-        case .completed: Khayt.collect
-        case .shipped, .delivered: Khayt.done
-        case .cancelled: Khayt.late
-        }
-    }
-
     /// The stage a job is in right now, by id.
     @MainActor
     static func of(job id: String, in shop: Shop) -> Stage? {
