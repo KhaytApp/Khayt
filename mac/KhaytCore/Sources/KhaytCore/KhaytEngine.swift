@@ -7395,6 +7395,42 @@ public actor KhaytEngine {
             """, [order, .object(settings), .number(Double(year)), .array(orders)], as: InvoiceNumbered.self)
     }
 
+    /// Documents in the book that print one number
+    /// (`KhaytInvoiceDocument.duplicateNumbers`): what two computers offline
+    /// at the same moment can still make. Each group lists its jobs oldest first.
+    public struct DuplicateNumber: Decodable, Sendable, Identifiable, Hashable {
+        public struct Job: Decodable, Sendable, Identifiable, Hashable {
+            public let id: String
+            public let ref: String
+            public let project: String
+            public let date: String
+        }
+        public let number: String
+        public let kind: String
+        public let year: String
+        public let jobs: [Job]
+        public var id: String { kind + "|" + year + "|" + number }
+    }
+
+    public func duplicateNumbers(orders: [JSONValue], settings: [String: JSONValue]) throws -> [DuplicateNumber] {
+        try runtime.call2("KhaytInvoiceDocument.duplicateNumbers(ARG0, ARG1)",
+                          [.array(orders), .object(settings)], as: [DuplicateNumber].self)
+    }
+
+    /// `lib/order-new.js`'s `renumber`: the job with the next free number,
+    /// the counters it advanced, and the number given. Pure — the caller runs
+    /// it INSIDE the store write and writes both back.
+    public func renumber(order: JSONValue, settings: [String: JSONValue],
+                         orders: [JSONValue], year: Int) throws -> InvoiceNumbered {
+        try runtime.call2("""
+            (function (o, s, book, y) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              var n = KhaytOrderNew.renumber(order, settings, book, y);
+              return { order: order, settings: settings, number: n };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .object(settings), .array(orders), .number(Double(year))], as: InvoiceNumbered.self)
+    }
+
     /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.
     public func invoiceNumberOwed(order: JSONValue, settings: [String: JSONValue]) throws -> Bool {
         try runtime.call2("KhaytOrderNew.invoiceNumberOwed(ARG0, ARG1)",

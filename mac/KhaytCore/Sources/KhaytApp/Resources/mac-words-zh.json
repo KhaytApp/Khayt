@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "已登录，但此店铺的密钥无法上传到 Khayt Cloud，因此其他设备暂时无法同步。请重新登录以重试。",
  "mac.cloud_key_published": "此店铺的密钥现已存入 Khayt Cloud，账本也已发送，你的其他设备可以登录并同步了。",
  "mac.cloud_line_hint": "点按以登录或检查云端；按住 Control 点按可查看更多。",
+ "mac.cloud_twin_jobs": "来自另一台电脑的 {n} 个任务使用了此处已有的编号。两者都已保留，对方的编号已加标记。",
+ "mac.cloud_twin_jobs_one": "来自另一台电脑的 {n} 个任务使用了此处已有的编号。两者都已保留，对方的编号已加标记。",
  "mac.cloud_lost_edits": "在此处所做的 {n} 项更改已被丢弃：该记录已在另一台设备上被删除。",
  "mac.cloud_lost_edits_one": "在此处所做的 {n} 项更改已被丢弃：该记录已在另一台设备上被删除。",
  "mac.cloud_nothing_to_send": "没有需要发送的内容——云端已经拥有。",

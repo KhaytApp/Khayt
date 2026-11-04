@@ -377,7 +377,7 @@ function renderDashboard() {
     <div class="dash-order-row">
       <div class="dash-order-info">
         <strong>${escapeHtml(o.project || t('inv.walk_in'))}</strong>
-        <span class="dash-order-id">${escapeHtml(o.id)}</span>
+        <span class="dash-order-id">${escapeHtml(jobRef(o))}</span>
       </div>
       <div class="dash-order-meta">
         ${badge}
@@ -414,7 +414,7 @@ function renderDashboard() {
         return `<div class="dash-order-row">
           <div class="dash-order-info">
             <strong>${escapeHtml(o.project || t('inv.walk_in'))}</strong>
-            <span class="dash-order-id">${escapeHtml(o.id)}</span>
+            <span class="dash-order-id">${escapeHtml(jobRef(o))}</span>
           </div>
           <div class="dash-order-meta">
             <span class="badge ${escapeHtml(o.status)}">${escapeHtml(t('queue.' + o.status))}</span>
@@ -722,7 +722,7 @@ function renderDashboard() {
         return `<div class="dash-order-row">
           <div class="dash-order-info">
             <strong>${escapeHtml(q.project || t('inv.walk_in'))}</strong>
-            <span class="dash-order-id">${escapeHtml(q.id)}${client ? ' · ' + escapeHtml(localName(client)) : ''}</span>
+            <span class="dash-order-id">${escapeHtml(jobRef(q))}${client ? ' · ' + escapeHtml(localName(client)) : ''}</span>
           </div>
           <div class="dash-order-meta">
             ${badge}
@@ -751,7 +751,7 @@ function renderDashboard() {
       return `<div class="dash-section pro-only" style="border-inline-start:3px solid var(--primary); padding-inline-start:12px; margin-bottom:14px;">
         <h3 class="dash-section-head" style="color:var(--primary);">💳 ${escapeHtml(t('dash.payments_due'))} (${paymentsDue.length})</h3>
         ${paymentsDue.map(({ order: o, inst, instIndex, client }) => {
-          const clientName = client ? localName(client) : (o.project || o.id);
+          const clientName = client ? localName(client) : (o.project || jobRef(o));
           const daysUntil = Math.round((new Date(inst.dueDate + 'T00:00:00') - new Date(new Date().setHours(0,0,0,0))) / 86400000);
           const badge = daysUntil < 0
             ? `<span class="due-badge overdue">${Math.abs(daysUntil)}d overdue</span>`
@@ -761,7 +761,7 @@ function renderDashboard() {
           return `<div class="dash-order-row">
             <div class="dash-order-info">
               <strong>${escapeHtml(clientName)}</strong>
-              <span class="dash-order-id">${escapeHtml(o.id)} · ${escapeHtml(inst.note || '')} · ${fmtPrice(inst.amount || 0)}</span>
+              <span class="dash-order-id">${escapeHtml(jobRef(o))} · ${escapeHtml(inst.note || '')} · ${fmtPrice(inst.amount || 0)}</span>
             </div>
             <div class="dash-order-meta">
               ${badge}

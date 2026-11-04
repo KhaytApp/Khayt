@@ -16,6 +16,11 @@ struct ShopStatus: Codable, Sendable {
 
 struct QueueOrder: Codable, Identifiable, Sendable {
     let id: String
+    /// The readable half of a new job's id (lib/order-new.js `mintOrderId`):
+    /// `INV-2026-0042` for an id `INV-2026-0042-k7qx`. Absent on older jobs.
+    var jobNumber: String? = nil
+    /// What a person reads for the job; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let project: String?
     let client: String?
     let status: String
@@ -50,7 +55,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     let priority: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, project, client, status, machine, machineId, dueDate, priority
+        case id, jobNumber, project, client, status, machine, machineId, dueDate, priority
     }
 
     /// Spelled out because `init(from:)` above suppresses the synthesized one,
@@ -65,6 +70,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
+        jobNumber = try? c.decodeIfPresent(String.self, forKey: .jobNumber)
         project = try c.decodeIfPresent(String.self, forKey: .project)
         client = try c.decodeIfPresent(String.self, forKey: .client)
         status = try c.decode(String.self, forKey: .status)
@@ -94,7 +100,7 @@ struct QueueOrder: Codable, Identifiable, Sendable {
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
-            ?? id
+            ?? reference
     }
 
     var displayClient: String {
@@ -536,6 +542,10 @@ struct InventorySpool: Codable, Identifiable, Sendable {
 
 struct OrderLogEntry: Codable, Identifiable, Sendable {
     let id: String
+    /// The readable half of a new job's id — see `QueueOrder.jobNumber`.
+    var jobNumber: String? = nil
+    /// What a person reads for the job; `id` stays the key.
+    var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let project: String?
     let client: String?
     let status: String
@@ -550,7 +560,7 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     let quoteExpiresAt: String?
 
     var displayTitle: String {
-        (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? id
+        (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference
     }
 
     var displayClient: String {

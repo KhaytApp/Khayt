@@ -114,7 +114,7 @@
     const c = CHIP[cls];
     return `<div class="vv-workrow">
       <span class="vv-badge-stat" style="color:${c.fg};background:${c.bg}">${escapeHtml(label)}</span>
-      <div class="vv-grow"><div class="vv-nm">${escapeHtml(title)}</div><div class="vv-meta">${escapeHtml(order.id)} · ${escapeHtml(sub)}</div></div>
+      <div class="vv-grow"><div class="vv-nm">${escapeHtml(title)}</div><div class="vv-meta">${escapeHtml(jobRef(order))} · ${escapeHtml(sub)}</div></div>
       <span class="vv-due">${escapeHtml(due)}</span>
     </div>`;
   }
@@ -162,7 +162,7 @@
       pct = est != null ? est : 0;
       state = 'printing';
     }
-    const jobName = order ? (order.project || order.id) : machine.materialType || tr('mach.status_idle', 'idle');
+    const jobName = order ? (order.project || jobRef(order)) : machine.materialType || tr('mach.status_idle', 'idle');
     let color = 'var(--vv-blue)';
     if (state === 'error') color = 'var(--vv-red)';
     else if (state === 'idle' || state === 'reconnecting') color = 'var(--ink-3)';

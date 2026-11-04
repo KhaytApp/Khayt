@@ -133,7 +133,7 @@ struct JobCard: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(order.id)
+                    Text(order.reference)
                         .font(.khaytMono(11.5, .medium))
                         .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)

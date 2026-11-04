@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "Oturum açıldı, ancak bu dükkânın anahtarı Khayt Cloud'a konamadı; bu yüzden diğer cihazlar henüz eşzamanlayamıyor. Yeniden denemek için tekrar oturum açın.",
  "mac.cloud_key_published": "Bu dükkânın anahtarı artık Khayt Cloud'da ve defter gönderildi; diğer cihazlarınız oturum açıp eşzamanlayabilir.",
  "mac.cloud_line_hint": "Oturum açmak veya bulutu denetlemek için tıklayın; daha fazlası için sağ tıklayın.",
+ "mac.cloud_twin_jobs": "Başka bir bilgisayardan gelen {n} iş, burada zaten kullanılan bir numara taşıyordu. İkisi de tutuldu; onlarınki işaretlendi.",
+ "mac.cloud_twin_jobs_one": "Başka bir bilgisayardan gelen {n} iş, burada zaten kullanılan bir numara taşıyordu. İkisi de tutuldu; onunki işaretlendi.",
  "mac.cloud_lost_edits": "Burada yapılan {n} değişiklik atıldı: kayıt başka bir cihazda silinmişti.",
  "mac.cloud_lost_edits_one": "Burada yapılan {n} değişiklik atıldı: kayıt başka bir cihazda silinmişti.",
  "mac.cloud_nothing_to_send": "Gönderilecek bir şey kalmadı — bulutta zaten var.",

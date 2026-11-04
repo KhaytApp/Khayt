@@ -208,7 +208,7 @@ private struct Detail: View {
                 .textSelection(.enabled)
                 .help(job.project)
             HStack(spacing: 6) {
-                Text(job.id).monospacedDigit()
+                Text(job.reference).monospacedDigit()
                 if let s = Stage.of(job) {
                     Text("·")
                     Label(shop.words.callIt(s.key), systemImage: s.symbol).labelStyle(.titleAndIcon)

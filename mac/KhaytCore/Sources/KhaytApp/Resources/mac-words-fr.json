@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "Connecté, mais la clé de cet atelier n’a pas pu être placée sur Khayt Cloud ; les autres appareils ne peuvent donc pas encore se synchroniser. Reconnectez-vous pour réessayer.",
  "mac.cloud_key_published": "La clé de cet atelier est maintenant sur Khayt Cloud et le livre a été envoyé : vos autres appareils peuvent se connecter et se synchroniser.",
  "mac.cloud_line_hint": "Cliquez pour vous connecter ou vérifier le cloud ; clic droit pour plus d’options.",
+ "mac.cloud_twin_jobs": "{n} travaux venus d’un autre ordinateur portaient une référence déjà utilisée ici. Les deux sont gardés ; la leur est marquée.",
+ "mac.cloud_twin_jobs_one": "{n} travail venu d’un autre ordinateur portait une référence déjà utilisée ici. Les deux sont gardés ; la sienne est marquée.",
  "mac.cloud_lost_edits": "{n} modifications faites ici ont été abandonnées : l’enregistrement avait été supprimé sur un autre appareil.",
  "mac.cloud_lost_edits_one": "{n} modification faite ici a été abandonnée : l’enregistrement avait été supprimé sur un autre appareil.",
  "mac.cloud_nothing_to_send": "Plus rien à envoyer — le cloud l’a déjà.",

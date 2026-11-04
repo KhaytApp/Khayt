@@ -142,6 +142,30 @@
     return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5).toUpperCase();
   }
 
+  /**
+   * The reference a PERSON reads for a job: its `jobNumber`, else its id.
+   *
+   * Since ids became unique across computers (lib/order-new.js `mintOrderId`)
+   * a new job's id is `INV-2026-0042-k7qx` — the number and a random tag that
+   * exists only so two computers can never key two jobs alike. Every list,
+   * card, label, page, message and toast shows this; the id stays the key for
+   * lookups, `data-` attributes, links and file paths the app reads back.
+   * Older jobs have no `jobNumber`, and their id is their number.
+   *
+   * Takes the order, or an order's id (looked up in the book), for rows a
+   * report hands over with only the id. The Mac's rule is `Order.reference`.
+   * test/job-reference-display.test.js keeps new screens from showing the id.
+   */
+  function jobRef(orderOrId) {
+    let o = orderOrId;
+    if (typeof o === 'string') {
+      const book = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
+      o = book.find((x) => x && x.id === orderOrId) || { id: orderOrId };
+    }
+    if (!o || typeof o !== 'object') return '';
+    return String((typeof o.jobNumber === 'string' && o.jobNumber) || o.id || '');
+  }
+
   function safeCssColor(val, fallback = '#5E2E14') {
     return /^#[0-9a-fA-F]{3,8}$/.test(String(val || '')) ? String(val) : fallback;
   }
@@ -245,6 +269,7 @@
     safeImageSrc,
     safeHttpUrl,
     uid,
+    jobRef,
     safeCssColor,
     initials,
     parseCsvString,

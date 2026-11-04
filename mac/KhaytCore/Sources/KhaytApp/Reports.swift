@@ -1176,7 +1176,7 @@ struct Reports: View {
 
                     Table(owed.rows.sorted(using: order), sortOrder: $order) {
                         TableColumn(shop.words.callIt("an.aged_col_order"), value: \.id) { row in
-                            Text(row.id).monospacedDigit().foregroundStyle(.secondary)
+                            Text(shop.reference(ofJob: row.id)).monospacedDigit().foregroundStyle(.secondary)
                         }
                         .width(min: 90, ideal: 120)
                         TableColumn(shop.words.callIt("an.aged_col_project"), value: \.project) { row in

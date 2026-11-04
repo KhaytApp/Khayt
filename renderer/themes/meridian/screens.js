@@ -164,7 +164,7 @@
     if (typeof renderLogs === 'function') renderLogs();
     if (typeof renderDashboard === 'function') renderDashboard();
     if (typeof toast === 'function') {
-      toast(`${order.project || order.id} → ${machine.name || machineId}`, 'success');
+      toast(`${order.project || jobRef(order)} → ${machine.name || machineId}`, 'success');
     }
     return true;
   }

@@ -112,7 +112,7 @@ final class WidgetFeed {
         orders.filter { Stage.of($0) == .pending }
             .sorted(by: Shop.boardOrder) // few jobs; `boardSorted` reads each once
             .map { o in
-                ShopWidgetSnapshot.QueuedJob(id: o.id, title: o.project.isEmpty ? o.id : o.project,
+                ShopWidgetSnapshot.QueuedJob(id: o.id, title: o.project.isEmpty ? o.reference : o.project,
                                              due: Order.day(o.dueDate), late: o.isOverdue(now: now),
                                              urgent: o.priority)
             }

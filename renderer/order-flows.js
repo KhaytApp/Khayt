@@ -1315,7 +1315,7 @@ function openPaymentModal(orderId) {
     </div>
     <div id="_paySummary">${paySummaryHtml()}</div>
     <p style="font-size:11.5px; color:var(--text-muted); margin:10px 0 0;">
-      ${order.id} · ${escapeHtml(order.project)} · ${fmtPrice(fullAmount)}
+      ${escapeHtml(jobRef(order))} · ${escapeHtml(order.project)} · ${fmtPrice(fullAmount)}
     </p>
     ${depositNote}
   `;
@@ -1719,7 +1719,7 @@ function openOrderEditor(orderId) {
   `;
 
   openFormModal({
-    title: `${t('oe.title')} — ${order.id}`,
+    title: `${t('oe.title')} — ${escapeHtml(jobRef(order))}`,
     saveLabel: t('common.save'),
     sizeLg: true,
     bodyHtml,
@@ -2279,8 +2279,8 @@ function openBatchPlannerModal() {
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid transparent;transition:background .1s;" class="batch-row">
       <input type="checkbox" class="batch-cb" data-id="${o.id}" data-time="${+o.printTime || 0}" data-weight="${totalWeight.toFixed(1)}" data-mat="${escapeHtml(matNames)}" style="margin-top:2px;width:auto;flex-shrink:0;">
       <div style="flex:1;">
-        <div style="font-weight:600;font-size:13px;">${escapeHtml(o.project || o.id)}</div>
-        <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(o.id)} · ${o.printTime}h · ${Math.round(totalWeight)}g${matNames ? ' · ' + escapeHtml(matNames) : ''}${machine ? ' · <span style="color:' + safeCssColor(machine.color) + ';">' + escapeHtml(machine.name) + '</span>' : ''}</div>
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(o.project || jobRef(o))}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(jobRef(o))} · ${o.printTime}h · ${Math.round(totalWeight)}g${matNames ? ' · ' + escapeHtml(matNames) : ''}${machine ? ' · <span style="color:' + safeCssColor(machine.color) + ';">' + escapeHtml(machine.name) + '</span>' : ''}</div>
       </div>
       <span style="font-weight:600;color:var(--success);white-space:nowrap;">${fmtPrice(o.price)}</span>
     </label>`;
@@ -2368,7 +2368,7 @@ function openBatchPlannerModal() {
       const checked = [...document.querySelectorAll('.batch-cb:checked')];
       const ids = checked.length ? new Set(checked.map(cb => cb.dataset.id)) : null;
       const jobs = candidates.filter(o => !ids || ids.has(o.id)).map(o => ({
-        id: o.id, project: o.project || o.id, hours: +o.printTime || 0,
+        id: o.id, project: o.project || jobRef(o), hours: +o.printTime || 0,
         grams: (o.parts || []).reduce((s, p) => s + (+p.printWeight || 0) * (+p.qty || 1), 0),
         material: [...new Set((o.parts || []).map(p => p.material).filter(Boolean))][0] || o.material || '',
       }));
@@ -2458,13 +2458,13 @@ function openOrderTimeline(orderId) {
   const overlay = appendStackedModal(`
     <div class="modal modal-form" style="max-width:480px;width:100%;">
       <div class="modal-header">
-        <h3 id="modalTitle" style="margin:0;font-size:15px;">🕐 ${escapeHtml(t('ord.timeline_title'))} — ${escapeHtml(order.project || order.id)}</h3>
+        <h3 id="modalTitle" style="margin:0;font-size:15px;">🕐 ${escapeHtml(t('ord.timeline_title'))} — ${escapeHtml(order.project || jobRef(order))}</h3>
         <button class="btn ghost small" data-act="cancel" aria-label="Close" title="Close">×</button>
       </div>
       <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
         <div style="margin-bottom:12px;font-size:12.5px;color:var(--text-muted);">
           ${clientName ? `👤 ${escapeHtml(clientName)} · ` : ''}
-          ${escapeHtml(order.id)} · ${escapeHtml(t('ord.timeline_total'))}: <strong>${escapeHtml(totalStr)}</strong>
+          ${escapeHtml(jobRef(order))} · ${escapeHtml(t('ord.timeline_total'))}: <strong>${escapeHtml(totalStr)}</strong>
         </div>
         <div class="timeline-wrap">${stepsHtml}</div>
       </div>
@@ -2652,7 +2652,7 @@ async function generateOrderLabel(orderId) {
 <html lang="${docLang}" dir="${docDir}">
 <head>
 <meta charset="UTF-8">
-<title>Label — ${escapeHtml(order.id)}</title>
+<title>Label — ${escapeHtml(jobRef(order))}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, 'Segoe UI', sans-serif; background:#fff; color:#111; }
@@ -2688,7 +2688,7 @@ async function generateOrderLabel(orderId) {
   <div class="label-header">
     <div>
       <div class="shop">${escapeHtml(shopName)}</div>
-      <div class="order-id">${escapeHtml(order.id)}</div>
+      <div class="order-id">${escapeHtml(jobRef(order))}</div>
     </div>
     ${qrSvg ? `<div class="qr">${qrSvg}</div>` : ''}
   </div>
@@ -2770,7 +2770,7 @@ async function generatePackingSlip(orderId) {
 <html lang="${docLang}" dir="${docDir}">
 <head>
 <meta charset="UTF-8">
-<title>Packing Slip — ${escapeHtml(order.id)}</title>
+<title>Packing Slip — ${escapeHtml(jobRef(order))}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:-apple-system,'Segoe UI',sans-serif; font-size:11pt; color:#111; background:#fff; padding:20mm; }
@@ -2805,7 +2805,7 @@ async function generatePackingSlip(orderId) {
       <div class="slip-title">Packing Slip</div>
       <div class="slip-meta">
         <strong>${escapeHtml(t('common.date') || 'Date')}:</strong> ${escapeHtml(dateStr)}<br>
-        <strong>${escapeHtml(t('log.order_id') || 'Order') || 'Order'}:</strong> ${escapeHtml(order.id)}
+        <strong>${escapeHtml(t('log.order_id') || 'Order') || 'Order'}:</strong> ${escapeHtml(jobRef(order))}
         ${order.invoiceNum ? `<br><strong>${escapeHtml(t('ord.invoice_num') || 'Invoice')}:</strong> ${escapeHtml(String(order.invoiceNum))}` : ''}
       </div>
     </div>
@@ -2832,7 +2832,7 @@ async function generatePackingSlip(orderId) {
       </tr>
     </thead>
     <tbody>
-      ${rowsHtml || `<tr><td colspan="5" style="color:#888;text-align:center;">${escapeHtml(order.project || order.id)}</td></tr>`}
+      ${rowsHtml || `<tr><td colspan="5" style="color:#888;text-align:center;">${escapeHtml(order.project || jobRef(order))}</td></tr>`}
     </tbody>
     <tfoot>
       <tr>
@@ -2895,7 +2895,7 @@ function openPartialDeliveryModal(orderId) {
     </div>`;
 
   openFormModal({
-    title: `📦 ${t('ord.partial_delivery')} — ${escapeHtml(order.project || order.id)}`,
+    title: `📦 ${t('ord.partial_delivery')} — ${escapeHtml(order.project || jobRef(order))}`,
     saveLabel: t('ord.mark_delivered_parts'),
     sizeLg: false,
     bodyHtml,
@@ -2949,7 +2949,7 @@ function openSpoolSwitchModal(orderId) {
     : `<p style="color:var(--text-muted);">${escapeHtml(t('queue.parts_count', { n: 0 }))}</p>`;
 
   openFormModal({
-    title: `🔄 ${t('ord.spool_switch')} — ${escapeHtml(order.project || order.id)}`,
+    title: `🔄 ${t('ord.spool_switch')} — ${escapeHtml(order.project || jobRef(order))}`,
     noSave: true,
     bodyHtml: `<div id="spoolSwitchBody">${partsHtml}</div>`,
     onMount(modal) {
@@ -3133,7 +3133,7 @@ async function splitOrderAcrossMachines(orderId) {
       paidAmount: subPaid,
       paymentStatus: KhaytSplitOrder.paymentStatusFor(subPrice, subPaid),
       creditNotes: subCredit > 0
-        ? [{ id: uid('CN'), amount: subCredit, at: new Date().toISOString(), reason: `Carried from ${order.id}` }]
+        ? [{ id: uid('CN'), amount: subCredit, at: new Date().toISOString(), reason: `Carried from ${jobRef(order)}` }]
         : [],
       materialDeducted: false,
       statusHistory: [{ status: 'pending', at: new Date().toISOString() }],
@@ -3156,12 +3156,12 @@ function openChangeOrderModal(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
   openFormModal({
-    title: 'Change Order — ' + escapeHtml(order.project || order.id),
+    title: 'Change Order — ' + escapeHtml(order.project || jobRef(order)),
     sizeLg: false,
     saveLabel: 'Save Change Order',
     bodyHtml: `
       <div style="background:var(--surface-2);border-radius:6px;padding:10px;font-size:12px;margin-bottom:12px;color:var(--text-muted);">
-        <strong>Order:</strong> ${escapeHtml(order.id)}<br>
+        <strong>Order:</strong> ${escapeHtml(jobRef(order))}<br>
         <strong>Project:</strong> ${escapeHtml(order.project || '—')}<br>
         <strong>Current Price:</strong> ${fmtPrice(order.price)}<br>
         <strong>Current Due Date:</strong> ${escapeHtml(order.dueDate || '—')}

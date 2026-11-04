@@ -277,7 +277,7 @@ struct DueThisWeek: View {
             HStack(spacing: 10) {
                 chip
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(order.project.isEmpty ? order.id : order.project)
+                    Text(order.project.isEmpty ? order.reference : order.project)
                         .font(.system(size: 13, weight: .medium)).lineLimit(1)
                     Text(order.client).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -429,7 +429,7 @@ struct MachineCards: View {
         /// The job and its customer; the file name when the book has no job.
         private func detailLine(_ status: KhaytEngine.PrinterStatus) -> String {
             if let job {
-                let name = job.project.isEmpty ? job.id : job.project
+                let name = job.project.isEmpty ? job.reference : job.project
                 return job.client.isEmpty ? name : name + " · " + job.client
             }
             return status.filename.isEmpty ? shop.words.callIt("mac.live") : status.filename

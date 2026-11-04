@@ -1084,6 +1084,9 @@ final class Shop {
                 fileRows = []
             }
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
+            let twice = (try? await engine?.duplicateNumbers(orders: orderRows, settings: Self.settings(root))) ?? []
+            if overtaken() { return }
+            duplicateNumbers = twice
             if case .array(let people)? = root["clients"] { clientRows = people } else { clientRows = [] }
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
             // A live web store follows the catalogue: see `webStoreFollow`.
@@ -2228,6 +2231,11 @@ final class Shop {
 
     /// Orders asking for about a thousand times what they should.
     private(set) var suspectOrders: [KhaytEngine.SuspectOrder] = []
+
+    /// Documents that print the same number — two computers on one book can
+    /// still both issue one while offline. Shown on Today with a way to give
+    /// one of them the next free number (`renumberJob`).
+    private(set) var duplicateNumbers: [KhaytEngine.DuplicateNumber] = []
 
     /// The order being received, or nil.
     var receivingGoods: PurchaseOrder?

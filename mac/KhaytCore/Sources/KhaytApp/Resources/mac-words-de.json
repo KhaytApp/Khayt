@@ -304,6 +304,8 @@
  "mac.cloud_key_not_published": "Angemeldet, aber der Schlüssel dieses Shops konnte nicht auf Khayt Cloud abgelegt werden, daher können andere Geräte noch nicht synchronisieren. Melden Sie sich erneut an, um es noch einmal zu versuchen.",
  "mac.cloud_key_published": "Der Schlüssel dieses Shops liegt jetzt auf Khayt Cloud, und das Geschäftsbuch wurde gesendet, sodass sich Ihre anderen Geräte anmelden und synchronisieren können.",
  "mac.cloud_line_hint": "Klicken, um sich anzumelden oder die Cloud zu prüfen; mit Rechtsklick mehr.",
+ "mac.cloud_twin_jobs": "{n} Aufträge von einem anderen Computer hatten eine Referenz, die hier schon vergeben war. Beide werden behalten; ihre Referenz ist markiert.",
+ "mac.cloud_twin_jobs_one": "{n} Auftrag von einem anderen Computer hatte eine Referenz, die hier schon vergeben war. Beide werden behalten; seine Referenz ist markiert.",
  "mac.cloud_lost_edits": "{n} hier vorgenommene Änderungen wurden verworfen: Der Datensatz war auf einem anderen Gerät gelöscht worden.",
  "mac.cloud_lost_edits_one": "{n} hier vorgenommene Änderung wurde verworfen: Der Datensatz war auf einem anderen Gerät gelöscht worden.",
  "mac.cloud_nothing_to_send": "Nichts mehr zu senden – die Cloud hat es bereits.",

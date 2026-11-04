@@ -239,3 +239,67 @@ test('other collections are untouched by the rule', () => {
   assert.equal(book.clients.length, 1);
   assert.equal(book.clients[0].name, 'b');
 });
+
+/* ── 4. Two papers with one number are found, and one is renumbered ───────── */
+
+test('two invoices printing one number are named, oldest first', () => {
+  const book = [
+    { id: 'INV-2026-0042-ab12', jobNumber: 'INV-2026-0042', invoiceNumber: 'INV-2026-0042', status: 'pending',
+      date: '2026-09-04', timestamp: '2026-09-04T11:00:00.000Z', project: 'Windows job' },
+    { id: 'INV-2026-0042-cd34', jobNumber: 'INV-2026-0042', invoiceNumber: 'INV-2026-0042', status: 'completed',
+      date: '2026-09-04', timestamp: '2026-09-04T09:00:00.000Z', project: 'Mac job' },
+    { id: 'INV-2026-0043-ef56', jobNumber: 'INV-2026-0043', invoiceNumber: 'INV-2026-0043', status: 'pending', date: '2026-09-05' },
+  ];
+  const dups = Doc.duplicateNumbers(book, {});
+  assert.equal(dups.length, 1);
+  assert.equal(dups[0].number, 'INV-2026-0042');
+  assert.equal(dups[0].kind, 'invoice');
+  assert.deepEqual(dups[0].jobs.map((j) => j.project), ['Mac job', 'Windows job']);
+  assert.deepEqual(dups[0].jobs.map((j) => j.ref), ['INV-2026-0042', 'INV-2026-0042']);
+});
+
+test('a quote and an invoice, or two years, are not duplicates of each other', () => {
+  const book = [
+    { id: 'Q1', jobNumber: 'X-0001', status: 'quote', date: '2026-01-02' },
+    { id: 'J1', jobNumber: 'X-0001', status: 'pending', date: '2026-01-02' },
+    { id: 'J2', jobNumber: 'Y-0001', status: 'pending', date: '2025-12-30' },
+    { id: 'J3', jobNumber: 'Y-0001', status: 'pending', date: '2026-01-03' },
+  ];
+  assert.deepEqual(Doc.duplicateNumbers(book, {}), []);
+});
+
+test('an older book with unique ids has no duplicates', () => {
+  const book = [{ id: 'INV-2026-0001', status: 'pending' }, { id: 'INV-2026-0002', status: 'pending' }];
+  assert.deepEqual(Doc.duplicateNumbers(book, {}), []);
+});
+
+test('renumbering gives the newer job the next free number and keeps its id', () => {
+  const s = { invNumNext: 42, invNumYear: 2026 };
+  const num = 'INV-2026-0042';
+  const older = { id: `${num}-cd34`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'pending', date: '2026-09-04' };
+  const newer = { id: `${num}-ab12`, jobNumber: num, invoiceNumber: num, invoiceNum: num, status: 'pending', date: '2026-09-04' };
+  const other = { id: 'INV-2026-0043-ef56', jobNumber: 'INV-2026-0043', invoiceNumber: 'INV-2026-0043', status: 'pending', date: '2026-09-05' };
+  const book = [older, newer, other];
+  const given = N.renumber(newer, s, book, 2026);
+  assert.equal(given, 'INV-2026-0044', 'past every number the book holds');
+  assert.equal(newer.id, `${num}-ab12`, 'the id is the key — it never moves');
+  assert.equal(newer.jobNumber, 'INV-2026-0044');
+  assert.equal(newer.invoiceNumber, 'INV-2026-0044');
+  assert.equal(newer.invoiceNum, 'INV-2026-0044');
+  assert.equal(newer.renumberedFrom, num);
+  assert.equal(Doc.documentNumber(newer, s), 'INV-2026-0044');
+  assert.deepEqual(Doc.duplicateNumbers(book, s), [], 'and the pair is gone');
+  assert.equal(s.invNumNext, 45);
+});
+
+test('renumbering a quote moves its quote number; an approved quote its invoice number', () => {
+  const s = { quoteNumNext: 3, quoteNumYear: 2026, invNumNext: 10, invNumYear: 2026 };
+  const q = { id: 'QUO-2026-0003-aaaa', jobNumber: 'QUO-2026-0003', status: 'quote', date: '2026-09-04' };
+  assert.equal(N.renumber(q, s, [q], 2026), 'QUO-2026-0004');
+  assert.equal(q.jobNumber, 'QUO-2026-0004');
+  const approved = { id: 'QUO-2026-0001', status: 'pending', quoteAcceptedAt: '2026-09-01',
+    invoiceNumber: 'INV-2026-0009', invoiceNum: 'INV-2026-0009', date: '2026-09-01' };
+  assert.equal(N.renumber(approved, s, [approved], 2026), 'INV-2026-0010');
+  assert.equal(approved.id, 'QUO-2026-0001');
+  assert.equal(Doc.documentNumber(approved, s), 'INV-2026-0010');
+});

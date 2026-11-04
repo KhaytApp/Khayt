@@ -232,6 +232,17 @@
   function mintOrderId(jobNumber, bytes) { return `${jobNumber}-${idTag(bytes)}`; }
 
   /**
+   * The reference a person reads for a job: `jobNumber`, else the id. Every
+   * screen, page, message and log line a person reads shows this; the id
+   * stays the key. renderer/util.js `jobRef` and the Mac's `Order.reference`
+   * are the same rule.
+   */
+  function jobRef(order) {
+    if (!order || typeof order !== 'object') return '';
+    return String((typeof order.jobNumber === 'string' && order.jobNumber) || order.id || '');
+  }
+
+  /**
    * Whether this job BEGAN AS A QUOTE, so its invoice is numbered by the
    * invoice counter rather than by its id.
    *
@@ -733,12 +744,55 @@
     };
   }
 
+  /**
+   * Give a job whose printed number another job already carries the next
+   * free one. The id never changes: payments, links and the phone point at it.
+   *
+   * Two computers offline at once can both reach for the same next invoice
+   * number (the counter reads the book, but only once the other job has
+   * synced). `KhaytInvoiceDocument.duplicateNumbers` finds the pairs; this is
+   * the one fix offered, and it is the shop's to press — a number may already
+   * be on a paper in a customer's hands, and only the shop knows which.
+   *
+   * What changes is whatever that job PRINTS (`documentNumber`):
+   *   - a quote: its `jobNumber`, from the quote counter;
+   *   - a job that began as a quote: its invoice number;
+   *   - any other job: its invoice number and its `jobNumber` together, as a
+   *     new job takes them. An older job whose id is its number gains a
+   *     `jobNumber`, which is what prints from then on.
+   * `renumberedFrom` keeps what it printed before. `settings` IS MUTATED,
+   * as by `newOrder`; the caller writes both. Returns the new number.
+   */
+  function renumber(order, settings, orders, year) {
+    if (!order || typeof order !== 'object') return null;
+    const s = settings || {};
+    const D = global.KhaytInvoiceDocument;
+    const before = D && typeof D.documentNumber === 'function'
+      ? D.documentNumber(order, s) : (order.invoiceNumber || order.jobNumber || order.id);
+    let given;
+    if (order.status === 'quote') {
+      const seq = allocateQuoteSeq(s, year, orders);
+      given = order.jobNumber = `${s.quotePrefix || 'QUO'}-${year}-${seq}`;
+    } else if (beganAsQuote(order, s)) {
+      given = allocateInvoiceNumber(s, year, orders);
+      order.invoiceNum = given;
+      order.invoiceNumber = given;
+    } else {
+      const inv = allocateInvoice(s, year, orders);
+      order.invoiceNum = inv.number;
+      order.invoiceNumber = inv.number;
+      given = order.jobNumber = `${s.invPrefix || 'INV'}-${year}-${inv.seq4}`;
+    }
+    if (before && before !== given) order.renumberedFrom = before;
+    return given;
+  }
+
   /** How many random bytes each token needs. */
   const TOKEN_BYTES = 16;
 
   const api = {
     TOKEN_BYTES,
-    allocateInvoice, allocateInvoiceNumber, allocateQuoteSeq, mintOrderId, avgDailyWorkingHours,
+    allocateInvoice, allocateInvoiceNumber, allocateQuoteSeq, mintOrderId, jobRef, renumber, avgDailyWorkingHours,
     estimateDueDate, newOrder, componentsCost, jobCurrency, inShopCurrency, overheadHours, isAgreed,
     invoiceNumberOwed, ensureInvoiceNumber, beganAsQuote, awaitingApproval,
   };

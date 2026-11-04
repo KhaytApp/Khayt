@@ -1877,7 +1877,7 @@ function wireEvents() {
       const inst = (order.instalments || [])[instIdx];
       if (!inst) return;
       const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-      const clientName = client ? localName(client) : (order.project || order.id);
+      const clientName = client ? localName(client) : (order.project || jobRef(order));
       const msg = `Hi ${clientName}! A payment of ${fmtMoney(inst.amount || 0)} ${currencySymbol()} for order #${order.id} (${inst.note || ''}) is due on ${inst.dueDate || ''}. Please let us know if you have any questions.`;
       const phone = client?.phone || '';
       if (window.hubAPI?.shareWhatsApp) {

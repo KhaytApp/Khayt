@@ -82,7 +82,7 @@ function generateClientStatement(clientId) {
     const bal   = orderOwedBase(o);
     return `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:6px 8px; font-size:12px; white-space:nowrap;">${escapeHtml(o.date || '')}</td>
-      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(o.id)}</td>
+      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(jobRef(o))}</td>
       <td style="padding:6px 8px; font-size:12px;">${escapeHtml(o.project || '')}</td>
       <td style="padding:6px 8px; font-size:12px; text-align:end;">${fmtPrice(orderRevenueBase(o))}</td>
       <td style="padding:6px 8px; font-size:12px; text-align:end; color:#2a9d8f;">${fmtPrice(paid)}</td>
@@ -387,7 +387,7 @@ function openQuoteRevisionsModal(orderId) {
       </table></div>`;
 
   openFormModal({
-    title: `📋 ${t('ord.quote_revisions')} — ${escapeHtml(order.project || order.id)} (${t('ord.quote_version', { n: order.quoteVersion || 1 })})`,
+    title: `📋 ${t('ord.quote_revisions')} — ${escapeHtml(order.project || jobRef(order))} (${t('ord.quote_version', { n: order.quoteVersion || 1 })})`,
     noSave: true,
     bodyHtml: revsHtml,
   });
@@ -406,7 +406,7 @@ async function exportInvoicePDF(orderId, { askWhere = true, openAfter = true } =
     if (!window.hubAPI?.exportPDF) return null;
     const finalPath = await window.hubAPI.exportPDF({
       askWhere,
-      defaultName: `${order.id}.pdf`
+      defaultName: `${jobRef(order)}.pdf`
     });
     if (!finalPath) return null;
     toast(t('inv.saved'), 'success');
@@ -430,7 +430,7 @@ async function shareInvoiceWhatsApp(orderId) {
   await new Promise(r => setTimeout(r, 60));
   let pdfPath = null;
   if (window.hubAPI?.exportPDF) {
-    try { pdfPath = await window.hubAPI.exportPDF({ askWhere: false, defaultName: `${order.id}.pdf` }); }
+    try { pdfPath = await window.hubAPI.exportPDF({ askWhere: false, defaultName: `${jobRef(order)}.pdf` }); }
     catch (e) { console.error(e); }
   }
   const displayName = client ? (localName(client))
@@ -500,11 +500,11 @@ async function sendQuoteFollowUp(orderId, opts = {}) {
     if (!opts.silent) toast(t('quote.followup_no_phone'), 'info', 3200);
     return false;
   }
-  const name = client ? localName(client) : (order.project || order.id);
+  const name = client ? localName(client) : (order.project || jobRef(order));
   const message = t('quote.followup_msg', {
     name,
     id: order.id,
-    project: order.project || order.id,
+    project: order.project || jobRef(order),
     total: fmtPrice(order.price),
     expires: order.quoteExpiresAt || '',
   });
@@ -535,7 +535,7 @@ async function shareTrackingWhatsApp(orderId) {
   const phone = client?.phone;
   if (!phone) { toast(t('pay.remind_no_phone'), 'info'); return; }
   const msg = t('ship.tracking_msg', {
-    project: order.project || order.id,
+    project: order.project || jobRef(order),
     courier: order.courierName || '',
     tracking: order.trackingNumber,
   });
@@ -623,7 +623,7 @@ async function prepareZatcaPhase2Payload(order) {
     subtotal: exVat,
     vatAmount: vatAmt,
     vatRate: settings.enableVat ? rate : 0,
-    itemName: order.project || order.id,
+    itemName: order.project || jobRef(order),
     invoiceCounter: icv,
     pih: z2.lastInvoiceHash || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI4NjJhNGRhNjM3NWQ2OGM5',
   });
@@ -733,8 +733,8 @@ function maybeAutoSubmitZatca(order) {
   if (order.zatcaSubmission?.status === 'accepted') return;
   submitOrderToZatca(order.id, { silent: true })
     .then((r) => {
-      if (r?.ok && !r.skipped) toast(t('zatca2.auto_submitted', { id: order.id }) || `Invoice ${order.id} submitted to ZATCA`, 'success', 4000);
-      else if (r?.ok === false && !r.skipped) toast(t('zatca2.auto_submit_failed', { id: order.id }) || `ZATCA auto-submit failed for ${order.id}`, 'warning', 5000);
+      if (r?.ok && !r.skipped) toast(t('zatca2.auto_submitted', { id: jobRef(order) }) || `Invoice ${jobRef(order)} submitted to ZATCA`, 'success', 4000);
+      else if (r?.ok === false && !r.skipped) toast(t('zatca2.auto_submit_failed', { id: jobRef(order) }) || `ZATCA auto-submit failed for ${jobRef(order)}`, 'warning', 5000);
     })
     .catch((e) => console.error('ZATCA auto-submit:', e));
 }
@@ -828,7 +828,7 @@ async function renderInvoiceForOrder(order, opts = {}) {
           subtotal:      _z2tax.subtotal,
           vatAmount:     _z2tax.taxTotal,
           vatRate:       _z2profile.rates.reduce((sum, r) => sum + r.percent, 0),
-          itemName:      order.project || order.id,
+          itemName:      order.project || jobRef(order),
           invoiceCounter: (z2.invoiceCounter || 0) + 1,
           pih:           z2.lastInvoiceHash || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI4NjJhNGRhNjM3NWQ2OGM5',
         });
@@ -1201,7 +1201,7 @@ function openCreditNoteModal(orderId) {
 
   const bodyHtml = `
     <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">
-      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(order.id)}</strong> · ${fmtPrice(order.price)} ${currencySymbol()}
+      ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(jobRef(order))}</strong> · ${fmtPrice(order.price)} ${currencySymbol()}
     </p>
     <label>${escapeHtml(t('cn.credit_amount'))} (${currencySymbol()})</label>
     <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
@@ -1273,7 +1273,7 @@ function generateCreditNote(order, creditAmount, reason) {
           <div class="meta">
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.no"))}</span><span class="v">${escapeHtml(cnId)}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(today))}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(order.id)}</span></div>
+            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
           </div>
         </div>
       </div>
@@ -1302,7 +1302,7 @@ function generateCreditNote(order, creditAmount, reason) {
         <tbody>
           <tr>
             <td>
-              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || order.id)}</div>
+              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || jobRef(order))}</div>
               ${reason ? `<div class="meta">${escapeHtml(reason)}</div>` : ''}
             </td>
             <td class="center">1</td>
@@ -1366,7 +1366,7 @@ function generateDeliveryNote(id) {
           <div class="title">${escapeHtml(t("doc.delivery_note"))}</div>
           ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(secondLang, "doc.delivery_note"))}</div>` : ''}
           <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(order.id)}</span></div>
+            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
             <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(order.date))}</span></div>
           </div>
         </div>

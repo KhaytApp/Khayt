@@ -955,6 +955,9 @@ async function loadAll() {
   // stops new ones; it cannot undo what is already on disk, so say so rather
   // than leaving the shop to find out. Report-only — see findResurrected().
   if (typeof reportResurrectedRecords === 'function') reportResurrectedRecords();
+  // Two papers with one number — what two computers offline at once can still
+  // make. Named so the shop can give one a new number (renderer/settings.js).
+  if (typeof reportDuplicateNumbers === 'function') reportDuplicateNumbers();
 
   /* Two things a shop upgrading from an earlier build meets in its OWN data.
    *

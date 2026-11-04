@@ -174,9 +174,20 @@ struct CloudCheckSheet: View {
                 // Delete wins over a local edit — and a shop is told, because a
                 // merge that threw somebody's work away in silence is the
                 // failure the conflicts list exists to prevent.
-                if !pulled.conflicts.isEmpty {
-                    Label(shop.words.counting(pulled.conflicts.count, "mac.cloud_lost_edits"),
+                // Two different jobs under one id are NOT lost edits: both are
+                // kept (lib/sync.js "TWO RECORDS, ONE ID"), so they are said
+                // apart, in their own words.
+                let twins = pulled.conflicts.filter(Self.isTwin).count
+                let lost = pulled.conflicts.count - twins
+                if lost > 0 {
+                    Label(shop.words.counting(lost, "mac.cloud_lost_edits"),
                           systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if twins > 0 {
+                    Label(shop.words.counting(twins, "mac.cloud_twin_jobs"),
+                          systemImage: "doc.on.doc")
                         .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -202,5 +213,13 @@ struct CloudCheckSheet: View {
                 }
             }
         }
+    }
+}
+
+extension CloudCheckSheet {
+    /// A conflict that is two jobs sharing one id (`kind: "id_collision"`).
+    static func isTwin(_ conflict: JSONValue) -> Bool {
+        if case .object(let c) = conflict, case .string("id_collision")? = c["kind"] { return true }
+        return false
     }
 }

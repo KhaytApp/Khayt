@@ -2037,6 +2037,82 @@ function reportOverwrittenEdits(conflicts) {
  * the owner to dismiss it; announcing once ever is missed by anyone who was not
  * looking that day.
  */
+/**
+ * Documents in the book that print the same number, and a way to fix one.
+ *
+ * Two computers on one book can both issue the next number while they are
+ * out of sync: each counter reads the book (lib/order-new.js
+ * `allocateInvoiceNumber`), but a job the other made offline is not in it yet.
+ * No job is lost to that any more; two papers with one number is what is
+ * left, and `KhaytInvoiceDocument.duplicateNumbers` names them. Which one the
+ * customer already holds only the shop knows, so nothing is renumbered unasked:
+ * the warning opens a list with "New number" on every job (`KhaytOrderNew.renumber`).
+ *
+ * Announced when the set CHANGES, as reportResurrectedRecords is.
+ */
+function reportDuplicateNumbers({ force = false } = {}) {
+  const Doc = (typeof KhaytInvoiceDocument !== 'undefined') ? KhaytInvoiceDocument : null;
+  if (!Doc || typeof Doc.duplicateNumbers !== 'function' || typeof printLog === 'undefined') return [];
+  let dups = [];
+  try { dups = Doc.duplicateNumbers(printLog, settings); } catch (e) { return []; }
+  const KEY = 'hub_dup_numbers_seen_v1';
+  const signature = dups.map((g) => `${g.kind}|${g.year}|${g.number}:${g.jobs.map((j) => j.id).join('+')}`).sort().join(',');
+  if (dups.length) {
+    try { console.warn('[numbers] documents sharing a number:', signature); } catch (e) { /* noop */ }
+  }
+  let lastSeen = '';
+  try { lastSeen = localStorage.getItem(KEY) || ''; } catch (e) { /* private mode */ }
+  try { localStorage.setItem(KEY, signature); } catch (e) { /* non-fatal */ }
+  if (!dups.length || (!force && signature === lastSeen)) return dups;
+  const msg = dups.length === 1
+    ? t('dupnum.toast_one').replace('{number}', dups[0].number)
+    : t('dupnum.toast_many').replace('{n}', String(dups.length));
+  if (typeof toast === 'function') {
+    toast(msg, 'warning', 15000, { action: { label: t('dupnum.review'), run: openDuplicateNumbers } });
+  }
+  return dups;
+}
+
+/** The list behind the warning: each number, its jobs, and "New number". */
+function openDuplicateNumbers() {
+  const Doc = KhaytInvoiceDocument;
+  const dups = Doc.duplicateNumbers(printLog, settings);
+  const rows = dups.map((g) => `
+      <div style="margin:10px 0;">
+        <div style="font-weight:600;font-family:var(--font-num);">${escapeHtml(g.number)}</div>
+        ${g.jobs.map((j) => `
+          <div style="display:flex;gap:8px;align-items:center;padding:3px 0;">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(j.project || j.ref)}</span>
+            <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(j.date)}</span>
+            <button type="button" class="btn ghost small dupRenumber" data-id="${escapeHtml(j.id)}" data-number="${escapeHtml(g.number)}">${escapeHtml(t('dupnum.renumber'))}</button>
+          </div>`).join('')}
+      </div>`).join('');
+  const overlay = appendStackedModal(`
+      <div class="modal modal-form" role="dialog" aria-modal="true" aria-labelledby="dupNumbersTitle">
+        <div class="modal-header">
+          <h3 id="dupNumbersTitle">${escapeHtml(t('dupnum.title'))}</h3>
+          <button class="btn ghost small" id="dupNumbersClose" aria-label="Close" title="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:12.5px;color:var(--text-muted);margin-top:0;">${escapeHtml(t('dupnum.why'))}</p>
+          ${rows}
+        </div>
+      </div>`);
+  overlay.querySelector('#dupNumbersClose').addEventListener('click', () => overlay.remove());
+  overlay.querySelectorAll('.dupRenumber').forEach((btn) => btn.addEventListener('click', () => {
+    const order = printLog.find((o) => o && o.id === btn.dataset.id);
+    if (!order) return;
+    const given = KhaytOrderNew.renumber(order, settings, printLog, new Date().getFullYear());
+    if (!given) return;
+    saveAll();
+    overlay.remove();
+    toast(t('dupnum.renumbered').replace('{old}', btn.dataset.number).replace('{new}', given), 'success', 5000);
+    if (typeof renderLogs === 'function') renderLogs();
+    if (typeof renderKanban === 'function') renderKanban();
+    if (KhaytInvoiceDocument.duplicateNumbers(printLog, settings).length) openDuplicateNumbers();
+  }));
+}
+
 function reportResurrectedRecords() {
   if (typeof KhaytSync === 'undefined' || !KhaytSync.findResurrected) return;
   let found = [];
@@ -2187,7 +2263,7 @@ function cloudSyncDeps() {
     save: () => saveAll(),
     push: (snap) => window.hubAPI.cloudPush(snap),
     pull: () => window.hubAPI.cloudPull(),
-    onConflicts: (conflicts) => { reportSyncConflicts(conflicts); reportOverwrittenEdits(conflicts); },
+    onConflicts: (conflicts) => { reportSyncConflicts(conflicts); reportOverwrittenEdits(conflicts); reportDuplicateNumbers(); },
   };
 }
 
@@ -6808,6 +6884,8 @@ function renderTelegramSettings() {
     // this line the typeof check there just sees undefined and the whole thing
     // silently never runs — which is the failure the four names above document.
     reportResurrectedRecords,
+    reportDuplicateNumbers,
+    openDuplicateNumbers,
     reportLegacyMoneyState,
     // The organisation overview's three line builders. Pure string in, string
     // out, and the only place money is put in front of a chain owner — so they
