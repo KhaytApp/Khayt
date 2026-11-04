@@ -1046,15 +1046,13 @@ final class LanServer {
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)
             }
             let whole = request.query["scope"] == "whole"
-            let cut = whole
-                ? (store: masked, taken: BookScope.Taken(
-                    collections: [:], omitted: [], takenAt: StoreWriter.iso(host.now())))
-                : BookScope.take(from: masked, now: host.now())
-            // An ENVELOPE, not a bare store. The records alone cannot say what
-            // was left out, and a partial book that cannot say it is partial is
-            // worse than none: a screen would count 200 orders and report a
-            // three-year-old shop as having done 200.
-            guard let body = Self.envelope(store: cut.store, taken: cut.taken, whole: whole) else {
+            // OFF THE MAIN ACTOR. Cutting the book and encoding it ran right
+            // here, on the main actor — and `?scope=whole` on a 15 MB book is
+            // seconds of JSON with the window frozen, repeatable by any paired
+            // phone. Only the clock is read here; the cut and the encode run
+            // on a Dispatch thread (not the cooperative pool — see `PinWork`).
+            let now = host.now()
+            guard let body = await PinWork.run({ Self.storeBody(masked: masked, whole: whole, now: now) }) else {
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)
             }
             return .json(200, body)
@@ -1859,6 +1857,21 @@ final class LanServer {
                                   "Content-Disposition": "attachment; filename=\"khayt-orders.ics\"",
                                   "Cache-Control": "no-cache"],
                         body: Data(ics.utf8))
+    }
+
+    /// The whole `GET /api/store` reply body, from the masked book.
+    ///
+    /// `nonisolated` and pure so the route can run it off the main actor. An
+    /// ENVELOPE, not a bare store. The records alone cannot say what was left
+    /// out, and a partial book that cannot say it is partial is worse than
+    /// none: a screen would count 200 orders and report a three-year-old shop
+    /// as having done 200.
+    nonisolated static func storeBody(masked: [String: JSONValue], whole: Bool, now: Date) -> String? {
+        let cut = whole
+            ? (store: masked, taken: BookScope.Taken(
+                collections: [:], omitted: [], takenAt: StoreWriter.iso(now)))
+            : BookScope.take(from: masked, now: now)
+        return envelope(store: cut.store, taken: cut.taken, whole: whole)
     }
 
     /// `{ scope, store }` — what travelled, and the description of what did not.

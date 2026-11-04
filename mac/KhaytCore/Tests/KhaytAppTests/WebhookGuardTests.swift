@@ -352,6 +352,21 @@ struct WebhookWiringTests {
                 "the client carries its own copy of the blocked ranges")
     }
 
+    @Test("DNS is waited on by a Dispatch thread, not a cooperative-pool one")
+    func resolverIsOffThePool() async throws {
+        // `getaddrinfo` blocks until DNS answers or gives up — seconds, on a
+        // bad network. Inside `Task.detached` that held a pool thread the LAN
+        // server, sync and the JS engine also need; the comment above it said
+        // the opposite. `PinWork.run` parks it on a Dispatch queue instead.
+        let client = try Self.code("WebhookClient.swift")
+        #expect(client.contains("await PinWork.run { resolve(host) }"),
+                "the resolver is no longer on a Dispatch queue")
+        #expect(!client.contains("Task.detached"),
+                "a blocking call in WebhookClient runs inside Task.detached again")
+        // And it still answers: a name every machine resolves without a network.
+        #expect(!(await WebhookClient.addresses(of: "localhost")).isEmpty)
+    }
+
     @Test("the deliveries a move owes are actually sent")
     func theyAreSent() throws {
         // ── THE BUG THIS CATCHES IS A CORRECT MODULE WITH NO CALLER ───────
