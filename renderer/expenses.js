@@ -617,7 +617,7 @@ function ordersToInvoiceRows() {
     currencyOf: (o) => ((typeof clientCurrency === 'function')
       ? orderCurrency(o) : (settings.currency || 'SAR')),
     toBase: (typeof convertToBase === 'function')
-      ? ((amt, cur) => convertToBase(amt, cur)) : ((amt) => amt),
+      ? ((amt, cur, o) => (o && typeof orderToBase === 'function' ? orderToBase(amt, o) : convertToBase(amt, cur))) : ((amt) => amt),
   });
 }
 
@@ -638,7 +638,7 @@ function orderToInvoiceRow(o) {
     vatRate: rate,
     taxMode: _tp.mode,
     baseCurrency,
-    baseAmount: (typeof convertToBase === 'function') ? convertToBase(+o.price || 0, cur) : (+o.price || 0),
+    baseAmount: (typeof orderToBase === 'function') ? orderToBase(+o.price || 0, o) : (+o.price || 0),
   };
 }
 
@@ -864,7 +864,7 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     if (!monthMap[month]) monthMap[month] = { orders: 0, revenue: 0, vatCollected: 0, taxableSales: 0, shipping: 0 };
     monthMap[month].orders++;
     monthMap[month].revenue += orderNetRevenueBase(o);
-    monthMap[month].shipping += convertToBase(+o.shippingCost || 0, orderCurrency(o));
+    monthMap[month].shipping += orderToBase(+o.shippingCost || 0, o);
   }
   // VAT FOLLOWS THE INVOICE, NOT THE FINISHED JOB. The tax point is the issued
   // invoice, so a job still printing owes its VAT in the month it is dated —

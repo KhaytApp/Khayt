@@ -493,7 +493,6 @@
   "inv.weight_total": "総重量（g）",
   "kan.due_tomorrow": "明日",
   "kan.orders": "注文",
-  "kan.total_partial": "{total} + 未換算 {n} 件",
   "lan.not_running": "LANサーバーは起動していません",
   "lan.start_hint": "先に設定でLANサーバーを起動してください",
   "log.clear_filters": "フィルターをクリア",

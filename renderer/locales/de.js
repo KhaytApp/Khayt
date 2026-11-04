@@ -493,7 +493,6 @@
   "inv.weight_total": "Gesamtgewicht (g)",
   "kan.due_tomorrow": "Morgen",
   "kan.orders": "Aufträge",
-  "kan.total_partial": "{total} + {n} nicht umgerechnet",
   "lan.not_running": "LAN-Server läuft nicht",
   "lan.start_hint": "Starten Sie zuerst den LAN-Server in den Einstellungen",
   "log.clear_filters": "Filter zurücksetzen",

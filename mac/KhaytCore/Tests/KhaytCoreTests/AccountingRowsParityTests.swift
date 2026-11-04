@@ -264,7 +264,7 @@ struct AccountingRowsParityTests {
 
         let with = AccountingRows.invoiceRows(orders: orders, settings: ["currency": .string("SAR")],
                                               clients: [], tax: vat,
-                                              toBase: { amount, _ in amount * 3.75 })
+                                              toBase: { amount, _, _ in amount * 3.75 })
         guard case .object(let converted)? = with.first else { Issue.record("no row"); return }
         #expect(converted["baseCurrency"] == .string("SAR"))
         #expect(converted["baseAmount"] == .number(375))

@@ -493,7 +493,6 @@
   "inv.weight_total": "总重量（g）",
   "kan.due_tomorrow": "明天",
   "kan.orders": "订单",
-  "kan.total_partial": "{total} + {n} 笔未换算",
   "lan.not_running": "LAN 服务器未运行",
   "lan.start_hint": "请先在设置中启动 LAN 服务器",
   "log.clear_filters": "清除筛选",

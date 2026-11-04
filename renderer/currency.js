@@ -22,7 +22,9 @@
   function fmtMoneyIn(n, currencyCode) {
     const cur = CURRENCIES[currencyCode] || CURRENCIES[global.settings?.currency] || CURRENCIES.SAR;
     const val = fmtMoney(n);
-    return cur.pos === 'before' ? `${cur.symbol} ${val}` : `${val} ${cur.symbol}`;
+    // U+202F, as `fmtPrice` joins them: a plain space let "€ 100.00" wrap
+    // between the mark and the figure in a narrow cell.
+    return cur.pos === 'before' ? `${cur.symbol} ${val}` : `${val} ${cur.symbol}`;
   }
 
   /* The rules moved to lib/order-money.js so the Mac app could use the same
@@ -76,20 +78,23 @@
   }
 
   /**
-   * A total across jobs in the shop's currency, each job at the rate it was
-   * saved at (lib/order-money.js earnedTotalAtSavedRates). A job with no saved
-   * rate is left out, and the figure says so rather than passing for whole.
+   * A total across jobs in the shop's currency — the reports' own figure
+   * (lib/order-money.js earnedTotalBase): each job at the rate it was saved
+   * at, one saved before rates were kept at today's.
    */
   function fmtJobsTotal(orders) {
-    const r = M().earnedTotalAtSavedRates(orders, ctx(), CURRENCIES);
-    if (!r.partial) return fmtPrice(r.total);
-    const tr = typeof global.t === 'function' ? global.t : null;
-    const said = tr ? tr('kan.total_partial', { total: fmtPrice(r.total), n: r.left }) : '';
-    return said && said !== 'kan.total_partial' ? said : `${fmtPrice(r.total)} + ${r.left}`;
+    return fmtPrice(M().earnedTotalBase(orders, ctx(), CURRENCIES));
   }
 
   function convertToBase(amount, fromCurrency) {
     return M().convertToBase(amount, fromCurrency, ctx());
+  }
+
+  /** One of an ORDER's amounts in the shop's currency, at its saved rate when
+   *  it has one (lib/order-money.js orderToBase). Prefer this to
+   *  `convertToBase` whenever the amount belongs to an order. */
+  function orderToBase(amount, o) {
+    return M().orderToBase(amount, o, ctx(), CURRENCIES);
   }
 
   function orderRevenueBase(o) {
@@ -180,6 +185,7 @@
     clientCurrency,
     orderCurrency,
     convertToBase,
+    orderToBase,
     orderRevenueBase,
     orderCreditedRaw,
     orderCreditedBase,

@@ -493,7 +493,6 @@
   "inv.weight_total": "Toplam Ağırlık (g)",
   "kan.due_tomorrow": "Yarın",
   "kan.orders": "sipariş",
-  "kan.total_partial": "{total} + {n} çevrilmedi",
   "lan.not_running": "LAN sunucusu çalışmıyor",
   "lan.start_hint": "Önce Ayarlar'dan LAN sunucusunu başlatın",
   "log.clear_filters": "Filtreleri temizle",

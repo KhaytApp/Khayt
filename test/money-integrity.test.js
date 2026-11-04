@@ -395,7 +395,7 @@ test('margin figures net credit notes in the order\'s own currency', () => {
   // left alone is gone with it).
   assert.match(read('lib/pnl-report.js'), /money\.orderNetRevenueBase\(o, moneyCtx, known\)/,
     'the P&L rule nets credit notes');
-  assert.match(read('lib/pnl-report.js'), /money\.convertToBase\(cost, money\.orderCurrency\(o, moneyCtx, known\), moneyCtx\)/,
+  assert.match(read('lib/pnl-report.js'), /money\.orderToBase\(cost, o, moneyCtx, known\)/,
     'and prices the cost in the same currency');
   assert.match(read('renderer/analytics.js'),
     /const rev = Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,

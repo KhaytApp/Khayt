@@ -134,7 +134,7 @@ public enum AccountingRows {
     public static func invoiceRows(orders: [JSONValue], settings: [String: JSONValue],
                                    clients: [JSONValue], tax: Tax,
                                    currencyOf: ((JSONValue) -> String)? = nil,
-                                   toBase: ((Double, String) -> Double)? = nil,
+                                   toBase: ((Double, String, JSONValue) -> Double)? = nil,
                                    localName: ((JSONValue) -> String)? = nil) -> [JSONValue] {
         let baseCurrency = JSSemantics.truthy(settings["currency"])
             ? JSSemantics.text(settings["currency"]) : "SAR"
@@ -192,7 +192,8 @@ public enum AccountingRows {
             // `undefined` disappears from the row entirely when there is no
             // converter, rather than arriving as a null the exporter would
             // print as a figure of nothing.
-            if let toBase { row["baseAmount"] = .number(toBase(price.isNaN ? 0 : price, currency)) }
+            // The order goes too, so a host can use the rate it was saved at.
+            if let toBase { row["baseAmount"] = .number(toBase(price.isNaN ? 0 : price, currency, order)) }
             out.append(.object(row))
         }
         return out

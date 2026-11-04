@@ -610,7 +610,6 @@
   "inv.weight_total": "الوزن الإجمالي (غ)",
   "kan.due_tomorrow": "غدًا",
   "kan.orders": "طلبات",
-  "kan.total_partial": "{total} + {n} دون تحويل",
   "lan.not_running": "خادم الشبكة المحلية غير مُشغَّل",
   "lan.start_hint": "شغّل خادم الشبكة المحلية من الإعدادات أولًا",
   "log.clear_filters": "مسح عوامل التصفية",

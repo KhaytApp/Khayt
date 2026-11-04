@@ -60,22 +60,22 @@ function generateClientStatement(clientId) {
   const bizPrimary = shopName() || 'Khayt';
 
   // All statement figures are in the shop's BASE currency so multi-currency
-  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert).
-  const curOf = (o) => (typeof orderCurrency === 'function') ? orderCurrency(o) : (settings.currency || 'SAR');
+  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert),
+  // every figure at the order's saved rate when it has one (orderToBase).
   // Cash actually received (base). Falls back to price ONLY for legacy fully-paid
   // orders with no recorded amount AND no gift settlement — otherwise a gift-card
   // -settled order would be counted as both "paid" (price) and "gift".
   const cashPaidBase = (o) => {
     const recorded = +o.paidAmount || 0;
-    if (recorded > 0) return convertToBase(recorded, curOf(o));
-    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? convertToBase(+o.price || 0, curOf(o)) : 0;
+    if (recorded > 0) return orderToBase(recorded, o);
+    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? orderToBase(+o.price || 0, o) : 0;
   };
   const totalCharges = orders.reduce((s, o) => s + orderRevenueBase(o), 0);
   const totalPaid    = orders.reduce((s, o) => s + cashPaidBase(o), 0);
   // Gift-card redemptions settle part of the balance just like a payment.
-  const totalGift    = orders.reduce((s, o) => s + convertToBase(+o.giftCardDiscount || 0, curOf(o)), 0);
+  const totalGift    = orders.reduce((s, o) => s + orderToBase(+o.giftCardDiscount || 0, o), 0);
   const totalCredit  = orders.reduce((s, o) =>
-    s + convertToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), curOf(o)), 0);
+    s + orderToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), o), 0);
   const outstanding  = orders.reduce((s, o) => s + orderOwedBase(o), 0);
 
   const rowsHtml = orders.map(o => {

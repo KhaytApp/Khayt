@@ -134,46 +134,75 @@ test('the job lists format a job price through fmtOrderPrice', () => {
 
 const M = require('../lib/order-money.js');
 
-test('a column total counts each job at its SAVED rate, and says when one is left out', () => {
-  const ctx = { settings: { currency: 'SAR', exchangeRates: { EUR: 9 } }, clients: [] };
+test('ONE rate everywhere: an order converts at its saved rate, a legacy one at today\'s', () => {
+  const ctx = { settings: { currency: 'SAR', exchangeRates: { EUR: 9 } }, clients: [{ id: 'C1', currency: 'EUR' }] };
   const done = { status: 'completed' };
-  const r = M.earnedTotalAtSavedRates([
-    Object.assign({ price: 100 }, done),
-    Object.assign({ price: 25, currency: 'EUR', fxRate: 4 }, done),   // 100 SAR, not 225
-    Object.assign({ price: 50, currency: 'SAR', creditNotes: [{ amount: 10 }] }, done),
-  ], ctx);
-  assert.deepEqual(r, { total: 240, partial: false, left: 0 });
-  const p = M.earnedTotalAtSavedRates([
-    Object.assign({ price: 100 }, done),
-    Object.assign({ price: 25, currency: 'EUR' }, done),   // no saved rate: left out
-  ], ctx);
-  assert.deepEqual(p, { total: 100, partial: true, left: 1 });
+  const saved = Object.assign({ price: 25, currency: 'EUR', fxRate: 4, paidAmount: 5,
+    creditNotes: [{ amount: 5 }] }, done);
+  assert.equal(M.orderToBase(25, saved, ctx), 100);          // not 225 at today's 9
+  assert.equal(M.orderRevenueBase(saved, ctx), 100);
+  assert.equal(M.orderCreditedBase(saved, ctx), 20);
+  assert.equal(M.orderNetRevenueBase(saved, ctx), 80);
+  assert.equal(M.orderOwedBase(saved, ctx), 60);               // (25 − 5 − 5) × 4
+  // A job saved before rates were kept falls back to today's, as reports did.
+  const legacy = Object.assign({ price: 25, currency: 'EUR' }, done);
+  assert.equal(M.orderRevenueBase(legacy, ctx), 225);
+  // So does one whose currency comes from the client rather than the record:
+  // the stored rate belongs to the stored code only.
+  assert.equal(M.orderRevenueBase(Object.assign({ price: 25, clientId: 'C1', fxRate: 4 }, done), ctx), 225);
+  // The shop's own currency is never touched.
+  assert.equal(M.orderToBase(50, Object.assign({ fxRate: 4 }, done), ctx), 50);
 });
 
-test('the board totals go through the saved-rate rule, and partial reads in every language', () => {
+test('a column total is the reports\' figure, legacy jobs included', () => {
+  const ctx = { settings: { currency: 'SAR', exchangeRates: { EUR: 9 } }, clients: [] };
+  const done = { status: 'completed' };
+  const jobs = [
+    Object.assign({ price: 100 }, done),
+    Object.assign({ price: 25, currency: 'EUR', fxRate: 4 }, done),       // 100
+    Object.assign({ price: 50, currency: 'SAR', creditNotes: [{ amount: 10 }] }, done),   // 40
+    Object.assign({ price: 10, currency: 'EUR' }, done),                  // legacy: 90
+  ];
+  assert.equal(M.earnedTotalBase(jobs, ctx), 330);
+  assert.equal(M.earnedTotalBase(jobs, ctx),
+    jobs.reduce((s, o) => s + M.orderNetRevenueBase(o, ctx), 0));
+});
+
+test('the board totals go through the shared rule; no partial key is left behind', () => {
   const kan = read('renderer/kanban.js');
   assert.match(kan, /const totalValFoot = fmtJobsTotal\(sorted\);/);
   assert.match(kan, /const totalVal = fmtJobsTotal\(sorted\);/);
-  assert.doesNotMatch(kan, /sorted\.reduce\(\(s, o\) => s \+ orderNetRevenueBase\(o\), 0\)/);
   const dir = path.join(ROOT, 'renderer', 'locales');
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
     const s = read(path.join('renderer', 'locales', f));
-    assert.match(s, /"kan\.total_partial": "[^"]*\{total\}[^"]*\{n\}[^"]*"/, f);
+    assert.doesNotMatch(s, /kan\.total_partial/, f);
     assert.match(s, /"inv\.qr_phase2_foreign_currency": "[^"]+"/, f);
   }
-});
-
-test('fmtJobsTotal: whole in SAR, partial when a job has no saved rate', () => {
   require('../renderer/format.js');
   const C = require('../renderer/currency.js');
   global.settings = { currency: 'SAR', exchangeRates: { EUR: 9 } };
   global.clients = [];
-  global.t = (k, v) => (k === 'kan.total_partial' ? `${v.total} + ${v.n} not converted` : k);
-  const done = { status: 'completed' };
-  assert.equal(C.fmtJobsTotal([Object.assign({ price: 25, currency: 'EUR', fxRate: 4 }, done)]), C.fmtPrice(100));
-  assert.equal(C.fmtJobsTotal([Object.assign({ price: 100 }, done), Object.assign({ price: 25, currency: 'EUR' }, done)]),
-    `${C.fmtPrice(100)} + 1 not converted`);
-  delete global.t;
+  assert.equal(C.fmtJobsTotal([{ price: 25, currency: 'EUR', fxRate: 4, status: 'completed' }]), C.fmtPrice(100));
+});
+
+test('fmtMoneyIn joins with a narrow no-break space, as fmtPrice does', () => {
+  require('../renderer/format.js');
+  const C = require('../renderer/currency.js');
+  global.settings = { currency: 'SAR' };
+  assert.doesNotMatch(C.fmtMoneyIn(100, 'EUR'), / /);
+  assert.match(C.fmtMoneyIn(100, 'EUR'), / /);
+});
+
+test('every per-order conversion goes through orderToBase', () => {
+  for (const f of ['lib/pnl-report.js', 'lib/receivables.js', 'lib/report-records.js',
+                   'renderer/invoicing.js', 'renderer/expenses.js']) {
+    assert.doesNotMatch(read(f), /convertToBase\([^)]*orderCurrency\(o/, f);
+    assert.doesNotMatch(read(f), /convertToBase\([^)]*curOf\(o\)/, f);
+  }
+  assert.match(read('lib/accounting-rows.js'), /toBase\(price, cur, o\)/);
+  const eng = read('mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift');
+  assert.match(eng, /billed: M\.orderToBase\(/);
+  assert.match(eng, /rateById\[String\(o\.id\)\] = M\.orderToBase\(1, o, ctx/);
 });
 
 test('Phase 2 refuses a job that is not in SAR; SAR passes', () => {
