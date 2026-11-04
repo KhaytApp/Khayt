@@ -54,7 +54,7 @@ struct MachineProfitPage: View {
                     rows(report)
                     if let sites {
                         LocationPlCard(shop: shop, report: sites)
-                            .card(rail: Khayt.brand, padding: 14)
+                            .card(padding: 14)
                             .padding(Metric.screen)
                     }
                     Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
@@ -65,10 +65,10 @@ struct MachineProfitPage: View {
                     // there was.
                     MaintenanceCostCard(shop: shop, rows: maintenance,
                                         year: Self.thisYear())
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                         .padding(Metric.screen)
                     DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                         .padding(Metric.screen)
                 }
             }
@@ -81,10 +81,10 @@ struct MachineProfitPage: View {
                 Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
                 PowerActuals(shop: shop, rows: power)
                 MaintenanceCostCard(shop: shop, rows: maintenance, year: Self.thisYear())
-                    .card(rail: Khayt.brand, padding: 14)
+                    .card(padding: 14)
                     .padding(Metric.screen)
                 DowntimeCard(shop: shop, rows: downtime, months: downtimeMonths)
-                    .card(rail: Khayt.brand, padding: 14)
+                    .card(padding: 14)
                     .padding(Metric.screen)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

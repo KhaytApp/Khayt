@@ -265,7 +265,12 @@ struct Waterfall: View {
                 let slot = direction == .rightToLeft ? count - 1 - i : i
                 return step * CGFloat(slot) + step / 2
             }
-            func y(_ v: Double) -> CGFloat { CGFloat((hi - v) / span) * plot }
+            // A fixed strip above the highest bar for its figure. The 1.28
+            // headroom is a share of the VALUES, so a small revenue beside a
+            // large overhead left a few points and its label was cut off at the
+            // top of the card (beta.19 review, Reports).
+            let label: CGFloat = 18
+            func y(_ v: Double) -> CGFloat { label + CGFloat((hi - v) / span) * (plot - label) }
 
             // The zero line — the only rule on the chart that means anything,
             // so the only one drawn at all.

@@ -996,46 +996,46 @@ struct Reports: View {
                     // that frames it: a shop reading who its best customers are
                     // should know first whether it is finding new ones.
                     CustomerMixCard(shop: shop, report: mix)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // Directly under the mix, because they are halves of one
                     // question: that card says whether new customers are
                     // arriving, this one says where from. A shop deciding
                     // where to spend needs both, and neither alone.
                     ClientSourcesCard(shop: shop, report: sources)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // And whether the people found that way stay. Above the
                     // lifetime table, which ranks them by what they spent;
                     // this says how many come back at all.
                     ClientRetentionCard(shop: shop, report: retention)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     ClientValueTable(shop: shop, report: worth)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // ── AND WHICH OF THEM EARNS ───────────────────────────
                     //
                     // The list above is what sells MOST. This is what makes
                     // money, and the two are routinely in a different order —
                     // which is the finding, and why they sit on one screen.
                     ProductProfitTable(shop: shop, report: earns)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // What sold, above; what the printer's hours are best
                     // spent on, here — the whole catalogue, made or not.
                     BestUseOfPrinterCard(shop: shop, report: shop.profitPerHour)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     ThroughputCard(shop: shop, report: when)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // WHEN work finishes, above; how LONG it took, here.
                     CycleTimeCard(shop: shop, cycle: cycle, lead: lead)
-                        .card(rail: Khayt.brand, padding: 14)
+                        .card(padding: 14)
                     // How long it took, above; whether that was in time, here.
                     OnTimeCard(shop: shop, report: promises)
-                        .card(rail: (promises?.rate ?? 100) < 70 ? Khayt.attention : Khayt.brand,
+                        .card(rail: (promises?.rate ?? 100) < 70 ? Khayt.attention : nil,
                               padding: 14)
                     // Beside what the shop MADE, because work done twice was
                     // billed once — the gap between the two figures on this
                     // card is time the shop was not paid for.
                     QualityCard(shop: shop, report: quality)
                         .card(rail: (quality?.firstPassYield ?? 1) < 0.75
-                                    ? Khayt.attention : Khayt.brand,
+                                    ? Khayt.attention : nil,
                               padding: 14)
                     // Who did that work, under how well it was done: the
                     // jobs, the waste and the estimates are the same three
@@ -1043,11 +1043,11 @@ struct Reports: View {
                     // staff on the book.
                     if let staff {
                         OperatorPerformanceCard(shop: shop, report: staff)
-                            .card(rail: Khayt.brand, padding: 14)
+                            .card(padding: 14)
                     }
                     if let labour {
                         OperatorTimeCard(shop: shop, report: labour)
-                            .card(rail: Khayt.brand, padding: 14)
+                            .card(padding: 14)
                     }
                     // Under quality, and last, because it is the only figure on
                     // this screen the shop did not work out for itself: whether
@@ -1055,7 +1055,7 @@ struct Reports: View {
                     // it, and this is the customer's.
                     RatingTrendCard(shop: shop, trend: ratings)
                         .card(rail: (ratings?.average ?? 5) < 3
-                                    ? Khayt.attention : Khayt.brand,
+                                    ? Khayt.attention : nil,
                               padding: 14)
                 }
                 .padding(Metric.screen)
@@ -1312,7 +1312,12 @@ struct Reports: View {
                 out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_col_labour"),
                                          amount: -row.labourValue))
             }
-            out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
+            // Only when there is any, like the monthly costs below: a 0.00 bar
+            // labelled Expenses beside the side panel's −300 Expenses read as
+            // two answers to one question (beta.19 review).
+            if row.expenses != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
+            }
             // Only when there is any. A bar of zero height under a label is a
             // row of the table that wandered onto the chart.
             if row.fixed != 0 {
@@ -1410,7 +1415,7 @@ struct Reports: View {
                         Text(Self.netHeading(shop.words, period: period))
                             .font(.system(size: 10, weight: .semibold))
                             .textCase(.uppercase).tracking(0.6)
-                            .foregroundStyle(Khayt.brand)
+                            .foregroundStyle(.secondary)
                         BigFigure(value: Money.figure(net), unit: Money.mark(shop.currency),
                                   tint: net < 0 ? Khayt.late : nil, size: 28)
                         // ── AND THE SUM THAT MADE IT ─────────────────────
@@ -1432,7 +1437,7 @@ struct Reports: View {
                         Text(shop.words.callIt("mac.pnl_title"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    .card(rail: net < 0 ? Khayt.late : Khayt.brand, padding: 14)
+                    .card(rail: net < 0 ? Khayt.late : nil, padding: 14)
 
                     // ── AND WHETHER IT WAS ENOUGH ─────────────────────────
                     //
@@ -1441,7 +1446,7 @@ struct Reports: View {
                     // what the shop had to bill to cover the rent, and that
                     // figure lived nowhere in this app at all.
                     BreakEvenCard(shop: shop, report: floor)
-                        .card(rail: (floor?.surplus ?? 0) < 0 ? Khayt.late : Khayt.brand,
+                        .card(rail: (floor?.surplus ?? 0) < 0 ? Khayt.late : nil,
                               padding: 14)
 
                     // The components it is made of. Net is deliberately NOT
@@ -1466,8 +1471,18 @@ struct Reports: View {
                                 DetailLine(shop.words.callIt("pnl.labour"),
                                            Money.cost(rows.reduce(0) { $0 + $1.labourValue }, shop.currency))
                             }
-                            DetailLine(shop.words.callIt("an.pnl_expenses"),
-                                       Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency))
+                            // The two the chart draws apart, drawn apart here:
+                            // this said "Expenses −300" for a shop whose 300 was
+                            // its monthly overhead and whose Expenses screen was
+                            // empty.
+                            if rows.contains(where: { $0.expenses != 0 }) || !rows.contains(where: { $0.fixed != 0 }) {
+                                DetailLine(shop.words.callIt("an.pnl_expenses"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.expenses }, shop.currency))
+                            }
+                            if rows.contains(where: { $0.fixed != 0 }) {
+                                DetailLine(shop.words.callIt("mac.waterfall_fixed"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.fixed }, shop.currency))
+                            }
                             // Ruled off from the two above it, because it is
                             // NOT a third subtraction — it is what the shop
                             // owes ZATCA, and revenue above is already net of

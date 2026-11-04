@@ -37,7 +37,7 @@ struct ThroughputCard: View {
             Text(words.callIt("mac.tp_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, report.totals.jobs > 0 {
                 if let day = report.totals.busiestDay, let hour = report.totals.busiestHour {

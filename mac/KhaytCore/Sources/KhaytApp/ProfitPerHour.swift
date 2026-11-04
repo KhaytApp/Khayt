@@ -54,7 +54,7 @@ struct BestUseOfPrinterCard: View {
             Text(words.callIt("mac.pph_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
             Text(words.callIt("mac.pph_intro"))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

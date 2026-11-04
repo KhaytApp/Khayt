@@ -35,7 +35,7 @@ struct RatingTrendCard: View {
                 Text(words.callIt("an.nps_trend"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if let trend, trend.responses > 0, let average = trend.average {
                     // "3 responses · Avg 4.7" — the responses IN THE WINDOW.

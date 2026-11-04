@@ -26,7 +26,7 @@ struct MachineReliabilityCard: View {
                 Text(words.callIt("mac.mr_title"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let rate = report?.totals.scrapRate {
                     Text(words.callIt("mac.mr_rate",

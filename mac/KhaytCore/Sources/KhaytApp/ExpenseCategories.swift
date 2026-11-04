@@ -34,7 +34,7 @@ struct ExpenseCategoriesCard: View {
                 Text(words.callIt("an.exp_by_cat") + (period.map { " · " + $0 } ?? ""))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if let report, !report.rows.isEmpty {
                     Text(Money.text(report.total, shop.currency))
