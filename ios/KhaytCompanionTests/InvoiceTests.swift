@@ -133,6 +133,36 @@ final class InvoiceTests: XCTestCase {
         }
     }
 
+    /// The ZATCA QR's total and VAT are riyals: a scanner reads the bare
+    /// number as SAR. A job saved in a client's currency is converted at the
+    /// rate stored on it; with no stored rate there is no QR, and the paper
+    /// says why in its place.
+    func testTheZatcaQrStatesRiyalsOrSaysWhyNot() async throws {
+        let r = try reader { store in
+            guard case .object(var s)? = store["settings"] else { return }
+            s["enableZatca"] = .bool(true); s["vat"] = .string("300000000000003")
+            s["currency"] = .string("SAR")
+            store["settings"] = .object(s)
+            self.addOrder(&store, ["id": .string("S-4001"), "status": .string("completed")])
+            self.addOrder(&store, ["id": .string("S-4002"), "status": .string("completed"),
+                                   "currency": .string("EUR"), "fxRate": .number(4.05)])
+            self.addOrder(&store, ["id": .string("S-4003"), "status": .string("completed"),
+                                   "currency": .string("EUR")])
+        }
+        for ok in ["S-4001", "S-4002"] {
+            guard case .paper(let doc, _) = try await r.invoice(orderId: ok, language: "en") else {
+                return XCTFail("\(ok): expected paper")
+            }
+            XCTAssertTrue(doc.html.contains("alt=\"ZATCA\""), "\(ok) carries a QR")
+            XCTAssertFalse(doc.html.contains("no saved rate"), ok)
+        }
+        guard case .paper(let doc, _) = try await r.invoice(orderId: "S-4003", language: "en") else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertFalse(doc.html.contains("alt=\"ZATCA\""), "no riyal figure, so no QR")
+        XCTAssertTrue(doc.html.contains("no saved rate to state it in SAR"), "the reason prints in its place")
+    }
+
     func testAPartialHistoryPrintsNoLoyaltyBadge() async throws {
         let base = SampleShop.scope()
         var held = base.collections
