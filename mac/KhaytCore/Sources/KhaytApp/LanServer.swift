@@ -2915,7 +2915,10 @@ extension Shop {
             written = try await Self.recordStorefront(into: &root, engine: engine, platform: platform,
                                                       payload: payload, id: id, now: now)
         }
-        if written != nil { await load(source) }
+        if written != nil {
+            await load(source)
+            afterStorefrontOrder(platform, order: written)
+        }
         return written
     }
 
@@ -3042,6 +3045,9 @@ extension Shop {
             approved = result.order
         }
         await load(source)
+        // Said, and the `quote_approved` webhook — what Electron does with the
+        // same approval (`Shop+ArrivedByItself.swift`).
+        if approved != nil { await afterLanApproval(approved) }
         return approved
     }
 

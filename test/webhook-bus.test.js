@@ -176,6 +176,15 @@ test('order_delivered carries no status, because delivered is not one', () => {
     JSON.stringify({ orderId: 'ORD-1', project: 'Bracket', client: 'Acme' }));
 });
 
+test('quote_approved is the shape the desktop fires on a LAN approval', () => {
+  // renderer/app-boot.js fires { orderId, project, client } when a customer
+  // approves on the LAN page; the Mac builds the same delivery from here.
+  const order = { id: 'QUO-1', project: 'Bracket', client: 'Acme', status: 'pending' };
+  assert.equal(
+    JSON.stringify(B.statusPayload('quote_approved', order, 'pending')),
+    JSON.stringify({ orderId: 'QUO-1', project: 'Bracket', client: 'Acme' }));
+});
+
 test('buildWireBody is the envelope main.js has posted since webhooks shipped', () => {
   assert.equal(
     JSON.stringify(B.buildWireBody('status_changed', { id: 'dlv_1' }, 1789)),

@@ -414,6 +414,15 @@ struct ToChase: View {
                     }
                     .padding(.vertical, 3)
                     .frame(minHeight: Metric.row)
+                    .contentShape(Rectangle())
+                    // Open the job, as every other row on Today does. A row
+                    // that says "chase this" and cannot be opened left the
+                    // shop searching for the job to message the customer
+                    // from.
+                    .onTapGesture {
+                        shop.shelf = .jobs(nil)
+                        shop.selection = row.id
+                    }
                     if row.id != rows.last?.id { LayerRule() }
                 }
             }

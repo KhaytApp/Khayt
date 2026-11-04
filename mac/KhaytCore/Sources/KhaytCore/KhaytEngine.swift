@@ -7355,6 +7355,13 @@ public actor KhaytEngine {
               var r = globalThis.KhaytLanQuotePage.applyQuoteApprovalToStore(data, id, now);
               if (!r) return { found: false, error: null, order: null, printLog: null, settings: null };
               if (r.error) return { found: true, error: r.error, order: r.order || null, printLog: null, settings: null };
+              // The move into Pending goes on the job's trail, as Electron's
+              // renderer writes it when its LAN server reports the approval
+              // (`renderer/app-boot.js`), capped at the same 200. Without it
+              // a customer-approved job's history began at its next move.
+              var trail = Array.isArray(r.order.statusHistory) ? r.order.statusHistory.slice() : [];
+              trail.push({ status: r.order.status, at: r.order.clientApprovedAt || now });
+              r.order.statusHistory = trail.length > 200 ? trail.slice(-200) : trail;
               // An accepted quote is an invoice now, and an invoice has a
               // number: `KhaytOrderNew.ensureInvoiceNumber`, the counter a new
               // order takes from. Electron gives it one in the renderer when
