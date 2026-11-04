@@ -337,3 +337,17 @@ test('a legacy `delivered` job ran the machine too', () => {
     { machineId: 'M1', status: 'delivered', printTime: 8 },
   ], 'M1'), 20);
 });
+
+test('starter tasks: every one has a clock, and each kind gets its own', () => {
+  const M = require('../lib/maintenance.js');
+  for (const t of M.STARTER_TASKS) {
+    assert.ok(t.intervalHours > 0 || t.intervalDays > 0, `${t.id} has no interval and would never be due`);
+    assert.match(t.id, /^[a-z]+$/);
+  }
+  const fdm = M.starterTasks('fdm').map((t) => t.id);
+  const resin = M.starterTasks('resin').map((t) => t.id);
+  assert.ok(fdm.includes('nozzle') && !fdm.includes('fep'));
+  assert.ok(resin.includes('fep') && !resin.includes('nozzle'));
+  assert.deepEqual(M.starterTasks(undefined).map((t) => t.id), fdm, 'no kind reads as fdm');
+  assert.deepEqual(M.starterTasks('laser'), [], 'a kind with no list gets none, not fdm');
+});

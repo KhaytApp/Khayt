@@ -58,6 +58,7 @@ struct MachineSheet: View {
     /// offered beside the typed wattage, never applied without "Use this".
     @State private var measuredPower: KhaytEngine.PowerSuggestion?
     @State private var targetHours: Double = 0
+    @State private var clearsOwnBed = false
     @State private var nozzleMaterial = "brass"
     @State private var nozzleInstalled: Date?
     @State private var nozzleThreshold: Double = 0
@@ -447,6 +448,21 @@ struct MachineSheet: View {
                     TextField("", value: $targetHours, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                 }
+                // A belt printer, a plate changer, or a slicer profile whose end
+                // routine pushes the part off: the next job may go straight on
+                // without anybody saying the bed is clear (lib/auto-dispatch.js).
+                // Off by default, and said plainly, because a wrong yes drags a
+                // nozzle through yesterday's part.
+                GridRow {
+                    Toggle(shop.words.callIt("mac.clears_own_bed"), isOn: $clearsOwnBed)
+                        .gridCellColumns(2)
+                }
+                GridRow {
+                    Text(shop.words.callIt("mac.clears_own_bed_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .gridCellColumns(2)
+                }
             }
     }
 
@@ -828,6 +844,7 @@ struct MachineSheet: View {
         var depMethod = "perHour"
         var depMonthly: Double = 0
         var locationId = ""
+        var clearsOwnBed = false
 
         /// A machine as the sheet opens it. `kind` is the module's answer —
         /// for every machine recorded before Khayt could ask, a filament
@@ -864,6 +881,7 @@ struct MachineSheet: View {
             f.apiSerial = machine.printerApi?.serial ?? ""
             f.apiSlug = machine.printerApi?.printerSlug ?? ""
             f.targetHours = machine.targetHoursPerDay ?? 0
+            f.clearsOwnBed = machine.clearsOwnBed == true
             f.locationId = machine.locationId ?? ""
             if let d = machine.depreciation {
                 f.depPrice = d.price ?? 0
@@ -910,6 +928,7 @@ struct MachineSheet: View {
                 "nozzleDiameter": .number(nozzleDiameter),
                 "powerDraw": .number(powerDraw),
                 "targetHoursPerDay": .number(targetHours),
+                "clearsOwnBed": .bool(clearsOwnBed),
                 "nozzle": .object(nozzle),
                 // Through the shared rule, which drops the whole block when there
                 // is no price — so clearing the price is how a shop takes it off.
@@ -982,7 +1001,8 @@ struct MachineSheet: View {
              plugUser: plugUser, plugAutoOff: plugAutoOff, plugDelay: plugDelay,
              loadedRows: loadedRows, depPrice: depPrice, depBought: depBought,
              depLife: depLife, depUnit: depUnit, depResidual: depResidual,
-             depMethod: depMethod, depMonthly: depMonthly, locationId: locationId)
+             depMethod: depMethod, depMonthly: depMonthly, locationId: locationId,
+             clearsOwnBed: clearsOwnBed)
     }
 
     private func fill() {
@@ -1021,6 +1041,7 @@ struct MachineSheet: View {
         apiSerial = f.apiSerial
         apiSlug = f.apiSlug
         targetHours = f.targetHours
+        clearsOwnBed = f.clearsOwnBed
         depPrice = f.depPrice
         depBought = f.depBought
         depLife = f.depLife
