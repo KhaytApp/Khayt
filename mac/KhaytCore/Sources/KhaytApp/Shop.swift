@@ -52,7 +52,32 @@ final class Shop {
     /// The library on screen, patched in place by a library edit
     /// (`Shop+LibraryWrites.swift`) rather than by reloading the whole book.
     /// Only ever the book's own records: a put-aside model stays in here.
-    func showLibraryFiles(_ next: [LibraryFile]) { files = next }
+    func showLibraryFiles(_ next: [LibraryFile]) { files = withPrintHistory(next) }
+
+    /// Each model's history off the jobs (`PrintHistory`, `lib/print-history.js`),
+    /// worked out once per book read — O(jobs) — and put on the models as they
+    /// are shown (`withPrintHistory`), never per draw.
+    @ObservationIgnored private(set) var printHistory: [String: PrintHistory.Entry] = [:]
+
+    /// These models with what their finished jobs say put on them
+    /// (`LibraryFile.printed`), merged with each record's own counter. O(files).
+    ///
+    /// Every assignment of `files` goes through this, so the "Never printed"
+    /// chip, the Times printed range, the Last run and Printed sorts, ⌘J, the
+    /// inspector and the phone's library all read the same answer.
+    func withPrintHistory(_ next: [LibraryFile]) -> [LibraryFile] {
+        let history = printHistory
+        guard !history.isEmpty || next.contains(where: { $0.printed != nil }) else { return next }
+        return next.map { file in
+            var f = file
+            f.printed = history[file.id].map { entry in
+                PrintHistory.merge(timesPrinted: file.timesPrinted.map { .number(Double($0)) },
+                                   timesFailed: nil,
+                                   lastPrinted: file.lastPrinted.map(JSONValue.string), entry: entry)
+            }
+            return f
+        }
+    }
 
     /// The Archived view: only the models that have been put aside, where they
     /// can be restored. Off, they are still in the book, just not offered.
@@ -379,7 +404,7 @@ final class Shop {
 
     /// Give the shop a library, for a test. The book on disk is not touched.
     func pretendLibrary(_ rows: [JSONValue]) {
-        files = Self.decodeFiles(["printFiles": .array(rows)]).items
+        files = withPrintHistory(Self.decodeFiles(["printFiles": .array(rows)]).items)
         clearLibrarySelection()
     }
 
@@ -953,7 +978,10 @@ final class Shop {
             spools = Self.decode(root, "inventory", as: Spool.self)
             consumables = Self.decode(root, "consumables", as: Consumable.self)
             let decodedFiles = library ?? Self.decodeFiles(root)
-            files = decodedFiles.items
+            // The jobs this book holds, before the models are shown: what
+            // each model's finished jobs say is put on it as it goes up.
+            printHistory = PrintHistory.byFile(Self.rows(root, "printLog"))
+            files = withPrintHistory(decodedFiles.items)
             skipped += decodedFiles.skipped
             // In the same breath, not after the seconds of work below: a
             // model being deleted must not reappear (and be choosable) for
@@ -1450,6 +1478,7 @@ final class Shop {
             if overtaken() { return }
             siteScope = nil
             orders = []
+            printHistory = [:]
             files = []
             // A book that would not open must not stay findable.
             Spotlight.shared.forget()

@@ -1870,10 +1870,14 @@ extension Shop {
         /// Models this shop has never actually made.
         ///
         /// The other library tools in this category carry a printed FLAG a
-        /// person ticks. Khayt has the real answer — `timesPrinted` is written
-        /// by the jobs — so this is a fact rather than a reminder, and the
-        /// question it answers is the one a shop with a big library asks:
-        /// what have I collected and never printed.
+        /// person ticks. Khayt has the real answer — its finished jobs name
+        /// the model they made (`parts[].printFileId`), and `PrintHistory`
+        /// (`lib/print-history.js`) counts them, merged with the record's own
+        /// `timesPrinted` (which only the desktop's manual "log a print" ever
+        /// wrote, and NO job does) into `LibraryFile.printCount` — so this is
+        /// a fact rather than a reminder, and the question it answers is the
+        /// one a shop with a big library asks: what have I collected and never
+        /// printed.
         var neverPrinted = 0
         /// Per machine that says what it has loaded: how many models could
         /// start on it now, without a spool swap.
@@ -1917,15 +1921,6 @@ extension Shop {
     enum LibraryAxis {
         case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage
         case noFigures, inCatalogue, fromWeb, fits
-    }
-
-    /// How many times a record says it has been printed.
-    ///
-    /// `timesPrinted` is the field; absent means none, which is the same
-    /// answer a record written before the field existed gives.
-    private static func rowPrintCount(_ row: JSONValue) -> Int {
-        guard case .object(let o) = row, case .number(let n)? = o["timesPrinted"] else { return 0 }
-        return Int(saturating: n)
     }
 
     /// The group a record is in, by the rule the grid files it under —
@@ -2032,6 +2027,9 @@ extension Shop {
         var creatorIds = Set<String>(), printNextIds = Set<String>(), dupeIds = Set<String>()
         var noFigureIds = Set<String>(), catalogueIds = Set<String>(), webIds = Set<String>()
         var fitIds = Set<String>()
+        // Off the models, not the rows: a record's own `timesPrinted` is only
+        // the desktop's manual log, and the jobs' answer is on `LibraryFile`.
+        let printedIds = Set(files.lazy.filter { $0.printCount > 0 }.map(\.id))
         for row in libraryRows {
             let id = Self.rowText(row, "id")
             guard let pools = poolsOf[id] else { continue }
@@ -2039,7 +2037,7 @@ extension Shop {
             if on(.category) { categoryPool.append(row); categoryKey.combine(id) }
             if on(.tag) { tagPool.append(row); tagKey.combine(id) }
             if on(.unfiled), Self.rowGroup(row) == nil { unfiled += 1 }
-            if on(.neverPrinted), Self.rowPrintCount(row) == 0 { never += 1 }
+            if on(.neverPrinted), !printedIds.contains(id) { never += 1 }
             if on(.ready) {
                 for (k, r) in readyOn.enumerated() where r.onBed.contains(id) { readyCounts[k] += 1 }
                 if anywhere.contains(id) { readyAnywhere += 1 }
@@ -2325,8 +2323,8 @@ extension Shop {
     /// Put these models on the Print next list, or take them off.
     ///
     /// The ONE mark for "I mean to print this": Printventory's Want/Queued,
-    /// which Khayt does not need the rest of — a job is the queue, and
-    /// `timesPrinted` is Printed. On the record (`printNextAt`, and its
+    /// which Khayt does not need the rest of — a job is the queue, and a
+    /// finished job is Printed (`LibraryFile.printCount`). On the record (`printNextAt`, and its
     /// optional `printNextFor`), so it syncs with the model, through
     /// `editFiles` — on the write chain, gated by `permitted`, undoable.
     /// Taking a model off takes its note with it. False when refused.
