@@ -91,6 +91,14 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"/Localized: Localizable.strings",
+				Fonts/Archivo-Bold.ttf,
+				Fonts/HankenGrotesk-Medium.ttf,
+				Fonts/HankenGrotesk-Regular.ttf,
+				Fonts/HankenGrotesk-SemiBold.ttf,
+				Fonts/JetBrainsMono-Medium.ttf,
+				Fonts/OFL-archivo.txt,
+				Fonts/OFL-hanken-grotesk.txt,
+				Fonts/OFL-jetbrains-mono.txt,
 				Info.plist,
 				KhaytQueueWidget.swift,
 				KhaytWidget.entitlements,

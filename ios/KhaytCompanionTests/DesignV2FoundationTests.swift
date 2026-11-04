@@ -58,4 +58,30 @@ final class DesignV2FoundationTests: XCTestCase {
         XCTAssertEqual(Initials.of("نورة السعود"), "نا")
         XCTAssertEqual(Initials.of(""), "?")
     }
+
+    /// The widget extension carries its own copies of the faces it draws in
+    /// (a widget cannot use the app's registered fonts). Its UIAppFonts must
+    /// name files that are there, and those files must be the faces
+    /// `PrintActivityLook` asks for by name, or the Lock Screen falls back
+    /// to the system font without a word.
+    func testTheWidgetBundlesTheFacesItAsksFor() throws {
+        let widget = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()      // KhaytCompanionTests
+            .deletingLastPathComponent()      // ios
+            .appendingPathComponent("KhaytWidget")
+        let plist = try XCTUnwrap(NSDictionary(contentsOf: widget.appendingPathComponent("Info.plist")))
+        let files = try XCTUnwrap(plist["UIAppFonts"] as? [String])
+        var names: Set<String> = []
+        for file in files {
+            let data = try Data(contentsOf: widget.appendingPathComponent("Fonts").appendingPathComponent(file))
+            let font = try XCTUnwrap(CGDataProvider(data: data as CFData).flatMap(CGFont.init), file)
+            names.insert(try XCTUnwrap(font.postScriptName as String?, file))
+        }
+        XCTAssertEqual(names, Set(PrintActivityLook.faces))
+        // And the app registers every one of them too: the app compiles these
+        // views for its own tests and previews.
+        for name in PrintActivityLook.faces {
+            XCTAssertNotNil(UIFont(name: name, size: 12), name)
+        }
+    }
 }
