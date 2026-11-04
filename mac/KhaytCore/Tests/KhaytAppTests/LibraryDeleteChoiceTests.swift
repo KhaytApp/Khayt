@@ -106,9 +106,12 @@ struct LibraryDeleteChoiceTests {
             try LibraryStorageTests.model(url, size: 9)
             many.append(try record(["id": id, "name": id, "sourceFile": ["filename": "x.stl"]]))
         }
+        // The engine loads the whole shared library; under CI load that alone
+        // took longer than the bound, so it is built before the clock starts.
+        let engine = try KhaytEngine()
         let started = ContinuousClock.now
         let p = await Shop.planDelete(many, roots: [f.root.path], remote: .bucket(config), prefix: "",
-                                      remoteTag: "bucket:", engine: try KhaytEngine(), fetch: hangs,
+                                      remoteTag: "bucket:", engine: engine, fetch: hangs,
                                       patience: .milliseconds(400),
                                       modelFile: { [paths = f.paths, root = f.root] file in
                                           paths[file.id] ?? root.appending(path: "\(file.id)/x.stl")
