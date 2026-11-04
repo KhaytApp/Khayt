@@ -119,6 +119,20 @@ const { contentHash: modelContentHash } = require('./lib/model-identity');
 const { extract: extractPrintThumb } = require('./lib/thumbnail-extract');
 const bambu = require('./lib/bambu');
 const { bambuFtpUpload } = require('./lib/bambu-ftp');
+const bambuSliced = require('./lib/bambu-sliced');
+
+/**
+ * The job Khayt last sent each Bambu, by machine id: the remote name, the plate
+ * it started and what every plate was sliced to use (`bambu.slicedPlan`).
+ *
+ * A Bambu reports no extrusion, so this is the only source of grams for its
+ * jobs — the SLICED figure for the plate that ran, labelled as such all the way
+ * to the completion sheet. In memory only: a restart mid-print forgets it, and
+ * that job is then typed by the shop as before. Khayt's own clock for the job
+ * is lost the same way (`printer-poll-cache` will not trust a job it did not
+ * watch start), so the two fail together rather than half a figure surviving.
+ */
+const bambuSentJobs = new Map();
 const { resolvePrinterTarget } = require('./lib/main/printer-target');
 const printerUpload = require('./lib/printer-upload');
 const { sendSms, sendWhatsappTemplate, checkWhatsapp } = require('./lib/sms');
@@ -1440,8 +1454,15 @@ async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
     if (!dev) return { ok: false, error: 'Bambu needs the printer serial number.' };
     if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
     try {
+      // Read before it goes: which plate to start, and what each was sliced to use.
+      const plan = bambu.slicedPlan(bytes);
       await bambuFtpUpload({ host: printerHost, accessCode, remoteName: name, data: bytes });
-      if (startPrint) await bambu.bambuSendPrint({ host: printerHost, accessCode, serial: dev, fileName: name });
+      if (startPrint) {
+        await bambu.bambuSendPrint({ host: printerHost, accessCode, serial: dev, fileName: name, plate: plan.plate });
+        if (machine && machine.id) {
+          bambuSentJobs.set(machine.id, { remoteName: name, plate: plan.plate, plates: plan.plates, at: Date.now() });
+        }
+      }
       return { ok: true, started: !!startPrint, filename: name };
     } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
@@ -5333,7 +5354,9 @@ async function fetchPrinterStatus(machine) {
     const dev = String(serial || printerSlug || '').trim();
     if (!dev) return { ok: false, error: 'Bambu needs the printer serial number (Settings → Device on the printer).' };
     if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
-    return bambu.fetchBambuStatus({ host: printerHost, port: portNum, accessCode, serial: dev });
+    const status = await bambu.fetchBambuStatus({ host: printerHost, port: portNum, accessCode, serial: dev });
+    // The sliced figures of the job Khayt sent, while the printer is running it.
+    return bambuSliced.withSliced(status, bambuSentJobs.get(machine.id), extractActuals);
   }
   // SDCP (Elegoo resin): a WebSocket, not HTTP either. The mainboard id is its
   // address on the protocol — every frame is topic-addressed by it — and
