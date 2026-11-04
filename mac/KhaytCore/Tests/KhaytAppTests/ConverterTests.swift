@@ -78,7 +78,9 @@ struct ConverterTests {
         let shop = MenuCoverageTests.source("Shop.swift")
         // One matcher now (`Shop.libraryMatcher`): off the Archived view a
         // put-aside model fails it; in that view only those pass.
-        #expect(shop.contains("if axis != .archived, f.isArchived != q.archived { return false }"),
+        // Since the one-pass recount (#2206) the axes are `libraryAxisMisses`,
+        // and the matcher skips an axis by masking its bit.
+        #expect(shop.contains("if f.isArchived != q.archived { missed |= LibraryAxis.archived.bit }"),
                 "the library still offers a model that has been replaced")
         // `files` itself keeps them: the import dedupe, the product links and
         // the job records all read it, and a model vanishing from there would
