@@ -68,7 +68,10 @@
       const observed = observedDurationS(p.jobClock, now);
       if (observed !== null && !(actuals && actuals.durationS > 0 && !actuals.timeBasis)) {
         const base = actuals || { filamentMm: null, filamentGrams: null, durationS: null, source: 'bambu' };
-        actuals = { ...base, durationS: observed, timeBasis: 'observed' };
+        // The time is now the watch's own reading, so the source is the
+        // printer ('bambu'), not the sliced file: the completion records
+        // `actualsSource.time` from it. The grams keep `gramsBasis: 'sliced'`.
+        actuals = { ...base, durationS: observed, timeBasis: 'observed', source: 'bambu' };
       }
     }
     if (!actuals) return p.lastCompleted || null;

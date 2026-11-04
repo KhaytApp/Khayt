@@ -76,7 +76,7 @@ import Testing
             "filename": .string("khayt-xyz.gcode.3mf"),
             "actuals": .object([
                 "filamentGrams": .number(41.83), "durationS": .number(5600),
-                "source": .string("bambu-sliced"), "gramsBasis": .string("sliced"),
+                "source": .string("bambu"), "gramsBasis": .string("sliced"),
                 "timeBasis": .string("observed"), "plate": .number(2),
             ]),
         ])

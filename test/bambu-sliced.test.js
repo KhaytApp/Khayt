@@ -241,9 +241,9 @@ test('the observed time replaces a slice prediction and keeps the sliced grams',
   const a = e.lastCompleted.actuals;
   assert.equal(a.durationS, 6_030);
   assert.equal(a.timeBasis, 'observed');
-  assert.equal(a.filamentGrams, 41.83);
+  assert.equal(a.source, 'bambu', 'observed time is the printer\'s reading, not the sliced file\'s');
   assert.equal(a.gramsBasis, 'sliced');
-  assert.equal(a.source, 'bambu-sliced');
+  assert.equal(a.filamentGrams, 41.83);
 });
 
 test('a job Khayt opened on half done is not timed; the slice prediction stands, labelled sliced', () => {
