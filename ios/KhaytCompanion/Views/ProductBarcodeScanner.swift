@@ -47,8 +47,8 @@ struct ProductBarcodeScanner: View {
     private var entryPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L10n.tr("barcode.type"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
             HStack {
                 TextField(L10n.tr("barcode.placeholder"), text: $typed)
                     .keyboardType(.numberPad)
@@ -62,8 +62,8 @@ struct ProductBarcodeScanner: View {
             }
             if !typed.isEmpty, typedCode == nil {
                 Text(L10n.tr("barcode.invalid"))
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .font(.khayt(11, relativeTo: .caption2))
+                    .foregroundStyle(KhaytDesign.attention)
             }
         }
         .padding()
