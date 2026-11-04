@@ -158,24 +158,25 @@ struct SettingsView: View {
         return L10n.format("settings.not_sent", ListFormatter.localizedString(byJoining: names))
     }
 
+    /// One row that opens a menu, not a segmented strip: the strip was three
+    /// choices (System, English, Arabic) and held them; at ten (#2181) every
+    /// name broke across three lines ("Portuguê / s / (Bras / il)").
     private var languagePicker: some View {
-        HStack(spacing: 3) {
-            ForEach(AppLanguage.allCases) { lang in
-                let on = settings.appLanguage == lang
-                Button { settings.appLanguage = lang } label: {
-                    Text(lang.label)
-                        .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .foregroundStyle(on ? KhaytDesign.ink : KhaytDesign.note)
-                        .background(on ? KhaytDesign.surface : .clear, in: RoundedRectangle(cornerRadius: 8))
-                        .contentShape(Rectangle())
+        Menu {
+            Picker(selection: $settings.appLanguage) {
+                ForEach(AppLanguage.allCases) { lang in
+                    Text(lang.label).tag(lang)
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(on ? .isSelected : [])
+            } label: { EmptyView() }
+        } label: {
+            settingRow(settings.appLanguage.label, last: true) {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(KhaytDesign.note)
             }
         }
-        .padding(3)
-        .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 10))
+        .buttonStyle(.plain)
+        .card()
     }
 
     private var notificationsCard: some View {

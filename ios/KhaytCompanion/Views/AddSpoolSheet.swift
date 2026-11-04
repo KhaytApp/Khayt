@@ -188,19 +188,19 @@ struct AddSpoolSheet: View {
                 ProgressView()
                     .controlSize(.large)
                 Text(L10n.tr("spool.lookup.busy"))
-                    .font(.title3.bold())
+                    .font(.khayt(20, .bold, relativeTo: .title3))
                 Text(L10n.tr("spool.lookup.busy.sub"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.khayt(15, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
             } else {
                 Image(systemName: "barcode")
                     .font(.system(size: 56))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(KhaytDesign.brand)
                 Text(L10n.tr("spool.lookup.title"))
-                    .font(.title3.bold())
+                    .font(.khayt(20, .bold, relativeTo: .title3))
                 Text(L10n.tr("spool.lookup.body"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.khayt(15, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
                 Button {
@@ -231,12 +231,12 @@ struct AddSpoolSheet: View {
             Spacer()
             Image(systemName: "camera.viewfinder")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(KhaytDesign.brand)
             Text(L10n.tr("spool.label.title"))
-                .font(.title3.bold())
+                .font(.khayt(20, .bold, relativeTo: .title3))
             Text(L10n.tr("spool.label.body"))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.khayt(15, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.note)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             Button {
@@ -257,13 +257,13 @@ struct AddSpoolSheet: View {
             Spacer()
             Image(systemName: "nfc")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(KhaytDesign.brand)
             Text(L10n.tr("spool.nfc.title"))
-                .font(.title3.bold())
+                .font(.khayt(20, .bold, relativeTo: .title3))
             if !nfc.isAvailable {
                 Text(L10n.tr("spool.nfc.unavailable"))
-                    .foregroundStyle(.orange)
-                    .font(.caption)
+                    .foregroundStyle(KhaytDesign.attention)
+                    .font(.khayt(12, relativeTo: .caption))
             }
             Button {
                 nfc.beginScan()
@@ -349,16 +349,16 @@ struct SpoolReviewForm: View {
             if let errorMessage, !errorMessage.isEmpty {
                 Section {
                     Text(errorMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
+                        .font(.khayt(15, relativeTo: .subheadline))
+                        .foregroundStyle(KhaytDesign.danger)
                 }
             }
 
             if !draft.sourceNote.isEmpty {
                 Section {
                     Text(draft.sourceNote)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.note)
                 }
             }
 
@@ -371,7 +371,7 @@ struct SpoolReviewForm: View {
                     HStack(spacing: 6) {
                         ForEach(Self.materials, id: \.self) { m in
                             Button(m) { draft.material = m }
-                                .font(.caption.weight(.semibold))
+                                .font(.khayt(12, .semibold, relativeTo: .caption))
                                 .padding(.horizontal, 10)
                                 .frame(height: 30)
                                 .background(draft.material == m ? KhaytDesign.brandDim : KhaytDesign.surface2,
@@ -424,7 +424,7 @@ struct SpoolReviewForm: View {
                         Spacer()
                         Text("\(draft.quantity)")
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(KhaytDesign.note)
                     }
                 }
             }
@@ -500,10 +500,10 @@ struct TagPreviewCard: View {
                 }
                 VStack(alignment: .leading) {
                     Text(tag.materialLabel.isEmpty ? L10n.tr("spool.detail.filament") : tag.materialLabel)
-                        .font(.headline)
+                        .font(.khayt(17, .semibold, relativeTo: .headline))
                     Text(tag.standard)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.note)
                 }
             }
             HStack(spacing: 12) {
@@ -519,8 +519,8 @@ struct TagPreviewCard: View {
 
     private func meta(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.caption.bold())
+            Text(label).font(.khayt(11, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)
+            Text(value).font(.khayt(12, .bold, relativeTo: .caption))
         }
     }
 }

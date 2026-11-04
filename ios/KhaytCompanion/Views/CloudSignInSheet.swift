@@ -48,7 +48,7 @@ struct CloudSignInSheet: View {
                     }
                 }
                 if let problem {
-                    Section { Text(problem).font(.footnote).foregroundStyle(KhaytDesign.danger) }
+                    Section { Text(problem).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.danger) }
                 }
                 Section {
                     Button {
