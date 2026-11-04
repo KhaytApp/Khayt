@@ -4,7 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Mac: the Jobs table's Stage column is the redesign's status pill**: the stage's tint and dot, with the word in ordinary ink. PrintTender, a printer maintenance tracker, is added to the competitive watch list.
+- **Mac: the Jobs table's Stage column is the redesign's status pill**: the stage's tint and dot, with the word in ordinary ink. PrintTender (maintenance), Printforge (an Australian shop platform) and FilaStash (iPhone filament inventory) are added to the competitive watch list.
 
 - **Mac: the Board in the redesign.** Each card is a thumbnail tile with the title and customer beside it, and a footer with the due date (a red pill when late) and what is owed. A job printing now shows the amber thread with its machine and time left. The red left edge and the colour-names line are gone, and the flag and the person it is assigned to stay. Each column head is the stage's dot, its name and its count.
 - **Docs: eight more products on the competitive watch list.** FARMONE 3D, SnapCon, FlowQ, FoxTrack (re-read), Printlooper, FlowForgeStudio, Print Planner and FilAccount are now in `docs/KHAYT-COMPETITIVE-ROADMAP.md`, each with what it overlaps and whether Khayt already has it; the two worth acting on are files that eject their own part, and SnapCon as the U1 fleet tool to watch.
