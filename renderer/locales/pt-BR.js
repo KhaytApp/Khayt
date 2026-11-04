@@ -4663,6 +4663,8 @@
   "act.from_printer": "Estes números vêm de {source} — o que o trabalho realmente consumiu, não a estimativa.",
   "act.from_printer_file": "Estes números vieram de {source}, medidos em {file} — o que aquele trabalho realmente consumiu, não a estimativa.",
   "act.your_printer": "sua impressora",
+  "act.sliced": "Fatiado",
+  "act.sliced_note": "Valor do fatiador para a placa impressa (placa {plate}), lido do arquivo que o Khayt enviou — não medido pela impressora.",
   "setup.title": "Ajustes que deram certo",
   "setup.add": "＋ Adicionar ajuste",
   "setup.add_title": "Adicionar ajuste",

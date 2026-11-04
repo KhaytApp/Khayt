@@ -20,7 +20,7 @@ struct CycleTimeCard: View {
                 Text(words.callIt("an.cycle_time"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let avg = cycle?.avgDays {
                     Text(Self.said(avg, words))

@@ -39,7 +39,7 @@ struct DowntimeCard: View {
                 Text(words.callIt("an.downtime"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if !rows.isEmpty {
                     Text(Self.hours(rows.reduce(0) { $0 + $1.total }, words))

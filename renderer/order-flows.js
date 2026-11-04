@@ -290,10 +290,18 @@ function promptActuals(order, onConfirm) {
   // relabel their typing as something the printer measured.
   const timeIsMeasured   = order.actualPrintTime == null && pre.timeMeasured;
   const weightIsMeasured = order.actualWeight    == null && pre.weightMeasured;
+  // SLICED, not measured: a Bambu's grams (and, until Khayt has watched a whole
+  // job, its time) are the file's own figure for the plate that ran. Offered,
+  // labelled, and recorded as 'manual' below so no measured-only report counts
+  // them.
+  const timeIsSliced   = order.actualPrintTime == null && !!pre.timeSliced;
+  const weightIsSliced = order.actualWeight    == null && !!pre.weightSliced;
 
-  const tag = (measured) => measured
+  const tag = (measured, sliced) => measured
     ? `<span style="color:var(--ok,#159d68);font-weight:600;">${escapeHtml(t('act.measured'))}</span>`
-    : escapeHtml(t('act.est'));
+    : sliced
+      ? `<span style="font-weight:600;">${escapeHtml(t('act.sliced'))}</span>`
+      : escapeHtml(t('act.est'));
 
   openFormModal({
     title:     t('act.title'),
@@ -316,16 +324,20 @@ function promptActuals(order, onConfirm) {
               ? t('act.from_printer_file', { source: pre.source || t('act.your_printer'), file: pre.filename })
               : t('act.from_printer', { source: pre.source || t('act.your_printer') }))}</p>`
         : ''}
+      ${(timeIsSliced || weightIsSliced)
+        ? `<p style="font-size:12px;margin:-6px 0 14px;padding:8px 10px;border-radius:var(--radius);background:var(--bg-elev);">${escapeHtml(
+            t('act.sliced_note', { plate: pre.plate != null ? pre.plate : '1', file: pre.filename || '' }))}</p>`
+        : ''}
       <div class="inline-pair">
         <div>
           <label>${escapeHtml(t('act.print_time'))} (${escapeHtml(t('common.hours'))})</label>
           <input type="number" id="actTime" value="${initTime}" min="0" step="0.1">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${tag(timeIsMeasured)} · ${escapeHtml(t('act.est'))}: ${order.printTime} ${escapeHtml(t('common.hours'))}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${tag(timeIsMeasured, timeIsSliced)} · ${escapeHtml(t('act.est'))}: ${order.printTime} ${escapeHtml(t('common.hours'))}</div>
         </div>
         <div>
           <label>${escapeHtml(t('act.weight'))} (${escapeHtml(t('common.grams'))})</label>
           <input type="number" id="actWeight" value="${initWeight}" min="0" step="1">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${tag(weightIsMeasured)} · ${escapeHtml(t('act.est'))}: ${estWeight.toFixed(0)} ${escapeHtml(t('common.grams'))}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${tag(weightIsMeasured, weightIsSliced)} · ${escapeHtml(t('act.est'))}: ${estWeight.toFixed(0)} ${escapeHtml(t('common.grams'))}</div>
         </div>
       </div>`,
     onSave(modal) {

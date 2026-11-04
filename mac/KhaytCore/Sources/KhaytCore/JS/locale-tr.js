@@ -4662,6 +4662,8 @@
   "act.from_printer": "Bu rakamlar {source} kaynaklıdır — işin gerçekte harcadığı miktar, tahmin değil.",
   "act.from_printer_file": "Bu değerler {source} kaynağından, {file} yazdırılırken ölçüldü — o işin gerçekte harcadığı, tahmin değil.",
   "act.your_printer": "yazıcın",
+  "act.sliced": "Dilimlenmiş",
+  "act.sliced_note": "Basılan plakanın dilimleyici değeri (plaka {plate}); Khayt’ın gönderdiği dosyadan okundu, yazıcı ölçmedi.",
   "setup.title": "İşe yarayan ayarlar",
   "setup.add": "＋ Ayar ekle",
   "setup.add_title": "Ayar ekle",

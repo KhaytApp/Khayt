@@ -176,9 +176,10 @@ struct DashboardView: View {
                 // the title, with the shop's name after it when it has one.
                 Text(dateLine)
                     .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
-                    .tracking(L10n.usesArabicLayout ? 0 : 0.8)
+                    .khaytTracking(0.8)
                     .foregroundStyle(KhaytDesign.note)
-                    .lineLimit(1)
+                    // At the largest text sizes it shrank to "WEDNESDAY, 4 NOV…".
+                    .lineLimit(1).minimumScaleFactor(0.7)
                 Text(L10n.tr("pulse.title"))
                     .font(.khaytDisplay(30, .bold, relativeTo: .largeTitle))
                     .tracking(-0.6)
@@ -269,7 +270,7 @@ struct DashboardView: View {
                 .environment(\.layoutDirection, .leftToRight)
             Text(L10n.usesArabicLayout ? label : label.uppercased())
                 .font(L10n.usesArabicLayout ? .khayt(11, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
-                .tracking(L10n.usesArabicLayout ? 0 : 0.6)
+                .khaytTracking(0.6)
                 .foregroundStyle(labelTint)
                 .lineLimit(1).minimumScaleFactor(0.8)
         }
@@ -288,7 +289,7 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(L10n.usesArabicLayout ? L10n.tr("pulse.this_month") : L10n.tr("pulse.this_month").uppercased())
                 .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
-                .tracking(L10n.usesArabicLayout ? 0 : 0.8)
+                .khaytTracking(0.8)
                 .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(pulse?.thisMonth.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
@@ -325,7 +326,7 @@ struct DashboardView: View {
             HStack(spacing: 4) {
                 Text(L10n.usesArabicLayout ? label : label.uppercased())
                     .font(L10n.usesArabicLayout ? .khayt(11, .semibold, relativeTo: .caption2) : .khaytMono(10, .medium, relativeTo: .caption2))
-                    .tracking(L10n.usesArabicLayout ? 0 : 0.6)
+                    .khaytTracking(0.6)
                 if chevron {
                     Image(systemName: "chevron.forward").font(.system(size: 9, weight: .bold))
                 }
@@ -376,7 +377,7 @@ struct DashboardView: View {
                                 .font(.khayt(21, .semibold, relativeTo: .title3).monospacedDigit())
                             Text(id == "all" ? L10n.tr("orders.filter.all") : L10n.tr("stage.short.\(id)"))
                                 .font(.khayt(9.5, .bold, relativeTo: .caption2))
-                                .tracking(0.8)
+                                .khaytTracking(0.8)
                         }
                         .foregroundStyle(on ? tone : (n > 0 || id == "all" ? KhaytDesign.ink : KhaytDesign.note))
                         .frame(minWidth: 60, minHeight: 64)
@@ -500,7 +501,7 @@ struct DashboardView: View {
         HStack(alignment: .firstTextBaseline) {
             Text(L10n.usesArabicLayout ? title : title.uppercased())
                 .font(L10n.usesArabicLayout ? .khayt(12, .bold, relativeTo: .caption2) : .khaytMono(11, .medium, relativeTo: .caption2))
-                .tracking(L10n.usesArabicLayout ? 0 : 0.9)
+                .khaytTracking(0.9)
                 .foregroundStyle(KhaytDesign.note)
             Spacer()
             if let trailing {

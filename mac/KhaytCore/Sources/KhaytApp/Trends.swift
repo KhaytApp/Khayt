@@ -33,7 +33,7 @@ struct TrendsChart: View {
             Text(words.callIt("an.cost_trends"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let trends, trends.anyReading {
                 Row(title: words.callIt("an.rev_per_hour"),

@@ -4662,6 +4662,8 @@
   "act.from_printer": "Estas cifras vienen de {source}: lo que el trabajo consumió realmente, no la estimación.",
   "act.from_printer_file": "Estas cifras vienen de {source}, medidas en {file} — lo que ese trabajo consumió realmente, no la estimación.",
   "act.your_printer": "tu impresora",
+  "act.sliced": "Laminado",
+  "act.sliced_note": "Cifra del laminador para la placa impresa (placa {plate}), leída del archivo que envió Khayt; no la midió la impresora.",
   "setup.title": "Ajustes que funcionaron",
   "setup.add": "＋ Añadir ajuste",
   "setup.add_title": "Añadir ajuste",

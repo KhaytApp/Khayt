@@ -4662,6 +4662,8 @@
   "act.from_printer": "这些数字来自 {source}——是这次作业的实际用量，不是估算。",
   "act.from_printer_file": "这些数值来自 {source}，是打印 {file} 时实测的——那一次作业的实际用量，不是估算。",
   "act.your_printer": "你的打印机",
+  "act.sliced": "切片值",
+  "act.sliced_note": "所打印板（第 {plate} 板）的切片数值，读取自 Khayt 发送的文件——并非打印机实测。",
   "setup.title": "成功过的设置",
   "setup.add": "＋ 添加设置",
   "setup.add_title": "添加设置",

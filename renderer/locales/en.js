@@ -4663,6 +4663,8 @@
   "act.from_printer": "These figures came from {source} — what the job actually used, not the estimate.",
   "act.from_printer_file": "These figures came from {source}, measured on {file} — what that job actually used, not the estimate.",
   "act.your_printer": "your printer",
+  "act.sliced": "Sliced",
+  "act.sliced_note": "Sliced figure for the plate printed (plate {plate}), read from the file Khayt sent — not measured by the printer.",
   "setup.title": "Settings that worked",
   "setup.add": "＋ Add a setup",
   "setup.add_title": "Add a setup",

@@ -6,6 +6,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Desktop: "Clears its own plate" on a printer, and common maintenance tasks to start from.** The printer editor has the Mac's new switch for a belt printer, a plate changer or a slicer profile that pushes each part off: ticking it saves `clearsOwnBed: true` and unticking removes it, the same rule as the Mac, so the Mac app offers that printer its next job without waiting for Bed is clear (the desktop doesn't start jobs by itself, and the hint says so). The maintenance log's recurring tasks now offer the Mac's starter list for the printer's kind (clean the build plate, belts, rods, nozzle, PTFE tube, fans, wiring, filter; FEP, vat and washing alcohol for resin): a click fills the name and interval to adjust before adding, and a task already on the printer isn't offered again. Nine languages, worded as on the Mac.
 
+- **iPhone: Arabic labels no longer spaced letter by letter.** Across the app, Arabic eyebrows and small labels looked stretched: "الـمـبـلـغ" for المبلغ, "نـوع الـفـشـل", "الإشـعـارات". The redesign sets them in JetBrains Mono, which has no Arabic, and spaces their letters out for English capitals, which pulls Arabic's joined letters apart. In Arabic they now use the text face with no extra spacing, so they read as normal words. English is unchanged. Home's date line also shrinks a little before it would cut off at the largest text sizes.
+- **Mac: Machines, Reports, the Calculator and the other screens in the redesign's quieter style.** Section headings are grey small caps rather than blue, cards have the rounder corners Today uses, and the blue stripe down the side of a card is gone where it only decorated it. A stripe now always means something: late, needs attention, running or done.
+
+- **Mac: fixes from a screen-by-screen review of beta.19.** The selected sidebar row could not be read while the sidebar had focus (blue text on the blue selection). The site picker at the top of the sidebar was drawn in the old navy sidebar's inks and nearly vanished. A machine the shop put under service is no longer listed on Today as "not answering" (it is the shop's own decision, not something that needs them), the Today machine figure says "1 under service", the machine card no longer says "Under service" twice, and the Machines screen no longer tells the shop to check that it is switched on. The Inventory cards no longer run from the sidebar to the window edge. Every screen now has its name in the toolbar (Library, Catalogue, Customers, Expenses, Calculator and Gift cards had none). Library's sidebar count leaves out archived models, as the screen does. The kits above the Jobs table are headed Kits. The Calculator's quantity lines up with the fields beside it. Today's net income card no longer shows a change beside a figure it does not have. On Reports, the side panel splits Expenses from Monthly costs as the chart does, the chart no longer draws a 0.00 Expenses bar, and the top bar's figure is no longer cut off.
+
+- **Real figures for Bambu jobs (unverified on a real Bambu).** When the desktop app sends a 3MF to a Bambu, it reads the file's `Metadata/slice_info.config` first and keeps what the plate it starts was sliced to weigh. When that job finishes, the completion sheet offers those grams labelled **Sliced**, with a note naming the plate, and never as Measured. Accepting them records the weight as typed, so no measured-only report counts it. The time is now how long Khayt watched the job print: from the first poll that read RUNNING to the one that read FINISH, with paused polls taken off. It is only used when Khayt saw the job start and never lost the printer for more than 10 minutes. Otherwise the file's prediction is offered, labelled Sliced. This works on both the desktop and the Mac, because the Mac runs the same poll cache. The desktop also starts the plate the file actually carries, so a "this plate only" export from plate 3 no longer asks for a missing `plate_1.gcode`. Still missing: jobs started outside Khayt (the FTPS client cannot RETR yet), and the Mac cannot send to a Bambu itself, so its grams come only from desktop-sent jobs.
 - **Mac: the Jobs table's Stage column is the redesign's status pill**: the stage's tint and dot, with the word in ordinary ink. PrintTender (maintenance), Printforge (an Australian shop platform) FilaStash (iPhone filament inventory) and 3DPrinterOS (cloud fleet control for schools and enterprises) are added to the competitive watch list.
 - **iPhone: the Lock Screen print and the Home Screen widget in the redesign's type.** The Live Activity (Lock Screen and Dynamic Island) and the queue widget now use the app's faces instead of the system's rounded font: the time left and the counts in Archivo, names and pills in Hanken Grotesk, and the end time and labels in Hanken Grotesk, and the percent in JetBrains Mono. JetBrains Mono has no Arabic, so anything with words stays in the text face; the widget's labels had been set in a mono face since #2192, which spaced Arabic letter by letter. The widget extension carries its own copies of the five faces it uses, with their licences, because a widget can't use the fonts the app registers. The small lock-screen widget keeps the system font, which the system draws in one tint.
 - **A printer can be marked "Clears its own plate"** (a belt printer, a plate changer, or a slicer profile that pushes each part off). Dispatch then offers it the next job without waiting for Bed is clear. Off by default; only the shop can turn it on. On the Mac it is in the machine sheet.
@@ -9089,6 +9095,33 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.20] - 2026-11-04
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A printer can be marked "Clears its own plate"** in its machine sheet: a belt printer, a plate changer, or a slicer profile that pushes each part off. Khayt then offers it the next job without waiting for Bed is clear. Off unless the shop turns it on.
+- **Start a maintenance task from a common one.** The new-task sheet offers thirteen usual tasks, from the build plate and belts to the resin vat film, with starting intervals to adjust to the maker's manual.
+- **Bambu jobs fill in their own time**: Khayt times a print it watched from start to finish, pauses taken off. Grams come from the sliced file when the desktop app sent the job, labelled "Sliced", never "measured".
+
+### Changed
+
+- **The Board in the redesign.** Each card is a picture tile with the title and customer, a red pill when the job is late, and the amber thread with the machine and time left while it prints. Each column is headed by its stage's dot.
+- **The Jobs table's Stage column is a status pill**, the same as on Today.
+- **The remaining screens take the redesign's quieter style.** Section headings are grey rather than blue, and a coloured stripe on a card now always means something: late, needs attention, running or done.
+- **Every screen has its name in the toolbar.** Library, Catalogue, Customers, Expenses, the Calculator and Gift cards had none.
+
+### Fixed
+
+- **The selected row in the sidebar is readable again.** While the sidebar had focus it was blue text on a blue selection.
+- **The site picker at the top of the sidebar** no longer nearly vanishes.
+- **A machine you put under service** is no longer listed on Today as "not answering". Today says "1 under service", and the Machines screen no longer asks you to check that it is switched on.
+- **Reports** names Expenses and Monthly costs apart in the side panel, as the chart does, and the top bar's figure is no longer cut off.
+- **The Inventory cards** no longer run from the sidebar to the window's edge.
+- **Smaller fixes**: Library's sidebar count leaves out archived models, as the screen does; the kits above the Jobs table are headed Kits; the Calculator's quantity lines up with its fields; and Today's net income card no longer shows a change beside a figure it does not have.
 
 ## [4.0.0-beta.19] - 2026-11-04
 

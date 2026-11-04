@@ -33,7 +33,7 @@ struct OrderPhotosCard: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(L10n.tr("photos.title").uppercased())
                 .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .tracking(1.05)
+                .khaytTracking(1.05)
                 .foregroundStyle(KhaytDesign.note)
             VStack(alignment: .leading, spacing: 10) {
                 if access == .needsCloud {

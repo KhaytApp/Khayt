@@ -25,7 +25,7 @@ struct ProductProfitTable: View {
             Text(words.callIt("mac.pp_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, !report.rows.isEmpty {
                 if let best = report.totals.bestPerHour, let rate = best.profitPerHour {

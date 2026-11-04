@@ -147,7 +147,7 @@ private struct KhaytCard: ViewModifier {
             .frame(maxWidth: .infinity,
                    maxHeight: fills ? .infinity : nil,
                    alignment: fills ? .topLeading : .leading)
-            .background(Khayt.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Khayt.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(alignment: .leading) {
                 // Clipped to the card's own shape so the bar takes the corner
                 // radius on the two corners it touches and stays square on the
@@ -157,9 +157,9 @@ private struct KhaytCard: ViewModifier {
                     Rectangle().fill(rail).frame(width: 3)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Khayt.hairline, lineWidth: 1)
             }
     }

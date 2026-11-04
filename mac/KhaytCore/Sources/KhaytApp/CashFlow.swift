@@ -49,7 +49,7 @@ struct CashFlowChart: View {
                 Text(words.callIt("an.cash_flow"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Key(colour: Khayt.done, label: words.callIt("an.collected"))
                 Key(colour: Khayt.late, label: words.callIt("an.expenses_paid"))

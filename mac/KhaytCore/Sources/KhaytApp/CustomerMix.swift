@@ -23,7 +23,7 @@ struct CustomerMixCard: View {
             Text(words.callIt("mac.cm_title"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
-                .foregroundStyle(Khayt.brand)
+                .foregroundStyle(.secondary)
 
             if let report, let share = report.fresh.shareOfRevenue {
                 HStack(alignment: .top, spacing: 22) {

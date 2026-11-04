@@ -159,7 +159,7 @@ struct ScheduleSheet: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .card(rail: Khayt.brand)
+            .card()
         }
     }
 

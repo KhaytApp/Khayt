@@ -97,14 +97,14 @@ struct Machines: View {
                 // nowhere in this app.
                 if !shop.machinesInUse.isEmpty {
                     CapacityCard(shop: shop, report: load)
-                        .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.brand,
+                        .card(rail: load?.totals.overbooked == true ? Khayt.late : nil,
                               padding: 14)
                     // Capacity says whether a machine is busy; this says
                     // whether being busy is worth it. The pair is the case for
                     // servicing one printer and selling another.
                     MachineReliabilityCard(shop: shop, report: scrap)
                         .card(rail: (scrap?.totals.scrapRate ?? 0) >= 0.05
-                                    ? Khayt.attention : Khayt.brand,
+                                    ? Khayt.attention : nil,
                               padding: 14)
                 }
                 // Retired printers are not on the floor: they are listed below,
@@ -773,6 +773,7 @@ struct Inventory: View {
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         ToOrderRow(shop: shop)
                             .padding(.bottom, 14)
+                            .padding([.horizontal, .top], Metric.screen)
                     }
                     // The WHOLE shelf now, not only what is urgent on it —
                     // see `ConsumablesCard`. Still only when nothing is being
@@ -796,6 +797,11 @@ struct Inventory: View {
                                   ? Khayt.attention : nil,
                                   padding: 14)
                             .padding(.bottom, 14)
+                            // In from the edges like the spool grid under it:
+                            // the cards above and below the grid ran from the
+                            // sidebar to the window edge (beta.19 review).
+                            .padding(.horizontal, Metric.screen)
+                            .padding(.top, Metric.screen)
                     }
                     // ── WHAT IT COSTS, ABOVE WHAT IS ON IT ────────────────
                     //
@@ -821,10 +827,12 @@ struct Inventory: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 14)
                                 .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
                         } else {
                             MaterialCostCard(shop: shop, report: prices)
-                                .card(rail: Khayt.brand, padding: 14)
+                                .card(padding: 14)
                                 .padding(.bottom, 14)
+                                .padding(.horizontal, Metric.screen)
                         }
                     }
                     // ── WHAT WAS PAID, UNDER WHAT IT COSTS ────────────────
@@ -839,7 +847,7 @@ struct Inventory: View {
                     if !supplierPrices.isEmpty,
                        shop.search.trimmingCharacters(in: .whitespaces).isEmpty {
                         SupplierPricesCard(shop: shop, groups: supplierPrices)
-                            .card(rail: Khayt.brand, padding: 14)
+                            .card(padding: 14)
                             .padding(.bottom, 14)
                     }
                     // ── WHAT IS COMING, BESIDE WHAT IS HERE ───────────────
@@ -961,6 +969,7 @@ struct Inventory: View {
                         SuppliersCard(shop: shop)
                             .card(padding: 14)
                             .padding(.bottom, 14)
+                            .padding(.horizontal, Metric.screen)
                     }
                 }
                 .background(Khayt.ground)

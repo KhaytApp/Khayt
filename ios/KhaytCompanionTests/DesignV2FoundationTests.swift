@@ -84,4 +84,17 @@ final class DesignV2FoundationTests: XCTestCase {
             XCTAssertNotNil(UIFont(name: name, size: 12), name)
         }
     }
+
+    /// JetBrains Mono has no Arabic: in Arabic, the mono labels take the
+    /// text face (spaced letter by letter otherwise), and positive
+    /// letter-spacing is dropped, which pulled joined letters apart.
+    func testArabicNeverSetsWordsInTheMonoFace() {
+        let before = L10n.currentLanguage
+        defer { L10n.setLanguage(before) }
+        L10n.setLanguage(.en)
+        XCTAssertEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
+        L10n.setLanguage(.ar)
+        XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.postScriptName(.medium), size: 12, relativeTo: .caption))
+        XCTAssertNotEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
+    }
 }

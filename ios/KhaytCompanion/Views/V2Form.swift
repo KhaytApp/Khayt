@@ -26,7 +26,7 @@ struct V2Field<Input: View>: View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label.uppercased())
                 .font(.khayt(10, .bold, relativeTo: .caption2))
-                .tracking(1)
+                .khaytTracking(1)
                 .foregroundStyle(KhaytDesign.note)
             input
                 .font(.khayt(16, .medium, relativeTo: .body))

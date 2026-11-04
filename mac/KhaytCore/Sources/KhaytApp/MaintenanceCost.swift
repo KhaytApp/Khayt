@@ -36,7 +36,7 @@ struct MaintenanceCostCard: View {
                 Text(words.callIt("an.maint_cost"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
-                    .foregroundStyle(Khayt.brand)
+                    .foregroundStyle(.secondary)
                 Text(String(year))
                     .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
                 Spacer(minLength: 8)

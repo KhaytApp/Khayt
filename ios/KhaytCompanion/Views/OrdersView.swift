@@ -461,7 +461,7 @@ struct RushBadge: View {
         Label(L10n.tr("orders.rush"), systemImage: "bolt.fill")
             .labelStyle(.titleAndIcon)
             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-            .tracking(0.6)
+            .khaytTracking(0.6)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .foregroundStyle(KhaytDesign.attention)
@@ -473,7 +473,7 @@ struct LateBadge: View {
     var body: some View {
         Text(L10n.tr("orders.late"))
             .font(.khayt(10.5, .bold, relativeTo: .caption2))
-            .tracking(0.6)
+            .khaytTracking(0.6)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .foregroundStyle(KhaytDesign.late)

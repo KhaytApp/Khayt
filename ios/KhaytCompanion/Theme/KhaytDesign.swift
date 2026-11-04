@@ -212,7 +212,7 @@ struct KhaytSectionHeader: View {
         HStack {
             Text(L10n.usesArabicLayout ? text : text.uppercased())
                 .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11.5, .medium))
-                .tracking(L10n.usesArabicLayout ? 0 : 0.6)
+                .khaytTracking(0.6)
                 .foregroundStyle(KhaytDesign.textDim)
             Spacer()
             if let actionTitle, let action {
@@ -230,7 +230,7 @@ struct KhaytEyebrow: View {
     var body: some View {
         Text(L10n.usesArabicLayout ? text : text.uppercased())
             .font(L10n.usesArabicLayout ? .khayt(10.5, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
-            .tracking(L10n.usesArabicLayout ? 0 : 1.0)
+            .khaytTracking(1.0)
             .foregroundStyle(KhaytDesign.textMuted)
     }
 }

@@ -88,8 +88,31 @@ extension Font {
     }
 
     /// JetBrains Mono — order numbers, grams, times, eyebrows.
+    ///
+    /// Not in Arabic: JetBrains Mono has no Arabic, and Arabic set in it
+    /// came out spaced letter by letter ("الـمـبـلـغ") in every eyebrow and
+    /// label that carries a translated word. There the text face stands in;
+    /// its figures are tabular already, so numbers still line up.
     static func khaytMono(_ size: CGFloat, _ weight: Font.Weight = .medium,
                           relativeTo style: Font.TextStyle = .caption) -> Font {
-        .custom(KhaytType.monoName(weight), size: size, relativeTo: style)
+        L10n.usesArabicLayout
+            ? .custom(KhaytType.postScriptName(weight), size: size, relativeTo: style)
+            : .custom(KhaytType.monoName(weight), size: size, relativeTo: style)
+    }
+}
+
+/// Letter-spacing for eyebrows and labels, dropped in Arabic: tracking pulls
+/// a cursive script's joined letters apart. Negative tracking (tightened
+/// display figures) is kept. `Text` keeps its own overload so concatenation
+/// and Text-only modifiers still chain.
+extension Text {
+    func khaytTracking(_ value: CGFloat) -> Text {
+        tracking(L10n.usesArabicLayout && value > 0 ? 0 : value)
+    }
+}
+
+extension View {
+    func khaytTracking(_ value: CGFloat) -> some View {
+        tracking(L10n.usesArabicLayout && value > 0 ? 0 : value)
     }
 }

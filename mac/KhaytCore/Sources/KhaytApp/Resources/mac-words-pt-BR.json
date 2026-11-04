@@ -781,6 +781,7 @@
  "mac.fixed_remove": "Remover este custo",
  "mac.fixed_section": "Custos mensais",
  "mac.fixed_total": "Todo mês:",
+ "mac.fleet_service": "{n} em manutenção",
  "mac.fleet_offline": "{n} sem resposta",
  "mac.flow_factor": "Fluxo (100% é como fatiado)",
  "mac.full_spool": "Carretel cheio",

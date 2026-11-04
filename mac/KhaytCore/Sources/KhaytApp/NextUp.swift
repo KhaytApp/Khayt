@@ -55,7 +55,7 @@ struct NextUp: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .card(rail: Khayt.brand, padding: 14)
+            .card(padding: 14)
         }
     }
 
