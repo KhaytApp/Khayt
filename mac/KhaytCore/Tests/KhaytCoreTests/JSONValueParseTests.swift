@@ -273,11 +273,14 @@ struct JSONValueParseTests {
     func readBudget() throws {
         let data = SyntheticBook.make(records: 10_000)
         let clock = ContinuousClock()
-        let legacy = try clock.measure { _ = try JSONDecoder().decode([String: Legacy].self, from: data) }
-        var fast = Duration.seconds(3600)
+        // Best of three for BOTH sides, interleaved. One legacy sample against
+        // the best of three fast ones flaked at 1.985x on a loaded CI runner
+        // (#2202): a single lucky legacy run moves the ratio, and interleaving
+        // keeps a burst of load from landing on one side only.
+        var legacy = Duration.seconds(3600), fast = Duration.seconds(3600)
         for _ in 0..<3 {
-            let t = try clock.measure { _ = try JSONValue.decode([String: JSONValue].self, from: data) }
-            fast = min(fast, t)
+            legacy = min(legacy, try clock.measure { _ = try JSONDecoder().decode([String: Legacy].self, from: data) })
+            fast = min(fast, try clock.measure { _ = try JSONValue.decode([String: JSONValue].self, from: data) })
         }
         let ratio = legacy / fast
         print("JSONValue read budget: fast \(fast) vs old \(legacy), \(ratio)x")
@@ -294,11 +297,11 @@ struct JSONValueParseTests {
     func writeBudget() throws {
         let book = try JSONValue.decode([String: JSONValue].self, from: SyntheticBook.make(records: 10_000))
         let clock = ContinuousClock()
-        let reference = try clock.measure { _ = try JSONEncoder().encode(book) }
-        var fast = Duration.seconds(3600)
+        // Best of three for both sides, interleaved — see `readBudget`.
+        var reference = Duration.seconds(3600), fast = Duration.seconds(3600)
         for _ in 0..<3 {
-            let t = try clock.measure { _ = try JSONValue.encode(book) }
-            fast = min(fast, t)
+            reference = min(reference, try clock.measure { _ = try JSONEncoder().encode(book) })
+            fast = min(fast, try clock.measure { _ = try JSONValue.encode(book) })
         }
         #expect(reference / fast > 2, "fast \(fast) vs JSONEncoder \(reference)")
     }
