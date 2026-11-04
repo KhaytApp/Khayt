@@ -1312,7 +1312,12 @@ struct Reports: View {
                 out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_col_labour"),
                                          amount: -row.labourValue))
             }
-            out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
+            // Only when there is any, like the monthly costs below: a 0.00 bar
+            // labelled Expenses beside the side panel's −300 Expenses read as
+            // two answers to one question (beta.19 review).
+            if row.expenses != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
+            }
             // Only when there is any. A bar of zero height under a label is a
             // row of the table that wandered onto the chart.
             if row.fixed != 0 {
@@ -1466,8 +1471,18 @@ struct Reports: View {
                                 DetailLine(shop.words.callIt("pnl.labour"),
                                            Money.cost(rows.reduce(0) { $0 + $1.labourValue }, shop.currency))
                             }
-                            DetailLine(shop.words.callIt("an.pnl_expenses"),
-                                       Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency))
+                            // The two the chart draws apart, drawn apart here:
+                            // this said "Expenses −300" for a shop whose 300 was
+                            // its monthly overhead and whose Expenses screen was
+                            // empty.
+                            if rows.contains(where: { $0.expenses != 0 }) || !rows.contains(where: { $0.fixed != 0 }) {
+                                DetailLine(shop.words.callIt("an.pnl_expenses"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.expenses }, shop.currency))
+                            }
+                            if rows.contains(where: { $0.fixed != 0 }) {
+                                DetailLine(shop.words.callIt("mac.waterfall_fixed"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.fixed }, shop.currency))
+                            }
                             // Ruled off from the two above it, because it is
                             // NOT a third subtraction — it is what the shop
                             // owes ZATCA, and revenue above is already net of
