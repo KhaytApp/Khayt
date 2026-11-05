@@ -9141,6 +9141,16 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.22] - 2026-11-05
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Quote requests with a STEP file come in.** Khayt Cloud's quote form now takes .step and .stp files. They have no instant price, so they arrive as a request; Khayt files the model in your library as CAD, unmeasured, before taking the request off the cloud. Before this version such a request stayed in Online orders.
+- **Hide "Quotes by Khayt" on your quote page (Studio).** Settings › Online › Quote form for your store has a switch for the line on the standalone quote page your link opens. Inside an iframe on your own site it is already hidden. If your plan does not include it, the switch goes back and says why.
+
 ## [4.0.0-beta.21] - 2026-11-05
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
