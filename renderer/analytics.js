@@ -28,6 +28,53 @@ const _topCtx = () => ({
 /* ============================================================
    Simple Reports — shown instead of full Analytics in Simple mode
    ============================================================ */
+/**
+ * This month's trade revenue, the figure a monthly revenue goal is measured
+ * against: finished, not voided, not the shop's own prints, net of tax — the
+ * same set the Simple reports' "Revenue this month" tile counts.
+ */
+function monthTradeRevenue(now = new Date()) {
+  const m = localMonthStr(now);
+  return printLog
+    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(m))
+    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+}
+
+/**
+ * The monthly revenue goal set in Settings › Business, as a progress bar with
+ * a month-end forecast. Empty when no goal is set or the mode has no commerce.
+ *
+ * The goal was settable but shown nowhere: the only reader was the original
+ * dashboard, which every built-in design replaces with its own, and the
+ * redesign moved revenue to Analytics. So it lives here now, on both the
+ * Simple and the Professional screen, and is always THIS month whatever range
+ * the Analytics picker shows.
+ */
+function monthGoalHtml(now = new Date()) {
+  const goal = +settings.monthlyGoal || 0;
+  const biz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
+  if (!(goal > 0) || !biz) return '';
+  const rev = monthTradeRevenue(now);
+  const pct = Math.min(100, (rev / goal) * 100);
+  const day = now.getDate();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const forecast = day < days && rev > 0 ? Math.round((rev / day) * days) : null;
+  const col = pct >= 100 ? 'var(--success)' : pct >= 60 ? 'var(--primary)' : 'var(--warning)';
+  const month = now.toLocaleDateString(localeTag(), { month: 'long' });
+  return `
+    <div class="dash-goal" id="analyticsGoal">
+      <div class="dash-goal-top">
+        <span class="dash-goal-label">${escapeHtml(t('dash.goal'))} · ${escapeHtml(month)}</span>
+        <span class="dash-goal-nums">${[
+          `<bdi>${escapeHtml(fmtPrice(rev))}</bdi> / <bdi>${escapeHtml(fmtPrice(goal))}</bdi>`,
+          `<bdi>${Math.round(pct)}%</bdi>`,
+          forecast != null ? `<span title="${escapeHtml(t('dash.forecast_tip'))}">${escapeHtml(t('dash.forecast'))} <bdi>${escapeHtml(fmtPrice(forecast))}</bdi></span>` : '',
+        ].filter(Boolean).join(' · ')}</span>
+      </div>
+      <div class="dash-goal-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-label="${escapeHtml(t('dash.goal'))}"><div class="dash-goal-fill" style="width:${pct.toFixed(1)}%;background:${col}"></div></div>
+    </div>`;
+}
+
 function renderSimpleReports() {
   const wrap = $('#analyticsSimpleWrap');
   if (!wrap) return;
@@ -75,6 +122,7 @@ function renderSimpleReports() {
         <div class="stat-value"><span>${fmtMoney(outstanding)}</span><span class="unit">${escapeHtml(currencySymbol())}</span></div>
       </div>
     </div>
+    ${monthGoalHtml()}
     ${topTags.length > 0 ? `
     <h4 style="font-size:13px;font-weight:600;margin:0 0 10px;">${escapeHtml(t('an.simple_top_products') || 'Top products this month')}</h4>
     <ul class="leaderboard" style="margin-bottom:16px;">
@@ -393,6 +441,8 @@ function renderAnalytics() {
   if (crEl) crEl.textContent = convRate !== null ? `${convRate}%` : '—';
 
   renderHandoffAnalyticsOverview({ revenue, completed, receivables, convRate, revSpark });
+  const goalWrap = $('#analyticsGoalWrap');
+  if (goalWrap) goalWrap.innerHTML = monthGoalHtml();
 
   // Top products
   const topProducts = _topLists()?.topProducts(orders, _topCtx(), { limit: 5 }) || [];
