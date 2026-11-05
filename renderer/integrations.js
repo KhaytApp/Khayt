@@ -1936,6 +1936,7 @@ function trackShipment(trackingNumber, carrier) {
       ${p.link ? `<div style="font-size:12.5px;margin-top:4px;"><a href="#" data-intake-link="${escapeHtml(p.link)}" style="color:var(--primary);">${escapeHtml(p.link)}</a></div>` : ''}
       ${p.photo ? `<img src="${escapeHtml(p.photo)}" alt="" style="max-width:160px;border-radius:8px;margin-top:8px;border:1px solid var(--border-soft);">` : ''}
       ${intakeFileLine(p.file)}
+      ${intakeShelfLine(p)}
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn primary small" data-intake-import="${escapeHtml(it.id)}">${escapeHtml(t('intake.import'))}</button>
         <button class="btn ghost small" data-intake-dismiss="${escapeHtml(it.id)}">${escapeHtml(t('intake.dismiss'))}</button>
@@ -2086,11 +2087,34 @@ function trackShipment(trackingNumber, carrier) {
     } catch (_) { return 0; }
   }
 
+  /** `settings.storefront.stockQty` — what the shop counted on the shelf. */
+  function intakeShelfCounts() {
+    const sf = (settings && settings.storefront) || {};
+    return (sf.stockQty && typeof sf.stockQty === 'object') ? sf.stockQty : {};
+  }
+
+  /** What the shelf would answer for a request, for its row: "2 off the
+   *  shelf, 1 to print", or nothing when no line comes off the shelf. */
+  function intakeShelfLine(p) {
+    const S = global.KhaytShelfSale;
+    if (!S || (p && p.quote)) return '';
+    const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    let r;
+    try { r = S.read(p || {}, { products: list, stock: intakeShelfCounts() }); } catch (_) { return ''; }
+    if (!r || !(r.fromShelf > 0)) return '';
+    const text = r.toPrint > 0 ? t('intake.shelf_part', { shelf: r.fromShelf, print: r.toPrint }) : t('intake.off_shelf', { n: r.fromShelf });
+    return `<div style="font-size:12.5px;margin-top:4px;color:var(--success, #2f855a);">📦 ${escapeHtml(text)}</div>`;
+  }
+
   function intakeStoreJob(p, orderId) {
     const S = global.KhaytShelfSale, J = global.KhaytStoreOrderJob;
     if (!S || !J) return null;
     const list = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
-    const reading = S.read(p, { products: list, stock: {} });
+    // THE SHELF FIRST, as the Mac's Online orders and both webhook paths do:
+    // a line for something already made comes off the shelf, and only what
+    // the shelf cannot cover is printed. Read here, at the moment of import,
+    // against the count the book holds now.
+    const reading = S.read(p, { products: list, stock: intakeShelfCounts() });
     if (!reading.lines.length) return null;
     const job = J.build(reading, {
       products: list,
@@ -2184,10 +2208,41 @@ function trackShipment(trackingNumber, carrier) {
         order.price = intakeQuotePrice({ baseCost: storeJob.parts.reduce((s2, x) => s2 + (+x.baseCost || 0), 0) });
       }
     }
+    // What came off the shelf: the count goes down (and is re-dated, because
+    // a count carries the date it is current as of), and an order the shelf
+    // covers whole is a SALE — recorded completed from stock, nothing queued.
+    // lib/storefront-webhook.js `takeOffTheShelf` and the Mac's
+    // putOnlineOrder write the same fields.
+    let soldFromShelf = false;
+    const reading = storeJob && storeJob.reading;
+    if (reading && reading.fromShelf > 0) {
+      const at = now.toISOString();
+      const sf = { ...(settings.storefront || {}) };
+      const stockQty = { ...(sf.stockQty || {}) };
+      const stockCountedAt = { ...(sf.stockCountedAt || {}) };
+      for (const e of global.KhaytShelfSale.effects(reading, at)) {
+        if (e.type !== 'deduct') continue;
+        stockQty[e.productId] = e.to;
+        stockCountedAt[e.productId] = e.countedAt;
+      }
+      settings.storefront = { ...sf, stockQty, stockCountedAt };
+      order.shelfTaken = reading.fromShelf;
+      order.notes = [order.notes, `${reading.fromShelf} off the shelf` + (reading.toPrint > 0 ? `, ${reading.toPrint} to print` : '')]
+        .filter(Boolean).join('\n');
+      if (reading.allFromShelf) {
+        soldFromShelf = true;
+        Object.assign(order, {
+          fromStock: true, status: 'completed', completedAt: at,
+          statusHistory: [{ status: 'completed', at }],
+          quoteVersion: undefined, quoteRevisions: undefined,
+        });
+        delete order.quoteVersion; delete order.quoteRevisions;
+      }
+    }
     printLog.unshift(order);
     await dismissIntake(it.id, c, true); // remove from the cloud inbox (best-effort)
     saveAll();
-    toast(t('intake.imported'), 'success');
+    toast(soldFromShelf ? `${t('intake.record_sale')} ✓` : t('intake.imported'), 'success');
     if (typeof switchTab === 'function') switchTab('logs-tab');
     return true;
   }
