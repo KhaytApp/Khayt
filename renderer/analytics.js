@@ -1757,6 +1757,54 @@ function renderPrinterUtilizationChart() {
   });
 }
 
+/**
+ * Where a quarter's money went, as a waterfall: revenue down through each cost
+ * to the net — the Mac's Reports "QuarterDrawn". Built from the SAME row the
+ * P&L table shows (lib/pnl-report.js pnlByPeriod), so the two cannot disagree,
+ * and a step is drawn only where it is not zero (a 0.00 bar is a table row
+ * that wandered onto the chart).
+ */
+function pnlWaterfallHtml(row) {
+  if (!row) return '';
+  const steps = [{ label: t('an.revenue'), amount: +row.revenue || 0, anchored: true }];
+  const add = (label, v) => { if (+v) steps.push({ label, amount: -(+v) }); };
+  add(t('pnl.cogs'), row.cogs);
+  add(t('pnlw.waste'), row.waste);
+  add(t('pnlw.depreciation'), row.depreciation);
+  add(t('pnlw.labour'), row.labour);
+  add(t('an.pnl_expenses'), row.expenses);
+  add(t('pnlw.fixed'), row.fixed);
+  steps.push({ label: t('an.pnl_net'), amount: +row.net || 0, anchored: true });
+  // Running totals: each step floats from where the last one ended.
+  let run = 0;
+  const bars = steps.map((st) => {
+    let from, to;
+    if (st.anchored) { from = 0; to = st.amount; run = st.amount; }
+    else { from = run; to = run + st.amount; run = to; }
+    return { ...st, lo: Math.min(from, to), hi: Math.max(from, to) };
+  });
+  const top = Math.max(1, ...bars.map((b) => b.hi));
+  const bottom = Math.min(0, ...bars.map((b) => b.lo));
+  const W = 560, H = 200, padT = 16, padB = 46, padL = 8;
+  const span = top - bottom || 1;
+  const y = (v) => padT + (top - v) / span * (H - padT - padB);
+  const slot = (W - padL * 2) / bars.length;
+  const bw = Math.min(46, slot * 0.6);
+  const rects = bars.map((b, i) => {
+    const x = padL + i * slot + (slot - bw) / 2;
+    const color = b.anchored ? (b.amount >= 0 ? 'var(--primary)' : 'var(--danger,#c23b42)') : 'var(--danger,#c23b42)';
+    const h = Math.max(1, y(b.lo) - y(b.hi));
+    return `<rect x="${x.toFixed(1)}" y="${y(b.hi).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${color}" opacity="${b.anchored ? 0.9 : 0.55}"><title>${escapeHtml(b.label)}: ${escapeHtml(fmtMoney(b.amount))}</title></rect>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${(y(b.hi) - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--text-muted)">${escapeHtml(fmtMoney(Math.abs(b.amount)))}</text>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${H - padB + 14}" text-anchor="middle" font-size="9.5" fill="var(--text)">${escapeHtml(String(b.label).slice(0, 16))}</text>`;
+  }).join('');
+  const zero = bottom < 0 ? `<line x1="${padL}" x2="${W - padL}" y1="${y(0)}" y2="${y(0)}" stroke="var(--border)"/>` : '';
+  return `<div style="margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px;">${escapeHtml(t('pnlw.title', { q: row.period }))} · ${escapeHtml(t('an.pnl_orders'))} ${row.orders}</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${escapeHtml(t('pnlw.title', { q: row.period }))}" style="max-width:${W}px;direction:ltr;">${zero}${rects}</svg>
+  </div>`;
+}
+
 /* ============================================================
    P&L (Profit & Loss) quarterly/annual view
    ============================================================ */
@@ -1788,7 +1836,9 @@ function renderPnLSection() {
   const hasLabour = rows.some((r) => (r.labour || 0) > 0);
 
   const cur = currencySymbol();
+  const latest = rows.slice().sort((a, b) => String(b.period).localeCompare(String(a.period)))[0];
   el.innerHTML = `
+    ${pnlWaterfallHtml(latest)}
     ${hasFixed ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Fixed overhead: ${fmtMoney(rows.find((r) => r.fixed > 0).fixed)}/quarter included in net</div>` : ''}
     <div style="overflow-x:auto;">
       <table style="width:100%; border-collapse:collapse; font-size:13px;">
