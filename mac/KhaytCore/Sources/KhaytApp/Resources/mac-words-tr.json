@@ -3525,5 +3525,12 @@
  "mac.qfe_hide_footer": "Teklif sayfasında “Quotes by Khayt” yazısını gizle",
  "mac.qfe_hide_footer_hint": "Bu yalnızca bağlantıdan açılan teklif sayfasını etkiler. Kendi sitenizdeki bir iframe içinde bu satır zaten gizlidir.",
  "mac.qfe_err_plan_required": "“Quotes by Khayt” yazısını gizlemek için Khayt Cloud Studio planı gerekir; bu yüzden satır teklif sayfasında kalıyor.",
- "mac.qfe_err_bad_footer": "Khayt Cloud bu ayarı kabul etmedi, hiçbir şey değiştirilmedi."
+ "mac.qfe_err_bad_footer": "Khayt Cloud bu ayarı kabul etmedi, hiçbir şey değiştirilmedi.",
+ "mac.bnpl_title": "Sonra öde bağlantısı",
+ "mac.bnpl_section": "Sonra öde (Tabby, Tamara)",
+ "mac.bnpl_note": "Khayt açıkken oluşturduğu her bağlantıyı kontrol eder, sağlayıcının beklediği adımı atar (Tamara onayı, Tabby tahsilatı) ve ödemeyi işe kaydeder. Anahtarlar defterde şifrelenir.",
+ "mac.bnpl_forget": "Kayıtlı anahtarı unut",
+ "mac.bnpl_unsealed": "Bu anahtar şifrelenemedi, bu yüzden hiçbir şey kaydedilmedi. Defter eşitlenir ve yedeklenir; şifresiz bir anahtar da onunla giderdi.",
+ "mac.bnpl_none": "Ayarlar ▸ Çevrimiçi bölümünden Tabby veya Tamara'yı API anahtarıyla açın.",
+ "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek."
 }

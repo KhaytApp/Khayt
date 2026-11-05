@@ -3525,5 +3525,12 @@
  "mac.qfe_hide_footer": "見積ページの「Quotes by Khayt」を非表示にする",
  "mac.qfe_hide_footer_hint": "リンクから開く見積ページだけに適用されます。自分のサイトの iframe 内では、この表示は最初から隠れています。",
  "mac.qfe_err_plan_required": "「Quotes by Khayt」を非表示にするには Khayt Cloud の Studio プランが必要です。見積ページには表示されたままです。",
- "mac.qfe_err_bad_footer": "Khayt Cloud がこの設定を受け付けなかったため、何も変更されていません。"
+ "mac.qfe_err_bad_footer": "Khayt Cloud がこの設定を受け付けなかったため、何も変更されていません。",
+ "mac.bnpl_title": "後払いリンク",
+ "mac.bnpl_section": "後払い（Tabby、Tamara）",
+ "mac.bnpl_note": "Khayt が開いている間、作成した各リンクを確認し、提供元が待っている手続き（Tamara の承認、Tabby のキャプチャ）を行い、支払いをジョブに記録します。キーは台帳内で暗号化されます。",
+ "mac.bnpl_forget": "保存したキーを削除",
+ "mac.bnpl_unsealed": "そのキーを暗号化できなかったため、何も保存されていません。台帳は同期・バックアップされるため、平文のキーも一緒に送られてしまいます。",
+ "mac.bnpl_none": "設定 ▸ オンライン で、API キーとともに Tabby または Tamara をオンにしてください。",
+ "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。"
 }

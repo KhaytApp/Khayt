@@ -138,58 +138,6 @@ struct MilestoneTests {
         return []
     }
 
-    @Test("adding, stamping and deleting write the book and keep what the desktop put there")
-    func writesTheBook() async throws {
-        var book = PerfBook.synthesize(models: 3)
-        book["printLog"] = .array([.object(Self.job(milestones: [Self.deposit]))])
-        try await withPerfBook(book) { shop, url in
-            #expect(shop.milestones(of: "J1").map(\.id) == ["MS-LX1ABC"])
-
-            // ADD.
-            let added = await shop.addMilestone(to: "J1", label: "On delivery 50%", percentage: 50, amount: 575)
-            #expect(added, Comment(rawValue: shop.moveProblem ?? "refused"))
-            var disk = try Self.onDisk(url)
-            #expect(Self.list(disk).count == 2)
-            #expect(Self.list(disk)[0] == Self.deposit, "the desktop's milestone, paidAt and all")
-            guard case .object(let fresh) = Self.list(disk)[1] else { Issue.record("not a milestone"); return }
-            #expect(fresh["label"] == .string("On delivery 50%"))
-            #expect(fresh["percentage"] == .number(50))
-            #expect(fresh["amount"] == .number(575))
-            guard case .string(let newId)? = fresh["id"] else { Issue.record("no id"); return }
-            #expect(newId.hasPrefix("MS-"))
-            #expect(disk["invoiceNote"] == .string("keep me"))
-            #expect(shop.milestones(of: "J1").count == 2, "the window reads it back")
-
-            // An empty label, or no money, writes nothing.
-            #expect(await shop.addMilestone(to: "J1", label: "  ", percentage: 10, amount: 100) == false)
-            #expect(await shop.addMilestone(to: "J1", label: "X", percentage: 10, amount: 0) == false)
-            #expect(Self.list(try Self.onDisk(url)).count == 2)
-
-            // PROFORMA: stamps the book's day on that one milestone, then shows it.
-            shop.pendingMilestones = Shop.PendingHold(id: "J1", project: "Turbine bracket")
-            await shop.showMilestoneProforma("J1", milestone: "MS-LX1ABC")
-            disk = try Self.onDisk(url)
-            guard case .object(let stamped) = Self.list(disk)[0] else { Issue.record("not a milestone"); return }
-            #expect(stamped["issuedAt"] == .string(Calendar.book.dayString(Date())))
-            #expect(stamped["paidAt"] == .string("2026-10-03"), "beside it, untouched")
-            #expect(stamped["note"] == .string("wire"))
-            #expect(shop.pendingMilestones == nil)
-            #expect(shop.pendingInvoice?.proforma == true)
-            #expect(shop.pendingInvoice?.milestone == "MS-LX1ABC")
-            // It numbered nothing: the job has no invoice number now either.
-            #expect(disk["invoiceNumber"] == nil)
-
-            // DELETE.
-            let deleted = await shop.deleteMilestone(from: "J1", milestone: newId)
-            #expect(deleted)
-            disk = try Self.onDisk(url)
-            #expect(Self.list(disk).count == 1)
-            guard case .object(let kept) = Self.list(disk)[0] else { Issue.record("not a milestone"); return }
-            #expect(kept["id"] == .string("MS-LX1ABC"))
-            #expect(kept["paidAt"] == .string("2026-10-03"))
-        }
-    }
-
     @Test("it is offered on the work a proforma is for, and a milestone writes through the one-order chain")
     func wired() throws {
         func job(_ status: String, price: Double = 100) throws -> Order {
@@ -212,6 +160,66 @@ struct MilestoneTests {
         for menu in ["OrdersTable.swift", "OrderInspector.swift"] {
             let text = try String(contentsOf: app.appending(path: menu), encoding: .utf8)
             #expect(text.contains("shop.showMilestones(job.id)"), "\(menu) does not offer Milestones")
+        }
+    }
+}
+
+/// The write, on a real book in the temp support folder — in the suite that
+/// owns that folder (`withPerfBook`), so no other suite's book replaces it
+/// mid-test. As its own suite it raced `LibraryEditPerfTests` for the folder
+/// and failed with "Another app has this book open now" when the two ran
+/// side by side.
+extension LibraryEditPerfTests {
+
+    @Test("adding, stamping and deleting write the book and keep what the desktop put there")
+    func milestones_writesTheBook() async throws {
+        var book = PerfBook.synthesize(models: 3)
+        book["printLog"] = .array([.object(MilestoneTests.job(milestones: [MilestoneTests.deposit]))])
+        try await withPerfBook(book) { shop, url in
+            #expect(shop.milestones(of: "J1").map(\.id) == ["MS-LX1ABC"])
+
+            // ADD.
+            let added = await shop.addMilestone(to: "J1", label: "On delivery 50%", percentage: 50, amount: 575)
+            #expect(added, Comment(rawValue: shop.moveProblem ?? "refused"))
+            var disk = try MilestoneTests.onDisk(url)
+            #expect(MilestoneTests.list(disk).count == 2)
+            #expect(MilestoneTests.list(disk)[0] == MilestoneTests.deposit, "the desktop's milestone, paidAt and all")
+            guard case .object(let fresh) = MilestoneTests.list(disk)[1] else { Issue.record("not a milestone"); return }
+            #expect(fresh["label"] == .string("On delivery 50%"))
+            #expect(fresh["percentage"] == .number(50))
+            #expect(fresh["amount"] == .number(575))
+            guard case .string(let newId)? = fresh["id"] else { Issue.record("no id"); return }
+            #expect(newId.hasPrefix("MS-"))
+            #expect(disk["invoiceNote"] == .string("keep me"))
+            #expect(shop.milestones(of: "J1").count == 2, "the window reads it back")
+
+            // An empty label, or no money, writes nothing.
+            #expect(await shop.addMilestone(to: "J1", label: "  ", percentage: 10, amount: 100) == false)
+            #expect(await shop.addMilestone(to: "J1", label: "X", percentage: 10, amount: 0) == false)
+            #expect(MilestoneTests.list(try MilestoneTests.onDisk(url)).count == 2)
+
+            // PROFORMA: stamps the book's day on that one milestone, then shows it.
+            shop.pendingMilestones = Shop.PendingHold(id: "J1", project: "Turbine bracket")
+            await shop.showMilestoneProforma("J1", milestone: "MS-LX1ABC")
+            disk = try MilestoneTests.onDisk(url)
+            guard case .object(let stamped) = MilestoneTests.list(disk)[0] else { Issue.record("not a milestone"); return }
+            #expect(stamped["issuedAt"] == .string(Calendar.book.dayString(Date())))
+            #expect(stamped["paidAt"] == .string("2026-10-03"), "beside it, untouched")
+            #expect(stamped["note"] == .string("wire"))
+            #expect(shop.pendingMilestones == nil)
+            #expect(shop.pendingInvoice?.proforma == true)
+            #expect(shop.pendingInvoice?.milestone == "MS-LX1ABC")
+            // It numbered nothing: the job has no invoice number now either.
+            #expect(disk["invoiceNumber"] == nil)
+
+            // DELETE.
+            let deleted = await shop.deleteMilestone(from: "J1", milestone: newId)
+            #expect(deleted)
+            disk = try MilestoneTests.onDisk(url)
+            #expect(MilestoneTests.list(disk).count == 1)
+            guard case .object(let kept) = MilestoneTests.list(disk)[0] else { Issue.record("not a milestone"); return }
+            #expect(kept["id"] == .string("MS-LX1ABC"))
+            #expect(kept["paidAt"] == .string("2026-10-03"))
         }
     }
 }

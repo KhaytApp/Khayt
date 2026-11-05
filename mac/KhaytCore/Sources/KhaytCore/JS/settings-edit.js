@@ -518,6 +518,37 @@
       }
     }
 
+    // ── PAY-LATER LINKS (TABBY, TAMARA), WHEN A FORM CARRIES THEM ─────────
+    //
+    // `out.bnpl` further down keeps whatever is stored, because the only screen
+    // that wrote it was `renderer/settings.js` (straight into the book). The Mac
+    // saves through this function, so without a branch here its Tabby / Tamara
+    // settings would appear to save and change nothing.
+    //
+    // Per provider, merged over what is stored, in the fields the desktop's
+    // form writes: `enabled`, and the text fields trimmed. The keys are OPAQUE
+    // — sealed by the host before they arrive — and follow Telegram's rule:
+    // absent keeps what is stored, an empty string clears it. A provider the
+    // form does not name (Stripe, on the Mac) is left exactly as stored.
+    if (has(f, 'bnpl') && f.bnpl && typeof f.bnpl === 'object') {
+      const FIELDS = {
+        tabby: { text: ['merchantCode', 'currency'], secret: ['apiKey'] },
+        tamara: { text: ['currency', 'country'], secret: ['apiKey', 'notificationToken'] },
+      };
+      const held = s.bnpl || {};
+      const bnpl = { ...held };
+      for (const id of Object.keys(FIELDS)) {
+        const g = f.bnpl[id];
+        if (!g || typeof g !== 'object') continue;
+        const row = { ...(held[id] || {}) };
+        if (has(g, 'enabled')) row.enabled = !!g.enabled;
+        for (const k of FIELDS[id].text) if (has(g, k)) row[k] = String(g[k] == null ? '' : g[k]).trim();
+        for (const k of FIELDS[id].secret) if (has(g, k)) row[k] = String(g[k] || '');
+        bnpl[id] = row;
+      }
+      out.bnpl = bnpl;
+    }
+
     // ── NTFY, WHEN A FORM CARRIES IT ──────────────────────────────────────
     //
     // A push channel for printer alerts (`lib/alert-routes.js`). Merged over
@@ -684,7 +715,7 @@
     // Preserved, in the shape their readers expect.
     out.zatcaPhase2 = s.zatcaPhase2 || {};
     out.emailDigest = s.emailDigest || {};
-    out.bnpl = s.bnpl || {};
+    if (!has(f, 'bnpl') || !f.bnpl || typeof f.bnpl !== 'object') out.bnpl = s.bnpl || {};
     out.exchangeRates = s.exchangeRates || {};
     out.exchangeRatesUpdatedAt = s.exchangeRatesUpdatedAt ?? null;
     out.staleHours = s.staleHours || {};

@@ -461,7 +461,13 @@ async function openBnplModal(orderId) {
   if (!order) return;
   const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
   const buyer  = { name: client ? localName(client) : (order.client || ''), phone: client?.phone || '', email: client?.email || '' };
-  const amount = +order.price || 0;
+  // What the customer still OWES — the bill (price + tax on a tax-on-top shop)
+  // less what was paid — by lib/bnpl-requests.js checkoutArgs, which the Mac's
+  // pay-later sheet builds its checkout from too. It used to be order.price: a
+  // job with a deposit was asked for the whole price again.
+  const bnplCtx = { settings, clients, buyerName: buyer.name };
+  const owedArgs = KhaytBnplRequests.checkoutArgs(order, 'tabby', bnplCtx);
+  const amount = owedArgs.refused ? 0 : owedArgs.amount;
   const b      = settings.bnpl || {};
 
   const apiSvcs = BNPL_CATALOG.filter(s => s.hasApi && b[s.id]?.enabled && b[s.id]?.apiKey);
@@ -508,16 +514,19 @@ async function openBnplModal(orderId) {
       let result;
       const cfg = b[svc.id];
       const commonArgs = { amount, currency: cfg.currency || 'SAR', description: order.project || jobRef(order), buyer, orderId: KhaytInvoiceDocument.documentNumber(order, settings), itemName: order.project || jobRef(order) };
-      if (svc.id === 'tabby')  result = await window.hubAPI?.bnplTabby?.({ ...commonArgs, apiKey: cfg.apiKey, merchantCode: cfg.merchantCode });
-      if (svc.id === 'tamara') result = await window.hubAPI?.bnplTamara?.({ ...commonArgs, apiKey: cfg.apiKey, country: cfg.country || 'SA' });
-      if (svc.id === 'stripe') result = await window.hubAPI?.bnplStripe?.({ ...commonArgs, apiKey: cfg.apiKey, successUrl: cfg.successUrl, cancelUrl: cfg.cancelUrl, customerEmail: buyer.email });
+      // Nothing owed: no link for nothing (the same refusal the Mac gives).
+      const bnplArgs = (svc.id === 'tabby' || svc.id === 'tamara') ? KhaytBnplRequests.checkoutArgs(order, svc.id, bnplCtx) : null;
+      if ((bnplArgs && bnplArgs.refused) || !(amount > 0)) result = { ok: false, error: t('inst.nothing_owed') };
+      else if (svc.id === 'tabby')  result = await window.hubAPI?.bnplTabby?.({ ...bnplArgs, apiKey: cfg.apiKey });
+      else if (svc.id === 'tamara') result = await window.hubAPI?.bnplTamara?.({ ...bnplArgs, apiKey: cfg.apiKey });
+      else if (svc.id === 'stripe') result = await window.hubAPI?.bnplStripe?.({ ...commonArgs, apiKey: cfg.apiKey, successUrl: cfg.successUrl, cancelUrl: cfg.cancelUrl, customerEmail: buyer.email });
       if (btn) { btn.disabled = false; btn.textContent = t('bnpl.generate'); }
       if (!res_el) return;
       if (result?.ok && result.url) {
         // Remember the link on its job, so the app can finish the payment once the
         // customer has paid — Tamara's authorise, Tabby's capture (renderer/bnpl-watch.js).
         if ((svc.id === 'tabby' || svc.id === 'tamara') && typeof KhaytBnplConfirm !== 'undefined') {
-          const link = KhaytBnplConfirm.linkRecord(svc.id, result, { amount, currency: cfg.currency || 'SAR' });
+          const link = KhaytBnplConfirm.linkRecord(svc.id, result, { amount: bnplArgs.amount, currency: bnplArgs.currency });
           if (link) { KhaytBnplConfirm.addLink(order, link); saveAll(); }
         }
         // Generate QR for the link

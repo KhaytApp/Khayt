@@ -175,9 +175,69 @@ test('a Saudi Tabby link is asked about on api.tabby.sa, any other on api.tabby.
     await h.check({ provider: 'tabby', id: 'pay-12345678' });   // a link made before currencies were kept: SAR, as the checkout defaults
     assert.deepEqual(urls, ['https://api.tabby.sa/api/v2/payments/pay-12345678', 'https://api.tabby.sa/api/v2/payments/pay-12345678']);
   } finally { h.restore(); }
-  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'main', 'payment-links.js'), 'utf8');
-  assert.match(src, /fetch\(`\$\{BnplRules\.tabbyBase\(currency \|\| 'SAR'\)\}\/checkout`/, 'the checkout uses the same host');
-  assert.ok(!/'https:\/\/api\.tabby\.ai/.test(src), 'no hard-coded UAE host left');
+  const R = require('../lib/bnpl-requests');
+  assert.equal(R.plan('checkout', { provider: 'tabby', currency: 'SAR' }, []).request.url, 'https://api.tabby.sa/api/v2/checkout', 'the checkout uses the same host');
+  assert.equal(R.plan('checkout', { provider: 'tabby', currency: 'AED' }, []).request.url, 'https://api.tabby.ai/api/v2/checkout');
+  for (const f of ['main/payment-links.js', 'bnpl-requests.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', f), 'utf8');
+    assert.ok(!/'https:\/\/api\.tabby\.ai/.test(src), 'no hard-coded UAE host left in ' + f);
+  }
+});
+
+// ── the checkout itself: one definition, which the Mac sends too ───────────
+function checkoutHandlers(fetchImpl) {
+  const handlers = new Map();
+  const realFetch = global.fetch;
+  global.fetch = fetchImpl;
+  const { registerPaymentLinks } = require('../lib/main/payment-links.js');
+  registerPaymentLinks({ ipcMain: { handle: (n, f) => handlers.set(n, f) }, resolveStoreSecret: (incoming) => incoming || 'sk_disk' });
+  return { tabby: (a) => handlers.get('hub:bnpl-tabby')(null, a), tamara: (a) => handlers.get('hub:bnpl-tamara')(null, a), restore: () => { global.fetch = realFetch; } };
+}
+
+test('the Tabby and Tamara checkouts send what they always sent, and read the id a check takes', async () => {
+  const seen = [];
+  const h = checkoutHandlers(async (url, init) => {
+    seen.push({ url, method: init.method, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+    return url.includes('tamara')
+      ? reply(200, { checkout_url: 'https://checkout.tamara.co/x', checkout_id: 'chk-1', order_id: 'ord-12345678' })
+      : reply(200, { id: 'sess-1', payment: { id: 'pay-12345678' }, configuration: { available_products: { installments: [{ web_url: 'https://checkout.tabby.ai/x' }] } } });
+  });
+  try {
+    const args = { amount: 172.5, currency: 'SAR', description: 'Lamp', buyer: { name: 'Sara Al Ahmad', phone: '+966500000000', email: 's@x.test' }, orderId: 'INV-7', itemName: 'Lamp' };
+    assert.deepEqual(await h.tabby({ ...args, apiKey: 'k1', merchantCode: 'M1' }),
+      { ok: true, url: 'https://checkout.tabby.ai/x', checkoutId: 'sess-1', paymentId: 'pay-12345678' });
+    assert.deepEqual(seen[0].url, 'https://api.tabby.sa/api/v2/checkout');
+    assert.equal(seen[0].auth, 'Bearer k1');
+    assert.deepEqual(seen[0].body, {
+      payment: {
+        amount: '172.50', currency: 'SAR', description: 'Lamp',
+        buyer: { phone: '+966500000000', name: 'Sara Al Ahmad', email: 's@x.test' },
+        buyer_history: { registered_since: '2024-01-01T00:00:00Z', loyalty_level: 0 },
+        order: { reference_id: 'INV-7', items: [{ title: 'Lamp', unit_price: '172.50', qty: 1, category: '3D Printing', reference_id: 'INV-7' }], tax_amount: '0.00', shipping_amount: '0.00' },
+        meta: { order_id: 'INV-7', customer: 'Sara Al Ahmad' },
+      },
+      lang: 'en', merchant_code: 'M1',
+      merchant_urls: { success: 'https://khaytapp.com/success', cancel: 'https://khaytapp.com/cancel', failure: 'https://khaytapp.com/failure' },
+    });
+    assert.deepEqual(await h.tamara({ ...args, apiKey: 'k2', country: 'sa' }),
+      { ok: true, url: 'https://checkout.tamara.co/x', checkoutId: 'chk-1', orderId: 'ord-12345678' });
+    assert.equal(seen[1].url, 'https://api.tamara.co/checkout');
+    assert.deepEqual(seen[1].body, {
+      order_reference_id: 'INV-7', total_amount: { amount: '172.50', currency: 'SAR' }, description: 'Lamp', country_code: 'SA',
+      payment_type: 'PAY_BY_INSTALMENTS', instalments: 3,
+      items: [{ name: 'Lamp', sku: 'INV-7', quantity: 1, unit_price: { amount: '172.50', currency: 'SAR' }, total_amount: { amount: '172.50', currency: 'SAR' }, type: 'digital' }],
+      consumer: { email: 's@x.test', first_name: 'Sara', last_name: 'Al Ahmad', phone_number: '+966500000000' },
+      merchant_url: { success: 'https://khaytapp.com/success', failure: 'https://khaytapp.com/failure', cancel: 'https://khaytapp.com/cancel', notification: 'https://khaytapp.com/notify' },
+    });
+  } finally { h.restore(); }
+});
+
+test('a refused checkout says the provider\'s own words', async () => {
+  const h = checkoutHandlers(async (url) => (url.includes('tamara') ? reply(422, { message: 'bad phone' }) : reply(401, { error: 'bad key' })));
+  try {
+    assert.deepEqual(await h.tabby({ apiKey: 'k', amount: 1 }), { ok: false, status: 401, error: 'bad key' });
+    assert.deepEqual(await h.tamara({ apiKey: 'k', amount: 1 }), { ok: false, status: 422, error: 'bad phone' });
+  } finally { h.restore(); }
 });
 
 test('a Tamara link is captured once its job has gone out, inside Tamara\'s 21 days', () => {
@@ -267,4 +327,68 @@ test('a Tamara authorise starts the 21 days', async () => {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'bnpl-watch.js'), 'utf8') + ';this.checkBnplLinks = checkBnplLinks;', ctx);
   await ctx.checkBnplLinks();
   assert.equal(order.bnplLinks[0].authorisedAt, order.bnplLinks[0].checkedAt);
+});
+
+// ── settings: the Mac saves through lib/settings-edit.js ────────────────────
+test('a settings form carrying bnpl merges per provider; keys absent are kept, empty cleared, Stripe untouched', () => {
+  const { apply } = require('../lib/settings-edit.js');
+  const stored = { bnpl: {
+    tabby: { enabled: false, apiKey: '__enc__a', merchantCode: 'M', currency: 'SAR' },
+    tamara: { enabled: true, apiKey: '__enc__b', notificationToken: '__enc__c', currency: 'SAR', country: 'SA' },
+    stripe: { enabled: true, apiKey: '__enc__s' },
+  } };
+  const out = apply(stored, { bnpl: { tabby: { enabled: true, merchantCode: ' M2 ' }, tamara: { notificationToken: '' } } }, { year: 2026 }).bnpl;
+  assert.deepEqual(out.tabby, { enabled: true, apiKey: '__enc__a', merchantCode: 'M2', currency: 'SAR' });
+  assert.deepEqual(out.tamara, { enabled: true, apiKey: '__enc__b', notificationToken: '', currency: 'SAR', country: 'SA' });
+  assert.deepEqual(out.stripe, stored.bnpl.stripe);
+  assert.deepEqual(apply(stored, {}, { year: 2026 }).bnpl, stored.bnpl, 'a form without bnpl keeps it as stored');
+});
+
+// ── the link is for what is still owed ──────────────────────────────────────
+test('a pay-later link asks for what is owed: the tax-on-top bill less the deposit, and none when settled', () => {
+  require('../lib/tax.js');
+  require('../lib/business-scope.js');
+  require('../lib/order-money.js');
+  const R = require('../lib/bnpl-requests');
+  const EXCL = { currency: 'SAR', tax: { name: 'VAT', mode: 'exclusive', rates: [{ id: 'vat', label: 'VAT', percent: 15 }] },
+    bnpl: { tabby: { merchantCode: 'M1', currency: 'SAR' }, tamara: { country: 'SA' } } };
+  // 200 + 15% = 230 billed, 50 deposit paid: 180 owed. It was order.price, 200.
+  const order = { id: 'J1', project: 'Lamp', price: 200, paidAmount: 50, status: 'completed', clientId: 'C1', date: '2026-10-01' };
+  const clients = [{ id: 'C1', phone: '+9665', email: 'c@x.test' }];
+  const tab = R.checkoutArgs(order, 'tabby', { settings: EXCL, clients, buyerName: 'Noura' });
+  assert.equal(tab.amount, 180);
+  assert.equal(tab.merchantCode, 'M1');
+  assert.deepEqual(tab.buyer, { name: 'Noura', phone: '+9665', email: 'c@x.test' });
+  assert.equal(tab.description, 'Lamp');
+  assert.equal(R.checkoutArgs(order, 'tamara', { settings: EXCL, clients }).country, 'SA');
+  // The checkout body carries it.
+  assert.equal(R.plan('checkout', tab, []).request.body.payment.amount, '180.00');
+  // Settled: no link for nothing.
+  assert.deepEqual(R.checkoutArgs({ ...order, paidAmount: 230 }, 'tabby', { settings: EXCL, clients }), { refused: 'nothing_owed' });
+  // An inclusive (or untaxed) shop: the price is the bill.
+  assert.equal(R.checkoutArgs(order, 'tabby', { settings: { currency: 'SAR' }, clients }).amount, 150);
+  // The desktop dialog builds from this, not from order.price.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'integrations.js'), 'utf8');
+  assert.match(src, /KhaytBnplRequests\.checkoutArgs\(order, svc\.id, bnplCtx\)/);
+  assert.ok(!/const amount = \+order\.price/.test(src), 'no link for the bare price');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8'), /<script src="\.\.\/lib\/bnpl-requests\.js"><\/script>/);
+});
+
+// ── Stripe: a custom redirect URL is kept, a private one is not ─────────────
+test('Stripe keeps a shop\'s own https success and cancel URLs, and refuses private ones', async () => {
+  const handlers = new Map();
+  const realFetch = global.fetch;
+  const sent = [];
+  global.fetch = async (url, init) => { sent.push(new URLSearchParams(init.body)); return reply(200, { url: 'https://checkout.stripe.com/x', id: 'cs_1' }); };
+  try {
+    const { registerPaymentLinks } = require('../lib/main/payment-links.js');
+    registerPaymentLinks({ ipcMain: { handle: (n, f) => handlers.set(n, f) }, resolveStoreSecret: (incoming) => incoming });
+    const stripe = (a) => handlers.get('hub:bnpl-stripe')(null, { apiKey: 'sk_test_1', amount: 10, ...a });
+    assert.equal((await stripe({ successUrl: 'https://shop.example/thanks', cancelUrl: 'https://shop.example/back' })).ok, true);
+    assert.equal(sent[0].get('success_url'), 'https://shop.example/thanks');
+    assert.equal(sent[0].get('cancel_url'), 'https://shop.example/back');
+    await stripe({ successUrl: 'https://127.0.0.1/x', cancelUrl: 'https://192.168.1.5/y' });
+    assert.equal(sent[1].get('success_url'), 'https://khaytapp.com/success');
+    assert.equal(sent[1].get('cancel_url'), 'https://khaytapp.com/cancel');
+  } finally { global.fetch = realFetch; }
 });

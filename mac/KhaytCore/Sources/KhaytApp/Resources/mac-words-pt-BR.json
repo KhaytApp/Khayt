@@ -3525,5 +3525,12 @@
  "mac.qfe_hide_footer": "Ocultar “Quotes by Khayt” na página de orçamento",
  "mac.qfe_hide_footer_hint": "Isso só muda a página de orçamento aberta pelo link. Dentro de um iframe no seu próprio site, a linha já fica oculta.",
  "mac.qfe_err_plan_required": "Para ocultar “Quotes by Khayt” é preciso o plano Studio do Khayt Cloud, então a linha continua na página de orçamento.",
- "mac.qfe_err_bad_footer": "O Khayt Cloud não aceitou essa configuração, então nada foi alterado."
+ "mac.qfe_err_bad_footer": "O Khayt Cloud não aceitou essa configuração, então nada foi alterado.",
+ "mac.bnpl_title": "Link de pagamento parcelado",
+ "mac.bnpl_section": "Pagar depois (Tabby, Tamara)",
+ "mac.bnpl_note": "Enquanto o Khayt está aberto, ele verifica cada link criado, executa a etapa que o provedor aguarda (a autorização da Tamara, a captura da Tabby) e registra o pagamento no trabalho. As chaves ficam criptografadas no livro.",
+ "mac.bnpl_forget": "Esquecer a chave salva",
+ "mac.bnpl_unsealed": "Não foi possível criptografar essa chave, então nada foi salvo. O livro é sincronizado e tem backup, e uma chave sem criptografia iria junto.",
+ "mac.bnpl_none": "Ative a Tabby ou a Tamara, com a chave de API, em Ajustes ▸ Online.",
+ "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar."
 }

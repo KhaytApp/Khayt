@@ -652,6 +652,15 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("p", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // A Tabby / Tamara pay-later link, beside Record payment: the money
+        // the customer will pay, and the app records it when they have.
+        if shop.offersBnpl(job) {
+            Button(Words.upfront("mac.bnpl_title") + "\u{2026}") {
+                guard let one = job else { return }
+                shop.pendingBnpl = Shop.PendingHold(id: one.id, project: one.project)
+            }
+            .disabled(!canMove)
+        }
         // PAYING OVER MONTHS. Beside Record payment because it is the same
         // question at a different distance: one is cash that has arrived, the
         // other is what was agreed about the cash still to come. No shortcut —

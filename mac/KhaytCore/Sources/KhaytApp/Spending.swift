@@ -316,34 +316,43 @@ struct Waste: View {
     struct TrueCost: View {
         let shop: Shop
         let shown: [WasteEntry]
+        /// `KhaytFailedPrintCost.totals` over the shown rows — the one
+        /// definition of the three costs, the same one `WhereFailuresCost`
+        /// groups by, so this total and those groups cannot disagree.
+        @State private var totals: KhaytEngine.FailedCostTotals?
 
         var body: some View {
-            let costed = shown.filter { $0.costFull != nil }
-            if !costed.isEmpty {
-                let filament = shown.reduce(0) { $0 + $1.cost }
-                let machine = shown.reduce(0) { $0 + ($1.costMachine ?? 0) }
-                let power = shown.reduce(0) { $0 + ($1.costPower ?? 0) }
-                let wh = shown.reduce(0) { $0 + ($1.energyWh ?? 0) }
-                DetailSection(shop.words.callIt("mac.waste_true_title")) {
-                    DetailLine(shop.words.callIt("mac.waste_filament"), Money.text(filament, shop.currency))
-                    DetailLine(shop.words.callIt("mac.waste_machine"), Money.text(machine, shop.currency))
-                    DetailLine(shop.words.callIt("mac.waste_power"), Money.text(power, shop.currency))
-                    if wh > 0 {
-                        DetailLine(shop.words.callIt("mac.waste_energy"),
-                                   Money.quantity(wh / 1000, decimals: 2) + " kWh")
-                    }
-                    DetailLine(shop.words.callIt("mac.waste_full"),
-                               Money.text(filament + machine + power, shop.currency), strong: true)
-                    Text(shop.words.callIt("mac.waste_true_note"))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if costed.count < shown.count {
-                        Text(shop.words.callIt("mac.waste_true_older"))
+            Group {
+                if let t = totals, t.costed > 0 {
+                    DetailSection(shop.words.callIt("mac.waste_true_title")) {
+                        DetailLine(shop.words.callIt("mac.waste_filament"), Money.text(t.material, shop.currency))
+                        DetailLine(shop.words.callIt("mac.waste_machine"), Money.text(t.machine, shop.currency))
+                        DetailLine(shop.words.callIt("mac.waste_power"), Money.text(t.power, shop.currency))
+                        if t.energyWh > 0 {
+                            DetailLine(shop.words.callIt("mac.waste_energy"),
+                                       Money.quantity(t.energyWh / 1000, decimals: 2) + " kWh")
+                        }
+                        DetailLine(shop.words.callIt("mac.waste_full"),
+                                   Money.text(t.full, shop.currency), strong: true)
+                        Text(shop.words.callIt("mac.waste_true_note"))
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if t.costed < shown.count {
+                            Text(shop.words.callIt("mac.waste_true_older"))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
+            .task(id: shown) { await sum() }
+        }
+
+        private func sum() async {
+            guard let engine = shop.engine else { totals = nil; return }
+            let ids = Set(shown.map(\.id))
+            let log = shop.wasteRows.filter { Shop.recordId($0).map(ids.contains) ?? false }
+            totals = try? await engine.failedCostTotals(wasteLog: log)
         }
     }
 

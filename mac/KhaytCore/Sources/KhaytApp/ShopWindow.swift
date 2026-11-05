@@ -730,6 +730,7 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
             .shopSheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingBnpl) { BnplLinkSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
