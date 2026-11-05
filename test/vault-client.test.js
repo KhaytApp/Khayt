@@ -129,3 +129,86 @@ test('a redirect is refused, not followed', async () => {
   const e = await client(fakeFetch(() => [302, {}])).usage().catch((x) => x);
   assert.equal(e.reason, 'redirect');
 });
+
+// ── upload routes (VaultClient.swift "Uploads") ────────────────────────────
+
+function rawFetch(handler) {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, init });
+    const [status, body] = await handler(url, init);
+    return { status, json: async () => { if (body === undefined) throw new Error('no body'); return body; } };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test('upload routes: paths, bodies, replies', async () => {
+  const tag = 'ab'.repeat(32);
+  const part = { index: 0, size: 21, url: 'https://store.example/p/0' };
+  const f = fakeFetch(({ url, method }) => {
+    if (method === 'POST' && url.endsWith('/vault/uploads')) return [201, { uploadId: 'u_1', fileId: 'f_1', version: 2, expiresAt: 'x', parts: [part] }];
+    if (url.includes('/parts?from=')) return [200, { parts: [part] }];
+    if (url.endsWith('/complete')) return [201, { fileId: 'f_1', version: 2, rev: 9 }];
+    return [200, {}];
+  });
+  const c = client(f);
+  const s = await c.startUpload({ sizes: [21], tag, fileId: 'f_1', baseVersion: 1, deviceId: 'x'.repeat(70) });
+  assert.deepEqual(s, { uploadId: 'u_1', fileId: 'f_1', version: 2, expiresAt: 'x', parts: [part] });
+  assert.deepEqual(await c.uploadParts('u_1', 256), [part]);
+  assert.deepEqual(await c.completeUpload('u_1', { manifestHash: 'm', wrappedKey: 'w', versionMeta: 'v', meta: 'mm' }),
+    { fileId: 'f_1', version: 2, rev: 9, conflict: false });
+  await c.completeUpload('u_1', { manifestHash: 'm', wrappedKey: 'w', versionMeta: 'v' });
+  await c.abandonUpload('u_1');
+  const p = BASE + '/v1/shops/shop_1';
+  assert.deepEqual(f.calls.map((x) => [x.method, x.url]), [
+    ['POST', p + '/vault/uploads'],
+    ['GET', p + '/vault/uploads/u_1/parts?from=256'],
+    ['POST', p + '/vault/uploads/u_1/complete'],
+    ['POST', p + '/vault/uploads/u_1/complete'],
+    ['DELETE', p + '/vault/uploads/u_1'],
+  ]);
+  assert.deepEqual(f.calls[0].body, { chunkBytes: 4194304, sizes: [21], tag, fileId: 'f_1', baseVersion: 1, deviceId: 'x'.repeat(64) });
+  assert.deepEqual(f.calls[2].body, { manifestHash: 'm', wrappedKey: 'w', versionMeta: 'v', meta: 'mm' });
+  assert.equal('meta' in f.calls[3].body, false);
+  for (const x of f.calls) assert.equal(x.headers.authorization, 'Bearer tok');
+  await assert.rejects(c.abandonUpload('../x'), /uploadId/);
+  await assert.rejects(c.startUpload({ sizes: [21], tag: 'nothex' }), /tag/);
+});
+
+test('upload refusals: duplicate, parts-missing, upload-expired, too large', async () => {
+  const cases = [
+    [409, { reason: 'duplicate', fileId: 'f_9', version: 4 }, (e) => { assert.equal(e.fileId, 'f_9'); assert.equal(e.version, 4); }],
+    [409, { reason: 'parts-missing', indexes: [1, 3] }, (e) => assert.deepEqual(e.indexes, [1, 3])],
+    [410, { reason: 'upload-expired' }, () => {}],
+    [413, { reason: 'file-too-large', limit: 10 }, (e) => assert.equal(e.limit, 10)],
+  ];
+  for (const [status, body, check] of cases) {
+    const e = await client(fakeFetch(() => [status, body]))
+      .completeUpload('u_1', { manifestHash: 'm', wrappedKey: 'w', versionMeta: 'v' }).catch((x) => x);
+    assert.equal(e.status, status);
+    assert.equal(e.reason, body.reason);
+    check(e);
+  }
+});
+
+test('putPart: no Authorization, exact Content-Length, https only (loopback aside), refusals carry the index', async () => {
+  const f = rawFetch(() => [200, {}]);
+  const c = createVaultClient({ baseUrl: BASE, shopId: 'shop_1', token: 'tok', fetch: f });
+  const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+  await c.putPart('https://store.example/p/0?X-Amz-Signature=1', bytes, { index: 0, size: 5 });
+  const { url, init } = f.calls[0];
+  assert.equal(url, 'https://store.example/p/0?X-Amz-Signature=1');
+  assert.equal(init.method, 'PUT');
+  assert.deepEqual(init.headers, { 'content-length': '5' });
+  assert.equal(init.body, bytes);
+  assert.equal(init.redirect, 'manual');
+  await c.putPart('http://127.0.0.1:9/p', bytes);
+  await assert.rejects(c.putPart('http://store.example/p', bytes), (e) => e.reason === 'bad-reply');
+  await assert.rejects(c.putPart('https://store.example/p', bytes, { index: 2, size: 6 }),
+    (e) => e.reason === 'transfer' && e.index === 2);
+  assert.equal(f.calls.length, 2);
+  const bad = createVaultClient({ baseUrl: BASE, shopId: 'shop_1', token: 'tok', fetch: rawFetch(() => [403, undefined]) });
+  const e = await bad.putPart('https://store.example/p', bytes, { index: 7 }).catch((x) => x);
+  assert.deepEqual([e.reason, e.status, e.index], ['transfer', 403, 7]);
+});
