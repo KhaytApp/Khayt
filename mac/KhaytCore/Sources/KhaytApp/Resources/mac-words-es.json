@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "Olvidar la clave guardada",
  "mac.bnpl_unsealed": "No se pudo cifrar esa clave, así que no se guardó nada. El libro se sincroniza y se respalda, y una clave sin cifrar iría con él.",
  "mac.bnpl_none": "Active Tabby o Tamara, con su clave de API, en Ajustes ▸ En línea.",
- "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado."
+ "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado.",
+ "mac.quote_version_col": "Versión",
+ "mac.customer_papers": "Estado de cuenta y facturas"
 }

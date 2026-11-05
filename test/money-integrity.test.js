@@ -310,10 +310,12 @@ test('no revenue aggregation still totals the GROSS price', () => {
 test('the client statement and the journal keep the GROSS figure on purpose', () => {
   // Both already account for credit notes as their own line. Netting here would
   // subtract the same credit twice — the mirror image of the defect above.
-  const inv = read('renderer/invoicing.js');
-  assert.match(inv, /const totalCharges = orders\.reduce\(\(s, o\) => s \+ orderRevenueBase\(o\), 0\);/,
+  // The statement is lib/shop-documents.js now, which both apps print.
+  const inv = read('lib/shop-documents.js');
+  assert.match(inv, /charge: ctx\.orderRevenueBase\(o\)/,
     'the statement charges line is gross; totalCredit is shown beside it');
-  assert.match(inv, /const totalCredit\s+= orders\.reduce/, 'and the credit line must still exist');
+  assert.match(inv, /totalCharges: rows\.reduce\(\(s, r\) => s \+ r\.charge, 0\)/);
+  assert.match(inv, /totalCredit: list\.reduce/, 'and the credit line must still exist');
 
   const integrations = read('renderer/integrations.js');
   assert.match(integrations, /'Credit Note'.*'Revenue'/,

@@ -136,6 +136,12 @@ struct CustomersTable: View {
                 }
                 Divider()
             }
+            if ids.count == 1, let id = ids.first,
+               let person = shop.shownCustomers.first(where: { $0.id == id }), person.record != nil {
+                // Their account, on paper (`Shop+Papers.swift`).
+                CustomerPaperItems(shop: shop, person: person)
+                Divider()
+            }
             CustomerDeleteItems(shop: shop, ids: shop.shownCustomers.map(\.id).filter { ids.contains($0) })
             if ids.count == 1, let id = ids.first,
                let person = shop.shownCustomers.first(where: { $0.id == id }) {
@@ -430,6 +436,13 @@ struct CustomerInspector: View {
                         }
                     }
                     if person.record != nil {
+                        LayerRule()
+                        // Their account, on paper: every job, paid and owed.
+                        DetailSection(shop.words.callIt("mac.customer_papers")) {
+                            CustomerPaperItems(shop: shop, person: person)
+                                .buttonStyle(.link)
+                                .font(.callout)
+                        }
                         LayerRule()
                         DetailSection(shop.words.callIt("priv.section")) {
                             CustomerPrivacyItems(shop: shop, person: person, inMenu: false)

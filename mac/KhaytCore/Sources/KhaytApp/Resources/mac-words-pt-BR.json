@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "Esquecer a chave salva",
  "mac.bnpl_unsealed": "Não foi possível criptografar essa chave, então nada foi salvo. O livro é sincronizado e tem backup, e uma chave sem criptografia iria junto.",
  "mac.bnpl_none": "Ative a Tabby ou a Tamara, com a chave de API, em Ajustes ▸ Online.",
- "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar."
+ "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar.",
+ "mac.quote_version_col": "Versão",
+ "mac.customer_papers": "Extrato e faturas"
 }

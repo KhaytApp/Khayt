@@ -885,6 +885,8 @@ struct WindowSheets: ViewModifier {
             // A customer with work erased, Unlink or Full (`Shop+Privacy.swift`).
             .shopSheet(item: $shop.erasingCustomer) { CustomerEraseSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingPaper) { PaperSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingRevisions) { QuoteRevisionsSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingMilestones) { MilestonesSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingDayReport) { DayReportSheet(shop: shop, request: $0) }

@@ -346,6 +346,16 @@ private struct Detail: View {
                     .font(.callout)
                     .disabled(!shop.canMoveJobs)
             }
+            // The papers that go with the work — what goes in the box, what
+            // the customer signs for, the floor's sheet. Showing one writes
+            // nothing, so they are offered as the invoice is.
+            if job.status != "quote" {
+                JobPaperButtons(shop: shop, job: job)
+            }
+            // A quote's other answers: chase it, change it, or turn it down.
+            if job.status == "quote" {
+                QuoteActions(shop: shop, job: job)
+            }
             // The customer's way to say yes. Only on a quote, only on a real
             // book (the link is minted into the job), and only while the
             // server is up — the link points at this Mac.

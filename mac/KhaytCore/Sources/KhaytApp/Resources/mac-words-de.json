@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "Gespeicherten Schlüssel vergessen",
  "mac.bnpl_unsealed": "Dieser Schlüssel konnte nicht verschlüsselt werden, daher wurde nichts gespeichert. Das Buch wird synchronisiert und gesichert, und ein unverschlüsselter Schlüssel ginge mit.",
  "mac.bnpl_none": "Schalten Sie Tabby oder Tamara mit dem API-Schlüssel unter Einstellungen ▸ Online ein.",
- "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat."
+ "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat.",
+ "mac.quote_version_col": "Version",
+ "mac.customer_papers": "Kontoauszug und Rechnungen"
 }

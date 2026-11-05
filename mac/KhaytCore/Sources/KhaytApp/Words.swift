@@ -415,6 +415,7 @@ final class Words {
             .merging(WebSaveWords.table) { mine, _ in mine }
             .merging(WebAttachWords.table) { mine, _ in mine }
             .merging(BrowserHostWords.table) { mine, _ in mine }
+            .merging(DocumentWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── Library grid redesign ─────────────────────────────────────────

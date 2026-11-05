@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "删除已保存的密钥",
  "mac.bnpl_unsealed": "该密钥无法加密，因此未保存任何内容。账本会同步和备份，未加密的密钥会随之传出。",
  "mac.bnpl_none": "请在 设置 ▸ 在线 中开启 Tabby 或 Tamara，并填写其 API 密钥。",
- "mac.bnpl_watching": "客户付款后，Khayt 会完成这笔付款并记到该工作上。"
+ "mac.bnpl_watching": "客户付款后，Khayt 会完成这笔付款并记到该工作上。",
+ "mac.quote_version_col": "版本",
+ "mac.customer_papers": "对账单和发票"
 }

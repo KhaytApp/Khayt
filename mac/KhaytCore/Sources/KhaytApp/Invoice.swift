@@ -224,12 +224,15 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// What the last save did, in the shop's language. Shown under the paper.
     @Published var note: String?
 
-    init(document: InvoiceDocument) {
+    /// `wholePage`: the document is a page of its own, styles and all — the
+    /// packing slip (`lib/shop-documents.js`) — and is drawn as it is rather
+    /// than inside the invoice's stylesheet.
+    init(document: InvoiceDocument, wholePage: Bool = false) {
         self.document = document
         self.webView = DocumentWeb.view()
         super.init()
         webView.navigationDelegate = self
-        webView.loadHTMLString(Self.page(document), baseURL: nil)
+        webView.loadHTMLString(wholePage ? document.html : Self.page(document), baseURL: nil)
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
