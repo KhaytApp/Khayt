@@ -74,10 +74,7 @@ struct Expenses: View {
                 ForEach(due.prefix(5)) { e in
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(Khayt.attention)
-                        Text(shop.words.callIt("exp.recurring_due") + ": "
-                             + shop.words.callIt("exp.cat." + e.category) + " "
-                             + Money.text(e.amount, shop.currency)
-                             + (e.note.isEmpty ? "" : " \u{00B7} " + e.note))
+                        Text(label(e))
                             .lineLimit(1).truncationMode(.tail)
                         Text(e.nextDue ?? "").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         Spacer()
@@ -101,6 +98,17 @@ struct Expenses: View {
             }
             .background(due.isEmpty ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.quaternary.opacity(0.4)))
             .task(id: shop.expenses) { due = await shop.dueRecurringExpenses() }
+        }
+
+        /// One line per due expense. Built in steps: as a single `+` chain
+        /// inside `Text(...)` the release compiler gave up type-checking it.
+        private func label(_ e: Expense) -> String {
+            let due: String = shop.words.callIt("exp.recurring_due")
+            let category: String = shop.words.callIt("exp.cat." + e.category)
+            let amount: String = Money.text(e.amount, shop.currency)
+            var line = due + ": " + category + " " + amount
+            if !e.note.isEmpty { line += " \u{00B7} " + e.note }
+            return line
         }
 
         private func answer(_ e: Expense, add: Bool) {
