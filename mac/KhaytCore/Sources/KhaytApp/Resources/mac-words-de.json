@@ -3532,5 +3532,13 @@
  "mac.bnpl_forget": "Gespeicherten Schlüssel vergessen",
  "mac.bnpl_unsealed": "Dieser Schlüssel konnte nicht verschlüsselt werden, daher wurde nichts gespeichert. Das Buch wird synchronisiert und gesichert, und ein unverschlüsselter Schlüssel ginge mit.",
  "mac.bnpl_none": "Schalten Sie Tabby oder Tamara mit dem API-Schlüssel unter Einstellungen ▸ Online ein.",
- "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat."
+ "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat.",
+ "mac.send_will_slice": "Dies ist ein Modell. Khayt schneidet es zuerst mit {name} und sendet dann den G-Code.",
+ "mac.slice_send_only": "Slicen und senden",
+ "mac.send_choose_hint_model": "Wählen Sie eine geslicte Datei oder ein Modell, das zuerst geslict wird.",
+ "mac.cv_colour_plan": "Farben",
+ "mac.cv_plan_slots": "Slot für Slot",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Farbband-Wechsel",
+ "mac.cv_fit_unknown": "Dieses Modell wurde noch nicht vermessen, daher wird nicht geprüft, ob es auf das Druckbett passt."
 }

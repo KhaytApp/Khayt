@@ -190,7 +190,7 @@ extension Shop {
         pendingCompletion = nil; pendingEdit = nil; pendingHold = nil; pendingInvoice = nil; pendingMilestones = nil
         pendingLabels = nil; pendingDayReport = nil; pendingLibraryDelete = nil; pendingPayment = nil; pendingBnpl = nil
         pendingJobDelete = nil; pendingCustomerDelete = nil; pendingMachineAsk = nil; erasingCustomer = nil
-        pendingQcFail = nil; pendingSend = nil; pendingShipment = nil
+        pendingQcFail = nil; pendingSend = nil; pendingShipment = nil; pendingConvert = nil; pendingBatchConvert = nil
         planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
         showingHistoryFor = nil; spoolHistoryFor = nil
     }

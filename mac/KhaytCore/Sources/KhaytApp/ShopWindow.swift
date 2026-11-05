@@ -733,6 +733,8 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingBnpl) { BnplLinkSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingConvert) { ConvertSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingBatchConvert) { BatchConvertSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
             .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }

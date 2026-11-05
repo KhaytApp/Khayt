@@ -192,6 +192,11 @@ public actor KhaytEngine {
         // often, without making any of them late or jumping a priority. Needs
         // `loaded-colours` above it.
         "swap-queue",
+        // The converter's "Match to loaded spools": every colour of a file to
+        // the loaded spool most like it, and the slot map or merge the
+        // converter applies for that. Pure; reads `loaded-colours` above it
+        // through its global for the material family.
+        "spool-match",
         // Groups and categories. Pure, and bundled rather than ported because
         // the rule that matters is not the reading — it is that a name matching
         // one already in use IS that name and adopts its spelling. "Saudi Kings"
@@ -2053,14 +2058,40 @@ public actor KhaytEngine {
         /// How many filaments it can hold. Nil for a single-material machine
         /// that does not say.
         public let maxColors: Int?
+        /// One of the shop's own printers (`settings.customPrinters`, the
+        /// desktop converter's "My printers"), converted for through
+        /// `targetProfile` rather than by id: the converter has no registry
+        /// entry for it.
+        public var custom: Bool? = nil
+        /// Mixes colours in hardware (the Snapmaker U1): Full Spectrum and
+        /// band-swap can apply. The batch converter offers its colour choice
+        /// only for such a printer, as the desktop's does.
+        public var supportsMixedFilament: Bool? = nil
+
+        public init(id: String, name: String, maxColors: Int?, custom: Bool? = nil,
+                    supportsMixedFilament: Bool? = nil) {
+            self.id = id; self.name = name; self.maxColors = maxColors; self.custom = custom
+            self.supportsMixedFilament = supportsMixedFilament
+        }
     }
 
-    public func printerProfiles() throws -> [PrinterProfile] {
+    /// The shop's own printers (`settings.customPrinters`, written by the
+    /// desktop's custom-printers manager) first, then the built-in ones — the
+    /// order the desktop converter offers them in. A custom printer the shared
+    /// rule cannot read (no name) is left out, as `customProfile` leaves it.
+    public func printerProfiles(custom: [JSONValue] = []) throws -> [PrinterProfile] {
         try runtime.call2("""
-            KhaytPrinterProfiles.listProfiles().map((p) => (
-              { id: p.id, name: p.name, maxColors: p.maxColors == null ? null : p.maxColors }
-            ))
-            """, [], as: [PrinterProfile].self)
+            (function (custom) {
+              const P = KhaytPrinterProfiles;
+              const own = (Array.isArray(custom) ? custom : []).map((c) => P.customProfile(c)).filter(Boolean)
+                .map((p) => ({ id: p.id, name: p.name, maxColors: p.maxColors, custom: true,
+                               supportsMixedFilament: !!p.supportsMixedFilament }));
+              return own.concat(P.listProfiles().map((p) => (
+                { id: p.id, name: p.name, maxColors: p.maxColors == null ? null : p.maxColors,
+                  supportsMixedFilament: !!p.supportsMixedFilament }
+              )));
+            })(ARG0)
+            """, [.array(custom)], as: [PrinterProfile].self)
     }
 
     /// What a converted 3MF should contain.
@@ -2148,6 +2179,204 @@ public actor KhaytEngine {
               };
             })(ARG0, ARG1)
             """, [.array(members), .object(options)], as: Conversion.self)
+    }
+
+    // MARK: - Before a conversion: what the file is, and what the target can do
+
+    /// What the converter sheet shows before a byte is written: the file's
+    /// own colours and settings, the target, whether the model fits its bed,
+    /// and which colour plans that target offers for it.
+    ///
+    /// Every answer is a shared rule's — `analyzeMembers`, `fitWarnings`,
+    /// `fsPreviewMembers` and `analyzeColorBandsMembers` in `lib/mf-convert.js`,
+    /// and the target gates in `lib/printer-profiles.js` — so the sheet and
+    /// the desktop's converter cannot disagree about whether a file can be
+    /// printed in Full Spectrum on a U1.
+    public struct ConvertPreview: Decodable, Sendable {
+        public struct Filament: Decodable, Sendable, Hashable {
+            public let color: String?
+            public let grams: Double?
+            public let type: String?
+        }
+        public struct Meta: Decodable, Sendable {
+            public let printerModel: String?
+            public let nozzle: Double?
+            public let layerHeight: Double?
+            public let totalGrams: Double?
+            public let printMinutes: Double?
+        }
+        public struct Bed: Decodable, Sendable, Hashable {
+            public let x: Double?
+            public let y: Double?
+            public let z: Double?
+        }
+        public struct Head: Decodable, Sendable, Hashable { public let hex: String }
+        public struct Mix: Decodable, Sendable, Hashable {
+            public let srcHex: String
+            public let ids: [Int]
+            public let weights: [Double]
+            public let deltaE: Double?
+        }
+        public struct FullSpectrum: Decodable, Sendable {
+            public let available: Bool
+            public let heads: [Head]?
+            public let mixes: [Mix]?
+        }
+        public struct Swap: Decodable, Sendable, Hashable {
+            public let toolhead: Int
+            public let z: Double
+            public let toColour: String?
+        }
+        public struct Bands: Decodable, Sendable {
+            public let available: Bool
+            public let banded: Bool?
+            public let manualSwaps: Int?
+            public let instructions: [Swap]?
+        }
+        public let ok: Bool
+        public let error: String?
+        public let flavour: String?
+        public let filaments: [Filament]?
+        public let meta: Meta?
+        public let targetName: String?
+        public let maxColors: Int?
+        public let bed: Bed?
+        /// Normalise: the vendor's settings stripped, nothing retargeted.
+        public let generic: Bool?
+        /// Another ecosystem's printer: the file is saved as a Generic 3MF.
+        public let cross: Bool?
+        public let fullSpectrumCapable: Bool?
+        public let bandSwapEligible: Bool?
+        public let fitWarnings: [String]?
+        public let fullSpectrum: FullSpectrum?
+        public let bands: Bands?
+    }
+
+    /// `members` and `meshes` exactly as `convertMembers` takes them.
+    /// `bounds` is the model's measured size (`Mesh`), which the Mac knows
+    /// without the mesh crossing. Ask for `plans` only with the `.model`
+    /// members bound: the band analysis and the Full Spectrum plan read the
+    /// paint inside the mesh.
+    public func convertPreview(_ members: [JSONValue], target: [String: JSONValue],
+                               bounds: [String: JSONValue]? = nil, plans: Bool = false,
+                               meshes: [String: String] = [:]) throws -> ConvertPreview {
+        try runtime.withBoundStrings(meshes) {
+            try runtime.call2("""
+                (function (members, opts, bounds, plans) {
+                  members = members.map(function (m) {
+                    if (!m || !m.meshVar) return m;
+                    var text = globalThis[m.meshVar];
+                    if (typeof text !== 'string') return m;
+                    return { name: m.name, size: m.size, data: text };
+                  });
+                  const MF = KhaytMfConvert, P = KhaytPrinterProfiles;
+                  const a = MF.analyzeMembers(members);
+                  if (!a.ok) return { ok: false, error: a.error || 'Not a readable 3MF.' };
+                  const custom = opts.targetProfile && typeof opts.targetProfile === 'object' && opts.targetProfile.id
+                    ? P.customProfile(opts.targetProfile) : null;
+                  const target = custom || (opts.targetId ? P.getProfile(opts.targetId) : null) || P.GENERIC;
+                  const used = a.filaments.length;
+                  const generic = target.id === P.GENERIC.id;
+                  const cross = P.isCrossEcosystem(a.flavour, target);
+                  const fsCapable = !generic && P.fullSpectrumCapable(a.flavour, target, used);
+                  const box = bounds || a.bounds || null;
+                  let fs = null, bands = null;
+                  if (plans && fsCapable) {
+                    const t = custom ? { targetProfile: opts.targetProfile } : { targetId: target.id };
+                    fs = MF.fsPreviewMembers(members, t);
+                    bands = MF.analyzeColorBandsMembers(members, {});
+                  }
+                  const m = a.meta || {};
+                  const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+                  return {
+                    ok: true, flavour: a.flavour,
+                    filaments: a.filaments.map((f) => ({ color: f.color || null, grams: num(f.grams), type: f.type || null })),
+                    meta: { printerModel: m.printerModel || null, nozzle: num(m.nozzle), layerHeight: num(m.layerHeight),
+                            totalGrams: num(m.totalGrams), printMinutes: num(m.printMinutes) },
+                    targetName: target.name, maxColors: target.maxColors || null, bed: target.bed || null,
+                    generic, cross, fullSpectrumCapable: fsCapable,
+                    bandSwapEligible: P.bandSwapEligible(a.flavour, target, used, bands),
+                    fitWarnings: box ? MF.fitWarnings(box, target) : [],
+                    fullSpectrum: fs && fs.available ? { available: true,
+                      heads: fs.heads.map((h) => ({ hex: h.hex })),
+                      mixes: fs.mixes.map((x) => ({ srcHex: x.srcHex, ids: x.ids || [], weights: x.weights || [], deltaE: num(x.deltaE) })) } : null,
+                    bands: bands ? { available: !!bands.available, banded: !!bands.banded, manualSwaps: bands.manualSwaps || 0,
+                      instructions: (bands.instructions || []).map((s) => ({ toolhead: s.toolhead, z: s.z, toColour: s.toColour || null })) } : null,
+                  };
+                })(ARG0, ARG1, ARG2, ARG3)
+                """, [.array(members), .object(target), bounds.map { .object($0) } ?? .null, .bool(plans)],
+                as: ConvertPreview.self)
+        }
+    }
+
+    /// "Match to loaded spools": `lib/spool-match.js` `planSpoolMatch`, and
+    /// the options it adds to the conversion (`convertOptions`) — nil when it
+    /// adds none, or when the match is refused (`refusal` then says why).
+    public struct SpoolMatch: Decodable, Sendable {
+        public struct Row: Decodable, Sendable, Hashable {
+            public let index: Int
+            public let hex: String
+            public let material: String?
+            public let slot: Int
+            public let spoolHex: String
+            public let spoolMaterial: String?
+            public let deltaE: Double
+            public let quality: String
+            public let materialMismatch: Bool
+        }
+        public struct Warning: Decodable, Sendable, Hashable {
+            public let code: String
+            public let index: Int?
+            public let deltaE: Double?
+            public let file: String?
+            public let spool: String?
+            public let slot: Int?
+            public let slots: [Int]?
+            public let n: Int?
+        }
+        public struct Refusal: Decodable, Sendable, Hashable {
+            public let code: String
+            public let slot: Int?
+            public let n: Int?
+        }
+        public let ok: Bool
+        public let rows: [Row]
+        public let map: [Int]
+        /// The slots that hold a spool, 0-based — what a row may be moved to.
+        public let usable: [Int]
+        /// `none`, `slotMap`, `grow`, `merge` or `refused`.
+        public let kind: String
+        public let refusal: Refusal?
+        public let warnings: [Warning]
+        public let options: JSONValue?
+    }
+
+    public func spoolMatch(colours: [[String: JSONValue]], loaded: [LoadedSlot], slotCount: Int?,
+                           flavour: String, map: [Int]? = nil) throws -> SpoolMatch {
+        let loadedJSON: [JSONValue] = loaded.map {
+            .object(["slot": .number(Double($0.slot)), "hex": .string($0.hex), "material": .string($0.material)])
+        }
+        return try runtime.call2("""
+            (function (cols, loaded, slotCount, flavour, map) {
+              const SM = KhaytSpoolMatch;
+              const p = SM.planSpoolMatch(cols, loaded, { slotCount: slotCount || undefined, flavour, map: map || undefined });
+              const req = p.request || { kind: 'none' };
+              return {
+                ok: p.ok, rows: p.rows.map((r) => ({ index: r.index, hex: r.hex, material: r.material || null, slot: r.slot,
+                  spoolHex: r.spoolHex, spoolMaterial: r.spoolMaterial || null, deltaE: r.deltaE, quality: r.quality,
+                  materialMismatch: !!r.materialMismatch })),
+                map: p.map, usable: p.slots.usable.map((u, j) => (u ? j : -1)).filter((j) => j >= 0),
+                kind: req.kind, refusal: req.refusal || null,
+                warnings: p.warnings.map((w) => ({ code: w.code, index: w.index == null ? null : w.index,
+                  deltaE: w.deltaE == null ? null : w.deltaE, file: w.file || null, spool: w.spool || null,
+                  slot: w.slot == null ? null : w.slot, slots: w.slots || null, n: w.n == null ? null : w.n })),
+                options: p.ok ? SM.convertOptions(req) : null,
+              };
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [.array(colours.map { .object($0) }), .array(loadedJSON),
+                  slotCount.map { .number(Double($0)) } ?? .null, .string(flavour),
+                  map.map { .array($0.map { .number(Double($0)) }) } ?? .null],
+            as: SpoolMatch.self)
     }
 
     // MARK: - The accountant's file

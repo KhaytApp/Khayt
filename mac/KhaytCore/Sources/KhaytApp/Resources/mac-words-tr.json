@@ -3532,5 +3532,13 @@
  "mac.bnpl_forget": "Kayıtlı anahtarı unut",
  "mac.bnpl_unsealed": "Bu anahtar şifrelenemedi, bu yüzden hiçbir şey kaydedilmedi. Defter eşitlenir ve yedeklenir; şifresiz bir anahtar da onunla giderdi.",
  "mac.bnpl_none": "Ayarlar ▸ Çevrimiçi bölümünden Tabby veya Tamara'yı API anahtarıyla açın.",
- "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek."
+ "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek.",
+ "mac.send_will_slice": "Bu bir model. Khayt önce {name} ile dilimler, ardından G-code'u gönderir.",
+ "mac.slice_send_only": "Dilimle ve gönder",
+ "mac.send_choose_hint_model": "Dilimlenmiş bir dosya ya da önce dilimlenecek bir model seçin.",
+ "mac.cv_colour_plan": "Renkler",
+ "mac.cv_plan_slots": "Yuva yuva",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Bant değişimi",
+ "mac.cv_fit_unknown": "Bu model henüz ölçülmedi, bu yüzden tablaya sığıp sığmadığı kontrol edilmiyor."
 }

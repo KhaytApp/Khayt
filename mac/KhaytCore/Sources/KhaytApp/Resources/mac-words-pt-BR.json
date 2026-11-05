@@ -3532,5 +3532,13 @@
  "mac.bnpl_forget": "Esquecer a chave salva",
  "mac.bnpl_unsealed": "Não foi possível criptografar essa chave, então nada foi salvo. O livro é sincronizado e tem backup, e uma chave sem criptografia iria junto.",
  "mac.bnpl_none": "Ative a Tabby ou a Tamara, com a chave de API, em Ajustes ▸ Online.",
- "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar."
+ "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar.",
+ "mac.send_will_slice": "Isto é um modelo. O Khayt o fatia primeiro com {name} e depois envia o G-code.",
+ "mac.slice_send_only": "Fatiar e enviar",
+ "mac.send_choose_hint_model": "Escolha um arquivo fatiado ou um modelo para fatiar primeiro.",
+ "mac.cv_colour_plan": "Cores",
+ "mac.cv_plan_slots": "Slot por slot",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Troca por faixas",
+ "mac.cv_fit_unknown": "Este modelo ainda não foi medido, então não se verifica se ele cabe na mesa."
 }

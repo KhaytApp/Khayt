@@ -73,6 +73,8 @@
   // conversion can't be picked; for an unknown source, only Generic is meaningful.
   function compatibleWith(sourceFlavour, p) {
     const P = profiles();
+    // The shared rule (lib/printer-profiles.js), which the Mac's converter asks too.
+    if (P && P.compatibleWith) return P.compatibleWith(sourceFlavour, p);
     if (!p || !P || !P.configFamily) return true;
     if (P.configFamily(p.flavour) === 'generic') return true; // Generic normalize is always valid
     if (!sourceFlavour || sourceFlavour === 'generic') return true;
@@ -86,6 +88,7 @@
   function isPrusaProject(sourceFlavour, p) {
     const P = profiles();
     const prof = typeof p === 'string' ? getProfileById(p) : p;
+    if (P && P.isPrusaProjectTarget) return P.isPrusaProjectTarget(sourceFlavour, prof);
     return !!(prof && P && P.prusaProjectReady === true && P.configFamily && P.configFamily(sourceFlavour) === 'bbl'
       && P.configFamily(prof.flavour) === 'prusa' && prof.printerSettingsId && prof.bed && prof.bed.x);
   }
@@ -210,6 +213,8 @@
   // printers can't mix), and require ≥2 physical heads to mix between.
   function fsCapable(sourceFlavour, targetId, usedColours) {
     const p = getProfileById(targetId);
+    const P = profiles();
+    if (P && P.fullSpectrumCapable) return P.fullSpectrumCapable(sourceFlavour, p, usedColours);
     return !!(p && p.supportsMixedFilament && p.maxColors >= 2 && usedColours > p.maxColors && !isCrossEcosystem(sourceFlavour, targetId));
   }
 

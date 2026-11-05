@@ -3532,5 +3532,13 @@
  "mac.bnpl_forget": "Oublier la clé enregistrée",
  "mac.bnpl_unsealed": "Cette clé n'a pas pu être chiffrée, rien n'a donc été enregistré. Le registre est synchronisé et sauvegardé, et une clé en clair partirait avec lui.",
  "mac.bnpl_none": "Activez Tabby ou Tamara, avec sa clé API, dans Réglages ▸ En ligne.",
- "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé."
+ "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé.",
+ "mac.send_will_slice": "Ceci est un modèle. Khayt le tranche d’abord avec {name}, puis envoie le G-code.",
+ "mac.slice_send_only": "Trancher et envoyer",
+ "mac.send_choose_hint_model": "Choisissez un fichier tranché, ou un modèle à trancher d’abord.",
+ "mac.cv_colour_plan": "Couleurs",
+ "mac.cv_plan_slots": "Emplacement par emplacement",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Échange par bandes",
+ "mac.cv_fit_unknown": "Ce modèle n’a pas encore été mesuré : son ajustement au plateau n’est pas vérifié."
 }
