@@ -358,7 +358,10 @@ task; R7 ([#743]) left a hardware dependency rather than a task.
       shop keeps blob-syncing with no error and nothing for its owner to do. It
       takes effect in the next release — there is no open prerelease line, so
       that is `3.7.0-beta.1`.
-- [ ] **Flip the portal read gate.** Built, deployed and dormant. Until it is on,
+- [x] **Flip the portal read gate.** **Done 2026-10-06:** `PORTAL_READ_GATE=true` is live
+      on khayt-cloud (rollback: delete the variable and redeploy); the adoption counter
+      keeps watching `wouldRefuse` for a shop that was cut off. The history below is kept
+      as it was written. Built, deployed and dormant. Until it is on,
       the fix for "anyone with a portal link can read the whole message thread"
       is only *closable*, not closed.
       **It is no longer waiting on anything that has to be built.** The endpoint
