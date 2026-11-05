@@ -161,6 +161,26 @@ struct BnplTests {
         #expect(settled == .object(["refused": .string("nothing_owed")]))
     }
 
+    @Test("a Tabby checkout carries the customer's history from the book's jobs, as the desktop sends it")
+    func checkoutBuyerHistory() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("J9"), "project": .string("Vase"), "price": .number(100),
+                                      "status": .string("pending"), "clientId": .string("C1"), "date": .string("2026-10-01")])
+        let others: [JSONValue] = [
+            .object(["id": .string("J1"), "clientId": .string("C1"), "status": .string("completed"), "date": .string("2025-03-02")]),
+            .object(["id": .string("J2"), "clientId": .string("C1"), "status": .string("completed"), "date": .string("2026-01-05")]),
+            .object(["id": .string("J3"), "clientId": .string("C1"), "status": .string("cancelled"), "date": .string("2024-12-31")]),
+            .object(["id": .string("J4"), "clientId": .string("C2"), "status": .string("completed"), "date": .string("2020-01-01")]),
+            job,
+        ]
+        let clients: [JSONValue] = [.object(["id": .string("C1")])]
+        let a = try await engine.bnplCheckoutArgs(order: job, provider: "tabby", settings: [:], clients: clients,
+                                                  buyerName: "Noura", orders: others)
+        guard case .object(let o) = a, case .object(let h)? = o["buyerHistory"] else { Issue.record("no history"); return }
+        #expect(h["registeredSince"] == .string("2024-12-31T00:00:00Z"), "the customer's earliest job, any status")
+        #expect(h["loyaltyLevel"] == .number(2), "their OTHER completed jobs; not another customer's, not this one")
+    }
+
     // MARK: - Settings
 
     @Test("the settings save merges per provider: an absent key is kept, an empty one cleared, Stripe untouched")
