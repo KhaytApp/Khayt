@@ -68,6 +68,8 @@ const {
   mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
+const KhaytSdcpProtocol = require('./lib/sdcp');
+const KhaytSdcpReply = require('./lib/sdcp-reply');
 const { normalizeProgress, fileProgressPct, explainPrinterHttp } = require('./lib/printer-status');
 const KhaytDuet = require('./lib/duet');
 const KhaytRepetier = require('./lib/repetier');
@@ -5119,8 +5121,14 @@ async function fetchPrinterHistory(machine, limit) {
   }
 }
 
+// Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).
+// Each command opens its own connection here, so it only has to be distinct
+// enough to match the reply; seeded from the clock so a restart does not reuse.
+let _bambuSeq = Math.floor(Date.now() / 1000) % 1e9;
+function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(_bambuSeq); }
+
 async function sendPrinterCommand(machine, command) {
-  const { type, host, port, apiKey, printerSlug } = (machine && machine.printerApi) || {};
+  const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
   const target = await resolvePrinterTarget(host);
@@ -5130,6 +5138,42 @@ async function sendPrinterCommand(machine, command) {
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };
   }
+  // ── NOT HTTP: Bambu (MQTT over TLS) and Elegoo SDCP (WebSocket) ──────────
+  // The Mac has paused, resumed and cancelled these since PrinterControl.swift;
+  // this app polled them but could only watch. The bytes are the shared
+  // builder's (lib/printer-commands.js), so both apps send the same frame.
+  if (type === 'bambu') {
+    const dev = String(serial || printerSlug || '').trim();
+    if (!dev) return { ok: false, error: 'Bambu needs the printer serial number (Settings → Device on the printer).' };
+    if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
+    const req = printerCommands.buildCommand(type, command, null, { transports: ['mqtt'], sequenceId: nextBambuSequence() });
+    if (req.unsupported) return { ok: false, error: req.unsupported };
+    const r = await bambu.bambuSendCommand({ host: printerHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
+    return r.ok ? { ok: true, command } : r;
+  }
+  if (type === 'sdcp') {
+    const board = String(serial || printerSlug || '').trim();
+    if (!board) return { ok: false, error: 'SDCP needs the printer’s mainboard ID — run a network scan to find it.' };
+    const req = printerCommands.buildCommand(type, command, null, { transports: ['sdcp'], mainboardId: board });
+    if (req.unsupported) return { ok: false, error: req.unsupported };
+    try {
+      await sdcpClient.askOnce({
+        connect: (url) => new WebSocket(url),
+        url: KhaytSdcpProtocol.websocketUrl(printerHost),
+        request: JSON.parse(req.sdcp.frame),
+        pick: (msg) => {
+          const a = KhaytSdcpReply.takeAck(msg, board, req.sdcp.cmd, req.sdcp.requestId);
+          if (!a) return null;
+          if (!a.ok) throw new Error(a.error);
+          return true;
+        },
+      });
+      return { ok: true, command };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e).replace(/^SDCP reply rejected: /, 'The printer refused: ') };
+    }
+  }
+
   const base = `http://${printerHost}:${portNum}`;
   const headers = {};
   if (apiKey) {
@@ -5297,6 +5341,29 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
   sendPrinterCommand(machine, command));
+
+/**
+ * A Bambu's speed preset and chamber light — the Mac's PrinterControl.swift
+ * `.speed` / `.light`. The request is lib/printer-commands.js `buildControl`,
+ * which accepts only its closed set of values, so nothing typed reaches the wire.
+ */
+async function sendPrinterControl(machine, control, value) {
+  const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
+  if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port number' };
+  const dev = String(serial || printerSlug || '').trim();
+  if (!dev) return { ok: false, error: 'Bambu needs the printer serial number (Settings → Device on the printer).' };
+  if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
+  const req = printerCommands.buildControl(type, control, value, { transports: ['mqtt'], sequenceId: nextBambuSequence() });
+  if (req.unsupported) return { ok: false, error: req.unsupported };
+  const r = await bambu.bambuSendCommand({ host: target.urlHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
+  return r.ok ? { ok: true, control } : r;
+}
+ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) =>
+  sendPrinterControl(machine, control, value));
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
 /**
