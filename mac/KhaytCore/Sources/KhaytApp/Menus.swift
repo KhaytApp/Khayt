@@ -109,10 +109,17 @@ struct KhaytCommands: Commands {
             Button(Words.upfront("mac.feedback_menu")) { shop.askForFeedback() }.disabled(shop.needsSignIn)
         }
 
-        CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop).disabled(shop.needsSignIn) }
-        CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop).disabled(shop.needsSignIn) }
-        CommandMenu(Text(Words.upfront("mac.menu_job"))) { JobMenu().environment(shop).disabled(shop.needsSignIn) }
-        CommandMenu(Text(Words.upfront("mac.menu_model"))) { ModelMenu().environment(shop).disabled(shop.needsSignIn) }
+        // In a Group: a `Commands` body takes at most ten children, and the
+        // Tools menu made it eleven.
+        Group {
+            CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop).disabled(shop.needsSignIn) }
+            CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop).disabled(shop.needsSignIn) }
+            CommandMenu(Text(Words.upfront("mac.menu_job"))) { JobMenu().environment(shop).disabled(shop.needsSignIn) }
+            CommandMenu(Text(Words.upfront("mac.menu_model"))) { ModelMenu().environment(shop).disabled(shop.needsSignIn) }
+            // The Bed Ready tools — HueForge, calibration, Orca filaments —
+            // which open a window of their own (`StudioWindow`).
+            CommandMenu(Text(Words.upfront("mac.menu_tools"))) { ToolsMenu().environment(shop).disabled(shop.needsSignIn) }
+        }
     }
 }
 

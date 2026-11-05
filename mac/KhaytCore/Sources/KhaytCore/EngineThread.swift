@@ -77,6 +77,14 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
     }
 
     /// The engine thread the caller is running on, if it is one.
+    /// A thread of its own, outside the pool, for an engine whose calls take
+    /// SECONDS — `StudioEngine`'s HueForge plan. On a pooled thread one plan
+    /// would hold up every shop engine sharing it; on its own it holds up
+    /// nothing but itself.
+    static func dedicated(name: String) -> EngineThread {
+        EngineThread(name: name)
+    }
+
     static var current: EngineThread? {
         Thread.current.threadDictionary[currentKey] as? EngineThread
     }

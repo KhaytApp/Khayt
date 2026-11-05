@@ -61,6 +61,17 @@ struct KhaytApp: App {
         // disables. Apple: "Removes all commands defined by the modified
         // scene"; the window can still be opened programmatically.
         .commandsRemoved()
+
+        // Tools ▸ HueForge Studio, Calibration Assistant, Filament Profiles —
+        // the Bed Ready tools, beside the shop's window rather than in it. Only
+        // the Tools menu opens it, and the staff lock disables that menu, so
+        // it has no Window-menu item of its own either.
+        Window(Text(Words.upfront("mac.st_title")), id: StudioWindow.id) {
+            StudioWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
+        }
+        .defaultSize(width: 1100, height: 760)
+        .commandsRemoved()
     }
 
     /// The shop's window, with no title bar of its own.

@@ -415,6 +415,7 @@ final class Words {
             .merging(WebSaveWords.table) { mine, _ in mine }
             .merging(WebAttachWords.table) { mine, _ in mine }
             .merging(BrowserHostWords.table) { mine, _ in mine }
+            .merging(StudioWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── Library grid redesign ─────────────────────────────────────────
@@ -6284,6 +6285,8 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The Calibration Assistant's two confirmations, in Bed Ready's words.
+        "cal.model_saved", "cal.result_saved",
         // The first-run setup's filament step, in the Spool sheet's own words.
         "inv.cost", "inv.weight",
         // The product editor. Khayt's own words for the same two fields on its

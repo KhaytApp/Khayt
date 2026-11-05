@@ -184,6 +184,21 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // The HueForge studio: a photo as a filament-painted relief for the
+        // U1, and the 3MF it prints from. `HueForgeEngine` runs these in a
+        // context of its own, on a thread of its own, because one plan takes
+        // seconds; they are listed here so the bundle carries them and the
+        // drift guards watch them. After `color-mix`, which they read off the
+        // global. The 3MF module hands back MEMBERS — the zip is Swift's.
+        "hueforge",
+        "hueforge-flat",
+        "hueforge-3mf",
+        // Installing and tuning Orca-family filament presets: which printers
+        // a slicer folder holds, the version to stamp, what a measurement
+        // becomes. The folder walking is Swift's (`OrcaFolders`).
+        "orca-presets",
+        // The Calibration Assistant's tests and procedural test models.
+        "calibration-models",
         // What can be printed with the filament already loaded: a model's
         // colours against a machine's heads, perceptually and by material
         // family. Needs `color-mix` above it.
