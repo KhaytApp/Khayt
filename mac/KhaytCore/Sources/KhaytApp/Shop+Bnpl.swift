@@ -99,7 +99,7 @@ extension Shop {
             let order = JSONValue.object(raw)
             args = try await engine.bnplCheckoutArgs(
                 order: order, provider: provider, settings: settingsDict, clients: clientRows,
-                buyerName: Self.emailClientName(for: raw, in: clientRows))
+                buyerName: Self.emailClientName(for: raw, in: clientRows), orders: orderRows)
             if case .object(let a) = args, a["refused"] != nil {
                 return BnplLinkOutcome(problem: words.callIt("inst.nothing_owed"))
             }

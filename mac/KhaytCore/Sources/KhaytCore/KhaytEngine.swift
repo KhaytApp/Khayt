@@ -14234,9 +14234,11 @@ public actor KhaytEngine {
     /// number as the reference, and the customer's name, phone and email. Or
     /// `{ refused: 'nothing_owed' }` for a job already settled.
     public func bnplCheckoutArgs(order: JSONValue, provider: String, settings: [String: JSONValue],
-                                 clients: [JSONValue], buyerName: String) throws -> JSONValue {
-        try runtime.call2("KhaytBnplRequests.checkoutArgs(ARG0, ARG1, {settings: ARG2, clients: ARG3, buyerName: ARG4})",
-                          [order, .string(provider), .object(settings), .array(clients), .string(buyerName)],
+                                 clients: [JSONValue], buyerName: String, orders: [JSONValue] = []) throws -> JSONValue {
+        // `orders`: the book's jobs, for Tabby's buyer history (the customer's
+        // first job and how many others they completed), as the desktop sends.
+        try runtime.call2("KhaytBnplRequests.checkoutArgs(ARG0, ARG1, {settings: ARG2, clients: ARG3, buyerName: ARG4, orders: ARG5})",
+                          [order, .string(provider), .object(settings), .array(clients), .string(buyerName), .array(orders)],
                           as: JSONValue.self)
     }
 
