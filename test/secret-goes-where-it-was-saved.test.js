@@ -114,7 +114,9 @@ test('main.js binds every secret whose destination the window names', () => {
   assert.equal((src.match(/cloudToken\((?:token|authToken), url\)/g) || []).length >= 24, true);
   for (const h of ['hub:accounting-push', 'hub:webhook-post', 'hub:fire-webhook']) {
     const body = src.slice(src.indexOf(`ipcMain.handle('${h}'`)).slice(0, 2500);
-    assert.match(body, /resolveStoreSecretFor\(/, h);
+    // hub:fire-webhook binds through `webhookBus.signingSecretFor`, which
+    // knows the subscriptions' addresses as well as the event webhook's.
+    assert.match(body, h === 'hub:fire-webhook' ? /webhookBus\.signingSecretFor\(/ : /resolveStoreSecretFor\(/, h);
   }
   const sms = src.slice(src.indexOf("ipcMain.handle('hub:send-sms'")).slice(0, 1500);
   assert.match(sms, /provider === 'webhook'[\s\S]*resolveStoreSecretFor\([\s\S]*smsConfig\?\.url/);

@@ -466,111 +466,16 @@ function renderSmsNotificationSettings() {
    Feature I: Email Digest Scheduler
    ============================================================ */
 
-function buildDigestEmailHtml() {
+function buildDigestEmailHtml(test) {
+  // The figures and the page are `lib/email-digest.js`, shared with the Mac
+  // app so the same book mails the same digest from either.
+  const D = KhaytEmailDigest;
   const now = new Date();
-  const todayStr = localDateStr(now);
-  const freq = settings.emailDigest?.frequency || 'daily';
-  const freqLabel = freq === 'weekly' ? 'Weekly' : (freq === 'monthly' ? 'Monthly' : 'Daily');
-
-  // Compute period bounds
-  let periodLabel, periodFrom, periodTo;
-  if (freq === 'weekly') {
-    const jan1 = new Date(now.getFullYear(), 0, 1);
-    const weekNum = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-    periodLabel = `Week ${weekNum}, ${now.getFullYear()}`;
-    // Start of week (Monday)
-    const dayOfWeek = now.getDay(); // 0=Sun
-    const diffToMon = (dayOfWeek === 0) ? -6 : 1 - dayOfWeek;
-    periodFrom = new Date(now);
-    periodFrom.setDate(now.getDate() + diffToMon);
-    periodFrom.setHours(0, 0, 0, 0);
-    periodTo = new Date(now);
-  } else if (freq === 'monthly') {
-    periodLabel = now.toLocaleDateString(localeTag(), { month: 'long', year: 'numeric' });
-    periodFrom = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    periodTo = new Date(now);
-  } else {
-    periodLabel = todayStr;
-    periodFrom = new Date(now);
-    periodFrom.setHours(0, 0, 0, 0);
-    periodTo = new Date(now);
-  }
-
-  const fromIso = periodFrom.toISOString();
-  const toIso = periodTo.toISOString();
-
-  // Stats
-  const completedThisPeriod = printLog.filter(o =>
-    KhaytOrderStatus.isFinished(o) &&
-    o.completedAt && o.completedAt >= fromIso && o.completedAt <= toIso
-  );
-  const revenueThisPeriod = completedThisPeriod.reduce((s, o) => s + orderNetRevenueBase(o), 0);
-  const outstanding = printLog
-    .filter(o => KhaytOrderStatus.isFinished(o) && payStatus(o) !== 'paid')
-    .reduce((s, o) => s + orderOwedBase(o), 0);
-
-  // Low-stock spools
-  const reorderPt = settings.lowStockThreshold ?? 200;
-  const lowStockSpools = inventory
-    .filter(s => (+s.weight || 0) < (s.reorderPoint ?? reorderPt))
-    .slice(0, 5);
-
-  const waitingCount = waitingList.length;
-  const shopName = escapeHtml(shopField('biz') || 'Khayt');
-  const currency = escapeHtml(settings.currency || 'SAR');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>${shopName} Digest</title></head>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:Arial,sans-serif;">
-  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
-    <div style="background:#6c47ff;padding:24px 32px;">
-      <h1 style="margin:0;color:#fff;font-size:22px;">${shopName}</h1>
-      <p style="margin:4px 0 0;color:rgba(255,255,255,.8);font-size:13px;">${freqLabel} Digest · ${escapeHtml(periodLabel)}</p>
-    </div>
-    <div style="padding:28px 32px;">
-      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
-        <thead><tr style="border-bottom:2px solid #eee;">
-          <th style="text-align:left;padding:8px 0;color:#888;">Metric</th>
-          <th style="text-align:right;padding:8px 0;color:#888;">Value</th>
-        </tr></thead>
-        <tbody>
-          <tr style="border-bottom:1px solid #f0f0f0;">
-            <td style="padding:10px 0;">Completed orders this period</td>
-            <td style="text-align:right;font-weight:600;">${completedThisPeriod.length}</td>
-          </tr>
-          <tr style="border-bottom:1px solid #f0f0f0;">
-            <td style="padding:10px 0;">Revenue this period</td>
-            <td style="text-align:right;font-weight:600;color:#22c55e;">${revenueThisPeriod.toFixed(2)} ${currency}</td>
-          </tr>
-          <tr style="border-bottom:1px solid #f0f0f0;">
-            <td style="padding:10px 0;">Outstanding receivables</td>
-            <td style="text-align:right;font-weight:600;color:${outstanding > 0 ? '#f59e0b' : '#888'};">${outstanding.toFixed(2)} ${currency}</td>
-          </tr>
-          <tr style="border-bottom:1px solid #f0f0f0;">
-            <td style="padding:10px 0;">Low-stock spools</td>
-            <td style="text-align:right;font-weight:600;color:${lowStockSpools.length > 0 ? '#ef4444' : '#888'};">${lowStockSpools.length}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px 0;">Waiting list items</td>
-            <td style="text-align:right;font-weight:600;">${waitingCount}</td>
-          </tr>
-        </tbody>
-      </table>
-      ${lowStockSpools.length > 0 ? `
-      <div style="background:#fff5f5;border-left:3px solid #ef4444;padding:12px 16px;border-radius:4px;margin-bottom:20px;">
-        <div style="font-weight:600;font-size:13px;color:#ef4444;margin-bottom:8px;">Low Stock Alert</div>
-        <ul style="margin:0;padding:0 0 0 16px;font-size:13px;color:#333;">
-          ${lowStockSpools.map(s => `<li style="margin-bottom:4px;">${escapeHtml(s.material || s.brand || 'Spool')} — ${+s.weight || 0}g remaining (reorder at ${s.reorderPoint ?? reorderPt}g)</li>`).join('')}
-        </ul>
-      </div>` : ''}
-    </div>
-    <div style="padding:16px 32px;background:#f8f8fb;text-align:center;font-size:11px;color:#aaa;border-top:1px solid #eee;">
-      Sent by Khayt · ${escapeHtml(todayStr)}
-    </div>
-  </div>
-</body>
-</html>`;
+  const figures = D.figures({
+    orders: printLog, inventory, waitingList, settings, clients, now, locale: localeTag(),
+  });
+  return D.html(figures, { shopName: shopField('biz') || 'Khayt', currency: settings.currency || 'SAR',
+    today: localDateStr(now) });
 }
 
 /**
@@ -3889,7 +3794,7 @@ function renderDigestSettings() {
     const to = (el.querySelector('#digestRecipient').value.trim()) || settings.email || '';
     if (!to) { if (resEl) resEl.textContent = 'No recipient email.'; return; }
     const body = buildDigestEmailHtml();
-    const subject = `${shopName() || 'Khayt'} — Test Digest`;
+    const subject = KhaytEmailDigest.subject(shopName(), 'daily', true);
     const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
     if (resEl) {
       if (result?.ok) { resEl.textContent = 'Test sent!'; resEl.style.color = 'var(--success)'; }
@@ -4059,11 +3964,16 @@ function renderWebhookSettings() {
     <button class="btn ghost small" id="btnTestWebhook" style="margin-inline-start:8px;" data-i18n="whk.test">Test (send ping)</button>`;
 
   el.querySelector('#btnSaveWebhooks').addEventListener('click', () => {
-    settings.webhooks = {
+    const form = {
       enabled: el.querySelector('#whk_enabled').checked,
       secret:  el.querySelector('#whk_secret').value.trim(),
       events:  Object.fromEntries(events.map(ev => [ev.key, el.querySelector(`#whk_${ev.key}`).value.trim()]))
     };
+    // Kept in step with the subscriptions the Mac edits, and keeping the
+    // delivery log and the retries this form never showed
+    // (`KhaytWebhookBus.fromLegacyForm`). It used to replace the whole block.
+    settings.webhooks = (typeof KhaytWebhookBus !== 'undefined')
+      ? KhaytWebhookBus.fromLegacyForm(settings.webhooks, form) : form;
     saveAll();
     toast(t('webhook.saved'), 'success');
   });

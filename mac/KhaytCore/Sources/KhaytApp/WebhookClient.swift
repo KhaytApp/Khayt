@@ -69,6 +69,18 @@ enum WebhookClient {
     @discardableResult
     static func deliver(_ body: JSONValue, to url: URL, secret: String,
                         event: String, engine: KhaytEngine) async throws -> Int {
+        let payload = try JSONEncoder().encode(body)
+        let headers = signedHeaders(payload: payload, secret: secret, event: event, now: Date())
+        return try await post(payload, to: url, headers: headers, engine: engine)
+    }
+
+    /// One POST of these bytes with these headers, through BOTH guards and the
+    /// pinned socket — what a webhook delivery goes out on, and the accounting
+    /// push and an SMS provider too: each carries a shop's secret in a header
+    /// to an address the book names, which is exactly the request the guards
+    /// are for. Returns the HTTP status, or throws for a fault.
+    static func post(_ payload: Data, to url: URL, headers: [(String, String)],
+                     engine: KhaytEngine) async throws -> Int {
         guard let host = url.host, !host.isEmpty else { throw Failure.blocked("") }
         // https ONLY, which is what the other app allows. Plain http would
         // carry a shop's order data and its HMAC across the network in the
@@ -91,8 +103,6 @@ enum WebhookClient {
         // have let URLSession resolve it on its own, unchecked.
         guard !resolved.isEmpty else { throw Failure.refused("\(host) did not resolve") }
 
-        let payload = try JSONEncoder().encode(body)
-        let headers = signedHeaders(payload: payload, secret: secret, event: event, now: Date())
         let head = requestHead(url, host: host, headers: headers, length: payload.count)
 
         // The checked addresses, in the resolver's order; the first that

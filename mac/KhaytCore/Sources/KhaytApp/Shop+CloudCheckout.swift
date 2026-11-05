@@ -20,6 +20,36 @@ extension Shop {
         return try? await CloudCheckout.digest(connection, token: token, fetch: Self.plansFetch)
     }
 
+    /// The cloud digest as the email-summary choice reads it: what the cloud
+    /// holds, or why it cannot be had — `/v1/shops/{id}/digest` answers 403
+    /// `owner-only` to a sign-in that is not the owner's and 409 `no-account`
+    /// to a shop with no owner account, and each is said in a sentence.
+    enum CloudDigestState: Equatable {
+        case unavailable                    // not signed in as the owner: not offered
+        case ok(CloudCheckout.Digest)
+        case refused(String)
+    }
+
+    func cloudDigestState(setting enabled: Bool? = nil) async -> CloudDigestState {
+        guard cloudIsOwner, let (connection, token) = await vaultSession() else { return .unavailable }
+        do {
+            if let enabled {
+                return .ok(try await CloudCheckout.setDigest(enabled, connection, token: token, fetch: Self.plansFetch))
+            }
+            return .ok(try await CloudCheckout.digest(connection, token: token, fetch: Self.plansFetch))
+        } catch let refusal as CloudPlans.Refusal {
+            return .refused(Self.cloudDigestRefusal(refusal, words: words))
+        } catch {
+            return .refused(words.callIt("mac.summary_cloud_failed"))
+        }
+    }
+
+    static func cloudDigestRefusal(_ r: CloudPlans.Refusal, words: Words) -> String {
+        if r.status == 403 { return words.callIt("mac.summary_cloud_owner_only") }
+        if r.status == 409 { return words.callIt("mac.summary_cloud_no_account") }
+        return words.callIt("mac.summary_cloud_failed")
+    }
+
     /// Saves the choice; answers what the cloud now holds, or nil when it
     /// refused (the switch is put back).
     func setCloudDigest(_ enabled: Bool) async -> CloudCheckout.Digest? {

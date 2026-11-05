@@ -166,6 +166,11 @@ struct IntegrationsPane: View {
                 // draft that a revert could write back.
                 EmailSettings(shop: shop)
 
+                // Which summary the shop gets by email: the KPI email this Mac
+                // sends on its schedule, Khayt Cloud's weekly one, both or
+                // neither. Below the mail settings it sends through.
+                EmailSummarySettings(shop: shop)
+
                 // And where the shop's own alerts go. Same defect as the email
                 // settings above: this app has always SENT Telegram and never
                 // been able to be set up for it.
@@ -175,12 +180,23 @@ struct IntegrationsPane: View {
                 // own WhatsApp Business account. Saves itself: a sealed token.
                 WhatsAppBusinessSettings(shop: shop)
 
+                // Texts through the shop's own SMS provider — Twilio, Unifonic
+                // or its webhook — the desktop's `smsConfig`. Saves itself.
+                SmsSettings(shop: shop)
+
                 // A second way to reach a phone: ntfy, with no bot to set up.
                 NtfySettings(shop: shop)
 
                 // Which carriers the shop ships with, and the secret each signs
                 // its status updates with. Saves itself, for the same reason.
                 CarrierSettings(shop: shop)
+
+                // Telling other software: the outgoing webhooks with their
+                // delivery log, the signed event webhook, and paid invoices
+                // pushed to the accounting system. Each saves itself.
+                WebhookSettings(shop: shop)
+                EventWebhookSettings(shop: shop)
+                AccountingSyncSettings(shop: shop)
 
                 // The shop's own messages, on the page where the rest of
                 // reaching a customer lives. They are a COLLECTION rather than

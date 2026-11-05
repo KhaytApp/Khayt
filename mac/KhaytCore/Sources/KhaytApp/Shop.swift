@@ -1422,6 +1422,8 @@ final class Shop {
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
             if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
+            // The KPI email, webhook retries and failed accounting pushes.
+            if next.build != nil { startIntegrationsPass() } else { stopIntegrationsPass() }
             // Another book's requests are not this one's: counted afresh, and
             // its first read is a new baseline rather than a burst of alerts.
             quoteRequestsWaiting = 0
@@ -3020,6 +3022,19 @@ final class Shop {
     /// second click in that time sent the template twice; one that Meta took
     /// but whose log line could not be written would be offered again.
     var whatsAppSending: Set<String> = []
+    // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
+    /// Texts in flight or sent this run, as "job|milestone" — one click, one text.
+    var smsSending: Set<String> = []
+    /// Webhook deliveries in flight (their ids): a retry pass that overlaps
+    /// a move's own send, or a second pass, must not post one twice.
+    var webhookInFlight: Set<String> = []
+    /// Invoices being pushed to the accounting system, by order id.
+    var accountingPushing: Set<String> = []
+    /// True while the local KPI email is going out, so two ticks cannot send two.
+    var digestSending = false
+    /// The pass that sends what is due: the KPI email, queued webhook retries,
+    /// failed accounting pushes.
+    var integrationsTask: Task<Void, Never>?
     /// What the last move had to say — the due date it pushed out, the spools
     /// it emptied, the ones that are now low.
     var moveNotices: [String] = []

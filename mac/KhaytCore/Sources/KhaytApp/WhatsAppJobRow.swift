@@ -21,6 +21,10 @@ struct WhatsAppJobRow: View {
     /// The update as WhatsApp Business would send it now, when it can.
     @State private var business: WhatsAppCloudMessage?
     @State private var sending = false
+    /// When this milestone's update was last texted, through the shop's SMS
+    /// provider (`Shop+Integrations.swift`).
+    @State private var textedAt: String?
+    @State private var texting = false
 
     /// A new line in the log, a move, a shipment — any of them can change the
     /// answer, so the look is keyed on all of it.
@@ -85,9 +89,34 @@ struct WhatsAppJobRow: View {
                         .font(.callout)
                 }
             }
+            // The same update as a TEXT, through the shop's own SMS provider —
+            // pressed, never sent on its own.
+            if let offer, shop.smsProvider != nil {
+                HStack {
+                    Button(shop.words.callIt("mac.sms_send_update")) {
+                        texting = true
+                        Task {
+                            if let problem = await shop.sendSmsUpdate(for: job) { shop.moveProblem = problem }
+                            textedAt = await shop.smsSentAt(for: job, milestone: offer.milestone)
+                            texting = false
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .disabled(texting)
+                    if let at = textedAt {
+                        Text(shop.words.callIt("mac.sms_update_sent", ["day": .string(Calendar.localDay(ofInstant: at))]))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
         .task(id: key + "|" + shop.settingsValue.hashValue.description) {
             offer = await shop.whatsAppOffer(for: job)
+            textedAt = nil
+            if let offer, shop.smsProvider != nil {
+                textedAt = await shop.smsSentAt(for: job, milestone: offer.milestone)
+            }
             business = shop.whatsAppBusinessAccount() == nil ? nil
                 : await shop.whatsAppBusinessMessage(before: nil, jobId: job.id, now: true)
         }
