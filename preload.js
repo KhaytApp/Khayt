@@ -376,6 +376,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
 
   // Telegram notifications
   sendTelegram: (opts) => ipcRenderer.invoke('hub:send-telegram', opts),
+  sendNtfy:            (alert) => ipcRenderer.invoke('hub:send-ntfy', alert || {}),
 
   // LAN events — intake form submissions
   onLanIntakeSubmitted: (() => { let _cb=null; ipcRenderer.on('lan-intake-submitted', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),

@@ -6811,6 +6811,39 @@ ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, pay
 });
 
 
+/**
+ * One ntfy push (ntfy.sh or a self-hosted server) — the Mac's `sendNtfy`.
+ *
+ * The window sends only WHAT happened ({ type, title, body }). Where it goes is
+ * read here from the saved book (lib/alert-routes.js `ntfyRequest` builds it
+ * from settings.ntfy), and the access token is opened here too, so a token is
+ * only ever sent to the server the shop saved, never to an address a window
+ * names. Self-hosted servers are often on the LAN, so http and private hosts
+ * are allowed, as the Mac allows them; redirects are not followed.
+ */
+ipcMain.handle('hub:send-ntfy', async (_e, { type, title, body } = {}) => {
+  let book = null;
+  try { book = readStoreDecryptedFromDisk(); } catch (_) { book = null; }
+  const s = (book && book.settings) || {};
+  const req = require('./lib/alert-routes.js').ntfyRequest({ type, title, body }, s);
+  if (!req) return { ok: false, error: 'ntfy is not set up: save a topic first' };
+  const headers = { ...req.headers, 'Content-Type': 'text/plain; charset=utf-8' };
+  const token = String((s.ntfy && s.ntfy.token) || '').trim();
+  if (token) headers.Authorization = `Bearer ${token.replace(/[\r\n]/g, '')}`;
+  // Header values are Latin-1 on the wire; a title in Arabic goes as RFC 2047.
+  for (const k of ['Title']) {
+    if (/[^\x20-\x7e]/.test(headers[k] || '')) headers[k] = `=?UTF-8?B?${Buffer.from(headers[k], 'utf8').toString('base64')}?=`;
+  }
+  try {
+    const res = await fetch(req.url, { method: 'POST', headers, body: req.body, redirect: 'manual', signal: AbortSignal.timeout(10000) });
+    if (res.status >= 300 && res.status < 400) return { ok: false, error: 'The ntfy server redirected; check the address' };
+    if (!res.ok) return { ok: false, status: res.status, error: res.status === 401 || res.status === 403 ? 'The ntfy server refused the access token' : `ntfy answered ${res.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
 /** The chat-id rule, shared with both windows and the Mac app. */
 function telegramChatId(value) {
   try {
