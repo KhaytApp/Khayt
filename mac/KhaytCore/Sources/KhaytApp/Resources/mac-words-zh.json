@@ -3639,5 +3639,13 @@
  "mac.summary_cloud_owner_only": "只有店主可以选择 Khayt Cloud 的每周摘要。请以店主身份登录云端后再更改。",
  "mac.summary_cloud_no_account": "此店铺在 Khayt Cloud 中还没有店主账户，因此每周摘要无人可发。",
  "mac.summary_cloud_failed": "无法向 Khayt Cloud 查询每周摘要。请稍后再试。",
- "mac.sms_test_message": "Khayt 测试消息 — 通知工作正常。"
+ "mac.sms_test_message": "Khayt 测试消息 — 通知工作正常。",
+ "mac.send_will_slice": "这是一个模型。Khayt 会先用 {name} 切片，然后发送 G-code。",
+ "mac.slice_send_only": "切片并发送",
+ "mac.send_choose_hint_model": "请选择已切片的文件，或选择要先切片的模型。",
+ "mac.cv_colour_plan": "颜色",
+ "mac.cv_plan_slots": "逐个槽位",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "分段换料",
+ "mac.cv_fit_unknown": "此模型尚未测量，因此未检查它是否能放进打印床。"
 }

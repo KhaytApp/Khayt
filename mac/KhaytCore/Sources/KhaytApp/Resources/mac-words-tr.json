@@ -3639,5 +3639,13 @@
  "mac.summary_cloud_owner_only": "Khayt Cloud'un haftalık özetini yalnızca dükkân sahibi seçebilir. Değiştirmek için buluta sahip olarak giriş yapın.",
  "mac.summary_cloud_no_account": "Bu dükkânın Khayt Cloud'da henüz bir sahip hesabı yok, bu yüzden haftalık özetin gönderileceği kimse yok.",
  "mac.summary_cloud_failed": "Khayt Cloud'a haftalık özet sorulamadı. Daha sonra yeniden deneyin.",
- "mac.sms_test_message": "Khayt test mesajı — bildirimler çalışıyor."
+ "mac.sms_test_message": "Khayt test mesajı — bildirimler çalışıyor.",
+ "mac.send_will_slice": "Bu bir model. Khayt önce {name} ile dilimler, ardından G-code'u gönderir.",
+ "mac.slice_send_only": "Dilimle ve gönder",
+ "mac.send_choose_hint_model": "Dilimlenmiş bir dosya ya da önce dilimlenecek bir model seçin.",
+ "mac.cv_colour_plan": "Renkler",
+ "mac.cv_plan_slots": "Yuva yuva",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Bant değişimi",
+ "mac.cv_fit_unknown": "Bu model henüz ölçülmedi, bu yüzden tablaya sığıp sığmadığı kontrol edilmiyor."
 }

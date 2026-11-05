@@ -1970,6 +1970,8 @@ extension Shop {
         pendingBnpl = nil
         pendingShipment = nil
         pendingSend = nil
+        pendingConvert = nil
+        pendingBatchConvert = nil
         pendingEdit = nil
         pendingDetails = nil
         pendingVoid = nil

@@ -868,15 +868,15 @@ private struct ModelMenu: View {
         // nothing is selected is an item no run ever sees.
         Menu(Words.upfront("mac.convert_for")) {
             ForEach(shop.printerProfiles) { profile in
-                Button(profile.name) {
+                Button(profile.name + "\u{2026}") {
                     guard let file = shop.selectedFile else { return }
-                    Task { await shop.convertModel(file, targetId: profile.id) }
+                    shop.openConverter(file, targetId: profile.id)
                 }
             }
             Divider()
-            Button(Words.upfront("mac.standard_3mf")) {
+            Button(Words.upfront("mac.standard_3mf") + "\u{2026}") {
                 guard let file = shop.selectedFile else { return }
-                Task { await shop.convertModel(file, targetId: nil) }
+                shop.openConverter(file, targetId: nil)
             }
         }
         .disabled(shop.converting || !canConvert)

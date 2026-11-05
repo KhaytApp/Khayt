@@ -3639,5 +3639,13 @@
  "mac.summary_cloud_owner_only": "Nur der Inhaber des Geschäfts kann die wöchentliche Zusammenfassung von Khayt Cloud wählen. Melden Sie sich als Inhaber in der Cloud an, um sie zu ändern.",
  "mac.summary_cloud_no_account": "Dieses Geschäft hat noch kein Inhaberkonto in Khayt Cloud, daher gibt es niemanden, an den die wöchentliche Zusammenfassung gehen könnte.",
  "mac.summary_cloud_failed": "Khayt Cloud konnte nicht nach der wöchentlichen Zusammenfassung gefragt werden. Versuchen Sie es später erneut.",
- "mac.sms_test_message": "Testnachricht von Khayt – Benachrichtigungen funktionieren."
+ "mac.sms_test_message": "Testnachricht von Khayt – Benachrichtigungen funktionieren.",
+ "mac.send_will_slice": "Dies ist ein Modell. Khayt schneidet es zuerst mit {name} und sendet dann den G-Code.",
+ "mac.slice_send_only": "Slicen und senden",
+ "mac.send_choose_hint_model": "Wählen Sie eine geslicte Datei oder ein Modell, das zuerst geslict wird.",
+ "mac.cv_colour_plan": "Farben",
+ "mac.cv_plan_slots": "Slot für Slot",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Farbband-Wechsel",
+ "mac.cv_fit_unknown": "Dieses Modell wurde noch nicht vermessen, daher wird nicht geprüft, ob es auf das Druckbett passt."
 }

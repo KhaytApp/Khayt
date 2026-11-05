@@ -232,9 +232,8 @@
       const p = st.plan;
       if (!p || !p.ok) return { active: true, refusal: p ? p.warnings.map(warningText).filter(Boolean).join(' ') : '' };
       if (p.request.kind === 'refused') { render(); return { active: true, refusal: refusalText(p.request.refusal) }; }
-      if (p.request.kind === 'none') return { active: true, request: p.request.slotSpools ? { slotMap: null, slotSpools: p.request.slotSpools, spoolStrict: true } : null };
-      return { active: true, request: { slotMap: p.request.slotMap || null, mergeToSlots: !!p.request.mergeToSlots, spoolMerge: p.request.spoolMerge || null,
-        growToSlots: p.request.growToSlots || null, slotSpools: p.request.slotSpools || null, spoolStrict: true } };
+      // The options the match adds to the convert: lib/spool-match.js, which the Mac asks too.
+      return { active: true, request: sm.convertOptions(p.request) };
     };
     // The converter refused the match after all (a model it could not read, settings it cannot
     // reorder): say so here, next to the table, as well as in the toast.

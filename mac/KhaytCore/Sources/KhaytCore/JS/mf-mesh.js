@@ -18,8 +18,16 @@
 (function (global) {
   const zipRead = (typeof require === 'function') ? require('./zip-read') : global.KhaytZip;
 
-  const strFromU8 = (u8) => Buffer.isBuffer(u8) ? u8.toString('utf8') : Buffer.from(u8.buffer || u8, u8.byteOffset || 0, u8.byteLength).toString('utf8');
-  const strToU8 = (s) => Buffer.from(String(s), 'utf8');
+  // A member's data is a Buffer in Node and a STRING in the native Mac app, whose zip is Swift's and
+  // which hands text across (KhaytEngine.convertMembers). JavaScriptCore has no `Buffer`, so the
+  // string case is answered before it is touched: before, every mesh read there threw, and band-swap
+  // and the per-plate palettes quietly reported "not available" on the Mac.
+  const hasBuffer = typeof Buffer !== 'undefined';
+  const strFromU8 = (u8) => (typeof u8 === 'string' ? u8
+    : hasBuffer && Buffer.isBuffer(u8) ? u8.toString('utf8')
+    : hasBuffer ? Buffer.from(u8.buffer || u8, u8.byteOffset || 0, u8.byteLength).toString('utf8')
+    : new TextDecoder('utf-8').decode(u8));
+  const strToU8 = (s) => (hasBuffer ? Buffer.from(String(s), 'utf8') : String(s));
 
   function normalizeHex(h) {
     const s = (h || '').replace('#', '');

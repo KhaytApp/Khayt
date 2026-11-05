@@ -3639,5 +3639,13 @@
  "mac.summary_cloud_owner_only": "Solo el propietario de la tienda puede elegir el resumen semanal de Khayt Cloud. Inicia sesión en la nube como propietario para cambiarlo.",
  "mac.summary_cloud_no_account": "Esta tienda aún no tiene una cuenta de propietario en Khayt Cloud, así que no hay a quién enviar el resumen semanal.",
  "mac.summary_cloud_failed": "No se pudo consultar a Khayt Cloud sobre el resumen semanal. Inténtalo más tarde.",
- "mac.sms_test_message": "Mensaje de prueba de Khayt: las notificaciones funcionan."
+ "mac.sms_test_message": "Mensaje de prueba de Khayt: las notificaciones funcionan.",
+ "mac.send_will_slice": "Esto es un modelo. Khayt lo lamina primero con {name} y luego envía el G-code.",
+ "mac.slice_send_only": "Laminar y enviar",
+ "mac.send_choose_hint_model": "Elija un archivo laminado o un modelo para laminar primero.",
+ "mac.cv_colour_plan": "Colores",
+ "mac.cv_plan_slots": "Ranura por ranura",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "Cambio por franjas",
+ "mac.cv_fit_unknown": "Este modelo aún no se ha medido, así que no se comprueba si cabe en la cama."
 }

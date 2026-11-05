@@ -1258,7 +1258,11 @@ final class Shop {
             timeline = projected
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
-            let profiles = (try? await engine?.printerProfiles()) ?? []
+            // The shop's own printers first (`settings.customPrinters`), as
+            // the desktop converter lists them.
+            var customPrinters: [JSONValue] = []
+            if case .array(let own)? = settingsDict["customPrinters"] { customPrinters = own }
+            let profiles = (try? await engine?.printerProfiles(custom: customPrinters)) ?? []
             if overtaken() { return }
             printerProfiles = profiles
             // And what each shelf row is counted in. Same reason: read in view
@@ -2021,6 +2025,13 @@ final class Shop {
     var pendingSend: PendingHold?
     /// What the last send said, beside the button that made it.
     var sendNote: String?
+    /// The machine a model is being sliced for, while the slicer runs
+    /// (`Shop+PrintPrep.swift`).
+    var slicingFor: String?
+    /// The model open in the converter sheet, and the printer it opened on.
+    var pendingConvert: ConvertRequest?
+    /// Several models open in the batch converter.
+    var pendingBatchConvert: BatchConvertRequest?
 
     // Stored for "What to run next" (Shop+Jobs.swift).
     /// The dispatcher's answer, recomputed when the book or the printers move.

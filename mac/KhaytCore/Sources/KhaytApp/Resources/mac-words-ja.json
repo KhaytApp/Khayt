@@ -3639,5 +3639,13 @@
  "mac.summary_cloud_owner_only": "Khayt Cloud の週次まとめを選べるのはショップのオーナーだけです。変更するにはオーナーとしてクラウドにサインインしてください。",
  "mac.summary_cloud_no_account": "このショップにはまだ Khayt Cloud のオーナーアカウントがないため、週次まとめの送信先がありません。",
  "mac.summary_cloud_failed": "Khayt Cloud に週次まとめについて問い合わせできませんでした。後でもう一度お試しください。",
- "mac.sms_test_message": "Khayt のテストメッセージ — 通知は正常に動作しています。"
+ "mac.sms_test_message": "Khayt のテストメッセージ — 通知は正常に動作しています。",
+ "mac.send_will_slice": "これはモデルです。Khayt はまず {name} でスライスしてから G-code を送信します。",
+ "mac.slice_send_only": "スライスして送信",
+ "mac.send_choose_hint_model": "スライス済みのファイル、または先にスライスするモデルを選んでください。",
+ "mac.cv_colour_plan": "色",
+ "mac.cv_plan_slots": "スロットごと",
+ "mac.cv_plan_fs": "Full Spectrum",
+ "mac.cv_plan_band": "バンド交換",
+ "mac.cv_fit_unknown": "このモデルはまだ計測されていないため、ベッドに収まるかは確認されていません。"
 }

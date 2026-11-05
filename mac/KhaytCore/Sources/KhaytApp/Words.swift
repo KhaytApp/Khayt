@@ -418,6 +418,7 @@ final class Words {
             .merging(DocumentWords.table) { mine, _ in mine }
             .merging(ShopPagesWords.table) { mine, _ in mine }
             .merging(IntegrationWords.table) { mine, _ in mine }
+            .merging(PrintPrepWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -6480,6 +6481,24 @@ final class Words {
         "waiting.remind_msg", "waiting.remind_phone", "waiting.decline", "waiting.untitled",
         "waiting.project_required", "waiting.funnel_total", "waiting.funnel_active", "waiting.funnel_converted",
         "waiting.funnel_declined", "waiting.funnel_pipeline", "common.more", "common.edit", "inv.walk_in",
+        // Slice-and-send and the converter sheet, in the desktop's own words
+        // (`renderer/machines.js`, `renderer/converter.js`, `converter-spools.js`).
+        "slicer.no_config", "slicer.fail", "slicer.sending", "slicer.send_title",
+        "conv.title", "conv.target", "conv.convert", "conv.analyzing", "conv.analyze_failed",
+        "conv.detected", "conv.colours", "conv.src_printer", "conv.src_size", "conv.src_material",
+        "conv.src_time", "conv.src_nozzle", "conv.src_layer", "conv.fit_ok", "conv.fit_no",
+        "conv.normalize_note", "conv.cross_note", "conv.no_colours", "conv.remap_hint", "conv.slot",
+        "conv.dup_slots", "conv.fs_toggle", "conv.fs_planning", "conv.fs_load", "conv.fs_mixes",
+        "conv.fs_no_mix", "conv.fs_head", "conv.band_toggle", "conv.band_swap_at", "conv.band_no_swap",
+        "conv.band_pauses", "conv.spool_title", "conv.spool_hint", "conv.spool_source",
+        "conv.spool_src_live", "conv.spool_src_typed", "conv.spool_q_good", "conv.spool_q_fair",
+        "conv.spool_q_poor", "conv.spool_far_count", "conv.spool_material", "conv.spool_beyond",
+        "conv.spool_no_spools", "conv.spool_refused_end", "conv.spool_refused_printer",
+        "conv.spool_refused_bad", "conv.spool_applies_map", "conv.spool_applies_merge",
+        "conv.spool_applies_grow", "conv.spool_none",
+        "conv.batch_target", "conv.batch_run", "conv.batch_done", "conv.batch_fail", "conv.batch_colour",
+        "conv.batch_colour_merge", "conv.batch_colour_fs", "conv.batch_colour_band", "conv.batch_cross_note",
+        "conv.batch_dest_folder", "common.done",
     ]
 }
 

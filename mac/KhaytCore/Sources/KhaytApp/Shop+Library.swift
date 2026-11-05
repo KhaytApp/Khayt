@@ -1179,7 +1179,12 @@ extension Shop {
     /// The save panel first, deliberately. A conversion that runs and then asks
     /// where to put it has already spent the time before the shop can change
     /// its mind, and a shop that cancels should have cost nothing.
-    func convertModel(_ file: LibraryFile, targetId: String?) async {
+    ///
+    /// `extra` is what the converter sheet chose (`ConvertSheet`): a slot
+    /// map, Full Spectrum, band-swap, a spool match, or `mode: normalize` for a
+    /// printer from another ecosystem — the options the desktop's converter
+    /// hands `hub:mf-convert`, by the same names.
+    func convertModel(_ file: LibraryFile, targetId: String?, extra: [String: JSONValue] = [:]) async {
         guard permitted("inventory", "create") else { return }
         clearLastOutcome()
         guard let source = modelFile(for: file) else {
@@ -1215,9 +1220,12 @@ extension Shop {
 
         converting = true
         defer { converting = false }
-        var options: [String: JSONValue] = [:]
-        if let targetId { options["targetId"] = .string(targetId) }
-        else { options["mode"] = .string("normalize") }
+        var options = extra
+        if let targetId {
+            // One of the shop's own printers travels whole (`targetProfile`):
+            // the converter has no registry entry to look it up by.
+            for (key, value) in convertTarget(targetId) { options[key] = value }
+        } else { options["mode"] = .string("normalize") }
 
         do {
             _ = try await Converter.convert(source, into: destination,
