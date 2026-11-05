@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "Le Google Drive de la bibliothèque d’impression",
   "offsite.choose": "Choisir un dossier…",
   "offsite.encrypted": "Chiffrée avec votre clé Khayt Cloud avant de quitter cet ordinateur. Sur un nouvel ordinateur, connectez-vous à Khayt Cloud avec votre phrase secrète pour la restaurer.",
+  "offsite.secrets_note": "Les clés d’API et mots de passe enregistrés sous Windows ou Linux sont liés à cet ordinateur : après une restauration sur un autre ordinateur, il faut les saisir à nouveau.",
   "offsite.needs_unlock": "Pas de sauvegarde : le livre ne quitte cet ordinateur que chiffré avec votre clé Khayt Cloud, et Khayt Cloud n’est pas déverrouillé ici. Déverrouillez-le pour sauvegarder.",
   "offsite.last": "Dernière sauvegarde externe : {when}, {size}",
   "offsite.never": "Aucune sauvegarde externe pour l’instant.",

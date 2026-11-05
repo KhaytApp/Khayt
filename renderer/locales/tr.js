@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "Baskı kitaplığının Google Drive’ı",
   "offsite.choose": "Klasör Seç…",
   "offsite.encrypted": "Bu bilgisayardan çıkmadan önce Khayt Cloud anahtarınızla şifrelenir. Yeni bir bilgisayarda geri yüklemek için parolanızla Khayt Cloud’da oturum açın.",
+  "offsite.secrets_note": "Windows veya Linux’ta kaydedilen API anahtarları ve parolalar o bilgisayara bağlıdır; başka bir bilgisayarda geri yükledikten sonra yeniden girilmeleri gerekir.",
   "offsite.needs_unlock": "Yedeklenmiyor: defter bu bilgisayardan yalnızca Khayt Cloud anahtarınızla şifrelenmiş olarak çıkar ve Khayt Cloud burada kilitli. Yedeklemek için kilidini açın.",
   "offsite.last": "Son harici yedek: {when}, {size}",
   "offsite.never": "Henüz harici yedek yok.",

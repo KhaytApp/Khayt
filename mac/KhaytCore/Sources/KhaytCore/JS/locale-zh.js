@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "打印库的 Google Drive",
   "offsite.choose": "选取文件夹…",
   "offsite.encrypted": "在离开这台电脑之前，已使用你的 Khayt Cloud 密钥加密。在新电脑上，请使用你的口令登录 Khayt Cloud 来恢复。",
+  "offsite.secrets_note": "在 Windows 或 Linux 上保存的 API 密钥和密码与该电脑绑定，在另一台电脑上恢复后需要重新输入。",
   "offsite.needs_unlock": "未备份：账本只有在使用你的 Khayt Cloud 密钥加密后才会离开这台电脑，而 Khayt Cloud 在此处未解锁。请解锁以进行备份。",
   "offsite.last": "上次异地备份：{when}，{size}",
   "offsite.never": "尚无异地备份。",

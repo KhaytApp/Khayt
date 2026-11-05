@@ -2570,6 +2570,7 @@
   "offsite.dest_drive": "The print library’s Google Drive",
   "offsite.choose": "Choose folder…",
   "offsite.encrypted": "Encrypted with your Khayt Cloud key before it leaves this computer. On a new computer, sign in to Khayt Cloud with your passphrase to restore it.",
+  "offsite.secrets_note": "API keys and passwords saved on Windows or Linux are locked to that computer, so after restoring on another computer they need entering again.",
   "offsite.needs_unlock": "Not backing up: the book only leaves this computer encrypted with your Khayt Cloud key, and Khayt Cloud is not unlocked here. Unlock it to back up.",
   "offsite.last": "Last off-site backup: {when}, {size}",
   "offsite.never": "No off-site backup yet.",

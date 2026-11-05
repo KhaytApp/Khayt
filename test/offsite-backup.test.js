@@ -159,3 +159,10 @@ test('the main-process job: settings stay on this computer, and nothing is sent 
     fs.rmSync(userData, { recursive: true, force: true }); fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('the committed fixture the Mac opens still opens here (the cross-app promise)', () => {
+  const dir = path.join(__dirname, 'fixtures', 'offsite-backup');
+  const key = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1));
+  const sealed = fs.readFileSync(path.join(dir, 'khayt-book-2026-11-05.khaytbak'));
+  assert.ok(OB.open(sealed, key).equals(fs.readFileSync(path.join(dir, 'book.json'))));
+});

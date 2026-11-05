@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "印刷ライブラリのGoogle Drive",
   "offsite.choose": "フォルダを選択…",
   "offsite.encrypted": "このコンピュータから出る前に、Khayt Cloudのキーで暗号化されます。新しいコンピュータで復元するには、パスフレーズでKhayt Cloudにサインインしてください。",
+  "offsite.secrets_note": "WindowsやLinuxで保存したAPIキーとパスワードはそのコンピュータに固定されているため、別のコンピュータで復元した後は入力し直す必要があります。",
   "offsite.needs_unlock": "バックアップされていません：帳簿はKhayt Cloudのキーで暗号化された状態でのみこのコンピュータから出ますが、ここではKhayt Cloudのロックが解除されていません。バックアップするには、ロックを解除してください。",
   "offsite.last": "直近のオフサイトバックアップ：{when}、{size}",
   "offsite.never": "オフサイトバックアップはまだありません。",

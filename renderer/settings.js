@@ -6178,7 +6178,7 @@ async function renderOffsiteBackup() {
     </div>
     ${st.where ? `<p style="font-size:11.5px;color:var(--text-dim);margin:6px 0 0;word-break:break-all;">${escapeHtml(st.where)}</p>` : ''}
     ${problem ? `<p style="font-size:12px;color:var(--warning, #b7791f);margin:6px 0 0;">${escapeHtml(problem)}</p>` : ''}
-    <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('offsite.encrypted'))}</p>
+    <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('offsite.encrypted'))} ${escapeHtml(t('offsite.secrets_note'))}</p>
     <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(line)}</p>
     ${failing}
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">

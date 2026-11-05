@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "Das Google Drive der Druckbibliothek",
   "offsite.choose": "Ordner wählen …",
   "offsite.encrypted": "Vor dem Verlassen dieses Computers mit Ihrem Khayt-Cloud-Schlüssel verschlüsselt. Melden Sie sich auf einem neuen Computer mit Ihrer Passphrase bei Khayt Cloud an, um sie wiederherzustellen.",
+  "offsite.secrets_note": "Auf Windows oder Linux gespeicherte API-Schlüssel und Passwörter sind an diesen Computer gebunden; nach einer Wiederherstellung auf einem anderen Computer müssen sie neu eingegeben werden.",
   "offsite.needs_unlock": "Keine Sicherung: Das Geschäftsbuch verlässt diesen Computer nur mit Ihrem Khayt-Cloud-Schlüssel verschlüsselt, und Khayt Cloud ist hier nicht entsperrt. Entsperren Sie sie, um zu sichern.",
   "offsite.last": "Letzte externe Sicherung: {when}, {size}",
   "offsite.never": "Noch keine externe Sicherung.",

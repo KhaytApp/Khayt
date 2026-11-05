@@ -2569,6 +2569,7 @@
   "offsite.dest_drive": "El Google Drive de la biblioteca de impresión",
   "offsite.choose": "Elegir carpeta…",
   "offsite.encrypted": "Cifrada con tu clave de Khayt Cloud antes de salir de este equipo. En un equipo nuevo, inicia sesión en Khayt Cloud con tu frase de contraseña para restaurarla.",
+  "offsite.secrets_note": "Las claves de API y contraseñas guardadas en Windows o Linux quedan ligadas a ese equipo, así que tras restaurar en otro equipo hay que volver a introducirlas.",
   "offsite.needs_unlock": "No se está respaldando: el libro solo sale de este equipo cifrado con tu clave de Khayt Cloud, y Khayt Cloud no está desbloqueado aquí. Desbloquéalo para respaldar.",
   "offsite.last": "Última copia de seguridad externa: {when}, {size}",
   "offsite.never": "Aún no hay copia de seguridad externa.",
