@@ -550,6 +550,157 @@
    * Delete over files that were not on screen. The maintainer's decision
    * (2026-10-01): both apps refuse that.
    */
+  /* ── Khayt Vault share links (lib/main/vault-links.js) ────────────────
+   * The Mac's "Share by Private Link…" and its Share links sheet. Offered only
+   * when the library is kept in the vault, Khayt Cloud is unlocked and the
+   * cloud answers for the vault; a model with no vault copy is refused by name. */
+  let _vaultLinksOn = false;
+  async function refreshVaultLinksOn() {
+    const was = _vaultLinksOn;
+    try { const r = await window.hubAPI?.vaultLinksStatus?.(); _vaultLinksOn = !!(r && r.ok && r.available); }
+    catch (_) { _vaultLinksOn = false; }
+    if (was !== _vaultLinksOn && _selectMode) renderBulkBar();
+  }
+  function vlError(r) {
+    const reason = (r && r.reason) || '';
+    const map = {
+      'no-links': 'vl.err_no_links', 'links-full': 'vl.err_links_full', 'links-disabled': 'vl.err_links_off',
+      'no-vault': 'vl.err_vault_off', 'vault-off': 'vl.err_vault_off', 'not-in-vault': 'vl.err_not_in_vault',
+      'not-shareable': 'vl.err_not_in_vault', 'unknown-items': 'vl.err_not_in_vault', 'downloads-cap': 'vl.err_downloads_cap',
+      'signin': 'vl.err_signin', 'incomplete': 'vl.err_incomplete', 'unknown-grant': 'vl.err_unknown_grant',
+      'not-allowed': 'vl.err_not_allowed', 'weak-password': 'vl.password_rule',
+    };
+    if (reason === 'locked') return t('offsite.needs_unlock');
+    if (r && r.status === 401) return t('vl.err_signin');
+    const key = map[reason] || 'vl.err_generic';
+    const names = r && Array.isArray(r.names) && r.names.length ? ` (${r.names.slice(0, 5).join(', ')}${r.names.length > 5 ? '…' : ''})` : '';
+    return t(key, { n: (r && r.limit) || '' }) + names;
+  }
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); toast(t('vl.copy_link') + ' ✓', 'success'); }
+    catch (_) { toast(text, 'info', 12000); }
+  }
+
+  /** Back the selected models up into the vault now (lib/main/vault-backup.js):
+   *  the Mac's library backup, to the same vault objects. */
+  async function vaultBackupSelected() {
+    const ids = [..._selected];
+    if (!ids.length || !window.hubAPI?.vaultBackup) return;
+    toast(t('vb.back_up') + '…', 'info');
+    const r = await window.hubAPI.vaultBackup(ids).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || (!r.done && !r.failed)) { toast(vlError(r), 'error', 9000); return; }
+    const done = (r.done || []).length, failed = (r.failed || []).length;
+    toast(t('vb.done', { n: done, total: done + failed }), failed ? 'warning' : 'success', 7000);
+    if (failed) toast(t('vb.some_failed', { n: failed }), 'error', 9000);
+  }
+
+  function vaultShareSelected() {
+    const ids = [..._selected];
+    if (!ids.length) return;
+    const days = [1, 7, 30, 90];
+    openFormModal({
+      title: t('vl.share_title'),
+      saveLabel: t('vl.create'),
+      bodyHtml: `
+        <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="vlLimit" style="width:auto;margin:0;" checked> ${escapeHtml(t('vl.limit_downloads'))}
+          <input type="number" id="vlMax" min="1" max="1000" value="5" style="width:80px;margin-inline-start:8px;"></label>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:6px;"><input type="checkbox" id="vlPerFile" style="width:auto;margin:0;"> ${escapeHtml(t('vl.per_file'))}</label>
+        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 10px;">${escapeHtml(t('vl.downloads_explain'))}</p>
+        <label>${escapeHtml(t('vl.ends'))}</label>
+        <select id="vlEnds">${days.map((d) => `<option value="${d}" ${d === 7 ? 'selected' : ''}>${escapeHtml(t('vl.after_days', { n: d }))}</option>`).join('')}
+          <option value="0">${escapeHtml(t('vl.no_end'))}</option></select>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:10px;"><input type="checkbox" id="vlUsePw" style="width:auto;margin:0;"> ${escapeHtml(t('vl.use_password'))}</label>
+        <input type="password" id="vlPw" placeholder="${escapeHtml(t('vl.password_ph'))}" autocomplete="new-password" style="margin-top:6px;" disabled>
+        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('vl.password_rule'))} ${escapeHtml(t('vl.password_explain'))}</p>
+        <input type="text" id="vlNote" maxlength="500" placeholder="${escapeHtml(t('vl.note_ph'))}" style="margin-top:10px;">
+        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('vl.note_explain'))}</p>`,
+      onMount(modal) {
+        const use = modal.querySelector('#vlUsePw'), pw = modal.querySelector('#vlPw');
+        use.addEventListener('change', () => { pw.disabled = !use.checked; if (use.checked) pw.focus(); });
+        modal.querySelector('#vlLimit').addEventListener('change', (e) => { modal.querySelector('#vlMax').disabled = !e.target.checked; modal.querySelector('#vlPerFile').disabled = !e.target.checked; });
+      },
+      async onSave(modal) {
+        const limit = modal.querySelector('#vlLimit').checked;
+        const days = Number(modal.querySelector('#vlEnds').value) || 0;
+        const options = {
+          maxDownloads: limit ? Math.max(1, Math.floor(Number(modal.querySelector('#vlMax').value) || 5)) : undefined,
+          perFile: limit && modal.querySelector('#vlPerFile').checked ? true : undefined,
+          expiresAt: days ? new Date(Date.now() + days * 86400000).toISOString() : undefined,
+          password: modal.querySelector('#vlUsePw').checked ? (modal.querySelector('#vlPw').value || '') : null,
+          note: modal.querySelector('#vlNote').value.trim() || undefined,
+        };
+        if (options.password !== null && [...options.password.normalize('NFC')].length < 10) { toast(t('vl.password_rule'), 'error'); return false; }
+        const r = await window.hubAPI.vaultShare({ recordIds: ids, options }).catch((e) => ({ ok: false, error: e.message }));
+        if (!r || !r.ok) { toast(vlError(r), 'error', 9000); return false; }
+        showVaultLinkMade(r, options.password !== null);
+        return true;
+      },
+    });
+  }
+
+  function showVaultLinkMade(r, hasPassword) {
+    openFormModal({
+      title: t('vl.share_title'),
+      saveLabel: t('vl.copy_link'),
+      bodyHtml: `<input type="text" readonly value="${escapeHtml(r.url)}" style="width:100%;font-family:monospace;font-size:12px;" onfocus="this.select()">
+        ${hasPassword ? `<p style="font-size:12px;margin:8px 0 0;">${escapeHtml(t('vl.password_separately'))}</p>` : ''}`,
+      onSave() { copyText(r.url); return true; },
+    });
+  }
+
+  async function openVaultLinks() {
+    const r = await window.hubAPI.vaultLinks().catch((e) => ({ ok: false, error: e.message }));
+    if (!r || !r.ok) { toast(vlError(r), 'error', 9000); return; }
+    const fmt = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag()); } catch (_) { return iso; } };
+    const stateKey = { ok: 'vl.state_ok', disabled: 'vl.state_disabled', revoked: 'vl.state_revoked', expired: 'vl.state_expired', 'used-up': 'vl.state_used_up', incomplete: 'vl.state_incomplete' };
+    const rows = (r.grants || []).map((g) => {
+      const limits = g.limits || {};
+      const used = Number(g.used) || 0;
+      const usage = limits.maxDownloads ? t('vl.used_left', { used, left: Math.max(0, limits.maxDownloads - used) }) : t('vl.used_no_limit', { used });
+      const ends = g.state === 'revoked' && g.revokedAt ? t('vl.revoked_on', { date: fmt(g.revokedAt) })
+        : (g.expiresAt ? t('vl.ends_on', { date: fmt(g.expiresAt) }) : (limits.validForSec ? t('vl.ends_after_open') : t('vl.no_end')));
+      const live = g.state === 'ok';
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;" data-grant="${escapeHtml(g.grantId)}">
+        <div style="display:flex;gap:8px;align-items:center;"><strong style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml((g.names || []).join(', ') || g.grantId)}</strong>
+          <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t(stateKey[g.state] || 'vl.state_unknown'))}</span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${escapeHtml(usage)} · ${escapeHtml(ends)}${g.password ? ' · ' + escapeHtml(t('vl.has_password')) : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          ${live && g.copyable ? `<button class="btn small" data-vl="copy">${escapeHtml(t('vl.copy_link'))}</button>` : ''}
+          ${live && limits.maxDownloads ? `<button class="btn small ghost" data-vl="add">${escapeHtml(t('vl.add_downloads', { n: 5 }))}</button>` : ''}
+          ${live && g.expiresAt ? `<button class="btn small ghost" data-vl="extend">${escapeHtml(t('vl.extend_days', { n: 7 }))}</button>` : ''}
+          ${g.state !== 'revoked' ? `<button class="btn small ghost danger" data-vl="revoke">${escapeHtml(t('vl.revoke'))}</button>` : ''}
+        </div></div>`;
+    }).join('');
+    openFormModal({
+      title: t('vl.links_title'),
+      sizeLg: true,
+      saveLabel: t('vl.refresh'),
+      bodyHtml: rows || `<p style="color:var(--text-muted);">${escapeHtml(t('vl.none'))}</p>`,
+      onMount(modal) {
+        modal.addEventListener('click', async (e) => {
+          const b = e.target.closest('[data-vl]'); if (!b) return;
+          const card = b.closest('[data-grant]'); const id = card && card.dataset.grant;
+          const g = (r.grants || []).find((x) => x.grantId === id); if (!g) return;
+          if (b.dataset.vl === 'copy') {
+            const u = await window.hubAPI.vaultLinkUrl(id);
+            if (u && u.ok) copyText(u.url); else toast(vlError(u), 'error');
+            return;
+          }
+          if (b.dataset.vl === 'revoke' && !(await confirmModal(t('vl.revoke_title') + '\n' + t('vl.revoke_explain'), { danger: true }))) return;
+          const change = b.dataset.vl === 'revoke' ? { action: 'revoke' }
+            : b.dataset.vl === 'add' ? { action: 'add', value: 5 }
+            : { action: 'extend', value: new Date(Math.max(Date.parse(g.expiresAt) || Date.now(), Date.now()) + 7 * 86400000).toISOString() };
+          b.disabled = true;
+          const done = await window.hubAPI.vaultLinkChange({ grantId: id, ...change }).catch((err) => ({ ok: false, error: err.message }));
+          if (!done || !done.ok) { toast(vlError(done), 'error', 9000); b.disabled = false; return; }
+          modal.querySelector('[data-act="cancel"]')?.click();
+          openVaultLinks();
+        });
+      },
+      onSave() { openVaultLinks(); return true; },
+    });
+  }
+
   function bulkBarHtml() {
     /* Not in the gallery. Its figures have no checkbox and no picked state, so
      * the bar was floating over photos it could not mark — while still offering
@@ -568,6 +719,9 @@
       <button class="btn small ghost" data-act="pf-bulk-group" ${has ? '' : 'disabled'}>${_bi('folder', '🗂')}${escapeHtml(t('plib.group') || 'Group')}</button>
       <button class="btn small ghost" data-act="pf-bulk-cat" ${has ? '' : 'disabled'}>${_bi('board', '▦')}${escapeHtml(t('plib.category') || 'Category')}</button>
       <button class="btn small ghost" data-act="pf-bulk-tag" ${has ? '' : 'disabled'}>${escapeHtml(t('plib.tags_short') || 'Tags')}</button>
+      ${_vaultLinksOn ? `<button class="btn small ghost" data-act="pf-bulk-vault-backup" ${has ? '' : 'disabled'}>${escapeHtml(t('vb.back_up'))}</button>
+      <button class="btn small ghost" data-act="pf-bulk-share" ${has ? '' : 'disabled'}>${escapeHtml(t('vl.share_title'))}…</button>
+      <button class="btn small ghost" data-act="pf-vault-links">${escapeHtml(t('vl.links_title'))}</button>` : ''}
       <button class="btn small ghost danger" data-act="pf-bulk-del" ${has ? '' : 'disabled'}>${_bi('trash', '🗑')}${escapeHtml(t('common.delete') || 'Delete')}</button>
       <span class="act-end"></span>
       <button class="btn small" data-act="pf-select-off">${escapeHtml(t('common.done') || 'Done')}</button>
@@ -614,6 +768,7 @@
 
   function setSelectMode(on) {
     _selectMode = on;
+    if (on) refreshVaultLinksOn();  // Khayt Cloud may have been unlocked since
     if (!on) _selected.clear();
     renderPrintFiles();
   }
@@ -1069,6 +1224,7 @@
   function resetPage() { _page = PAGE; growThumbCache(PAGE); }
 
   function renderPrintFiles() {
+    if (!renderPrintFiles._vlAsked) { renderPrintFiles._vlAsked = true; refreshVaultLinksOn(); }
     // Older multi-plate 3MFs get their corrected totals, once, after the library shows.
     if (!_plateRescanDone) setTimeout(rescanOldPlates, 3000);
     const el = document.getElementById('printfiles-tab');
@@ -1186,6 +1342,9 @@
       case 'pf-bulk-cat': bulkFile('category'); break;
       case 'pf-bulk-tag': bulkTag(); break;
       case 'pf-bulk-del': bulkDelete(); break;
+      case 'pf-bulk-share': vaultShareSelected(); break;
+      case 'pf-bulk-vault-backup': vaultBackupSelected(); break;
+      case 'pf-vault-links': openVaultLinks(); break;
       case 'pf-view-library': if (_view !== 'library') { _view = 'library'; resetPage(); renderPrintFiles(); } break;
       // Leaving the library drops the selection rather than carrying it
       // invisibly into a screen with no way to see or change it.

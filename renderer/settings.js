@@ -3705,6 +3705,7 @@ function renderDigestSettings() {
   ).join('');
 
   el.innerHTML = `
+    <div id="cloudDigestBox"></div>
     <div style="margin-bottom:12px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:0;">
         <input type="checkbox" id="digestEnabled" style="width:auto;margin:0;" ${d.enabled ? 'checked' : ''}>
@@ -3801,6 +3802,37 @@ function renderDigestSettings() {
       else if (result?.fallback) { resEl.textContent = 'mailto: fallback'; resEl.style.color = 'var(--text-muted)'; }
       else { resEl.textContent = 'Failed: ' + (result?.error || ''); resEl.style.color = 'var(--danger)'; }
     }
+  });
+
+  renderCloudDigest();
+}
+
+/** The OTHER weekly email: Khayt Cloud's owner summary (order requests,
+ *  quotes, messages, payments, reviews), switched on the cloud — the Mac's
+ *  DigestSettings. An option beside this computer's own KPI email above, not a
+ *  replacement for it. Shown only while Khayt Cloud is connected. */
+async function renderCloudDigest() {
+  const box = document.getElementById('cloudDigestBox');
+  const c = settings.cloud || {};
+  if (!box || !(c.enabled && c.shopId) || !window.hubAPI?.cloudDigest) { if (box) box.innerHTML = ''; return; }
+  const r = await window.hubAPI.cloudDigest({ url: c.url, shopId: c.shopId, token: c.token }).catch(() => null);
+  if (!r || !r.ok) { box.innerHTML = ''; return; }  // an older cloud without the route: nothing to offer
+  const status = !r.serverEnabled ? t('cdigest.not_sent')
+    : (r.lastSentWeek ? t('cdigest.last', { day: r.lastSentWeek }) : '');
+  box.innerHTML = `
+    <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(t('cdigest.title'))} · Khayt Cloud</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="cloudDigestOn" style="width:auto;margin:0;" ${r.enabled ? 'checked' : ''}> ${escapeHtml(t('cdigest.toggle'))}
+      </label>
+      <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('cdigest.hint'))}</p>
+      ${status ? `<p style="font-size:11.5px;color:var(--text-dim);margin:4px 0 0;">${escapeHtml(status)}</p>` : ''}
+    </div>`;
+  box.querySelector('#cloudDigestOn')?.addEventListener('change', async (e) => {
+    e.target.disabled = true;
+    const got = await window.hubAPI.cloudDigest({ url: c.url, shopId: c.shopId, token: c.token, enabled: e.target.checked }).catch(() => null);
+    if (!got || !got.ok) toast(t('cdigest.failed'), 'error');
+    renderCloudDigest();
   });
 }
 
@@ -6963,6 +6995,7 @@ function renderNtfySettings() {
     renderAccountingSyncSettings,
     renderIntegrationsSettings,
     renderDigestSettings,
+    renderCloudDigest,
     renderAiSettings,
     renderSlicerSettings,
     renderCloudSettings,

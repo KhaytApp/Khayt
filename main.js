@@ -1874,10 +1874,47 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
   },
   libraryDrive: () => printLibDrive(),
 });
+// Backing library models up into the Khayt Vault (lib/main/vault-backup.js):
+// the Mac's library backup, to the same vault objects. Writes no record field.
+const vaultBackup = require('./lib/main/vault-backup.js').createVaultBackup({
+  app,
+  readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
+  getDek: () => (cloudBackend ? cloudDek : null),
+  cloudToken: (token, url) => cloudToken(token, url),
+  isVaultOn: () => printLibVaultOn(),
+  itemDir: (id) => printLibItemDir(id),
+  isModelFile: (n) => PLT.isModelFile(n),
+  deviceId: 'desktop',
+});
+ipcMain.handle('hub:vault-backup', async (_e, { recordIds } = {}) => {
+  try { return await vaultBackup.backUp(Array.isArray(recordIds) ? recordIds : []); }
+  catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+// Khayt Vault share links (lib/main/vault-links.js): the Mac's share sheet and
+// links sheet, for files already in the vault. Needs Khayt Cloud unlocked.
+require('./lib/main/vault-links.js').registerVaultLinks({
+  app, ipcMain, safeStorage,
+  readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
+  getDek: () => (cloudBackend ? cloudDek : null),
+  cloudToken: (token, url) => cloudToken(token, url),
+  isVaultOn: () => printLibVaultOn(),
+});
 // Every printer call takes the machine the window holds, whose credentials are
 // masked; this puts the real ones back from the book on disk.
 const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSecrets({
   readDisk: () => readStoreDecryptedFromDisk(), isMasked: isStoreSecretMasked,
+});
+
+// A printer's smart plug (lib/main/smart-plug.js): read, switch, and the
+// auto-off after a cooled print. Same LAN pinning and secret fill as printers.
+require('./lib/main/smart-plug.js').registerSmartPlug({
+  ipcMain,
+  fill: (m) => machineSecrets.fill(m),
+  resolveTarget: (host) => resolvePrinterTarget(host),
+  statusCache: () => printerStatusCache,
+  readMachines: () => { try { return (readStoreDecryptedFromDisk() || {}).machines || []; } catch (_) { return []; } },
+  notify: (m) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('smart-plug-auto-off', { machineId: m.id, name: m.name || '' })),
 });
 
 // ── Telemetry (TELEMETRY-SPEC) ──────────────────────────────────────────────
@@ -2466,7 +2503,19 @@ function printLibRemotesFor(provider) {
  * @returns {null|{folder: boolean|null, s3: boolean|null}} null when no backup
  *   is configured at all.
  */
+/**
+ * On a library kept in the Khayt Vault, a new model goes there too, in the
+ * background, unless the shop turned "back up new models" off (only an
+ * explicit false does; absent is on, as on the Mac). Failures are logged and
+ * shown by the next manual backup, never undone. lib/main/vault-backup.js.
+ */
+function printLibVaultBackUpNew(id, filename) {
+  if (!printLibVaultOn() || ((printLibSettings() || {}).vault || {}).backUpNew === false || !PLT.isModelFile(filename)) return;
+  vaultBackup.backUp([id]).catch((e) => console.error('printlib vault backup:', e && e.message));
+}
+
 async function printLibMirrorFile(id, filename, srcPath) {
+  printLibVaultBackUpNew(id, filename);
   const dir = printLibMirrorItemDir(id);
   // Each remote's own "keep a copy of every new model" switch
   // (settings.printLibrary.<s3|gdrive>.backUpNew, set on the Mac's storage
@@ -6564,6 +6613,16 @@ ipcMain.handle('hub:cloud-set-plan', async (_e, { url, shopId, token, plan } = {
     const r = await cloudClient.setPlan(url, shopId, token, String(plan || ''));
     return r.refused ? { ok: false, reason: r.reason, error: r.error } : { ok: true, ...r };
   } catch (e) { return { ok: false, reason: '', error: String(e && e.message || e) }; }
+});
+
+ipcMain.handle('hub:cloud-digest', async (_e, { url, shopId, token, enabled } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const d = typeof enabled === 'boolean'
+      ? await cloudClient.setDigest(url, shopId, token, enabled)
+      : await cloudClient.digest(url, shopId, token);
+    return { ok: true, ...d };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-billing-me', async (_e, { url, shopId, token } = {}) => {
