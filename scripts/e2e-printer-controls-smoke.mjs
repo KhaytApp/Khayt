@@ -37,7 +37,11 @@ try {
   await window.waitForSelector('[data-machine-ctl="m-k"]');
 
   ok(JSON.stringify(await acts(window, 'm-k')) === JSON.stringify(['printer-pause', 'printer-cancel', 'printer-drop']), 'a Klipper printer that is printing offers Pause, Cancel and Drop one object');
-  ok((await acts(window, 'm-b')).length === 0, 'a Bambu printer offers no job control (its protocol cannot)');
+  // Bambu over MQTT since the Mac-parity pass: the job verbs, plus its own
+  // Speed / Light menu (a select, not a data-act button).
+  ok(JSON.stringify(await acts(window, 'm-b')) === JSON.stringify(['printer-pause', 'printer-cancel']), 'a Bambu printer that is printing offers Pause and Cancel');
+  ok(await window.evaluate(() => !!document.querySelector('select[data-printer-control="m-b"]')), 'a Bambu printer offers its Speed / Light menu');
+  ok(await window.evaluate(() => !document.querySelector('select[data-printer-control="m-k"]')), 'no Speed / Light menu on a printer that is not a Bambu');
   ok(JSON.stringify(await acts(window, 'm-r')) === JSON.stringify(['printer-cancel']), 'Repetier offers Cancel but not Pause, which it cannot do');
 
   await window.evaluate(() => { machineStatusCache['m-k'].state = 'paused'; updateMachinesLiveStatus(); });
