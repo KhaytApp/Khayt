@@ -3993,15 +3993,17 @@ function renderLoyaltyTiersSettings() {
       const idx = parseInt(inp.dataset.idx, 10);
       if (!seen.has(idx)) seen.add(idx);
     });
-    const newTiers = [];
+    const rawTiers = [];
     seen.forEach(idx => {
-      const name = el.querySelector(`.tier-name[data-idx="${idx}"]`)?.value.trim() || '';
-      const minOrders = +(el.querySelector(`.tier-min-orders[data-idx="${idx}"]`)?.value || 0);
-      const minSpend  = +(el.querySelector(`.tier-min-spend[data-idx="${idx}"]`)?.value || 0);
-      const discountPct = +(el.querySelector(`.tier-discount[data-idx="${idx}"]`)?.value || 0);
-      if (name) newTiers.push({ name, minOrders, minSpend, discountPct });
+      rawTiers.push({
+        name: el.querySelector(`.tier-name[data-idx="${idx}"]`)?.value || '',
+        minOrders: el.querySelector(`.tier-min-orders[data-idx="${idx}"]`)?.value,
+        minSpend: el.querySelector(`.tier-min-spend[data-idx="${idx}"]`)?.value,
+        discountPct: el.querySelector(`.tier-discount[data-idx="${idx}"]`)?.value,
+      });
     });
-    settings.loyaltyTiers = newTiers;
+    // lib/loyalty.js `cleanTiers`, the rule the Mac's tier editor saves through.
+    settings.loyaltyTiers = KhaytLoyalty.cleanTiers(rawTiers);
     saveAll();
     toast(t('common.save'), 'success');
     renderLoyaltyTiersSettings();
@@ -4894,14 +4896,9 @@ function renderExchangeRatesSettings() {
 
   el.querySelectorAll('.xr-input').forEach(input => {
     input.addEventListener('input', () => {
-      const code = input.dataset.code;
-      const val = parseFloat(input.value);
-      if (!settings.exchangeRates) settings.exchangeRates = {};
-      if (!isNaN(val) && val > 0) {
-        settings.exchangeRates[code] = val;
-      } else {
-        delete settings.exchangeRates[code];
-      }
+      // lib/settings-edit.js `exchangeRates`, the rule the Mac's editor uses.
+      settings.exchangeRates = KhaytSettingsEdit.exchangeRates(settings,
+        { [input.dataset.code]: input.value }, { base }).exchangeRates;
       saveAll();
     });
   });
@@ -4916,12 +4913,12 @@ function renderExchangeRatesSettings() {
     try {
       const res = await window.hubAPI.fetchExchangeRates(base);
       if (res && res.ok && res.rates) {
-        if (!settings.exchangeRates) settings.exchangeRates = {};
-        let n = 0;
-        for (const [code, rate] of Object.entries(res.rates)) {
-          if (CURRENCIES[code] && +rate > 0) { settings.exchangeRates[code] = +(+rate).toFixed(4); n++; }
-        }
-        settings.exchangeRatesUpdatedAt = res.updatedAt || new Date().toISOString();
+        const known = Object.fromEntries(Object.entries(res.rates).filter(([code, rate]) => CURRENCIES[code] && +rate > 0));
+        const n = Object.keys(known).length;
+        const next = KhaytSettingsEdit.exchangeRates(settings, known,
+          { base, fetchedAt: res.updatedAt || new Date().toISOString() });
+        settings.exchangeRates = next.exchangeRates;
+        settings.exchangeRatesUpdatedAt = next.exchangeRatesUpdatedAt;
         saveAll();
         renderExchangeRatesSettings();
         toast((t('xr.fetched') || 'Updated {n} rates vs {base}').replace('{n}', n).replace('{base}', base), 'success');

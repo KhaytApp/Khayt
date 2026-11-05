@@ -3532,5 +3532,18 @@
  "mac.bnpl_forget": "Kayıtlı anahtarı unut",
  "mac.bnpl_unsealed": "Bu anahtar şifrelenemedi, bu yüzden hiçbir şey kaydedilmedi. Defter eşitlenir ve yedeklenir; şifresiz bir anahtar da onunla giderdi.",
  "mac.bnpl_none": "Ayarlar ▸ Çevrimiçi bölümünden Tabby veya Tamara'yı API anahtarıyla açın.",
- "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek."
+ "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek.",
+ "mac.goto_group_spool": "Filament",
+ "mac.recurring_skip": "Atla",
+ "mac.recurring_more": "{n} tane daha vadesi geldi",
+ "mac.recurring_more_one": "Bir tane daha vadesi geldi",
+ "mac.goal_vs_last_month": "Geçen aya göre",
+ "mac.adj_none": "Henüz düzeltme yok.",
+ "mac.dry_none": "Henüz kurutma kaydı yok.",
+ "mac.inv_num_format": "Biçim",
+ "mac.inv_num_next_is": "Sonraki fatura: {number}",
+ "mac.loyalty_tiers": "Seviyeler",
+ "mac.loyalty_tiers_hint": "Müşteri en az bu kadar tamamlanmış sipariş ve bu kadar harcamayla bir seviyeye ulaşır ve onun indirimini alır. Ulaştığı en yüksek seviye geçerlidir.",
+ "mac.loyalty_tier_name": "Seviye",
+ "mac.loyalty_add_tier": "Seviye ekle"
 }

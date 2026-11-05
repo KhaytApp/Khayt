@@ -3532,5 +3532,18 @@
  "mac.bnpl_forget": "Oublier la clé enregistrée",
  "mac.bnpl_unsealed": "Cette clé n'a pas pu être chiffrée, rien n'a donc été enregistré. Le registre est synchronisé et sauvegardé, et une clé en clair partirait avec lui.",
  "mac.bnpl_none": "Activez Tabby ou Tamara, avec sa clé API, dans Réglages ▸ En ligne.",
- "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé."
+ "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé.",
+ "mac.goto_group_spool": "Filament",
+ "mac.recurring_skip": "Ignorer",
+ "mac.recurring_more": "{n} autres à échéance",
+ "mac.recurring_more_one": "Une autre à échéance",
+ "mac.goal_vs_last_month": "Par rapport au mois dernier",
+ "mac.adj_none": "Aucun ajustement pour l'instant.",
+ "mac.dry_none": "Aucun séchage enregistré pour l'instant.",
+ "mac.inv_num_format": "Format",
+ "mac.inv_num_next_is": "Prochaine facture : {number}",
+ "mac.loyalty_tiers": "Niveaux",
+ "mac.loyalty_tiers_hint": "Un client atteint un niveau avec au moins ce nombre de commandes terminées et ce montant dépensé, et obtient sa remise. Le niveau le plus élevé atteint s'applique.",
+ "mac.loyalty_tier_name": "Niveau",
+ "mac.loyalty_add_tier": "Ajouter un niveau"
 }

@@ -23,7 +23,7 @@ extension Shop {
         if let cache = goToCache, cache.revision == bookRevision { return cache.index }
         let revision = bookRevision
         let book = GoToBook(orders: orders, customers: customers, files: files,
-                            products: catalogueRows, machines: machines)
+                            products: catalogueRows, machines: machines, spools: spools)
         let index = await Task.detached(priority: .userInitiated) { book.index() }.value
         goToBuilds += 1
         // Not over a newer book: a change that landed while this was building
@@ -43,6 +43,8 @@ extension Shop {
         var kinds: Set<GoToIndex.Kind> = [.screen, .model, .product, .machine]
         if lockAllows("orders", "view") { kinds.insert(.job) }
         if canShow(.customers) { kinds.insert(.customer) }
+        // The shelf, as the desktop's search finds it — gated like the screen.
+        if canShow(.inventory) { kinds.insert(.spool) }
         return kinds
     }
 
@@ -117,6 +119,11 @@ extension Shop {
             // The machines screen keeps no selection to set; the screen is
             // where a machine is.
             shelf = .machines
+        case .spool:
+            // The shelf, its search cleared so the card is there to select.
+            shelf = .inventory
+            search = ""
+            spoolSelection = entry.id
         case .folder, .archive, .tag, .search:
             // ⌘J's kinds — never in ⌘K's index (`goToKinds`), so never here
             // past the gate above; ⌘J runs them itself (`jump(to:)`).
@@ -141,6 +148,7 @@ struct GoToBook: Sendable {
     var files: [LibraryFile]
     var products: [KhaytEngine.CatalogueRow]
     var machines: [Machine]
+    var spools: [Spool] = []
 
     func index() -> GoToIndex {
         var entries: [GoToIndex.Entry] = []
@@ -185,6 +193,17 @@ struct GoToBook: Sendable {
             entries.append(.init(kind: .machine, id: machine.id, title: machine.name,
                                  subtitle: machine.printerModelName ?? "",
                                  fields: [machine.name, machine.printerModelName ?? "", machine.vendor ?? ""]))
+        }
+        // What the desktop's search finds a spool by: its material, its
+        // colour, its lot and its id.
+        for spool in spools {
+            entries.append(.init(kind: .spool, id: spool.id,
+                                 title: [spool.material, spool.colourVariant ?? ""]
+                                    .filter { !$0.isEmpty }.joined(separator: " \u{00B7} "),
+                                 subtitle: [spool.storage ?? "", spool.lot ?? ""]
+                                    .filter { !$0.isEmpty }.joined(separator: " \u{00B7} "),
+                                 fields: [spool.material, spool.colourVariant ?? "", spool.materialType ?? "",
+                                          spool.lot ?? "", spool.id]))
         }
         return GoToIndex(entries)
     }

@@ -3532,5 +3532,18 @@
  "mac.bnpl_forget": "保存したキーを削除",
  "mac.bnpl_unsealed": "そのキーを暗号化できなかったため、何も保存されていません。台帳は同期・バックアップされるため、平文のキーも一緒に送られてしまいます。",
  "mac.bnpl_none": "設定 ▸ オンライン で、API キーとともに Tabby または Tamara をオンにしてください。",
- "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。"
+ "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。",
+ "mac.goto_group_spool": "フィラメント",
+ "mac.recurring_skip": "スキップ",
+ "mac.recurring_more": "ほかに{n}件が期日",
+ "mac.recurring_more_one": "ほかに1件が期日",
+ "mac.goal_vs_last_month": "先月比",
+ "mac.adj_none": "調整はまだありません。",
+ "mac.dry_none": "乾燥の記録はまだありません。",
+ "mac.inv_num_format": "形式",
+ "mac.inv_num_next_is": "次の請求書: {number}",
+ "mac.loyalty_tiers": "ランク",
+ "mac.loyalty_tiers_hint": "完了した注文数と支出額がそれぞれこの値以上になると、顧客はそのランクに達し、割引を受けられます。達した最も高いランクが適用されます。",
+ "mac.loyalty_tier_name": "ランク",
+ "mac.loyalty_add_tier": "ランクを追加"
 }

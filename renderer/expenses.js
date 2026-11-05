@@ -33,16 +33,24 @@ function checkRecurringExpenses() {
     skipBtn.className = 'undo-btn';
     skipBtn.style.marginInlineStart = '4px';
     skipBtn.textContent = 'Skip';
+    // `comeRound` is the rule the Mac answers the same prompt with: the copy
+    // keeps the original's reclaimable tax and location, and the schedule
+    // moves on from where it stood. Spliced in place — other screens hold
+    // this array.
+    const answer = (add) => {
+      const next = ExpenseBook.comeRound(expenses, exp.id, { add, id: uid('EXP'), today: todayStr });
+      if (next) expenses.splice(0, expenses.length, ...next);
+      return !!next;
+    };
     addBtn.addEventListener('click', () => {
-      expenses.unshift(ExpenseBook.recurrence(exp, { id: uid('EXP'), today: todayStr }));
-      exp.nextDue = calcNextDueDate(exp.nextDue || todayStr, exp.recurring);
+      answer(true);
       saveAll();
       renderExpenses();
       toast(t('exp.recurring_added'), 'success');
       c.remove();
     });
     skipBtn.addEventListener('click', () => {
-      exp.nextDue = calcNextDueDate(exp.nextDue || todayStr, exp.recurring);
+      answer(false);
       saveAll();
       c.remove();
     });

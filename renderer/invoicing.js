@@ -302,30 +302,31 @@ function renderInvoiceNumberingSection() {
     </div>
     <div id="invNumGapsResult" style="margin-top:8px; font-size:12.5px;"></div>`;
 
+  // lib/settings-edit.js `invoiceNumbering` / `invoiceNumberGaps`: the Mac's
+  // numbering section sets and audits the counter through the same rules.
+  const numbering = (form) => {
+    const next = KhaytSettingsEdit.invoiceNumbering(settings, form, { year: new Date().getFullYear() });
+    for (const k of ['invNumPrefix', 'invNumNext', 'invNumFormat', 'invNumYear']) {
+      if (next[k] !== undefined) settings[k] = next[k];
+    }
+  };
   el.querySelector('#btnSaveInvNum').addEventListener('click', () => {
-    settings.invNumPrefix = el.querySelector('#invNumPrefix').value.trim() || 'INV';
-    settings.invNumNext   = Math.max(1, parseInt(el.querySelector('#invNumNext').value, 10) || 1);
-    settings.invNumFormat = el.querySelector('#invNumFormat').value;
+    numbering({
+      prefix: el.querySelector('#invNumPrefix').value,
+      next: el.querySelector('#invNumNext').value,
+      format: el.querySelector('#invNumFormat').value,
+    });
     saveAll();
     toast(t('set.saved'), 'success');
   });
   el.querySelector('#btnInvNumReset').addEventListener('click', () => {
-    settings.invNumYear  = new Date().getFullYear();
-    settings.invNumNext  = 1;
+    numbering({ reset: true });
     saveAll();
     el.querySelector('#invNumNext').value = '1';
     toast(t('set.inv_num_reset'), 'success');
   });
   el.querySelector('#btnInvNumDetectGaps').addEventListener('click', () => {
-    const nums = printLog
-      .map(o => o.invoiceNum || o.id)
-      .map(id => { const m = /(\d+)$/.exec(id); return m ? parseInt(m[1], 10) : null; })
-      .filter(n => n !== null)
-      .sort((a, b) => a - b);
-    const gaps = [];
-    for (let i = 1; i < nums.length; i++) {
-      for (let g = nums[i - 1] + 1; g < nums[i]; g++) gaps.push(g);
-    }
+    const gaps = KhaytSettingsEdit.invoiceNumberGaps(printLog);
     const res = el.querySelector('#invNumGapsResult');
     if (res) {
       res.textContent = gaps.length === 0

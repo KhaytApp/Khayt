@@ -338,6 +338,10 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     /// shows it. It is the answer to "what happened to that kilo", which is
     /// the question a shelf count raises every time it disagrees.
     let usageHistory: [Use]?
+    /// Which of the shop's sites the spool is kept at (`store.locations`).
+    /// Absent or empty is Unassigned — `lib/spool-edit.js` writes no key for
+    /// it. A `var` with a default so the memberwise init keeps its shape.
+    var locationId: String? = nil
 
     struct Use: Decodable, Hashable, Sendable {
         /// `YYYY-MM-DD`.

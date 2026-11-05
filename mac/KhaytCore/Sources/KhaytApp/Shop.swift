@@ -1347,6 +1347,7 @@ final class Shop {
             wasteLog = Self.decode(root, "wasteLog", as: WasteEntry.self)
             if case .array(let rows)? = root["expenses"] { expenseRows = rows } else { expenseRows = [] }
             if case .array(let rows)? = root["wasteLog"] { wasteRows = rows } else { wasteRows = [] }
+            if case .array(let rows)? = root["auditLog"] { auditRows = rows } else { auditRows = [] }
             readSnapshots(root)
             // AFTER `orderRows` is read, which it groups. A kit is several
             // print-log entries that are one physical object, and the rollup
@@ -1702,7 +1703,27 @@ final class Shop {
                                                consumables: Self.rows(root, "consumables"),
                                                currencies: Invoice.currencyTable(self))
         guard ticket == loadGeneration else { return }
-        thisMonthRevenue = monthKpis?.revenue ?? 0
+        // THE GOAL'S FIGURE IS THE DESKTOP'S: `KhaytKpiRows.tradeRevenue`, the
+        // one rule both goal bars read — finished, not voided, not Not
+        // business, net of tax — with last month on the same rule for the
+        // month-over-month chip. The month's KPIs answer the same set; the
+        // trade figure is preferred so the two apps cannot drift apart again.
+        let span = Self.goalSpan(Date())
+        let known = Invoice.currencyTable(self)
+        let monthTrade = try? await engine.tradeRevenue(orders: orders, settings: settings, clients: clients,
+                                                        currencies: known, from: span.from, to: span.to)
+        let lastTrade = try? await engine.tradeRevenue(orders: orders, settings: settings, clients: clients,
+                                                       currencies: known, from: span.lastFrom, to: span.lastTo)
+        guard ticket == loadGeneration else { return }
+        thisMonthRevenue = monthTrade ?? monthKpis?.revenue ?? 0
+        let goal = Self.plainNumber(settings["monthlyGoal"]) ?? 0
+        if goal > 0 {
+            monthGoal = try? await engine.goalPace(revenue: thisMonthRevenue, previous: lastTrade ?? 0,
+                                                   goal: goal, day: span.day, days: span.days)
+        } else {
+            monthGoal = nil
+        }
+        guard ticket == loadGeneration else { return }
         kpiOrders = orders
         kpiClients = clients
         kpiSettings = settings
@@ -2303,6 +2324,20 @@ final class Shop {
     var showingHistoryFor: Supplier?
     /// The spool whose usage log is open, if any.
     var spoolHistoryFor: Spool?
+    /// The spool whose stock is being adjusted by hand, if any.
+    var adjustingSpool: Spool?
+    /// The spool whose drying log is open, if any.
+    var dryingLogFor: Spool?
+    /// The spool being moved to another location, if any.
+    var transferringSpool: Spool?
+    /// Whether the team's activity log is open.
+    var showingActivityLog = false
+    /// The card chosen on the shelf — kept here so Go to… can choose one.
+    var spoolSelection: Spool.ID?
+    /// This month against its goal: the share, the month-end pace and the
+    /// change from last month (`KhaytKpiRows.goalPace`). Nil until the book
+    /// has been read, or with no goal set.
+    private(set) var monthGoal: KhaytEngine.GoalPace?
     /// The order whose supplier bill is being typed in, if any. Set when a
     /// bill turns up after the goods rather than with them.
     var billingOrder: PurchaseOrder?
@@ -2409,6 +2444,8 @@ final class Shop {
     /// Machine maintenance entries — `{ machineId, date, cost }`.
     private(set) var maintenanceRows: [JSONValue] = []
     private(set) var wasteRows: [JSONValue] = []
+    /// The team activity log (`auditLog`), oldest first as the book keeps it.
+    private(set) var auditRows: [JSONValue] = []
 
     /// Which period the two screens are showing. On the shop, not the view, so
     /// a snapshot run can turn to a month and photograph it.

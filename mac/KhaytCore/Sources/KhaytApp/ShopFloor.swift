@@ -715,7 +715,11 @@ struct Upkeep: View {
 /// six spools.
 struct Inventory: View {
     @Bindable var shop: Shop
-    @State private var selection: Spool.ID?
+    /// The card chosen — on the shop, so Go to… can choose one too.
+    private var selection: Spool.ID? {
+        get { shop.spoolSelection }
+        nonmutating set { shop.spoolSelection = newValue }
+    }
     /// The spool chosen for Delete, held until the shop answers.
     @State private var deletingSpool: Spool?
     @State private var needs: [KhaytEngine.ConsumableNeed] = []
@@ -927,6 +931,23 @@ struct Inventory: View {
                                         Task { shop.moveProblem = await shop.markDried(spool.id) }
                                     }
                                     .disabled(!shop.canMoveJobs)
+                                    // THE DESKTOP'S THREE SHELF FORMS: the
+                                    // drying log (a read too, so not gated on
+                                    // writing), a correction with its reason,
+                                    // and — for a shop with sites — a move.
+                                    Button(shop.words.callIt("inv.dry_log") + "\u{2026}") {
+                                        shop.dryingLogFor = spool
+                                    }
+                                    Button(shop.words.callIt("inv.adjust_title") + "\u{2026}") {
+                                        shop.adjustingSpool = spool
+                                    }
+                                    .disabled(!shop.canMoveJobs)
+                                    if !shop.locations.isEmpty {
+                                        Button(shop.words.callIt("inv.transfer_title") + "\u{2026}") {
+                                            shop.transferringSpool = spool
+                                        }
+                                        .disabled(!shop.canMoveJobs)
+                                    }
                                     Divider()
                                     if shop.canMoveJobs, shop.has("purchasing") {
                                         // ORDER MORE. Drafted, never sent: a

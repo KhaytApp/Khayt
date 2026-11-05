@@ -3532,5 +3532,18 @@
  "mac.bnpl_forget": "Olvidar la clave guardada",
  "mac.bnpl_unsealed": "No se pudo cifrar esa clave, así que no se guardó nada. El libro se sincroniza y se respalda, y una clave sin cifrar iría con él.",
  "mac.bnpl_none": "Active Tabby o Tamara, con su clave de API, en Ajustes ▸ En línea.",
- "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado."
+ "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado.",
+ "mac.goto_group_spool": "Filamento",
+ "mac.recurring_skip": "Omitir",
+ "mac.recurring_more": "{n} más pendientes",
+ "mac.recurring_more_one": "Una más pendiente",
+ "mac.goal_vs_last_month": "Frente al mes pasado",
+ "mac.adj_none": "Aún no hay ajustes.",
+ "mac.dry_none": "Aún no se ha registrado ningún secado.",
+ "mac.inv_num_format": "Formato",
+ "mac.inv_num_next_is": "Próxima factura: {number}",
+ "mac.loyalty_tiers": "Niveles",
+ "mac.loyalty_tiers_hint": "Un cliente alcanza un nivel con al menos estos pedidos completados y este gasto, y obtiene su descuento. Se aplica el nivel más alto que alcance.",
+ "mac.loyalty_tier_name": "Nivel",
+ "mac.loyalty_add_tier": "Añadir nivel"
 }
