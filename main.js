@@ -1434,6 +1434,7 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // name, the request — is `lib/printer-upload.js`, which the Mac app sends with
 // too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -1872,6 +1873,11 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
   },
   libraryDrive: () => printLibDrive(),
 });
+// Every printer call takes the machine the window holds, whose credentials are
+// masked; this puts the real ones back from the book on disk.
+const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSecrets({
+  readDisk: () => readStoreDecryptedFromDisk(), isMasked: isStoreSecretMasked,
+});
 
 // ── Telemetry (TELEMETRY-SPEC) ──────────────────────────────────────────────
 // OFF by default and gated on explicit per-stream consent. Scrubbing happens HERE — the
@@ -2080,6 +2086,8 @@ ipcMain.handle('hub:mint-api-token', async (_e, { label, scopes } = {}) => {
 let _diskStoreVersion = null;
 
 ipcMain.handle('hub:save-store', async (event, data) => {
+  // A save is when a credential changes: the next printer call reads it fresh.
+  machineSecrets.forget();
   try {
     if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
       const msg = `This data file was written by a newer version of ${FLAVOR_NAME} (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update ${FLAVOR_NAME}.`;
@@ -5110,6 +5118,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  * other printer call — isAllowedPrinterHost keeps it on the LAN.
  */
 async function fetchPrinterHistory(machine, limit) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
@@ -5149,6 +5158,7 @@ let _bambuSeq = Math.floor(Date.now() / 1000) % 1e9;
 function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(_bambuSeq); }
 
 async function sendPrinterCommand(machine, command) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -5309,6 +5319,7 @@ async function sendPrinterCommand(machine, command) {
  * a list from some seconds ago, and the object it names may have finished.
  */
 async function plateObjects(machine) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
@@ -5369,6 +5380,7 @@ ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
  * which accepts only its closed set of values, so nothing typed reaches the wire.
  */
 async function sendPrinterControl(machine, control, value) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
   const target = await resolvePrinterTarget(host);
@@ -5426,6 +5438,7 @@ function stockOptsFor(machine) {
 }
 
 async function fetchPrinterStatus(machine) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
   // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN

@@ -1171,7 +1171,9 @@ function openMachineEditor(machineId = null) {
           host:         document.getElementById('machApiHost')?.value.trim() || '',
           port:         document.getElementById('machApiPort')?.value ? parseInt(document.getElementById('machApiPort').value) : null,
           apiKey:       secretInputSave(draft.printerApi?.apiKey, document.getElementById('machApiKey')?.value),
-          accessCode:   document.getElementById('machApiAccessCode')?.value.trim() || '',
+          // As the API key: a blank field over a stored code keeps it. Read raw,
+          // an edit that did not retype it saved '' and erased the Bambu's code.
+          accessCode:   secretInputSave(draft.printerApi?.accessCode, document.getElementById('machApiAccessCode')?.value),
           printerSlug:  document.getElementById('machApiSlug')?.value.trim() || '',
         };
       }
