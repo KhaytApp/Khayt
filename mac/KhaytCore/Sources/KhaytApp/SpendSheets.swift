@@ -251,6 +251,22 @@ struct WasteSheet: View {
     @State private var orderId = ""
     @FocusState private var focused: Bool
 
+    /// Filled in from a printer's "Print failed" notice, when the sheet was
+    /// opened from one (`WastePrefill`) — as the starting values, so the job
+    /// picker's onChange does not replace the printer that reported it.
+    /// Nothing is logged until the shop presses Log.
+    init(shop: Shop) {
+        self.shop = shop
+        if let pre = shop.wastePrefill {
+            _machineId = State(initialValue: pre.machineId)
+            _orderId = State(initialValue: pre.orderId ?? "")
+            if let g = pre.grams { _weight = State(initialValue: g) }
+            if let m = pre.material, shop.spools.contains(where: { $0.material == m }) {
+                _material = State(initialValue: m)
+            }
+        }
+    }
+
     /// Jobs a print can have failed on: anything still in the works, and the
     /// job whose print just stopped (the finish seam names it).
     private var jobs: [Order] {
@@ -357,7 +373,7 @@ struct WasteSheet: View {
             if material.isEmpty { material = materials.first ?? "" }
             // The print that just stopped, when the finish seam could name its
             // job: the likeliest thing a shop opening this sheet is logging.
-            if orderId.isEmpty, let failed = shop.lastFailedJob() {
+            if orderId.isEmpty, shop.wastePrefill == nil, let failed = shop.lastFailedJob() {
                 orderId = failed.orderId
                 machineId = failed.machineId
             }

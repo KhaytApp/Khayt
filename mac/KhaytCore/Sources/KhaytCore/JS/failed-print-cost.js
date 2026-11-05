@@ -168,20 +168,37 @@
   }
 
   /**
-   * The log's three costs, summed — for the Waste screen's totals.
-   * A row written before the breakdown counts its `cost` as material and
-   * nothing else: that is all anybody ever knew about it.
+   * One row's three costs — THE definition of "full" that `totals` and
+   * `byGroup` both use, so a total and the groups it is split into add up
+   * to the same figure.
+   *
+   * A row written before the breakdown (or logged with no job behind it)
+   * counts its `cost` as material and nothing else: that is all anybody ever
+   * knew about it. A row WITH the breakdown reads `costMaterial`, which
+   * `attach` wrote from that same `cost`.
    */
+  function partsOf(w) {
+    const row = w || {};
+    const hasBreakdown = num(row.costFull) !== null;
+    return {
+      material: Math.max(0, num(hasBreakdown ? row.costMaterial : row.cost) || 0),
+      machine: Math.max(0, num(row.costMachine) || 0),
+      power: Math.max(0, num(row.costPower) || 0),
+      costed: hasBreakdown,
+    };
+  }
+
+  /** The log's three costs, summed — for the Waste screen's totals. */
   function totals(wasteLog) {
     let material = 0, machine = 0, power = 0, energyWh = 0, costed = 0;
     for (const w of Array.isArray(wasteLog) ? wasteLog : []) {
       if (!w) continue;
-      const hasBreakdown = num(w.costFull) !== null;
-      material += Math.max(0, num(hasBreakdown ? w.costMaterial : w.cost) || 0);
-      machine += Math.max(0, num(w.costMachine) || 0);
-      power += Math.max(0, num(w.costPower) || 0);
+      const p = partsOf(w);
+      material += p.material;
+      machine += p.machine;
+      power += p.power;
       energyWh += Math.max(0, num(w.energyWh) || 0);
-      if (hasBreakdown) costed += 1;
+      if (p.costed) costed += 1;
     }
     return {
       material: r2(material), machine: r2(machine), power: r2(power),
@@ -189,7 +206,112 @@
     };
   }
 
-  const api = { hourlyRateOf, hoursFor, breakdown, attach, fullCostOf, totals };
+  const str = (v) => (v == null ? '' : String(v)).trim();
+  const indexById = (rows) => {
+    const out = new Map();
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (r && str(r.id)) out.set(str(r.id), r);
+    }
+    return out;
+  };
+
+  /**
+   * WHERE the failures cost: the log grouped by printer, by material or by
+   * customer — each group's three costs and how many failures it holds.
+   *
+   * The links are only the ones the writers actually put on a waste row
+   * (`lib/waste-entry.js` newEntry/forOrder, `lib/qc-failure.js`, the Mac's
+   * `newWasteEntry`, the void-and-log path in `renderer/invoicing.js`):
+   *
+   *   machine   `machineId` on the row; else the job's `machineId` — the
+   *             desktop's job-waste form (`forOrder`) writes no printer
+   *   material  `material` on the row (every writer sets it); else the
+   *             material of the spool it came off (`spoolId`)
+   *   customer  nothing on the row: through its job (`orderId`) to the job's
+   *             `clientId` and that customer's record, else the name typed
+   *             on the job (`client`, which storefront orders carry)
+   *
+   * A row whose link cannot be followed is counted in ONE "Unknown" group
+   * (`key: null`, `unknown: true`) rather than dropped: the money was lost
+   * either way, and groups that add up to less than the total leave the shop
+   * wondering where the rest went. The caller words "Unknown" itself.
+   *
+   * @param {object[]} wasteLog
+   * @param {object}   opts  `{ by, orders, machines, spools, clients }`;
+   *   `by` is 'machine' | 'material' | 'customer' (anything else: no rows)
+   * @returns {{key: string|null, label: string, full: number, material: number,
+   *   machine: number, power: number, count: number, unknown: boolean}[]}
+   *   biggest full cost first
+   */
+  function byGroup(wasteLog, opts) {
+    const o = opts || {};
+    const by = o.by || 'machine';
+    if (by !== 'machine' && by !== 'material' && by !== 'customer') return [];
+    const orders = indexById(o.orders);
+    const machines = indexById(o.machines);
+    const spools = indexById(o.spools);
+    const clients = indexById(o.clients);
+
+    /** `{ key, label }` for one row, or null when the link is missing. */
+    function linkOf(w) {
+      const job = orders.get(str(w.orderId)) || null;
+      if (by === 'machine') {
+        const id = str(w.machineId) || str(job && job.machineId);
+        if (!id) return null;
+        const m = machines.get(id);
+        return { key: id, label: str(m && m.name) || id };
+      }
+      if (by === 'material') {
+        const spool = spools.get(str(w.spoolId));
+        const name = str(w.material) || str(spool && spool.material);
+        return name ? { key: name, label: name } : null;
+      }
+      if (!job) return null;
+      const cid = str(job.clientId);
+      if (cid) {
+        const c = clients.get(cid);
+        return { key: cid, label: str(c && (c.name || c.company)) || str(job.client) || cid };
+      }
+      const typed = str(job.client);
+      return typed ? { key: 'name:' + typed.toLowerCase(), label: typed } : null;
+    }
+
+    const groups = new Map();
+    let unknown = null;
+    for (const w of Array.isArray(wasteLog) ? wasteLog : []) {
+      if (!w) continue;
+      const link = linkOf(w);
+      let g;
+      if (link) {
+        g = groups.get(link.key);
+        if (!g) {
+          g = { key: link.key, label: link.label, material: 0, machine: 0, power: 0, count: 0, unknown: false };
+          groups.set(link.key, g);
+        }
+      } else {
+        unknown = unknown || { key: null, label: 'Unknown', material: 0, machine: 0, power: 0, count: 0, unknown: true };
+        g = unknown;
+      }
+      const p = partsOf(w);
+      g.material += p.material;
+      g.machine += p.machine;
+      g.power += p.power;
+      g.count += 1;
+    }
+    const all = Array.from(groups.values());
+    if (unknown) all.push(unknown);
+    const rows = all.map((g) => ({
+      key: g.key, label: g.label,
+      full: r2(g.material + g.machine + g.power),
+      material: r2(g.material), machine: r2(g.machine), power: r2(g.power),
+      count: g.count, unknown: g.unknown,
+    }));
+    rows.sort((a, b) => (b.full - a.full) || (b.count - a.count)
+      || (Number(a.unknown) - Number(b.unknown)) || a.label.localeCompare(b.label));
+    return rows;
+  }
+
+  const api = { hourlyRateOf, hoursFor, breakdown, attach, fullCostOf, partsOf, totals, byGroup };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytFailedPrintCost = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

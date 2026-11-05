@@ -286,6 +286,13 @@ struct PrinterTrouble: View {
                                 }
                             }
                             Spacer(minLength: 12)
+                            // The waste sheet, filled in from the failure.
+                            if notice.kind == PrintNoticeKind.failed.rawValue, shop.canLogWasteFromNotice {
+                                Button(shop.words.callIt("mac.waste_from_notice")) {
+                                    shop.logWasteFromNotice(notice)
+                                }
+                                .controlSize(.small)
+                            }
                             Text(shop.words.say(notice.at, Date.FormatStyle(date: .omitted, time: .shortened)))
                                 .font(TypeScale.body(11)).monospacedDigit()
                                 .foregroundStyle(Role.text3)

@@ -173,7 +173,7 @@ extension Shop {
         addingConsumable = false; addingExpense = false; addingMachine = false; addingSpool = false
         askingTheBook = false; checkingCloud = false; confirmingSignOut = false
         findingPrinters = false; importingSpoolman = false; issuingGiftCard = false
-        loggingWaste = false; namingGroup = false; pausingProduction = false
+        loggingWaste = false; wastePrefill = nil; namingGroup = false; pausingProduction = false
         readingReceipt = false; receiptPrefill = nil
         planningBatch = false; planningCampaign = false; reviewingDeposits = false
         reviewingSyncLosses = false; scanning = false; schedulingWork = false

@@ -2831,6 +2831,9 @@ final class Shop {
     var readingReceipt = false
     var receiptPrefill: KhaytEngine.ReceiptDraft?
     var loggingWaste = false
+    /// "Log as waste…" on a failed print's notice: what the waste sheet
+    /// starts from, never saved by itself (`WastePrefill`).
+    var wastePrefill: WastePrefill?
     /// The printers Khayt knows, read once per launch — the catalogue is a
     /// constant, not something a book carries.
     var catalog: [CatalogPrinter] = []

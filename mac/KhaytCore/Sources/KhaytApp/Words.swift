@@ -1030,6 +1030,19 @@ final class Words {
         "mac.waste_no_job":     ["en": "No job", "ar": "بلا طلب"],
         "mac.waste_job_help":   ["en": "Link the failed print to its job to cost its machine time and electricity too.",
                                  "ar": "اربط الطباعة الفاشلة بطلبها لتُحسب تكلفة وقت الآلة والكهرباء أيضًا."],
+        // WHERE FAILURES COST (`KhaytFailedPrintCost.byGroup`): the Waste
+        // screen's breakdown by printer, material or customer.
+        "mac.waste_where_title":  ["en": "Where failures cost", "ar": "أين تكلّف الطباعات الفاشلة"],
+        "mac.waste_by_printer":   ["en": "By printer", "ar": "حسب الطابعة"],
+        "mac.waste_by_material":  ["en": "By material", "ar": "حسب المادة"],
+        "mac.waste_by_customer":  ["en": "By customer", "ar": "حسب العميل"],
+        "mac.waste_unknown":      ["en": "Unknown", "ar": "غير معروف"],
+        "mac.waste_n_failures":   ["en": "{n} failures", "ar": "{n} طباعة فاشلة"],
+        "mac.waste_n_failures_one": ["en": "{n} failure", "ar": "طباعة فاشلة واحدة"],
+        "mac.waste_n_failures_two": ["en": "{n} failures", "ar": "طباعتان فاشلتان"],
+        "mac.waste_n_failures_few": ["en": "{n} failures", "ar": "{n} طباعات فاشلة"],
+        // On a printer's "Print failed" notice: the waste sheet, filled in.
+        "mac.waste_from_notice":  ["en": "Log as waste…", "ar": "تسجيل كهدر…"],
         // A machine's wattage, from what its plug measured (`print-energy`).
         // {prints} is a `Words.counting` of `mac.acc_prints`.
         "mac.power_measured":   ["en": "The plug measured {watts} W over {prints}.",
