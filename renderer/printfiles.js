@@ -598,7 +598,9 @@
           <option value="0">${escapeHtml(t('vl.no_end'))}</option></select>
         <label style="display:flex;gap:8px;align-items:center;margin-top:10px;"><input type="checkbox" id="vlUsePw" style="width:auto;margin:0;"> ${escapeHtml(t('vl.use_password'))}</label>
         <input type="password" id="vlPw" placeholder="${escapeHtml(t('vl.password_ph'))}" autocomplete="new-password" style="margin-top:6px;" disabled>
-        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('vl.password_rule'))} ${escapeHtml(t('vl.password_explain'))}</p>`,
+        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('vl.password_rule'))} ${escapeHtml(t('vl.password_explain'))}</p>
+        <input type="text" id="vlNote" maxlength="500" placeholder="${escapeHtml(t('vl.note_ph'))}" style="margin-top:10px;">
+        <p style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('vl.note_explain'))}</p>`,
       onMount(modal) {
         const use = modal.querySelector('#vlUsePw'), pw = modal.querySelector('#vlPw');
         use.addEventListener('change', () => { pw.disabled = !use.checked; if (use.checked) pw.focus(); });
@@ -612,6 +614,7 @@
           perFile: limit && modal.querySelector('#vlPerFile').checked ? true : undefined,
           expiresAt: days ? new Date(Date.now() + days * 86400000).toISOString() : undefined,
           password: modal.querySelector('#vlUsePw').checked ? (modal.querySelector('#vlPw').value || '') : null,
+          note: modal.querySelector('#vlNote').value.trim() || undefined,
         };
         if (options.password !== null && [...options.password.normalize('NFC')].length < 10) { toast(t('vl.password_rule'), 'error'); return false; }
         const r = await window.hubAPI.vaultShare({ recordIds: ids, options }).catch((e) => ({ ok: false, error: e.message }));

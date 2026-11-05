@@ -2656,6 +2656,8 @@
   "vl.ends_after_open": "Se termine un certain temps après sa première ouverture",
   "vl.revoked_on": "Révoqué le {date}",
   "vl.has_password": "Mot de passe requis",
+  "vl.note_ph": "Note pour vous (facultatif)",
+  "vl.note_explain": "Seul votre atelier voit cette note, dans la liste des liens de partage. Elle est chiffrée avant de quitter cet ordinateur.",
   "vl.err_generic": "Le lien n’a pas pu être créé ou modifié. Vérifiez la connexion et réessayez.",
   "vl.err_no_links": "Votre offre n’inclut pas les liens de partage.",
   "vl.err_links_full": "Les liens de partage de votre offre sont tous utilisés ({n}). Révoquez-en un, ou changez d’offre.",

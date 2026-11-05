@@ -2656,6 +2656,8 @@
   "vl.ends_after_open": "Endet eine festgelegte Zeit nach dem ersten Öffnen",
   "vl.revoked_on": "Widerrufen am {date}",
   "vl.has_password": "Braucht ein Passwort",
+  "vl.note_ph": "Notiz für Sie selbst (optional)",
+  "vl.note_explain": "Nur Ihr Shop sieht diese Notiz in der Liste „Freigabelinks“. Sie wird verschlüsselt, bevor sie diesen Computer verlässt.",
   "vl.err_generic": "Der Link konnte nicht erstellt oder geändert werden. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
   "vl.err_no_links": "Ihr Tarif enthält keine Freigabelinks.",
   "vl.err_links_full": "Die Freigabelinks Ihres Tarifs sind alle belegt ({n}). Widerrufen Sie einen oder wechseln Sie den Tarif.",

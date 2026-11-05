@@ -2657,6 +2657,8 @@
   "vl.ends_after_open": "Ends a set time after it is first opened",
   "vl.revoked_on": "Revoked {date}",
   "vl.has_password": "Needs a password",
+  "vl.note_ph": "Note for yourself (optional)",
+  "vl.note_explain": "Only your shop sees this note, in the Share Links list. It is encrypted before it leaves this computer.",
   "vl.err_generic": "The link could not be made or changed. Check the connection and try again.",
   "vl.err_no_links": "Your plan does not include share links.",
   "vl.err_links_full": "Your plan's share links are all in use ({n}). Revoke one, or change plan.",

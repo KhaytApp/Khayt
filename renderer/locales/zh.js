@@ -2656,6 +2656,8 @@
   "vl.ends_after_open": "首次打开后一段时间结束",
   "vl.revoked_on": "撤销于 {date}",
   "vl.has_password": "需要密码",
+  "vl.note_ph": "给自己的备注（可选）",
+  "vl.note_explain": "只有你的店铺能在“分享链接”列表中看到此备注。它在离开这台电脑 之前已加密。",
   "vl.err_generic": "无法创建或更改链接。请检查连接后重试。",
   "vl.err_no_links": "你的套餐不包含分享链接。",
   "vl.err_links_full": "你套餐的分享链接已全部用完（{n}）。请撤销一个，或更换套餐。",

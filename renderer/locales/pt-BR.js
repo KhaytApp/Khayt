@@ -2657,6 +2657,8 @@
   "vl.ends_after_open": "Termina um tempo definido após ser aberto pela primeira vez",
   "vl.revoked_on": "Revogado em {date}",
   "vl.has_password": "Exige senha",
+  "vl.note_ph": "Nota para você (opcional)",
+  "vl.note_explain": "Somente a sua loja vê esta nota, na lista de Links de compartilhamento. Ela é criptografada antes de sair deste computador.",
   "vl.err_generic": "Não foi possível criar ou alterar o link. Verifique a conexão e tente novamente.",
   "vl.err_no_links": "Seu plano não inclui links de compartilhamento.",
   "vl.err_links_full": "Todos os links de compartilhamento do seu plano estão em uso ({n}). Revogue um ou mude de plano.",

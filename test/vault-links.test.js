@@ -223,14 +223,14 @@ test('a password link: weak passwords refused; a strong one needs the password t
   await assert.rejects(V.decryptLinkMeta(noPw, out.grantId, 'file0', unb64(item.linkMeta)));
 });
 
-test('a note is refused up front when this build cannot seal it', async () => {
-  if (L.noteSupported()) return;
+test('a note goes in sealed under the vault key, and only the shop opens it', async () => {
   const files = await feed(1);
   const { client, calls } = fakeCloud();
-  const e = await L.createLink({ dek: DEK, files, fileIds: ['file0'], client, options: { note: 'for Sara' } })
-    .catch((x) => x);
-  assert.equal(e.reason, 'note-unsupported');
-  assert.equal(calls.length, 0);
+  const out = await L.createLink({ dek: DEK, files, fileIds: ['file0'], client, options: { note: 'for Sara' } });
+  const sent = calls.find((c) => c.method === 'POST').body;
+  assert.ok(sent.ownerNote && !sent.ownerNote.includes('Sara'), 'sealed, not in the clear');
+  const vk = await V.deriveVaultKey(DEK);
+  assert.equal(await V.decryptGrantNote(vk, out.grantId, sent.ownerNote), 'for Sara');
 });
 
 test('revoke, extend and addDownloads send the PATCH the Mac sends', async () => {

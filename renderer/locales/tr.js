@@ -2656,6 +2656,8 @@
   "vl.ends_after_open": "İlk açıldıktan belirli bir süre sonra biter",
   "vl.revoked_on": "İptal edildi: {date}",
   "vl.has_password": "Parola gerekir",
+  "vl.note_ph": "Kendiniz için not (isteğe bağlı)",
+  "vl.note_explain": "Bu notu yalnızca dükkânınız, Paylaşım Bağlantıları listesinde görür. Bu bilgisayardan çıkmadan önce şifrelenir.",
   "vl.err_generic": "Bağlantı oluşturulamadı veya değiştirilemedi. Bağlantıyı kontrol edip yeniden deneyin.",
   "vl.err_no_links": "Planınız paylaşım bağlantılarını içermiyor.",
   "vl.err_links_full": "Planınızın paylaşım bağlantılarının hepsi kullanımda ({n}). Birini iptal edin veya planı değiştirin.",

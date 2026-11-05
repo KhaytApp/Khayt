@@ -2656,6 +2656,8 @@
   "vl.ends_after_open": "Termina un tiempo fijo después de abrirse por primera vez",
   "vl.revoked_on": "Revocado el {date}",
   "vl.has_password": "Requiere contraseña",
+  "vl.note_ph": "Nota para ti (opcional)",
+  "vl.note_explain": "Solo tu taller ve esta nota, en la lista Enlaces para compartir. Se cifra antes de salir de este equipo.",
   "vl.err_generic": "No se pudo crear o cambiar el enlace. Comprueba la conexión e inténtalo de nuevo.",
   "vl.err_no_links": "Tu plan no incluye enlaces para compartir.",
   "vl.err_links_full": "Todos los enlaces para compartir de tu plan están en uso ({n}). Revoca uno o cambia de plan.",
