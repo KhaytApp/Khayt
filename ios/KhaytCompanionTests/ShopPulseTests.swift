@@ -56,6 +56,19 @@ final class ShopPulseTests: XCTestCase {
         XCTAssertNotNil(pulse.thisYear)
     }
 
+    func testTheSampleShopHasTakingsThisMonthAndThisYearWhicheverDayItOpens() async throws {
+        // The sample shop is what the website photographs and a new user sees
+        // first. Its newest completed job was dated nine days back, so on the
+        // first nine days of every month Home read "This month 0".
+        for stamp in ["2026-11-01T08:00:00Z", "2027-01-01T08:00:00Z", "2026-11-05T08:00:00Z"] {
+            let day = ISO8601DateFormatter().date(from: stamp)!
+            try book.replace(with: SampleShop.book(now: day), scope: SampleShop.scope(now: day))
+            let pulse = try await BookReader(book: book).pulse(now: day)
+            XCTAssertGreaterThan(pulse.thisMonth ?? 0, 0, "This month on \(stamp)")
+            XCTAssertGreaterThan(pulse.thisYear ?? 0, 0, "This year on \(stamp)")
+        }
+    }
+
     func testOwedCountsOpenOrdersByTheShopsOwnRule() async throws {
         // Owed is open work, every one of which travels — so it is always answerable.
         // Paid is `paidAmount`, as `lib/order-money.js` reads it; there is no

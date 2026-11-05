@@ -107,7 +107,9 @@ enum SampleShop {
                       extra: ["quoteExpiresAt": day(7)]),
                 order("S-1048", "quote", "Prototype housing", "Acme Robotics", "C-1", placed: -2, due: nil, price: 340, paid: 0, material: "ABS", qty: 2,
                       extra: ["quoteExpiresAt": day(5)]),
-                order("S-1038", "completed", "Planter", "Maya Chen", "C-3", placed: -9, due: -2, price: 35, paid: 35, material: "PLA", qty: 1),
+                // Placed and finished today, so Home's This month and This
+                // year have takings on the first day of a month or a year.
+                order("S-1038", "completed", "Planter", "Maya Chen", "C-3", placed: 0, due: 0, price: 35, paid: 35, material: "PLA", qty: 1),
                 order("S-1036", "completed", "Gear housing", "Acme Robotics", "C-1", placed: -12, due: -5, price: 150, paid: 150, material: "Nylon", qty: 3),
                 order("S-1031", "completed", "Crown models", "Northside Dental", "C-2", placed: -20, due: -14, price: 310, paid: 310, material: "Resin", qty: 8),
                 order("S-1024", "completed", "Dice tower", "Tabletop Guild", "C-4", placed: -40, due: -33, price: 55, paid: 55, material: "PLA", qty: 1),

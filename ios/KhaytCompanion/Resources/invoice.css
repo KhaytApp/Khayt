@@ -82,6 +82,20 @@ html.printing-labels #label-print-area {
   letter-spacing: -0.005em;
 }
 
+/* The documents are drawn inside the app window (#invoice-print-area), so the
+   app's own table rules in styles.css reach them: `td { color: var(--text) }`
+   painted the quantity column in the THEME's text colour - pale grey on the
+   white page under a dark theme, printed and in the PDF - and `th` and the
+   row hover laid the app's dark header and hover tint over the paper. A
+   document's cells take the paper's ink. `.inv-wrap td` outranks the bare `td`
+   and still loses to every `.inv table.lines` rule below, so the document's
+   own styling is untouched. The Mac prints the same HTML with no app sheet,
+   which is the look this restores. Guarded by scripts/e2e-smoke.mjs
+   testInvoiceCellsTakePaperInk. */
+.inv-wrap th, .inv-wrap td { color: inherit; }
+.inv-wrap th { background: none; text-transform: none; letter-spacing: normal; }
+.inv-wrap tbody tr:hover { background: none; }
+
 /* ---------- Document templates (branding presets; structure-safe) ----------
    classic = default. modern = accent header band + thicker bar. minimal =
    no color bar, lighter borders, restrained accent. Applied on .inv-wrap. */
