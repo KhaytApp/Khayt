@@ -877,14 +877,17 @@ function renderKanban() {
  * lib/auto-dispatch.js. It PROPOSES: Send sets the job's machine and nothing
  * else, and a printer nobody has said is empty is shown as waiting, with the
  * one button that answers it, rather than quietly left out. */
-// The rule answers in keys; listed here so each one is a literal t() call.
+// The rule answers in keys (ad.*); the desktop's words for them are nextup.*,
+// because the Mac defines ad.* itself and reads these locale files too — a
+// borrowed key must never shadow one it supplies (WordsTests). Listed here so
+// each one is a literal t() call.
 const NEXT_UP_WORDS = {
-  'ad.next_in_queue': () => t('ad.next_in_queue'), 'ad.same_material': () => t('ad.same_material'),
-  'ad.materials_unknown': () => t('ad.materials_unknown'), 'ad.bed_not_clear': () => t('ad.bed_not_clear'),
-  'ad.bed_unknown': () => t('ad.bed_unknown'), 'ad.busy': () => t('ad.busy'),
-  'ad.printer_error': () => t('ad.printer_error'), 'ad.no_reading': () => t('ad.no_reading'),
-  'ad.no_printer': () => t('ad.no_printer'), 'ad.under_service': () => t('ad.under_service'),
-  'ad.retired': () => t('ad.retired'), 'ad.held': () => t('ad.held'),
+  'ad.next_in_queue': () => t('nextup.next_in_queue'), 'ad.same_material': () => t('nextup.same_material'),
+  'ad.materials_unknown': () => t('nextup.materials_unknown'), 'ad.bed_not_clear': () => t('nextup.bed_not_clear'),
+  'ad.bed_unknown': () => t('nextup.bed_unknown'), 'ad.busy': () => t('nextup.busy'),
+  'ad.printer_error': () => t('nextup.printer_error'), 'ad.no_reading': () => t('nextup.no_reading'),
+  'ad.no_printer': () => t('nextup.no_printer'), 'ad.under_service': () => t('nextup.under_service'),
+  'ad.retired': () => t('nextup.retired'), 'ad.held': () => t('nextup.held'),
 };
 function nextUpWord(key) { const f = NEXT_UP_WORDS[key]; return f ? f() : key; }
 
