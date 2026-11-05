@@ -179,6 +179,7 @@ struct LibraryEditPerfTests {
             // The best of three: another test sharing the main thread can
             // stall one run, but the freeze this guards against stalled
             // every one of them by seconds.
+            let budget = SpeedBudget.calibrate()
             var best = Double.infinity
             var gone: [String] = []
             for i in 0..<3 {
@@ -190,7 +191,7 @@ struct LibraryEditPerfTests {
                 let drawn = shop.files.contains { $0.id == one.id }
                 #expect(!drawn, "still on screen")
             }
-            #expect(best < Self.budgetMs, "a delete held the main thread \(Int(best)) ms")
+            budget.expect(best, under: Self.budgetMs, "a delete held the main thread")
             let onDisk = try diskIds(url)
             #expect(onDisk.count == 9_997)
             #expect(onDisk.isDisjoint(with: gone), "a delete never reached the book")

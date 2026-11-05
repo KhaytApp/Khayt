@@ -174,6 +174,7 @@ struct LibraryStage3aTests {
         shop.libraryMemo.machineFitsKey = nil
         let before = shop.libraryMemo.work.fitBuilds
         let clock = ContinuousClock()
+        let budget = SpeedBudget.calibrate()
         let first = clock.measure {
             for f in shop.files { _ = shop.libraryFitChips(f) }
             _ = shop.libraryFitSets()
@@ -198,9 +199,12 @@ struct LibraryStage3aTests {
         }
         #expect(shop.libraryFacets.fits.contains { $0.machineId == "MACH-u1" && $0.count > 0 })
         print("stage3a 600 models: full facet recount from cold \(recount)")
-        // Wall-clock bounds only as a backstop (CI runners are slow); the
-        // counts above are the real guard.
-        #expect(first < .seconds(10) && again < .seconds(10) && filtered < .seconds(10))
+        // Wall-clock bounds only as a backstop, scaled by how slow the
+        // machine measures right now (`SpeedBudget`); the counts above are
+        // the real guard.
+        budget.expect(first, under: .seconds(10), "the first pass of 600 fits")
+        budget.expect(again, under: .seconds(10), "ten redraws of 600 fits")
+        budget.expect(filtered, under: .seconds(10), "the Fits filter")
         print("stage3a 600 models: first pass \(first), ten redraws \(again), Fits filter \(filtered), builds \(built)")
     }
 
