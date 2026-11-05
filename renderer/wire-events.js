@@ -1702,6 +1702,13 @@ function wireEvents() {
     if (btn.dataset.act === 'printer-cancel') printerJobCommand(btn.dataset.id, 'cancel');
     if (btn.dataset.act === 'printer-drop') openDropObject(btn.dataset.id);
   });
+  $('#machinesList')?.addEventListener('change', (e) => {
+    const sel = e.target.closest('select[data-printer-control]');
+    if (!sel || !sel.value) return;
+    const [control, value] = sel.value.split(':');
+    sel.value = '';
+    printerControl(sel.dataset.printerControl, control, control === 'speed' ? Number(value) : value);
+  });
 
   // Feature 8 (new): Locations settings
   $('#btnAddLocation')?.addEventListener('click', () => openLocationEditor(null));

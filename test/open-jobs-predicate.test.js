@@ -48,7 +48,12 @@ test('the renderer never hand-writes "not finished and not a quote"', () => {
 test('the spool reservation and over-commit check leave a cancelled job out', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'inventory.js'), 'utf8');
   const body = (name) => src.slice(src.indexOf(`function ${name}(`), src.indexOf('\n}\n', src.indexOf(`function ${name}(`)));
-  for (const fn of ['getSpoolReservedGrams', 'checkSpoolOvercommit', 'renderPipelineDemand']) {
+  for (const fn of ['getSpoolReservedGrams', 'renderPipelineDemand']) {
     assert.match(body(fn), /KhaytOrderStatus\.isOpen\(o\)/, fn);
   }
+  // The over-commit check is the shared rule (lib/reorder.js), whose OPEN_STATUSES
+  // has no 'cancelled' or 'quote' — the same answer the Mac gets.
+  assert.match(body('checkSpoolOvercommit'), /KhaytReorder\.overcommitWarnings\(/);
+  const { OPEN_STATUSES } = require('../lib/reorder.js');
+  assert.ok(!OPEN_STATUSES.has('cancelled') && !OPEN_STATUSES.has('quote'));
 });
