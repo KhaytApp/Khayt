@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "現在",
  "mac.intake_reminder_due": "リマインダー予定日 {date}",
  "mac.intake_remind_text": "{name} 様、「{project}」のプロジェクトについてのご連絡です。ただいま空きがございますので、進めてよろしければお知らせください。",
- "mac.intake_remind_text_noname": "「{project}」のプロジェクトについてのご連絡です。ただいま空きがございますので、進めてよろしければお知らせください。"
+ "mac.intake_remind_text_noname": "「{project}」のプロジェクトについてのご連絡です。ただいま空きがございますので、進めてよろしければお知らせください。",
+ "mac.goto_group_spool": "フィラメント",
+ "mac.recurring_skip": "スキップ",
+ "mac.recurring_more": "ほかに{n}件が期日",
+ "mac.recurring_more_one": "ほかに{n}件が期日",
+ "mac.goal_vs_last_month": "先月比",
+ "mac.adj_none": "調整はまだありません。",
+ "mac.dry_none": "乾燥の記録はまだありません。",
+ "mac.inv_num_format": "形式",
+ "mac.inv_num_next_is": "次の請求書: {number}",
+ "mac.loyalty_tiers": "ランク",
+ "mac.loyalty_tiers_hint": "完了した注文数と支出額がそれぞれこの値以上になると、顧客はそのランクに達し、割引を受けられます。達した最も高いランクが適用されます。",
+ "mac.loyalty_tier_name": "ランク",
+ "mac.loyalty_add_tier": "ランクを追加"
 }

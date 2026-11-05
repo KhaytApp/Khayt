@@ -8802,6 +8802,146 @@ public actor KhaytEngine {
                           as: [BudgetRow].self)
     }
 
+    // MARK: - Money, stock and settings the desktop already had
+
+    /// The recurring expenses due on or before `today`: `KhaytExpenseBook.due`.
+    public func expensesDue(_ expenses: [JSONValue], today: String) throws -> [JSONValue] {
+        try runtime.call2("KhaytExpenseBook.due(ARG0, ARG1)",
+                          [.array(expenses), .string(today)], as: [JSONValue].self)
+    }
+
+    /// A recurring expense answered: Add files this cycle's copy and moves the
+    /// schedule on, Skip only moves it on (`KhaytExpenseBook.comeRound`). The
+    /// whole list back, or nil when `id` is no longer due — answered already.
+    public func expenseComeRound(_ expenses: [JSONValue], id: String, add: Bool,
+                                 newId: String, today: String) throws -> [JSONValue]? {
+        try runtime.call2("KhaytExpenseBook.comeRound(ARG0, ARG1, {add: ARG2, id: ARG3, today: ARG4})",
+                          [.array(expenses), .string(id), .bool(add), .string(newId), .string(today)],
+                          as: [JSONValue]?.self)
+    }
+
+    /// Grams put on or taken off a spool by hand, with the reason
+    /// (`KhaytSpoolEdit.adjustStock`): the spool with its `adjustments` row,
+    /// or `refused`.
+    public func adjustStock(_ spool: JSONValue, input: [String: JSONValue],
+                            id: String, today: String) throws -> SpoolWritten {
+        try runtime.call2("KhaytSpoolEdit.adjustStock(ARG0, ARG1, {id: ARG2, today: ARG3})",
+                          [spool, .object(input), .string(id), .string(today)], as: SpoolWritten.self)
+    }
+
+    /// Stock moved between locations, the whole spool or a split of it.
+    public struct Transferred: Decodable, Sendable {
+        public let spools: [JSONValue]?
+        public let refused: String?
+    }
+
+    /// `KhaytSpoolEdit.transferStock`. `dest` empty is Unassigned.
+    public func transferStock(_ spool: JSONValue, dest: String, qty: Double,
+                              newId: String) throws -> Transferred {
+        try runtime.call2("KhaytSpoolEdit.transferStock(ARG0, {dest: ARG1, qty: ARG2}, {newId: ARG3})",
+                          [spool, .string(dest), .number(qty), .string(newId)], as: Transferred.self)
+    }
+
+    /// The invoice counter set by its own section (`KhaytSettingsEdit.invoiceNumbering`).
+    public func invoiceNumbering(_ settings: [String: JSONValue], form: [String: JSONValue],
+                                 year: Int) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytSettingsEdit.invoiceNumbering(ARG0, ARG1, {year: ARG2})",
+                          [.object(settings), .object(form), .number(Double(year))],
+                          as: [String: JSONValue].self)
+    }
+
+    /// The numbers missing from the book's invoice sequence.
+    public func invoiceNumberGaps(_ orders: [JSONValue]) throws -> [Int] {
+        try runtime.call2("KhaytSettingsEdit.invoiceNumberGaps(ARG0)", [.array(orders)], as: [Int].self)
+    }
+
+    /// The exchange-rate table edited (`KhaytSettingsEdit.exchangeRates`).
+    /// `fetchedAt` marks it refreshed from the live feed.
+    public func exchangeRates(_ settings: [String: JSONValue], edits: [String: JSONValue],
+                              base: String, fetchedAt: String?) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytSettingsEdit.exchangeRates(ARG0, ARG1, {base: ARG2, fetchedAt: ARG3})",
+                          [.object(settings), .object(edits), .string(base), fetchedAt.map(JSONValue.string) ?? .null],
+                          as: [String: JSONValue].self)
+    }
+
+    /// A live rate feed's answer, as the book stores rates.
+    public struct FeedRates: Decodable, Sendable {
+        public let rates: [String: Double]?
+        public let updatedAt: String?
+        public let error: String?
+    }
+
+    /// `KhaytSettingsEdit.ratesFromFeed` — inverted to base units per one
+    /// foreign unit, limited to `known`.
+    public func ratesFromFeed(_ body: JSONValue, base: String,
+                              known: [String: JSONValue]) throws -> FeedRates {
+        try runtime.call2("KhaytSettingsEdit.ratesFromFeed(ARG0, ARG1, ARG2)",
+                          [body, .string(base), .object(known)], as: FeedRates.self)
+    }
+
+    /// The loyalty tiers as the editor saves them (`KhaytLoyalty.cleanTiers`).
+    public func cleanLoyaltyTiers(_ rows: [JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytLoyalty.cleanTiers(ARG0)", [.array(rows)], as: [JSONValue].self)
+    }
+
+    /// One job's failures, added up.
+    public struct WasteOrder: Decodable, Sendable, Hashable, Identifiable {
+        public let orderId: String
+        public let cost: Double
+        public let count: Int
+        public var id: String { orderId }
+    }
+
+    /// The jobs whose failures cost the most (`KhaytWasteEntry.topOrders`).
+    public func wasteTopOrders(_ wasteLog: [JSONValue], limit: Int) throws -> [WasteOrder] {
+        try runtime.call2("KhaytWasteEntry.topOrders(ARG0, ARG1)",
+                          [.array(wasteLog), .number(Double(limit))], as: [WasteOrder].self)
+    }
+
+    /// Waste as a share of revenue, and how worried to be.
+    public struct WasteShare: Decodable, Sendable, Equatable {
+        public let pct: Double
+        /// `ok` | `warn` | `bad`
+        public let tone: String
+    }
+
+    /// `KhaytWasteEntry.shareOfRevenue`; nil when there is no revenue.
+    public func wasteShare(cost: Double, revenue: Double) throws -> WasteShare? {
+        try runtime.call2("KhaytWasteEntry.shareOfRevenue(ARG0, ARG1)",
+                          [.number(cost), .number(revenue)], as: WasteShare?.self)
+    }
+
+    /// The shop's TRADE revenue over a span (`KhaytKpiRows.tradeRevenue`):
+    /// finished, not voided, not Not business, net of tax. What the goal bar
+    /// and the waste share are measured against, in both apps. `from`/`to`
+    /// inclusive `YYYY-MM-DD`, empty for no bound.
+    public func tradeRevenue(orders: [JSONValue], settings: [String: JSONValue],
+                             clients: [JSONValue], currencies: [String: JSONValue],
+                             from: String, to: String) throws -> Double {
+        try runtime.call2("KhaytKpiRows.tradeRevenue({orders: ARG0, settings: ARG1, clients: ARG2, known: ARG3, from: ARG4, to: ARG5})",
+                          [.array(orders), .object(settings), .array(clients), .object(currencies),
+                           .string(from), .string(to)], as: Double.self)
+    }
+
+    /// How the month is going against its goal (`KhaytKpiRows.goalPace`).
+    public struct GoalPace: Decodable, Sendable, Equatable {
+        public let revenue: Double
+        public let goal: Double
+        public let pct: Double
+        public let reached: Bool
+        /// The month-end pace; nil on the month's last day or before anything is earned.
+        public let forecast: Double?
+        /// The change from last month, in percent; nil when last month earned nothing.
+        public let deltaPct: Double?
+    }
+
+    public func goalPace(revenue: Double, previous: Double, goal: Double,
+                         day: Int, days: Int) throws -> GoalPace {
+        try runtime.call2("KhaytKpiRows.goalPace({revenue: ARG0, previous: ARG1, goal: ARG2, day: ARG3, days: ARG4})",
+                          [.number(revenue), .number(previous), .number(goal),
+                           .number(Double(day)), .number(Double(days))], as: GoalPace.self)
+    }
+
     /// A failed print written down by hand.
     ///
     /// `inventory` COMES BACK CHANGED when the entry deducts: the grams come

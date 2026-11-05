@@ -261,16 +261,19 @@ function renderDashboard() {
 
   // Monthly goal
   const thisMonthStr = localMonthStr(today);
-  const monthlyRev   = printLog
-    .filter(o => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(thisMonthStr))
-    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  // `KhaytKpiRows.tradeRevenue`: the one rule both apps' goal bars read —
+  // finished, not voided, not Not business, net of tax. This summed every
+  // finished job's gross price, voided ones and the shop's own prints too.
+  const _trade = (d) => {
+    const [from, to] = KhaytKpiRows.bounds('month', d);
+    return KhaytKpiRows.tradeRevenue({ orders: printLog, settings, clients, from, to,
+      known: (typeof KhaytCurrencies !== 'undefined' && KhaytCurrencies.CURRENCIES) || undefined });
+  };
+  const monthlyRev   = _trade(today);
 
   // QW8: Previous month revenue for delta chip
   const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const prevMonthStr = localMonthStr(prevMonthDate);
-  const prevMonthRev = printLog
-    .filter(o => KhaytOrderStatus.isFinished(o) && (o.date || '').startsWith(prevMonthStr))
-    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  const prevMonthRev = _trade(prevMonthDate);
   const revDeltaPct = prevMonthRev > 0 ? ((monthlyRev - prevMonthRev) / prevMonthRev * 100) : null;
   const revDeltaHtml = revDeltaPct !== null
     ? `<span class="delta-chip ${revDeltaPct >= 0 ? 'delta-up' : 'delta-down'}" style="font-size:10px;padding:1px 6px;border-radius:10px;margin-inline-start:6px;font-weight:600;background:${revDeltaPct >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'};color:${revDeltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">${revDeltaPct >= 0 ? '▲' : '▼'} ${Math.abs(revDeltaPct).toFixed(0)}%</span>`

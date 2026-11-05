@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "当前",
  "mac.intake_reminder_due": "提醒日期 {date}",
  "mac.intake_remind_text": "{name} 您好，提醒您一下关于“{project}”的项目。我们现在有空档，如果您想继续，请告诉我们！",
- "mac.intake_remind_text_noname": "您好，提醒您一下关于“{project}”的项目。我们现在有空档，如果您想继续，请告诉我们！"
+ "mac.intake_remind_text_noname": "您好，提醒您一下关于“{project}”的项目。我们现在有空档，如果您想继续，请告诉我们！",
+ "mac.goto_group_spool": "耗材",
+ "mac.recurring_skip": "跳过",
+ "mac.recurring_more": "还有 {n} 项到期",
+ "mac.recurring_more_one": "还有 {n} 项到期",
+ "mac.goal_vs_last_month": "与上月相比",
+ "mac.adj_none": "暂无调整。",
+ "mac.dry_none": "尚无烘干记录。",
+ "mac.inv_num_format": "格式",
+ "mac.inv_num_next_is": "下一张发票：{number}",
+ "mac.loyalty_tiers": "等级",
+ "mac.loyalty_tiers_hint": "客户的已完成订单数和消费额至少达到这些数值，即可升到该等级并享受其折扣。按其达到的最高等级计算。",
+ "mac.loyalty_tier_name": "等级",
+ "mac.loyalty_add_tier": "添加等级"
 }

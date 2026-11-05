@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "şimdi",
  "mac.intake_reminder_due": "Hatırlatma tarihi {date}",
  "mac.intake_remind_text": "Merhaba {name}, “{project}” projeniz için kısa bir hatırlatma. Boş bir zamanımız var; devam etmek isterseniz bize haber verin!",
- "mac.intake_remind_text_noname": "Merhaba, “{project}” projeniz için kısa bir hatırlatma. Boş bir zamanımız var; devam etmek isterseniz bize haber verin!"
+ "mac.intake_remind_text_noname": "Merhaba, “{project}” projeniz için kısa bir hatırlatma. Boş bir zamanımız var; devam etmek isterseniz bize haber verin!",
+ "mac.goto_group_spool": "Filament",
+ "mac.recurring_skip": "Atla",
+ "mac.recurring_more": "{n} tane daha vadesi geldi",
+ "mac.recurring_more_one": "{n} tane daha vadesi geldi",
+ "mac.goal_vs_last_month": "Geçen aya göre",
+ "mac.adj_none": "Henüz düzeltme yok.",
+ "mac.dry_none": "Henüz kurutma kaydı yok.",
+ "mac.inv_num_format": "Biçim",
+ "mac.inv_num_next_is": "Sonraki fatura: {number}",
+ "mac.loyalty_tiers": "Seviyeler",
+ "mac.loyalty_tiers_hint": "Müşteri en az bu kadar tamamlanmış sipariş ve bu kadar harcamayla bir seviyeye ulaşır ve onun indirimini alır. Ulaştığı en yüksek seviye geçerlidir.",
+ "mac.loyalty_tier_name": "Seviye",
+ "mac.loyalty_add_tier": "Seviye ekle"
 }

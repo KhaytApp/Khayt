@@ -1884,17 +1884,15 @@ function openStockAdjustModal(itemId) {
       </div>
       ${histHtml}`,
     onSave() {
-      const amount = num(document.getElementById('adjAmountInput').value, 0);
-      if (amount <= 0) { toast(t('sup.amount_required'), 'error'); return false; }
-      const type   = document.querySelector('input[name="adjType"]:checked').value;
-      const reason = document.getElementById('adjReasonInput').value.trim();
-      if (!item.adjustments) item.adjustments = [];
-      item.adjustments.unshift({ id: uid('ADJ'), date: today, type, amount, reason });
-      if (type === 'add') {
-        item.weight = Math.max(0, item.weight + amount);
-      } else {
-        item.weight = Math.max(0, item.weight - amount);
-      }
+      // lib/spool-edit.js `adjustStock` — the Mac's Adjust stock writes the
+      // same row through the same rule.
+      const made = SpoolEdit.adjustStock(item, {
+        amount: document.getElementById('adjAmountInput').value,
+        type: document.querySelector('input[name="adjType"]:checked').value,
+        reason: document.getElementById('adjReasonInput').value,
+      }, { id: uid('ADJ'), today });
+      if (made.refused) { toast(t('sup.amount_required'), 'error'); return false; }
+      Object.assign(item, made.spool);
       saveAll();
       renderInventory();
       toast(t('inv.adj_saved'), 'success');
@@ -4884,32 +4882,21 @@ async function openStockTransferModal(itemId) {
       const destRaw = modal.querySelector('#stDest').value || '';
       const dest = destRaw || undefined;
       const qty = Math.round(num(modal.querySelector('#stQty').value, 0));
-      if ((dest || null) === (item.locationId || null)) { toast(t('inv.transfer_same') || 'Pick a different location.', 'error'); return false; }
-      if (qty <= 0) { toast(t('inv.transfer_qty_invalid') || 'Enter a quantity greater than zero.', 'error'); return false; }
-      if (qty > maxQty) { toast(t('inv.transfer_qty_over') || 'Not enough stock to transfer.', 'error'); return false; }
+      // lib/spool-edit.js `transferStock` decides — the Mac moves stock
+      // through the same rule, so a split there and here is the same split.
+      const moved = SpoolEdit.transferStock(item, { dest, qty }, { newId: uid('INV') });
+      if (moved.refused === 'same_location') { toast(t('inv.transfer_same') || 'Pick a different location.', 'error'); return false; }
+      if (moved.refused === 'qty_invalid') { toast(t('inv.transfer_qty_invalid') || 'Enter a quantity greater than zero.', 'error'); return false; }
+      if (moved.refused) { toast(t('inv.transfer_qty_over') || 'Not enough stock to transfer.', 'error'); return false; }
       const destName = dest ? (locs.find(l => l.id === dest)?.name || '') : (t('inv.location_unassigned') || 'Unassigned');
       const ok = await confirmModal(
         (t('inv.transfer_confirm_msg', { qty, unit, dest: destName }) ||
          `Move ${qty}${unit} to ${destName}?`));
       if (!ok) return false;
-      if (qty >= maxQty) {
-        // Move the whole spool.
-        item.locationId = dest;
-      } else {
-        // Split: reduce source, create a new spool at the destination.
-        item.weight = Math.max(0, (+item.weight || 0) - qty);
-        const clone = {
-          ...item,
-          id: uid('INV'),
-          weight: qty,
-          locationId: dest,
-          // Reset per-spool histories that should not carry to the split-off spool.
-          usageHistory: [],
-          adjustments: [],
-          priceHistory: (item.priceHistory || []).slice(),
-        };
-        inventory.push(clone);
-      }
+      // The whole spool, or the source and its split.
+      for (const k of Object.keys(item)) if (!(k in moved.spools[0])) delete item[k];
+      Object.assign(item, moved.spools[0]);
+      if (moved.spools[1]) inventory.push(moved.spools[1]);
       saveAll();
       renderInventory();
       toast(t('inv.transfer_done') || 'Stock transferred', 'success');

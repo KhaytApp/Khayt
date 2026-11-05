@@ -236,6 +236,12 @@ private struct BookMenu: View {
         }
         .disabled(shop.engine == nil || !shop.lockAllows("analytics", "view"))
 
+        // Who did what: the team activity log this app has always written
+        // and never shown. A read, behind the lock's `logs` area as the
+        // desktop's Activity button is.
+        Button(Words.upfront("audit.btn_title") + "\u{2026}") { shop.showingActivityLog = true }
+            .disabled(!shop.lockAllows("logs", "view"))
+
         // Only where the shop has agreed to it. A menu item offering to send a
         // summary of the book to a vendor, on a shop that has switched the
         // feature off, is an advertisement in a menu.

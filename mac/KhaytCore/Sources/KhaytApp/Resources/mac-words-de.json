@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "jetzt",
  "mac.intake_reminder_due": "Erinnerung fällig am {date}",
  "mac.intake_remind_text": "Hallo {name}, eine kurze Erinnerung an Ihr Projekt „{project}“. Wir haben gerade einen Termin frei – sagen Sie uns, ob wir loslegen sollen!",
- "mac.intake_remind_text_noname": "Hallo, eine kurze Erinnerung an Ihr Projekt „{project}“. Wir haben gerade einen Termin frei – sagen Sie uns, ob wir loslegen sollen!"
+ "mac.intake_remind_text_noname": "Hallo, eine kurze Erinnerung an Ihr Projekt „{project}“. Wir haben gerade einen Termin frei – sagen Sie uns, ob wir loslegen sollen!",
+ "mac.goto_group_spool": "Filament",
+ "mac.recurring_skip": "Überspringen",
+ "mac.recurring_more": "{n} weitere fällig",
+ "mac.recurring_more_one": "{n} weitere fällig",
+ "mac.goal_vs_last_month": "Im Vergleich zum Vormonat",
+ "mac.adj_none": "Noch keine Korrekturen.",
+ "mac.dry_none": "Noch keine Trocknung erfasst.",
+ "mac.inv_num_format": "Format",
+ "mac.inv_num_next_is": "Nächste Rechnung: {number}",
+ "mac.loyalty_tiers": "Stufen",
+ "mac.loyalty_tiers_hint": "Ein Kunde erreicht eine Stufe mit mindestens so vielen abgeschlossenen Aufträgen und so viel Umsatz und erhält deren Rabatt. Es gilt die höchste erreichte Stufe.",
+ "mac.loyalty_tier_name": "Stufe",
+ "mac.loyalty_add_tier": "Stufe hinzufügen"
 }

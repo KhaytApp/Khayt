@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "ahora",
  "mac.intake_reminder_due": "Recordatorio para el {date}",
  "mac.intake_remind_text": "Hola {name}, te recordamos tu proyecto «{project}». Tenemos un hueco disponible: dinos si quieres seguir adelante.",
- "mac.intake_remind_text_noname": "Hola, te recordamos tu proyecto «{project}». Tenemos un hueco disponible: dinos si quieres seguir adelante."
+ "mac.intake_remind_text_noname": "Hola, te recordamos tu proyecto «{project}». Tenemos un hueco disponible: dinos si quieres seguir adelante.",
+ "mac.goto_group_spool": "Filamento",
+ "mac.recurring_skip": "Omitir",
+ "mac.recurring_more": "{n} más pendientes",
+ "mac.recurring_more_one": "{n} más pendiente",
+ "mac.goal_vs_last_month": "Frente al mes pasado",
+ "mac.adj_none": "Aún no hay ajustes.",
+ "mac.dry_none": "Aún no se ha registrado ningún secado.",
+ "mac.inv_num_format": "Formato",
+ "mac.inv_num_next_is": "Próxima factura: {number}",
+ "mac.loyalty_tiers": "Niveles",
+ "mac.loyalty_tiers_hint": "Un cliente alcanza un nivel con al menos estos pedidos completados y este gasto, y obtiene su descuento. Se aplica el nivel más alto que alcance.",
+ "mac.loyalty_tier_name": "Nivel",
+ "mac.loyalty_add_tier": "Añadir nivel"
 }

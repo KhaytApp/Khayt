@@ -195,6 +195,7 @@ extension Shop {
         pendingRma = nil; pendingReprint = nil; pendingHistory = nil; showingIntake = false
         planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
         showingHistoryFor = nil; spoolHistoryFor = nil
+        adjustingSpool = nil; dryingLogFor = nil; transferringSpool = nil; showingActivityLog = false
     }
 
     /// The screen a shelf is gated on, under the lock.

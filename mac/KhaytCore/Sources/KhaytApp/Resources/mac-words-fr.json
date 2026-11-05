@@ -3543,5 +3543,18 @@
  "mac.timeline_current": "maintenant",
  "mac.intake_reminder_due": "Rappel prévu le {date}",
  "mac.intake_remind_text": "Bonjour {name}, petit rappel concernant votre projet « {project} ». Nous avons un créneau disponible : dites-nous si vous souhaitez continuer !",
- "mac.intake_remind_text_noname": "Bonjour, petit rappel concernant votre projet « {project} ». Nous avons un créneau disponible : dites-nous si vous souhaitez continuer !"
+ "mac.intake_remind_text_noname": "Bonjour, petit rappel concernant votre projet « {project} ». Nous avons un créneau disponible : dites-nous si vous souhaitez continuer !",
+ "mac.goto_group_spool": "Filament",
+ "mac.recurring_skip": "Ignorer",
+ "mac.recurring_more": "{n} autres à échéance",
+ "mac.recurring_more_one": "{n} autre à échéance",
+ "mac.goal_vs_last_month": "Par rapport au mois dernier",
+ "mac.adj_none": "Aucun ajustement pour l'instant.",
+ "mac.dry_none": "Aucun séchage enregistré pour l'instant.",
+ "mac.inv_num_format": "Format",
+ "mac.inv_num_next_is": "Prochaine facture : {number}",
+ "mac.loyalty_tiers": "Niveaux",
+ "mac.loyalty_tiers_hint": "Un client atteint un niveau avec au moins ce nombre de commandes terminées et ce montant dépensé, et obtient sa remise. Le niveau le plus élevé atteint s'applique.",
+ "mac.loyalty_tier_name": "Niveau",
+ "mac.loyalty_add_tier": "Ajouter un niveau"
 }
