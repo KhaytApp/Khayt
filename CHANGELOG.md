@@ -5,10 +5,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **Mac: Tabby is told who the customer is.** A Tabby link from the Mac now sends the customer's first job date and how many other jobs they have completed, the same buyer history the Windows and Linux app sends since #2229, instead of a fixed date and zero.
-- **Fixed: Tabby saw every customer as new (both apps).** A Tabby link told Tabby that every customer had been with you since 1 January 2024, with no past orders, whoever they were. It now sends the date you first knew them (their customer record, or their earliest job) and how many of their jobs you have completed. The Windows/Linux app counts those jobs from your book; the Mac sends the date only.
 - **Mac: Tabby and Tamara pay-later links.** Settings › Online has a new Pay later section for your Tabby and Tamara keys (the same settings the Windows/Linux app uses, keys encrypted in the book). A job then offers "Pay later link…" in its inspector and the Jobs menu: make a checkout link for what is still owed, copy it or share it with the customer. While the app is open it checks each link every ten minutes and when you come back to it, takes the step the provider is waiting for (Tamara's authorise within 72 hours, Tabby's capture), records the payment on the job with the usual receipt email and webhooks, and captures a Tamara order once its job has shipped. The requests are now one shared module (`lib/bnpl-requests.js`) that both apps send, so they cannot drift. The Waste screen's true-cost totals now come from the same shared rule as its "Where failures cost" groups.
-- **Fixed: a pay-later link asked for the whole price again (both apps).** A Tabby, Tamara or Stripe link from a job was made for the job's price, ignoring a deposit already paid and, on a shop that adds tax on top, the tax. It is now for what is still owed (the bill less what was paid, the same figure the invoice's balance shows), and no link is made for a job already paid in full.
-- **Fixed: custom Stripe success and cancel URLs were ignored (Windows/Linux).** The address check they go through was never loaded, so every link fell back to the khaytapp.com pages. Your own https addresses are used again; private and local addresses are still refused.
 - **Mac: see where failed prints cost you.** The Waste screen's summary has a new "Where failures cost" section: switch between By printer, By material and By customer to see which ones lost the most, with each one's true cost (filament, machine time and electricity) and how many failures it had. Entries with no printer, job or customer recorded are grouped under Unknown, so the groups always add up to the true cost above. By customer only shows for people who can see customers.
 - **Mac: log a failed print as waste from its notice.** When a printer reports a failed print, its entry under Printer trouble now has a "Log as waste…" button. It opens the usual waste sheet already filled in with the printer, the job it was printing (when Khayt knows it) and an estimate of the grams used (the job's grams times how far the print got, when both are known; otherwise the field is left for you). Nothing is saved until you check it and press Log. The button only shows for people who can log waste.
 - **Mac: quote-form requests with a STEP file can be taken in.** Khayt Cloud's quote form now accepts .step and .stp files (it shows the customer no price for them). The Mac files such a model in your library as CAD, unmeasured, before it removes the request from the cloud, and now tells Khayt Cloud it does, so these requests no longer stay stuck in Online orders.
@@ -6716,6 +6713,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.4.2] - 2026-11-05
+
+### Fixed
+
+- **Fixed: a pay-later link asked for the whole price again (both apps).** A Tabby, Tamara or Stripe link from a job was made for the job's price, ignoring a deposit already paid and, on a shop that adds tax on top, the tax. It is now for what is still owed (the bill less what was paid, the same figure the invoice's balance shows), and no link is made for a job already paid in full.
+
+- **Fixed: custom Stripe success and cancel URLs were ignored (Windows/Linux).** The address check they go through was never loaded, so every link fell back to the khaytapp.com pages. Your own https addresses are used again; private and local addresses are still refused.
+
+- **Fixed: Tabby saw every customer as new (both apps).** A Tabby link told Tabby that every customer had been with you since 1 January 2024, with no past orders, whoever they were. It now sends the date you first knew them (their customer record, or their earliest job) and how many of their jobs you have completed. The Windows/Linux app counts those jobs from your book; the Mac sends the date only.
 
 ## [4.4.1] - 2026-11-05
 
