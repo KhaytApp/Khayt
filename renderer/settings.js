@@ -5829,6 +5829,7 @@ function loadSettingsIntoForm() {
   renderIntegrationsSettings();
   // Batch-2 Feature 10: Telegram settings
   renderTelegramSettings();
+  renderNtfySettings();
   // Feature I: Email digest scheduler
   renderDigestSettings();
   renderAiSettings();
@@ -6742,23 +6743,50 @@ async function disableSecurity() {
   toast(t('sec.disabled_toast'), 'success');
 }
 
+// What each channel may be told, as a list of switches that complete the
+// sentence "Send a message when …" (the Mac's wording). The print notices are
+// opt-in per channel; the faults default as lib/alert-routes.js says.
+function _alertSwitchesHtml(prefix, vals) {
+  const row = (id, on, label) => `<label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <input type="checkbox" id="${prefix}${id}" style="width:auto;" ${on ? 'checked' : ''}> ${escapeHtml(label)}</label>`;
+  return [
+    row('Error', vals.error, t('alerts.printer_error')),
+    row('Offline', vals.offline, t('alerts.printer_offline')),
+    row('Stall', vals.stall, t('alerts.printer_stall')),
+    row('Runout', vals.runout, t('ntfy.runout')),
+    row('Finished', vals.finished, t('alerts.notify_finished')),
+    row('Failed', vals.failed, t('alerts.notify_failed')),
+    row('Paused', vals.paused, t('alerts.notify_paused')),
+    row('Names', vals.names, t('alerts.notice_names')),
+    `<div style="font-size:11px;color:var(--text-muted);margin:3px 0 0 24px;">${escapeHtml(t('alerts.notice_names_hint'))}</div>`,
+  ].join('');
+}
+function _readAlertSwitches(el, prefix) {
+  const on = (id) => !!el.querySelector('#' + prefix + id)?.checked;
+  return { error: on('Error'), offline: on('Offline'), stall: on('Stall'), runout: on('Runout'),
+           finished: on('Finished'), failed: on('Failed'), paused: on('Paused'), names: on('Names') };
+}
+
 function renderTelegramSettings() {
-  const el = document.getElementById('telegramSettingsSection');
+  // The card's container is #telegramSettingsContainer. This looked for
+  // #telegramSettingsSection, an id the page has not had since v2.0.12, so the
+  // card under Settings › Integrations › Telegram Notifications was empty and
+  // a Windows/Linux shop could not set Telegram up at all.
+  const el = document.getElementById('telegramSettingsContainer');
   if (!el) return;
   const tg = settings.telegram || {};
   el.innerHTML = `
-    <h4 style="margin-bottom:10px;">Telegram Notifications</h4>
     <label>Bot Token</label>
     <input type="password" id="tgBotToken" value="${escapeHtml(tg.botToken || '')}" placeholder="123456:ABC-...">
     <label style="margin-top:8px;">Chat ID</label>
     <input type="text" id="tgChatId" value="${escapeHtml(tg.chatId || '')}" placeholder="-100123456789 or @yourchannel">
     <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${escapeHtml(t('tg.chat_id_hint') || 'A numeric id for a group, or the @username of a public channel.')}</div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-      <button class="btn small" id="btnTgTest">Test</button>
-      <span style="font-size:12px;color:var(--text-muted);">Sends a test message to verify the bot works</span>
+      <button class="btn small" id="btnTgTest">${escapeHtml(t('alerts.send_test'))}</button>
     </div>
     <div style="margin-top:12px;">
-      <label style="display:flex;align-items:center;gap:8px;">
+      <div style="font-weight:600;font-size:13px;">${escapeHtml(t('alerts.when'))}</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
         <input type="checkbox" id="tgNotifyComplete" style="width:auto;" ${tg.notifyOnComplete ? 'checked' : ''}> Notify on order completed
       </label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
@@ -6767,15 +6795,12 @@ function renderTelegramSettings() {
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
         <input type="checkbox" id="tgNotifyLowStock" style="width:auto;" ${tg.notifyOnLowStock ? 'checked' : ''}> Notify on low stock
       </label>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyPrinterError" style="width:auto;" ${(tg.notifyPrinterError ?? true) ? 'checked' : ''}> ${escapeHtml(t('fleet.notify_error'))}
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyPrinterOffline" style="width:auto;" ${(tg.notifyPrinterOffline ?? true) ? 'checked' : ''}> ${escapeHtml(t('fleet.notify_offline'))}
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyPrinterStall" style="width:auto;" ${tg.notifyPrinterStall ? 'checked' : ''}> ${escapeHtml(t('fleet.notify_stall'))}
-      </label>
+      ${_alertSwitchesHtml('tgA', {
+        error: tg.notifyPrinterError !== false, offline: tg.notifyPrinterOffline !== false,
+        stall: !!tg.notifyPrinterStall, runout: tg.notifyPrinterRunout !== false,
+        finished: tg.notifyPrintFinished === true, failed: tg.notifyPrintFailed === true,
+        paused: tg.notifyPrintPaused === true, names: tg.printNoticeNames === true,
+      })}
     </div>
     <button class="btn primary small" id="btnSaveTgSettings" style="margin-top:12px;">Save Telegram Settings</button>`;
 
@@ -6789,7 +6814,7 @@ function renderTelegramSettings() {
     if (TG && !TG.isChatId(chatId)) { toast(t('tg.bad_chat_id'), 'error'); return; }
     if (window.hubAPI?.sendTelegram) {
       window.hubAPI.sendTelegram({ botToken, chatId, message: '✅ Khayt test notification' })
-        .then(() => toast(t('tg.test_sent'), 'success'))
+        .then((r) => (r && r.ok === false) ? toast(t('tg.error') + ': ' + (r.error || r.status || ''), 'error') : toast(t('tg.test_sent'), 'success'))
         .catch(e => toast(t('tg.error') + ': ' + e.message, 'error'));
     } else {
       toast(t('common.telegram_unavailable'), 'info');
@@ -6802,19 +6827,92 @@ function renderTelegramSettings() {
     const notifyOnComplete = el.querySelector('#tgNotifyComplete').checked;
     const notifyOnHold     = el.querySelector('#tgNotifyHold').checked;
     const notifyOnLowStock = el.querySelector('#tgNotifyLowStock').checked;
-    const notifyPrinterError   = el.querySelector('#tgNotifyPrinterError').checked;
-    const notifyPrinterOffline = el.querySelector('#tgNotifyPrinterOffline').checked;
-    const notifyPrinterStall   = el.querySelector('#tgNotifyPrinterStall').checked;
-    // Over what is stored, not instead of it: the Mac writes switches this form
-    // does not show (notifyPrinterRunout, the print notices and noticeNames),
-    // and a desktop Save must not turn them back to their defaults.
+    const a = _readAlertSwitches(el, 'tgA');
+    // Over what is stored, not instead of it: fields this form does not show
+    // (the Mac may write more) keep their values.
     settings.telegram = {
       ...(settings.telegram || {}),
       botToken, chatId, notifyOnComplete, notifyOnHold, notifyOnLowStock,
-      notifyPrinterError, notifyPrinterOffline, notifyPrinterStall,
+      notifyPrinterError: a.error, notifyPrinterOffline: a.offline, notifyPrinterStall: a.stall,
+      notifyPrinterRunout: a.runout, notifyPrintFinished: a.finished, notifyPrintFailed: a.failed,
+      notifyPrintPaused: a.paused, printNoticeNames: a.names,
     };
     saveAll();
     toast(t('tg.settings_saved'), 'success');
+  });
+}
+
+/** Printer alerts pushed to a phone through ntfy — the Mac's NtfySettings, on
+ *  the same `settings.ntfy` record ({ enabled, server, topic, token, events,
+ *  printNoticeNames }). The token is a sealed secret (store-secret-paths). */
+function renderNtfySettings() {
+  const el = document.getElementById('ntfySettingsContainer');
+  if (!el) return;
+  const n = settings.ntfy || {};
+  const ev = n.events || {};
+  const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
+  const def = (k) => ev[k] === undefined ? !!(AR && AR.DEFAULT_ON[k]) : !!ev[k];
+  el.innerHTML = `
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">${escapeHtml(t('ntfy.hint'))}</p>
+    <label style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="ntfyEnabled" style="width:auto;" ${n.enabled ? 'checked' : ''}> ${escapeHtml(t('ntfy.enable'))}
+    </label>
+    <label style="margin-top:8px;">${escapeHtml(t('ntfy.topic'))}</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="ntfyTopic" value="${escapeHtml(n.topic || '')}" maxlength="64" style="flex:1;" autocomplete="off" spellcheck="false">
+      <button class="btn small ghost" id="btnNtfyMakeTopic" type="button">${escapeHtml(t('ntfy.make_topic'))}</button>
+    </div>
+    <label style="margin-top:8px;">${escapeHtml(t('ntfy.server'))}</label>
+    <input type="url" id="ntfyServer" value="${escapeHtml(n.server || '')}" placeholder="https://ntfy.sh">
+    <label style="margin-top:8px;">${escapeHtml(t('ntfy.token'))}</label>
+    <input type="password" id="ntfyToken" value="" placeholder="${escapeHtml(secretFieldPlaceholder(n.token))}" autocomplete="off">
+    <div style="margin-top:12px;">
+      <div style="font-weight:600;font-size:13px;">${escapeHtml(t('alerts.when'))}</div>
+      ${_alertSwitchesHtml('ntA', {
+        error: def('error'), offline: def('offline'), stall: def('stall'), runout: def('runout'),
+        finished: ev.finished === true, failed: ev.failed === true, paused: ev.paused === true,
+        names: n.printNoticeNames === true,
+      })}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn primary small" id="btnSaveNtfy">${escapeHtml(t('common.save') || 'Save')}</button>
+      <button class="btn small" id="btnNtfyTest">${escapeHtml(t('alerts.send_test'))}</button>
+    </div>`;
+
+  el.querySelector('#btnNtfyMakeTopic')?.addEventListener('click', () => {
+    // A topic nobody would guess: on public ntfy.sh, knowing it is reading it.
+    const b = new Uint8Array(9); crypto.getRandomValues(b);
+    el.querySelector('#ntfyTopic').value = 'khayt-' + Array.from(b, (x) => x.toString(36).padStart(2, '0')).join('').slice(0, 16);
+  });
+
+  const save = () => {
+    const topic = el.querySelector('#ntfyTopic').value.trim();
+    const server = el.querySelector('#ntfyServer').value.trim();
+    if (topic && AR && !AR.validTopic(topic)) { toast(t('ntfy.topic') + ': A–Z, 0–9, _ and -, up to 64', 'error'); return false; }
+    const typed = el.querySelector('#ntfyToken').value.trim();
+    const a = _readAlertSwitches(el, 'ntA');
+    const next = {
+      ...(settings.ntfy || {}),
+      enabled: el.querySelector('#ntfyEnabled').checked, server, topic,
+      token: typed ? typed : ((settings.ntfy || {}).token || ''),
+      events: { ...((settings.ntfy || {}).events || {}), error: a.error, offline: a.offline, stall: a.stall, runout: a.runout,
+                finished: a.finished, failed: a.failed, paused: a.paused },
+      printNoticeNames: a.names,
+    };
+    if (AR && next.enabled && !AR.server({ ntfy: next })) { toast(t('ntfy.server') + ': http(s)://…', 'error'); return false; }
+    settings.ntfy = next;
+    saveAll();
+    return true;
+  };
+  el.querySelector('#btnSaveNtfy')?.addEventListener('click', () => { if (save()) toast(t('tg.settings_saved'), 'success'); });
+  el.querySelector('#btnNtfyTest')?.addEventListener('click', async () => {
+    // The main process reads the SAVED settings, so save first.
+    if (!save()) return;
+    if (typeof flushSave === 'function') await flushSave();
+    const r = await window.hubAPI?.sendNtfy?.({ type: 'finished', title: t('ntfy.test_title'), body: t('ntfy.test_body') })
+      .catch((e) => ({ ok: false, error: e.message }));
+    if (r && r.ok) toast(t('ntfy.test_sent'), 'success');
+    else toast('ntfy: ' + ((r && r.error) || 'unavailable'), 'error');
   });
 }
   const api = {
@@ -6889,6 +6987,7 @@ function renderTelegramSettings() {
     fullWipeData,
     renderSecuritySettings,
     renderTelegramSettings,
+    renderNtfySettings,
     // These four panels were declared like every other one but never added to
     // this hand-maintained list, so nothing outside this IIFE could re-render
     // them — renderPrivacySettings in particular, which now has to refresh when

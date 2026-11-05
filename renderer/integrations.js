@@ -1675,29 +1675,64 @@ let _printPhase = {};
  * engine isn't loaded.
  */
 function notifyPrintTransitions(currCache) {
-  if (typeof Notification === 'undefined') return;
-  if (settings && settings.notifyPrintDone === false) return;
+  // The local notification is opt-out (notifyPrintDone); the same transitions
+  // also go to Telegram / ntfy for a shop that switched those on per channel
+  // (lib/alert-routes.js NOTICE_TYPES, opt-in) — the Mac's PrintNotices.
+  const local = typeof Notification !== 'undefined' && !(settings && settings.notifyPrintDone === false);
   const curr = currCache || {};
   Object.keys(curr).forEach((mid) => {
     const c = curr[mid];
     if (!c || c.error === undefined && !c.state && c.progress == null) return;
     const st = String(c.state || '').toLowerCase();
-    const printing = /print|run|busy/i.test(st) && !/error|fault|halt/i.test(st);
+    const paused = /paus/.test(st);
+    const printing = !paused && /print|run|busy/i.test(st) && !/error|fault|halt/i.test(st);
     const isError = !!c.error || /error|fault|halt|attention|fail/i.test(st);
-    const isDone = /finish|complete|success|done|standby/i.test(st) || (!printing && !isError && Number(c.progress) >= 99);
+    const isDone = /finish|complete|success|done|standby/i.test(st) || (!printing && !paused && !isError && Number(c.progress) >= 99);
     const prev = _printPhase[mid];
     if (printing) { _printPhase[mid] = 'printing'; return; }
     const machine = (typeof machines !== 'undefined') ? machines.find((m) => m.id === mid) : null;
     const name = (machine && (machine.name || machine.label)) || t('notif.print_a_printer') || 'Your printer';
     const fn = c.filename ? String(c.filename).replace(/[\r\n\t]/g, ' ').slice(0, 120) : '';
-    if (prev === 'printing' && isDone) {
+    if (paused) {
+      // Told once per pause; a resume puts it back to printing and re-arms it.
+      if (prev === 'printing') { _printPhase[mid] = 'paused'; sendPrintNotice('paused', name, fn); }
+      return;
+    }
+    if ((prev === 'printing' || prev === 'paused') && isDone) {
       _printPhase[mid] = 'done';
-      _firePrintNotification('✅ ' + (t('notif.print_done_title', { name }) || (name + ' — print complete')), fn);
-    } else if (prev === 'printing' && isError) {
+      if (local) _firePrintNotification('✅ ' + (t('notif.print_done_title', { name }) || (name + ' — print complete')), fn);
+      sendPrintNotice('finished', name, fn);
+    } else if ((prev === 'printing' || prev === 'paused') && isError) {
       _printPhase[mid] = 'error';
-      _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), fn || (c.error ? String(c.error).slice(0, 120) : ''));
+      if (local) _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), fn || (c.error ? String(c.error).slice(0, 120) : ''));
+      sendPrintNotice('failed', name, fn);
     }
   });
+}
+
+/** Where a print's own news goes beyond this screen: Telegram and ntfy, each
+ *  only when the shop switched that notice on for it. The file name is left
+ *  out unless the shop ticked "include job and file names" for that channel,
+ *  because a file is often named after the customer. */
+function sendPrintNotice(kind, machineName, filename) {
+  const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
+  if (!AR) return;
+  const routes = AR.routes(kind, settings);
+  if (!routes.telegram && !routes.ntfy) return;
+  const names = AR.noticeNames(settings);
+  const title = t('alerts.notice_' + kind, { machine: machineName });
+  const icon = kind === 'finished' ? '✅' : kind === 'failed' ? '❌' : '⏸';
+  const tg = settings.telegram || {};
+  if (routes.telegram && window.hubAPI?.sendTelegram) {
+    const message = `${icon} ${title}` + (names.telegram && filename ? '\n' + filename : '');
+    window.hubAPI.sendTelegram({ botToken: tg.botToken, chatId: tg.chatId, message })
+      .catch(e => console.warn('Telegram print notice failed:', e));
+  }
+  if (routes.ntfy && window.hubAPI?.sendNtfy) {
+    window.hubAPI.sendNtfy({ type: kind, title, body: names.ntfy ? filename : '' })
+      .then(r => { if (r && !r.ok) console.warn('ntfy print notice failed:', r.error); })
+      .catch(e => console.warn('ntfy print notice failed:', e));
+  }
 }
 
 function _firePrintNotification(title, body) {
@@ -1716,9 +1751,13 @@ function dispatchPrinterAlerts(currCache) {
   if (!compute) return;
   let result;
   try {
+    const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
     result = compute(_printerAlertPrevCache, currCache || {}, settings, Date.now(), {
       alertState: _printerAlertState,
       machines,
+      // Which types to compute at all: whatever Telegram OR ntfy asked for
+      // (a runout is on by default; a stall only when a channel wants it).
+      ...(AR ? { enable: AR.enable(settings) } : {}),
     });
   } catch (e) {
     console.warn('computePrinterAlerts failed:', e);
@@ -1733,14 +1772,23 @@ function dispatchPrinterAlerts(currCache) {
 function firePrinterAlert(alert) {
   // tgSafe: strip control chars and truncate to prevent message manipulation
   const tgSafe = s => String(s ?? '').replace(/[\r\n\t]/g, ' ').slice(0, 200);
-  const icon = alert.type === 'error' ? '❌' : alert.type === 'offline' ? '📴' : '⏸';
+  const icon = alert.type === 'error' ? '❌' : alert.type === 'offline' ? '📴' : alert.type === 'runout' ? '🧵' : '⏸';
   const message = `${icon} ${tgSafe(alert.message)}`;
 
-  // Telegram (reuses the order-notification transport)
+  // Which channels: the shared rule (lib/alert-routes.js), so each channel's own
+  // switches are honoured — the Mac asks the same question. Without it, the old
+  // answer: Telegram whenever it is set up.
+  const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
   const tg = settings.telegram;
-  if (tg && tg.botToken && tg.chatId) {
+  const routes = AR ? AR.routes(alert.type, settings) : { telegram: !!(tg && tg.botToken && tg.chatId), ntfy: false };
+  if (routes.telegram) {
     window.hubAPI?.sendTelegram?.({ botToken: tg.botToken, chatId: tg.chatId, message })
       .catch(e => console.warn('Telegram printer alert failed:', e));
+  }
+  if (routes.ntfy && window.hubAPI?.sendNtfy) {
+    window.hubAPI.sendNtfy({ type: alert.type, title: tgSafe(alert.message), body: '' })
+      .then(r => { if (r && !r.ok) console.warn('ntfy printer alert failed:', r.error); })
+      .catch(e => console.warn('ntfy printer alert failed:', e));
   }
 
   // Webhook (reuses fireWebhook with a dedicated event name)
