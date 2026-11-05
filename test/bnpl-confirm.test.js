@@ -343,3 +343,52 @@ test('a settings form carrying bnpl merges per provider; keys absent are kept, e
   assert.deepEqual(out.stripe, stored.bnpl.stripe);
   assert.deepEqual(apply(stored, {}, { year: 2026 }).bnpl, stored.bnpl, 'a form without bnpl keeps it as stored');
 });
+
+// ── the link is for what is still owed ──────────────────────────────────────
+test('a pay-later link asks for what is owed: the tax-on-top bill less the deposit, and none when settled', () => {
+  require('../lib/tax.js');
+  require('../lib/business-scope.js');
+  require('../lib/order-money.js');
+  const R = require('../lib/bnpl-requests');
+  const EXCL = { currency: 'SAR', tax: { name: 'VAT', mode: 'exclusive', rates: [{ id: 'vat', label: 'VAT', percent: 15 }] },
+    bnpl: { tabby: { merchantCode: 'M1', currency: 'SAR' }, tamara: { country: 'SA' } } };
+  // 200 + 15% = 230 billed, 50 deposit paid: 180 owed. It was order.price, 200.
+  const order = { id: 'J1', project: 'Lamp', price: 200, paidAmount: 50, status: 'completed', clientId: 'C1', date: '2026-10-01' };
+  const clients = [{ id: 'C1', phone: '+9665', email: 'c@x.test' }];
+  const tab = R.checkoutArgs(order, 'tabby', { settings: EXCL, clients, buyerName: 'Noura' });
+  assert.equal(tab.amount, 180);
+  assert.equal(tab.merchantCode, 'M1');
+  assert.deepEqual(tab.buyer, { name: 'Noura', phone: '+9665', email: 'c@x.test' });
+  assert.equal(tab.description, 'Lamp');
+  assert.equal(R.checkoutArgs(order, 'tamara', { settings: EXCL, clients }).country, 'SA');
+  // The checkout body carries it.
+  assert.equal(R.plan('checkout', tab, []).request.body.payment.amount, '180.00');
+  // Settled: no link for nothing.
+  assert.deepEqual(R.checkoutArgs({ ...order, paidAmount: 230 }, 'tabby', { settings: EXCL, clients }), { refused: 'nothing_owed' });
+  // An inclusive (or untaxed) shop: the price is the bill.
+  assert.equal(R.checkoutArgs(order, 'tabby', { settings: { currency: 'SAR' }, clients }).amount, 150);
+  // The desktop dialog builds from this, not from order.price.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'integrations.js'), 'utf8');
+  assert.match(src, /KhaytBnplRequests\.checkoutArgs\(order, svc\.id, bnplCtx\)/);
+  assert.ok(!/const amount = \+order\.price/.test(src), 'no link for the bare price');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8'), /<script src="\.\.\/lib\/bnpl-requests\.js"><\/script>/);
+});
+
+// ── Stripe: a custom redirect URL is kept, a private one is not ─────────────
+test('Stripe keeps a shop\'s own https success and cancel URLs, and refuses private ones', async () => {
+  const handlers = new Map();
+  const realFetch = global.fetch;
+  const sent = [];
+  global.fetch = async (url, init) => { sent.push(new URLSearchParams(init.body)); return reply(200, { url: 'https://checkout.stripe.com/x', id: 'cs_1' }); };
+  try {
+    const { registerPaymentLinks } = require('../lib/main/payment-links.js');
+    registerPaymentLinks({ ipcMain: { handle: (n, f) => handlers.set(n, f) }, resolveStoreSecret: (incoming) => incoming });
+    const stripe = (a) => handlers.get('hub:bnpl-stripe')(null, { apiKey: 'sk_test_1', amount: 10, ...a });
+    assert.equal((await stripe({ successUrl: 'https://shop.example/thanks', cancelUrl: 'https://shop.example/back' })).ok, true);
+    assert.equal(sent[0].get('success_url'), 'https://shop.example/thanks');
+    assert.equal(sent[0].get('cancel_url'), 'https://shop.example/back');
+    await stripe({ successUrl: 'https://127.0.0.1/x', cancelUrl: 'https://192.168.1.5/y' });
+    assert.equal(sent[1].get('success_url'), 'https://khaytapp.com/success');
+    assert.equal(sent[1].get('cancel_url'), 'https://khaytapp.com/cancel');
+  } finally { global.fetch = realFetch; }
+});

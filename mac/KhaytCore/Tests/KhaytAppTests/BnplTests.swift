@@ -130,23 +130,35 @@ struct BnplTests {
                                              "last_name": .string("Al Ahmad"), "phone_number": .string("+966500000000")]))
     }
 
-    @Test("a checkout's arguments are the desktop dialog's: the price, the document number, the customer")
+    @Test("a checkout asks for what is OWED: the tax-on-top bill less the deposit; a settled job is refused")
     func checkoutArgs() async throws {
         let engine = try KhaytEngine()
-        let order: JSONValue = .object(["id": .string("J1"), "project": .string("Lamp"), "price": .number(200),
-                                        "clientId": .string("C1"), "date": .string("2026-10-01")])
+        // 200 + 15% = 230 billed, 50 deposit paid: 180 owed (it was the bare price, 200).
+        var fields: [String: JSONValue] = [
+            "id": .string("J1"), "project": .string("Lamp"), "price": .number(200), "paidAmount": .number(50),
+            "status": .string("completed"), "clientId": .string("C1"), "date": .string("2026-10-01")]
         let clients: [JSONValue] = [.object(["id": .string("C1"), "phone": .string("+9665"), "email": .string("c@x.test")])]
-        let settings: [String: JSONValue] = ["bnpl": .object(["tabby": .object(["merchantCode": .string("M1")])])]
-        let a = try await engine.bnplCheckoutArgs(order: order, provider: "tabby", settings: settings,
+        let settings: [String: JSONValue] = [
+            "currency": .string("SAR"),
+            "tax": .object(["name": .string("VAT"), "mode": .string("exclusive"),
+                            "rates": .array([.object(["id": .string("vat"), "label": .string("VAT"), "percent": .number(15)])])]),
+            "bnpl": .object(["tabby": .object(["merchantCode": .string("M1")])]),
+        ]
+        let a = try await engine.bnplCheckoutArgs(order: .object(fields), provider: "tabby", settings: settings,
                                                   clients: clients, buyerName: "Noura")
         guard case .object(let o) = a else { Issue.record("not an object"); return }
-        #expect(o["amount"] == .number(200))
+        #expect(o["amount"] == .number(180))
         #expect(o["currency"] == .string("SAR"), "the desktop's default")
         #expect(o["merchantCode"] == .string("M1"))
         #expect(o["description"] == .string("Lamp"))
         #expect(o["buyer"] == .object(["name": .string("Noura"), "phone": .string("+9665"), "email": .string("c@x.test")]))
-        let number = try await engine.documentNumber(order: order, settings: settings)
+        let number = try await engine.documentNumber(order: .object(fields), settings: settings)
         #expect(o["orderId"] == .string(number))
+
+        fields["paidAmount"] = .number(230)
+        let settled = try await engine.bnplCheckoutArgs(order: .object(fields), provider: "tabby", settings: settings,
+                                                        clients: clients, buyerName: "Noura")
+        #expect(settled == .object(["refused": .string("nothing_owed")]))
     }
 
     // MARK: - Settings
@@ -311,6 +323,24 @@ extension LibraryEditPerfTests {
             guard case .object(let body)? = fake.seen.first?.body else { Issue.record("no body"); return }
             #expect(body["total_amount"] == .object(["amount": .string("200.00"), "currency": .string("SAR")]))
             #expect(fake.seen.first?.auth == "Bearer sk_test_tamara")
+        }
+    }
+
+    @Test("no link is made for a job already paid in full, and nothing is sent")
+    func bnpl_noLinkForNothingOwed() async throws {
+        let fake = BnplTests.Fake([:])
+        let kept = Shop.bnplFetch
+        Shop.bnplFetch = fake.fetch
+        defer { Shop.bnplFetch = kept }
+        try await withPerfBook(BnplTests.book([BnplTests.job("J1", extra: ["paidAmount": .number(200),
+                                                                           "paymentStatus": .string("paid")])])) { shop, url in
+            shop.stopWatchingBnpl()
+            let out = await shop.makeBnplLink("J1", provider: "tabby")
+            #expect(out.url == nil)
+            #expect(out.problem == shop.words.callIt("inst.nothing_owed"))
+            #expect(fake.seen.isEmpty)
+            let disk = try DepositsAndRemindersTests.onDisk(url, "J1")
+            #expect(BnplTests.links(disk).isEmpty)
         }
     }
 

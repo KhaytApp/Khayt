@@ -8,7 +8,7 @@ import KhaytCore
 /// The desktop's pay-later dialog (`openBnplModal`), for the two providers this
 /// app finishes payments for: one row per provider that is switched on with a
 /// key, a button that makes the link, then the link with Copy and Share. The
-/// amount is the job's price, as the desktop sends it. Once made, the link is
+/// amount is what is still owed on the job, as the desktop sends it. Once made, the link is
 /// remembered on the job and the app finishes the payment by itself when the
 /// customer has paid (`Shop+Bnpl.swift`).
 struct BnplLinkSheet: View {
@@ -30,7 +30,7 @@ struct BnplLinkSheet: View {
             if let job {
                 HStack {
                     Text(shop.words.callIt("bnpl.amount_label")).foregroundStyle(.secondary)
-                    Text(Money.text(job.price, job.currency)).monospacedDigit()
+                    Text(Money.text(job.owedInOwnCurrency, job.currency)).monospacedDigit()
                 }
             }
             let offered = shop.bnplProvidersOffered

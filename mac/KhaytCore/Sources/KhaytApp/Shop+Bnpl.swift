@@ -6,8 +6,9 @@ import KhaytCore
 ///
 /// ── WHAT THE DESKTOP DOES, AND THIS DOES THE SAME ─────────────────────────
 ///
-/// A link is made from the job (`renderer/integrations.js openBnplModal`): the
-/// job's price, its document number as the reference, the customer's name,
+/// A link is made from the job (`renderer/integrations.js openBnplModal`): what
+/// is still owed on it (`KhaytBnplRequests.checkoutArgs` — the bill, tax on top
+/// included, less what was paid), its document number as the reference, the customer's name,
 /// phone and email. The provider's id for it is remembered on the job as
 /// `order.bnplLinks[]` (`lib/bnpl-confirm.js linkRecord` / `addLink`).
 ///
@@ -99,6 +100,9 @@ extension Shop {
             args = try await engine.bnplCheckoutArgs(
                 order: order, provider: provider, settings: settingsDict, clients: clientRows,
                 buyerName: Self.emailClientName(for: raw, in: clientRows))
+            if case .object(let a) = args, a["refused"] != nil {
+                return BnplLinkOutcome(problem: words.callIt("inst.nothing_owed"))
+            }
             let key = try await bnplKey(provider)
             result = try await BnplClient.run("checkout", args: args, key: key, engine: engine, fetch: Self.bnplFetch)
         } catch {

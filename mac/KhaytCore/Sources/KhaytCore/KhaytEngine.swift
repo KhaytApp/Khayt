@@ -14228,33 +14228,16 @@ public actor KhaytEngine {
                           [.string(flow), args, .array(replies.map(\.json))], as: BnplStep.self)
     }
 
-    /// What a checkout for this job sends, as the desktop's pay-later dialog
-    /// builds it: the job's PRICE, its document number as the reference, its
-    /// project (or job number) as the description, and the customer's name,
-    /// phone and email.
+    /// What a checkout for this job sends (`KhaytBnplRequests.checkoutArgs`,
+    /// which the desktop's pay-later dialog builds from too): what is still
+    /// OWED — the bill, tax on top included, less what was paid — its document
+    /// number as the reference, and the customer's name, phone and email. Or
+    /// `{ refused: 'nothing_owed' }` for a job already settled.
     public func bnplCheckoutArgs(order: JSONValue, provider: String, settings: [String: JSONValue],
                                  clients: [JSONValue], buyerName: String) throws -> JSONValue {
-        try runtime.call2("""
-            (function (order, provider, settings, clients, buyerName) {
-              var cfg = ((settings.bnpl || {})[provider]) || {};
-              var client = order.clientId ? (clients || []).find(function (c) { return c && c.id === order.clientId; }) : null;
-              var ref = String((typeof order.jobNumber === 'string' && order.jobNumber) || order.id || '');
-              var label = order.project || ref;
-              var args = {
-                provider: provider,
-                amount: +order.price || 0,
-                currency: cfg.currency || 'SAR',
-                description: label,
-                buyer: { name: client ? buyerName : (order.client || ''), phone: (client && client.phone) || '', email: (client && client.email) || '' },
-                orderId: KhaytInvoiceDocument.documentNumber(order, settings),
-                itemName: label,
-              };
-              if (provider === 'tabby') args.merchantCode = cfg.merchantCode;
-              if (provider === 'tamara') args.country = cfg.country || 'SA';
-              return args;
-            })(ARG0, ARG1, ARG2, ARG3, ARG4)
-            """, [order, .string(provider), .object(settings), .array(clients), .string(buyerName)],
-            as: JSONValue.self)
+        try runtime.call2("KhaytBnplRequests.checkoutArgs(ARG0, ARG1, {settings: ARG2, clients: ARG3, buyerName: ARG4})",
+                          [order, .string(provider), .object(settings), .array(clients), .string(buyerName)],
+                          as: JSONValue.self)
     }
 
     /// The job with a checkout's link remembered on it (`linkRecord` +
