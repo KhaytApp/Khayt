@@ -7,7 +7,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: see where failed prints cost you.** The Waste screen's summary has a new "Where failures cost" section: switch between By printer, By material and By customer to see which ones lost the most, with each one's true cost (filament, machine time and electricity) and how many failures it had. Entries with no printer, job or customer recorded are grouped under Unknown, so the groups always add up to the true cost above. By customer only shows for people who can see customers.
 - **Mac: log a failed print as waste from its notice.** When a printer reports a failed print, its entry under Printer trouble now has a "Log as waste…" button. It opens the usual waste sheet already filled in with the printer, the job it was printing (when Khayt knows it) and an estimate of the grams used (the job's grams times how far the print got, when both are known; otherwise the field is left for you). Nothing is saved until you check it and press Log. The button only shows for people who can log waste.
 - **Mac: quote-form requests with a STEP file can be taken in.** Khayt Cloud's quote form now accepts .step and .stp files (it shows the customer no price for them). The Mac files such a model in your library as CAD, unmeasured, before it removes the request from the cloud, and now tells Khayt Cloud it does, so these requests no longer stay stuck in Online orders.
-- **Desktop: quote-form requests with a STEP file can be taken in.** A .step or .stp file sent through Khayt Cloud's quote form is saved with the quote on Import, as any other file is, and the desktop now tells Khayt Cloud so, so Import and Dismiss work for these requests instead of being refused.
 - **Mac: hide "Quotes by Khayt" on your quote page (Studio).** Settings › Online › Quote form for your store has a new switch to hide the "Quotes by Khayt" line on the standalone quote page your link opens. It only shows on a plan that includes it (or once hidden, so you can turn it back on). Inside an iframe on your own site the line is already hidden. If Khayt Cloud refuses because the plan does not include it, the switch goes back and says why. The Studio plan now lists "Your quote form without Khayt branding".
 - **iPhone: an untitled job in Spotlight and Siri reads by its job number.** A job with no project name was listed in Spotlight under its full id, random tag included (INV-2026-0042-k7qx); it now shows INV-2026-0042, as every screen in the app does.
 
@@ -6712,6 +6711,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [4.4.1] - 2026-11-05
+
+### Fixed
+
+- **Desktop: quote-form requests with a STEP file can be taken in.** A .step or .stp file sent through Khayt Cloud's quote form is saved with the quote on Import, as any other file is, and the desktop now tells Khayt Cloud so, so Import and Dismiss work for these requests instead of being refused.
 
 ## [4.4.0] - 2026-11-05
 
