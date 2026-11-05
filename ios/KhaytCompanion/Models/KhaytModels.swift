@@ -564,6 +564,10 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// writes it from `quoteValidityDays`). Nil on everything that is not a
     /// quote, and on quotes made before the field existed.
     let quoteExpiresAt: String?
+    /// The currency `price` is in: a job is converted into its client's
+    /// currency when it is saved (#2148), so it is not always the shop's.
+    /// Absent means the shop's.
+    var currency: String? = nil
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference

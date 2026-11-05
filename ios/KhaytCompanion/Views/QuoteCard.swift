@@ -62,7 +62,7 @@ struct QuoteCard: View {
                     }
                     Spacer(minLength: 0)
                     if let price = quote.price {
-                        Text(Money.text(price, currency))
+                        Text(Money.text(price, quote.currency.flatMap { $0.isEmpty ? nil : $0 } ?? currency))
                             .font(.khayt(14, .semibold, relativeTo: .subheadline).monospacedDigit())
                             .foregroundStyle(KhaytDesign.ink)
                             .lineLimit(1)

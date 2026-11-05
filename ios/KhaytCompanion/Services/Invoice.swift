@@ -117,11 +117,20 @@ extension BookReader {
         if !proforma, case .bool(true)? = settings["enableZatca"] {
             let words = (try? await engine.translations(language: language)) ?? [:]
             let refusal = (try? await engine.zatcaReadiness(settings: settings, sellerName: sellerName)).flatMap { $0 }
+            // Tags 4 and 5 are RIYALS. A job saved in a client's currency is
+            // converted at the rate stored on it when it was saved; with no
+            // rate there is no honest figure and no QR (`qrAmounts`, shared
+            // with the desktop and the Mac).
+            let riyals = try? await engine.zatcaAmounts(
+                order: row, settings: settings, total: subtotal + taxTotal, vatAmount: taxTotal)
             if let refusal {
                 qrProblem = Self.zatcaRefusal(refusal, words: words)
-            } else if let payload = try? await engine.zatcaPayload(
+            } else if case .refused(let why)? = riyals {
+                qrProblem = Self.zatcaRefusal(why, words: words)
+            } else if case .amounts(let total, let vat)? = riyals,
+                let payload = try? await engine.zatcaPayload(
                 sellerName: sellerName, vatNumber: Self.text(settings["vat"]) ?? "", timestamp: stamp ?? "",
-                total: Self.amount(subtotal + taxTotal), vatAmount: Self.amount(taxTotal)),
+                total: Self.amount(total), vatAmount: Self.amount(vat)),
                 let image = Self.qrImage(payload) {
                 qrSvg = "<img src=\"\(image)\" width=\"120\" height=\"120\" alt=\"ZATCA\">"
             } else {
