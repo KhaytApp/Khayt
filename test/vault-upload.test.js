@@ -286,6 +286,25 @@ test('a source that changes while sealing is refused and abandoned, nothing sent
   assert.equal(cloud.route('DELETE', /\/vault\/uploads\//).length, 1);
 });
 
+test('no spool: a part re-sealed at SEND time from changed bytes is never sent, and the upload is abandoned', async () => {
+  // Sealing reads each chunk once; the send pass reads them again. Here the
+  // file changes in between. Two plaintexts under one DK and counter nonce
+  // must never both reach the server.
+  const cloud = fakeCloud();
+  const size = CB + 20;
+  const good = pattern(size);
+  const bad = Buffer.from(good); bad[CB + 3] ^= 0xff;
+  // One part at a time, and the file changes the moment the first part has
+  // landed: chunk 1 is re-sealed at send time from the changed bytes.
+  const e = await uploadFile({ dek: DEK, size, name: 'r.stl', client: cloud.client, concurrency: 1,
+    readChunk: async (o, l) => (cloud.puts().length > 0 ? bad : good).subarray(o, o + l) }).catch((x) => x);
+  assert.equal(e.reason, 'source-changed');
+  assert.match(e.message, /changed since the upload started/);
+  assert.deepEqual(cloud.puts().map(putIndex), [0], 'only the unchanged part 0 was sent (and the send pass did start)');
+  assert.equal(cloud.route('POST', /\/complete$/).length, 0);
+  assert.equal(cloud.route('DELETE', /\/vault\/uploads\//).length, 1, 'abandoned');
+});
+
 test('resume from a spool: same uploadId, only the parts not sent, the same sealed bytes', async () => {
   const cloud = fakeCloud({ failPutOnce: { 2: 503 } });
   const spool = memorySpool();
