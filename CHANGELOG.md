@@ -9143,6 +9143,16 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.23] - 2026-11-05
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **See where failed prints cost you.** The Waste screen has a "Where failures cost" section: By printer, By material or By customer, each with its true cost (filament, machine time and electricity) and how many failures it had. Failures with nothing recorded to group by are counted under Unknown, so the groups add up to the total above. By customer shows only for people who can see customers.
+- **Log a failed print as waste from its notice.** When a printer reports a failed print, its entry under Printer trouble has a "Log as waste…" button. It opens the waste sheet filled in with the printer, the job and the grams used so far (the job's grams times how far the print got, when both are known). Nothing is saved until you press Log.
+
 ## [4.0.0-beta.22] - 2026-11-05
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
