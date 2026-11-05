@@ -43,6 +43,34 @@ enum QuoteFormEmbed {
         var files: Files?
         var month: Month?
         var links: Links?
+        /// The "Quotes by Khayt" line on the standalone page. Nil from a
+        /// cloud that predates it: then the switch is not offered.
+        var footer: Footer?
+
+        struct Footer: Decodable, Equatable, Sendable {
+            /// The shop has asked for it hidden.
+            var hide: Bool
+            /// The shop's plan lets it be hidden (`quoteFormBranding`).
+            var canHide: Bool
+            /// Whether the standalone page draws it right now.
+            var shown: Bool
+
+            init(hide: Bool = false, canHide: Bool = false, shown: Bool = true) {
+                self.hide = hide; self.canHide = canHide; self.shown = shown
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: Key.self)
+                hide = ((try? c.decodeIfPresent(Bool.self, forKey: .hide)) ?? nil) ?? false
+                canHide = ((try? c.decodeIfPresent(Bool.self, forKey: .canHide)) ?? nil) ?? false
+                shown = ((try? c.decodeIfPresent(Bool.self, forKey: .shown)) ?? nil) ?? !hide
+            }
+            private enum Key: String, CodingKey { case hide, canHide, shown }
+
+            /// The switch is drawn for a plan that may hide it, and for a
+            /// shop that hid it once — so it can always be turned back on.
+            var offered: Bool { canHide || hide }
+        }
 
         struct Files: Decodable, Equatable, Sendable {
             var count: Int?
@@ -64,10 +92,10 @@ enum QuoteFormEmbed {
 
         init(enabled: Bool = false, origins: [String] = [], updatedAt: String? = nil,
              priceAvailable: Bool? = nil, keepsFiles: Bool? = nil, files: Files? = nil,
-             month: Month? = nil, links: Links? = nil) {
+             month: Month? = nil, links: Links? = nil, footer: Footer? = nil) {
             self.enabled = enabled; self.origins = origins; self.updatedAt = updatedAt
             self.priceAvailable = priceAvailable; self.keepsFiles = keepsFiles
-            self.files = files; self.month = month; self.links = links
+            self.files = files; self.month = month; self.links = links; self.footer = footer
         }
 
         init(from decoder: Decoder) throws {
@@ -88,9 +116,10 @@ enum QuoteFormEmbed {
                 l.page = safe(l.page); l.frame = safe(l.frame); l.script = safe(l.script)
                 links = l
             } else { links = nil }
+            footer = try? c.decodeIfPresent(Footer.self, forKey: .footer)
         }
         private enum Key: String, CodingKey {
-            case enabled, origins, updatedAt, priceAvailable, keepsFiles, files, month, links
+            case enabled, origins, updatedAt, priceAvailable, keepsFiles, files, month, links, footer
         }
     }
 
@@ -105,6 +134,10 @@ enum QuoteFormEmbed {
         case badOrigin(String)
         /// Refused here before sending: more than `maxOrigins`.
         case tooMany
+        /// 402 `plan-required`: hiding the footer is not on this shop's plan.
+        case planRequired
+        /// 400 `bad-footer`: the cloud refused the footer setting.
+        case badFooter
         case malformed
         case http(Int, String)
 
@@ -115,6 +148,8 @@ enum QuoteFormEmbed {
             case .unauthorised: "Khayt Cloud did not accept this sign-in."
             case .badOrigin(let value): "Not an allowed web address: \(value)"
             case .tooMany: "At most \(QuoteFormEmbed.maxOrigins) web addresses."
+            case .planRequired: "Hiding “Quotes by Khayt” is not part of this shop's Khayt Cloud plan."
+            case .badFooter: "Khayt Cloud did not accept the footer setting."
             case .malformed: "Khayt Cloud answered with something this app could not read."
             case .http(let code, let body): "Khayt Cloud answered \(code)" + (body.isEmpty ? "" : ": \(body)")
             }
@@ -146,7 +181,22 @@ enum QuoteFormEmbed {
         return try answer(try await fetch(request))
     }
 
-    private static func answer(_ pair: (Data, URLResponse)) throws -> State {
+    /// `PUT /embed/footer`: hide or show "Quotes by Khayt" on the standalone
+    /// page. Showing it (`false`) is always allowed; hiding it needs a plan
+    /// with `quoteFormBranding` (402 `plan-required` otherwise). Answers with
+    /// the same body as `GET /embed`.
+    @MainActor static func saveFooter(hide: Bool, _ connection: CloudReader.Connection,
+                                      token: String, fetch: Fetch) async throws -> State {
+        var request = try CloudReader.request(connection, token: token, method: "PUT", tail: "/embed/footer")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["hideFooter": hide])
+        return try answer(try await fetch(request), footer: true)
+    }
+
+    /// `footer`: the footer route, where ANY 404 is the feature off (a
+    /// cloud without the route, or with the form dark) — not offered, said
+    /// quietly, like `QuoteSheetPublisher.Failure.notOffered`.
+    private static func answer(_ pair: (Data, URLResponse), footer: Bool = false) throws -> State {
         let (data, response) = pair
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -154,6 +204,11 @@ enum QuoteFormEmbed {
         case 200:
             guard let state = try? JSONDecoder().decode(State.self, from: data) else { throw Failure.malformed }
             return state
+        case 402 where footer || (body?["reason"] as? String) == "plan-required":
+            throw Failure.planRequired
+        case 400 where footer:
+            throw Failure.badFooter
+        case 404 where footer: throw Failure.notAvailable
         case 400 where (body?["reason"] as? String) == "bad-embed":
             throw Failure.badOrigin((body?["value"] as? String) ?? "")
         case 401: throw Failure.unauthorised
@@ -275,6 +330,25 @@ extension Shop {
         }
     }
 
+    /// Hide or show "Quotes by Khayt" on the standalone quote page. Gated
+    /// like the form itself (owner or manager), and by the operator lock like
+    /// every other cloud write.
+    func saveQuoteFormFooter(hide: Bool) async -> Result<QuoteFormEmbed.State, QuoteFormSaveFailure> {
+        guard cloudCanManageEmbed else { return .failure(.init(sentence: words.callIt("mac.qfe_managers_only"))) }
+        guard permitted("cloud", "edit") else { return .failure(.init(sentence: moveProblem ?? words.callIt("mac.lock_not_allowed"))) }
+        guard let (connection, token) = await vaultSession() else {
+            return .failure(.init(sentence: words.callIt("mac.qfe_needs_cloud")))
+        }
+        do {
+            return .success(try await QuoteFormEmbed.saveFooter(hide: hide, connection, token: token,
+                                                                fetch: Self.embedFetch))
+        } catch QuoteFormEmbed.Failure.notAvailable {
+            return .failure(.init(sentence: words.callIt("mac.qfe_not_available"), notAvailable: true))
+        } catch {
+            return .failure(.init(sentence: embedProblem(error)))
+        }
+    }
+
     struct QuoteFormSaveFailure: Error, Equatable {
         let sentence: String
         var notAvailable = false
@@ -291,6 +365,8 @@ extension Shop {
         case .badOrigin(let value): return words.callIt("mac.qfe_err_origin", ["value": .string(value)])
         case .tooMany: return words.callIt("mac.qfe_err_too_many", ["n": .number(Double(QuoteFormEmbed.maxOrigins))])
         case .malformed: return words.callIt("mac.qfe_err_malformed")
+        case .planRequired: return words.callIt("mac.qfe_err_plan_required")
+        case .badFooter: return words.callIt("mac.qfe_err_bad_footer")
         case .http(let code, _): return words.callIt("mac.cloud_err_http", ["code": .string(String(code))])
         }
     }

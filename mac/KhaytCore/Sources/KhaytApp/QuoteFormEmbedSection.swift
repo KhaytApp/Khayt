@@ -21,6 +21,12 @@ struct QuoteFormEmbedSection: View {
     @State private var busy = false
     @State private var problem: String?
     @State private var copied: String?
+    /// "Quotes by Khayt" hidden on the standalone page, as the switch shows it.
+    @State private var hideFooter = false
+    @State private var footerBusy = false
+    @State private var footerProblem: String?
+    /// False once the footer route answered 404: the cloud does not offer it.
+    @State private var footerOffered = true
     @AppStorage(Shop.quoteAutoImportKey) private var autoImport = false
     private let preloaded: Bool
     /// The rows in a plain stack, for a photograph: `ImageRenderer` cannot
@@ -38,6 +44,7 @@ struct QuoteFormEmbedSection: View {
         if case .shown(let s)? = shown {
             _enabled = State(initialValue: s.enabled)
             _originsText = State(initialValue: s.origins.joined(separator: "\n"))
+            _hideFooter = State(initialValue: s.footer?.hide ?? false)
         }
     }
 
@@ -113,6 +120,25 @@ struct QuoteFormEmbedSection: View {
         Toggle(words.callIt("mac.qfe_auto_import"), isOn: $autoImport)
         Text(words.callIt("mac.qfe_auto_import_hint")).font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+
+        // ── "QUOTES BY KHAYT" ON THE STANDALONE PAGE ────────────────────
+        // Only on a plan that may hide it, or once hidden (so it can always
+        // be shown again). SAVES ITSELF, and a refusal puts the switch back
+        // with the reason beside it: flipped and refused, it looked hidden
+        // and was not.
+        if footerOffered, let footer = state.footer, footer.offered {
+            Toggle(words.callIt("mac.qfe_hide_footer"), isOn: $hideFooter)
+                .disabled(!canChange || footerBusy)
+                .onChange(of: hideFooter) { _, now in
+                    if now != footer.hide, canChange { Task { await saveFooter(now) } }
+                }
+            Text(words.callIt("mac.qfe_hide_footer_hint")).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let footerProblem {
+                Text(footerProblem).font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
 
         // ── WHAT IT CAN AND CANNOT DO RIGHT NOW ─────────────────────────
         if state.priceAvailable == false {
@@ -281,6 +307,22 @@ struct QuoteFormEmbedSection: View {
         if case .shown(let s) = read {
             enabled = s.enabled
             originsText = s.origins.joined(separator: "\n")
+            hideFooter = s.footer?.hide ?? false
+        }
+    }
+
+    private func saveFooter(_ hide: Bool) async {
+        footerProblem = nil
+        footerBusy = true
+        defer { footerBusy = false }
+        switch await shop.saveQuoteFormFooter(hide: hide) {
+        case .success(let state):
+            pane = .shown(state)
+            hideFooter = state.footer?.hide ?? hide
+        case .failure(let failure):
+            // 404: the cloud does not offer it — the switch goes, quietly.
+            if failure.notAvailable { footerOffered = false } else { footerProblem = failure.sentence }
+            if case .shown(let s)? = pane { hideFooter = s.footer?.hide ?? false }
         }
     }
 
@@ -299,6 +341,7 @@ struct QuoteFormEmbedSection: View {
         case .success(let state):
             pane = .shown(state)
             enabled = state.enabled
+            hideFooter = state.footer?.hide ?? hideFooter
             originsText = state.origins.joined(separator: "\n")
         case .failure(let failure):
             if failure.notAvailable { pane = .notAvailable } else { problem = failure.sentence }

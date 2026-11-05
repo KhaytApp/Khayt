@@ -3513,5 +3513,9 @@
  "mac.nav_today": "今日",
  "mac.nav_more": "その他",
  "mac.nav_saved": "保存済み",
- "mac.jobs_layout": "ジョブの表示"
+ "mac.jobs_layout": "ジョブの表示",
+ "mac.qfe_hide_footer": "見積ページの「Quotes by Khayt」を非表示にする",
+ "mac.qfe_hide_footer_hint": "リンクから開く見積ページだけに適用されます。自分のサイトの iframe 内では、この表示は最初から隠れています。",
+ "mac.qfe_err_plan_required": "「Quotes by Khayt」を非表示にするには Khayt Cloud の Studio プランが必要です。見積ページには表示されたままです。",
+ "mac.qfe_err_bad_footer": "Khayt Cloud がこの設定を受け付けなかったため、何も変更されていません。"
 }

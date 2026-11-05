@@ -3513,5 +3513,9 @@
  "mac.nav_today": "Hoje",
  "mac.nav_more": "Mais",
  "mac.nav_saved": "Salvo",
- "mac.jobs_layout": "Visualização dos trabalhos"
+ "mac.jobs_layout": "Visualização dos trabalhos",
+ "mac.qfe_hide_footer": "Ocultar “Quotes by Khayt” na página de orçamento",
+ "mac.qfe_hide_footer_hint": "Isso só muda a página de orçamento aberta pelo link. Dentro de um iframe no seu próprio site, a linha já fica oculta.",
+ "mac.qfe_err_plan_required": "Para ocultar “Quotes by Khayt” é preciso o plano Studio do Khayt Cloud, então a linha continua na página de orçamento.",
+ "mac.qfe_err_bad_footer": "O Khayt Cloud não aceitou essa configuração, então nada foi alterado."
 }

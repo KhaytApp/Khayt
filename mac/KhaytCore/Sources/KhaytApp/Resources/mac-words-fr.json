@@ -3513,5 +3513,9 @@
  "mac.nav_today": "Aujourd’hui",
  "mac.nav_more": "Plus",
  "mac.nav_saved": "Enregistré",
- "mac.jobs_layout": "Affichage des travaux"
+ "mac.jobs_layout": "Affichage des travaux",
+ "mac.qfe_hide_footer": "Masquer « Quotes by Khayt » sur la page de devis",
+ "mac.qfe_hide_footer_hint": "Cela ne change que la page de devis ouverte depuis le lien. Dans un iframe sur votre propre site, la ligne est déjà masquée.",
+ "mac.qfe_err_plan_required": "Masquer « Quotes by Khayt » nécessite l’offre Studio de Khayt Cloud : la ligne reste donc sur la page de devis.",
+ "mac.qfe_err_bad_footer": "Khayt Cloud n’a pas accepté ce réglage, rien n’a été modifié."
 }
