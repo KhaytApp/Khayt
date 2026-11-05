@@ -3532,5 +3532,21 @@
  "mac.bnpl_forget": "保存したキーを削除",
  "mac.bnpl_unsealed": "そのキーを暗号化できなかったため、何も保存されていません。台帳は同期・バックアップされるため、平文のキーも一緒に送られてしまいます。",
  "mac.bnpl_none": "設定 ▸ オンライン で、API キーとともに Tabby または Tamara をオンにしてください。",
- "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。"
+ "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。",
+ "mac.env_hint": "湿ったフィラメントや寒い部屋は印刷失敗の原因になります。1日1回の記録で作業場の変化がわかります。",
+ "mac.env_temp": "温度 (°C)",
+ "mac.env_humidity": "湿度 (%)",
+ "mac.env_machine": "プリンター",
+ "mac.env_room": "作業場全体",
+ "mac.env_notes": "メモ",
+ "mac.env_none": "まだ記録がありません。作業場の温度と湿度を記録すると、その推移がわかります。",
+ "mac.env_trend": "最近の記録の温度",
+ "mac.env_delete_q": "この記録を削除しますか？",
+ "mac.holidays_none": "休業日はありません。",
+ "mac.holidays_hint": "店が休みの日です。Khayt は納期までに残る印刷時間を数えるとき、これらの日を除きます。",
+ "mac.sv_avg": "平均評価",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "回答数",
+ "mac.sv_nps_hint": "お客様がつけたすべての評価です。NPS では、星5つを推奨者、星4つを中立者、星3つ以下を批判者として数えます。",
+ "mac.rv_owner_only": "レビューを1件ずつ読んで削除できるのは店のオーナーだけです。"
 }

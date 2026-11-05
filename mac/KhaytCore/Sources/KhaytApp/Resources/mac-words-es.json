@@ -3532,5 +3532,21 @@
  "mac.bnpl_forget": "Olvidar la clave guardada",
  "mac.bnpl_unsealed": "No se pudo cifrar esa clave, así que no se guardó nada. El libro se sincroniza y se respalda, y una clave sin cifrar iría con él.",
  "mac.bnpl_none": "Active Tabby o Tamara, con su clave de API, en Ajustes ▸ En línea.",
- "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado."
+ "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado.",
+ "mac.env_hint": "El filamento húmedo y un taller frío provocan impresiones fallidas. Una lectura al día muestra cuándo cambia el taller.",
+ "mac.env_temp": "Temperatura (°C)",
+ "mac.env_humidity": "Humedad (%)",
+ "mac.env_machine": "Impresora",
+ "mac.env_room": "Todo el taller",
+ "mac.env_notes": "Notas",
+ "mac.env_none": "Aún no hay lecturas. Registra la temperatura y la humedad del taller para ver cómo cambian.",
+ "mac.env_trend": "Temperatura en las últimas lecturas",
+ "mac.env_delete_q": "¿Eliminar esta lectura?",
+ "mac.holidays_none": "No hay días de cierre.",
+ "mac.holidays_hint": "Días en que la tienda está cerrada. Khayt los omite al contar las horas de impresión que quedan antes de una fecha de entrega.",
+ "mac.sv_avg": "Valoración media",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Respuestas",
+ "mac.sv_nps_hint": "Todas las valoraciones de tus clientes. Para el NPS, cinco estrellas cuentan como promotor, cuatro como pasivo y tres o menos como detractor.",
+ "mac.rv_owner_only": "Solo el propietario de la tienda puede leer las reseñas una por una y eliminarlas."
 }

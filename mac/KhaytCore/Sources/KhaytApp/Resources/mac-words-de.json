@@ -3532,5 +3532,21 @@
  "mac.bnpl_forget": "Gespeicherten Schlüssel vergessen",
  "mac.bnpl_unsealed": "Dieser Schlüssel konnte nicht verschlüsselt werden, daher wurde nichts gespeichert. Das Buch wird synchronisiert und gesichert, und ein unverschlüsselter Schlüssel ginge mit.",
  "mac.bnpl_none": "Schalten Sie Tabby oder Tamara mit dem API-Schlüssel unter Einstellungen ▸ Online ein.",
- "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat."
+ "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat.",
+ "mac.env_hint": "Feuchtes Filament und ein kalter Raum führen zu Fehldrucken. Eine Messung pro Tag zeigt, wann sich die Werkstatt verändert.",
+ "mac.env_temp": "Temperatur (°C)",
+ "mac.env_humidity": "Luftfeuchtigkeit (%)",
+ "mac.env_machine": "Drucker",
+ "mac.env_room": "Ganze Werkstatt",
+ "mac.env_notes": "Notizen",
+ "mac.env_none": "Noch keine Messungen. Erfassen Sie Temperatur und Luftfeuchtigkeit der Werkstatt, um ihren Verlauf zu sehen.",
+ "mac.env_trend": "Temperatur der letzten Messungen",
+ "mac.env_delete_q": "Diese Messung löschen?",
+ "mac.holidays_none": "Keine Schließtage.",
+ "mac.holidays_hint": "Tage, an denen der Shop geschlossen ist. Khayt lässt sie aus, wenn es die Druckstunden bis zu einem Fälligkeitsdatum zählt.",
+ "mac.sv_avg": "Durchschnittliche Bewertung",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Antworten",
+ "mac.sv_nps_hint": "Jede Bewertung Ihrer Kunden. Für den NPS zählen fünf Sterne als Promotor, vier als passiv und drei oder weniger als Kritiker.",
+ "mac.rv_owner_only": "Nur der Inhaber des Shops kann die Bewertungen einzeln lesen und entfernen."
 }

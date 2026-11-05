@@ -3532,5 +3532,21 @@
  "mac.bnpl_forget": "Esquecer a chave salva",
  "mac.bnpl_unsealed": "Não foi possível criptografar essa chave, então nada foi salvo. O livro é sincronizado e tem backup, e uma chave sem criptografia iria junto.",
  "mac.bnpl_none": "Ative a Tabby ou a Tamara, com a chave de API, em Ajustes ▸ Online.",
- "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar."
+ "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar.",
+ "mac.env_hint": "Filamento úmido e uma sala fria causam impressões com falha. Uma leitura por dia mostra quando a oficina muda.",
+ "mac.env_temp": "Temperatura (°C)",
+ "mac.env_humidity": "Umidade (%)",
+ "mac.env_machine": "Impressora",
+ "mac.env_room": "Oficina inteira",
+ "mac.env_notes": "Observações",
+ "mac.env_none": "Nenhuma leitura ainda. Registre a temperatura e a umidade da oficina para ver como elas variam.",
+ "mac.env_trend": "Temperatura nas leituras recentes",
+ "mac.env_delete_q": "Excluir esta leitura?",
+ "mac.holidays_none": "Nenhuma data de fechamento.",
+ "mac.holidays_hint": "Dias em que a loja fica fechada. O Khayt os ignora ao contar as horas de impressão restantes antes de um prazo.",
+ "mac.sv_avg": "Avaliação média",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Respostas",
+ "mac.sv_nps_hint": "Todas as avaliações dos seus clientes. No NPS, cinco estrelas contam como promotor, quatro como neutro e três ou menos como detrator.",
+ "mac.rv_owner_only": "Só o dono da loja pode ler as avaliações uma a uma e removê-las."
 }

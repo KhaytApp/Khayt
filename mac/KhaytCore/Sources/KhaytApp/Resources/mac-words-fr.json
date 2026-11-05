@@ -3532,5 +3532,21 @@
  "mac.bnpl_forget": "Oublier la clé enregistrée",
  "mac.bnpl_unsealed": "Cette clé n'a pas pu être chiffrée, rien n'a donc été enregistré. Le registre est synchronisé et sauvegardé, et une clé en clair partirait avec lui.",
  "mac.bnpl_none": "Activez Tabby ou Tamara, avec sa clé API, dans Réglages ▸ En ligne.",
- "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé."
+ "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé.",
+ "mac.env_hint": "Un filament humide et une pièce froide font rater les impressions. Un relevé par jour montre quand l’atelier dérive.",
+ "mac.env_temp": "Température (°C)",
+ "mac.env_humidity": "Humidité (%)",
+ "mac.env_machine": "Imprimante",
+ "mac.env_room": "Tout l’atelier",
+ "mac.env_notes": "Notes",
+ "mac.env_none": "Aucun relevé pour l’instant. Notez la température et l’humidité de l’atelier pour voir leur évolution.",
+ "mac.env_trend": "Température des derniers relevés",
+ "mac.env_delete_q": "Supprimer ce relevé ?",
+ "mac.holidays_none": "Aucune date de fermeture.",
+ "mac.holidays_hint": "Jours de fermeture de la boutique. Khayt les ignore lorsqu’il compte les heures d’impression restantes avant une échéance.",
+ "mac.sv_avg": "Note moyenne",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Réponses",
+ "mac.sv_nps_hint": "Toutes les notes données par vos clients. Pour le NPS, cinq étoiles comptent comme promoteur, quatre comme passif et trois ou moins comme détracteur.",
+ "mac.rv_owner_only": "Seul le propriétaire de la boutique peut lire les avis un par un et les supprimer."
 }

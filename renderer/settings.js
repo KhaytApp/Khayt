@@ -1471,7 +1471,8 @@ async function openStorefrontModal() {
   if (!c.shopId || !c.token) { toast(t('intake.connect_first'), 'error'); return; }
   const baseUrl = String(c.url || '').replace(/\/+$/, '');
   const link = `${baseUrl}/shop/${c.shopId}`;
-  const reviewLink = `${baseUrl}/review/${c.shopId}`;
+  const SI = KhaytStorefrontInsights;
+  const reviewLink = SI.reviewLink(baseUrl, c.shopId);
   const sf = settings.storefront || (settings.storefront = { prices: {}, depositPct: 0, payUrl: '', note: '' });
   if (!sf.prices) sf.prices = {};
   if (!sf.categories) sf.categories = {};
@@ -1753,15 +1754,16 @@ async function openStorefrontModal() {
           revEl.style.color = 'var(--text-muted)';
           return;
         }
-        const list = r.reviews || [];
+        // `lib/storefront-insights.js reviewRows` — the Mac lists the same rows.
+        const list = SI.reviewRows(r.reviews);
         if (!list.length) { revEl.textContent = t('store.reviews_none') || 'No reviews yet.'; return; }
         revEl.innerHTML = list.map((rv) => `
           <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border-soft);">
-            <span style="color:var(--accent);white-space:nowrap;">${'★'.repeat(Math.max(0, Math.min(5, +rv.rating || 0)))}</span>
+            <span style="color:var(--accent);white-space:nowrap;">${'★'.repeat(rv.stars)}</span>
             <div style="flex:1;min-width:0;">
-              <div style="word-break:break-word;">${escapeHtml(rv.comment || '')}</div>
+              <div style="word-break:break-word;">${escapeHtml(rv.comment)}</div>
               <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(rv.name || t('store.review_anon') || 'Anonymous')}
-                · ${escapeHtml(String(rv.createdAt || '').slice(0, 10))}
+                · ${escapeHtml(rv.day)}
                 · ${rv.verified ? escapeHtml(t('store.review_verified') || 'verified customer') : escapeHtml(t('store.review_unverified') || 'unverified')}</div>
             </div>
             <button class="btn ghost small rev-del" data-rid="${escapeHtml(String(rv.id))}" type="button">${escapeHtml(t('common.delete') || 'Delete')}</button>
@@ -1780,13 +1782,14 @@ async function openStorefrontModal() {
       const insEl = modal.querySelector('#storeInsights');
       window.hubAPI.cloudStorefrontStats?.({ url: c.url, shopId: c.shopId, token: c.token }).then((r) => {
         if (!insEl) return;
-        const s = r && r.ok && r.stats;
-        if (!s || (!s.views && !s.carts && !s.orders)) { insEl.textContent = t('store.insights_empty') || 'No storefront activity yet.'; return; }
-        const conv = s.views > 0 ? Math.round((s.orders / s.views) * 1000) / 10 : 0;
+        // `lib/storefront-insights.js` — the Mac's web store sheet reads the same.
+        const s = SI.insights(r && r.ok && r.stats);
+        if (s.empty) { insEl.textContent = t('store.insights_empty') || 'No storefront activity yet.'; return; }
+        const conv = s.conversionPct;
         const stat = (n, lbl) => `<span style="display:inline-block;margin-inline-end:14px;"><b style="color:var(--text);font-size:15px;">${n}</b> ${escapeHtml(lbl)}</span>`;
         const funnel = stat(s.views, t('store.ins_views') || 'views') + stat(s.carts, t('store.ins_carts') || 'carts')
           + stat(s.orders, t('store.ins_orders') || 'orders') + stat(conv + '%', t('store.ins_conv') || 'conversion');
-        const top = (s.items || []).filter((it) => it.orders || it.carts).slice(0, 5)
+        const top = s.top
           .map((it) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${escapeHtml(it.name || it.id)}</span><span class="muted">${it.orders || 0} ${escapeHtml(t('store.ins_orders') || 'orders')} · ${it.carts || 0} ${escapeHtml(t('store.ins_carts') || 'carts')}</span></div>`).join('');
         insEl.innerHTML = `<div style="margin-bottom:6px;">${funnel}</div>` + (top ? `<div style="margin-top:6px;border-top:1px solid var(--border-soft);padding-top:6px;">${top}</div>` : '');
       }).catch(() => { if (insEl) insEl.textContent = t('store.insights_empty') || 'No storefront activity yet.'; });
@@ -6341,12 +6344,14 @@ async function openCloudSnapshotsModal() {
 function renderHolidayList() {
   const el = $('#holidayList');
   if (!el) return;
-  const holidays = settings.holidays || [];
+  // `lib/working-week.js holidays` — real days, once each, in date order; the
+  // Mac lists them from the same reader.
+  const holidays = KhaytWorkingWeek.holidays(settings);
   if (holidays.length === 0) {
     el.innerHTML = `<span style="font-size:12px; color:var(--text-muted);">${escapeHtml(t('set.holidays'))}: none</span>`;
     return;
   }
-  el.innerHTML = [...holidays].sort().map(d => `
+  el.innerHTML = holidays.map(d => `
     <span class="holiday-chip" style="display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:16px; padding:2px 10px; font-size:12px;">
       ${escapeHtml(d)}
       <button type="button" data-act="rm-holiday" data-date="${escapeHtml(d)}" aria-label="${escapeHtml(t('common.delete'))}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:13px; padding:0; line-height:1;" title="${escapeHtml(t('common.delete'))}">×</button>

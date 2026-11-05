@@ -1081,6 +1081,7 @@ final class Shop {
             locationRows = Self.rows(root, "locations")
             operatorRows = Self.rows(root, "operators")
             timeEntryRows = Self.rows(root, "timeEntries")
+            envLogRows = Self.rows(root, "envLogs")
             await refreshLock()
             if overtaken() { return }
             // What has been ordered and not yet arrived. Read raw for the same
@@ -2225,6 +2226,10 @@ final class Shop {
 
     /// Hours the staff logged against jobs (`store.timeEntries`), raw.
     private(set) var timeEntryRows: [JSONValue] = []
+
+    /// The workshop's temperature and humidity readings (`store.envLogs`),
+    /// raw — `lib/env-log.js` reads them (`Shop+EnvLog.swift`).
+    private(set) var envLogRows: [JSONValue] = []
 
     /// Who is signed in on THIS Mac, by operator id — nil is nobody.
     ///
