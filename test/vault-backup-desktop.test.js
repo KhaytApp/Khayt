@@ -115,3 +115,8 @@ test('the same bytes again are adopted, not uploaded twice', async () => {
   assert.equal(cloud.files.size, 1);
   assert.equal([...cloud.files.values()][0].versions.length, 1, 'no second version');
 });
+
+test('the desktop-backup fixture the Mac runs through VaultApply still describes what this code writes', () => {
+  const r = require('child_process').spawnSync(process.execPath, [require('path').join(__dirname, '..', 'scripts', 'gen-vault-backup-fixture.js'), '--check'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr || r.stdout);
+});
