@@ -4,7 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Mac: Tabby and Tamara pay-later links.** Settings › Online has a new Pay later section for your Tabby and Tamara keys (the same settings the Windows/Linux app uses, keys encrypted in the book). A job then offers "Pay later link…" in its inspector and the Jobs menu: make a checkout link for the job's price, copy it or share it with the customer. While the app is open it checks each link every ten minutes and when you come back to it, takes the step the provider is waiting for (Tamara's authorise within 72 hours, Tabby's capture), records the payment on the job with the usual receipt email and webhooks, and captures a Tamara order once its job has shipped. The requests are now one shared module (`lib/bnpl-requests.js`) that both apps send, so they cannot drift. The Waste screen's true-cost totals now come from the same shared rule as its "Where failures cost" groups.
+- **Mac: Tabby and Tamara pay-later links.** Settings › Online has a new Pay later section for your Tabby and Tamara keys (the same settings the Windows/Linux app uses, keys encrypted in the book). A job then offers "Pay later link…" in its inspector and the Jobs menu: make a checkout link for what is still owed, copy it or share it with the customer. While the app is open it checks each link every ten minutes and when you come back to it, takes the step the provider is waiting for (Tamara's authorise within 72 hours, Tabby's capture), records the payment on the job with the usual receipt email and webhooks, and captures a Tamara order once its job has shipped. The requests are now one shared module (`lib/bnpl-requests.js`) that both apps send, so they cannot drift. The Waste screen's true-cost totals now come from the same shared rule as its "Where failures cost" groups.
 - **Fixed: a pay-later link asked for the whole price again (both apps).** A Tabby, Tamara or Stripe link from a job was made for the job's price, ignoring a deposit already paid and, on a shop that adds tax on top, the tax. It is now for what is still owed (the bill less what was paid, the same figure the invoice's balance shows), and no link is made for a job already paid in full.
 - **Fixed: custom Stripe success and cancel URLs were ignored (Windows/Linux).** The address check they go through was never loaded, so every link fell back to the khaytapp.com pages. Your own https addresses are used again; private and local addresses are still refused.
 - **Mac: see where failed prints cost you.** The Waste screen's summary has a new "Where failures cost" section: switch between By printer, By material and By customer to see which ones lost the most, with each one's true cost (filament, machine time and electricity) and how many failures it had. Entries with no printer, job or customer recorded are grouped under Unknown, so the groups always add up to the true cost above. By customer only shows for people who can see customers.
@@ -9150,6 +9150,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.24] - 2026-11-05
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Tabby and Tamara pay-later links.** Settings › Online has a Pay later section for your Tabby and Tamara keys. They are the same settings the Windows and Linux app uses, and the keys are encrypted in the book. A job then offers "Pay later link…" in its inspector and the Jobs menu. It makes a checkout link for what the customer still owes, which you can copy or share. While Khayt is open it checks each link every ten minutes and whenever you come back to the app. It takes the step the provider is waiting for (Tamara's authorise within 72 hours, Tabby's capture) and records the payment on the job with the usual receipt email and webhooks. It captures a Tamara order once its job has shipped.
+
+### Fixed
+
+- **A pay-later link no longer asks for the whole price again.** A link is now for the bill less what was already paid, including tax on a shop that adds it on top. No link is made for a job already paid in full.
 
 ## [4.0.0-beta.23] - 2026-11-05
 
