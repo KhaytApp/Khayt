@@ -740,6 +740,8 @@ struct RoundTripTests {
         "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",
         "saveLocation": "sets name and address on the stored record in place (Shop.writeLocation) and never re-encodes it; LocationsTests.editKeepsFields proves every other field survives",
         "saveQuoteFormEmbed": "never writes the book: PUTs {enabled, origins} to the cloud and shows what the cloud answers; QuoteFormEmbedTests covers the body and the answer",
+        "saveQuoteFormFooter": "never writes the book: the caller of QuoteFormEmbed.saveFooter, gated, and shows what the cloud answers",
+        "saveFooter": "never writes the book: PUTs {hideFooter} to the cloud's /embed/footer; QuoteFormEmbedTests.footerSave covers the body and the answers",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 
