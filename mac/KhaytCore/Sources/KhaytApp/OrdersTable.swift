@@ -541,6 +541,12 @@ struct JobActions: View {
             Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
                 .disabled(!shop.canMoveJobs)
         }
+        if job.status == "quote" {
+            Divider()
+            QuoteItems(shop: shop, job: job)
+        } else {
+            JobPaperItems(shop: shop, job: job)
+        }
         Divider()
         JobDeleteItems(shop: shop, ids: [job.id])
     }

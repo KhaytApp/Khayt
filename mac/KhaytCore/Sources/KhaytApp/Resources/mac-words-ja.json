@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "保存したキーを削除",
  "mac.bnpl_unsealed": "そのキーを暗号化できなかったため、何も保存されていません。台帳は同期・バックアップされるため、平文のキーも一緒に送られてしまいます。",
  "mac.bnpl_none": "設定 ▸ オンライン で、API キーとともに Tabby または Tamara をオンにしてください。",
- "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。"
+ "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。",
+ "mac.quote_version_col": "バージョン",
+ "mac.customer_papers": "取引明細書と請求書"
 }

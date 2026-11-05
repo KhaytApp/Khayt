@@ -1457,6 +1457,9 @@ final class Shop {
             if overtaken() { return }
             remeasureIfDue()
             createRecurringIfDue()
+            // The quote follow-ups the shop switched on (Settings ▸ Quote
+            // follow-ups) — after the dashboard has chosen which are due.
+            followUpQuotesIfDue()
             readProvenanceIfDue()
             readSlicerFiguresIfDue()
             rescanLinkedIfDue()
@@ -1691,6 +1694,8 @@ final class Shop {
             orders: orders, settings: settings, owed: owedByOrderId, clients: clients)) ?? []) : []
         guard ticket == loadGeneration else { return }
         invoicesToChase = invoices
+        // Flagged once a session, as the other app's six-hourly check does.
+        flagOverdueInvoices(invoices)
         let quotes = switches.quotes
             ? ((try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []) : []
         guard ticket == loadGeneration else { return }
@@ -1844,6 +1849,16 @@ final class Shop {
     // Stored for "Standing orders" (Shop+Customers.swift).
     /// The books whose standing orders this launch has already made.
     var recurringBooks: Set<String> = []
+
+    // Stored for "Quotes and follow-ups" (Shop+Quotes.swift).
+    /// When each book's automatic follow-up pass last ran this launch.
+    var chaseRuns: [String: Date] = [:]
+    /// The overdue invoices already flagged this launch (`flagOverdueInvoices`).
+    var flaggedInvoices: Set<String> = []
+    /// The quote whose kept versions are on screen.
+    var pendingRevisions: PendingHold?
+    /// The packing slip, delivery note, work order or statement on screen.
+    var pendingPaper: PaperRequest?
 
     // Stored for "What a customer has agreed to pay" (Shop+Library.swift).
     /// The model the window is showing a Quick Look of, or nil.

@@ -1973,6 +1973,8 @@ extension Shop {
         pendingEdit = nil
         pendingQcFail = nil
         pendingInvoice = nil
+        pendingPaper = nil
+        pendingRevisions = nil
         pendingMilestones = nil
         pendingLabels = nil
         pendingDayReport = nil

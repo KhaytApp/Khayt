@@ -3532,5 +3532,7 @@
  "mac.bnpl_forget": "Kayıtlı anahtarı unut",
  "mac.bnpl_unsealed": "Bu anahtar şifrelenemedi, bu yüzden hiçbir şey kaydedilmedi. Defter eşitlenir ve yedeklenir; şifresiz bir anahtar da onunla giderdi.",
  "mac.bnpl_none": "Ayarlar ▸ Çevrimiçi bölümünden Tabby veya Tamara'yı API anahtarıyla açın.",
- "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek."
+ "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek.",
+ "mac.quote_version_col": "Sürüm",
+ "mac.customer_papers": "Hesap ekstresi ve faturalar"
 }

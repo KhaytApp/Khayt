@@ -488,6 +488,19 @@ struct ToChase: View {
                             .help(shop.words.callIt("mac.send_reminder"))
                             .accessibilityLabel(shop.words.callIt("mac.send_reminder"))
                         }
+                        // A quote about to lapse: the follow-up, recorded so the
+                        // row leaves the list for its cooldown
+                        // (`Shop.sendQuoteFollowUp`).
+                        if !overdue, shop.canMoveJobs {
+                            Button {
+                                Task { await shop.sendQuoteFollowUp(row.id) }
+                            } label: {
+                                Image(systemName: "bubble.left")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(shop.words.callIt("quote.followup_btn"))
+                            .accessibilityLabel(shop.words.callIt("quote.followup_btn"))
+                        }
                     }
                     .padding(.vertical, 3)
                     .frame(minHeight: Metric.row)

@@ -638,6 +638,12 @@ private struct JobMenu: View {
             Task { await shop.askForOrderLabels([id]) }
         }
         .disabled(job == nil)
+        // The other papers that go with the work (`Shop+Papers.swift`).
+        JobPaperItems(shop: shop, job: job, upfront: true)
+        // A quote's answers besides Approve (`Shop+Quotes.swift`). Always
+        // listed, greyed off a quote: a menu bar's items are built once.
+        Divider()
+        QuoteItems(shop: shop, job: job, upfront: true)
 
         // WHAT THE CUSTOMER THOUGHT. Offered on finished work only, the way
         // the other app offers it — a rating on a job still on the bench would
