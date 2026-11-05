@@ -55,9 +55,9 @@ const THUMB_ROSE = makeThumbPng([34, 14, 24], [58, 24, 40], [244, 114, 182]);
 export function buildScreenshotDemoStore() {
   const today = isoDate(new Date());
   const clients = [
-    { id: 'C1', nameEn: 'Najd Robotics', nameAr: 'نجد للروبotics', phone: '+966 50 111 2233', email: 'ops@najd.example', tier: 'Gold', creditLimit: 5000 },
+    { id: 'C1', nameEn: 'Najd Robotics', nameAr: 'نجد للروبوتات', phone: '+966 50 111 2233', email: 'ops@najd.example', tier: 'Gold', creditLimit: 5000 },
     { id: 'C2', nameEn: 'Tuwaiq Models', nameAr: 'نماذج طويق', phone: '+966 55 444 5566', email: 'print@tuwaiq.example', tier: 'Gold', creditLimit: 8000 },
-    { id: 'C3', nameEn: 'Atelier Hessa', nameAr: 'أتelier حصة', phone: '+966 54 777 8899', tier: 'Silver' },
+    { id: 'C3', nameEn: 'Atelier Hessa', nameAr: 'أتيليه حصة', phone: '+966 54 777 8899', tier: 'Silver' },
     { id: 'C4', nameEn: 'Coastal Drones', nameAr: 'درونز الساحل', phone: '+966 56 222 3344', tier: 'Silver' },
     { id: 'C5', nameEn: 'Khalid M.', phone: '+966 53 999 0011', tier: 'Bronze' },
   ];
