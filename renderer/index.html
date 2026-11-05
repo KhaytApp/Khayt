@@ -656,6 +656,8 @@
     <!-- ===================== QUEUE ===================== -->
     <section id="queue-tab" class="tab-content khayt-queue" role="tabpanel" aria-labelledby="tabbtn-queue-tab" aria-hidden="true" tabindex="-1">
       <div id="locationScopeBannerQueue" class="location-scope-banner" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);"></div>
+      <!-- Next up: the dispatcher's proposals (lib/auto-dispatch.js) -->
+      <div id="nextUpPanel" class="card next-up" hidden></div>
       <!-- Machine Queues -->
       <details id="machineQueuesWrap" class="queue-machines">
         <summary class="queue-machines-summary"><span data-i18n="queue.machines_toggle">Machines</span></summary>
@@ -2833,6 +2835,7 @@
 <script src="../lib/estimate-calibration.js"></script>
 <script src="../lib/stl-thumbnail.js"></script>
 <script src="../lib/reorder.js"></script>
+<script src="../lib/auto-dispatch.js"></script>
 <script src="../lib/consumable-reorder.js"></script>
 <script src="../lib/payment-plan.js"></script>
 <script src="../lib/whatsapp-send.js"></script>

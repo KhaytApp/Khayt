@@ -165,6 +165,7 @@ test('deductFilamentForOrder uses non-low summary when nothing drops below', () 
 });
 
 function invStubs() {
+  require('../lib/reorder.js'); // sets globalThis.KhaytReorder, as index.html does
   global.settings = { autoDeduct: true, lowStockThreshold: 200 };
   global.consumables = [];
   global.toast = () => {};
@@ -188,6 +189,12 @@ test('H1: reservation + over-commit key on filamentId (most parts have no spoolI
   const warns = api.checkSpoolOvercommit([{ filamentId: 'S1', printWeight: 80, qty: 1 }], 'O2');
   assert.equal(warns.length, 1);
   assert.equal(warns[0].needed, 80);
+  // A cancelled job and a quote reserve nothing, so they never warn.
+  global.printLog = [
+    { id: 'O1', status: 'cancelled', parts: [{ filamentId: 'S1', printWeight: 80, qty: 1 }] },
+    { id: 'O3', status: 'quote', parts: [{ filamentId: 'S1', printWeight: 80, qty: 1 }] },
+  ];
+  assert.equal(api.checkSpoolOvercommit([{ filamentId: 'S1', printWeight: 80, qty: 1 }], 'O2').length, 0);
 });
 
 test('H2: additionalSpools are not deducted twice at completion', () => {

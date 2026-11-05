@@ -1489,45 +1489,14 @@ function todayPlusDays(n) {
   return localDateStr(d);
 }
 
-// Feature 3: Check if saving parts would over-commit any spool
+// Feature 3: Check if saving parts would over-commit any spool.
+// The rule is lib/reorder.js overcommitWarnings — the one the Mac asks too — so
+// the two apps agree on what an open job reserves (a quote, a cancelled or an
+// archived job reserves nothing).
 function checkSpoolOvercommit(parts, excludeOrderId) {
-  const warnings = [];
-  // Grams needed per spool across the parts being saved (colour-aware: a multicolour
-  // part spreads its demand across each assigned colour filament).
-  const needBySpool = {};
-  for (const part of (parts || [])) {
-    if (part.colours && part.colours.length) {
-      const q = +part.qty || 1;
-      for (const c of part.colours) {
-        if (!c.filamentId) continue;
-        needBySpool[c.filamentId] = (needBySpool[c.filamentId] || 0) + (+c.grams || 0) * q;
-      }
-    } else {
-      const key = part.spoolId || part.filamentId;
-      if (!key) continue;
-      needBySpool[key] = (needBySpool[key] || 0) + partGramsConsumed(part);
-    }
-  }
-  for (const [key, thisJobNeeds] of Object.entries(needBySpool)) {
-    const item = inventory.find(i => i.id === key);
-    if (!item) continue;
-    // Compute already-reserved excluding the order being edited
-    const alreadyReserved = printLog
-      // !archived: renderPipelineDemand already excludes archived orders, so a
-      // reservation that survives archiving contradicts the demand view beside it.
-      .filter(o => KhaytOrderStatus.isOpen(o) && !o.archived && o.id !== excludeOrderId)
-      .reduce((s, o) =>
-        s + (o.parts || []).reduce((ps, p) => ps + partGramsForSpool(p, key), 0)
-      , 0);
-    if (alreadyReserved + thisJobNeeds > item.weight) {
-      warnings.push({
-        spoolName: item.material,
-        available: Math.max(0, item.weight - alreadyReserved),
-        needed: thisJobNeeds,
-      });
-    }
-  }
-  return warnings;
+  return KhaytReorder.overcommitWarnings(parts || [], printLog, inventory, {
+    excludeOrderId, partGrams: partGramsConsumed,
+  });
 }
 
 /* ── Pipeline material demand ───────────────────────────── */
