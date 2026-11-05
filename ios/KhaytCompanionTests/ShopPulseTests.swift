@@ -67,6 +67,10 @@ final class ShopPulseTests: XCTestCase {
             XCTAssertGreaterThan(pulse.thisMonth ?? 0, 0, "This month on \(stamp)")
             XCTAssertGreaterThan(pulse.thisYear ?? 0, 0, "This year on \(stamp)")
         }
+        // Done today reads the shop's real day, so it is checked on today's sample.
+        try book.replace(with: SampleShop.book(), scope: SampleShop.scope(now: Date()))
+        let today = try await BookReader(book: book).pulse()
+        XCTAssertEqual(today.doneToday, 1, "the job finished today is counted")
     }
 
     func testOwedCountsOpenOrdersByTheShopsOwnRule() async throws {
