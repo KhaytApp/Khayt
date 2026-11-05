@@ -418,6 +418,26 @@ final class Words {
             .merging(DocumentWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
+        // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
+        //
+        // The whole order editor, void and credit note, RMA and reprint, the
+        // timeline and edit history, and the job intake waiting list. Almost
+        // every word on those screens is the other app's own (`borrowed`);
+        // these are the few it never needed.
+        "mac.order_details": ["en": "Order Details", "ar": "تفاصيل الطلب"],
+        "mac.void_waste_amount": ["en": "{grams} g {material}", "ar": "{grams} غ {material}"],
+        "mac.credit_room": ["en": "Up to {amount} can still be credited.",
+                            "ar": "يمكن إصدار إشعار دائن بما يصل إلى {amount}."],
+        "mac.rma_refund_hint": ["en": "A refund is written as a credit note, which opens next.",
+                                "ar": "يُسجَّل الاسترداد كإشعار دائن، وسيُفتح بعد الحفظ."],
+        "mac.reprint_hint": ["en": "A new job is made with the same parts and linked to this one. Its price can be changed afterwards.",
+                             "ar": "يُنشأ عمل جديد بالقطع نفسها ومرتبط بهذا العمل. يمكن تعديل سعره بعد ذلك."],
+        "mac.timeline_current": ["en": "now", "ar": "الآن"],
+        "mac.intake_reminder_due": ["en": "Reminder due {date}", "ar": "موعد التذكير {date}"],
+        "mac.intake_remind_text": ["en": "Hi {name}, just a reminder about your project “{project}”. We have a slot available, so let us know if you’d like to go ahead!",
+                                   "ar": "مرحبًا {name}، نذكّرك بمشروعك «{project}». لدينا موعد متاح، فأخبرنا إن رغبت في المتابعة!"],
+        "mac.intake_remind_text_noname": ["en": "Hi, just a reminder about your project “{project}”. We have a slot available, so let us know if you’d like to go ahead!",
+                                          "ar": "مرحبًا، نذكّرك بمشروعك «{project}». لدينا موعد متاح، فأخبرنا إن رغبت في المتابعة!"],
         // ── Library grid redesign ─────────────────────────────────────────
         //
         // Tile size, grid or list, the facts line on a tile, the three new
@@ -6408,6 +6428,27 @@ final class Words {
         "lan.iq_enable", "lan.iq_enable_hint", "lan.iq_printer", "lan.iq_pick", "lan.iq_filament",
         "lan.iq_flat", "lan.iq_spool_cost", "lan.iq_spool_weight", "lan.iq_margin",
         "lan.iq_min", "lan.iq_waste", "lan.iq_limit", "lan.iq_note", "slicer.none",
+        // The desktop's order tools (`Shop+OrderTools.swift`), in its own words:
+        // the order editor, void and credit note, RMA and reprint, the
+        // timeline and edit history, and the job intake waiting list.
+        "oe.title", "oe.notes", "oe.internal_notes", "oe.internal_notes_ph", "oe.invoice_notes",
+        "oe.invoice_notes_hint", "oe.discount_pct", "oe.shipping", "oe.delivery_address",
+        "oe.select_address", "oe.courier", "oe.tracking_number", "op.assigned", "op.unassigned",
+        "tag.label", "tag.ph", "tag.hint", "calc.extra_lines", "calc.add_extra_line", "calc.extra_label_ph",
+        "inv.void_btn", "inv.void_confirm", "inv.void_reason", "inv.void_reason_ph", "inv.already_voided",
+        "waste.voided_order", "cn.title", "cn.ref_order", "cn.credit_amount", "cn.reason", "cn.reason_ph",
+        "cn.generate", "cn.nothing_left", "doc.credit_note", "ord.edit_history", "ord.edit_history_empty",
+        "ord.timeline", "ord.timeline_title", "ord.timeline_empty", "ord.timeline_total", "oe.reprint",
+        "qc.rma_title", "qc.rma_reason", "qc.rma_reason_ph", "qc.rma_resolution", "qc.res_reprint",
+        "qc.res_refund", "qc.res_declined", "qc.within_warranty", "qc.out_of_warranty", "qc.reprint_cost",
+        "qc.cost_shop", "qc.cost_billable", "waiting.title", "waiting.add", "waiting.edit", "waiting.empty",
+        "waiting.project", "waiting.project_ph", "waiting.client", "waiting.no_client", "waiting.priority_label",
+        "waiting.priority_urgent", "waiting.priority_high", "waiting.priority_normal", "waiting.priority_low",
+        "waiting.notes", "waiting.notes_ph", "waiting.est_value", "waiting.est_prefix", "waiting.reminder_date",
+        "waiting.status", "waiting.status_reminded", "waiting.promote", "waiting.remind", "waiting.remind_title",
+        "waiting.remind_msg", "waiting.remind_phone", "waiting.decline", "waiting.untitled",
+        "waiting.project_required", "waiting.funnel_total", "waiting.funnel_active", "waiting.funnel_converted",
+        "waiting.funnel_declined", "waiting.funnel_pipeline", "common.more", "common.edit", "inv.walk_in",
     ]
 }
 

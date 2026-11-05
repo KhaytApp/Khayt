@@ -3534,5 +3534,14 @@
  "mac.bnpl_none": "Activez Tabby ou Tamara, avec sa clé API, dans Réglages ▸ En ligne.",
  "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé.",
  "mac.quote_version_col": "Version",
- "mac.customer_papers": "Relevé et factures"
+ "mac.customer_papers": "Relevé et factures",
+ "mac.order_details": "Détails de la commande",
+ "mac.void_waste_amount": "{grams} g {material}",
+ "mac.credit_room": "Il reste jusqu’à {amount} à créditer.",
+ "mac.rma_refund_hint": "Un remboursement est enregistré comme un avoir, qui s’ouvre ensuite.",
+ "mac.reprint_hint": "Une nouvelle commande est créée avec les mêmes pièces et liée à celle-ci. Son prix peut être modifié ensuite.",
+ "mac.timeline_current": "maintenant",
+ "mac.intake_reminder_due": "Rappel prévu le {date}",
+ "mac.intake_remind_text": "Bonjour {name}, petit rappel concernant votre projet « {project} ». Nous avons un créneau disponible : dites-nous si vous souhaitez continuer !",
+ "mac.intake_remind_text_noname": "Bonjour, petit rappel concernant votre projet « {project} ». Nous avons un créneau disponible : dites-nous si vous souhaitez continuer !"
 }

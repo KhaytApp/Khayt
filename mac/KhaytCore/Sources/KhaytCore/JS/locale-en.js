@@ -2427,6 +2427,7 @@
   "cn.credit_amount": "Credit amount",
   "cn.reason": "Reason",
   "cn.reason_ph": "e.g. Defective part, order cancellation",
+  "cn.nothing_left": "Nothing is left to credit on this job.",
   "cn.generate": "Generate credit note",
   "wo.title": "Work Order",
   "oe.courier": "Courier / Carrier",

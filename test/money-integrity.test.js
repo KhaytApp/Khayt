@@ -206,8 +206,9 @@ test('a partial refund leaves no marker on the order at all', () => {
   assert.equal(o.voidedAt, undefined);
   assert.equal(o.creditedAt, undefined);
   assert.equal(o.status, 'completed');
-  const src = read('renderer/invoicing.js');
-  assert.match(src, /if \(totalCredited >= \(\+order\.price \|\| 0\)\) \{/,
+  // The credit note's record is lib/invoice-reversal.js now, for both apps.
+  const src = read('lib/invoice-reversal.js');
+  assert.match(src, /if \(credited\(order\) >= num\(order\.price\)\) order\.creditedAt = o\.now;/,
     'creditedAt is set only at FULL credit — a partial refund must be caught via creditNotes[]');
 });
 

@@ -10,6 +10,9 @@
    This only adds the save. */
 const OrderNew = () => global.KhaytOrderNew
   || (typeof require === 'function' ? require('../lib/order-new.js') : null);
+/** Voiding and crediting — lib/invoice-reversal.js, which the Mac writes with too. */
+const Reversal = () => global.KhaytInvoiceReversal
+  || (typeof require === 'function' ? require('../lib/invoice-reversal.js') : null);
 function nextInvoiceNumber() {
   // The book goes in so the counter moves past numbers another computer on
   // this book already issued — settings, where the counter lives, never sync.
@@ -1096,9 +1099,10 @@ async function voidInvoice(orderId) {
   const ok = await confirmModal(t('inv.void_confirm', { id: order.id }), { danger: true, okText: t('inv.void_btn') });
   if (!ok) return;
   // Calculate total weight for the waste checkbox label
-  const voidTotalWeight = (order.parts || []).reduce((s, p) => s + (+p.weightG || +p.printWeight || 0), 0);
-  const voidMaterial = order.material || (order.parts || []).find(p => p.material)?.material || '';
-  const hasWeightData = voidTotalWeight > 0 && voidMaterial;
+  const voidMat = Reversal().materialOf(order);
+  const voidTotalWeight = voidMat.weight;
+  const voidMaterial = voidMat.material;
+  const hasWeightData = voidMat.loggable;
   openFormModal({
     title: t('inv.void_btn') + ' — ' + order.id,
     saveLabel: t('inv.void_btn'),
@@ -1114,32 +1118,19 @@ async function voidInvoice(orderId) {
     `,
     onMount(modal) { setTimeout(() => modal.querySelector('#voidReasonInput')?.focus(), 40); },
     onSave(modal) {
-      order.voidedAt = new Date().toISOString();
-      order.voidedReason = modal.querySelector('#voidReasonInput').value.trim() || 'Voided';
-      order.status = order.status === 'completed' ? 'completed' : order.status; // keep status
-      order.paymentStatus = 'voided';
-      if (!order.statusHistory) order.statusHistory = [];
-      order.statusHistory.push({ status: 'voided', at: order.voidedAt });
-      if (order.statusHistory.length > 200) order.statusHistory = order.statusHistory.slice(-200);
-      // Feature 5 (UX): Auto-log material waste if the order has parts with weight data
+      // The stamps, the status history and the optional waste row are
+      // lib/invoice-reversal.js `voidInvoice`; the status itself is kept.
       const logWasteChk = modal.querySelector('#voidLogWasteCheck');
-      if (logWasteChk && logWasteChk.checked) {
-        const totalWeight = (order.parts || []).reduce((s, p) => s + (+p.weightG || +p.printWeight || 0), 0);
-        const material = order.material || (order.parts || []).find(p => p.material)?.material || '';
-        if (totalWeight > 0 && material) {
-          wasteLog.unshift({
-            id: uid('W'),
-            date: localDateStr(),
-            orderId: order.id,
-            machineId: order.machineId || null,
-            material,
-            weight: totalWeight,
-            failureType: 'operator_error',
-            notes: t('waste.voided_order'),
-            cost: 0,
-          });
-        }
-      }
+      const out = Reversal().voidInvoice(order, {
+        reason: modal.querySelector('#voidReasonInput').value,
+        now: new Date().toISOString(),
+        logWaste: !!(logWasteChk && logWasteChk.checked),
+        wasteId: uid('W'),
+        today: localDateStr(),
+        wasteNote: t('waste.voided_order'),
+      });
+      if (!out.ok) { toast(t('inv.already_voided'), 'warning'); return true; }
+      if (out.waste) wasteLog.unshift(out.waste);
       saveAll();
       renderLogs(); renderKanban();
       toast(t('inv.voided_toast', { id: order.id }), 'success');
@@ -1151,7 +1142,10 @@ async function voidInvoice(orderId) {
 function openCreditNoteModal(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
-  let creditAmt = +order.price || 0;
+  // What is left to credit: the price less any earlier credit notes.
+  const creditRoom = Reversal().creditRoom(order);
+  if (creditRoom < 0.01) { toast(t('cn.nothing_left'), 'warning'); return; }
+  let creditAmt = creditRoom;
   let reason = '';
 
   const bodyHtml = `
@@ -1159,7 +1153,7 @@ function openCreditNoteModal(orderId) {
       ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(jobRef(order))}</strong> · ${fmtOrderPrice(order.price, order)}
     </p>
     <label>${escapeHtml(t('cn.credit_amount'))} (${escapeHtml(orderCurrencySymbol(order))})</label>
-    <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
+    <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${creditRoom}">
     <label style="margin-top:14px;">${escapeHtml(t('cn.reason'))}</label>
     <textarea id="cnReasonInput" rows="3" style="resize:vertical;" placeholder="${escapeHtml(t('cn.reason_ph'))}">${escapeHtml(reason)}</textarea>`;
 
@@ -1169,7 +1163,7 @@ function openCreditNoteModal(orderId) {
     sizeLg: false,
     bodyHtml,
     onSave() {
-      const amt = Math.min(Math.max(0.01, num(document.getElementById('cnAmtInput').value, creditAmt)), +order.price);
+      const amt = num(document.getElementById('cnAmtInput').value, creditAmt);
       const rsn = document.getElementById('cnReasonInput').value.trim();
       generateCreditNote(order, amt, rsn);
       return true;
@@ -1181,105 +1175,27 @@ function generateCreditNote(order, creditAmount, reason) {
   // A credit note reduces the amount DUE (a refund / cancelled charge). It is
   // recorded only in creditNotes[]; paidAmount is left untouched so the credit
   // is applied exactly once — orderOwedBase and payStatus both subtract it from
-  // the effective price. (Mutating paidAmount here double-counted the credit.)
-  if (!order.creditNotes) order.creditNotes = [];
-  order.creditNotes.push({ id: 'CN-' + Date.now().toString(36), amount: creditAmount, reason, issuedAt: new Date().toISOString() });
-  const totalCredited = order.creditNotes.reduce((s, cn) => s + (+cn.amount || 0), 0);
-  // If credit equals full price, treat as voided for reporting
-  if (totalCredited >= (+order.price || 0)) {
-    order.creditedAt = new Date().toISOString();
-  }
+  // the effective price. The record, the cap and `creditedAt` at full credit
+  // are lib/invoice-reversal.js, and so is the document, so the Mac prints
+  // the same credit note.
+  const R = Reversal();
+  const out = R.creditNote(order, {
+    amount: creditAmount, reason, now: new Date().toISOString(), id: 'CN-' + Date.now().toString(36),
+  });
+  if (!out.ok) { toast(t('cn.nothing_left'), 'warning'); return; }
   saveAll();
   const area = $('#invoice-print-area');
-  const isAr = i18n.current === 'ar';
-  const dir  = isAr ? 'rtl' : 'ltr';
-  // Same rule as the invoice — see renderInvoice(). A credit note and a delivery
-  // note are customer-facing documents too, and were bilingual unconditionally.
-  const _dl = KhaytInvoiceLanguage.resolveDocumentLanguage({
-    mode: settings.invoiceBilingual, lang: i18n.current,
-    secondary: settings.invoiceSecondLang, enableZatca: settings.enableZatca,
-  });
-  const bi = _dl.bilingual;
-  const secondLang = _dl.secondary;
-  const bizPrimary = shopName();
-  const cnId = 'CN-' + order.id;
-  const today = localDateStr();
   const linkedClient = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  const clientName = (order.project || '').trim() || t('inv.walk_in');
-  const clientSub  = linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '';
-  // Feature 3: Build reversal reference line
-  const invoiceNumber = invoiceDocNumber(order);
-  const originalDate  = order.date || '';
-
-  area.innerHTML = `
-    <div class="inv-wrap">
-    <div class="inv-top-bar" style="background:#b91c1c;"></div>
-    <div class="inv" dir="${dir}" lang="${i18n.current}" style="--brand:#7f1d1d; --accent:#dc2626; --highlight:#fee2e2;">
-      <div class="inv-header">
-        <div class="biz">
-          <div class="mark">${safeBizLogo() ? `<img src="${safeBizLogo()}" style="max-height:60px; max-width:120px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
-          <div class="biz-name">
-            <h1>${escapeHtml(bizPrimary || 'Khayt')}</h1>
-          </div>
-        </div>
-        <div class="doc">
-          <div class="title" style="color:#dc2626;">${escapeHtml(t("doc.credit_note"))}</div>
-          ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(secondLang, "doc.credit_note"))}</div>` : ''}
-          <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.no"))}</span><span class="v">${escapeHtml(cnId)}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(today))}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="cn-ref-line">
-        ${escapeHtml(t('cn.reversal_of'))}: <strong>#${escapeHtml(invoiceNumber)}</strong>
-        ${originalDate ? ` &mdash; ${escapeHtml(t('cn.original_date'))}: ${escapeHtml(formatPrintDate(originalDate))}` : ''}
-      </div>
-
-      <div class="bill-to">
-        <div class="label"><span>${escapeHtml(t("doc.issued_to"))}</span></div>
-        <div>
-          <div class="name">${escapeHtml(clientName)}</div>
-          ${clientSub ? `<div class="name-sub">${escapeHtml(clientSub)}</div>` : ''}
-        </div>
-      </div>
-
-      <table class="lines">
-        <thead>
-          <tr>
-            <th>${escapeHtml(t("doc.description"))}</th>
-            <th style="text-align:center; width:60px;">${escapeHtml(t("doc.qty"))}</th>
-            <th class="th-amount" style="width:150px;">${escapeHtml(t("doc.amount"))}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || jobRef(order))}</div>
-              ${reason ? `<div class="meta">${escapeHtml(reason)}</div>` : ''}
-            </td>
-            <td class="center">1</td>
-            <td class="amount" style="color:#dc2626;">−${fmtMoney(creditAmount)} <span style="color:#666; font-weight:500;">${currencySymbol()}</span></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="totals">
-        <div class="summary">
-          <div class="row grand">
-            <span class="label-en" style="color:#dc2626;">${escapeHtml(t("doc.credit_total"))}</span>
-            <span class="v" style="color:#dc2626;">−${fmtMoney(creditAmount)}<span class="unit">${currencySymbol()}</span></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        <div class="legal">${escapeHtml(t("doc.generated_by"))}</div>
-      </div>
-    </div>
-    </div>`;
+  const doc = R.creditNoteHtml(order, out.note, {
+    t, i18n, escapeHtml, fmtMoney, formatPrintDate, settings,
+    shopName: shopName(), logo: safeBizLogo(), BRAND_MARK_SVG,
+    currencySymbol: escapeHtml(orderCurrencySymbol(order)),
+    jobRef: jobRef(order), invoiceNumber: invoiceDocNumber(order),
+    clientName: (order.project || '').trim() || t('inv.walk_in'),
+    clientSub: linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '',
+    today: localDateStr(),
+  });
+  area.innerHTML = doc.html;
 
   setTimeout(() => window.print(), 80);
 }
