@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "Passer à la liste groupée",
   "common.hours_short": "h",
   "queue.machines_toggle": "Imprimantes",
+  "kan.reordered": "Ordre de la file modifié",
   "queue.next_up": "À suivre",
   "queue.next_send": "Envoyer",
   "queue.bed_cleared": "Le plateau est vide",

@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "切换到分组列表",
   "common.hours_short": "小时",
   "queue.machines_toggle": "\u6253\u5370\u673a",
+  "kan.reordered": "队列顺序已更改",
   "queue.next_up": "下一个",
   "queue.next_send": "发送",
   "queue.bed_cleared": "热床已清空",

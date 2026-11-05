@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "Cambiar a la lista agrupada",
   "common.hours_short": "h",
   "queue.machines_toggle": "Impresoras",
+  "kan.reordered": "Orden de la cola cambiado",
   "queue.next_up": "A continuación",
   "queue.next_send": "Enviar",
   "queue.bed_cleared": "Cama despejada",

@@ -518,15 +518,26 @@ async function batchAssignMachine() {
     { danger: false }
   );
   if (!ok) return;
+  const before = [];
   for (const id of ids) {
     const o = printLog.find(x => x.id === id);
     if (!o) continue;
+    before.push([o, o.machineId, o.machine]);
     o.machineId = machineId;
     o.machine   = machine?.name || machineId;
   }
   saveAll();
   renderKanban(); renderLogs(); renderDashboard();
-  toast(`🖨 ${ids.length} ${t('batch.orders') || 'order(s)'} ${t('batch.assigned_to') || 'assigned to'} ${machine?.name || machineId}`, 'success');
+  toast(`🖨 ${ids.length} ${t('batch.orders') || 'order(s)'} ${t('batch.assigned_to') || 'assigned to'} ${machine?.name || machineId}`, 'success', 6000, {
+    // Each job back on the machine it had, or on none.
+    undo: () => {
+      for (const [o, mid, mname] of before) {
+        if (mid === undefined) delete o.machineId; else o.machineId = mid;
+        if (mname === undefined) delete o.machine; else o.machine = mname;
+      }
+      saveAll(); renderKanban(); renderLogs(); renderDashboard();
+    },
+  });
 }
 
 /**

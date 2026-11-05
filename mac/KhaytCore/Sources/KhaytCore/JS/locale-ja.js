@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "グループ表示のリストに切り替える",
   "common.hours_short": "時間",
   "queue.machines_toggle": "\u30d7\u30ea\u30f3\u30bf\u30fc",
+  "kan.reordered": "キューの順番を変更しました",
   "queue.next_up": "次の予定",
   "queue.next_send": "送信",
   "queue.bed_cleared": "ベッドは空です",

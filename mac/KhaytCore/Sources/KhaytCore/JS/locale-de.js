@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "Zur gruppierten Liste wechseln",
   "common.hours_short": "Std",
   "queue.machines_toggle": "Drucker",
+  "kan.reordered": "Reihenfolge der Warteschlange geändert",
   "queue.next_up": "Als Nächstes",
   "queue.next_send": "Senden",
   "queue.bed_cleared": "Druckbett ist leer",

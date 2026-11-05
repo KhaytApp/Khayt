@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "التبديل إلى القائمة المجمّعة",
   "common.hours_short": "س",
   "queue.machines_toggle": "\u0627\u0644\u0637\u0627\u0628\u0639\u0627\u062a",
+  "kan.reordered": "تغيّر ترتيب الطابور",
   "queue.next_up": "التالي",
   "queue.next_send": "أرسِل",
   "queue.bed_cleared": "الطاولة فارغة",

@@ -4353,6 +4353,7 @@
   "queue.view_list_hint": "Gruplanmış listeye geç",
   "common.hours_short": "sa",
   "queue.machines_toggle": "Yaz\u0131c\u0131lar",
+  "kan.reordered": "Sıra düzeni değişti",
   "queue.next_up": "Sıradaki",
   "queue.next_send": "Gönder",
   "queue.bed_cleared": "Tabla temiz",

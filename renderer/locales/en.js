@@ -4354,6 +4354,7 @@
   "queue.view_list_hint": "Switch to the grouped list",
   "common.hours_short": "h",
   "queue.machines_toggle": "Machines",
+  "kan.reordered": "Queue order changed",
   "queue.next_up": "Next up",
   "queue.next_send": "Send",
   "queue.bed_cleared": "Bed is clear",

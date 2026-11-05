@@ -4354,6 +4354,7 @@
   "queue.view_list_hint": "Mudar para a lista agrupada",
   "common.hours_short": "h",
   "queue.machines_toggle": "Máquinas",
+  "kan.reordered": "Ordem da fila alterada",
   "queue.next_up": "A seguir",
   "queue.next_send": "Enviar",
   "queue.bed_cleared": "A mesa está livre",
