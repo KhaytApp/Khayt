@@ -5829,6 +5829,7 @@ function loadSettingsIntoForm() {
   renderIntegrationsSettings();
   // Batch-2 Feature 10: Telegram settings
   renderTelegramSettings();
+  renderOffsiteBackup();
   // Feature I: Email digest scheduler
   renderDigestSettings();
   renderAiSettings();
@@ -6136,6 +6137,111 @@ function saveSettingsFromForm() {
   if (typeof renderBuild === 'function') renderBuild();
   if (typeof applyCoachTips === 'function') applyCoachTips(document);
   toast(t('set.saved'), 'success');
+}
+
+/* ============================================================
+   Off-site backup — the Mac's OffsiteBackupSettings, to the same files
+   (lib/offsite-backup.js; the schedule is lib/main/offsite-backup.js).
+   ============================================================ */
+function _offsiteWords(code, fallback) {
+  // Codes the main process sends for the reasons a shop can act on.
+  return ['bucket_missing', 'drive_missing', 'folder_missing', 'needs_unlock'].includes(code)
+    ? t('offsite.' + code) : (fallback || code || '');
+}
+function _offsiteSize(n) {
+  const b = +n || 0;
+  return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+}
+
+async function renderOffsiteBackup() {
+  const el = document.getElementById('offsiteBackupSection');
+  if (!el || !window.hubAPI?.offsiteGet) return;
+  let st;
+  try { st = await window.hubAPI.offsiteGet(); } catch (_) { return; }
+  const s = st.settings || {}, status = st.status || {};
+  const when = (iso) => { try { return new Date(iso).toLocaleString(localeTag()); } catch (_) { return iso; } };
+  const opt = (v, label) => `<option value="${v}" ${s.destination === v ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+  let line = status.lastAt ? t('offsite.last', { when: when(status.lastAt), size: _offsiteSize(status.lastBytes) }) : t('offsite.never');
+  const failing = status.failingSince
+    ? `<p style="font-size:12px;color:var(--danger);margin:6px 0 0;">${escapeHtml(t('offsite.failing', { when: when(status.failingSince), why: _offsiteWords(status.lastCode, status.lastError) }))}</p>` : '';
+  const problem = !st.ready ? _offsiteWords(st.problem) : (!st.unlocked ? t('offsite.needs_unlock') : '');
+  el.innerHTML = `
+    <div style="font-weight:600;margin-bottom:4px;">${escapeHtml(t('offsite.title'))}</div>
+    <p style="font-size:11.5px;color:var(--text-muted);margin:0 0 8px;">${escapeHtml(t('offsite.why'))}</p>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="offsiteOn" style="width:auto;margin:0;" ${s.enabled ? 'checked' : ''}> ${escapeHtml(t('offsite.on'))}
+    </label>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+      <label for="offsiteDest" style="margin:0;">${escapeHtml(t('offsite.where'))}</label>
+      <select id="offsiteDest" style="width:auto;">${opt('folder', t('offsite.dest_folder'))}${opt('bucket', t('offsite.dest_bucket'))}${opt('drive', t('offsite.dest_drive'))}</select>
+      ${s.destination === 'folder' ? `<button class="btn small" id="offsiteChoose">${escapeHtml(t('offsite.choose'))}</button>` : ''}
+    </div>
+    ${st.where ? `<p style="font-size:11.5px;color:var(--text-dim);margin:6px 0 0;word-break:break-all;">${escapeHtml(st.where)}</p>` : ''}
+    ${problem ? `<p style="font-size:12px;color:var(--warning, #b7791f);margin:6px 0 0;">${escapeHtml(problem)}</p>` : ''}
+    <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('offsite.encrypted'))}</p>
+    <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(line)}</p>
+    ${failing}
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn" id="offsiteNow" ${st.ready && st.unlocked ? '' : 'disabled'}>${escapeHtml(t('offsite.now'))}</button>
+      <button class="btn" id="offsiteRestore" ${st.ready && st.unlocked ? '' : 'disabled'}>${escapeHtml(t('offsite.restore'))}</button>
+    </div>`;
+  el.querySelector('#offsiteOn')?.addEventListener('change', async (e) => {
+    await window.hubAPI.offsiteSet({ enabled: e.target.checked }); renderOffsiteBackup();
+  });
+  el.querySelector('#offsiteDest')?.addEventListener('change', async (e) => {
+    await window.hubAPI.offsiteSet({ destination: e.target.value }); renderOffsiteBackup();
+  });
+  el.querySelector('#offsiteChoose')?.addEventListener('click', async () => {
+    const r = await window.hubAPI.offsitePickFolder();
+    if (r && r.ok === false) toast(r.error, 'error');
+    renderOffsiteBackup();
+  });
+  el.querySelector('#offsiteNow')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    // The book on disk is what is sent, so this window's edits go first.
+    if (typeof flushSave === 'function') await flushSave();
+    const r = await window.hubAPI.offsiteRun();
+    if (r && r.ok) toast(t('offsite.done', { name: r.name, size: _offsiteSize(r.bytes) }), 'success');
+    else toast(t('offsite.failed') + ' ' + _offsiteWords(r && r.code, r && r.error), 'error', 9000);
+    renderOffsiteBackup();
+  });
+  el.querySelector('#offsiteRestore')?.addEventListener('click', openOffsiteRestoreModal);
+}
+
+async function openOffsiteRestoreModal() {
+  const r = await window.hubAPI.offsiteList().catch((e) => ({ ok: false, error: e.message }));
+  if (!r || !r.ok) { toast(t('offsite.failed') + ' ' + _offsiteWords(r && r.code, r && r.error), 'error'); return; }
+  if (!r.entries.length) { toast(t('offsite.none'), 'info'); return; }
+  const listHtml = r.entries.map((b, i) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px;">
+      <input type="radio" name="offsiteChoice" value="${escapeHtml(b.name)}" ${i === 0 ? 'checked' : ''} style="width:auto;margin:0;">
+      <span style="flex:1;font-size:13px;">${escapeHtml(b.name.replace(/^khayt-book-|\.khaytbak$/g, ''))}</span>
+      <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(_offsiteSize(b.bytes))}</span>
+    </label>`).join('');
+  openFormModal({
+    title: t('offsite.restore_title'),
+    saveLabel: t('common.confirm'),
+    bodyHtml: `<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px;">${escapeHtml(t('offsite.restore_explain'))}</p>${listHtml}`,
+    async onSave(modal) {
+      const chosen = modal.querySelector('input[name="offsiteChoice"]:checked');
+      if (!chosen) return false;
+      if (!(await confirmModal(t('set.restore_confirm'), { danger: true }))) return false;
+      const got = await window.hubAPI.offsiteRestore(chosen.value).catch((e) => ({ ok: false, error: e.message }));
+      if (!got || !got.ok) { toast(t('offsite.failed') + ' ' + _offsiteWords(got && got.code, got && got.error), 'error', 9000); return false; }
+      // The same steps as a local restore (openRestoreBackupModal).
+      const data = safeJsonParse(got.json);
+      await forgetCloudServerView();
+      if (!replaceStoreFromSnapshot(data)) { toast(t('set.restore_error'), 'error'); return false; }
+      saveAll();
+      initialRender();
+      loadSettingsIntoForm();
+      applyTheme(settings.theme);
+      i18n.set(settings.lang);
+      refreshCurrencyLabels();
+      toast(t('offsite.restored', { name: chosen.value }), 'success');
+      return true;
+    },
+  });
 }
 
 /* ============================================================
@@ -6889,6 +6995,8 @@ function renderTelegramSettings() {
     fullWipeData,
     renderSecuritySettings,
     renderTelegramSettings,
+    renderOffsiteBackup,
+    openOffsiteRestoreModal,
     // These four panels were declared like every other one but never added to
     // this hand-maintained list, so nothing outside this IIFE could re-render
     // them — renderPrivacySettings in particular, which now has to refresh when
