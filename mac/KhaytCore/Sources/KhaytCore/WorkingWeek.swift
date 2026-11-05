@@ -100,4 +100,28 @@ public enum WorkingWeek {
         let total = hours(settings: settings).values.reduce(0.0) { $0 + ($1 > 0 ? $1 : 0) }
         return total > 0 ? total / 7 : 8
     }
+
+    /// The days the shop is closed (`settings.holidays`), `YYYY-MM-DD` local
+    /// days: only real-looking days, once each, in date order — `holidays`
+    /// in `lib/working-week.js`.
+    public static func holidays(settings: JSONValue?) -> [String] {
+        guard case .object(let s)? = settings, case .array(let raw)? = s["holidays"] else { return [] }
+        var seen = Set<String>()
+        for case .string(let d) in raw where isDay(d) { seen.insert(d) }
+        // `Array.prototype.sort()` compares UTF-16 code units; these are ASCII
+        // digits and hyphens, so a plain string order is the same order.
+        return seen.sorted()
+    }
+
+    /// Whether a `YYYY-MM-DD` day is one of the shop's holidays.
+    public static func isHoliday(settings: JSONValue?, day: String) -> Bool {
+        holidays(settings: settings).contains(day)
+    }
+
+    /// `/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/` — `\d` is ASCII in
+    /// JavaScript, so an Arabic-Indic digit is not a day. `\z`, not `$`: ICU's
+    /// `$` also matches before a final newline, and JavaScript's does not.
+    static func isDay(_ d: String) -> Bool {
+        d.range(of: "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\\z", options: .regularExpression) != nil
+    }
 }

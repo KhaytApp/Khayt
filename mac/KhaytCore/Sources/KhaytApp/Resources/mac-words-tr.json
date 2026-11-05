@@ -3556,5 +3556,21 @@
  "mac.loyalty_tiers": "Seviyeler",
  "mac.loyalty_tiers_hint": "Müşteri en az bu kadar tamamlanmış sipariş ve bu kadar harcamayla bir seviyeye ulaşır ve onun indirimini alır. Ulaştığı en yüksek seviye geçerlidir.",
  "mac.loyalty_tier_name": "Seviye",
- "mac.loyalty_add_tier": "Seviye ekle"
+ "mac.loyalty_add_tier": "Seviye ekle",
+ "mac.env_hint": "Nemli filament ve soğuk bir oda baskı hatalarına yol açar. Günde bir ölçüm, atölyenin ne zaman değiştiğini gösterir.",
+ "mac.env_temp": "Sıcaklık (°C)",
+ "mac.env_humidity": "Nem (%)",
+ "mac.env_machine": "Yazıcı",
+ "mac.env_room": "Tüm atölye",
+ "mac.env_notes": "Notlar",
+ "mac.env_none": "Henüz ölçüm yok. Nasıl değiştiklerini görmek için atölyenin sıcaklığını ve nemini kaydedin.",
+ "mac.env_trend": "Son ölçümlerdeki sıcaklık",
+ "mac.env_delete_q": "Bu ölçüm silinsin mi?",
+ "mac.holidays_none": "Kapalı gün yok.",
+ "mac.holidays_hint": "Dükkânın kapalı olduğu günler. Khayt, teslim tarihine kalan baskı saatlerini sayarken bu günleri atlar.",
+ "mac.sv_avg": "Ortalama puan",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Yanıtlar",
+ "mac.sv_nps_hint": "Müşterilerinizin verdiği tüm puanlar. NPS için beş yıldız destekçi, dört pasif, üç veya daha azı eleştirmen sayılır.",
+ "mac.rv_owner_only": "Yorumları tek tek okuyup kaldırabilen yalnızca dükkân sahibidir."
 }

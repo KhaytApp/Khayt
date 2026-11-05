@@ -1072,6 +1072,13 @@ public actor KhaytEngine {
         // publish one, so a product added on the Mac never reached the store.
         "product-specs",
         "storefront-catalog",
+        // What the store's visitors did and what its customers said: the
+        // funnel, the review rows and the review link, as the desktop's
+        // Storefront dialog reads them.
+        "storefront-insights",
+        // The workshop's temperature and humidity (`envLogs`): the check, the
+        // record and the trend, in the desktop's frozen shape.
+        "env-log",
         // A web-store order both ways: whether a queue item may become a job
         // with nobody pressing a button, which customer it is, and what the
         // store is told as the job moves. After `carriers`, whose tracking
@@ -14219,6 +14226,147 @@ public actor KhaytEngine {
             """,
             [ledger, .string(task), .string(model), usage, .number(now.timeIntervalSince1970 * 1000)],
             as: JSONValue.self)
+    }
+
+    /// This month's AI spend per feature, from `settings.aiUsage` — the
+    /// desktop's `aiSpendHtml`, through `KhaytAiUsage.summarize`. Each row's
+    /// `labelKey` is the feature's translation key (`ai-privacy`), or nil for
+    /// a task no feature names. `estimated` is the model having no price of
+    /// its own, so Opus rates were assumed.
+    public struct AiSpend: Decodable, Sendable, Equatable {
+        public struct Row: Decodable, Sendable, Equatable {
+            public let task: String
+            public let labelKey: String?
+            public let calls: Int
+            public let cost: String
+        }
+        public let month: String
+        public let rows: [Row]
+        public let total: String
+        public let estimated: Bool
+    }
+
+    public func aiSpend(settings: [String: JSONValue], now: Date) throws -> AiSpend {
+        try runtime.call2("""
+            (function (s, now) {
+              var U = KhaytAiUsage, P = KhaytAiPrivacy;
+              var r = U.summarize(s && s.aiUsage, now);
+              return {
+                month: r.month,
+                rows: r.rows.map(function (row) {
+                  var spec = P && P.AI_FEATURES[row.task];
+                  return { task: row.task, labelKey: spec ? spec.labelKey : null,
+                           calls: row.calls, cost: U.fmtUsd(row.costExact) };
+                }),
+                total: U.fmtUsd(r.total.cost),
+                estimated: U.isEstimatedModel(((s && s.ai) || {}).model),
+              };
+            })(ARG0, ARG1)
+            """,
+            [.object(settings), .number(now.timeIntervalSince1970 * 1000)], as: AiSpend.self)
+    }
+
+    // MARK: - The environment log (`lib/env-log.js`)
+
+    /// One reading of `envLogs`, the desktop's shape.
+    public struct EnvReading: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let timestamp: String
+        public let temperature: Double?
+        public let humidity: Double?
+        public let machineId: String?
+        public let notes: String
+    }
+
+    /// Why a typed reading cannot be logged — a translation key — or nil.
+    public func envLogCheck(temperature: String, humidity: String) throws -> String? {
+        let said = try runtime.call2("KhaytEnvLog.check({ temperature: ARG0, humidity: ARG1 })",
+                                     [.string(temperature), .string(humidity)], as: JSONValue.self)
+        if case .string(let key) = said { return key }
+        return nil
+    }
+
+    /// The record to append, or `.null` when the check refuses it.
+    public func envLogEntry(temperature: String, humidity: String, machineId: String?, notes: String,
+                            id: String, now: Date) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytEnvLog.entry({ temperature: ARG0, humidity: ARG1, machineId: ARG2, notes: ARG3 },
+                              { id: ARG4, now: ARG5 })
+            """,
+            [.string(temperature), .string(humidity), machineId.map(JSONValue.string) ?? .null,
+             .string(notes), .string(id), .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// The list and the temperature line, as the desktop draws them.
+    public struct EnvLogView: Decodable, Sendable, Equatable {
+        public struct Trend: Decodable, Sendable, Equatable {
+            public let readings: [Double]
+            public let min: Double
+            public let max: Double
+        }
+        public let recent: [EnvReading]
+        public let trend: Trend?
+    }
+
+    public func envLogView(_ logs: [JSONValue]) throws -> EnvLogView {
+        try runtime.call2("""
+            (function (logs) {
+              // A reading written by hand into an older book can carry a
+              // number as text or no notes at all; the list reads what is
+              // there rather than refusing the whole log.
+              var num = function (v) { var n = +v; return v == null || v === '' || !isFinite(n) ? null : n; };
+              return {
+                recent: KhaytEnvLog.recent(logs).map(function (r) {
+                  return { id: String(r.id == null ? '' : r.id), timestamp: String(r.timestamp || ''),
+                           temperature: num(r.temperature), humidity: num(r.humidity),
+                           machineId: r.machineId ? String(r.machineId) : null,
+                           notes: r.notes == null ? '' : String(r.notes) };
+                }),
+                trend: KhaytEnvLog.temperatureTrend(logs),
+              };
+            })(ARG0)
+            """,
+            [.array(logs)], as: EnvLogView.self)
+    }
+
+    // MARK: - The web store's visitors and reviews (`lib/storefront-insights.js`)
+
+    public struct StorefrontInsights: Decodable, Sendable, Equatable {
+        public struct Top: Decodable, Sendable, Equatable, Identifiable {
+            public let id: String
+            public let name: String
+            public let orders: Int
+            public let carts: Int
+        }
+        public let empty: Bool
+        public let views: Int
+        public let carts: Int
+        public let orders: Int
+        public let conversionPct: Double
+        public let top: [Top]
+    }
+
+    public func storefrontInsights(_ stats: JSONValue) throws -> StorefrontInsights {
+        try runtime.call2("KhaytStorefrontInsights.insights(ARG0)", [stats], as: StorefrontInsights.self)
+    }
+
+    public struct ReviewRow: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let stars: Int
+        public let comment: String
+        public let name: String
+        public let day: String
+        public let verified: Bool
+    }
+
+    public func reviewRows(_ reviews: JSONValue) throws -> [ReviewRow] {
+        try runtime.call2("KhaytStorefrontInsights.reviewRows(ARG0)", [reviews], as: [ReviewRow].self)
+    }
+
+    /// `{cloud}/review/{shopId}`, or "" without both.
+    public func reviewLink(baseUrl: String, shopId: String) throws -> String {
+        try runtime.call2("KhaytStorefrontInsights.reviewLink(ARG0, ARG1)",
+                          [.string(baseUrl), .string(shopId)], as: String.self)
     }
 
     // MARK: - What a product costs, and what it is worth

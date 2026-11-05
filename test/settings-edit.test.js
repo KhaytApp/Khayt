@@ -820,3 +820,10 @@ test('a template field another app keeps survives a save that only sends the nam
   const out = apply(held, { whatsappTemplates: { ready: { name: 'order_ready', langs: ['en'] } } }, CTX);
   assert.deepEqual(out.whatsappTemplates.ready, { name: 'order_ready', langs: ['en'], category: 'UTILITY' });
 });
+
+test('holidays: a form without them keeps them; a form with them has them cleaned', () => {
+  const held = { holidays: ['2026-09-23', 'junk'] };
+  assert.deepEqual(apply(held, { phone: '1' }, CTX).holidays, ['2026-09-23', 'junk'], 'the desktop never sends them, so they are kept as they were');
+  assert.deepEqual(apply(held, { holidays: ['2026-12-01', '2026-09-23', '2026-12-01', 'x'] }, CTX).holidays, ['2026-09-23', '2026-12-01']);
+  assert.deepEqual(apply(held, { holidays: [] }, CTX).holidays, [], 'the last one removed is none, not the old list');
+});

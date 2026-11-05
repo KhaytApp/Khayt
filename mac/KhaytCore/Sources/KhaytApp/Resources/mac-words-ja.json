@@ -3556,5 +3556,21 @@
  "mac.loyalty_tiers": "ランク",
  "mac.loyalty_tiers_hint": "完了した注文数と支出額がそれぞれこの値以上になると、顧客はそのランクに達し、割引を受けられます。達した最も高いランクが適用されます。",
  "mac.loyalty_tier_name": "ランク",
- "mac.loyalty_add_tier": "ランクを追加"
+ "mac.loyalty_add_tier": "ランクを追加",
+ "mac.env_hint": "湿ったフィラメントや寒い部屋は印刷失敗の原因になります。1日1回の記録で作業場の変化がわかります。",
+ "mac.env_temp": "温度 (°C)",
+ "mac.env_humidity": "湿度 (%)",
+ "mac.env_machine": "プリンター",
+ "mac.env_room": "作業場全体",
+ "mac.env_notes": "メモ",
+ "mac.env_none": "まだ記録がありません。作業場の温度と湿度を記録すると、その推移がわかります。",
+ "mac.env_trend": "最近の記録の温度",
+ "mac.env_delete_q": "この記録を削除しますか？",
+ "mac.holidays_none": "休業日はありません。",
+ "mac.holidays_hint": "店が休みの日です。Khayt は納期までに残る印刷時間を数えるとき、これらの日を除きます。",
+ "mac.sv_avg": "平均評価",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "回答数",
+ "mac.sv_nps_hint": "お客様がつけたすべての評価です。NPS では、星5つを推奨者、星4つを中立者、星3つ以下を批判者として数えます。",
+ "mac.rv_owner_only": "レビューを1件ずつ読んで削除できるのは店のオーナーだけです。"
 }

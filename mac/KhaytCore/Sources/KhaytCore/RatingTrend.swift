@@ -113,4 +113,61 @@ public enum RatingTrend {
                       allTimeResponses: allTime,
                       enough: responses >= minResponses)
     }
+
+    // MARK: - The satisfaction card
+
+    /// One bar of the star spread.
+    public struct Bar: Sendable, Equatable, Identifiable {
+        public let stars: Int
+        public let count: Int
+        /// Of all responses, rounded to a whole per cent.
+        public let pct: Int
+        public var id: Int { stars }
+    }
+
+    public struct Summary: Sendable, Equatable {
+        public let responses: Int
+        public let average: Double?
+        /// Five stars down to one, the order the card draws it.
+        public let spread: [Bar]
+        public let promoters: Int
+        public let passives: Int
+        public let detractors: Int
+        /// Promoters minus detractors over responses, as a whole number from
+        /// -100 to 100; nil with no responses.
+        public let nps: Int?
+    }
+
+    /// `summary` from `lib/rating-trend.js`: every rating in the book, its
+    /// average, the star spread and an NPS read off the five-star scale (5 a
+    /// promoter, 4 passive, 1–3 a detractor). The jobs are the ones `ratingOf`
+    /// accepts, the same the trend reads.
+    public static func summary(orders: [JSONValue]) -> Summary {
+        var counts = [Int](repeating: 0, count: 6)
+        var responses = 0, total = 0.0, promoters = 0, detractors = 0
+        for order in orders {
+            guard let r = ratingOf(order) else { continue }
+            responses += 1
+            total += r
+            // `Math.round`: halves go UP, which for these positive figures is
+            // what `.rounded()` (to nearest, away from zero) does too.
+            let star = Int(Swift.min(maxRating, Swift.max(minRating, r.rounded())))
+            counts[star] += 1
+            if r >= maxRating { promoters += 1 } else if r <= 3 { detractors += 1 }
+        }
+        let spread = [5, 4, 3, 2, 1].map { stars in
+            Bar(stars: stars, count: counts[stars],
+                pct: responses > 0 ? jsRound(Double(counts[stars]) / Double(responses) * 100) : 0)
+        }
+        return Summary(responses: responses,
+                       average: responses > 0 ? total / Double(responses) : nil,
+                       spread: spread, promoters: promoters,
+                       passives: responses - promoters - detractors, detractors: detractors,
+                       nps: responses > 0
+                           ? jsRound(Double(promoters - detractors) / Double(responses) * 100) : nil)
+    }
+
+    /// `Math.round`: half rounds toward +∞, so -16.5 is -16 (Swift's
+    /// `.rounded()` would say -17, and a negative NPS is a real case).
+    static func jsRound(_ x: Double) -> Int { Int((x + 0.5).rounded(.down)) }
 }

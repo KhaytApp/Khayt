@@ -3556,5 +3556,21 @@
  "mac.loyalty_tiers": "等级",
  "mac.loyalty_tiers_hint": "客户的已完成订单数和消费额至少达到这些数值，即可升到该等级并享受其折扣。按其达到的最高等级计算。",
  "mac.loyalty_tier_name": "等级",
- "mac.loyalty_add_tier": "添加等级"
+ "mac.loyalty_add_tier": "添加等级",
+ "mac.env_hint": "受潮的耗材和寒冷的房间会导致打印失败。每天记录一次，就能看出工作间何时发生变化。",
+ "mac.env_temp": "温度 (°C)",
+ "mac.env_humidity": "湿度 (%)",
+ "mac.env_machine": "打印机",
+ "mac.env_room": "整个工作间",
+ "mac.env_notes": "备注",
+ "mac.env_none": "还没有记录。记录工作间的温度和湿度，即可查看它们的变化。",
+ "mac.env_trend": "最近记录的温度",
+ "mac.env_delete_q": "删除这条记录？",
+ "mac.holidays_none": "没有休息日。",
+ "mac.holidays_hint": "店铺休息的日子。Khayt 计算截止日期前剩余的打印小时数时会跳过这些日子。",
+ "mac.sv_avg": "平均评分",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "回复数",
+ "mac.sv_nps_hint": "客户给出的所有评分。计算 NPS 时，五星算推荐者，四星算中立者，三星及以下算贬损者。",
+ "mac.rv_owner_only": "只有店主可以逐条查看并删除评价。"
 }

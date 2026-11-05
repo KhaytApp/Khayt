@@ -3556,5 +3556,21 @@
  "mac.loyalty_tiers": "Stufen",
  "mac.loyalty_tiers_hint": "Ein Kunde erreicht eine Stufe mit mindestens so vielen abgeschlossenen Aufträgen und so viel Umsatz und erhält deren Rabatt. Es gilt die höchste erreichte Stufe.",
  "mac.loyalty_tier_name": "Stufe",
- "mac.loyalty_add_tier": "Stufe hinzufügen"
+ "mac.loyalty_add_tier": "Stufe hinzufügen",
+ "mac.env_hint": "Feuchtes Filament und ein kalter Raum führen zu Fehldrucken. Eine Messung pro Tag zeigt, wann sich die Werkstatt verändert.",
+ "mac.env_temp": "Temperatur (°C)",
+ "mac.env_humidity": "Luftfeuchtigkeit (%)",
+ "mac.env_machine": "Drucker",
+ "mac.env_room": "Ganze Werkstatt",
+ "mac.env_notes": "Notizen",
+ "mac.env_none": "Noch keine Messungen. Erfassen Sie Temperatur und Luftfeuchtigkeit der Werkstatt, um ihren Verlauf zu sehen.",
+ "mac.env_trend": "Temperatur der letzten Messungen",
+ "mac.env_delete_q": "Diese Messung löschen?",
+ "mac.holidays_none": "Keine Schließtage.",
+ "mac.holidays_hint": "Tage, an denen der Shop geschlossen ist. Khayt lässt sie aus, wenn es die Druckstunden bis zu einem Fälligkeitsdatum zählt.",
+ "mac.sv_avg": "Durchschnittliche Bewertung",
+ "mac.sv_nps": "NPS",
+ "mac.sv_responses": "Antworten",
+ "mac.sv_nps_hint": "Jede Bewertung Ihrer Kunden. Für den NPS zählen fünf Sterne als Promotor, vier als passiv und drei oder weniger als Kritiker.",
+ "mac.rv_owner_only": "Nur der Inhaber des Shops kann die Bewertungen einzeln lesen und entfernen."
 }

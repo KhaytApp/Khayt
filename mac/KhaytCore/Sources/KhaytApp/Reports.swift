@@ -52,6 +52,9 @@ struct Reports: View {
     /// `RatingTrendCard` for why the caption used to cover a different span
     /// from the chart under it.
     @State private var ratings: KhaytEngine.RatingTrend?
+    /// Every rating in the book: average, star spread and NPS — the other
+    /// app's "Customer Satisfaction" card (`lib/rating-trend.js summary`).
+    @State private var surveys: KhaytCore.RatingTrend.Summary?
     /// Where the shop's customers came from. Beside the customer mix, which
     /// says whether it is finding new ones at all.
     @State private var sources: KhaytEngine.ClientSources?
@@ -119,7 +122,7 @@ struct Reports: View {
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
                      when: when, quality: quality, cycle: cycle, lead: lead,
-                     promises: promises, ratings: ratings, sources: sources,
+                     promises: promises, ratings: ratings, surveys: surveys, sources: sources,
                      retention: retention, staff: staff, labour: labour)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
@@ -775,6 +778,9 @@ struct Reports: View {
             months.append(String(format: "%04d-%02d", year, m))
         }
         ratings = try? await engine.ratingTrend(orders: shop.orderRows, months: months)
+        // The whole book, as the other app's card counts it: the trend above
+        // is the window, this is the standing.
+        surveys = KhaytCore.RatingTrend.summary(orders: shop.orderRows)
     }
 
     /// The two staff cards. The whole book, NOT the chosen period: an
@@ -965,6 +971,7 @@ struct Reports: View {
         let lead: KhaytEngine.LeadTime?
         let promises: KhaytEngine.OnTime?
         let ratings: KhaytEngine.RatingTrend?
+        let surveys: KhaytCore.RatingTrend.Summary?
         let sources: KhaytEngine.ClientSources?
         let retention: KhaytEngine.ClientRetention?
         let staff: KhaytEngine.OperatorPerformance?
@@ -1057,6 +1064,13 @@ struct Reports: View {
                         .card(rail: (ratings?.average ?? 5) < 3
                                     ? Khayt.attention : nil,
                               padding: 14)
+                    // The line above is the last six months; this is every
+                    // rating the shop has, with the spread and the NPS.
+                    if let surveys, surveys.responses > 0 {
+                        SurveySummaryCard(shop: shop, summary: surveys)
+                            .card(rail: (surveys.nps ?? 0) < 0 ? Khayt.attention : nil,
+                                  padding: 14)
+                    }
                 }
                 .padding(Metric.screen)
             }

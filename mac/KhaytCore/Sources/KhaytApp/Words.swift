@@ -416,6 +416,7 @@ final class Words {
             .merging(WebAttachWords.table) { mine, _ in mine }
             .merging(BrowserHostWords.table) { mine, _ in mine }
             .merging(DocumentWords.table) { mine, _ in mine }
+            .merging(ShopPagesWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────

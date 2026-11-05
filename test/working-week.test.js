@@ -100,3 +100,12 @@ test('the module loads before the file that reads it at eval time', () => {
     assert.ok(lib < state, `${page}: working-week.js has to load before app-state.js`);
   }
 });
+
+test('holidays: real days, once each, in date order', () => {
+  assert.deepEqual(W.holidays({ holidays: ['2026-12-02', '2026-09-23', 'soon', '2026-13-01', 42, '2026-09-23', '2026-2-1'] }),
+    ['2026-09-23', '2026-12-02']);
+  assert.deepEqual(W.holidays({}), []);
+  assert.deepEqual(W.holidays({ holidays: 'x' }), []);
+  assert.equal(W.isHoliday({ holidays: ['2026-09-23'] }, '2026-09-23'), true);
+  assert.equal(W.isHoliday({ holidays: ['2026-09-23'] }, '2026-09-24'), false);
+});

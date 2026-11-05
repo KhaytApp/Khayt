@@ -848,6 +848,8 @@ struct OperationsPane: View {
         /// Minutes one spool change takes — an ESTIMATE, used only to say what
         /// grouping the queue by colour saves (`lib/swap-queue.js`).
         var swapMinutes = OperationsPane.swapMinutesDefault
+        /// `settings.holidays`, the days the shop is closed (`YYYY-MM-DD`).
+        var holidays: [String] = []
 
         static let days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
         static let columns = ["pending", "printing", "post", "qc"]
@@ -888,6 +890,7 @@ struct OperationsPane: View {
             // shop has never set them, so that is what the fields show.
             for day in days { d.hours[day] = Shop.plainNumber(hours[day]) ?? (hours.isEmpty ? 8 : 0) }
             for col in columns { d.wip[col] = Shop.plainNumber(wip[col]) ?? 0 }
+            d.holidays = WorkingWeek.holidays(settings: .object(settings))
             return d
         }
         func form() -> [String: JSONValue] {
@@ -914,7 +917,8 @@ struct OperationsPane: View {
                                          "channel": .string(payReminderChannel)]),
              "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
                                        "windowDays": .number(quoteFollowUpWindow)]),
-             "swapMinutes": .number(swapMinutes)]
+             "swapMinutes": .number(swapMinutes),
+             "holidays": .array(holidays.map(JSONValue.string))]
         }
     }
 
@@ -968,6 +972,7 @@ struct OperationsPane: View {
                 } footer: {
                     Text(shop.words.callIt("set.wh_hint"))
                 }
+                HolidaysSection(shop: shop, holidays: $draft.holidays)
                 Section {
                     // ── THE HOURS AND THE DAYS ARE THE GRID ABOVE ────────
                     //
@@ -1065,6 +1070,9 @@ struct OperationsPane: View {
                     Toggle(shop.words.callIt("set.qc_require_photo"), isOn: $draft.qcRequirePhotoOnFail).disabled(!draft.qcEnabled)
                     numberRow("set.qc_warranty_days", $draft.qcWarrantyDays).disabled(!draft.qcEnabled)
                 }
+                // Saved as each reading is logged, like the sites and staff
+                // at the top — a reading is a record, not a setting.
+                EnvironmentLogSection(shop: shop)
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
@@ -1452,6 +1460,9 @@ struct AssistantPane: View {
                         }
                     }
                 }
+
+                // What the shop's key has spent this month, per feature.
+                AiSpendSection(shop: shop)
 
                 Section(shop.words.callIt("set.ai_provider")) {
                     row(shop.words.callIt("set.ai_provider")) {

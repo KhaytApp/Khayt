@@ -90,15 +90,21 @@ test('every field from a stranger is escaped', () => {
     if (!m) continue;
     assert.match(m[0], /escapeHtml\(/, `${f} reaches innerHTML unescaped`);
   }
-  assert.match(body, /\$\{escapeHtml\(rv\.comment \|\| ''\)\}/, 'the comment is not escaped');
+  assert.match(body, /\$\{escapeHtml\(rv\.comment(?: \|\| '')?\)\}/, 'the comment is not escaped');
+  // The rows come from the shared reader, which makes every field a string.
+  assert.match(body, /SI\.reviewRows\(r\.reviews\)/, 'the rows are not read through lib/storefront-insights.js');
 });
 
 test('the star count cannot be forged into a huge string', () => {
   // '★'.repeat(rating) with an unclamped rating from the server is a trivial
-  // way to make the panel unusable.
+  // way to make the panel unusable. The clamp lives in
+  // lib/storefront-insights.js now, which the Mac lists reviews through too.
   const set = code('renderer/settings.js');
-  assert.match(set, /'★'\.repeat\(Math\.max\(0, Math\.min\(5, \+rv\.rating \|\| 0\)\)\)/,
-    'the rating is repeated without being clamped');
+  assert.match(set, /'★'\.repeat\(rv\.stars\)/, 'the stars are not the clamped ones');
+  const SI = require('../lib/storefront-insights.js');
+  assert.equal(SI.reviewRows([{ id: 'r', rating: 1e9 }])[0].stars, 5, 'the rating is repeated without being clamped');
+  assert.equal(SI.reviewRows([{ id: 'r', rating: -1e9 }])[0].stars, 0);
+  assert.equal(SI.reviewRows([{ id: 'r', rating: 'x' }])[0].stars, 0);
 });
 
 test('all six strings exist in every locale', () => {

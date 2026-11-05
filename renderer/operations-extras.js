@@ -875,7 +875,8 @@ function renderEnvLogs() {
   const container = document.getElementById('envLogsContainer');
   if (!container) return;
 
-  const recent = (envLogs || []).slice().sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || '')).slice(0, 50);
+  // `lib/env-log.js` — the list and the line; the Mac reads them from it too.
+  const recent = KhaytEnvLog.recent(envLogs);
 
   if (recent.length === 0) {
     container.innerHTML = `<div class="empty-state" style="padding:20px;">No environmental logs yet.</div>`;
@@ -894,15 +895,12 @@ function renderEnvLogs() {
   }).join('');
 
   // Simple SVG sparkline for temperature — last 20 entries in chronological order
-  const sparkData = (envLogs || [])
-    .filter(l => l.temperature != null)
-    .slice().sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''))
-    .slice(-20);
+  const trend = KhaytEnvLog.temperatureTrend(envLogs);
 
   let sparkHtml = '';
-  if (sparkData.length >= 2) {
-    const temps = sparkData.map(l => +l.temperature);
-    const minT = Math.min(...temps), maxT = Math.max(...temps);
+  if (trend) {
+    const temps = trend.readings;
+    const minT = trend.min, maxT = trend.max;
     const range = maxT - minT || 1;
     const W = 240, H = 48;
     const pts = temps.map((t, i) => {
@@ -944,26 +942,19 @@ function openLogEnvModal() {
       <label style="margin-top:10px;">Notes (optional)</label>
       <textarea id="envNotes" rows="2"></textarea>`,
     onSave(modal) {
-      const temp     = modal.querySelector('#envTemp').value;
-      const humidity = modal.querySelector('#envHumidity').value;
-      if (temp === '' && humidity === '') { toast(t('env.need_value'), 'error'); return false; }
-      if (temp !== '') {
-        const t = num(temp, null);
-        if (t === null || t < -50 || t > 100) { toast(t('env.temp_range'), 'error'); return false; }
-      }
-      if (humidity !== '') {
-        const h = num(humidity, null);
-        if (h === null || h < 0 || h > 100) { toast(t('env.humidity_range'), 'error'); return false; }
-      }
-      if (!envLogs) envLogs = [];
-      envLogs.push({
-        id: uid('ENV'),
-        timestamp:   new Date().toISOString(),
-        temperature: temp !== '' ? num(temp, null) : null,
-        humidity:    humidity !== '' ? num(humidity, null) : null,
+      // `lib/env-log.js` checks and builds the record. The check used to read
+      // the temperature into a local `t`, shadowing the translation function,
+      // so an out-of-range reading threw instead of saying why.
+      const form = {
+        temperature: modal.querySelector('#envTemp').value,
+        humidity:    modal.querySelector('#envHumidity').value,
         machineId:   modal.querySelector('#envMachine').value || null,
-        notes:       modal.querySelector('#envNotes').value.trim(),
-      });
+        notes:       modal.querySelector('#envNotes').value,
+      };
+      const refused = KhaytEnvLog.check(form);
+      if (refused) { toast(t(refused), 'error'); return false; }
+      if (!envLogs) envLogs = [];
+      envLogs.push(KhaytEnvLog.entry(form, { id: uid('ENV'), now: Date.now() }));
       saveAll();
       renderEnvLogs();
       toast(t('env.logged'), 'success');
