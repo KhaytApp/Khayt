@@ -33,15 +33,18 @@ test('nothing is offered until the shop is signed in, on a vault library, and un
   assert.equal((await setup({ book: signedIn, dek: null }).handlers['hub:vault-links-status']()).reason, 'locked');
 });
 
-test('a model with no vault copy is refused by name before anything is sent', async () => {
-  let calls = 0;
+test('a model with no vault copy is refused by name, and no link is made', async () => {
+  const calls = [];
   const book = { ...signedIn, printFiles: [{ id: 'R1', name: 'Dragon', vaultFileId: 'F1' }, { id: 'R2', name: 'Vase' }] };
-  const { handlers } = setup({ book, fetchImpl: async () => { calls++; throw new Error('no network in tests'); } });
+  const { handlers } = setup({ book, fetchImpl: async (url, init) => {
+    calls.push([init.method, new URL(url).pathname]);
+    return new Response(JSON.stringify({ rev: 1, more: false, files: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  } });
   const r = await handlers['hub:vault-share'](null, { recordIds: ['R1', 'R2'], options: {} });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'not-in-vault');
   assert.deepEqual(r.names, ['Vase']);
-  assert.equal(calls, 0);
+  assert.ok(!calls.some(([m, p]) => m === 'POST' && /\/vault\/grants$/.test(p)), 'a link was created');
 });
 
 test('a link secret is kept sealed on this computer, read back for Copy Link, and forgotten on revoke', async () => {

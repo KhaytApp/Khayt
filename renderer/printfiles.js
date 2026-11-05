@@ -581,6 +581,19 @@
     catch (_) { toast(text, 'info', 12000); }
   }
 
+  /** Back the selected models up into the vault now (lib/main/vault-backup.js):
+   *  the Mac's library backup, to the same vault objects. */
+  async function vaultBackupSelected() {
+    const ids = [..._selected];
+    if (!ids.length || !window.hubAPI?.vaultBackup) return;
+    toast(t('vb.back_up') + '…', 'info');
+    const r = await window.hubAPI.vaultBackup(ids).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || (!r.done && !r.failed)) { toast(vlError(r), 'error', 9000); return; }
+    const done = (r.done || []).length, failed = (r.failed || []).length;
+    toast(t('vb.done', { n: done, total: done + failed }), failed ? 'warning' : 'success', 7000);
+    if (failed) toast(t('vb.some_failed', { n: failed }), 'error', 9000);
+  }
+
   function vaultShareSelected() {
     const ids = [..._selected];
     if (!ids.length) return;
@@ -706,7 +719,8 @@
       <button class="btn small ghost" data-act="pf-bulk-group" ${has ? '' : 'disabled'}>${_bi('folder', '🗂')}${escapeHtml(t('plib.group') || 'Group')}</button>
       <button class="btn small ghost" data-act="pf-bulk-cat" ${has ? '' : 'disabled'}>${_bi('board', '▦')}${escapeHtml(t('plib.category') || 'Category')}</button>
       <button class="btn small ghost" data-act="pf-bulk-tag" ${has ? '' : 'disabled'}>${escapeHtml(t('plib.tags_short') || 'Tags')}</button>
-      ${_vaultLinksOn ? `<button class="btn small ghost" data-act="pf-bulk-share" ${has ? '' : 'disabled'}>${escapeHtml(t('vl.share_title'))}…</button>
+      ${_vaultLinksOn ? `<button class="btn small ghost" data-act="pf-bulk-vault-backup" ${has ? '' : 'disabled'}>${escapeHtml(t('vb.back_up'))}</button>
+      <button class="btn small ghost" data-act="pf-bulk-share" ${has ? '' : 'disabled'}>${escapeHtml(t('vl.share_title'))}…</button>
       <button class="btn small ghost" data-act="pf-vault-links">${escapeHtml(t('vl.links_title'))}</button>` : ''}
       <button class="btn small ghost danger" data-act="pf-bulk-del" ${has ? '' : 'disabled'}>${_bi('trash', '🗑')}${escapeHtml(t('common.delete') || 'Delete')}</button>
       <span class="act-end"></span>
@@ -1329,6 +1343,7 @@
       case 'pf-bulk-tag': bulkTag(); break;
       case 'pf-bulk-del': bulkDelete(); break;
       case 'pf-bulk-share': vaultShareSelected(); break;
+      case 'pf-bulk-vault-backup': vaultBackupSelected(); break;
       case 'pf-vault-links': openVaultLinks(); break;
       case 'pf-view-library': if (_view !== 'library') { _view = 'library'; resetPage(); renderPrintFiles(); } break;
       // Leaving the library drops the selection rather than carrying it

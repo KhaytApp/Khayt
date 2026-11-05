@@ -1873,6 +1873,23 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
   },
   libraryDrive: () => printLibDrive(),
 });
+// Backing library models up into the Khayt Vault (lib/main/vault-backup.js):
+// the Mac's library backup, to the same vault objects. Writes no record field.
+const vaultBackup = require('./lib/main/vault-backup.js').createVaultBackup({
+  app,
+  readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
+  getDek: () => (cloudBackend ? cloudDek : null),
+  cloudToken: (token, url) => cloudToken(token, url),
+  isVaultOn: () => printLibVaultOn(),
+  itemDir: (id) => printLibItemDir(id),
+  isModelFile: (n) => PLT.isModelFile(n),
+  deviceId: 'desktop',
+});
+ipcMain.handle('hub:vault-backup', async (_e, { recordIds } = {}) => {
+  try { return await vaultBackup.backUp(Array.isArray(recordIds) ? recordIds : []); }
+  catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
 // Khayt Vault share links (lib/main/vault-links.js): the Mac's share sheet and
 // links sheet, for files already in the vault. Needs Khayt Cloud unlocked.
 require('./lib/main/vault-links.js').registerVaultLinks({
@@ -2485,7 +2502,19 @@ function printLibRemotesFor(provider) {
  * @returns {null|{folder: boolean|null, s3: boolean|null}} null when no backup
  *   is configured at all.
  */
+/**
+ * On a library kept in the Khayt Vault, a new model goes there too, in the
+ * background, unless the shop turned "back up new models" off (only an
+ * explicit false does; absent is on, as on the Mac). Failures are logged and
+ * shown by the next manual backup, never undone. lib/main/vault-backup.js.
+ */
+function printLibVaultBackUpNew(id, filename) {
+  if (!printLibVaultOn() || ((printLibSettings() || {}).vault || {}).backUpNew === false || !PLT.isModelFile(filename)) return;
+  vaultBackup.backUp([id]).catch((e) => console.error('printlib vault backup:', e && e.message));
+}
+
 async function printLibMirrorFile(id, filename, srcPath) {
+  printLibVaultBackUpNew(id, filename);
   const dir = printLibMirrorItemDir(id);
   // Each remote's own "keep a copy of every new model" switch
   // (settings.printLibrary.<s3|gdrive>.backUpNew, set on the Mac's storage

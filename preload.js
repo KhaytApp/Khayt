@@ -90,6 +90,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   restoreBackup:      (backupPath) => ipcRenderer.invoke('hub:restore-backup', backupPath),
   vaultLinksStatus:    () => ipcRenderer.invoke('hub:vault-links-status'),
   vaultShare:          (o) => ipcRenderer.invoke('hub:vault-share', o || {}),
+  vaultBackup:         (recordIds) => ipcRenderer.invoke('hub:vault-backup', { recordIds }),
   vaultLinks:          () => ipcRenderer.invoke('hub:vault-links'),
   vaultLinkUrl:        (grantId) => ipcRenderer.invoke('hub:vault-link-url', { grantId }),
   vaultLinkChange:     (o) => ipcRenderer.invoke('hub:vault-link-change', o || {}),
