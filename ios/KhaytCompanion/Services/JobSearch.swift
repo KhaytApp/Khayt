@@ -43,7 +43,7 @@ struct JobSearchQuery: EntityStringQuery {
               let rows = try? await BookReader(book: book).recentOrders(limit: 400) else { return [] }
         return rows.map { o in
             JobSearchEntity(id: o.id,
-                            title: (o.project?.isEmpty == false ? o.project! : o.id),
+                            title: o.displayTitle,
                             client: o.client ?? "",
                             stage: OrderStatus(rawValue: o.status)?.localizedLabel ?? o.status)
         }
