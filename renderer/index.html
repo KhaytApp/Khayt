@@ -2264,6 +2264,11 @@
         </div>
 
         <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="ntfy.section">Push to a phone (ntfy)</div>
+        <div id="ntfySettingsContainer"></div>
+        </div>
+
+        <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.salla_zid_title">Salla / Zid Webhooks</div>
         <div id="sallaZidContainer"></div>
         </div>
@@ -2781,6 +2786,7 @@
      caller in integrations.js silently returned — the whole feature was dead in the
      shipped app despite having 22 passing unit tests. -->
 <script src="../lib/printer-alerts.js"></script>
+<script src="../lib/alert-routes.js"></script>
 <script src="../lib/rbac.js"></script>
 <script src="../lib/accounting-rows.js"></script>
 <script src="../lib/accounting-export.js"></script>
