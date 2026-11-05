@@ -1457,10 +1457,10 @@ final class Shop {
             if overtaken() { return }
             remeasureIfDue()
             createRecurringIfDue()
+            readProvenanceIfDue()
             // The quote follow-ups the shop switched on (Settings ▸ Quote
             // follow-ups) — after the dashboard has chosen which are due.
             followUpQuotesIfDue()
-            readProvenanceIfDue()
             readSlicerFiguresIfDue()
             rescanLinkedIfDue()
             rescanStorageIfDue()
