@@ -188,6 +188,25 @@ private struct Detail: View {
                     Divider()
                     DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
                 }
+                // What happened to it: the stages it went through and how
+                // long each took, and every change to its due date, discount,
+                // shipping, priority and price.
+                Divider()
+                HStack(spacing: 14) {
+                    Button(shop.words.callIt("ord.timeline")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project)
+                    }
+                    Button(shop.words.callIt("ord.edit_history")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project, edits: true)
+                    }
+                    if shop.canMoveJobs {
+                        Button(shop.words.callIt("mac.order_details")) {
+                            shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
             }
             .padding(16)
         }

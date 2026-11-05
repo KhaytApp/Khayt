@@ -742,6 +742,8 @@ struct RoundTripTests {
         "saveQuoteFormEmbed": "never writes the book: PUTs {enabled, origins} to the cloud and shows what the cloud answers; QuoteFormEmbedTests covers the body and the answer",
         "saveQuoteFormFooter": "never writes the book: the caller of QuoteFormEmbed.saveFooter, gated, and shows what the cloud answers",
         "saveFooter": "never writes the book: PUTs {hideFooter} to the cloud's /embed/footer; QuoteFormEmbedTests.footerSave covers the body and the answers",
+        "editOrderDetails": "hands lib/order-edit.js applyDetails only the fields the sheet changed (OrderDetailsSheet.fields) and the rule touches only those; OrderToolsTests.onlyChanged proves an untouched sheet sends nothing",
+        "saveIntake": "lib/intake-queue.js saveItem merges the editor's seven fields onto the stored entry and keeps the rest; test/intake-queue.test.js proves the intake form's phone, consent and estValue survive",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 

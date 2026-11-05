@@ -735,6 +735,9 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
+            // The desktop's order tools (`Shop+OrderTools.swift`), as one
+            // modifier so this chain does not grow by eight.
+            .modifier(OrderToolSheets(shop: shop))
             .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
             .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
             .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }

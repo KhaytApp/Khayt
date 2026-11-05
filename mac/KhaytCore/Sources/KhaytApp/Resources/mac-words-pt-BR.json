@@ -3532,5 +3532,14 @@
  "mac.bnpl_forget": "Esquecer a chave salva",
  "mac.bnpl_unsealed": "Não foi possível criptografar essa chave, então nada foi salvo. O livro é sincronizado e tem backup, e uma chave sem criptografia iria junto.",
  "mac.bnpl_none": "Ative a Tabby ou a Tamara, com a chave de API, em Ajustes ▸ Online.",
- "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar."
+ "mac.bnpl_watching": "O Khayt concluirá este pagamento e o registrará no trabalho assim que o cliente pagar.",
+ "mac.order_details": "Detalhes do pedido",
+ "mac.void_waste_amount": "{grams} g {material}",
+ "mac.credit_room": "Ainda é possível creditar até {amount}.",
+ "mac.rma_refund_hint": "Um reembolso é registrado como nota de crédito, que abre em seguida.",
+ "mac.reprint_hint": "Um novo pedido é criado com as mesmas peças e vinculado a este. O preço pode ser alterado depois.",
+ "mac.timeline_current": "agora",
+ "mac.intake_reminder_due": "Lembrete para {date}",
+ "mac.intake_remind_text": "Olá {name}, passando para lembrar do seu projeto “{project}”. Temos um horário disponível — avise se quiser seguir em frente!",
+ "mac.intake_remind_text_noname": "Olá, passando para lembrar do seu projeto “{project}”. Temos um horário disponível — avise se quiser seguir em frente!"
 }

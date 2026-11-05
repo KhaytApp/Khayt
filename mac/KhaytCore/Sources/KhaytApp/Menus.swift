@@ -630,6 +630,37 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // THE WHOLE ORDER EDITOR, beside the quick one: notes, tags, discount,
+        // shipping, extra charges, the address and who is on it.
+        Button(Words.upfront("mac.order_details") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingDetails = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove)
+        Button(Words.upfront("ord.timeline") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingHistory = Shop.HistoryRequest(id: one.id, project: one.project)
+        }
+        .disabled(job == nil)
+        Button(Words.upfront("ord.edit_history") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingHistory = Shop.HistoryRequest(id: one.id, project: one.project, edits: true)
+        }
+        .disabled(job == nil)
+        Button(Words.upfront("oe.reprint") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingReprint = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove || job?.status == "quote")
+        Button(Words.upfront("qc.rma_title") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingRma = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove || job?.deliveredAt == nil)
+        // Enquiries that are not jobs yet — what the LAN intake form and the
+        // other app's waiting list hold.
+        Button(Words.upfront("waiting.title") + "\u{2026}") { shop.showingIntake = true }
+        .disabled(!shop.source.isReal)
         // A LABEL FOR THE BOX. The shelf could be labelled from here and a job
         // could not, so a parcel going out of the door had to be labelled from
         // the other app.
@@ -688,6 +719,17 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("p", modifiers: [.option, .command])
         .disabled(job == nil)
+        Button(Words.upfront("cn.title") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingCredit = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!shop.canReverseInvoices || !(job.map(Shop.hasInvoice) ?? false)
+                  || job?.voided == true || job?.credited == true)
+        Button(Words.upfront("inv.void_btn") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingVoid = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!shop.canReverseInvoices || !(job.map(Shop.hasInvoice) ?? false) || job?.voided == true)
     }
 
     /// Where "along" or "back" would put the selected job, or nil when there

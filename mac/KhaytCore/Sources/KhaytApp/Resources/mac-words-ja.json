@@ -3532,5 +3532,14 @@
  "mac.bnpl_forget": "保存したキーを削除",
  "mac.bnpl_unsealed": "そのキーを暗号化できなかったため、何も保存されていません。台帳は同期・バックアップされるため、平文のキーも一緒に送られてしまいます。",
  "mac.bnpl_none": "設定 ▸ オンライン で、API キーとともに Tabby または Tamara をオンにしてください。",
- "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。"
+ "mac.bnpl_watching": "お客様の支払いが済むと、Khayt がこの支払いを完了し、ジョブに記録します。",
+ "mac.order_details": "注文の詳細",
+ "mac.void_waste_amount": "{grams} g {material}",
+ "mac.credit_room": "あと最大 {amount} までクレジットできます。",
+ "mac.rma_refund_hint": "返金はクレジットノートとして記録され、次に開きます。",
+ "mac.reprint_hint": "同じパーツで新しい注文が作成され、この注文にリンクされます。価格は後から変更できます。",
+ "mac.timeline_current": "現在",
+ "mac.intake_reminder_due": "リマインダー予定日 {date}",
+ "mac.intake_remind_text": "{name} 様、「{project}」のプロジェクトについてのご連絡です。ただいま空きがございますので、進めてよろしければお知らせください。",
+ "mac.intake_remind_text_noname": "「{project}」のプロジェクトについてのご連絡です。ただいま空きがございますので、進めてよろしければお知らせください。"
 }

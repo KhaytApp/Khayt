@@ -1045,6 +1045,8 @@ final class Shop {
             if !canShow(shelf) { shelf = .dashboard }
             if shelf == .expenses, !has("expenses") { shelf = .dashboard }
             lanBook = Self.lanBook(from: root)
+            intakeRows = Self.rows(root, "waitingList")
+            intakeHistoryRows = Self.rows(root, "waitingListHistory")
             pricingBook = Self.pricingBook(from: root)
             await syncLanServer()
             if overtaken() { return }
@@ -2204,6 +2206,27 @@ final class Shop {
 
     /// The job being edited.
     var pendingEdit: PendingHold?
+    /// The job open in the whole order editor — notes, tags, discount,
+    /// shipping, extra charges, the address and who is on it.
+    var pendingDetails: PendingHold?
+    /// The job whose invoice is being voided.
+    var pendingVoid: PendingHold?
+    /// The job a credit note is being written for.
+    var pendingCredit: PendingHold?
+    /// The credit note just issued, shown to save or print.
+    var creditPaper: CreditPaperRequest?
+    /// The delivered job a customer came back about (RMA).
+    var pendingRma: PendingHold?
+    /// The job a manual reprint is being made of.
+    var pendingReprint: PendingHold?
+    /// The job whose edit history and stage timeline are shown.
+    var pendingHistory: HistoryRequest?
+    /// The job intake waiting list, open.
+    var showingIntake = false
+    /// `waitingList` and `waitingListHistory`, as the book holds them — the
+    /// enquiries the LAN intake form and the other app write.
+    private(set) var intakeRows: [JSONValue] = []
+    private(set) var intakeHistoryRows: [JSONValue] = []
 
     // Stored for "What the shop has on order" (Shop+Stock.swift).
     /// Purchase orders, as the book holds them.

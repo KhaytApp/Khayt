@@ -70,12 +70,8 @@ function computeQcMetrics(orders) { return QcMetrics.qcMetrics(orders); }
 
 // Auto-suggest whether a delivered order's RMA is inside its warranty window.
 function computeWithinWarranty(deliveredAt, warrantyDays, nowMs) {
-  if (!deliveredAt) return false;
-  const days = (typeof warrantyDays === 'number' && warrantyDays >= 0) ? warrantyDays : 30;
-  const delivered = new Date(deliveredAt).getTime();
-  if (!Number.isFinite(delivered)) return false;
-  const now = typeof nowMs === 'number' ? nowMs : Date.now();
-  return (now - delivered) <= days * 86400000;
+  // lib/reprint.js — the Mac's RMA sheet asks the same question.
+  return ReprintRules().withinWarranty(deliveredAt, warrantyDays, nowMs);
 }
 
 /** The new-order rules, however this file happens to be loaded. */
@@ -2189,32 +2185,17 @@ function openOrderEditor(orderId) {
           try { await window.hubAPI.deleteOrderFile(fn); } catch (_) {}
         }
       }
-      // Recalculate price when any price-affecting field changed (compute prev values BEFORE overwriting)
-      const prevOldExtra   = (order.extraLines || []).reduce((s, l) => s + (+l.amount || 0), 0);
-      const newExtraTotal  = draft.extraLines.reduce((s, l) => s + Math.max(0, +l.amount || 0), 0);
-      if (draft.discountPct !== (order.discountPct || 0) ||
-          draft.shippingCost !== (+order.shippingCost || 0) ||
-          newExtraTotal !== prevOldExtra) {
-        const prevDiscountPct = order.discountPct || 0;
-        const prevShipping    = +order.shippingCost || 0;
-        const sellingBase = order.priceBeforeDiscount ||
-          (prevDiscountPct < 100
-            ? (+order.price - prevShipping - prevOldExtra) / (1 - prevDiscountPct / 100)
-            : (+order.price - prevShipping - prevOldExtra)); // 100% discount: base = original price
-        // Plus what the customer agreed for particular parts, which the
-        // discount never touched — see lib/pricing.js.
-        const newPrice = sellingBase * (1 - draft.discountPct / 100) + (+order.agreedAmount || 0) + draft.shippingCost + newExtraTotal;
-        order.price = +newPrice.toFixed(2);
-        order.discountPct = draft.discountPct;
-        order.priceBeforeDiscount = draft.discountPct > 0 ? +sellingBase.toFixed(2) : null;
-        order.shippingCost = draft.shippingCost;
-        // Re-clamp paidAmount in case the price fell below what was already
-        // paid. Billed, not priced: a shop that adds tax on top can hold
-        // price + tax. The status is the shared rule's, not a guess.
-        const billed = KhaytOrderMoney.orderGrossRaw(order, { settings });
-        if ((order.paidAmount || 0) > billed) order.paidAmount = billed;
-        order.paymentStatus = KhaytOrderPayment.statusOf(order, { settings });
-      }
+      // Re-price for a new discount, shipping cost or extra charges. The
+      // arithmetic — the selling base recovered from the current price, the
+      // agreed part amounts the discount never touches, paid capped at what
+      // is billed — is lib/order-edit.js `repriceTerms`, which the Mac's
+      // order editor runs too. It reads the OLD extra lines off the order, so
+      // it runs before they are replaced below.
+      EditRules().repriceTerms(order, {
+        discountPct: draft.discountPct,
+        shippingCost: draft.shippingCost,
+        extraLines: draft.extraLines,
+      }, { settings });
       // A typed total is the last word, after the arithmetic above. The shared
       // rule writes it, how the price was reached, and what follows for the
       // money — lib/order-edit.js.
@@ -2585,14 +2566,12 @@ function openRmaModal(orderId) {
       const reason = modal.querySelector('#rmaReason').value.trim();
       const resolution = modal.querySelector('#rmaResolution').value;
       const withinWarranty = !!modal.querySelector('#rmaWithin')?.checked;
-      order.rma = {
-        reportedAt: new Date().toISOString(),
+      // The record is lib/reprint.js `openRma`, which the Mac writes with too.
+      ReprintRules().openRma(order, {
+        reason, resolution, withinWarranty,
         reportedBy: (settings && settings.activeOperatorId) || null,
-        reason: reason || null,
-        withinWarranty,
-        resolution,
-        reprintId: null,
-      };
+        now: new Date().toISOString(),
+      });
       saveAll();
       renderKanban(); renderLogs();
       if (typeof fireQcWebhook === 'function') fireQcWebhook('rma_opened', order);
