@@ -1934,6 +1934,8 @@
 <script src="../lib/stl-estimate.js"></script>
 <script src="../lib/stl-thumbnail.js"></script>
 <script src="../lib/reorder.js"></script>
+<!-- kanban.js asks it for Next up; Bed Ready has no panel for it, so it plans nothing. -->
+<script src="../lib/auto-dispatch.js"></script>
 <!-- Five modules Bed Ready reads for and never loaded. Each call site is
      guarded by `typeof`, so their absence was not an error — it was the feature
      simply not being there: no consumable category filter, no reorder

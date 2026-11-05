@@ -21,6 +21,7 @@ function _kGlyph(name, emoji, size) {
 function _kIco(name, emoji, size) { return _kGlyph(name, emoji, size); }
 function _kIcoL(name, emoji, size) { const g = _kGlyph(name, emoji, size); return g ? (/^<span/.test(g) ? g : g + ' ') : ''; }
 function updateKanbanLiveStatus() {
+  if (typeof renderNextUp === 'function' && document.getElementById('queue-tab')?.classList.contains('active')) renderNextUp();
   const cards = document.querySelectorAll('.printer-live-status[data-machine-id]');
   cards.forEach(el => {
     const mid = el.dataset.machineId;
@@ -871,7 +872,112 @@ function renderKanban() {
   updateNotifBadge();
 }
 
+/* ── Next up: which job goes on which idle printer ─────────────────────────
+ * The Mac's Next up panel (mac/…/NextUp.swift), asking the same rule —
+ * lib/auto-dispatch.js. It PROPOSES: Send sets the job's machine and nothing
+ * else, and a printer nobody has said is empty is shown as waiting, with the
+ * one button that answers it, rather than quietly left out. */
+// The rule answers in keys (ad.*); the desktop's words for them are nextup.*,
+// because the Mac defines ad.* itself and reads these locale files too — a
+// borrowed key must never shadow one it supplies (WordsTests). Listed here so
+// each one is a literal t() call.
+const NEXT_UP_WORDS = {
+  'ad.next_in_queue': () => t('nextup.next_in_queue'), 'ad.same_material': () => t('nextup.same_material'),
+  'ad.materials_unknown': () => t('nextup.materials_unknown'), 'ad.bed_not_clear': () => t('nextup.bed_not_clear'),
+  'ad.bed_unknown': () => t('nextup.bed_unknown'), 'ad.busy': () => t('nextup.busy'),
+  'ad.printer_error': () => t('nextup.printer_error'), 'ad.no_reading': () => t('nextup.no_reading'),
+  'ad.no_printer': () => t('nextup.no_printer'), 'ad.under_service': () => t('nextup.under_service'),
+  'ad.retired': () => t('nextup.retired'), 'ad.held': () => t('nextup.held'),
+};
+function nextUpWord(key) { const f = NEXT_UP_WORDS[key]; return f ? f() : key; }
+
+/** What each machine printed last — the best signal Khayt has of what is loaded. */
+function nextUpLastMaterial() {
+  const seen = {};
+  for (const o of printLog) {
+    if (!o || !o.machineId) continue;
+    const done = o.completedAt || o.deliveredAt;
+    if (!done) continue;
+    const material = (o.parts || []).map(p => p && p.material).find(Boolean);
+    if (!material) continue;
+    if (seen[o.machineId] && seen[o.machineId].at >= done) continue;
+    seen[o.machineId] = { at: done, material };
+  }
+  const out = {};
+  for (const id in seen) out[id] = seen[id].material;
+  return out;
+}
+
+function nextUpPlan() {
+  // Bed Ready loads the rule too, but its queue has no #nextUpPanel.
+  const AD = typeof KhaytAutoDispatch !== 'undefined' ? KhaytAutoDispatch : null;
+  if (!AD) return null;
+  const locM = typeof machineMatchesActiveLocation === 'function' ? machineMatchesActiveLocation : () => true;
+  const locO = typeof orderMatchesActiveLocation === 'function' ? orderMatchesActiveLocation : () => true;
+  const fleet = activeMachines().filter(locM);
+  // A shop that has paused production is offered nothing: every machine is held.
+  const paused = {};
+  if (settings.productionPaused) for (const m of fleet) paused[m.id] = true;
+  return AD.plan({
+    orders: printLog.filter(o => o && !o.archived && locO(o)),
+    machines: fleet,
+    live: (typeof machineStatusCache !== 'undefined' ? machineStatusCache : {}) || {},
+    lastMaterialByMachine: nextUpLastMaterial(),
+    paused,
+  });
+}
+
+function renderNextUp() {
+  const el = document.getElementById('nextUpPanel');
+  if (!el) return;
+  const plan = nextUpPlan();
+  // Only machines with a printer linked can be dispatched to; a shop with no
+  // linked printers gets no panel rather than a list of "No printer linked".
+  const waiting = plan ? plan.waiting.filter(w => w.blocked !== 'ad.no_printer') : [];
+  if (!plan || (!plan.proposals.length && !waiting.length)) { el.innerHTML = ''; el.hidden = true; return; }
+  const mName = (id) => { const m = machines.find(x => x.id === id); return m ? m.name : id; };
+  const rows = plan.proposals.map(p => {
+    const o = printLog.find(x => x.id === p.orderId);
+    const caveats = (p.caveats || []).map(c => `<div class="next-up-caveat">⚠︎ ${escapeHtml(nextUpWord(c))}</div>`).join('');
+    return `<div class="next-up-row">
+      <div class="next-up-main">
+        <div><strong>${escapeHtml(o ? (o.project || jobRef(o)) : p.orderId)}</strong> <span class="next-up-arrow" aria-hidden="true">→</span> ${escapeHtml(mName(p.machineId))}</div>
+        <div class="next-up-why">${escapeHtml(nextUpWord(p.reason))}</div>${caveats}
+      </div>
+      <button type="button" class="btn small" data-next-up-send="${escapeHtml(p.orderId)}" data-machine="${escapeHtml(p.machineId)}">${escapeHtml(t('queue.next_send'))}</button>
+    </div>`;
+  }).join('');
+  const waits = waiting.map(w => `<div class="next-up-row next-up-waiting">
+      <span class="next-up-machine">${escapeHtml(mName(w.machineId))}</span>
+      <span class="next-up-why">${escapeHtml(nextUpWord(w.blocked))}</span>
+      ${w.blocked.startsWith('ad.bed') ? `<button type="button" class="btn ghost small" data-bed-clear="${escapeHtml(w.machineId)}">${escapeHtml(t('queue.bed_cleared'))}</button>` : ''}
+    </div>`).join('');
+  el.hidden = false;
+  el.innerHTML = `<h3 class="card-head sec-title" style="margin:0 0 8px;"><span class="swatch"></span>${escapeHtml(t('queue.next_up'))}</h3>${rows}${waits}`;
+  if (!el.dataset.wired) {
+    el.dataset.wired = '1';
+    el.addEventListener('click', (ev) => {
+      const send = ev.target.closest('[data-next-up-send]');
+      if (send) {
+        const o = printLog.find(x => x.id === send.dataset.nextUpSend);
+        // Re-read at the click: a job given a machine by hand since the panel
+        // was drawn keeps it (the Mac's accept() does the same inside its write).
+        if (o && !o.machineId) { o.machineId = send.dataset.machine; saveAll(); }
+        renderMachineQueues(); if (typeof renderKanban === 'function') renderKanban();
+        return;
+      }
+      const bed = ev.target.closest('[data-bed-clear]');
+      if (bed) {
+        const m = machines.find(x => x.id === bed.dataset.bedClear);
+        if (m) { m.bedClearedAt = new Date().toISOString(); saveAll(); }
+        renderNextUp();
+      }
+    });
+  }
+}
+
 function renderMachineQueues() {
+  renderNextUp();
   const container = document.getElementById('machineQueuesContainer');
   if (!container) return;
   if (machines.length === 0) { container.innerHTML = `<div class="empty-state" style="padding:24px;">${escapeHtml(t('mach.empty'))}</div>`; return; }

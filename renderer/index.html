@@ -656,6 +656,8 @@
     <!-- ===================== QUEUE ===================== -->
     <section id="queue-tab" class="tab-content khayt-queue" role="tabpanel" aria-labelledby="tabbtn-queue-tab" aria-hidden="true" tabindex="-1">
       <div id="locationScopeBannerQueue" class="location-scope-banner" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);"></div>
+      <!-- Next up: the dispatcher's proposals (lib/auto-dispatch.js) -->
+      <div id="nextUpPanel" class="card next-up" hidden></div>
       <!-- Machine Queues -->
       <details id="machineQueuesWrap" class="queue-machines">
         <summary class="queue-machines-summary"><span data-i18n="queue.machines_toggle">Machines</span></summary>
@@ -2461,6 +2463,8 @@
           <button class="btn" id="btnRestoreBackup" data-i18n="set.restore_backup">Restore from backup…</button>
           <button class="btn" id="btnRestorePoints" data-i18n="rp.btn">Restore points…</button>
         </div>
+        <!-- Off-site backup (renderSettings → renderOffsiteBackup): the Mac's, to the same files. -->
+        <div id="offsiteBackupSection" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);"></div>
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:12px;">
           <input type="checkbox" id="set_coachTips" style="width:auto; margin:0;">
           <span data-i18n="set.coach_tips">Show contextual help tips (ⓘ) on fields</span>
@@ -2841,6 +2845,7 @@
 <script src="../lib/estimate-calibration.js"></script>
 <script src="../lib/stl-thumbnail.js"></script>
 <script src="../lib/reorder.js"></script>
+<script src="../lib/auto-dispatch.js"></script>
 <script src="../lib/consumable-reorder.js"></script>
 <script src="../lib/payment-plan.js"></script>
 <script src="../lib/whatsapp-send.js"></script>
