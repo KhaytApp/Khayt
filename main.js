@@ -1851,6 +1851,27 @@ ipcMain.handle('hub:relocate-printers', async (_e, { machines, statusCache, requ
 
 // BNPL checkout links (Tabby, Tamara, Stripe) — lib/main/payment-links.js.
 registerPaymentLinks({ ipcMain, resolveStoreSecret });
+// The nightly off-site backup (lib/main/offsite-backup.js): the Mac's, to the
+// same files. Sealed with the Khayt Cloud key, so only while that is unlocked.
+require('./lib/main/offsite-backup.js').registerOffsiteBackup({
+  app, ipcMain, dialog, BrowserWindow,
+  getDek: () => (cloudBackend ? cloudDek : null),
+  readBookBytes: () => { try { return fs.readFileSync(dataFilePath()); } catch (_) { return null; } },
+  decryptForWindow: async (bytes, event) => {
+    const parsed = safeJsonParse(Buffer.from(bytes).toString('utf8'));
+    await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
+    return JSON.stringify(decryptStoreSecrets(JSON.parse(JSON.stringify(parsed))));
+  },
+  libraryBucket: () => {
+    const b = printLibS3();
+    if (!b) return null;
+    const cfg = printLibS3Settings();
+    let host = String(cfg.endpoint || '');
+    try { host = new URL(host).host; } catch (_) { /* keep as typed */ }
+    return { ...b, label: `${cfg.bucket} · ${host}` };
+  },
+  libraryDrive: () => printLibDrive(),
+});
 
 // ── Telemetry (TELEMETRY-SPEC) ──────────────────────────────────────────────
 // OFF by default and gated on explicit per-stream consent. Scrubbing happens HERE — the
@@ -5954,6 +5975,9 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
 // The unlocked backend (with the in-memory DEK) lives only for the session; the
 // passphrase is never stored, so the renderer re-unlocks each launch.
 let cloudBackend = null;
+// The shop's data key while Khayt Cloud is unlocked here, for the off-site
+// backup to seal with (lib/main/offsite-backup.js). Cleared on lock.
+let cloudDek = null;
 
 // The shop's cloud token, for the server it was saved for. Every handler below
 // takes the URL from the window; a saved token goes only to the saved server's
@@ -6547,6 +6571,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
   try {
     token = cloudToken(token, url);
     const dek = cloudClient.unlockWithPassphrase(String(passphrase || ''), keyset);
+    cloudDek = dek;
     cloudBackend = cloudClient.backendFor(url, shopId, token, dek, {
       // Warm launch: let this session start from the server view the last one
       // left behind, so the first pull asks for a slice instead of the base and
@@ -6564,7 +6589,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
       },
     });
     return { ok: true };
-  } catch (e) { cloudBackend = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { cloudBackend = null; cloudDek = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
@@ -6729,7 +6754,7 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; clearOrgSession(); return { ok: true }; });
+ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; cloudDek = null; clearOrgSession(); return { ok: true }; });
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
   try { return { ok: true, ...(await cloudBackend.push(snapshot)) }; }
