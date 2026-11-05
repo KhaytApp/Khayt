@@ -67,7 +67,7 @@ struct CalibrationAssistant: View {
         .onChange(of: test) { Task { await describe() } }
         .onChange(of: material) { Task { await describe() } }
         .alert(words.callIt("mac.cal_save_q"), isPresented: $asking) {
-            Button(words.callIt("mac.cal_save_profile")) { Task { await saveProfile() } }
+            Button(words.callIt("mac.cal_save_profile")) { Task { await writeTunedProfile() } }
             Button(words.callIt("common.cancel"), role: .cancel) {}
         } message: {
             Text(words.callIt("mac.cal_save_body", ["slicer": .string(slicer?.slicer.label ?? "")]))
@@ -99,7 +99,7 @@ struct CalibrationAssistant: View {
                     }
                 }
                 HStack {
-                    Button(words.callIt("mac.cal_save_model") + "\u{2026}") { Task { await saveModel() } }
+                    Button(words.callIt("mac.cal_save_model") + "\u{2026}") { Task { await writeTestModel() } }
                         .buttonStyle(.borderedProminent)
                         .disabled(shown == nil)
                     Button(words.callIt("mac.cal_copy_plan")) {
@@ -132,7 +132,7 @@ struct CalibrationAssistant: View {
         shown = try? await engine.describeCalibration(test: test, material: material)
     }
 
-    private func saveModel() async {
+    private func writeTestModel() async {
         guard let shown, let engine = await Studio.engine(),
               let stl = try? await engine.calibrationModel(test: test, material: material),
               let url = Studio.askWhereToSave(shown.fileName, type: "stl") else { return }
@@ -293,7 +293,7 @@ struct CalibrationAssistant: View {
 
     /// `saveCalibratedProfile`: the base read off disk, the shared rule makes
     /// the tuned preset, and it is written into the same folder.
-    private func saveProfile() async {
+    private func writeTunedProfile() async {
         guard shop.permitted("settings", "edit"), let s = slicer, !baseFile.isEmpty,
               let engine = await Studio.engine() else { return }
         let file = (baseFile as NSString).lastPathComponent    // confined to the folder

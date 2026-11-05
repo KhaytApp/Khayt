@@ -49,7 +49,6 @@ public actor StudioEngine {
     public init(bundle: Bundle? = nil) throws {
         let thread = EngineThread.dedicated(name: "khayt.studio")
         self.thread = thread
-        nonisolated(unsafe) let bundle = bundle
         runtime = try thread.sync {
             let runtime = try JSRuntime(modules: Self.modules, bundle: bundle)
             let resources = bundle ?? BundledResources.javaScript
@@ -57,7 +56,7 @@ public actor StudioEngine {
                 throw KhaytJSError.moduleMissing("hueforge-u1-template.json")
             }
             let template = try String(contentsOf: url, encoding: .utf8)
-            try runtime.withBoundStrings(["__hfTemplateText": template]) {
+            _ = try runtime.withBoundStrings(["__hfTemplateText": template]) {
                 try runtime.evaluate("globalThis.KhaytHueForgeU1Template = JSON.parse(globalThis.__hfTemplateText); true")
             }
             try runtime.evaluate(Self.glue)
@@ -86,7 +85,7 @@ public actor StudioEngine {
               let text = String(data: picture.rgba, encoding: .isoLatin1) else {
             throw KhaytJSError.unexpectedResult("a picture whose size and pixels disagree")
         }
-        try runtime.withBoundStrings(["__hfPixels": text]) {
+        _ = try runtime.withBoundStrings(["__hfPixels": text]) {
             try runtime.evaluate("__studio.setPicture(\(picture.width), \(picture.height)); true")
         }
     }

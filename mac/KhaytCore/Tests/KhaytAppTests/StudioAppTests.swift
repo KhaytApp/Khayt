@@ -133,6 +133,21 @@ struct StudioAppTests {
         #expect(Words.upfront("mac.menu_tools") != "mac.menu_tools")
     }
 
+    @Test("a filament row is found by identity, so an edit after a removal writes nothing")
+    func rowsByIdentity() {
+        let model = HueForgeModel()
+        model.filaments = [.init(hex: "#000000", td: 1), .init(hex: "#FF0000", td: 2), .init(hex: "#FFFFFF", td: 5)]
+        #expect(model.ids.count == 3)
+        let last = model.ids[2], first = model.ids[0]
+        model.remove(2)
+        model.setTd(last, 9)
+        #expect(model.filaments.map(\.td) == [1, 2], "the removed row's late edit landed on another row")
+        model.move(0, by: 1)
+        #expect(model.ids[1] == first && model.filaments[1].hex == "#000000")
+        model.setTd(first, 3)
+        #expect(model.filaments[1].td == 3)
+    }
+
     @Test("the export's file name follows the desktop's rule")
     func exportName() {
         let model = HueForgeModel()

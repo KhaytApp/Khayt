@@ -228,7 +228,7 @@ struct OrcaFilamentProfiles: View {
                         }
                     } else {
                         Text(words.callIt("mac.of_no_printers", ["slicer": .string(slicer?.slicer.label ?? "")]))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Khayt.late)
                     }
                     Button(words.callIt("mac.of_reveal")) { if let s = slicer { OrcaFolders.reveal(s) } }
                 }
@@ -282,7 +282,7 @@ struct OrcaFilamentProfiles: View {
                     }
                     Spacer()
                     if isInstalled(p) {
-                        Text(words.callIt("mac.of_installed")).font(.caption).foregroundStyle(.green)
+                        Text(words.callIt("mac.of_installed")).font(.caption).foregroundStyle(Khayt.done)
                     } else {
                         Button(installing == p.id ? words.callIt("mac.of_installing") : words.callIt("mac.of_install")) {
                             asking = p

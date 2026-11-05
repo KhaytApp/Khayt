@@ -103,8 +103,10 @@ struct HueForgeStudio: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(words.callIt(model.mode == .relief ? "mac.hf_stack_hint" : "mac.hf_stack_hint_flat"))
                     .font(.caption).foregroundStyle(.secondary)
-                ForEach(Array(model.filaments.enumerated()), id: \.offset) { i, _ in
-                    filamentRow(i)
+                // By identity, not position (`RowsByIDTests`): a TD field that
+                // commits after its row was removed writes nothing.
+                ForEach(Array(model.ids.enumerated()), id: \.element) { i, id in
+                    filamentRow(i, id)
                 }
                 HStack {
                     Stepper(value: $model.maxColors, in: 2...4) {
@@ -120,19 +122,19 @@ struct HueForgeStudio: View {
         }
     }
 
-    private func filamentRow(_ i: Int) -> some View {
+    private func filamentRow(_ i: Int, _ id: UUID) -> some View {
         HStack(spacing: 8) {
             Text(words.callIt("mac.hf_head", ["n": .number(Double(i + 1))]))
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 .frame(width: 28, alignment: .leading)
             ColorPicker("", selection: Binding(
-                get: { Color(nsColor: NSColor(hex: model.filaments[safe: i]?.hex ?? "") ?? .gray) },
-                set: { model.setColour(i, NSColor($0).hexString) }), supportsOpacity: false)
+                get: { Color(nsColor: NSColor(hex: model.filament(id)?.hex ?? "") ?? .gray) },
+                set: { model.setColour(id, NSColor($0).hexString) }), supportsOpacity: false)
                 .labelsHidden()
                 .accessibilityLabel(words.callIt("mac.hf_colour"))
             VStack(alignment: .leading, spacing: 0) {
-                Text(model.filaments[safe: i]?.hex ?? "").font(.caption.monospaced())
-                if let name = model.filaments[safe: i]?.name {
+                Text(model.filament(id)?.hex ?? "").font(.caption.monospaced())
+                if let name = model.filament(id)?.name {
                     Text(name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -140,8 +142,9 @@ struct HueForgeStudio: View {
             if model.mode == .relief {
                 Text(words.callIt("mac.hf_td")).font(.caption).foregroundStyle(.secondary)
                 TextField(words.callIt("mac.hf_td"), value: Binding(
-                    get: { model.filaments[safe: i]?.td ?? 1 },
-                    set: { model.setTd(i, $0) }), format: .number.precision(.fractionLength(0...2)))
+                    get: { model.filament(id)?.td ?? 1 },
+                    set: { model.setTd(id, $0) }), format: .number.precision(.fractionLength(0...2)).locale(Money.digits))
+                    .textFieldStyle(.roundedBorder)
                     .frame(width: 54)
                     .help(words.callIt("mac.hf_td_help"))
             }
@@ -205,8 +208,9 @@ struct HueForgeStudio: View {
                 TextField(words.callIt(key), value: Binding(
                     get: { value.wrappedValue },
                     set: { value.wrappedValue = min(range.upperBound, max(range.lowerBound, $0)) }),
-                    format: .number.precision(.fractionLength(0...2)))
+                    format: .number.precision(.fractionLength(0...2)).locale(Money.digits))
                     .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
                 Stepper("", value: value, in: range, step: step).labelsHidden()
                 Text(words.callIt("mac.unit_mm")).foregroundStyle(.secondary)
@@ -237,7 +241,7 @@ struct HueForgeStudio: View {
             verdict
             HStack {
                 if let note = model.note {
-                    Text(note).font(.callout).foregroundStyle(model.noteIsProblem ? AnyShapeStyle(Color.red) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                    Text(note).font(.callout).foregroundStyle(model.noteIsProblem ? AnyShapeStyle(Khayt.late) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
                         .lineLimit(2)
                 }
                 Spacer()
@@ -298,7 +302,16 @@ final class HueForgeModel {
     var picture: StudioEngine.Picture?
     var pictureName: String?
     var mode: Mode = .relief
-    var filaments: [StudioEngine.Filament] = []
+    var filaments: [StudioEngine.Filament] = [] {
+        // A row's identity, kept beside it: replaced with the list, carried
+        // through every add, remove and move below.
+        didSet { if ids.count != filaments.count { ids = filaments.map { _ in UUID() } } }
+    }
+    private(set) var ids: [UUID] = []
+
+    func filament(_ id: UUID) -> StudioEngine.Filament? {
+        ids.firstIndex(of: id).flatMap { filaments.indices.contains($0) ? filaments[$0] : nil }
+    }
     var maxColors = 4 { didSet { if maxColors != oldValue { Task { await suggest(owned: lastOwned) } } } }
     var settings = StudioEngine.ReliefSettings()
     var relief: StudioEngine.ReliefPlan?
@@ -402,42 +415,46 @@ final class HueForgeModel {
         lastOwned = owned
         guard picture != nil, let engine = await Studio.engine() else { return }
         guard let picked = try? await engine.suggest(owned: owned, maxColors: maxColors), !picked.isEmpty else { return }
+        ids = []
         filaments = picked
         // The desktop's opaque foundation, ~0.4 mm (`autoPalette`).
         settings.baseLayers = min(20, max(2, Int((0.4 / settings.layerH).rounded())))
     }
 
-    func setColour(_ i: Int, _ hex: String?) {
-        guard filaments.indices.contains(i), let hex, !hex.isEmpty else { return }
+    func setColour(_ id: UUID, _ hex: String?) {
+        guard let i = ids.firstIndex(of: id), filaments.indices.contains(i), let hex, !hex.isEmpty else { return }
         filaments[i].hex = hex.uppercased()
         filaments[i].name = nil
         Task {
             if let engine = await Studio.engine(), let td = try? await engine.defaultTd(hex),
-               filaments.indices.contains(i), filaments[i].hex == hex.uppercased() {
-                filaments[i].td = td
+               let k = ids.firstIndex(of: id), filaments.indices.contains(k), filaments[k].hex == hex.uppercased() {
+                filaments[k].td = td
             }
         }
     }
 
-    func setTd(_ i: Int, _ td: Double) {
-        guard filaments.indices.contains(i) else { return }
+    func setTd(_ id: UUID, _ td: Double) {
+        guard let i = ids.firstIndex(of: id), filaments.indices.contains(i) else { return }
         filaments[i].td = min(50, max(0.1, td))
     }
 
     func move(_ i: Int, by d: Int) {
         let j = i + d
-        guard filaments.indices.contains(i), filaments.indices.contains(j) else { return }
+        guard filaments.indices.contains(i), filaments.indices.contains(j), ids.count == filaments.count else { return }
+        ids.swapAt(i, j)
         filaments.swapAt(i, j)
     }
 
     func remove(_ i: Int) {
-        guard filaments.count > 1, filaments.indices.contains(i) else { return }
+        guard filaments.count > 1, filaments.indices.contains(i), ids.count == filaments.count else { return }
+        ids.remove(at: i)
         filaments.remove(at: i)
     }
 
     /// A fifth head does not exist on the U1; the desktop adds a white.
     func addFilament() {
         guard filaments.count < 4 else { return }
+        ids.append(UUID())
         filaments.append(StudioEngine.Filament(hex: "#FFFFFF", td: 5))
     }
 
@@ -575,6 +592,3 @@ final class HueForgeModel {
     var safeStem: String { stem.replacing(/[^\w.-]+/, with: "_") }
 }
 
-fileprivate extension Array {
-    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
-}
