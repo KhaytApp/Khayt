@@ -2437,6 +2437,7 @@
   "cn.credit_amount": "Alacak tutarı",
   "cn.reason": "Sebep",
   "cn.reason_ph": "ör. Kusurlu parça, sipariş iptali",
+  "cn.nothing_left": "Bu işte alacak kaydedilecek bir şey kalmadı.",
   "cn.generate": "Alacak dekontu oluştur",
   "wo.title": "İş Emri",
   "oe.courier": "Kurye / Taşıyıcı",

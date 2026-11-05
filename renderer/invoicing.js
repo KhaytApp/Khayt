@@ -10,6 +10,9 @@
    This only adds the save. */
 const OrderNew = () => global.KhaytOrderNew
   || (typeof require === 'function' ? require('../lib/order-new.js') : null);
+/** Voiding and crediting — lib/invoice-reversal.js, which the Mac writes with too. */
+const Reversal = () => global.KhaytInvoiceReversal
+  || (typeof require === 'function' ? require('../lib/invoice-reversal.js') : null);
 function nextInvoiceNumber() {
   // The book goes in so the counter moves past numbers another computer on
   // this book already issued — settings, where the counter lives, never sync.
@@ -52,117 +55,11 @@ function nextQuoteSeq() {
 function generateClientStatement(clientId) {
   const c = clients.find(x => x.id === clientId);
   if (!c) return;
-  const displayName = localName(c);
-  const orders = printLog.filter(o => o.clientId === clientId)
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-  const bizPrimary = shopName() || 'Khayt';
-
-  // All statement figures are in the shop's BASE currency so multi-currency
-  // clients' rows and totals reconcile (orderRevenueBase/orderOwedBase convert),
-  // every figure at the order's saved rate when it has one (orderToBase).
-  // Cash actually received (base). Falls back to price ONLY for legacy fully-paid
-  // orders with no recorded amount AND no gift settlement — otherwise a gift-card
-  // -settled order would be counted as both "paid" (price) and "gift".
-  const cashPaidBase = (o) => {
-    const recorded = +o.paidAmount || 0;
-    if (recorded > 0) return orderToBase(recorded, o);
-    return (payStatus(o) === 'paid' && !(+o.giftCardDiscount > 0)) ? orderToBase(+o.price || 0, o) : 0;
-  };
-  const totalCharges = orders.reduce((s, o) => s + orderRevenueBase(o), 0);
-  const totalPaid    = orders.reduce((s, o) => s + cashPaidBase(o), 0);
-  // Gift-card redemptions settle part of the balance just like a payment.
-  const totalGift    = orders.reduce((s, o) => s + orderToBase(+o.giftCardDiscount || 0, o), 0);
-  const totalCredit  = orders.reduce((s, o) =>
-    s + orderToBase((o.creditNotes || []).reduce((a, cn) => a + (+cn.amount || 0), 0), o), 0);
-  const outstanding  = orders.reduce((s, o) => s + orderOwedBase(o), 0);
-
-  const rowsHtml = orders.map(o => {
-    const paid  = cashPaidBase(o);
-    const bal   = orderOwedBase(o);
-    return `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:6px 8px; font-size:12px; white-space:nowrap;">${escapeHtml(o.date || '')}</td>
-      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(jobRef(o))}</td>
-      <td style="padding:6px 8px; font-size:12px;">${escapeHtml(o.project || '')}</td>
-      <td style="padding:6px 8px; font-size:12px; text-align:end;">${fmtPrice(orderRevenueBase(o))}</td>
-      <td style="padding:6px 8px; font-size:12px; text-align:end; color:#2a9d8f;">${fmtPrice(paid)}</td>
-      <td style="padding:6px 8px; font-size:12px; text-align:end; color:${bal > 0 ? '#e63946' : '#2a9d8f'};">${fmtPrice(bal)}</td>
-    </tr>`;
-  }).join('');
-
+  // The statement is lib/shop-documents.js, which the Mac app prints as well.
+  // Every figure on it is in the shop's BASE currency, so a multi-currency
+  // customer's rows and totals reconcile (orderRevenueBase/orderOwedBase).
   const area = $('#invoice-print-area');
-  area.innerHTML = `
-    <div class="inv-wrap">
-    <div class="inv-top-bar" style="background:var(--primary);"></div>
-    <div class="inv" style="--brand:#1a1a2e; --accent:#4a90e2; --highlight:#eef3fc;">
-      <div class="inv-header">
-        <div class="biz">
-          <div class="mark">${safeBizLogo() ? `<img src="${safeBizLogo()}" style="max-height:60px; max-width:120px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
-          <div class="biz-name"><h1>${escapeHtml(bizPrimary)}</h1></div>
-        </div>
-        <div class="doc">
-          <div class="title">${escapeHtml(t('cl.statement_title'))}</div>
-          <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t('common.date'))}</span><span class="v">${escapeHtml(localDateStr())}</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="bill-to">
-        <div class="label"><span>${escapeHtml(t('inv.billed_to'))}</span></div>
-        <div>
-          <div class="name">${escapeHtml(displayName)}</div>
-          ${c.phone ? `<div class="name-sub">${escapeHtml(c.phone)}</div>` : ''}
-          ${c.email ? `<div class="name-sub">${escapeHtml(c.email)}</div>` : ''}
-        </div>
-      </div>
-      <table style="width:100%; border-collapse:collapse; margin-top:16px; font-size:13px;">
-        <thead>
-          <tr style="border-bottom:2px solid #333; text-align:start;">
-            <th style="padding:6px 8px;">${escapeHtml(t('common.date'))}</th>
-            <th style="padding:6px 8px;">${escapeHtml(t('log.id') || 'Order ID')}</th>
-            <th style="padding:6px 8px;">${escapeHtml(t('oe.project') || 'Description')}</th>
-            <th style="padding:6px 8px; text-align:end;">${escapeHtml(t('log.price'))}</th>
-            <th style="padding:6px 8px; text-align:end;">${escapeHtml(t('cl.stmt_paid'))}</th>
-            <th style="padding:6px 8px; text-align:end;">${escapeHtml(t('cl.stmt_outstanding'))}</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot>
-          <tr style="border-top:2px solid #333; font-weight:700;">
-            <td colspan="3" style="padding:8px 8px;">${escapeHtml(t('common.total'))}</td>
-            <td style="padding:8px 8px; text-align:end;">${fmtPrice(totalCharges)}</td>
-            <td style="padding:8px 8px; text-align:end; color:#2a9d8f;">${fmtPrice(totalPaid)}</td>
-            <td style="padding:8px 8px; text-align:end; color:${outstanding > 0 ? '#e63946' : '#2a9d8f'};">${fmtPrice(outstanding)}</td>
-          </tr>
-        </tfoot>
-      </table>
-      <div style="margin-top:20px; display:flex; gap:24px; flex-wrap:wrap;">
-        <div style="background:#f8f9fa; padding:12px 16px; border-radius:6px; min-width:150px;">
-          <div style="font-size:11px; color:#666;">${escapeHtml(t('cl.stmt_charges'))}</div>
-          <div style="font-size:18px; font-weight:700;">${fmtPrice(totalCharges)}</div>
-        </div>
-        <div style="background:#f0fdf4; padding:12px 16px; border-radius:6px; min-width:150px;">
-          <div style="font-size:11px; color:#666;">${escapeHtml(t('cl.stmt_paid'))}</div>
-          <div style="font-size:18px; font-weight:700; color:#2a9d8f;">${fmtPrice(totalPaid)}</div>
-        </div>
-        ${totalGift > 0 ? `<div style="background:#f8f9fa; padding:12px 16px; border-radius:6px; min-width:150px;">
-          <div style="font-size:11px; color:#666;">${escapeHtml(t('cl.stmt_gift') || 'Gift cards')}</div>
-          <div style="font-size:18px; font-weight:700; color:#2a9d8f;">${fmtPrice(totalGift)}</div>
-        </div>` : ''}
-        ${totalCredit > 0 ? `<div style="background:#f8f9fa; padding:12px 16px; border-radius:6px; min-width:150px;">
-          <div style="font-size:11px; color:#666;">${escapeHtml(t('cl.stmt_credit') || 'Credit notes')}</div>
-          <div style="font-size:18px; font-weight:700; color:#2a9d8f;">${fmtPrice(totalCredit)}</div>
-        </div>` : ''}
-        <div style="background:${outstanding > 0 ? '#fff5f5' : '#f0fdf4'}; padding:12px 16px; border-radius:6px; min-width:150px;">
-          <div style="font-size:11px; color:#666;">${escapeHtml(t('cl.stmt_outstanding'))}</div>
-          <div style="font-size:18px; font-weight:700; color:${outstanding > 0 ? '#e63946' : '#2a9d8f'};">${fmtPrice(outstanding)}</div>
-        </div>
-      </div>
-      <div class="footer" style="margin-top:24px;">
-        <div class="legal">${escapeHtml(t('legal') || 'Generated by Khayt')}</div>
-      </div>
-    </div>
-    </div>`;
+  area.innerHTML = KhaytShopDocuments.clientStatementHtml(c, printLog, shopDocumentContext(null));
   setTimeout(() => window.print(), 80);
 }
 
@@ -174,9 +71,7 @@ function generateClientStatement(clientId) {
 async function exportClientInvoices(clientId) {
   const c = clients.find(x => x.id === clientId);
   if (!c) return;
-  const orders = printLog
-    .filter(o => o.clientId === clientId && KhaytOrderStatus.isFinished(o))
-    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const orders = KhaytShopDocuments.invoicesToExport(clientId, printLog, KhaytOrderStatus.isFinished);
   if (orders.length === 0) {
     toast(t('cl.no_invoices'), 'info');
     return;
@@ -302,30 +197,31 @@ function renderInvoiceNumberingSection() {
     </div>
     <div id="invNumGapsResult" style="margin-top:8px; font-size:12.5px;"></div>`;
 
+  // lib/settings-edit.js `invoiceNumbering` / `invoiceNumberGaps`: the Mac's
+  // numbering section sets and audits the counter through the same rules.
+  const numbering = (form) => {
+    const next = KhaytSettingsEdit.invoiceNumbering(settings, form, { year: new Date().getFullYear() });
+    for (const k of ['invNumPrefix', 'invNumNext', 'invNumFormat', 'invNumYear']) {
+      if (next[k] !== undefined) settings[k] = next[k];
+    }
+  };
   el.querySelector('#btnSaveInvNum').addEventListener('click', () => {
-    settings.invNumPrefix = el.querySelector('#invNumPrefix').value.trim() || 'INV';
-    settings.invNumNext   = Math.max(1, parseInt(el.querySelector('#invNumNext').value, 10) || 1);
-    settings.invNumFormat = el.querySelector('#invNumFormat').value;
+    numbering({
+      prefix: el.querySelector('#invNumPrefix').value,
+      next: el.querySelector('#invNumNext').value,
+      format: el.querySelector('#invNumFormat').value,
+    });
     saveAll();
     toast(t('set.saved'), 'success');
   });
   el.querySelector('#btnInvNumReset').addEventListener('click', () => {
-    settings.invNumYear  = new Date().getFullYear();
-    settings.invNumNext  = 1;
+    numbering({ reset: true });
     saveAll();
     el.querySelector('#invNumNext').value = '1';
     toast(t('set.inv_num_reset'), 'success');
   });
   el.querySelector('#btnInvNumDetectGaps').addEventListener('click', () => {
-    const nums = printLog
-      .map(o => o.invoiceNum || o.id)
-      .map(id => { const m = /(\d+)$/.exec(id); return m ? parseInt(m[1], 10) : null; })
-      .filter(n => n !== null)
-      .sort((a, b) => a - b);
-    const gaps = [];
-    for (let i = 1; i < nums.length; i++) {
-      for (let g = nums[i - 1] + 1; g < nums[i]; g++) gaps.push(g);
-    }
+    const gaps = KhaytSettingsEdit.invoiceNumberGaps(printLog);
     const res = el.querySelector('#invNumGapsResult');
     if (res) {
       res.textContent = gaps.length === 0
@@ -342,19 +238,9 @@ function renderInvoiceNumberingSection() {
 function reviseQuote(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order || order.status !== 'quote') return;
-  // Snapshot current state
-  const snapshot = {
-    version:     order.quoteVersion || 1,
-    snapshotAt:  new Date().toISOString(),
-    price:       order.price,
-    parts:       (order.parts || []).map(p => ({ ...p })),
-    notes:       order.notes || '',
-    material:    order.material || '',
-    printTime:   order.printTime || 0,
-  };
-  if (!order.quoteRevisions) order.quoteRevisions = [];
-  order.quoteRevisions.push(snapshot);
-  order.quoteVersion = (order.quoteVersion || 1) + 1;
+  // Snapshot current state — lib/quote-revision.js, the rule the Mac app
+  // revises a quote by, so both keep the same quoteRevisions[] / quoteVersion.
+  KhaytQuoteRevision.revise(order, Date.now());
   saveAll();
   // Open order editor so operator can revise
   openOrderEditor(orderId);
@@ -376,7 +262,7 @@ function openQuoteRevisionsModal(orderId) {
           <th>Notes</th>
         </tr></thead>
         <tbody>
-          ${[...revisions].reverse().map(rev => `<tr>
+          ${KhaytQuoteRevision.history(order).map(rev => `<tr>
             <td><strong>v${rev.version}</strong></td>
             <td style="font-size:11.5px;">${new Date(rev.snapshotAt).toLocaleDateString(localeTag())}</td>
             <td>${fmtPrice(rev.price)}</td>
@@ -1214,9 +1100,10 @@ async function voidInvoice(orderId) {
   const ok = await confirmModal(t('inv.void_confirm', { id: order.id }), { danger: true, okText: t('inv.void_btn') });
   if (!ok) return;
   // Calculate total weight for the waste checkbox label
-  const voidTotalWeight = (order.parts || []).reduce((s, p) => s + (+p.weightG || +p.printWeight || 0), 0);
-  const voidMaterial = order.material || (order.parts || []).find(p => p.material)?.material || '';
-  const hasWeightData = voidTotalWeight > 0 && voidMaterial;
+  const voidMat = Reversal().materialOf(order);
+  const voidTotalWeight = voidMat.weight;
+  const voidMaterial = voidMat.material;
+  const hasWeightData = voidMat.loggable;
   openFormModal({
     title: t('inv.void_btn') + ' — ' + order.id,
     saveLabel: t('inv.void_btn'),
@@ -1232,32 +1119,19 @@ async function voidInvoice(orderId) {
     `,
     onMount(modal) { setTimeout(() => modal.querySelector('#voidReasonInput')?.focus(), 40); },
     onSave(modal) {
-      order.voidedAt = new Date().toISOString();
-      order.voidedReason = modal.querySelector('#voidReasonInput').value.trim() || 'Voided';
-      order.status = order.status === 'completed' ? 'completed' : order.status; // keep status
-      order.paymentStatus = 'voided';
-      if (!order.statusHistory) order.statusHistory = [];
-      order.statusHistory.push({ status: 'voided', at: order.voidedAt });
-      if (order.statusHistory.length > 200) order.statusHistory = order.statusHistory.slice(-200);
-      // Feature 5 (UX): Auto-log material waste if the order has parts with weight data
+      // The stamps, the status history and the optional waste row are
+      // lib/invoice-reversal.js `voidInvoice`; the status itself is kept.
       const logWasteChk = modal.querySelector('#voidLogWasteCheck');
-      if (logWasteChk && logWasteChk.checked) {
-        const totalWeight = (order.parts || []).reduce((s, p) => s + (+p.weightG || +p.printWeight || 0), 0);
-        const material = order.material || (order.parts || []).find(p => p.material)?.material || '';
-        if (totalWeight > 0 && material) {
-          wasteLog.unshift({
-            id: uid('W'),
-            date: localDateStr(),
-            orderId: order.id,
-            machineId: order.machineId || null,
-            material,
-            weight: totalWeight,
-            failureType: 'operator_error',
-            notes: t('waste.voided_order'),
-            cost: 0,
-          });
-        }
-      }
+      const out = Reversal().voidInvoice(order, {
+        reason: modal.querySelector('#voidReasonInput').value,
+        now: new Date().toISOString(),
+        logWaste: !!(logWasteChk && logWasteChk.checked),
+        wasteId: uid('W'),
+        today: localDateStr(),
+        wasteNote: t('waste.voided_order'),
+      });
+      if (!out.ok) { toast(t('inv.already_voided'), 'warning'); return true; }
+      if (out.waste) wasteLog.unshift(out.waste);
       saveAll();
       renderLogs(); renderKanban();
       toast(t('inv.voided_toast', { id: order.id }), 'success');
@@ -1269,7 +1143,10 @@ async function voidInvoice(orderId) {
 function openCreditNoteModal(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
-  let creditAmt = +order.price || 0;
+  // What is left to credit: the price less any earlier credit notes.
+  const creditRoom = Reversal().creditRoom(order);
+  if (creditRoom < 0.01) { toast(t('cn.nothing_left'), 'warning'); return; }
+  let creditAmt = creditRoom;
   let reason = '';
 
   const bodyHtml = `
@@ -1277,7 +1154,7 @@ function openCreditNoteModal(orderId) {
       ${escapeHtml(t('cn.ref_order'))}: <strong>${escapeHtml(jobRef(order))}</strong> · ${fmtOrderPrice(order.price, order)}
     </p>
     <label>${escapeHtml(t('cn.credit_amount'))} (${escapeHtml(orderCurrencySymbol(order))})</label>
-    <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${order.price}">
+    <input type="number" id="cnAmtInput" value="${creditAmt.toFixed(2)}" min="0.01" step="0.01" max="${creditRoom}">
     <label style="margin-top:14px;">${escapeHtml(t('cn.reason'))}</label>
     <textarea id="cnReasonInput" rows="3" style="resize:vertical;" placeholder="${escapeHtml(t('cn.reason_ph'))}">${escapeHtml(reason)}</textarea>`;
 
@@ -1287,7 +1164,7 @@ function openCreditNoteModal(orderId) {
     sizeLg: false,
     bodyHtml,
     onSave() {
-      const amt = Math.min(Math.max(0.01, num(document.getElementById('cnAmtInput').value, creditAmt)), +order.price);
+      const amt = num(document.getElementById('cnAmtInput').value, creditAmt);
       const rsn = document.getElementById('cnReasonInput').value.trim();
       generateCreditNote(order, amt, rsn);
       return true;
@@ -1299,105 +1176,27 @@ function generateCreditNote(order, creditAmount, reason) {
   // A credit note reduces the amount DUE (a refund / cancelled charge). It is
   // recorded only in creditNotes[]; paidAmount is left untouched so the credit
   // is applied exactly once — orderOwedBase and payStatus both subtract it from
-  // the effective price. (Mutating paidAmount here double-counted the credit.)
-  if (!order.creditNotes) order.creditNotes = [];
-  order.creditNotes.push({ id: 'CN-' + Date.now().toString(36), amount: creditAmount, reason, issuedAt: new Date().toISOString() });
-  const totalCredited = order.creditNotes.reduce((s, cn) => s + (+cn.amount || 0), 0);
-  // If credit equals full price, treat as voided for reporting
-  if (totalCredited >= (+order.price || 0)) {
-    order.creditedAt = new Date().toISOString();
-  }
+  // the effective price. The record, the cap and `creditedAt` at full credit
+  // are lib/invoice-reversal.js, and so is the document, so the Mac prints
+  // the same credit note.
+  const R = Reversal();
+  const out = R.creditNote(order, {
+    amount: creditAmount, reason, now: new Date().toISOString(), id: 'CN-' + Date.now().toString(36),
+  });
+  if (!out.ok) { toast(t('cn.nothing_left'), 'warning'); return; }
   saveAll();
   const area = $('#invoice-print-area');
-  const isAr = i18n.current === 'ar';
-  const dir  = isAr ? 'rtl' : 'ltr';
-  // Same rule as the invoice — see renderInvoice(). A credit note and a delivery
-  // note are customer-facing documents too, and were bilingual unconditionally.
-  const _dl = KhaytInvoiceLanguage.resolveDocumentLanguage({
-    mode: settings.invoiceBilingual, lang: i18n.current,
-    secondary: settings.invoiceSecondLang, enableZatca: settings.enableZatca,
-  });
-  const bi = _dl.bilingual;
-  const secondLang = _dl.secondary;
-  const bizPrimary = shopName();
-  const cnId = 'CN-' + order.id;
-  const today = localDateStr();
   const linkedClient = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  const clientName = (order.project || '').trim() || t('inv.walk_in');
-  const clientSub  = linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '';
-  // Feature 3: Build reversal reference line
-  const invoiceNumber = invoiceDocNumber(order);
-  const originalDate  = order.date || '';
-
-  area.innerHTML = `
-    <div class="inv-wrap">
-    <div class="inv-top-bar" style="background:#b91c1c;"></div>
-    <div class="inv" dir="${dir}" lang="${i18n.current}" style="--brand:#7f1d1d; --accent:#dc2626; --highlight:#fee2e2;">
-      <div class="inv-header">
-        <div class="biz">
-          <div class="mark">${safeBizLogo() ? `<img src="${safeBizLogo()}" style="max-height:60px; max-width:120px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
-          <div class="biz-name">
-            <h1>${escapeHtml(bizPrimary || 'Khayt')}</h1>
-          </div>
-        </div>
-        <div class="doc">
-          <div class="title" style="color:#dc2626;">${escapeHtml(t("doc.credit_note"))}</div>
-          ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(secondLang, "doc.credit_note"))}</div>` : ''}
-          <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.no"))}</span><span class="v">${escapeHtml(cnId)}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(today))}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="cn-ref-line">
-        ${escapeHtml(t('cn.reversal_of'))}: <strong>#${escapeHtml(invoiceNumber)}</strong>
-        ${originalDate ? ` &mdash; ${escapeHtml(t('cn.original_date'))}: ${escapeHtml(formatPrintDate(originalDate))}` : ''}
-      </div>
-
-      <div class="bill-to">
-        <div class="label"><span>${escapeHtml(t("doc.issued_to"))}</span></div>
-        <div>
-          <div class="name">${escapeHtml(clientName)}</div>
-          ${clientSub ? `<div class="name-sub">${escapeHtml(clientSub)}</div>` : ''}
-        </div>
-      </div>
-
-      <table class="lines">
-        <thead>
-          <tr>
-            <th>${escapeHtml(t("doc.description"))}</th>
-            <th style="text-align:center; width:60px;">${escapeHtml(t("doc.qty"))}</th>
-            <th class="th-amount" style="width:150px;">${escapeHtml(t("doc.amount"))}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <div class="desc-en">${escapeHtml(t("doc.credit_note"))} — ${escapeHtml(order.project || jobRef(order))}</div>
-              ${reason ? `<div class="meta">${escapeHtml(reason)}</div>` : ''}
-            </td>
-            <td class="center">1</td>
-            <td class="amount" style="color:#dc2626;">−${fmtMoney(creditAmount)} <span style="color:#666; font-weight:500;">${currencySymbol()}</span></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="totals">
-        <div class="summary">
-          <div class="row grand">
-            <span class="label-en" style="color:#dc2626;">${escapeHtml(t("doc.credit_total"))}</span>
-            <span class="v" style="color:#dc2626;">−${fmtMoney(creditAmount)}<span class="unit">${currencySymbol()}</span></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer">
-        <div class="legal">${escapeHtml(t("doc.generated_by"))}</div>
-      </div>
-    </div>
-    </div>`;
+  const doc = R.creditNoteHtml(order, out.note, {
+    t, i18n, escapeHtml, fmtMoney, formatPrintDate, settings,
+    shopName: shopName(), logo: safeBizLogo(), BRAND_MARK_SVG,
+    currencySymbol: escapeHtml(orderCurrencySymbol(order)),
+    jobRef: jobRef(order), invoiceNumber: invoiceDocNumber(order),
+    clientName: (order.project || '').trim() || t('inv.walk_in'),
+    clientSub: linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '',
+    today: localDateStr(),
+  });
+  area.innerHTML = doc.html;
 
   setTimeout(() => window.print(), 80);
 }
@@ -1407,94 +1206,8 @@ function generateDeliveryNote(id) {
   const order = printLog.find(o => o.id === id);
   if (!order) return;
   const area = $('#invoice-print-area');
-  const isAr = i18n.current === 'ar';
-  const dir  = isAr ? 'rtl' : 'ltr';
-  // Same rule as the invoice — see renderInvoice(). A credit note and a delivery
-  // note are customer-facing documents too, and were bilingual unconditionally.
-  const _dl = KhaytInvoiceLanguage.resolveDocumentLanguage({
-    mode: settings.invoiceBilingual, lang: i18n.current,
-    secondary: settings.invoiceSecondLang, enableZatca: settings.enableZatca,
-  });
-  const bi = _dl.bilingual;
-  const secondLang = _dl.secondary;
-  const bizPrimary = shopName();
-  const linkedClient = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  const clientName = (order.project || '').trim() || t('inv.walk_in');
-  const clientSub  = linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '';
-  const lines = (order.parts && order.parts.length > 0) ? order.parts
-    : [{ name: t('inv.services_default'), qty: 1 }];
-
-  area.innerHTML = `
-    <div class="inv-wrap">
-    <div class="inv-top-bar" style="background:var(--primary);"></div>
-    <div class="inv" dir="${dir}" lang="${i18n.current}" style="--brand:#1a1a2e; --accent:#4a90e2; --highlight:#eef3fc;">
-      <div class="inv-header">
-        <div class="biz">
-          <div class="mark">${safeBizLogo() ? `<img src="${safeBizLogo()}" style="max-height:60px; max-width:120px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
-          <div class="biz-name">
-            <h1>${escapeHtml(bizPrimary || 'Khayt')}</h1>
-          </div>
-        </div>
-        <div class="doc">
-          <div class="title">${escapeHtml(t("doc.delivery_note"))}</div>
-          ${bi ? `<div class="title-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(i18n.tIn(secondLang, "doc.delivery_note"))}</div>` : ''}
-          <div class="meta">
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.ref"))}</span><span class="v">${escapeHtml(jobRef(order))}</span></div>
-            <div class="meta-row"><span class="k">${escapeHtml(t("doc.date"))}</span><span class="v">${escapeHtml(formatPrintDate(order.date))}</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="bill-to">
-        <div class="label"><span>${escapeHtml(t("doc.deliver_to"))}</span></div>
-        <div>
-          <div class="name">${escapeHtml(clientName)}</div>
-          ${clientSub ? `<div class="name-sub">${escapeHtml(clientSub)}</div>` : ''}
-        </div>
-      </div>
-      ${(order.trackingNumber || order.courierName || order.deliveryAddress) ? `
-      <div class="delivery-tracking">
-        ${order.courierName ? `<div><strong>${escapeHtml(t("doc.courier"))}:</strong> ${escapeHtml(order.courierName)}</div>` : ''}
-        ${order.trackingNumber ? `<div><strong>${escapeHtml(t("doc.tracking"))}:</strong> ${escapeHtml(order.trackingNumber)}</div>` : ''}
-        ${order.deliveryAddress ? `<div><strong>${escapeHtml(t("doc.address"))}:</strong> ${escapeHtml(order.deliveryAddress)}</div>` : ''}
-      </div>` : ''}
-      ${(() => {
-        // OUTSIDE the courier/tracking block on purpose. That block only renders
-        // when there is shipping information, and a shop handing an order over
-        // in person still puts the safety sheet in the box.
-        //
-        // Only the packable documents: this sheet goes to the customer, and a
-        // machine setup sheet is not something to put in the box.
-        const docs = KhaytProductDocs.packableDocsForOrder(order, typeof products !== "undefined" ? products : []);
-        if (!docs.length) return "";
-        return `<div class="delivery-docs" style="margin-top:8px;"><strong>${escapeHtml(t("pdoc.enclosed") || "Enclosed")}:</strong> ${docs.map((x) => escapeHtml(x.name)).join(", ")}</div>`;
-      })()}
-      <table class="lines">
-        <thead>
-          <tr>
-            <th>${escapeHtml(t("doc.item"))}</th>
-            <th style="text-align:center; width:60px;">${escapeHtml(t("doc.qty"))}</th>
-            <th style="width:120px;">${escapeHtml(t("doc.notes"))}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lines.map(p => `
-            <tr>
-              <td>${escapeHtml(p.name)}</td>
-              <td class="center">${p.qty || 1}</td>
-              <td></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-      <div style="margin-top:32px; display:flex; justify-content:space-between; gap:32px;">
-        <div style="flex:1; border-top:1px solid #ccc; padding-top:8px; font-size:12px; color:#888;">${escapeHtml(t("doc.received_by"))}</div>
-        <div style="flex:1; border-top:1px solid #ccc; padding-top:8px; font-size:12px; color:#888;">${escapeHtml(t("doc.delivered_by"))}</div>
-      </div>
-      <div class="footer" style="margin-top:24px;">
-        <div class="legal">${escapeHtml(t("doc.generated_by"))}</div>
-      </div>
-    </div>
-    </div>`;
-
+  // The paper is lib/shop-documents.js, which the Mac app prints as well.
+  area.innerHTML = KhaytShopDocuments.deliveryNoteHtml(order, shopDocumentContext(order));
   setTimeout(() => window.print(), 80);
 }
 

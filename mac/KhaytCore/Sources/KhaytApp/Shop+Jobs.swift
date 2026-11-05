@@ -1971,8 +1971,17 @@ extension Shop {
         pendingShipment = nil
         pendingSend = nil
         pendingEdit = nil
+        pendingDetails = nil
+        pendingVoid = nil
+        pendingCredit = nil
+        creditPaper = nil
+        pendingRma = nil
+        pendingReprint = nil
+        pendingHistory = nil
         pendingQcFail = nil
         pendingInvoice = nil
+        pendingPaper = nil
+        pendingRevisions = nil
         pendingMilestones = nil
         pendingLabels = nil
         pendingDayReport = nil

@@ -70,12 +70,8 @@ function computeQcMetrics(orders) { return QcMetrics.qcMetrics(orders); }
 
 // Auto-suggest whether a delivered order's RMA is inside its warranty window.
 function computeWithinWarranty(deliveredAt, warrantyDays, nowMs) {
-  if (!deliveredAt) return false;
-  const days = (typeof warrantyDays === 'number' && warrantyDays >= 0) ? warrantyDays : 30;
-  const delivered = new Date(deliveredAt).getTime();
-  if (!Number.isFinite(delivered)) return false;
-  const now = typeof nowMs === 'number' ? nowMs : Date.now();
-  return (now - delivered) <= days * 86400000;
+  // lib/reprint.js — the Mac's RMA sheet asks the same question.
+  return ReprintRules().withinWarranty(deliveredAt, warrantyDays, nowMs);
 }
 
 /** The new-order rules, however this file happens to be loaded. */
@@ -2189,32 +2185,17 @@ function openOrderEditor(orderId) {
           try { await window.hubAPI.deleteOrderFile(fn); } catch (_) {}
         }
       }
-      // Recalculate price when any price-affecting field changed (compute prev values BEFORE overwriting)
-      const prevOldExtra   = (order.extraLines || []).reduce((s, l) => s + (+l.amount || 0), 0);
-      const newExtraTotal  = draft.extraLines.reduce((s, l) => s + Math.max(0, +l.amount || 0), 0);
-      if (draft.discountPct !== (order.discountPct || 0) ||
-          draft.shippingCost !== (+order.shippingCost || 0) ||
-          newExtraTotal !== prevOldExtra) {
-        const prevDiscountPct = order.discountPct || 0;
-        const prevShipping    = +order.shippingCost || 0;
-        const sellingBase = order.priceBeforeDiscount ||
-          (prevDiscountPct < 100
-            ? (+order.price - prevShipping - prevOldExtra) / (1 - prevDiscountPct / 100)
-            : (+order.price - prevShipping - prevOldExtra)); // 100% discount: base = original price
-        // Plus what the customer agreed for particular parts, which the
-        // discount never touched — see lib/pricing.js.
-        const newPrice = sellingBase * (1 - draft.discountPct / 100) + (+order.agreedAmount || 0) + draft.shippingCost + newExtraTotal;
-        order.price = +newPrice.toFixed(2);
-        order.discountPct = draft.discountPct;
-        order.priceBeforeDiscount = draft.discountPct > 0 ? +sellingBase.toFixed(2) : null;
-        order.shippingCost = draft.shippingCost;
-        // Re-clamp paidAmount in case the price fell below what was already
-        // paid. Billed, not priced: a shop that adds tax on top can hold
-        // price + tax. The status is the shared rule's, not a guess.
-        const billed = KhaytOrderMoney.orderGrossRaw(order, { settings });
-        if ((order.paidAmount || 0) > billed) order.paidAmount = billed;
-        order.paymentStatus = KhaytOrderPayment.statusOf(order, { settings });
-      }
+      // Re-price for a new discount, shipping cost or extra charges. The
+      // arithmetic — the selling base recovered from the current price, the
+      // agreed part amounts the discount never touches, paid capped at what
+      // is billed — is lib/order-edit.js `repriceTerms`, which the Mac's
+      // order editor runs too. It reads the OLD extra lines off the order, so
+      // it runs before they are replaced below.
+      EditRules().repriceTerms(order, {
+        discountPct: draft.discountPct,
+        shippingCost: draft.shippingCost,
+        extraLines: draft.extraLines,
+      }, { settings });
       // A typed total is the last word, after the arithmetic above. The shared
       // rule writes it, how the price was reached, and what follows for the
       // money — lib/order-edit.js.
@@ -2585,14 +2566,12 @@ function openRmaModal(orderId) {
       const reason = modal.querySelector('#rmaReason').value.trim();
       const resolution = modal.querySelector('#rmaResolution').value;
       const withinWarranty = !!modal.querySelector('#rmaWithin')?.checked;
-      order.rma = {
-        reportedAt: new Date().toISOString(),
+      // The record is lib/reprint.js `openRma`, which the Mac writes with too.
+      ReprintRules().openRma(order, {
+        reason, resolution, withinWarranty,
         reportedBy: (settings && settings.activeOperatorId) || null,
-        reason: reason || null,
-        withinWarranty,
-        resolution,
-        reprintId: null,
-      };
+        now: new Date().toISOString(),
+      });
       saveAll();
       renderKanban(); renderLogs();
       if (typeof fireQcWebhook === 'function') fireQcWebhook('rma_opened', order);
@@ -2720,123 +2699,8 @@ async function generateOrderLabel(orderId) {
 async function generatePackingSlip(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
-  const client = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-  const clientName = client ? localName(client) : (order.client || '');
-  const clientPhone = client?.phone || '';
-  const deliveryAddr = order.deliveryAddress
-    || (client?.addresses?.[0]?.address || '');
-  const shopName = shopField('biz') || 'Khayt';
-  const shopPhone = settings.phone || '';
-  const shopEmail = settings.email || '';
-  const accentColor = safeCssColor(settings.invAccentColor, '#5E2E14');
-  const dateStr = order.completedAt
-    ? new Date(order.completedAt).toLocaleDateString(localeTag())
-    : order.date || localDateStr();
-
-  const parts = order.parts || [];
-  const rowsHtml = parts.map(p => {
-    const qty = p.qty || 1;
-    const wt = Math.round((+p.printWeight || 0) * qty);
-    return `<tr>
-      <td>${escapeHtml(p.name || order.project || '—')}</td>
-      <td>${escapeHtml(p.material || order.material || '—')}</td>
-      <td>${escapeHtml(p.color || p.colour || '—')}</td>
-      <td style="text-align:center;">${qty}</td>
-      <td style="text-align:right;">${wt > 0 ? wt + 'g' : '—'}</td>
-    </tr>`;
-  }).join('');
-
-  const totalWeight = parts.reduce((s, p) => s + (+p.printWeight || 0) * (p.qty || 1), 0);
-  const totalQty = parts.reduce((s, p) => s + (p.qty || 1), 0);
-
-  // Printed output must follow the shop's own language, not default to LTR English.
-  const docLang = (typeof i18n !== 'undefined' && i18n.current === 'ar') ? 'ar' : 'en';
-  const docDir = docLang === 'ar' ? 'rtl' : 'ltr';
-  const html = `<!DOCTYPE html>
-<html lang="${docLang}" dir="${docDir}">
-<head>
-<meta charset="UTF-8">
-<title>Packing Slip — ${escapeHtml(jobRef(order))}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,'Segoe UI',sans-serif; font-size:11pt; color:#111; background:#fff; padding:20mm; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10mm; border-bottom:2px solid ${accentColor}; padding-bottom:6mm; }
-  .shop-name { font-size:18pt; font-weight:800; color:${accentColor}; }
-  .shop-sub { font-size:9pt; color:#666; margin-top:2mm; }
-  .slip-title { font-size:22pt; font-weight:700; color:${accentColor}; text-align:right; text-transform:uppercase; letter-spacing:1pt; }
-  .slip-meta { font-size:9.5pt; color:#444; text-align:right; margin-top:2mm; line-height:1.7; }
-  .section { margin-bottom:8mm; }
-  .section-label { font-size:8pt; text-transform:uppercase; letter-spacing:.5pt; color:#888; margin-bottom:1.5mm; font-weight:700; }
-  .bill-to { font-size:11pt; line-height:1.6; }
-  table { width:100%; border-collapse:collapse; margin-bottom:6mm; }
-  thead tr { background:${accentColor}; color:#fff; }
-  thead th { padding:3mm 4mm; text-align:left; font-size:9pt; font-weight:700; letter-spacing:.3pt; }
-  thead th:last-child, thead th:nth-child(4) { text-align:right; }
-  tbody tr:nth-child(even) { background:#f9fafb; }
-  td { padding:2.5mm 4mm; font-size:10pt; border-bottom:0.3mm solid #e5e7eb; }
-  td:last-child, td:nth-child(4) { text-align:right; }
-  tfoot td { padding:3mm 4mm; font-size:10.5pt; font-weight:700; border-top:1.5px solid #111; }
-  .notes { background:#fffbeb; border-inline-start:3mm solid #fbbf24; padding:3mm 4mm; font-size:10pt; border-radius:1mm; margin-bottom:8mm; }
-  .footer { text-align:center; font-size:9pt; color:#888; border-top:0.5mm solid #e5e7eb; padding-top:4mm; margin-top:4mm; }
-  @media print { body { padding:15mm; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="shop-name">${escapeHtml(shopName)}</div>
-      <div class="shop-sub">${shopPhone ? escapeHtml(shopPhone) : ''}${shopPhone && shopEmail ? ' · ' : ''}${shopEmail ? escapeHtml(shopEmail) : ''}</div>
-    </div>
-    <div>
-      <div class="slip-title">Packing Slip</div>
-      <div class="slip-meta">
-        <strong>${escapeHtml(t('common.date') || 'Date')}:</strong> ${escapeHtml(dateStr)}<br>
-        <strong>${escapeHtml(t('log.order_id') || 'Order') || 'Order'}:</strong> ${escapeHtml(jobRef(order))}
-        ${order.invoiceNum ? `<br><strong>${escapeHtml(t('ord.invoice_num') || 'Invoice')}:</strong> ${escapeHtml(String(order.invoiceNum))}` : ''}
-      </div>
-    </div>
-  </div>
-
-  ${(clientName || deliveryAddr || clientPhone) ? `
-  <div class="section">
-    <div class="section-label">${escapeHtml(t('ps.ship_to') || 'Ship / Bill To')}</div>
-    <div class="bill-to">
-      ${clientName ? `<strong>${escapeHtml(clientName)}</strong><br>` : ''}
-      ${deliveryAddr ? escapeHtml(deliveryAddr).replace(/\\n/g, '<br>') + '<br>' : ''}
-      ${clientPhone ? escapeHtml(clientPhone) : ''}
-    </div>
-  </div>` : ''}
-
-  <table>
-    <thead>
-      <tr>
-        <th>${escapeHtml(t('ps.item') || 'Item')}</th>
-        <th>${escapeHtml(t('ps.material') || 'Material')}</th>
-        <th>${escapeHtml(t('ps.color') || 'Color')}</th>
-        <th style="text-align:right;">${escapeHtml(t('ps.qty') || 'Qty')}</th>
-        <th style="text-align:right;">${escapeHtml(t('ps.weight') || 'Weight')}</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml || `<tr><td colspan="5" style="color:#888;text-align:center;">${escapeHtml(order.project || jobRef(order))}</td></tr>`}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="3" style="text-align:right;font-weight:600;">${escapeHtml(t('ps.total') || 'Total')}</td>
-        <td style="text-align:right;">${totalQty}</td>
-        <td style="text-align:right;">${totalWeight > 0 ? Math.round(totalWeight) + 'g' : '—'}</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  ${order.notes ? `<div class="notes"><strong>${escapeHtml(t('common.notes') || 'Notes')}:</strong> ${escapeHtml(order.notes)}</div>` : ''}
-
-  <div class="footer">
-    ${escapeHtml(t('ps.thank_you') || 'Thank you for your business!')}
-    ${shopName ? ` · ${escapeHtml(shopName)}` : ''}
-  </div>
-</body>
-</html>`;
+  // The page is lib/shop-documents.js, which the Mac app prints as well.
+  const html = KhaytShopDocuments.packingSlipHtml(order, shopDocumentContext(order));
 
   const win = window.open('', '_blank', 'width=900,height=700,toolbar=0,menubar=0,scrollbars=1');
   if (win) {

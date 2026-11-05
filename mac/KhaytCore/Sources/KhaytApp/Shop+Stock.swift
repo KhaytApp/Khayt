@@ -415,7 +415,11 @@ extension Shop {
     ///
     /// Through `spool-edit.js` like every other change to a spool, so the one
     /// rule that decides what a spool record may hold keeps deciding it.
-    func markDried(_ id: String, on day: String? = nil) async -> String? {
+    /// With `tempC`, `hours` and `notes` it is the Drying Log's "Log drying
+    /// session" — the row the desktop's log writes, `tempC`/`durationH` null
+    /// when not given, as it writes them.
+    func markDried(_ id: String, on day: String? = nil, tempC: Double? = nil,
+                   hours: Double? = nil, notes: String = "") async -> String? {
         guard permitted("inventory", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
@@ -433,10 +437,13 @@ extension Shop {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                 }
                 let when = day ?? Self.localDay()
+                // A session logged for an earlier day does not move `driedAt`
+                // back past a later drying the spool already records.
+                let stored = String((Self.plainString(was["driedAt"]) ?? "").prefix(10))
                 let out = try await engine.editSpool(
                     shelf[at],
                     input: ["material": .string(Self.plainString(was["material"]) ?? ""),
-                            "driedAt": .string(when)],
+                            "driedAt": .string(max(when, stored))],
                     settings: Self.settings(root), today: Self.today())
                 guard case .object(var record) = out.spool else { return }
                 // AND the log row, through the drying-log rule, as the other
@@ -444,7 +451,8 @@ extension Shop {
                 // but left the spool's drying history with no record of it.
                 let logged = FilamentDryness.recordDrying(
                     .object(record),
-                    entry: ["id": .string(Self.uid("DRY")), "date": .string(when)])
+                    entry: Self.dryingEntry(id: Self.uid("DRY"), date: when, tempC: tempC,
+                                            hours: hours, notes: notes))
                 record["dryingLog"] = .array(logged.dryingLog)
                 if let newest = logged.driedAt { record["driedAt"] = .string(newest) }
                 StoreWriter.stamp(&record)
@@ -458,6 +466,20 @@ extension Shop {
         }
         await load(source)
         return nil
+    }
+
+    /// One drying-log row, in the desktop's shape: `{ id, date, tempC,
+    /// durationH, notes }`, a figure not given written as null. "Dried
+    /// today" with nothing else said writes the date alone, as it always has.
+    nonisolated static func dryingEntry(id: String, date: String, tempC: Double?,
+                                        hours: Double?, notes: String) -> [String: JSONValue] {
+        var entry: [String: JSONValue] = ["id": .string(id), "date": .string(date)]
+        let said = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard tempC != nil || hours != nil || !said.isEmpty else { return entry }
+        entry["tempC"] = tempC.map(JSONValue.number) ?? .null
+        entry["durationH"] = hours.map(JSONValue.number) ?? .null
+        entry["notes"] = .string(said)
+        return entry
     }
 
     /// Say a supplier's bill has been paid — or that it has not, after all.

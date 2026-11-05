@@ -207,7 +207,38 @@
     return { count, grams, cost, byFailureType };
   }
 
-  const api = { FAILURE_TYPES, costOf, newEntry, forOrder, removeEntry, totals };
+  /**
+   * The jobs whose failures cost the most: the log's entries summed by
+   * `orderId`, biggest first, at most `limit` (5). An entry logged against no
+   * job is nobody's. `[{ orderId, cost, count }]`.
+   */
+  function topOrders(wasteLog, limit) {
+    const by = {};
+    for (const w of wasteLog || []) {
+      if (!w || !w.orderId) continue;
+      const row = by[w.orderId] || (by[w.orderId] = { orderId: w.orderId, cost: 0, count: 0 });
+      row.cost += num(w.cost);
+      row.count += 1;
+    }
+    return Object.values(by)
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, limit > 0 ? limit : 5)
+      .map((r) => ({ ...r, cost: Math.round(r.cost * 100) / 100 }));
+  }
+
+  /**
+   * Waste as a share of revenue, and how worried to be about it: `ok` up to
+   * 2%, `warn` to 5%, `bad` beyond — the desktop's colours. Null when there
+   * is no revenue to compare with: a percentage of nothing is not a figure.
+   */
+  function shareOfRevenue(cost, revenue) {
+    const r = num(revenue);
+    if (!(r > 0)) return null;
+    const pct = (num(cost) / r) * 100;
+    return { pct, tone: pct > 5 ? 'bad' : pct > 2 ? 'warn' : 'ok' };
+  }
+
+  const api = { FAILURE_TYPES, costOf, newEntry, forOrder, removeEntry, totals, topOrders, shareOfRevenue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytWasteEntry = api;
 

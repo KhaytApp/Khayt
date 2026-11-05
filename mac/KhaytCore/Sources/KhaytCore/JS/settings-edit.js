@@ -807,7 +807,104 @@
     return out;
   }
 
-  const api = { apply, chooseCountry, DAYS, WIP_COLUMNS, DEFAULT_EXPENSE_CATEGORIES, ELEC_RATE_BOUND };
+  /** The two invoice-number formats the numbering section offers. */
+  const INV_NUM_FORMATS = ['{prefix}-{year}-{seq4}', '{prefix}-{seq4}'];
+
+  /**
+   * The invoice counter, as its own section sets it — `apply` deliberately
+   * leaves these four alone. Returns the settings to store.
+   *
+   * `form`: `{ prefix, next, format }`, any of them absent to keep what is
+   * stored; `reset: true` with `ctx.year` starts the year's count again at 1.
+   * The prefix is trimmed and at most ten characters (the desktop's field
+   * limit), `INV` when empty; the next number is a whole number of at least 1;
+   * a format neither app offers keeps the stored one.
+   */
+  function invoiceNumbering(settings, form, ctx) {
+    const s = settings || {};
+    const f = form || {};
+    const c = ctx || {};
+    const out = { ...s };
+    if (f.reset) {
+      out.invNumYear = c.year != null ? c.year : new Date().getFullYear();
+      out.invNumNext = 1;
+      return out;
+    }
+    if (has(f, 'prefix')) out.invNumPrefix = String(f.prefix == null ? '' : f.prefix).trim().slice(0, 10) || 'INV';
+    if (has(f, 'next')) out.invNumNext = Math.max(1, Math.floor(num(f.next, 1)) || 1);
+    if (has(f, 'format') && INV_NUM_FORMATS.includes(f.format)) out.invNumFormat = f.format;
+    return out;
+  }
+
+  /**
+   * The numbers missing from the book's invoice sequence: the trailing digits
+   * of each job's invoice number (else its id), sorted, and every whole
+   * number between two neighbours that nothing carries. What "Detect gaps"
+   * lists; an auditor asks about exactly these.
+   */
+  function invoiceNumberGaps(orders) {
+    const nums = (Array.isArray(orders) ? orders : [])
+      .map((o) => o && (o.invoiceNumber || o.invoiceNum || o.id))
+      .map((id) => { const m = /(\d+)$/.exec(String(id || '')); return m ? parseInt(m[1], 10) : null; })
+      .filter((n) => n !== null)
+      .sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 1; i < nums.length; i++) {
+      // A run of thousands is two unrelated series, not a gap worth listing.
+      if (nums[i] - nums[i - 1] > 1000) continue;
+      for (let g = nums[i - 1] + 1; g < nums[i]; g++) gaps.push(g);
+    }
+    return gaps;
+  }
+
+  /**
+   * The shop's exchange rates, edited: `edits` is `{ CODE: rate }`, base
+   * units per one foreign unit. A positive rate is kept; anything else takes
+   * the code off the table. `ctx.base` is never given a rate of its own.
+   * `ctx.fetchedAt` marks the table as refreshed from a live feed, and with
+   * it each rate is rounded to four places, as the desktop's Fetch has always
+   * stored them. Returns the settings to store.
+   */
+  function exchangeRates(settings, edits, ctx) {
+    const s = settings || {};
+    const c = ctx || {};
+    const base = String(c.base || s.currency || 'SAR');
+    const rates = { ...(s.exchangeRates || {}) };
+    for (const [code, raw] of Object.entries(edits || {})) {
+      if (!/^[A-Z]{3}$/.test(code) || code === base) continue;
+      const n = parseFloat(raw);
+      if (Number.isFinite(n) && n > 0) rates[code] = c.fetchedAt ? +n.toFixed(4) : n;
+      else delete rates[code];
+    }
+    const out = { ...s, exchangeRates: rates };
+    if (c.fetchedAt) out.exchangeRatesUpdatedAt = c.fetchedAt;
+    return out;
+  }
+
+  /**
+   * A live feed's answer, as this shop stores rates. open.er-api.com says
+   * "1 BASE = rates[X] X"; the book keeps base units per ONE foreign unit,
+   * so each is inverted. `known` (the shop's currency table) limits it to
+   * currencies Khayt can price in. Returns `{ rates, updatedAt }`, or
+   * `{ error }` for an answer that is not a success.
+   */
+  function ratesFromFeed(body, base, known) {
+    const b = body || {};
+    if (b.result !== 'success' || !b.rates || typeof b.rates !== 'object') {
+      return { error: b['error-type'] || 'bad_response' };
+    }
+    const rates = {};
+    for (const [cur, r] of Object.entries(b.rates)) {
+      const n = +r;
+      if (cur === base || !Number.isFinite(n) || n <= 0) continue;
+      if (known && !Object.prototype.hasOwnProperty.call(known, cur)) continue;
+      rates[cur] = 1 / n;
+    }
+    return { rates, updatedAt: b.time_last_update_utc || null };
+  }
+
+  const api = { apply, chooseCountry, DAYS, WIP_COLUMNS, DEFAULT_EXPENSE_CATEGORIES, ELEC_RATE_BOUND,
+    INV_NUM_FORMATS, invoiceNumbering, invoiceNumberGaps, exchangeRates, ratesFromFeed };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytSettingsEdit = api;
 

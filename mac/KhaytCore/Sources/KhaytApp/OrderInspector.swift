@@ -188,6 +188,25 @@ private struct Detail: View {
                     Divider()
                     DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
                 }
+                // What happened to it: the stages it went through and how
+                // long each took, and every change to its due date, discount,
+                // shipping, priority and price.
+                Divider()
+                HStack(spacing: 14) {
+                    Button(shop.words.callIt("ord.timeline")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project)
+                    }
+                    Button(shop.words.callIt("ord.edit_history")) {
+                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project, edits: true)
+                    }
+                    if shop.canMoveJobs {
+                        Button(shop.words.callIt("mac.order_details")) {
+                            shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
+                        }
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.callout)
             }
             .padding(16)
         }
@@ -345,6 +364,16 @@ private struct Detail: View {
                     .buttonStyle(.link)
                     .font(.callout)
                     .disabled(!shop.canMoveJobs)
+            }
+            // The papers that go with the work — what goes in the box, what
+            // the customer signs for, the floor's sheet. Showing one writes
+            // nothing, so they are offered as the invoice is.
+            if job.status != "quote" {
+                JobPaperButtons(shop: shop, job: job)
+            }
+            // A quote's other answers: chase it, change it, or turn it down.
+            if job.status == "quote" {
+                QuoteActions(shop: shop, job: job)
             }
             // The customer's way to say yes. Only on a quote, only on a real
             // book (the link is minted into the job), and only while the

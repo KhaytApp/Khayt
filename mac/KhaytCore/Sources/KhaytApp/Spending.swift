@@ -15,6 +15,19 @@ struct Expenses: View {
     private var rows: [Expense] { shop.shownExpenses.sorted(using: order) }
 
     var body: some View {
+        VStack(spacing: 0) {
+            DueRecurring(shop: shop)
+            screen
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Khayt.ground)
+        .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
+                                      addLabel: shop.words.callIt("exp.add_title")) }
+        .shopSheet(isPresented: $shop.addingExpense, onDismiss: { shop.receiptPrefill = nil }) { ExpenseSheet(shop: shop) }
+        .shopSheet(isPresented: $shop.readingReceipt) { ReceiptReaderSheet(shop: shop) }
+    }
+
+    private var screen: some View {
         Group {
             // AN EMPTY BOOK IS ONE STATE, NOT THREE PANES. With nothing ever
             // recorded, the split drew an empty table, a summary of zeros and
@@ -41,11 +54,71 @@ struct Expenses: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Khayt.ground)
-        .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
-                                      addLabel: shop.words.callIt("exp.add_title")) }
-        .shopSheet(isPresented: $shop.addingExpense, onDismiss: { shop.receiptPrefill = nil }) { ExpenseSheet(shop: shop) }
-        .shopSheet(isPresented: $shop.readingReceipt) { ReceiptReaderSheet(shop: shop) }
+    }
+
+    /// The standing costs that have come round, each with the desktop's two
+    /// answers: Add files this cycle's copy (`lib/expense-book.js`
+    /// `comeRound`), Skip moves the schedule on and files nothing.
+    ///
+    /// A strip above the table rather than a toast: the desktop's toast is
+    /// gone in eight seconds and asks again at the next launch, and a list
+    /// that stays until it is answered says the same thing without a timer.
+    /// Nothing at all when nothing is due.
+    struct DueRecurring: View {
+        @Bindable var shop: Shop
+        @State private var due: [Expense] = []
+        @State private var busy = false
+
+        var body: some View {
+            VStack(spacing: 0) {
+                ForEach(due.prefix(5)) { e in
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(Khayt.attention)
+                        Text(label(e))
+                            .lineLimit(1).truncationMode(.tail)
+                        Text(e.nextDue ?? "").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        Spacer()
+                        Button(shop.words.callIt("mac.recurring_skip")) { answer(e, add: false) }
+                            .disabled(busy || !shop.canMoveJobs)
+                        Button(shop.words.callIt("common.add")) { answer(e, add: true) }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(busy || !shop.canMoveJobs)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    Divider()
+                }
+                if due.count > 5 {
+                    Text(shop.words.counting(due.count - 5, "mac.recurring_more"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14).padding(.vertical, 5)
+                    Divider()
+                }
+            }
+            .background(due.isEmpty ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.quaternary.opacity(0.4)))
+            .task(id: shop.expenses) { due = await shop.dueRecurringExpenses() }
+        }
+
+        /// One line per due expense. Built in steps: as a single `+` chain
+        /// inside `Text(...)` the release compiler gave up type-checking it.
+        private func label(_ e: Expense) -> String {
+            let due: String = shop.words.callIt("exp.recurring_due")
+            let category: String = shop.words.callIt("exp.cat." + e.category)
+            let amount: String = Money.text(e.amount, shop.currency)
+            var line = due + ": " + category + " " + amount
+            if !e.note.isEmpty { line += " \u{00B7} " + e.note }
+            return line
+        }
+
+        private func answer(_ e: Expense, add: Bool) {
+            busy = true
+            Task {
+                await shop.answerRecurring(e.id, add: add)
+                due = await shop.dueRecurringExpenses()
+                busy = false
+            }
+        }
     }
 
     private var table: some View {
@@ -436,7 +509,20 @@ struct Waste: View {
                                    "\(Money.grams(grams)) \(shop.words.callIt("common.grams"))")
                         DetailLine(shop.words.callIt("waste.total_cost"),
                                    Money.text(cost, shop.currency), strong: true)
+                        // AGAINST WHAT THE PERIOD EARNED — the desktop's
+                        // figure and colours (`lib/waste-entry.js`
+                        // `shareOfRevenue`), over the period's trade revenue
+                        // (`tradeRevenue`, the goal bar's rule). Absent with
+                        // no revenue to divide by.
+                        if let share {
+                            DetailLine(shop.words.callIt("waste.pct_revenue"),
+                                       Money.quantity(share.pct, decimals: 1) + "%")
+                                .foregroundStyle(share.tone == "bad" ? AnyShapeStyle(Khayt.late)
+                                                 : share.tone == "warn" ? AnyShapeStyle(Khayt.attention)
+                                                 : AnyShapeStyle(Khayt.done))
+                        }
                     }
+                    TopOrders(shop: shop, shown: shown)
                     TrueCost(shop: shop, shown: shown)
                     WhereFailuresCost(shop: shop, shown: shown)
                     let counts = Dictionary(grouping: shown, by: \.failureType).mapValues(\.count)
@@ -453,6 +539,57 @@ struct Waste: View {
             .task(id: shop.wasteRows.count) {
                 guard let engine = shop.engine else { return }
                 trend = try? await engine.wasteTrend(wasteLog: shop.wasteRows, now: Date(), months: 6, named: 3)
+            }
+            .task(id: Asked(period: shop.period, shown: shop.shownWaste)) { await divide() }
+        }
+
+        @State private var share: KhaytEngine.WasteShare?
+        private struct Asked: Hashable { let period: Period; let shown: [WasteEntry] }
+
+        private func divide() async {
+            guard let engine = shop.engine else { share = nil; return }
+            let span = shop.wasteRevenueSpan()
+            let cost = shop.shownWaste.reduce(0) { $0 + $1.cost }
+            guard let revenue = await shop.tradeRevenue(from: span.from, to: span.to) else { share = nil; return }
+            share = try? await engine.wasteShare(cost: cost, revenue: revenue)
+        }
+    }
+
+    /// The jobs whose failures cost the most — the desktop's "Top orders by
+    /// waste" (`lib/waste-entry.js` `topOrders`), over the shown entries.
+    /// Only for somebody who may see the jobs; a row opens its job.
+    struct TopOrders: View {
+        let shop: Shop
+        let shown: [WasteEntry]
+        @State private var rows: [KhaytEngine.WasteOrder] = []
+
+        var body: some View {
+            Group {
+                if shop.lockAllows("orders", "view"), !rows.isEmpty {
+                    DetailSection(shop.words.callIt("waste.top_orders")) {
+                        ForEach(rows) { row in
+                            let job = shop.orders.first { $0.id == row.orderId }
+                            Button {
+                                guard job != nil else { return }
+                                shop.shelf = .jobs(nil)
+                                shop.search = ""
+                                shop.selection = row.orderId
+                            } label: {
+                                DetailLine((job.map { $0.project.isEmpty ? $0.reference : $0.project } ?? row.orderId)
+                                           + " \u{00B7} " + shop.words.counting(row.count, "mac.waste_n_failures"),
+                                           Money.text(row.cost, shop.currency))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(job == nil)
+                        }
+                    }
+                }
+            }
+            .task(id: shown) {
+                guard let engine = shop.engine else { rows = []; return }
+                let ids = Set(shown.map(\.id))
+                let log = shop.wasteRows.filter { Shop.recordId($0).map(ids.contains) ?? false }
+                rows = (try? await engine.wasteTopOrders(log, limit: 5)) ?? []
             }
         }
     }

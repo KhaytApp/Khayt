@@ -37,7 +37,7 @@ public struct GoToIndex: Sendable {
     /// Which kind of thing a row is, in the order the groups are listed when
     /// their best hits tie.
     public enum Kind: String, Sendable, CaseIterable, Comparable {
-        case screen, job, customer, model, product, machine
+        case screen, job, customer, model, product, machine, spool
         /// ⌘J's own kinds — the library's folders, the compressed files shown
         /// as folders, its tags and its saved searches. ⌘K never lists them
         /// (`Shop.goToKinds` names its kinds one by one).
