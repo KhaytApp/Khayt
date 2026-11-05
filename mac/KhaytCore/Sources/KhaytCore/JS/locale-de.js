@@ -2466,6 +2466,7 @@
   "cn.credit_amount": "Gutschriftsbetrag",
   "cn.reason": "Grund",
   "cn.reason_ph": "z.B. Defektes Teil, Stornierung",
+  "cn.nothing_left": "Für diesen Auftrag ist nichts mehr gutzuschreiben.",
   "cn.generate": "Gutschrift erstellen",
   "wo.title": "Arbeitsauftrag",
   "oe.courier": "Kurier / Träger",

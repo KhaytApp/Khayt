@@ -2466,6 +2466,7 @@
   "cn.credit_amount": "贷项金额",
   "cn.reason": "原因",
   "cn.reason_ph": "例：零件损坏、取消订单",
+  "cn.nothing_left": "此订单已没有可贷记的金额。",
   "cn.generate": "生成贷项通知单",
   "wo.title": "工单",
   "oe.courier": "快递公司",

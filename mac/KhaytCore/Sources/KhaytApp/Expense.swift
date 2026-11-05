@@ -17,9 +17,12 @@ struct Expense: Identifiable, Decodable, Hashable, Sendable {
     /// "monthly", "quarterly", "annually" — or nil for a one-off.
     let recurring: String?
     let nextDue: String?
+    /// The site it was spent for (`store.locations`); nil or empty is the
+    /// shop as a whole.
+    let locationId: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, category, amount, note, orderId, receiptPath, recurring, nextDue
+        case id, date, category, amount, note, orderId, receiptPath, recurring, nextDue, locationId
     }
 
     init(from decoder: Decoder) throws {
@@ -37,6 +40,7 @@ struct Expense: Identifiable, Decodable, Hashable, Sendable {
         receiptPath = try c.decodeIfPresent(String.self, forKey: .receiptPath)
         recurring = try c.decodeIfPresent(String.self, forKey: .recurring)
         nextDue = try c.decodeIfPresent(String.self, forKey: .nextDue)
+        locationId = (try? c.decodeIfPresent(String.self, forKey: .locationId)) ?? nil
     }
 
     var day: Date? { Order.day(date) }

@@ -646,6 +646,10 @@ struct InvoicePane: View {
                         }
                     }
                 }
+                // Their own Save, like the desktop's sections: settings-edit
+                // keeps both and takes neither from the form above.
+                Section { InvoiceNumberingSection(shop: shop) }
+                Section { ExchangeRatesSection(shop: shop) }
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
@@ -792,6 +796,12 @@ struct PaymentsPane: View {
                         Text(shop.words.callIt("mac.points_explains"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                }
+                // The tiers the programme climbs, with their own Save — the
+                // desktop's tier editor. Only once the programme is on: a
+                // tier is read by nothing while it is off.
+                if draft.loyaltyEnabled {
+                    Section { LoyaltyTiersSection(shop: shop) }
                 }
             }
             .formStyle(.grouped)

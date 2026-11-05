@@ -2466,6 +2466,7 @@
   "cn.credit_amount": "Montant du crédit",
   "cn.reason": "Motif",
   "cn.reason_ph": "ex. Pièce défectueuse, annulation",
+  "cn.nothing_left": "Il ne reste rien à créditer sur cette commande.",
   "cn.generate": "Générer la note de crédit",
   "wo.title": "Bon de travail",
   "oe.courier": "Transporteur",

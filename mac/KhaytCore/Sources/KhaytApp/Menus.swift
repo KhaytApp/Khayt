@@ -236,6 +236,12 @@ private struct BookMenu: View {
         }
         .disabled(shop.engine == nil || !shop.lockAllows("analytics", "view"))
 
+        // Who did what: the team activity log this app has always written
+        // and never shown. A read, behind the lock's `logs` area as the
+        // desktop's Activity button is.
+        Button(Words.upfront("audit.btn_title") + "\u{2026}") { shop.showingActivityLog = true }
+            .disabled(!shop.lockAllows("logs", "view"))
+
         // Only where the shop has agreed to it. A menu item offering to send a
         // summary of the book to a vendor, on a shop that has switched the
         // feature off, is an advertisement in a menu.
@@ -630,6 +636,37 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .disabled(!canMove)
+        // THE WHOLE ORDER EDITOR, beside the quick one: notes, tags, discount,
+        // shipping, extra charges, the address and who is on it.
+        Button(Words.upfront("mac.order_details") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingDetails = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove)
+        Button(Words.upfront("ord.timeline") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingHistory = Shop.HistoryRequest(id: one.id, project: one.project)
+        }
+        .disabled(job == nil)
+        Button(Words.upfront("ord.edit_history") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingHistory = Shop.HistoryRequest(id: one.id, project: one.project, edits: true)
+        }
+        .disabled(job == nil)
+        Button(Words.upfront("oe.reprint") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingReprint = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove || job?.status == "quote")
+        Button(Words.upfront("qc.rma_title") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingRma = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!canMove || job?.deliveredAt == nil)
+        // Enquiries that are not jobs yet — what the LAN intake form and the
+        // other app's waiting list hold.
+        Button(Words.upfront("waiting.title") + "\u{2026}") { shop.showingIntake = true }
+        .disabled(!shop.source.isReal)
         // A LABEL FOR THE BOX. The shelf could be labelled from here and a job
         // could not, so a parcel going out of the door had to be labelled from
         // the other app.
@@ -638,6 +675,12 @@ private struct JobMenu: View {
             Task { await shop.askForOrderLabels([id]) }
         }
         .disabled(job == nil)
+        // The other papers that go with the work (`Shop+Papers.swift`).
+        JobPaperItems(shop: shop, job: job, upfront: true)
+        // A quote's answers besides Approve (`Shop+Quotes.swift`). Always
+        // listed, greyed off a quote: a menu bar's items are built once.
+        Divider()
+        QuoteItems(shop: shop, job: job, upfront: true)
 
         // WHAT THE CUSTOMER THOUGHT. Offered on finished work only, the way
         // the other app offers it — a rating on a job still on the bench would
@@ -688,6 +731,17 @@ private struct JobMenu: View {
         }
         .keyboardShortcut("p", modifiers: [.option, .command])
         .disabled(job == nil)
+        Button(Words.upfront("cn.title") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingCredit = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!shop.canReverseInvoices || !(job.map(Shop.hasInvoice) ?? false)
+                  || job?.voided == true || job?.credited == true)
+        Button(Words.upfront("inv.void_btn") + "\u{2026}") {
+            guard let one = job else { return }
+            shop.pendingVoid = Shop.PendingHold(id: one.id, project: one.project)
+        }
+        .disabled(!shop.canReverseInvoices || !(job.map(Shop.hasInvoice) ?? false) || job?.voided == true)
     }
 
     /// Where "along" or "back" would put the selected job, or nil when there

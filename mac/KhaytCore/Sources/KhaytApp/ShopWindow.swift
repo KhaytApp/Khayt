@@ -735,6 +735,9 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
+            // The desktop's order tools (`Shop+OrderTools.swift`), as one
+            // modifier so this chain does not grow by eight.
+            .modifier(OrderToolSheets(shop: shop))
             .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
             .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
             .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
@@ -885,6 +888,8 @@ struct WindowSheets: ViewModifier {
             // A customer with work erased, Unlink or Full (`Shop+Privacy.swift`).
             .shopSheet(item: $shop.erasingCustomer) { CustomerEraseSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingPaper) { PaperSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingRevisions) { QuoteRevisionsSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingMilestones) { MilestonesSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingDayReport) { DayReportSheet(shop: shop, request: $0) }
@@ -899,6 +904,10 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
             .shopSheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
             .shopSheet(item: $shop.spoolHistoryFor) { SpoolHistorySheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.adjustingSpool) { StockAdjustSheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.dryingLogFor) { DryingLogSheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.transferringSpool) { TransferStockSheet(shop: shop, spool: $0) }
+            .shopSheet(isPresented: $shop.showingActivityLog) { ActivityLogSheet(shop: shop) }
             .shopSheet(item: $shop.billingOrder) { BillSheet(shop: shop, order: $0) }
             .shopSheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
             .shopSheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }

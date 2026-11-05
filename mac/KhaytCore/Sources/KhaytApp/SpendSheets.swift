@@ -25,6 +25,10 @@ struct ExpenseSheet: View {
     @State private var note = ""
     @State private var orderId = ""
     @State private var recurring = ""
+    /// Which site the money was spent for; empty is the shop as a whole. It
+    /// starts at the site the shop is looking at, as the desktop's form does,
+    /// and the location P&L reads it (`lib/location-pl.js`).
+    @State private var locationId = ""
     /// What the note reads like, when the shared rule is confident enough to
     /// say. Held in state because the engine is an actor and a view cannot ask
     /// it a question while it is drawing.
@@ -39,6 +43,7 @@ struct ExpenseSheet: View {
     /// frame rather than a frame after it.
     init(shop: Shop) {
         self.shop = shop
+        _locationId = State(initialValue: shop.siteFilter ?? "")
         if let read = shop.receiptPrefill {
             // To the halala: a QR may write six decimals, and the field shows two.
             _amount = State(initialValue: Self.halala(read.draft.amount))
@@ -173,6 +178,20 @@ struct ExpenseSheet: View {
                     }
                     .labelsHidden()
                 }
+                // Only for a shop with sites, as the desktop's form shows it.
+                if !shop.locations.isEmpty {
+                    GridRow {
+                        Text(shop.words.callIt("inv.location_branch")).foregroundStyle(.secondary)
+                        Picker("", selection: $locationId) {
+                            Text(shop.words.callIt("inv.location_unassigned")).tag("")
+                            ForEach(shop.locations) { loc in Text(loc.name).tag(loc.id) }
+                            if !locationId.isEmpty && shop.locationName(locationId) == nil {
+                                Text(shop.words.callIt("mac.location_gone")).tag(locationId)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                }
                 GridRow {
                     Text(shop.words.callIt("exp.order_ref")).foregroundStyle(.secondary)
                     // Typed, not picked: a shop links an expense to a job it
@@ -221,6 +240,7 @@ struct ExpenseSheet: View {
             "orderId": .string(orderId),
             "recurring": .string(recurring),
             "receiptRef": .string(receiptRef),
+            "locationId": .string(locationId),
         ]
         dismiss()
         Task { await shop.addExpense(input) }

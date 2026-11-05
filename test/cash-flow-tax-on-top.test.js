@@ -37,7 +37,15 @@ test('the desktop passes settings to cash flow, caps the payment form by cashDue
   assert.match(a.slice(at, at + 300), /settings,/);
   const f = r('order-flows.js');
   assert.match(f, /KhaytOrderPayment\.cashDue\(order, \{ settings \}\)\.cash/);
-  assert.match(f, /const billed = KhaytOrderMoney\.orderGrossRaw\(order, \{ settings \}\);\n\s+if \(\(order\.paidAmount \|\| 0\) > billed\) order\.paidAmount = billed;\n\s+order\.paymentStatus = KhaytOrderPayment\.statusOf\(order, \{ settings \}\);/);
+  // The re-price on a discount / shipping / extras edit is lib/order-edit.js
+  // `repriceTerms` now (the Mac's editor runs it too); the desktop hands it
+  // the settings, and the rule caps by the billed gross and re-reads status.
+  assert.match(f, /EditRules\(\)\.repriceTerms\(order, \{[\s\S]*?\}, \{ settings \}\);/);
+  const e = fs.readFileSync(path.join(__dirname, '..', 'lib', 'order-edit.js'), 'utf8');
+  const rt = e.slice(e.indexOf('function repriceTerms'));
+  assert.match(rt, /Money\.orderGrossRaw\(order, settingsCtx\)/);
+  assert.match(rt, /if \(\(order\.paidAmount \|\| 0\) > billed\) order\.paidAmount = billed;/);
+  assert.match(rt, /order\.paymentStatus = Pay\.statusOf\(order, settingsCtx\)/);
   assert.doesNotMatch(f, /draft\.paidAmount = Math\.min\(Math\.max\(0, rawVal\), \+order\.price \|\| 0\)/);
 });
 

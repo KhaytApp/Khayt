@@ -58,8 +58,15 @@ function renderWasteLog() {
       WASTE_FAILURE_TYPES.map(ft => `<option value="${escapeHtml(ft)}"${ft === wasteFailureFilter ? ' selected' : ''}>${escapeHtml(t('waste.ft.' + ft))}</option>`).join('');
   }
   if (statEl) {
-    const completedRevenue = printLog.filter(o => KhaytOrderStatus.isFinished(o)).reduce((s, o) => s + orderNetRevenueBase(o), 0);
-    const wastePct = completedRevenue > 0 ? (totalWasteCost / completedRevenue * 100) : null;
+    // The book's whole trade (lib/kpi-rows.js `tradeRevenue`: finished, not
+    // voided, not Not business, net of tax) against the whole log, through
+    // lib/waste-entry.js `shareOfRevenue` — the Mac's Waste screen asks the
+    // same two rules for its period. This divided by every finished job's
+    // gross price, voided ones included.
+    const completedRevenue = KhaytKpiRows.tradeRevenue({ orders: printLog, settings, clients,
+      known: (typeof KhaytCurrencies !== 'undefined' && KhaytCurrencies.CURRENCIES) || undefined });
+    const share = WasteEntry.shareOfRevenue(totalWasteCost, completedRevenue);
+    const wastePct = share ? share.pct : null;
     const maxFt = Object.values(ftCounts).reduce((a, b) => Math.max(a, b), 1);
     const ftBars = WASTE_FAILURE_TYPES.filter(ft => ftCounts[ft] > 0).sort((a, b) => (ftCounts[b] || 0) - (ftCounts[a] || 0)).map(ft => {
       const pct = ((ftCounts[ft] || 0) / maxFt * 100).toFixed(1);
@@ -88,15 +95,8 @@ function renderWasteLog() {
   if (topWasteOrdersEl && !biz) {
     topWasteOrdersEl.innerHTML = '';
   } else if (topWasteOrdersEl) {
-    const orderWaste = {};
-    for (const w of wasteLog) {
-      if (!w.orderId) continue;
-      if (!orderWaste[w.orderId]) orderWaste[w.orderId] = 0;
-      orderWaste[w.orderId] += (+w.cost || 0);
-    }
-    const topOrders = Object.entries(orderWaste)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    // lib/waste-entry.js `topOrders`, the list the Mac shows too.
+    const topOrders = WasteEntry.topOrders(wasteLog, 5).map((r) => [r.orderId, r.cost]);
     if (topOrders.length === 0) {
       topWasteOrdersEl.innerHTML = '';
     } else {

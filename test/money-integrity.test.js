@@ -206,8 +206,9 @@ test('a partial refund leaves no marker on the order at all', () => {
   assert.equal(o.voidedAt, undefined);
   assert.equal(o.creditedAt, undefined);
   assert.equal(o.status, 'completed');
-  const src = read('renderer/invoicing.js');
-  assert.match(src, /if \(totalCredited >= \(\+order\.price \|\| 0\)\) \{/,
+  // The credit note's record is lib/invoice-reversal.js now, for both apps.
+  const src = read('lib/invoice-reversal.js');
+  assert.match(src, /if \(credited\(order\) >= num\(order\.price\)\) order\.creditedAt = o\.now;/,
     'creditedAt is set only at FULL credit — a partial refund must be caught via creditNotes[]');
 });
 
@@ -310,10 +311,12 @@ test('no revenue aggregation still totals the GROSS price', () => {
 test('the client statement and the journal keep the GROSS figure on purpose', () => {
   // Both already account for credit notes as their own line. Netting here would
   // subtract the same credit twice — the mirror image of the defect above.
-  const inv = read('renderer/invoicing.js');
-  assert.match(inv, /const totalCharges = orders\.reduce\(\(s, o\) => s \+ orderRevenueBase\(o\), 0\);/,
+  // The statement is lib/shop-documents.js now, which both apps print.
+  const inv = read('lib/shop-documents.js');
+  assert.match(inv, /charge: ctx\.orderRevenueBase\(o\)/,
     'the statement charges line is gross; totalCredit is shown beside it');
-  assert.match(inv, /const totalCredit\s+= orders\.reduce/, 'and the credit line must still exist');
+  assert.match(inv, /totalCharges: rows\.reduce\(\(s, r\) => s \+ r\.charge, 0\)/);
+  assert.match(inv, /totalCredit: list\.reduce/, 'and the credit line must still exist');
 
   const integrations = read('renderer/integrations.js');
   assert.match(integrations, /'Credit Note'.*'Revenue'/,
