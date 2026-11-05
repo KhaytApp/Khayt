@@ -313,6 +313,43 @@ async function testClientCurrencyQuote(window) {
   if (!ok) throw new Error(`client-currency quote failed: ${JSON.stringify(r)}`);
 }
 
+// The invoice is drawn inside the app window, so the app's `td { color:
+// var(--text) }` used to paint the quantity column in the theme's text colour
+// (pale grey on white under a dark theme, in print and PDF). Every cell must
+// take the paper's ink, and the payment-schedule header must not get the
+// app's header fill.
+async function testInvoiceCellsTakePaperInk(window) {
+  const r = await window.evaluate(async () => {
+    const o = { id: 'E2E-INK-1', invoiceNum: 'INV-E2E-INK', date: localDateStr(), timestamp: new Date().toISOString(),
+      project: 'Ink job', price: 500, status: 'completed',
+      parts: [{ name: 'Part Ink', material: 'PLA', baseCost: 100, qty: 2, printTime: 1 }],
+      instalments: [{ dueDate: localDateStr(), amount: 250, paid: false }, { dueDate: localDateStr(), amount: 250, paid: true }] };
+    printLog.unshift(o);
+    try {
+      await renderInvoiceForOrder(o);
+      const area = document.querySelector('#invoice-print-area');
+      const inv = area.querySelector('.inv');
+      const ink = getComputedStyle(inv).color;
+      const qty = area.querySelector('table.lines td.center');
+      const schedTh = [...area.querySelectorAll('table:not(.lines) th')][0];
+      const schedTd = [...area.querySelectorAll('table:not(.lines) td')][0];
+      const bg = schedTh ? getComputedStyle(schedTh).backgroundColor : null;
+      return {
+        ink,
+        qty: qty && getComputedStyle(qty).color,
+        schedTd: schedTd && getComputedStyle(schedTd).color,
+        schedThBg: bg,
+        schedThUpper: schedTh ? getComputedStyle(schedTh).textTransform : null,
+      };
+    } finally {
+      printLog.shift(); saveAll();
+    }
+  });
+  const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
+  const ok = r.qty === r.ink && r.schedTd === r.ink && clear(r.schedThBg) && r.schedThUpper === 'none';
+  if (!ok) throw new Error(`invoice cells take the app theme, not the paper's ink: ${JSON.stringify(r)}`);
+}
+
 // A milestone is a PROFORMA for its part of the job (Nov 2026): one line, its
 // own amount, no ZATCA QR, nothing of the job's parts or shipping — the job's
 // one tax invoice stays the job's.
@@ -708,6 +745,7 @@ try {
   await testIndexes(window);
   await testPruneArchived(window);
   await testMilestoneProforma(window);
+  await testInvoiceCellsTakePaperInk(window);
   await testClientCurrencyQuote(window);
   await testToastButtonClickable(window);
   const owner = testStoreOwnership();
