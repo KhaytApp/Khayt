@@ -1701,6 +1701,8 @@ function wireEvents() {
     if (btn.dataset.act === 'printer-resume') printerJobCommand(btn.dataset.id, 'resume');
     if (btn.dataset.act === 'printer-cancel') printerJobCommand(btn.dataset.id, 'cancel');
     if (btn.dataset.act === 'printer-drop') openDropObject(btn.dataset.id);
+    if (btn.dataset.act === 'plug-on') plugSwitch(btn.dataset.id, true);
+    if (btn.dataset.act === 'plug-off') plugSwitch(btn.dataset.id, false);
   });
   $('#machinesList')?.addEventListener('change', (e) => {
     const sel = e.target.closest('select[data-printer-control]');

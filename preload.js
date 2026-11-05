@@ -320,6 +320,12 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   setAppLanguage: (lang, menuStrings) => ipcRenderer.invoke('hub:set-app-language', lang, menuStrings),
+  smartPlug:           (machine, action) => ipcRenderer.invoke('hub:smart-plug', { machine, action }),
+  onSmartPlugAutoOff: (() => {
+    let _cb = null;
+    ipcRenderer.on('smart-plug-auto-off', (_e, data) => { if (_cb) _cb(data); });
+    return (cb) => { _cb = cb; };
+  })(),
   onPrinterStatusUpdate: (() => {
     // Single persistent listener — swaps the callback instead of stacking listeners
     let _cb = null;

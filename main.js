@@ -1879,6 +1879,17 @@ const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSec
   readDisk: () => readStoreDecryptedFromDisk(), isMasked: isStoreSecretMasked,
 });
 
+// A printer's smart plug (lib/main/smart-plug.js): read, switch, and the
+// auto-off after a cooled print. Same LAN pinning and secret fill as printers.
+require('./lib/main/smart-plug.js').registerSmartPlug({
+  ipcMain,
+  fill: (m) => machineSecrets.fill(m),
+  resolveTarget: (host) => resolvePrinterTarget(host),
+  statusCache: () => printerStatusCache,
+  readMachines: () => { try { return (readStoreDecryptedFromDisk() || {}).machines || []; } catch (_) { return []; } },
+  notify: (m) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('smart-plug-auto-off', { machineId: m.id, name: m.name || '' })),
+});
+
 // ── Telemetry (TELEMETRY-SPEC) ──────────────────────────────────────────────
 // OFF by default and gated on explicit per-stream consent. Scrubbing happens HERE — the
 // single trusted choke point — and the transport only ever accepts scrubber output, so an
