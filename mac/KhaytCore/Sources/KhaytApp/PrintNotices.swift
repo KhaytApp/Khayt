@@ -174,11 +174,19 @@ extension Shop {
         // locked screen and in Notification Centre.
         let project = goToKinds.contains(.job)
             ? ended.orderId.flatMap { id in orders.first { $0.id == id } }?.project : nil
+        // How far it got, by the printer's last report — the reading the
+        // failed print's costing reads too (`failedCosting`). Kept on the
+        // notice for "Log as waste…", which estimates the grams from it.
+        var progress: Double?
+        if case .object(let live)? = printers.statusCache[ended.machineId],
+           let p = Self.plainNumber(live["progress"]), p > 0 {
+            progress = p
+        }
         let notice = PrinterNotice.Notice(
             machineId: ended.machineId, machine: ended.machineName, kind: kind.rawValue,
             title: words.callIt(kind.titleKey, ["machine": .string(ended.machineName)]),
             body: PrinterWatch.noticeBody(filename: ended.filename, progress: 0, shop: self, project: project),
-            at: Date())
+            at: Date(), orderId: ended.orderId, progress: progress)
         if kind == .finished { printers.notices.announce(notice) } else { printers.notices.raise(notice) }
         sendPrintNotice(kind, notice, bare: "")
     }
@@ -199,5 +207,62 @@ extension Shop {
     /// by anyone who knows its name.
     func sendPrintNotice(_ kind: PrintNoticeKind, _ notice: PrinterNotice.Notice, bare: String) {
         Task { await sendAlert(type: kind.rawValue, title: notice.title, body: bare, namedBody: notice.body) }
+    }
+
+    // MARK: - "Log as waste…" on a failed print
+
+    /// Whether a "Print failed" notice offers "Log as waste…". The manual
+    /// waste flow's own gates: the Waste screen's "+" (`canMoveJobs`), the
+    /// screen itself, and `logWaste`'s `inventory`/`create`.
+    var canLogWasteFromNotice: Bool {
+        canMoveJobs && canShow(.waste) && lockAllows("inventory", "create")
+    }
+
+    /// Open the ordinary waste sheet, filled in from the notice. NOTHING is
+    /// written here: the shop reads the sheet and presses Log, or Cancel.
+    func logWasteFromNotice(_ notice: PrinterNotice.Notice) {
+        guard notice.kind == PrintNoticeKind.failed.rawValue, canLogWasteFromNotice else { return }
+        wastePrefill = WastePrefill.from(notice, orders: orders)
+        // The sheet hangs off the Waste screen, as the "+" opens it.
+        if !showingWaste { shelf = .waste }
+        loggingWaste = true
+    }
+}
+
+/// What the waste sheet starts from when it is opened from a printer's
+/// "Print failed" notice: the machine, the job that was printing when the
+/// book could name it, and the grams estimated as the job's grams × how far
+/// the print got — only when BOTH are known. Otherwise the grams are left
+/// empty for the shop to fill: a guess of the whole job for a print that
+/// stopped at 10% would be a figure certainly wrong.
+///
+/// Pure, so the arithmetic is tested without a window.
+struct WastePrefill: Equatable, Sendable {
+    let machineId: String
+    let orderId: String?
+    let grams: Double?
+    /// The job's material, for the sheet to pick when the shelf has it.
+    let material: String?
+
+    static func make(machineId: String, orderId: String?, jobGrams: Double?,
+                     progress: Double?, material: String? = nil) -> WastePrefill {
+        var grams: Double?
+        if let g = jobGrams, g.isFinite, g > 0, let p = progress, p.isFinite, p > 0 {
+            // To a tenth of a gram, which is what the sheet's field shows.
+            grams = (g * min(p, 100) / 100 * 10).rounded() / 10
+        }
+        let job = orderId.flatMap { $0.isEmpty ? nil : $0 }
+        let named = material.flatMap { $0.isEmpty ? nil : $0 }
+        return WastePrefill(machineId: machineId, orderId: job, grams: grams, material: named)
+    }
+
+    /// From a notice and the book's jobs. A job the book no longer has is no
+    /// job: the sheet's picker could not show it.
+    @MainActor
+    static func from(_ notice: PrinterNotice.Notice, orders: [Order]) -> WastePrefill {
+        let job = notice.orderId.flatMap { id in orders.first { $0.id == id } }
+        return make(machineId: notice.machineId, orderId: job?.id,
+                    jobGrams: job.map(Shop.quotedGrams), progress: notice.progress,
+                    material: job?.parts.first { !$0.material.isEmpty }?.material)
     }
 }

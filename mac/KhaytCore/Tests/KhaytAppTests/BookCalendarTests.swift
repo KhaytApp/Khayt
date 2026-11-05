@@ -103,9 +103,10 @@ struct BookCalendarTests {
                                        "updatedAt": String(format: "2026-09-%02dT10:00:00.000Z", i % 28 + 1)]
             return try JSONDecoder().decode(LibraryFile.self, from: JSONSerialization.data(withJSONObject: json))
         }
+        let budget = SpeedBudget.calibrate()
         let began = Date()
         let sorted = LibrarySort.khayt.sorted(files)
-        #expect(Date().timeIntervalSince(began) < 0.2, "sorting 400 models took over 200 ms")
+        budget.expect(Date().timeIntervalSince(began) * 1000, under: 200, "sorting 400 models")
         #expect(sorted.first?.isFavourite == true, "favourites first")
         #expect(sorted == files.sorted(by: LibrarySort.khayt.order), "the same order as the comparator")
     }

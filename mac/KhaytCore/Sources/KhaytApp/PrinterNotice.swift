@@ -38,6 +38,13 @@ final class PrinterNotice {
         let title: String
         let body: String
         let at: Date
+        /// The job that was printing, when the finish seam could name it —
+        /// for "Log as waste…" on a failed print. Never drawn: a banner shows
+        /// on a locked screen.
+        var orderId: String? = nil
+        /// How far the print got (0–100) by the printer's last report, when
+        /// it said; the waste sheet estimates the grams from it.
+        var progress: Double? = nil
     }
 
     /// A macOS notification is only possible in a packaged app. See the note

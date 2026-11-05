@@ -102,3 +102,87 @@ test('a job-linked waste entry, costed whole', () => {
   assert.equal(entry.costPower, 0.04);
   assert.equal(entry.hoursSource, 'printer');
 });
+
+// ── byGroup: where the failures cost ────────────────────────────────────────
+
+const ORDERS = [
+  { id: 'J1', machineId: 'M1', clientId: 'C1' },
+  { id: 'J2', machineId: 'M2', clientId: 'C2' },
+  { id: 'J3', client: 'Walk-in Sara' },            // a name typed on the job, no record
+  { id: 'J4', clientId: 'C9' },                     // a customer since deleted
+];
+const MACHINES = [{ id: 'M1', name: 'U1' }, { id: 'M2', name: 'X1C' }];
+const SPOOLS = [{ id: 'S1', material: 'PETG' }];
+const CLIENTS = [{ id: 'C1', name: 'Noura' }, { id: 'C2', company: 'Acme' }];
+// A breakdown row (job-linked), a legacy row with `cost` only, a row whose
+// printer is reached only through its job (the desktop's `forOrder` writes no
+// machineId), a row on no job at all, and one whose material is only on its spool.
+const LOG = [
+  { id: 'W1', orderId: 'J1', machineId: 'M1', material: 'PLA', cost: 4,
+    costMaterial: 4, costMachine: 6, costPower: 1, costFull: 11 },
+  { id: 'W2', machineId: 'M1', material: 'PLA', cost: 2.5 },
+  { id: 'W3', orderId: 'J2', material: 'PETG', cost: 3,
+    costMaterial: 3, costMachine: 9, costPower: 2, costFull: 14 },
+  { id: 'W4', material: 'ABS', cost: 1.25 },
+  { id: 'W5', orderId: 'J3', machineId: 'M2', material: '', spoolId: 'S1', cost: 0.75 },
+  { id: 'W6', orderId: 'J4', machineId: 'M-gone', material: 'PLA', cost: 1 },
+];
+const CTX = { orders: ORDERS, machines: MACHINES, spools: SPOOLS, clients: CLIENTS };
+
+test('byGroup: by printer — the row\'s machine, else its job\'s; a printer no longer in the book keeps its id', () => {
+  const rows = F.byGroup(LOG, Object.assign({ by: 'machine' }, CTX));
+  assert.deepEqual(rows.map((r) => [r.key, r.label, r.full, r.count]), [
+    ['M2', 'X1C', 14.75, 2],
+    ['M1', 'U1', 13.5, 2],
+    [null, 'Unknown', 1.25, 1],
+    ['M-gone', 'M-gone', 1, 1],
+  ]);
+  const m2 = rows[0];
+  assert.deepEqual([m2.material, m2.machine, m2.power], [3.75, 9, 2]);
+  assert.equal(rows[2].unknown, true);
+  assert.equal(rows[0].unknown, false);
+});
+
+test('byGroup: by material — the row\'s, else the spool it came off', () => {
+  const rows = F.byGroup(LOG, Object.assign({ by: 'material' }, CTX));
+  assert.deepEqual(rows.map((r) => [r.key, r.full, r.count]), [
+    ['PETG', 14.75, 2],
+    ['PLA', 14.5, 3],
+    ['ABS', 1.25, 1],
+  ]);
+  assert.ok(!rows.some((r) => r.unknown), 'every row had a material');
+});
+
+test('byGroup: by customer — only through the job; no job is Unknown', () => {
+  const rows = F.byGroup(LOG, Object.assign({ by: 'customer' }, CTX));
+  assert.deepEqual(rows.map((r) => [r.key, r.label, r.full, r.count]), [
+    ['C2', 'Acme', 14, 1],
+    ['C1', 'Noura', 11, 1],
+    [null, 'Unknown', 3.75, 2],                     // W2 and W4 have no job
+    ['C9', 'C9', 1, 1],
+    ['name:walk-in sara', 'Walk-in Sara', 0.75, 1],
+  ]);
+});
+
+test('byGroup: a legacy row (cost only, no breakdown) counts as material only', () => {
+  const [row] = F.byGroup([{ machineId: 'M1', material: 'PLA', cost: 2.5 }], { by: 'machine', machines: MACHINES });
+  assert.deepEqual(row, { key: 'M1', label: 'U1', full: 2.5, material: 2.5, machine: 0, power: 0, count: 1, unknown: false });
+});
+
+test('byGroup and totals agree on "full", whichever way the log is cut', () => {
+  const t = F.totals(LOG);
+  for (const by of ['machine', 'material', 'customer']) {
+    const rows = F.byGroup(LOG, Object.assign({ by }, CTX));
+    const sum = rows.reduce((s, r) => s + r.full, 0);
+    assert.equal(Math.round(sum * 100) / 100, t.full, by);
+    assert.equal(rows.reduce((s, r) => s + r.count, 0), LOG.length, by);
+  }
+});
+
+test('byGroup: nothing in, nothing out; an unknown grouping is no rows', () => {
+  assert.deepEqual(F.byGroup([], { by: 'machine' }), []);
+  assert.deepEqual(F.byGroup(null), []);
+  assert.deepEqual(F.byGroup(LOG, { by: 'colour' }), []);
+  // No context at all: every printer is still its own group, by id.
+  assert.deepEqual(F.byGroup([{ machineId: 'M1', cost: 1 }, null]).map((r) => r.label), ['M1']);
+});

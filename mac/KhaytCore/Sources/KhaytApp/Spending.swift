@@ -222,7 +222,7 @@ struct Waste: View {
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.loggingWaste = true },
                                       addLabel: shop.words.callIt("waste.add")) }
-        .shopSheet(isPresented: $shop.loggingWaste) { WasteSheet(shop: shop) }
+        .shopSheet(isPresented: $shop.loggingWaste, onDismiss: { shop.wastePrefill = nil }) { WasteSheet(shop: shop) }
     }
 
     private var table: some View {
@@ -347,6 +347,65 @@ struct Waste: View {
         }
     }
 
+    /// WHERE the failures cost: the shown entries grouped by printer, by
+    /// material or by customer, biggest true cost first
+    /// (`KhaytFailedPrintCost.byGroup`). The same "true cost" as the section
+    /// above, so the groups add up to its total — an entry whose printer, job
+    /// or customer is not known is counted under "Unknown", not dropped.
+    struct WhereFailuresCost: View {
+        let shop: Shop
+        let shown: [WasteEntry]
+        @State private var by = "machine"
+        @State private var rows: [KhaytEngine.FailedCostGroup] = []
+
+        /// The top of the list; the table has the rest.
+        static let shownRows = 5
+
+        /// By customer only for somebody who may see the customers.
+        private var groupings: [(String, String)] {
+            var out = [("machine", "mac.waste_by_printer"), ("material", "mac.waste_by_material")]
+            if shop.canShow(.customers) { out.append(("customer", "mac.waste_by_customer")) }
+            return out
+        }
+
+        private struct Asked: Hashable {
+            let by: String
+            let shown: [WasteEntry]
+        }
+
+        var body: some View {
+            if !shown.isEmpty {
+                DetailSection(shop.words.callIt("mac.waste_where_title")) {
+                    Picker("", selection: $by) {
+                        ForEach(groupings, id: \.0) { key, word in
+                            Text(shop.words.callIt(word)).tag(key)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    ForEach(rows.prefix(Self.shownRows)) { row in
+                        DetailLine((row.unknown ? shop.words.callIt("mac.waste_unknown") : row.label)
+                                   + " · " + shop.words.counting(row.count, "mac.waste_n_failures"),
+                                   Money.text(row.full, shop.currency), dim: row.unknown)
+                    }
+                }
+                .task(id: Asked(by: by, shown: shown)) { await group() }
+            }
+        }
+
+        private func group() async {
+            // A grouping the person may no longer see (signed out of a role
+            // that could) falls back to the printer.
+            if !groupings.contains(where: { $0.0 == by }) { by = "machine"; return }
+            guard let engine = shop.engine else { rows = []; return }
+            let ids = Set(shown.map(\.id))
+            let log = shop.wasteRows.filter { Shop.recordId($0).map(ids.contains) ?? false }
+            rows = (try? await engine.failedCostByGroup(
+                wasteLog: log, by: by, orders: shop.orderRows, machines: shop.machineRows,
+                spools: shop.inventoryRows, clients: shop.clientRows)) ?? []
+        }
+    }
+
     /// Entries, grams, cost — and which failures the shop keeps having.
     private struct Summary: View {
         let shop: Shop
@@ -370,6 +429,7 @@ struct Waste: View {
                                    Money.text(cost, shop.currency), strong: true)
                     }
                     TrueCost(shop: shop, shown: shown)
+                    WhereFailuresCost(shop: shop, shown: shown)
                     let counts = Dictionary(grouping: shown, by: \.failureType).mapValues(\.count)
                     if !counts.isEmpty {
                         DetailSection(shop.words.callIt("waste.failure_breakdown")) {

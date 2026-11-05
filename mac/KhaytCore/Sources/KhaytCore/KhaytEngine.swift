@@ -5098,6 +5098,34 @@ public actor KhaytEngine {
                           [.array(wasteLog)], as: FailedCostTotals.self)
     }
 
+    /// One group of the waste log — a printer, a material or a customer —
+    /// and what its failures cost (`KhaytFailedPrintCost.byGroup`). `key` is
+    /// nil, and `unknown` true, for the one group of rows the link could not
+    /// be followed for; its `label` is English and the caller words it.
+    public struct FailedCostGroup: Decodable, Sendable, Equatable, Identifiable {
+        public let key: String?
+        public let label: String
+        public let full: Double
+        public let material: Double
+        public let machine: Double
+        public let power: Double
+        public let count: Int
+        public let unknown: Bool
+        public var id: String { key ?? "\u{0}unknown" }
+    }
+
+    /// Where the failures cost: the waste log grouped `by` "machine",
+    /// "material" or "customer", biggest full cost first. The same "full"
+    /// as `failedCostTotals`, so the groups add up to its total.
+    public func failedCostByGroup(wasteLog: [JSONValue], by: String,
+                                  orders: [JSONValue], machines: [JSONValue],
+                                  spools: [JSONValue], clients: [JSONValue] = []) throws -> [FailedCostGroup] {
+        try runtime.call2(
+            "globalThis.KhaytFailedPrintCost.byGroup(ARG0, {by: ARG1, orders: ARG2, machines: ARG3, spools: ARG4, clients: ARG5})",
+            [.array(wasteLog), .string(by), .array(orders), .array(machines), .array(spools), .array(clients)],
+            as: [FailedCostGroup].self)
+    }
+
     /// A picture appended to a product through `product-images.addImage`.
     public struct ProductImageAdded: Decodable, Sendable {
         public let product: JSONValue

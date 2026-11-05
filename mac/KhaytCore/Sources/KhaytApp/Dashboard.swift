@@ -755,6 +755,15 @@ private struct WentWrong: View {
                                 }
                             }
                             Spacer(minLength: 12)
+                            // A failed print's filament is gone whether or
+                            // not anybody writes it down: the waste sheet,
+                            // filled in from what the printer said.
+                            if notice.kind == PrintNoticeKind.failed.rawValue, shop.canLogWasteFromNotice {
+                                Button(shop.words.callIt("mac.waste_from_notice")) {
+                                    shop.logWasteFromNotice(notice)
+                                }
+                                .controlSize(.small)
+                            }
                             Text(shop.words.say(notice.at, Date.FormatStyle(date: .omitted, time: .shortened)))
                                 .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
                         }
