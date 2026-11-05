@@ -60,11 +60,16 @@ try {
   // Legacy one-URL-per-event config migrates to subscriptions.
   const migrated = await window.evaluate(() => {
     settings.webhooks = { enabled: true, secret: 'legacy', events: { order_created: 'https://old.example/h', status_changed: 'https://old.example/h' } };
-    return webhookSubscriptions();
+    const subs = webhookSubscriptions();
+    // What a delivery to it is signed with: the shop's one shared secret.
+    return subs.map(s => ({ ...s, signsWith: KhaytWebhookBus.subscriptionSecret(s, settings.webhooks) }));
   });
   ok(migrated.length === 1, 'legacy config collapsed to one subscription per URL');
   ok(migrated[0].events.length === 2, 'both legacy events attached to it');
-  ok(migrated[0].secret === 'legacy', 'legacy secret preserved');
+  // The secret is never copied onto a subscription: that path is not sealed,
+  // and it reached paired phones unmasked (lib/store-secret-paths.js DROP_PATHS).
+  ok(!migrated[0].secret, 'a migrated subscription carries no secret of its own');
+  ok(migrated[0].signsWith === 'legacy', 'it still signs with the shop\'s shared secret');
 
   console.log('\n✅ Webhook bus smoke: all assertions passed');
 } catch (e) {
