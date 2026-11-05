@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "Filamento",
  "mac.recurring_skip": "Omitir",
  "mac.recurring_more": "{n} más pendientes",
- "mac.recurring_more_one": "Una más pendiente",
+ "mac.recurring_more_one": "{n} más pendiente",
  "mac.goal_vs_last_month": "Frente al mes pasado",
  "mac.adj_none": "Aún no hay ajustes.",
  "mac.dry_none": "Aún no se ha registrado ningún secado.",

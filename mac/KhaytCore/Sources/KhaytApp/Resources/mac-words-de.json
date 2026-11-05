@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "Filament",
  "mac.recurring_skip": "Überspringen",
  "mac.recurring_more": "{n} weitere fällig",
- "mac.recurring_more_one": "Eine weitere fällig",
+ "mac.recurring_more_one": "{n} weitere fällig",
  "mac.goal_vs_last_month": "Im Vergleich zum Vormonat",
  "mac.adj_none": "Noch keine Korrekturen.",
  "mac.dry_none": "Noch keine Trocknung erfasst.",

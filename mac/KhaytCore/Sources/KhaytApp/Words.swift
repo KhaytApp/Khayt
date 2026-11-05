@@ -4802,7 +4802,7 @@ final class Words {
         // Money, stock and settings the desktop already had (Shop+MoneyStock.swift).
         "mac.recurring_skip": ["en": "Skip", "ar": "تخطٍّ"],
         "mac.recurring_more": ["en": "{n} more due", "ar": "{n} أخرى مستحقة"],
-        "mac.recurring_more_one": ["en": "One more due", "ar": "واحدة أخرى مستحقة"],
+        "mac.recurring_more_one": ["en": "{n} more due", "ar": "واحدة أخرى مستحقة"],
         "mac.goal_vs_last_month": ["en": "Against last month", "ar": "مقارنةً بالشهر الماضي"],
         "mac.adj_none": ["en": "No adjustments yet.", "ar": "لا تعديلات بعد."],
         "mac.dry_none": ["en": "No drying recorded yet.", "ar": "لم يُسجَّل أي تجفيف بعد."],

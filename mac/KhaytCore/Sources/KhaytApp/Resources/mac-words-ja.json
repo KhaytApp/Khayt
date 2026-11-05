@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "フィラメント",
  "mac.recurring_skip": "スキップ",
  "mac.recurring_more": "ほかに{n}件が期日",
- "mac.recurring_more_one": "ほかに1件が期日",
+ "mac.recurring_more_one": "ほかに{n}件が期日",
  "mac.goal_vs_last_month": "先月比",
  "mac.adj_none": "調整はまだありません。",
  "mac.dry_none": "乾燥の記録はまだありません。",

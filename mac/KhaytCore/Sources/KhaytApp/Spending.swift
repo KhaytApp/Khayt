@@ -509,8 +509,8 @@ struct Waste: View {
                         if let share {
                             DetailLine(shop.words.callIt("waste.pct_revenue"),
                                        Money.quantity(share.pct, decimals: 1) + "%")
-                                .foregroundStyle(share.tone == "bad" ? AnyShapeStyle(Khayt.attention)
-                                                 : share.tone == "warn" ? AnyShapeStyle(.orange)
+                                .foregroundStyle(share.tone == "bad" ? AnyShapeStyle(Khayt.late)
+                                                 : share.tone == "warn" ? AnyShapeStyle(Khayt.attention)
                                                  : AnyShapeStyle(Khayt.done))
                         }
                     }

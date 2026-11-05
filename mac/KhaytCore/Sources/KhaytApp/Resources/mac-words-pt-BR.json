@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "Filamento",
  "mac.recurring_skip": "Pular",
  "mac.recurring_more": "Mais {n} vencidas",
- "mac.recurring_more_one": "Mais uma vencida",
+ "mac.recurring_more_one": "Mais {n} vencida",
  "mac.goal_vs_last_month": "Em relação ao mês passado",
  "mac.adj_none": "Nenhum ajuste ainda.",
  "mac.dry_none": "Nenhuma secagem registrada ainda.",

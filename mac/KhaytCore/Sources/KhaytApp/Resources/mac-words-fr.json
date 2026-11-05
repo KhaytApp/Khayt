@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "Filament",
  "mac.recurring_skip": "Ignorer",
  "mac.recurring_more": "{n} autres à échéance",
- "mac.recurring_more_one": "Une autre à échéance",
+ "mac.recurring_more_one": "{n} autre à échéance",
  "mac.goal_vs_last_month": "Par rapport au mois dernier",
  "mac.adj_none": "Aucun ajustement pour l'instant.",
  "mac.dry_none": "Aucun séchage enregistré pour l'instant.",

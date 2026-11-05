@@ -266,7 +266,7 @@ struct LoyaltyTiersSection: View {
                         Color.clear.frame(width: 0, height: 0)
                     }
                     .font(.caption).foregroundStyle(.secondary)
-                    ForEach($tiers) { $tier in
+                    ForEach($tiers.byID) { $tier in
                         GridRow {
                             TextField("", text: $tier.name).textFieldStyle(.roundedBorder).frame(minWidth: 110)
                             TextField("", value: $tier.minOrders, format: .number.locale(Money.digits))

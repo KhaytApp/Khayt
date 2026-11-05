@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "耗材",
  "mac.recurring_skip": "跳过",
  "mac.recurring_more": "还有 {n} 项到期",
- "mac.recurring_more_one": "还有 1 项到期",
+ "mac.recurring_more_one": "还有 {n} 项到期",
  "mac.goal_vs_last_month": "与上月相比",
  "mac.adj_none": "暂无调整。",
  "mac.dry_none": "尚无烘干记录。",

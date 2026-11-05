@@ -3536,7 +3536,7 @@
  "mac.goto_group_spool": "Filament",
  "mac.recurring_skip": "Atla",
  "mac.recurring_more": "{n} tane daha vadesi geldi",
- "mac.recurring_more_one": "Bir tane daha vadesi geldi",
+ "mac.recurring_more_one": "{n} tane daha vadesi geldi",
  "mac.goal_vs_last_month": "Geçen aya göre",
  "mac.adj_none": "Henüz düzeltme yok.",
  "mac.dry_none": "Henüz kurutma kaydı yok.",
