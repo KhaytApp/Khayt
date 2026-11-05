@@ -787,6 +787,8 @@
     <section id="logs-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-logs-tab" aria-hidden="true" tabindex="-1">
       <div class="card">
         <div id="depositAuditBanner"></div>
+        <!-- Finished jobs charged nothing (lib/attention.js selectUnpricedFinished): the Mac's triage card. -->
+        <div id="unpricedBanner"></div>
         <div id="batchBar" class="batch-bar" style="display:none;">
           <span id="batchCount" class="batch-count"></span>
           <button class="btn small primary pro-only" id="btnBatchPdf" data-i18n="batch.export_pdfs">Export PDFs</button>
@@ -805,6 +807,7 @@
           <button class="btn small" id="btnBatchAssignMachine" data-i18n="batch.assign_machine">Assign</button>
           <select id="batchKitSelect" class="toolbar-select" style="max-width:160px;"></select>
           <button class="btn small" id="btnBatchKit" data-i18n="kit.add_to">🧩 Add to kit…</button>
+          <button class="btn small ghost" id="btnBatchNonBusiness" data-i18n="unpriced.mark">Not business</button>
           <button class="btn small ghost" id="btnBatchArchive" data-i18n="batch.archive">📦 Archive</button>
           <button class="btn ghost small" id="btnBatchClear" data-i18n="batch.clear_sel">Clear</button>
         </div>

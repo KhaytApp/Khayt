@@ -186,6 +186,7 @@ function wireEvents() {
     if (id && typeof disbandKit === 'function') disbandKit(id);
   });
   $('#btnBatchArchive')?.addEventListener('click', batchArchiveOrders);
+  $('#btnBatchNonBusiness')?.addEventListener('click', batchNonBusiness);
   $('#showArchivedToggle')?.addEventListener('change', e => {
     showArchivedOrders = e.target.checked;
     renderLogs();
