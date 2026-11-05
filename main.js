@@ -1873,6 +1873,15 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
   },
   libraryDrive: () => printLibDrive(),
 });
+// Khayt Vault share links (lib/main/vault-links.js): the Mac's share sheet and
+// links sheet, for files already in the vault. Needs Khayt Cloud unlocked.
+require('./lib/main/vault-links.js').registerVaultLinks({
+  app, ipcMain, safeStorage,
+  readBook: () => { try { return readStoreDecryptedFromDisk(); } catch (_) { return null; } },
+  getDek: () => (cloudBackend ? cloudDek : null),
+  cloudToken: (token, url) => cloudToken(token, url),
+  isVaultOn: () => printLibVaultOn(),
+});
 // Every printer call takes the machine the window holds, whose credentials are
 // masked; this puts the real ones back from the book on disk.
 const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSecrets({
