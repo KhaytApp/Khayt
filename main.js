@@ -6461,6 +6461,16 @@ ipcMain.handle('hub:cloud-set-plan', async (_e, { url, shopId, token, plan } = {
   } catch (e) { return { ok: false, reason: '', error: String(e && e.message || e) }; }
 });
 
+ipcMain.handle('hub:cloud-digest', async (_e, { url, shopId, token, enabled } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const d = typeof enabled === 'boolean'
+      ? await cloudClient.setDigest(url, shopId, token, enabled)
+      : await cloudClient.digest(url, shopId, token);
+    return { ok: true, ...d };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('hub:cloud-billing-me', async (_e, { url, shopId, token } = {}) => {
   try {
     token = cloudToken(token, url);
