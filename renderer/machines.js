@@ -154,6 +154,92 @@ function _printerVerbOk(m, cmd) {
   return PC.supports(api.type, cmd, { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer', transports: ['http', 'mqtt', 'sdcp'] });
 }
 
+/* ── Smart plug (lib/smart-plug.js; main: lib/main/smart-plug.js) ────────
+ * The Mac's MachineSheet plug section and card buttons. Turning a plug OFF is
+ * checked twice — here for the button, and again in the main process against
+ * the poller's own reading — because power is never cut while the printer is
+ * printing, paused, not answering or hot. */
+function smartPlugEditorHtml(draft) {
+  const p = draft.smartPlug || {};
+  const type = p.type || 'none';
+  const opt = (v, label) => `<option value="${v}"${type === v ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  const show = (kinds) => (kinds.includes(type) ? '' : 'display:none;');
+  return `<div id="plugSection" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
+    <label style="margin-top:0; font-weight:600;">${escapeHtml(t('splug.title'))}</label>
+    <select id="plugType">${opt('none', t('splug.none'))}${opt('shelly', t('splug.kind_shelly'))}${opt('shelly-rpc', 'Shelly (Gen 2+ / Plus)')}${opt('tasmota', 'Tasmota')}${opt('homeassistant', 'Home Assistant')}</select>
+    <div data-plug-fields style="${type === 'none' ? 'display:none;' : ''}">
+      <label>${escapeHtml(t('splug.host'))}</label>
+      <input type="text" id="plugHost" value="${escapeHtml(p.host || '')}" placeholder="192.168.1.50" autocomplete="off" spellcheck="false">
+      <div data-plug-for="homeassistant" style="${show(['homeassistant'])}">
+        <label>${escapeHtml(t('splug.entity'))}</label><input type="text" id="plugEntity" value="${escapeHtml(p.entity || '')}" placeholder="switch.printer_plug">
+        <label>${escapeHtml(t('splug.token'))}</label><input type="password" id="plugToken" value="" placeholder="${escapeHtml(secretFieldPlaceholder(p.token))}" autocomplete="off">
+      </div>
+      <div data-plug-for="tasmota" style="${show(['tasmota'])}">
+        <label>${escapeHtml(t('splug.user'))}</label><input type="text" id="plugUser" value="${escapeHtml(p.user || '')}" autocomplete="off">
+        <label>${escapeHtml(t('splug.password'))}</label><input type="password" id="plugPassword" value="" placeholder="${escapeHtml(secretFieldPlaceholder(p.password))}" autocomplete="off">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;">
+        <input type="checkbox" id="plugAutoOff" style="width:auto;margin:0;" ${p.autoOff === true ? 'checked' : ''}> ${escapeHtml(t('splug.auto_off'))}
+      </label>
+      <div style="display:flex;align-items:center;gap:6px;margin:6px 0 0 24px;">
+        <span>${escapeHtml(t('splug.delay'))}</span>
+        <input type="number" id="plugDelay" min="0" max="240" value="${escapeHtml(String(p.delayMin ?? 10))}" style="width:70px;">
+        <span>${escapeHtml(t('splug.minutes'))}</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0 24px;">${escapeHtml(t('splug.why'))}</div>
+    </div>
+  </div>`;
+}
+
+/** Wired once per editor: show the fields the chosen kind needs. */
+function wireSmartPlugEditor(modal) {
+  const sel = modal.querySelector('#plugType');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    modal.querySelector('[data-plug-fields]').style.display = sel.value === 'none' ? 'none' : '';
+    modal.querySelectorAll('[data-plug-for]').forEach((el) => { el.style.display = el.dataset.plugFor === sel.value ? '' : 'none'; });
+  });
+}
+
+/** The card's plug line: its state, and Turn on / Turn off. */
+const _plugState = {};
+function smartPlugCardHtml(m) {
+  if (!m || !m.smartPlug || !m.smartPlug.type || m.smartPlug.type === 'none') return '';
+  const st = _plugState[m.id];
+  const word = !st ? '' : st.on === true ? t('splug.on') : st.on === false ? t('splug.off') : t('splug.unknown');
+  const watts = st && Number.isFinite(st.watts) ? ` · ${Math.round(st.watts)} W` : '';
+  const id = escapeHtml(m.id);
+  return `<div class="plug-line" data-plug-line="${id}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px;">
+    <span style="color:var(--text-muted);">🔌 ${escapeHtml(word)}${escapeHtml(watts)}</span>
+    <button class="btn small ghost" data-act="plug-on" data-id="${id}">${escapeHtml(t('splug.turn_on'))}</button>
+    <button class="btn small ghost" data-act="plug-off" data-id="${id}">${escapeHtml(t('splug.turn_off'))}</button>
+  </div>`;
+}
+
+async function refreshPlug(machineId) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || !window.hubAPI?.smartPlug) return;
+  const r = await window.hubAPI.smartPlug(m, 'status').catch(() => null);
+  _plugState[machineId] = r && r.ok ? { on: r.on, watts: r.watts, at: Date.now() } : { on: null, watts: null, at: Date.now() };
+  const line = document.querySelector(`[data-plug-line="${CSS.escape(machineId)}"]`);
+  if (line) line.outerHTML = smartPlugCardHtml(m);
+}
+
+async function plugSwitch(machineId, on) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || !window.hubAPI?.smartPlug) return;
+  if (!on) {
+    // The button asks the rule first, with what this window last heard.
+    const live = (typeof machineStatusCache !== 'undefined' && machineStatusCache[machineId]) || null;
+    const safe = (typeof KhaytSmartPlug !== 'undefined') ? KhaytSmartPlug.canTurnOff(live) : { ok: true };
+    if (!safe.ok) { toast(t('splug.' + String(safe.reason).replace(/^plug\./, '')), 'error', 6000); return; }
+  }
+  const r = await window.hubAPI.smartPlug(m, on ? 'on' : 'off').catch((e) => ({ ok: false, error: e.message }));
+  if (!r || !r.ok) { toast((r && r.reason ? t(r.reason) : '') || (r && r.error) || t('splug.unreachable'), 'error', 6000); return; }
+  _plugState[machineId] = { on: r.on == null ? on : r.on, watts: r.watts };
+  refreshPlug(machineId);
+}
+
 function machineControlsHtml(m) {
   if (!m || !m.printerApi || !m.printerApi.type || m.printerApi.type === 'none') return '';
   const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
@@ -388,6 +474,7 @@ function renderMachines() {
         ${m.isOffline ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">${_mIcoL('alert', '⚠', 12)}${escapeHtml(t('mach.offline_badge'))}</span>` : ''}
         <span data-machine-live="${escapeHtml(m.id)}">${machineLiveBadge(m)}</span>
         <span data-machine-ctl="${escapeHtml(m.id)}" style="display:inline-flex;gap:6px;">${retired ? '' : machineControlsHtml(m)}</span>
+        ${retired ? '' : smartPlugCardHtml(m)}
         ${active > 0 ? `<span class="machine-jobs-badge">${active} ${escapeHtml(t('mach.active_jobs'))}</span>` : ''}
         ${svcBadge ? `<span class="pro-only">${svcBadge}</span>` : ''}
         ${downtimeBadge ? `<span class="pro-only">${downtimeBadge}</span>` : ''}
@@ -417,6 +504,12 @@ function renderMachines() {
     window.hubAPI?.openExternal?.(a.dataset.url);
   }));
   updateNotifBadge();
+  // Each plug's state, read once per draw (the button line updates in place).
+  machines.forEach((m) => {
+    if (!m || !m.smartPlug || !m.smartPlug.type || m.smartPlug.type === 'none' || m.retiredAt) return;
+    const st = _plugState[m.id];
+    if (!st || Date.now() - (st.at || 0) > 60000) refreshPlug(m.id);
+  });
 }
 
 /**
@@ -596,6 +689,8 @@ function openMachineEditor(machineId = null) {
       <div style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0 24px; line-height:1.45;">
         ${escapeHtml(t('mach.clears_own_bed_hint'))} ${escapeHtml(t('mach.clears_own_bed_mac'))}
       </div>
+
+      ${smartPlugEditorHtml(draft)}
 
       <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
         <label style="font-size:12.5px; font-weight:600; margin-bottom:8px;">${escapeHtml(t('mach.compat_materials'))}</label>
@@ -1124,6 +1219,7 @@ function openMachineEditor(machineId = null) {
       // Only a real true is kept, and unticking REMOVES the field — the rule
       // lib/machine-edit.js applies on the Mac, so the two never disagree on
       // whether a machine clears its own plate (lib/auto-dispatch.js reads it).
+      wireSmartPlugEditor(modal);
       modal.querySelector('#machClearsOwnBed').addEventListener('change', e => {
         if (e.target.checked) draft.clearsOwnBed = true; else delete draft.clearsOwnBed;
       });
@@ -1220,6 +1316,24 @@ function openMachineEditor(machineId = null) {
           method: val('machDepMethod'), monthlyHours: val('machDepMonthlyHours'),
         });
         if (next) draft.depreciation = next; else delete draft.depreciation;
+      }
+      // The smart plug (lib/smart-plug.js reads `smartPlug`); secrets as the
+      // printer's: a blank field over a stored token or password keeps it.
+      {
+        const val = (id) => (document.getElementById(id)?.value ?? '').trim();
+        const type = val('plugType');
+        if (!type || type === 'none') delete draft.smartPlug;
+        else {
+          const was = draft.smartPlug || {};
+          draft.smartPlug = {
+            type, host: val('plugHost'), entity: val('plugEntity'),
+            token: secretInputSave(was.token, document.getElementById('plugToken')?.value),
+            user: val('plugUser'),
+            password: secretInputSave(was.password, document.getElementById('plugPassword')?.value),
+            autoOff: !!document.getElementById('plugAutoOff')?.checked,
+            delayMin: Math.max(0, Math.floor(Number(val('plugDelay')) || 10)),
+          };
+        }
       }
       // Persist locationId
       const machLocEl = document.getElementById('machLocationId');
@@ -1971,6 +2085,9 @@ function machineWearRate(m) {
   const api = {
     machineControlsHtml,
     printerJobCommand,
+    plugSwitch,
+    refreshPlug,
+    smartPlugCardHtml,
     printerControl,
     openDropObject,
 

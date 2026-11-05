@@ -396,6 +396,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (typeof dispatchPrinterAlerts === 'function') dispatchPrinterAlerts(machineStatusCache);
     }).catch(() => {});
   }
+  // A plug the main process switched off after a cooled print (lib/main/smart-plug.js).
+  window.hubAPI?.onSmartPlugAutoOff?.((d) => {
+    toast(t('splug.auto_off_done', { name: (d && d.name) || '' }), 'info', 8000);
+    if (d && d.machineId && typeof refreshPlug === 'function') refreshPlug(d.machineId);
+  });
   if (window.hubAPI?.onPrinterStatusUpdate) {
     window.hubAPI.onPrinterStatusUpdate(data => {
       machineStatusCache = data || {};

@@ -157,6 +157,7 @@ function clientsWithAnyOrder(clients, printLog) {
 }
 
 function renderLogs() {
+  try { renderUnpricedBanner(); } catch (_) { /* advisory */ }
   renderDepositAuditBanner();
   const tbody = $('#logTable tbody');
   // Repopulate tag filter dropdown with all existing tags
@@ -711,6 +712,63 @@ async function disbandKit(kitId) {
   toast(t('kit.disbanded') || 'Kit disbanded', 'success');
 }
 
+/**
+ * Not business, for many jobs at once — the Mac's markNotBusiness. A job that
+ * is a test, a gift or something for the shop itself is left out of revenue
+ * and reports (lib/business-scope.js). If every selected job already is, the
+ * press takes them back in. One undo for the lot.
+ */
+function setNonBusinessFor(ids, on) {
+  const before = [];
+  for (const id of ids) {
+    const o = printLog.find(x => x.id === id);
+    if (!o) continue;
+    before.push([o, o.nonBusiness === true]);
+    KhaytBusinessScope.setNonBusiness(o, on);
+  }
+  if (!before.length) return;
+  saveAll();
+  renderLogs();
+  renderUnpricedBanner();
+  toast(t('unpriced.done', { n: before.length }), 'success', 6000, {
+    undo: () => {
+      for (const [o, was] of before) KhaytBusinessScope.setNonBusiness(o, was);
+      saveAll(); renderLogs(); renderUnpricedBanner();
+    },
+  });
+}
+
+function batchNonBusiness() {
+  const ids = [...selectedOrders];
+  if (!ids.length) return;
+  const all = ids.every((id) => (printLog.find(x => x.id === id) || {}).nonBusiness === true);
+  setNonBusinessFor(ids, !all);
+  selectedOrders.clear();
+  renderBatchBar();
+}
+
+/** "19 finished jobs were charged nothing": finished at price 0 and still
+ *  counted as trade, so the P&L carries their cost with no revenue. The shop
+ *  decides: priced by mistake (open them) or Not business (one press). */
+function renderUnpricedBanner() {
+  const el = document.getElementById('unpricedBanner');
+  if (!el) return;
+  const A = (typeof KhaytAttention !== 'undefined') ? KhaytAttention : null;
+  if (!A || typeof A.selectUnpricedFinished !== 'function' || settings.mode === 'enthusiast') { el.innerHTML = ''; return; }
+  const { count, ids } = A.selectUnpricedFinished(printLog.filter(o => !o.archived));
+  if (!count) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="banner-warn" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-elev);">
+    <span style="flex:1;min-width:200px;">${escapeHtml(t(count === 1 ? 'unpriced.count_one' : 'unpriced.count', { n: count }))}</span>
+    <button class="btn small" data-unpriced="show">${escapeHtml(t('unpriced.show'))}</button>
+    <button class="btn small ghost" data-unpriced="mark">${escapeHtml(t('unpriced.mark'))}</button>
+  </div>`;
+  el.querySelector('[data-unpriced="show"]').onclick = () => {
+    selectedOrders.clear(); ids.forEach((id) => selectedOrders.add(id));
+    renderBatchBar(); renderLogs();
+  };
+  el.querySelector('[data-unpriced="mark"]').onclick = () => setNonBusinessFor(ids, true);
+}
+
 async function batchArchiveOrders() {
   const ids = [...selectedOrders];
   if (ids.length === 0) return;
@@ -770,6 +828,8 @@ function exportOrdersCsv() {
     batchMoveStatus,
     batchAssignMachine,
     batchArchiveOrders,
+    batchNonBusiness,
+    renderUnpricedBanner,
     batchAddToKit,
     renderKitStrip,
     disbandKit,

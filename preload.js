@@ -88,6 +88,12 @@ contextBridge.exposeInMainWorld('hubAPI', {
   revealBackupsFolder:() => ipcRenderer.invoke('hub:reveal-backups-folder'),
   listBackups:        () => ipcRenderer.invoke('hub:list-backups'),
   restoreBackup:      (backupPath) => ipcRenderer.invoke('hub:restore-backup', backupPath),
+  vaultLinksStatus:    () => ipcRenderer.invoke('hub:vault-links-status'),
+  vaultShare:          (o) => ipcRenderer.invoke('hub:vault-share', o || {}),
+  vaultBackup:         (recordIds) => ipcRenderer.invoke('hub:vault-backup', { recordIds }),
+  vaultLinks:          () => ipcRenderer.invoke('hub:vault-links'),
+  vaultLinkUrl:        (grantId) => ipcRenderer.invoke('hub:vault-link-url', { grantId }),
+  vaultLinkChange:     (o) => ipcRenderer.invoke('hub:vault-link-change', o || {}),
   offsiteGet:          () => ipcRenderer.invoke('hub:offsite-get'),
   offsiteSet:          (s) => ipcRenderer.invoke('hub:offsite-set', s || {}),
   offsiteRun:          () => ipcRenderer.invoke('hub:offsite-run'),
@@ -272,6 +278,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudPortalReply: (opts) => ipcRenderer.invoke('hub:cloud-portal-reply', opts),
   webhookPost: (opts) => ipcRenderer.invoke('hub:webhook-post', opts),
   cloudBillingMe: (opts) => ipcRenderer.invoke('hub:cloud-billing-me', opts),
+  cloudDigest: (opts) => ipcRenderer.invoke('hub:cloud-digest', opts),
   cloudPlans: (opts) => ipcRenderer.invoke('hub:cloud-plans', opts),
   cloudSetPlan: (opts) => ipcRenderer.invoke('hub:cloud-set-plan', opts),
   cloudPutKeyset: (opts) => ipcRenderer.invoke('hub:cloud-put-keyset', opts),
@@ -320,6 +327,12 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
   setAppLanguage: (lang, menuStrings) => ipcRenderer.invoke('hub:set-app-language', lang, menuStrings),
+  smartPlug:           (machine, action) => ipcRenderer.invoke('hub:smart-plug', { machine, action }),
+  onSmartPlugAutoOff: (() => {
+    let _cb = null;
+    ipcRenderer.on('smart-plug-auto-off', (_e, data) => { if (_cb) _cb(data); });
+    return (cb) => { _cb = cb; };
+  })(),
   onPrinterStatusUpdate: (() => {
     // Single persistent listener — swaps the callback instead of stacking listeners
     let _cb = null;
