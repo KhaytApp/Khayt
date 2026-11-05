@@ -211,6 +211,7 @@ const {
   resolveStoreSecret,
   resolveStoreSecretFor,
   isStoreSecretMasked,
+  STORE_SECRET_MASK,
   readStoreDecryptedFromDisk,
   dataFilePath,
 } = createStoreIo({
@@ -6728,10 +6729,19 @@ ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, pay
   if (!url || !url.startsWith('https://')) return { ok: false, error: 'Invalid URL — only https:// allowed' };
   try {
     // The order-event webhook comes through here too (deliverWebhook), and its
-    // secret reaches the window masked. Fill it in only for its saved URL; a
-    // subscription's own secret is not masked and passes through.
-    secret = resolveStoreSecretFor(secret, d => d?.settings?.eventWebhooks?.secret,
-      SecretDestination.urlKey(url), d => SecretDestination.urlKey(d?.settings?.eventWebhooks?.url));
+    // secret reaches the window masked — as does the shop's subscription
+    // signing secret (`settings.webhooks.secret`), which a subscription with
+    // none of its own signs with. Filled in from the store only for an address
+    // the shop saved: the event webhook's, or one of its subscriptions'
+    // (`webhookBus.signingSecretFor`). A secret the window typed passes through.
+    if (!secret || isStoreSecretMasked(secret)) {
+      const masked = !!secret;
+      const disk = readStoreDecryptedFromDisk();
+      const found = webhookBus.signingSecretFor(disk && disk.settings, url, SecretDestination.urlKey, STORE_SECRET_MASK);
+      if (found.found) secret = found.secret;
+      else if (masked) throw new Error('The saved secret belongs to a different address. Save the settings first, or enter the secret again.');
+      else secret = '';
+    }
     const body = JSON.stringify(webhookBus.buildWireBody(webhookEvent, payload));
     // V1 stays bare hex, as this transport has always sent it; V2 and the
     // timestamp are added (see webhook-send.js).

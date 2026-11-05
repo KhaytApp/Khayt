@@ -415,6 +415,7 @@ final class Words {
             .merging(WebSaveWords.table) { mine, _ in mine }
             .merging(WebAttachWords.table) { mine, _ in mine }
             .merging(BrowserHostWords.table) { mine, _ in mine }
+            .merging(IntegrationWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── Library grid redesign ─────────────────────────────────────────
@@ -6284,6 +6285,20 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The integrations sections (`IntegrationSettings.swift`): the
+        // desktop's own words for its SMS, webhook, accounting and digest
+        // settings, borrowed so the two apps name each field alike.
+        "sms.title", "sms.provider", "sms.channel", "sms.none", "sms.webhook", "sms.from",
+        "sms.sender", "sms.url", "sms.secret", "sms.test", "sms.test_sent", "sms.need_phone",
+        "set.webhooks_title", "set.webhooks_hint", "whk.enabled", "whk.secret", "whk.test",
+        "hook.delivered", "ewh.title", "ewh.enabled", "ewh.url", "ewh.secret", "ewh.events",
+        "ewh.ev_created", "ewh.ev_status", "ewh.ev_paid", "ewh.test", "ewh.enter_url",
+        "acct.title", "acct.intro", "acct.enable", "acct.format", "acct.fmt_generic", "acct.url",
+        "acct.secret", "acct.sales_account", "acct.sales_account_ph", "acct.tax_code",
+        "acct.tax_code_ph", "acct.mapping_hint", "acct.push_on_paid", "acct.test", "acct.test_sent",
+        "acct.need_url", "acct.push_failed", "digest.frequency", "digest.daily", "digest.weekly",
+        "digest.monthly", "digest.send_hour", "digest.weekday", "digest.monthday",
+        "digest.recipient", "digest.send_test",
         // The first-run setup's filament step, in the Spool sheet's own words.
         "inv.cost", "inv.weight",
         // The product editor. Khayt's own words for the same two fields on its

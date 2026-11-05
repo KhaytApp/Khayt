@@ -216,6 +216,8 @@ struct CampaignTests {
 
     /// A WhatsApp list is phone numbers, and every send here is a mail. The
     /// sheet offered WhatsApp and posted the numbers as addresses.
+    /// A book WITH a text provider sends them through it (`sendTextCampaign`,
+    /// IntegrationsParityTests); the sample has none.
     @Test("a campaign goes by email only: the sheet offers nothing else and a send refuses")
     func emailOnly() async throws {
         #expect(Shop.Segment.channels == ["email"])

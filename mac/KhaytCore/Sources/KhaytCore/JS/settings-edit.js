@@ -84,6 +84,10 @@
     return R && typeof R.MAX_ELEC_RATE === 'number' ? R.MAX_ELEC_RATE : ELEC_RATE_BOUND;
   };
 
+  const webhookBus = () => (typeof global.KhaytWebhookBus !== 'undefined')
+    ? global.KhaytWebhookBus
+    : (function () { try { return require('./webhook-bus.js'); } catch (e) { return null; } })();
+
   const printRisk = () => (typeof global.KhaytPrintRisk !== 'undefined')
     ? global.KhaytPrintRisk
     : (function () { try { return require('./print-risk.js'); } catch (e) { return null; } })();
@@ -678,6 +682,18 @@
           : (held.phoneNumberId || ''),
         token: has(g, 'token') ? String(g.token || '') : (held.token || ''),
       };
+      // The text providers' fields (Twilio, Unifonic, a webhook), the ones the
+      // desktop's SMS screen writes — only when a form names them, so the
+      // WhatsApp Business pane, which names none, keeps them as stored. Text
+      // is trimmed; the secrets are OPAQUE (sealed by the host) and follow the
+      // token's rule: absent keeps, an empty string clears.
+      if (has(g, 'channel')) out.smsConfig.channel = g.channel === 'sms' ? 'sms' : 'whatsapp';
+      for (const k of ['accountSid', 'from', 'senderId', 'url']) {
+        if (has(g, k)) out.smsConfig[k] = String(g[k] == null ? '' : g[k]).trim();
+      }
+      for (const k of ['authToken', 'appSid', 'secret']) {
+        if (has(g, k)) out.smsConfig[k] = String(g[k] || '');
+      }
     }
     if (has(f, 'whatsappTemplates')) {
       const g = f.whatsappTemplates && typeof f.whatsappTemplates === 'object' ? f.whatsappTemplates : {};
@@ -712,9 +728,97 @@
         when: rules ? rules.riskWhen({ printRisk: pr }) : ((s.printRisk || {}).when ?? 'demand'),
       };
     }
+    // ── OUTBOUND WEBHOOKS, WHEN A FORM CARRIES THEM ───────────────────────
+    //
+    // `settings.webhooks`: the switch, the shop's one signing secret (OPAQUE,
+    // sealed by the host; absent keeps, empty clears) and the subscriptions —
+    // each through `KhaytWebhookBus.editSubscription`, and the block through
+    // `withSubscriptions`, which keeps the legacy per-event map the desktop's
+    // screen shows in step and drops retries for a subscription taken away.
+    // The delivery log is kept as stored: it is written by deliveries, not by
+    // a settings form.
+    if (has(f, 'webhooks') && f.webhooks && typeof f.webhooks === 'object') {
+      const g = f.webhooks;
+      const held = s.webhooks || {};
+      const B = webhookBus();
+      let wh = { ...held };
+      if (has(g, 'enabled')) wh.enabled = !!g.enabled;
+      if (has(g, 'secret')) wh.secret = String(g.secret || '');
+      if (B && Array.isArray(g.subscriptions)) {
+        const stored = Array.isArray(held.subscriptions) && held.subscriptions.length
+          ? held.subscriptions : B.migrateLegacyWebhooks(held);
+        const subs = [];
+        for (const one of g.subscriptions) {
+          if (!one || typeof one !== 'object' || !B.isSubscriptionUrl(one.url)) continue;
+          const prev = one.id ? stored.find((x) => x && x.id === one.id) : null;
+          if (one.id && !prev && !one.isNew) continue;
+          subs.push(B.editSubscription(prev, one, one.id, c.nowIso || ''));
+        }
+        wh = B.withSubscriptions(wh, subs);
+      }
+      out.webhooks = wh;
+    }
+    // `settings.eventWebhooks`: one https endpoint, its secret (OPAQUE, the
+    // same rule) and a switch per event that defaults ON — the desktop
+    // writes `false` for one turned off, and nothing else.
+    if (has(f, 'eventWebhooks') && f.eventWebhooks && typeof f.eventWebhooks === 'object') {
+      const g = f.eventWebhooks;
+      const held = s.eventWebhooks || {};
+      const ev = { ...(held.events || {}) };
+      for (const k of ['created', 'status', 'paid']) {
+        if (g.events && has(g.events, k)) ev[k] = !!g.events[k];
+      }
+      out.eventWebhooks = {
+        ...held,
+        enabled: has(g, 'enabled') ? !!g.enabled : !!held.enabled,
+        url: has(g, 'url') ? String(g.url == null ? '' : g.url).trim() : (held.url || ''),
+        secret: has(g, 'secret') ? String(g.secret || '') : (held.secret || ''),
+        events: ev,
+      };
+    }
+    // `settings.accountingSync`: the desktop's fields, merged over what is
+    // held (its export dialogue keeps the sales account and tax code here
+    // too). The secret is OPAQUE, by the same rule. `pushOnPaid` defaults ON,
+    // as the desktop reads it.
+    if (has(f, 'accountingSync') && f.accountingSync && typeof f.accountingSync === 'object') {
+      const g = f.accountingSync;
+      const held = s.accountingSync || { enabled: false, format: 'generic', webhookUrl: '', secret: '', pushOnPaid: true };
+      const FORMATS = ['generic', 'quickbooks', 'xero', 'zoho', 'wafeq', 'daftra'];
+      const next = { ...held };
+      if (has(g, 'enabled')) next.enabled = !!g.enabled;
+      if (has(g, 'pushOnPaid')) next.pushOnPaid = !!g.pushOnPaid;
+      if (has(g, 'format')) next.format = FORMATS.indexOf(g.format) !== -1 ? g.format : 'generic';
+      for (const k of ['webhookUrl', 'salesAccount', 'taxCode']) {
+        if (has(g, k)) next[k] = String(g[k] == null ? '' : g[k]).trim().slice(0, k === 'webhookUrl' ? 2048 : 40);
+      }
+      if (has(g, 'secret')) next.secret = String(g.secret || '');
+      out.accountingSync = next;
+    }
     // Preserved, in the shape their readers expect.
     out.zatcaPhase2 = s.zatcaPhase2 || {};
-    out.emailDigest = s.emailDigest || {};
+    // `settings.emailDigest`, the desktop's fields, when a form carries them:
+    // the hour clamped to the day, the weekday to the week, the day of the
+    // month to 1–28 (the desktop offers no later day, so a short month never
+    // skips it). `lastSentDate` is the sender's, never a form's.
+    if (has(f, 'emailDigest') && f.emailDigest && typeof f.emailDigest === 'object') {
+      const g = f.emailDigest;
+      const held = s.emailDigest || {};
+      const int = (v, lo, hi, d) => { const n = Math.floor(num(v, d)); return clamp(lo, hi, n); };
+      out.emailDigest = {
+        ...held,
+        enabled: has(g, 'enabled') ? !!g.enabled : !!held.enabled,
+        frequency: has(g, 'frequency')
+          ? (['daily', 'weekly', 'monthly'].indexOf(g.frequency) !== -1 ? g.frequency : 'daily')
+          : (held.frequency || 'daily'),
+        hour: has(g, 'hour') ? int(g.hour, 0, 23, 8) : (held.hour ?? 8),
+        weekday: has(g, 'weekday') ? int(g.weekday, 0, 6, 1) : (held.weekday ?? 1),
+        monthday: has(g, 'monthday') ? int(g.monthday, 1, 28, 1) : (held.monthday ?? 1),
+        recipientEmail: has(g, 'recipientEmail') ? String(g.recipientEmail || '').trim() : (held.recipientEmail || ''),
+        lastSentDate: held.lastSentDate || '',
+      };
+    } else {
+      out.emailDigest = s.emailDigest || {};
+    }
     if (!has(f, 'bnpl') || !f.bnpl || typeof f.bnpl !== 'object') out.bnpl = s.bnpl || {};
     out.exchangeRates = s.exchangeRates || {};
     out.exchangeRatesUpdatedAt = s.exchangeRatesUpdatedAt ?? null;

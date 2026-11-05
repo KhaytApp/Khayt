@@ -824,6 +824,10 @@ extension Shop {
         Telemetry.feature(.paymentRecorded, in: self)
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
+        // An invoice this payment made PAID goes to the accounting system, if
+        // the shop switched that on — the desktop's `maybePushAccounting`,
+        // fired from the same moment (its payment dialog).
+        await pushAccountingIfOwed(id)
         // The customer's page shows the balance. A payment is counted as one
         // this app CAN carry to the portal (`channelsThisAppCannotSend`
         // waves it through), and then nothing carried it: the page went on
