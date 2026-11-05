@@ -3525,5 +3525,12 @@
  "mac.qfe_hide_footer": "„Quotes by Khayt“ auf der Angebotsseite ausblenden",
  "mac.qfe_hide_footer_hint": "Das betrifft nur die Angebotsseite, die über den Link geöffnet wird. In einem iframe auf Ihrer eigenen Website ist die Zeile bereits ausgeblendet.",
  "mac.qfe_err_plan_required": "Zum Ausblenden von „Quotes by Khayt“ brauchen Sie den Studio-Tarif von Khayt Cloud, daher bleibt die Zeile auf der Angebotsseite.",
- "mac.qfe_err_bad_footer": "Khayt Cloud hat diese Einstellung nicht angenommen, es wurde nichts geändert."
+ "mac.qfe_err_bad_footer": "Khayt Cloud hat diese Einstellung nicht angenommen, es wurde nichts geändert.",
+ "mac.bnpl_title": "Link für späteres Bezahlen",
+ "mac.bnpl_section": "Später bezahlen (Tabby, Tamara)",
+ "mac.bnpl_note": "Solange Khayt geöffnet ist, prüft es jeden erstellten Link, erledigt den Schritt, auf den der Anbieter wartet (Autorisierung bei Tamara, Erfassung bei Tabby), und verbucht die Zahlung beim Auftrag. Schlüssel werden im Buch verschlüsselt.",
+ "mac.bnpl_forget": "Gespeicherten Schlüssel vergessen",
+ "mac.bnpl_unsealed": "Dieser Schlüssel konnte nicht verschlüsselt werden, daher wurde nichts gespeichert. Das Buch wird synchronisiert und gesichert, und ein unverschlüsselter Schlüssel ginge mit.",
+ "mac.bnpl_none": "Schalten Sie Tabby oder Tamara mit dem API-Schlüssel unter Einstellungen ▸ Online ein.",
+ "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat."
 }

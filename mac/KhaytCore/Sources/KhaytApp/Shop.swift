@@ -1412,6 +1412,8 @@ final class Shop {
             if next.build != nil { startPublishingCustomerRecords() } else { stopPublishingCustomerRecords() }
             // What customers did with their portal links: approvals and deposits.
             if next.build != nil { startWatchingPortal() } else { stopWatchingPortal() }
+            // Tabby / Tamara links the customer may have paid: finished and recorded.
+            if next.build != nil { startWatchingBnpl() } else { stopWatchingBnpl() }
             if next.build != nil { startPollingWhatsAppReports() } else { stopPollingWhatsAppReports() }
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
@@ -2755,6 +2757,15 @@ final class Shop {
     var portalWatchedAt: Date?
     /// After a 429: nothing is asked before this.
     var portalWatchNotBefore: Date?
+    // Tabby / Tamara links finished on their own (Shop+Bnpl.swift).
+    var bnplWatchTask: Task<Void, Never>?
+    var bnplWatchObserver: NSObjectProtocol?
+    var bnplWatchBusy = false
+    var bnplWatchedAt: Date?
+    /// After a provider's 429: nothing is asked before this.
+    var bnplWatchNotBefore: Date?
+    /// The job whose "Pay later link" sheet is open.
+    var pendingBnpl: PendingHold?
     /// The last portal deposit recorded, while its notice can still undo it.
     var portalDepositUndo: PortalDepositUndo?
 

@@ -3525,5 +3525,12 @@
  "mac.qfe_hide_footer": "Masquer « Quotes by Khayt » sur la page de devis",
  "mac.qfe_hide_footer_hint": "Cela ne change que la page de devis ouverte depuis le lien. Dans un iframe sur votre propre site, la ligne est déjà masquée.",
  "mac.qfe_err_plan_required": "Masquer « Quotes by Khayt » nécessite l’offre Studio de Khayt Cloud : la ligne reste donc sur la page de devis.",
- "mac.qfe_err_bad_footer": "Khayt Cloud n’a pas accepté ce réglage, rien n’a été modifié."
+ "mac.qfe_err_bad_footer": "Khayt Cloud n’a pas accepté ce réglage, rien n’a été modifié.",
+ "mac.bnpl_title": "Lien de paiement différé",
+ "mac.bnpl_section": "Paiement différé (Tabby, Tamara)",
+ "mac.bnpl_note": "Tant que Khayt est ouvert, il vérifie chaque lien créé, effectue l'étape attendue par le prestataire (autorisation Tamara, capture Tabby) et enregistre le paiement sur la commande. Les clés sont chiffrées dans le registre.",
+ "mac.bnpl_forget": "Oublier la clé enregistrée",
+ "mac.bnpl_unsealed": "Cette clé n'a pas pu être chiffrée, rien n'a donc été enregistré. Le registre est synchronisé et sauvegardé, et une clé en clair partirait avec lui.",
+ "mac.bnpl_none": "Activez Tabby ou Tamara, avec sa clé API, dans Réglages ▸ En ligne.",
+ "mac.bnpl_watching": "Khayt finalisera ce paiement et l'enregistrera sur la commande dès que le client aura payé."
 }

@@ -3549,6 +3549,21 @@ final class Words {
         // "Bot Token" and "Chat ID" as English literals, and spells two of its
         // own checkboxes "Notify on order on_hold", which is a raw status
         // value shown to a shop. Said properly here, and in both languages.
+        // Tabby / Tamara pay-later links (BnplSettings, BnplLinkSheet).
+        "mac.bnpl_title": ["en": "Pay later link",
+            "ar": "رابط الدفع لاحقًا"],
+        "mac.bnpl_section": ["en": "Pay later (Tabby, Tamara)",
+            "ar": "الدفع لاحقًا (تابي، تمارا)"],
+        "mac.bnpl_note": ["en": "While Khayt is open it checks each link it made, takes the step the provider is waiting for (Tamara's authorise, Tabby's capture) and records the payment on the job. Keys are encrypted in the book.",
+            "ar": "ما دام خيط مفتوحًا فإنه يتحقق من كل رابط أنشأه، ويتخذ الخطوة التي ينتظرها المزوّد (تفويض تمارا، تحصيل تابي)، ويسجّل الدفعة على العمل. المفاتيح مشفّرة في الدفتر."],
+        "mac.bnpl_forget": ["en": "Forget the stored key",
+            "ar": "حذف المفتاح المحفوظ"],
+        "mac.bnpl_unsealed": ["en": "That key could not be encrypted, so nothing was saved. The book syncs and is backed up, and a key in the clear would go with it.",
+            "ar": "تعذّر تشفير المفتاح، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، والمفتاح غير المشفّر سينتقل معه."],
+        "mac.bnpl_none": ["en": "Switch Tabby or Tamara on, with its API key, in Settings ▸ Online.",
+            "ar": "فعّل تابي أو تمارا مع مفتاح API الخاص به من الإعدادات ▸ عبر الإنترنت."],
+        "mac.bnpl_watching": ["en": "Khayt will finish this payment and record it on the job once the customer has paid.",
+            "ar": "سيُكمل خيط هذه الدفعة ويسجّلها على العمل بعد أن يدفع العميل."],
         "mac.tg_section": ["en": "Telegram alerts", "ar": "تنبيهات تيليجرام"],
         "mac.tg_token": ["en": "Bot token", "ar": "رمز البوت"],
         "mac.tg_chat": ["en": "Chat ID", "ar": "معرّف المحادثة"],

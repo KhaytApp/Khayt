@@ -299,6 +299,15 @@ private struct Detail: View {
                 .buttonStyle(.link)
                 .font(.callout)
                 .padding(.top, 2)
+                // A Tabby / Tamara checkout for the customer, when the shop
+                // has either switched on — the desktop's card button.
+                if shop.offersBnpl(job) {
+                    Button(shop.words.callIt("mac.bnpl_title") + "\u{2026}") {
+                        shop.pendingBnpl = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                }
                 // A reminder for money still owed on real work — never a
                 // quote, which is chased by its own follow-up.
                 if job.status != "quote", !job.isSettled {

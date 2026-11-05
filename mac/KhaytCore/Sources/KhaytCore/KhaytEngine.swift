@@ -414,6 +414,13 @@ public actor KhaytEngine {
         // to "is this paid" instead of the three that had drifted apart — the
         // smallest of which was the one that WROTE the field the others read.
         "order-payment",
+        // A Tabby / Tamara pay-later link on a job, and finishing it: what each
+        // provider's status asks of the shop (Tamara's authorise within 72 h,
+        // Tabby's capture), and the requests that say so — the same body, host
+        // and reading of the answer the desktop's main process sends. The Mac
+        // only carries them (`BnplClient`).
+        "bnpl-confirm",
+        "bnpl-requests",
         // Changing a job's own details, and remembering that it changed. Five
         // fields are recorded because those are the ones a customer can be told
         // a different answer about later.
@@ -14204,6 +14211,169 @@ public actor KhaytEngine {
                         + " return { order: o, effects: r.effects.map(function(e){ return e.type; }),"
                         + " webhookEffects: [], refused: r.refused || null };})()",
                           [order], as: PaymentRecorded.self)
+    }
+
+    // MARK: - Pay-later links (Tabby, Tamara)
+    //
+    // `lib/bnpl-confirm.js` (what a link on a job is, and what each provider's
+    // status asks of the shop) and `lib/bnpl-requests.js` (what is sent, and
+    // what an answer means). The record-keeping below is the desktop's
+    // `renderer/integrations.js` (a new link) and `renderer/bnpl-watch.js` (a
+    // check, a capture) — the same calls into the same module, in JavaScript,
+    // so both apps write one shape onto the job.
+
+    /// The next request of a flow, or its result (`KhaytBnplRequests.plan`).
+    public func bnplPlan(flow: String, args: JSONValue, replies: [BnplReply]) throws -> BnplStep {
+        try runtime.call2("KhaytBnplRequests.plan(ARG0, ARG1, ARG2)",
+                          [.string(flow), args, .array(replies.map(\.json))], as: BnplStep.self)
+    }
+
+    /// What a checkout for this job sends, as the desktop's pay-later dialog
+    /// builds it: the job's PRICE, its document number as the reference, its
+    /// project (or job number) as the description, and the customer's name,
+    /// phone and email.
+    public func bnplCheckoutArgs(order: JSONValue, provider: String, settings: [String: JSONValue],
+                                 clients: [JSONValue], buyerName: String) throws -> JSONValue {
+        try runtime.call2("""
+            (function (order, provider, settings, clients, buyerName) {
+              var cfg = ((settings.bnpl || {})[provider]) || {};
+              var client = order.clientId ? (clients || []).find(function (c) { return c && c.id === order.clientId; }) : null;
+              var ref = String((typeof order.jobNumber === 'string' && order.jobNumber) || order.id || '');
+              var label = order.project || ref;
+              var args = {
+                provider: provider,
+                amount: +order.price || 0,
+                currency: cfg.currency || 'SAR',
+                description: label,
+                buyer: { name: client ? buyerName : (order.client || ''), phone: (client && client.phone) || '', email: (client && client.email) || '' },
+                orderId: KhaytInvoiceDocument.documentNumber(order, settings),
+                itemName: label,
+              };
+              if (provider === 'tabby') args.merchantCode = cfg.merchantCode;
+              if (provider === 'tamara') args.country = cfg.country || 'SA';
+              return args;
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [order, .string(provider), .object(settings), .array(clients), .string(buyerName)],
+            as: JSONValue.self)
+    }
+
+    /// The job with a checkout's link remembered on it (`linkRecord` +
+    /// `addLink`), or nil when the provider gave no id to follow.
+    public func bnplAddLink(order: JSONValue, provider: String, created: BnplResult,
+                            amount: Double, currency: String, at: String) throws -> JSONValue? {
+        try runtime.call2("""
+            (function (order, provider, created, amount, currency, at) {
+              var link = KhaytBnplConfirm.linkRecord(provider, created, { amount: amount, currency: currency, at: at });
+              if (!link) return null;
+              KhaytBnplConfirm.addLink(order, link);
+              return order;
+            })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)
+            """, [order, .string(provider), created.json, .number(amount), .string(currency), .string(at)],
+            as: JSONValue?.self)
+    }
+
+    /// One link worth asking about (`linksToCheck`, `linksToCapture`).
+    public struct BnplDue: Decodable, Sendable, Equatable {
+        public let orderId: String
+        public let provider: String
+        public let id: String
+        public let currency: String?
+        /// For a capture: what Tamara is told about the shipment (`captureShipping`).
+        public let shipping: JSONValue?
+    }
+
+    public func bnplLinksToCheck(orders: [JSONValue], now: String) throws -> [BnplDue] {
+        try runtime.call2("""
+            KhaytBnplConfirm.linksToCheck(ARG0, ARG1).map(function (d) {
+              return { orderId: d.orderId, provider: d.link.provider, id: d.link.id, currency: d.link.currency || null };
+            })
+            """, [.array(orders), .string(now)], as: [BnplDue].self)
+    }
+
+    public func bnplLinksToCapture(orders: [JSONValue], now: String) throws -> [BnplDue] {
+        try runtime.call2("""
+            (function (orders, now) {
+              return KhaytBnplConfirm.linksToCapture(orders, now).map(function (d) {
+                var order = orders.find(function (o) { return o && o.id === d.orderId; });
+                return { orderId: d.orderId, provider: d.link.provider, id: d.link.id, currency: d.link.currency || null,
+                         shipping: KhaytBnplConfirm.captureShipping(order) };
+              });
+            })(ARG0, ARG1)
+            """, [.array(orders), .string(now)], as: [BnplDue].self)
+    }
+
+    /// What a check did to the job, as `renderer/bnpl-watch.js` does it.
+    public struct BnplChecked: Decodable, Sendable {
+        /// `gone` (the link is no longer open on the job — another run, or the
+        /// other app, finished it), `failed` (left open; try again), `paid`,
+        /// `closed`, `status` (still open, the provider's status changed) or
+        /// `same` (nothing to write).
+        public let outcome: String
+        public let order: JSONValue
+        /// For `paid`: the payment to record (`paymentFor`) — what was already
+        /// paid plus the link's amount, by the provider's name.
+        public let payment: Payment?
+        /// For `failed`: a STEP failed (authorise / capture) — money waiting on
+        /// the shop, worth saying, unlike a network blip.
+        public let stepFailed: Bool?
+        public struct Payment: Decodable, Sendable, Equatable {
+            public let amount: Double
+            public let method: String
+            public let paidAt: String?
+        }
+    }
+
+    public func bnplApplyCheck(order: JSONValue, provider: String, id: String, result: BnplResult,
+                               today: String, at: String) throws -> BnplChecked {
+        try runtime.call2("""
+            (function (order, provider, id, r, today, at) {
+              var live = (order.bnplLinks || []).find(function (l) { return l && l.provider === provider && l.id === id; });
+              if (!live || live.state !== 'open') return { outcome: 'gone', order: order };
+              if (!r || !r.ok) return { outcome: 'failed', order: order, stepFailed: !!(r && r.remoteStatus) };
+              if (r.state === 'paid') {
+                KhaytBnplConfirm.settle(live, 'paid', r.remoteStatus, at);
+                if (r.step === 'authorised') live.authorisedAt = live.checkedAt;   // Tamara's 21 days run from here
+                return { outcome: 'paid', order: order, payment: KhaytBnplConfirm.paymentFor(order, live, today) };
+              }
+              if (r.state === 'closed') { KhaytBnplConfirm.settle(live, 'closed', r.remoteStatus, at); return { outcome: 'closed', order: order }; }
+              if (live.remoteStatus !== r.remoteStatus) { KhaytBnplConfirm.settle(live, 'open', r.remoteStatus, at); return { outcome: 'status', order: order }; }
+              return { outcome: 'same', order: order };
+            })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)
+            """, [order, .string(provider), .string(id), result.json, .string(today), .string(at)],
+            as: BnplChecked.self)
+    }
+
+    /// What a Tamara capture did to the job, as `captureShippedTamara` does it.
+    public struct BnplCaptured: Decodable, Sendable {
+        /// True when the job changed and is worth writing.
+        public let changed: Bool
+        /// A failure the shop has not been told about yet (said once, not
+        /// every run).
+        public let sayFailure: Bool
+        public let error: String?
+        public let order: JSONValue
+    }
+
+    public func bnplApplyCapture(order: JSONValue, id: String, result: BnplResult, at: String) throws -> BnplCaptured {
+        try runtime.call2("""
+            (function (order, id, r, at) {
+              var live = (order.bnplLinks || []).find(function (l) { return l && l.provider === 'tamara' && l.id === id; });
+              if (!live) return { changed: false, sayFailure: false, order: order };
+              if (r && r.ok) {
+                if (r.captured) live.capturedAt = at;
+                else live.captureDone = true;                  // refunded, cancelled…: never ask again
+                if (r.remoteStatus) live.remoteStatus = String(r.remoteStatus);
+                delete live.captureError;
+                return { changed: true, sayFailure: false, order: order };
+              }
+              var err = (r && r.error) || '';
+              if (r && r.remoteStatus && live.captureError !== err) {
+                live.captureError = err;
+                return { changed: true, sayFailure: true, error: err, order: order };
+              }
+              return { changed: false, sayFailure: false, error: err, order: order };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [order, .string(id), result.json, .string(at)], as: BnplCaptured.self)
     }
 
     // MARK: - The books, as an assistant may ask about them (`khayt-mcp`)
