@@ -83,6 +83,8 @@ test('the Mac and the phone show Order.reference, not the id', () => {
     /Text\((?:job|order|quote)\.id\)/,
     /Text\("#\\\((?:job|order|quote)\.id\)/,
     /\b\w+\.project\.isEmpty \? \w+\.id :/,
+    // The force-unwrapped spelling Spotlight's job search used.
+    /\b\w+\.project! : \w+\.id\b/,
   ], ALLOWED);
   assert.deepEqual(found, [], 'show `.reference`:\n' + found.join('\n'));
 });
