@@ -72,6 +72,15 @@
   const pos = (v) => Math.max(0, Number.isFinite(+v) ? +v : 0);
   const list = (store, key) => (store && Array.isArray(store[key]) ? store[key] : []);
   const err = (status, error) => ({ status, body: { error } });
+  /**
+   * A record about to be changed by a rule that MUTATES (`order-status.apply`
+   * pushes onto `statusHistory`, `spool-edit.applyEdit` onto `priceHistory`).
+   * A spread copies the top level only, so the push landed on the array the
+   * caller's book still held — and a server that asks twice (once to answer,
+   * once inside the write) pushed twice. Every decision here must leave the
+   * book it was handed exactly as it was. JSON, because a record is JSON.
+   */
+  const deepCopy = (record) => JSON.parse(JSON.stringify(record));
 
   // ── Spools on the wire ──────────────────────────────────────────────────
 
@@ -318,8 +327,14 @@
     if (idx === -1) return err(404, 'Order not found');
     const updated = { ...log[idx] };
     if (status) updated.status = status;
+    // null (what the phone sends) or an empty string unassigns; anything that
+    // is not a string or a number is refused rather than read as "unassign".
+    if (machineIn !== undefined && machineIn !== null && typeof machineIn !== 'string'
+        && !(typeof machineIn === 'number' && Number.isFinite(machineIn))) {
+      return err(400, 'Invalid machineId');
+    }
     if (machineIn !== undefined) {
-      const machineId = wireId(machineIn);
+      const machineId = machineIn === null ? null : wireId(machineIn);
       if (!machineId) {
         updated.machineId = null;
         updated.machine = null;
@@ -433,7 +448,7 @@
     if (i === -1) return err(404, 'Spool not found');
     // What is LEFT, in all three of its names — `weight` is what every piece
     // of arithmetic reads, and the one this endpoint once forgot to write.
-    const next = { ...inv[i] };
+    const next = deepCopy(inv[i]);
     SpoolEdit().applyEdit(next, { weight: grams }, { today: todayOf(ctx) });
     next.remaining = next.weight;
     next.weightRemaining = next.weight;
@@ -457,6 +472,14 @@
 
   const WAITING_STATUSES = ['active', 'reminded', 'declined'];
 
+  /** `YYYY-MM-DD`, and a day the calendar has (no 2026-02-30). */
+  function isCalendarDay(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return false;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+  }
+
   /**
    * `PATCH /api/waiting-list/:id` — `{ status }`. A DECLINED entry leaves the
    * list for `waitingListHistory`, stamped `declinedAt`; every reader handles
@@ -468,6 +491,17 @@
     const parsed = cleanBody(raw) || {};
     const { status } = parsed;
     if (!WAITING_STATUSES.includes(status)) return err(400, 'Invalid status');
+    // When to remind the customer — the field the desktop's own editor writes
+    // (renderer/waiting-list.js, lib/intake-queue.js saveItem): a calendar day,
+    // `YYYY-MM-DD`, or '' to clear it. Absent leaves it alone.
+    const hasReminder = Object.prototype.hasOwnProperty.call(parsed, 'reminderDate');
+    let reminderDate;
+    if (hasReminder) {
+      const r = parsed.reminderDate;
+      if (r === null || r === '') reminderDate = '';
+      else if (typeof r === 'string' && isCalendarDay(r.trim())) reminderDate = r.trim();
+      else return err(400, 'Invalid reminderDate');
+    }
     const entries = [...list(cur, 'waitingList')];
     const i = entries.findIndex((w) => w && w.id === itemId);
     if (i === -1) return err(404, 'Waiting list item not found');
@@ -480,6 +514,7 @@
       };
     } else {
       entries[i] = { ...entries[i], status };
+      if (hasReminder) entries[i].reminderDate = reminderDate;
       next = { ...cur, waitingList: entries };
     }
     return { status: 200, body: { ok: true }, store: next, emit: { channel: 'lan-waiting-updated', payload: { id: itemId, status } } };
@@ -566,7 +601,7 @@
       const log = [...list(cur, 'printLog')];
       const i = log.findIndex((o) => o && o.status === from && (o.machine === machineName || o.machineId === machineId));
       if (i !== -1) {
-        const moved = { ...log[i] };
+        const moved = deepCopy(log[i]);
         OrderStatus().apply(moved, to, { now: nowOf(ctx) });
         log[i] = moved;
         store = { ...cur, printLog: log };
@@ -578,7 +613,12 @@
     return out;
   }
 
+  /** Every collection a rule here reads or writes. */
+  const BOOK_KEYS = ['printLog', 'waitingList', 'waitingListHistory', 'settings', 'machines',
+    'clients', 'inventory', 'wasteLog'];
+
   const api = {
+    BOOK_KEYS,
     LAN_SPOOL_FIELDS, LAN_SPOOL_READ_FIELDS, pickLanSpoolFields, pickLanSpoolRead,
     ORDER_STATUSES, WAITING_STATUSES,
     ordersList, machinesList, inventoryList, waitingList, clientsList, orderQuoteUrl,

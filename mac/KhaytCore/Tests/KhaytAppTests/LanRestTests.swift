@@ -165,6 +165,10 @@ struct LanRestTests {
                                      headers: Self.pin).status == 400)
         #expect(try await bench.send("PATCH", "/api/orders/missing", body: Self.json(#"{"status":"qc"}"#),
                                      headers: Self.pin).status == 404)
+        #expect(try await bench.send("PATCH", "/api/orders/" + id, body: Self.json(#"{"machineId":true}"#),
+                                     headers: Self.pin).status == 400, "a machineId that is not an id is refused")
+        #expect(try await bench.send("PATCH", "/api/orders/" + id, body: Self.json(#"{"machineId":null}"#),
+                                     headers: Self.pin).status == 200, "null still unassigns")
         bench.book.put(["id": .string("Q-1"), "status": .string("quote"), "project": .string("Q"),
                         "quoteExpiresAt": .string("2099-01-01")])
         let approved = try await bench.send("POST", "/api/orders/Q-1/approve", body: Self.json("{}"), headers: Self.pin)
@@ -178,6 +182,12 @@ struct LanRestTests {
         let bench = try await Bench(rest: true)
         defer { bench.stop() }
         bench.book.value["waitingList"] = .array([.object(["id": .string("w1"), "project": .string("Ask"), "rev": .number(3)])])
+        let reminded = try await bench.send("PATCH", "/api/waiting-list/w1",
+                                            body: Self.json(#"{"status":"reminded","reminderDate":"2027-02-01"}"#), headers: Self.pin)
+        #expect(reminded.status == 200)
+        #expect(Self.rows(bench, "waitingList").first?["reminderDate"] == .string("2027-02-01"))
+        #expect(try await bench.send("PATCH", "/api/waiting-list/w1", body: Self.json(#"{"status":"reminded","reminderDate":"tomorrow"}"#),
+                                     headers: Self.pin).status == 400)
         let reply = try await bench.send("PATCH", "/api/waiting-list/w1", body: Self.json(#"{"status":"declined"}"#), headers: Self.pin)
         #expect(reply.status == 200)
         #expect(Self.rows(bench, "waitingList").isEmpty)
@@ -211,7 +221,11 @@ struct LanRestTests {
         let bench = try await Bench(rest: true, printerWebhookToken: "hook-secret-123")
         defer { bench.stop() }
         bench.book.value["machines"] = .array([.object(["id": .string("m1"), "name": .string("MK4")])])
-        bench.book.put(["id": .string("J1"), "status": .string("printing"), "machineId": .string("m1"), "project": .string("Vase")])
+        // WITH a history: the desktop wrote this job's twice over (#2252 review),
+        // because its probe and its write shared one book. Here the probe and
+        // the write each cross into JavaScriptCore as a fresh JSON copy.
+        bench.book.put(["id": .string("J1"), "status": .string("printing"), "machineId": .string("m1"), "project": .string("Vase"),
+                        "statusHistory": .array([.object(["status": .string("printing"), "at": .string("2027-01-15T08:00:00.000Z")])])])
         let wrong = try await bench.send("POST", "/api/webhook/printer/m1", body: Self.json(#"{"topic":"PrintDone"}"#),
                                          headers: ["x-khayt-webhook-token": "nope"])
         #expect(wrong.status == 401)
@@ -221,6 +235,8 @@ struct LanRestTests {
                                       headers: ["x-khayt-webhook-token": "hook-secret-123"])
         #expect(ok.status == 200)
         #expect(bench.book.job("J1")?["status"] == .string("post"))
+        guard case .array(let trail)? = bench.book.job("J1")?["statusHistory"] else { Issue.record("no history"); return }
+        #expect(trail.count == 2, "one new entry, not one per decision")
     }
 
     @Test("a server that has not wired the writes does not have the write routes")

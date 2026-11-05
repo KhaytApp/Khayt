@@ -171,3 +171,58 @@ test('a body with prototype keys is cleaned before it is read', () => {
   assert.equal(out.status, 201);
   assert.equal(({}).polluted, undefined);
 });
+
+// ── EVERY DECISION IS PURE (review of #2252) ──────────────────────────────
+//
+// A server asks each write rule twice, the first time on the book it holds.
+// A rule that changed anything it was handed — a nested array pushed onto
+// through a shallow copy — changed the live book, and pushed twice.
+test('no write rule changes the book it is handed, nested arrays included', () => {
+  const b = book();
+  b.printLog[1].statusHistory = [{ status: 'printing', at: '2026-11-01T08:00:00.000Z' }];
+  b.printLog[0].statusHistory = [{ status: 'pending', at: '2026-11-01T07:00:00.000Z' }];
+  b.inventory[0].priceHistory = [{ cost: 70, at: '2026-01-01' }];
+  b.waitingList[0].reminderDate = '2026-11-01';
+  const before = JSON.stringify(b);
+  const at = { ...ctx, nowIso: new Date(NOW).toISOString() };
+  R.orderCreate(b, { project: 'P', clientId: 'c1', machineId: 'm1' }, ctx);
+  R.orderPatch(b, 'o1', { status: 'qc', machineId: 'm1' });
+  R.orderApprove(b, 'q1', at);
+  R.inventoryCreate(b, { material: 'PLA', colourVariant: 'Matte' }, ctx);
+  R.inventoryPatch(b, 's1', { remaining: 10 }, ctx);
+  R.inventoryDelete(b, 's1');
+  R.waitingListPatch(b, 'w1', { status: 'reminded', reminderDate: '2026-12-01' }, ctx);
+  R.waitingListPatch(b, 'w1', { status: 'declined' }, ctx);
+  R.wasteCreate(b, { material: 'PLA', weight: 5, deduct: true }, ctx);
+  R.printerEvent(b, 'm1', { topic: 'PrintDone' }, ctx);
+  assert.equal(JSON.stringify(b), before);
+});
+
+test('asked twice, as a server asks, the printer webhook adds one history entry', () => {
+  const b = book();
+  b.printLog[1].statusHistory = [{ status: 'printing', at: '2026-11-01T08:00:00.000Z' }];
+  R.printerEvent(b, 'm1', { topic: 'PrintDone' }, ctx);        // the probe
+  const out = R.printerEvent(b, 'm1', { topic: 'PrintDone' }, ctx); // inside the write
+  assert.deepEqual(out.store.printLog[1].statusHistory.map((h) => h.status), ['printing', 'post']);
+});
+
+test('PATCH /api/orders/:id: null unassigns, anything else that is not an id is refused', () => {
+  const b = book();
+  assert.equal(R.orderPatch(b, 'o1', { machineId: null }).store.printLog[0].machine, null);
+  for (const bad of [true, {}, [], Infinity]) {
+    assert.equal(R.orderPatch(b, 'o1', { machineId: bad }).status, 400, String(bad));
+  }
+});
+
+test('PATCH /api/waiting-list/:id takes the reminder day the desktop editor writes', () => {
+  const b = book();
+  const set = R.waitingListPatch(b, 'w1', { status: 'reminded', reminderDate: '2026-12-01' }, ctx).store;
+  assert.equal(set.waitingList[0].status, 'reminded');
+  assert.equal(set.waitingList[0].reminderDate, '2026-12-01');
+  const kept = R.waitingListPatch({ ...b, waitingList: [{ id: 'w1', reminderDate: '2026-11-20' }] }, 'w1', { status: 'reminded' }, ctx).store;
+  assert.equal(kept.waitingList[0].reminderDate, '2026-11-20', 'absent leaves it alone');
+  assert.equal(R.waitingListPatch(b, 'w1', { status: 'active', reminderDate: '' }, ctx).store.waitingList[0].reminderDate, '');
+  for (const bad of ['2026-02-30', '12/01/2026', '2026-12-01T00:00:00Z', 20261201]) {
+    assert.equal(R.waitingListPatch(b, 'w1', { status: 'reminded', reminderDate: bad }, ctx).status, 400, String(bad));
+  }
+});

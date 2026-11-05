@@ -716,8 +716,15 @@ Active intake / waiting-list entries (excludes declined). **Requires owner PIN.*
 
 Update intake item status. **Requires owner PIN.**
 
-**Body:** `{ "status": "reminded" }` or `{ "status": "declined" }`  
-Declining moves the item to `waitingListHistory` on desktop.
+**Body:** `{ "status": "active" | "reminded" | "declined", "reminderDate"?: "YYYY-MM-DD" }`  
+Declining moves the item to `waitingListHistory`, stamped `declinedAt` (both apps).
+`reminderDate` (Nov 2026) is the field the desktop's own waiting-list editor writes: a
+calendar day, or `""`/`null` to clear it; absent leaves it alone; anything else is
+**400** `{"error":"Invalid reminderDate"}`.
+
+`PATCH /api/orders/:id`: `machineId: null` (or `""`) unassigns; a `machineId` that is
+not a string or number is **400** `{"error":"Invalid machineId"}` (Nov 2026; it used to
+unassign silently).
 
 **Desktop side effect:** `lan-waiting-updated` IPC.
 
