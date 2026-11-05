@@ -83,6 +83,17 @@ final class QuotesOnPhoneTests: XCTestCase {
         XCTAssertFalse(entries[1].isQuoteExpired(today: "2030-01-01"), "no last day never expires")
     }
 
+    /// A quote for a client billed in euros is stored in euros (#2148), so its
+    /// card carries the quote's own currency, not the shop's.
+    func testAQuoteKeepsItsOwnCurrency() throws {
+        let entries = try JSONDecoder().decode([OrderLogEntry].self, from: Data("""
+            [{"id":"Q-1","status":"quote","price":100,"currency":"EUR"},
+             {"id":"Q-2","status":"quote","price":100}]
+            """.utf8))
+        XCTAssertEqual(entries[0].currency, "EUR")
+        XCTAssertNil(entries[1].currency, "absent means the shop's")
+    }
+
     func testTheSampleShopHasQuotesTheQueueLeavesOut() async throws {
         try book.replace(with: SampleShop.book(), scope: SampleShop.scope())
         let reader = BookReader(book: book)
