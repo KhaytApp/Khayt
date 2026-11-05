@@ -309,7 +309,9 @@ test('SDCP refuses without a mainboard id rather than opening a socket to nothin
   // The id is the printer's address on this protocol: every frame is
   // topic-addressed by it, so a poll without one cannot be answered and must
   // say why rather than timing out for eight seconds per cycle.
-  const at = mainJs.indexOf("if (type === 'sdcp')");
+  // The POLLER's branch; sendPrinterCommand has its own SDCP branch, tested below.
+  const poll = mainJs.indexOf('async function fetchPrinterStatus(');
+  const at = mainJs.indexOf("if (type === 'sdcp')", poll);
   const body = mainJs.slice(at, at + 700);
   assert.match(body, /mainboard ID/i, 'the missing-id case does not explain itself');
   assert.match(body, /sdcpClient\.fetchStatus\(/, 'the branch does not use the tested client');
@@ -323,4 +325,19 @@ test('the default SDCP port is the one the spec names', () => {
   assert.equal(sdcp.DISCOVERY_PORT, 3000);
   assert.match(mainJs, /sdcp: 3030/, 'defaultPrinterPort does not know about SDCP');
   assert.equal(sdcp.websocketUrl('10.0.0.4'), 'ws://10.0.0.4:3030/websocket');
+});
+
+test('pause / resume / cancel reach an SDCP printer through the tested client and its ack', () => {
+  // The Mac sends these (PrinterControl.swift); this app could only watch. The
+  // frame is lib/printer-commands.js's and the answer is sdcp-reply's takeAck.
+  const fn = mainJs.indexOf('async function sendPrinterCommand(');
+  const at = mainJs.indexOf("if (type === 'sdcp')", fn);
+  assert.ok(fn > 0 && at > fn, 'sendPrinterCommand has no SDCP branch');
+  const body = mainJs.slice(at, at + 1400);
+  assert.ok(mainJs.indexOf('resolvePrinterTarget(host)', fn) < at, 'the command branch runs before the host guard');
+  assert.match(body, /mainboard ID/i);
+  assert.match(body, /transports: \['sdcp'\]/);
+  assert.match(body, /sdcpClient\.askOnce\(/);
+  assert.match(body, /connect: \(url\) => new WebSocket\(url\)/);
+  assert.match(body, /takeAck\(msg, board, req\.sdcp\.cmd, req\.sdcp\.requestId\)/);
 });

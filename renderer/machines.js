@@ -149,9 +149,9 @@ function _printerVerbOk(m, cmd) {
   const PC = (typeof KhaytPrinterCommands !== 'undefined') ? KhaytPrinterCommands : null;
   const api = (m && m.printerApi) || {};
   if (!PC) return false;
-  // The shared answer (supports): one table of what each protocol can do, and
-  // HTTP is the only transport this app performs.
-  return PC.supports(api.type, cmd, { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer', transports: ['http'] });
+  // The shared answer (supports): one table of what each protocol can do. This
+  // app performs HTTP, Bambu's MQTT and Elegoo's SDCP (main.js sendPrinterCommand).
+  return PC.supports(api.type, cmd, { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer', transports: ['http', 'mqtt', 'sdcp'] });
 }
 
 function machineControlsHtml(m) {
@@ -176,6 +176,19 @@ function machineControlsHtml(m) {
   }
   if (_printerVerbOk(m, 'cancel')) out.push(`<button class="btn small danger" data-act="printer-cancel" data-id="${id}">${escapeHtml(t('mach.printer_cancel'))}</button>`);
   if (m.printerApi.type === 'moonraker') out.push(`<button class="btn small ghost" data-act="printer-drop" data-id="${id}">${escapeHtml(t('mach.drop_object'))}…</button>`);
+  // A Bambu's speed preset and chamber light (the Mac's card has both). One
+  // compact menu; a change event sends it, and the menu resets to its label.
+  const PC = (typeof KhaytPrinterCommands !== 'undefined') ? KhaytPrinterCommands : null;
+  if (PC && m.printerApi.type === 'bambu' && !PC.buildControl('bambu', 'light', 'on', { transports: ['mqtt'] }).unsupported) {
+    const speeds = [1, 2, 3, 4].map((n) => `<option value="speed:${n}">${escapeHtml(t('mach.printer_speed_' + n))}</option>`).join('');
+    out.push(`<select class="btn small ghost" data-printer-control="${id}" aria-label="${escapeHtml(t('mach.printer_speed'))}">
+      <option value="" selected>${escapeHtml(t('mach.printer_speed'))} / ${escapeHtml(t('mach.printer_light'))}…</option>
+      <optgroup label="${escapeHtml(t('mach.printer_speed'))}">${speeds}</optgroup>
+      <optgroup label="${escapeHtml(t('mach.printer_light'))}">
+        <option value="light:on">${escapeHtml(t('mach.printer_light_on'))}</option>
+        <option value="light:off">${escapeHtml(t('mach.printer_light_off'))}</option>
+      </optgroup></select>`);
+  }
   return out.join('');
 }
 
@@ -197,7 +210,31 @@ async function printerJobCommand(machineId, command, confirmed = false) {
   try {
     const r = await window.hubAPI.printerCommand(m, command).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
     if (r && r.ok) toast(t('mach.printer_sent'), 'success');
-    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), 'error');
+    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), r && r.unconfirmed ? 'warning' : 'error');
+  } finally {
+    _printerBusy.delete(machineId);
+  }
+}
+
+// Speed changes the print running now, so it asks (the Mac's speed_ask); the
+// light is harmless and goes straight through.
+async function printerControl(machineId, control, value, confirmed = false) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || _printerBusy.has(machineId) || !window.hubAPI?.printerControl) return;
+  if (control === 'speed' && !confirmed) {
+    openFormModal({
+      title: t('mach.speed_ask', { machine: m.name || '', speed: t('mach.printer_speed_' + value) }),
+      bodyHtml: `<p style="margin:0;">${escapeHtml(t('mach.speed_why'))}</p>`,
+      saveLabel: t('mach.speed_set'),
+      onSave: () => { printerControl(machineId, control, value, true); return true; },
+    });
+    return;
+  }
+  _printerBusy.add(machineId);
+  try {
+    const r = await window.hubAPI.printerControl(m, control, value).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+    if (r && r.ok) toast(t('mach.printer_sent'), 'success');
+    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), r && r.unconfirmed ? 'warning' : 'error');
   } finally {
     _printerBusy.delete(machineId);
   }
@@ -1134,7 +1171,9 @@ function openMachineEditor(machineId = null) {
           host:         document.getElementById('machApiHost')?.value.trim() || '',
           port:         document.getElementById('machApiPort')?.value ? parseInt(document.getElementById('machApiPort').value) : null,
           apiKey:       secretInputSave(draft.printerApi?.apiKey, document.getElementById('machApiKey')?.value),
-          accessCode:   document.getElementById('machApiAccessCode')?.value.trim() || '',
+          // As the API key: a blank field over a stored code keeps it. Read raw,
+          // an edit that did not retype it saved '' and erased the Bambu's code.
+          accessCode:   secretInputSave(draft.printerApi?.accessCode, document.getElementById('machApiAccessCode')?.value),
           printerSlug:  document.getElementById('machApiSlug')?.value.trim() || '',
         };
       }
@@ -1932,6 +1971,7 @@ function machineWearRate(m) {
   const api = {
     machineControlsHtml,
     printerJobCommand,
+    printerControl,
     openDropObject,
 
     MACHINE_COLORS,

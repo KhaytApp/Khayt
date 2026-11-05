@@ -88,6 +88,12 @@ contextBridge.exposeInMainWorld('hubAPI', {
   revealBackupsFolder:() => ipcRenderer.invoke('hub:reveal-backups-folder'),
   listBackups:        () => ipcRenderer.invoke('hub:list-backups'),
   restoreBackup:      (backupPath) => ipcRenderer.invoke('hub:restore-backup', backupPath),
+  offsiteGet:          () => ipcRenderer.invoke('hub:offsite-get'),
+  offsiteSet:          (s) => ipcRenderer.invoke('hub:offsite-set', s || {}),
+  offsiteRun:          () => ipcRenderer.invoke('hub:offsite-run'),
+  offsitePickFolder:   () => ipcRenderer.invoke('hub:offsite-pick-folder'),
+  offsiteList:         () => ipcRenderer.invoke('hub:offsite-list'),
+  offsiteRestore:      (name) => ipcRenderer.invoke('hub:offsite-restore', name),
   exportCsvBundle:    (files) => ipcRenderer.invoke('hub:export-csv-bundle', files),
   createRestorePoint: (opts) => ipcRenderer.invoke('hub:create-restore-point', opts),
   listRestorePoints:  () => ipcRenderer.invoke('hub:list-restore-points'),
@@ -307,6 +313,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Pause / resume / cancel the running job. Main validates the host and the
   // command name; nothing here is trusted.
   printerCommand:      (machine, command) => ipcRenderer.invoke('hub:printer-command', { machine, command }),
+  printerControl:      (machine, control, value) => ipcRenderer.invoke('hub:printer-control', { machine, control, value }),
   // What is on the plate, and dropping one of it. Klipper only, and the drop
   // cannot be undone — see lib/exclude-object.js.
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),

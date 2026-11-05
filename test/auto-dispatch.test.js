@@ -233,3 +233,31 @@ test('nothing can propose a machine whose bed is unaccounted for', () => {
               `a bed of ${JSON.stringify(bed)} was treated as clear`);
   }
 });
+
+// ── WHAT THE BOOK KNOWS ────────────────────────────────────────────────────
+
+/// Nothing writes `lastFinishedAt` on a machine and most pollers never report
+/// one, so a bed marked clear once used to stay clear for ever. A job on that
+/// machine finished after the stamp is a part on the plate.
+test('a job finished on the machine after its bed was cleared makes the bed not clear again', () => {
+  const m = machine({ bedClearedAt: '2026-09-11T10:00:00Z' });
+  const idle = { state: 'idle' };                       // no lastFinishedAt from the poller
+  const done = job({ id: 'D1', status: 'completed', machineId: 'M1', completedAt: '2026-09-12T08:00:00Z' });
+  const out = ad.plan({ orders: [done, job()], machines: [m], live: { M1: idle } });
+  assert.deepEqual(out.proposals, []);
+  assert.deepEqual(out.waiting, [{ machineId: 'M1', blocked: 'ad.bed_not_clear' }]);
+
+  // Cleared again after that print: offered.
+  const again = ad.plan({ orders: [done, job()], machines: [machine({ bedClearedAt: '2026-09-12T09:00:00Z' })], live: { M1: idle } });
+  assert.deepEqual(again.proposals.map((p) => [p.orderId, p.machineId]), [['J1', 'M1']]);
+});
+
+/// Send sets machineId and nothing else, so the machine is still idle until
+/// somebody starts the job. It must not be offered a second one meanwhile.
+test('a machine already sent a job that has not started is not offered another', () => {
+  const sent = job({ id: 'S1', machineId: 'M1' });
+  const out = ad.plan({ orders: [sent, job({ id: 'J2' })], machines: [machine()], live: { M1: ready } });
+  assert.deepEqual(out.proposals, [], 'two jobs promised one plate');
+  assert.deepEqual(out.idle, []);
+  assert.deepEqual(out.waiting, []);
+});

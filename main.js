@@ -68,6 +68,8 @@ const {
   mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
+const KhaytSdcpProtocol = require('./lib/sdcp');
+const KhaytSdcpReply = require('./lib/sdcp-reply');
 const { normalizeProgress, fileProgressPct, explainPrinterHttp } = require('./lib/printer-status');
 const KhaytDuet = require('./lib/duet');
 const KhaytRepetier = require('./lib/repetier');
@@ -1432,6 +1434,7 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // name, the request — is `lib/printer-upload.js`, which the Mac app sends with
 // too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
@@ -1849,6 +1852,32 @@ ipcMain.handle('hub:relocate-printers', async (_e, { machines, statusCache, requ
 
 // BNPL checkout links (Tabby, Tamara, Stripe) — lib/main/payment-links.js.
 registerPaymentLinks({ ipcMain, resolveStoreSecret });
+// The nightly off-site backup (lib/main/offsite-backup.js): the Mac's, to the
+// same files. Sealed with the Khayt Cloud key, so only while that is unlocked.
+require('./lib/main/offsite-backup.js').registerOffsiteBackup({
+  app, ipcMain, dialog, BrowserWindow,
+  getDek: () => (cloudBackend ? cloudDek : null),
+  readBookBytes: () => { try { return fs.readFileSync(dataFilePath()); } catch (_) { return null; } },
+  decryptForWindow: async (bytes, event) => {
+    const parsed = safeJsonParse(Buffer.from(bytes).toString('utf8'));
+    await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
+    return JSON.stringify(decryptStoreSecrets(JSON.parse(JSON.stringify(parsed))));
+  },
+  libraryBucket: () => {
+    const b = printLibS3();
+    if (!b) return null;
+    const cfg = printLibS3Settings();
+    let host = String(cfg.endpoint || '');
+    try { host = new URL(host).host; } catch (_) { /* keep as typed */ }
+    return { ...b, label: `${cfg.bucket} · ${host}` };
+  },
+  libraryDrive: () => printLibDrive(),
+});
+// Every printer call takes the machine the window holds, whose credentials are
+// masked; this puts the real ones back from the book on disk.
+const machineSecrets = require('./lib/main/machine-secrets.js').createMachineSecrets({
+  readDisk: () => readStoreDecryptedFromDisk(), isMasked: isStoreSecretMasked,
+});
 
 // ── Telemetry (TELEMETRY-SPEC) ──────────────────────────────────────────────
 // OFF by default and gated on explicit per-stream consent. Scrubbing happens HERE — the
@@ -2057,6 +2086,8 @@ ipcMain.handle('hub:mint-api-token', async (_e, { label, scopes } = {}) => {
 let _diskStoreVersion = null;
 
 ipcMain.handle('hub:save-store', async (event, data) => {
+  // A save is when a credential changes: the next printer call reads it fresh.
+  machineSecrets.forget();
   try {
     if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
       const msg = `This data file was written by a newer version of ${FLAVOR_NAME} (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update ${FLAVOR_NAME}.`;
@@ -5087,6 +5118,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
  * other printer call — isAllowedPrinterHost keeps it on the LAN.
  */
 async function fetchPrinterHistory(machine, limit) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
@@ -5119,8 +5151,15 @@ async function fetchPrinterHistory(machine, limit) {
   }
 }
 
+// Bambu's `sequence_id`: "incremented by 1 on each request" (OpenBambuAPI).
+// Each command opens its own connection here, so it only has to be distinct
+// enough to match the reply; seeded from the clock so a restart does not reuse.
+let _bambuSeq = Math.floor(Date.now() / 1000) % 1e9;
+function nextBambuSequence() { _bambuSeq = (_bambuSeq + 1) % 1e9; return String(_bambuSeq); }
+
 async function sendPrinterCommand(machine, command) {
-  const { type, host, port, apiKey, printerSlug } = (machine && machine.printerApi) || {};
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  const { type, host, port, apiKey, printerSlug, accessCode, serial } = (machine && machine.printerApi) || {};
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
   // address the name resolved to, never to the name looked up again.
   const target = await resolvePrinterTarget(host);
@@ -5130,6 +5169,42 @@ async function sendPrinterCommand(machine, command) {
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };
   }
+  // ── NOT HTTP: Bambu (MQTT over TLS) and Elegoo SDCP (WebSocket) ──────────
+  // The Mac has paused, resumed and cancelled these since PrinterControl.swift;
+  // this app polled them but could only watch. The bytes are the shared
+  // builder's (lib/printer-commands.js), so both apps send the same frame.
+  if (type === 'bambu') {
+    const dev = String(serial || printerSlug || '').trim();
+    if (!dev) return { ok: false, error: 'Bambu needs the printer serial number (Settings → Device on the printer).' };
+    if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
+    const req = printerCommands.buildCommand(type, command, null, { transports: ['mqtt'], sequenceId: nextBambuSequence() });
+    if (req.unsupported) return { ok: false, error: req.unsupported };
+    const r = await bambu.bambuSendCommand({ host: printerHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
+    return r.ok ? { ok: true, command } : r;
+  }
+  if (type === 'sdcp') {
+    const board = String(serial || printerSlug || '').trim();
+    if (!board) return { ok: false, error: 'SDCP needs the printer’s mainboard ID — run a network scan to find it.' };
+    const req = printerCommands.buildCommand(type, command, null, { transports: ['sdcp'], mainboardId: board });
+    if (req.unsupported) return { ok: false, error: req.unsupported };
+    try {
+      await sdcpClient.askOnce({
+        connect: (url) => new WebSocket(url),
+        url: KhaytSdcpProtocol.websocketUrl(printerHost),
+        request: JSON.parse(req.sdcp.frame),
+        pick: (msg) => {
+          const a = KhaytSdcpReply.takeAck(msg, board, req.sdcp.cmd, req.sdcp.requestId);
+          if (!a) return null;
+          if (!a.ok) throw new Error(a.error);
+          return true;
+        },
+      });
+      return { ok: true, command };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e).replace(/^SDCP reply rejected: /, 'The printer refused: ') };
+    }
+  }
+
   const base = `http://${printerHost}:${portNum}`;
   const headers = {};
   if (apiKey) {
@@ -5244,6 +5319,7 @@ async function sendPrinterCommand(machine, command) {
  * a list from some seconds ago, and the object it names may have finished.
  */
 async function plateObjects(machine) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
@@ -5297,6 +5373,30 @@ ipcMain.handle('hub:printer-exclude-object', async (_e, { machine, name } = {}) 
 
 ipcMain.handle('hub:printer-command', async (_e, { machine, command } = {}) =>
   sendPrinterCommand(machine, command));
+
+/**
+ * A Bambu's speed preset and chamber light — the Mac's PrinterControl.swift
+ * `.speed` / `.light`. The request is lib/printer-commands.js `buildControl`,
+ * which accepts only its closed set of values, so nothing typed reaches the wire.
+ */
+async function sendPrinterControl(machine, control, value) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
+  const { type, host, port, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
+  if (type !== 'bambu') return { ok: false, error: `${control} is not available for this printer type` };
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const portNum = parseInt(port || defaultPrinterPort(type), 10);
+  if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port number' };
+  const dev = String(serial || printerSlug || '').trim();
+  if (!dev) return { ok: false, error: 'Bambu needs the printer serial number (Settings → Device on the printer).' };
+  if (!accessCode) return { ok: false, error: 'Bambu needs the LAN access code.' };
+  const req = printerCommands.buildControl(type, control, value, { transports: ['mqtt'], sequenceId: nextBambuSequence() });
+  if (req.unsupported) return { ok: false, error: req.unsupported };
+  const r = await bambu.bambuSendCommand({ host: target.urlHost, port: portNum, accessCode, serial: dev, mqtt: req.mqtt });
+  return r.ok ? { ok: true, control } : r;
+}
+ipcMain.handle('hub:printer-control', async (_e, { machine, control, value } = {}) =>
+  sendPrinterControl(machine, control, value));
 // Read-only: safe to call while the printer is mid-job, which is when a shop is
 // most likely to reach for it.
 /**
@@ -5338,6 +5438,7 @@ function stockOptsFor(machine) {
 }
 
 async function fetchPrinterStatus(machine) {
+  machine = machineSecrets.fill(machine);  // the window holds the mask (lib/main/machine-secrets.js)
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
   // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
   // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
@@ -5887,6 +5988,9 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
 // The unlocked backend (with the in-memory DEK) lives only for the session; the
 // passphrase is never stored, so the renderer re-unlocks each launch.
 let cloudBackend = null;
+// The shop's data key while Khayt Cloud is unlocked here, for the off-site
+// backup to seal with (lib/main/offsite-backup.js). Cleared on lock.
+let cloudDek = null;
 
 // The shop's cloud token, for the server it was saved for. Every handler below
 // takes the URL from the window; a saved token goes only to the saved server's
@@ -6480,6 +6584,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
   try {
     token = cloudToken(token, url);
     const dek = cloudClient.unlockWithPassphrase(String(passphrase || ''), keyset);
+    cloudDek = dek;
     cloudBackend = cloudClient.backendFor(url, shopId, token, dek, {
       // Warm launch: let this session start from the server view the last one
       // left behind, so the first pull asks for a slice instead of the base and
@@ -6497,7 +6602,7 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
       },
     });
     return { ok: true };
-  } catch (e) { cloudBackend = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
+  } catch (e) { cloudBackend = null; cloudDek = null; return { ok: false, error: 'Wrong passphrase or invalid keyset' }; }
 });
 
 /* ── Organisations (multi-shop) ───────────────────────────────────────────────
@@ -6662,7 +6767,7 @@ ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; clearOrgSession(); return { ok: true }; });
+ipcMain.handle('hub:cloud-lock', () => { cloudBackend = null; cloudDek = null; clearOrgSession(); return { ok: true }; });
 ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
   try { return { ok: true, ...(await cloudBackend.push(snapshot)) }; }

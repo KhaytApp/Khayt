@@ -66,6 +66,6 @@ test('no printer path in main.js falls back to the text-only host check', () => 
   // that and then sends a key is the bug this module exists to close.
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'main.js'), 'utf8');
   assert.doesNotMatch(src, /isAllowedPrinterHost\(printerHost\)/);
-  assert.equal((src.match(/await resolvePrinterTarget\(host\)/g) || []).length, 5,
-    'upload, history, command, plate and status each resolve and pin');
+  assert.equal((src.match(/await resolvePrinterTarget\(host\)/g) || []).length, 6,
+    'upload, history, command, control (Bambu speed/light), plate and status each resolve and pin');
 });

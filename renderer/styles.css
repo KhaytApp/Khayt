@@ -5332,3 +5332,15 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .licence-at-sale.credit { background: var(--surface-2); border: 1px solid var(--border-soft); }
 .licence-at-sale .licence-credit-line { color: var(--text-muted); user-select: text; overflow-wrap: anywhere; }
 .licence-at-sale .btn { justify-self: start; margin-top: 4px; }
+
+/* Next up (renderer/kanban.js renderNextUp): the dispatcher's proposals. */
+.next-up { padding: 12px 14px; margin-bottom: 14px; }
+.next-up-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+.next-up-row:first-of-type { border-top: 0; }
+.next-up-main { flex: 1; min-width: 0; }
+.next-up-why { font-size: 12px; color: var(--text-muted); }
+.next-up-waiting .next-up-machine { color: var(--text-muted); }
+.next-up-waiting .next-up-why { flex: 1; }
+.next-up-caveat { font-size: 12px; color: var(--warning, #b7791f); }
+/* The queue runs the other way in Arabic, so the arrow turns with it. */
+[dir="rtl"] .next-up-arrow { display: inline-block; transform: scaleX(-1); }
