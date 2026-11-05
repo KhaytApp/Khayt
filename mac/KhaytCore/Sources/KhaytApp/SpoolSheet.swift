@@ -38,6 +38,9 @@ struct SpoolSheet: View {
     /// worked out from. Asked only when editing: a new spool records it itself.
     @State private var fullWeight: Double = 0
     @State private var lot = ""
+    /// Which site the spool is kept at; empty is Unassigned. A new spool
+    /// starts at the site the shop is looking at, as the desktop's does.
+    @State private var locationId = ""
     @State private var reorderPoint: Double = 200
     /// Whether the shop has said a reorder point for THIS spool. A new spool
     /// shows the threshold it would get anyway — the shop's own for grams, the
@@ -301,6 +304,23 @@ struct SpoolSheet: View {
                     // A lot is a short code; unbounded, the field ran off the sheet.
                     TextField("", text: $lot).textFieldStyle(.roundedBorder).frame(width: 220)
                 }
+                // WHERE IT IS KEPT — only for a shop with sites, or a spool
+                // still naming one, as the machine sheet asks it. Moving part
+                // of a roll is Transfer, on the card's menu.
+                if !shop.locations.isEmpty || !locationId.isEmpty {
+                    GridRow {
+                        Text(shop.words.callIt("inv.location_branch")).foregroundStyle(.secondary)
+                        Picker("", selection: $locationId) {
+                            Text(shop.words.callIt("inv.location_unassigned")).tag("")
+                            ForEach(shop.locations) { loc in Text(loc.name).tag(loc.id) }
+                            if !locationId.isEmpty && shop.locationName(locationId) == nil {
+                                Text(shop.words.callIt("mac.location_gone")).tag(locationId)
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
                 if !isNew {
                     // WHEN IT WAS BOUGHT, beside when it was opened. The two
                     // answer different questions — how long it has been in the
@@ -418,6 +438,7 @@ struct SpoolSheet: View {
         var weight: Double = 1000
         var fullWeight: Double = 0
         var lot = ""
+        var locationId = ""
         var reorderPoint: Double = 200
         /// False for a new spool nobody typed a reorder point into: see
         /// `SpoolSheet.reorderPointSet`.
@@ -439,6 +460,7 @@ struct SpoolSheet: View {
                  weight: spool.weight ?? 0,
                  fullWeight: spool.spoolWeight ?? 0,
                  lot: spool.lot ?? "",
+                 locationId: spool.locationId ?? "",
                  reorderPoint: spool.reorderPoint ?? 200,
                  reorderPointSet: true,
                  printTemp: spool.printTemp ?? 0,
@@ -459,6 +481,8 @@ struct SpoolSheet: View {
                 "weight": .number(weight),
                 "unit": .string(unit),
                 "lot": .string(lot),
+                // `spool-edit.js` writes no key for Unassigned.
+                "locationId": .string(locationId),
                 "colourVariant": .string(colourVariant),
                 // Sent even at zero, which is how the rule is told to CLEAR one:
                 // it stores nothing for a value that is not above zero, so a shop
@@ -491,13 +515,17 @@ struct SpoolSheet: View {
     private var form: Form {
         Form(material: material, unit: unit, colourVariant: colourVariant, swatch: swatch,
              cost: cost, vatAmount: vatAmount, weight: weight, fullWeight: fullWeight,
-             lot: lot, reorderPoint: reorderPoint, reorderPointSet: reorderPointSet, printTemp: printTemp, bedTemp: bedTemp,
+             lot: lot, locationId: locationId, reorderPoint: reorderPoint, reorderPointSet: reorderPointSet, printTemp: printTemp, bedTemp: bedTemp,
              maxSpeed: maxSpeed, openedAt: openedAt, purchasedAt: purchasedAt,
              reorderQty: reorderQty)
     }
 
     private func fill() {
-        guard let spool = existing else { focused = true; return }
+        guard let spool = existing else {
+            locationId = shop.siteFilter ?? ""
+            focused = true
+            return
+        }
         let f = Form.opening(spool, unit: shop.unit(of: spool)?.unit ?? "g")
         material = f.material
         colourVariant = f.colourVariant
@@ -508,6 +536,7 @@ struct SpoolSheet: View {
         fullWeight = f.fullWeight
         unit = f.unit
         lot = f.lot
+        locationId = f.locationId
         reorderPoint = f.reorderPoint
         reorderPointSet = f.reorderPointSet
         printTemp = f.printTemp

@@ -43,11 +43,6 @@ const RENDERER = path.join(ROOT, 'renderer');
  */
 const ALLOWED = [
   {
-    file: 'invoicing.js',
-    snippet: "order.status = order.status === 'completed' ? 'completed' : order.status;",
-    why: 'Writes the status back unchanged. Reads nothing about the job.',
-  },
-  {
     file: 'kanban.js',
     snippet: "if (status === 'completed') {",
     why: 'Offers the "Mark delivered" button, which a delivered job must not be offered.',

@@ -120,6 +120,7 @@ struct GoToPalette: View {
         case .model: "cube"
         case .product: "tag"
         case .machine: "printer"
+        case .spool: "circle.circle"
         case .screen: entry.id.hasPrefix("command:") ? "command" : "rectangle.stack"
         case .folder: "folder"
         case .archive: "doc.zipper"

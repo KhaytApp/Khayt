@@ -2437,6 +2437,7 @@
   "cn.credit_amount": "クレジット金額",
   "cn.reason": "理由",
   "cn.reason_ph": "例：不良品、注文キャンセル",
+  "cn.nothing_left": "この注文にはこれ以上クレジットできる金額がありません。",
   "cn.generate": "クレジットノートを発行",
   "wo.title": "作業指示書",
   "oe.courier": "宅配業者 / 配送会社",

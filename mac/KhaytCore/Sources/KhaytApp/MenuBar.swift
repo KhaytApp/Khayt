@@ -164,7 +164,25 @@ final class FloorStatus {
         popover.contentSize = NSSize(width: 320, height: 1)
         popover.contentViewController = NSHostingController(rootView: FloorPanel(shop: shop).modifier(ShopsLocale(words: shop.words)))
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+        Self.joinTheSpaceInFront(popover)
         self.popover = popover
+    }
+
+    /// Over another app's FULL-SCREEN Space the panel did not appear: the menu
+    /// bar slid down, the click landed, and the popover's window opened on the
+    /// desktop Space behind, where Khayt's own window lives. A popover's window
+    /// is an ordinary one and joins only the Space its app is on. Telling it
+    /// it is a full-screen auxiliary that may join any Space puts it where the
+    /// click was, and ordering it front without activating Khayt keeps the
+    /// person in their full-screen app. It does not activate the app, because
+    /// activating would switch to Khayt's window's Space, which is the same
+    /// failure seen from the other side.
+    static func joinTheSpaceInFront(_ popover: NSPopover) {
+        guard let window = popover.contentViewController?.view.window else { return }
+        window.collectionBehavior.formUnion([.fullScreenAuxiliary, .canJoinAllSpaces, .transient])
+        window.level = .popUpMenu
+        window.orderFrontRegardless()
+        window.makeKey()
     }
 }
 

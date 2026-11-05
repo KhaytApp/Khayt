@@ -30,14 +30,24 @@ const _topCtx = () => ({
    ============================================================ */
 /**
  * This month's trade revenue, the figure a monthly revenue goal is measured
- * against: finished, not voided, not the shop's own prints, net of tax — the
- * same set the Simple reports' "Revenue this month" tile counts.
+ * against: finished, not voided, not the shop's own prints, net of tax —
+ * `KhaytKpiRows.tradeRevenue`, the one rule the Mac's goal reads too. This
+ * summed `orderNetRevenueBase` here, which is GROSS of tax, so the bar and
+ * the Mac's disagreed by the VAT on every job.
  */
 function monthTradeRevenue(now = new Date()) {
-  const m = localMonthStr(now);
-  return printLog
-    .filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && (o.date || '').startsWith(m))
-    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  const [from, to] = KhaytKpiRows.bounds('month', now);
+  return KhaytKpiRows.tradeRevenue({
+    orders: printLog, from, to,
+    settings: typeof settings !== 'undefined' ? settings : {},
+    clients: typeof clients !== 'undefined' ? clients : [],
+    known: (typeof KhaytCurrencies !== 'undefined' && KhaytCurrencies.CURRENCIES) || undefined,
+  });
+}
+
+/** Last month's, on the same rule — what the month-over-month chip compares with. */
+function prevMonthTradeRevenue(now = new Date()) {
+  return monthTradeRevenue(new Date(now.getFullYear(), now.getMonth() - 1, 15));
 }
 
 /**
@@ -48,19 +58,25 @@ function monthTradeRevenue(now = new Date()) {
  * dashboard, which every built-in design replaces with its own, and the
  * redesign moved revenue to Analytics. So it lives here now, on both the
  * Simple and the Professional screen, and is always THIS month whatever range
- * the Analytics picker shows.
+ * the Analytics picker shows. The share, the pace and the change from last
+ * month are `KhaytKpiRows.goalPace`'s, so the Mac's bar says the same.
  */
 function monthGoalHtml(now = new Date()) {
   const goal = +settings.monthlyGoal || 0;
   const biz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
   if (!(goal > 0) || !biz) return '';
   const rev = monthTradeRevenue(now);
-  const pct = Math.min(100, (rev / goal) * 100);
-  const day = now.getDate();
-  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const forecast = day < days && rev > 0 ? Math.round((rev / day) * days) : null;
+  const pace = KhaytKpiRows.goalPace({
+    revenue: rev, previous: prevMonthTradeRevenue(now), goal,
+    day: now.getDate(), days: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+  });
+  const pct = pace.pct;
+  const forecast = pace.forecast;
   const col = pct >= 100 ? 'var(--success)' : pct >= 60 ? 'var(--primary)' : 'var(--warning)';
   const month = now.toLocaleDateString(localeTag(), { month: 'long' });
+  const delta = pace.deltaPct != null
+    ? `<span class="${pace.deltaPct >= 0 ? 'delta-up' : 'delta-down'}" style="color:${pace.deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};"><bdi>${pace.deltaPct >= 0 ? '▲' : '▼'} ${Math.abs(pace.deltaPct).toFixed(0)}%</bdi></span>`
+    : '';
   return `
     <div class="dash-goal" id="analyticsGoal">
       <div class="dash-goal-top">
@@ -68,6 +84,7 @@ function monthGoalHtml(now = new Date()) {
         <span class="dash-goal-nums">${[
           `<bdi>${escapeHtml(fmtPrice(rev))}</bdi> / <bdi>${escapeHtml(fmtPrice(goal))}</bdi>`,
           `<bdi>${Math.round(pct)}%</bdi>`,
+          delta,
           forecast != null ? `<span title="${escapeHtml(t('dash.forecast_tip'))}">${escapeHtml(t('dash.forecast'))} <bdi>${escapeHtml(fmtPrice(forecast))}</bdi></span>` : '',
         ].filter(Boolean).join(' · ')}</span>
       </div>

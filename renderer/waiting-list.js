@@ -9,6 +9,14 @@
     return svg ? `<span class="pf-ico" aria-hidden="true">${svg}</span>` : '';
   };
 
+  /**
+   * The list's rules — what is shown and in what order, saving an entry,
+   * promoting it, the funnel, the customer it is for — are
+   * `lib/intake-queue.js`, which the Mac app runs on the same records.
+   */
+  const Q = () => ((typeof globalThis !== 'undefined' && globalThis.KhaytIntakeQueue)
+    ? globalThis.KhaytIntakeQueue : require('../lib/intake-queue.js'));
+
 /* ── Waiting List (Job Intake) ──────────────────────────── */
 function renderWaitingList() {
   renderWaitingOnlinePanel?.();
@@ -22,11 +30,7 @@ function renderWaitingList() {
   // Enthusiast (hobbyist) mode has no clients/sales pipeline — hide client names
   // and estimated sale value on intake items (the project/notes stay).
   const biz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-  const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
-  const visible = waitingList.filter(w => w.status !== 'declined');
-  const sorted = [...visible].sort((a, b) =>
-    (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2)
-  );
+  const sorted = Q().visible(waitingList);
   const priorityColors = { urgent: 'var(--danger)', high: '#f59e0b', normal: 'var(--text-muted)', low: 'var(--text-muted)' };
   const priorityLabels = { urgent: '🔴', high: '🟠', normal: '🔵', low: '⚪' };
   const today = localDateStr();
@@ -35,7 +39,7 @@ function renderWaitingList() {
     const client = (biz && item.clientId) ? clients.find(c => c.id === item.clientId) : null;
     const clientName = client ? localName(client) : '';
     const dot = priorityLabels[item.priority] || '🔵';
-    const isDueReminder = item.reminderDate && item.reminderDate <= today && item.status !== 'declined';
+    const isDueReminder = Q().reminderDue(item, today);
     return `<div class="waiting-item" data-id="${item.id}" style="${isDueReminder ? 'border-inline-start: 3px solid var(--primary);' : ''}">
       <div class="waiting-item-left">
         <span style="font-size:14px;">${dot}</span>
@@ -103,20 +107,20 @@ function openWaitingItemEditor(itemId = null) {
         <option value="declined" ${draft.status === 'declined' ? 'selected' : ''}>Declined</option>
       </select>`,
     onSave() {
-      draft.project        = document.querySelector('[data-f="project"]')?.value.trim() || '';
-      draft.clientId       = document.querySelector('[data-f="clientId"]')?.value || '';
-      draft.priority       = document.querySelector('[data-f="priority"]')?.value || 'normal';
-      draft.notes          = document.querySelector('[data-f="notes"]')?.value.trim() || '';
-      draft.estimatedValue = parseFloat(document.querySelector('[data-f="estimatedValue"]')?.value) || 0;
-      draft.reminderDate   = document.querySelector('[data-f="reminderDate"]')?.value || '';
-      draft.status         = document.querySelector('[data-f="status"]')?.value || 'active';
-      if (!draft.project) { alert(t('waiting.project_required')); return false; }
-      if (!existing) {
-        waitingList.unshift(draft);
-      } else {
-        const idx = waitingList.findIndex(w => w.id === itemId);
-        if (idx !== -1) waitingList[idx] = draft;
+      const saved = Q().saveItem(waitingList, {
+        project:        document.querySelector('[data-f="project"]')?.value || '',
+        clientId:       document.querySelector('[data-f="clientId"]')?.value || '',
+        priority:       document.querySelector('[data-f="priority"]')?.value || 'normal',
+        notes:          document.querySelector('[data-f="notes"]')?.value || '',
+        estimatedValue: parseFloat(document.querySelector('[data-f="estimatedValue"]')?.value) || 0,
+        reminderDate:   document.querySelector('[data-f="reminderDate"]')?.value || '',
+        status:         document.querySelector('[data-f="status"]')?.value || 'active',
+      }, { id: existing ? itemId : null, newId: draft.id, now: draft.addedAt });
+      if (!saved.ok) {
+        if (saved.error === 'project_required') { alert(t('waiting.project_required')); return false; }
+        return true;
       }
+      waitingList = saved.list;
       saveAll();
       renderWaitingList();
       updateWaitingBadge();
@@ -127,30 +131,12 @@ function openWaitingItemEditor(itemId = null) {
 /** Match waiting-list client or create a lightweight client record. */
 function resolveClientFromWaitingItem(item) {
   if (!item) return null;
-  if (item.clientId && clients.find((c) => c.id === item.clientId)) return item.clientId;
-  const name = String(item.clientName || '').trim();
-  if (!name) return null;
-  const lower = name.toLowerCase();
-  let existing = clients.find((c) => {
-    const en = (c.nameEn || '').trim().toLowerCase();
-    const ar = (c.nameAr || '').trim().toLowerCase();
-    return en === lower || ar === lower;
-  });
-  if (!existing && item.phone) {
-    const phone = String(item.phone).trim();
-    existing = clients.find((c) => String(c.phone || '').trim() === phone);
+  const found = Q().resolveClient(item, clients, uid('CLI'));
+  if (found.created) {
+    clients.push(found.created);
+    saveAll();
   }
-  if (existing) return existing.id;
-  const created = {
-    id: uid('CLI'),
-    nameEn: name,
-    nameAr: '',
-    phone: item.phone || '',
-    email: item.email || '',
-  };
-  clients.push(created);
-  saveAll();
-  return created.id;
+  return found.clientId;
 }
 
 function prefillCalculatorFromWaitingItem(item) {
@@ -165,25 +151,17 @@ function prefillCalculatorFromWaitingItem(item) {
     currentClientId = null;
   }
   if ($('#partName')) $('#partName').value = String(item.project || '').slice(0, 120);
-  if ($('#partNote')) {
-    const lines = [];
-    if (item.notes && item.notes !== item.project) lines.push(String(item.notes));
-    if (item.phone) lines.push(`Phone: ${item.phone}`);
-    if (item.email) lines.push(`Email: ${item.email}`);
-    if (item.material) lines.push(`Material: ${item.material}`);
-    if (item.budget) lines.push(`Budget: ${item.budget}`);
-    if (item.referenceLink) lines.push(`Link: ${item.referenceLink}`);
-    $('#partNote').value = lines.join('\n').slice(0, 800);
-  }
+  if ($('#partNote')) $('#partNote').value = Q().promotionNote(item);
   if (typeof renderBuild === 'function') renderBuild();
   if (typeof updateGrandTotal === 'function') updateGrandTotal();
 }
 
 function promoteWaitingItem(itemId) {
-  const item = waitingList.find(w => w.id === itemId);
-  if (!item) return;
-  waitingListHistory.push({ ...item, status: 'converted', convertedAt: new Date().toISOString() });
-  waitingList = waitingList.filter(w => w.id !== itemId);
+  const moved = Q().promote(waitingList, waitingListHistory, itemId, new Date().toISOString());
+  if (!moved) return;
+  const item = moved.item;
+  waitingList = moved.list;
+  waitingListHistory = moved.history;
   saveAll();
   renderWaitingList();
   updateWaitingBadge();
@@ -197,31 +175,26 @@ function promoteWaitingItem(itemId) {
 function updateWaitingBadge() {
   const badge = $('#waitingBadge');
   if (!badge) return;
-  const activeCount = waitingList.filter(w => w.status === 'active' || w.status === 'reminded').length;
+  const activeCount = Q().openCount(waitingList);
   badge.textContent = activeCount;
   badge.style.display = activeCount > 0 ? 'inline-flex' : 'none';
   // Pulse badge if any item has a reminder date today or overdue
   const today = localDateStr();
-  const hasDueReminder = waitingList.some(w => w.reminderDate && w.reminderDate <= today && w.status !== 'declined');
+  const hasDueReminder = waitingList.some(w => Q().reminderDue(w, today));
   badge.style.animation = hasDueReminder ? 'pulse 1s infinite' : '';
 }
 
 function renderWaitingFunnel() {
   const el = $('#waitingFunnelSection');
   if (!el) return;
-  const allItems = [...waitingList, ...waitingListHistory];
-  const totalAdded = allItems.length;
+  const f = Q().funnel(waitingList, waitingListHistory);
+  const totalAdded = f.total;
   // Hide the funnel entirely when there's no intake data — avoids an all-zeros widget
   if (totalAdded === 0) { el.innerHTML = ''; return; }
-  const active = waitingList.filter(w => w.status === 'active' || w.status === 'reminded').length;
-  const converted = waitingListHistory.filter(w => w.status === 'converted').length;
-  const declined = allItems.filter(w => w.status === 'declined').length;
-  const convRate = totalAdded > 0 ? ((converted / totalAdded) * 100).toFixed(1) : '0.0';
+  const { active, converted, declined, pipeline } = f;
+  const convRate = f.convertedPct.toFixed(1);
   // Pipeline value is a sales figure — business modes only.
   const biz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-  const pipeline = waitingList
-    .filter(w => w.status === 'active' || w.status === 'reminded')
-    .reduce((s, w) => s + (+(w.estValue || w.estimatedValue) || 0), 0);
 
   // Bar segments
   const convPct  = totalAdded > 0 ? (converted / totalAdded * 100) : 0;

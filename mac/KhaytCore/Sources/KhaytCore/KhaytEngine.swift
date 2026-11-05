@@ -465,6 +465,12 @@ public actor KhaytEngine {
         // reprint reaches the first-pass and RMA figures. After `order-new`,
         // which makes the new job.
         "reprint",
+        // Voiding an invoice and issuing a credit note — the desktop's
+        // records (`voidedAt`, `creditNotes[]`) and its credit note document.
+        "invoice-reversal",
+        // The job intake waiting list the LAN intake form writes into: what
+        // is shown, saving, promoting, the funnel.
+        "intake-queue",
         // A customer's standing order and their agreed prices. The recurrence
         // engine is what the schedule advances by (the 31st of January to the
         // 28th of February, not the 3rd of March), and the recurring rule
@@ -503,6 +509,13 @@ public actor KhaytEngine {
         // showed the raw ISO timestamp under DATE.
         "print-date",
         "invoice-document",
+        // The shop's other papers — packing slip, delivery note, work order,
+        // account statement — lifted out of the renderer so this app prints
+        // the same ones. AFTER invoice-language, which it asks through a
+        // global whether to print a second language.
+        "shop-documents",
+        // A quote's kept versions (`quoteRevisions[]`, `quoteVersion`).
+        "quote-revision",
         // The currencies a shop can price in, and how a settings form is
         // saved. The save was a 240-line literal inside the Electron settings
         // page, which is why only that page could change a setting; lifted so
@@ -8075,6 +8088,157 @@ public actor KhaytEngine {
             as: JobEdited.self)
     }
 
+    // MARK: - The order editor, its history, voids, credit notes, RMAs, intake
+
+    /// The whole order editor's save — notes, tags, the delivery address,
+    /// courier and tracking, who is on it, the due date and priority, and the
+    /// three terms that re-price it (discount, shipping, extra charges) — by
+    /// `lib/order-edit.js applyDetails`, the rule the desktop's editor runs.
+    ///
+    /// `fields` names ONLY what the shop changed; a key left out is left
+    /// alone. `editId` names the history entry for the tracked fields and
+    /// `priceId` the one for a typed total. `changed` is false when the
+    /// record came out as it went in.
+    public func editOrderDetails(order: JSONValue, fields: [String: JSONValue],
+                                 settings: [String: JSONValue] = [:], now: Date,
+                                 editId: String, priceId: String) throws -> JobEdited {
+        try runtime.call2(
+            "(function(){ var o = ARG0;"
+          + " var r = KhaytOrderEdit.applyDetails(o, ARG1, { now: ARG2, id: ARG3, priceId: ARG4, settings: ARG5 });"
+          + " return { order: o, changed: r.changed }; })()",
+            [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId),
+             .string(priceId), settings.isEmpty ? .null : .object(settings)],
+            as: JobEdited.self)
+    }
+
+    /// A job's edits, newest first — `lib/order-edit.js editLog`.
+    public func editLog(_ order: JSONValue) throws -> [OrderEditEntry] {
+        try runtime.call2("KhaytOrderEdit.editLog(ARG0)", [order], as: [OrderEditEntry].self)
+    }
+
+    /// A job's way through the stages and how long each took —
+    /// `lib/order-edit.js timeline`.
+    public func orderTimeline(_ order: JSONValue, now: Date) throws -> OrderTimeline {
+        try runtime.call2("KhaytOrderEdit.timeline(ARG0, ARG1)",
+                          [order, .number(now.timeIntervalSince1970 * 1000)], as: OrderTimeline.self)
+    }
+
+    /// Void a job's invoice — `lib/invoice-reversal.js voidInvoice`. `waste`
+    /// is the row to put at the top of `wasteLog`, when one was asked for.
+    public func voidInvoice(_ order: JSONValue, reason: String, now: Date, logWaste: Bool,
+                            wasteId: String, today: String, wasteNote: String) throws -> InvoiceVoided {
+        try runtime.call2(
+            "(function (o) { var r = KhaytInvoiceReversal.voidInvoice(o, { reason: ARG1, now: ARG2,"
+          + " logWaste: ARG3, wasteId: ARG4, today: ARG5, wasteNote: ARG6 });"
+          + " return { ok: r.ok, error: r.error || null, order: o, waste: r.waste || null }; })(ARG0)",
+            [order, .string(reason), .string(StoreWriter.iso(now)), .bool(logWaste),
+             .string(wasteId), .string(today), .string(wasteNote)], as: InvoiceVoided.self)
+    }
+
+    /// What a void would book as waste: the parts' weight and material.
+    public func voidMaterial(_ order: JSONValue) throws -> VoidMaterial {
+        try runtime.call2("KhaytInvoiceReversal.materialOf(ARG0)", [order], as: VoidMaterial.self)
+    }
+
+    /// The most a new credit note can be for — the price less earlier credit.
+    public func creditRoom(_ order: JSONValue) throws -> Double {
+        try runtime.call2("KhaytInvoiceReversal.creditRoom(ARG0)", [order], as: Double.self)
+    }
+
+    /// Issue a credit note — `lib/invoice-reversal.js creditNote`.
+    public func creditNote(_ order: JSONValue, amount: Double, reason: String, now: Date,
+                           id: String) throws -> CreditIssued {
+        try runtime.call2(
+            "(function (o) { var r = KhaytInvoiceReversal.creditNote(o, { amount: ARG1, reason: ARG2, now: ARG3, id: ARG4 });"
+          + " return { ok: r.ok, error: r.error || null, order: o, note: r.note || null }; })(ARG0)",
+            [order, .number(amount), .string(reason), .string(StoreWriter.iso(now)), .string(id)],
+            as: CreditIssued.self)
+    }
+
+    /// The credit note a customer is handed — the desktop's document
+    /// (`lib/invoice-reversal.js creditNoteHtml`), in the shop's language.
+    public func creditNoteHtml(order: JSONValue, note: JSONValue, settings: [String: JSONValue],
+                               language: String, shopName: String, currencySymbol: String,
+                               invoiceNumber: String, jobRef: String, clientName: String,
+                               clientSub: String, today: String) throws -> InvoiceDocument {
+        ensureLocale(language)
+        if case .string(let second)? = settings["invoiceSecondLang"] { ensureLocale(second) }
+        return try runtime.call2(CREDIT_NOTE_SCRIPT,
+            [order, note, .object(settings), .string(language),
+             .object(["shopName": .string(shopName), "currencySymbol": .string(currencySymbol),
+                      "invoiceNumber": .string(invoiceNumber), "jobRef": .string(jobRef),
+                      "clientName": .string(clientName), "clientSub": .string(clientSub),
+                      "today": .string(today)])],
+            as: InvoiceDocument.self)
+    }
+
+    /// Inside the warranty window — `lib/reprint.js withinWarranty`.
+    public func withinWarranty(deliveredAt: String?, warrantyDays: Double?, now: Date) throws -> Bool {
+        try runtime.call2("KhaytReprint.withinWarranty(ARG0, ARG1, ARG2)",
+                          [deliveredAt.map(JSONValue.string) ?? .null, warrantyDays.map(JSONValue.number) ?? .null,
+                           .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
+    }
+
+    /// Record a customer-reported defect — `lib/reprint.js openRma`.
+    /// `reprintCost` is what a linked reprint should be made at, or nil.
+    public func openRma(_ order: JSONValue, reason: String, resolution: String, withinWarranty: Bool,
+                        reportedBy: String?, now: Date) throws -> RmaOpened {
+        try runtime.call2(
+            "(function (o) { var r = KhaytReprint.openRma(o, { reason: ARG1, resolution: ARG2,"
+          + " withinWarranty: ARG3, reportedBy: ARG4, now: ARG5 });"
+          + " return { order: o, reprintCost: r.reprintCost }; })(ARG0)",
+            [order, .string(reason), .string(resolution), .bool(withinWarranty),
+             reportedBy.map(JSONValue.string) ?? .null, .string(StoreWriter.iso(now))],
+            as: RmaOpened.self)
+    }
+
+    /// The waiting list as it is shown — `lib/intake-queue.js visible`.
+    public func intakeVisible(_ list: [JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytIntakeQueue.visible(ARG0)", [.array(list)], as: [JSONValue].self)
+    }
+
+    /// The intake funnel — `lib/intake-queue.js funnel`.
+    public func intakeFunnel(list: [JSONValue], history: [JSONValue]) throws -> IntakeFunnel {
+        try runtime.call2("KhaytIntakeQueue.funnel(ARG0, ARG1)", [.array(list), .array(history)],
+                          as: IntakeFunnel.self)
+    }
+
+    /// Add or change an enquiry — `lib/intake-queue.js saveItem`.
+    public func intakeSave(list: [JSONValue], fields: [String: JSONValue], id: String?,
+                           newId: String, now: Date) throws -> IntakeSaved {
+        try runtime.call2(
+            "(function () { var r = KhaytIntakeQueue.saveItem(ARG0, ARG1, { id: ARG2, newId: ARG3, now: ARG4 });"
+          + " return { ok: r.ok, error: r.error || null, list: r.list || null, item: r.item || null }; })()",
+            [.array(list), .object(fields), id.map(JSONValue.string) ?? .null, .string(newId),
+             .string(StoreWriter.iso(now))], as: IntakeSaved.self)
+    }
+
+    /// Turn an enquiry into work — `lib/intake-queue.js promote`, plus the
+    /// customer it is for (`resolveClient`) and the note the job opens with.
+    public func intakePromote(list: [JSONValue], history: [JSONValue], clients: [JSONValue],
+                              id: String, newClientId: String, now: Date) throws -> IntakePromoted? {
+        try runtime.call2(
+            "(function () { var r = KhaytIntakeQueue.promote(ARG0, ARG1, ARG3, ARG5);"
+          + " if (!r) return null;"
+          + " var c = KhaytIntakeQueue.resolveClient(r.item, ARG2, ARG4);"
+          + " return { list: r.list, history: r.history, item: r.item, clientId: c.clientId,"
+          + " createdClient: c.created, note: KhaytIntakeQueue.promotionNote(r.item) }; })()",
+            [.array(list), .array(history), .array(clients), .string(id), .string(newClientId),
+             .string(StoreWriter.iso(now))], as: IntakePromoted?.self)
+    }
+
+    /// The customer was reminded — `lib/intake-queue.js markReminded`.
+    public func intakeReminded(list: [JSONValue], id: String, now: Date) throws -> [JSONValue] {
+        try runtime.call2("KhaytIntakeQueue.markReminded(ARG0, ARG1, ARG2)",
+                          [.array(list), .string(id), .string(StoreWriter.iso(now))], as: [JSONValue].self)
+    }
+
+    /// The enquiry was turned down — `lib/intake-queue.js decline`.
+    public func intakeDeclined(list: [JSONValue], id: String) throws -> [JSONValue] {
+        try runtime.call2("KhaytIntakeQueue.decline(ARG0, ARG1)", [.array(list), .string(id)],
+                          as: [JSONValue].self)
+    }
+
     /// The priority a job is at, however old the record is.
     public func priority(of order: JSONValue) throws -> String {
         try runtime.call("KhaytOrderEdit", "priorityOf", [order], as: String.self)
@@ -8279,6 +8443,127 @@ public actor KhaytEngine {
                            .string(language), .object(money), .object(sellerFields),
                            .array(orders)],
                           as: InvoiceDocument.self)
+    }
+
+    // MARK: - The shop's other papers
+
+    /// Which of `lib/shop-documents.js`'s papers about ONE job.
+    public enum ShopPaper: String, Sendable, CaseIterable {
+        /// What goes in the box: the parts, their weights, who it ships to.
+        /// A whole page of its own, with its own styles.
+        case packingSlip
+        /// What the customer signs for. In the invoice's stylesheet.
+        case deliveryNote
+        /// The floor's sheet: no prices. In the invoice's stylesheet.
+        case workOrder
+    }
+
+    /// What every paper is drawn with, gathered by the app: the shop's words
+    /// are this runtime's own catalogue, so only DATA comes from Swift.
+    ///
+    /// `docs` is the job's product documents (`OrderDocs.forOrder`), as
+    /// `{name, packWithOrder}` rows: the delivery note lists the ones that go
+    /// in the box, the work order all of them. `today` is the day in the
+    /// book's own calendar.
+    public struct PaperInputs: Sendable {
+        public var settings: [String: JSONValue]
+        public var clients: [JSONValue]
+        public var machines: [JSONValue]
+        public var inventory: [JSONValue]
+        public var currencies: [String: JSONValue]
+        public var language: String
+        public var shopName: String
+        public var today: String
+        public var docs: [JSONValue]
+
+        public init(settings: [String: JSONValue], clients: [JSONValue], machines: [JSONValue] = [],
+                    inventory: [JSONValue] = [], currencies: [String: JSONValue] = [:],
+                    language: String, shopName: String, today: String, docs: [JSONValue] = []) {
+            self.settings = settings; self.clients = clients; self.machines = machines
+            self.inventory = inventory; self.currencies = currencies; self.language = language
+            self.shopName = shopName; self.today = today; self.docs = docs
+        }
+    }
+
+    /// One job's packing slip, delivery note or work order, as HTML.
+    public func shopPaperHtml(_ kind: ShopPaper, order: JSONValue, _ inputs: PaperInputs) throws -> String {
+        ensureLocale(inputs.language)
+        if case .string(let second)? = inputs.settings["invoiceSecondLang"] { ensureLocale(second) }
+        return try runtime.call2(SHOP_PAPER_SCRIPT, [
+            .string(kind.rawValue), order, Self.paperContext(inputs), .null, .array([]),
+        ], as: String.self)
+    }
+
+    /// A customer's account statement: every job of theirs, oldest first,
+    /// charged, paid and still owed — all in the shop's own currency.
+    public func statementHtml(client: JSONValue, orders: [JSONValue], _ inputs: PaperInputs) throws -> String {
+        ensureLocale(inputs.language)
+        return try runtime.call2(SHOP_PAPER_SCRIPT, [
+            .string("statement"), .null, Self.paperContext(inputs), client, .array(orders),
+        ], as: String.self)
+    }
+
+    private static func paperContext(_ i: PaperInputs) -> JSONValue {
+        .object([
+            "settings": .object(i.settings), "clients": .array(i.clients),
+            "machines": .array(i.machines), "inventory": .array(i.inventory),
+            "currencies": .object(i.currencies), "language": .string(i.language),
+            "shopName": .string(i.shopName), "today": .string(i.today), "docs": .array(i.docs),
+        ])
+    }
+
+    /// The jobs "Export all invoices" writes for a customer: their FINISHED
+    /// work, oldest first (`invoicesToExport` with `KhaytOrderStatus.isFinished`).
+    public func invoicesToExport(clientId: String, orders: [JSONValue]) throws -> [String] {
+        try runtime.call2(
+            "KhaytShopDocuments.invoicesToExport(ARG0, ARG1, KhaytOrderStatus.isFinished).map(function (o) { return o.id; })",
+            [.string(clientId), .array(orders)], as: [String].self)
+    }
+
+    // MARK: - Quotes: revisions and follow-ups
+
+    /// The quote with what it says now kept as a revision and its version
+    /// moved on one (`KhaytQuoteRevision.revise`): `quoteRevisions[]`,
+    /// `quoteVersion`. A job that is not a quote comes back as it went.
+    public func reviseQuote(order: JSONValue, now: Date = Date()) throws -> JSONValue {
+        try runtime.call2("KhaytQuoteRevision.revise(ARG0, ARG1)",
+                          [order, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// One kept version of a quote, as the history lists it.
+    public struct QuoteRevision: Decodable, Sendable, Equatable, Identifiable {
+        public let version: Int
+        public let snapshotAt: String
+        public let price: Double
+        public let partCount: Int
+        public let notes: String
+        public var id: Int { version }
+    }
+
+    /// A quote's kept versions, newest first (`KhaytQuoteRevision.history`).
+    public func quoteRevisions(order: JSONValue) throws -> [QuoteRevision] {
+        try runtime.call2(
+            "KhaytQuoteRevision.history(ARG0).map(function (r) { return { version: +r.version || 1,"
+          + " snapshotAt: String(r.snapshotAt || ''), price: +r.price || 0,"
+          + " partCount: (r.parts || []).length, notes: String(r.notes || '') }; })",
+            [order], as: [QuoteRevision].self)
+    }
+
+    /// The quote with a follow-up recorded on it (`markFollowUpPatch`):
+    /// `followUpSentAt` and `followUpCount`, which the cooldown and the cap read.
+    public func markFollowUp(order: JSONValue, now: Date = Date()) throws -> JSONValue {
+        try runtime.call2(
+            "Object.assign(ARG0, KhaytQuoteFollowUp.markFollowUpPatch(ARG0, ARG1))",
+            [order, .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Whether this quote is due a follow-up NOW, by the shop's own tuning —
+    /// asked again inside the write, on the book as it is on disk, so a quote
+    /// the other computer has just followed up is not followed up twice.
+    public func followUpDue(order: JSONValue, settings: [String: JSONValue], now: Date = Date()) throws -> Bool {
+        try runtime.call2(
+            "KhaytQuoteFollowUp.isDueForFollowUp(ARG0, KhaytQuoteFollowUp.followUpConfig(ARG1), ARG2)",
+            [order, .object(settings), .number(now.timeIntervalSince1970 * 1000)], as: Bool.self)
     }
 
     // MARK: - The shop's own settings
@@ -8589,6 +8874,146 @@ public actor KhaytEngine {
         try runtime.call2("KhaytExpenseBook.budgetProgress(ARG0, ARG1)",
                           [.object(byCategory.mapValues(JSONValue.number)), .object(budgets)],
                           as: [BudgetRow].self)
+    }
+
+    // MARK: - Money, stock and settings the desktop already had
+
+    /// The recurring expenses due on or before `today`: `KhaytExpenseBook.due`.
+    public func expensesDue(_ expenses: [JSONValue], today: String) throws -> [JSONValue] {
+        try runtime.call2("KhaytExpenseBook.due(ARG0, ARG1)",
+                          [.array(expenses), .string(today)], as: [JSONValue].self)
+    }
+
+    /// A recurring expense answered: Add files this cycle's copy and moves the
+    /// schedule on, Skip only moves it on (`KhaytExpenseBook.comeRound`). The
+    /// whole list back, or nil when `id` is no longer due — answered already.
+    public func expenseComeRound(_ expenses: [JSONValue], id: String, add: Bool,
+                                 newId: String, today: String) throws -> [JSONValue]? {
+        try runtime.call2("KhaytExpenseBook.comeRound(ARG0, ARG1, {add: ARG2, id: ARG3, today: ARG4})",
+                          [.array(expenses), .string(id), .bool(add), .string(newId), .string(today)],
+                          as: [JSONValue]?.self)
+    }
+
+    /// Grams put on or taken off a spool by hand, with the reason
+    /// (`KhaytSpoolEdit.adjustStock`): the spool with its `adjustments` row,
+    /// or `refused`.
+    public func adjustStock(_ spool: JSONValue, input: [String: JSONValue],
+                            id: String, today: String) throws -> SpoolWritten {
+        try runtime.call2("KhaytSpoolEdit.adjustStock(ARG0, ARG1, {id: ARG2, today: ARG3})",
+                          [spool, .object(input), .string(id), .string(today)], as: SpoolWritten.self)
+    }
+
+    /// Stock moved between locations, the whole spool or a split of it.
+    public struct Transferred: Decodable, Sendable {
+        public let spools: [JSONValue]?
+        public let refused: String?
+    }
+
+    /// `KhaytSpoolEdit.transferStock`. `dest` empty is Unassigned.
+    public func transferStock(_ spool: JSONValue, dest: String, qty: Double,
+                              newId: String) throws -> Transferred {
+        try runtime.call2("KhaytSpoolEdit.transferStock(ARG0, {dest: ARG1, qty: ARG2}, {newId: ARG3})",
+                          [spool, .string(dest), .number(qty), .string(newId)], as: Transferred.self)
+    }
+
+    /// The invoice counter set by its own section (`KhaytSettingsEdit.invoiceNumbering`).
+    public func invoiceNumbering(_ settings: [String: JSONValue], form: [String: JSONValue],
+                                 year: Int) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytSettingsEdit.invoiceNumbering(ARG0, ARG1, {year: ARG2})",
+                          [.object(settings), .object(form), .number(Double(year))],
+                          as: [String: JSONValue].self)
+    }
+
+    /// The numbers missing from the book's invoice sequence.
+    public func invoiceNumberGaps(_ orders: [JSONValue]) throws -> [Int] {
+        try runtime.call2("KhaytSettingsEdit.invoiceNumberGaps(ARG0)", [.array(orders)], as: [Int].self)
+    }
+
+    /// The exchange-rate table edited (`KhaytSettingsEdit.exchangeRates`).
+    /// `fetchedAt` marks it refreshed from the live feed.
+    public func exchangeRates(_ settings: [String: JSONValue], edits: [String: JSONValue],
+                              base: String, fetchedAt: String?) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytSettingsEdit.exchangeRates(ARG0, ARG1, {base: ARG2, fetchedAt: ARG3})",
+                          [.object(settings), .object(edits), .string(base), fetchedAt.map(JSONValue.string) ?? .null],
+                          as: [String: JSONValue].self)
+    }
+
+    /// A live rate feed's answer, as the book stores rates.
+    public struct FeedRates: Decodable, Sendable {
+        public let rates: [String: Double]?
+        public let updatedAt: String?
+        public let error: String?
+    }
+
+    /// `KhaytSettingsEdit.ratesFromFeed` — inverted to base units per one
+    /// foreign unit, limited to `known`.
+    public func ratesFromFeed(_ body: JSONValue, base: String,
+                              known: [String: JSONValue]) throws -> FeedRates {
+        try runtime.call2("KhaytSettingsEdit.ratesFromFeed(ARG0, ARG1, ARG2)",
+                          [body, .string(base), .object(known)], as: FeedRates.self)
+    }
+
+    /// The loyalty tiers as the editor saves them (`KhaytLoyalty.cleanTiers`).
+    public func cleanLoyaltyTiers(_ rows: [JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytLoyalty.cleanTiers(ARG0)", [.array(rows)], as: [JSONValue].self)
+    }
+
+    /// One job's failures, added up.
+    public struct WasteOrder: Decodable, Sendable, Hashable, Identifiable {
+        public let orderId: String
+        public let cost: Double
+        public let count: Int
+        public var id: String { orderId }
+    }
+
+    /// The jobs whose failures cost the most (`KhaytWasteEntry.topOrders`).
+    public func wasteTopOrders(_ wasteLog: [JSONValue], limit: Int) throws -> [WasteOrder] {
+        try runtime.call2("KhaytWasteEntry.topOrders(ARG0, ARG1)",
+                          [.array(wasteLog), .number(Double(limit))], as: [WasteOrder].self)
+    }
+
+    /// Waste as a share of revenue, and how worried to be.
+    public struct WasteShare: Decodable, Sendable, Equatable {
+        public let pct: Double
+        /// `ok` | `warn` | `bad`
+        public let tone: String
+    }
+
+    /// `KhaytWasteEntry.shareOfRevenue`; nil when there is no revenue.
+    public func wasteShare(cost: Double, revenue: Double) throws -> WasteShare? {
+        try runtime.call2("KhaytWasteEntry.shareOfRevenue(ARG0, ARG1)",
+                          [.number(cost), .number(revenue)], as: WasteShare?.self)
+    }
+
+    /// The shop's TRADE revenue over a span (`KhaytKpiRows.tradeRevenue`):
+    /// finished, not voided, not Not business, net of tax. What the goal bar
+    /// and the waste share are measured against, in both apps. `from`/`to`
+    /// inclusive `YYYY-MM-DD`, empty for no bound.
+    public func tradeRevenue(orders: [JSONValue], settings: [String: JSONValue],
+                             clients: [JSONValue], currencies: [String: JSONValue],
+                             from: String, to: String) throws -> Double {
+        try runtime.call2("KhaytKpiRows.tradeRevenue({orders: ARG0, settings: ARG1, clients: ARG2, known: ARG3, from: ARG4, to: ARG5})",
+                          [.array(orders), .object(settings), .array(clients), .object(currencies),
+                           .string(from), .string(to)], as: Double.self)
+    }
+
+    /// How the month is going against its goal (`KhaytKpiRows.goalPace`).
+    public struct GoalPace: Decodable, Sendable, Equatable {
+        public let revenue: Double
+        public let goal: Double
+        public let pct: Double
+        public let reached: Bool
+        /// The month-end pace; nil on the month's last day or before anything is earned.
+        public let forecast: Double?
+        /// The change from last month, in percent; nil when last month earned nothing.
+        public let deltaPct: Double?
+    }
+
+    public func goalPace(revenue: Double, previous: Double, goal: Double,
+                         day: Int, days: Int) throws -> GoalPace {
+        try runtime.call2("KhaytKpiRows.goalPace({revenue: ARG0, previous: ARG1, goal: ARG2, day: ARG3, days: ARG4})",
+                          [.number(revenue), .number(previous), .number(goal),
+                           .number(Double(day)), .number(Double(days))], as: GoalPace.self)
     }
 
     /// A failed print written down by hand.
@@ -14776,6 +15201,114 @@ private let INVOICE_SCRIPT = """
   };
   for (var key in money) ctx[key] = money[key];
   return KhaytInvoiceDocument.invoiceHtml(order, ctx);
+})()
+"""
+
+/// The packing slip, delivery note, work order and account statement.
+///
+/// `lib/shop-documents.js` takes the renderer's helpers as one `ctx`; these
+/// are the same helpers INVOICE_SCRIPT builds for the invoice, on the same
+/// terms — the runtime's own catalogue for words, `data:image/` only for a
+/// logo, and the shared money rules (`KhaytOrderMoney`, `KhaytOrderPayment`)
+/// for every figure on a statement, so it reconciles with the invoices.
+private let SHOP_PAPER_SCRIPT = """
+(function (kind, order, inp, client, orders) {
+  var settings = inp.settings || {}, clients = inp.clients || [], language = inp.language || 'en';
+  var currencies = (inp.currencies && Object.keys(inp.currencies).length) ? inp.currencies
+    : ((globalThis.KhaytCurrencies && globalThis.KhaytCurrencies.CURRENCIES) || {});
+  var locales = globalThis.KhaytLocales || {};
+  function say(lang, key, vars) {
+    var table = locales[lang] || locales.en || {};
+    var s = table[key] || (locales.en || {})[key] || key;
+    if (vars) for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k]));
+    return s;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  var M = globalThis.KhaytOrderMoney, P = globalThis.KhaytOrderPayment, D = globalThis.KhaytPrintDate;
+  var known = Object.keys(currencies).length ? currencies : null;
+  var mctx = { settings: settings, clients: clients };
+  var tag = D ? D.localeTagFor(language) : 'en-US';
+  var logo = (typeof settings.bizLogo === 'string' && settings.bizLogo.indexOf('data:image/') === 0) ? settings.bizLogo : '';
+  // `fmtPrice` in `renderer/currency.js`: two decimals and the shop's own
+  // mark, on the side its currency writes it, joined by a narrow space.
+  function fmtPrice(n) {
+    var cur = currencies[settings.currency] || currencies.SAR || { symbol: settings.currency || '', pos: 'after' };
+    var num = (Math.round((+n || 0) * 100) / 100).toFixed(2);
+    return cur.pos === 'before' ? cur.symbol + '\\u202f' + num : num + '\\u202f' + cur.symbol;
+  }
+  var ctx = {
+    t: function (k, v) { return say(language, k, v); },
+    tIn: function (l, k, v) { return say(l, k, v); },
+    lang: language,
+    escapeHtml: esc,
+    settings: settings, clients: clients,
+    machines: inp.machines || [], inventory: inp.inventory || [], docs: inp.docs || [],
+    shopName: inp.shopName || '',
+    safeBizLogo: logo,
+    brandMark: '',
+    safeCssColor: function (v, fallback) {
+      return /^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? String(v) : (fallback || '#5E2E14');
+    },
+    jobRef: function (o) { return String((o && typeof o.jobNumber === 'string' && o.jobNumber) || (o && o.id) || ''); },
+    localName: function (c) {
+      var C = globalThis.KhaytContentLanguages;
+      return String((C ? C.read(c, 'name', language, settings) : '') || (c && (c.name || c.company)) || '');
+    },
+    formatPrintDate: function (iso) { return D ? D.printDate(iso, tag) : String(iso || ''); },
+    today: inp.today,
+    localeTag: tag,
+    fmtPrice: fmtPrice,
+    orderRevenueBase: function (o) { return M.orderRevenueBase(o, mctx, known); },
+    orderOwedBase: function (o) { return M.orderOwedBase(o, mctx, known); },
+    orderToBase: function (n, o) { return M.orderToBase(n, o, mctx, known); },
+    payStatus: function (o) { return P ? P.statusOf(o, { settings: settings }) : (o.paymentStatus || 'unpaid'); },
+  };
+  var S = KhaytShopDocuments;
+  if (kind === 'packingSlip') return S.packingSlipHtml(order, ctx);
+  if (kind === 'deliveryNote') return S.deliveryNoteHtml(order, ctx);
+  if (kind === 'workOrder') return S.workOrderHtml(order, ctx);
+  if (kind === 'statement') return S.clientStatementHtml(client, orders, ctx);
+  throw new Error('unknown paper ' + kind);
+})(ARG0, ARG1, ARG2, ARG3, ARG4)
+"""
+
+/// The credit note document, with the same ways of saying things the invoice
+/// script hands `lib/invoice-document.js` — the locale tables, the escaping,
+/// the `data:image/` guard on the shop's logo.
+private let CREDIT_NOTE_SCRIPT = """
+(function () {
+  var order = ARG0, note = ARG1, settings = ARG2, language = ARG3, x = ARG4 || {};
+  var locales = globalThis.KhaytLocales || {};
+  function say(lang, key, vars) {
+    var table = locales[lang] || locales.en || {};
+    var s = table[key] || (locales.en || {})[key] || key;
+    if (vars) for (var k in vars) s = s.split('{' + k + '}').join(String(vars[k]));
+    return s;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  var logo = (typeof settings.bizLogo === 'string' && settings.bizLogo.indexOf('data:image/') === 0)
+    ? settings.bizLogo : '';
+  var dates = globalThis.KhaytPrintDate;
+  return KhaytInvoiceReversal.creditNoteHtml(order, note, {
+    t: function (k, v) { return say(language, k, v); },
+    i18n: { current: language, tIn: function (l, k, v) { return say(l, k, v); } },
+    escapeHtml: esc,
+    fmtMoney: function (n) { var v = +n; return (isFinite(v) ? v : 0).toFixed(2); },
+    formatPrintDate: function (d) {
+      return dates ? dates.printDate(d, dates.localeTagFor(language)) : String(d || '');
+    },
+    settings: settings, shopName: x.shopName, logo: logo, BRAND_MARK_SVG: '',
+    currencySymbol: esc(x.currencySymbol), invoiceNumber: x.invoiceNumber, jobRef: x.jobRef,
+    clientName: x.clientName, clientSub: x.clientSub, today: x.today
+  });
 })()
 """
 

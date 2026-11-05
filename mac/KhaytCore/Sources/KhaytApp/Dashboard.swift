@@ -488,6 +488,19 @@ struct ToChase: View {
                             .help(shop.words.callIt("mac.send_reminder"))
                             .accessibilityLabel(shop.words.callIt("mac.send_reminder"))
                         }
+                        // A quote about to lapse: the follow-up, recorded so the
+                        // row leaves the list for its cooldown
+                        // (`Shop.sendQuoteFollowUp`).
+                        if !overdue, shop.canMoveJobs {
+                            Button {
+                                Task { await shop.sendQuoteFollowUp(row.id) }
+                            } label: {
+                                Image(systemName: "bubble.left")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(shop.words.callIt("quote.followup_btn"))
+                            .accessibilityLabel(shop.words.callIt("quote.followup_btn"))
+                        }
                     }
                     .padding(.vertical, 3)
                     .frame(minHeight: Metric.row)
@@ -523,9 +536,10 @@ struct ToChase: View {
 /// This month against the target the shop set.
 ///
 /// Nothing at all when the target is zero, which `dash.goal_hint` states is
-/// how you switch it off. The figure is `kpis` for the month, so it is the
-/// same revenue the tiles above show when the period is This month — not a
-/// second opinion about what counts.
+/// how you switch it off. The figure is `KhaytKpiRows.tradeRevenue` for the
+/// month — the rule the desktop's goal bar reads, and the same set the tiles
+/// above count when the period is This month — not a second opinion about
+/// what counts.
 private struct Goal: View {
     let shop: Shop
     /// Swept on arrival, moved on a new reading, still on a redraw — the shape
@@ -551,6 +565,26 @@ private struct Goal: View {
                             .contentTransition(.numericText())
                             .foregroundStyle(done >= goal ? AnyShapeStyle(Khayt.done)
                                                           : AnyShapeStyle(.secondary))
+                    }
+                    // THE PACE AND THE CHANGE, as the desktop's bar says
+                    // them (`KhaytKpiRows.goalPace`): where the month ends
+                    // at the rate so far, and how it compares with the last.
+                    if let pace = shop.monthGoal, pace.forecast != nil || pace.deltaPct != nil {
+                        HStack(spacing: 8) {
+                            if let delta = pace.deltaPct {
+                                Text(verbatim: (delta >= 0 ? "\u{25B2} " : "\u{25BC} ")
+                                     + shop.words.numeral(Int(abs(delta).rounded())) + "%")
+                                    .font(.caption.weight(.semibold)).monospacedDigit()
+                                    .foregroundStyle(delta >= 0 ? Khayt.done : Khayt.attention)
+                                    .help(shop.words.callIt("mac.goal_vs_last_month"))
+                            }
+                            if let forecast = pace.forecast {
+                                Text(shop.words.callIt("dash.forecast") + " " + Money.text(forecast, shop.currency))
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                    .help(shop.words.callIt("dash.forecast_tip"))
+                            }
+                            Spacer(minLength: 0)
+                        }
                     }
                     ProgressView(value: shown)
                         .tint(done >= goal ? Khayt.done : Khayt.brand)

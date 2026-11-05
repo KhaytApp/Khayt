@@ -2438,6 +2438,7 @@
   "cn.credit_amount": "Valor do crédito",
   "cn.reason": "Motivo",
   "cn.reason_ph": "ex.: peça defeituosa, cancelamento do pedido",
+  "cn.nothing_left": "Não resta nada a creditar neste pedido.",
   "cn.generate": "Gerar nota de crédito",
   "wo.title": "Ordem de serviço",
   "oe.courier": "Transportadora",

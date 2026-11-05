@@ -459,6 +459,15 @@ struct NewJobButton: ToolbarContent {
             .disabled(!shop.canMoveJobs)
             .help(shop.words.callIt("mac.new_job"))
         }
+        // Enquiries waiting for an answer — only when there are some, so a
+        // shop that takes none sees nothing new.
+        if shop.intakeOpenCount > 0 {
+            ToolbarItem {
+                Button(shop.words.callIt("waiting.title") + " (\(shop.intakeOpenCount))",
+                       systemImage: "tray.full") { shop.showingIntake = true }
+                    .help(shop.words.callIt("waiting.title"))
+            }
+        }
     }
 }
 
@@ -499,6 +508,10 @@ struct JobActions: View {
             shop.pendingEdit = Shop.PendingHold(id: job.id, project: job.project)
         }
         .disabled(!shop.canMoveJobs)
+        Button(shop.words.callIt("mac.order_details") + "\u{2026}") {
+            shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
+        }
+        .disabled(!shop.canMoveJobs)
         Button(shop.words.callIt("pay.modal_title")) {
             shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
         }
@@ -532,14 +545,23 @@ struct JobActions: View {
         }
         .disabled(!shop.canMoveJobs || job.status != "completed" || job.deliveredAt != nil)
         Divider()
+        JobRecordItems(shop: shop, job: job)
+        Divider()
         // Not gated on the book being ours: showing a shop what it would hand a
         // customer changes nothing, and refusing to draw the sample's invoice
         // would hide the thing this app is for.
         Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+        JobInvoiceItems(shop: shop, job: job)
         if Shop.offersProforma(job) {
             Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
             Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
                 .disabled(!shop.canMoveJobs)
+        }
+        if job.status == "quote" {
+            Divider()
+            QuoteItems(shop: shop, job: job)
+        } else {
+            JobPaperItems(shop: shop, job: job)
         }
         Divider()
         JobDeleteItems(shop: shop, ids: [job.id])

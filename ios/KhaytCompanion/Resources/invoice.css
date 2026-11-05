@@ -514,3 +514,9 @@ html.printing-labels #label-print-area {
   color: var(--ink-mute);
 }
 
+
+/* ── Delivery note and work order (lib/shop-documents.js) ─────────────
+   Also in styles.css for the desktop window; here so the Mac and the
+   phone, which print with this sheet alone, draw the same boxes. */
+.delivery-tracking { margin-top:12px; padding:10px 14px; background:rgba(91,156,240,0.06); border:1px solid rgba(91,156,240,0.15); border-radius:6px; font-size:12px; }
+.wo-checks { padding: 12px 0; }

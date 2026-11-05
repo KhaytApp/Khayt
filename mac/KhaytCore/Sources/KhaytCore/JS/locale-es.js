@@ -2437,6 +2437,7 @@
   "cn.credit_amount": "Importe del crédito",
   "cn.reason": "Motivo",
   "cn.reason_ph": "p.ej. Pieza defectuosa, cancelación",
+  "cn.nothing_left": "No queda nada por abonar en este trabajo.",
   "cn.generate": "Generar nota de crédito",
   "wo.title": "Orden de trabajo",
   "oe.courier": "Mensajería",
