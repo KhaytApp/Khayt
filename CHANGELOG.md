@@ -14,8 +14,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: the library stays responsive with very large books.** With ten thousand models, the chips over the grid are counted in one pass over the library instead of about fifteen, and only once you pause typing rather than after every letter. The inspector, the catalogue and the iPhone's library pages find a model's record straight away instead of looking through the whole library each time. Adding a folder of models (from a Google Drive folder, say) no longer freezes the window while it is looked through: the import banner shows at once. Asking to delete models reads their folders in the background too. Scrolling quickly through the grid decodes at most four thumbnails at a time and skips the ones already scrolled past, and reading a 3MF's print settings no longer holds up the app's other background work.
 
-- **Desktop: "Clears its own plate" on a printer, and common maintenance tasks to start from.** The printer editor has the Mac's new switch for a belt printer, a plate changer or a slicer profile that pushes each part off: ticking it saves `clearsOwnBed: true` and unticking removes it, the same rule as the Mac, so the Mac app offers that printer its next job without waiting for Bed is clear (the desktop doesn't start jobs by itself, and the hint says so). The maintenance log's recurring tasks now offer the Mac's starter list for the printer's kind (clean the build plate, belts, rods, nozzle, PTFE tube, fans, wiring, filter; FEP, vat and washing alcohol for resin): a click fills the name and interval to adjust before adding, and a task already on the printer isn't offered again. Nine languages, worded as on the Mac.
-
 - **Store orders arrive as real jobs (Mac and desktop).** A Salla or Zid order, or one taken from the cloud order queue, now finds its product in your catalogue: first by SKU (the product's own or one of its variants'), then by its exact name. A matched product brings its parts, models, grams, hours and material, sized to how many were ordered, so the job reserves filament and carries its cost like a job you made from the catalogue. A line that matches nothing is never guessed: it stays on the job marked "Not matched to a product", and you pick the product later (in the job inspector on the Mac, from the badge on the board card on the desktop). Taking finished stock off the shelf, signature checks and duplicate protection are unchanged. Marking an order shipped back in Salla or Zid is not done yet: it needs each platform's API credentials.
 - **Mac: Scrap or Reprint after a QC failure.** With quality control switched on, the QC-failed sheet now offers Scrap (keep the failed job as a record) or Reprint (a new job linked to the failed one, with who pays: the shop or the customer), as the desktop does. Both jobs show a link to each other, and first-time pass and warranty figures now count Mac reprints. With quality control off, a failed job still goes back to Pending.
 - **The QC failed and RMA opened webhooks now send.** "QC failed" and "RMA opened" are events you can point a webhook at. Both apps send QC failed when a job fails inspection; the desktop sends RMA opened when a warranty claim is opened.
@@ -9131,6 +9129,37 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.21] - 2026-11-05
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Store orders arrive as real jobs.** A Salla or Zid order, or one from the cloud order queue, finds its product in your catalogue by SKU first, then by its exact name, and arrives with its parts, grams and hours, filament reserved, priced at what the customer paid. A line nothing matches stays on the job marked "Not matched to a product", with a menu in the job panel to pick it later. Nothing is guessed.
+- **Scrap or Reprint after a QC failure.** With quality control on, a failed check offers Scrap or Reprint, and who pays for the reprint. A reprint is a new job linked to the failed one both ways; the failure and its waste are recorded as before.
+- **A deposit paid on the portal records itself**, once, in the job's own currency. Khayt checks the portal by itself when you open the app and every 15 minutes, and a deposit you already typed in by hand is not added twice. Undo is on the notice.
+- **Send a reminder from Today or the job panel**, by WhatsApp or email, for what is owed or the milestone that is due, with your pay link filled in. Each reminder is recorded, so the cooldown and the three-reminder limit apply. Settings has "Send reminders by", and milestones can have a due date.
+- **Documents that share a number** are listed on Today, with a button to give the newer one the next free number (undoable).
+
+### Changed
+
+- **Two computers on one book no longer give two jobs the same number.** New jobs get an id that cannot collide; everything you read still shows the plain job number, and invoices print as before.
+- **Times printed and last printed come from your finished jobs**, so Never printed, the Printed sorts and ⌘J are right on a Mac-only shop.
+- **Search finds every word you type, in any order** and any field, and reads underscores, dashes and dots in file names as spaces.
+- **A job for a customer billed in another currency shows that currency** in the tables and on the board, and every report converts it at the rate it was saved at.
+- **The library stays quick with ten thousand models**: opening a model, typing a search, importing a folder and deleting many models no longer hold up the window.
+
+### Fixed
+
+- **The ZATCA QR on a foreign-currency invoice** states riyals at the job's saved rate, or is left off with the reason, rather than a euro total.
+- **The Owed bar** counts credit notes and gift cards, as the figure above it does.
+- **Tagging several models** changes only the tags they share; tags only some of them carried are kept.
+- **Quotes and jobs warn** when a model's licence does not allow selling prints.
+- **The "Saved from web" filter** shows in the Show menu while it is on.
+- **The app no longer stalls** while a Keychain prompt waits, or while the iPhone downloads the whole book.
+- **A customer approving a quote over Wi-Fi** is logged on the job, sends the quote_approved webhook and tells you; a new Salla or Zid order shows a notification; an overdue row on Today opens its job.
 
 ## [4.0.0-beta.20] - 2026-11-04
 
