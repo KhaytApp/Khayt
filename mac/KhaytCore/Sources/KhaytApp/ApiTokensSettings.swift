@@ -58,11 +58,8 @@ extension Shop {
                                     scopes: chosen, known: known, now: StoreWriter.iso(Date()))
         let record = minted.record
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            // Off the main thread, on the write chain: a whole-book write.
+            try await StoreWriter.updateOffMain(build) { root in
                 Self.editApiTokens(&root) { $0.append(.object(record)) }
             }
         } catch {
@@ -79,11 +76,7 @@ extension Shop {
         guard permitted("security", "edit") else { apiTokenProblem = moveProblem; return false }
         guard let build = source.build else { apiTokenProblem = words.callIt("mac.settings_sample"); return false }
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 Self.editApiTokens(&root) { list in
                     list.removeAll { if case .object(let o) = $0 { return o["id"] == .string(id) } else { return false } }
                 }
