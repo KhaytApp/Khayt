@@ -374,6 +374,42 @@ test('a pay-later link asks for what is owed: the tax-on-top bill less the depos
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8'), /<script src="\.\.\/lib\/bnpl-requests\.js"><\/script>/);
 });
 
+// ── Tabby hears who the customer is to the shop ────────────────────────────
+test('a Tabby checkout carries the customer\'s real history, not a fixed 2024 date', () => {
+  require('../lib/tax.js');
+  require('../lib/business-scope.js');
+  require('../lib/order-money.js');
+  const R = require('../lib/bnpl-requests');
+  const S = { currency: 'SAR', bnpl: { tabby: { merchantCode: 'M1' } } };
+  const order = { id: 'J9', price: 100, status: 'completed', clientId: 'C1', date: '2026-10-01' };
+  const orders = [
+    order,
+    { id: 'J1', clientId: 'C1', status: 'completed', date: '2023-03-04' },
+    { id: 'J2', clientId: 'C1', status: 'completed', date: '2025-01-01' },
+    { id: 'J3', clientId: 'C1', status: 'cancelled', date: '2022-01-01' },
+    { id: 'J4', clientId: 'C2', status: 'completed', date: '2020-01-01' },
+  ];
+  // The record's own date wins when it is earlier than every job.
+  let h = R.checkoutArgs(order, 'tabby', { settings: S, clients: [{ id: 'C1', createdAt: '2021-06-15' }], orders }).buyerHistory;
+  assert.deepEqual(h, { registeredSince: '2021-06-15T00:00:00Z', loyaltyLevel: 2 });
+  // A record made after their first job: the first job is when the shop met them.
+  // (A cancelled job still dates the meeting; only completed ones are loyalty.)
+  h = R.checkoutArgs(order, 'tabby', { settings: S, clients: [{ id: 'C1', createdAt: '2026-01-01' }], orders }).buyerHistory;
+  assert.equal(h.registeredSince, '2022-01-01T00:00:00Z');
+  // No record and no other jobs: this job's date; not this job in its own loyalty.
+  h = R.checkoutArgs({ ...order, clientId: null, client: 'Walk-in' }, 'tabby', { settings: S, clients: [], orders }).buyerHistory;
+  assert.deepEqual(h, { registeredSince: '2026-10-01T00:00:00Z', loyaltyLevel: 0 });
+  // The body sends it.
+  const body = R.plan('checkout', R.checkoutArgs(order, 'tabby', { settings: S, clients: [{ id: 'C1', createdAt: '2021-06-15T09:30:00.000Z' }], orders }), []).request.body;
+  assert.deepEqual(body.payment.buyer_history, { registered_since: '2021-06-15T09:30:00Z', loyalty_level: 2 });
+  // Tamara has no such field: nothing added.
+  assert.equal(R.checkoutArgs(order, 'tamara', { settings: S, clients: [], orders }).buyerHistory, undefined);
+  // The desktop's main process passes it through, and the dialog hands it the book.
+  const ipc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'main', 'payment-links.js'), 'utf8');
+  assert.match(ipc, /provider: 'tabby', merchantCode, amount, currency, description, buyer, orderId, itemName, buyerHistory \}/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'integrations.js'), 'utf8'), /bnplCtx = \{ settings, clients, orders: printLog/);
+});
+
 // ── Stripe: a custom redirect URL is kept, a private one is not ─────────────
 test('Stripe keeps a shop\'s own https success and cancel URLs, and refuses private ones', async () => {
   const handlers = new Map();

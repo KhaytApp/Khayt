@@ -465,7 +465,7 @@ async function openBnplModal(orderId) {
   // less what was paid — by lib/bnpl-requests.js checkoutArgs, which the Mac's
   // pay-later sheet builds its checkout from too. It used to be order.price: a
   // job with a deposit was asked for the whole price again.
-  const bnplCtx = { settings, clients, buyerName: buyer.name };
+  const bnplCtx = { settings, clients, orders: printLog, buyerName: buyer.name };
   const owedArgs = KhaytBnplRequests.checkoutArgs(order, 'tabby', bnplCtx);
   const amount = owedArgs.refused ? 0 : owedArgs.amount;
   const b      = settings.bnpl || {};
