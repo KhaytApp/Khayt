@@ -106,8 +106,8 @@ struct LibraryDeleteChoiceTests {
             try LibraryStorageTests.model(url, size: 9)
             many.append(try record(["id": id, "name": id, "sourceFile": ["filename": "x.stl"]]))
         }
-        // The engine loads the whole shared library; under CI load that alone
-        // took longer than the bound, so it is built before the clock starts.
+        // Built before the clock: the plan is what is timed, not loading the
+        // shared library.
         let engine = try KhaytEngine()
         let started = ContinuousClock.now
         let p = await Shop.planDelete(many, roots: [f.root.path], remote: .bucket(config), prefix: "",
@@ -117,9 +117,11 @@ struct LibraryDeleteChoiceTests {
                                           paths[file.id] ?? root.appending(path: "\(file.id)/x.stl")
                                       })
         // Each remote hangs for 60 s; a plan that waited on one would take a
-        // minute. 30 s, not 10: under the whole suite's load the 400 ms
-        // patience alone stretched past 10 (beta.1 batch run).
-        #expect(ContinuousClock.now - started < .seconds(30), "the plan waited on the remote")
+        // minute, so under 50 s proves it did not. Alone this takes well under a
+        // second; under the whole suite's load on CI the 400 ms timer shares a
+        // starved pool and has taken 35–36 s (#2206, #2216, #2217), so a tighter
+        // bound measures the runner, not the plan.
+        #expect(ContinuousClock.now - started < .seconds(50), "the plan waited on the remote")
         #expect(flight.most > 1 && flight.most <= Shop.deleteCheckWidth, "\(flight.most) at once")
         #expect(p.keptOnline.isEmpty, "nothing is kept online on a copy nobody saw")
         #expect(p.onlyHere.contains("PF-a") && p.ids.count == many.count)
