@@ -193,7 +193,7 @@ test('editing keeps the legacy map in step and drops retries for a subscription 
   const a = Bus.editSubscription(null, { url: ' https://a.example/h ', events: ['status_changed', 'nope', 'order_created'] }, 'whs_a', 'T');
   assert.deepEqual(a.events, ['order_created', 'status_changed'], 'catalogue order, no unknown event');
   assert.equal(a.url, 'https://a.example/h');
-  assert.equal(a.secret, '');
+  assert.equal('secret' in a, false);
   const wh = Bus.withSubscriptions({ deliveries: [1], pending: [{ id: 'p1', subscriptionId: 'whs_gone' },
     { id: 'p2', subscriptionId: 'whs_a' }, { id: 'p3', subscriptionId: 'event:status' }] }, [a]);
   assert.deepEqual(wh.events, { order_created: 'https://a.example/h', status_changed: 'https://a.example/h' });
@@ -292,4 +292,53 @@ test('settings-edit: webhooks, event webhooks, accounting and the digest', () =>
   assert.deepEqual(same.webhooks, out.webhooks);
   assert.deepEqual(same.emailDigest, out.emailDigest);
   assert.deepEqual(same.accountingSync, out.accountingSync);
+});
+
+// ── SECURITY: no copy of the signing secret on a subscription ───────────────
+
+const Paths = require('../lib/store-secret-paths.js');
+const Validate = require('../lib/store-validate.js');
+require('../lib/cloud-outbox.js');
+const Outbox = globalThis.KhaytCloudOutbox;
+const { signatureHeaders } = require('../lib/webhook-send.js');
+
+test('a migrated book carries no subscriptions[].secret', () => {
+  const subs = Bus.migrateLegacyWebhooks({ secret: 'REAL', enabled: true,
+    events: { status_changed: 'https://a.example/h', order_created: 'https://a.example/h' } });
+  assert.equal(subs.length, 1);
+  assert.equal('secret' in subs[0], false);
+  assert.equal(JSON.stringify(subs).includes('REAL'), false);
+  // And the editors never write one, even over a stored copy.
+  assert.equal('secret' in Bus.editSubscription({ id: 'a', secret: 'REAL' }, { url: 'https://a.example/h', events: [] }), false);
+  const wh = Bus.withSubscriptions({}, [{ id: 'a', url: 'https://a.example/h', events: [], secret: 'REAL' }]);
+  assert.equal(JSON.stringify(wh).includes('REAL'), false);
+});
+
+test('a book that already carries one loses it on load, and so on the next save', () => {
+  const store = { version: 10, settings: { webhooks: { secret: 'S', subscriptions: [
+    { id: 'a', url: 'https://a.example/h', events: ['status_changed'], secret: 'REAL' },
+    { id: 'b', url: 'https://b.example/h', events: ['status_changed'] },
+  ] } } };
+  const { normalized } = Validate.normalizeStoreSnapshot(store);
+  assert.equal(JSON.stringify(normalized).includes('REAL'), false);
+  assert.equal(normalized.settings.webhooks.secret, 'S', 'the real, sealed path is untouched');
+  assert.deepEqual(Paths.DROP_PATHS, ['settings.webhooks.subscriptions[].secret']);
+});
+
+test('what a phone (/api/store) and the cloud are sent never carries it, not even masked', () => {
+  const store = { settings: { webhooks: { secret: 'S', subscriptions: [{ id: 'a', url: 'https://a.example/h', secret: 'REAL' }] } } };
+  for (const out of [Outbox.forPhone(store), Outbox.forCloud(store)]) {
+    assert.equal(JSON.stringify(out).includes('REAL'), false);
+    assert.equal('secret' in out.settings.webhooks.subscriptions[0], false);
+  }
+  assert.equal(store.settings.webhooks.subscriptions[0].secret, 'REAL', 'the caller\'s copy is not mutated');
+});
+
+test('the delivery signature is unchanged: a migrated subscription signs with the shared secret', () => {
+  const wh = { secret: 'shared', events: { status_changed: 'https://a.example/h' } };
+  const before = { url: 'https://a.example/h', secret: 'shared' };     // what migration used to write
+  const [after] = Bus.migrateLegacyWebhooks(wh);
+  const body = '{"event":"status_changed"}';
+  assert.deepEqual(signatureHeaders(Bus.subscriptionSecret(after, wh), body, 1_800_000_000_000),
+    signatureHeaders(Bus.subscriptionSecret(before, wh), body, 1_800_000_000_000));
 });

@@ -4400,6 +4400,12 @@ public actor KhaytEngine {
         try runtime.value("KhaytStoreSecretPaths", "SECRET_PATHS", as: [String].self)
     }
 
+    /// Paths whose value is REMOVED, never kept (`DROP_PATHS`) — what
+    /// `StoreScrub` mirrors for the write path.
+    public func dropPaths() throws -> [String] {
+        try runtime.value("KhaytStoreSecretPaths", "DROP_PATHS", as: [String].self)
+    }
+
     // MARK: - Moving a job
 
     /// May this job move to `status`?
