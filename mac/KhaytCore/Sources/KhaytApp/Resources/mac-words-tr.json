@@ -1861,7 +1861,7 @@
  "mac.on_time": "Zamanında",
  "mac.online_add_to_queue": "Kuyruğa ekle",
  "mac.online_already_recorded": "Bu sipariş zaten defterdeydi, bu yüzden ikinci bir iş oluşturulmadı. Kuyruktan çıkarıldı.",
- "mac.online_desc": "Bu Mac, dükkânın Wi‑Fi'ındaki telefonlara canlı kuyruğu, müşteri kabul formunu, teklif onayını, takip sayfasını ve takvim akışını ve Windows ile Linux uygulamasının sunduğu aynı durum API'sini sunar. Salla ve Zid'den siparişleri, SMSA, Aramex ve Saudi Post'tan paket güncellemelerini alır. Yazıcı webhook'ları şimdilik o uygulamada çalışır.",
+ "mac.online_desc": "Bu Mac, dükkânın Wi‑Fi'ındaki telefonlara canlı kuyruğu, müşteri kabul formunu, teklif onayını, takip sayfasını ve takvim akışını ve Windows ile Linux uygulamasının sunduğu aynı durum API'sini sunar. Salla ve Zid'den siparişleri, SMSA, Aramex ve Saudi Post'tan paket güncellemelerini alır. Ayrıca PIN veya bir API belirteciyle REST API'sini (siparişler, müşteriler, stok, bekleme listesi ve fire) ve yazıcı webhook'larını yanıtlar.",
  "mac.online_kept_in_queue": "Sipariş kaydedildi, ancak bulut kuyruğundan çıkarılamadı — yeniden sunulacak.",
  "mac.online_none": "Vitrininizden yeni bir şey yok.",
  "mac.online_off_shelf": "{n} raftan",
@@ -3532,5 +3532,8 @@
  "mac.bnpl_forget": "Kayıtlı anahtarı unut",
  "mac.bnpl_unsealed": "Bu anahtar şifrelenemedi, bu yüzden hiçbir şey kaydedilmedi. Defter eşitlenir ve yedeklenir; şifresiz bir anahtar da onunla giderdi.",
  "mac.bnpl_none": "Ayarlar ▸ Çevrimiçi bölümünden Tabby veya Tamara'yı API anahtarıyla açın.",
- "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek."
+ "mac.bnpl_watching": "Müşteri ödediğinde Khayt bu ödemeyi tamamlayıp işe kaydedecek.",
+ "mac.api_where": "Betikler bu Mac’in LAN sunucusuna {url} adresinden ulaşır ve belirteci “Authorization: Bearer” olarak gönderir. Sunucunun açık olması gerekir.",
+ "mac.api_scopes": "Yetkiler",
+ "mac.api_owner_only": "API belirteçlerini yalnızca sahip oluşturabilir veya iptal edebilir."
 }

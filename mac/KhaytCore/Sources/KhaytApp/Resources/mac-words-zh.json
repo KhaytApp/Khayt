@@ -1861,7 +1861,7 @@
  "mac.on_time": "准时",
  "mac.online_add_to_queue": "添加到队列",
  "mac.online_already_recorded": "此订单已在账本中，因此未创建第二个订单。它已从队列中移除。",
- "mac.online_desc": "这台 Mac 向店铺 Wi‑Fi 中的手机提供实时队列、客户登记表单、报价确认、追踪页面和日历订阅，以及与 Windows 和 Linux 版 App 相同的状态 API。它接收来自 Salla 和 Zid 的订单，以及来自 SMSA、Aramex 和 Saudi Post 的包裹更新。打印机 webhook 目前在那个 App 中运行。",
+ "mac.online_desc": "这台 Mac 向店铺 Wi‑Fi 中的手机提供实时队列、客户登记表单、报价确认、追踪页面和日历订阅，以及与 Windows 和 Linux 版 App 相同的状态 API。它接收来自 Salla 和 Zid 的订单，以及来自 SMSA、Aramex 和 Saudi Post 的包裹更新。它还在 PIN 或 API 令牌的保护下响应 REST API（订单、客户、库存、等候名单和废料）以及打印机 webhook。",
  "mac.online_kept_in_queue": "订单已记录，但无法从云端队列中移除——它会被再次提供。",
  "mac.online_none": "你的店面没有新内容。",
  "mac.online_off_shelf": "从货架取走 {n} 件",
@@ -3532,5 +3532,8 @@
  "mac.bnpl_forget": "删除已保存的密钥",
  "mac.bnpl_unsealed": "该密钥无法加密，因此未保存任何内容。账本会同步和备份，未加密的密钥会随之传出。",
  "mac.bnpl_none": "请在 设置 ▸ 在线 中开启 Tabby 或 Tamara，并填写其 API 密钥。",
- "mac.bnpl_watching": "客户付款后，Khayt 会完成这笔付款并记到该工作上。"
+ "mac.bnpl_watching": "客户付款后，Khayt 会完成这笔付款并记到该工作上。",
+ "mac.api_where": "脚本通过 {url} 访问这台 Mac 的局域网服务器，并以“Authorization: Bearer”发送令牌。服务器必须处于开启状态。",
+ "mac.api_scopes": "权限范围",
+ "mac.api_owner_only": "只有所有者可以创建或撤销 API 令牌。"
 }

@@ -209,9 +209,19 @@
    * from a device that can read the blob needs a key that device does not
    * hold; that is not this list.
    */
+  /*   settings.lanApi.apiTokens[].hash  an automation token's SHA-256. The
+   *                                     token is 256 random bits, so the hash
+   *                                     is not a thing to crack — but it is
+   *                                     what the LAN API checks a bearer
+   *                                     against, and a phone checks nothing
+   *                                     against it. Kept between computers for
+   *                                     the same reason as the PIN hashes.
+   *                                     Added Nov 2026 with the Mac's LAN API.
+   */
   const PHONE_PRIVATE_PATHS = Object.freeze([
     'operators[].pinHash',
     'settings.recoveryCodeHash',
+    'settings.lanApi.apiTokens[].hash',
   ]);
 
   /** Visit every non-empty string at a path in `paths`, with a setter. */

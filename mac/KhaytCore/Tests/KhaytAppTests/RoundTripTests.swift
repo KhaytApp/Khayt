@@ -742,6 +742,7 @@ struct RoundTripTests {
         "saveQuoteFormEmbed": "never writes the book: PUTs {enabled, origins} to the cloud and shows what the cloud answers; QuoteFormEmbedTests covers the body and the answer",
         "saveQuoteFormFooter": "never writes the book: the caller of QuoteFormEmbed.saveFooter, gated, and shows what the cloud answers",
         "saveFooter": "never writes the book: PUTs {hideFooter} to the cloud's /embed/footer; QuoteFormEmbedTests.footerSave covers the body and the answers",
+        "editApiTokens": "appends or removes one whole token record in settings.lanApi.apiTokens, in place inside the write; every other key of settings and lanApi is put back as read, and no record is re-encoded from a form",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 

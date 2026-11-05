@@ -179,9 +179,11 @@ with different rules; nothing in this file applies to them.
 - **The LAN API has two implementations that are not the same.** `lib/lan-server.js`
   serves the full surface; the native Mac's `LanServer.swift` serves `/api/status`,
   `/api/queue`, `/api/store`, the customer intake, quotes, tracking, the calendar
-  the Salla/Zid order webhooks and the SMSA/Aramex/SPL carrier webhooks — not the
-  printer webhook, nor the
-  phone's write routes (`/api/orders`, `/api/inventory`, …). Do not
+  the Salla/Zid order webhooks, the SMSA/Aramex/SPL carrier webhooks, and (since
+  Nov 2026) the REST routes (`/api/orders`, `/api/inventory`, `/api/clients`,
+  `/api/waiting-list`, `/api/waste`, `/api/machines`) and the printer webhook,
+  whose rules are `lib/lan-rest.js` for both — but not `/api/expense`,
+  `/api/quote` or the tunnel. Do not
   assume a route exists on both. [`docs/LAN_API.md`](docs/LAN_API.md) marks which is which.
 - **`scripts/ios-contract-capture.mjs` must be fixed against what the desktop
   actually writes, not what seems reasonable.** It built its fixture with

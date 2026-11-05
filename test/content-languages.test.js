@@ -355,7 +355,9 @@ test('the phone numbers an order the way the desk does', () => {
   // what a new job IS lives in lib/order-new.js, which the desk, the phone and
   // the Mac app all build the record with. So this now pins the LAN server to
   // that one rule rather than to a second copy in the renderer.
-  const lan = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-server.js'), 'utf8');
+  // `POST /api/orders` is lib/lan-rest.js's `orderCreate` now, which both LAN
+  // servers (the desktop's and the Mac's) build the record with.
+  const lan = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-rest.js'), 'utf8');
   const shared = fs.readFileSync(path.join(__dirname, '..', 'lib', 'order-new.js'), 'utf8');
   const of = (src) => (src.match(/asQuote \? \(settings\.quotePrefix \|\| 'QUO'\) : \(settings\.(\w+) \|\| '(\w+)'\)/) || []).slice(1);
   assert.deepEqual(of(lan), of(shared), 'the phone and the shared rule must mint the same order prefix');

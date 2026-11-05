@@ -1861,7 +1861,7 @@
  "mac.on_time": "A tiempo",
  "mac.online_add_to_queue": "Añadir a la cola",
  "mac.online_already_recorded": "Este pedido ya estaba en el libro, así que no se creó un segundo trabajo. Se ha sacado de la cola.",
- "mac.online_desc": "Este Mac sirve la cola en vivo a teléfonos en la Wi‑Fi del taller, el formulario de recepción de clientes, la aprobación de presupuestos, la página de seguimiento y el calendario, además de la misma API de estado que sirve la app de Windows y Linux. Recibe pedidos de Salla y Zid, y actualizaciones de paquetes de SMSA, Aramex y Saudi Post. Los webhooks de impresora siguen ejecutándose en esa app por ahora.",
+ "mac.online_desc": "Este Mac sirve la cola en vivo a teléfonos en la Wi‑Fi del taller, el formulario de recepción de clientes, la aprobación de presupuestos, la página de seguimiento y el calendario, además de la misma API de estado que sirve la app de Windows y Linux. Recibe pedidos de Salla y Zid, y actualizaciones de paquetes de SMSA, Aramex y Saudi Post. También responde a la API REST (pedidos, clientes, inventario, lista de espera y desperdicio) y a los webhooks de impresora, tras el PIN o un token de API.",
  "mac.online_kept_in_queue": "El pedido se registró, pero no se pudo sacar de la cola de la nube: se volverá a ofrecer.",
  "mac.online_none": "Nada nuevo de tu tienda.",
  "mac.online_off_shelf": "{n} del estante",
@@ -3532,5 +3532,8 @@
  "mac.bnpl_forget": "Olvidar la clave guardada",
  "mac.bnpl_unsealed": "No se pudo cifrar esa clave, así que no se guardó nada. El libro se sincroniza y se respalda, y una clave sin cifrar iría con él.",
  "mac.bnpl_none": "Active Tabby o Tamara, con su clave de API, en Ajustes ▸ En línea.",
- "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado."
+ "mac.bnpl_watching": "Khayt terminará este pago y lo registrará en el trabajo cuando el cliente haya pagado.",
+ "mac.api_where": "Los scripts llegan al servidor LAN de este Mac en {url} y envían el token como “Authorization: Bearer”. El servidor tiene que estar activado.",
+ "mac.api_scopes": "Permisos",
+ "mac.api_owner_only": "Solo el propietario puede crear o revocar tokens de API."
 }

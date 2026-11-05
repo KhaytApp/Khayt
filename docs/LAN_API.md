@@ -45,6 +45,13 @@ Authorization: Bearer khayt_<random>
 * Repeated bad tokens hit the same per-IP lockout as bad PINs (10/min → **429**).
 * Tokens are an **addition** to the owner PIN, not a replacement — `x-khayt-pin` keeps
   working exactly as before for humans and the iOS app.
+* **Both apps** (Nov 2026). The native Mac mints and revokes them in **Settings → Online →
+  API Tokens** (the owner only, under the staff lock), stores the same record
+  (`settings.lanApi.apiTokens[]`: `id`, `label`, `scopes`, `createdAt`, `lastUsedAt`, and the
+  SHA-256 `hash`), and its LAN server checks them with the same rules
+  (`lib/api-tokens.js requiredScope`). A token minted on either computer verifies on the other.
+* The hash never reaches a phone: `/api/store` masks `settings.lanApi.apiTokens[].hash`
+  (`lib/store-secret-paths.js` PHONE_PRIVATE), and an export drops it.
 
 | Mechanism | Details |
 |-----------|---------|
@@ -465,6 +472,25 @@ arrays present. Checked before the engine sees it.
 **Response 500** — the book could not be written. Nothing was changed, and a
 client must not treat this as delivered.
 
+### The REST routes — served by both apps (Nov 2026)
+
+`/api/orders` (GET, POST), `/api/orders/:id` (PATCH), `/api/orders/:id/quote-url` (GET),
+`/api/orders/:id/approve` (POST), `/api/machines` (GET), `/api/inventory` (GET, POST),
+`/api/inventory/:id` (PATCH, DELETE), `/api/waiting-list` (GET), `/api/waiting-list/:id`
+(PATCH), `/api/clients` (GET), `/api/waste` (POST) and `/api/webhook/printer/:id` (POST)
+are answered by **both** `lib/lan-server.js` and the native Mac's `LanServer.swift`
+(`LanServer+Rest.swift`). What each one reads and writes is one module,
+`lib/lan-rest.js`, which both servers run — the Mac in JavaScriptCore — so the bodies
+and the records written are the same. Each server decides a write on the book it holds
+(a refusal costs no write) and again inside its write chain, and answers from the
+second. The same gate on both: the owner PIN (header), or a scoped API token where the
+route is in the scope model; `/api/waste` is in no scope and takes the PIN only.
+
+Where the two differ: a write the Mac cannot put on disk is **500** (the desktop says
+400), and a body that is not JSON is **400** `{"error":"Invalid JSON"}`. `/api/machines`
+answers GET only on the Mac. `POST /api/expense` and `POST /api/quote` are still
+desktop-only.
+
 ### `GET /api/orders`
 
 Order log slice. **Requires owner PIN.**
@@ -759,6 +785,10 @@ Owner approves a quote (same as customer web approval). **Requires owner PIN.**
 
 **Response 200:** `{ "ok": true, "order": { ... } }`
 
+**Response 404** no such order, **409** not awaiting approval, **410** the quote has
+expired (`{"error":"Quote has expired"}`). Before Nov 2026 an expired quote answered
+200 `ok` and was left unchanged.
+
 ### `GET /api/machines`
 
 Machine list glance. **Requires owner PIN.**
@@ -863,8 +893,13 @@ A carrier saying where a parcel is. **Served by both apps**; the rule is
   `shippedAt` / `deliveredAt` by `order-status.stampFromShipping`. An event
   that changes nothing is not written.
 
-The printer webhook (`/api/webhook/printer/:id`) is **served by the Windows
-and Linux app only** — the Mac polls its printers itself.
+The printer webhook (`/api/webhook/printer/:id`) is **served by both apps**
+(the Mac since Nov 2026): the `x-khayt-webhook-token` header against
+`settings.lanApi.webhookToken` (never `?token=`), compared in constant time, ten
+wrong ones per address to a one-minute lockout on its own channel. `{topic}`,
+`{event}` or `{state}` is read as print started / done / cancelled, and the job on
+that machine moves through `lib/order-status.js` (`lib/lan-rest.js printerEvent`).
+Answers `{ "ok": true, "event", "advanced" }`.
 
 ### `GET /api/version` and `POST /api/files/local` — Khayt as a printer in the slicer
 

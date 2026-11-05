@@ -57,6 +57,10 @@ const listened = all(/ipcRenderer\.on\(\s*['"]([^'"]+)/g, PRELOAD);
 const handled = all(/ipcMain\.(?:handle|handleOnce)\(\s*['"]([^'"]+)/g, MAIN);
 const received = all(/ipcMain\.(?:on|once)\(\s*['"]([^'"]+)/g, MAIN);
 const pushed = all(/\.send\(\s*['"]([^'"]+)/g, MAIN);
+// The LAN REST rules name the channel a write is announced on, and lib/lan-server.js
+// sends it (`restWrite` → `webContents.send(out.emit.channel, …)`): a pushed
+// channel all the same, so it counts as one.
+for (const c of all(/\bchannel:\s*['"]([^'"]+)/g, fs.readFileSync(path.join(ROOT, 'lib', 'lan-rest.js'), 'utf8'))) pushed.add(c);
 
 test('every channel the renderer invokes has a handler', () => {
   // The dangerous direction: this rejects at runtime, often in a rarely-hit path.

@@ -831,6 +831,14 @@ public actor KhaytEngine {
         "privacy",
         "lan-intake",
         "lan-quote-page",
+        // The LAN REST API: what `/api/orders`, `/api/clients`, `/api/inventory`,
+        // `/api/waste`, `/api/waiting-list`, `/api/machines` and the printer
+        // webhook read and write — lifted out of `lib/lan-server.js` so this
+        // app answers them with the same records — and the API tokens' scope
+        // rules (minting and hashing are Swift's: `ApiTokens`). Both reach
+        // their siblings at call time, so their place here is not load-bearing.
+        "api-token-scopes",
+        "lan-rest",
         "carriers",
         // A job handed to a carrier: who, which service, under what tracking
         // number, and a parcel's status moved by hand without going backwards.
@@ -7613,6 +7621,72 @@ public actor KhaytEngine {
     public func documentNumber(order: JSONValue, settings: [String: JSONValue]) throws -> String {
         try runtime.call2("KhaytInvoiceDocument.documentNumber(ARG0, ARG1)",
                           [order, .object(settings)], as: String.self)
+    }
+
+    // MARK: - The LAN REST API
+
+    /// What a `lib/lan-rest.js` rule answered: the HTTP status and body, and
+    /// the book to write when something changed (nil for a read or a refusal).
+    public struct LanRestOutcome: Decodable, Sendable {
+        public let status: Int
+        public let body: JSONValue
+        public let store: JSONValue?
+        public init(status: Int, body: JSONValue, store: JSONValue?) {
+            self.status = status; self.body = body; self.store = store
+        }
+        /// The book to write, when the rule changed one.
+        public var changed: [String: JSONValue]? {
+            if case .object(let o)? = store { return o }
+            return nil
+        }
+    }
+
+    /// The rules a LAN server may ask by name — and nothing else, so a name
+    /// can never be anything but one of these functions.
+    public static let lanRestReads: Set<String> = [
+        "ordersList", "machinesList", "inventoryList", "waitingList", "clientsList", "orderQuoteUrl",
+    ]
+    public static let lanRestWrites: Set<String> = [
+        "orderCreate", "orderPatch", "orderApprove", "inventoryCreate", "inventoryPatch",
+        "inventoryDelete", "waitingListPatch", "wasteCreate", "printerEvent",
+    ]
+
+    /// Run `KhaytLanRest.<op>(store, ...args)`. A read's answer is its body
+    /// with status 200; a write's is `{ status, body, store? }`. Run on the
+    /// book the server holds to answer a refusal without a write, and again
+    /// INSIDE the write on the book as it is then.
+    public func lanRest(_ op: String, store: JSONValue, args: [JSONValue] = []) throws -> LanRestOutcome {
+        guard Self.lanRestReads.contains(op) || Self.lanRestWrites.contains(op) else {
+            throw KhaytJSError.unexpectedResult("lanRest: \(op) is not a LAN REST rule")
+        }
+        let params = (0...args.count).map { "ARG\($0)" }.joined(separator: ", ")
+        return try runtime.call2("""
+            (function () {
+              var r = globalThis.KhaytLanRest.\(op)(\(params));
+              if (r && typeof r.status === 'number' && Object.prototype.hasOwnProperty.call(r, 'body')) {
+                return { status: r.status, body: r.body === undefined ? null : r.body, store: r.store || null };
+              }
+              return { status: 200, body: r === undefined ? null : r, store: null };
+            })()
+            """, [store] + args, as: LanRestOutcome.self)
+    }
+
+    /// The scope a request needs from an API token, or nil when the route is
+    /// not part of the scope model (the PIN still applies there) —
+    /// `lib/api-token-scopes.js requiredScope`, given the `/v1` form of the path.
+    public func apiTokenScope(path: String, method: String) throws -> String? {
+        try runtime.call2("globalThis.KhaytApiTokenScopes.requiredScope(ARG0, ARG1)",
+                          [.string(path), .string(method)], as: String?.self)
+    }
+
+    /// Every scope a token can be granted, in the desktop's order.
+    public func apiTokenScopes() throws -> [String] {
+        try runtime.call2("globalThis.KhaytApiTokenScopes.SCOPES.slice()", [], as: [String].self)
+    }
+
+    /// The owner-facing list — never the hash (`redactTokens`).
+    public func apiTokensRedacted(_ tokens: JSONValue) throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytApiTokenScopes.redactTokens(ARG0)", [tokens], as: [JSONValue].self)
     }
 
     // MARK: - Storefront order webhooks

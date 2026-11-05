@@ -57,11 +57,22 @@ test('the book handed in is not changed', () => {
 });
 
 test('the list says what it masks', () => {
-  assert.deepEqual([...P.PHONE_PRIVATE_PATHS].sort(), ['operators[].pinHash', 'settings.recoveryCodeHash']);
+  assert.deepEqual([...P.PHONE_PRIVATE_PATHS].sort(),
+    ['operators[].pinHash', 'settings.lanApi.apiTokens[].hash', 'settings.recoveryCodeHash']);
   const seen = [];
   P.forEachPhonePrivate(book(), (v) => seen.push(v));
   assert.equal(seen.length, 2);
   P.forEachPhonePrivate(null, () => assert.fail('nothing to visit'));
+});
+
+test('an API token reaches a phone without its hash, and the cloud keeps it', () => {
+  const b = { settings: { lanApi: { apiTokens: [{ id: 'tok_1', label: 'Zapier', hash: HASH, scopes: ['orders:read'] }] } } };
+  const phone = forPhone(b).settings.lanApi.apiTokens[0];
+  assert.equal(phone.hash, '__KHAYT_MASKED__');
+  assert.equal(phone.label, 'Zapier', 'the owner-facing fields still travel');
+  assert.deepEqual(phone.scopes, ['orders:read']);
+  assert.equal(JSON.stringify(forPhone(b)).includes(HASH), false, 'the hash appears nowhere a phone is handed');
+  assert.equal(b.settings.lanApi.apiTokens[0].hash, HASH, 'the book handed in is not changed');
 });
 
 test('a phone that edits an operator and sends it home does not wipe the PIN', () => {

@@ -161,6 +161,10 @@ struct OnlinePane: View {
                                 missing: draft.enabled && !draft.pinStored
                                     && draft.pin.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                // Scoped tokens for scripts, beside the PIN they stand in for.
+                // Saves itself: a token is shown once, so it is in the book
+                // the moment it exists.
+                ApiTokensSection(shop: shop)
                 // ── ALERTS ON THE SHOP'S IPHONES ───────────────────────
                 //
                 // A finished print is sent to the shop's iPhones through

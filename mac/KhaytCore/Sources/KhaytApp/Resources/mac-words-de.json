@@ -1861,7 +1861,7 @@
  "mac.on_time": "Pünktlich",
  "mac.online_add_to_queue": "Zur Warteschlange hinzufügen",
  "mac.online_already_recorded": "Diese Bestellung war bereits im Geschäftsbuch, daher wurde kein zweiter Auftrag erstellt. Sie wurde aus der Warteschlange genommen.",
- "mac.online_desc": "Dieser Mac stellt Telefonen im WLAN des Shops die Live-Warteschlange bereit, außerdem das Kundenformular zur Annahme, die Angebotsfreigabe, die Tracking-Seite und den Kalender-Feed sowie dieselbe Status-API, die die Windows- und Linux-App bereitstellt. Er nimmt Bestellungen von Salla und Zid entgegen und Paketupdates von SMSA, Aramex und Saudi Post. Drucker-Webhooks laufen vorerst in dieser App.",
+ "mac.online_desc": "Dieser Mac stellt Telefonen im WLAN des Shops die Live-Warteschlange bereit, außerdem das Kundenformular zur Annahme, die Angebotsfreigabe, die Tracking-Seite und den Kalender-Feed sowie dieselbe Status-API, die die Windows- und Linux-App bereitstellt. Er nimmt Bestellungen von Salla und Zid entgegen und Paketupdates von SMSA, Aramex und Saudi Post. Er beantwortet auch die REST-API (Aufträge, Kunden, Lager, Warteliste und Ausschuss) und Drucker-Webhooks, hinter der PIN oder einem API-Token.",
  "mac.online_kept_in_queue": "Die Bestellung wurde erfasst, konnte aber nicht aus der Cloud-Warteschlange genommen werden – sie wird erneut angeboten.",
  "mac.online_none": "Nichts Neues aus Ihrem Webshop.",
  "mac.online_off_shelf": "{n} aus dem Regal",
@@ -3532,5 +3532,8 @@
  "mac.bnpl_forget": "Gespeicherten Schlüssel vergessen",
  "mac.bnpl_unsealed": "Dieser Schlüssel konnte nicht verschlüsselt werden, daher wurde nichts gespeichert. Das Buch wird synchronisiert und gesichert, und ein unverschlüsselter Schlüssel ginge mit.",
  "mac.bnpl_none": "Schalten Sie Tabby oder Tamara mit dem API-Schlüssel unter Einstellungen ▸ Online ein.",
- "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat."
+ "mac.bnpl_watching": "Khayt schließt diese Zahlung ab und verbucht sie beim Auftrag, sobald der Kunde bezahlt hat.",
+ "mac.api_where": "Skripte erreichen den LAN-Server dieses Macs unter {url} und senden das Token als „Authorization: Bearer“. Der Server muss eingeschaltet sein.",
+ "mac.api_scopes": "Berechtigungen",
+ "mac.api_owner_only": "Nur der Inhaber kann API-Tokens erstellen oder widerrufen."
 }
