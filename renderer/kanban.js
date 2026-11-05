@@ -906,7 +906,7 @@ function nextUpLastMaterial() {
 }
 
 function nextUpPlan() {
-  // Bed Ready loads this file without the rule, and has no Next up.
+  // Bed Ready loads the rule too, but its queue has no #nextUpPanel.
   const AD = typeof KhaytAutoDispatch !== 'undefined' ? KhaytAutoDispatch : null;
   if (!AD) return null;
   const locM = typeof machineMatchesActiveLocation === 'function' ? machineMatchesActiveLocation : () => true;
