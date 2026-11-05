@@ -419,6 +419,7 @@ final class Words {
             .merging(ShopPagesWords.table) { mine, _ in mine }
             .merging(IntegrationWords.table) { mine, _ in mine }
             .merging(PrintPrepWords.table) { mine, _ in mine }
+            .merging(StudioWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -6337,6 +6338,8 @@ final class Words {
         "acct.need_url", "acct.push_failed", "digest.frequency", "digest.daily", "digest.weekly",
         "digest.monthly", "digest.send_hour", "digest.weekday", "digest.monthday",
         "digest.recipient", "digest.send_test",
+        // The Calibration Assistant's two confirmations, in Bed Ready's words.
+        "cal.model_saved", "cal.result_saved",
         // The first-run setup's filament step, in the Spool sheet's own words.
         "inv.cost", "inv.weight",
         // The product editor. Khayt's own words for the same two fields on its

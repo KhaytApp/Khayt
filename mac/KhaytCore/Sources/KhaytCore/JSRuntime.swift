@@ -248,6 +248,11 @@ public final class JSRuntime {
                           // by two of its own callers, which had never mattered
                           // because both reached it through `require`.
                           "filament-mixer": "filamentMixer",
+                          // HueForge spells its F in capitals; the derived
+                          // name would be `KhaytHueforge…`.
+                          "hueforge": "KhaytHueForge",
+                          "hueforge-flat": "KhaytHueForgeFlat",
+                          "hueforge-3mf": "KhaytHueForge3mf",
                           "full-spectrum": "fullSpectrum"]
         if let known = exceptions[module] { return known }
         let camel = module.split(separator: "-").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()

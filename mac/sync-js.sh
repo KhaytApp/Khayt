@@ -14,7 +14,7 @@ mkdir -p "$DEST"
 # comment simply stopped being copied, which is drift that reports itself as
 # nothing at all. Found the day such a comment was written.
 MODULES=$(sed -n '/static let modules = \[/,/^    \]$/p' mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift \
-          | grep -oE '^\s*"[a-z-]+",' | grep -oE '"[a-z-]+"' | tr -d '"')
+          | grep -oE '^\s*"[a-z0-9-]+",' | grep -oE '"[a-z0-9-]+"' | tr -d '"')
 [ -z "$MODULES" ] && { echo "could not read the module list from KhaytEngine.swift" >&2; exit 1; }
 for m in $MODULES; do
   cp "lib/$m.js" "$DEST/$m.js"
@@ -52,6 +52,13 @@ for l in $LOCALES; do
   cp "renderer/locales/$l.js" "$DEST/locale-$l.js"
   echo "  synced locale $l"
 done
+
+# The U1 project settings HueForge's 3MF is built on. `hueforge-3mf.js` reads
+# it with `require` in Node; under JavaScriptCore the Mac reads this copy and
+# hands it over as `KhaytHueForgeU1Template`. Data, not a module, so it is
+# copied by name — and `HueForgeEngineTests` holds it to lib/.
+cp lib/hueforge-u1-template.json "$DEST/hueforge-u1-template.json"
+echo "  synced hueforge-u1-template.json"
 
 # The invoice's stylesheet. The html is a bundled module; this is what it looks
 # like, and two copies would be two documents that agree until one is edited.
