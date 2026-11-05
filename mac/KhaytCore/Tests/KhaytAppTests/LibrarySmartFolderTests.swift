@@ -295,6 +295,7 @@ struct LibrarySmartFolderTests {
         #expect(shop.files.count == 600)
 
         let clock = ContinuousClock()
+        var budget = SpeedBudget.calibrate()
         var worst: Duration = .zero
         for max in [60.0, 120, 240, 480] {
             shop.libraryRanges.minutes = .init(max: max)
@@ -302,7 +303,7 @@ struct LibrarySmartFolderTests {
             await shop.settleLibraryFacets()
             worst = Swift.max(worst, clock.now - t)
         }
-        #expect(ms(worst) < 10_000, "a facet recount took \(ms(worst)) ms")
+        budget.expect(ms(worst), under: 10_000, "a facet recount")
 
         // The same question again: the memo answers, nothing is counted.
         let ran = shop.libraryMemo.work.facetRecounts
@@ -313,10 +314,11 @@ struct LibrarySmartFolderTests {
         #expect(shop.libraryMemo.work.facetMemoHits == hits + 1)
 
         let rows = shop.librarySmartRows
+        budget = SpeedBudget.calibrate()
         let t = clock.now
         let counts = rows.map { shop.libraryCount($0.query) }
         let took = clock.now - t
-        #expect(ms(took) < 5_000, "\(rows.count) smart-folder counts took \(ms(took)) ms")
+        budget.expect(ms(took), under: 5_000, "\(rows.count) smart-folder counts")
         #expect(counts.allSatisfy { $0 >= 0 && $0 <= 600 })
         // A redraw of the sidebar asks again and does no work.
         let before = shop.libraryMemo.work.queryCounts

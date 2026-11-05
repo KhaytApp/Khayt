@@ -31,6 +31,7 @@ struct LibraryTenThousandTests {
         let shop = await Self.shop()
         #expect(shop.files.count == 10_000)
         let clock = ContinuousClock()
+        let budget = SpeedBudget.calibrate()
         var times: [Double] = []
         for typed in ["d", "dr", "dra", "drag", "#1", "#12"] {
             shop.search = typed
@@ -46,7 +47,8 @@ struct LibraryTenThousandTests {
         await shop.readLibraryFacets()
         times.append(ms(clock.now - t))
         print("10k facet recount ms:", times.map { String(format: "%.1f", $0) }.joined(separator: " "))
-        #expect(times.allSatisfy { $0 < 10_000 })
+        print("10k facet recount", budget)
+        budget.expect(times.max() ?? 0, under: 10_000, "the slowest 10k facet recount")
     }
 
     @Test("a burst of thumbnails is decoded at most four at a time, and a tile gone away is not decoded")
@@ -83,6 +85,7 @@ struct LibraryTenThousandTests {
         let shop = await Self.shop()
         let ids = shop.files.map(\.id)
         let clock = ContinuousClock()
+        let budget = SpeedBudget.calibrate()
         let t = clock.now
         var found = 0
         for id in ids.prefix(2_000) where shop.row(for: id) != nil { found += 1 }
@@ -98,7 +101,7 @@ struct LibraryTenThousandTests {
               "| the old walk:", String(format: "%.1f", ms(clock.now - w)))
         #expect(walked == 2_000)
         #expect(found == 2_000)
-        #expect(took < 10_000)
+        budget.expect(took, under: 10_000, "10k row(for:) x2000")
         // The first record with the id, as the walk found it.
         if case .object(let rec)? = shop.row(for: ids[5]), case .string(let id)? = rec["id"] {
             #expect(id == ids[5])
