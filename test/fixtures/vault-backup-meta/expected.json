@@ -1,0 +1,31 @@
+{
+  "metaStable": {
+    "key": "print-files/ab_c_d/Dragon.3MF",
+    "kind": "3mf",
+    "name": "Dragon.3MF",
+    "path": "",
+    "seq": 1,
+    "size": 2000,
+    "sha256": "750b440d73dbea6e136f45cfadc00cc77e7ce1c6e75c5105d990797812ad882c",
+    "hasRecordId": false
+  },
+  "metaPlain": {
+    "key": "print-files/ab_c_d/Dragon.3MF",
+    "kind": "3mf",
+    "manifestHash": "45264339af595bd461ab057935ba4e4184927d55f0aab891931649a92597284c",
+    "name": "Dragon.3MF",
+    "path": "",
+    "seq": 1,
+    "sha256": "750b440d73dbea6e136f45cfadc00cc77e7ce1c6e75c5105d990797812ad882c",
+    "size": 2000,
+    "uploadId": "fixtureUpload1"
+  },
+  "expectAfterVaultApply": {
+    "recordId": "PF-2026/ab:c d",
+    "vaultFileId": "fixtureFile1",
+    "contentHash": "750b440d73dbea6e136f45cfadc00cc77e7ce1c6e75c5105d990797812ad882c",
+    "sourceFileSize": 2000,
+    "newRecords": 0,
+    "held": false
+  }
+}
