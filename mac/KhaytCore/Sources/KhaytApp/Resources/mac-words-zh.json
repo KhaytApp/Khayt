@@ -3513,5 +3513,9 @@
  "mac.nav_today": "今天",
  "mac.nav_more": "更多",
  "mac.nav_saved": "已保存",
- "mac.jobs_layout": "任务视图"
+ "mac.jobs_layout": "任务视图",
+ "mac.qfe_hide_footer": "在报价页面隐藏“Quotes by Khayt”",
+ "mac.qfe_hide_footer_hint": "这只影响通过链接打开的报价页面。嵌入你自己网站的 iframe 中时，这行字本来就是隐藏的。",
+ "mac.qfe_err_plan_required": "隐藏“Quotes by Khayt”需要 Khayt Cloud 的 Studio 套餐，因此这行字仍会显示在报价页面上。",
+ "mac.qfe_err_bad_footer": "Khayt Cloud 没有接受该设置，因此没有任何更改。"
 }

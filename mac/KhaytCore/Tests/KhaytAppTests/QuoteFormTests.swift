@@ -168,6 +168,72 @@ struct QuoteFormEmbedTests {
         }
     }
 
+    // MARK: - "Quotes by Khayt" footer
+
+    @Test("footer: read from GET /embed; offered on canHide or hide; absent on an older cloud")
+    func footerIsRead() throws {
+        func state(_ json: String) throws -> QuoteFormEmbed.State {
+            try JSONDecoder().decode(QuoteFormEmbed.State.self, from: Data(json.utf8))
+        }
+        let studio = try state(#"{"enabled":true,"origins":[],"footer":{"hide":false,"canHide":true,"shown":true}}"#)
+        #expect(studio.footer == .init(hide: false, canHide: true, shown: true))
+        #expect(studio.footer?.offered == true)
+        // Hidden once, plan since lowered: still offered, so it can be shown again.
+        #expect(try state(#"{"enabled":true,"origins":[],"footer":{"hide":true,"canHide":false,"shown":true}}"#).footer?.offered == true)
+        #expect(try state(#"{"enabled":true,"origins":[],"footer":{"hide":false,"canHide":false,"shown":true}}"#).footer?.offered == false)
+        #expect(try state(#"{"enabled":true,"origins":[]}"#).footer == nil)
+    }
+
+    @Test("footer: PUT /embed/footer {hideFooter}; 402 is plan-required, 400 bad-footer, 404 not offered")
+    func footerSave() async throws {
+        var seen: URLRequest?
+        let saved = try await QuoteFormEmbed.saveFooter(hide: true, Self.connection, token: "t", fetch: Self.answer(
+            #"{"enabled":true,"origins":[],"footer":{"hide":true,"canHide":true,"shown":false}}"#,
+            seen: { seen = $0 }))
+        #expect(saved.footer?.hide == true)
+        #expect(saved.footer?.shown == false)
+        let request = try #require(seen)
+        #expect(request.httpMethod == "PUT")
+        #expect(request.url?.path == "/v1/shops/shop_a1/embed/footer")
+        let body = try #require(request.httpBody.flatMap { try JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        #expect(body["hideFooter"] as? Bool == true)
+
+        await #expect(throws: QuoteFormEmbed.Failure.planRequired) {
+            _ = try await QuoteFormEmbed.saveFooter(hide: true, Self.connection, token: "t", fetch: Self.answer(
+                #"{"error":"Payment required","reason":"plan-required"}"#, status: 402))
+        }
+        await #expect(throws: QuoteFormEmbed.Failure.badFooter) {
+            _ = try await QuoteFormEmbed.saveFooter(hide: true, Self.connection, token: "t", fetch: Self.answer(
+                #"{"error":"Bad request","reason":"bad-footer"}"#, status: 400))
+        }
+        await #expect(throws: QuoteFormEmbed.Failure.notAvailable) {
+            _ = try await QuoteFormEmbed.saveFooter(hide: false, Self.connection, token: "t", fetch: Self.answer(
+                #"{"error":"Not found"}"#, status: 404))
+        }
+        await #expect(throws: QuoteFormEmbed.Failure.notAllowed) {
+            _ = try await QuoteFormEmbed.saveFooter(hide: false, Self.connection, token: "t", fetch: Self.answer(
+                #"{"error":"Forbidden"}"#, status: 403))
+        }
+    }
+
+    @Test("footer: a non-manager may not change it, and nothing is asked")
+    func footerGated() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        var calls = 0
+        let was = Shop.embedFetch
+        Shop.embedFetch = { r in
+            calls += 1
+            return (Data(), HTTPURLResponse(url: r.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!)
+        }
+        defer { Shop.embedFetch = was }
+        guard case .failure(let failure) = await shop.saveQuoteFormFooter(hide: true)
+        else { Issue.record("a sign-in with no role saved the footer"); return }
+        #expect(failure.sentence == shop.words.callIt("mac.qfe_managers_only"))
+        #expect(shop.embedProblem(QuoteFormEmbed.Failure.planRequired) == shop.words.callIt("mac.qfe_err_plan_required"))
+        #expect(calls == 0)
+    }
+
     @Test("not connected: nothing is asked, and a non-manager may not save")
     func notConnectedAsksNothing() async {
         let shop = Shop()
@@ -493,6 +559,27 @@ struct QuoteFormImportTests {
         #expect(cloud.log == [Self.filePath, Self.drainPath])
     }
 
+    /// khayt-cloud takes .step/.stp on the form (never priced) and only lets a
+    /// level-3 client drain one: the Mac's claim holds because a STEP goes in
+    /// the library, filed unmeasured, before the DELETE.
+    @Test("a STEP from the form is filed in the library (not held), then drained")
+    func stepFileIsFiled() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let step = Data("ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n".utf8)
+        let cloud = Cloud(scratch: scratch, body: step, headers: ["X-Content-SHA256": Self.sha(step)])
+        let result = try await Self.run(Self.renamed(Self.payload(step), to: "bracket.step"),
+                                        cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal == nil)
+        #expect(!result.notTaken)
+        #expect(result.heldAt == nil)
+        #expect(result.printFileId != nil)
+        #expect(result.drained)
+        #expect(try scratch.libraryRecords().count == 1)
+        #expect(cloud.log == [Self.filePath, Self.drainPath])
+    }
+
     @Test("a machine file that cannot be kept stays in the queue: nothing written, no drain")
     func machineFileUnkeptStaysQueued() async throws {
         let engine = try KhaytEngine()
@@ -775,7 +862,7 @@ struct IntakeFileCapableTests {
         }
         try await CloudIntake.drain(Self.connection, token: "t", id: "21", fetch: fetch)
         _ = try await CloudIntake.list(Self.connection, token: "t", fetch: fetch)
-        #expect(seen[0].value(forHTTPHeaderField: "X-Intake-File-Capable") == "2")
+        #expect(seen[0].value(forHTTPHeaderField: "X-Intake-File-Capable") == "3")
         #expect(seen[0].value(forHTTPHeaderField: "x-delta-capable") == "1")
         #expect(seen[1].value(forHTTPHeaderField: "X-Intake-File-Capable") == nil)
     }

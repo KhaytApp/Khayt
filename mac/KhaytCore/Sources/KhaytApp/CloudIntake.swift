@@ -137,10 +137,13 @@ enum CloudIntake {
         // and khayt-cloud refuses to delete a kept file for a client that does
         // not say so — an older build would throw the visitor's model away.
         // It is a LEVEL (khayt-cloud #147): 1 keeps stl/obj/3mf, 2 keeps every
-        // type the form accepts. Beta.9 said 1 and dropped G-code, so only 2
-        // may drain a G-code request. 2 holds because a file the library will
-        // not take is kept beside the book (`QuoteFormFile.heldFolder`).
-        request.setValue("2", forHTTPHeaderField: "X-Intake-File-Capable")
+        // type the form accepted then (G-code too), 3 keeps STEP/STP as well.
+        // Beta.9 said 1 and dropped G-code, so only 2 may drain a G-code
+        // request, and only 3 a STEP one. 3 holds because a STEP is in
+        // `QuoteFormFile.modelKinds` and the library files CAD unmeasured
+        // (`LibraryImport.kinds`), and a file the library will not take is
+        // kept beside the book (`QuoteFormFile.heldFolder`).
+        request.setValue("3", forHTTPHeaderField: "X-Intake-File-Capable")
         let (data, response) = try await fetch(request)
         if (response as? HTTPURLResponse)?.statusCode == 409,
            let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

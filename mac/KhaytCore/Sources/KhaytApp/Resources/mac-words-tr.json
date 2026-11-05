@@ -3513,5 +3513,9 @@
  "mac.nav_today": "Bugün",
  "mac.nav_more": "Diğer",
  "mac.nav_saved": "Kaydedildi",
- "mac.jobs_layout": "İş görünümü"
+ "mac.jobs_layout": "İş görünümü",
+ "mac.qfe_hide_footer": "Teklif sayfasında “Quotes by Khayt” yazısını gizle",
+ "mac.qfe_hide_footer_hint": "Bu yalnızca bağlantıdan açılan teklif sayfasını etkiler. Kendi sitenizdeki bir iframe içinde bu satır zaten gizlidir.",
+ "mac.qfe_err_plan_required": "“Quotes by Khayt” yazısını gizlemek için Khayt Cloud Studio planı gerekir; bu yüzden satır teklif sayfasında kalıyor.",
+ "mac.qfe_err_bad_footer": "Khayt Cloud bu ayarı kabul etmedi, hiçbir şey değiştirilmedi."
 }

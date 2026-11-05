@@ -3513,5 +3513,9 @@
  "mac.nav_today": "Heute",
  "mac.nav_more": "Mehr",
  "mac.nav_saved": "Gespeichert",
- "mac.jobs_layout": "Ansicht der Aufträge"
+ "mac.jobs_layout": "Ansicht der Aufträge",
+ "mac.qfe_hide_footer": "„Quotes by Khayt“ auf der Angebotsseite ausblenden",
+ "mac.qfe_hide_footer_hint": "Das betrifft nur die Angebotsseite, die über den Link geöffnet wird. In einem iframe auf Ihrer eigenen Website ist die Zeile bereits ausgeblendet.",
+ "mac.qfe_err_plan_required": "Zum Ausblenden von „Quotes by Khayt“ brauchen Sie den Studio-Tarif von Khayt Cloud, daher bleibt die Zeile auf der Angebotsseite.",
+ "mac.qfe_err_bad_footer": "Khayt Cloud hat diese Einstellung nicht angenommen, es wurde nichts geändert."
 }
