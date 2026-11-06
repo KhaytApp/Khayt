@@ -255,7 +255,12 @@ struct WhatsAppBusinessTests {
         #expect(try read("Integrations.swift").contains("WhatsAppBusinessSettings(shop: shop)"))
         #expect(try read("WhatsAppJobRow.swift").contains("sendWhatsAppBusiness("))
         #expect(try read("CustomerSheet.swift").contains("optedIntoWhatsApp("))
-        #expect(try read("Shop+Jobs.swift").contains("await sendOwedWhatsApp(before: wasOrder, jobId: id)"))
+        // A move's deliveries are `deliverMove`, which a board move and a LAN
+        // REST move (`LanServer+Rest.swift`) both call after the write.
+        let jobs = try read("Shop+Jobs.swift")
+        #expect(jobs.contains("await sendOwedWhatsApp(before: before, jobId: jobId)"))
+        #expect(jobs.contains("await deliverMove(telegram: telegram, email: mail, portal: portal, webhooks: owed,"))
+        #expect(try read("LanServer+Rest.swift").contains("await deliverMove("))
         // markDelivered, markShipped and ship are not status moves: each sends itself.
         let money = try read("Shop+Money.swift")
         #expect(money.components(separatedBy: "await sendOwedWhatsApp(before: before, jobId: id)").count - 1 == 3)

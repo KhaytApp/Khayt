@@ -42,8 +42,94 @@ struct StudioEngineTests {
         #expect(!plan.bands.isEmpty)
         #expect(plan.bands.allSatisfy { (0..<4).contains($0.head) && $0.z1 > $0.z0 })
         #expect(plan.slots.count <= 4)
-        #expect(plan.totalLayers == Int((2.4 / 0.08).rounded()))
+        #expect(plan.totalLayers == Int((3.2 / 0.08).rounded()))
         #expect(!plan.tiled)
+    }
+
+    @Test("the relief defaults are Bed Ready's approved ones: 3.2 mm, vividness 8 / 6, chromaWeight 0.5 / 1")
+    func approvedDefaults() throws {
+        var s = StudioEngine.ReliefSettings()
+        #expect(s.heightMm == 3.2 && s.vivid == 8 && s.chromaWeight == 0.5)
+        // vividness 8 is the approved colour TD scale 0.3, and 6 the black-and-white 0.5
+        #expect(abs((1.1 - Double(StudioEngine.ReliefSettings.colourVivid) * 0.1) - 0.3) < 1e-9)
+        #expect(abs((1.1 - Double(StudioEngine.ReliefSettings.neutralVivid) * 0.1) - 0.5) < 1e-9)
+        s.fit(neutral: true, keepVivid: false)
+        #expect(s.vivid == 6 && s.chromaWeight == 1)
+        s.fit(neutral: false, keepVivid: false)
+        #expect(s.vivid == 8 && s.chromaWeight == 0.5)
+        s.vivid = 10
+        s.fit(neutral: true, keepVivid: true)
+        #expect(s.vivid == 10 && s.chromaWeight == 1)
+        // the settings cross to the engine with the matching in them
+        let json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(s)) as? [String: Any])
+        #expect(json["chromaWeight"] as? Double == 1)
+    }
+
+    @Test("black and white means every filament is neutral, by Lab chroma")
+    func blackAndWhite() throws {
+        typealias R = StudioEngine.ReliefSettings
+        // Bed Ready's black-and-white set
+        #expect(R.isBlackAndWhite(["#161616", "#3A3A3C", "#5A5B5D", "#8B8C8E", "#BDBEC0", "#F4F4F2"]))
+        #expect(R.isBlackAndWhite(["#000000", "#FFFFFF"]))
+        #expect(!R.isBlackAndWhite(["#161616", "#C04040", "#F4F4F2"]))
+        #expect(!R.isBlackAndWhite(["#161616", "#C99B27"]))
+        #expect(!R.isBlackAndWhite([]))
+        #expect(!R.isBlackAndWhite(["#161616", "nope"]))
+        #expect(try #require(R.labChroma("#808080")) < 0.01)
+        // the Swift Lab is lib/color-mix.js's: #C04040 is a = 51.10, b = 28.67 there (chroma 58.59)
+        #expect(abs(try #require(R.labChroma("#C04040")) - 58.59) < 0.01)
+    }
+
+    /// Greys and whites that lean warm or cool, a hair either side of the
+    /// cutoff of 6 (Lab chroma in the comment), plus the clear cases.
+    static let toneHexes: [String] = [
+        "#161616", "#3A3A3C", "#5A5B5D", "#8B8C8E", "#BDBEC0", "#F4F4F2", "#000000", "#FFFFFF",
+        "#EEF2F6", "#8A8580", "#8C9198", "#8E949C", "#F2EEE4", "#E8EDF5",           // 2.5 – 5.3
+        "#BFC8D1", "#D1C8BF", "#485058",                                            // 5.71, 5.82, 5.91
+        "#879099", "#585048", "#999087", "#BEC8D2",                                 // 6.04, 6.17, 6.21, 6.33
+        "#A39A90", "#9A8F84", "#7F8A95", "#D8C8A8", "#C04040", "#0A3D7A", "#C99B27", // 6.6 and up
+        "nope", "#12345",
+    ]
+
+    @Test("the black-and-white rule is lib/hueforge.js's isNeutralPalette, hex for hex")
+    func neutralRuleIsTheEngines() async throws {
+        let engine = try StudioEngine()
+        for hex in Self.toneHexes {
+            let js = try await engine.isNeutralPalette([hex])
+            #expect(StudioEngine.ReliefSettings.isBlackAndWhite([hex]) == js, "\(hex): Swift and lib/hueforge.js disagree")
+        }
+        // the ones either side of the cutoff land where the comment says
+        #expect(try await engine.isNeutralPalette(["#BFC8D1", "#D1C8BF", "#485058"]))
+        for over in ["#879099", "#585048", "#999087", "#BEC8D2"] {
+            #expect(try await engine.isNeutralPalette([over]) == false, "\(over)")
+        }
+        let mixed = ["#161616", "#8C9198", "#F2EEE4", "#879099"]
+        #expect(try await engine.isNeutralPalette(mixed) == StudioEngine.ReliefSettings.isBlackAndWhite(mixed))
+        #expect(try await engine.isNeutralPalette([]) == StudioEngine.ReliefSettings.isBlackAndWhite([]))
+    }
+
+    @Test("the defaults are lib/hueforge.js's TONE_DEFAULTS")
+    func toneDefaultsAreTheEngines() async throws {
+        typealias R = StudioEngine.ReliefSettings
+        let t = try await StudioEngine().toneDefaults()
+        let s = R()
+        #expect(t.colour.heightMm == s.heightMm && t.bw.heightMm == s.heightMm)
+        #expect(t.colour.vivid == R.colourVivid && t.bw.vivid == R.neutralVivid)
+        #expect(t.colour.chromaWeight == R.colourChromaWeight && t.bw.chromaWeight == R.neutralChromaWeight)
+        #expect(s.vivid == t.colour.vivid && s.chromaWeight == t.colour.chromaWeight)
+    }
+
+    @Test("the engine plans with the settings' chromaWeight")
+    func chromaWeightReachesTheEngine() async throws {
+        let engine = try StudioEngine()
+        try await engine.setPicture(Self.picture())
+        let fils = try await engine.suggest(owned: [], maxColors: 4)
+        var s = StudioEngine.ReliefSettings()
+        s.chromaWeight = 1
+        let plain = try #require(try await engine.planRelief(fils, s))
+        s.chromaWeight = 0.5
+        let weighted = try #require(try await engine.planRelief(fils, s))
+        #expect(plain.preview != weighted.preview || plain.bands != weighted.bands)
     }
 
     @Test("the 3MF carries the members a U1 project needs, thumbnails left to the app")

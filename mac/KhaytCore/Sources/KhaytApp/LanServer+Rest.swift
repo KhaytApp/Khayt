@@ -100,7 +100,9 @@ extension LanServer {
                                         "status": request.query["status"].map { .string($0) } ?? .null])
             return await restRead(request, "ordersList", [q])
         case "/api/orders" where m == "POST":
-            return await restWrite(request, "orderCreate") { [$0, self.restContext()] }
+            // With the job's tokens, as the desktop's server hands them: a job
+            // taken over the LAN gets a tracking link (`lib/order-new.js`).
+            return await restWrite(request, "orderCreate") { [$0, self.restContext(withTokens: true)] }
         case "/api/machines" where isGet:
             return await restRead(request, "machinesList", [])
         case "/api/inventory" where isGet:
@@ -119,7 +121,7 @@ extension LanServer {
         }
         if let (id, rest) = Self.restSegment(path, under: "/api/orders/") {
             if rest.isEmpty && m == "PATCH" {
-                return await restWrite(request, "orderPatch") { [.string(id), $0] }
+                return await restWrite(request, "orderPatch") { [.string(id), $0, self.restContext()] }
             }
             if rest == "quote-url" && isGet {
                 let base = "http://" + (request.headers["host"] ?? "localhost")
@@ -145,14 +147,25 @@ extension LanServer {
     /// The moment, the shop's day and two random bytes — built ONCE per
     /// request, so the record decided on the held book and the one written
     /// inside the write carry the same id.
-    func restContext() -> JSONValue {
+    ///
+    /// `withTokens` adds a new job's random bytes, in the shape the desktop's
+    /// server passes (`lib/lan-server.js`, `POST /api/orders`): 16 for the
+    /// tracking link, 16 for the quote approval and 4 for the id tag. With
+    /// `tokens.id` present, `orderCreate` tags the id from those bytes rather
+    /// than from `rand`, as it does on the desktop.
+    func restContext(withTokens: Bool = false) -> JSONValue {
         let now = host.now()
-        return .object([
+        var ctx: [String: JSONValue] = [
             "nowMs": .number((now.timeIntervalSince1970 * 1000).rounded()),
             "nowIso": .string(StoreWriter.iso(now)),
             "today": .string(Self.localDay(now)),
             "rand": .string(host.randomHex()),
-        ])
+        ]
+        if withTokens {
+            let bytes = { (n: Int) in JSONValue.array(self.host.randomBytes(n).map { .number(Double($0)) }) }
+            ctx["tokens"] = .object(["tracking": bytes(16), "quoteApproval": bytes(16), "id": bytes(4)])
+        }
+        return .object(ctx)
     }
 
     private var restBookNow: JSONValue { .object(host.restBook?() ?? host.store()) }
@@ -269,6 +282,8 @@ extension Shop {
     func lanRestWrite(_ op: String, args: [JSONValue]) async throws -> KhaytEngine.LanRestOutcome {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var outcome: KhaytEngine.LanRestOutcome?
+        var moved: LanRestMove?
+        var approved: JSONValue?
         do {
             // lock: system — a LAN REST write; the LAN server gated it with the owner LAN PIN or a scoped API token.
             try await StoreWriter.update(
@@ -276,17 +291,146 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                let out = try await Self.applyLanRest(into: &root, engine: engine, op: op, args: args)
-                outcome = out
+                let done = try await Self.applyLanRestWrite(into: &root, engine: engine, words: self.words,
+                                                            op: op, args: args)
+                outcome = done.outcome
+                moved = done.move
+                approved = done.approved
                 // Refused on the book as it is now: nothing to write.
-                if out.changed == nil { throw LanRestUnchanged() }
+                if done.outcome.changed == nil { throw LanRestUnchanged() }
             }
         } catch is LanRestUnchanged {
             if let outcome { return outcome }
         }
         await load(source)
         guard let outcome else { throw CocoaError(.fileWriteUnknown) }
+        // Only once the write has committed, as after a move on the board:
+        // the messages and webhooks the move owes.
+        if let moved {
+            let o = moved.outcome
+            await deliverMove(telegram: o.telegram, email: o.email, portal: o.portal, webhooks: o.webhooks,
+                              before: moved.before, jobId: moved.jobId)
+        }
+        // And after an approval, what the customer's own approval sends.
+        if approved != nil { await afterLanApproval(approved) }
         return outcome
+    }
+
+    /// A status move made over the LAN by `applyLanRestWrite`: what it owes
+    /// outward, and the job as the write found it (for the WhatsApp milestone).
+    struct LanRestMove {
+        let jobId: String
+        let before: JSONValue?
+        let outcome: MoveOutcome
+    }
+
+    /// What `applyLanRestWrite` did: the answer, and what the host owes once
+    /// the write commits (a move's deliveries, or an approval's webhook).
+    struct LanRestApplied {
+        let outcome: KhaytEngine.LanRestOutcome
+        var move: LanRestMove? = nil
+        var approved: JSONValue? = nil
+    }
+
+    /// A LAN REST write, as `lanRestWrite` runs it inside the write.
+    ///
+    /// ── A STATUS MOVE IS THE BOARD'S MOVE ─────────────────────────────────
+    ///
+    /// `PATCH /api/orders/:id` with a new `status` is a move, and on this Mac a
+    /// move is `applyMove`: the shared rules' gate and `apply`, the filament
+    /// and packaging taken off the shelf (and given back when a finished job is
+    /// reopened), the invoice number a quote earns when it is accepted, the
+    /// activity log, and what it owes the customer and the webhooks. The rule
+    /// in `lib/lan-rest.js` makes the same move without any of that: its
+    /// effects travel in `emit`, which only the desktop window runs.
+    ///
+    /// So the request is first decided by `orderPatch` on the book as it is
+    /// now (a bad status or machine is its 400, a missing job its 404, a
+    /// refusal its 409), and that answer is discarded when it is a yes. The
+    /// move is made by `applyMove` alone, then `orderPatch` runs again on the
+    /// moved book. The job already has the status at that point, so it changes
+    /// only the machine and builds the reply. The status is applied once: the
+    /// JavaScript rule never applies it to the book this writes.
+    ///
+    /// A move `applyMove` refuses (the rules, or a channel this Mac cannot
+    /// send) is the 409 the desktop sends, `{ error: 'Move refused', code,
+    /// params }`, and nothing is written.
+    ///
+    /// The invoice number a quote earns is given ONCE. `orderPatch` numbers a
+    /// quote leaving `quote` too (#2264), but its first pass only decides and
+    /// is discarded whole (its `store`, and the counter in it, never reach
+    /// `root`), and its second pass sees a job that is no longer a quote.
+    ///
+    /// ── AN APPROVAL IS THE CUSTOMER'S APPROVAL ────────────────────────────
+    ///
+    /// `POST /api/orders/:id/approve` is decided by `orderApprove` (404, 410,
+    /// 409) and then made by `applyQuoteApproval`, the write the customer's
+    /// own approval page makes: Pending with its trail, the invoice number,
+    /// Print next cleared. `lanRestWrite` then sends what that page sends.
+    static func applyLanRestWrite(into root: inout [String: JSONValue], engine: KhaytEngine, words: Words,
+                                  op: String, args: [JSONValue]) async throws -> LanRestApplied {
+        if op == "orderApprove" { return try await applyLanRestApproval(into: &root, engine: engine, args: args) }
+        guard op == "orderPatch", let (id, stage) = lanStatusMove(in: root, args: args) else {
+            return LanRestApplied(outcome: try await applyLanRest(into: &root, engine: engine, op: op, args: args))
+        }
+        // Decides only: its book, settings counter and all, is never written.
+        let check = try await engine.lanRest(op, store: .object(lanRestBook(from: root)), args: args)
+        guard check.changed != nil else { return LanRestApplied(outcome: check) }
+        let before = rows(root, "printLog").first { recordId($0) == id }
+        var moved = root
+        let move: MoveOutcome
+        do {
+            move = try await applyMove(to: &moved, id: id, stage: stage, engine: engine, words: words)
+        } catch let refused as MoveRefused {
+            let body: JSONValue = .object(["error": .string("Move refused"),
+                                           "code": .string(refused.code ?? "refused"),
+                                           "params": .object(refused.params)])
+            return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(status: 409, body: body, store: nil))
+        }
+        // A quote accepted into a job takes its models off Print next, as a
+        // move on the board does.
+        clearPrintNext(&moved, acceptedFrom: before,
+                       now: rows(moved, "printLog").first { recordId($0) == id })
+        root = moved
+        let out = try await applyLanRest(into: &root, engine: engine, op: op, args: args)
+        return LanRestApplied(outcome: out, move: LanRestMove(jobId: id, before: before, outcome: move))
+    }
+
+    /// `POST /api/orders/:id/approve` on this Mac — see `applyLanRestWrite`.
+    nonisolated static func applyLanRestApproval(into root: inout [String: JSONValue], engine: KhaytEngine,
+                                                 args: [JSONValue]) async throws -> LanRestApplied {
+        let check = try await engine.lanRest("orderApprove", store: .object(lanRestBook(from: root)), args: args)
+        guard check.changed != nil, case .string(let id)? = args.first else { return LanRestApplied(outcome: check) }
+        var nowIso = StoreWriter.iso(Date())
+        if args.count > 1, case .object(let ctx) = args[1], case .string(let s)? = ctx["nowIso"] { nowIso = s }
+        var approving = root
+        guard case .object(let job)? = try await applyQuoteApproval(into: &approving, engine: engine,
+                                                                     jobId: id, nowIso: nowIso) else {
+            // The rule said yes a moment ago on this same book; say what it says now.
+            return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(
+                status: 409, body: .object(["error": .string("Quote cannot be approved in its current state")]), store: nil))
+        }
+        root = approving
+        // The body `orderApprove` answers.
+        let body: JSONValue = .object(["ok": .bool(true), "order": .object([
+            "id": job["id"] ?? .string(id), "status": job["status"] ?? .null,
+            "quoteAcceptedAt": job["quoteAcceptedAt"] ?? .null,
+        ])])
+        return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(status: 200, body: body,
+                                                                  store: .object(lanRestBook(from: root))),
+                              approved: .object(job))
+    }
+
+    /// The job and the stage when `orderPatch`'s arguments ask to move a job
+    /// that is in the book to a status it does not already have. Nil for
+    /// anything else: no status, the same status, an unknown one, or a job
+    /// that is not there. `orderPatch` answers each of those itself.
+    nonisolated static func lanStatusMove(in root: [String: JSONValue], args: [JSONValue]) -> (String, Stage)? {
+        guard args.count >= 2, case .string(let id) = args[0], case .object(let body) = args[1],
+              case .string(let status)? = body["status"], let stage = Stage(rawValue: status),
+              let job = rows(root, "printLog").first(where: { recordId($0) == id }),
+              case .object(let o) = job, o["status"] != .string(status) else { return nil }
+        return (id, stage)
     }
 }
 
