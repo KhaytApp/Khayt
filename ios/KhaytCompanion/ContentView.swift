@@ -176,9 +176,13 @@ struct MainTabView: View {
     private func page(_ id: Int) -> some View {
         ZStack {
             KhaytScreenBackground()
+            // In regular width the tabs float over the top of the page
+            // (iPad, iPhone Duo unfolded) and covered the banner, so there
+            // it sits at the foot of the page instead.
             VStack(spacing: 0) {
-                ConnectionBanner()
+                if widthClass != .regular { ConnectionBanner() }
                 tabContent(id)
+                if widthClass == .regular { ConnectionBanner() }
             }
         }
     }
