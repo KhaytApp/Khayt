@@ -117,9 +117,15 @@ const SEAMS = [
   },
   {
     what: 'the VAT return computes VAT',
-    where: 'renderer/operations-extras.js',
-    needs: /KhaytTax\.computeTax\(gross, taxProfile\)/,
+    where: 'lib/vat-return.js',
+    needs: /Tax\.computeTax\(gross, taxProfile\)/,
     why: 'the return declares zero VAT due again',
+  },
+  {
+    what: 'the desktop VAT return is the shared one',
+    where: 'renderer/operations-extras.js',
+    needs: /KhaytVatReturn\.boxes\(printLog[\s\S]{0,300}revenueOf: orderNetRevenueBase/,
+    why: 'the desktop works the return out on its own again, and the Mac prints a different one',
   },
   {
     what: 'mailto refuses a hidden recipient',

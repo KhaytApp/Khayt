@@ -748,6 +748,10 @@ struct RoundTripTests {
         "saveInvoiceNumbering": "writes only the four invNum* counter keys through KhaytSettingsEdit.invoiceNumbering over the settings read inside the write chain (MoneyStockParityTests.invoiceNumbering)",
         "saveLoyaltyTiers": "writes only settings.loyaltyTiers through KhaytLoyalty.cleanTiers, which keeps every field of a tier the editor does not show (MoneyStockParityTests.loyaltyTiers)",
         "editApiTokens": "appends or removes one whole token record in settings.lanApi.apiTokens, in place inside the write; every other key of settings and lanApi is put back as read, and no record is re-encoded from a form",
+        "editSettingsList": "appends one new entry to, or removes the one pointed-at entry from, settings.postChecklist/postProcessPresets/customFields/savedFilters, on the settings read inside the write chain; every other entry and key goes back as read (OrderFlowParityTests.listAdd, listRemove)",
+        "editPostCheck": "sets one key of order.postChecks on the stored record in place (Shop.ticking) and never re-encodes it; OrderFlowParityTests.ticking",
+        "saveFilterPreset": "the caller of editSettingsList(.savedFilters, .add) with a new entry in the desktop's eight-key shape; no stored entry is re-encoded (OrderFlowParityTests.filterSaved)",
+        "saveCsvImport": "only appends NEW records built by lib/csv-import.js plan inside the write chain; no existing record is opened or re-encoded (OrderFlowParityTests.csvImport, test/csv-import.test.js)",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 

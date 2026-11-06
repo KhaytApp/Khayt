@@ -168,6 +168,9 @@ test('the desktop P&L builder and VAT return use the tax-point rule, and shippin
   // Dated by the invoice's day, so an accepted quote's VAT is in range by its acceptance.
   assert.match(body, /inRange\(KhaytPnl\.taxPointDate\(o\), analyticsRange/);
   assert.doesNotMatch(body, /shippingCost/);
+  // The return's figures are lib/vat-return.js's now (the Mac prints it too).
   const ops = fs.readFileSync(path.join(__dirname, '../renderer/operations-extras.js'), 'utf8');
-  assert.match(ops, /KhaytPnl\.isTaxPoint\(o\) && day >= fromDate/);
+  assert.match(ops, /KhaytVatReturn\.boxes\(printLog/);
+  const lib = fs.readFileSync(path.join(__dirname, '../lib/vat-return.js'), 'utf8');
+  assert.match(lib, /Pnl\.isTaxPoint\(o\) && day >= fromDate/);
 });

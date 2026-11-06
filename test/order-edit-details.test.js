@@ -173,3 +173,15 @@ test('timeline says how long each stage took, the current one up to now', () => 
   assert.equal(line.totalMs, 26 * 3600000);
   assert.deepEqual(E.timeline({}, 0), { steps: [], totalMs: 0 });
 });
+
+test('custom order fields merge one key at a time; blanks go, and nothing left takes customData away', () => {
+  const o = Object.assign(JOB(), { customData: { CF1: 'PO-7', CFgone: 'kept: a field removed from Settings' } });
+  E.applyDetails(o, { customData: { CF1: '  PO-8 ', CF2: 'Blue' } }, { now: NOW, id: 'e' });
+  assert.deepEqual(o.customData, { CF1: 'PO-8', CFgone: 'kept: a field removed from Settings', CF2: 'Blue' });
+  assert.equal(o.editHistory, undefined, 'not a tracked field');
+  E.applyDetails(o, { customData: { CF1: '', CF2: '  ', CFgone: '' } }, { now: NOW, id: 'e' });
+  assert.equal('customData' in o, false);
+  const p = JOB();
+  E.applyDetails(p, { notes: 'x' }, { now: NOW, id: 'e' });
+  assert.equal('customData' in p, false, 'not handed, not written');
+});

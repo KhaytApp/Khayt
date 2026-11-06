@@ -322,6 +322,20 @@
     }
     if (has(n, 'dueDate')) order.dueDate = n.dueDate;
     if (has(n, 'priorityLevel')) Object.assign(order, priorityFrom(n.priorityLevel));
+    // The shop's own order fields (`settings.customFields`), stored as
+    // `customData: { [fieldId]: text }`. MERGED, one key at a time: a value
+    // for a field this editor was not handed — one the shop has since
+    // removed from Settings, or one added on another device — stays. A blank
+    // value takes its key away, and no values left takes `customData` away,
+    // as the desktop's editor leaves it.
+    if (has(n, 'customData') && n.customData && typeof n.customData === 'object') {
+      const cd = Object.assign({}, (order.customData && typeof order.customData === 'object') ? order.customData : {});
+      for (const k of Object.keys(n.customData)) {
+        const v = n.customData[k] == null ? '' : String(n.customData[k]).trim();
+        if (v) cd[k] = v; else delete cd[k];
+      }
+      if (Object.keys(cd).length) order.customData = cd; else delete order.customData;
+    }
 
     const terms = {};
     for (const k of ['discountPct', 'shippingCost', 'extraLines']) if (has(n, k)) terms[k] = n[k];
