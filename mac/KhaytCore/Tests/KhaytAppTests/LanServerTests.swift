@@ -45,6 +45,7 @@ struct LanServerTests {
         init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
              readTimeout: TimeInterval = 15, foldsDeltas: Bool = false,
+             rest: Bool = false, printerWebhookToken: String = "",
              identity: Curve25519.Signing.PrivateKey = .init()) async throws {
             let shop = Shop()
             await shop.load(.sample)
@@ -57,7 +58,8 @@ struct LanServerTests {
             self.box = box
             let recorded = self.recorded
             let book = self.book
-            book.value = shop.lanBook
+            // The REST routes read the clients and the shelf too (`lanRestBook`).
+            book.value = rest ? shop.lanRestBook : shop.lanBook
             var host = LanServer.Host(
                 store: { book.value }, pin: pin, engine: engine,
                 now: { box.now }, nowText: { "09:16" },
@@ -134,6 +136,19 @@ struct LanServerTests {
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
             }
+            // The REST writes, as the app runs them (`Shop.applyLanRest`) — on
+            // the bench's book rather than a file. Off unless asked, as in the app.
+            if rest {
+                host.restBook = { book.value }
+                host.restWrite = { op, args in
+                    var root = book.value
+                    let out = try await Shop.applyLanRest(into: &root, engine: engine, op: op, args: args)
+                    if out.changed != nil { book.value = root }
+                    return out
+                }
+                host.printerWebhookToken = printerWebhookToken
+                host.randomHex = { "ab12" }
+            }
             let server = LanServer(host: host)
             self.server = server
             port = try await server.start(port: 0, bind: .loopback)
@@ -181,6 +196,20 @@ struct LanServerTests {
         func get(_ path: String, headers: [String: String] = [:], method: String = "GET") async throws -> Reply {
             var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
             request.httpMethod = method
+            for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+            let (data, response) = try await NoRedirect.session.data(for: request)
+            let http = try #require(response as? HTTPURLResponse)
+            var out: [String: String] = [:]
+            for (k, v) in http.allHeaderFields { out[String(describing: k).lowercased()] = String(describing: v) }
+            return Reply(status: http.statusCode, headers: out, body: data)
+        }
+        /// Any method, any body — the REST routes take PATCH and DELETE.
+        func send(_ method: String, _ path: String, body: Data? = nil,
+                  headers: [String: String] = [:]) async throws -> Reply {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            request.httpMethod = method
+            request.httpBody = body
+            if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
             for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
             let (data, response) = try await NoRedirect.session.data(for: request)
             let http = try #require(response as? HTTPURLResponse)

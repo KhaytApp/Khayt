@@ -124,3 +124,44 @@ test('a wrong token moves nothing', async () => {
   assert.equal(r.status, 401);
   assert.equal(store.printLog[0].status, 'pending');
 });
+
+// ── THE HISTORY IS WRITTEN ONCE (review of #2252) ─────────────────────────
+//
+// The server decides a write twice — once on the book it holds, to answer a
+// refusal without writing, and again inside the write — and here, as in the
+// app, both see the SAME live object. The rule copied the job shallowly, so
+// `order-status.apply` pushed onto the history array the live book still held:
+// a job with one entry was written with three, and the probe had changed the
+// book before any write. Only reachable from a job that already HAS a history,
+// which the tests above never started from.
+test('a job with a history gets ONE new entry, and the held book is not touched by the probe', async () => {
+  const history = [{ status: 'pending', at: '2026-10-01T07:00:00.000Z' }, { status: 'printing', at: '2026-10-01T08:00:00.000Z' }];
+  store = { ...freshStore(), printLog: [job('printing', { statusHistory: history })] };
+  let seenBeforeWrite = null;
+  beforeWrite = () => { seenBeforeWrite = store.printLog[0].statusHistory.length; };
+  const r = await fire('print_done');
+  assert.equal(r.status, 200);
+  assert.equal(seenBeforeWrite, 2, 'the probe changed the live book before the write');
+  assert.deepEqual(store.printLog[0].statusHistory.map((h) => h.status), ['pending', 'printing', 'post']);
+  assert.equal(history.length, 2, 'the array the book held was pushed onto');
+});
+
+test('PATCH /api/orders/:id leaves an existing history exactly as it was', async () => {
+  const history = [{ status: 'pending', at: '2026-10-01T07:00:00.000Z' }];
+  store = { ...freshStore(), printLog: [job('pending', { statusHistory: history })] };
+  const r = await fetch(`${BASE}/api/orders/J1`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', 'x-khayt-pin': '43218765' },
+    body: JSON.stringify({ status: 'qc' }),
+  });
+  assert.equal(r.status, 200);
+  assert.equal(store.printLog[0].status, 'qc');
+  assert.deepEqual(store.printLog[0].statusHistory, [{ status: 'pending', at: '2026-10-01T07:00:00.000Z' }]);
+  const bad = await fetch(`${BASE}/api/orders/J1`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', 'x-khayt-pin': '43218765' },
+    body: JSON.stringify({ machineId: true }),
+  });
+  assert.equal(bad.status, 400, 'a machineId that is not a string, number or null is refused');
+  assert.equal(store.printLog[0].machineId, 'm1', 'and the job keeps its printer');
+});

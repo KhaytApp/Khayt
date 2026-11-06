@@ -23,11 +23,12 @@ struct LanEndpointsTests {
     /// making this one do so would be the two servers disagreeing, which is the
     /// thing `LanServerTests` exists to prevent.
     static let writes: Set<String> = ["/api/store/deltas", "/api/intake", "/api/devices",
-                                      "/api/intake/estimate", "/api/survey"]
+                                      "/api/intake/estimate", "/api/survey", "/api/waste"]
 
     @Test("every endpoint the 404 advertises is one this server routes")
     func advertisedEndpointsAnswer() async throws {
-        let bench = try await LanServerTests.Bench()
+        // With the REST writes wired, as the app wires them.
+        let bench = try await LanServerTests.Bench(rest: true)
         defer { bench.stop() }
         for endpoint in LanServer.endpoints where !endpoint.contains(":") {
             let method = Self.writes.contains(endpoint) ? "POST" : "GET"
@@ -61,8 +62,10 @@ struct LanEndpointsTests {
     /// server's again.
     @Test("the 404 does not recite the other server's routes")
     func noForeignRoutes() async throws {
-        let foreign = ["/api/clients", "/api/machines", "/api/inventory", "/api/orders",
-                       "/api/waiting-list", "/api/webhook/salla", "/api/webhook/zid",
+        // The REST routes (`/api/orders`, `/api/clients`, …) are served here
+        // since Nov 2026 (`LanServer+Rest`), so they are no longer foreign; the
+        // webhooks are served too but never advertised before the gate.
+        let foreign = ["/api/webhook/salla", "/api/webhook/zid",
                        "/api/webhook/smsa", "/api/webhook/aramex", "/api/webhook/spl",
                        "/api/webhook/printer/:machineId"]
         for route in foreign {

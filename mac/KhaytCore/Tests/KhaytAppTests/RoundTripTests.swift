@@ -747,6 +747,7 @@ struct RoundTripTests {
         "saveExchangeRates": "writes only settings.exchangeRates through KhaytSettingsEdit.exchangeRates over the settings read inside the write chain; every other key goes back as read (MoneyStockParityTests.exchangeRates)",
         "saveInvoiceNumbering": "writes only the four invNum* counter keys through KhaytSettingsEdit.invoiceNumbering over the settings read inside the write chain (MoneyStockParityTests.invoiceNumbering)",
         "saveLoyaltyTiers": "writes only settings.loyaltyTiers through KhaytLoyalty.cleanTiers, which keeps every field of a tier the editor does not show (MoneyStockParityTests.loyaltyTiers)",
+        "editApiTokens": "appends or removes one whole token record in settings.lanApi.apiTokens, in place inside the write; every other key of settings and lanApi is put back as read, and no record is re-encoded from a form",
         "saveOperator": "sets only the fields the sheet changed on the stored record in place (Shop.writeOperator) and never re-encodes it; OperatorsTests.editKeepsFields proves pinHash and every other field survive",
     ]
 
