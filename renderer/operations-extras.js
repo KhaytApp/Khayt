@@ -871,9 +871,30 @@ function deleteSlicerProfile(profileId) {
 }
 
 /* ── Feature 9: Environmental Condition Logging ─────────────── */
+/** Take a reading out — the Mac can, and a mistyped 250 °C was there for good.
+ *  Asks first, and Undo puts it back where it was. */
+async function deleteEnvLog(id) {
+  const i = envLogs.findIndex((l) => l && l.id === id);
+  if (i < 0) return;
+  if (!(await confirmModal(t('common.delete') + '?', { danger: true }))) return;
+  const [gone] = envLogs.splice(i, 1);
+  saveAll();
+  renderEnvLogs();
+  toast(t('env.deleted'), 'success', 6000, {
+    undo: () => { envLogs.splice(Math.min(i, envLogs.length), 0, gone); saveAll(); renderEnvLogs(); },
+  });
+}
+
 function renderEnvLogs() {
   const container = document.getElementById('envLogsContainer');
   if (!container) return;
+  if (!container.dataset.delWired) {
+    container.dataset.delWired = '1';
+    container.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-env-del]');
+      if (b && b.dataset.envDel) deleteEnvLog(b.dataset.envDel);
+    });
+  }
 
   // `lib/env-log.js` — the list and the line; the Mac reads them from it too.
   const recent = KhaytEnvLog.recent(envLogs);
@@ -891,6 +912,7 @@ function renderEnvLogs() {
       <td>${log.humidity    != null ? log.humidity    + '%'  : '—'}</td>
       <td>${mach ? escapeHtml(mach.name) : '—'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(log.notes || '')}</td>
+      <td><button type="button" class="btn small ghost" data-env-del="${escapeHtml(log.id || '')}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">✕</button></td>
     </tr>`;
   }).join('');
 
@@ -920,7 +942,7 @@ function renderEnvLogs() {
     ${sparkHtml}
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>Machine</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Time</th><th>Temp (°C)</th><th>Humidity (%)</th><th>Machine</th><th>Notes</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
@@ -963,6 +985,7 @@ function openLogEnvModal() {
 }
 (function (global) {
   const api = {
+    deleteEnvLog,
     openShiftChecklistModal,
     openEndOfDayReport,
     processRecurringOrders,
