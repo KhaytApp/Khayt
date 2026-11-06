@@ -329,9 +329,22 @@ enum Converter {
             throw Failure.refused(planned.error ?? "the converter refused it")
         }
 
-        // Rebuild. A member the plan rewrote is written from its new text; every
-        // other one is copied out of the source, which is how geometry survives
-        // a conversion byte for byte.
+        let out = try rebuild(members, from: source, entries: entries)
+
+        // ATOMIC: the Save panel lets a shop pick the model it is converting
+        // FROM, and a plain write truncated the only copy before writing the
+        // new one — a crash or a full disk in between lost both.
+        do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
+        catch { throw Failure.unreadable(ErrorText.plain(error)) }
+        return Result(url: destination, report: planned.report)
+    }
+
+    /// The new zip's members. A member the plan rewrote is written from its
+    /// new text; every other one is copied out of the source — by `from` when
+    /// it is a renamed copy (a split plate's thumbnail), else by its own name —
+    /// which is how geometry survives a conversion byte for byte.
+    nonisolated static func rebuild(_ members: [KhaytEngine.ConvertedMember], from source: URL,
+                                    entries: [Zip.Entry]) throws -> [ZipWrite.Member] {
         let byName = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
         var out: [ZipWrite.Member] = []
         /// What the rebuild holds so far, against the same cap.
@@ -356,7 +369,7 @@ enum Converter {
                 data.replaceSubrange(range, with: Data(block.utf8))
                 try hold(data)
                 out.append(.init(member.name, data))
-            } else if let entry = byName[member.name] {
+            } else if let entry = byName[member.from ?? member.name] {
                 guard let data = try? Zip.data(of: entry, in: source, limit: .max) else {
                     throw Failure.unreadable("\(member.name) would not come back out")
                 }
@@ -369,13 +382,57 @@ enum Converter {
                 throw Failure.refused("the conversion asked for \(member.name), which is not in the file")
             }
         }
+        return out
+    }
 
-        // ATOMIC: the Save panel lets a shop pick the model it is converting
-        // FROM, and a plain write truncated the only copy before writing the
-        // new one — a crash or a full disk in between lost both.
-        do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
-        catch { throw Failure.unreadable(ErrorText.plain(error)) }
-        return Result(url: destination, report: planned.report)
+    /// One plate's file, as "Split into plates" writes it.
+    struct PlateResult: Sendable {
+        let index: Int
+        let url: URL?
+        let report: JSONValue?
+        /// Why this plate was not written; the others still were.
+        let error: String?
+    }
+
+    /// "Split into plates": every plate of `source` converted into a file of
+    /// its own in `folder`, named as `lib/plates.js` `plateFileName` names it
+    /// (`statue-plate3.3mf`). Each plate keeps its own colours in slots 1..k
+    /// (`lib/plate-split.js`). One plate that cannot stand alone fails alone.
+    ///
+    /// The meshes come in when the project has more colours than the target
+    /// has slots (`bindMeshes`): a plate's own colour map rewrites the paint,
+    /// and reads it to know which colours the plate prints with. Read once,
+    /// for every plate.
+    static func convertPlates(_ source: URL, into folder: URL, options: [String: JSONValue],
+                              bindMeshes: Bool, engine: KhaytEngine) async throws -> [PlateResult] {
+        let (entries, described, meshes) = try await describeOffMain(source, bindMeshes: bindMeshes)
+        let plates = try await engine.splitPlates(described, sourceName: source.lastPathComponent, meshes: meshes)
+        guard plates.count >= 2 else {
+            throw Failure.refused("This project has only one plate — convert the whole file instead.")
+        }
+        var results: [PlateResult] = []
+        for plate in plates {
+            guard plate.splittable else {
+                results.append(PlateResult(index: plate.index, url: nil, report: nil,
+                                           error: plate.problem ?? "This plate cannot be split out."))
+                continue
+            }
+            do {
+                let planned = try await engine.convertPlateMembers(described, plateIndex: plate.index,
+                                                                   options: options, meshes: meshes)
+                guard planned.ok, let members = planned.members else {
+                    throw Failure.refused(planned.error ?? "the converter refused it")
+                }
+                let out = try rebuild(members, from: source, entries: entries)
+                let destination = folder.appending(path: plate.fileName)
+                do { try ZipWrite.archive(out).write(to: destination, options: .atomic) }
+                catch { throw Failure.unreadable(ErrorText.plain(error)) }
+                results.append(PlateResult(index: plate.index, url: destination, report: planned.report, error: nil))
+            } catch let failure as Failure {
+                results.append(PlateResult(index: plate.index, url: nil, report: nil, error: failure.description))
+            }
+        }
+        return results
     }
 
     private static func truthy(_ value: JSONValue?) -> Bool {

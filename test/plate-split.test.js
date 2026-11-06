@@ -161,8 +161,8 @@ test('the variable layer height stays by default, the prime tower goes', () => {
   assert.equal(p1.report.vlhGuard, true);
 });
 
-test('dropVariableLayerHeight keeps the prime tower and drops the VLH members, and says so', () => {
-  const r = split.splitPlates(wide(), Object.assign({ dropVariableLayerHeight: true }, U1));
+test('vlhGuard "keep-prime-tower" keeps the prime tower and drops the VLH members, and says so', () => {
+  const r = split.splitPlates(wide(), Object.assign({ vlhGuard: 'keep-prime-tower' }, U1));
   const p1 = r.files[0];
   assert.equal(zipText(p1.buffer, /layer_heights_profile\.txt$/), null);
   assert.equal(cfg(p1.buffer).enable_prime_tower, undefined, 'the tower setting is left as the source had it');
@@ -209,4 +209,52 @@ test('outside a split, plateColours is the only way in: mergeToSlots and no opti
   assert.equal(cfg(merged.buffer).filament_colour.length, 4);
   assert.equal(merged.report.plateColours, undefined);
   assert.ok(merged.report.warnings.some((w) => /Merged 8 colours into the nearest 4/.test(w)));
+});
+
+test('vlhGuard "keep-layers" is the guard of today, the same as no option', () => {
+  const p1 = split.splitPlates(wide(), Object.assign({ vlhGuard: 'keep-layers' }, U1)).files[0];
+  assert.ok(zipText(p1.buffer, /layer_heights_profile\.txt$/));
+  assert.equal(cfg(p1.buffer).enable_prime_tower, '0');
+  assert.equal(p1.report.vlhDropped, undefined);
+});
+
+test('platesFitSlots: the Bed Ready rule over the plate listing', () => {
+  const plate = (...c) => ({ colorIndices: c });
+  // Grendizer-shaped: 8 colours as a whole, every plate within four.
+  assert.equal(plates.platesFitSlots([plate(0), plate(1, 2), plate(3, 4, 5, 6), plate(7)], 4), 4);
+  assert.equal(plates.platesFitSlots([plate(0, 1, 2), plate(3, 4, 5, 6, 7)], 4), null, 'one plate over the slots');
+  assert.equal(plates.platesFitSlots([plate(0, 1), plate(2, 3)], 4), null, 'the whole file fits: no reason to split');
+  assert.equal(plates.platesFitSlots([plate(0, 1, 2, 3, 4)], 4), null, 'one plate');
+  // Over this module's own listing: the fixture's 4-colour project fits as a whole.
+  assert.equal(plates.platesFitSlots(plates.peekPlates(buildMultiPlate3mf()).plates, 4), null);
+});
+
+test('keep-prime-tower keeps every height range and its filament, and strips only its layer height', () => {
+  const { writeZip } = require('../lib/zip-write');
+  const ranges = '<?xml version="1.0" encoding="utf-8"?>\n<objects>\n <object id="1">\n  <range min_z="0" max_z="2">\n'
+    + '   <option opt_key="extruder">2</option>\n   <option opt_key="layer_height">0.08</option>\n  </range>\n'
+    + '  <range min_z="2" max_z="4">\n   <option opt_key="layer_height">0.12</option>\n   <option opt_key="extruder">1</option>\n  </range>\n </object>\n</objects>\n';
+  const file = writeZip([
+    { name: '3D/3dmodel.model', data: '<?xml version="1.0"?><model unit="millimeter"><resources><object id="1"/></resources></model>' },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify({ printer_model: 'Bambu Lab X1 Carbon', nozzle_diameter: ['0.4'],
+      filament_colour: ['#FF0000', '#00FF00'], filament_type: ['PLA', 'PLA'], enable_prime_tower: '1', support_type: 'tree(auto)' }) },
+    { name: 'Metadata/layer_config_ranges.xml', data: ranges },
+    { name: 'Metadata/layer_heights_profile.txt', data: 'object_id=1|0.2;0.1;10;0.3' },
+  ]);
+  const r = mf.convert(file, { targetId: 'snapmaker-u1', vlhGuard: 'keep-prime-tower' });
+  assert.ok(r.ok, r.error);
+  assert.equal(zipText(r.buffer, /layer_heights_profile\.txt$/), null, 'the profile is gone');
+  const after = zipText(r.buffer, /layer_config_ranges\.xml$/);
+  assert.ok(after, 'the ranges stay');
+  assert.doesNotMatch(after, /opt_key="layer_height"/);
+  assert.equal((after.match(/<option opt_key="extruder">/g) || []).length, 2, 'both ranges keep their filament');
+  assert.equal((after.match(/<range\b/g) || []).length, 2);
+  const c = cfg(r.buffer);
+  assert.equal(c.enable_prime_tower, '1', 'the tower stays');
+  assert.equal(c.support_type, 'tree(auto)', 'tree supports stay');
+  assert.ok(!String((c.different_settings_to_system || [''])[0]).includes('enable_prime_tower'), 'no tower-off pin');
+  // keep-layers is the guard, and wins over keepPrimeTowerVlh.
+  const g = mf.convert(file, { targetId: 'snapmaker-u1', vlhGuard: 'keep-layers', keepPrimeTowerVlh: true });
+  assert.equal(cfg(g.buffer).enable_prime_tower, '0');
+  assert.match(zipText(g.buffer, /layer_config_ranges\.xml$/), /opt_key="layer_height"/);
 });
