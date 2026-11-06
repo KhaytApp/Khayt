@@ -1171,6 +1171,7 @@
   "notif.print_done_title": "{name} — Druck abgeschlossen",
   "notif.print_fail_title": "{name} — Druck fehlgeschlagen",
   "notif.print_a_printer": "Dein Drucker",
+  "finphoto.taken": "Foto auf {name} beim Druckende aufgenommen: {job}",
   "ntfy.section": "Push aufs Telefon (ntfy)",
   "ntfy.enable": "Druckermeldungen über ntfy senden",
   "ntfy.hint": "Kein Konto und kein Bot nötig: Installieren Sie die ntfy-App und abonnieren Sie dieses Topic. Jeder, der das Topic kennt, kann es lesen, also wählen Sie eines, das niemand errät.",

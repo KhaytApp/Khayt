@@ -1171,6 +1171,7 @@
   "notif.print_done_title": "{name} — baskı tamamlandı",
   "notif.print_fail_title": "{name} — baskı başarısız",
   "notif.print_a_printer": "Yazıcınız",
+  "finphoto.taken": "Baskı bittiğinde {name} üzerinde fotoğraf çekildi: {job}",
   "ntfy.section": "Telefona gönder (ntfy)",
   "ntfy.enable": "Yazıcı uyarılarını ntfy ile gönder",
   "ntfy.hint": "Hesap veya bot gerekmez: ntfy uygulamasını kurun ve bu konuya abone olun. Konuyu bilen herkes onu okuyabilir, bu yüzden kimsenin tahmin edemeyeceği bir tane seçin.",

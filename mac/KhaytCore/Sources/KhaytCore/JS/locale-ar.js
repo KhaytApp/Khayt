@@ -1289,6 +1289,7 @@
   "notif.print_done_title": "{name} — انتهت الطباعة",
   "notif.print_fail_title": "{name} — فشلت الطباعة",
   "notif.print_a_printer": "طابعتك",
+  "finphoto.taken": "التُقطت صورة على {name} عند انتهاء الطباعة: {job}",
   "ntfy.section": "إشعار إلى الهاتف (ntfy)",
   "ntfy.enable": "أرسل تنبيهات الطابعات عبر ntfy",
   "ntfy.hint": "لا يلزم حساب أو بوت: ثبّت تطبيق ntfy واشترك في هذا الموضوع. من يعرف اسم الموضوع يستطيع قراءته، فاجعله اسمًا لا يُخمَّن.",
