@@ -223,6 +223,14 @@ struct Reports: View {
                         ExpenseCategoriesCard(shop: shop, report: spending,
                                               period: shop.pnlPeriodTitle())
                             .padding(Metric.screen)
+                        // The other app's six-month trend charts — revenue
+                        // against spending, and the margin — and which
+                        // filament earns and how much of each is used.
+                        // Shared rules: lib/pnl-trend.js, lib/filament-report.js.
+                        RevenueTrendCards(shop: shop)
+                            .padding(Metric.screen)
+                        FilamentReportCards(shop: shop)
+                            .padding(Metric.screen)
                     }
                     }
                     Totals(shop: shop, rows: rows, floor: floor, vat: vat,
@@ -1029,6 +1037,10 @@ struct Reports: View {
                     BestUseOfPrinterCard(shop: shop, report: shop.profitPerHour)
                         .card(padding: 14)
                     ThroughputCard(shop: shop, report: when)
+                        .card(padding: 14)
+                    // Which days, over the last twelve weeks — the other
+                    // app's production heatmap (lib/completion-heatmap.js).
+                    CompletionHeatmapCard(shop: shop)
                         .card(padding: 14)
                     // WHEN work finishes, above; how LONG it took, here.
                     CycleTimeCard(shop: shop, cycle: cycle, lead: lead)

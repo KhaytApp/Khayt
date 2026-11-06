@@ -3762,5 +3762,7 @@
  "mac.of_installed": "Instalado",
  "mac.of_install_q": "¿Instalar este perfil de filamento?",
  "mac.of_install_body": "{name} se escribe en la carpeta de filamentos de {slicer} para {printer}.",
- "mac.of_done": "{name} instalado para {printer}. Vuelve a abrir {slicer} para verlo."
+ "mac.of_done": "{name} instalado para {printer}. Vuelve a abrir {slicer} para verlo.",
+ "mac.vat_return_print_hint": "La declaración por casillas de un periodo, para pasarla a la declaración que presenta. Imprímala o guárdela como PDF desde el panel de impresión.",
+ "mac.filament_net_note": "Los ingresos son lo que ganó cada trabajo, sin IVA, repartido entre sus filamentos según su parte del coste."
 }

@@ -277,24 +277,16 @@ function buildHandoffHeatmapCells() {
   const completed = printLog.filter(o =>
     KhaytOrderStatus.isFinished(o) && o.completedAt && inRange(o.date, analyticsRange, 'analytics'),
   );
-  const matrix = Array.from({ length: 7 }, () => Array(12).fill(0));
-  completed.forEach(o => {
-    try {
-      const d = new Date(o.completedAt);
-      const week = Math.min(11, Math.floor((Date.now() - d.getTime()) / (7 * 86400000)));
-      const dow = d.getDay();
-      if (week >= 0 && week < 12) matrix[dow][11 - week]++;
-    } catch (_) { /* ignore */ }
-  });
-  const maxVal = Math.max(1, ...matrix.flat());
+  // The counting is lib/completion-heatmap.js's, shared with the Mac.
+  const heat = KhaytCompletionHeatmap.heatmap(completed, { now: Date.now(), isFinished: (o) => KhaytOrderStatus.isFinished(o) });
+  const { matrix, maxVal } = heat;
   const cells = [];
   for (let w = 0; w < 12; w++) {
     for (let d = 0; d < 7; d++) {
-      const v = matrix[d][w] / maxVal;
-      cells.push(`<span style="background:hsl(var(--accent-h) var(--accent-s) var(--accent-l) / ${(0.12 + v * 0.85).toFixed(2)})"></span>`);
+      cells.push(`<span style="background:hsl(var(--accent-h) var(--accent-s) var(--accent-l) / ${KhaytCompletionHeatmap.intensity(matrix[d][w], maxVal).toFixed(2)})"></span>`);
     }
   }
-  return { cells: cells.join(''), maxVal, hasData: completed.length >= 5 };
+  return { cells: cells.join(''), maxVal, hasData: heat.hasData };
 }
 
 function renderHandoffAnalyticsOverview(ctx) {
@@ -820,10 +812,10 @@ function renderMonthlyTrendChart() {
     machines: (typeof machines !== 'undefined' ? machines : []),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   });
-  const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
+  // Which lines make the expense bar is lib/pnl-trend.js's, shared with the Mac.
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) + (byKey[m].depreciation || 0) + (byKey[m].labour || 0) : 0; });
+  KhaytPnlTrend.monthlyTrend(rows, months).forEach(r => { revByMonth[r.month] = r.revenue; expByMonth[r.month] = r.expenses; });
 
   const maxVal = Math.max(...months.map(m => Math.max(revByMonth[m], expByMonth[m])), 1);
 
@@ -1016,8 +1008,7 @@ function renderProfitMarginChart() {
     machines: (typeof machines !== 'undefined' ? machines : []),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   });
-  const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
-  const vals = months.map(m => (byKey[m] && byKey[m].marginPct != null) ? byKey[m].marginPct : null);
+  const vals = KhaytPnlTrend.marginTrend(rows, months).map(r => r.marginPct);
 
   const hasData = vals.some(v => v !== null);
   if (!hasData) { el.innerHTML = ''; return; }

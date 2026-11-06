@@ -612,143 +612,22 @@ function exportGaztVatReturn(period) {
   else if (period === 'q4') { fromDate = `${now.getFullYear()}-10-01`; toDate = `${now.getFullYear()}-12-31`; }
   else { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-12-31`; }
 
-  // EVERY ISSUED INVOICE, not every finished job: the invoice is the tax point,
-  // so a job still printing owes its tax in the period it is dated — the rule
-  // the P&L, the VAT summary and the accountant's invoice export share
-  // (lib/pnl-report.js isTaxPoint). Finished-only, this return declared less
-  // output tax than the invoices the shop had already handed out. Dated by
-  // the INVOICE's day (`taxPointDate`): an accepted quote's is its acceptance,
-  // not the quote's own date.
-  const periodOrders = printLog.filter(o => {
-    const day = KhaytPnl.taxPointDate(o);
-    return KhaytPnl.isTaxPoint(o) && day >= fromDate && day <= toDate;
+  // THE FIGURES AND THE DOCUMENT ARE lib/vat-return.js's — the Mac prints the
+  // same return from the same rule. Every issued invoice dated in the period
+  // (the invoice is the tax point, `KhaytPnl.isTaxPoint`/`taxPointDate`),
+  // split by lib/tax.js the way the invoices are; a FILED period's later
+  // changes adjusted in the first open one (`KhaytPnl.vatCorrections`); and
+  // the shop's own tax name, with box numbers only on the Saudi form. See the
+  // module for the history of each.
+  const vatBoxes = KhaytVatReturn.boxes(printLog, expenses || [], {
+    settings, clients: (typeof clients !== 'undefined' ? clients : []),
+    currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    from: fromDate, to: toDate, revenueOf: orderNetRevenueBase,
   });
-  // Boxes 1-3 used to read `o.vatAmount` and `o.vatRate`. NEITHER FIELD IS EVER
-  // WRITTEN — not by the order form, not by the invoice, not by any importer.
-  // `+undefined || 0` is 0 and `NaN === 0` is false, so Box 3 (VAT due) was
-  // always zero and Box 2 always zero, while Box 1 reported the price INCLUDING
-  // the VAT. On SAR 400,000 of sales at 15% the form declared:
-  //
-  //     Box 1  400,000.00      (overstated by the VAT itself)
-  //     Box 3        0.00      (SAR 52,173.92 was owed)
-  //     NET          0.00
-  //
-  // The tax arithmetic already exists and every invoice uses it: lib/tax.js,
-  // whose profile treats a price as tax-INCLUSIVE, which is what a Saudi shop's
-  // prices are. Use the same module, so the return and the invoices can never
-  // disagree about one order.
-  const taxProfile = KhaytTax.profileFromSettings(settings);
-  const ratePct = taxProfile.rates.reduce((sum, r) => sum + r.percent, 0);
-  const vatRegistered = ratePct > 0;
-
-  /* THE FIGURES TRAVEL; THE BOX NUMBERS DO NOT.
-   *
-   * lib/tax.js carries thirty country presets — VAT, GST, Sales Tax — in both
-   * inclusive and exclusive mode, and the arithmetic above is right for all of
-   * them: computeTax splits a price the way that country prices. What was NOT
-   * right for any of them but one is the paperwork around it. This document
-   * called itself a "GAZT VAT Return" and numbered its rows Box 1, 2, 3, 6, 7,
-   * which is the Saudi form. A UK shop files a VAT100 whose nine boxes mean
-   * different things; a US shop has no VAT return at all and pays sales tax to a
-   * state. Handing either of them a Saudi form with their numbers in it is worse
-   * than handing them a plain list, because the numbers look authoritative.
-   *
-   * So: the shop's own tax NAME, box numbers only where they are the shop's own
-   * (the Saudi preset), and no claim anywhere that this IS a return. It is a
-   * summary to transcribe onto whatever form the shop actually files. */
-  const taxName = String(taxProfile.name || 'Tax');
-  // A shop that predates the country presets has no settings.tax at all, and
-  // every one of those was Saudi — including one that has VAT switched off, which
-  // is a registration state, not a country.
-  const isSaudiForm = settings.tax ? (settings.tax.country || '') === 'SA' : true;
-  const boxNo = (n) => (isSaudiForm ? `Box ${n}` : '');
-
-  let box1 = 0;   // standard-rated sales, NET of VAT
-  let box2 = 0;   // zero-rated sales
-  let box3 = 0;   // VAT due on those sales
-  for (const o of periodOrders) {
-    // orderNetRevenueBase is the shop's one revenue chokepoint: base currency,
-    // credit notes already deducted, personal prints excluded. A credit note
-    // reverses a sale and its VAT together, which is what a return wants.
-    const gross = orderNetRevenueBase(o);
-    if (!gross) continue;
-    if (vatRegistered) {
-      const t = KhaytTax.computeTax(gross, taxProfile);
-      box1 += t.subtotal;
-      box3 += t.taxTotal;
-    } else {
-      // Khayt models ONE shop-level rate, so there is no per-order zero-rating:
-      // either the shop charges tax on everything or on nothing. That is a real
-      // limitation in jurisdictions with mixed rating, and it is why this is
-      // presented as a summary to transcribe rather than as a filing.
-      box2 += gross;
-    }
-  }
-
-  // A FILED RETURN IS NOT REWRITTEN (lib/vat-periods.js): a period the shop
-  // marked filed reads what it was filed with, and any later change to it (a
-  // cancel, void, credit, edit, or an invoice backdated in) is adjusted in the
-  // first open period. The corrections are the P&L's own
-  // (KhaytPnl.vatCorrections), each counted where its day falls; the
-  // adjustments are also totalled on their own line.
-  let adjSales = 0, adjVat = 0;
-  if (vatRegistered && typeof KhaytPnl.vatCorrections === 'function') {
-    const corrections = KhaytPnl.vatCorrections(printLog, {
-      settings, clients: (typeof clients !== 'undefined' ? clients : []),
-      currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
-    });
-    for (const c of corrections) {
-      if (!(c.day >= fromDate && c.day <= toDate)) continue;
-      box1 += c.sales;
-      box3 += c.vat;
-      if (c.kind === 'adjustment') { adjSales += c.sales; adjVat += c.vat; }
-    }
-  }
-
-  const periodExp = (expenses || []).filter(e => e.date >= fromDate && e.date <= toDate);
-  const box6 = periodExp.reduce((s, e) => s + (+e.amount || 0), 0);
-  // No expense record carries a VAT figure — the form has never had the field —
-  // so there is nothing here to total. Printing a confident 0 invited a shop to
-  // file "nothing reclaimable" as though Khayt had checked. It is marked as
-  // needing their own figure instead.
-  const box7 = periodExp.reduce((s, e) => s + (+e.vatAmount || 0), 0);
-  const box7Known = periodExp.some(e => +e.vatAmount > 0);
-  const netVat = box3 - box7;
-
   const periodTitle = bounds ? vatPeriodLabel(period) : `${period.toUpperCase()} ${now.getFullYear()}`;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>${escapeHtml(taxName)} summary — ${escapeHtml(periodTitle)}</title>
-    <style>body{font-family:sans-serif;max-width:700px;margin:auto;padding:24px;}
-      h1{font-size:18px;} table{width:100%;border-collapse:collapse;margin-top:16px;}
-      th{background:#f3f4f6;text-align:left;padding:8px;border:1px solid #ddd;font-size:13px;}
-      td{padding:8px;border:1px solid #ddd;font-size:13px;}
-      .net{font-weight:700;background:#fef3c7;}
-      .warn{margin-top:16px;padding:10px 12px;border:1px solid #f59e0b;background:#fffbeb;font-size:12px;}</style></head>
-    <body>
-      <h1>${escapeHtml(taxName)} summary — ${escapeHtml(shopName() || '')} (${escapeHtml(periodTitle)})</h1>
-      <p style="font-size:12px;color:#666;">Period: ${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</p>
-      <table>
-        <thead><tr><th>Box</th><th>Description</th><th>Amount (${escapeHtml(currencySymbol())})</th></tr></thead>
-        <tbody>
-          <tr><td>${boxNo(1)}</td><td>Sales at the standard rate (net of ${escapeHtml(taxName)})</td><td>${fmtMoney(box1)}</td></tr>
-          <tr><td>${boxNo(2)}</td><td>Sales at zero rate</td><td>${fmtMoney(box2)}</td></tr>
-          <tr><td>${boxNo(3)}</td><td>${escapeHtml(taxName)} collected on sales</td><td>${fmtMoney(box3)}</td></tr>
-          ${(adjVat || adjSales) ? `<tr><td></td><td>of which: adjustment for a filed period (sales ${fmtMoney(adjSales)})</td><td>${fmtMoney(adjVat)}</td></tr>` : ''}
-          <tr><td>${boxNo(6)}</td><td>Total purchases</td><td>${fmtMoney(box6)}</td></tr>
-          <tr><td>${boxNo(7)}</td><td>${escapeHtml(taxName)} paid on purchases (recoverable)</td><td>${box7Known ? fmtMoney(box7) : '&mdash;'}</td></tr>
-          <tr class="net"><td colspan="2">Net ${escapeHtml(taxName)} payable</td><td>${fmtMoney(netVat)}</td></tr>
-        </tbody>
-      </table>
-      ${box7Known ? '' : `<p class="warn">Khayt does not record ${escapeHtml(taxName)} on expenses, so the
-        recoverable line is blank and the net figure assumes nothing is reclaimable. Add your own
-        figure before filing.</p>`}
-      <p class="warn">This is a summary to transcribe onto the return you file &mdash; not the return
-        itself. Khayt applies one rate to every sale, so a shop with mixed or exempt rating must
-        split these figures itself.${isSaudiForm ? '' : ' The box numbers on your form will differ.'}</p>
-      <p style="font-size:12px;color:#666;margin-top:16px;">${taxProfile.mode === 'inclusive'
-        ? `Prices in Khayt include ${escapeHtml(taxName)} at ${escapeHtml(String(ratePct))}%, and sales are shown with it removed.`
-        : `Prices in Khayt exclude ${escapeHtml(taxName)}; it is added at ${escapeHtml(String(ratePct))}% and shown separately.`}</p>
-    </body></html>`;
+  const html = KhaytVatReturn.html(vatBoxes, {
+    shopName: shopName() || '', periodTitle, currencySymbol: currencySymbol(),
+  });
 
   if (window.hubAPI?.exportPDF) {
     window.hubAPI.exportPDF({ html, filename: `tax-summary-${period}-${now.getFullYear()}.pdf` })

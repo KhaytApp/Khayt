@@ -3762,5 +3762,7 @@
  "mac.of_installed": "Kuruldu",
  "mac.of_install_q": "Bu filament profili kurulsun mu?",
  "mac.of_install_body": "{name}, {printer} için {slicer} filament klasörüne yazılır.",
- "mac.of_done": "{name}, {printer} için kuruldu. Görmek için {slicer} uygulamasını yeniden açın."
+ "mac.of_done": "{name}, {printer} için kuruldu. Görmek için {slicer} uygulamasını yeniden açın.",
+ "mac.vat_return_print_hint": "Bir dönemin kutu kutu beyannamesi; verdiğiniz beyannameye aktarmak için. Yazdırın ya da yazdırma panelinden PDF olarak kaydedin.",
+ "mac.filament_net_note": "Gelir, her işin KDV hariç kazandırdığıdır; maliyetteki paylarına göre filamentlerine bölünür."
 }

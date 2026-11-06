@@ -33,6 +33,8 @@ const KhaytOrderStatus = require(path.join(ROOT, 'lib/order-status.js'));
 // Which jobs are declared: every issued invoice (the tax point), the rule the
 // P&L and the invoice export share.
 const KhaytPnl = require(path.join(ROOT, 'lib/pnl-report.js'));
+// The figures and the document — shared with the Mac, which prints the same one.
+const KhaytVatReturn = require(path.join(ROOT, 'lib/vat-return.js'));
 
 /**
  * Run exportGaztVatReturn with the globals it reads, and capture the HTML it
@@ -46,6 +48,7 @@ function runReturn({ orders, expenses = [], settings = { enableVat: true, vatRat
     KhaytTax,
     KhaytOrderStatus,
     KhaytPnl,
+    KhaytVatReturn,
     settings,
     printLog: orders,
     expenses,
@@ -202,12 +205,15 @@ test('the return uses the same tax module as the invoices', () => {
   // If these ever diverge, one order is taxed two ways by the same shop.
   // Comments stripped: this guard quotes the old field names in the explanation
   // above the fix, and a guard that reads its own prose as the bug never passes.
-  const src = fs.readFileSync(path.join(ROOT, 'renderer/operations-extras.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  // The figures are lib/vat-return.js's (the Mac prints the same return), and
+  // the desktop must hand its export to it rather than work them out again.
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const src = strip(fs.readFileSync(path.join(ROOT, 'renderer/operations-extras.js'), 'utf8'));
   const at = src.indexOf('function exportGaztVatReturn');
-  const body = src.slice(at, at + 3000);
-  assert.match(body, /KhaytTax\.profileFromSettings\(settings\)/, 'the return derives its own tax profile');
-  assert.match(body, /KhaytTax\.computeTax\(/, 'the return computes VAT by hand again');
+  assert.match(src.slice(at, at + 3000), /KhaytVatReturn\.boxes\(/, 'the desktop works the return out on its own');
+  const body = strip(fs.readFileSync(path.join(ROOT, 'lib/vat-return.js'), 'utf8'));
+  assert.match(body, /Tax\.profileFromSettings\(settings\)/, 'the return derives its own tax profile');
+  assert.match(body, /Tax\.computeTax\(/, 'the return computes VAT by hand again');
   assert.ok(!/o\.vatAmount|o\.vatRate/.test(body),
     'the return still reads an order field that nothing writes');
 });

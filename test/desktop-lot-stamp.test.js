@@ -29,9 +29,19 @@ test('the spool switch stamps the lot on the row it writes', () => {
 });
 
 test('a test print stamps the lot on the row it writes', () => {
+  // The row is written by lib/test-prints.js now (the Mac logs test prints
+  // too); the desktop hands it the deduction's lot stamp.
   const src = decomment(read('renderer/inventory.js'));
-  assert.ok(/item\.usageHistory\.unshift\(Object\.assign\(\{ orderId: newTp\.id[^\n]*\},\s*Deduction\(\)\.lotStamp\(item\)\)\)/.test(src),
+  assert.ok(/TP\.addTestPrint\([^\n]*lotStamp: \(s\) => Deduction\(\)\.lotStamp\(s\)/.test(src),
     'the test-print row is written without the lot stamp');
+  const lib = decomment(read('lib/test-prints.js'));
+  assert.ok(/history\.unshift\(Object\.assign\(\{ orderId: newTp\.id[\s\S]*?\},\s*lotStampOf\(item, o\)\)\)/.test(lib),
+    'lib/test-prints.js writes the usage line without the lot stamp');
+  const TP = require('../lib/test-prints.js');
+  const out = TP.addTestPrint([], { id: 'sp', weight: 100, lot: ' L-1 ', poId: 'PO-2' },
+    TP.normalize({ weightUsed: 3 }, '2026-11-06'), { id: 'TP9', lotStamp });
+  assert.equal(out.item.usageHistory[0].lot, 'L-1');
+  assert.equal(out.item.usageHistory[0].poId, 'PO-2');
 });
 
 test('both pages load order-deduction before the scripts that call it', () => {

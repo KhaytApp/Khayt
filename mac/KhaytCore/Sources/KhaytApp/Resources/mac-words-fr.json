@@ -3762,5 +3762,7 @@
  "mac.of_installed": "Installé",
  "mac.of_install_q": "Installer ce profil de filament ?",
  "mac.of_install_body": "{name} est écrit dans le dossier des filaments de {slicer} pour {printer}.",
- "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir."
+ "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir.",
+ "mac.vat_return_print_hint": "La déclaration par cases d’une période, à reporter sur la déclaration que vous déposez. Imprimez-la ou enregistrez-la en PDF depuis la fenêtre d’impression.",
+ "mac.filament_net_note": "Le chiffre d’affaires est ce que chaque travail a rapporté, hors TVA, réparti entre ses filaments selon leur part du coût."
 }

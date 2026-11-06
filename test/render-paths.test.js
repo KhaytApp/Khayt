@@ -93,6 +93,9 @@ function loadAnalyticsStack() {
   // were missing here until a test seeded one.
   require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
   require('../lib/pnl-report.js'); // globalThis.KhaytPnl
+  require('../lib/pnl-trend.js'); // globalThis.KhaytPnlTrend — the two trend charts
+  require('../lib/completion-heatmap.js'); // globalThis.KhaytCompletionHeatmap
+  require('../lib/filament-report.js'); // globalThis.KhaytFilamentReport — dashboard tables
   require('../lib/location-pl.js'); // globalThis.KhaytLocationPl
   require('../lib/site-filter.js'); // globalThis.KhaytSiteFilter
   require('../lib/operators.js'); // globalThis.KhaytOperators

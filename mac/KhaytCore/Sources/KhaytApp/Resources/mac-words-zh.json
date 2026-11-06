@@ -3762,5 +3762,7 @@
  "mac.of_installed": "已安装",
  "mac.of_install_q": "安装此耗材配置？",
  "mac.of_install_body": "{name} 将写入 {slicer} 的耗材文件夹，用于 {printer}。",
- "mac.of_done": "已为 {printer} 安装 {name}。重新打开 {slicer} 即可看到。"
+ "mac.of_done": "已为 {printer} 安装 {name}。重新打开 {slicer} 即可看到。",
+ "mac.vat_return_print_hint": "某一期间的分栏申报表，供您誊写到实际提交的申报表上。可打印，或在打印面板中存储为 PDF。",
+ "mac.filament_net_note": "收入为每项工作扣除增值税后的所得，按各耗材在成本中的占比分摊。"
 }

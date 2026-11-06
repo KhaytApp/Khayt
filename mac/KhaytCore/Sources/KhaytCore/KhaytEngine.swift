@@ -1128,6 +1128,16 @@ public actor KhaytEngine {
         // for the queue. Neither reads the other, so their order is free.
         "telemetry-scrub",
         "telemetry-sender",
+        // Reports the other app computed inline and the Mac draws too: profit
+        // by filament and material usage, the P&L's two trend charts, the
+        // completion heatmap, the box-form VAT return and the test-print log.
+        // Each reads its siblings (`order-status`, `pnl-report`, `tax`,
+        // `order-deduction`) when called, so they come after them.
+        "filament-report",
+        "pnl-trend",
+        "completion-heatmap",
+        "vat-return",
+        "test-prints",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -5561,6 +5571,135 @@ public actor KhaytEngine {
                            .array(inventory), orders.map { .array($0) } ?? .null,
                            .array(timeEntries)],
                           as: MachineProfitReport.self)
+    }
+
+    // MARK: - The desktop's reports, from the desktop's rules
+
+    /// Profit by filament and material usage by month — `lib/filament-report.js`,
+    /// the module the other app's dashboard draws both from.
+    ///
+    /// Revenue is what each order EARNED (`orderEarnedBase`: net of tax, in
+    /// the shop's currency), the figure every other money screen uses.
+    /// `months` is the window in book months (`Calendar.book.monthKeys`).
+    public func filamentReport(orders: [JSONValue], inventory: [JSONValue],
+                               settings: [String: JSONValue], clients: [JSONValue],
+                               months: [String]) throws -> FilamentReport {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          return {
+            rows: KhaytFilamentReport.profitByFilament(ARG0, ARG1, {
+              revenueOf: function (o) { return KhaytOrderMoney.orderEarnedBase(o, ctx); },
+            }),
+            usage: KhaytFilamentReport.materialUsage(ARG1, ARG4, { limit: 6 }),
+            months: ARG4,
+          };
+        })()
+        """#, [.array(orders), .array(inventory), .object(settings), .array(clients),
+               .array(months.map { .string($0) })],
+           as: FilamentReport.self)
+    }
+
+    /// Six months of revenue against spending, and the margin, from the P&L
+    /// by month — `lib/pnl-trend.js` over `pnlByPeriod`, as the other app's
+    /// two trend charts. `input` is the shop's P&L inputs; its granularity
+    /// and span are replaced (every month, the whole book).
+    public func pnlTrend(_ input: PnlInputs, months: [String]) throws -> [PnlTrendMonth] {
+        var asked = input
+        asked.granularity = "month"
+        asked.from = nil
+        asked.to = nil
+        return try runtime.call2(
+            "(function(){var rows = KhaytPnl.pnlByPeriod(ARG0, ARG1, \(PnlInputs.context));"
+          + " var t = KhaytPnlTrend.monthlyTrend(rows, ARG13), m = KhaytPnlTrend.marginTrend(rows, ARG13);"
+          + " return t.map(function (r, i) { return { month: r.month, revenue: r.revenue,"
+          + " expenses: r.expenses, profit: r.profit, marginPct: m[i].marginPct }; });})()",
+            asked.arguments + [.array(months.map { .string($0) })],
+            as: [PnlTrendMonth].self)
+    }
+
+    /// Twelve weeks of finished work by weekday — `lib/completion-heatmap.js`.
+    /// `orders` is already filtered to the period the page shows.
+    public func completionHeatmap(orders: [JSONValue], now: Date) throws -> CompletionHeatmap {
+        try runtime.call2(#"""
+        (function () {
+          var h = KhaytCompletionHeatmap.heatmap(ARG0, { now: ARG1 });
+          h.intensity = h.matrix.map(function (row) {
+            return row.map(function (n) { return KhaytCompletionHeatmap.intensity(n, h.maxVal); });
+          });
+          return h;
+        })()
+        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000)],
+           as: CompletionHeatmap.self)
+    }
+
+    /// The box-form VAT return for `from`…`to` and its one-page document —
+    /// `lib/vat-return.js`, the module the other app's "Export VAT Return"
+    /// prints. Revenue is `orderNetRevenueBase` there and here; the currency
+    /// mark is the shared table's, as the other app's `currencySymbol`.
+    public func vatReturn(orders: [JSONValue], expenses: [JSONValue],
+                          settings: [String: JSONValue], clients: [JSONValue],
+                          currencies: [String: JSONValue], from: String, to: String,
+                          shopName: String, periodTitle: String) throws -> VatReturnDocument {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          var known = (ARG4 && Object.keys(ARG4).length) ? ARG4 : undefined;
+          var b = KhaytVatReturn.boxes(ARG0, ARG1, {
+            settings: ARG2, clients: ARG3, currencies: known, from: ARG5, to: ARG6,
+            revenueOf: function (o) { return KhaytOrderMoney.orderNetRevenueBase(o, ctx, known); },
+          });
+          var table = (globalThis.KhaytCurrencies && KhaytCurrencies.CURRENCIES) || {};
+          var cur = table[(ARG2 || {}).currency] || table.SAR || { symbol: '' };
+          b.html = KhaytVatReturn.html(b, { shopName: ARG7, periodTitle: ARG8, currencySymbol: cur.symbol });
+          return b;
+        })()
+        """#, [.array(orders), .array(expenses), .object(settings), .array(clients),
+               .object(currencies), .string(from), .string(to), .string(shopName),
+               .string(periodTitle)],
+           as: VatReturnDocument.self)
+    }
+
+    /// The shopping list from the reorder points — `lib/reorder.js
+    /// shoppingList`, low spools picked by `KhaytOrderDeduction.isLowStock`
+    /// (the shelf's own badge rule), and its text to copy.
+    public func shoppingList(spools: [JSONValue], suppliers: [JSONValue],
+                             settings: [String: JSONValue], noSupplier: String,
+                             title: String) throws -> ShoppingList {
+        try runtime.call2(#"""
+        (function () {
+          var groups = KhaytReorder.shoppingList(ARG0, ARG1, {
+            isLow: function (s) { return KhaytOrderDeduction.isLowStock(s, ARG2); },
+            noSupplier: ARG3,
+          });
+          return { groups: groups, text: KhaytReorder.shoppingListText(groups, ARG4) };
+        })()
+        """#, [.array(spools), .array(suppliers), .object(settings), .string(noSupplier),
+               .string(title)],
+           as: ShoppingList.self)
+    }
+
+    /// A test print logged against a spool — `lib/test-prints.js`: the row in
+    /// the desktop's fields, and the spool with any filament it used taken off
+    /// and its usage line written (lot stamped, as a recall reads it).
+    public func addTestPrint(_ testPrints: [JSONValue], spool: JSONValue,
+                             raw: [String: JSONValue], id: String,
+                             today: String) throws -> TestPrintChange {
+        try runtime.call2(#"""
+        (function () {
+          var input = KhaytTestPrints.normalize(ARG2, ARG4);
+          return KhaytTestPrints.addTestPrint(ARG0, ARG1, input, { id: ARG3 });
+        })()
+        """#, [.array(testPrints), spool, .object(raw), .string(id), .string(today)],
+           as: TestPrintChange.self)
+    }
+
+    /// A test print taken off the log, its grams put back on the spool.
+    public func removeTestPrint(_ testPrints: [JSONValue], spool: JSONValue?,
+                                id: String) throws -> TestPrintChange {
+        try runtime.call2("KhaytTestPrints.removeTestPrint(ARG0, ARG1, ARG2)",
+                          [.array(testPrints), spool ?? .null, .string(id)],
+                          as: TestPrintChange.self)
     }
 
     // MARK: - Finding a printer

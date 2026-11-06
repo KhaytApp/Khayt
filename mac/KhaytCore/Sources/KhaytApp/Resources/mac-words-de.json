@@ -3762,5 +3762,7 @@
  "mac.of_installed": "Installiert",
  "mac.of_install_q": "Dieses Filamentprofil installieren?",
  "mac.of_install_body": "{name} wird für {printer} in den Filamentordner von {slicer} geschrieben.",
- "mac.of_done": "{name} für {printer} installiert. Öffnen Sie {slicer} erneut, um es zu sehen."
+ "mac.of_done": "{name} für {printer} installiert. Öffnen Sie {slicer} erneut, um es zu sehen.",
+ "mac.vat_return_print_hint": "Die Erklärung nach Kennziffern für einen Zeitraum, zum Übertragen in die Erklärung, die Sie einreichen. Drucken Sie sie aus oder sichern Sie sie im Druckdialog als PDF.",
+ "mac.filament_net_note": "Der Umsatz ist, was jeder Auftrag ohne MwSt. eingebracht hat, aufgeteilt auf seine Filamente nach ihrem Anteil an den Kosten."
 }

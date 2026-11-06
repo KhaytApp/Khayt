@@ -3762,5 +3762,7 @@
  "mac.of_installed": "インストール済み",
  "mac.of_install_q": "このフィラメントプロファイルをインストールしますか？",
  "mac.of_install_body": "{name} を {printer} 用に {slicer} のフィラメントフォルダへ書き込みます。",
- "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。"
+ "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。",
+ "mac.vat_return_print_hint": "期間ごとの欄別申告書です。提出する申告書に書き写してください。印刷するか、プリントパネルからPDFとして保存できます。",
+ "mac.filament_net_note": "売上は各ジョブの税抜きの収益で、コストに占める割合に応じてフィラメントごとに配分しています。"
 }

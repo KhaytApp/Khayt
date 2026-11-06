@@ -1355,6 +1355,7 @@ final class Shop {
             if case .array(let rows)? = root["expenses"] { expenseRows = rows } else { expenseRows = [] }
             if case .array(let rows)? = root["wasteLog"] { wasteRows = rows } else { wasteRows = [] }
             if case .array(let rows)? = root["auditLog"] { auditRows = rows } else { auditRows = [] }
+            if case .array(let rows)? = root["testPrints"] { testPrintRows = rows } else { testPrintRows = [] }
             readSnapshots(root)
             // AFTER `orderRows` is read, which it groups. A kit is several
             // print-log entries that are one physical object, and the rollup
@@ -2502,6 +2503,10 @@ final class Shop {
     private(set) var wasteRows: [JSONValue] = []
     /// The team activity log (`auditLog`), oldest first as the book keeps it.
     private(set) var auditRows: [JSONValue] = []
+    /// The test-print log (`testPrints`), as the other app writes it
+    /// (`lib/test-prints.js`). Read whole; one spool's rows are picked by
+    /// `KhaytTestPrints.forSpool`'s rule in `testPrints(for:)`.
+    private(set) var testPrintRows: [JSONValue] = []
 
     /// Which period the two screens are showing. On the shop, not the view, so
     /// a snapshot run can turn to a month and photograph it.
@@ -3014,6 +3019,13 @@ final class Shop {
     var pendingLabels: LabelSheetRequest?
     /// Book ▸ End of Day Report…, built once when asked (`EndOfDayReport.swift`).
     var pendingDayReport: DayReportRequest?
+    /// A one-page document from a shared rule — the box-form VAT return, the
+    /// shopping list — waiting to be printed (`PrintedPageSheet`).
+    var pendingPrintedPage: PrintedPageRequest?
+    /// The shopping list, worked out when the shop asked (`ShoppingListSheet`).
+    var pendingShoppingList: ShoppingListRequest?
+    /// The spool whose test-print log is open, if any (`TestPrintLogSheet`).
+    var testPrintLogFor: Spool?
 
     /// The job being dragged, or nil.
     var draggingJob: Order.ID?

@@ -3762,5 +3762,7 @@
  "mac.of_installed": "Instalado",
  "mac.of_install_q": "Instalar este perfil de filamento?",
  "mac.of_install_body": "{name} é gravado na pasta de filamentos do {slicer} para {printer}.",
- "mac.of_done": "{name} instalado para {printer}. Abra o {slicer} de novo para vê-lo."
+ "mac.of_done": "{name} instalado para {printer}. Abra o {slicer} de novo para vê-lo.",
+ "mac.vat_return_print_hint": "A declaração por campos de um período, para copiar na declaração que você entrega. Imprima ou salve como PDF no painel de impressão.",
+ "mac.filament_net_note": "A receita é o que cada trabalho rendeu, sem impostos, dividida entre seus filamentos conforme a parte de cada um no custo."
 }
