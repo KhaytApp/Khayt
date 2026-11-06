@@ -1037,3 +1037,7 @@
 "quote.history.empty" = "Ainda não há versões anteriores.";
 "quote.needs_book" = "Revisar e fazer follow-up de um orçamento exige o livro da oficina neste telefone. Sincronize com o Mac ou faça no Mac.";
 "quote.not_a_quote" = "Este trabalho não é mais um orçamento.";
+"printphotos.title" = "Fotos da impressão";
+"printphotos.one" = "Foto da impressão concluída";
+"printphotos.note" = "Adicionadas no computador, incluindo a foto que a impressora tira quando uma impressão termina. Elas também aparecem no Portfólio de lá.";
+"printphotos.full_on_computer" = "Esta é a cópia pequena que viaja com o livro. A foto em tamanho real está no computador que a tirou.";

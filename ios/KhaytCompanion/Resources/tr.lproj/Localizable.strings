@@ -1037,3 +1037,7 @@
 "quote.history.empty" = "Henüz önceki sürüm yok.";
 "quote.needs_book" = "Bir teklifi revize etmek ve hatırlatmak için dükkânın defterinin bu telefonda olması gerekir. Mac ile eşitleyin ya da Mac'te yapın.";
 "quote.not_a_quote" = "Bu iş artık bir teklif değil.";
+"printphotos.title" = "Baskı fotoğrafları";
+"printphotos.one" = "Biten baskının fotoğrafı";
+"printphotos.note" = "Bilgisayarda eklendi; baskı bittiğinde yazıcının kendi çektiği fotoğraf da dahil. Oradaki Portfolyo’da da görünürler.";
+"printphotos.full_on_computer" = "Bu, defterle birlikte gelen küçük kopyadır. Tam boyutlu fotoğraf, onu çeken bilgisayardadır.";

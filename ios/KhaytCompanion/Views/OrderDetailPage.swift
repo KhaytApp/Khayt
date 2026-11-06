@@ -33,6 +33,8 @@ struct OrderDetailPage: View {
     @State private var whatsApp: KhaytAPIClient.WhatsAppOffer?
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
+    /// The job's own photos of the finished print, from the book.
+    @State private var printPhotos: [JobPrintPhoto] = []
     @State private var showingInvoice = false
     @State private var showingProforma = false
     /// The carriers to ship with, when this job is finished and not yet sent.
@@ -131,6 +133,12 @@ struct OrderDetailPage: View {
                 ContactCard(client: customer)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            // The finished print, as the Mac and the desktop keep it — the
+            // printer's own snapshot at the end of a print among them.
+            if !printPhotos.isEmpty {
+                PrintPhotosCard(photos: printPhotos)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
             // Only an order the Mac has published has a page to put a photo on.
             if let photoAccess, photoAccess != .notPublished {
                 OrderPhotosCard(access: photoAccess)
@@ -198,6 +206,7 @@ struct OrderDetailPage: View {
             shipChoices = await api.shipChoices(orderId: order.id)
             customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
+            printPhotos = api.printPhotos(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             if order.status == OrderStatus.quote.rawValue { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG

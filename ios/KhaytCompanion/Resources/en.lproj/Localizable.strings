@@ -1037,3 +1037,7 @@
 "quote.history.empty" = "No earlier versions yet.";
 "quote.needs_book" = "Revising and following up on a quote needs the shop's book on this phone. Sync with the Mac, or do it on the Mac.";
 "quote.not_a_quote" = "This job is no longer a quote.";
+"printphotos.title" = "Photos of the print";
+"printphotos.one" = "Photo of the finished print";
+"printphotos.note" = "Added on the computer, including the printer’s own photo when a print finishes. They are also in the Portfolio there.";
+"printphotos.full_on_computer" = "This is the small copy that travels with the book. The full-size photo is on the computer that took it.";

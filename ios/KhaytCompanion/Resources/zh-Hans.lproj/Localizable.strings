@@ -1037,3 +1037,7 @@
 "quote.history.empty" = "还没有以前的版本。";
 "quote.needs_book" = "修改和跟进报价需要此手机上有店铺账本。请与 Mac 同步，或在 Mac 上操作。";
 "quote.not_a_quote" = "此订单已不再是报价。";
+"printphotos.title" = "打印照片";
+"printphotos.one" = "完成的打印件照片";
+"printphotos.note" = "在电脑上添加，包括打印完成时打印机自己拍的照片。它们也会显示在电脑上的作品集中。";
+"printphotos.full_on_computer" = "这是随账本同步的小尺寸副本。全尺寸照片保存在拍摄它的电脑上。";

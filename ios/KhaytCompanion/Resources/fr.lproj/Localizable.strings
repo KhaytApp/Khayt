@@ -1037,3 +1037,7 @@
 "quote.history.empty" = "Pas encore de version précédente.";
 "quote.needs_book" = "Réviser et relancer un devis nécessite le registre de l’atelier sur ce téléphone. Synchronisez avec le Mac, ou faites-le sur le Mac.";
 "quote.not_a_quote" = "Cette commande n’est plus un devis.";
+"printphotos.title" = "Photos de l’impression";
+"printphotos.one" = "Photo de l’impression terminée";
+"printphotos.note" = "Ajoutées sur l’ordinateur, y compris la photo prise par l’imprimante à la fin d’une impression. Elles figurent aussi dans le Portfolio là-bas.";
+"printphotos.full_on_computer" = "Ceci est la petite copie qui voyage avec le registre. La photo en taille réelle se trouve sur l’ordinateur qui l’a prise.";
