@@ -15,7 +15,10 @@ test('migrateLegacyWebhooks: one subscription per distinct URL, events collapsed
   assert.equal(subs.length, 2, 'two distinct URLs');
   const a = subs.find(s => s.url === 'https://a.example/hook');
   assert.deepEqual(a.events.sort(), ['order_created', 'status_changed']);
-  assert.equal(a.secret, 's3cret', 'legacy secret carried over');
+  // The legacy secret is NOT copied onto the subscription (store-secret-paths
+  // DROP_PATHS): it signs with the shared one, `subscriptionSecret`.
+  assert.equal('secret' in a, false, 'no copy of the signing secret');
+  assert.equal(B.subscriptionSecret(a, { secret: 's3cret' }), 's3cret');
   assert.equal(a.enabled, true);
   const b = subs.find(s => s.url === 'https://b.example/hook');
   assert.deepEqual(b.events, ['payment_received']);

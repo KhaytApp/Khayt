@@ -41,7 +41,12 @@
       if (!byUrl.has(u)) {
         byUrl.set(u, {
           id: 'whs_' + Math.abs(hashString(u)).toString(36),
-          url: u, events: [], secret: wh.secret || '', enabled: wh.enabled !== false,
+          // NO SECRET OF ITS OWN. This used to copy `wh.secret` here, and the
+          // desktop saves what it migrates — so the shop's real signing secret
+          // landed in `subscriptions[].secret`, a path that is not sealed on
+          // disk nor masked to a phone. It signs with the shared secret
+          // instead (`subscriptionSecret`); lib/store-secret-paths.js DROP_PATHS.
+          url: u, events: [], enabled: wh.enabled !== false,
           createdAt: new Date().toISOString(),
         });
       }
@@ -210,11 +215,153 @@
     return (Array.isArray(pending) ? pending : []).filter(p => p && p.id !== id);
   }
 
+  // ── EDITING THE SUBSCRIPTIONS ──────────────────────────────────────────
+  //
+  // The desktop's settings screen edits the LEGACY shape — one URL per event
+  // and one signing secret (`settings.webhooks.events{}`, `.secret`) — and
+  // migrates it into subscriptions on first use. The Mac edits the
+  // subscriptions themselves: several URLs, each listening to the events it
+  // names. Both are kept in step, so either screen shows what the other saved.
+
+  /**
+   * The secret a subscription signs with: its own, else the shop's one
+   * signing secret. `settings.webhooks.secret` is a registered (sealed)
+   * secret and a subscription's is not, so the Mac stores none per
+   * subscription and every delivery signs with the shared one — the only
+   * secret the desktop's screen has ever offered.
+   */
+  function subscriptionSecret(sub, webhooks) {
+    return String((sub && sub.secret) || (webhooks && webhooks.secret) || '');
+  }
+
+  /**
+   * The legacy one-URL-per-event map for these subscriptions: for each event,
+   * the first enabled subscription listening to it. What the desktop's screen
+   * shows, and what `migrateLegacyWebhooks` would turn back into them.
+   */
+  function legacyEvents(subscriptions) {
+    const out = {};
+    for (const s of Array.isArray(subscriptions) ? subscriptions : []) {
+      if (!s || s.enabled === false || !s.url || !Array.isArray(s.events)) continue;
+      for (const e of s.events) if (EVENTS.includes(e) && !out[e]) out[e] = String(s.url);
+    }
+    return out;
+  }
+
+  /** Is this a URL a subscription may post to? https only, as both transports send. */
+  function isSubscriptionUrl(url) {
+    return /^https:\/\/[^\s/]+/i.test(String(url || '').trim());
+  }
+
+  /**
+   * One subscription as a form describes it: the URL trimmed, only events
+   * from the catalogue, each once, in catalogue order. `prev` is the stored
+   * one being edited (its id and createdAt are kept), or null for a new one,
+   * which takes `id` and `nowIso`. Never a secret: see `subscriptionSecret`.
+   */
+  function editSubscription(prev, form, id, nowIso) {
+    const p = prev || {};
+    const f = form || {};
+    const asked = Array.isArray(f.events) ? f.events : [];
+    const out = Object.assign({}, p, {
+      id: p.id || String(id || ''),
+      url: String(f.url == null ? (p.url || '') : f.url).trim(),
+      events: EVENTS.filter((e) => asked.includes(e)),
+      enabled: f.enabled == null ? p.enabled !== false : !!f.enabled,
+      createdAt: p.createdAt || String(f.createdAt || nowIso || ''),
+    });
+    // A subscription switched back on is no longer "gone". And never a
+    // secret of its own (store-secret-paths DROP_PATHS), even one stored.
+    if (out.enabled) delete out.disabledReason;
+    delete out.secret;
+    return out;
+  }
+
+  /**
+   * The webhooks block with these subscriptions in it: the legacy map
+   * rebuilt from them, and the retries for a subscription that is no longer
+   * there (or no longer on) dropped — a retry for a deleted URL would post to
+   * an address the shop took away. Everything else is kept as stored.
+   */
+  function withSubscriptions(webhooks, subscriptions) {
+    const wh = webhooks || {};
+    const subs = (Array.isArray(subscriptions) ? subscriptions : []).filter((s) => s && s.id)
+      .map((s) => { const c = Object.assign({}, s); delete c.secret; return c; });
+    const live = new Set(subs.filter((s) => s.enabled !== false).map((s) => s.id));
+    const pending = (Array.isArray(wh.pending) ? wh.pending : [])
+      .filter((p) => p && (live.has(p.subscriptionId) || String(p.subscriptionId || '').startsWith('event:')));
+    return Object.assign({}, wh, { subscriptions: subs, events: legacyEvents(subs), pending });
+  }
+
+  /**
+   * The desktop's legacy screen, saved: keep the subscriptions when the URLs
+   * it shows are the ones they already make (the shop changed the switch or
+   * the secret), and rebuild them from the screen only when a URL changed —
+   * that screen cannot show a second URL on one event, and rebuilding on
+   * every save threw away the deliveries' subscription ids for nothing.
+   */
+  function fromLegacyForm(webhooks, form) {
+    const wh = webhooks || {};
+    const f = form || {};
+    const events = {};
+    for (const [k, v] of Object.entries(f.events || {})) { const u = String(v || '').trim(); if (u) events[k] = u; }
+    const base = Object.assign({}, wh, { enabled: !!f.enabled, secret: f.secret == null ? wh.secret : f.secret });
+    const subs = Array.isArray(wh.subscriptions) ? wh.subscriptions : null;
+    const same = (a, b) => {
+      const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+      return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+    };
+    if (subs && same(legacyEvents(subs), events)) return Object.assign(base, { events });
+    const out = Object.assign(base, { events });
+    delete out.subscriptions;
+    return out;
+  }
+
+  /**
+   * The secret to sign a delivery to `url` with, filled in from the store.
+   * For a host whose window holds the MASK rather than a secret (the
+   * desktop): the event webhook's when `url` is its address, else the shop's
+   * signing secret when `url` is one of its subscriptions'. `{ found, secret }`
+   * — not found means the address is none the shop saved, and nothing from
+   * the store may sign for it. `urlKey` is `lib/secret-destination.js`'s.
+   */
+  function signingSecretFor(settings, url, urlKey, mask) {
+    const s = settings || {};
+    const key = urlKey(url);
+    if (!key) return { found: false, secret: '' };
+    const ew = s.eventWebhooks || {};
+    if (ew.url && urlKey(ew.url) === key) return { found: true, secret: String(ew.secret || '') };
+    const wh = s.webhooks || {};
+    const subs = Array.isArray(wh.subscriptions) && wh.subscriptions.length
+      ? wh.subscriptions : migrateLegacyWebhooks(wh);
+    const sub = subs.find((x) => x && x.url && urlKey(x.url) === key);
+    if (!sub) return { found: false, secret: '' };
+    const own = String(sub.secret || '');
+    const usable = own && own !== mask && !own.startsWith('__enc__');
+    return { found: true, secret: usable ? own : String(wh.secret || '') };
+  }
+
+  /**
+   * A line of the delivery log. The payload is kept with it (the desktop's
+   * `resendWebhookDelivery` already read `rec.payload`, which nothing wrote),
+   * so a resend sends what the first attempt did.
+   */
+  function deliveryRecord(o) {
+    const r = o || {};
+    return {
+      id: String(r.id || ''), subscriptionId: String(r.subscriptionId || ''), event: String(r.event || ''),
+      at: String(r.at || ''), status: r.status || 'failed', httpStatus: r.httpStatus || null,
+      attempts: r.attempts || 1, error: r.error || null, payload: r.payload || {},
+    };
+  }
+
   const api = {
     EVENTS, MAX_ATTEMPTS, DELIVERY_LOG_CAP, PENDING_CAP,
     schedulePending, duePending, futurePending, removePending,
     migrateLegacyWebhooks, matchSubscriptions, buildDeliveryBody,
     statusPayload, buildWireBody,
+    subscriptionSecret, legacyEvents, isSubscriptionUrl, editSubscription, withSubscriptions,
+    fromLegacyForm, signingSecretFor, deliveryRecord,
     backoffDelayMs, shouldRetry, isGone, appendDelivery, deliveriesFor,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

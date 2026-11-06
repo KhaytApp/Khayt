@@ -127,3 +127,41 @@ test('an empty book yields an empty, drawable report', () => {
   assert.equal(r.points.length, 6);
   assert.deepEqual(RT.trend(undefined, undefined).points, []);
 });
+
+/* ------------------------------------------------------------------
+   The satisfaction card: average, spread and NPS over every rating.
+   ------------------------------------------------------------------ */
+
+test('summary: average, the spread five stars down, and NPS on a five-star scale', () => {
+  const orders = [5, 5, 5, 4, 3, 1].map((r, i) => ({ id: 'S' + i, survey: { rating: r } }));
+  orders.push({ id: 'none' }, { id: 'zero', survey: { rating: 0 } });
+  const s = RT.summary(orders);
+  assert.equal(s.responses, 6);
+  assert.equal(s.average, 23 / 6);
+  assert.deepEqual(s.spread.map((b) => b.stars), [5, 4, 3, 2, 1]);
+  assert.deepEqual(s.spread.map((b) => b.count), [3, 1, 1, 0, 1]);
+  assert.deepEqual(s.spread.map((b) => b.pct), [50, 17, 17, 0, 17]);
+  assert.equal(s.promoters, 3);
+  assert.equal(s.passives, 1);
+  assert.equal(s.detractors, 2);
+  assert.equal(s.nps, 17);
+});
+
+test('summary: a rating stored as text is a number, not a string glued on', () => {
+  // The inline version summed with `+`, so "5" made the average a string.
+  const s = RT.summary([{ survey: { rating: '5' } }, { survey: { rating: 4 } }]);
+  assert.equal(s.average, 4.5);
+  assert.equal(s.spread[0].count, 1);
+});
+
+test('summary: a half star lands in a bar, so the bars add up to the responses', () => {
+  const s = RT.summary([{ survey: { rating: 4.5 } }, { survey: { rating: 3.4 } }]);
+  assert.equal(s.spread.reduce((n, b) => n + b.count, 0), s.responses);
+});
+
+test('summary: nobody asked is no figures, not zeros', () => {
+  const s = RT.summary([]);
+  assert.equal(s.responses, 0);
+  assert.equal(s.average, null);
+  assert.equal(s.nps, null);
+});

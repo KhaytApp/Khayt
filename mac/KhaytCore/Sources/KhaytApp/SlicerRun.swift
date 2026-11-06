@@ -34,6 +34,11 @@ enum SlicerRun {
     /// patience.
     static let patience: TimeInterval = 180
 
+    /// Where a shop's own slice runs (slice-and-send): serial, so two sends
+    /// never race one slicer, and a dispatch queue rather than the cooperative
+    /// pool, which a three-minute blocking slice would starve.
+    static let queue = DispatchQueue(label: "khayt.slice", qos: .userInitiated)
+
     /// How much of the G-code is read. The slicer writes its totals in the
     /// header and the footer; the middle is a million moves nobody needs.
     static let window = 65_536

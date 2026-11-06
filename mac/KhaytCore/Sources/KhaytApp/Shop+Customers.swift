@@ -305,6 +305,12 @@ extension Shop {
         /// phone numbers and then mailed them.
         static let channels = ["email"]
 
+        /// And `sms` / `whatsapp` once the shop has a text provider (Twilio,
+        /// Unifonic or its webhook): both go through it, as the desktop's do.
+        static func channels(textProvider: Bool) -> [String] {
+            textProvider ? ["email", "sms", "whatsapp"] : channels
+        }
+
         var criteria: [String: JSONValue] {
             var out: [String: JSONValue] = [:]
             if let minSpend { out["minSpend"] = .number(minSpend) }
@@ -460,8 +466,13 @@ extension Shop {
     func sendCampaign(_ body: String, subject: String = "", channel: String = "email",
                       to recipients: [KhaytEngine.Recipient]) async -> String {
         guard permitted("clients", "edit") else { return moveProblem ?? "" }
-        // Every send below is a MAIL. A list built for any other channel holds
-        // phone numbers, and posting them as addresses is the bug this stops.
+        // A text campaign goes through the shop's SMS provider; every other
+        // send below is a MAIL. A list built for a phone channel holds phone
+        // numbers, and posting them as addresses is the bug this stops.
+        // Without a text provider, a phone channel is still refused as before.
+        if channel == "sms" || channel == "whatsapp", smsProvider != nil {
+            return await sendTextCampaign(body, channel: channel, to: recipients)
+        }
         guard channel == "email" else { return words.callIt("mac.campaign_email_only") }
         guard !recipients.isEmpty else { return words.callIt("camp.none") }
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -573,10 +584,32 @@ extension Shop {
     /// The other app keeps the last fifty runs on `settings.campaignLog`; this
     /// writes the same records into the same place. A shop that sends from one
     /// app and looks in the other should find one history, not two.
-    private func recordCampaign(reached: Int, sent: Int, failed: Int) async {
+    /// The same campaign as texts, one at a time at the desktop's 350 ms, each
+    /// through `sendText` — the rule's list, the shop's provider.
+    private func sendTextCampaign(_ body: String, channel: String,
+                                  to recipients: [KhaytEngine.Recipient]) async -> String {
+        guard permitted("clients", "edit") else { return moveProblem ?? "" }
+        guard !recipients.isEmpty else { return words.callIt("camp.none") }
+        guard !body.trimmingCharacters(in: .whitespaces).isEmpty else { return words.callIt("camp.need_body") }
+        guard smsProvider != nil else { return words.callIt("mac.sms_r_not_set_up") }
+        var sent = 0
+        var failed = 0
+        for recipient in recipients {
+            if Task.isCancelled { break }
+            let filled = await campaignPreview(body, for: recipient)
+            if await sendText(filled, to: recipient.contact, channel: channel) == nil { sent += 1 } else { failed += 1 }
+            try? await Task.sleep(for: .milliseconds(350))
+        }
+        await recordCampaign(reached: recipients.count, sent: sent, failed: failed, channel: channel)
+        var said = words.callIt("camp.done") + ": " + String(sent)
+        if failed > 0 { said += " · " + String(failed) + " " + words.callIt("camp.failed") }
+        return said
+    }
+
+    private func recordCampaign(reached: Int, sent: Int, failed: Int, channel: String = "email") async {
         guard let build = source.build else { return }
         do {
-            // lock: callers — sendCampaign
+            // lock: callers — sendCampaign, sendTextCampaign
             try await StoreWriter.updateOffMain(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
@@ -584,7 +617,7 @@ extension Shop {
                 if case .array(let existing)? = settings["campaignLog"] { log = existing }
                 log.append(.object([
                     "at": .string(ISO8601DateFormatter().string(from: Date())),
-                    "channel": .string("email"),
+                    "channel": .string(channel),
                     "recipients": .number(Double(reached)),
                     "sent": .number(Double(sent)),
                     "failed": .number(Double(failed)),

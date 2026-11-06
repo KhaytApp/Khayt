@@ -112,6 +112,8 @@ public enum StoreWriter {
 
         let before = root
         try mutate(&root)
+        // A secret's stray copy never survives a write (`StoreScrub`).
+        StoreScrub.dropStrays(&root)
         if recordingDeletes {
             reviveUnderNewIds(before: before, after: &root)
             recordDeletions(before: before, after: &root)
@@ -195,6 +197,7 @@ public enum StoreWriter {
             let changed = root
             let next = try await offMain { () throws -> Data in
                 var root = changed
+                StoreScrub.dropStrays(&root)
                 if recordingDeletes {
                     reviveUnderNewIds(before: decoded, after: &root)
                     recordDeletions(before: decoded, after: &root)

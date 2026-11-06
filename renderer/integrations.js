@@ -91,40 +91,21 @@ let _digestInFlight = false;
 
 async function checkAndSendDigest() {
   if (_digestInFlight) return;
-  const d = settings.emailDigest;
-  if (!d?.enabled) return;
+  if (typeof KhaytEmailDigest === 'undefined') return;
   const cfg = settings.emailConfig;
-  if (!cfg || cfg.provider === 'none') return;
-  const to = d.recipientEmail || settings.email;
-  if (!to) return;
-  const now = new Date();
-  if (now.getHours() !== (d.hour ?? 8)) return;
-  // Compute period key
-  let periodKey;
-  if (d.frequency === 'weekly') {
-    if (now.getDay() !== (d.weekday ?? 1)) return;
-    // ISO week number
-    const jan1 = new Date(now.getFullYear(), 0, 1);
-    const week = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-    periodKey = `${now.getFullYear()}-W${String(week).padStart(2,'0')}`;
-  } else if (d.frequency === 'monthly') {
-    // Fire on the configured day-of-month (clamped to the month's length).
-    const lastDom = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const fireDom = Math.min(d.monthday ?? 1, lastDom);
-    if (now.getDate() !== fireDom) return;
-    periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  } else {
-    periodKey = localDateStr(now);
-  }
-  if (d.lastSentDate === periodKey) return; // already sent
+  if (!settings.emailDigest?.enabled || !cfg || cfg.provider === 'none') return;
+  // When it is due and which period it is for: `lib/email-digest.js`, shared
+  // with the Mac app, so the two cannot both send one period's digest.
+  const when = KhaytEmailDigest.due(settings, new Date());
+  if (!when.due) return;
+  const to = KhaytEmailDigest.recipient(settings.emailDigest, settings);
   const body = buildDigestEmailHtml();
-  const freqWord = d.frequency === 'weekly' ? 'Weekly' : (d.frequency === 'monthly' ? 'Monthly' : 'Daily');
-  const subject = `${shopName() || 'Khayt'} — ${freqWord} Digest`;
+  const subject = KhaytEmailDigest.subject(shopName(), KhaytEmailDigest.frequencyOf(settings.emailDigest));
   _digestInFlight = true;
   try {
     const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
     if (result?.ok) {
-      settings.emailDigest = { ...settings.emailDigest, lastSentDate: periodKey };
+      settings.emailDigest = KhaytEmailDigest.sent(settings, when.periodKey);
       saveAll();
     }
   } finally {
@@ -192,18 +173,26 @@ async function deliverWebhook(sub, body, attempt = 1) {
   if (!Bus) return;
   let status, error;
   try {
-    const r = await window.hubAPI?.fireWebhook?.(sub.url, body.event, body, sub.secret || '');
+    // A subscription with no secret of its own signs with the shop's one
+    // signing secret (`KhaytWebhookBus.subscriptionSecret`) — the Mac stores
+    // none per subscription. The event webhook keeps its own.
+    const secret = String(sub.id || '').startsWith('event:') ? (sub.secret || '')
+      : Bus.subscriptionSecret(sub, settings.webhooks);
+    const r = await window.hubAPI?.fireWebhook?.(sub.url, body.event, body, secret);
     status = r && r.status;
     if (r && r.ok === false) error = r.error || `HTTP ${status || '?'}`;
   } catch (e) {
     error = String(e && e.message || e);
   }
   const okDelivered = !error;
-  recordWebhookDelivery({
+  recordWebhookDelivery(Bus.deliveryRecord({
     id: body.id, subscriptionId: sub.id, event: body.event, at: new Date().toISOString(),
     status: okDelivered ? 'ok' : (Bus.shouldRetry(status, attempt) ? 'retrying' : 'failed'),
     httpStatus: status || null, attempts: attempt, error: error || null,
-  });
+    // Kept so a resend sends what this attempt did (`resendWebhookDelivery`
+    // reads it; nothing wrote it before).
+    payload: body.payload || {},
+  }));
   if (okDelivered) { clearPendingWebhook(body.id); return; }
   // A consumer answering 410 Gone is telling us to stop for good.
   if (Bus.isGone(status)) { clearPendingWebhook(body.id); disableWebhookSubscription(sub.id, 'gone'); return; }

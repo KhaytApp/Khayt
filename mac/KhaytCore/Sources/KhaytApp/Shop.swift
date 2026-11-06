@@ -1083,6 +1083,7 @@ final class Shop {
             locationRows = Self.rows(root, "locations")
             operatorRows = Self.rows(root, "operators")
             timeEntryRows = Self.rows(root, "timeEntries")
+            envLogRows = Self.rows(root, "envLogs")
             await refreshLock()
             if overtaken() { return }
             // What has been ordered and not yet arrived. Read raw for the same
@@ -1257,7 +1258,11 @@ final class Shop {
             timeline = projected
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
-            let profiles = (try? await engine?.printerProfiles()) ?? []
+            // The shop's own printers first (`settings.customPrinters`), as
+            // the desktop converter lists them.
+            var customPrinters: [JSONValue] = []
+            if case .array(let own)? = settingsDict["customPrinters"] { customPrinters = own }
+            let profiles = (try? await engine?.printerProfiles(custom: customPrinters)) ?? []
             if overtaken() { return }
             printerProfiles = profiles
             // And what each shelf row is counted in. Same reason: read in view
@@ -1421,6 +1426,8 @@ final class Shop {
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
             if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
+            // The KPI email, webhook retries and failed accounting pushes.
+            if next.build != nil { startIntegrationsPass() } else { stopIntegrationsPass() }
             // Another book's requests are not this one's: counted afresh, and
             // its first read is a new baseline rather than a burst of alerts.
             quoteRequestsWaiting = 0
@@ -2018,6 +2025,13 @@ final class Shop {
     var pendingSend: PendingHold?
     /// What the last send said, beside the button that made it.
     var sendNote: String?
+    /// The machine a model is being sliced for, while the slicer runs
+    /// (`Shop+PrintPrep.swift`).
+    var slicingFor: String?
+    /// The model open in the converter sheet, and the printer it opened on.
+    var pendingConvert: ConvertRequest?
+    /// Several models open in the batch converter.
+    var pendingBatchConvert: BatchConvertRequest?
 
     // Stored for "What to run next" (Shop+Jobs.swift).
     /// The dispatcher's answer, recomputed when the book or the printers move.
@@ -2284,6 +2298,10 @@ final class Shop {
 
     /// Hours the staff logged against jobs (`store.timeEntries`), raw.
     private(set) var timeEntryRows: [JSONValue] = []
+
+    /// The workshop's temperature and humidity readings (`store.envLogs`),
+    /// raw — `lib/env-log.js` reads them (`Shop+EnvLog.swift`).
+    private(set) var envLogRows: [JSONValue] = []
 
     /// Who is signed in on THIS Mac, by operator id — nil is nobody.
     ///
@@ -3015,6 +3033,19 @@ final class Shop {
     /// second click in that time sent the template twice; one that Meta took
     /// but whose log line could not be written would be offered again.
     var whatsAppSending: Set<String> = []
+    // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
+    /// Texts in flight or sent this run, as "job|milestone" — one click, one text.
+    var smsSending: Set<String> = []
+    /// Webhook deliveries in flight (their ids): a retry pass that overlaps
+    /// a move's own send, or a second pass, must not post one twice.
+    var webhookInFlight: Set<String> = []
+    /// Invoices being pushed to the accounting system, by order id.
+    var accountingPushing: Set<String> = []
+    /// True while the local KPI email is going out, so two ticks cannot send two.
+    var digestSending = false
+    /// The pass that sends what is due: the KPI email, queued webhook retries,
+    /// failed accounting pushes.
+    var integrationsTask: Task<Void, Never>?
     /// What the last move had to say — the due date it pushed out, the spools
     /// it emptied, the ones that are now low.
     var moveNotices: [String] = []

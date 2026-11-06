@@ -36,6 +36,9 @@ struct CampaignSheet: View {
     /// state because the answer is the engine's and a view cannot ask an actor
     /// a question while it is drawing.
     @State private var canSend = false
+    /// Email needs a mail provider this app speaks; a text needs the shop's
+    /// SMS provider.
+    private var sendable: Bool { segment.channel == "email" ? canSend : shop.smsProvider != nil }
 
     var body: some View {
         SheetFrame(width: Self.width) {
@@ -45,8 +48,8 @@ struct CampaignSheet: View {
                 GridRow {
                     Text(shop.words.callIt("camp.channel")).foregroundStyle(.secondary)
                     Picker("", selection: $segment.channel) {
-                        ForEach(Shop.Segment.channels, id: \.self) { channel in
-                            Text(shop.words.callIt(channel == "email"
+                        ForEach(Shop.Segment.channels(textProvider: shop.smsProvider != nil), id: \.self) { channel in
+                            Text(channel == "sms" ? "SMS" : shop.words.callIt(channel == "email"
                                                    ? "camp.ch_email" : "mac.whatsapp")).tag(channel)
                         }
                     }
@@ -97,6 +100,7 @@ struct CampaignSheet: View {
             // note from your printer, Layla" — so it is filled per recipient
             // rather than sent as literal braces. Left empty, the shop's own
             // name is used.
+            if segment.channel == "email" {
             VStack(alignment: .leading, spacing: 6) {
                 Text(shop.words.callIt("camp.subject")).foregroundStyle(.secondary)
                 TextField(shop.words.callIt("camp.subject_ph"), text: $subject)
@@ -107,6 +111,7 @@ struct CampaignSheet: View {
                     .onChange(of: subject) {
                         if subject.count > 160 { subject = String(subject.prefix(160)) }
                     }
+            }
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -190,7 +195,7 @@ struct CampaignSheet: View {
                 if !result.isEmpty {
                     Text(result).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if !canSend {
+                } else if !sendable {
                     // SAID, NOT HIDDEN. A shop on SMTP has a Send button that
                     // would always fail; it is told why, by name, rather than
                     // shown a control that does nothing.
@@ -203,7 +208,7 @@ struct CampaignSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("camp.send")) { confirming = true }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(sending || !canSend || recipients.isEmpty
+                    .disabled(sending || !sendable || recipients.isEmpty
                               || body_.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }

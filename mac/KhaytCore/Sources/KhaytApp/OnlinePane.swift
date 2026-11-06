@@ -125,8 +125,10 @@ struct OnlinePane: View {
                 CloudLibrarySettings(shop: shop)
                 CloudPlanSettings(shop: shop)
                 PayLinkSettings(shop: shop)
+                ShopSlugSettings(shop: shop)
                 BnplSettings(shop: shop)
-                DigestSettings(shop: shop)
+                // The weekly cloud digest is chosen with the other email
+                // summary now, in Settings › Integrations (EmailSummarySettings).
                 TeamSettings(shop: shop)
                 Section(shop.words.callIt("mac.online_title")) {
                     Text(shop.words.callIt("mac.online_desc"))

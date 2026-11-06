@@ -213,6 +213,15 @@
     if (isPlainObject(store.settings)) {
       normalized.settings = sanitisePlainObject(store.settings);
     }
+    // Copies of a secret that must not exist (lib/store-secret-paths.js
+    // DROP_PATHS): removed on load, so the next save writes the book without
+    // them. Missing module, nothing dropped — this never refuses a load.
+    const paths = global.KhaytStoreSecretPaths
+      || (typeof require === 'function' ? (() => { try { return require('./store-secret-paths.js'); } catch (e) { return null; } })() : null);
+    if (paths && typeof paths.dropStrays === 'function') {
+      const n = paths.dropStrays(normalized);
+      if (n > 0) warnings.push(`Removed ${n} stray secret cop${n === 1 ? 'y' : 'ies'}`);
+    }
 
     if (typeof store.version === 'number') {
       normalized.version = store.version;

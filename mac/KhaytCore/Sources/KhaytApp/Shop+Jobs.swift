@@ -1970,6 +1970,8 @@ extension Shop {
         pendingBnpl = nil
         pendingShipment = nil
         pendingSend = nil
+        pendingConvert = nil
+        pendingBatchConvert = nil
         pendingEdit = nil
         pendingDetails = nil
         pendingVoid = nil
@@ -2222,43 +2224,38 @@ extension Shop {
     /// consumer was down would be the wrong trade. The shop is TOLD, which is
     /// the whole point of the app having refused these moves before.
     func fire(_ deliveries: [KhaytEngine.WebhookDelivery]) async {
-        guard let engine else { return }
+        guard engine != nil else { return }
         var sent = 0
+        var tries: [WebhookTry] = []
         for one in deliveries {
             // The HOST, not the whole URL: a webhook URL usually carries a
             // token in its path, and a sentence on screen is a sentence that
             // gets screenshotted into a support chat.
             let name = URL(string: one.url)?.host ?? one.url
-            guard let url = URL(string: one.url) else {
+            guard URL(string: one.url) != nil else {
                 moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
                     + " " + words.callIt("mac.webhook_bad_url")
                 continue
             }
-            do {
-                // SEALED SECRETS ARE OPENED AT THE POINT OF USE, the way the
-                // Telegram token is. `settings.webhooks.secret` is a registered
-                // path, and the legacy config carries it down into every
-                // migrated subscription — so signing with the string as it sits
-                // in the book would sign with the ciphertext and every delivery
-                // would fail verification at the consumer.
-                // `open` returns a value with no marker untouched, so this is
-                // the same call whether the shop's secret is sealed or is from
-                // a store written before sealing existed.
-                let secret = try await Secrets.open(one.secret, for: source)
-                let status = try await WebhookClient.deliver(
-                    one.body, to: url, secret: secret, event: one.event, engine: engine)
-                if (200..<300).contains(status) {
-                    sent += 1
-                } else {
-                    moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
-                        + " HTTP \(status)"
-                }
-            } catch {
+            // SEALED SECRETS ARE OPENED AT THE POINT OF USE, the way the
+            // Telegram token is (`attemptWebhook`). `settings.webhooks.secret`
+            // is a registered path, and a subscription with no secret of its
+            // own signs with it — so signing with the string as it sits in
+            // the book would sign with the ciphertext and every delivery
+            // would fail verification at the consumer.
+            let tried = await attemptWebhook(one)
+            tries.append(tried)
+            if tried.ok {
+                sent += 1
+            } else {
                 moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
-                    + " " + ((error as? LocalizedError)?.errorDescription
-                             ?? self.said(error))
+                    + " " + (tried.error ?? "")
             }
         }
+        // Into the delivery log, and a failure worth retrying onto the
+        // queue — the desktop's `deliverWebhook`, so a consumer that was down
+        // for a minute still hears about the job (`recordWebhookAttempts`).
+        await recordWebhookAttempts(tries)
         if sent > 0 {
             moveNotices.append(words.counting(sent, "mac.webhooks_sent"))
         }
