@@ -2110,6 +2110,11 @@ process.on('unhandledRejection', (reason) => {
 ipcMain.handle('hub:mint-api-token', async (_e, { label, scopes } = {}) => {
   try {
     const ApiTokens = require('./lib/api-tokens.js');
+    // The owner's alone (rbac security/edit), read from the book on disk —
+    // the window flushes its save first, so a just-signed-in owner is seen.
+    let book = null;
+    try { book = readStoreDecryptedFromDisk(); } catch (_) { book = null; }
+    if (!ApiTokens.mayManageTokens(book)) return { ok: false, error: 'not_allowed' };
     const { token, record } = ApiTokens.generateToken({ label, scopes });
     return { ok: true, token, record };
   } catch (e) {
@@ -2148,7 +2153,16 @@ ipcMain.handle('hub:save-store', async (event, data) => {
       return { ok: false, error: errors[0] || 'Invalid store' };
     }
     if (errors.length) console.warn('hub:save-store: salvaged with issues:', errors.join('; '));
-    const merged = mergeStoreSecretsFromDisk(normalized);
+    // Creating or revoking an API token is the owner's (rbac security/edit,
+    // as on the Mac): a save from a role that may not changes the token list
+    // back to what is on disk, whatever the window sent.
+    let merged = mergeStoreSecretsFromDisk(normalized);
+    try {
+      const ApiTokens = require('./lib/api-tokens.js');
+      const guarded = ApiTokens.guardTokenSave(merged, readStoreDecryptedFromDisk());
+      if (guarded !== merged) console.warn('hub:save-store: API token change refused for this role');
+      merged = guarded;
+    } catch (e) { console.error('hub:save-store: token guard failed:', e && e.message); }
     // First real keychain write. Explain once, before encryptForDisk triggers
     // the OS permission prompt — but only when there is actually a plaintext
     // secret to encrypt, so a shop that never configures a credential is never

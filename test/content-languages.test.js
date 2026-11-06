@@ -360,7 +360,10 @@ test('the phone numbers an order the way the desk does', () => {
   const lan = fs.readFileSync(path.join(__dirname, '..', 'lib', 'lan-rest.js'), 'utf8');
   const shared = fs.readFileSync(path.join(__dirname, '..', 'lib', 'order-new.js'), 'utf8');
   const of = (src) => (src.match(/asQuote \? \(settings\.quotePrefix \|\| 'QUO'\) : \(settings\.(\w+) \|\| '(\w+)'\)/) || []).slice(1);
-  assert.deepEqual(of(lan), of(shared), 'the phone and the shared rule must mint the same order prefix');
+  // Since Nov 2026 it does not copy the prefix line at all: it asks the shared
+  // rule for the whole record, so there is no second copy to drift.
+  assert.match(lan, /N\.newOrder\(\{/, 'POST /api/orders builds its record with lib/order-new.js newOrder');
+  assert.deepEqual(of(lan), [], 'and has no order prefix of its own to drift');
   assert.deepEqual(of(shared), ['invPrefix', 'INV']);
 
   // And the renderer must not have grown one back.

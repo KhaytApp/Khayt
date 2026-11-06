@@ -530,6 +530,68 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  // THE LAN WRITES THE WINDOW NEVER HEARD. The server writes the book on disk
+  // and tells the window; a window that does not take the change saves its own
+  // whole copy over it at the next saveAll() — a job raised from the phone or
+  // the API, a spool reweighed or deleted at the shelf, a waiting-list entry
+  // answered, each undone by the next edit at the desk. Each is taken into the
+  // window's state here and saved, as onLanSpoolAdded always did.
+  if (window.hubAPI?.onLanOrderCreated) {
+    window.hubAPI.onLanOrderCreated((payload) => {
+      const order = payload && payload.order;
+      if (!order || !order.id || printLog.some((o) => o && o.id === order.id)) return;
+      // The invoice and quote counters it advanced (lib/order-new.js), so this
+      // window's next save does not put them back.
+      const moved = (payload.settingsChanged && typeof payload.settingsChanged === 'object') ? payload.settingsChanged : {};
+      for (const [k, v] of Object.entries(moved)) {
+        if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+        settings[k] = v;
+      }
+      printLog.unshift(order);
+      saveAll();
+      renderLogs();
+      renderKanban();
+      if (typeof renderDashboard === 'function') renderDashboard();
+    });
+  }
+  if (window.hubAPI?.onLanSpoolUpdated) {
+    window.hubAPI.onLanSpoolUpdated((spool) => {
+      if (!spool || !spool.id) return;
+      const i = inventory.findIndex((s) => s && s.id === spool.id);
+      if (i === -1) return;
+      inventory[i] = spool;
+      saveAll();
+      renderInventory();
+    });
+  }
+  if (window.hubAPI?.onLanSpoolDeleted) {
+    window.hubAPI.onLanSpoolDeleted((payload) => {
+      const id = payload && payload.id;
+      if (!id) return;
+      const i = inventory.findIndex((s) => s && s.id === id);
+      if (i === -1) return;
+      inventory.splice(i, 1);
+      saveAll();
+      renderInventory();
+    });
+  }
+  if (window.hubAPI?.onLanWaitingUpdated) {
+    window.hubAPI.onLanWaitingUpdated((payload) => {
+      const entry = payload && payload.entry;
+      if (!payload || !payload.id || !entry || entry.id !== payload.id) return;
+      const i = waitingList.findIndex((w) => w && w.id === payload.id);
+      if (payload.declined) {
+        if (i !== -1) waitingList.splice(i, 1);
+        if (!waitingListHistory.some((w) => w && w.id === entry.id && w.declinedAt === entry.declinedAt)) waitingListHistory.push(entry);
+      } else if (i !== -1) {
+        waitingList[i] = entry;
+      } else {
+        return;
+      }
+      saveAll();
+      if (typeof renderWaitingList === 'function') renderWaitingList();
+    });
+  }
   if (window.hubAPI?.onLanExpenseAdded) {
     window.hubAPI.onLanExpenseAdded((payload) => {
       // Phone photographed a receipt. The server has written both the image and
@@ -575,7 +637,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.hubAPI.onLanOrderUpdated((payload) => {
       const { id, status } = payload;
       const idx = printLog.findIndex(o => o.id === id);
-      if (idx !== -1) {
+      if (idx !== -1 && payload.changed && typeof payload.changed === 'object' && Array.isArray(payload.effects)) {
+        // PATCH /api/orders/:id ran the shared status rule (lib/lan-rest.js
+        // orderPatch): take the fields the move changed — status, history,
+        // completedAt, the machine — and nothing else, then run what the rule
+        // asked for (deduct the filament, the webhooks, the customer's
+        // message) here, the one place that can. Same object, so an open
+        // modal keeps it.
+        const order = printLog[idx];
+        const prevTier = typeof getClientTier === 'function' ? getClientTier(order.clientId) : null;
+        // The invoice counter, when the move gave a quote its number.
+        for (const [k, v] of Object.entries((payload.settingsChanged && typeof payload.settingsChanged === 'object') ? payload.settingsChanged : {})) {
+          if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+          settings[k] = v;
+        }
+        for (const k of (Array.isArray(payload.removed) ? payload.removed : [])) delete order[k];
+        for (const [k, v] of Object.entries(payload.changed)) {
+          if (k === 'id' || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+          order[k] = v;
+        }
+        if (typeof runStatusEffects === 'function' && payload.effects.length) {
+          runStatusEffects(order, payload.effects, { prevTier });
+        }
+        saveAll();
+        renderLogs();
+        renderKanban();
+        renderDashboard();
+        toast('📱 ' + t('ord.status_updated_phone', { id, status: order.status }), 'info', 3000);
+      } else if (idx !== -1) {
         printLog[idx].status = status;
         if (payload.clientApprovedAt) printLog[idx].clientApprovedAt = payload.clientApprovedAt;
         if (payload.quoteAcceptedAt) printLog[idx].quoteAcceptedAt = payload.quoteAcceptedAt;
