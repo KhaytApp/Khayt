@@ -217,7 +217,7 @@ struct MakerRunPublishSheet: View {
             ForEach(steps) { s in
                 HStack(spacing: 8) {
                     switch s.state {
-                    case .done: Image(systemName: "checkmark").foregroundStyle(.green)
+                    case .done: Image(systemName: "checkmark").foregroundStyle(Khayt.done)
                     case .running: ProgressView().controlSize(.small)
                     case .failed: Image(systemName: "xmark").foregroundStyle(Khayt.attention)
                     case .pending: Image(systemName: "circle").foregroundStyle(.secondary)
@@ -293,12 +293,12 @@ struct MakerRunPublishSheet: View {
                 if case .bool(true)? = v["verified"] {
                     let printer = [Shop.plainString(v["brand"]), Shop.plainString(v["printer"])].compactMap { $0 }.joined(separator: " ")
                     Text(w.callIt("mr.verified_for", ["printer": .string(printer.isEmpty ? "—" : printer)]))
-                        .font(.caption).foregroundStyle(.green)
+                        .font(.caption).foregroundStyle(Khayt.done)
                 } else if case .bool(false)? = v["verified"] {
                     Text(w.callIt("mr.not_verified", ["reason": .string(Shop.plainString(v["reason"]) ?? w.callIt("mr.reason_unknown"))]))
                         .font(.caption).foregroundStyle(Khayt.attention)
                 } else if case .bool(true)? = v["badge"] {
-                    Text(w.callIt("mr.v_badge")).font(.caption).foregroundStyle(.green)
+                    Text(w.callIt("mr.v_badge")).font(.caption).foregroundStyle(Khayt.done)
                 }
             }
             if let at = Shop.plainNumber(l["publishedAt"]) {

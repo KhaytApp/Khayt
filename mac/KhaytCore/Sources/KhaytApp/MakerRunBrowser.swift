@@ -123,7 +123,7 @@ struct MakerRunBrowser: View {
                 }
                 Spacer(minLength: 0)
                 if d.verification.badge {
-                    Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                    Image(systemName: "checkmark.seal.fill").foregroundStyle(Khayt.done)
                         .help(shop.words.callIt("mr.verified"))
                 }
             }
@@ -278,7 +278,7 @@ struct MakerRunDesignPanel: View {
                 }
                 if let note {
                     Text(note).font(.callout)
-                        .foregroundStyle(noteIsProblem ? Khayt.attention : Color.green)
+                        .foregroundStyle(noteIsProblem ? Khayt.attention : Khayt.done)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
@@ -310,7 +310,7 @@ struct MakerRunDesignPanel: View {
             Text(d.license ?? w.callIt("mr.licence_none")).font(.callout.weight(.semibold))
             Text(w.callIt(use == true ? "mr.lic_commercial" : use == false ? "mr.lic_noncommercial" : "mr.lic_check"))
                 .font(.caption)
-                .foregroundStyle(use == true ? Color.green : use == false ? Khayt.attention : Color.secondary)
+                .foregroundStyle(use == true ? Khayt.done : use == false ? Khayt.attention : Color.secondary)
         }
     }
 
@@ -329,7 +329,7 @@ struct MakerRunDesignPanel: View {
     private func tick(_ on: Bool, _ label: String) -> some View {
         Label(label, systemImage: on ? "checkmark" : "minus")
             .font(.caption)
-            .foregroundStyle(on ? Color.green : Color.secondary)
+            .foregroundStyle(on ? Khayt.done : Color.secondary)
     }
 
     /// The files — by `listingKind`, never by `external` or a missing link: a
@@ -384,7 +384,7 @@ struct MakerRunDesignPanel: View {
                     HStack(spacing: 4) {
                         Text(bits.isEmpty ? w.callIt("mr.profile_unnamed") : bits.joined(separator: " · "))
                             .font(.caption)
-                        if p.badge { Image(systemName: "checkmark").font(.caption).foregroundStyle(.green) }
+                        if p.badge { Image(systemName: "checkmark").font(.caption).foregroundStyle(Khayt.done) }
                     }
                 }
             }

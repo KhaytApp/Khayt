@@ -42,8 +42,16 @@ struct ColourPlanSheet: View {
             if loaded && problem == nil {
                 Text(w.callIt("mac.cpl_used_by")).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                table
-                slotMap
+                // A 3MF can carry many colours: the rows scroll inside a
+                // capped height rather than growing the sheet off a laptop.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        table
+                        slotMap
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 520)
             }
             if let problem {
                 Text(problem).font(.callout).foregroundStyle(Khayt.attention)
@@ -96,7 +104,7 @@ struct ColourPlanSheet: View {
                         }
                     }
                     TextField("", value: Binding(get: { plan[i].grams }, set: { plan[i].grams = max(0, $0.isFinite ? $0 : 0) }),
-                              format: .number.precision(.fractionLength(0...1)))
+                              format: .number.precision(.fractionLength(0...1)).locale(Money.digits))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
                     Text(summary?.rows[safe: i]?.cost.map { Money.short($0, shop.currency) } ?? "—")
@@ -131,9 +139,9 @@ struct ColourPlanSheet: View {
 
     private func colour(for band: String) -> Color {
         switch band {
-        case "good": .green
-        case "ok": .orange
-        default: Khayt.attention
+        case "good": Khayt.done
+        case "ok": Khayt.attention
+        default: Khayt.late
         }
     }
 
