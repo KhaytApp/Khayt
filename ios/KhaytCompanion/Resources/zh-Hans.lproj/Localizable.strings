@@ -188,6 +188,8 @@
 "orders.queue_clear" = "队列已清空";
 "orders.pick" = "选择订单";
 "orders.pick.sub" = "订单详情将显示在列表旁边。";
+"clients.pick" = "选择客户";
+"clients.pick.sub" = "客户详情将显示在列表旁边。";
 "inventory.pick" = "选择线轴";
 "inventory.pick.sub" = "线轴详情将显示在货架旁边。";
 "orders.queue_clear.sub" = "已全部处理——没有进行中的订单";

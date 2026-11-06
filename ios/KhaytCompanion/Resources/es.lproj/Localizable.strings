@@ -188,6 +188,8 @@
 "orders.queue_clear" = "La cola está vacía";
 "orders.pick" = "Elige un pedido";
 "orders.pick.sub" = "Su ficha se abre aquí, junto a la lista.";
+"clients.pick" = "Elige un cliente";
+"clients.pick.sub" = "Su ficha se abre aquí, junto a la lista.";
 "inventory.pick" = "Elige una bobina";
 "inventory.pick.sub" = "Su ficha se abre aquí, junto a la estantería.";
 "orders.queue_clear.sub" = "Todo al día: no hay pedidos activos";

@@ -103,10 +103,9 @@ struct OrdersView: View {
 
     var body: some View {
         if isSplit {
-            NavigationSplitView {
-                listPage
-                    .navigationSplitViewColumnWidth(min: 340, ideal: 420)
-            } detail: {
+            ListBesidePage {
+                NavigationStack { listPage }
+            } page: {
                 NavigationStack {
                     if let order = openOrder {
                         detailPage(order)

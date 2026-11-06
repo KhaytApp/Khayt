@@ -188,6 +188,8 @@
 "orders.queue_clear" = "Queue is clear";
 "orders.pick" = "Pick an order";
 "orders.pick.sub" = "Its page opens here, beside the list.";
+"clients.pick" = "Pick a customer";
+"clients.pick.sub" = "Their page opens here, beside the list.";
 "inventory.pick" = "Pick a spool";
 "inventory.pick.sub" = "Its page opens here, beside the shelf.";
 "orders.queue_clear.sub" = "All caught up — no active orders";

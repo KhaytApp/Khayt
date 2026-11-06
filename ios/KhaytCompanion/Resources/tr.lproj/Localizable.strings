@@ -188,6 +188,8 @@
 "orders.queue_clear" = "Sıra boş";
 "orders.pick" = "Bir sipariş seçin";
 "orders.pick.sub" = "Sayfası listenin yanında açılır.";
+"clients.pick" = "Bir müşteri seçin";
+"clients.pick.sub" = "Sayfası listenin yanında açılır.";
 "inventory.pick" = "Bir makara seçin";
 "inventory.pick.sub" = "Sayfası rafın yanında açılır.";
 "orders.queue_clear.sub" = "Her şey tamam — aktif sipariş yok";
