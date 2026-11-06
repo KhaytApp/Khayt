@@ -1007,3 +1007,7 @@
 "new.expense.detail" = "拍下收据";
 "new.waste.detail" = "打印失败或冲料";
 "new.more" = "更多";
+"printphotos.title" = "打印照片";
+"printphotos.one" = "完成的打印件照片";
+"printphotos.note" = "在电脑上添加，包括打印完成时打印机自己拍的照片。它们也会显示在电脑上的作品集中。";
+"printphotos.full_on_computer" = "这是随账本同步的小尺寸副本。全尺寸照片保存在拍摄它的电脑上。";
