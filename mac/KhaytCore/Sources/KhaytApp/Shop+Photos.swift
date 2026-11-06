@@ -117,9 +117,14 @@ extension Shop {
     /// was written (`OrderPhoto.attach`). `updateRecord` stamps the job:
     /// without the stamp the other machine's older copy wins the next merge
     /// and the photograph disappears again. Nil when it worked, else why not.
-    private func attachJobPhoto(_ made: (thumb: String, full: Data), jobId: String,
-                                build: StoreReader.Build, folder: URL) async -> String? {
-        guard permitted("orders", "edit") else { return moveProblem }
+    ///
+    /// `gate` is the person at this Mac by default. A paired phone passes
+    /// a `.system` gate (`phoneAddJobPhoto`): the phone is the owner's, enrolled with
+    /// the owner PIN, and the Mac's staff lock is about whoever is at THIS Mac.
+    func attachJobPhoto(_ made: (thumb: String, full: Data), jobId: String,
+                        build: StoreReader.Build, folder: URL,
+                        gate: LockGate = .person("orders", "edit")) async -> String? {
+        guard permitted(gate) else { return moveProblem }
         do {
             // The index the other app uses is the position in the job's own
             // list, so it is read from the record rather than counted from the

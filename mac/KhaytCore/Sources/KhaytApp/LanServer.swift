@@ -187,6 +187,9 @@ final class LanServer {
         /// `Shop.phonePrinterCommand`. Unset, the route is not here and the
         /// phone reads the 404 as "this Mac predates it".
         var printerCommand: (@MainActor (_ machineId: String, _ verb: PrinterVerb) async -> (Int, String))? = nil
+        /// A paired phone's photo of a job (`Shop.phoneAddJobPhoto`): the JPEG
+        /// it sent, filed as the Mac's own Add Photo files one.
+        var addJobPhoto: (@MainActor (_ jobId: String, _ data: Data) async -> (Int, String))? = nil
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -741,7 +744,21 @@ final class LanServer {
             return try await readSlicerUpload(connection, on: queue, requestLine: requestLine, headers: headers,
                                               start: body, length: length, remote: remote, slot: slot)
         }
-        if length > Self.maxBody {
+        if length > Self.maxBody, Self.isJobPhotoUpload(method: requestLine[0], target: requestLine[1]) {
+            // A phone's photo of a job: past a megabyte, up to the photo cap,
+            // for a SIGNED enrolled phone only — judged from the head before a
+            // byte of body is read, and sharing the large-body slots.
+            guard length <= OrderPhoto.maxBytes else { throw ReadRefusal.tooLarge }
+            guard LanDevices.isSigned(headers) else {
+                throw ReadRefusal.refused(.json(403, #"{"ok":false,"reason":"device-key-required"}"#))
+            }
+            let probe = Request(method: "POST", path: "/api/orders/x/photos", query: [:],
+                                headers: headers, body: Data(), remote: remote)
+            if let refused = await pinGate(probe, headOnly: true) { throw ReadRefusal.refused(refused) }
+            guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
+            largeBodies += 1
+            slot.held = true
+        } else if length > Self.maxBody {
             // Only the upload route reads past a megabyte, and the slot is
             // taken BEFORE the first byte of body is awaited — with no
             // suspension between the check and the claim.
@@ -1201,6 +1218,19 @@ final class LanServer {
             }
             let (id, verb) = Self.printerPath(path)!
             let (status, body) = await host.printerCommand!(id, verb)
+            return .json(status, body)
+
+        // ── A PHONE ADDS A PHOTO TO A JOB (`Shop+PhonePhotos`) ───────────
+        //
+        // SIGNED PHONES ONLY, like the printer route: the body is the JPEG
+        // itself, and an API token never reaches this.
+        case (_, false) where request.method == "POST" && host.addJobPhoto != nil
+                && Self.jobPhotoPath(path) != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.addJobPhoto!(Self.jobPhotoPath(path)!, request.body)
             return .json(status, body)
 
         case (_, true) where host.libraryThumb != nil && Self.libraryPath(path)?.action == "thumb":
@@ -2802,6 +2832,9 @@ extension Shop {
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.printerCommand = { [weak self] id, verb in
             await self?.phonePrinterCommand(id, verb) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.addJobPhoto = { [weak self] id, data in
+            await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.failed = { [weak self] said in
             guard let self else { return }

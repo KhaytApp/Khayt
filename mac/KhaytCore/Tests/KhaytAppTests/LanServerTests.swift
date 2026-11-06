@@ -37,6 +37,9 @@ struct LanServerTests {
         let foldCalls = Counter()
         /// What `/api/printer/…` asked the stubbed printer hook, in order.
         let printerCalls = PrinterCalls()
+        /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
+        /// job and the byte count, in order.
+        let photoCalls = PrinterCalls()
         var tokens = 0
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
@@ -135,6 +138,11 @@ struct LanServerTests {
             host.printerCommand = { id, verb in
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let photoCalls = self.photoCalls
+            host.addJobPhoto = { id, data in
+                photoCalls.calls.append("\(id) \(data.count)")
+                return (201, #"{"ok":true,"index":0}"#)
             }
             // The REST writes, as the app runs them (`Shop.applyLanRest`) — on
             // the bench's book rather than a file. Off unless asked, as in the app.
