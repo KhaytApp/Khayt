@@ -80,6 +80,45 @@ struct StudioEngineTests {
         #expect(abs(try #require(R.labChroma("#C04040")) - 58.59) < 0.01)
     }
 
+    /// Greys and whites that lean warm or cool, a hair either side of the
+    /// cutoff of 6 (Lab chroma in the comment), plus the clear cases.
+    static let toneHexes: [String] = [
+        "#161616", "#3A3A3C", "#5A5B5D", "#8B8C8E", "#BDBEC0", "#F4F4F2", "#000000", "#FFFFFF",
+        "#EEF2F6", "#8A8580", "#8C9198", "#8E949C", "#F2EEE4", "#E8EDF5",           // 2.5 – 5.3
+        "#BFC8D1", "#D1C8BF", "#485058",                                            // 5.71, 5.82, 5.91
+        "#879099", "#585048", "#999087", "#BEC8D2",                                 // 6.04, 6.17, 6.21, 6.33
+        "#A39A90", "#9A8F84", "#7F8A95", "#D8C8A8", "#C04040", "#0A3D7A", "#C99B27", // 6.6 and up
+        "nope", "#12345",
+    ]
+
+    @Test("the black-and-white rule is lib/hueforge.js's isNeutralPalette, hex for hex")
+    func neutralRuleIsTheEngines() async throws {
+        let engine = try StudioEngine()
+        for hex in Self.toneHexes {
+            let js = try await engine.isNeutralPalette([hex])
+            #expect(StudioEngine.ReliefSettings.isBlackAndWhite([hex]) == js, "\(hex): Swift and lib/hueforge.js disagree")
+        }
+        // the ones either side of the cutoff land where the comment says
+        #expect(try await engine.isNeutralPalette(["#BFC8D1", "#D1C8BF", "#485058"]))
+        for over in ["#879099", "#585048", "#999087", "#BEC8D2"] {
+            #expect(try await engine.isNeutralPalette([over]) == false, "\(over)")
+        }
+        let mixed = ["#161616", "#8C9198", "#F2EEE4", "#879099"]
+        #expect(try await engine.isNeutralPalette(mixed) == StudioEngine.ReliefSettings.isBlackAndWhite(mixed))
+        #expect(try await engine.isNeutralPalette([]) == StudioEngine.ReliefSettings.isBlackAndWhite([]))
+    }
+
+    @Test("the defaults are lib/hueforge.js's TONE_DEFAULTS")
+    func toneDefaultsAreTheEngines() async throws {
+        typealias R = StudioEngine.ReliefSettings
+        let t = try await StudioEngine().toneDefaults()
+        let s = R()
+        #expect(t.colour.heightMm == s.heightMm && t.bw.heightMm == s.heightMm)
+        #expect(t.colour.vivid == R.colourVivid && t.bw.vivid == R.neutralVivid)
+        #expect(t.colour.chromaWeight == R.colourChromaWeight && t.bw.chromaWeight == R.neutralChromaWeight)
+        #expect(s.vivid == t.colour.vivid && s.chromaWeight == t.colour.chromaWeight)
+    }
+
     @Test("the engine plans with the settings' chromaWeight")
     func chromaWeightReachesTheEngine() async throws {
         let engine = try StudioEngine()

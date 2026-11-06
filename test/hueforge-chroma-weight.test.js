@@ -91,3 +91,47 @@ test('sequenceLoss takes chromaWeight and stays the same at 1', () => {
   assert.strictEqual(HF.sequenceLoss(reps, pal, 2, false, 1), base);
   assert.notStrictEqual(HF.sequenceLoss(reps, pal, 2, false, 0.5), base);
 });
+
+// ── Colour vs black and white, and the approved defaults: one rule for every app ──
+
+const chroma = (hex) => { const l = KC.hexToLab(hex); return Math.hypot(l.a, l.b); };
+
+test('TONE_DEFAULTS are the approved print settings, and cannot be edited by a caller', () => {
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(HF.TONE_DEFAULTS)), {
+    colour: { heightMm: 3.2, vivid: 8, chromaWeight: 0.5 },
+    bw: { heightMm: 3.2, vivid: 6, chromaWeight: 1 },
+  });
+  // the panels' vividness control maps to the approved TD scales: 0.3 colour, 0.5 black and white
+  assert.ok(Math.abs((1.1 - HF.TONE_DEFAULTS.colour.vivid * 0.1) - 0.3) < 1e-9);
+  assert.ok(Math.abs((1.1 - HF.TONE_DEFAULTS.bw.vivid * 0.1) - 0.5) < 1e-9);
+  assert.ok(Object.isFrozen(HF.TONE_DEFAULTS) && Object.isFrozen(HF.TONE_DEFAULTS.colour) && Object.isFrozen(HF.TONE_DEFAULTS.bw));
+});
+
+test("isNeutralPalette: Bed Ready's neutral set is black and white", () => {
+  const set = ['#161616', '#3A3A3C', '#5A5B5D', '#8B8C8E', '#BDBEC0', '#F4F4F2'];
+  assert.ok(set.every((h) => chroma(h) <= 1.4), 'Bed Ready tops out at 1.4');
+  assert.strictEqual(HF.isNeutralPalette(set), true);
+  assert.strictEqual(HF.isNeutralPalette(['#000000', '#FFFFFF']), true);
+});
+
+test('isNeutralPalette: real-world warm and cool greys either side of the cutoff of 6', () => {
+  const under = ['#EEF2F6', '#8A8580', '#8C9198', '#F2EEE4', '#BFC8D1', '#D1C8BF', '#485058'];
+  const over = ['#879099', '#585048', '#999087', '#BEC8D2', '#A39A90'];
+  for (const h of under) { assert.ok(chroma(h) <= 6 && chroma(h) > 1.4, `${h} ${chroma(h)}`); assert.strictEqual(HF.isNeutralPalette([h]), true, h); }
+  for (const h of over) { assert.ok(chroma(h) > 6 && chroma(h) < 7, `${h} ${chroma(h)}`); assert.strictEqual(HF.isNeutralPalette([h]), false, h); }
+  // every filament must be neutral
+  assert.strictEqual(HF.isNeutralPalette(['#161616', '#8C9198', '#F2EEE4']), true);
+  assert.strictEqual(HF.isNeutralPalette(['#161616', '#8C9198', '#879099']), false);
+  assert.strictEqual(HF.isNeutralPalette(['#161616', '#C04040', '#F4F4F2']), false);
+});
+
+test('isNeutralPalette: maxChroma, empty and unreadable input', () => {
+  assert.strictEqual(HF.isNeutralPalette(['#8C9198'], 1.4), false, "Bed Ready's cutoff refuses a cool grey");
+  assert.strictEqual(HF.isNeutralPalette(['#879099'], 7), true);
+  assert.strictEqual(HF.isNeutralPalette(['#000000'], 0), true);
+  assert.strictEqual(HF.isNeutralPalette(['#808080'], 0), false, 'a cutoff of 0 is taken, not replaced by 6');
+  assert.strictEqual(HF.isNeutralPalette([]), false);
+  assert.strictEqual(HF.isNeutralPalette(null), false);
+  assert.strictEqual(HF.isNeutralPalette(['#161616', 'nope']), false);
+  assert.strictEqual(HF.isNeutralPalette(['#12345']), false);
+});

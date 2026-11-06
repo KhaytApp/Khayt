@@ -122,6 +122,27 @@ public actor StudioEngine {
         try runtime.call2("KhaytHueForge.defaultTd(ARG0)", [.string(hex)], as: Double.self)
     }
 
+    /// lib/hueforge.js's black-and-white rule, run in the engine. This is
+    /// what `ReliefSettings.isBlackAndWhite` copies.
+    public func isNeutralPalette(_ hexes: [String]) throws -> Bool {
+        try runtime.call2("KhaytHueForge.isNeutralPalette(ARG0)", [.array(hexes.map { .string($0) })], as: Bool.self)
+    }
+
+    public struct ToneDefaults: Decodable, Sendable, Equatable {
+        public struct Tone: Decodable, Sendable, Equatable {
+            public let heightMm: Double
+            public let vivid: Int
+            public let chromaWeight: Double
+        }
+        public let colour: Tone
+        public let bw: Tone
+    }
+
+    /// lib/hueforge.js's `TONE_DEFAULTS`, which `ReliefSettings` copies.
+    public func toneDefaults() throws -> ToneDefaults {
+        try runtime.call2("KhaytHueForge.TONE_DEFAULTS", [], as: ToneDefaults.self)
+    }
+
     /// The settings a relief is planned with — the desktop panel's fields.
     ///
     /// The starting values are Bed Ready's approved portrait settings (Nov
@@ -131,6 +152,11 @@ public actor StudioEngine {
     /// lightness before hue (`chromaWeight` 0.5); black and white plans at 6
     /// (TD scale 0.5) with plain colour distance, because a stack of neutrals
     /// has no hue to trade. `fit(neutral:keepVivid:)` moves between the two.
+    ///
+    /// The numbers and the black-and-white rule are lib/hueforge.js's
+    /// `TONE_DEFAULTS` and `isNeutralPalette`, copied here because the studio
+    /// needs them synchronously as the filaments change; StudioEngineTests
+    /// pins the copy against the JavaScript (`toneDefaults`, `isNeutralPalette`).
     public struct ReliefSettings: Codable, Sendable, Hashable {
         public var layerH = 0.08
         public var heightMm = 3.2
@@ -152,12 +178,13 @@ public actor StudioEngine {
         public static let neutralVivid = 6
         public static let colourChromaWeight = 0.5
         public static let neutralChromaWeight = 1.0
-        /// The Lab chroma at or under which a filament counts as neutral. Bed
-        /// Ready's black-and-white set (#161616 … #F4F4F2) sits under 1.5; a
-        /// "cool white" or "warm grey" spool drifts a little further.
+        /// The Lab chroma at or under which a filament counts as neutral:
+        /// `isNeutralPalette`'s 6, looser than Bed Ready's curated set (≤ 1.4)
+        /// because a shop's real greys and whites lean warm or cool.
         public static let neutralChroma = 6.0
 
-        /// Black and white: there is a filament, and every one is neutral.
+        /// Black and white: there is a filament, and every one is neutral
+        /// (lib/hueforge.js `isNeutralPalette`).
         public static func isBlackAndWhite(_ hexes: [String]) -> Bool {
             !hexes.isEmpty && hexes.allSatisfy { labChroma($0).map { $0 <= neutralChroma } ?? false }
         }
