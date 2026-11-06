@@ -18,7 +18,8 @@ struct OrderDetailPage: View {
     @State private var order: QueueOrder
     let facts: OrderFacts?
     /// The quote's own record, from the Quotes list: its price and last day.
-    let quote: OrderLogEntry?
+    /// Read again after a revision moves its price.
+    @State private var quote: OrderLogEntry?
     /// Called after a write, so the screen underneath is current when the page
     /// is popped.
     let onChanged: () async -> Void
@@ -42,12 +43,20 @@ struct OrderDetailPage: View {
     @State private var customer: Client?
     @State private var saleProblems: [ModelLicence.SaleProblem] = []
     @State private var moveNotes: [String] = []
+    /// A packing slip, delivery note or work order, being shown.
+    @State private var paper: PaperSubject?
+    /// A quote's version, follow-ups and kept versions, from the book.
+    @State private var quoteState: KhaytAPIClient.QuoteState?
+    @State private var revising: KhaytAPIClient.QuoteState?
+    @State private var showingHistory = false
+    @State private var followingUp = false
+    @Environment(\.openURL) private var openURL
 
     init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
          onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
         self.facts = facts
-        self.quote = quote
+        _quote = State(initialValue: quote)
         self.onChanged = onChanged
     }
 
@@ -69,6 +78,18 @@ struct OrderDetailPage: View {
                                quote: order.status == OrderStatus.quote.rawValue ? quote : nil,
                                currency: currency,
                                onAnswer: { answer in Task { await answerQuote(answer) } })
+            if order.status == OrderStatus.quote.rawValue, let quoteState {
+                QuoteToolsCard(state: quoteState, followingUp: followingUp,
+                               onRevise: { revising = quoteState },
+                               onFollowUp: { Task { await followUp() } },
+                               onHistory: { showingHistory = true })
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            } else if order.status == OrderStatus.quote.rawValue, !api.holdsBook {
+                // No LAN route revises or follows up a quote: say so, rather
+                // than offer what this phone cannot do.
+                V2Note(text: L10n.tr("quote.needs_book"), tone: KhaytDesign.note)
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
             if let payment {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
@@ -95,6 +116,12 @@ struct OrderDetailPage: View {
                             self.shipChoices = await api.shipChoices(orderId: order.id)
                         }
                     }
+            }
+            // The papers besides the invoice, from the book. A quote is not
+            // work yet; a cancelled job is nothing to pack or make.
+            if api.holdsBook, order.status != "quote", order.status != "cancelled" {
+                JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
+                    .padding(.horizontal, 16).padding(.bottom, 16)
             }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
@@ -129,6 +156,14 @@ struct OrderDetailPage: View {
         }
         .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
         .navigationDestination(isPresented: $showingProforma) { InvoicePage(orderId: order.id, proforma: true) }
+        .navigationDestination(item: $paper) { ShopPaperPage(subject: $0) }
+        .sheet(item: Binding(get: { revising.map { RevisingQuote(state: $0) } },
+                             set: { if $0 == nil { revising = nil } })) { r in
+            ReviseQuoteSheet(orderId: order.id, start: r.state, currency: currency) { await quoteRevised() }
+        }
+        .sheet(isPresented: $showingHistory) {
+            if let quoteState { QuoteHistorySheet(state: quoteState, currency: currency) }
+        }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -164,11 +199,18 @@ struct OrderDetailPage: View {
             customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
+            if order.status == OrderStatus.quote.rawValue { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
             // `-KhaytInvoice YES` with `-KhaytOpen order:<id>`: the invoice, for screenshots.
             if UserDefaults.standard.bool(forKey: "KhaytInvoice") { showingInvoice = true }
+            // `-KhaytPaper packingSlip|deliveryNote|workOrder`: that paper, for screenshots.
+            if let k = UserDefaults.standard.string(forKey: "KhaytPaper"), let kind = KhaytEngine.ShopPaper(rawValue: k) {
+                paper = .job(kind, orderId: order.id)
+            }
+            // `-KhaytQuoteHistory YES` on a quote: its history, for screenshots.
+            if quoteState != nil, UserDefaults.standard.bool(forKey: "KhaytQuoteHistory") { showingHistory = true }
             #endif
         }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
@@ -181,6 +223,36 @@ struct OrderDetailPage: View {
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
         if payment != nil, UserDefaults.standard.bool(forKey: "KhaytPaySheet") { recordingPayment = true }
         #endif
+    }
+
+    /// A revision landed: the quote's tools, its price and the list under
+    /// the page read again.
+    private func quoteRevised() async {
+        quoteState = await api.quoteState(orderId: order.id)
+        if let fresh = (try? await api.fetchRecentOrders(limit: 200, status: OrderStatus.quote.rawValue))?
+            .first(where: { $0.id == order.id }) { quote = fresh }
+        await onChanged()
+    }
+
+    /// Follow up on the quote: recorded in the book first, then WhatsApp
+    /// opens with the shop's words, and the message goes in the customer's
+    /// log — as the Mac's Follow up does.
+    private func followUp() async {
+        guard !followingUp else { return }
+        followingUp = true
+        defer { followingUp = false }
+        do {
+            let chat = try await api.followUpQuote(orderId: order.id)
+            errorMessage = nil
+            openURL(chat.url)
+            await api.logWhatsApp(orderId: order.id, text: chat.text, milestone: nil, lang: nil)
+            CompanionHaptics.success()
+            quoteState = await api.quoteState(orderId: order.id)
+            await onChanged()
+        } catch {
+            errorMessage = error.localizedDescription
+            CompanionHaptics.warning()
+        }
     }
 
     private func advance() async {
@@ -694,6 +766,11 @@ private struct StageStepper: View {
 }
 
 /// The Edit sheet's subject, identified for `.sheet(item:)`.
+private struct RevisingQuote: Identifiable {
+    let state: KhaytAPIClient.QuoteState
+    var id: Int { state.version }
+}
+
 private struct EditingJob: Identifiable {
     let state: KhaytAPIClient.OrderEditState
     var id: String { "\(state.dueDate ?? "")|\(state.priorityLevel)|\(state.price)" }
