@@ -1680,12 +1680,13 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     @discardableResult
-    private func request(path: String, method: String, body: Data?, requiresPin: Bool) async throws -> (Data, URLResponse) {
+    private func request(path: String, method: String, body: Data?, requiresPin: Bool,
+                         contentType: String = "application/json") async throws -> (Data, URLResponse) {
         let url = try makeURL(path: path)
-        guard requiresPin else { return try await send(url, method: method, body: body, auth: .none) }
-        guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin) }
+        guard requiresPin else { return try await send(url, method: method, body: body, auth: .none, contentType: contentType) }
+        guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin, contentType: contentType) }
 
-        let (data, response) = try await send(url, method: method, body: body, auth: .device(device))
+        let (data, response) = try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         guard (response as? HTTPURLResponse)?.statusCode == 401 else { return (data, response) }
         switch DeviceKey.refusal(data) {
         case .unknown?:
@@ -1693,12 +1694,12 @@ final class KhaytAPIClient: ObservableObject {
             // the PIN for this one, and enrol again from scratch.
             settings.device = nil
             enrolNotBefore = nil
-            return try await send(url, method: method, body: body, auth: .pin)
+            return try await send(url, method: method, body: body, auth: .pin, contentType: contentType)
         case .clock(let now)?:
             clockOffset = TimeInterval(now) - Date().timeIntervalSince1970
-            return try await send(url, method: method, body: body, auth: .device(device))
+            return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         case .replay?:
-            return try await send(url, method: method, body: body, auth: .device(device))
+            return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
         case .revoked?:
             // Signed out on the Mac: never back to the PIN, never enrol.
             settings.forgetMac(keepShop: cloud != nil)
@@ -1721,12 +1722,13 @@ final class KhaytAPIClient: ObservableObject {
     /// The Mac's clock minus this phone's, once the Mac has said (`device-clock`).
     private var clockOffset: TimeInterval = 0
 
-    private func send(_ url: URL, method: String, body: Data?, auth: Auth) async throws -> (Data, URLResponse) {
+    private func send(_ url: URL, method: String, body: Data?, auth: Auth,
+                      contentType: String = "application/json") async throws -> (Data, URLResponse) {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if body != nil {
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(contentType, forHTTPHeaderField: "Content-Type")
             req.httpBody = body
         }
         switch auth {
@@ -1751,6 +1753,26 @@ final class KhaytAPIClient: ObservableObject {
         } catch {
             throw KhaytAPIError.transport(error)
         }
+    }
+
+    // MARK: - A photo of the print, from this phone
+
+    /// The Mac takes a job photo only from a phone it enrolled (signed), never
+    /// on the PIN alone: `POST /api/orders/{id}/photos` (docs/LAN_API.md).
+    var canAddJobPhoto: Bool { usableDevice != nil && !settings.isSampleShop }
+
+    /// Send one photo of the finished print to the Mac, which keeps it full
+    /// size beside the book, makes the small copy every app shows, and adds it
+    /// to the job. Then the book is pulled, so it shows here too.
+    func addJobPhoto(orderId: String, jpeg: Data) async -> JobPhotoUpload {
+        guard canAddJobPhoto else { return .refused("device-key-required") }
+        guard let id = try? encodeOrderIdForPath(orderId),
+              let (data, response) = try? await request(path: "/api/orders/\(id)/photos", method: "POST",
+                                                         body: jpeg, requiresPin: true, contentType: "image/jpeg"),
+              let http = response as? HTTPURLResponse else { return .refused("unreachable") }
+        let reply = JobPhotoUpload.read(status: http.statusCode, body: data)
+        if case .added = reply, let book { _ = try? await pullBook(into: book) }
+        return reply
     }
 
     // MARK: - Enrolling this phone

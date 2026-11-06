@@ -1009,3 +1009,14 @@
 "printphotos.one" = "Foto de la impresión terminada";
 "printphotos.note" = "Añadidas en el ordenador, incluida la foto que toma la impresora al terminar una impresión. También aparecen allí en el Portafolio.";
 "printphotos.full_on_computer" = "Esta es la copia pequeña que viaja con el libro. La foto a tamaño completo está en el ordenador que la tomó.";
+"printphotos.note.add" = "Las fotos que añades aquí van al Mac a tamaño completo y a su Portafolio. La foto que toma la impresora al terminar también aparece aquí.";
+"printphotos.take" = "Hacer foto";
+"printphotos.pick" = "Elegir foto";
+"printphotos.sending" = "Enviando al Mac…";
+"printphotos.why.device" = "Este teléfono debe volver a vincularse con el Mac antes de poder añadir fotos.";
+"printphotos.why.not_found" = "El Mac ya no tiene este trabajo.";
+"printphotos.why.old_mac" = "Actualiza Khayt en el Mac para añadir fotos desde el teléfono.";
+"printphotos.why.read_only" = "El taller está en solo lectura en el Mac ahora mismo, así que no puede recibir una foto.";
+"printphotos.why.too_large" = "Esa foto es demasiado grande para el Mac. Prueba con una más pequeña.";
+"printphotos.why.not_image" = "El Mac no puede leer esa imagen. Prueba con JPEG o PNG.";
+"printphotos.why.unreachable" = "No se pudo contactar con el Mac. Para añadir una foto necesitas la wifi del taller.";

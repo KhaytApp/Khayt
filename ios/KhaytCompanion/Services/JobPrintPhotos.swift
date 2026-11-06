@@ -84,3 +84,50 @@ extension KhaytAPIClient {
         return data
     }
 }
+
+/// What the Mac said to a photo sent from this phone.
+enum JobPhotoUpload: Equatable, Sendable {
+    case added(index: Int)
+    case refused(String)
+
+    /// 201 `{ ok, index, filename }`; otherwise the refusal's `reason`, or
+    /// one read off the status the route documents.
+    static func read(status: Int, body: Data) -> JobPhotoUpload {
+        let o: [String: JSONValue] = {
+            if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body) { return o }
+            return [:]
+        }()
+        if (200...299).contains(status), o["ok"] == .bool(true) {
+            if case .number(let n)? = o["index"] { return .added(index: Int(n)) }
+            return .added(index: -1)
+        }
+        if case .string(let r)? = o["reason"], !r.isEmpty { return .refused(r) }
+        switch status {
+        case 403: return .refused("device-key-required")
+        // The route's own 404 says `not-found`; a bare one is a Mac from
+        // before the route (beta.26 and older), which has no such address.
+        case 404: return .refused("old-mac")
+        case 409: return .refused("read-only")
+        case 413: return .refused("too-large")
+        case 415: return .refused("not-an-image")
+        default: return .refused("unreachable")
+        }
+    }
+
+    /// What to tell the person when it was not added.
+    var sentence: String {
+        switch self {
+        case .added: return ""
+        case .refused(let r):
+            switch r {
+            case "device-key-required": return L10n.tr("printphotos.why.device")
+            case "not-found": return L10n.tr("printphotos.why.not_found")
+            case "old-mac": return L10n.tr("printphotos.why.old_mac")
+            case "read-only": return L10n.tr("printphotos.why.read_only")
+            case "too-large": return L10n.tr("printphotos.why.too_large")
+            case "not-an-image": return L10n.tr("printphotos.why.not_image")
+            default: return L10n.tr("printphotos.why.unreachable")
+            }
+        }
+    }
+}

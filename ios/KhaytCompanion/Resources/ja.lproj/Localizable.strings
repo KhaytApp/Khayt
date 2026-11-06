@@ -1009,3 +1009,14 @@
 "printphotos.one" = "完成したプリントの写真";
 "printphotos.note" = "コンピューターで追加された写真です。プリント完了時にプリンターが撮影した写真も含まれます。コンピューターのポートフォリオにも表示されます。";
 "printphotos.full_on_computer" = "これは帳簿と一緒に同期される小さなコピーです。フルサイズの写真は撮影したコンピューターにあります。";
+"printphotos.note.add" = "ここで追加した写真はフルサイズでMacに送られ、Macのポートフォリオに入ります。プリント完了時にプリンターが撮影した写真もここに表示されます。";
+"printphotos.take" = "写真を撮る";
+"printphotos.pick" = "写真を選ぶ";
+"printphotos.sending" = "Macに送信中…";
+"printphotos.why.device" = "写真を追加するには、このiPhoneをMacともう一度ペアリングする必要があります。";
+"printphotos.why.not_found" = "この注文はMacにもうありません。";
+"printphotos.why.old_mac" = "iPhoneから写真を追加するには、MacのKhaytをアップデートしてください。";
+"printphotos.why.read_only" = "Macのショップは現在読み取り専用のため、写真を受け取れません。";
+"printphotos.why.too_large" = "この写真はMacには大きすぎます。小さい写真をお試しください。";
+"printphotos.why.not_image" = "Macが読み取れない画像です。JPEGまたはPNGをお試しください。";
+"printphotos.why.unreachable" = "Macに接続できませんでした。写真の追加にはショップのWi-Fiが必要です。";

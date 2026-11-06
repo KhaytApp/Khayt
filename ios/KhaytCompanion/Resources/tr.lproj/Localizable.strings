@@ -1009,3 +1009,14 @@
 "printphotos.one" = "Biten baskının fotoğrafı";
 "printphotos.note" = "Bilgisayarda eklendi; baskı bittiğinde yazıcının kendi çektiği fotoğraf da dahil. Oradaki Portfolyo’da da görünürler.";
 "printphotos.full_on_computer" = "Bu, defterle birlikte gelen küçük kopyadır. Tam boyutlu fotoğraf, onu çeken bilgisayardadır.";
+"printphotos.note.add" = "Buraya eklediğiniz fotoğraflar tam boyutlu olarak Mac’e ve onun Portfolyo’suna gider. Yazıcının baskı bitince çektiği fotoğraf da burada görünür.";
+"printphotos.take" = "Fotoğraf çek";
+"printphotos.pick" = "Fotoğraf seç";
+"printphotos.sending" = "Mac’e gönderiliyor…";
+"printphotos.why.device" = "Bu telefonun fotoğraf ekleyebilmesi için Mac ile yeniden eşleşmesi gerekiyor.";
+"printphotos.why.not_found" = "Bu iş artık Mac’te yok.";
+"printphotos.why.old_mac" = "Telefondan fotoğraf eklemek için Mac’teki Khayt’ı güncelleyin.";
+"printphotos.why.read_only" = "Atölye şu anda Mac’te salt okunur, bu yüzden fotoğraf alamıyor.";
+"printphotos.why.too_large" = "Bu fotoğraf Mac için çok büyük. Daha küçük bir tane deneyin.";
+"printphotos.why.not_image" = "Mac bu görüntüyü okuyamıyor. JPEG veya PNG deneyin.";
+"printphotos.why.unreachable" = "Mac’e ulaşılamadı. Fotoğraf eklemek için atölyenin Wi-Fi’ı gerekiyor.";

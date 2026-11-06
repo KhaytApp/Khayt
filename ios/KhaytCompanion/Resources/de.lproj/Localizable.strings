@@ -1009,3 +1009,14 @@
 "printphotos.one" = "Foto des fertigen Drucks";
 "printphotos.note" = "Am Computer hinzugefügt, auch das eigene Foto des Druckers, wenn ein Druck fertig ist. Dort stehen sie auch im Portfolio.";
 "printphotos.full_on_computer" = "Das ist die kleine Kopie, die mit dem Buch reist. Das Foto in voller Größe liegt auf dem Computer, der es aufgenommen hat.";
+"printphotos.note.add" = "Fotos, die du hier hinzufügst, gehen in voller Größe an den Mac und in sein Portfolio. Das eigene Foto des Druckers am Ende eines Drucks erscheint hier ebenfalls.";
+"printphotos.take" = "Foto aufnehmen";
+"printphotos.pick" = "Foto auswählen";
+"printphotos.sending" = "Wird an den Mac gesendet …";
+"printphotos.why.device" = "Dieses iPhone muss erneut mit dem Mac gekoppelt werden, bevor es Fotos hinzufügen kann.";
+"printphotos.why.not_found" = "Der Mac hat diesen Auftrag nicht mehr.";
+"printphotos.why.old_mac" = "Aktualisiere Khayt auf dem Mac, um Fotos vom iPhone hinzuzufügen.";
+"printphotos.why.read_only" = "Die Werkstatt ist auf dem Mac gerade schreibgeschützt und kann kein Foto annehmen.";
+"printphotos.why.too_large" = "Dieses Foto ist zu groß für den Mac. Versuche ein kleineres.";
+"printphotos.why.not_image" = "Dieses Foto kann der Mac nicht lesen. Versuche JPEG oder PNG.";
+"printphotos.why.unreachable" = "Der Mac ist nicht erreichbar. Zum Hinzufügen eines Fotos brauchst du das WLAN der Werkstatt.";

@@ -74,3 +74,34 @@ final class JobPrintPhotosTests: XCTestCase {
         XCTAssertNil(API.thumbBytes("data:image/jpeg;base64," + huge.base64EncodedString()))
     }
 }
+
+/// The Mac's answers to `POST /api/orders/{id}/photos` (docs/LAN_API.md).
+final class JobPhotoUploadTests: XCTestCase {
+    func testAddedReadsTheIndex() {
+        let body = Data(#"{"ok":true,"index":3,"filename":"J-1-3-abc.jpg"}"#.utf8)
+        XCTAssertEqual(JobPhotoUpload.read(status: 201, body: body), .added(index: 3))
+    }
+
+    func testEachRefusalSaysWhyInWords() {
+        let cases: [(Int, String, String)] = [
+            (403, #"{"ok":false,"reason":"device-key-required"}"#, "printphotos.why.device"),
+            (404, #"{"ok":false,"reason":"not-found"}"#, "printphotos.why.not_found"),
+            (409, #"{"ok":false,"reason":"read-only"}"#, "printphotos.why.read_only"),
+            (413, "", "printphotos.why.too_large"),
+            (415, "", "printphotos.why.not_image"),
+            (500, "", "printphotos.why.unreachable"),
+            // A Mac from before the route: a bare 404, not the route's own.
+            (404, #"{"error":"Not found"}"#, "printphotos.why.old_mac"),
+        ]
+        for (status, body, key) in cases {
+            let reply = JobPhotoUpload.read(status: status, body: Data(body.utf8))
+            guard case .refused = reply else { return XCTFail("\(status) read as added") }
+            XCTAssertEqual(reply.sentence, L10n.tr(key), "\(status)")
+            XCTAssertNotEqual(reply.sentence, key, "the sentence exists for \(key)")
+        }
+    }
+
+    func testA2xxWithoutOkIsNotAnAddedPhoto() {
+        XCTAssertEqual(JobPhotoUpload.read(status: 200, body: Data("{}".utf8)), .refused("unreachable"))
+    }
+}
