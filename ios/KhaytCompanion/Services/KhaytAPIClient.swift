@@ -1358,6 +1358,11 @@ final class KhaytAPIClient: ObservableObject {
             requiresPin: true
         )
         // A refusal (locked pairing, bad stage) must surface, not look saved.
+        // The shop's rule refusing the move says why, in this app's words.
+        if let http = response as? HTTPURLResponse,
+           let refused = BookWriter.MoveRefused.fromWire(status: http.statusCode, body: data) {
+            throw refused
+        }
         try ensureOK(data, response)
         return []
     }
