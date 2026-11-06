@@ -3377,18 +3377,14 @@ function renderAgedReceivables() {
 function renderSurveyAnalytics() {
   const el = $('#surveyAnalyticsSection');
   if (!el) return;
-  const surveyed = printLog.filter(o => o.survey?.rating);
-  if (surveyed.length === 0) {
+  // `lib/rating-trend.js summary` — the Mac draws the same card from it.
+  const S = KhaytRatingTrend.summary(printLog);
+  if (S.responses === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);">${escapeHtml(t('an.no_survey_yet'))}</p>`;
     return;
   }
-  const avg = surveyed.reduce((s, o) => s + o.survey.rating, 0) / surveyed.length;
-  const dist = [1,2,3,4,5].map(r => ({ r, n: surveyed.filter(o => o.survey.rating === r).length }));
-  // NPS on 5-star scale: 5 = promoter, 4 = passive, 1-3 = detractors
-  // (True NPS requires 0-10 scale; adapt proportionally: 5→promoter, 4→passive, ≤3→detractor)
-  const promoters  = surveyed.filter(o => o.survey.rating === 5).length;
-  const detractors = surveyed.filter(o => o.survey.rating <= 3).length;
-  const nps = Math.round((promoters - detractors) / surveyed.length * 100);
+  const avg = S.average;
+  const nps = S.nps;
 
   el.innerHTML = `
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
@@ -3401,13 +3397,12 @@ function renderSurveyAnalytics() {
         <div style="font-size:11px;color:var(--text-muted);">NPS Score</div>
       </div>
       <div style="text-align:center;padding:12px 20px;background:var(--bg-elev);border-radius:var(--radius);">
-        <div style="font-size:28px;font-weight:700;">${surveyed.length}</div>
+        <div style="font-size:28px;font-weight:700;">${S.responses}</div>
         <div style="font-size:11px;color:var(--text-muted);">Responses</div>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;">
-      ${dist.reverse().map(({r, n}) => {
-        const pct = surveyed.length > 0 ? Math.round(n / surveyed.length * 100) : 0;
+      ${S.spread.map(({ stars: r, count: n, pct }) => {
         return `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;">
           <span style="width:18px;text-align:right;">${r}⭐</span>
           <div style="flex:1;background:var(--bg);border-radius:4px;height:14px;overflow:hidden;">

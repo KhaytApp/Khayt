@@ -31,7 +31,7 @@ enum Converter {
     /// wide margin — the largest in this shop's library is 46 kB — and refuses
     /// meshes, which begin at hundreds of kilobytes and run to hundreds of
     /// megabytes.
-    static let inlineLimit = 4 << 20
+    nonisolated static let inlineLimit = 4 << 20
 
     /// How much mesh may cross for a COLOUR PLAN, which is the one job that
     /// needs it.
@@ -128,7 +128,7 @@ enum Converter {
     /// the target bed is a different size. Passing this member by name alone
     /// meant the rule had nothing to read and the conversion failed outright —
     /// so the block crosses on its own, and comes back on its own.
-    static func isRootModel(_ name: String) -> Bool {
+    nonisolated static func isRootModel(_ name: String) -> Bool {
         name.lowercased().hasSuffix("3d/3dmodel.model")
     }
 
@@ -139,7 +139,7 @@ enum Converter {
     /// are never decoded into a String to have one line changed. Nil when the
     /// file has no build block (`<build/>`, or a CAD export that has none),
     /// which is a file with no layout to re-tile rather than a failure.
-    static func buildBlockRange(in data: Data) -> Range<Data.Index>? {
+    nonisolated static func buildBlockRange(in data: Data) -> Range<Data.Index>? {
         var from = data.startIndex
         while let open = data.range(of: Data("<build".utf8), in: from..<data.endIndex) {
             // `<buildinfo` is not `<build`. The element name ends at a space or
@@ -213,15 +213,14 @@ enum Converter {
         let report: JSONValue?
     }
 
-    /// Convert `source` for a target printer and write the result to `into`.
-    static func convert(_ source: URL, into destination: URL,
-                        options: [String: JSONValue], engine: KhaytEngine) async throws -> Result {
-        // A colour plan rewrites the mesh, so for those two options the
-        // `.model` members come in with their bytes. Everything else still
-        // crosses by name, which is what keeps the rest of a 400 MB file out
-        // of this process.
-        let paintPlan = truthy(options["fullSpectrum"]) || truthy(options["bandSwap"])
-
+    /// What the engine is told about each member of `source`: its name and
+    /// size, the text of every small one, the `<build>` block of the root
+    /// model — and, with `bindMeshes`, every `.model` member's XML, bound by
+    /// name (see `paintInlineLimit`). Shared by the conversion and the sheet's
+    /// preview, so the preview is asked about exactly the file the conversion
+    /// will read. Blocking file work: called off the main thread by `preview`.
+    nonisolated static func describe(_ source: URL, bindMeshes: Bool) throws
+        -> (entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]) {
         let entries: [Zip.Entry]
         do { entries = try Zip.entries(of: source) }
         catch { throw Failure.unreadable(ErrorText.plain(error)) }
@@ -246,7 +245,7 @@ enum Converter {
             let isModel = entry.name.lowercased().hasSuffix(".model")
             // A colour plan reads and rewrites EVERY `.model` member, not only
             // the root: a 3MF may carry one per object.
-            if paintPlan, isModel {
+            if bindMeshes, isModel {
                 // THE TOTAL, not this one member. Every mesh in the file is
                 // bound at the same time, so a model in twelve painted parts
                 // costs the sum of them — checking each on its own would let a
@@ -284,6 +283,46 @@ enum Converter {
             }
             described.append(.object(member))
         }
+
+        return (entries, described, meshes)
+    }
+
+    /// What the converter sheet shows: `KhaytEngine.convertPreview`, for this
+    /// file and target. The zip is read on a queue of its own, never on the
+    /// main thread: with `plans` the meshes come out whole, and a painted
+    /// model runs to hundreds of megabytes.
+    static func preview(_ source: URL, target: [String: JSONValue], bounds: [String: JSONValue]?,
+                        plans: Bool, engine: KhaytEngine) async throws -> KhaytEngine.ConvertPreview {
+        let (_, described, meshes) = try await describeOffMain(source, bindMeshes: plans)
+        return try await engine.convertPreview(described, target: target, bounds: bounds,
+                                               plans: plans, meshes: meshes)
+    }
+
+    /// `describe`, on `readQueue`.
+    static func describeOffMain(_ source: URL, bindMeshes: Bool) async throws
+        -> (entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]) {
+        let read: Swift.Result<(entries: [Zip.Entry], described: [JSONValue], meshes: [String: String]), any Error> =
+            await withCheckedContinuation { done in
+                readQueue.async { done.resume(returning: Swift.Result { try describe(source, bindMeshes: bindMeshes) }) }
+            }
+        return try read.get()
+    }
+
+    /// Where a 3MF is read for the sheet and the conversion: serial and off the cooperative pool,
+    /// so a slow read blocks neither the window nor Swift's own threads.
+    nonisolated static let readQueue = DispatchQueue(label: "khayt.convert.read", qos: .userInitiated)
+
+    /// Convert `source` for a target printer and write the result to `into`.
+    static func convert(_ source: URL, into destination: URL,
+                        options: [String: JSONValue], engine: KhaytEngine) async throws -> Result {
+        // A colour plan rewrites the mesh, so for those two options the
+        // `.model` members come in with their bytes. Everything else still
+        // crosses by name, which is what keeps the rest of a 400 MB file out
+        // of this process.
+        let paintPlan = truthy(options["fullSpectrum"]) || truthy(options["bandSwap"])
+
+        // Read off the main thread: with a colour plan every mesh comes out whole.
+        let (entries, described, meshes) = try await describeOffMain(source, bindMeshes: paintPlan)
 
         let planned = try await engine.convertMembers(described, options: options, meshes: meshes)
         guard planned.ok, let members = planned.members else {

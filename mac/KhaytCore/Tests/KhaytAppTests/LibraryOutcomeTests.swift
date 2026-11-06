@@ -46,7 +46,7 @@ struct LibraryOutcomeTests {
 
         for gesture in ["func addModelToLibrary() async {",
                         "func addModelsToLibrary(_ chosen: [URL]) async {",
-                        "func convertModel(_ file: LibraryFile, targetId: String?) async {",
+                        "func convertModel(_ file: LibraryFile, targetId: String?, extra: [String: JSONValue] = [:]) async {",
                         "func openInSlicer(_ url: URL, slicer: KhaytEngine.Slicer) async {",
                         "func deleteLibraryFiles(_ files: [LibraryFile]) async {",
                         "func fileSelection(under name: String) async {"] {

@@ -128,17 +128,34 @@ struct ModelActions: View {
             // CONVERT, beside the slicers: a maker converts a file in order to
             // open it in one of them. Only for a 3MF — an STL carries no
             // printer settings to rewrite.
-            if (file.sourceFile?.ext ?? "").lowercased() == "3mf", !shop.printerProfiles.isEmpty {
+            // SEVERAL 3MFs selected: the desktop's batch converter, one
+            // printer for all of them (`BatchConvertSheet`).
+            let batch = chosen.filter { ($0.sourceFile?.ext ?? "").lowercased() == "3mf" }
+            if batch.count > 1, !shop.printerProfiles.isEmpty {
+                Menu(shop.words.callIt("conv.batch_target")) {
+                    ForEach(shop.printerProfiles) { profile in
+                        Button(profile.name + "\u{2026}") { shop.openBatchConverter(batch, targetId: profile.id) }
+                    }
+                    Divider()
+                    Button(shop.words.callIt("mac.standard_3mf") + "\u{2026}") {
+                        shop.openBatchConverter(batch, targetId: nil)
+                    }
+                }
+                .disabled(shop.converting)
+            } else if (file.sourceFile?.ext ?? "").lowercased() == "3mf", !shop.printerProfiles.isEmpty {
                 Menu(shop.words.callIt("mac.convert_for")) {
                     ForEach(shop.printerProfiles) { profile in
-                        Button(profile.name) {
-                            Task { await shop.convertModel(file, targetId: profile.id) }
+                        // Opens the converter on that printer: colours,
+                        // slots, Full Spectrum and the bed fit are chosen
+                        // there before anything is written.
+                        Button(profile.name + "\u{2026}") {
+                            shop.openConverter(file, targetId: profile.id)
                         }
                     }
                     Divider()
                     // The vendor's settings stripped rather than replaced.
-                    Button(shop.words.callIt("mac.standard_3mf")) {
-                        Task { await shop.convertModel(file, targetId: nil) }
+                    Button(shop.words.callIt("mac.standard_3mf") + "\u{2026}") {
+                        shop.openConverter(file, targetId: nil)
                     }
                 }
                 .disabled(shop.converting)

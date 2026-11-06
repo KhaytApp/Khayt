@@ -650,31 +650,37 @@ function orderToInvoiceRow(o) {
   };
 }
 
-/** Push a paid order to the accounting webhook once (idempotent via accountingPushedAt). */
+/** Push a paid order to the accounting webhook once (idempotent via accountingPushedAt).
+ *
+ * WHEN and WHAT are `lib/accounting-push.js`, shared with the Mac app: the
+ * switch, "push when paid", paid-and-not-pushed, an address; the payload; and
+ * what the order records afterwards. This is the renderer's transport only. */
 function maybePushAccounting(order) {
+  const P = (typeof KhaytAccountingPush !== 'undefined') ? KhaytAccountingPush : null;
+  if (!P || !P.wouldPush(order, settings).push) return;
+  if (typeof KhaytAccountingExport === 'undefined' || !window.hubAPI?.accountingPush) return;
   const cfg = settings.accountingSync;
-  if (!cfg || !cfg.enabled || cfg.pushOnPaid === false) return;
-  if (!order || order.paymentStatus !== 'paid' || order.accountingPushedAt) return;
-  if (typeof KhaytAccountingExport === 'undefined' || !window.hubAPI?.accountingPush || !/^https?:\/\//i.test(cfg.webhookUrl || '')) return;
-  const payload = KhaytAccountingExport.buildInvoicePayload(orderToInvoiceRow(order), { format: cfg.format, salesAccount: cfg.salesAccount, taxCode: cfg.taxCode });
+  const payload = P.payloadFor(orderToInvoiceRow(order), order, settings);
+  const record = (ok, error) => {
+    const out = P.outcome(ok, new Date().toISOString(), error);
+    Object.assign(order, out.set);
+    for (const k of out.clear) delete order[k];
+    saveAll();
+  };
   window.hubAPI.accountingPush({ url: cfg.webhookUrl, secret: cfg.secret, payload })
     .then((r) => {
-      if (r && r.ok) { order.accountingPushedAt = new Date().toISOString(); saveAll(); return; }
+      if (r && r.ok) { record(true); return; }
       // This fires on exactly one event — the unpaid→paid transition — so a failure here
       // is never retried: the order is already paid and the transition cannot recur. The
       // invoice silently never reaches the books. Record the failure so the boot-time
       // sweep below can retry it, and tell the owner.
-      order.accountingPushFailedAt = new Date().toISOString();
-      order.accountingPushError = String((r && r.error) || 'unknown error');
-      saveAll();
+      record(false, String((r && r.error) || 'unknown error'));
       toast('⚠ ' + (t('acct.push_failed') || 'Could not send this invoice to your accounting system') +
         ' — ' + order.accountingPushError, 'error', 7000);
     })
     .catch((e) => {
       console.error('accounting push:', e);
-      order.accountingPushFailedAt = new Date().toISOString();
-      order.accountingPushError = String(e && e.message || e);
-      saveAll();
+      record(false, String(e && e.message || e));
       toast('⚠ ' + (t('acct.push_failed') || 'Could not send this invoice to your accounting system'), 'error', 7000);
     });
 }
@@ -685,11 +691,8 @@ function maybePushAccounting(order) {
  * books, with nothing to trigger another attempt.
  */
 function retryFailedAccountingPushes() {
-  const cfg = settings.accountingSync;
-  if (!cfg || !cfg.enabled) return;
-  const stuck = (printLog || []).filter(o =>
-    o && o.paymentStatus === 'paid' && !o.accountingPushedAt && o.accountingPushFailedAt);
-  for (const order of stuck) maybePushAccounting(order);
+  if (typeof KhaytAccountingPush === 'undefined') return;
+  for (const order of KhaytAccountingPush.retryable(printLog || [], settings)) maybePushAccounting(order);
 }
 
 /** Export invoices/expenses as accountant-ready CSV (QuickBooks/Xero/Zoho/generic). */

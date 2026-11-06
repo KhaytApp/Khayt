@@ -33,6 +33,9 @@ struct UnbundlingIsSafeTests {
         "mf-convert": ["KhaytZip", "KhaytZipWrite"],
         "mf-mesh": ["KhaytZip"],
         "thumbnail-extract": ["KhaytZip"],
+        // The Mac asks for `u1Members`/`flatU1Members` and zips them in
+        // Swift (`ZipWrite`); the zipping entry points are never called here.
+        "hueforge-3mf": ["KhaytZipWrite"],
     ]
 
     @Test("every global a bundled module reads is itself bundled")

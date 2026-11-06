@@ -1291,7 +1291,10 @@
     const w = [];
     if (!bounds || !target || !target.bed) return w;
     const b = target.bed;
-    const fit = printFit ? printFit.check(bounds, b) : null;
+    // Read at the call, not only at load: the native Mac bundles `print-fit` AFTER this module, so
+    // at load its global was not there yet and every bed-fit warning was silently empty on the Mac.
+    const pf = printFit || (typeof global !== 'undefined' && global.KhaytPrintFit) || null;
+    const fit = pf ? pf.check(bounds, b) : null;
     if (!fit || !fit.known) return w;
     if (fit.footprint) w.push(`Model footprint ${bounds.x}×${bounds.y} mm is larger than ${target.name}'s bed ${b.x}×${b.y} mm — it may not fit. Rotate or rescale in your slicer.`);
     if (fit.height) w.push(`Model height ${bounds.z} mm exceeds ${target.name}'s ${b.z} mm max — it may not fit.`);
@@ -1304,7 +1307,16 @@
    * @returns {{ ok:boolean, flavour?:string, filaments?:Array, colorCount?:number, memberCount?:number, hasGeometry?:boolean, meta?:object, bounds?:object|null, error?:string }}
    */
   function analyze(buf) {
-    const members = readMembers(buf);
+    return analyzeMembers(readMembers(buf));
+  }
+
+  /**
+   * `analyze`, from members a host has already read — the native Mac, whose zip
+   * is Swift's (see `convertMembers`). A mesh the host passed by NAME alone has
+   * no bounds to give, so `bounds` is null for it and the host measures the
+   * model itself.
+   */
+  function analyzeMembers(members) {
     if (!members.length) return { ok: false, error: 'Not a readable 3MF/ZIP file.' };
     const hasGeometry = members.some((m) => /\.model$/i.test(m.name));
     const filaments = extractFilaments(members);
@@ -2947,7 +2959,11 @@
    * non-Orca target). Pure read — no file is written.
    */
   function fsPreview(buf, opts = {}) {
-    const members = readMembers(buf);
+    return fsPreviewMembers(readMembers(buf), opts);
+  }
+
+  /** `fsPreview`, from members already read (the Mac's own zip; see `convertMembers`). */
+  function fsPreviewMembers(members, opts = {}) {
     if (!members.length) return { available: false };
     const custom = opts.targetProfile && typeof opts.targetProfile === 'object' && opts.targetProfile.id
       ? profiles.customProfile(opts.targetProfile) : null;
@@ -2980,7 +2996,12 @@
    */
   function analyzeColorBands(buf, opts = {}) {
     if (!colorBands || !mfMesh || !mfMesh.extractMeshFromMembers) return { available: false };
-    const members = readMembers(buf);
+    return analyzeColorBandsMembers(readMembers(buf), opts);
+  }
+
+  /** `analyzeColorBands`, from members already read (the Mac's own zip; see `convertMembers`). */
+  function analyzeColorBandsMembers(members, opts = {}) {
+    if (!colorBands || !mfMesh || !mfMesh.extractMeshFromMembers) return { available: false };
     if (!members.length) return { available: false };
     let mesh;
     try { mesh = mfMesh.extractMeshFromMembers(members); } catch (_) { return { available: false }; }
@@ -3018,7 +3039,7 @@
     });
   }
 
-  const api = { analyze, convert, convertMembers, fsPreview, prusaPreview, analyzeColorBands, readMembers, detectFlavour, extractFilaments, extractMeta, computeBounds, countTriangles, measureMesh, extractTriangles, extractTrianglesWithPaint, extractPlates, plateOf, platePalettes, fitWarnings };
+  const api = { analyze, analyzeMembers, convert, convertMembers, fsPreview, fsPreviewMembers, prusaPreview, analyzeColorBands, analyzeColorBandsMembers, readMembers, detectFlavour, extractFilaments, extractMeta, computeBounds, countTriangles, measureMesh, extractTriangles, extractTrianglesWithPaint, extractPlates, plateOf, platePalettes, fitWarnings };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') global.KhaytMfConvert = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

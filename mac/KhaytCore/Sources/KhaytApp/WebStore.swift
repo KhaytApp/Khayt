@@ -864,6 +864,12 @@ struct WebStoreSheet: View {
                         Text(shop.words.callIt("mac.ws_settings")).font(.callout)
                     }
                 }
+                // ── WHO CAME, AND WHAT THEY SAID ─────────────────────────────
+                //
+                // The other app's Storefront dialog shows both under its
+                // publish controls; here they sit above the page's address.
+                StorefrontInsightsSection(shop: shop)
+                CustomerReviewsSection(shop: shop)
                 if let page = connection.flatMap(CatalogPublisher.shopPage) {
                     Section(shop.words.callIt("mac.ws_page")) {
                         Text(verbatim: page.absoluteString)

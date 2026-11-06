@@ -184,6 +184,21 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // The HueForge studio: a photo as a filament-painted relief for the
+        // U1, and the 3MF it prints from. `HueForgeEngine` runs these in a
+        // context of its own, on a thread of its own, because one plan takes
+        // seconds; they are listed here so the bundle carries them and the
+        // drift guards watch them. After `color-mix`, which they read off the
+        // global. The 3MF module hands back MEMBERS — the zip is Swift's.
+        "hueforge",
+        "hueforge-flat",
+        "hueforge-3mf",
+        // Installing and tuning Orca-family filament presets: which printers
+        // a slicer folder holds, the version to stamp, what a measurement
+        // becomes. The folder walking is Swift's (`OrcaFolders`).
+        "orca-presets",
+        // The Calibration Assistant's tests and procedural test models.
+        "calibration-models",
         // What can be printed with the filament already loaded: a model's
         // colours against a machine's heads, perceptually and by material
         // family. Needs `color-mix` above it.
@@ -192,6 +207,11 @@ public actor KhaytEngine {
         // often, without making any of them late or jumping a priority. Needs
         // `loaded-colours` above it.
         "swap-queue",
+        // The converter's "Match to loaded spools": every colour of a file to
+        // the loaded spool most like it, and the slot map or merge the
+        // converter applies for that. Pure; reads `loaded-colours` above it
+        // through its global for the material family.
+        "spool-match",
         // Groups and categories. Pure, and bundled rather than ported because
         // the rule that matters is not the reading — it is that a name matching
         // one already in use IS that name and adopts its spelling. "Saudi Kings"
@@ -246,6 +266,13 @@ public actor KhaytEngine {
         // about the same order by two copies of one shop.
         "webhooks",
         "webhook-bus",
+        // The other integrations both apps now send the same way: an SMS
+        // provider's request (Twilio, Unifonic, the shop's own webhook), a
+        // paid invoice pushed to the accounting system, and the shop's own
+        // scheduled KPI email. Rules only — the sending is each host's.
+        "sms-request",
+        "accounting-push",
+        "email-digest",
         // What happens to a job when its stage changes: what may move, and what
         // moving it costs. Lifted out of renderer/order-flows.js so this app can
         // move a job by the same rules rather than reimplement the most
@@ -1072,6 +1099,13 @@ public actor KhaytEngine {
         // publish one, so a product added on the Mac never reached the store.
         "product-specs",
         "storefront-catalog",
+        // What the store's visitors did and what its customers said: the
+        // funnel, the review rows and the review link, as the desktop's
+        // Storefront dialog reads them.
+        "storefront-insights",
+        // The workshop's temperature and humidity (`envLogs`): the check, the
+        // record and the trend, in the desktop's frozen shape.
+        "env-log",
         // A web-store order both ways: whether a queue item may become a job
         // with nobody pressing a button, which customer it is, and what the
         // store is told as the job moves. After `carriers`, whose tracking
@@ -2066,14 +2100,40 @@ public actor KhaytEngine {
         /// How many filaments it can hold. Nil for a single-material machine
         /// that does not say.
         public let maxColors: Int?
+        /// One of the shop's own printers (`settings.customPrinters`, the
+        /// desktop converter's "My printers"), converted for through
+        /// `targetProfile` rather than by id: the converter has no registry
+        /// entry for it.
+        public var custom: Bool? = nil
+        /// Mixes colours in hardware (the Snapmaker U1): Full Spectrum and
+        /// band-swap can apply. The batch converter offers its colour choice
+        /// only for such a printer, as the desktop's does.
+        public var supportsMixedFilament: Bool? = nil
+
+        public init(id: String, name: String, maxColors: Int?, custom: Bool? = nil,
+                    supportsMixedFilament: Bool? = nil) {
+            self.id = id; self.name = name; self.maxColors = maxColors; self.custom = custom
+            self.supportsMixedFilament = supportsMixedFilament
+        }
     }
 
-    public func printerProfiles() throws -> [PrinterProfile] {
+    /// The shop's own printers (`settings.customPrinters`, written by the
+    /// desktop's custom-printers manager) first, then the built-in ones — the
+    /// order the desktop converter offers them in. A custom printer the shared
+    /// rule cannot read (no name) is left out, as `customProfile` leaves it.
+    public func printerProfiles(custom: [JSONValue] = []) throws -> [PrinterProfile] {
         try runtime.call2("""
-            KhaytPrinterProfiles.listProfiles().map((p) => (
-              { id: p.id, name: p.name, maxColors: p.maxColors == null ? null : p.maxColors }
-            ))
-            """, [], as: [PrinterProfile].self)
+            (function (custom) {
+              const P = KhaytPrinterProfiles;
+              const own = (Array.isArray(custom) ? custom : []).map((c) => P.customProfile(c)).filter(Boolean)
+                .map((p) => ({ id: p.id, name: p.name, maxColors: p.maxColors, custom: true,
+                               supportsMixedFilament: !!p.supportsMixedFilament }));
+              return own.concat(P.listProfiles().map((p) => (
+                { id: p.id, name: p.name, maxColors: p.maxColors == null ? null : p.maxColors,
+                  supportsMixedFilament: !!p.supportsMixedFilament }
+              )));
+            })(ARG0)
+            """, [.array(custom)], as: [PrinterProfile].self)
     }
 
     /// What a converted 3MF should contain.
@@ -2163,6 +2223,204 @@ public actor KhaytEngine {
             """, [.array(members), .object(options)], as: Conversion.self)
     }
 
+    // MARK: - Before a conversion: what the file is, and what the target can do
+
+    /// What the converter sheet shows before a byte is written: the file's
+    /// own colours and settings, the target, whether the model fits its bed,
+    /// and which colour plans that target offers for it.
+    ///
+    /// Every answer is a shared rule's — `analyzeMembers`, `fitWarnings`,
+    /// `fsPreviewMembers` and `analyzeColorBandsMembers` in `lib/mf-convert.js`,
+    /// and the target gates in `lib/printer-profiles.js` — so the sheet and
+    /// the desktop's converter cannot disagree about whether a file can be
+    /// printed in Full Spectrum on a U1.
+    public struct ConvertPreview: Decodable, Sendable {
+        public struct Filament: Decodable, Sendable, Hashable {
+            public let color: String?
+            public let grams: Double?
+            public let type: String?
+        }
+        public struct Meta: Decodable, Sendable {
+            public let printerModel: String?
+            public let nozzle: Double?
+            public let layerHeight: Double?
+            public let totalGrams: Double?
+            public let printMinutes: Double?
+        }
+        public struct Bed: Decodable, Sendable, Hashable {
+            public let x: Double?
+            public let y: Double?
+            public let z: Double?
+        }
+        public struct Head: Decodable, Sendable, Hashable { public let hex: String }
+        public struct Mix: Decodable, Sendable, Hashable {
+            public let srcHex: String
+            public let ids: [Int]
+            public let weights: [Double]
+            public let deltaE: Double?
+        }
+        public struct FullSpectrum: Decodable, Sendable {
+            public let available: Bool
+            public let heads: [Head]?
+            public let mixes: [Mix]?
+        }
+        public struct Swap: Decodable, Sendable, Hashable {
+            public let toolhead: Int
+            public let z: Double
+            public let toColour: String?
+        }
+        public struct Bands: Decodable, Sendable {
+            public let available: Bool
+            public let banded: Bool?
+            public let manualSwaps: Int?
+            public let instructions: [Swap]?
+        }
+        public let ok: Bool
+        public let error: String?
+        public let flavour: String?
+        public let filaments: [Filament]?
+        public let meta: Meta?
+        public let targetName: String?
+        public let maxColors: Int?
+        public let bed: Bed?
+        /// Normalise: the vendor's settings stripped, nothing retargeted.
+        public let generic: Bool?
+        /// Another ecosystem's printer: the file is saved as a Generic 3MF.
+        public let cross: Bool?
+        public let fullSpectrumCapable: Bool?
+        public let bandSwapEligible: Bool?
+        public let fitWarnings: [String]?
+        public let fullSpectrum: FullSpectrum?
+        public let bands: Bands?
+    }
+
+    /// `members` and `meshes` exactly as `convertMembers` takes them.
+    /// `bounds` is the model's measured size (`Mesh`), which the Mac knows
+    /// without the mesh crossing. Ask for `plans` only with the `.model`
+    /// members bound: the band analysis and the Full Spectrum plan read the
+    /// paint inside the mesh.
+    public func convertPreview(_ members: [JSONValue], target: [String: JSONValue],
+                               bounds: [String: JSONValue]? = nil, plans: Bool = false,
+                               meshes: [String: String] = [:]) throws -> ConvertPreview {
+        try runtime.withBoundStrings(meshes) {
+            try runtime.call2("""
+                (function (members, opts, bounds, plans) {
+                  members = members.map(function (m) {
+                    if (!m || !m.meshVar) return m;
+                    var text = globalThis[m.meshVar];
+                    if (typeof text !== 'string') return m;
+                    return { name: m.name, size: m.size, data: text };
+                  });
+                  const MF = KhaytMfConvert, P = KhaytPrinterProfiles;
+                  const a = MF.analyzeMembers(members);
+                  if (!a.ok) return { ok: false, error: a.error || 'Not a readable 3MF.' };
+                  const custom = opts.targetProfile && typeof opts.targetProfile === 'object' && opts.targetProfile.id
+                    ? P.customProfile(opts.targetProfile) : null;
+                  const target = custom || (opts.targetId ? P.getProfile(opts.targetId) : null) || P.GENERIC;
+                  const used = a.filaments.length;
+                  const generic = target.id === P.GENERIC.id;
+                  const cross = P.isCrossEcosystem(a.flavour, target);
+                  const fsCapable = !generic && P.fullSpectrumCapable(a.flavour, target, used);
+                  const box = bounds || a.bounds || null;
+                  let fs = null, bands = null;
+                  if (plans && fsCapable) {
+                    const t = custom ? { targetProfile: opts.targetProfile } : { targetId: target.id };
+                    fs = MF.fsPreviewMembers(members, t);
+                    bands = MF.analyzeColorBandsMembers(members, {});
+                  }
+                  const m = a.meta || {};
+                  const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+                  return {
+                    ok: true, flavour: a.flavour,
+                    filaments: a.filaments.map((f) => ({ color: f.color || null, grams: num(f.grams), type: f.type || null })),
+                    meta: { printerModel: m.printerModel || null, nozzle: num(m.nozzle), layerHeight: num(m.layerHeight),
+                            totalGrams: num(m.totalGrams), printMinutes: num(m.printMinutes) },
+                    targetName: target.name, maxColors: target.maxColors || null, bed: target.bed || null,
+                    generic, cross, fullSpectrumCapable: fsCapable,
+                    bandSwapEligible: P.bandSwapEligible(a.flavour, target, used, bands),
+                    fitWarnings: box ? MF.fitWarnings(box, target) : [],
+                    fullSpectrum: fs && fs.available ? { available: true,
+                      heads: fs.heads.map((h) => ({ hex: h.hex })),
+                      mixes: fs.mixes.map((x) => ({ srcHex: x.srcHex, ids: x.ids || [], weights: x.weights || [], deltaE: num(x.deltaE) })) } : null,
+                    bands: bands ? { available: !!bands.available, banded: !!bands.banded, manualSwaps: bands.manualSwaps || 0,
+                      instructions: (bands.instructions || []).map((s) => ({ toolhead: s.toolhead, z: s.z, toColour: s.toColour || null })) } : null,
+                  };
+                })(ARG0, ARG1, ARG2, ARG3)
+                """, [.array(members), .object(target), bounds.map { .object($0) } ?? .null, .bool(plans)],
+                as: ConvertPreview.self)
+        }
+    }
+
+    /// "Match to loaded spools": `lib/spool-match.js` `planSpoolMatch`, and
+    /// the options it adds to the conversion (`convertOptions`) — nil when it
+    /// adds none, or when the match is refused (`refusal` then says why).
+    public struct SpoolMatch: Decodable, Sendable {
+        public struct Row: Decodable, Sendable, Hashable {
+            public let index: Int
+            public let hex: String
+            public let material: String?
+            public let slot: Int
+            public let spoolHex: String
+            public let spoolMaterial: String?
+            public let deltaE: Double
+            public let quality: String
+            public let materialMismatch: Bool
+        }
+        public struct Warning: Decodable, Sendable, Hashable {
+            public let code: String
+            public let index: Int?
+            public let deltaE: Double?
+            public let file: String?
+            public let spool: String?
+            public let slot: Int?
+            public let slots: [Int]?
+            public let n: Int?
+        }
+        public struct Refusal: Decodable, Sendable, Hashable {
+            public let code: String
+            public let slot: Int?
+            public let n: Int?
+        }
+        public let ok: Bool
+        public let rows: [Row]
+        public let map: [Int]
+        /// The slots that hold a spool, 0-based — what a row may be moved to.
+        public let usable: [Int]
+        /// `none`, `slotMap`, `grow`, `merge` or `refused`.
+        public let kind: String
+        public let refusal: Refusal?
+        public let warnings: [Warning]
+        public let options: JSONValue?
+    }
+
+    public func spoolMatch(colours: [[String: JSONValue]], loaded: [LoadedSlot], slotCount: Int?,
+                           flavour: String, map: [Int]? = nil) throws -> SpoolMatch {
+        let loadedJSON: [JSONValue] = loaded.map {
+            .object(["slot": .number(Double($0.slot)), "hex": .string($0.hex), "material": .string($0.material)])
+        }
+        return try runtime.call2("""
+            (function (cols, loaded, slotCount, flavour, map) {
+              const SM = KhaytSpoolMatch;
+              const p = SM.planSpoolMatch(cols, loaded, { slotCount: slotCount || undefined, flavour, map: map || undefined });
+              const req = p.request || { kind: 'none' };
+              return {
+                ok: p.ok, rows: p.rows.map((r) => ({ index: r.index, hex: r.hex, material: r.material || null, slot: r.slot,
+                  spoolHex: r.spoolHex, spoolMaterial: r.spoolMaterial || null, deltaE: r.deltaE, quality: r.quality,
+                  materialMismatch: !!r.materialMismatch })),
+                map: p.map, usable: p.slots.usable.map((u, j) => (u ? j : -1)).filter((j) => j >= 0),
+                kind: req.kind, refusal: req.refusal || null,
+                warnings: p.warnings.map((w) => ({ code: w.code, index: w.index == null ? null : w.index,
+                  deltaE: w.deltaE == null ? null : w.deltaE, file: w.file || null, spool: w.spool || null,
+                  slot: w.slot == null ? null : w.slot, slots: w.slots || null, n: w.n == null ? null : w.n })),
+                options: p.ok ? SM.convertOptions(req) : null,
+              };
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            """, [.array(colours.map { .object($0) }), .array(loadedJSON),
+                  slotCount.map { .number(Double($0)) } ?? .null, .string(flavour),
+                  map.map { .array($0.map { .number(Double($0)) }) } ?? .null],
+            as: SpoolMatch.self)
+    }
+
     // MARK: - The accountant's file
 
     /// The shop's invoices as a CSV, in the layout the accountant's software
@@ -2191,6 +2449,23 @@ public actor KhaytEngine {
                            language: String = "en",
                            from: String = "", to: String = "",
                            currencies: [String: JSONValue]? = nil) throws -> String {
+        let rows = try invoiceRows(orders, settings: settings, clients: clients,
+                                   language: language, currencies: currencies)
+        // `buildInvoiceCsv` is a formatter and stays where it is: it lays out
+        // the accounting packages' column orders, which is a table, not a rule.
+        return try runtime.call2(
+            "KhaytAccountingExport.buildInvoiceCsv(ARG0, ARG1)",
+            [.array(rows), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
+            as: String.self)
+    }
+
+    /// The print log as the accountant's invoice rows — the rows the CSV is
+    /// laid out from and the accounting push sends one of. ONE builder for
+    /// both, so the invoice a shop's books received by push is the row its
+    /// accountant's file has for it.
+    public func invoiceRows(_ orders: [JSONValue], settings: [String: JSONValue],
+                            clients: [JSONValue], language: String = "en",
+                            currencies: [String: JSONValue]? = nil) throws -> [JSONValue] {
         // The PROFILE is still `lib/tax.js` — eight bundled modules read it, so
         // it has not moved — but which orders are invoices, and whose name goes
         // on each row, is `KhaytCore.AccountingRows` now.
@@ -2294,12 +2569,7 @@ public actor KhaytEngine {
                 guard case .object(let c) = client, let id = c["id"] else { return "" }
                 return nameById[JSSemantics.text(id)] ?? ""
             })
-        // `buildInvoiceCsv` is a formatter and stays where it is: it lays out
-        // the accounting packages' column orders, which is a table, not a rule.
-        return try runtime.call2(
-            "KhaytAccountingExport.buildInvoiceCsv(ARG0, ARG1)",
-            [.array(rows), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
-            as: String.self)
+        return rows
     }
 
     /// The shop's expenses as a CSV, in the same layouts.
@@ -4392,6 +4662,12 @@ public actor KhaytEngine {
     /// `machines[].printerApi.apiKey` means "for every element of machines".
     public func secretPaths() throws -> [String] {
         try runtime.value("KhaytStoreSecretPaths", "SECRET_PATHS", as: [String].self)
+    }
+
+    /// Paths whose value is REMOVED, never kept (`DROP_PATHS`) — what
+    /// `StoreScrub` mirrors for the write path.
+    public func dropPaths() throws -> [String] {
+        try runtime.value("KhaytStoreSecretPaths", "DROP_PATHS", as: [String].self)
     }
 
     // MARK: - Moving a job
@@ -14221,6 +14497,147 @@ public actor KhaytEngine {
             as: JSONValue.self)
     }
 
+    /// This month's AI spend per feature, from `settings.aiUsage` — the
+    /// desktop's `aiSpendHtml`, through `KhaytAiUsage.summarize`. Each row's
+    /// `labelKey` is the feature's translation key (`ai-privacy`), or nil for
+    /// a task no feature names. `estimated` is the model having no price of
+    /// its own, so Opus rates were assumed.
+    public struct AiSpend: Decodable, Sendable, Equatable {
+        public struct Row: Decodable, Sendable, Equatable {
+            public let task: String
+            public let labelKey: String?
+            public let calls: Int
+            public let cost: String
+        }
+        public let month: String
+        public let rows: [Row]
+        public let total: String
+        public let estimated: Bool
+    }
+
+    public func aiSpend(settings: [String: JSONValue], now: Date) throws -> AiSpend {
+        try runtime.call2("""
+            (function (s, now) {
+              var U = KhaytAiUsage, P = KhaytAiPrivacy;
+              var r = U.summarize(s && s.aiUsage, now);
+              return {
+                month: r.month,
+                rows: r.rows.map(function (row) {
+                  var spec = P && P.AI_FEATURES[row.task];
+                  return { task: row.task, labelKey: spec ? spec.labelKey : null,
+                           calls: row.calls, cost: U.fmtUsd(row.costExact) };
+                }),
+                total: U.fmtUsd(r.total.cost),
+                estimated: U.isEstimatedModel(((s && s.ai) || {}).model),
+              };
+            })(ARG0, ARG1)
+            """,
+            [.object(settings), .number(now.timeIntervalSince1970 * 1000)], as: AiSpend.self)
+    }
+
+    // MARK: - The environment log (`lib/env-log.js`)
+
+    /// One reading of `envLogs`, the desktop's shape.
+    public struct EnvReading: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let timestamp: String
+        public let temperature: Double?
+        public let humidity: Double?
+        public let machineId: String?
+        public let notes: String
+    }
+
+    /// Why a typed reading cannot be logged — a translation key — or nil.
+    public func envLogCheck(temperature: String, humidity: String) throws -> String? {
+        let said = try runtime.call2("KhaytEnvLog.check({ temperature: ARG0, humidity: ARG1 })",
+                                     [.string(temperature), .string(humidity)], as: JSONValue.self)
+        if case .string(let key) = said { return key }
+        return nil
+    }
+
+    /// The record to append, or `.null` when the check refuses it.
+    public func envLogEntry(temperature: String, humidity: String, machineId: String?, notes: String,
+                            id: String, now: Date) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytEnvLog.entry({ temperature: ARG0, humidity: ARG1, machineId: ARG2, notes: ARG3 },
+                              { id: ARG4, now: ARG5 })
+            """,
+            [.string(temperature), .string(humidity), machineId.map(JSONValue.string) ?? .null,
+             .string(notes), .string(id), .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// The list and the temperature line, as the desktop draws them.
+    public struct EnvLogView: Decodable, Sendable, Equatable {
+        public struct Trend: Decodable, Sendable, Equatable {
+            public let readings: [Double]
+            public let min: Double
+            public let max: Double
+        }
+        public let recent: [EnvReading]
+        public let trend: Trend?
+    }
+
+    public func envLogView(_ logs: [JSONValue]) throws -> EnvLogView {
+        try runtime.call2("""
+            (function (logs) {
+              // A reading written by hand into an older book can carry a
+              // number as text or no notes at all; the list reads what is
+              // there rather than refusing the whole log.
+              var num = function (v) { var n = +v; return v == null || v === '' || !isFinite(n) ? null : n; };
+              return {
+                recent: KhaytEnvLog.recent(logs).map(function (r) {
+                  return { id: String(r.id == null ? '' : r.id), timestamp: String(r.timestamp || ''),
+                           temperature: num(r.temperature), humidity: num(r.humidity),
+                           machineId: r.machineId ? String(r.machineId) : null,
+                           notes: r.notes == null ? '' : String(r.notes) };
+                }),
+                trend: KhaytEnvLog.temperatureTrend(logs),
+              };
+            })(ARG0)
+            """,
+            [.array(logs)], as: EnvLogView.self)
+    }
+
+    // MARK: - The web store's visitors and reviews (`lib/storefront-insights.js`)
+
+    public struct StorefrontInsights: Decodable, Sendable, Equatable {
+        public struct Top: Decodable, Sendable, Equatable, Identifiable {
+            public let id: String
+            public let name: String
+            public let orders: Int
+            public let carts: Int
+        }
+        public let empty: Bool
+        public let views: Int
+        public let carts: Int
+        public let orders: Int
+        public let conversionPct: Double
+        public let top: [Top]
+    }
+
+    public func storefrontInsights(_ stats: JSONValue) throws -> StorefrontInsights {
+        try runtime.call2("KhaytStorefrontInsights.insights(ARG0)", [stats], as: StorefrontInsights.self)
+    }
+
+    public struct ReviewRow: Decodable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let stars: Int
+        public let comment: String
+        public let name: String
+        public let day: String
+        public let verified: Bool
+    }
+
+    public func reviewRows(_ reviews: JSONValue) throws -> [ReviewRow] {
+        try runtime.call2("KhaytStorefrontInsights.reviewRows(ARG0)", [reviews], as: [ReviewRow].self)
+    }
+
+    /// `{cloud}/review/{shopId}`, or "" without both.
+    public func reviewLink(baseUrl: String, shopId: String) throws -> String {
+        try runtime.call2("KhaytStorefrontInsights.reviewLink(ARG0, ARG1)",
+                          [.string(baseUrl), .string(shopId)], as: String.self)
+    }
+
     // MARK: - What a product costs, and what it is worth
 
     /// A product priced from its own parts.
@@ -14499,6 +14916,14 @@ public actor KhaytEngine {
         public let event: String
         public let deliveryId: String
         public let body: JSONValue
+        /// Which subscription it is for — a bus subscription's id, or
+        /// `event:<type>` for the signed event webhook, as the desktop's
+        /// delivery log names them — and the payload it carried, so the log
+        /// can resend it. Nil for a delivery built before either existed.
+        public let subscriptionId: String?
+        public let payload: JSONValue?
+        /// The attempt this is: 1 for a first send, more for a retry.
+        public let attempt: Int?
     }
 
     /// Every webhook a move owes, to every consumer that asked for it.
@@ -14538,8 +14963,12 @@ public actor KhaytEngine {
                     var id = body.id + '_' + subs[j].id;
                     var one = Object.assign({}, body, { id: id });
                     out.push({
-                      url: subs[j].url, secret: subs[j].secret || '', event: e.event,
-                      deliveryId: id,
+                      // Its own secret, else the shop's one signing secret
+                      // (`subscriptionSecret`): the Mac stores none per
+                      // subscription, and the desktop's screen has only one.
+                      url: subs[j].url, secret: KhaytWebhookBus.subscriptionSecret(subs[j], wh),
+                      event: e.event, deliveryId: id, subscriptionId: String(subs[j].id || ''),
+                      payload: payload, attempt: 1,
                       body: KhaytWebhookBus.buildWireBody(e.event, one, a.nowMs),
                     });
                   }
@@ -14555,7 +14984,8 @@ public actor KhaytEngine {
                   });
                   out.push({
                     url: w.url, secret: w.secret || '', event: built.event,
-                    deliveryId: built.id,
+                    deliveryId: built.id, subscriptionId: w.id || ('event:' + e.event),
+                    payload: built, attempt: 1,
                     body: KhaytWebhookBus.buildWireBody(built.event, built, a.nowMs),
                   });
                 }
@@ -14589,6 +15019,344 @@ public actor KhaytEngine {
             """,
             [.object(["status": .number(Double(status)), "attempt": .number(Double(attempt))])],
             as: WebhookNext.self)
+    }
+
+    // MARK: - The delivery log, retries and resends
+
+    /// The webhooks block after one attempt, and what to do next.
+    ///
+    /// `lib/webhook-bus.js`'s policy, the desktop's `deliverWebhook` in one
+    /// step: the attempt goes into the delivery log (`deliveryRecord`,
+    /// `appendDelivery`); a failure worth retrying is queued with its backoff
+    /// (`schedulePending`) BEFORE anything waits on it, so a quit mid-backoff
+    /// resumes on the next launch; a 410 Gone switches the subscription off
+    /// for good; anything else that is over clears the queue entry.
+    public struct WebhookAttempt: Decodable, Sendable {
+        public let webhooks: JSONValue
+        public let retry: Bool
+        public let afterMs: Double
+        public let gone: Bool
+    }
+
+    public func webhookAttempt(webhooks: JSONValue, delivery: WebhookDelivery, status: Int?,
+                               error: String?, nowMs: Double, at: String) throws -> WebhookAttempt {
+        try runtime.call2("""
+            (function (a) {
+              var B = KhaytWebhookBus, wh = Object.assign({}, a.webhooks || {});
+              var d = a.delivery, attempt = d.attempt || 1;
+              var ok = a.status != null && a.status >= 200 && a.status < 300 && !a.error;
+              var retry = !ok && B.shouldRetry(a.status == null ? 0 : a.status, attempt);
+              var gone = !ok && B.isGone(a.status);
+              wh.deliveries = B.appendDelivery(wh.deliveries, B.deliveryRecord({
+                id: d.deliveryId, subscriptionId: d.subscriptionId, event: d.event, at: a.at,
+                status: ok ? 'ok' : (retry ? 'retrying' : 'failed'),
+                httpStatus: a.status || null, attempts: attempt,
+                error: ok ? null : (a.error || ('HTTP ' + (a.status || '?'))),
+                payload: d.payload || {},
+              }));
+              var afterMs = 0;
+              if (retry && !gone) {
+                afterMs = B.backoffDelayMs(attempt + 1);
+                wh.pending = B.schedulePending(wh.pending, {
+                  id: d.deliveryId, subscriptionId: d.subscriptionId, event: d.event,
+                  payload: d.payload || {}, attempt: attempt + 1,
+                }, afterMs, a.nowMs);
+              } else {
+                wh.pending = B.removePending(wh.pending, d.deliveryId);
+              }
+              if (gone) {
+                wh.subscriptions = (wh.subscriptions || []).map(function (s) {
+                  return s && s.id === d.subscriptionId
+                    ? Object.assign({}, s, { enabled: false, disabledReason: 'gone' }) : s;
+                });
+              }
+              return { webhooks: wh, retry: retry && !gone, afterMs: afterMs, gone: gone };
+            })(ARG0)
+            """,
+            [.object(["webhooks": webhooks, "status": status.map { .number(Double($0)) } ?? .null,
+                      "error": error.map(JSONValue.string) ?? .null, "nowMs": .number(nowMs),
+                      "at": .string(at),
+                      "delivery": .object([
+                        "deliveryId": .string(delivery.deliveryId),
+                        "subscriptionId": .string(delivery.subscriptionId ?? ""),
+                        "event": .string(delivery.event),
+                        "payload": delivery.payload ?? .object([:]),
+                        "attempt": .number(Double(delivery.attempt ?? 1)),
+                      ])])],
+            as: WebhookAttempt.self)
+    }
+
+    /// A delivery rebuilt from the queue or the log, addressed as the shop's
+    /// settings now say — or nil when the subscription is gone or off (a
+    /// retry for an address the shop took away is not sent). `resend` makes
+    /// a fresh id (`<id>_resend`) and a first attempt, the desktop's
+    /// `resendWebhookDelivery`; a queued retry keeps its id and its attempt.
+    public func webhookRedelivery(_ entry: JSONValue, settings: [String: JSONValue],
+                                  resend: Bool, nowMs: Double, at: String) throws -> WebhookDelivery? {
+        try runtime.call2("""
+            (function (a) {
+              var B = KhaytWebhookBus, s = a.settings || {}, e = a.entry || {};
+              var sid = String(e.subscriptionId || ''), event = String(e.event || '');
+              var id = a.resend ? String(e.id || '') + '_resend' : String(e.id || '');
+              var attempt = a.resend ? 1 : (e.attempt || 1);
+              var ew = s.eventWebhooks || {};
+              if (sid.indexOf('event:') === 0 || (ew.id && sid === ew.id)) {
+                if (!ew.enabled || !/^https:\\/\\//i.test(ew.url || '')) return null;
+                var built = Object.assign({}, e.payload || {});
+                if (!built.event) return null;
+                return { url: ew.url, secret: ew.secret || '', event: built.event, deliveryId: id,
+                  subscriptionId: sid, payload: built, attempt: attempt,
+                  body: B.buildWireBody(built.event, built, a.nowMs) };
+              }
+              var wh = s.webhooks || {};
+              if (!wh.enabled) return null;
+              var subs = Array.isArray(wh.subscriptions) && wh.subscriptions.length
+                ? wh.subscriptions : B.migrateLegacyWebhooks(wh);
+              var sub = subs.filter(function (x) { return x && x.id === sid; })[0];
+              if (!sub || sub.enabled === false || !sub.url) return null;
+              var body = B.buildDeliveryBody(event, e.payload || {}, id, a.at);
+              return { url: sub.url, secret: B.subscriptionSecret(sub, wh), event: event, deliveryId: id,
+                subscriptionId: sid, payload: e.payload || {}, attempt: attempt,
+                body: B.buildWireBody(event, body, a.nowMs) };
+            })(ARG0)
+            """,
+            [.object(["entry": entry, "settings": .object(settings), "resend": .bool(resend),
+                      "nowMs": .number(nowMs), "at": .string(at)])],
+            as: WebhookDelivery?.self)
+    }
+
+    /// The retries whose time has come — including any that came due while
+    /// the app was closed (`duePending`).
+    public func webhookDue(_ webhooks: JSONValue, nowMs: Double) throws -> [JSONValue] {
+        try runtime.call2("KhaytWebhookBus.duePending((ARG0 || {}).pending, ARG1)",
+                          [webhooks, .number(nowMs)], as: [JSONValue].self)
+    }
+
+    /// The webhooks block with these queued retries taken off it.
+    public func webhookDropPending(_ webhooks: JSONValue, ids: [String]) throws -> JSONValue {
+        try runtime.call2("""
+            (function (w, ids) {
+              var out = Object.assign({}, w || {});
+              for (var i = 0; i < ids.length; i++) out.pending = KhaytWebhookBus.removePending(out.pending, ids[i]);
+              return out;
+            })(ARG0, ARG1)
+            """, [webhooks, .array(ids.map(JSONValue.string))], as: JSONValue.self)
+    }
+
+    /// A ping to one address: the desktop's "Test (send ping)" body.
+    public func webhookPing(url: String, secret: String, nowMs: Double) throws -> WebhookDelivery {
+        try runtime.call2("""
+            (function (a) {
+              var payload = { message: 'Khayt webhook test' };
+              return { url: a.url, secret: a.secret, event: 'ping', deliveryId: 'ping_' + a.nowMs,
+                subscriptionId: '', payload: payload, attempt: 1,
+                body: KhaytWebhookBus.buildWireBody('ping', payload, a.nowMs) };
+            })(ARG0)
+            """, [.object(["url": .string(url), "secret": .string(secret), "nowMs": .number(nowMs)])],
+            as: WebhookDelivery.self)
+    }
+
+    /// A sample signed event, the desktop's "Test (send sample)".
+    public func eventWebhookSample(url: String, secret: String, shopName: String,
+                                   currency: String, at: String, nowMs: Double) throws -> WebhookDelivery {
+        try runtime.call2("""
+            (function (a) {
+              var built = KhaytWebhooks.buildWebhookEvent('created',
+                { id: 'SAMPLE-1', project: 'Test order', status: 'pending', paymentStatus: 'unpaid', price: 100 },
+                { at: a.at, shopName: a.shopName || 'Khayt', clientName: 'Test client', currency: a.currency });
+              return { url: a.url, secret: a.secret, event: built.event, deliveryId: built.id,
+                subscriptionId: '', payload: built, attempt: 1,
+                body: KhaytWebhookBus.buildWireBody(built.event, built, a.nowMs) };
+            })(ARG0)
+            """, [.object(["url": .string(url), "secret": .string(secret), "shopName": .string(shopName),
+                           "currency": .string(currency), "at": .string(at), "nowMs": .number(nowMs)])],
+            as: WebhookDelivery.self)
+    }
+
+    /// The subscription events, in catalogue order — what a subscription may
+    /// listen to.
+    public func webhookEvents() throws -> [String] {
+        try runtime.call2("KhaytWebhookBus.EVENTS.slice()", [], as: [String].self)
+    }
+
+    // MARK: - SMS
+
+    /// Whether the stored account can send a text (`KhaytSmsRequest.textAccount`).
+    public struct SmsAccount: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        public let provider: String
+        public let channel: String
+        public let reason: String
+    }
+
+    public func smsAccount(settings: [String: JSONValue]) throws -> SmsAccount {
+        try runtime.call2("KhaytSmsRequest.textAccount(ARG0)", [.object(settings)], as: SmsAccount.self)
+    }
+
+    /// One provider request, built by the shared rule. `error` is the rule's
+    /// refusal (a missing SID, a bad URL) in place of a request.
+    public struct SmsRequest: Decodable, Sendable {
+        public let url: String?
+        public let method: String?
+        public let headers: [String: String]?
+        public let body: String?
+        public let contentType: String?
+        public let error: String?
+    }
+
+    /// `config` carries the secrets ALREADY OPENED — they go into the request
+    /// and nowhere else; nothing here keeps or logs one.
+    public func smsRequest(provider: String, config: [String: JSONValue], to: String,
+                           message: String, channel: String) throws -> SmsRequest {
+        try runtime.call2("""
+            (function (a) {
+              try { return KhaytSmsRequest.buildSmsRequest(a.provider, a.cfg, { to: a.to, message: a.message, channel: a.channel }); }
+              catch (e) { return { error: String(e && e.message || e) }; }
+            })(ARG0)
+            """, [.object(["provider": .string(provider), "cfg": .object(config), "to": .string(to),
+                           "message": .string(message), "channel": .string(channel)])],
+            as: SmsRequest.self)
+    }
+
+    public struct SmsResult: Decodable, Sendable {
+        public let ok: Bool
+        public let status: Int?
+        public let error: String?
+    }
+
+    public func smsResult(status: Int, text: String) throws -> SmsResult {
+        try runtime.call2("KhaytSmsRequest.readSmsResponse(ARG0, ARG1)",
+                          [.number(Double(status)), .string(text)], as: SmsResult.self)
+    }
+
+    /// The `type: 'sms'` line a text writes to the customer's log.
+    public func smsCommEntry(id: String, at: Date, text: String, orderId: String?,
+                             milestone: String?, provider: String) throws -> JSONValue {
+        var o: [String: JSONValue] = ["id": .string(id), "at": .string(ISO8601DateFormatter().string(from: at)),
+                                      "text": .string(text), "provider": .string(provider)]
+        if let orderId { o["orderId"] = .string(orderId) }
+        if let milestone { o["milestone"] = .string(milestone) }
+        return try runtime.call2("KhaytSmsRequest.commEntry(ARG0)", [.object(o)], as: JSONValue.self)
+    }
+
+    /// When this job's update for this milestone was last texted, or nil.
+    public func smsSentAt(commLog: [JSONValue], orderId: String, milestone: String) throws -> String? {
+        try runtime.call2("KhaytSmsRequest.sentAt(ARG0, ARG1, ARG2)",
+                          [.array(commLog), .string(orderId), .string(milestone)], as: String?.self)
+    }
+
+    // MARK: - Accounting push
+
+    public struct AccountingDecision: Decodable, Sendable, Equatable {
+        public let push: Bool
+        public let reason: String
+    }
+
+    /// Is this order owed a push now (`KhaytAccountingPush.wouldPush`)?
+    public func accountingWouldPush(order: JSONValue, settings: [String: JSONValue]) throws -> AccountingDecision {
+        try runtime.call2("KhaytAccountingPush.wouldPush(ARG0, ARG1)", [order, .object(settings)],
+                          as: AccountingDecision.self)
+    }
+
+    /// The ids a retry sweep sends again: paid, never pushed, a failure on record.
+    public func accountingRetryable(orders: [JSONValue], settings: [String: JSONValue]) throws -> [String] {
+        try runtime.call2("""
+            KhaytAccountingPush.retryable(ARG0, ARG1).map(function (o) { return String(o.id); })
+            """, [.array(orders), .object(settings)], as: [String].self)
+    }
+
+    /// The JSON one invoice is pushed as, from its invoice row — the row the
+    /// accountant's CSV has for it (`invoiceRows`). Nil when the order is not
+    /// an invoice at all (a quote, a voided one, nothing to charge).
+    public func accountingPayload(order: JSONValue, settings: [String: JSONValue], clients: [JSONValue],
+                                  language: String = "en",
+                                  currencies: [String: JSONValue]? = nil) throws -> JSONValue? {
+        guard let row = try invoiceRows([order], settings: settings, clients: clients,
+                                        language: language, currencies: currencies).first else { return nil }
+        return try runtime.call2("KhaytAccountingPush.payloadFor(ARG0, ARG1, ARG2)",
+                                 [row, order, .object(settings)], as: JSONValue.self)
+    }
+
+    public func accountingTestPayload(settings: [String: JSONValue], nowMs: Double) throws -> JSONValue {
+        try runtime.call2("KhaytAccountingPush.testPayload(ARG0, ARG1)",
+                          [.object(settings), .number(nowMs)], as: JSONValue.self)
+    }
+
+    public struct AccountingRequest: Decodable, Sendable {
+        public let headers: [String: String]
+        public let body: String
+    }
+
+    public func accountingRequest(payload: JSONValue, secret: String) throws -> AccountingRequest {
+        try runtime.call2("KhaytAccountingPush.request(ARG0, ARG1)", [payload, .string(secret)],
+                          as: AccountingRequest.self)
+    }
+
+    public struct AccountingOutcome: Decodable, Sendable {
+        public let set: [String: JSONValue]
+        public let clear: [String]
+    }
+
+    public func accountingOutcome(ok: Bool, at: String, error: String?) throws -> AccountingOutcome {
+        try runtime.call2("KhaytAccountingPush.outcome(ARG0, ARG1, ARG2)",
+                          [.bool(ok), .string(at), error.map(JSONValue.string) ?? .null],
+                          as: AccountingOutcome.self)
+    }
+
+    // MARK: - The shop's KPI email
+
+    public struct DigestDue: Decodable, Sendable, Equatable {
+        public let due: Bool
+        public let periodKey: String
+        public let reason: String
+    }
+
+    /// Is the local KPI email due now (`KhaytEmailDigest.due`)? Local time:
+    /// the JavaScript clock reads the Mac's time zone, as the desktop's does.
+    public func digestDue(settings: [String: JSONValue], nowMs: Double) throws -> DigestDue {
+        try runtime.call2("KhaytEmailDigest.due(ARG0, new Date(ARG1))",
+                          [.object(settings), .number(nowMs)], as: DigestDue.self)
+    }
+
+    public struct DigestEmail: Decodable, Sendable {
+        public let to: String
+        public let subject: String
+        public let html: String
+    }
+
+    /// The email, figures and page both, as the desktop builds it. `test`
+    /// for the settings' "Send test" (the desktop's "Test Digest" subject).
+    public func digestEmail(orders: [JSONValue], inventory: [JSONValue], waitingList: [JSONValue],
+                            clients: [JSONValue], settings: [String: JSONValue], shopName: String,
+                            localeTag: String, nowMs: Double, test: Bool,
+                            recipient: String? = nil) throws -> DigestEmail {
+        try runtime.call2("""
+            (function (a) {
+              var D = KhaytEmailDigest, now = new Date(a.nowMs);
+              var f = D.figures({ orders: a.orders, inventory: a.inventory, waitingList: a.waiting,
+                clients: a.clients, settings: a.settings, now: now, locale: a.tag });
+              var pad = function (n) { return String(n).padStart(2, '0'); };
+              var today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+              var to = a.recipient || D.recipient(a.settings.emailDigest, a.settings);
+              return {
+                to: to,
+                subject: D.subject(a.shopName, D.frequencyOf(a.settings.emailDigest), a.test),
+                html: D.html(f, { shopName: a.shopName, currency: a.settings.currency || 'SAR', today: today }),
+              };
+            })(ARG0)
+            """, [.object(["orders": .array(orders), "inventory": .array(inventory),
+                           "waiting": .array(waitingList), "clients": .array(clients),
+                           "settings": .object(settings), "shopName": .string(shopName),
+                           "tag": .string(localeTag), "nowMs": .number(nowMs), "test": .bool(test),
+                           "recipient": recipient.map(JSONValue.string) ?? .null])],
+            as: DigestEmail.self)
+    }
+
+    /// The digest block once a period's email went: its key, so neither app
+    /// sends it again this period.
+    public func digestSent(settings: [String: JSONValue], periodKey: String) throws -> JSONValue {
+        try runtime.call2("KhaytEmailDigest.sent(ARG0, ARG1)", [.object(settings), .string(periodKey)],
+                          as: JSONValue.self)
     }
 
     // MARK: - Money received
