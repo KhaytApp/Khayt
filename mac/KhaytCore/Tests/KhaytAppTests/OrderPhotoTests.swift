@@ -118,13 +118,21 @@ struct OrderPhotoTests {
         #expect(OrderPhoto.encode(Data([0x25, 0x50, 0x44, 0x46])) == nil, "a PDF header")
     }
 
-    @Test("the record carries exactly the two fields the other app reads")
+    @Test("the record carries exactly the fields the other app reads, source only when known")
     func recordShape() throws {
         let record = OrderPhoto.record(thumb: "data:image/jpeg;base64,AAA", filename: "O-0-x.jpg")
         guard case .object(let o) = record else { Issue.record("not an object"); return }
         #expect(Set(o.keys) == ["thumb", "filename"],
                 Comment(rawValue: "the record gained or lost a field: \(o.keys.sorted())"))
         #expect(o["filename"] == .string("O-0-x.jpg"))
+        // The desktop's three words, and nothing else.
+        #expect(Set([OrderPhoto.Source.printer, .shop, .phone].map(\.rawValue)) == ["printer", "shop", "phone"])
+        for source in [OrderPhoto.Source.printer, .shop, .phone] {
+            guard case .object(let s) = OrderPhoto.record(thumb: "t", filename: "f", source: source) else {
+                Issue.record("not an object"); return
+            }
+            #expect(Set(s.keys) == ["thumb", "filename", "source"] && s["source"] == .string(source.rawValue))
+        }
     }
 
     @Test("Portfolio reads back exactly what this writes")

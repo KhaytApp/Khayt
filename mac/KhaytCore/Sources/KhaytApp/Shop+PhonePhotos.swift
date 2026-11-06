@@ -28,7 +28,7 @@ extension Shop {
         guard let made = OrderPhoto.encode(data) else { return refuse(415, "not-an-image") }
         let index = OrderPhoto.nextIndex(job)
         // lock: system — a paired phone's photo; the LAN route takes a signed enrolled device only.
-        if let problem = await attachJobPhoto(made, jobId: jobId, build: build, folder: folder,
+        if let problem = await attachJobPhoto(made, jobId: jobId, build: build, folder: folder, source: .phone,
                                                 gate: .system("a paired phone's photo, over the signed LAN route")) {
             return (500, Self.photoJson(["ok": .bool(false), "reason": .string("write-failed"),
                                          "message": .string(problem)]))

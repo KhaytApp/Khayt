@@ -87,6 +87,7 @@ extension LibraryEditPerfTests {
                 Issue.record("the photo never reached the book"); return
             }
             #expect(photos.count == 1)
+            if case .object(let photo)? = photos.first { #expect(photo["source"] == .string("printer")) }
             #expect(job?["rev"] == .number(4), "the job was not stamped, so the photo would not sync")
         }
     }
@@ -108,6 +109,7 @@ extension LibraryEditPerfTests {
                 Issue.record("the photo never reached the book"); return
             }
             #expect(photos.count == 1 && thumb.hasPrefix("data:image/jpeg;base64,"))
+            #expect(photo["source"] == .string("phone"))
             #expect(name.hasPrefix("JPERF1-0-") && answer.1.contains(name))
             let folder = try #require(shop.photoFolder)
             #expect(FileManager.default.fileExists(atPath: folder.appending(path: name).path),

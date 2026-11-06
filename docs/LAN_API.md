@@ -886,7 +886,7 @@ unset or short PIN is `401`.
 
 > **Native Mac only** (Nov 2026). `lib/lan-server.js` does not serve it yet.
 
-A paired phone adding a photo to a job. The body is the image itself (a JPEG from the phone's camera), not JSON, up to 8 MB, the desktop's own photo cap. The Mac files it exactly as its own Add Photo does (`OrderPhoto`): a 240px thumbnail inline in `printLog[].printPhotos[]`, a 1600px copy in `order-photos/` beside the book, the desktop's `{orderId}-{index}-{base36 ms}.jpg` filename, and the file written before the record. Any job status is accepted, as with the printer's own finish photo.
+A paired phone adding a photo to a job. The body is the image itself (a JPEG from the phone's camera), not JSON, up to 8 MB, the desktop's own photo cap. The Mac files it exactly as its own Add Photo does (`OrderPhoto`): a 240px thumbnail inline in `printLog[].printPhotos[]`, a 1600px copy in `order-photos/` beside the book, the desktop's `{orderId}-{index}-{base36 ms}.jpg` filename, `"source": "phone"` on the record (the optional field both apps write: `printer`, `shop` or `phone`, missing on older photos), and the file written before the record. Any job status is accepted, as with the printer's own finish photo.
 
 **Requires a signed, enrolled phone**, like the printer route. The owner PIN sent bare, or an API token, is refused with `403 {"ok":false,"reason":"device-key-required"}`. A body over 1 MB is judged from the head before it is read: over 8 MB is `413 {"ok":false,"reason":"too-large"}`, an unsigned head is the 403, and it shares the large-body slots (`503 busy`).
 
