@@ -188,6 +188,8 @@
 "orders.queue_clear" = "الطابور فارغ";
 "orders.pick" = "اختر طلبًا";
 "orders.pick.sub" = "تُفتح صفحته هنا، بجانب القائمة.";
+"clients.pick" = "اختر عميلًا";
+"clients.pick.sub" = "تُفتح صفحته هنا، بجانب القائمة.";
 "inventory.pick" = "اختر بكرة";
 "inventory.pick.sub" = "تُفتح صفحتها هنا، بجانب الرف.";
 "orders.queue_clear.sub" = "كل شيء منجز — لا طلبات نشطة";
