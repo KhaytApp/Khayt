@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the sample shop no longer sends real notifications.** Trying the sample shop posted "Khayt disconnected — Desktop unreachable on LAN" (there is no Mac to reach) and could post queue, overdue and low-stock alerts about made-up jobs. It now posts none; a paired shop is unchanged.
 - **A job moved over the LAN on the Mac goes through the same move as the board (Mac).** `PATCH /api/orders/:id` with a new status now takes the filament and packaging off the shelf on completion (and gives them back when a finished job is reopened), dates the completion, writes the activity log as the board does, gives an accepted quote its invoice number, and sends the messages and webhooks a move on the board sends. The status is applied once. A move the shop's rules refuse returns the same 409 as the desktop, `{ error: 'Move refused', code, params }`, and writes nothing.
 - **A quote approved over the LAN on the Mac gets its invoice number (Mac).** `POST /api/orders/:id/approve` now makes the same approval as the customer's own quote page: the job moves to Pending with one entry in its history, is numbered once from the shop's invoice counter, and sends the `quote_approved` webhook. A second approval changes nothing.
 - **Jobs created over the LAN on the Mac get a tracking link (Mac).** `POST /api/orders` now gives the job its tracking token and its id tag from fresh random bytes, as the desktop does.
