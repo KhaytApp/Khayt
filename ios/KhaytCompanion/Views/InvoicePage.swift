@@ -11,7 +11,45 @@ struct InvoicePage: View {
     /// The proforma rather than the invoice.
     var proforma = false
 
-    private var title: String { L10n.tr(proforma ? "proforma.title" : "invoice.title") }
+    var body: some View {
+        PaperPage(title: L10n.tr(proforma ? "proforma.title" : "invoice.title"),
+                  failure: InvoiceRefusal.failed.message) {
+            switch await api.invoice(orderId: orderId, proforma: proforma) {
+            case .refused(let why): return .refused(why.message)
+            case .paper(let doc, let filename): return .paper(doc, filename: filename, wholePage: false)
+            }
+        }
+    }
+}
+
+/// A packing slip, delivery note, work order or account statement
+/// (`ShopPapers.swift`), on the same paper as the invoice.
+struct ShopPaperPage: View {
+    @EnvironmentObject private var api: KhaytAPIClient
+    let subject: PaperSubject
+
+    var body: some View {
+        PaperPage(title: subject.title, failure: PaperRefusal.failed.message) {
+            switch await api.shopPaper(subject) {
+            case .refused(let why): return .refused(why.message)
+            case .paper(let doc, let filename, let wholePage): return .paper(doc, filename: filename, wholePage: wholePage)
+            }
+        }
+    }
+}
+
+/// One of the shop's papers, shown, and handed to the share sheet as an A4
+/// PDF — the invoice's page, for every paper the phone makes.
+struct PaperPage: View {
+    enum Loaded {
+        case paper(InvoiceDocument, filename: String, wholePage: Bool)
+        case refused(String)
+    }
+
+    let title: String
+    /// What to say when the PDF cannot be made.
+    let failure: String
+    let load: () async -> Loaded
 
     @StateObject private var paper = InvoicePaper()
     @State private var refusal: String?
@@ -44,15 +82,15 @@ struct InvoicePage: View {
                 }
             }
         }
-        .task { await load() }
+        .task { await show() }
     }
 
-    private func load() async {
-        switch await api.invoice(orderId: orderId, proforma: proforma) {
+    private func show() async {
+        switch await load() {
         case .refused(let why):
-            refusal = why.message
-        case .paper(let doc, let filename):
-            paper.show(doc, filename: filename)
+            refusal = why
+        case .paper(let doc, let filename, let wholePage):
+            paper.show(doc, filename: filename, wholePage: wholePage)
             // The PDF is made as soon as the paper is laid out, so the share
             // button is ready by the time a thumb reaches it.
             while !paper.drawn, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(100)) }
@@ -65,7 +103,7 @@ struct InvoicePage: View {
         making = true
         defer { making = false }
         file = paper.pdfFile()
-        if file == nil { refusal = InvoiceRefusal.failed.message }
+        if file == nil { refusal = failure }
     }
 }
 
@@ -94,11 +132,14 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         webView.isOpaque = false
     }
 
-    func show(_ doc: InvoiceDocument, filename: String) {
+    /// `wholePage`: the document is a page of its own, styles and all — the
+    /// packing slip (`lib/shop-documents.js`) — and is drawn as it is rather
+    /// than inside the invoice's stylesheet, as the Mac draws it.
+    func show(_ doc: InvoiceDocument, filename: String, wholePage: Bool = false) {
         document = doc
         self.filename = filename
         drawn = false
-        webView.loadHTMLString(Self.page(doc), baseURL: nil)
+        webView.loadHTMLString(wholePage ? doc.html : Self.page(doc), baseURL: nil)
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
@@ -128,7 +169,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         let data = Self.pdf(from: webView.viewPrintFormatter())
         guard !data.isEmpty else { return nil }
         do {
-            let dir = FileManager.default.temporaryDirectory.appending(path: "khayt-invoice-\(UUID().uuidString)")
+            let dir = FileManager.default.temporaryDirectory.appending(path: "khayt-paper-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let url = dir.appending(path: filename)
             try data.write(to: url, options: .atomic)

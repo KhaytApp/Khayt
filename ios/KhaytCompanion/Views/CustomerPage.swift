@@ -12,6 +12,7 @@ struct CustomerPage: View {
     @State private var openOrder: QueueOrder?
     @State private var newOrder = false
     @State private var machines: [MachineInfo] = []
+    @State private var showingStatement = false
 
     var body: some View {
         ScrollView {
@@ -22,6 +23,15 @@ struct CustomerPage: View {
                 }
                 if let s = summary {
                     money(s)
+                    // Every job, what was paid and what is still owed, as a
+                    // paper to share (`ShopPapers.swift`).
+                    Button { showingStatement = true } label: {
+                        PaperRow(title: L10n.tr("paper.statement"), detail: L10n.tr("paper.statement.sub"),
+                                 icon: "doc.plaintext")
+                            .padding(.horizontal, 14).padding(.vertical, 2)
+                            .card()
+                    }
+                    .buttonStyle(.plain)
                     jobs(L10n.tr("customer.open"), s.openJobs, empty: L10n.tr("customer.open.none"))
                     if !s.agreements.isEmpty { agreements(s) }
                     jobs(L10n.tr("customer.history"), s.finishedJobs, empty: L10n.tr("customer.history.none"))
@@ -57,6 +67,9 @@ struct CustomerPage: View {
         }
         .sheet(isPresented: $newOrder) {
             NewOrderSheet(machines: machines, onCreated: { Task { await load() } }, initial: draft)
+        }
+        .navigationDestination(isPresented: $showingStatement) {
+            ShopPaperPage(subject: .statement(clientId: client.id))
         }
         .navigationDestination(item: $openOrder) { order in
             OrderDetailPage(order: order, facts: nil) { await load() }
