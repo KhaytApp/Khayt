@@ -219,6 +219,9 @@ final class LanServer {
         var printerWebhookToken: String = ""
         /// Two random bytes, hex — the random half of a new record's id.
         var randomHex: () -> String = { LanServer.randomToken(bytes: 2) }
+        /// `n` random bytes for a new job's tokens (`lib/order-new.js`
+        /// `ctx.tokens`): its tracking link, its quote approval and its id tag.
+        var randomBytes: (_ n: Int) -> [UInt8] = { n in (0..<n).map { _ in UInt8.random(in: 0...255) } }
     }
 
     struct Request {

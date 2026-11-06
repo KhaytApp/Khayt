@@ -61,6 +61,17 @@ struct ShopOperator: Identifiable, Hashable, Sendable {
     var fields: Fields {
         Fields(name: name, role: role, roleKey: shownRoleKey, hourlyRate: hourlyRate, active: active)
     }
+
+    /// The access level a NEW person starts with in the editor. The first
+    /// person a shop adds is its owner, and that level is WRITTEN as `roleKey`
+    /// (`Shop.writeOperator`), never left to be read off the job title. The
+    /// desktop's lock used to create its first admin with only a translated
+    /// title, and `lib/rbac.js roleFromLegacy` read "مدير", "管理者", "Yönetici"
+    /// and "管理员" as staff. Anyone added after the first starts as an
+    /// operator, so nobody becomes an owner unless someone chooses it.
+    static func startingRoleKey(forNewIn existing: [ShopOperator]) -> String {
+        existing.isEmpty ? "owner" : "operator"
+    }
 }
 
 /// Hours an operator logged against a job: `store.timeEntries[]`.
@@ -303,7 +314,9 @@ struct OperatorEditor: View {
         .padding(20)
         .frame(width: 440)
         .onAppear {
-            if let original { fields = original.fields }
+            if let original { fields = original.fields } else {
+                fields.roleKey = ShopOperator.startingRoleKey(forNewIn: shop.operators)
+            }
             shop.moveProblem = nil
         }
     }

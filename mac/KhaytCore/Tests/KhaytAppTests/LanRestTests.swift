@@ -157,7 +157,11 @@ struct LanRestTests {
         #expect(first["project"] == .string("Gear"))
         #expect(first["price"] == .number(12.35))
         guard case .string(let id)? = first["id"] else { Issue.record("no id"); return }
-        #expect(id.hasSuffix("-ab12"))
+        // Tagged from `tokens.id` (four 0x07 bytes → "7777"), as the desktop
+        // tags it, and given a tracking link from `tokens.tracking`.
+        #expect(id.hasSuffix("-7777"))
+        #expect(first["trackingToken"] == .string(String(repeating: "07", count: 16)))
+        #expect(first["quoteApprovalToken"] == nil, "a job is not a quote")
         let patched = try await bench.send("PATCH", "/api/orders/" + id, body: Self.json(#"{"status":"qc"}"#), headers: Self.pin)
         #expect(patched.status == 200)
         #expect(bench.book.job(id)?["status"] == .string("qc"))
@@ -237,6 +241,147 @@ struct LanRestTests {
         #expect(bench.book.job("J1")?["status"] == .string("post"))
         guard case .array(let trail)? = bench.book.job("J1")?["statusHistory"] else { Issue.record("no history"); return }
         #expect(trail.count == 2, "one new entry, not one per decision")
+    }
+
+    /// A shelf and a job that prints 160 g off it, in a shop that deducts.
+    static func shelfAndJob(_ bench: Bench, status: String = "printing", settings: [String: JSONValue] = [:]) {
+        var s: [String: JSONValue] = ["autoDeduct": .bool(true)]
+        for (k, v) in settings { s[k] = v }
+        bench.book.value["settings"] = .object(s)
+        bench.book.value["inventory"] = .array([
+            .object(["id": .string("S1"), "material": .string("PLA"), "weight": .number(1000), "rev": .number(1)]),
+        ])
+        bench.book.put(["id": .string("J1"), "project": .string("Bracket"), "status": .string(status), "rev": .number(1),
+                        "parts": .array([.object(["filamentId": .string("S1"), "printWeight": .number(150),
+                                                  "supportWeight": .number(10), "qty": .number(1)])]),
+                        "statusHistory": .array([.object(["status": .string(status), "at": .string("2027-01-15T08:00:00.000Z")])])])
+    }
+
+    static func weight(_ bench: Bench, _ id: String) -> JSONValue? {
+        rows(bench, "inventory").first { $0["id"] == .string(id) }?["weight"]
+    }
+
+    @Test("a job finished over the LAN runs the board's move: the shelf, the completion, one history entry — once")
+    func lanCompletionIsTheBoardsMove() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        Self.shelfAndJob(bench)
+        let done = try await bench.send("PATCH", "/api/orders/J1", body: Self.json(#"{"status":"completed"}"#), headers: Self.pin)
+        #expect(done.status == 200)
+        let job = try #require(bench.book.job("J1"))
+        #expect(job["status"] == .string("completed"))
+        #expect(job["completedAt"] != nil, "the completion is dated")
+        #expect(job["materialDeducted"] == .bool(true))
+        #expect(Self.weight(bench, "S1") == .number(840), "160 g off the spool, as a move on the board takes")
+        guard case .array(let trail)? = job["statusHistory"] else { Issue.record("no history"); return }
+        #expect(trail.count == 2, "one new entry — the rule applied once, not by JavaScript and again by the move")
+
+        // The same status again is no move: nothing more comes off the shelf.
+        let again = try await bench.send("PATCH", "/api/orders/J1", body: Self.json(#"{"status":"completed"}"#), headers: Self.pin)
+        #expect(again.status == 200)
+        #expect(Self.weight(bench, "S1") == .number(840), "never deducted twice")
+        guard case .array(let still)? = bench.book.job("J1")?["statusHistory"] else { Issue.record("no history"); return }
+        #expect(still.count == 2)
+    }
+
+    @Test("the move and the machine in one PATCH: both land, the status once")
+    func moveAndMachine() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        Self.shelfAndJob(bench, status: "pending")
+        bench.book.value["machines"] = .array([.object(["id": .string("m1"), "name": .string("MK4")])])
+        let reply = try await bench.send("PATCH", "/api/orders/J1", body: Self.json(#"{"status":"printing","machineId":"m1"}"#),
+                                         headers: Self.pin)
+        #expect(reply.status == 200)
+        let job = try #require(bench.book.job("J1"))
+        #expect(job["status"] == .string("printing"))
+        #expect(job["machine"] == .string("MK4"))
+        #expect(job["timerStart"] != nil, "the timer starts, as on the board")
+        #expect(Self.rows(bench, "auditLog").first?["detail"] == .string("J1 → printing"),
+                "and the move is in the team's activity log")
+        let body = try JSONValue.decode(JSONValue.self, from: reply.body)
+        guard case .object(let b) = body, case .object(let o)? = b["order"] else { Issue.record("no order"); return }
+        #expect(o["status"] == .string("printing"))
+        #expect(o["machineId"] == .string("m1"))
+        // A machine that is not there is refused before anything moves.
+        Self.shelfAndJob(bench, status: "pending")
+        let bad = try await bench.send("PATCH", "/api/orders/J1", body: Self.json(#"{"status":"printing","machineId":"nope"}"#),
+                                       headers: Self.pin)
+        #expect(bad.status == 404)
+        #expect(bench.book.job("J1")?["status"] == .string("pending"))
+    }
+
+    @Test("a move the shop's rules refuse is the desktop's 409, word for word, and writes nothing")
+    func refusedMoveIs409() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        Self.shelfAndJob(bench, status: "pending", settings: ["productionPaused": .bool(true)])
+        let before = bench.book.value
+        let reply = try await bench.send("PATCH", "/api/orders/J1", body: Self.json(#"{"status":"printing"}"#), headers: Self.pin)
+        #expect(reply.status == 409)
+        #expect(reply.text == #"{"code":"production_paused","error":"Move refused","params":{}}"#)
+        #expect(bench.book.value == before)
+    }
+
+    @Test("inside the write, a refused move is the same 409 body and the book is untouched")
+    func refusalInsideTheWrite() async throws {
+        let engine = try KhaytEngine()
+        let words = Words()
+        await words.load("en", engine: engine)
+        var root: [String: JSONValue] = [
+            "settings": .object(["productionPaused": .bool(true)]),
+            "printLog": .array([.object(["id": .string("J1"), "status": .string("pending")])]),
+        ]
+        let before = root
+        let done = try await Shop.applyLanRestWrite(into: &root, engine: engine, words: words, op: "orderPatch",
+                                                    args: [.string("J1"), .object(["status": .string("printing")]), .object([:])])
+        #expect(done.outcome.status == 409)
+        #expect(done.outcome.body == .object(["error": .string("Move refused"), "code": .string("production_paused"),
+                                              "params": .object([:])]))
+        #expect(done.move == nil)
+        #expect(root == before)
+    }
+
+    @Test("the board's own refusal carries the gate's code and params, which the LAN 409 sends")
+    func moveRefusalCarriesTheCode() async throws {
+        let engine = try KhaytEngine()
+        let words = Words()
+        await words.load("en", engine: engine)
+        var root: [String: JSONValue] = [
+            "settings": .object(["productionPaused": .bool(true)]),
+            "printLog": .array([.object(["id": .string("J1"), "status": .string("pending")])]),
+        ]
+        do {
+            _ = try await Shop.applyMove(to: &root, id: "J1", stage: .printing, engine: engine, words: words)
+            Issue.record("a paused shop moved a job to printing")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "production_paused")
+            #expect(refused.params.isEmpty)
+            #expect(!refused.sentence.isEmpty, "the person at the board still reads a sentence")
+        }
+        do {
+            _ = try await Shop.applyMove(to: &root, id: "missing", stage: .printing, engine: engine, words: words)
+            Issue.record("a missing job moved")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "order_gone")
+        }
+    }
+
+    @Test("a quote accepted over the LAN earns its invoice number, as on the board")
+    func quoteAcceptedGetsInvoiceNumber() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        bench.book.value["settings"] = .object([:])
+        bench.book.put(["id": .string("QUO-2027-0001-abcd"), "jobNumber": .string("QUO-2027-0001"),
+                        "status": .string("quote"), "project": .string("Sign"), "invoiceNum": .null])
+        let reply = try await bench.send("PATCH", "/api/orders/QUO-2027-0001-abcd", body: Self.json(#"{"status":"pending"}"#),
+                                         headers: Self.pin)
+        #expect(reply.status == 200)
+        let job = try #require(bench.book.job("QUO-2027-0001-abcd"))
+        #expect(job["status"] == .string("pending"))
+        #expect(job["quoteAcceptedAt"] != nil)
+        guard case .string(let number)? = job["invoiceNum"] else { Issue.record("no invoice number"); return }
+        #expect(number.hasPrefix("INV-"))
     }
 
     @Test("a server that has not wired the writes does not have the write routes")

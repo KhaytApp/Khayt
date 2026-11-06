@@ -100,7 +100,9 @@ extension LanServer {
                                         "status": request.query["status"].map { .string($0) } ?? .null])
             return await restRead(request, "ordersList", [q])
         case "/api/orders" where m == "POST":
-            return await restWrite(request, "orderCreate") { [$0, self.restContext()] }
+            // With the job's tokens, as the desktop's server hands them: a job
+            // taken over the LAN gets a tracking link (`lib/order-new.js`).
+            return await restWrite(request, "orderCreate") { [$0, self.restContext(withTokens: true)] }
         case "/api/machines" where isGet:
             return await restRead(request, "machinesList", [])
         case "/api/inventory" where isGet:
@@ -119,7 +121,7 @@ extension LanServer {
         }
         if let (id, rest) = Self.restSegment(path, under: "/api/orders/") {
             if rest.isEmpty && m == "PATCH" {
-                return await restWrite(request, "orderPatch") { [.string(id), $0] }
+                return await restWrite(request, "orderPatch") { [.string(id), $0, self.restContext()] }
             }
             if rest == "quote-url" && isGet {
                 let base = "http://" + (request.headers["host"] ?? "localhost")
@@ -145,14 +147,25 @@ extension LanServer {
     /// The moment, the shop's day and two random bytes — built ONCE per
     /// request, so the record decided on the held book and the one written
     /// inside the write carry the same id.
-    func restContext() -> JSONValue {
+    ///
+    /// `withTokens` adds a new job's random bytes, in the shape the desktop's
+    /// server passes (`lib/lan-server.js`, `POST /api/orders`): 16 for the
+    /// tracking link, 16 for the quote approval and 4 for the id tag. With
+    /// `tokens.id` present, `orderCreate` tags the id from those bytes rather
+    /// than from `rand`, as it does on the desktop.
+    func restContext(withTokens: Bool = false) -> JSONValue {
         let now = host.now()
-        return .object([
+        var ctx: [String: JSONValue] = [
             "nowMs": .number((now.timeIntervalSince1970 * 1000).rounded()),
             "nowIso": .string(StoreWriter.iso(now)),
             "today": .string(Self.localDay(now)),
             "rand": .string(host.randomHex()),
-        ])
+        ]
+        if withTokens {
+            let bytes = { (n: Int) in JSONValue.array(self.host.randomBytes(n).map { .number(Double($0)) }) }
+            ctx["tokens"] = .object(["tracking": bytes(16), "quoteApproval": bytes(16), "id": bytes(4)])
+        }
+        return .object(ctx)
     }
 
     private var restBookNow: JSONValue { .object(host.restBook?() ?? host.store()) }
@@ -269,6 +282,7 @@ extension Shop {
     func lanRestWrite(_ op: String, args: [JSONValue]) async throws -> KhaytEngine.LanRestOutcome {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var outcome: KhaytEngine.LanRestOutcome?
+        var moved: LanRestMove?
         do {
             // lock: system — a LAN REST write; the LAN server gated it with the owner LAN PIN or a scoped API token.
             try await StoreWriter.update(
@@ -276,17 +290,97 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                let out = try await Self.applyLanRest(into: &root, engine: engine, op: op, args: args)
-                outcome = out
+                let done = try await Self.applyLanRestWrite(into: &root, engine: engine, words: self.words,
+                                                            op: op, args: args)
+                outcome = done.outcome
+                moved = done.move
                 // Refused on the book as it is now: nothing to write.
-                if out.changed == nil { throw LanRestUnchanged() }
+                if done.outcome.changed == nil { throw LanRestUnchanged() }
             }
         } catch is LanRestUnchanged {
             if let outcome { return outcome }
         }
         await load(source)
         guard let outcome else { throw CocoaError(.fileWriteUnknown) }
+        // Only once the write has committed, as after a move on the board:
+        // the messages and webhooks the move owes.
+        if let moved {
+            let o = moved.outcome
+            await deliverMove(telegram: o.telegram, email: o.email, portal: o.portal, webhooks: o.webhooks,
+                              before: moved.before, jobId: moved.jobId)
+        }
         return outcome
+    }
+
+    /// A status move made over the LAN by `applyLanRestWrite`: what it owes
+    /// outward, and the job as the write found it (for the WhatsApp milestone).
+    struct LanRestMove {
+        let jobId: String
+        let before: JSONValue?
+        let outcome: MoveOutcome
+    }
+
+    /// A LAN REST write, as `lanRestWrite` runs it inside the write.
+    ///
+    /// ── A STATUS MOVE IS THE BOARD'S MOVE ─────────────────────────────────
+    ///
+    /// `PATCH /api/orders/:id` with a new `status` is a move, and on this Mac a
+    /// move is `applyMove`: the shared rules' gate and `apply`, the filament
+    /// and packaging taken off the shelf (and given back when a finished job is
+    /// reopened), the invoice number a quote earns when it is accepted, the
+    /// activity log, and what it owes the customer and the webhooks. The rule
+    /// in `lib/lan-rest.js` makes the same move without any of that: its
+    /// effects travel in `emit`, which only the desktop window runs.
+    ///
+    /// So the request is first decided by `orderPatch` on the book as it is
+    /// now (a bad status or machine is its 400, a missing job its 404, a
+    /// refusal its 409), and that answer is discarded when it is a yes. The
+    /// move is made by `applyMove` alone, then `orderPatch` runs again on the
+    /// moved book. The job already has the status at that point, so it changes
+    /// only the machine and builds the reply. The status is applied once: the
+    /// JavaScript rule never applies it to the book this writes.
+    ///
+    /// A move `applyMove` refuses (the rules, or a channel this Mac cannot
+    /// send) is the 409 the desktop sends, `{ error: 'Move refused', code,
+    /// params }`, and nothing is written.
+    static func applyLanRestWrite(into root: inout [String: JSONValue], engine: KhaytEngine, words: Words,
+                                  op: String, args: [JSONValue]) async throws
+        -> (outcome: KhaytEngine.LanRestOutcome, move: LanRestMove?) {
+        guard op == "orderPatch", let (id, stage) = lanStatusMove(in: root, args: args) else {
+            return (try await applyLanRest(into: &root, engine: engine, op: op, args: args), nil)
+        }
+        let check = try await engine.lanRest(op, store: .object(lanRestBook(from: root)), args: args)
+        guard check.changed != nil else { return (check, nil) }
+        let before = rows(root, "printLog").first { recordId($0) == id }
+        var moved = root
+        let move: MoveOutcome
+        do {
+            move = try await applyMove(to: &moved, id: id, stage: stage, engine: engine, words: words)
+        } catch let refused as MoveRefused {
+            let body: JSONValue = .object(["error": .string("Move refused"),
+                                           "code": .string(refused.code ?? "refused"),
+                                           "params": .object(refused.params)])
+            return (KhaytEngine.LanRestOutcome(status: 409, body: body, store: nil), nil)
+        }
+        // A quote accepted into a job takes its models off Print next, as a
+        // move on the board does.
+        clearPrintNext(&moved, acceptedFrom: before,
+                       now: rows(moved, "printLog").first { recordId($0) == id })
+        root = moved
+        let out = try await applyLanRest(into: &root, engine: engine, op: op, args: args)
+        return (out, LanRestMove(jobId: id, before: before, outcome: move))
+    }
+
+    /// The job and the stage when `orderPatch`'s arguments ask to move a job
+    /// that is in the book to a status it does not already have. Nil for
+    /// anything else: no status, the same status, an unknown one, or a job
+    /// that is not there. `orderPatch` answers each of those itself.
+    nonisolated static func lanStatusMove(in root: [String: JSONValue], args: [JSONValue]) -> (String, Stage)? {
+        guard args.count >= 2, case .string(let id) = args[0], case .object(let body) = args[1],
+              case .string(let status)? = body["status"], let stage = Stage(rawValue: status),
+              let job = rows(root, "printLog").first(where: { recordId($0) == id }),
+              case .object(let o) = job, o["status"] != .string(status) else { return nil }
+        return (id, stage)
     }
 }
 

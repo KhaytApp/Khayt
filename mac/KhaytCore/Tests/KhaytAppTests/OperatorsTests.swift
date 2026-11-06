@@ -102,6 +102,44 @@ import KhaytCore
         #expect(Shop.uid("OP").hasPrefix("OP-"))
     }
 
+    @Test("the first person a shop adds starts as its owner; everyone after as an operator")
+    func firstOperatorIsOwner() throws {
+        #expect(ShopOperator.startingRoleKey(forNewIn: []) == "owner")
+        let ops = Shop.rows(Self.book(), "operators").compactMap(ShopOperator.init(row:))
+        #expect(ShopOperator.startingRoleKey(forNewIn: ops) == "operator", "nobody is made an owner by default")
+    }
+
+    @Test("an Arabic shop's first owner is written as an owner, not read off the title")
+    func arabicOwnerIsWritten() async throws {
+        // The shop's language decides the title; the level is written beside it.
+        var root: [String: JSONValue] = ["operators": .array([]), "printLog": .array([])]
+        var undo: [Shop.ChangedRecord] = []
+        let f = ShopOperator.Fields(name: "نورة", role: "مدير",
+                                    roleKey: ShopOperator.startingRoleKey(forNewIn: []), hourlyRate: 0, active: true)
+        Shop.writeOperator(into: &root, id: nil, f, opened: nil, newId: "OP-owner", undo: &undo)
+        let r = try #require(Self.record(root, "operators", "OP-owner"))
+        #expect(r["roleKey"] == .string("owner"))
+        #expect(r["role"] == .string("مدير"), "the title is kept as typed")
+        #expect(ShopOperator(row: .object(r))?.roleKey == "owner", "and the lock reads the level, not the title")
+
+        // Why it must be written: the shared rule reads every one of these
+        // titles as staff with the lock on, so a record WITHOUT `roleKey` (the
+        // desktop's lock before #2264) is an owner read as an operator. Those
+        // records are left as they are — no migration — and stay so here.
+        let engine = try KhaytEngine()
+        for title in ["مدير", "管理者", "Yönetici", "管理员"] {
+            #expect(try await engine.roleFromLegacy(title, hasLock: true) == "operator", "\(title)")
+        }
+        #expect(try await engine.roleFromLegacy("Admin", hasLock: true) == "owner")
+        var legacy: [String: JSONValue] = ["operators": .array([
+            .object(["id": .string("OP-old"), "name": .string("نورة"), "role": .string("مدير")]),
+        ])]
+        let op = try #require(ShopOperator(row: Shop.rows(legacy, "operators")[0]))
+        #expect(op.roleKey == nil)
+        Shop.writeOperator(into: &legacy, id: "OP-old", op.fields, opened: op.fields, newId: "unused", undo: &undo)
+        #expect(Self.record(legacy, "operators", "OP-old")?["roleKey"] == nil, "an existing book is not migrated")
+    }
+
     @Test("the access levels are lib/rbac.js's, and an old title reads as it does there")
     func rolesAgree() throws {
         let src = try String(contentsOf: Self.repoRoot().appending(path: "lib/rbac.js"), encoding: .utf8)
