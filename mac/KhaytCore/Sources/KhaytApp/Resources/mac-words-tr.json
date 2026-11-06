@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "Model okunuyor",
  "mac.v3d_sampled": "{total} üçgenin {shown} tanesi gösteriliyor.",
  "mac.v3d_too_big": "Bu model 3B göstermek için çok büyük.",
- "mac.v3d_failed": "Bu model 3B gösterilemedi."
+ "mac.v3d_failed": "Bu model 3B gösterilemedi.",
+ "mac.mkr_rate_publish": "MakerRun saatte 20, günde 60 yeni ilana izin verir ve bu hesap sınıra ulaştı. Hiçbir şey kaybolmadı: bu ilanı daha sonra tamamlayın.",
+ "mac.mkr_field_refused": "{field}: {message}"
 }

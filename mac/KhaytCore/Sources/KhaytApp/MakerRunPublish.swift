@@ -121,6 +121,7 @@ struct MakerRunPublishSheet: View {
             if badExt { warning(w.callIt("mr.publish_bad_ext", ["ext": .string(ext.isEmpty ? "?" : ext)])) }
             if !here { warning(w.callIt("mac.mkr_not_here")) }
             if let problem { warning(problem) }
+            if let note { Text(note).font(.callout).fixedSize(horizontal: false, vertical: true) }
             field(w.callIt("mr.f_title"), "title") {
                 TextField("", text: $form.title).textFieldStyle(.roundedBorder)
             }
@@ -381,9 +382,21 @@ struct MakerRunPublishSheet: View {
     }
 
     private func fail(_ id: String, _ error: Error) {
-        set(id, .failed)
         running = false
-        problem = shop.saidMakerRun(error)
+        let code = (error as? MakerRun.Failure)?.code
+        // Maintenance and the hourly/daily cap are waits, not failures: the
+        // step goes back to waiting, the listing already made stays on the
+        // record, and Finish Upload (or Publish) carries on later. Nothing
+        // here retries by itself.
+        if code == "maintenance" || code == "rate_limited" {
+            set(id, .pending)
+            problem = nil
+            note = shop.saidMakerRun(error, publishing: true)
+            stage = listing == nil ? .form : .status
+            return
+        }
+        set(id, .failed)
+        problem = shop.saidMakerRun(error, publishing: true)
         if id == "create" {
             if let f = error as? MakerRun.Failure {
                 if f.code == "timeout" || f.code == "network" { createUncertain = true }
@@ -556,7 +569,7 @@ struct MakerRunPublishSheet: View {
         catch let f as MakerRun.Failure where f.code == "not_found" {
             // Already gone on the website is the outcome the shop asked for.
         } catch {
-            problem = shop.saidMakerRun(error)
+            problem = shop.saidMakerRun(error, publishing: true)
             stage = .status
             return
         }

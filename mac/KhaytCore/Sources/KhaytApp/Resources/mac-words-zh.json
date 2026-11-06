@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "正在读取模型",
  "mac.v3d_sampled": "显示 {total} 个三角形中的 {shown} 个。",
  "mac.v3d_too_big": "此模型太大，无法以 3D 显示。",
- "mac.v3d_failed": "无法以 3D 显示此模型。"
+ "mac.v3d_failed": "无法以 3D 显示此模型。",
+ "mac.mkr_rate_publish": "MakerRun 每小时最多 20 个新列表、每天最多 60 个，此账户已达上限。没有任何内容丢失：请稍后完成此列表。",
+ "mac.mkr_field_refused": "{field}：{message}"
 }

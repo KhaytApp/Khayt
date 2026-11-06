@@ -379,6 +379,83 @@ struct MakerRunClientTests {
         let status = try await client.status(slug: "clip")
         #expect(status.found && status.status == "published" && status.badge == true)
     }
+
+    // MARK: The four codes the MakerRun lane checked against the live API
+
+    static func linked() -> TestTokenStore {
+        TestTokenStore(MakerRunTokens(access: "A", refresh: "R", expires: 1_800_003_600))
+    }
+
+    static func termsSet(_ client: MakerRunClient) async {
+        await client.setTerms(categories: ["tools"], materials: ["rigid"], licences: ["CC0-1.0"])
+    }
+
+    static func input() -> MakerRun.CreateInput {
+        var i = MakerRun.CreateInput()
+        i.title = "Clip"; i.category = "tools"; i.license = "CC0-1.0"
+        return i
+    }
+
+    @Test("403 mfa_required is not a dead token: no refresh, no sign-out, the code comes back")
+    func mfaKeepsTheLink() async {
+        let session = MakerRunStub.session([
+            "/api/v1/designs": [(403, #"{"error":{"code":"mfa_required","message":"Complete two-factor."}}"#)],
+        ])
+        let store = Self.linked()
+        let client = MakerRunClient(base: Self.base, session: session, store: store, now: Self.now)
+        await Self.termsSet(client)
+        do { _ = try await client.create(Self.input()); Issue.record("expected mfa_required") }
+        catch let f as MakerRun.Failure { #expect(f.code == "mfa_required" && f.status == 403) }
+        catch { Issue.record("\(error)") }
+        #expect(await store.tokens?.refresh == "R", "the Keychain token stays")
+        #expect(await client.isLinked())
+        #expect(MakerRunStub.requests().map(\.path) == ["/api/v1/designs"], "no refresh, no retry")
+    }
+
+    @Test("503 maintenance is said with its wait, asked once, and the link stays")
+    func maintenanceOnce() async {
+        let session = MakerRunStub.session([
+            "/api/v1/designs": [(503, #"{"error":{"code":"maintenance","message":"Back soon."}}"#)],
+        ])
+        let store = Self.linked()
+        let client = MakerRunClient(base: Self.base, session: session, store: store, now: Self.now)
+        do { _ = try await client.listDesigns(MakerRun.Query()); Issue.record("expected maintenance") }
+        catch let f as MakerRun.Failure { #expect(f.code == "maintenance" && f.retryAfter == 60) }
+        catch { Issue.record("\(error)") }
+        #expect(MakerRunStub.requests().count == 1, "no retry storm")
+        #expect(await store.tokens?.refresh == "R")
+    }
+
+    @Test("429 rate_limited on publish comes back coded, once, with the link kept")
+    func rateLimited() async {
+        let session = MakerRunStub.session([
+            "/api/v1/designs/clip/files": [(429, #"{"error":{"code":"rate_limited","message":"Slow down."}}"#)],
+        ])
+        let store = Self.linked()
+        let client = MakerRunClient(base: Self.base, session: session, store: store, now: Self.now)
+        do { _ = try await client.uploadModel(slug: "clip", filename: "clip.3mf", data: Data("PK".utf8)); Issue.record("expected rate_limited") }
+        catch let f as MakerRun.Failure { #expect(f.code == "rate_limited" && f.retryAfter == 60) }
+        catch { Issue.record("\(error)") }
+        #expect(MakerRunStub.requests().count == 1)
+        #expect(await store.tokens?.refresh == "R")
+    }
+
+    @Test("422 invalid carries each refused field")
+    func invalidFields() async {
+        let session = MakerRunStub.session([
+            "/api/v1/designs": [(422, #"{"error":{"code":"invalid","message":"Some fields were rejected.","details":[{"field":"title","message":"Too similar to another listing."},{"field":"license","message":"Not allowed for hosted files."}]}}"#)],
+        ])
+        let client = MakerRunClient(base: Self.base, session: session, store: Self.linked(), now: Self.now)
+        await Self.termsSet(client)
+        do { _ = try await client.create(Self.input()); Issue.record("expected invalid") }
+        catch let f as MakerRun.Failure {
+            #expect(f.code == "invalid")
+            #expect(f.details == [MakerRun.Detail(field: "title", message: "Too similar to another listing."),
+                                  MakerRun.Detail(field: "license", message: "Not allowed for hosted files.")])
+        }
+        catch { Issue.record("\(error)") }
+    }
+
 }
 
 // MARK: - The planner and the vocabularies, through the engine

@@ -29,6 +29,8 @@ enum MakerRunWords {
         "mac.mkr_show_model": ["en": "Show in Library", "ar": "عرض في المكتبة"],
         "mac.mkr_publish": ["en": "Publish to MakerRun…", "ar": "النشر على MakerRun…"],
         "mac.mkr_on_makerrun": ["en": "On MakerRun…", "ar": "على MakerRun…"],
+        "mac.mkr_rate_publish": ["en": "MakerRun allows 20 new listings an hour and 60 a day, and this account has reached that. Nothing was lost: finish this listing later.", "ar": "يسمح MakerRun بعشرين إدراجًا جديدًا في الساعة وستين في اليوم، وقد بلغ هذا الحساب الحد. لم يضِع شيء: أكمل هذا الإدراج لاحقًا."],
+        "mac.mkr_field_refused": ["en": "{field}: {message}", "ar": "{field}: {message}"],
         "mac.mkr_choose": ["en": "Choose a design to see its files.", "ar": "اختر تصميمًا لعرض ملفاته."],
 
         // ── The colour planner ────────────────────────────────────────────

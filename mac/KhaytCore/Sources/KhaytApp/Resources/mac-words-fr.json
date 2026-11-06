@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "Lecture du modèle",
  "mac.v3d_sampled": "{shown} triangles affichés sur {total}.",
  "mac.v3d_too_big": "Ce modèle est trop volumineux pour l'affichage 3D.",
- "mac.v3d_failed": "Ce modèle n'a pas pu être affiché en 3D."
+ "mac.v3d_failed": "Ce modèle n'a pas pu être affiché en 3D.",
+ "mac.mkr_rate_publish": "MakerRun autorise 20 nouvelles annonces par heure et 60 par jour, et ce compte a atteint la limite. Rien n'est perdu : terminez cette annonce plus tard.",
+ "mac.mkr_field_refused": "{field} : {message}"
 }

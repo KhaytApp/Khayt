@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "Modell wird gelesen",
  "mac.v3d_sampled": "{shown} von {total} Dreiecken werden gezeigt.",
  "mac.v3d_too_big": "Dieses Modell ist zu groß für die 3D-Ansicht.",
- "mac.v3d_failed": "Dieses Modell konnte nicht in 3D gezeigt werden."
+ "mac.v3d_failed": "Dieses Modell konnte nicht in 3D gezeigt werden.",
+ "mac.mkr_rate_publish": "MakerRun erlaubt 20 neue Angebote pro Stunde und 60 pro Tag, und dieses Konto hat das erreicht. Nichts ging verloren: Schließen Sie dieses Angebot später ab.",
+ "mac.mkr_field_refused": "{field}: {message}"
 }

@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "Lendo o modelo",
  "mac.v3d_sampled": "Mostrando {shown} de {total} triângulos.",
  "mac.v3d_too_big": "Este modelo é grande demais para mostrar em 3D.",
- "mac.v3d_failed": "Não foi possível mostrar este modelo em 3D."
+ "mac.v3d_failed": "Não foi possível mostrar este modelo em 3D.",
+ "mac.mkr_rate_publish": "O MakerRun permite 20 novos anúncios por hora e 60 por dia, e esta conta chegou ao limite. Nada se perdeu: termine este anúncio mais tarde.",
+ "mac.mkr_field_refused": "{field}: {message}"
 }

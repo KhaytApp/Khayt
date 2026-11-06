@@ -107,4 +107,59 @@ struct MakerRunAppTests {
         let centre = loaded.node.childNodes.first?.position
         #expect(centre?.x == -5 && centre?.y == -5 && centre?.z == -5)
     }
+
+    // MARK: What the shop is told, for the four codes the live API sends
+
+    @Test("mfa_required tells the shop to finish two-factor on makerrun.com")
+    func saysMfa() {
+        let words = Words()
+        let said = Shop.saidMakerRun(MakerRun.Failure("mfa_required", "x", status: 403), words: words, publishing: true)
+        #expect(said == words.callIt("mr.err_mfa"))
+        #expect(said != words.callIt("mr.err_relink"), "not a sign-in-again")
+    }
+
+    @Test("maintenance says MakerRun is down for maintenance and when to come back")
+    func saysMaintenance() {
+        let words = Words()
+        let said = Shop.saidMakerRun(MakerRun.maintenanceFailure(retryAfter: 600), words: words)
+        #expect(said == words.callIt("mr.err_maintenance", ["mins": .string(words.numeral(10))]))
+        #expect(said.contains("maintenance"))
+    }
+
+    @Test("rate_limited while publishing names the 20-an-hour, 60-a-day cap")
+    func saysRateLimit() {
+        let words = Words()
+        let f = MakerRun.Failure("rate_limited", "x", status: 429, retryAfter: 60)
+        let publishing = Shop.saidMakerRun(f, words: words, publishing: true)
+        #expect(publishing == words.callIt("mac.mkr_rate_publish"))
+        #expect(publishing.contains("20") && publishing.contains("60"))
+        // Browsing keeps the desktop's plain "wait a minute".
+        #expect(Shop.saidMakerRun(f, words: words) == words.callIt("mr.err_rate", ["secs": .string(words.numeral(60))]))
+    }
+
+    @Test("invalid names each refused field by the form's own label")
+    func saysInvalidFields() {
+        let words = Words()
+        let f = MakerRun.Failure("invalid", "Some fields were rejected.", status: 422,
+                                 details: [MakerRun.Detail(field: "title", message: "Too similar."),
+                                           MakerRun.Detail(field: "license", message: "Not allowed.")])
+        let said = Shop.saidMakerRun(f, words: words, publishing: true)
+        #expect(said.contains(words.callIt("mr.f_title")) && said.contains("Too similar."))
+        #expect(said.contains(words.callIt("mr.f_licence")) && said.contains("Not allowed."))
+        #expect(Shop.fieldLabel("weird", words: words) == "weird")
+    }
+
+    @Test("a wait while publishing keeps the half-made listing and does not fail the step")
+    func waitsKeepTheListing() throws {
+        let src = try String(contentsOf: StoreRoundTripTests.repoRoot
+            .appending(path: "mac/KhaytCore/Sources/KhaytApp/MakerRunPublish.swift"), encoding: .utf8)
+        let fail = try #require(src.range(of: "private func fail("))
+        let body = String(src[fail.lowerBound...].prefix(900))
+        #expect(body.contains(#"code == "maintenance" || code == "rate_limited""#))
+        #expect(body.contains("set(id, .pending)"))
+        // The wait returns before anything touches the record.
+        let waitEnd = try #require(body.range(of: "return\n"))
+        #expect(!body[..<waitEnd.lowerBound].contains("setMakerRunListing"))
+    }
+
 }

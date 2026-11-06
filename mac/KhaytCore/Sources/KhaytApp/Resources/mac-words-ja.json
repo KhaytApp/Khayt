@@ -3801,5 +3801,7 @@
  "mac.v3d_reading": "モデルを読み込み中",
  "mac.v3d_sampled": "{total} 個中 {shown} 個の三角形を表示しています。",
  "mac.v3d_too_big": "このモデルは大きすぎて 3D 表示できません。",
- "mac.v3d_failed": "このモデルを 3D 表示できませんでした。"
+ "mac.v3d_failed": "このモデルを 3D 表示できませんでした。",
+ "mac.mkr_rate_publish": "MakerRun で新規掲載できるのは 1 時間に 20 件、1 日に 60 件までで、このアカウントは上限に達しました。何も失われていません。この掲載は後で完了してください。",
+ "mac.mkr_field_refused": "{field}: {message}"
 }

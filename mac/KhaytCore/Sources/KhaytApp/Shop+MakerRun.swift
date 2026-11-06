@@ -45,8 +45,25 @@ extension Shop {
 
     /// A refusal, said in the shop's language — the desktop's own words for
     /// each code (`bedready-makerrun.js` errorHtml).
-    func saidMakerRun(_ error: Error, downloading: Bool = false) -> String {
+    func saidMakerRun(_ error: Error, downloading: Bool = false, publishing: Bool = false) -> String {
         guard let f = error as? MakerRun.Failure else { return said(error) }
+        return Self.saidMakerRun(f, words: words, downloading: downloading, publishing: publishing)
+    }
+
+    /// The sentence for a refusal. Static so a test can hold each code to it.
+    ///
+    /// The four codes the MakerRun lane checked against the live API:
+    /// - `mfa_required` (403) is NOT a dead token. The shop finishes two-factor
+    ///   on makerrun.com and tries again. Nothing here signs it out: only a
+    ///   401 on `/api/app-token` clears the link.
+    /// - `maintenance` (503) is MakerRun being down for a while, not a failure.
+    ///   It is said once, with the wait, and nothing retries on its own.
+    /// - `rate_limited` (429) while publishing is MakerRun's cap of 20 new
+    ///   listings an hour and 60 a day. Said plainly; the half-made listing
+    ///   stays on the record so Finish Upload resumes it.
+    /// - `invalid` (422) names each refused field by the form's own label.
+    static func saidMakerRun(_ f: MakerRun.Failure, words: Words, downloading: Bool = false,
+                             publishing: Bool = false) -> String {
         switch f.code {
         case "not_linked", "relink", "auth", "unauthorized": return words.callIt("mr.err_relink")
         case "mfa_required": return words.callIt("mr.err_mfa")
@@ -55,6 +72,7 @@ extension Shop {
             let mins = max(1, Int((Double(f.retryAfter ?? 60) / 60).rounded()))
             return words.callIt("mr.err_maintenance", ["mins": .string(words.numeral(mins))])
         case "rate_limited":
+            if publishing { return words.callIt("mac.mkr_rate_publish") }
             return words.callIt("mr.err_rate", ["secs": .string(words.numeral(f.retryAfter ?? 60))])
         case "forbidden", "rejected":
             return words.callIt(downloading ? "mr.err_forbidden_download" : "mr.err_forbidden")
@@ -63,9 +81,26 @@ extension Shop {
         case "unavailable": return words.callIt("mr.err_unavailable")
         case "bad_response": return words.callIt("mr.err_bad_response")
         case "invalid" where !f.details.isEmpty:
-            let joined = f.details.map(\.message).filter { !$0.isEmpty }.joined(separator: " ")
-            return joined.isEmpty ? f.message : joined
+            let lines = f.details.map { d -> String in
+                words.callIt("mac.mkr_field_refused", ["field": .string(fieldLabel(d.field, words: words)),
+                                                       "message": .string(d.message.isEmpty ? words.callIt("mr.err_generic") : d.message)])
+            }
+            return lines.joined(separator: " ")
         default: return f.message.isEmpty ? words.callIt("mr.err_generic") : f.message
+        }
+    }
+
+    /// A refused field, by the publish form's own label; an unknown one by name.
+    static func fieldLabel(_ field: String, words: Words) -> String {
+        switch field {
+        case "title": words.callIt("mr.f_title")
+        case "description": words.callIt("mr.f_description")
+        case "category": words.callIt("mr.f_category")
+        case "material": words.callIt("mr.f_material")
+        case "license": words.callIt("mr.f_licence")
+        case "nsfw": words.callIt("mr.f_nsfw")
+        case "file": words.callIt("mr.files")
+        default: field
         }
     }
 
