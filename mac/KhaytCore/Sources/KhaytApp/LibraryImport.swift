@@ -289,7 +289,7 @@ enum LibraryImport {
     static func write(_ made: [Prepared], storeURL: URL,
                       owns: @escaping @Sendable () -> Bool,
                       whoHasIt: @escaping @Sendable () -> String?) async throws {
-        // lock: callers — add, flush, writeHeld
+        // lock: callers — add, flush, writeHeld, downloadFromMakerRun
         guard !made.isEmpty else { return }
         let records = made.reversed().map { JSONValue.object($0.record) }
         try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
@@ -328,7 +328,7 @@ enum LibraryImport {
                         online: Bool = false,
                         id fixedId: String? = nil,
                         archive: ArchiveRef? = nil) async throws -> Prepared {
-        // lock: callers — add, addMany, indexArchives, attachWebDownload, recordQuoteForm
+        // lock: callers — add, addMany, indexArchives, attachWebDownload, recordQuoteForm, downloadFromMakerRun
         let ext = source.pathExtension.lowercased()
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 

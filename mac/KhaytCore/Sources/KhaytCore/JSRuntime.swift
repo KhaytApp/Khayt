@@ -235,6 +235,9 @@ public final class JSRuntime {
                           // `color-mix.js` publishes `KhaytColor` — the file is
                           // named for the mixing, the global for the subject.
                           "color-mix": "KhaytColor",
+                          // Bed Ready's renderer reads MakerRun's vocabularies
+                          // under the product's own name.
+                          "makerrun-terms": "BedReadyMakerRunTerms",
                           // `printer-poll-cache.js` publishes `KhaytPollCache` —
                           // the file says whose cache it is, the global does not.
                           "printer-poll-cache": "KhaytPollCache",
@@ -341,6 +344,25 @@ public final class JSRuntime {
             }
         }
         return try body()
+    }
+
+    /// The bytes of a typed array a script evaluates to, copied out once —
+    /// for a mesh, where millions of floats as JSON would cost many times
+    /// the array. The script must hand back an array that starts at its
+    /// buffer's first byte (`a.byteOffset === 0`), so there is no question
+    /// of which end of a view JavaScriptCore's pointer names. Empty for
+    /// anything that is not a typed array.
+    public func typedArrayBytes(_ script: String) throws -> Data {
+        let value = try evaluate(script)
+        guard let ctx = context.jsGlobalContextRef, let ref = value.jsValueRef,
+              JSValueIsObject(ctx, ref) else { return Data() }
+        var exception: JSValueRef?
+        guard let object = JSValueToObject(ctx, ref, &exception), exception == nil else { return Data() }
+        let count = JSObjectGetTypedArrayByteLength(ctx, object, &exception)
+        guard exception == nil, count > 0,
+              JSObjectGetTypedArrayByteOffset(ctx, object, &exception) == 0,
+              let bytes = JSObjectGetTypedArrayBytesPtr(ctx, object, &exception) else { return Data() }
+        return Data(bytes: bytes, count: count)
     }
 
     /// Bind any values — native functions included — as globals for the

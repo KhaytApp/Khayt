@@ -766,6 +766,11 @@ final class Shop {
     /// `Invoice`, which needs to ask it the same questions the screens do.
     var engine: KhaytEngine?
 
+    /// MakerRun's client and its vocabularies (`Shop+MakerRun`), made on
+    /// first use. Not observed: nothing on screen draws from them directly.
+    @ObservationIgnored var makerRunClient: MakerRunClient?
+    @ObservationIgnored var makerRunTermsLoaded: KhaytEngine.MakerRunTerms?
+
     /// The day a test pinned with `load(_:asOf:)`, or nil for the real
     /// calendar. The period filter and the masthead's month read it, so a book
     /// rebased to a pinned day is also READ on that day — on the 1st of a

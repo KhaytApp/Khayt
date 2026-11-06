@@ -15,7 +15,7 @@ import Foundation
 /// there, every call runs there, and JavaScriptCore's own timers fire there —
 /// never on Swift's 512 KB pool threads, and never on the main thread.
 public actor KhaytEngine {
-    private let runtime: JSRuntime
+    let runtime: JSRuntime
     private let thread: EngineThread
 
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -184,6 +184,14 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // The multicolour print planner's rules: which spool each colour of a
+        // print file starts on, what it costs, and how the spools load into an
+        // AMS. Reads `KhaytColor` off the global, so after `color-mix`.
+        "color-plan",
+        // MakerRun's vocabularies — categories, materials, the licences its
+        // upload form offers, and how they meet the record's licence ids. The
+        // same file the Bed Ready publish form builds its menus from.
+        "makerrun-terms",
         // The HueForge studio: a photo as a filament-painted relief for the
         // U1, and the 3MF it prints from. `HueForgeEngine` runs these in a
         // context of its own, on a thread of its own, because one plan takes

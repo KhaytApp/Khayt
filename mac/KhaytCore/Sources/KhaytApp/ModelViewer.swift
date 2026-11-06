@@ -16,6 +16,8 @@ struct ModelViewer: View {
     @State private var drawn: MeshPreview.Drawn?
     @State private var drawing = false
     @State private var failed = false
+    /// Pictures from four fixed sides, or the model to orbit (`ModelOrbit`).
+    @AppStorage("library.viewer.orbit") private var orbit = false
 
     /// The formats the renderer reads.
     static let drawable: Set<String> = ["stl", "obj", "3mf"]
@@ -38,6 +40,24 @@ struct ModelViewer: View {
     var body: some View {
         let w = shop.words
         let url = shop.modelFile(for: file)
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("", selection: $orbit) {
+                Text(w.callIt("mac.v3d_pictures")).tag(false)
+                Text(w.callIt("mac.v3d_orbit")).tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            if orbit, let url {
+                ModelOrbit(shop: shop, file: file, url: url)
+            } else {
+                pictures(url)
+            }
+        }
+    }
+
+    @ViewBuilder private func pictures(_ url: URL?) -> some View {
+        let w = shop.words
         VStack(alignment: .leading, spacing: 8) {
             Picker(w.callIt("mac.mv_side_label"), selection: Binding(get: { shop.libraryViewAngle },
                                                                      set: { shop.libraryViewAngle = $0 })) {

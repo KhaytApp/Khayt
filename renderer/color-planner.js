@@ -15,12 +15,12 @@
  * each colour's own spool (see deductFilamentForOrder). Reads live `inventory`.
  */
 (function (global) {
-  const KC = () => global.KhaytColor;
+  // The rules — starting spools, costs, the slot map — are lib/color-plan.js,
+  // shared with the native Mac's planner. This file keeps only the modal.
+  const CP = () => global.KhaytColorPlan || (typeof require === 'function' ? require('../lib/color-plan.js') : null);
 
   function coloredFilaments() {
-    const list = Array.isArray(inventory) ? inventory : [];
-    const kc = KC();
-    return kc ? list.filter((it) => it && kc.hexToRgb(it.color)) : [];
+    return CP().colouredFilaments(Array.isArray(inventory) ? inventory : []);
   }
   function filamentLabel(it) {
     return [it.material, it.colourVariant].filter(Boolean).join(' — ') || (t('cmix.filament') || 'Filament');
@@ -29,7 +29,7 @@
     const s = size || 18;
     return `<span class="cs-swatch" style="background:${safeCssColor(hex, '#888')};width:${s}px;height:${s}px;"></span>`;
   }
-  const costPerGram = (it) => (it ? (+it.cost || 0) / Math.max(1, +it.weight || 1) : 0);
+  const costPerGram = (it) => CP().costPerGram(it);
   const money = (n) => (typeof fmtMoney === 'function' ? fmtMoney(n) : (Math.round(n * 100) / 100).toFixed(2));
 
   // Which print-file records can be planned (more than one colour).
@@ -39,19 +39,12 @@
   }
 
   function openColorPlanner(rec) {
-    const colours = (rec && Array.isArray(rec.colors)) ? rec.colors.filter((c) => c && c.hex) : [];
+    const colours = CP().plannableColours(rec);
     if (colours.length < 1) { toast(t('plan.no_colours') || 'This file has no colour data to plan.', 'error'); return; }
-    const kc = KC();
     const cands = coloredFilaments();
     if (!cands.length) { toast(t('plan.no_filaments') || 'Add filaments with a hex colour first.', 'error'); return; }
 
-    const saved = Array.isArray(rec.colorPlan) ? rec.colorPlan : [];
-    const plan = colours.map((c, i) => {
-      const prev = saved.find((s) => String(s.hex).toLowerCase() === String(c.hex).toLowerCase());
-      const near = kc.nearest(c.hex, cands, { limit: 1 })[0];
-      const fid = prev && cands.some((x) => x.id === prev.filamentId) ? prev.filamentId : (near ? near.id : (cands[0] && cands[0].id) || '');
-      return { hex: c.hex, label: c.label || `#${i + 1}`, grams: +(prev && prev.grams != null ? prev.grams : c.grams) || 0, filamentId: fid };
-    });
+    const plan = CP().initialPlan(colours, rec.colorPlan, cands);
 
     const optionsFor = (fid) =>
       `<option value="">${escapeHtml(t('plan.unassigned') || '— none —')}</option>` +
@@ -88,12 +81,10 @@
 
     // Physical AMS/MMU slot layout + swap guidance, derived from the assignment.
     // One slot per unique filament (colours sharing a filament share a slot).
-    const AMS_SLOTS = 4;
+    const AMS_SLOTS = CP().AMS_SLOTS;
     const slotMapHtml = () => {
-      const assigned = plan.filter((p) => p.filamentId && p.grams > 0);
-      if (!assigned.length) return '';
-      const slots = [];
-      assigned.forEach((p) => { if (!slots.some((s) => s.filamentId === p.filamentId)) slots.push({ filamentId: p.filamentId }); });
+      const slots = CP().summarise(plan, cands).slots.map((filamentId) => ({ filamentId }));
+      if (!slots.length) return '';
       const chips = slots.map((s, idx) => {
         const it = cands.find((x) => x.id === s.filamentId);
         return `<div class="cp-slot${idx >= AMS_SLOTS ? ' overflow' : ''}"><span class="cp-slot-n">${idx + 1}</span>${swatch(it ? it.color : '#888', 15)}<span class="cp-slot-name">${escapeHtml(it ? filamentLabel(it) : '?')}</span></div>`;
@@ -112,18 +103,16 @@
       saveLabel: t('plan.add_to_calc') || 'Add to calculator',
       onMount: (modal) => {
         const recompute = () => {
-          let totG = 0, totC = 0;
-          plan.forEach((p, i) => {
-            const it = cands.find((x) => x.id === p.filamentId);
-            const c = costPerGram(it) * (p.grams || 0);
-            totG += p.grams || 0; totC += c;
+          const sum = CP().summarise(plan, cands);
+          const totG = sum.totalGrams, totC = sum.totalCost;
+          sum.rows.forEach((r, i) => {
             const costEl = modal.querySelector(`[data-cost="${i}"]`);
-            if (costEl) costEl.textContent = it ? money(c) : '—';
+            if (costEl) costEl.textContent = r.cost != null ? money(r.cost) : '—';
             const deEl = modal.querySelector(`[data-de="${i}"]`);
             if (deEl) {
-              const de = it ? kc.deltaE(p.hex, it.color) : Infinity;
-              deEl.textContent = isFinite(de) ? `ΔE ${de.toFixed(1)}` : '';
-              deEl.className = 'cp-de' + (isFinite(de) ? (de < 5 ? ' good' : de < 12 ? ' ok' : ' far') : '');
+              const de = r.deltaE;
+              deEl.textContent = de != null ? `ΔE ${de.toFixed(1)}` : '';
+              deEl.className = 'cp-de' + (de != null ? ' ' + CP().closeness(de) : '');
             }
           });
           const tg = modal.querySelector('#cpTotG'); if (tg) tg.textContent = `${Math.round(totG * 10) / 10} g`;
@@ -142,10 +131,10 @@
         recompute();
       },
       onSave: () => {
-        const assigned = plan.filter((p) => p.filamentId && p.grams > 0);
+        const assigned = CP().assigned(plan);
         if (!assigned.length) { toast(t('plan.assign_first') || 'Assign a filament and grams to at least one colour.', 'error'); return false; }
         // Persist the assignment so re-opening the file remembers it.
-        rec.colorPlan = plan.map((p) => ({ hex: p.hex, filamentId: p.filamentId, grams: p.grams }));
+        rec.colorPlan = CP().toSaved(plan);
         if (typeof saveAll === 'function') saveAll();
         addPlannedPartToCalculator(rec, assigned);
         if (typeof switchTab === 'function') switchTab('calculator-tab');
