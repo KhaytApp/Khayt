@@ -96,7 +96,7 @@ struct LibraryDeleteChoiceTests {
         let hangs: S3.Fetch = { _ in
             flight.enter()
             defer { flight.leave() }
-            try await Task.sleep(for: .seconds(60))
+            try await Task.sleep(for: .seconds(600))
             throw CancellationError()
         }
         var many = f.files
@@ -116,12 +116,14 @@ struct LibraryDeleteChoiceTests {
                                       modelFile: { [paths = f.paths, root = f.root] file in
                                           paths[file.id] ?? root.appending(path: "\(file.id)/x.stl")
                                       })
-        // Each remote hangs for 60 s; a plan that waited on one would take a
-        // minute, so under 50 s proves it did not. Alone this takes well under a
-        // second; under the whole suite's load on CI the 400 ms timer shares a
-        // starved pool and has taken 35–36 s (#2206, #2216, #2217), so a tighter
-        // bound measures the runner, not the plan.
-        #expect(ContinuousClock.now - started < .seconds(50), "the plan waited on the remote")
+        // Each remote hangs for TEN MINUTES; a plan that waited on one would
+        // take that long, so under five proves it did not. Alone this takes
+        // well under a second; under the whole suite's load on CI the 400 ms
+        // timer shares a starved pool and has taken 35–36 s (#2206, #2216,
+        // #2217), then 53 and 59 s (Nov 2026, against a 60 s hang and a 50 s
+        // bound) once shard a grew. The gap is what proves it, so the gap was
+        // widened rather than the bound tightened.
+        #expect(ContinuousClock.now - started < .seconds(300), "the plan waited on the remote")
         #expect(flight.most > 1 && flight.most <= Shop.deleteCheckWidth, "\(flight.most) at once")
         #expect(p.keptOnline.isEmpty, "nothing is kept online on a copy nobody saw")
         #expect(p.onlyHere.contains("PF-a") && p.ids.count == many.count)

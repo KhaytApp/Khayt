@@ -32,44 +32,68 @@ struct ClientsView: View {
     @Environment(\.horizontalSizeClass) private var widthClass
     @State private var fold: FoldGap?
     private var columns: [GridItem] {
-        FoldGap.columns(fold, regularWidth: widthClass == .regular, spacing: 8)
+        FoldGap.columns(isSplit ? nil : fold, regularWidth: widthClass == .regular && !isSplit, spacing: 8)
     }
 
+    /// Regular width (iPhone Duo unfolded, an iPad) with a book: the list and
+    /// the open customer side by side, as Orders does. Without a book a tap
+    /// only offers to call, so there is no page to put beside the list.
+    private var isSplit: Bool { widthClass == .regular && api.holdsBook }
+    @State private var openClientId: String?
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    KhaytSearchField(text: $searchText, prompt: L10n.tr("clients.search"))
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
-                        .padding(.bottom, 10)
-                    content
-                    if api.holdsAll("clients"), !clients.isEmpty {
-                        windowLine
+        if isSplit {
+            ListBesidePage {
+                NavigationStack { listPage }
+            } page: {
+                NavigationStack {
+                    if let id = openClientId, let client = clients.first(where: { $0.id == id }) {
+                        CustomerPage(client: client).id(client.id)
+                    } else {
+                        ContentUnavailableView(L10n.tr("clients.pick"), systemImage: "person.2",
+                                               description: Text(L10n.tr("clients.pick.sub")))
+                            .background(KhaytDesign.ground.ignoresSafeArea())
                     }
                 }
-                .padding(.bottom, 18)
             }
-            .scrollIndicators(.hidden)
-            .scrollDismissesKeyboard(.immediately)
-            .refreshable { await load() }
-            .khaytScreen(title: L10n.tr("tab.clients"))
-            .background(KhaytDesign.ground.ignoresSafeArea())
-            .task {
-                await load()
-                didLoad = true
+        } else {
+            NavigationStack { listPage }
+        }
+    }
+
+    private var listPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                KhaytSearchField(text: $searchText, prompt: L10n.tr("clients.search"))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 10)
+                content
+                if api.holdsAll("clients"), !clients.isEmpty {
+                    windowLine
+                }
             }
-            .confirmationDialog(contactFor?.displayName ?? "", isPresented: contactShown, titleVisibility: .visible,
-                                presenting: contactFor) { client in
-                if let dial = client.dialNumber, let url = URL(string: "tel:\(dial)") {
-                    Button(L10n.tr("clients.call")) { openURL(url) }
-                }
-                if let wa = client.whatsappNumber, let url = URL(string: "https://wa.me/\(wa)") {
-                    Button(L10n.tr("clients.whatsapp")) { openURL(url) }
-                }
-                if let email = client.email, !email.isEmpty, let url = URL(string: "mailto:\(email)") {
-                    Button(L10n.tr("clients.email")) { openURL(url) }
-                }
+            .padding(.bottom, 18)
+        }
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.immediately)
+        .refreshable { await load() }
+        .khaytScreen(title: L10n.tr("tab.clients"))
+        .background(KhaytDesign.ground.ignoresSafeArea())
+        .task {
+            await load()
+            didLoad = true
+        }
+        .confirmationDialog(contactFor?.displayName ?? "", isPresented: contactShown, titleVisibility: .visible,
+                            presenting: contactFor) { client in
+            if let dial = client.dialNumber, let url = URL(string: "tel:\(dial)") {
+                Button(L10n.tr("clients.call")) { openURL(url) }
+            }
+            if let wa = client.whatsappNumber, let url = URL(string: "https://wa.me/\(wa)") {
+                Button(L10n.tr("clients.whatsapp")) { openURL(url) }
+            }
+            if let email = client.email, !email.isEmpty, let url = URL(string: "mailto:\(email)") {
+                Button(L10n.tr("clients.email")) { openURL(url) }
             }
         }
     }
@@ -94,7 +118,15 @@ struct ClientsView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(displayed) { client in
-                    if api.holdsBook {
+                    if isSplit {
+                        Button { openClientId = client.id } label: {
+                            ClientRow(client: client, open: count(openByName, client),
+                                      total: totalsByName.map { count($0, client) })
+                        }
+                        .buttonStyle(.plain)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(KhaytDesign.accent, lineWidth: 2)
+                            .opacity(openClientId == client.id ? 1 : 0))
+                    } else if api.holdsBook {
                         NavigationLink { CustomerPage(client: client) } label: {
                             ClientRow(client: client, open: count(openByName, client),
                                       total: totalsByName.map { count($0, client) })
