@@ -16,50 +16,48 @@ function calcNextDueDate(fromDate, recurring) {
   return ExpenseBook.nextDueDate(fromDate, recurring);
 }
 
+/**
+ * A recurring expense that has come round is a question the shop answers —
+ * Add (a dated copy) or Skip — and it stays asked until it is answered. It
+ * was an eight-second toast with "Skip" in English: missed while making
+ * coffee, it was simply gone until the next launch. Now it is a strip at the
+ * top of Expenses, as on the Mac (Spending.swift), and the launch notice only
+ * says how many are waiting and where.
+ */
 function checkRecurringExpenses() {
+  const due = ExpenseBook.due(expenses, localDateStr());
+  renderRecurringStrip();
+  if (!due.length) return;
+  toast(`${t('exp.recurring_due')}: ${due.length}`, 'info', 6000);
+}
+
+function renderRecurringStrip() {
+  const el = document.getElementById('recurringStrip');
+  if (!el) return;
   const todayStr = localDateStr();
   const due = ExpenseBook.due(expenses, todayStr);
-  if (due.length === 0) return;
-  for (const exp of due) {
-    const label = `${expCatLabel(exp.category)} ${fmtPrice(exp.amount)}`;
-    const c = document.createElement('div');
-    c.className = 'toast info';
-    c.style.cssText = 'max-width:360px;';
-    c.innerHTML = `<span>${escapeHtml(t('exp.recurring_due'))}: ${escapeHtml(label)}</span>`;
-    const addBtn = document.createElement('button');
-    addBtn.className = 'undo-btn';
-    addBtn.textContent = t('common.add') || 'Add';
-    const skipBtn = document.createElement('button');
-    skipBtn.className = 'undo-btn';
-    skipBtn.style.marginInlineStart = '4px';
-    skipBtn.textContent = 'Skip';
-    // `comeRound` is the rule the Mac answers the same prompt with: the copy
-    // keeps the original's reclaimable tax and location, and the schedule
-    // moves on from where it stood. Spliced in place — other screens hold
-    // this array.
-    const answer = (add) => {
-      const next = ExpenseBook.comeRound(expenses, exp.id, { add, id: uid('EXP'), today: todayStr });
-      if (next) expenses.splice(0, expenses.length, ...next);
-      return !!next;
-    };
-    addBtn.addEventListener('click', () => {
-      answer(true);
-      saveAll();
-      renderExpenses();
-      toast(t('exp.recurring_added'), 'success');
-      c.remove();
-    });
-    skipBtn.addEventListener('click', () => {
-      answer(false);
-      saveAll();
-      c.remove();
-    });
-    c.appendChild(addBtn);
-    c.appendChild(skipBtn);
-    $('#toastContainer').appendChild(c);
-    setTimeout(() => { c.style.opacity = '0'; c.style.transition = 'opacity .2s'; }, 8000 - 250);
-    setTimeout(() => c.remove(), 8000);
-  }
+  if (!due.length) { el.innerHTML = ''; return; }
+  const exp = due[0];
+  const label = `${expCatLabel(exp.category)} ${fmtPrice(exp.amount)}`;
+  const more = due.length - 1;
+  el.innerHTML = `<div class="card" role="status" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;">
+    <span style="flex:1;min-width:200px;"><strong>${escapeHtml(t('exp.recurring_due'))}:</strong> ${escapeHtml(label)}${exp.note ? ' · ' + escapeHtml(String(exp.note).slice(0, 80)) : ''}
+      ${more ? `<span style="color:var(--text-muted);font-size:12px;margin-inline-start:6px;">${escapeHtml(t(more === 1 ? 'exp.recurring_more_one' : 'exp.recurring_more', { n: more }))}</span>` : ''}</span>
+    <button class="btn small primary" data-recur="add">${escapeHtml(t('common.add') || 'Add')}</button>
+    <button class="btn small ghost" data-recur="skip">${escapeHtml(t('exp.recurring_skip'))}</button>
+  </div>`;
+  // `comeRound` is the rule the Mac answers the same prompt with: the copy
+  // keeps the original's reclaimable tax and location, and the schedule moves
+  // on from where it stood. Spliced in place — other screens hold this array.
+  const answer = (add) => {
+    const next = ExpenseBook.comeRound(expenses, exp.id, { add, id: uid('EXP'), today: todayStr });
+    if (next) expenses.splice(0, expenses.length, ...next);
+    saveAll();
+    if (add) toast(t('exp.recurring_added'), 'success');
+    renderExpenses();
+  };
+  el.querySelector('[data-recur="add"]').onclick = () => answer(true);
+  el.querySelector('[data-recur="skip"]').onclick = () => answer(false);
 }
 
 /* ============================================================
@@ -395,6 +393,7 @@ async function deleteExpense(id) {
 }
 
 function renderExpenses() {
+  try { renderRecurringStrip(); } catch (_) { /* advisory */ }
   const filtered = expenses.filter(e => inRange(e.date, expRangeFilter, 'expenses'));
   const tbody = $('#expenseTable tbody');
 
@@ -964,6 +963,7 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     retryFailedAccountingPushes,
     calcNextDueDate,
     checkRecurringExpenses,
+    renderRecurringStrip,
     expCatLabel,
     addExpense,
     setExpenseReceipt,

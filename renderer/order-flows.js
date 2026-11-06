@@ -2580,6 +2580,12 @@ function openRmaModal(orderId) {
         // Within warranty → shop eats it (no charge); outside → billable by default.
         setTimeout(() => createLinkedReprint(order, 'rma', withinWarranty ? 'shop' : 'billable'), 0);
       }
+      // A refund is money going back, and the document for that is a credit
+      // note: the Mac opens one right after (lib/invoice-reversal.js), and so
+      // does this — its modal says so when there is nothing left to credit.
+      if (resolution === 'refund' && typeof openCreditNoteModal === 'function') {
+        setTimeout(() => openCreditNoteModal(order.id), 0);
+      }
       return true;
     }
   });
