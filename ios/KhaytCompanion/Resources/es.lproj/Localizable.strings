@@ -1005,3 +1005,7 @@
 "new.expense.detail" = "Foto del recibo";
 "new.waste.detail" = "Una impresión fallida o purga";
 "new.more" = "Más";
+"printphotos.title" = "Fotos de la impresión";
+"printphotos.one" = "Foto de la impresión terminada";
+"printphotos.note" = "Añadidas en el ordenador, incluida la foto que toma la impresora al terminar una impresión. También aparecen allí en el Portafolio.";
+"printphotos.full_on_computer" = "Esta es la copia pequeña que viaja con el libro. La foto a tamaño completo está en el ordenador que la tomó.";

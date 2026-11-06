@@ -1005,3 +1005,7 @@
 "new.expense.detail" = "レシートを撮影";
 "new.waste.detail" = "失敗した印刷やパージ";
 "new.more" = "その他";
+"printphotos.title" = "プリントの写真";
+"printphotos.one" = "完成したプリントの写真";
+"printphotos.note" = "コンピューターで追加された写真です。プリント完了時にプリンターが撮影した写真も含まれます。コンピューターのポートフォリオにも表示されます。";
+"printphotos.full_on_computer" = "これは帳簿と一緒に同期される小さなコピーです。フルサイズの写真は撮影したコンピューターにあります。";

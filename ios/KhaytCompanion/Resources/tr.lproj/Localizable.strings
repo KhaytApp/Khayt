@@ -1005,3 +1005,7 @@
 "new.expense.detail" = "Fişin fotoğrafı";
 "new.waste.detail" = "Başarısız baskı veya tasfiye";
 "new.more" = "Diğer";
+"printphotos.title" = "Baskı fotoğrafları";
+"printphotos.one" = "Biten baskının fotoğrafı";
+"printphotos.note" = "Bilgisayarda eklendi; baskı bittiğinde yazıcının kendi çektiği fotoğraf da dahil. Oradaki Portfolyo’da da görünürler.";
+"printphotos.full_on_computer" = "Bu, defterle birlikte gelen küçük kopyadır. Tam boyutlu fotoğraf, onu çeken bilgisayardadır.";
