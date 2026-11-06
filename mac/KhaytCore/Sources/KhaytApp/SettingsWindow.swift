@@ -1070,6 +1070,11 @@ struct OperationsPane: View {
                     Toggle(shop.words.callIt("set.qc_require_photo"), isOn: $draft.qcRequirePhotoOnFail).disabled(!draft.qcEnabled)
                     numberRow("set.qc_warranty_days", $draft.qcWarrantyDays).disabled(!draft.qcEnabled)
                 }
+                // Saved as each one is added or removed, as the desktop's
+                // lists are — straight to the book, not with the bar below.
+                PostChecklistSettingsSection(shop: shop)
+                PostPresetsSettingsSection(shop: shop)
+                CustomFieldsSettingsSection(shop: shop)
                 // Saved as each reading is logged, like the sites and staff
                 // at the top — a reading is a record, not a setting.
                 EnvironmentLogSection(shop: shop)

@@ -371,16 +371,23 @@ test('every VAT figure is derived from the netted revenue', () => {
   // of this test warns against: it would have failed a change that preserved the
   // property. Assert the property. (The old expression was also wrong in the
   // other direction — it reported the gross as sales. See test/vat-return.test.js.)
-  const vatReturn = (() => {
-    const src = read('renderer/operations-extras.js')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  //
+  // The figures moved into lib/vat-return.js so the Mac prints the same
+  // return; the desktop hands it `orderNetRevenueBase`, and the module splits
+  // with lib/tax.js.
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const caller = (() => {
+    const src = strip(read('renderer/operations-extras.js'));
     const at = src.indexOf('function exportGaztVatReturn');
     assert.ok(at > 0, 'the VAT return is gone');
     return src.slice(at, at + 3000);
   })();
-  assert.match(vatReturn, /const gross = orderNetRevenueBase\(o\);/,
+  assert.match(caller, /KhaytVatReturn\.boxes\([\s\S]{0,300}revenueOf: orderNetRevenueBase/,
     'the VAT return must take its sales from the netted revenue, not the gross price');
-  assert.match(vatReturn, /KhaytTax\.computeTax\(gross, taxProfile\)/,
+  const vatReturn = strip(read('lib/vat-return.js'));
+  assert.match(vatReturn, /const gross = revenueOf\(o\);/,
+    'the VAT return must take its sales from what the caller says an order earned');
+  assert.match(vatReturn, /Tax\.computeTax\(gross, taxProfile\)/,
     'the VAT return must split net from VAT with the same module the invoices use');
   assert.ok(!/box1 \+= gross/.test(vatReturn),
     'box1 (standard-rated sales) must be NET of VAT — prices in Khayt include it');

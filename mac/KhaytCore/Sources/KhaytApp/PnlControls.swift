@@ -217,6 +217,33 @@ struct VatSummaryCard: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                // ── THE BOX-FORM RETURN, TO PRINT ───────────────────────
+                // The desktop's "Export VAT Return": the figures to copy onto
+                // the return the shop files (`lib/vat-return.js`), for this
+                // year or one of the periods above. Printed, or saved as a PDF
+                // from the print panel.
+                Divider()
+                Menu(words.callIt("exportVatReturn")) {
+                    Button(words.callIt("analytics.this_year")) {
+                        let year = Shop.bookYear()
+                        Task { await shop.askForVatReturn(title: words.callIt("analytics.this_year"),
+                                                          from: year.from, to: year.to) }
+                    }
+                    if !returns.isEmpty { Divider() }
+                    ForEach(returns) { r in
+                        Button(MonthLabel.period(r.period, words: words)) {
+                            Task { await shop.askForVatReturn(title: MonthLabel.period(r.period, words: words),
+                                                              from: r.from, to: r.to) }
+                        }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .disabled(!shop.lockAllows("analytics", "view"))
+                Text(words.callIt("mac.vat_return_print_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .card()
         }

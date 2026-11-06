@@ -32,7 +32,7 @@ import JavaScriptCore
 /// already inside. The solved relief stays inside too, and the export reads it
 /// from there, so a heightfield never crosses at all.
 public actor StudioEngine {
-    private let runtime: JSRuntime
+    let runtime: JSRuntime
     private let thread: EngineThread
 
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -40,7 +40,12 @@ public actor StudioEngine {
     }
 
     static let modules = ["color-mix", "hueforge", "hueforge-flat", "hueforge-3mf",
-                          "orca-presets", "calibration-models"]
+                          "orca-presets", "calibration-models",
+                          // The 3D viewer's 3MF reader — the desktop viewer's
+                          // own extractor, colours and all. Here and not on
+                          // the shop's engine because a big model takes
+                          // seconds to walk.
+                          "mf-mesh"]
 
     /// The U1's build plate, which `planTiles` cuts a relief to fit — the
     /// figure the desktop's export handler uses.
@@ -566,4 +571,82 @@ public actor StudioEngine {
       globalThis.__studio = api;
     })();
     """#
+
+    // MARK: - The 3D viewer
+
+    /// A 3MF's triangles for the library's 3D viewer: `lib/mf-mesh.js`'s
+    /// `extractMeshFromMembers`, the extractor the desktop's viewer draws
+    /// from — the build's placements, the plates, and each face's filament
+    /// (painted, per part, or per PrusaSlicer volume) — stride-sampled past
+    /// `maxFaces` exactly as it samples there.
+    public struct ViewerMesh: Sendable {
+        /// Nine floats a face, millimetres, Z up.
+        public let positions: [Float]
+        /// Each face's filament, 1-based; 0 is unpainted.
+        public let faceState: [UInt8]
+        /// The project's filament colours, `#RRGGBB`, by state − 1.
+        public let palette: [String]
+        public let triangleCount: Int
+        public let sampled: Bool
+        /// Past the hard cap: nothing to draw.
+        public let skipped: Bool
+        public init(positions: [Float], faceState: [UInt8], palette: [String],
+                    triangleCount: Int, sampled: Bool, skipped: Bool) {
+            self.positions = positions; self.faceState = faceState; self.palette = palette
+            self.triangleCount = triangleCount; self.sampled = sampled; self.skipped = skipped
+        }
+    }
+
+    private struct ViewerFacts: Decodable {
+        let palette: [String]
+        let triangleCount: Int
+        let sampled: Bool
+        let skipped: Bool
+    }
+
+    /// The desktop extractor's own budgets, read from the module rather than
+    /// copied: faces drawn before sampling starts, and past which nothing is.
+    public func viewerBudgets() throws -> (preview: Int, hardCap: Int) {
+        let both = try runtime.call2("[KhaytMfMesh.PREVIEW_BUDGET, KhaytMfMesh.HARD_CAP]", [], as: [Int].self)
+        guard both.count == 2 else { throw KhaytJSError.unexpectedResult("mf-mesh budgets") }
+        return (both[0], both[1])
+    }
+
+    /// `members` as `Converter.describe` lays them out, the model XML bound
+    /// by name in `meshes` (a model in a script's source costs twenty-six
+    /// times its size). The arrays cross as bytes, once.
+    public func viewerMesh(_ members: [JSONValue], meshes: [String: String],
+                           maxFaces: Int) throws -> ViewerMesh {
+        try runtime.withBoundStrings(meshes) {
+            let facts = try runtime.call2("""
+                (function (members, maxFaces) {
+                  members = members.map(function (m) {
+                    if (!m || !m.meshVar) return m;
+                    var text = globalThis[m.meshVar];
+                    return typeof text === 'string' ? { name: m.name, data: text } : m;
+                  }).filter(function (m) { return m && typeof m.data === 'string'; });
+                  var r = KhaytMfMesh.extractMeshFromMembers(members, maxFaces);
+                  var pos = r.positions.byteOffset === 0 ? r.positions : r.positions.slice();
+                  var st = r.faceState.byteOffset === 0 ? r.faceState : r.faceState.slice();
+                  globalThis.__viewerPositions = pos;
+                  globalThis.__viewerStates = st;
+                  return { palette: r.palette || [], triangleCount: r.triangleCount || 0,
+                           sampled: !!r.sampled, skipped: !!r.skipped };
+                })(ARG0, ARG1)
+                """, [.array(members), .number(Double(maxFaces))], as: ViewerFacts.self)
+            defer { _ = try? runtime.evaluate("globalThis.__viewerPositions = undefined; globalThis.__viewerStates = undefined; true") }
+            let posBytes = try runtime.typedArrayBytes("globalThis.__viewerPositions")
+            let stateBytes = try runtime.typedArrayBytes("globalThis.__viewerStates")
+            let positions: [Float] = posBytes.withUnsafeBytes { raw in
+                Array(raw.bindMemory(to: Float.self).prefix(posBytes.count / 4))
+            }
+            let states = [UInt8](stateBytes)
+            guard positions.count == states.count * 9 else {
+                throw KhaytJSError.unexpectedResult("a mesh whose faces and colours disagree")
+            }
+            return ViewerMesh(positions: positions, faceState: states, palette: facts.palette,
+                              triangleCount: facts.triangleCount, sampled: facts.sampled, skipped: facts.skipped)
+        }
+    }
+
 }

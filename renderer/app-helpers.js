@@ -218,10 +218,11 @@ function openCsvImportModal({ title, fields, onImport }) {
   let parsedHeaders = [];
   let parsedRows = [];
 
+  // The column matching, the parse and the row rules are lib/csv-import.js,
+  // shared with the Mac's File ▸ Import CSV….
+  const CSV = KhaytCsvImport;
   function autoMapIdx(fieldKey, fieldLabel, headers) {
-    const norm = s => s.toLowerCase().replace(/[\s_-]/g, '');
-    const targets = [norm(fieldKey), norm(fieldLabel)];
-    const idx = headers.findIndex(h => targets.includes(norm(h)));
+    const idx = CSV.autoMap([{ key: fieldKey, label: fieldLabel }], headers)[fieldKey];
     return idx >= 0 ? String(idx) : '';
   }
 
@@ -272,7 +273,7 @@ function openCsvImportModal({ title, fields, onImport }) {
   }
 
   function parseAndRender(text) {
-    const { headers, rows } = parseCsvString(text);
+    const { headers, rows } = CSV.parse(text);
     parsedHeaders = headers;
     parsedRows = rows;
     const area = $('#csvMappingArea');
@@ -304,16 +305,7 @@ function openCsvImportModal({ title, fields, onImport }) {
       if (!parsedRows.length) { toast(t('csv.no_data') || 'No data to import', 'error'); return false; }
       const mappings = {};
       $$('.csv-map-sel').forEach(sel => { mappings[sel.dataset.field] = sel.value !== '' ? +sel.value : -1; });
-      const objects = parsedRows.map(row => {
-        const obj = {};
-        fields.forEach(f => {
-          if (mappings[f.key] >= 0) {
-            const raw = row[mappings[f.key]]?.trim() || '';
-            obj[f.key] = f.type === 'number' ? (+raw || 0) : raw;
-          }
-        });
-        return obj;
-      }).filter(obj => fields.filter(f => f.required).every(f => obj[f.key]));
+      const objects = CSV.objects(parsedRows, fields, mappings);
 
       if (!objects.length) { toast(t('csv.no_valid_rows') || 'No valid rows found — check required fields', 'error'); return false; }
       const result = onImport(objects);

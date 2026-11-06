@@ -21,6 +21,8 @@ const KhaytTax = require('../lib/tax.js');
 const KhaytOrderStatus = require('../lib/order-status.js');
 const KhaytPnl = require('../lib/pnl-report.js');
 const { summarize } = require('../lib/vat-summary.js');
+// The return's figures and document (the Mac prints the same one).
+const KhaytVatReturn = require('../lib/vat-return.js');
 
 const VAT15 = { currency: 'SAR', enableVat: true, vatRate: 15 };
 const ROOT = path.join(__dirname, '..');
@@ -58,7 +60,7 @@ test('the P&L and VAT summary put an accepted quote\'s VAT in its acceptance mon
 });
 
 const sandboxBase = (orders) => ({
-  KhaytTax, KhaytOrderStatus, KhaytPnl, settings: VAT15, clients: [], printLog: orders, expenses: [],
+  KhaytTax, KhaytOrderStatus, KhaytPnl, KhaytVatReturn, settings: VAT15, clients: [], printLog: orders, expenses: [],
   console, orderNetRevenueBase: (o) => money.orderNetRevenueBase(o, { settings: VAT15, clients: [] }),
   orderCurrency: () => 'SAR', convertToBase: (v) => v, orderToBase: (v) => v, fmtMoney: (v) => Number(v).toFixed(2),
   currencySymbol: () => 'SAR', shopName: () => 'Shop', t: (k) => k, toast: () => {},

@@ -193,10 +193,12 @@ extension Shop {
         pendingQcFail = nil; pendingSend = nil; pendingShipment = nil
         pendingDetails = nil; pendingVoid = nil; pendingCredit = nil; creditPaper = nil
         pendingRma = nil; pendingReprint = nil; pendingHistory = nil; showingIntake = false
+        importingCsv = nil; namingFilter = false
         pendingConvert = nil; pendingBatchConvert = nil
         planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
         showingHistoryFor = nil; spoolHistoryFor = nil
         adjustingSpool = nil; dryingLogFor = nil; transferringSpool = nil; showingActivityLog = false
+        pendingPrintedPage = nil; pendingShoppingList = nil; testPrintLogFor = nil
     }
 
     /// The screen a shelf is gated on, under the lock.

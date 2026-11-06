@@ -16,6 +16,8 @@ struct OrderToolSheets: ViewModifier {
             .shopSheet(item: $shop.pendingReprint) { ReprintSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingHistory) { OrderHistorySheet(shop: shop, request: $0) }
             .shopSheet(isPresented: $shop.showingIntake) { IntakeSheet(shop: shop) }
+            .shopSheet(item: $shop.importingCsv) { CsvImportSheet(shop: shop, kind: $0) }
+            .shopSheet(isPresented: $shop.namingFilter) { SaveFilterSheet(shop: shop) }
     }
 }
 

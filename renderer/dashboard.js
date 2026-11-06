@@ -842,38 +842,13 @@ function renderFilamentAnalytics() {
   const el = $('#filamentPerfSection');
   if (!el) return;
 
-  const agg = {};
-  printLog
-    .filter(o => KhaytOrderStatus.isFinished(o))
-    .forEach(o => {
-      const parts = o.parts || [];
-      if (parts.length === 0) return;
-      const totalBase = parts.reduce((s, p) => s + (+p.baseCost || 0), 0);
-      parts.forEach(p => {
-        const key = p.filamentId || p.material || 'unknown';
-        const filItem = inventory.find(i => i.id === p.filamentId);
-        const label = p.material || filItem?.material || key;
-        if (!agg[key]) agg[key] = { label, color: filItem?.color || '#888', orderIds: new Set(), revenue: 0, matCost: 0, timePerGrams: [] };
-
-        agg[key].orderIds.add(o.id);
-
-        const revShare = totalBase > 0 ? (+p.baseCost / totalBase) * +o.price : +o.price / parts.length;
-        agg[key].revenue += revShare;
-
-        const spoolC = +p.spoolCost || 0;
-        const spoolW = Math.max(1, +p.spoolWeight || 1000);
-        const pw = +p.printWeight || 0;
-        agg[key].matCost += (spoolC / spoolW) * pw;
-
-        if (o.actualPrintTime != null && o.actualWeight != null && o.actualWeight > 0 && o.printTime > 0) {
-          const timeShare = (p.printTime / o.printTime) * o.actualPrintTime;
-          const weightShare = pw > 0 ? pw : o.actualWeight / parts.length;
-          if (weightShare > 0) agg[key].timePerGrams.push(timeShare / weightShare);
-        }
-      });
-    });
-
-  const rows = Object.values(agg).sort((a, b) => b.revenue - a.revenue);
+  // lib/filament-report.js, the rule the Mac's Reports draws from too. Revenue
+  // is what each order EARNED — net of tax, in the shop's currency — like every
+  // other money screen; this used to split the gross `price` instead.
+  const rows = KhaytFilamentReport.profitByFilament(printLog, inventory, {
+    isFinished: (o) => KhaytOrderStatus.isFinished(o),
+    revenueOf: orderEarnedBase,
+  });
   if (rows.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.filament_no_data'))}</p>`;
     return;
@@ -891,17 +866,15 @@ function renderFilamentAnalytics() {
         </tr></thead>
         <tbody>
           ${rows.map(r => {
-            const margin = r.revenue > 0 ? ((r.revenue - r.matCost) / r.revenue * 100) : 0;
-            const avgTPG = r.timePerGrams.length > 0
-              ? r.timePerGrams.reduce((s, v) => s + v, 0) / r.timePerGrams.length
-              : null;
+            const margin = r.marginPct;
+            const avgTPG = r.avgTimePerGram;
             const mCol = margin >= 60 ? 'var(--success)' : margin >= 30 ? 'var(--primary)' : 'var(--warning)';
             return `<tr>
               <td style="display:flex;align-items:center;gap:8px;">
                 <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${safeCssColor(r.color)};flex-shrink:0;border:1px solid rgba(255,255,255,0.15);"></span>
                 <strong>${escapeHtml(r.label)}</strong>
               </td>
-              <td style="font-variant-numeric:tabular-nums;">${r.orderIds.size}</td>
+              <td style="font-variant-numeric:tabular-nums;">${r.orders}</td>
               <td style="font-variant-numeric:tabular-nums;color:var(--success);">${fmtPrice(r.revenue)}</td>
               <td style="font-weight:600;color:${mCol};">${margin.toFixed(0)}%</td>
               <td style="color:var(--text-dim);">${avgTPG != null ? (avgTPG * 100).toFixed(2) + ' ' + escapeHtml(t('common.hours')) : '—'}</td>
@@ -930,34 +903,18 @@ function renderMaterialUsageChart() {
     });
   }
 
-  // Aggregate usage per material per month
-  const materialData = {};   // { materialName: { monthKey: grams } }
-  for (const item of inventory) {
-    if (!item.usageHistory || item.usageHistory.length === 0) continue;
-    const mat = item.material || 'Unknown';
-    if (!materialData[mat]) materialData[mat] = {};
-    for (const h of item.usageHistory) {
-      const mk = (h.date || '').slice(0, 7);
-      if (!months.find(m => m.key === mk)) continue;
-      materialData[mat][mk] = (materialData[mat][mk] || 0) + (+h.weightUsed || 0);
-    }
-  }
-
-  const materials = Object.keys(materialData).filter(mat =>
-    Object.values(materialData[mat]).some(v => v > 0)
-  ).slice(0, 6); // max 6 materials for readability
+  // Usage per material per month — lib/filament-report.js, which the Mac's
+  // Reports draws from too. At most six materials, for readability.
+  const usage = KhaytFilamentReport.materialUsage(inventory, months.map(m => m.key), { limit: 6 });
+  const materialData = usage.grams;   // { materialName: { monthKey: grams } }
+  const materials = usage.materials;
 
   if (materials.length === 0) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">${escapeHtml(t('an.mat_usage_empty') || 'No usage data yet. Spool weights update as orders complete.')}</p>`;
     return;
   }
 
-  // Assign colors from inventory items
-  const matColors = {};
-  for (const mat of materials) {
-    const invItem = inventory.find(i => i.material === mat);
-    matColors[mat] = invItem?.color || '#5b9cf0';
-  }
+  const matColors = usage.colors;
 
   // SVG stacked bar chart
   const W = 560, H = 180;
@@ -968,10 +925,7 @@ function renderMaterialUsageChart() {
   const gap    = Math.max(3, barW * 0.2);
 
   // Max total grams in any month
-  const monthTotals = months.map(m =>
-    materials.reduce((s, mat) => s + (materialData[mat][m.key] || 0), 0)
-  );
-  const maxG = Math.max(...monthTotals, 1);
+  const maxG = usage.maxGrams;
   const TICKS = 4;
 
   let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
