@@ -35,7 +35,9 @@ final class CompanionNotifications: ObservableObject {
         status: ShopStatus?,
         settings: ConnectionSettings
     ) {
-        guard settings.notifyConnection else { return }
+        // The sample shop has no Mac to lose: "Khayt disconnected" there is a
+        // false alarm on a real phone, posted to someone trying the app.
+        guard settings.notifyConnection, !settings.isSampleShop else { return }
         let ok = state == .connected
         if lastConnectionOK && !ok {
             post(
@@ -56,7 +58,9 @@ final class CompanionNotifications: ObservableObject {
         connected: Bool = true,
         asOf: Date = Date()
     ) {
-        if settings.notifyQueueChanges {
+        // Nothing in the sample shop happens, so nothing in it is news.
+        let real = !settings.isSampleShop
+        if real, settings.notifyQueueChanges {
             let q = status.queued
             let p = status.printing
             if let lq = lastQueued, let lp = lastPrinting, (lq != q || lp != p) {
@@ -70,7 +74,7 @@ final class CompanionNotifications: ObservableObject {
             lastPrinting = p
         }
 
-        if settings.notifyOverdue {
+        if real, settings.notifyOverdue {
             let overdue = queue.filter(\.isOverdue).count
             if let prev = lastOverdueCount, overdue > prev, overdue > 0 {
                 post(
@@ -82,7 +86,7 @@ final class CompanionNotifications: ObservableObject {
             lastOverdueCount = overdue
         }
 
-        if settings.notifyLowStock {
+        if real, settings.notifyLowStock {
             if let prev = lastLowStock, lowStockCount > prev, lowStockCount > 0 {
                 post(
                     id: "khayt.lowstock",
@@ -126,7 +130,11 @@ final class CompanionNotifications: ObservableObject {
         )
     }
 
+    /// Every kind this instance has posted, in order (what the tests read).
+    private(set) var posted: [String] = []
+
     private func post(id: String, title: String, body: String) {
+        posted.append(id)
         let tone: FeedItem.Tone = id == "khayt.overdue" || id == "khayt.offline" ? .late
             : id == "khayt.lowstock" ? .attention : .none
         let now = Date()
