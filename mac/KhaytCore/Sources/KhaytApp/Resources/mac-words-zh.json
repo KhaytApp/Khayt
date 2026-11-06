@@ -3765,5 +3765,7 @@
  "mac.of_done": "已为 {printer} 安装 {name}。重新打开 {slicer} 即可看到。",
  "mac.api_where": "脚本通过 {url} 访问这台 Mac 的局域网服务器，并以“Authorization: Bearer”发送令牌。服务器必须处于开启状态。",
  "mac.api_scopes": "权限范围",
- "mac.api_owner_only": "只有所有者可以创建或撤销 API 令牌。"
+ "mac.api_owner_only": "只有所有者可以创建或撤销 API 令牌。",
+ "mac.vat_return_print_hint": "某一期间的分栏申报表，供您誊写到实际提交的申报表上。可打印，或在打印面板中存储为 PDF。",
+ "mac.filament_net_note": "收入为每项工作扣除增值税后的所得，按各耗材在成本中的占比分摊。"
 }

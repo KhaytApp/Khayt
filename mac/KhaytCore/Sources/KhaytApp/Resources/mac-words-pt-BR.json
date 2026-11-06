@@ -3765,5 +3765,7 @@
  "mac.of_done": "{name} instalado para {printer}. Abra o {slicer} de novo para vê-lo.",
  "mac.api_where": "Os scripts acessam o servidor LAN deste Mac em {url} e enviam o token como “Authorization: Bearer”. O servidor precisa estar ligado.",
  "mac.api_scopes": "Permissões",
- "mac.api_owner_only": "Somente o proprietário pode criar ou revogar tokens de API."
+ "mac.api_owner_only": "Somente o proprietário pode criar ou revogar tokens de API.",
+ "mac.vat_return_print_hint": "A declaração por campos de um período, para copiar na declaração que você entrega. Imprima ou salve como PDF no painel de impressão.",
+ "mac.filament_net_note": "A receita é o que cada trabalho rendeu, sem impostos, dividida entre seus filamentos conforme a parte de cada um no custo."
 }

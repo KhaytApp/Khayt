@@ -421,6 +421,7 @@ final class Words {
             .merging(PrintPrepWords.table) { mine, _ in mine }
             .merging(StudioWords.table) { mine, _ in mine }
             .merging(ApiTokenWords.table) { mine, _ in mine }
+            .merging(ParityWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -6327,6 +6328,22 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The desktop-parity reports (`ParityReportCards.swift`), the box-form
+        // VAT return, the shopping list and the test-print log — in the
+        // other app's own words for each.
+        "an.filament_perf", "an.filament_no_data", "inv.material", "an.filament_orders",
+        "an.filament_margin", "an.filament_time_pg", "common.hours", "an.mat_usage_title",
+        "an.mat_usage_empty", "an.monthly_trend_title", "an.monthly_rev", "an.monthly_exp",
+        "an.monthly_profit_above", "an.profit_margin_title", "an.production_heatmap",
+        "an.last_12_weeks", "an.heatmap_no_data", "an.no_data", "vatReturn", "exportVatReturn",
+        "analytics.this_year", "shop.title", "shop.copy", "shop.none", "shop.no_supplier",
+        "common.print", "common.grams", "inv.test_prints", "inv.test_add", "inv.test_saved",
+        "inv.test_machine", "inv.test_type", "inv.test_result", "inv.print_temp", "inv.bed_temp",
+        "inv.test_speed", "inv.test_weight_used", "common.date", "common.notes",
+        "common.optional", "inv.spool_hist_empty",
+        "inv.test.temp_tower", "inv.test.retraction", "inv.test.first_layer", "inv.test.stringing",
+        "inv.test.overhang", "inv.test.dimensional", "inv.test.other", "inv.test.excellent",
+        "inv.test.good", "inv.test.fair", "inv.test.poor",
         // The integrations sections (`IntegrationSettings.swift`): the
         // desktop's own words for its SMS, webhook, accounting and digest
         // settings, borrowed so the two apps name each field alike.

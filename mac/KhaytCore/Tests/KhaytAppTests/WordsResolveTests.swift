@@ -117,6 +117,8 @@ struct WordsResolveTests {
                          "tools", "other"],
             "sup.cat.": ["filament", "hardware", "packaging", "services",
                          "tools", "other"],
+            // The test-print log's kinds and results (`TestPrintLogSheet`).
+            "inv.test.": TestPrintLogSheet.types + TestPrintLogSheet.results,
         ]
         var missing: [String] = []
         for (prefix, values) in domains {

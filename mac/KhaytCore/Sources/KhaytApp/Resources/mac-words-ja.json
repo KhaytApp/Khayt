@@ -3765,5 +3765,7 @@
  "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。",
  "mac.api_where": "スクリプトはこのMacのLANサーバー（{url}）に接続し、トークンを「Authorization: Bearer」として送信します。サーバーをオンにしておく必要があります。",
  "mac.api_scopes": "権限",
- "mac.api_owner_only": "APIトークンを作成・取り消しできるのはオーナーのみです。"
+ "mac.api_owner_only": "APIトークンを作成・取り消しできるのはオーナーのみです。",
+ "mac.vat_return_print_hint": "期間ごとの欄別申告書です。提出する申告書に書き写してください。印刷するか、プリントパネルからPDFとして保存できます。",
+ "mac.filament_net_note": "売上は各ジョブの税抜きの収益で、コストに占める割合に応じてフィラメントごとに配分しています。"
 }

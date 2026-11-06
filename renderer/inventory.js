@@ -2185,12 +2185,14 @@ function openTestPrintLog(itemId) {
   const item = inventory.find(i => i.id === itemId);
   if (!item) return;
   const todayStr = localDateStr();
-  const TEST_TYPES = ['temp_tower','retraction','first_layer','stringing','overhang','dimensional','other'];
-  const TEST_RESULTS = ['excellent','good','fair','poor'];
+  // What a row holds and what logging one does to the spool are
+  // lib/test-prints.js's — the Mac logs test prints through the same rule.
+  const TP = KhaytTestPrints;
+  const TEST_TYPES = TP.TEST_TYPES;
+  const TEST_RESULTS = TP.TEST_RESULTS;
 
   function listHtml() {
-    const entries = testPrints.filter(tp => tp.spoolId === itemId)
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const entries = TP.forSpool(testPrints, itemId);
     if (entries.length === 0)
       return `<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px 0;">${escapeHtml(t('inv.spool_hist_empty'))}</p>`;
     return `<div class="table-wrap"><table style="width:100%; font-size:12px;">
@@ -2283,36 +2285,34 @@ function openTestPrintLog(itemId) {
         if (!btn) return;
         const ok = await confirmModal(t('common.delete') + '?', { danger: true });
         if (!ok) return;
-        const tp = testPrints.find(x => x.id === btn.dataset.testId);
-        testPrints = testPrints.filter(x => x.id !== btn.dataset.testId);
-        // Restore filament weight when deleting a test print
-        if (tp && tp.weightUsed > 0) {
-          item.weight = (item.weight || 0) + tp.weightUsed;
-        }
+        // Restores the filament weight when the test print used some.
+        const out = TP.removeTestPrint(testPrints, item, btn.dataset.testId);
+        testPrints = out.testPrints;
+        if (out.item && out.item !== item) item.weight = out.item.weight;
         saveAll();
         modal.querySelector('#testPrintList').innerHTML = listHtml();
         renderInventory();
       });
     },
     onSave(modal) {
-      const date      = modal.querySelector('#tpDate').value || todayStr;
-      const machineId = modal.querySelector('#tpMachine').value || null;
-      const testType  = modal.querySelector('#tpType').value || 'other';
-      const result    = modal.querySelector('#tpResult').value || 'good';
-      const printTemp = parseFloat(modal.querySelector('#tpPrintTemp').value) || null;
-      const bedTemp   = parseFloat(modal.querySelector('#tpBedTemp').value) || null;
-      const speed     = parseFloat(modal.querySelector('#tpSpeed').value) || null;
-      const notes     = modal.querySelector('#tpNotes').value.trim();
-      const weightUsed = parseFloat(modal.querySelector('#tpWeight').value) || 0;
-      const newTp = { id: uid('TP'), spoolId: itemId, date, machineId, testType, result, printTemp, bedTemp, speed, notes, weightUsed };
-      testPrints.unshift(newTp);
-      if (weightUsed > 0) {
-        item.weight = Math.max(0, item.weight - weightUsed);
-        if (!item.usageHistory) item.usageHistory = [];
-        // The spool's lot as it is today, so a recall finds test prints too.
-        item.usageHistory.unshift(Object.assign({ orderId: newTp.id, project: `Test print (${testType})`, weightUsed, date },
-          Deduction().lotStamp(item)));
-        if (item.usageHistory.length > 200) item.usageHistory.length = 200;
+      const input = TP.normalize({
+        date:       modal.querySelector('#tpDate').value,
+        machineId:  modal.querySelector('#tpMachine').value,
+        testType:   modal.querySelector('#tpType').value,
+        result:     modal.querySelector('#tpResult').value,
+        printTemp:  modal.querySelector('#tpPrintTemp').value,
+        bedTemp:    modal.querySelector('#tpBedTemp').value,
+        speed:      modal.querySelector('#tpSpeed').value,
+        notes:      modal.querySelector('#tpNotes').value,
+        weightUsed: modal.querySelector('#tpWeight').value,
+      }, todayStr);
+      // A test print that used filament takes it off the spool, with a usage
+      // line carrying the spool's lot so a recall finds test prints too.
+      const out = TP.addTestPrint(testPrints, item, input, { id: uid('TP'), lotStamp: (s) => Deduction().lotStamp(s) });
+      testPrints = out.testPrints;
+      if (input.weightUsed > 0) {
+        item.weight = out.item.weight;
+        item.usageHistory = out.item.usageHistory;
       }
       saveAll();
       renderInventory();
@@ -4736,43 +4736,26 @@ function openShoppingList() {
     toast(t('shop.none') || 'Nothing to buy — every filament is above its reorder point.', 'success');
     return;
   }
-  const groups = {};
-  low.forEach((item) => {
-    let supName = '';
-    try {
-      const price = (typeof resolveReorderPrice === 'function') ? resolveReorderPrice(item) : null;
-      supName = (price && price.supplierName) || '';
-    } catch (e) { /* ignore */ }
-    if (!supName && item.supplierId && typeof suppliers !== 'undefined') {
-      const s = suppliers.find((x) => x.id === item.supplierId);
-      supName = (s && s.name) || '';
-    }
-    if (!supName) supName = t('shop.no_supplier') || 'No supplier set';
-    (groups[supName] = groups[supName] || []).push({
-      name: item.material || 'Filament',
-      have: Math.round(+item.weight || 0),
-      buy: Math.round(+item.reorderQty || 1000),
-      color: item.color || '#888',
-    });
+  // The list itself is lib/reorder.js's `shoppingList` — the Mac's is the same
+  // list. Grouped by the supplier that prices the material, else the spool's
+  // own, else "No supplier set"; suppliers in name order.
+  const groups = KhaytReorder.shoppingList(low, (typeof suppliers !== 'undefined' ? suppliers : []), {
+    isLow: () => true,
+    noSupplier: t('shop.no_supplier') || 'No supplier set',
   });
-
-  const supNames = Object.keys(groups).sort();
   // Language-neutral item line: "Name   120 g → 1000 g"
-  const textLines = [(t('shop.title') || 'Shopping list') + ' — ' + (shopName() || 'Bed Ready'), ''];
+  const text = KhaytReorder.shoppingListText(groups,
+    (t('shop.title') || 'Shopping list') + ' — ' + (shopName() || 'Bed Ready'));
   let html = '';
-  supNames.forEach((sup) => {
-    textLines.push(sup);
-    html += `<div class="shop-group"><div class="shop-sup">${escapeHtml(sup)}</div>`;
-    groups[sup].forEach((r) => {
-      textLines.push(`  • ${r.name}   ${r.have} g → ${r.buy} g`);
+  groups.forEach((g) => {
+    html += `<div class="shop-group"><div class="shop-sup">${escapeHtml(g.supplier)}</div>`;
+    g.items.forEach((r) => {
       html += `<div class="shop-row"><span class="shop-dot" style="background:${safeCssColor(r.color)}"></span>`
         + `<span class="shop-name">${escapeHtml(r.name)}</span>`
         + `<span class="shop-amt">${r.have} g <span class="shop-arrow">→</span> ${r.buy} g</span></div>`;
     });
-    textLines.push('');
     html += `</div>`;
   });
-  const text = textLines.join('\n');
 
   openFormModal({
     title: '🛒 ' + (t('shop.title') || 'Shopping list'),

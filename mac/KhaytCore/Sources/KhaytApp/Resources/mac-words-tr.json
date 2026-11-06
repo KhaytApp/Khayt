@@ -3765,5 +3765,7 @@
  "mac.of_done": "{name}, {printer} için kuruldu. Görmek için {slicer} uygulamasını yeniden açın.",
  "mac.api_where": "Betikler bu Mac’in LAN sunucusuna {url} adresinden ulaşır ve belirteci “Authorization: Bearer” olarak gönderir. Sunucunun açık olması gerekir.",
  "mac.api_scopes": "Yetkiler",
- "mac.api_owner_only": "API belirteçlerini yalnızca sahip oluşturabilir veya iptal edebilir."
+ "mac.api_owner_only": "API belirteçlerini yalnızca sahip oluşturabilir veya iptal edebilir.",
+ "mac.vat_return_print_hint": "Bir dönemin kutu kutu beyannamesi; verdiğiniz beyannameye aktarmak için. Yazdırın ya da yazdırma panelinden PDF olarak kaydedin.",
+ "mac.filament_net_note": "Gelir, her işin KDV hariç kazandırdığıdır; maliyetteki paylarına göre filamentlerine bölünür."
 }

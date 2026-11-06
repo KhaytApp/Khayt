@@ -3765,5 +3765,7 @@
  "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir.",
  "mac.api_where": "Les scripts joignent le serveur LAN de ce Mac à {url} et envoient le jeton en « Authorization: Bearer ». Le serveur doit être activé.",
  "mac.api_scopes": "Autorisations",
- "mac.api_owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API."
+ "mac.api_owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API.",
+ "mac.vat_return_print_hint": "La déclaration par cases d’une période, à reporter sur la déclaration que vous déposez. Imprimez-la ou enregistrez-la en PDF depuis la fenêtre d’impression.",
+ "mac.filament_net_note": "Le chiffre d’affaires est ce que chaque travail a rapporté, hors TVA, réparti entre ses filaments selon leur part du coût."
 }
