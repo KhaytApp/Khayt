@@ -3805,5 +3805,16 @@
  "mac.v3d_too_big": "Bu model 3B göstermek için çok büyük.",
  "mac.v3d_failed": "Bu model 3B gösterilemedi.",
  "mac.mkr_rate_publish": "MakerRun saatte 20, günde 60 yeni ilana izin verir ve bu hesap sınıra ulaştı. Hiçbir şey kaybolmadı: bu ilanı daha sonra tamamlayın.",
- "mac.mkr_field_refused": "{field}: {message}"
+ "mac.mkr_field_refused": "{field}: {message}",
+ "mac.saved_filters": "Kayıtlı Filtreler",
+ "mac.save_filter": "Geçerli Filtreyi Kaydet",
+ "mac.filter_name": "Filtre adı",
+ "mac.delete_saved_filter": "Kayıtlı Filtreyi Sil",
+ "mac.filter_narrows_more": "Bu kayıtlı filtre, Windows ve Linux için Khayt'ta ödeme, etiket, tarih veya personele göre de daraltır. Burada aşamasını ve aramasını uygular.",
+ "mac.import_csv": "CSV İçe Aktar",
+ "mac.csv_new": "Yeni",
+ "mac.csv_duplicate": "Defterde zaten var",
+ "mac.csv_read_failed": "Bu dosya metin olarak okunamadı.",
+ "mac.csv_found": "{n} satır bulundu. Her alanı bir sütunla eşleştirin.",
+ "mac.csv_done": "{n} içe aktarıldı, defterde zaten olduğu için {m} atlandı."
 }

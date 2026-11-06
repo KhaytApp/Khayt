@@ -342,7 +342,8 @@ private struct GoMenu: View {
             .keyboardShortcut("1", modifiers: .command)
         Button(Words.upfront("mac.all_jobs")) { shop.shelf = .jobs(nil) }
             .keyboardShortcut("2", modifiers: .command)
-            
+        SavedFiltersMenu()
+
         Button(Words.upfront("mac.board")) { shop.shelf = .board }
             .keyboardShortcut("7", modifiers: .command)
         Button(Words.upfront("mac.customers")) { shop.shelf = .customers }
@@ -502,6 +503,14 @@ private struct ModelBundleCommands: View {
             .disabled(!shop.showingLibrary || !shop.selectionIsOnThisMac)
         Button(Words.upfront("mac.mb_import_menu") + "\u{2026}") { Task { await shop.chooseModelBundle() } }
             .disabled(!shop.canMoveJobs || shop.importing)
+        // File ▸ Import CSV ▸ Spools / Clients / Products — the desktop's
+        // three importers, by `lib/csv-import.js`, with a preview first.
+        Menu(Words.upfront("mac.import_csv")) {
+            ForEach(Shop.CsvKind.allCases) { kind in
+                Button(Words.upfront(kind.titleKey) + "\u{2026}") { shop.importingCsv = kind }
+            }
+        }
+        .disabled(!shop.canWrite)
     }
 }
 

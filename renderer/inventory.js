@@ -133,150 +133,36 @@ function orderSpoolsByLocationPreference(candidates, locId) {
 }
 
 /* ============================================================
-   CSV import — Spools / Inventory
+   CSV import — Spools, Clients, Products
+   The fields, the duplicate tests and the records are lib/csv-import.js,
+   which the Mac's File ▸ Import CSV… runs too.
    ============================================================ */
+function _csvImportOf(kind, titleKey, titleFallback, rerender) {
+  const CSV = KhaytCsvImport;
+  openCsvImportModal({
+    title: t(titleKey) || titleFallback,
+    fields: CSV.FIELDS[kind].map((f) => ({ ...f, label: t(f.labelKey) || f.label })),
+    onImport: (rows) => {
+      const list = kind === 'spools' ? inventory : kind === 'clients' ? clients : products;
+      const out = CSV.plan(kind, rows, list || [], { today: localDateStr(), settings, newId: uid });
+      list.push(...out.add);
+      saveAll();
+      rerender();
+      return { imported: out.imported, skipped: out.skipped };
+    }
+  });
+}
+
 function importSpoolsCsv() {
-  openCsvImportModal({
-    title: t('csv.import_spools') || 'Import Spools from CSV',
-    fields: [
-      { key: 'material',        label: t('inv.material')        || 'Material',            required: true },
-      { key: 'brand',           label: t('inv.brand')           || 'Brand' },
-      { key: 'color',           label: t('inv.color')           || 'Color' },
-      { key: 'lot',             label: t('inv.lot')             || 'Lot / Batch' },
-      { key: 'diameter',        label: t('inv.diameter')        || 'Diameter (mm)',        type: 'number' },
-      { key: 'weightTotal',     label: t('inv.weight_total')    || 'Total Weight (g)',     type: 'number' },
-      { key: 'weightRemaining', label: t('inv.remaining')       || 'Remaining (g)',        type: 'number' },
-      { key: 'costPerKg',       label: t('inv.cost_per_kg')     || 'Cost/kg',              type: 'number' },
-      { key: 'reorderPoint',    label: t('inv.reorder_point')   || 'Reorder Point (g)',    type: 'number' },
-      { key: 'location',        label: t('inv.location')        || 'Location' },
-      { key: 'notes',           label: t('common.notes')        || 'Notes' },
-    ],
-    onImport: (rows) => {
-      let imported = 0, skipped = 0;
-      rows.forEach(row => {
-        const exists = (inventory || []).some(s =>
-          s.material?.toLowerCase() === row.material?.toLowerCase() &&
-          s.brand?.toLowerCase() === (row.brand || '').toLowerCase() &&
-          s.color?.toLowerCase() === (row.color || '').toLowerCase()
-        );
-        if (exists) { skipped++; return; }
-        const wt = row.weightTotal || 1000;
-        inventory.push({
-          id: uid('S'),
-          material: row.material,
-          brand: row.brand || '',
-          color: row.color || '',
-          lot: row.lot || undefined,
-          diameter: row.diameter || 1.75,
-          weight: row.weightRemaining != null ? row.weightRemaining : wt,
-          weightTotal: wt,
-          cost: row.costPerKg || 0,
-          reorderPoint: row.reorderPoint ?? (settings.lowStockThreshold ?? 200),
-          location: row.location || '',
-          notes: row.notes || '',
-          addedAt: localDateStr(),
-          usageHistory: [],
-        });
-        imported++;
-      });
-      saveAll();
-      renderInventory();
-      return { imported, skipped };
-    }
-  });
+  _csvImportOf('spools', 'csv.import_spools', 'Import Spools from CSV', () => renderInventory());
 }
 
-/* ============================================================
-   CSV import — Clients
-   ============================================================ */
 function importClientsCsv() {
-  openCsvImportModal({
-    title: t('csv.import_clients') || 'Import Clients from CSV',
-    fields: [
-      { key: 'nameEn',    label: t('cl.name_en')   || 'Name (English)',  required: true },
-      { key: 'nameAr',    label: t('cl.name_ar')   || 'Name (Arabic)' },
-      { key: 'phone',     label: t('cl.phone')     || 'Phone' },
-      { key: 'email',     label: t('cl.email')     || 'Email' },
-      { key: 'city',      label: t('cl.city')      || 'City' },
-      { key: 'address',   label: t('cl.address')   || 'Address' },
-      { key: 'vatNumber', label: t('cl.vat')       || 'VAT Number' },
-      { key: 'company',   label: t('cl.company')   || 'Company' },
-      { key: 'notes',     label: t('common.notes') || 'Notes' },
-    ],
-    onImport: (rows) => {
-      let imported = 0, skipped = 0;
-      rows.forEach(row => {
-        const exists = (clients || []).some(c =>
-          (c.nameEn?.toLowerCase() === row.nameEn?.toLowerCase()) ||
-          (row.phone && c.phone === row.phone) ||
-          (row.email && c.email?.toLowerCase() === row.email?.toLowerCase())
-        );
-        if (exists) { skipped++; return; }
-        clients.push({
-          id: uid('CL'),
-          nameEn: row.nameEn,
-          nameAr: row.nameAr || '',
-          phone: row.phone || '',
-          email: row.email || '',
-          city: row.city || '',
-          address: row.address || '',
-          vat: row.vatNumber || '',
-          company: row.company || '',
-          notes: row.notes || '',
-          createdAt: localDateStr(),
-          commLog: [],
-          loyaltyTier: 'standard',
-        });
-        imported++;
-      });
-      saveAll();
-      renderClients();
-      return { imported, skipped };
-    }
-  });
+  _csvImportOf('clients', 'csv.import_clients', 'Import Clients from CSV', () => renderClients());
 }
 
-/* ============================================================
-   CSV import — Products / Catalog
-   ============================================================ */
 function importProductsCsv() {
-  openCsvImportModal({
-    title: t('csv.import_products') || 'Import Products from CSV',
-    fields: [
-      { key: 'nameEn',        label: t('pe.name_en')     || 'Name (English)',   required: true },
-      { key: 'nameAr',        label: t('pe.name_ar')     || 'Name (Arabic)' },
-      { key: 'description',   label: t('pe.description') || 'Description' },
-      { key: 'defaultMargin', label: t('pe.default_margin') || 'Default Margin (%)', type: 'number' },
-      { key: 'sku',           label: t('cat.sku')        || 'SKU' },
-    ],
-    onImport: (rows) => {
-      let imported = 0, skipped = 0;
-      rows.forEach(row => {
-        const exists = (products || []).some(p =>
-          (p.nameEn?.toLowerCase() === row.nameEn?.toLowerCase()) ||
-          (row.sku && p.sku === row.sku)
-        );
-        if (exists) { skipped++; return; }
-        products.push({
-          id: uid('PROD'),
-          nameEn: row.nameEn,
-          nameAr: row.nameAr || '',
-          description: row.description || '',
-          defaultMargin: row.defaultMargin || 30,
-          sku: row.sku || '',
-          thumbnail: null,
-          imagePath: null,
-          priceTiers: [],
-          parts: [],
-          createdAt: localDateStr(),
-        });
-        imported++;
-      });
-      saveAll();
-      renderCatalog();
-      return { imported, skipped };
-    }
-  });
+  _csvImportOf('products', 'csv.import_products', 'Import Products from CSV', () => renderCatalog());
 }
 
 

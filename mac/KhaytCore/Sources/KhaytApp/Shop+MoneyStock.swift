@@ -248,7 +248,7 @@ extension Shop {
     /// which preserves these and takes none from a form. `change` is asked of
     /// the settings ON DISK, so a key the other app moved meanwhile is read
     /// fresh, and it returns the settings to store.
-    private func writeOwnSettings(
+    func writeOwnSettings(
         _ change: @escaping @Sendable ([String: JSONValue], KhaytEngine) async throws -> [String: JSONValue]
     ) async {
         guard permitted("settings", "edit") else {

@@ -3805,5 +3805,16 @@
  "mac.v3d_too_big": "Este modelo é grande demais para mostrar em 3D.",
  "mac.v3d_failed": "Não foi possível mostrar este modelo em 3D.",
  "mac.mkr_rate_publish": "O MakerRun permite 20 novos anúncios por hora e 60 por dia, e esta conta chegou ao limite. Nada se perdeu: termine este anúncio mais tarde.",
- "mac.mkr_field_refused": "{field}: {message}"
+ "mac.mkr_field_refused": "{field}: {message}",
+ "mac.saved_filters": "Filtros salvos",
+ "mac.save_filter": "Salvar filtro atual",
+ "mac.filter_name": "Nome do filtro",
+ "mac.delete_saved_filter": "Excluir filtro salvo",
+ "mac.filter_narrows_more": "Este filtro salvo também filtra por pagamento, etiqueta, datas ou equipe no Khayt para Windows e Linux. Aqui ele aplica a etapa e a busca.",
+ "mac.import_csv": "Importar CSV",
+ "mac.csv_new": "Novo",
+ "mac.csv_duplicate": "Já está no livro",
+ "mac.csv_read_failed": "Não foi possível ler este arquivo como texto.",
+ "mac.csv_found": "{n} linhas encontradas. Associe cada campo a uma coluna.",
+ "mac.csv_done": "{n} importados, {m} ignorados por já estarem no livro."
 }

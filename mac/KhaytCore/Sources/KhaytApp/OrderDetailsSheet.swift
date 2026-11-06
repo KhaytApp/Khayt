@@ -33,6 +33,9 @@ struct OrderDetailsSheet: View {
         var discountPct = 0.0
         var shippingCost = 0.0
         var lines: [Line] = []
+        /// The shop's own order fields (`settings.customFields`), by field id —
+        /// `order.customData`.
+        var custom: [String: String] = [:]
     }
 
     /// One extra charge. `raw` keeps every field the line carries — its id, a
@@ -63,6 +66,10 @@ struct OrderDetailsSheet: View {
                     delivery
                     Divider()
                     notes
+                    if !customFields.isEmpty {
+                        Divider()
+                        custom
+                    }
                 }
                 .padding(.vertical, 4)
             }
@@ -124,6 +131,23 @@ struct OrderDetailsSheet: View {
             HStack {
                 Text(shop.words.callIt("calc.extra_lines")).foregroundStyle(.secondary)
                 Spacer()
+                // The shop's post-process presets, each added as a line in
+                // one click — the desktop's preset picker.
+                let presets = shop.settingsList(.postProcessPresets)
+                if !presets.isEmpty {
+                    Menu(shop.words.callIt("set.post_process_presets")) {
+                        ForEach(Array(presets.enumerated()), id: \.offset) { _, p in
+                            let name = Shop.plainString(p["name"]) ?? ""
+                            let amount = Shop.plainNumber(p["amount"]) ?? 0
+                            let priced: String = Money.text(amount, shop.currency)
+                            let title: String = "\(name) (+\(priced))"
+                            Button(title) {
+                                form.lines.append(Line(label: name, amount: amount))
+                            }
+                        }
+                    }
+                    .fixedSize()
+                }
                 Button(shop.words.callIt("calc.add_extra_line")) { form.lines.append(Line()) }
                     .buttonStyle(.link)
             }
@@ -178,6 +202,25 @@ struct OrderDetailsSheet: View {
         note("oe.invoice_notes", $form.invoiceNotes, hint: "oe.invoice_notes_hint")
     }
 
+    /// `settings.customFields`, as `{ id, label }`.
+    private var customFields: [(id: String, label: String)] {
+        shop.settingsList(.customFields).compactMap { f in
+            guard let id = Shop.plainString(f["id"]), !id.isEmpty else { return nil }
+            return (id, Shop.plainString(f["label"]) ?? id)
+        }
+    }
+
+    @ViewBuilder private var custom: some View {
+        Text(shop.words.callIt("set.custom_fields_title")).foregroundStyle(.secondary)
+        ForEach(customFields, id: \.id) { f in
+            LabeledContent(f.label) {
+                TextField(f.label, text: Binding(get: { form.custom[f.id] ?? "" },
+                                                 set: { form.custom[f.id] = $0 }))
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+    }
+
     private func note(_ key: String, _ text: Binding<String>, hint: String?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(shop.words.callIt(key)).foregroundStyle(.secondary)
@@ -210,12 +253,17 @@ struct OrderDetailsSheet: View {
                                   amount: Shop.plainNumber(l["amount"]) ?? 0))
             }
         }
+        var custom: [String: String] = [:]
+        if case .object(let cd)? = o["customData"] {
+            for (k, v) in cd { if let s = Shop.plainString(v) { custom[k] = s } }
+        }
         return Form(notes: text("notes"), internalNotes: text("internalNotes"),
                     invoiceNotes: text("invoiceNotes"), tags: tags.joined(separator: ", "),
                     courierName: text("courierName"), trackingNumber: text("trackingNumber"),
                     deliveryAddress: text("deliveryAddress"), operatorId: text("operatorId"),
                     discountPct: Shop.plainNumber(o["discountPct"]) ?? 0,
-                    shippingCost: Shop.plainNumber(o["shippingCost"]) ?? 0, lines: lines)
+                    shippingCost: Shop.plainNumber(o["shippingCost"]) ?? 0, lines: lines,
+                    custom: custom)
     }
 
     /// What the shared rule is handed: ONLY what the shop changed.
@@ -233,6 +281,12 @@ struct OrderDetailsSheet: View {
         if form.tags != opened.tags { out["tags"] = .string(form.tags) }
         if form.discountPct != opened.discountPct { out["discountPct"] = .number(form.discountPct) }
         if form.shippingCost != opened.shippingCost { out["shippingCost"] = .number(form.shippingCost) }
+        // Only the custom fields the shop typed in: `applyDetails` merges them
+        // one key at a time, so a value for a field this sheet does not show
+        // stays in the book.
+        var custom: [String: JSONValue] = [:]
+        for (k, v) in form.custom where v != (opened.custom[k] ?? "") { custom[k] = .string(v) }
+        if !custom.isEmpty { out["customData"] = .object(custom) }
         if form.lines != opened.lines {
             out["extraLines"] = .array(form.lines.map { line in
                 var raw = line.raw
