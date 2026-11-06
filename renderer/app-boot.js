@@ -633,6 +633,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  // A paired phone added a photo to a job (POST /api/orders/:id/photos). The
+  // file and the record are already on disk; this copy of the book takes the
+  // photo too, ADDED to whatever the job holds here, or the next save would
+  // write the job back without it. Same object, so an open card keeps it.
+  if (window.hubAPI?.onLanOrderPhotoAdded) {
+    window.hubAPI.onLanOrderPhotoAdded((payload) => {
+      const photo = payload && payload.photo;
+      if (!photo || typeof photo.filename !== 'string' || typeof photo.thumb !== 'string') return;
+      const order = printLog.find((o) => o && o.id === payload.id);
+      if (!order) return;
+      const photos = Array.isArray(order.printPhotos) ? order.printPhotos : [];
+      if (photos.some((p) => p && p.filename === photo.filename)) return;
+      order.printPhotos = [...photos, { thumb: photo.thumb, filename: photo.filename }];
+      saveAll();
+      renderLogs();
+      toast('📱 ' + t('phonephoto.added', { job: order.project || order.jobNumber || order.id }), 'success', 4000);
+    });
+  }
   if (window.hubAPI?.onLanOrderUpdated) {
     window.hubAPI.onLanOrderUpdated((payload) => {
       const { id, status } = payload;
