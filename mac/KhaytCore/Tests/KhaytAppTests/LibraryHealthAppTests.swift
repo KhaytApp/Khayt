@@ -313,9 +313,20 @@ struct LibraryHealthAppTests {
         #expect(String(jobs[move.upperBound...].prefix(3000)).contains("Self.clearPrintNext(&root, acceptedFrom: wasOrder"),
                 "a move out of Quote (board, Job menu, portal approval) no longer clears Print next")
         let lan = try read("LanServer.swift")
-        let approve = try #require(lan.range(of: "func approveQuote(_ jobId: String"))
-        #expect(String(lan[approve.upperBound...].prefix(1500)).contains("Shop.clearPrintNext(&root, acceptedFrom: before"),
+        // The approval's write is `applyQuoteApproval`, shared by the LAN quote
+        // page (`approveQuote`) and `POST /api/orders/:id/approve`.
+        let approval = try #require(lan.range(of: "static func applyQuoteApproval(into root:"))
+        #expect(String(lan[approval.upperBound...].prefix(1500)).contains("Shop.clearPrintNext(&root, acceptedFrom: before"),
                 "the LAN quote page's approval no longer clears Print next")
+        let approve = try #require(lan.range(of: "func approveQuote(_ jobId: String"))
+        #expect(String(lan[approve.upperBound...].prefix(1000)).contains("Self.applyQuoteApproval(into: &root"),
+                "the LAN quote page no longer approves through the shared write")
+        #expect(try read("LanServer+Rest.swift").contains("try await applyQuoteApproval(into: &approving"),
+                "the REST approval no longer approves through the shared write")
+        let rest = try read("LanServer+Rest.swift")
+        let restMove = try #require(rest.range(of: "static func applyLanRestWrite(into root:"))
+        #expect(String(rest[restMove.upperBound...].prefix(2500)).contains("clearPrintNext(&moved, acceptedFrom: before"),
+                "a LAN status move out of Quote no longer clears Print next")
     }
 
     @Test("the sample book has two models on Print next, one with a note")

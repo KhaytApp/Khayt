@@ -747,17 +747,26 @@
 
   // squared Euclidean Lab distance — cheap inner-loop metric for the search (ΔE00 is used
   // for the final preview/reporting where accuracy, not speed, matters).
-  function labDist2(a, b) { const dl = a.L - b.L, da = a.a - b.a, db = a.b - b.b; return dl * dl + da * da + db * db; }
+  // `cw` < 1 matches lightness before hue: a stack's tones come from its depth, so a pixel that
+  // lands on the right lightness reads as shading even when the hue is a little off, while a
+  // closer hue at the wrong lightness reads as a blotch (see chromaWeight in planPainting).
+  // cw = 1 keeps the original sum term for term, so the default plan is bit-for-bit unchanged
+  // (dl² + 1·(da² + db²) groups the additions differently and can move the last bit).
+  function labDist2(a, b, cw) {
+    const dl = a.L - b.L, da = a.a - b.a, db = a.b - b.b;
+    if (cw === undefined || cw === 1) return dl * dl + da * da + db * db;
+    return dl * dl + cw * (da * da + db * db);
+  }
 
   /** Weighted mean nearest-palette distance of the reps (only heights k ≥ baseLayers are
    *  printable). Uses squared-Lab by default; ΔE00 when exact:true. */
-  function sequenceLoss(reps, palette, baseLayers, exact) {
+  function sequenceLoss(reps, palette, baseLayers, exact, cw) {
     let sum = 0, wsum = 0;
     for (let r = 0; r < reps.length; r++) {
       const rep = reps[r]; let best = Infinity;
       for (let j = 0; j < palette.length; j++) {
         if (palette[j].k < baseLayers) continue;
-        const d = exact ? KC.ciede2000(rep.lab, palette[j].lab) : labDist2(rep.lab, palette[j].lab);
+        const d = exact ? KC.ciede2000(rep.lab, palette[j].lab) : labDist2(rep.lab, palette[j].lab, cw);
         if (d < best) best = d;
       }
       if (best !== Infinity) { sum += (exact ? best : Math.sqrt(best)) * rep.w; wsum += rep.w; }
@@ -795,6 +804,7 @@
     // just enough to prefer a clean plan when two are equal in colour fidelity.
     const switchPenalty = opts.switchPenalty != null ? +opts.switchPenalty : 0.04;
     const tdScale = +opts.tdScale > 0 ? +opts.tdScale : 0.2;
+    const cw = +opts.chromaWeight > 0 ? +opts.chromaWeight : 1;
     const tds = filaments.map((f) => (+f.td > 0 ? +f.td : defaultTd(f.hex)));
     let baseIdx = 0; for (let i = 1; i < nFil; i++) if (tds[i] < tds[baseIdx]) baseIdx = i;
     if (nFil <= 1) { return { seq: new Array(totalLayers).fill(0), loss: 0, baseIdx: 0 }; }
@@ -807,7 +817,7 @@
     if (opts.monotonic === true) {
       const order = filaments.map((f, i) => i).sort((a, b) => luminance(filaments[a].hex) - luminance(filaments[b].hex));
       const nSeg = order.length;
-      const mcost = (s) => sequenceLoss(reps, compositeSequence(filaments, s, layerH, tdScale), baseLayers, false);
+      const mcost = (s) => sequenceLoss(reps, compositeSequence(filaments, s, layerH, tdScale), baseLayers, false, cw);
       const build = (bp) => {
         const s = new Array(totalLayers);
         for (let k = 0; k < baseLayers; k++) s[k] = order[0];
@@ -836,7 +846,7 @@
     }
 
     const switches = (s) => { let c = 0; for (let k = 1; k < s.length; k++) if (s[k] !== s[k - 1]) c++; return c; };
-    const cost = (s) => sequenceLoss(reps, compositeSequence(filaments, s, layerH, tdScale), baseLayers, false) + switchPenalty * switches(s);
+    const cost = (s) => sequenceLoss(reps, compositeSequence(filaments, s, layerH, tdScale), baseLayers, false, cw) + switchPenalty * switches(s);
 
     const seq = initSequence(filaments, totalLayers, baseLayers, baseIdx);
     let best = cost(seq);
@@ -896,6 +906,7 @@
     const baseLayers = Math.max(1, opts.baseLayers | 0);
     const dither = opts.dither !== false;
     const tdScale = +opts.tdScale > 0 ? +opts.tdScale : 0.2;
+    const cw = +opts.chromaWeight > 0 ? +opts.chromaWeight : 1;
     const palette = compositeSequence(filaments, seq, layerH, tdScale).filter((p) => p.k >= baseLayers);
     const { data, width, height } = img;
     const n = width * height;
@@ -929,7 +940,7 @@
         const tb = dither ? clamp255(data[o + 2] + errB[i]) : data[o + 2];
         const lab = KC.rgbToLab({ r: tr, g: tg, b: tb });
         let best = 0, bestD = Infinity;
-        for (let j = 0; j < palLab.length; j++) { const d = labDist2(lab, palLab[j]); if (d < bestD) { bestD = d; best = j; } }
+        for (let j = 0; j < palLab.length; j++) { const d = labDist2(lab, palLab[j], cw); if (d < bestD) { bestD = d; best = j; } }
         const k = palette[best].k;
         heights[i] = k; idxArr[i] = best; if (k < minK) minK = k; if (k > maxK) maxK = k;
         const rgb = palRgb[best];
@@ -1270,9 +1281,9 @@
       // sequence (each colour in one height band, ordered by lightness) so a smooth tone
       // maps to a smooth top colour. This is the single biggest print-cleanliness win.
       switchPenalty: opts.switchPenalty != null ? opts.switchPenalty : 1.0,
-      anneal: opts.anneal, seed: opts.seed, tdScale,
+      anneal: opts.anneal, seed: opts.seed, tdScale, chromaWeight: opts.chromaWeight,
     });
-    let solve = solveFromSequence(solveImg, fils, seq, { layerH, baseLayers, dither: opts.dither === true, tdScale, smooth: opts.smooth });
+    let solve = solveFromSequence(solveImg, fils, seq, { layerH, baseLayers, dither: opts.dither === true, tdScale, chromaWeight: opts.chromaWeight, smooth: opts.smooth });
     // The maker's colour fixes go on last, over the finished solve, so nothing smooths
     // them away; the export sends these heights.
     if (opts.fixes && opts.fixes.length) {
@@ -1286,7 +1297,38 @@
     };
   }
 
+  // The approved print settings for a portrait (Bed Ready, Nov 2026), one place for every app.
+  // `vivid` is the panels' 1–10 control, tdScale = 1.1 − vivid × 0.1: colour plans at TD scale
+  // 0.3 and matches lightness before hue (chromaWeight 0.5, so a face's shading is not broken up
+  // by pixels jumping to a closer hue at the wrong depth); black and white plans at 0.5, half as
+  // opaque as the engine's 0.2 so the greys between black and white get used, with plain colour
+  // distance because a stack of neutrals has no hue to trade. Both stand 3.2 mm tall.
+  const TONE_DEFAULTS = Object.freeze({
+    colour: Object.freeze({ heightMm: 3.2, vivid: 8, chromaWeight: 0.5 }),
+    bw: Object.freeze({ heightMm: 3.2, vivid: 6, chromaWeight: 1 }),
+  });
+
+  /**
+   * Black and white: there is at least one filament, and every one is neutral — CIELAB chroma
+   * √(a² + b²) at most `maxChroma`. An unreadable colour is not neutral.
+   *
+   * The cutoff of 6 is deliberately looser than Bed Ready's neutral set, which tops out at 1.4
+   * (#161616 … #F4F4F2): Bed Ready picks from that curated list, while Khayt's stacks are the
+   * shop's real spools, whose greys and whites lean warm or cool by a few units (a "cool white"
+   * like #EEF2F6 is ~2.7, a warm grey like #8A8580 ~3.4) and are still meant as black and white.
+   * Anything at 6 or more is a colour a viewer can name — #C04040 is 58.6, a beige #D8C8A8 ~14.
+   */
+  function isNeutralPalette(hexes, maxChroma) {
+    const lim = maxChroma != null && +maxChroma >= 0 ? +maxChroma : 6;
+    if (!Array.isArray(hexes) || !hexes.length) return false;
+    return hexes.every((h) => {
+      const lab = KC.hexToLab(h);
+      return !!lab && Math.hypot(lab.a, lab.b) <= lim;
+    });
+  }
+
   const api = {
+    TONE_DEFAULTS, isNeutralPalette,
     DEFAULT_LAYER_H, DEFAULT_BASE_LAYERS, DEFAULT_BAND_LAYERS, U1_HEADS,
     heightfieldToMesh, hangLayout, hangTabLayers, planTiles, tileSolve, meshToStlBinary, smoothHeights,
     luminance, defaultTd, layerAlpha, suggestLayers, orderByOpacity,

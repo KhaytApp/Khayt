@@ -180,7 +180,7 @@ struct HueForgeStudio: View {
                     Stepper(value: $model.settings.baseLayers, in: 1...20) {
                         Text(words.callIt("mac.hf_base", ["n": .number(Double(model.settings.baseLayers))]))
                     }
-                    Stepper(value: $model.settings.vivid, in: 1...10) {
+                    Stepper(value: Binding(get: { model.settings.vivid }, set: { model.setVivid($0) }), in: 1...10) {
                         Text(words.callIt("mac.hf_vivid", ["n": .number(Double(model.settings.vivid))]))
                     }
                     .help(words.callIt("mac.hf_vivid_help"))
@@ -305,7 +305,10 @@ final class HueForgeModel {
     var filaments: [StudioEngine.Filament] = [] {
         // A row's identity, kept beside it: replaced with the list, carried
         // through every add, remove and move below.
-        didSet { if ids.count != filaments.count { ids = filaments.map { _ in UUID() } } }
+        didSet {
+            if ids.count != filaments.count { ids = filaments.map { _ in UUID() } }
+            fitDefaults()
+        }
     }
     private(set) var ids: [UUID] = []
 
@@ -314,6 +317,24 @@ final class HueForgeModel {
     }
     var maxColors = 4 { didSet { if maxColors != oldValue { Task { await suggest(owned: lastOwned) } } } }
     var settings = StudioEngine.ReliefSettings()
+    /// Set once the shop moves the vividness itself: from then on a change of
+    /// filaments keeps its value instead of the colour / black-and-white default.
+    private(set) var vividMoved = false
+    /// Every filament neutral: plan for black and white.
+    var blackAndWhite: Bool { StudioEngine.ReliefSettings.isBlackAndWhite(filaments.map(\.hex)) }
+
+    func setVivid(_ v: Int) {
+        guard v != settings.vivid else { return }
+        vividMoved = true
+        settings.vivid = v
+    }
+
+    /// The approved starting point for this stack: vividness 8 and
+    /// lightness-first matching in colour, 6 and plain matching in black and
+    /// white. A vividness the shop chose stays.
+    func fitDefaults() {
+        settings.fit(neutral: blackAndWhite, keepVivid: vividMoved)
+    }
     var relief: StudioEngine.ReliefPlan?
     var flat: StudioEngine.FlatPlan?
     var previewImage: CGImage?
@@ -328,7 +349,7 @@ final class HueForgeModel {
 
     /// Everything a plan depends on. A change re-plans, a moment later.
     var replanKey: String {
-        "\(mode.rawValue)|\(filaments.map { "\($0.hex):\($0.td)" }.joined(separator: ","))|\(settings.layerH)|\(settings.heightMm)|\(settings.widthMm)|\(settings.baseLayers)|\(settings.vivid)|\(settings.smooth)|\(pictureName ?? "")"
+        "\(mode.rawValue)|\(filaments.map { "\($0.hex):\($0.td)" }.joined(separator: ","))|\(settings.layerH)|\(settings.heightMm)|\(settings.widthMm)|\(settings.baseLayers)|\(settings.vivid)|\(settings.chromaWeight)|\(settings.smooth)|\(pictureName ?? "")"
     }
 
     var canExport: Bool {

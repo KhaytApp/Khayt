@@ -140,14 +140,21 @@ struct LanServerTests {
             // the bench's book rather than a file. Off unless asked, as in the app.
             if rest {
                 host.restBook = { book.value }
-                host.restWrite = { op, args in
+                // `applyLanRestWrite`, as `Shop.lanRestWrite` runs it: a status
+                // move goes through the board's `applyMove`.
+                let words = shop.words
+                host.restWrite = { @MainActor op, args in
                     var root = book.value
-                    let out = try await Shop.applyLanRest(into: &root, engine: engine, op: op, args: args)
-                    if out.changed != nil { book.value = root }
-                    return out
+                    let done = try await Shop.applyLanRestWrite(into: &root, engine: engine, words: words,
+                                                                op: op, args: args)
+                    if done.outcome.changed != nil { book.value = root }
+                    return done.outcome
                 }
                 host.printerWebhookToken = printerWebhookToken
                 host.randomHex = { "ab12" }
+                // Fixed, so a job's tokens and id tag are known: 0x07 is `7`
+                // in the id-tag alphabet's 32 characters.
+                host.randomBytes = { n in Array(repeating: 7, count: n) }
             }
             let server = LanServer(host: host)
             self.server = server

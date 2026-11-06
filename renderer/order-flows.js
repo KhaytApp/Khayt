@@ -3135,6 +3135,9 @@ async function captureFailurePhoto(orderId) {
     // able to drive end to end.
     recordSetupOutcomes,
     updateStatus,
+    // A move made elsewhere (PATCH /api/orders/:id, lib/lan-rest.js) hands the
+    // window the rule's effects to perform: app-boot.js onLanOrderUpdated.
+    runStatusEffects,
     resumeFromHold,
     holdOrder,
     qcPassOrder,

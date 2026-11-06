@@ -1699,6 +1699,8 @@
   "set.elec_rate_hint": "What a kWh costs your shop. Quotes, failed prints and power reports use it unless a printer preset sets its own. Leave it empty for Khayt's default.",
   "set.prefs_section": "App Preferences",
   "set.readonly_note": "Only the owner can change Settings. You can read them here.",
+  "apitok.owner_only": "Only the owner can create or revoke API tokens.",
+  "apitok.last_used": "Last used {date}",
   "set.language": "Default language",
   "set.content_langs": "Product languages",
   "set.biz_name": "Business name",

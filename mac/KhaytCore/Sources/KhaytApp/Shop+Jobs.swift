@@ -2205,16 +2205,29 @@ extension Shop {
             //
             // WhatsApp first: it writes the customer's log, which starts from a
             // clean `moveProblem`, so a failure the others report must come after.
-            await sendOwedWhatsApp(before: wasOrder, jobId: id)
-            if let telegram { await tell(telegram) }
-            if let mail { await post(mail) }
-            if let portal { await refresh(portal) }
-            if !owed.isEmpty { await fire(owed) }
+            await deliverMove(telegram: telegram, email: mail, portal: portal, webhooks: owed,
+                              before: wasOrder, jobId: id)
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
             moveProblem = self.said(error)
         }
+    }
+
+    /// What a move owes outside the book, sent once the write has committed:
+    /// the customer's WhatsApp update, the Telegram message, the email, the
+    /// tracking page and the webhooks. Shared by a move made here (`moveJob`)
+    /// and one asked for over the LAN (`lanRestWrite`), so the two send the
+    /// same things.
+    func deliverMove(telegram: TelegramMessage?, email: OrderEmail?, portal: PortalRefresh?,
+                     webhooks: [KhaytEngine.WebhookDelivery], before: JSONValue?, jobId: Order.ID) async {
+        // WhatsApp first: it writes the customer's log, which starts from a
+        // clean `moveProblem`, so a failure the others report must come after.
+        await sendOwedWhatsApp(before: before, jobId: jobId)
+        if let telegram { await tell(telegram) }
+        if let email { await post(email) }
+        if let portal { await refresh(portal) }
+        if !webhooks.isEmpty { await fire(webhooks) }
     }
 
     /// Deliver what the move owes, and say what did not arrive.
@@ -2390,7 +2403,16 @@ extension Shop {
     }
 
     /// A move the rules refused, said in the shop's own words.
-    struct MoveRefused: Error { let sentence: String }
+    ///
+    /// `code` and `params` are the machine-readable reason a caller that is
+    /// not a person reads (the LAN REST API's 409, `lib/lan-rest.js`): the
+    /// gate's own code when the rules refused, else one of this app's
+    /// (`outbound_unavailable`, `unhandled_effect`, `order_gone`).
+    struct MoveRefused: Error {
+        let sentence: String
+        var code: String? = nil
+        var params: [String: JSONValue] = [:]
+    }
 
     /// The move itself, against the book as it is ON DISK.
     ///
@@ -2460,7 +2482,7 @@ extension Shop {
         if case .object(let s)? = root["settings"] { settings = s }
 
         guard var target = orders.first(where: { recordId($0) == id }) else {
-            throw MoveRefused(sentence: words.callIt("mac.move_gone"))
+            throw MoveRefused(sentence: words.callIt("mac.move_gone"), code: "order_gone")
         }
 
         // ── WHAT IT REALLY TOOK, WRITTEN BEFORE THE MOVE IS MADE ──────────
@@ -2527,7 +2549,8 @@ extension Shop {
         let cannotSend = await Self.channelsThisAppCannotSend(
             reaches, settings: settings, engine: engine)
         if !cannotSend.isEmpty {
-            throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
+            throw MoveRefused(sentence: words.outboundRefusal(cannotSend), code: "outbound_unavailable",
+                              params: ["channels": .array(cannotSend.map { .string($0.channel) })])
         }
         var telegram = reaches.contains { $0.channel == "telegram" }
             ? try? await engine.telegramMessage(order: target, newStatus: stage.rawValue,
@@ -2540,16 +2563,18 @@ extension Shop {
             now: Date(), today: localDay(), holdReason: holdReason, qcNotes: qcNotes)
 
         guard move.ok else {
-            throw MoveRefused(sentence: words.gateRefusal(move.gate))
+            throw MoveRefused(sentence: words.gateRefusal(move.gate), code: move.gate.block?.code ?? "refused",
+                              params: move.gate.block?.params ?? [:])
         }
         // An effect nobody classified is a gap, and a gap in a status change is
         // how something goes missing on this Mac and nowhere else. Refuse.
         if let unhandled = move.unhandled, !unhandled.isEmpty {
             throw MoveRefused(sentence: words.callIt("mac.move_unhandled")
-                              + " (" + unhandled.joined(separator: ", ") + ")")
+                              + " (" + unhandled.joined(separator: ", ") + ")",
+                              code: "unhandled_effect", params: ["effects": .array(unhandled.map(JSONValue.string))])
         }
         guard var changedOrder = move.order.flatMap(asObject) else {
-            throw MoveRefused(sentence: words.callIt("mac.move_gone"))
+            throw MoveRefused(sentence: words.callIt("mac.move_gone"), code: "order_gone")
         }
 
         // A completion asks for a survey token, and a random source is exactly
