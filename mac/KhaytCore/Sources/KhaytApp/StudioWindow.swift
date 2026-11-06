@@ -4,7 +4,8 @@ import UniformTypeIdentifiers
 import KhaytCore
 
 /// The Bed Ready tools on the Mac: the HueForge studio, the Calibration
-/// Assistant and the Orca filament profiles, in one window of their own.
+/// Assistant, the Orca filament profiles and the MakerRun catalogue, in one
+/// window of their own.
 ///
 /// ── WHY A WINDOW, AND WHY ONE ─────────────────────────────────────────────
 ///
@@ -43,6 +44,9 @@ struct StudioWindow: View {
                     OrcaFilamentProfiles(shop: shop)
                         .tabItem { Text(shop.words.callIt("mac.st_filaments")) }
                         .tag(StudioTab.filaments.rawValue)
+                    MakerRunBrowser(shop: shop)
+                        .tabItem { Text(shop.words.callIt("mac.st_makerrun")) }
+                        .tag(StudioTab.makerrun.rawValue)
                 }
                 .padding(.top, 6)
             }
@@ -52,7 +56,7 @@ struct StudioWindow: View {
 }
 
 enum StudioTab: String, CaseIterable {
-    case hueforge, calibration, filaments
+    case hueforge, calibration, filaments, makerrun
     static let storageKey = "studio.tab"
 }
 
@@ -68,6 +72,7 @@ struct ToolsMenu: View {
             .keyboardShortcut("h", modifiers: [.command, .option, .shift])
         Button(Words.upfront("mac.st_calibration") + "\u{2026}") { open(.calibration) }
         Button(Words.upfront("mac.st_filaments") + "\u{2026}") { open(.filaments) }
+        Button(Words.upfront("mac.st_makerrun") + "\u{2026}") { open(.makerrun) }
     }
 
     private func open(_ which: StudioTab) {
