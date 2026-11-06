@@ -636,6 +636,8 @@
       <div id="convPrusaWrap"></div>
       <div id="convFilamentWrap"></div>
       <div id="convRemapWrap">${remapTableHtml(filaments, currentMax(targetId))}</div>
+      <div id="convVlhWrap"></div>
+      <div id="convSplitWrap"></div>
       <div class="conv-dest">
         <div class="conv-dest-q">${escapeHtml(t('conv.dest_q') || 'Where should the converted file go?')}</div>
         <label class="conv-dest-opt"><input type="radio" name="convDest" value="library" checked> ${escapeHtml(src.recordId ? (t('conv.dest_this') || 'Keep it with this print file') : (t('conv.dest_new') || 'Add it to my Print-File library'))}</label>
@@ -653,6 +655,8 @@
           if (!box) return;
           box.innerHTML = platePickerHtml(plates);
           wirePlatePicker(box, src, plates, () => { const c = modal.querySelector('[data-act="cancel"]'); if (c) c.click(); });
+          platesList = plates;
+          paintSplit();
         });
         const sel = modal.querySelector('#convTarget');
         const wrap = modal.querySelector('#convRemapWrap');
@@ -909,6 +913,52 @@
             .then((mesh) => { previewBbox = mesh && mesh.bbox; previewCtl = renderPreviewInto(modal.querySelector('#convPreview'), pvCanvas, mesh, filaments.map((f) => f.color).filter(Boolean)); applyBed(); })
             .catch((e) => renderPreviewInto(modal.querySelector('#convPreview'), pvCanvas, { error: String((e && e.message) || e) }));
         }
+        // ── SPLIT INTO PLATES (lib/plate-split.js) + KEEP THE PRIME TOWER (mf-convert vlhGuard) ──
+        // Both off by default, so a convert is what it always was until the maker ticks one.
+        let platesList = null, splitOn = false, keepTower = false;
+        const splitWrap = modal.querySelector('#convSplitWrap');
+        const vlhWrap = modal.querySelector('#convVlhWrap');
+        const retargets = () => !((P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId));
+        const splittablePlates = () => (platesList || []).filter((p) => p.splittable);
+        const targetIsSnapmaker = () => {
+          const p = getProfileById(targetId);
+          return !!(p && (p.supportsMixedFilament || /snapmaker/i.test(String(p.name || p.orcaMachine || p.printerModel || ''))));
+        };
+        // The same rule as lib/plates.js platesFitSlots (Bed Ready's plate-colors.ts): the
+        // project needs more colours than the printer has, but every plate on its own does not.
+        const platesFit = (slots) => {
+          const per = (platesList || []).map((p) => (Array.isArray(p.colorIndices) ? p.colorIndices : []));
+          if (per.length < 2 || !(slots >= 1)) return false;
+          return new Set([].concat(...per)).size > slots && per.every((c) => c.length <= slots);
+        };
+        // While splitting, the whole-file colour options do not apply: hide them, as the Mac does.
+        const showWholeFile = (on) => ['#convRemapWrap', '#convFsWrap', '#convBandWrap', '#convPrusaWrap', '#convFilamentWrap', '.conv-dest']
+          .forEach((q) => { const el = modal.querySelector(q); if (el) el.style.display = on ? '' : 'none'; });
+        function paintSplit() {
+          if (!splitWrap) return;
+          const n = splittablePlates().length;
+          if (!retargets() || n < 2) { splitOn = false; splitWrap.innerHTML = ''; showWholeFile(true); return; }
+          const p = getProfileById(targetId);
+          const fits = p && platesFit(p.maxColors);
+          const tName = (p && p.name) || targetId;
+          splitWrap.innerHTML = `<label class="conv-dest-opt"><input type="checkbox" id="convSplitOn"${splitOn ? ' checked' : ''}> ${escapeHtml(tf('conv.split_plates', 'Split into one file per plate'))}</label>`
+            + (fits ? `<p class="conv-tip">${escapeHtml(tf('conv.split_fits', 'Every plate fits {n} slots on its own, so splitting keeps every colour.'.replace('{n}', p.maxColors), { n: p.maxColors }))}</p>` : '')
+            + (splitOn ? `<p class="conv-note">${escapeHtml(tf('conv.split_note', 'Makes {n} files, one per plate, each with its own colours in the first slots of {t}. You choose the folder; the options for the whole file below don’t apply.'.replace('{n}', n).replace('{t}', tName), { n, t: tName }))}</p>` : '');
+          const cb = splitWrap.querySelector('#convSplitOn');
+          if (cb) cb.onchange = () => { splitOn = cb.checked; paintSplit(); };
+          showWholeFile(!splitOn);
+        }
+        function paintVlh() {
+          if (!vlhWrap) return;
+          if (!(a.variableLayerHeight && retargets() && targetIsSnapmaker())) { keepTower = false; vlhWrap.innerHTML = ''; return; }
+          vlhWrap.innerHTML = `<label class="conv-dest-opt"><input type="checkbox" id="convKeepTower"${keepTower ? ' checked' : ''}> ${escapeHtml(tf('conv.keep_tower', 'Keep the prime tower (drop variable layer height)'))}</label>`
+            + `<p class="conv-tip">${escapeHtml(tf('conv.keep_tower_note', 'Snapmaker Orca can’t slice variable layer height with a prime tower or tree supports. Normally the tower is turned off; tick this to keep it and print at one layer height instead.'))}</p>`;
+          const cb = vlhWrap.querySelector('#convKeepTower');
+          if (cb) cb.onchange = () => { keepTower = cb.checked; };
+        }
+        modal._splitState = () => ({ on: splitOn && retargets() && splittablePlates().length >= 2 });
+        modal._vlhGuard = () => (keepTower && a.variableLayerHeight && retargets() && targetIsSnapmaker() ? 'keep-prime-tower' : null);
+        // ── end SPLIT / KEEP TOWER ──
         const renderForTarget = () => {
           const asGeneric = (P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId);
           if (chg) chg.innerHTML = changesHtml(a, targetId);
@@ -923,6 +973,8 @@
           prusaMix = false;
           if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan(); else paintPrusa();
           applyBed();
+          paintSplit();
+          paintVlh();
           return asGeneric;
         };
         // Resolve a catalogue printer's full profile (bed, slots, native machine) the first time it's
@@ -965,6 +1017,7 @@
         paintFs();
         paintFilaments();
         loadBandPlan();
+        paintVlh();
         // ── SPOOL MATCH (renderer/converter-spools.js): "Match to loaded spools" ──
         if (typeof KhaytConvSpools !== 'undefined') {
           KhaytConvSpools.mount(modal, {
@@ -1008,6 +1061,37 @@
       },
       async onSave(modal) {
         const isGeneric = (P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId);
+        const vlhGuard = (typeof modal._vlhGuard === 'function') ? modal._vlhGuard() : null;
+        // ── SPLIT INTO PLATES: one file per plate, into a folder the maker picks ──
+        if (!isGeneric && typeof modal._splitState === 'function' && modal._splitState().on && hub().mfSplitPlates) {
+          const targetProfile = (isCustomId(targetId) || isOrcaId(targetId)) ? getProfileById(targetId) : null;
+          // No per-slot filament picks: each plate numbers its own colours from slot 1, so a
+          // pick made against the whole file's slots would name the wrong spool. The print
+          // quality preset is the file's, and applies to every plate.
+          const process = (typeof modal._procPick === 'function') ? modal._procPick() : null;
+          const btn = modal.querySelector('[data-act="save"]');
+          if (btn) { btn.disabled = true; btn.textContent = tf('conv.split_working', 'Splitting into plates…'); }
+          let r;
+          try {
+            r = await hub().mfSplitPlates({ path: src.path, targetId, targetProfile, process, vlhGuard });
+          } catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+          const restore = () => { if (btn) { btn.disabled = false; btn.textContent = t('conv.convert') || 'Convert & save…'; } };
+          if (r && r.canceled) { restore(); return false; }
+          if (!r || !r.ok) { toast(convertErrorText(r), 'error', 6400); restore(); return false; }
+          const files = Array.isArray(r.files) ? r.files : [];
+          const done = files.filter((f) => f.ok);
+          for (const f of files.filter((x) => !x.ok)) {
+            toast(tf('conv.split_failed_one', 'Plate {n} wasn’t split: {why}'.replace('{n}', f.index).replace('{why}', f.error || ''), { n: f.index, why: f.error || '' }), 'warning', 6400);
+          }
+          const warned = new Set();
+          for (const f of done) for (const w of ((f.report && f.report.warnings) || [])) {
+            if (warned.has(w)) continue; warned.add(w); toast((_bdr ? '' : '⚠ ') + w, 'warning', 5200);
+          }
+          toast(tf('conv.split_done', '{k} of {n} plates saved to the folder.'.replace('{k}', done.length).replace('{n}', files.length), { k: done.length, n: files.length }), done.length ? 'success' : 'error', 4200);
+          if (!done.length) { restore(); return false; }
+          return true;
+        }
+        // ── end SPLIT ──
         const bandState = (typeof modal._bandState === 'function') ? modal._bandState() : { enabled: false };
         const bandOn = !isGeneric && bandState.enabled && !!(bandState.plan && bandState.plan.banded);
         const fsState = (typeof modal._fsState === 'function') ? modal._fsState() : { enabled: false };
@@ -1052,7 +1136,7 @@
             ? Array.from({ length: Math.max(...Object.keys(picksMap).map((k) => +k + 1)) }, (_, i) => picksMap[i] || null)
             : null;
           const process = (typeof modal._procPick === 'function') ? modal._procPick() : null;
-          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process, colorMix: !!(prusaState.on && prusaState.colorMix), ...(spoolOpts || {}) });
+          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process, colorMix: !!(prusaState.on && prusaState.colorMix), ...(spoolOpts || {}), ...(vlhGuard ? { vlhGuard } : {}) });
         } catch (e) { toast(String((e && e.message) || e), 'error'); if (btn) { btn.disabled = false; } return false; }
         if (r && r.refused === 'spool-match' && typeof modal._spoolRefused === 'function') modal._spoolRefused(r.error); // SPOOL MATCH
         if (r && r.canceled) { if (btn) { btn.disabled = false; btn.textContent = t('conv.convert') || 'Convert & save…'; } return false; }

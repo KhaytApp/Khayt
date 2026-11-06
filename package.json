@@ -31,6 +31,7 @@
     "verify:estimator": "node scripts/verify-estimator.mjs",
     "test:e2e:privacy": "node scripts/e2e-privacy-smoke.mjs",
     "test:e2e:3mfworker": "node scripts/e2e-3mf-worker.mjs",
+    "test:e2e:platesplit": "node scripts/e2e-plate-split-smoke.mjs",
     "test:e2e:assembly": "node scripts/e2e-assembly-smoke.mjs",
     "test:e2e:apitokens": "node scripts/e2e-api-tokens-smoke.mjs",
     "test:e2e:webhooks": "node scripts/e2e-webhook-bus-smoke.mjs",
