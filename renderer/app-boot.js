@@ -646,6 +646,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // modal keeps it.
         const order = printLog[idx];
         const prevTier = typeof getClientTier === 'function' ? getClientTier(order.clientId) : null;
+        // The invoice counter, when the move gave a quote its number.
+        for (const [k, v] of Object.entries((payload.settingsChanged && typeof payload.settingsChanged === 'object') ? payload.settingsChanged : {})) {
+          if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+          settings[k] = v;
+        }
         for (const k of (Array.isArray(payload.removed) ? payload.removed : [])) delete order[k];
         for (const [k, v] of Object.entries(payload.changed)) {
           if (k === 'id' || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;

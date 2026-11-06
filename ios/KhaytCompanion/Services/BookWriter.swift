@@ -133,6 +133,24 @@ struct BookWriter {
             params = gate.block?.params ?? [:]
         }
 
+        init(code: String?, params: [String: JSONValue]) {
+            self.code = code
+            self.params = params
+        }
+
+        /// The shop's own refusal over the wire: `PATCH /api/orders/:id`
+        /// answers a move its rule refuses with 409 `{ error, code, params }`
+        /// (`lib/lan-rest.js`, docs/LAN_API.md). Said in the same words as a
+        /// refusal from this phone's own book; nil for anything else.
+        static func fromWire(status: Int, body: Data) -> MoveRefused? {
+            guard status == 409,
+                  case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
+                  case .string(let code)? = o["code"], !code.isEmpty else { return nil }
+            var params: [String: JSONValue] = [:]
+            if case .object(let p)? = o["params"] { params = p }
+            return MoveRefused(code: code, params: params)
+        }
+
         var errorDescription: String? {
             switch code {
             case "production_paused":

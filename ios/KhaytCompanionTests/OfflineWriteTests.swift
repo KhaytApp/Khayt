@@ -501,6 +501,23 @@ final class OfflineWriteTests: XCTestCase {
         }
     }
 
+    func testTheShopsOwnRefusalOverTheWireIsSaidInTheSameWords() throws {
+        // lib/lan-rest.js answers a refused PATCH /api/orders/:id with this.
+        let paused = Data(#"{"error":"Move refused","code":"production_paused","params":{}}"#.utf8)
+        let fromWire = try XCTUnwrap(BookWriter.MoveRefused.fromWire(status: 409, body: paused))
+        XCTAssertEqual(fromWire.code, "production_paused")
+        XCTAssertEqual(fromWire.errorDescription, L10n.tr("move.refused.production_paused"))
+
+        let wip = Data(#"{"error":"Move refused","code":"wip_blocked","params":{"col":"printing","n":3}}"#.utf8)
+        let full = try XCTUnwrap(BookWriter.MoveRefused.fromWire(status: 409, body: wip))
+        XCTAssertEqual(full.errorDescription, L10n.format("move.refused.wip_blocked", L10n.tr("status.printing"), 3))
+
+        // Anything else is still the ordinary error path.
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 400, body: paused))
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 409, body: Data(#"{"error":"Conflict"}"#.utf8)))
+        XCTAssertNil(BookWriter.MoveRefused.fromWire(status: 409, body: Data("not json".utf8)))
+    }
+
     // MARK: - Deleting, waste and expenses
 
     /// The native Mac serves no `DELETE /api/inventory`, so this is the only way
