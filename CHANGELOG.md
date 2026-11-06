@@ -9293,6 +9293,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.26] - 2026-11-06
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release brings more of what the Windows and Linux app could do to the Mac, and HueForge portraits keep their shading.
+
+### Added
+
+- **Reports.** Profit by filament, material use per month, a box-form VAT return you can print or save as PDF, revenue-against-expenses and margin trend charts, and a 12-week completion heatmap.
+- **Stock.** A shopping list and a test-print log.
+- **MakerRun.** Browse, download and publish models on MakerRun from the Mac. You sign in by pasting the code from makerrun.com/app-link.
+- **Multicolour planner** and a 3D viewer you can turn with the mouse.
+- **Order flow.** A post-process checklist with presets, custom order fields, saved filters, and CSV import.
+- **Jobs made over the local network** (by the REST API or a paired device) get a tracking link and a job number from your counter, the same as jobs made on the Mac.
+
+### Changed
+
+- **HueForge uses Bed Ready's tested print settings.** Colour portraits are planned 3.2 mm tall at vividness 8 and match each pixel's lightness before its hue, so a face's shading is no longer broken up by pixels jumping to a closer colour at the wrong depth. When every loaded filament is black, white or grey, the plan uses black-and-white settings (3.2 mm, vividness 6), so the greys between black and white are used.
+- **The first person added to an empty shop starts as Owner.**
+
+### Fixed
+
+- **A status change sent over the local network now does everything the board does.** Completing a job takes its filament off the shelf, reopening a finished job puts it back, and a move the shop's rules refuse is answered with the reason. Approving a quote over the network gives it its invoice number, the same as the customer's quote page.
+- **Filament Performance revenue is net of VAT.**
+
 ## [4.0.0-beta.25] - 2026-11-06
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
