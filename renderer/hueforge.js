@@ -31,8 +31,30 @@
   let S = null; // session state
   let _rafPending = false;
 
+  // THE APPROVED STARTING POINT (Turki, Nov 2026, after a test print): the
+  // numbers and the colour-vs-black-and-white rule live in lib/hueforge.js
+  // (`TONE_DEFAULTS`, `isNeutralPalette`) so the Mac studio and this one decide
+  // alike. An engine without them gets this studio's old defaults, unchanged.
+  const OLD_TONES = { heightMm: 2.4, vivid: 9, chromaWeight: 1 };
+  /** The defaults for the filaments in hand: black and white when every one is neutral. */
+  function tonesFor(filaments) {
+    const hf = HF();
+    const T = hf && hf.TONE_DEFAULTS;
+    if (!T || !T.colour || !T.bw) return OLD_TONES;
+    const hexes = (filaments || []).map((f) => f && f.hex).filter(Boolean);
+    const bw = hexes.length > 0 && typeof hf.isNeutralPalette === 'function' && hf.isNeutralPalette(hexes);
+    return bw ? T.bw : T.colour;
+  }
+  /** Vividness follows the filaments until the maker moves it; the colour matching always does. */
+  function fitTones() {
+    const t = tonesFor(S.filaments);
+    if (!S.vividMoved) S.vivid = t.vivid;
+    S.chromaWeight = t.chromaWeight;
+  }
+
   function defaults() {
-    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: 2.4, dither: false, vivid: 9, smooth: 0, hang: '', holeMm: 4, fixes: [], fixPick: null, stack: null, solve: null, plan: null, paint: null, flat: null };
+    const t = tonesFor([]);
+    return { mode: 'relief', img: null, imgUrl: '', imgName: '', filaments: [], layerH: 0.08, baseLayers: 5, maxColors: 4, widthMm: 120, heightMm: t.heightMm, dither: false, vivid: t.vivid, vividMoved: false, chromaWeight: t.chromaWeight, smooth: 0, hang: '', holeMm: 4, fixes: [], fixPick: null, stack: null, solve: null, plan: null, paint: null, flat: null };
   }
   /** What the mesher needs to add a hanger (hangLayout in lib/hueforge.js). */
   function hangOpts() {
@@ -108,6 +130,7 @@
     if (!hf || !S.filaments.length || !S.img) { S.stack = S.solve = S.plan = S.paint = S.flat = null; return; }
     if (isFlat()) { recomputeFlat(); return; }
     S.flat = null;
+    fitTones();
     // Optimised per-layer painting: learn a filament sequence (reuse allowed) that
     // reproduces the image via the transmission model — the U1's free tool-changes make
     // the many swaps automatic. Falls back to nothing if no valid filaments.
@@ -115,7 +138,11 @@
       layerH: S.layerH, heightMm: S.heightMm, widthMm: S.widthMm,
       baseLayers: S.baseLayers, dither: S.dither === true,
       // vividness → front-lit TD scale (higher vivid = more opaque = more saturated pop)
-      tdScale: Math.max(0.1, 1.1 - (S.vivid || 9) * 0.1),
+      tdScale: Math.max(0.1, 1.1 - (S.vivid || tonesFor(S.filaments).vivid) * 0.1),
+      // Below 1, a pixel takes the layer at its lightness before the one nearer
+      // its hue, so a face shades instead of snapping into patches (1 in black
+      // and white, where there is no hue to trade).
+      chromaWeight: S.chromaWeight,
       smooth: S.smooth || 0,
       fixes: S.fixes,
     });
@@ -482,7 +509,7 @@
       '<label class="hf-num wide" title="Layer height">layer height<select class="input" id="hfLayerH">' + lopt + '</select></label>',
       flat ? '' : '<label class="hf-num wide" title="Solid base layers before the first colour">base layers<input type="number" id="hfBase" min="1" max="20" step="1" value="' + esc(S.baseLayers) + '" /></label>',
       '<label class="hf-num wide" title="Total relief height. More height = more colour layers = richer tones (and longer print).">height (mm)<input type="number" id="hfHeight" min="0.8" max="6" step="0.1" value="' + esc(S.heightMm) + '" /></label>',
-      flat ? '' : '<label class="hf-num wide" title="Colour vividness (front-lit correction). Higher = more saturated, punchier colour; lower = softer, more blended. 9 is a good default for reflective prints.">vividness<input type="number" id="hfVivid" min="1" max="10" step="1" value="' + esc(S.vivid) + '" /></label>',
+      flat ? '' : '<label class="hf-num wide" title="Colour vividness (front-lit correction). Higher = more saturated, punchier colour; lower = softer, more blended. It starts at the recommended value for your filaments (gentler for black and white) and stays where you put it.">vividness<input type="number" id="hfVivid" min="1" max="10" step="1" value="' + esc(S.vivid) + '" /></label>',
       flat ? '' : '<label class="hf-num wide" title="A hole through the top of the picture to hang it on a nail, or a loop on a tab above it for a keyring.">hanger'
         + '<select class="input" id="hfHang">'
         + '<option value=""' + (S.hang ? '' : ' selected') + '>None</option>'
@@ -843,8 +870,8 @@
     on('#hfLayerH', 'change', (e) => { S.layerH = clampNum(e.target.value, 0.04, 0.28, 0.12); scheduleRepaint(); });
     on('#hfWidth', 'input', (e) => { S.widthMm = clampNum(e.target.value, 40, isFlat() ? 270 : 1000, 120); scheduleRepaint(); });
     on('#hfBase', 'input', (e) => { S.baseLayers = Math.round(clampNum(e.target.value, 1, 20, 5)); scheduleRepaint(); });
-    on('#hfHeight', 'input', (e) => { S.heightMm = clampNum(e.target.value, 0.8, 6, 2.4); scheduleRepaint(); });
-    on('#hfVivid', 'input', (e) => { S.vivid = Math.round(clampNum(e.target.value, 1, 10, 9)); scheduleRepaint(); });
+    on('#hfHeight', 'input', (e) => { S.heightMm = clampNum(e.target.value, 0.8, 6, tonesFor(S.filaments).heightMm); scheduleRepaint(); });
+    on('#hfVivid', 'input', (e) => { S.vivid = Math.round(clampNum(e.target.value, 1, 10, tonesFor(S.filaments).vivid)); S.vividMoved = true; scheduleRepaint(); });
     on('#hfSmooth', 'input', (e) => { S.smooth = Math.round(clampNum(e.target.value, 0, 3, 0)); scheduleRepaint(); });
     on('#hfHang', 'change', (e) => { S.hang = e.target.value === 'hole' || e.target.value === 'loop' ? e.target.value : ''; render(); });
     on('#hfHoleMm', 'input', (e) => { S.holeMm = clampNum(e.target.value, 2, 12, 4); paint(); });
