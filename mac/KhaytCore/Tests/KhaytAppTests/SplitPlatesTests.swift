@@ -126,7 +126,8 @@ struct SplitPlatesTests {
         #expect(try member("Metadata/plate_1.png", in: two) == Data([0x89, 0x50, 0x4E, 0x47, 0xFF, 0x02]))
         // And the geometry it keeps is the source's, byte for byte.
         #expect(try member("3D/Objects/object_2.model", in: two) == (try member("3D/Objects/object_2.model", in: source)))
-        #expect((try? member("3D/Objects/object_1.model", in: two)) == nil, "another plate's geometry came along")
+        #expect(!(try Zip.entries(of: two)).contains { $0.name == "3D/Objects/object_1.model" },
+                "another plate's geometry came along")
     }
 
     @Test("the preview says how many plates a split would make, and whether the file has variable layer height")
