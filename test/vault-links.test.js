@@ -248,3 +248,15 @@ test('revoke, extend and addDownloads send the PATCH the Mac sends', async () =>
     ['PATCH', true, { addDownloads: 3 }],
   ]);
 });
+
+test('a listing whose chunkBytes contradicts the sealed record is refused', async () => {
+  const files = await feed(1);
+  const head = files[0].versions.find((v) => v.version === files[0].head);
+  head.chunkBytes = 1234;
+  const e = await L.prepareItems(DEK, files, ['file0']).catch((x) => x);
+  assert.equal(e.reason, 'not-shareable');
+  // the sealed record's own size is what a link uses; a matching listing is fine
+  head.chunkBytes = 4194304;
+  const ok = await L.prepareItems(DEK, files, ['file0']);
+  assert.equal(ok[0].linkMeta.manifest.chunkBytes, 4194304);
+});

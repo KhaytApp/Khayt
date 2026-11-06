@@ -40,7 +40,10 @@ async function run() {
     if (init.method === 'POST' && (m = tail.match(/^\/vault\/uploads\/([^/]+)\/complete$/))) {
       const u = uploads.get(m[1]);
       rows.set(u.fileId, { fileId: u.fileId, head: 1, meta: b.meta, metaRev: 1,
-        versions: [{ version: 1, uploadId: m[1], wrappedKey: b.wrappedKey, versionMeta: b.versionMeta, manifestHash: b.manifestHash, chunks: u.sizes.length, bytes: u.sizes.reduce((a, x) => a + x, 0) }],
+        versions: [{ version: 1, uploadId: m[1], wrappedKey: b.wrappedKey, versionMeta: b.versionMeta, manifestHash: b.manifestHash, chunks: u.sizes.length, bytes: u.sizes.reduce((a, x) => a + x, 0),
+          // The real cloud always sends it (khayt-cloud src/store.js), and the Mac's
+          // VaultClient.Version will not decode a row without it.
+          chunkBytes: 4194304 }],
         _sealedChunksB64: u.parts });
       rev++;
       return json(201, { fileId: u.fileId, version: 1, rev, conflict: false });

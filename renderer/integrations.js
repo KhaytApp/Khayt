@@ -1729,10 +1729,57 @@ function _firePrintNotification(title, body) {
   catch (e) { /* notifications unavailable — non-fatal */ }
 }
 
+/* ── The printer's own photo, the moment a print finishes ──────────────
+ * lib/print-finish-photo.js decides WHEN (the edge out of a job, once per
+ * print, and only for one that FINISHED — a failed or cancelled print is a
+ * picture of a failure) and WHICH JOB (none rather than a guess). This is the
+ * plumbing, as the Mac's FinishCamera: the camera, then the book. Best-effort:
+ * a snapshot that fails leaves the print, the poll and the book as they were. */
+let _finishMemo = {};
+async function captureFinishPhotos(currCache) {
+  const FP = globalThis.KhaytPrintFinishPhoto;
+  if (!FP || !window.hubAPI?.webcamSnapshot || !window.hubAPI?.saveOrderPhoto) return;
+  for (const mid of Object.keys(currCache || {})) {
+    const st = currCache[mid];
+    if (!st || st.error) continue;          // a missed poll is not an edge
+    const r = FP.track(_finishMemo, mid, st);
+    _finishMemo = r.memo;
+    if (!r.capture) continue;
+    const jobId = FP.jobFor(printLog, mid, r.filename);
+    const job = jobId && printLog.find((o) => o && o.id === jobId);
+    if (!job) continue;
+    try {
+      const snap = await window.hubAPI.webcamSnapshot({ machineId: mid });
+      if (!snap || !snap.ok || !snap.dataUrl) continue;   // no camera, or it did not answer
+      const filename = await window.hubAPI.saveOrderPhoto(job.id, 'finish-' + Date.now().toString(36), snap.dataUrl);
+      const thumb = await _finishThumb(snap.dataUrl);
+      job.printPhotos = [...(Array.isArray(job.printPhotos) ? job.printPhotos : []), { thumb, filename }];
+      saveAll();
+      const name = (machines.find((m) => m.id === mid) || {}).name || '';
+      toast(t('finphoto.taken', { name, job: job.project || job.jobNumber || job.id }), 'success', 6000);
+    } catch (e) { console.warn('finish photo failed:', e && e.message); }
+  }
+}
+function _finishThumb(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 240 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 function dispatchPrinterAlerts(currCache) {
   // Local print-done/failed desktop notification (independent of the Telegram/
   // webhook alert engine below, and of whether it's even loaded).
   try { notifyPrintTransitions(currCache); } catch (e) { /* non-fatal */ }
+  captureFinishPhotos(currCache).catch(() => {});
 
   const compute = (typeof computePrinterAlerts === 'function')
     ? computePrinterAlerts

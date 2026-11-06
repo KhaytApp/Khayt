@@ -32,33 +32,23 @@ struct VaultBackupFixtureTests {
         return d
     }
 
-    /// The row as the cloud's feed sends it. The fixture's fake vault left
-    /// out `chunkBytes` on each version, which the real cloud always sends
-    /// (khayt-cloud `src/store.js`, the feed's version rows) and the Mac's
-    /// `VaultClient.Version` requires; it is put back as the cloud would.
+    /// The row as the cloud's feed sends it: the fixture's own feed row, less
+    /// the part ciphertexts it carries alongside for a full open. The desktop's
+    /// generator writes `chunkBytes` on each version, as the real cloud does
+    /// (khayt-cloud `src/store.js`) and as `VaultClient.Version` requires.
     static func cloudRow(_ fixture: [String: Any]) -> [String: Any] {
         var row = fixture
         row["_sealedChunksB64"] = nil
-        if let versions = row["versions"] as? [[String: Any]] {
-            row["versions"] = versions.map { v -> [String: Any] in
-                var v = v
-                if v["chunkBytes"] == nil { v["chunkBytes"] = VaultCrypto.chunkBytes }
-                return v
-            }
-        }
         return row
     }
 
-    @Test("Fixture: the fixture's feed row as written lacks chunkBytes, which the Mac's feed decoder requires")
+    @Test("Fixture: the desktop's feed row decodes as written, chunkBytes and all")
     func feedRowAsWritten() throws {
-        var row = try Self.json("feed-row.json")
-        row["_sealedChunksB64"] = nil
+        let row = Self.cloudRow(try Self.json("feed-row.json"))
         let versions = try #require(row["versions"] as? [[String: Any]])
-        #expect(versions.allSatisfy { $0["chunkBytes"] == nil }, "if the generator now writes it, drop cloudRow's patch")
+        #expect(versions.allSatisfy { ($0["chunkBytes"] as? Int) == VaultCrypto.chunkBytes })
         let raw = try JSONSerialization.data(withJSONObject: row)
-        #expect((try? JSONDecoder().decode(VaultClient.FeedFile.self, from: raw)) == nil)
-        let real = try JSONSerialization.data(withJSONObject: Self.cloudRow(try Self.json("feed-row.json")))
-        #expect((try? JSONDecoder().decode(VaultClient.FeedFile.self, from: real)) != nil)
+        #expect((try? JSONDecoder().decode(VaultClient.FeedFile.self, from: raw)) != nil)
     }
 
     @Test("Fixture: a desktop vault backup links the SAME record on the Mac — vaultFileId, hash, size; no new record, no hold")
