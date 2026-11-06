@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "Déjà dans le registre",
  "mac.csv_read_failed": "Ce fichier n’a pas pu être lu comme du texte.",
  "mac.csv_found": "{n} lignes trouvées. Associez chaque champ à une colonne.",
- "mac.csv_done": "{n} importés, {m} ignorés car déjà dans le registre."
+ "mac.csv_done": "{n} importés, {m} ignorés car déjà dans le registre.",
+ "mac.cv_split": "Séparer en plateaux (un fichier chacun)",
+ "mac.cv_split_note": "{n} plateaux, un fichier chacun. Chaque fichier ne porte que les couleurs de son plateau, à partir de l’emplacement 1. Un plateau ayant plus de couleurs que {t} n’a d’emplacements est fusionné vers les plus proches.",
+ "mac.cv_split_folder": "Choisissez un dossier pour les fichiers des plateaux.",
+ "mac.cv_split_done": "{ok} plateaux sur {n} enregistrés dans {folder}.",
+ "mac.cv_split_failed": "Plateau {n} : {why}",
+ "mac.cv_keep_tower": "Garder la tour de purge (retirer la hauteur de couche variable)",
+ "mac.cv_keep_tower_note": "Snapmaker Orca ne peut pas trancher une hauteur de couche variable avec une tour de purge. Désactivé, la tour est retirée. Activé, la tour reste et la hauteur de couche variable est retirée ; les plages de hauteur gardent leurs changements de filament."
 }

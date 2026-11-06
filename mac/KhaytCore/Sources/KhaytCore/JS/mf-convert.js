@@ -1847,7 +1847,7 @@
    * their own slot; with no usage at all it falls back to merging the nearest pair.
    */
   function planMerge(members, filaments, target, opts, otherPlan, flavour) {
-    if (!opts || !opts.mergeToSlots || otherPlan) return null;
+    if (!opts || !(opts.mergeToSlots || Array.isArray(opts.plateColours)) || otherPlan) return null;
     if (!fullSpectrum || !fullSpectrum.reduceColors) return null;
     if (profiles.configFamily(flavour) !== 'bbl' || profiles.configFamily(target.flavour) !== 'bbl') return null;
     const slots = target.maxColors;
@@ -1859,6 +1859,32 @@
     // the config's colours, temperatures and paint describing different filaments.
     const proj = tryJson(memberText(members, /project_settings\.config$/i));
     if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== colors.length) return null;
+    // ── ONE PLATE'S OWN COLOURS (lib/plate-split.js) ────────────────────────────────
+    // "Split into plates" hands over the filaments ONE plate of the project prints with
+    // (0-based, read off its paint, objects and parts). Those take slots 1..k in the order
+    // the project numbers them and every other filament folds into slot 1 — nothing on this
+    // plate prints in them, so where they go changes no colour. A plate with more colours of
+    // its own than the printer has slots is merged to the nearest ones, among ITS colours
+    // only, the way "Merge to the nearest {n} slots" merges a whole file. Either way it is a
+    // merge plan, so the config, paint and extruders all move through the path below.
+    if (Array.isArray(opts.plateColours)) {
+      const used = [...new Set(opts.plateColours.filter((i) => Number.isInteger(i) && i >= 0 && i < colors.length))].sort((a, b) => a - b);
+      if (!used.length) return null;
+      let groupOf = used.map((_, j) => j), reps = used.slice();
+      if (used.length > slots) {
+        const usage = tallyPaintUsage(members, colors.length);
+        const own = used.map((i) => usage[i]);
+        const r = fullSpectrum.reduceColors(used.map((i) => colors[i]), own.some((u) => u > 0) ? own : undefined, undefined, slots);
+        groupOf = r.map.map((g) => Math.min(g, slots - 1));
+        reps = r.reps.map((j) => used[j]);
+      }
+      const map = colors.map(() => 0);
+      used.forEach((i, j) => { map[i] = groupOf[j]; });
+      const pm = explicitSpoolMerge({ map, reps }, colors.length, slots);
+      return pm ? { map: pm.map, colors: pm.reps.map((i) => normHex(colors[i])), slotSrc: pm.reps,
+        plate: { used: used.slice(), merged: used.length > slots } } : null;
+    }
+    // ── end ONE PLATE'S OWN COLOURS ──
     // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────
     // "Match to loaded spools" hands over its own groups: each colour onto the loaded spool
     // that looks most like it, and per slot the source whose settings it keeps. The rest of
@@ -2118,6 +2144,16 @@
   }
 
   // ── VARIABLE LAYER HEIGHT ON THE U1 ─────────────────────────────────────────────────────────
+  /**
+   * A layer_config_ranges.xml without each range's own layer height: the ranges and their other
+   * options (the extruder a by-height colour swap needs) stay. bedready.io dropRangeLayerHeights.
+   */
+  function dropRangeLayerHeights(xml) {
+    return xml.replace(/[ \t]*<option\s+opt_key="layer_height"\s*>[^<]*<\/option>[ \t]*\r?\n?/g, '');
+  }
+
+  /** The two members variable layer height travels in (Bambu/Orca and PrusaSlicer alike). */
+  const VLH_MEMBER = /(^|\/)(layer_config_ranges\.xml|layer_heights_profile\.txt)$/i;
   /** A Snapmaker-Orca target: the built-in U1, or a profile resolved from its machine catalogue. */
   function isSnapmakerOrca(target) {
     return target.flavour === 'orca' && (!!target.supportsMixedFilament || /snapmaker/i.test(String(target.orcaMachine || target.printerModel || '')));
@@ -2145,6 +2181,9 @@
    * VLH file converted for it came out unsliceable. Tower off, tree → normal (keeping the
    * (auto)/(manual) suffix), both pinned or Orca puts the tower straight back on import. The VLH
    * profile itself is kept. `keepPrimeTowerVlh` skips this. Ported from bedready.io applyVlhGuard.
+   * `vlhGuard: 'keep-prime-tower'` asks for the reverse instead — tower and supports kept, the VLH
+   * profile dropped and the ranges' layer heights stripped (convertMembers, `vlhDropped`), and the
+   * report says so. `vlhGuard: 'keep-layers'` is this guard, and wins over `keepPrimeTowerVlh`.
    */
   function applyVlhGuard(obj, report) {
     const pins = [];
@@ -2584,7 +2623,15 @@
       // object's own filament" and stays 0 — the object's extruder is remapped instead.
       let plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
       // Variable layer height travels as one of these two members; see applyVlhGuard.
-      const hasVLH = members.some((mm) => /(^|\/)(layer_config_ranges\.xml|layer_heights_profile\.txt)$/i.test(mm.name));
+      const hasVLH = members.some((mm) => VLH_MEMBER.test(mm.name));
+      // The reverse of applyVlhGuard, asked for by name (`vlhGuard: 'keep-prime-tower'`; the
+      // default, 'keep-layers', is the guard itself). The same key and the same three steps as
+      // bedready.io (#94, src/lib/convert.ts): the tower and tree supports are left as the
+      // source had them, layer_heights_profile.txt is dropped, and layer_config_ranges.xml
+      // keeps its ranges and their filaments — HueForge and by-height colour files swap
+      // filament there — losing only each range's own layer_height. Set where the guard would
+      // have run, so it applies to exactly the files the guard does.
+      let vlhDropped = false;
 
       // ── ALL OF THE PAINT MOVES, OR NONE OF IT ─────────────────────────────────────────
       // The mesh's paint, each object's extruder and the colour changes are rewritten together
@@ -2712,7 +2759,10 @@
             if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') {
               applyOrcaValueSafety(obj, report, isSnapmakerOrca(target));
               applyOrcaFilaments(obj, opts, report); // real Orca filament presets (+ per-slot picks)
-              if (hasVLH && isSnapmakerOrca(target) && !opts.keepPrimeTowerVlh) applyVlhGuard(obj, report);
+              if (hasVLH && isSnapmakerOrca(target)) {
+                if (opts.vlhGuard === 'keep-prime-tower') vlhDropped = true;
+                else if (opts.vlhGuard === 'keep-layers' || !opts.keepPrimeTowerVlh) applyVlhGuard(obj, report);
+              }
             }
             return { name: m.name, data: JSON.stringify(obj, null, 4) };
           }
@@ -2779,6 +2829,22 @@
         return m;
       });
 
+      if (vlhDropped) {
+        const PROFILE = /(^|\/)layer_heights_profile\.txt$/i, RANGES = /(^|\/)layer_config_ranges\.xml$/i;
+        const gone = [];
+        out = out.filter((mm) => { if (!PROFILE.test(mm.name)) return true; gone.push(mm.name); return false; });
+        out = out.map((mm) => {
+          if (!RANGES.test(mm.name) || mm.data == null) return mm;
+          const before = mm.data.toString('utf8'), after = dropRangeLayerHeights(before);
+          if (after === before) return mm;
+          gone.push(mm.name + ' (layer_height)');
+          return { name: mm.name, data: after };
+        });
+        report.vlhDropped = gone;
+        report.fieldsChanged.push('variable_layer_height');
+        report.warnings.push('This model uses variable layer height, which Snapmaker Orca cannot slice with a prime tower or tree supports. As asked, the prime tower and supports were kept and the variable layer height was removed: the model prints at its own layer height throughout. Height ranges keep their other settings, filament changes included.');
+      }
+
       // A foreign producer string makes Orca load geometry only — see forceOrcaGenerator.
       if (reprofile && target.flavour === 'orca') {
         const ri = out.findIndex((mm) => /(^|\/)3D\/3dmodel\.model$/i.test(mm.name));
@@ -2823,6 +2889,12 @@
           (sw ? ` with ${sw} manual filament swap(s) — M600 pauses were added at the swap heights. Load the head colours shown and swap the spool when ${target.name} pauses.` : ' — no manual swaps needed (fits the heads).'));
       } else if (fsPlan) {
         report.warnings.push(`Full Spectrum: kept ${target.maxColors} filaments physical and reproduced ${n - target.maxColors} extra colour(s) as ${fsPlan.mixDefs.length} dithered mix(es). Load the ${target.maxColors} head colours shown; ${target.name} prints the rest by mixing.`);
+      } else if (mergePlan && mergePlan.plate) { // ONE PLATE'S OWN COLOURS
+        const k = mergePlan.plate.used.length;
+        report.plateColours = { used: mergePlan.plate.used.map((i) => i + 1), slots: mergePlan.colors.slice(), merged: mergePlan.plate.merged };
+        report.warnings.push(mergePlan.plate.merged
+          ? `This plate uses ${k} colours of its own, more than the ${mergePlan.colors.length} slots of ${target.name}: the least-used now print in the closest-looking slot. Check the colours in your slicer before printing.`
+          : `This plate uses ${k} of the project's ${n} colours, now in slot${k === 1 ? '' : 's'} 1${k > 1 ? `–${k}` : ''} of ${target.name}. Load those spools for this plate.`);
       } else if (mergePlan && mergePlan.spool) { // SPOOL MATCH
         report.warnings.push(`Matched ${n} colours to the spools loaded in ${mergePlan.colors.length} slot${mergePlan.colors.length === 1 ? '' : 's'} of ${target.name}. Check the colours in your slicer before printing.`);
       } else if (mergePlan) {

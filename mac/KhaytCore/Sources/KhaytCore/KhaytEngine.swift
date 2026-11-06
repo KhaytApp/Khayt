@@ -164,6 +164,12 @@ public actor KhaytEngine {
         // asks for `color-mix` only when it plans, which is loaded below.
         "prusa-project",
         "mf-convert",
+        // "Split into plates": one plate as a project of its own (`plates`),
+        // then the ordinary conversion with that plate's own colours
+        // (`plate-split`). Both after `mf-convert`, which they read off the
+        // global; neither touches a zip, the same split as the converter.
+        "plates",
+        "plate-split",
         "kpi-rows",
         // What needs a shop's attention, and the figures on the dashboard.
         // Pure, zero requires, and already assigning onto globalThis — so the
@@ -2193,6 +2199,11 @@ public actor KhaytEngine {
         /// big to come back whole. The caller splices it into the original
         /// bytes where it found it; everything either side is untouched.
         public let buildBlock: String?
+        /// The source member to copy, when it is not the one this is named
+        /// after. Only "Split into plates" sets it: a plate's own thumbnail is
+        /// renamed (`plate_3.png` → `plate_1.png`), and copying by the new
+        /// name would put plate 1's picture into plate 3's file.
+        public var from: String? = nil
     }
 
     public struct Conversion: Decodable, Sendable {
@@ -2252,6 +2263,84 @@ public actor KhaytEngine {
               };
             })(ARG0, ARG1)
             """, [.array(members), .object(options)], as: Conversion.self)
+    }
+
+    /// One plate of a multi-plate project, converted on its own:
+    /// `lib/plate-split.js` `convertPlateMembers` — the plate extracted by
+    /// `lib/plates.js`, then the ordinary `convertMembers` with that plate's
+    /// own colours in slots 1..k. `members` and `meshes` exactly as
+    /// `convertMembers` takes them; `plateIndex` is 1-based, in the order the
+    /// project lists its plates.
+    ///
+    /// A member that comes back with neither text nor a block is copied from
+    /// the source — from `from` when it carries one, which is the member it
+    /// is a renamed copy of.
+    public func convertPlateMembers(_ members: [JSONValue], plateIndex: Int,
+                                    options: [String: JSONValue],
+                                    meshes: [String: String] = [:]) throws -> Conversion {
+        try runtime.withBoundStrings(meshes) {
+            try runtime.call2("""
+                (function (members, plateIndex, opts) {
+                  members = members.map(function (m) {
+                    if (!m || !m.meshVar) return m;
+                    var text = globalThis[m.meshVar];
+                    if (typeof text !== 'string') return m;
+                    return { name: m.name, size: m.size, data: text };
+                  });
+                  const planned = KhaytPlateSplit.convertPlateMembers(members, plateIndex, opts);
+                  if (!planned.ok) return { ok: false, error: planned.error };
+                  return {
+                    ok: true,
+                    report: planned.report,
+                    // A copy of a source member (untouched, perhaps renamed)
+                    // says which one; anything rewritten comes back as text.
+                    members: planned.members.map((m) => (
+                      m.sourceName != null ? { name: m.name, from: String(m.sourceName) }
+                      : m.data != null ? { name: m.name, text: String(m.data) }
+                      : m.buildBlock != null ? { name: m.name, buildBlock: String(m.buildBlock) }
+                      : { name: m.name }
+                    )),
+                  };
+                })(ARG0, ARG1, ARG2)
+                """, [.array(members), .number(Double(plateIndex)), .object(options)], as: Conversion.self)
+        }
+    }
+
+    /// The plates "Split into plates" would make, 1-based, and whether each
+    /// can stand alone (`lib/plate-split.js` `listPlatesMembers`).
+    public struct SplitPlate: Decodable, Sendable, Hashable {
+        public let index: Int
+        public let name: String?
+        public let splittable: Bool
+        public let problem: String?
+        /// `lib/plates.js` `plateFileName`: `statue.3mf`, plate 3 → `statue-plate3.3mf`.
+        public let fileName: String
+    }
+
+    /// `members` and `meshes` exactly as `convertPlateMembers` takes them: a
+    /// bound root model has to be swapped back in, or there is no plate
+    /// layout to read.
+    public func splitPlates(_ members: [JSONValue], sourceName: String,
+                            meshes: [String: String] = [:]) throws -> [SplitPlate] {
+        try runtime.withBoundStrings(meshes) { try splitPlatesBound(members, sourceName: sourceName) }
+    }
+
+    private func splitPlatesBound(_ members: [JSONValue], sourceName: String) throws -> [SplitPlate] {
+        try runtime.call2("""
+            (function (members, sourceName) {
+              members = members.map(function (m) {
+                if (!m || !m.meshVar) return m;
+                var text = globalThis[m.meshVar];
+                if (typeof text !== 'string') return m;
+                return { name: m.name, size: m.size, data: text };
+              });
+              const r = KhaytPlateSplit.listPlatesMembers(members);
+              if (!r.ok) return [];
+              return r.plates.map((p) => ({ index: p.index, name: p.name || null, splittable: !!p.splittable,
+                                            problem: p.problem ? p.problem.error : null,
+                                            fileName: KhaytPlates.plateFileName(sourceName, p.index) }));
+            })(ARG0, ARG1)
+            """, [.array(members), .string(sourceName)], as: [SplitPlate].self)
     }
 
     // MARK: - Before a conversion: what the file is, and what the target can do
@@ -2323,6 +2412,12 @@ public actor KhaytEngine {
         public let fitWarnings: [String]?
         public let fullSpectrum: FullSpectrum?
         public let bands: Bands?
+        /// How many plates "Split into plates" could make, every one of them
+        /// standing alone. Zero for a one-plate file.
+        public var plates: Int? = nil
+        /// The file carries a variable layer height profile, which Snapmaker
+        /// Orca will not slice with a prime tower (`applyVlhGuard`).
+        public var variableLayerHeight: Bool? = nil
     }
 
     /// `members` and `meshes` exactly as `convertMembers` takes them.
@@ -2361,13 +2456,19 @@ public actor KhaytEngine {
                   }
                   const m = a.meta || {};
                   const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+                  let plates = 0;
+                  try {
+                    const pl = KhaytPlateSplit.listPlatesMembers(members);
+                    plates = pl.ok && pl.plates.length >= 2 ? pl.plates.filter((x) => x.splittable).length : 0;
+                  } catch (_) { plates = 0; }
+                  const vlh = members.some((x) => x && /(^|\\/)(layer_config_ranges\\.xml|layer_heights_profile\\.txt)$/i.test(String(x.name)));
                   return {
                     ok: true, flavour: a.flavour,
                     filaments: a.filaments.map((f) => ({ color: f.color || null, grams: num(f.grams), type: f.type || null })),
                     meta: { printerModel: m.printerModel || null, nozzle: num(m.nozzle), layerHeight: num(m.layerHeight),
                             totalGrams: num(m.totalGrams), printMinutes: num(m.printMinutes) },
                     targetName: target.name, maxColors: target.maxColors || null, bed: target.bed || null,
-                    generic, cross, fullSpectrumCapable: fsCapable,
+                    generic, cross, fullSpectrumCapable: fsCapable, plates, variableLayerHeight: vlh,
                     bandSwapEligible: P.bandSwapEligible(a.flavour, target, used, bands),
                     fitWarnings: box ? MF.fitWarnings(box, target) : [],
                     fullSpectrum: fs && fs.available ? { available: true,

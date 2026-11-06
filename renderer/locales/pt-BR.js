@@ -1173,6 +1173,7 @@
   "notif.print_fail_title": "{name} — impressão falhou",
   "notif.print_a_printer": "Sua impressora",
   "finphoto.taken": "Foto tirada em {name} ao terminar a impressão: {job}",
+  "phonephoto.added": "Foto do seu celular adicionada a {job}",
   "ntfy.section": "Notificação para o celular (ntfy)",
   "ntfy.enable": "Enviar alertas da impressora pelo ntfy",
   "ntfy.hint": "Não precisa de conta nem de bot: instale o app ntfy e assine este tópico. Qualquer pessoa que conheça o tópico pode lê-lo, então crie um que ninguém adivinharia.",
