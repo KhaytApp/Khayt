@@ -32,6 +32,12 @@ struct JobPrintPhoto: Identifiable, Equatable, Sendable {
     let thumb: Data
     /// The full-size file's name on the computer, when there is one.
     let filename: String?
+    /// Who took it — `source` on the record, written by the Mac and the
+    /// desktop, and set to `phone` by their photo route. Nil for older
+    /// photos (and any value this phone does not know): unknown, not guessed.
+    var source: Source? = nil
+
+    enum Source: String, Sendable { case printer, shop, phone }
     var id: Int { index }
 }
 
@@ -62,7 +68,9 @@ extension KhaytAPIClient {
                       let bytes = thumbBytes(uri) else { continue }
                 var name: String?
                 if case .string(let f)? = p["filename"], !f.isEmpty { name = f }
-                out.append(JobPrintPhoto(index: i, thumb: bytes, filename: name))
+                var source: JobPrintPhoto.Source?
+                if case .string(let v)? = p["source"] { source = JobPrintPhoto.Source(rawValue: v) }
+                out.append(JobPrintPhoto(index: i, thumb: bytes, filename: name, source: source))
             }
             return out
         }
@@ -82,5 +90,52 @@ extension KhaytAPIClient {
         let jpeg = data.starts(with: [0xFF, 0xD8, 0xFF])
         guard jpeg || OrderPhotoPrep.isPNG(data) else { return nil }
         return data
+    }
+}
+
+/// What the Mac said to a photo sent from this phone.
+enum JobPhotoUpload: Equatable, Sendable {
+    case added(index: Int)
+    case refused(String)
+
+    /// 201 `{ ok, index, filename }`; otherwise the refusal's `reason`, or
+    /// one read off the status the route documents.
+    static func read(status: Int, body: Data) -> JobPhotoUpload {
+        let o: [String: JSONValue] = {
+            if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body) { return o }
+            return [:]
+        }()
+        if (200...299).contains(status), o["ok"] == .bool(true) {
+            if case .number(let n)? = o["index"] { return .added(index: Int(n)) }
+            return .added(index: -1)
+        }
+        if case .string(let r)? = o["reason"], !r.isEmpty { return .refused(r) }
+        switch status {
+        case 403: return .refused("device-key-required")
+        // The route's own 404 says `not-found`; a bare one is a Mac from
+        // before the route (beta.26 and older), which has no such address.
+        case 404: return .refused("old-mac")
+        case 409: return .refused("read-only")
+        case 413: return .refused("too-large")
+        case 415: return .refused("not-an-image")
+        default: return .refused("unreachable")
+        }
+    }
+
+    /// What to tell the person when it was not added.
+    var sentence: String {
+        switch self {
+        case .added: return ""
+        case .refused(let r):
+            switch r {
+            case "device-key-required": return L10n.tr("printphotos.why.device")
+            case "not-found": return L10n.tr("printphotos.why.not_found")
+            case "old-mac": return L10n.tr("printphotos.why.old_mac")
+            case "read-only": return L10n.tr("printphotos.why.read_only")
+            case "too-large": return L10n.tr("printphotos.why.too_large")
+            case "not-an-image": return L10n.tr("printphotos.why.not_image")
+            default: return L10n.tr("printphotos.why.unreachable")
+            }
+        }
     }
 }

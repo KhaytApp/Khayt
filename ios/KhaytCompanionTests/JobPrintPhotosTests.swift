@@ -32,12 +32,28 @@ final class JobPrintPhotosTests: XCTestCase {
         ])]
         let photos = API.printPhotos(in: store, orderId: "J1")
         XCTAssertEqual(photos.map(\.index), [0, 1])
+        XCTAssertEqual(photos.map(\.source), [nil, nil], "older photos: unknown, not guessed")
         XCTAssertEqual(photos.map(\.filename), ["J1-0-mabc123.jpg", "J1-0-mabc999.jpg"])
         XCTAssertEqual(photos.first?.thumb, jpeg)
         XCTAssertNotNil(UIImage(data: photos[0].thumb), "the thumbnail draws")
         XCTAssertEqual(API.printPhotos(in: store, orderId: "J0"), [])
         XCTAssertEqual(API.printPhotos(in: store, orderId: "J9"), [])
         XCTAssertEqual(API.printPhotos(in: [:], orderId: "J1"), [])
+    }
+
+    func testTheSourceIsReadWhenTheRecordCarriesIt() {
+        let store: [String: JSONValue] = ["printLog": .array([
+            .object(["id": .string("J1"), "printPhotos": .array([
+                .object(["thumb": .string(uri), "filename": .string("a.jpg"), "source": .string("printer")]),
+                .object(["thumb": .string(uri), "filename": .string("b.jpg"), "source": .string("shop")]),
+                .object(["thumb": .string(uri), "filename": .string("c.jpg"), "source": .string("phone")]),
+                .object(["thumb": .string(uri), "filename": .string("d.jpg"), "source": .string("drone")]),
+            ])]),
+        ])]
+        XCTAssertEqual(API.printPhotos(in: store, orderId: "J1").map(\.source), [.printer, .shop, .phone, nil])
+        for s in [JobPrintPhoto.Source.printer, .shop, .phone] {
+            XCTAssertNotEqual(PrintPhotosCard.words(s), "printphotos.source." + s.rawValue, "words for \(s)")
+        }
     }
 
     func testAPhotoWithoutAFileStillShowsAndBadRowsKeepTheOthersIndex() {
@@ -72,5 +88,36 @@ final class JobPrintPhotosTests: XCTestCase {
         // Far bigger than any thumbnail either app writes.
         let huge = Data([0xFF, 0xD8, 0xFF]) + Data(count: API.maxThumbBytes + 10)
         XCTAssertNil(API.thumbBytes("data:image/jpeg;base64," + huge.base64EncodedString()))
+    }
+}
+
+/// The Mac's answers to `POST /api/orders/{id}/photos` (docs/LAN_API.md).
+final class JobPhotoUploadTests: XCTestCase {
+    func testAddedReadsTheIndex() {
+        let body = Data(#"{"ok":true,"index":3,"filename":"J-1-3-abc.jpg"}"#.utf8)
+        XCTAssertEqual(JobPhotoUpload.read(status: 201, body: body), .added(index: 3))
+    }
+
+    func testEachRefusalSaysWhyInWords() {
+        let cases: [(Int, String, String)] = [
+            (403, #"{"ok":false,"reason":"device-key-required"}"#, "printphotos.why.device"),
+            (404, #"{"ok":false,"reason":"not-found"}"#, "printphotos.why.not_found"),
+            (409, #"{"ok":false,"reason":"read-only"}"#, "printphotos.why.read_only"),
+            (413, "", "printphotos.why.too_large"),
+            (415, "", "printphotos.why.not_image"),
+            (500, "", "printphotos.why.unreachable"),
+            // A Mac from before the route: a bare 404, not the route's own.
+            (404, #"{"error":"Not found"}"#, "printphotos.why.old_mac"),
+        ]
+        for (status, body, key) in cases {
+            let reply = JobPhotoUpload.read(status: status, body: Data(body.utf8))
+            guard case .refused = reply else { return XCTFail("\(status) read as added") }
+            XCTAssertEqual(reply.sentence, L10n.tr(key), "\(status)")
+            XCTAssertNotEqual(reply.sentence, key, "the sentence exists for \(key)")
+        }
+    }
+
+    func testA2xxWithoutOkIsNotAnAddedPhoto() {
+        XCTAssertEqual(JobPhotoUpload.read(status: 200, body: Data("{}".utf8)), .refused("unreachable"))
     }
 }
