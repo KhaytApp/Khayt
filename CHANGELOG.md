@@ -9310,6 +9310,9 @@ This release brings most of what the Windows and Linux app could do that the Mac
   - Orca filament profile installs.
 - **Tabby is told who the customer is.** A Tabby link now sends the customer's first job date and how many jobs they have completed.
 
+- **API tokens and the LAN REST API.** Settings › Online can create API tokens for scripts and automation tools. Each token is shown once and only a fingerprint of it is stored. The Mac's LAN server now answers the same REST routes as the Windows and Linux app: orders, machines, inventory, the waiting list, customers, waste and the printer webhook. Every route needs your PIN or a token with the right scope.
+- **Shipping on the customer's order page.** When an order has shipped, the customer's order page shows the carrier, the status and a tracking link.
+
 ### Fixed
 
 - **The menu bar panel opens over a full-screen app.** Before, it opened on the desktop behind the app.
