@@ -87,7 +87,38 @@ extension LibraryEditPerfTests {
                 Issue.record("the photo never reached the book"); return
             }
             #expect(photos.count == 1)
+            if case .object(let photo)? = photos.first { #expect(photo["source"] == .string("printer")) }
             #expect(job?["rev"] == .number(4), "the job was not stamped, so the photo would not sync")
+        }
+    }
+
+    /// A paired phone sends a photo of a finished job (`POST /api/orders/{id}/photos`).
+    @Test("a phone's photo of a job is filed as the Mac's own: both sizes, the file, the stamped record")
+    func phonePhotoIsFiled() async throws {
+        try await withPerfBook(Self.shopBook()) { shop, url in
+            var answer = (0, "")
+            let held = await Self.held {
+                answer = await shop.phoneAddJobPhoto("JPERF1", OrderPhotoTests.image(2000, 1500))
+            }
+            #expect(answer.0 == 201, "\(answer)")
+            #expect(answer.1.contains(#""ok":true"#) && answer.1.contains(#""index":0"#))
+            #expect(held.count == 0, "the main thread waited \(Int(held.worstMs)) ms on a whole-book write")
+            let job = try Self.onDisk(url, "printLog", "JPERF1")
+            guard case .array(let photos)? = job?["printPhotos"], case .object(let photo)? = photos.first,
+                  case .string(let name)? = photo["filename"], case .string(let thumb)? = photo["thumb"] else {
+                Issue.record("the photo never reached the book"); return
+            }
+            #expect(photos.count == 1 && thumb.hasPrefix("data:image/jpeg;base64,"))
+            #expect(photo["source"] == .string("phone"))
+            #expect(name.hasPrefix("JPERF1-0-") && answer.1.contains(name))
+            let folder = try #require(shop.photoFolder)
+            #expect(FileManager.default.fileExists(atPath: folder.appending(path: name).path),
+                    "a record naming a file that is not there")
+            #expect(job?["rev"] == .number(4), "the job was not stamped, so the photo would not sync")
+            // The phone's refusals, each said with its own reason.
+            #expect(await shop.phoneAddJobPhoto("NO-SUCH-JOB", OrderPhotoTests.image(64, 48)).0 == 404)
+            #expect(await shop.phoneAddJobPhoto("JPERF1", Data("not a picture".utf8)).0 == 415)
+            #expect(await shop.phoneAddJobPhoto("JPERF1", Data()).0 == 413)
         }
     }
 

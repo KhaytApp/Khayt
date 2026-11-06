@@ -37,6 +37,9 @@ struct LanServerTests {
         let foldCalls = Counter()
         /// What `/api/printer/…` asked the stubbed printer hook, in order.
         let printerCalls = PrinterCalls()
+        /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
+        /// job and the byte count, in order.
+        let photoCalls = PrinterCalls()
         var tokens = 0
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
@@ -135,6 +138,11 @@ struct LanServerTests {
             host.printerCommand = { id, verb in
                 printerCalls.calls.append("\(id) \(verb.rawValue)")
                 return (200, #"{"ok":true,"state":"paused"}"#)
+            }
+            let photoCalls = self.photoCalls
+            host.addJobPhoto = { id, data in
+                photoCalls.calls.append("\(id) \(data.count)")
+                return (201, #"{"ok":true,"index":0}"#)
             }
             // The REST writes, as the app runs them (`Shop.applyLanRest`) — on
             // the bench's book rather than a file. Off unless asked, as in the app.
@@ -290,7 +298,17 @@ struct LanServerTests {
             // LAN tests failed with -1001 on a working server — one run in
             // three. Still a ceiling, not a target: a request that does not
             // come back in five minutes is a real hang.
-            config.timeoutIntervalForRequest = 300
+            //
+            // NINE HUNDRED, not three hundred (Nov 2026). The parity batches
+            // added a few hundred more `@MainActor` tests to shard `a`
+            // (mac/test-shards.sh), which now queues ~2,800 s of main-actor
+            // work on CI. Main failed twice in a row (after #2266, and #2269),
+            // and in both runs every shard-`a` LAN test timed out at once with
+            // -1001, on a server that answers in milliseconds when the suite
+            // runs alone (141 tests in 33 s). Like `LanStallTests.patience`
+            // (600), it is the time a request may wait for its turn on a
+            // shared main thread, not how long the server takes.
+            config.timeoutIntervalForRequest = 900
             config.httpShouldSetCookies = false
             config.httpCookieAcceptPolicy = .never
             return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
