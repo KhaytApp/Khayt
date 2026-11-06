@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!order) return;
       const photos = Array.isArray(order.printPhotos) ? order.printPhotos : [];
       if (photos.some((p) => p && p.filename === photo.filename)) return;
-      order.printPhotos = [...photos, { thumb: photo.thumb, filename: photo.filename }];
+      order.printPhotos = [...photos, { thumb: photo.thumb, filename: photo.filename, source: 'phone' }];
       saveAll();
       renderLogs();
       toast('📱 ' + t('phonephoto.added', { job: order.project || order.jobNumber || order.id }), 'success', 4000);

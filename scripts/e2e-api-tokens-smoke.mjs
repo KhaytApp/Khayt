@@ -145,10 +145,12 @@ try {
     settings.shopName = (settings.shopName || 'Shop') + ' ';
     await flushSave();
     const disk = await window.hubAPI.loadStore();
-    return { thumb: thumb.slice(0, 23), onDisk: ((disk.printLog || []).find(o => o.id === 'API-1')?.printPhotos || []).length };
+    const kept = (disk.printLog || []).find(o => o.id === 'API-1')?.printPhotos || [];
+    return { thumb: thumb.slice(0, 23), onDisk: kept.length, source: kept[0] && kept[0].source };
   });
   ok(photoKept.thumb === 'data:image/jpeg;base64,', 'the window holds the inline thumbnail');
   ok(photoKept.onDisk === 1, 'and the photo is still on the job after a save from the window');
+  ok(photoKept.source === 'phone', `tagged as the phone's (${photoKept.source})`);
 
   // Revoked / unknown tokens are rejected outright.
   const revoked = await call('/v1/orders', { token: toks.revoked });

@@ -118,8 +118,8 @@ test('a paired phone adds a photo: the file first, then the record, and the wind
   assert.equal(out.index, 0);
   assert.match(out.filename, /^J1-0-[0-9a-z]+\.jpg$/, "the editor's {orderId}-{index}-{base36 ms} name");
   assert.deepEqual(fs.readFileSync(path.join(photosDir, out.filename)), img, 'the copy on disk is what the encoder made');
-  assert.deepEqual(job('J1').printPhotos, [{ thumb: 'data:image/jpeg;base64,VEhVTUI=', filename: out.filename }]);
-  assert.deepEqual(sent, [{ channel: 'lan-order-photo-added', payload: { id: 'J1', photo: { thumb: 'data:image/jpeg;base64,VEhVTUI=', filename: out.filename } } }]);
+  assert.deepEqual(job('J1').printPhotos, [{ thumb: 'data:image/jpeg;base64,VEhVTUI=', filename: out.filename, source: 'phone' }]);
+  assert.deepEqual(sent, [{ channel: 'lan-order-photo-added', payload: { id: 'J1', photo: { thumb: 'data:image/jpeg;base64,VEhVTUI=', filename: out.filename, source: 'phone' } } }]);
 
   const second = await (await post(dev, 'J1', jpeg())).json();
   assert.equal(second.index, 1, 'the index is its place in printPhotos');
@@ -183,9 +183,29 @@ test('the window adds the photo to its own copy of the job, once', () => {
   const at = src.indexOf('onLanOrderPhotoAdded((payload)');
   assert.ok(at > 0, 'app-boot listens for lan-order-photo-added');
   const body = src.slice(at, src.indexOf('\n  }\n', at));
-  assert.match(body, /\[\.\.\.photos, \{ thumb: photo\.thumb, filename: photo\.filename \}\]/, 'ADDED to what the job holds, not replaced');
+  assert.match(body, /\[\.\.\.photos, \{ thumb: photo\.thumb, filename: photo\.filename, source: 'phone' \}\]/, 'ADDED to what the job holds, not replaced');
   assert.match(body, /some\(\(p\) => p && p\.filename === photo\.filename\)/, 'a repeat is ignored');
   assert.match(body, /saveAll\(\)/);
   const preload = fs.readFileSync(path.join(ROOT, 'preload.js'), 'utf8');
   assert.match(preload, /onLanOrderPhotoAdded:.*'lan-order-photo-added'/);
+});
+
+test('every photo says where it came from: printer, shop or phone', () => {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  assert.match(read('renderer/integrations.js'), /\{ thumb, filename, source: 'printer' \}/, 'the finish snapshot');
+  assert.match(read('renderer/order-flows.js'), /draft\.printPhotos\.push\(\{ thumb, filename: null, source: 'shop' \}\)/, 'Add Photo at the desk');
+  assert.match(read('lib/lan-server.js'), /const photo = \{ thumb: enc\.thumb, filename, source: 'phone' \}/, 'a paired phone');
+});
+
+test("the order editor's Save keeps a photo that arrived while it was open", () => {
+  const src = fs.readFileSync(path.join(ROOT, 'renderer/order-flows.js'), 'utf8');
+  assert.match(src, /const photosAtOpen = new Set\(\(order\.printPhotos \|\| \[\]\)\.map\(p => p && p\.filename\)/);
+  assert.match(src, /order\.printPhotos = \[\.\.\.draft\.printPhotos, \.\.\.arrived\];/);
+  // The rule itself, run: the draft dropped B (the user removed it), C arrived.
+  const photosAtOpen = new Set(['A', 'B']);
+  const draft = { printPhotos: [{ filename: 'A' }, { filename: null, source: 'shop' }] };
+  const order = { printPhotos: [{ filename: 'A' }, { filename: 'B' }, { filename: 'C', source: 'phone' }] };
+  const body = src.slice(src.indexOf('const arrived = '), src.indexOf('order.printPhotos = [...draft.printPhotos, ...arrived];'));
+  const arrived = new Function('order', 'draft', 'photosAtOpen', body + '; return arrived;')(order, draft, photosAtOpen);
+  assert.deepEqual(arrived.map((p) => p.filename), ['C'], 'C is kept; B, removed in the editor, stays removed');
 });
