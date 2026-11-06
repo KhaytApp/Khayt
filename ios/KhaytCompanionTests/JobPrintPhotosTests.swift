@@ -32,12 +32,28 @@ final class JobPrintPhotosTests: XCTestCase {
         ])]
         let photos = API.printPhotos(in: store, orderId: "J1")
         XCTAssertEqual(photos.map(\.index), [0, 1])
+        XCTAssertEqual(photos.map(\.source), [nil, nil], "older photos: unknown, not guessed")
         XCTAssertEqual(photos.map(\.filename), ["J1-0-mabc123.jpg", "J1-0-mabc999.jpg"])
         XCTAssertEqual(photos.first?.thumb, jpeg)
         XCTAssertNotNil(UIImage(data: photos[0].thumb), "the thumbnail draws")
         XCTAssertEqual(API.printPhotos(in: store, orderId: "J0"), [])
         XCTAssertEqual(API.printPhotos(in: store, orderId: "J9"), [])
         XCTAssertEqual(API.printPhotos(in: [:], orderId: "J1"), [])
+    }
+
+    func testTheSourceIsReadWhenTheRecordCarriesIt() {
+        let store: [String: JSONValue] = ["printLog": .array([
+            .object(["id": .string("J1"), "printPhotos": .array([
+                .object(["thumb": .string(uri), "filename": .string("a.jpg"), "source": .string("printer")]),
+                .object(["thumb": .string(uri), "filename": .string("b.jpg"), "source": .string("shop")]),
+                .object(["thumb": .string(uri), "filename": .string("c.jpg"), "source": .string("phone")]),
+                .object(["thumb": .string(uri), "filename": .string("d.jpg"), "source": .string("drone")]),
+            ])]),
+        ])]
+        XCTAssertEqual(API.printPhotos(in: store, orderId: "J1").map(\.source), [.printer, .shop, .phone, nil])
+        for s in [JobPrintPhoto.Source.printer, .shop, .phone] {
+            XCTAssertNotEqual(PrintPhotosCard.words(s), "printphotos.source." + s.rawValue, "words for \(s)")
+        }
     }
 
     func testAPhotoWithoutAFileStillShowsAndBadRowsKeepTheOthersIndex() {

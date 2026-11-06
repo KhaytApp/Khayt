@@ -1009,6 +1009,9 @@
 "printphotos.one" = "Foto des fertigen Drucks";
 "printphotos.note" = "Am Computer hinzugefügt, auch das eigene Foto des Druckers, wenn ein Druck fertig ist. Dort stehen sie auch im Portfolio.";
 "printphotos.full_on_computer" = "Das ist die kleine Kopie, die mit dem Buch reist. Das Foto in voller Größe liegt auf dem Computer, der es aufgenommen hat.";
+"printphotos.source.printer" = "Vom Drucker aufgenommen";
+"printphotos.source.shop" = "Am Computer hinzugefügt";
+"printphotos.source.phone" = "Von einem iPhone hinzugefügt";
 "printphotos.note.add" = "Fotos, die du hier hinzufügst, gehen in voller Größe an den Mac und in sein Portfolio. Das eigene Foto des Druckers am Ende eines Drucks erscheint hier ebenfalls.";
 "printphotos.take" = "Foto aufnehmen";
 "printphotos.pick" = "Foto auswählen";

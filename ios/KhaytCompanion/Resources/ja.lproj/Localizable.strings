@@ -1009,6 +1009,9 @@
 "printphotos.one" = "完成したプリントの写真";
 "printphotos.note" = "コンピューターで追加された写真です。プリント完了時にプリンターが撮影した写真も含まれます。コンピューターのポートフォリオにも表示されます。";
 "printphotos.full_on_computer" = "これは帳簿と一緒に同期される小さなコピーです。フルサイズの写真は撮影したコンピューターにあります。";
+"printphotos.source.printer" = "プリンターが撮影";
+"printphotos.source.shop" = "コンピューターで追加";
+"printphotos.source.phone" = "iPhoneから追加";
 "printphotos.note.add" = "ここで追加した写真はフルサイズでMacに送られ、Macのポートフォリオに入ります。プリント完了時にプリンターが撮影した写真もここに表示されます。";
 "printphotos.take" = "写真を撮る";
 "printphotos.pick" = "写真を選ぶ";

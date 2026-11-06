@@ -1009,6 +1009,9 @@
 "printphotos.one" = "Foto de la impresión terminada";
 "printphotos.note" = "Añadidas en el ordenador, incluida la foto que toma la impresora al terminar una impresión. También aparecen allí en el Portafolio.";
 "printphotos.full_on_computer" = "Esta es la copia pequeña que viaja con el libro. La foto a tamaño completo está en el ordenador que la tomó.";
+"printphotos.source.printer" = "Tomada por la impresora";
+"printphotos.source.shop" = "Añadida en el ordenador";
+"printphotos.source.phone" = "Añadida desde un teléfono";
 "printphotos.note.add" = "Las fotos que añades aquí van al Mac a tamaño completo y a su Portafolio. La foto que toma la impresora al terminar también aparece aquí.";
 "printphotos.take" = "Hacer foto";
 "printphotos.pick" = "Elegir foto";

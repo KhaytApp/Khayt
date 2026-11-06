@@ -1009,6 +1009,9 @@
 "printphotos.one" = "Photo of the finished print";
 "printphotos.note" = "Added on the computer, including the printer’s own photo when a print finishes. They are also in the Portfolio there.";
 "printphotos.full_on_computer" = "This is the small copy that travels with the book. The full-size photo is on the computer that took it.";
+"printphotos.source.printer" = "Taken by the printer";
+"printphotos.source.shop" = "Added on the computer";
+"printphotos.source.phone" = "Added from a phone";
 "printphotos.note.add" = "Photos you add here go to the Mac at full size, and into its Portfolio. The printer’s own photo at the end of a print appears here too.";
 "printphotos.take" = "Take photo";
 "printphotos.pick" = "Choose photo";

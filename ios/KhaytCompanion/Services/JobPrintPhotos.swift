@@ -32,6 +32,12 @@ struct JobPrintPhoto: Identifiable, Equatable, Sendable {
     let thumb: Data
     /// The full-size file's name on the computer, when there is one.
     let filename: String?
+    /// Who took it — `source` on the record, written by the Mac and the
+    /// desktop, and set to `phone` by their photo route. Nil for older
+    /// photos (and any value this phone does not know): unknown, not guessed.
+    var source: Source? = nil
+
+    enum Source: String, Sendable { case printer, shop, phone }
     var id: Int { index }
 }
 
@@ -62,7 +68,9 @@ extension KhaytAPIClient {
                       let bytes = thumbBytes(uri) else { continue }
                 var name: String?
                 if case .string(let f)? = p["filename"], !f.isEmpty { name = f }
-                out.append(JobPrintPhoto(index: i, thumb: bytes, filename: name))
+                var source: JobPrintPhoto.Source?
+                if case .string(let v)? = p["source"] { source = JobPrintPhoto.Source(rawValue: v) }
+                out.append(JobPrintPhoto(index: i, thumb: bytes, filename: name, source: source))
             }
             return out
         }

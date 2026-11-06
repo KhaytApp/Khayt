@@ -1009,6 +1009,9 @@
 "printphotos.one" = "Biten baskının fotoğrafı";
 "printphotos.note" = "Bilgisayarda eklendi; baskı bittiğinde yazıcının kendi çektiği fotoğraf da dahil. Oradaki Portfolyo’da da görünürler.";
 "printphotos.full_on_computer" = "Bu, defterle birlikte gelen küçük kopyadır. Tam boyutlu fotoğraf, onu çeken bilgisayardadır.";
+"printphotos.source.printer" = "Yazıcı çekti";
+"printphotos.source.shop" = "Bilgisayarda eklendi";
+"printphotos.source.phone" = "Telefondan eklendi";
 "printphotos.note.add" = "Buraya eklediğiniz fotoğraflar tam boyutlu olarak Mac’e ve onun Portfolyo’suna gider. Yazıcının baskı bitince çektiği fotoğraf da burada görünür.";
 "printphotos.take" = "Fotoğraf çek";
 "printphotos.pick" = "Fotoğraf seç";

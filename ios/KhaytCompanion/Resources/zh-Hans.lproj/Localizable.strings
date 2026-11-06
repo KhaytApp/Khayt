@@ -1009,6 +1009,9 @@
 "printphotos.one" = "完成的打印件照片";
 "printphotos.note" = "在电脑上添加，包括打印完成时打印机自己拍的照片。它们也会显示在电脑上的作品集中。";
 "printphotos.full_on_computer" = "这是随账本同步的小尺寸副本。全尺寸照片保存在拍摄它的电脑上。";
+"printphotos.source.printer" = "由打印机拍摄";
+"printphotos.source.shop" = "在电脑上添加";
+"printphotos.source.phone" = "从手机添加";
 "printphotos.note.add" = "在这里添加的照片会以原尺寸发送到 Mac，并进入它的作品集。打印完成时打印机拍的照片也会显示在这里。";
 "printphotos.take" = "拍照";
 "printphotos.pick" = "选择照片";

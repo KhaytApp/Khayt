@@ -32,9 +32,13 @@ struct PrintPhotosCard: View {
                                     Image(uiImage: image).resizable().scaledToFill()
                                         .frame(width: 84, height: 84)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(alignment: .bottomLeading) {
+                                            if let source = photo.source { Self.badge(source).padding(4) }
+                                        }
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel(L10n.tr("printphotos.one"))
+                                .accessibilityLabel(photo.source.map { L10n.tr("printphotos.one") + ", " + Self.words($0) }
+                                                    ?? L10n.tr("printphotos.one"))
                             }
                         }
                     }
@@ -77,6 +81,11 @@ struct PrintPhotosCard: View {
                     Image(uiImage: image).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .accessibilityLabel(L10n.tr("printphotos.one"))
+                }
+                if let source = photo.source {
+                    Label(Self.words(source), systemImage: Self.symbol(source))
+                        .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(KhaytDesign.ink)
                 }
                 Text(L10n.tr("printphotos.full_on_computer"))
                     .font(.khayt(13, relativeTo: .footnote))
@@ -125,5 +134,27 @@ struct PrintPhotosCard: View {
         sending = false
         if case .refused = reply { problem = reply.sentence }
     }
+    static func words(_ source: JobPrintPhoto.Source) -> String {
+        L10n.tr("printphotos.source." + source.rawValue)
+    }
+
+    static func symbol(_ source: JobPrintPhoto.Source) -> String {
+        switch source {
+        case .printer: return "printer"
+        case .shop: return "desktopcomputer"
+        case .phone: return "iphone"
+        }
+    }
+
+    /// A small mark on the thumbnail: who took it.
+    static func badge(_ source: JobPrintPhoto.Source) -> some View {
+        Image(systemName: symbol(source))
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(4)
+            .background(Circle().fill(.black.opacity(0.55)))
+            .accessibilityHidden(true)
+    }
 }
+
 
