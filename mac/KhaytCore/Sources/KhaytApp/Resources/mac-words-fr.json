@@ -1861,7 +1861,7 @@
  "mac.on_time": "Dans les temps",
  "mac.online_add_to_queue": "Ajouter à la file",
  "mac.online_already_recorded": "Cette commande était déjà dans le livre ; aucune seconde commande n’a donc été créée. Elle a été retirée de la file.",
- "mac.online_desc": "Ce Mac sert la file en direct aux téléphones sur le Wi‑Fi de l’atelier, le formulaire de prise de commande client, l’approbation des devis, la page de suivi et le flux de calendrier, ainsi que la même API de statut que sert l’app Windows et Linux. Il reçoit les commandes de Salla et Zid, et les mises à jour de colis de SMSA, Aramex et Saudi Post. Les webhooks d’imprimante tournent pour l’instant dans cette app.",
+ "mac.online_desc": "Ce Mac sert la file en direct aux téléphones sur le Wi‑Fi de l’atelier, le formulaire de prise de commande client, l’approbation des devis, la page de suivi et le flux de calendrier, ainsi que la même API de statut que sert l’app Windows et Linux. Il reçoit les commandes de Salla et Zid, et les mises à jour de colis de SMSA, Aramex et Saudi Post. Il répond aussi à l’API REST (commandes, clients, stock, liste d’attente et rebuts) et aux webhooks d’imprimante, derrière le PIN ou un jeton d’API.",
  "mac.online_kept_in_queue": "La commande a été enregistrée, mais n’a pas pu être retirée de la file du cloud — elle sera proposée à nouveau.",
  "mac.online_none": "Rien de nouveau depuis votre boutique.",
  "mac.online_off_shelf": "{n} pris sur le stock",
@@ -3762,5 +3762,8 @@
  "mac.of_installed": "Installé",
  "mac.of_install_q": "Installer ce profil de filament ?",
  "mac.of_install_body": "{name} est écrit dans le dossier des filaments de {slicer} pour {printer}.",
- "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir."
+ "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir.",
+ "mac.api_where": "Les scripts joignent le serveur LAN de ce Mac à {url} et envoient le jeton en « Authorization: Bearer ». Le serveur doit être activé.",
+ "mac.api_scopes": "Autorisations",
+ "mac.api_owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API."
 }

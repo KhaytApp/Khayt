@@ -109,29 +109,20 @@ struct OnlinePaneTruthTests {
         }
     }
 
-    /// The other half: what genuinely has NOT been lifted is still declared.
-    ///
-    /// Without this the guard is satisfied by a pane that promises everything,
-    /// which is the opposite failure and the worse one — a shop waiting for a
-    /// webhook this app never sends.
-    @Test("what this app does not serve is still said plainly")
-    func unservedIsDeclared() throws {
-        let server = MenuCoverageTests.source("LanServer.swift")
+    /// The other half: what used to run only in the other app, and now runs
+    /// here, is said — the printer webhook and the REST API arrived in Nov
+    /// 2026 (`LanServer+Rest`), and a pane still deferring them would send a
+    /// shop to the other app for nothing.
+    @Test("the printer webhook and the REST API are served here, and the pane says so")
+    func restAndPrinterHookAreDeclared() throws {
+        let rest = MenuCoverageTests.source("LanServer+Rest.swift")
+        #expect(rest.contains("/api/webhook/printer/"), "the printer webhook is no longer routed")
+        #expect(rest.contains("\"/api/orders\""), "the REST API is no longer routed")
         let english = try #require(Words.own["mac.online_desc"]?["en"]).lowercased()
         let arabic = try #require(Words.own["mac.online_desc"]?["ar"])
-        // The printer webhook: no route here answers it, and the pane says
-        // where it runs. Salla, Zid and the carriers ARE answered, and the
-        // capability list above holds the pane to that.
-        let unserved: [(name: String, route: String, english: String, arabic: String)] = [
-            ("printer webhooks", "webhook/printer", "printer", "الطابعات"),
-        ]
-        for hook in unserved {
-            #expect(!server.contains(hook.route),
-                    Comment(rawValue: "\(hook.name) are served now — say so in the Online pane"))
-            #expect(english.contains(hook.english),
-                    Comment(rawValue: "the pane no longer says where \(hook.name) run"))
-            #expect(arabic.contains(hook.arabic),
-                    Comment(rawValue: "the Arabic pane no longer says where \(hook.name) run"))
-        }
+        #expect(english.contains("printer webhooks") && english.contains("rest api"))
+        #expect(arabic.contains("الطابعات") && arabic.contains("REST"))
+        #expect(!english.contains("run in that app"), "the pane still defers something to the other app")
+        #expect(!arabic.contains("ذلك التطبيق"), "the Arabic pane still defers something to the other app")
     }
 }

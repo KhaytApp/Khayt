@@ -1047,6 +1047,7 @@ final class Shop {
             lanBook = Self.lanBook(from: root)
             intakeRows = Self.rows(root, "waitingList")
             intakeHistoryRows = Self.rows(root, "waitingListHistory")
+            lanRestBook = Self.lanRestBook(from: root)
             pricingBook = Self.pricingBook(from: root)
             await syncLanServer()
             if overtaken() { return }
@@ -2199,6 +2200,11 @@ final class Shop {
     /// every upload came back "not configured". The tests never saw it: their
     /// bench put `printers` straight into the server's book.
     private(set) var pricingBook: [String: JSONValue] = [:]
+    /// What the LAN REST routes read (`LanServer+Rest`): `lanBook` plus the
+    /// clients, the shelf, the waste log and the declined requests. Its own
+    /// book for the same reason as `pricingBook`: `lanBook` is what a phone
+    /// is handed, and a phone does not need these from `/api/store`.
+    private(set) var lanRestBook: [String: JSONValue] = [:]
 
     /// The shop's fixed costs per print hour, and where the figure comes from
     /// (`lib/overhead-rate.js`). Nil until a book is open or when the engine
@@ -2215,6 +2221,8 @@ final class Shop {
     /// port or the PIN restarts it and one that did not leaves it be.
     var lanRunning: LanConfig?
     var lanProblem: String?
+    /// Why the last API token could not be made or revoked (`ApiTokensSection`).
+    var apiTokenProblem: String?
     /// Files a slicer sent to this Mac (`SlicerInbox`), newest first, and the
     /// sheet that lists them (`Shop+SlicerInbox`).
     var slicerUploads: [SlicerUpload] = []

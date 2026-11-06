@@ -47,11 +47,13 @@ public struct VaultMeta: Codable, Equatable, Sendable {
         self.key = key; self.recordId = recordId
     }
 
-    public func sealed(vaultKey: Data, fileId: String) throws -> Data {
+    /// `nonce` is for tests only (`test/fixtures/vault-upload-fixture`); nil
+    /// draws a random one, as production always does.
+    public func sealed(vaultKey: Data, fileId: String, nonce: Data? = nil) throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fileId, uploadId: uploadId,
-                                           json: try enc.encode(self))
+                                           json: try enc.encode(self), nonce: nonce)
     }
 
     /// Open a feed row's meta. It is sealed for the upload that was the head
@@ -165,6 +167,17 @@ public enum VaultUpload {
     }
 
     /// What the spool keeps between runs. Ciphertext and wraps only.
+    /// Test-only: the values `seal` otherwise draws at random, pinned so a
+    /// test can compare the wire bytes with the desktop's
+    /// (`test/fixtures/vault-upload-fixture`). Every field nil — the only
+    /// value production ever passes — is the random draw.
+    struct Pins: Sendable {
+        var dk: Data?
+        var wrapNonce: Data?
+        var versionMetaNonce: Data?
+        var metaNonce: Data?
+    }
+
     struct SpoolState: Codable, Equatable {
         var v = 1
         var sourceSha256: String
@@ -189,6 +202,12 @@ public enum VaultUpload {
     public static func run(_ job: Job, client: VaultClient, keys: VaultKeys, spoolRoot: URL,
                            concurrency: Int = concurrency,
                            progress: (@Sendable (Progress) -> Void)? = nil) async throws -> Outcome {
+        try await run(job, client: client, keys: keys, spoolRoot: spoolRoot, concurrency: concurrency,
+                      pins: Pins(), progress: progress)
+    }
+
+    static func run(_ job: Job, client: VaultClient, keys: VaultKeys, spoolRoot: URL, concurrency: Int,
+                    pins: Pins, progress: (@Sendable (Progress) -> Void)?) async throws -> Outcome {
         let fm = FileManager.default
         let dir = spoolDir(spoolRoot, job.spoolKey)
         let hashed = try await Task.detached { try plaintextDigest(job.source) }.value
@@ -228,7 +247,7 @@ public enum VaultUpload {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             try saveState(state, dir)
             state = try await Task.detached { [state] in
-                try seal(job, state: state, keys: keys, dir: dir, progress: progress)
+                try seal(job, state: state, keys: keys, dir: dir, pins: pins, progress: progress)
             }.value
             try saveState(state, dir)
         } catch {
@@ -263,10 +282,10 @@ public enum VaultUpload {
 
     /// Seal every chunk into the spool under a fresh DK, re-hashing the
     /// plaintext as it goes: bytes that changed since the first hash refuse.
-    static func seal(_ job: Job, state: SpoolState, keys: VaultKeys, dir: URL,
+    static func seal(_ job: Job, state: SpoolState, keys: VaultKeys, dir: URL, pins: Pins = Pins(),
                      progress: (@Sendable (Progress) -> Void)?) throws -> SpoolState {
         var s = state
-        let dk = VaultCrypto.newDataKey()
+        let dk = pins.dk ?? VaultCrypto.newDataKey()
         let h = try FileHandle(forReadingFrom: job.source)
         defer { try? h.close() }
         var sha = SHA256()
@@ -287,7 +306,7 @@ public enum VaultUpload {
         s.chunkHashes = hashes
         s.manifestHash = try VaultCrypto.manifestHash(size: s.size, chunkHashes: hashes)
         s.wrappedKey = try VaultCrypto.wrapDkForShop(vaultKey: keys.vaultKey, dk: dk, fileId: s.fileId,
-                                                     uploadId: s.uploadId).base64EncodedString()
+                                                     uploadId: s.uploadId, nonce: pins.wrapNonce).base64EncodedString()
         let meta = VaultMeta(seq: (job.lastSeq ?? 0) + 1, uploadId: s.uploadId, manifestHash: s.manifestHash,
                              size: s.size, sha256: s.sourceSha256, name: job.name, path: job.path, kind: job.kind,
                              key: job.key, recordId: job.recordId)
@@ -295,9 +314,10 @@ public enum VaultUpload {
         // The version's own record: its whole manifest, so a reader can check
         // every chunk as it streams.
         s.versionMeta = try VaultCrypto.encryptVersionMeta(vaultKey: keys.vaultKey, fileId: s.fileId, uploadId: s.uploadId,
-                                                           size: s.size, chunkHashes: hashes, seq: meta.seq)
+                                                           size: s.size, chunkHashes: hashes, seq: meta.seq,
+                                                           nonce: pins.versionMetaNonce)
             .base64EncodedString()
-        s.meta = try meta.sealed(vaultKey: keys.vaultKey, fileId: s.fileId).base64EncodedString()
+        s.meta = try meta.sealed(vaultKey: keys.vaultKey, fileId: s.fileId, nonce: pins.metaNonce).base64EncodedString()
         s.metaJSON = meta
         s.sealed = true
         return s

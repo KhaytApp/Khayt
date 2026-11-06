@@ -1861,7 +1861,7 @@
  "mac.on_time": "期限内",
  "mac.online_add_to_queue": "キューに追加",
  "mac.online_already_recorded": "この注文はすでに帳簿にあったため、2つ目のジョブは作成されませんでした。キューから削除されました。",
- "mac.online_desc": "このMacは、ショップのWi‑Fi内のスマートフォン向けのライブキュー、顧客受付フォーム、見積の承認、追跡ページ、カレンダーフィード、そしてWindows版とLinux版のAppが提供するものと同じステータスAPIを提供します。SallaとZidからの注文、SMSA、Aramex、Saudi Postからの荷物の更新を受け取ります。プリンターのWebhookは、当面そのAppで動作します。",
+ "mac.online_desc": "このMacは、ショップのWi‑Fi内のスマートフォン向けのライブキュー、顧客受付フォーム、見積の承認、追跡ページ、カレンダーフィード、そしてWindows版とLinux版のAppが提供するものと同じステータスAPIを提供します。SallaとZidからの注文、SMSA、Aramex、Saudi Postからの荷物の更新を受け取ります。PINまたはAPIトークンの背後で、REST API（注文、顧客、在庫、待機リスト、廃棄）とプリンターのWebhookにも応答します。",
  "mac.online_kept_in_queue": "注文は記録されましたが、クラウドのキューから削除できませんでした。再び提示されます。",
  "mac.online_none": "ストアフロントから新しいものはありません。",
  "mac.online_off_shelf": "棚から {n} 件",
@@ -3762,5 +3762,8 @@
  "mac.of_installed": "インストール済み",
  "mac.of_install_q": "このフィラメントプロファイルをインストールしますか？",
  "mac.of_install_body": "{name} を {printer} 用に {slicer} のフィラメントフォルダへ書き込みます。",
- "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。"
+ "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。",
+ "mac.api_where": "スクリプトはこのMacのLANサーバー（{url}）に接続し、トークンを「Authorization: Bearer」として送信します。サーバーをオンにしておく必要があります。",
+ "mac.api_scopes": "権限",
+ "mac.api_owner_only": "APIトークンを作成・取り消しできるのはオーナーのみです。"
 }

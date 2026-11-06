@@ -129,10 +129,12 @@ test('the LAN lists a phone reads carry the job number', () => {
   assert.equal(q[0].jobNumber, 'INV-2026-0042');
   const old = P.queueJson({ printLog: [{ id: 'INV-2026-0041', status: 'pending' }] });
   assert.equal('jobNumber' in old[0], false, 'an older job is sent as it always was');
-  // GET /api/orders is inline in the server; its map must pass the field on.
-  const server = fs.readFileSync(path.join(ROOT, 'lib/lan-server.js'), 'utf8');
-  const route = server.slice(server.indexOf("pathname === '/api/orders' && req.method === 'GET'"));
-  assert.match(route.slice(0, 1500), /jobNumber: o\.jobNumber/);
+  // GET /api/orders is lib/lan-rest.js's `ordersList`, which both LAN servers
+  // answer with; its map must pass the field on — and only where there is one.
+  const R = require('../lib/lan-rest.js');
+  const rows = R.ordersList({ printLog: [{ id: 'INV-2026-0042-k7qx', jobNumber: 'INV-2026-0042', status: 'pending' }, { id: 'INV-2026-0041', status: 'pending' }] }, {});
+  assert.equal(rows[0].jobNumber, 'INV-2026-0042');
+  assert.equal('jobNumber' in rows[1], false, 'an older job is sent as it always was');
 });
 
 test('jobRef: the number when there is one, else the id', () => {
