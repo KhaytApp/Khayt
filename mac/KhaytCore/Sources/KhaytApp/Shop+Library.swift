@@ -3513,6 +3513,9 @@ extension Shop {
             if case .string(let name)? = task["name"] { says += name }
             if case .number(let h)? = task["intervalHours"] { says += "/h" + String(h) }
             if case .number(let d)? = task["intervalDays"] { says += "/d" + String(d) }
+            // "Not needed" moves the due point without touching lastDone*.
+            if case .string(let seen)? = task["inspectedAt"] { says += "/i" + seen }
+            if case .string(let care)? = task["careTaskId"] { says += "/c" + care }
             return id + ":" + done + ":" + says
         }
         return "\(machine.id)|\(meter)|" + marks.sorted().joined(separator: ",")

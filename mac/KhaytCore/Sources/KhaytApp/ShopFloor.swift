@@ -157,6 +157,16 @@ struct Machines: View {
                 }
                 .disabled(shop.schedulableRows.isEmpty || shop.workingMachines.isEmpty)
             }
+            // Parts the coming maintenance needs, with the date to order by.
+            if shop.has("maintenance") {
+                ToolbarItem {
+                    Button(shop.words.callIt("mac.pb_title"), systemImage: "shippingbox") {
+                        Task { await shop.askForPartsList() }
+                    }
+                    .disabled(shop.maintTaskRows.isEmpty || shop.engine == nil)
+                    .help(shop.words.callIt("mac.pb_title"))
+                }
+            }
             ToolbarItem {
                 Button(shop.words.callIt("mach.add"), systemImage: "plus") { shop.addingMachine = true }
                     .disabled(!shop.canMoveJobs)
@@ -513,7 +523,18 @@ struct MachineCard: View {
                         ForEach(upkeep.tasks) { task in
                             Upkeep(task: task, machine: machine, shop: shop)
                         }
-                        AddMaintenanceTask(shop: shop, machine: machine)
+                        HStack(spacing: 14) {
+                            AddMaintenanceTask(shop: shop, machine: machine)
+                            // A maker's schedule for this model, in one step.
+                            ApplyCarePlan(shop: shop, machine: machine)
+                            // What those tasks will need, across the floor.
+                            if upkeep.tasks.contains(where: { $0.careTaskId != nil }) {
+                                Button(shop.words.callIt("mac.pb_title")) {
+                                    Task { await shop.askForPartsList() }
+                                }
+                                .buttonStyle(.borderless).font(.caption)
+                            }
+                        }
                     }
                 }
             }
@@ -604,6 +625,10 @@ struct Upkeep: View {
                 if let left {
                     Text(left).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                 }
+                if task.deferred == true {
+                    Text(shop.words.callIt("mac.mt_deferred"))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                }
             }
             Button(shop.words.callIt("maint.mark_done")) {
                 working = true
@@ -616,6 +641,25 @@ struct Upkeep: View {
             .font(.caption)
             // A sample book is not the shop's to write to.
             .disabled(working || !shop.canMoveJobs)
+            // ── INSPECTED, NOT NEEDED ─────────────────────────────────────
+            //
+            // The shop looked at the part and it is fine: push the task out
+            // without marking it done, so the history never claims a nozzle
+            // was changed that was not (`KhaytMaintenance.deferTask`). Only
+            // once the task is asking for attention.
+            if task.status != "ok" {
+                Button(shop.words.callIt("mac.mt_not_needed")) {
+                    working = true
+                    Task {
+                        await shop.deferMaintenanceTask(task.id, on: machine)
+                        working = false
+                    }
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .help(shop.words.callIt("mac.mt_not_needed_help"))
+                .disabled(working || !shop.canMoveJobs)
+            }
             // Changing the interval and stopping the task altogether. Drawn
             // in the tertiary colour rather than hidden until hover: a
             // schedule is read far more often than it is edited, so this
