@@ -129,3 +129,18 @@ test('the desktop prints these from the lib, not from copies of its own', () => 
     assert.ok(read(page).includes('<script src="../lib/shop-documents.js"></script>'), page + ' loads the lib');
   }
 });
+
+test('delivery note and work order: addressed to the customer, not the job description', () => {
+  // A job linked to Sara whose description is "Lamp <b>".
+  assert.ok(SD.workOrderHtml(job, ctx()).includes('<div class="name">Sara</div>'), 'work order: Sara');
+  const dn = SD.deliveryNoteHtml(job, ctx());
+  assert.ok(dn.includes('<div class="name">Sara</div>'), 'Deliver to: Sara');
+  assert.ok(!dn.includes('<div class="name">Lamp'), 'not the description');
+  // No linked customer: a typed name, then the description, then walk-in.
+  const typed = { ...job, clientId: null, client: 'Omar' };
+  assert.ok(SD.deliveryNoteHtml(typed, ctx()).includes('<div class="name">Omar</div>'));
+  const described = { ...job, clientId: null, project: 'Ahmed' };
+  assert.ok(SD.deliveryNoteHtml(described, ctx()).includes('<div class="name">Ahmed</div>'));
+  const none = { ...job, clientId: null, project: '' };
+  assert.ok(SD.deliveryNoteHtml(none, ctx()).includes('<div class="name">[inv.walk_in]</div>'));
+});
