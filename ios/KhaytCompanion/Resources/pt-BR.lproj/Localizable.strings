@@ -188,6 +188,8 @@
 "orders.queue_clear" = "A fila está vazia";
 "orders.pick" = "Escolha um pedido";
 "orders.pick.sub" = "A página dele abre aqui, ao lado da lista.";
+"clients.pick" = "Escolha um cliente";
+"clients.pick.sub" = "A página dele abre aqui, ao lado da lista.";
 "inventory.pick" = "Escolha um carretel";
 "inventory.pick.sub" = "A página dele abre aqui, ao lado da prateleira.";
 "orders.queue_clear.sub" = "Tudo em dia — nenhum pedido ativo";

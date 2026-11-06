@@ -188,6 +188,8 @@
 "orders.queue_clear" = "Die Warteschlange ist leer";
 "orders.pick" = "Auftrag auswählen";
 "orders.pick.sub" = "Die Details öffnen sich hier neben der Liste.";
+"clients.pick" = "Kunden auswählen";
+"clients.pick.sub" = "Die Details öffnen sich hier neben der Liste.";
 "inventory.pick" = "Spule auswählen";
 "inventory.pick.sub" = "Die Details öffnen sich hier neben dem Regal.";
 "orders.queue_clear.sub" = "Alles erledigt – keine aktiven Aufträge";
