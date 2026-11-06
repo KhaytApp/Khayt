@@ -122,6 +122,86 @@ struct BookWriter {
         throw StoreWriter.Refusal.unreadable("the book kept changing while this change was being made; try again")
     }
 
+    // MARK: - Quotes: revisions and follow-ups
+
+    /// Revise a quote: keep what it says now as a revision and move it on a
+    /// version (`lib/quote-revision.js` `revise` — `quoteRevisions[]`,
+    /// `quoteVersion`), then make the change (`lib/order-edit.js`
+    /// `applyDetails`: the price as a typed total, the notes), in ONE write.
+    ///
+    /// The Mac keeps the revision and then opens its editor; the phone's sheet
+    /// has the change already in hand, so the two land together, and a
+    /// revision is never kept for a sheet opened and closed. Returns false,
+    /// writing nothing, when the fields change nothing.
+    ///
+    /// Only a quote is revised. A job the customer has accepted throws
+    /// `Refusal.notAQuote`: it is changed by an edit, not a new version.
+    @discardableResult
+    func reviseQuote(orderId: String, fields: [String: JSONValue],
+                     engine: KhaytEngine, now: Date = Date()) async throws -> Bool {
+        try await rewriteOrder(orderId) { row, settings in
+            guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
+            let editId = Self.lanId("edit", now: now)
+            let priceId = Self.lanId("price", now: now)
+            // Asked of the quote as it is first: a revision kept for a change
+            // that changes nothing is a version nobody made.
+            let trial = try await engine.editOrderDetails(order: row, fields: fields, settings: settings,
+                                                          now: now, editId: editId, priceId: priceId)
+            guard trial.changed else { return nil }
+            let revised = try await engine.reviseQuote(order: row, now: now)
+            let edited = try await engine.editOrderDetails(order: revised, fields: fields, settings: settings,
+                                                           now: now, editId: editId, priceId: priceId)
+            return edited.order
+        }
+    }
+
+    /// Record a follow-up on a quote (`lib/quote-followup.js`
+    /// `markFollowUpPatch`: `followUpSentAt`, `followUpCount`), which is what
+    /// the cooldown and the cap read on every computer.
+    ///
+    /// Written BEFORE WhatsApp opens, inside the write on the book as it is
+    /// then, so a count another device moved a moment ago is moved on from,
+    /// not overwritten. Only a quote is followed up.
+    func recordFollowUp(orderId: String, engine: KhaytEngine, now: Date = Date()) async throws {
+        try await rewriteOrder(orderId) { row, _ in
+            guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
+            return try await engine.markFollowUp(order: row, now: now)
+        }
+    }
+
+    /// One job worked out by the engine and written back — the compare-and-
+    /// swap `setOrderStatus` does: worked out against the book as read, and
+    /// written only if the book is still that book, otherwise worked out
+    /// again. `change` returns nil for "nothing to write". Returns whether
+    /// anything was written.
+    @discardableResult
+    private func rewriteOrder(_ orderId: String,
+                              _ change: (JSONValue, [String: JSONValue]) async throws -> JSONValue?) async throws -> Bool {
+        struct Moved: Error {}
+        for _ in 0..<5 {
+            let store = try book.read()
+            guard let order = Self.rows(store, "printLog").first(where: { Self.rowId($0) == orderId }) else {
+                throw Refusal.noSuchOrder
+            }
+            var settings: [String: JSONValue] = [:]
+            if case .object(let s)? = store["settings"] { settings = s }
+            guard let changed = try await change(order, settings) else { return false }
+            var next = store
+            Self.putBack(&next, "printLog", changed: [changed])
+            guard next != store else { return false }
+            do {
+                try book.update { root in
+                    guard root == store else { throw Moved() }
+                    root = next
+                }
+                return true
+            } catch is Moved {
+                continue
+            }
+        }
+        throw StoreWriter.Refusal.unreadable("the book kept changing while this change was being made; try again")
+    }
+
     /// A move the shop's status rule refused (`order-status.gate`), said in
     /// the person's language. The code is the rule's; the sentence is ours.
     struct MoveRefused: Error, LocalizedError, Equatable {
@@ -282,6 +362,8 @@ struct BookWriter {
         case paymentWouldReach([String])
         /// An expense of nothing, which the endpoint answers 400.
         case noAmount
+        /// A revision or a follow-up for a job that is no longer a quote.
+        case notAQuote
 
         var errorDescription: String? {
             switch self {
@@ -302,6 +384,8 @@ struct BookWriter {
                 return L10n.format("pay.refused", ListFormatter.localizedString(byJoining: names.sorted()))
             case .noAmount:
                 return L10n.tr("error.amount_required")
+            case .notAQuote:
+                return L10n.tr("quote.not_a_quote")
             }
         }
     }
