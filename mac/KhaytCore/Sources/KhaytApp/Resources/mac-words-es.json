@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "Ya está en el libro",
  "mac.csv_read_failed": "No se pudo leer este archivo como texto.",
  "mac.csv_found": "{n} filas encontradas. Asigna una columna a cada campo.",
- "mac.csv_done": "{n} importados, {m} omitidos por estar ya en el libro."
+ "mac.csv_done": "{n} importados, {m} omitidos por estar ya en el libro.",
+ "mac.cv_split": "Dividir en placas (un archivo cada una)",
+ "mac.cv_split_note": "{n} placas, un archivo cada una. Cada archivo lleva solo los colores con los que imprime su placa, desde la ranura 1. Una placa con más colores que ranuras tiene {t} se fusiona con los más cercanos.",
+ "mac.cv_split_folder": "Elige una carpeta para los archivos de las placas.",
+ "mac.cv_split_done": "{ok} de {n} placas guardadas en {folder}.",
+ "mac.cv_split_failed": "Placa {n}: {why}",
+ "mac.cv_keep_tower": "Mantener la torre de purga (quitar la altura de capa variable)",
+ "mac.cv_keep_tower_note": "Snapmaker Orca no puede laminar altura de capa variable con torre de purga. Desactivado, se apaga la torre. Activado, la torre se mantiene y se quita la altura de capa variable; los rangos de altura conservan sus cambios de filamento."
 }

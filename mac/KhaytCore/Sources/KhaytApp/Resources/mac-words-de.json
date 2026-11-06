@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "Bereits im Buch",
  "mac.csv_read_failed": "Diese Datei konnte nicht als Text gelesen werden.",
  "mac.csv_found": "{n} Zeilen gefunden. Ordnen Sie jedem Feld eine Spalte zu.",
- "mac.csv_done": "{n} importiert, {m} übersprungen, da bereits im Buch."
+ "mac.csv_done": "{n} importiert, {m} übersprungen, da bereits im Buch.",
+ "mac.cv_split": "In Platten aufteilen (je eine Datei)",
+ "mac.cv_split_note": "{n} Platten, je eine Datei. Jede Datei enthält nur die Farben ihrer Platte, ab Slot 1. Eine Platte mit mehr Farben, als {t} Slots hat, wird auf die nächstliegenden zusammengeführt.",
+ "mac.cv_split_folder": "Wählen Sie einen Ordner für die Plattendateien.",
+ "mac.cv_split_done": "{ok} von {n} Platten in {folder} gespeichert.",
+ "mac.cv_split_failed": "Platte {n}: {why}",
+ "mac.cv_keep_tower": "Reinigungsturm behalten (variable Schichthöhe entfernen)",
+ "mac.cv_keep_tower_note": "Snapmaker Orca kann variable Schichthöhe nicht mit Reinigungsturm slicen. Aus: Der Turm wird abgeschaltet. An: Der Turm bleibt, die variable Schichthöhe wird entfernt; Höhenbereiche behalten ihre Filamentwechsel."
 }
