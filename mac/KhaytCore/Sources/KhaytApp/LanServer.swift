@@ -3104,25 +3104,36 @@ extension Shop {
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
         ) { root in
-            let result = try await engine.lanQuoteApply(store: .object(root), orderId: jobId, nowIso: nowIso)
-            guard result.found, result.error == nil, let printLog = result.printLog else { return }
-            let before = Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId })
-            root["printLog"] = printLog
-            // The customer said yes: the job's models come off Print next in
-            // this same write, as they do for a quote accepted on the Mac.
-            Shop.clearPrintNext(&root, acceptedFrom: before,
-                                now: Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId }))
-            // The invoice counter, advanced when the approval gave the job its
-            // number. Same write as the job, so the number on the job and the
-            // counter that issued it cannot land apart.
-            if let settings = result.settings { root["settings"] = settings }
-            approved = result.order
+            approved = try await Self.applyQuoteApproval(into: &root, engine: engine, jobId: jobId, nowIso: nowIso)
         }
         await load(source)
         // Said, and the `quote_approved` webhook — what Electron does with the
         // same approval (`Shop+ArrivedByItself.swift`).
         if approved != nil { await afterLanApproval(approved) }
         return approved
+    }
+
+    /// The approval itself, inside the write: the job into Pending with its
+    /// trail, its INVOICE NUMBER from the shop's counter (`ensureInvoiceNumber`
+    /// in `lanQuoteApply`, never a second one), and its models off Print next.
+    /// Used by the customer's page (`approveQuote`) and by the REST route
+    /// (`POST /api/orders/:id/approve`, `applyLanRestWrite`), so both make the
+    /// same approval. Nil, with the book untouched, when the rule refused.
+    nonisolated static func applyQuoteApproval(into root: inout [String: JSONValue], engine: KhaytEngine,
+                                               jobId: String, nowIso: String) async throws -> JSONValue? {
+        let result = try await engine.lanQuoteApply(store: .object(root), orderId: jobId, nowIso: nowIso)
+        guard result.found, result.error == nil, let printLog = result.printLog else { return nil }
+        let before = Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId })
+        root["printLog"] = printLog
+        // The customer said yes: the job's models come off Print next in
+        // this same write, as they do for a quote accepted on the Mac.
+        Shop.clearPrintNext(&root, acceptedFrom: before,
+                            now: Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId }))
+        // The invoice counter, advanced when the approval gave the job its
+        // number. Same write as the job, so the number on the job and the
+        // counter that issued it cannot land apart.
+        if let settings = result.settings { root["settings"] = settings }
+        return result.order
     }
 
     /// Price a customer's cleared upload by slicing it.

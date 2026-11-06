@@ -283,6 +283,7 @@ extension Shop {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var outcome: KhaytEngine.LanRestOutcome?
         var moved: LanRestMove?
+        var approved: JSONValue?
         do {
             // lock: system — a LAN REST write; the LAN server gated it with the owner LAN PIN or a scoped API token.
             try await StoreWriter.update(
@@ -294,6 +295,7 @@ extension Shop {
                                                             op: op, args: args)
                 outcome = done.outcome
                 moved = done.move
+                approved = done.approved
                 // Refused on the book as it is now: nothing to write.
                 if done.outcome.changed == nil { throw LanRestUnchanged() }
             }
@@ -309,6 +311,8 @@ extension Shop {
             await deliverMove(telegram: o.telegram, email: o.email, portal: o.portal, webhooks: o.webhooks,
                               before: moved.before, jobId: moved.jobId)
         }
+        // And after an approval, what the customer's own approval sends.
+        if approved != nil { await afterLanApproval(approved) }
         return outcome
     }
 
@@ -318,6 +322,14 @@ extension Shop {
         let jobId: String
         let before: JSONValue?
         let outcome: MoveOutcome
+    }
+
+    /// What `applyLanRestWrite` did: the answer, and what the host owes once
+    /// the write commits (a move's deliveries, or an approval's webhook).
+    struct LanRestApplied {
+        let outcome: KhaytEngine.LanRestOutcome
+        var move: LanRestMove? = nil
+        var approved: JSONValue? = nil
     }
 
     /// A LAN REST write, as `lanRestWrite` runs it inside the write.
@@ -343,14 +355,27 @@ extension Shop {
     /// A move `applyMove` refuses (the rules, or a channel this Mac cannot
     /// send) is the 409 the desktop sends, `{ error: 'Move refused', code,
     /// params }`, and nothing is written.
+    ///
+    /// The invoice number a quote earns is given ONCE. `orderPatch` numbers a
+    /// quote leaving `quote` too (#2264), but its first pass only decides and
+    /// is discarded whole (its `store`, and the counter in it, never reach
+    /// `root`), and its second pass sees a job that is no longer a quote.
+    ///
+    /// ── AN APPROVAL IS THE CUSTOMER'S APPROVAL ────────────────────────────
+    ///
+    /// `POST /api/orders/:id/approve` is decided by `orderApprove` (404, 410,
+    /// 409) and then made by `applyQuoteApproval`, the write the customer's
+    /// own approval page makes: Pending with its trail, the invoice number,
+    /// Print next cleared. `lanRestWrite` then sends what that page sends.
     static func applyLanRestWrite(into root: inout [String: JSONValue], engine: KhaytEngine, words: Words,
-                                  op: String, args: [JSONValue]) async throws
-        -> (outcome: KhaytEngine.LanRestOutcome, move: LanRestMove?) {
+                                  op: String, args: [JSONValue]) async throws -> LanRestApplied {
+        if op == "orderApprove" { return try await applyLanRestApproval(into: &root, engine: engine, args: args) }
         guard op == "orderPatch", let (id, stage) = lanStatusMove(in: root, args: args) else {
-            return (try await applyLanRest(into: &root, engine: engine, op: op, args: args), nil)
+            return LanRestApplied(outcome: try await applyLanRest(into: &root, engine: engine, op: op, args: args))
         }
+        // Decides only: its book, settings counter and all, is never written.
         let check = try await engine.lanRest(op, store: .object(lanRestBook(from: root)), args: args)
-        guard check.changed != nil else { return (check, nil) }
+        guard check.changed != nil else { return LanRestApplied(outcome: check) }
         let before = rows(root, "printLog").first { recordId($0) == id }
         var moved = root
         let move: MoveOutcome
@@ -360,7 +385,7 @@ extension Shop {
             let body: JSONValue = .object(["error": .string("Move refused"),
                                            "code": .string(refused.code ?? "refused"),
                                            "params": .object(refused.params)])
-            return (KhaytEngine.LanRestOutcome(status: 409, body: body, store: nil), nil)
+            return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(status: 409, body: body, store: nil))
         }
         // A quote accepted into a job takes its models off Print next, as a
         // move on the board does.
@@ -368,7 +393,32 @@ extension Shop {
                        now: rows(moved, "printLog").first { recordId($0) == id })
         root = moved
         let out = try await applyLanRest(into: &root, engine: engine, op: op, args: args)
-        return (out, LanRestMove(jobId: id, before: before, outcome: move))
+        return LanRestApplied(outcome: out, move: LanRestMove(jobId: id, before: before, outcome: move))
+    }
+
+    /// `POST /api/orders/:id/approve` on this Mac — see `applyLanRestWrite`.
+    nonisolated static func applyLanRestApproval(into root: inout [String: JSONValue], engine: KhaytEngine,
+                                                 args: [JSONValue]) async throws -> LanRestApplied {
+        let check = try await engine.lanRest("orderApprove", store: .object(lanRestBook(from: root)), args: args)
+        guard check.changed != nil, case .string(let id)? = args.first else { return LanRestApplied(outcome: check) }
+        var nowIso = StoreWriter.iso(Date())
+        if args.count > 1, case .object(let ctx) = args[1], case .string(let s)? = ctx["nowIso"] { nowIso = s }
+        var approving = root
+        guard case .object(let job)? = try await applyQuoteApproval(into: &approving, engine: engine,
+                                                                     jobId: id, nowIso: nowIso) else {
+            // The rule said yes a moment ago on this same book; say what it says now.
+            return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(
+                status: 409, body: .object(["error": .string("Quote cannot be approved in its current state")]), store: nil))
+        }
+        root = approving
+        // The body `orderApprove` answers.
+        let body: JSONValue = .object(["ok": .bool(true), "order": .object([
+            "id": job["id"] ?? .string(id), "status": job["status"] ?? .null,
+            "quoteAcceptedAt": job["quoteAcceptedAt"] ?? .null,
+        ])])
+        return LanRestApplied(outcome: KhaytEngine.LanRestOutcome(status: 200, body: body,
+                                                                  store: .object(lanRestBook(from: root))),
+                              approved: .object(job))
     }
 
     /// The job and the stage when `orderPatch`'s arguments ask to move a job

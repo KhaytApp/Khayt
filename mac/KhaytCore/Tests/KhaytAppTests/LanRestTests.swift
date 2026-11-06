@@ -367,21 +367,89 @@ struct LanRestTests {
         }
     }
 
-    @Test("a quote accepted over the LAN earns its invoice number, as on the board")
-    func quoteAcceptedGetsInvoiceNumber() async throws {
+    /// A shop whose next invoice is number 5 this year, and one quote.
+    /// `at`: the clock the numbering reads — the board's move reads now, an
+    /// approval the request's own moment (the bench clock, 2027).
+    static func quoteBook(_ bench: Bench, id: String, at: Date = Date()) -> Int {
+        let year = Calendar.book.component(.year, from: at)
+        bench.book.value["settings"] = .object(["invNumNext": .number(5), "invNumYear": .number(Double(year))])
+        bench.book.value["printLog"] = .array([])
+        bench.book.put(["id": .string(id), "jobNumber": .string("QUO-\(year)-0001"), "status": .string("quote"),
+                        "project": .string("Sign"), "quoteExpiresAt": .string("2099-01-01"), "invoiceNum": .null])
+        return year
+    }
+    static func counter(_ bench: Bench) -> JSONValue? {
+        guard case .object(let s)? = bench.book.value["settings"] else { return nil }
+        return s["invNumNext"]
+    }
+
+    @Test("a quote accepted over the LAN gets exactly one invoice number, the counter moves by one, and a repeat moves neither")
+    func quoteAcceptedGetsOneInvoiceNumber() async throws {
         let bench = try await Bench(rest: true)
         defer { bench.stop() }
-        bench.book.value["settings"] = .object([:])
-        bench.book.put(["id": .string("QUO-2027-0001-abcd"), "jobNumber": .string("QUO-2027-0001"),
-                        "status": .string("quote"), "project": .string("Sign"), "invoiceNum": .null])
-        let reply = try await bench.send("PATCH", "/api/orders/QUO-2027-0001-abcd", body: Self.json(#"{"status":"pending"}"#),
-                                         headers: Self.pin)
+        let year = Self.quoteBook(bench, id: "Q1")
+        let reply = try await bench.send("PATCH", "/api/orders/Q1", body: Self.json(#"{"status":"pending"}"#), headers: Self.pin)
         #expect(reply.status == 200)
-        let job = try #require(bench.book.job("QUO-2027-0001-abcd"))
+        let job = try #require(bench.book.job("Q1"))
         #expect(job["status"] == .string("pending"))
         #expect(job["quoteAcceptedAt"] != nil)
-        guard case .string(let number)? = job["invoiceNum"] else { Issue.record("no invoice number"); return }
-        #expect(number.hasPrefix("INV-"))
+        // ONE number, in both spellings: the board's move numbered it, and
+        // neither `orderPatch` pass gave a second — the first is discarded
+        // whole, the second sees a job that is no longer a quote.
+        #expect(job["invoiceNum"] == .string("INV-\(year)-0005"))
+        #expect(job["invoiceNumber"] == .string("INV-\(year)-0005"))
+        #expect(Self.counter(bench) == .number(6), "advanced by exactly one: nothing leaked from the discarded pass")
+        let after = bench.book.value
+        let again = try await bench.send("PATCH", "/api/orders/Q1", body: Self.json(#"{"status":"pending"}"#), headers: Self.pin)
+        #expect(again.status == 200)
+        #expect(bench.book.value == after, "a repeat changes neither the job nor the counter")
+    }
+
+    @Test("the deciding pass alone would have numbered the quote: its counter never reaches the book")
+    func decidingPassDoesNotLeak() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        _ = Self.quoteBook(bench, id: "Q1")
+        // What the first pass decides on, on its own: it numbers the quote and
+        // advances the counter in its `store`. That `store` is thrown away.
+        let alone = try await bench.engine.lanRest("orderPatch", store: .object(bench.book.value),
+                                                   args: [.string("Q1"), .object(["status": .string("pending")]), .object([:])])
+        guard case .object(let s)? = alone.changed?["settings"] else { Issue.record("the rule no longer numbers"); return }
+        #expect(s["invNumNext"] == .number(6))
+        // Had that counter reached the book, the board's move would have
+        // numbered from 6: INV-…-0006 and a counter of 7. It numbers from 5.
+        let engine = bench.engine
+        let words = Words()
+        await words.load("en", engine: engine)
+        var root = bench.book.value
+        _ = try await Shop.applyLanRestWrite(into: &root, engine: engine, words: words, op: "orderPatch",
+                                             args: [.string("Q1"), .object(["status": .string("pending")]), .object([:])])
+        guard case .object(let w)? = root["settings"] else { Issue.record("no settings"); return }
+        #expect(w["invNumNext"] == .number(6))
+        let year = Calendar.book.component(.year, from: Date())
+        #expect(Shop.rows(root, "printLog").compactMap(Shop.asObject).first?["invoiceNum"] == .string("INV-\(year)-0005"))
+    }
+
+    @Test("a quote approved over the LAN gets exactly one invoice number, as the customer's approval does")
+    func approvalGetsOneInvoiceNumber() async throws {
+        let bench = try await Bench(rest: true)
+        defer { bench.stop() }
+        let year = Self.quoteBook(bench, id: "Q1", at: Bench.start)
+        let reply = try await bench.send("POST", "/api/orders/Q1/approve", body: Self.json("{}"), headers: Self.pin)
+        #expect(reply.status == 200)
+        let body = try JSONValue.decode(JSONValue.self, from: reply.body)
+        guard case .object(let b) = body, case .object(let o)? = b["order"] else { Issue.record("no order"); return }
+        #expect(o["status"] == .string("pending"))
+        #expect(o["quoteAcceptedAt"] != nil && o["quoteAcceptedAt"] != .null)
+        let job = try #require(bench.book.job("Q1"))
+        #expect(job["invoiceNum"] == .string("INV-\(year)-0005"))
+        #expect(job["invoiceNumber"] == .string("INV-\(year)-0005"))
+        guard case .array(let trail)? = job["statusHistory"] else { Issue.record("no trail"); return }
+        #expect(trail.count == 1, "the move into Pending is on the trail once")
+        #expect(Self.counter(bench) == .number(6))
+        let after = bench.book.value
+        #expect(try await bench.send("POST", "/api/orders/Q1/approve", body: Self.json("{}"), headers: Self.pin).status == 409)
+        #expect(bench.book.value == after, "a second approval changes nothing")
     }
 
     @Test("a server that has not wired the writes does not have the write routes")
