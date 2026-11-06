@@ -28,6 +28,10 @@ struct LibraryInspector: View {
     @State private var summary: ModelSummary?
     /// The model whose bought-licence proof is being edited.
     @State private var proofFor: LibraryFile?
+    /// The model whose colours are being planned (`ColourPlanSheet`).
+    @State private var planFor: LibraryFile?
+    /// The model being published to MakerRun, or whose listing is open.
+    @State private var publishFor: LibraryFile?
 
     /// What the summary depends on: the record, and the catalogue it is
     /// priced against. A product saved or a rate changed moves the rows.
@@ -211,8 +215,17 @@ struct LibraryInspector: View {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
             }
+            // MakerRun: publish this model, or see the listing it has.
+            if file.sourceFile?.kind == "model" || shop.makerRunListing(of: file.id) != nil {
+                Button { publishFor = file } label: {
+                    Label(shop.words.callIt(shop.makerRunListing(of: file.id) == nil ? "mac.mkr_publish" : "mac.mkr_on_makerrun"),
+                          systemImage: "square.and.arrow.up")
+                }
+                .disabled(!shop.canWrite)
+            }
         }
         .controlSize(.small)
+        .shopSheet(item: $publishFor) { MakerRunPublishSheet(shop: shop, file: $0) }
     }
 
     /// "Archive", on its own: it changes what the library offers, and does
@@ -377,7 +390,15 @@ struct LibraryInspector: View {
             if file.swaps > 0 {
                 DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)")
             }
+            // The desktop offers its planner on a file with more than one
+            // colour (`plannableFiles`); one colour has nothing to plan.
+            if file.palette.filter({ !($0.hex ?? "").isEmpty }).count > 1 {
+                Button(shop.words.callIt("mac.cpl_open")) { planFor = file }
+                    .controlSize(.small)
+                    .disabled(!shop.canWrite)
+            }
         }
+        .shopSheet(item: $planFor) { ColourPlanSheet(shop: shop, file: $0) }
     }
 
     /// What the slicer was told to do with this model. Absent entirely for a

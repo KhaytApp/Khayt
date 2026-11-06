@@ -15,7 +15,7 @@ import Foundation
 /// there, every call runs there, and JavaScriptCore's own timers fire there —
 /// never on Swift's 512 KB pool threads, and never on the main thread.
 public actor KhaytEngine {
-    private let runtime: JSRuntime
+    let runtime: JSRuntime
     private let thread: EngineThread
 
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -184,6 +184,14 @@ public actor KhaytEngine {
         // spools mix in LINEAR light, and "closest" means perceptual distance
         // rather than the nearest hex triple.
         "color-mix",
+        // The multicolour print planner's rules: which spool each colour of a
+        // print file starts on, what it costs, and how the spools load into an
+        // AMS. Reads `KhaytColor` off the global, so after `color-mix`.
+        "color-plan",
+        // MakerRun's vocabularies — categories, materials, the licences its
+        // upload form offers, and how they meet the record's licence ids. The
+        // same file the Bed Ready publish form builds its menus from.
+        "makerrun-terms",
         // The HueForge studio: a photo as a filament-painted relief for the
         // U1, and the 3MF it prints from. `HueForgeEngine` runs these in a
         // context of its own, on a thread of its own, because one plan takes
@@ -452,6 +460,11 @@ public actor KhaytEngine {
         // fields are recorded because those are the ones a customer can be told
         // a different answer about later.
         "order-edit",
+        // Spools, clients and products from a spreadsheet: the parse, the
+        // column matching, the duplicate tests and the records — the rules the
+        // desktop's Import CSV ran inline, so File ▸ Import CSV… builds the
+        // same records from the same file.
+        "csv-import",
         // A job that failed inspection: the fields the metrics count, the
         // defect the analytics table is built from, and the waste row.
         "qc-failure",
@@ -1136,6 +1149,16 @@ public actor KhaytEngine {
         // for the queue. Neither reads the other, so their order is free.
         "telemetry-scrub",
         "telemetry-sender",
+        // Reports the other app computed inline and the Mac draws too: profit
+        // by filament and material usage, the P&L's two trend charts, the
+        // completion heatmap, the box-form VAT return and the test-print log.
+        // Each reads its siblings (`order-status`, `pnl-report`, `tax`,
+        // `order-deduction`) when called, so they come after them.
+        "filament-report",
+        "pnl-trend",
+        "completion-heatmap",
+        "vat-return",
+        "test-prints",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -5571,6 +5594,135 @@ public actor KhaytEngine {
                           as: MachineProfitReport.self)
     }
 
+    // MARK: - The desktop's reports, from the desktop's rules
+
+    /// Profit by filament and material usage by month — `lib/filament-report.js`,
+    /// the module the other app's dashboard draws both from.
+    ///
+    /// Revenue is what each order EARNED (`orderEarnedBase`: net of tax, in
+    /// the shop's currency), the figure every other money screen uses.
+    /// `months` is the window in book months (`Calendar.book.monthKeys`).
+    public func filamentReport(orders: [JSONValue], inventory: [JSONValue],
+                               settings: [String: JSONValue], clients: [JSONValue],
+                               months: [String]) throws -> FilamentReport {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          return {
+            rows: KhaytFilamentReport.profitByFilament(ARG0, ARG1, {
+              revenueOf: function (o) { return KhaytOrderMoney.orderEarnedBase(o, ctx); },
+            }),
+            usage: KhaytFilamentReport.materialUsage(ARG1, ARG4, { limit: 6 }),
+            months: ARG4,
+          };
+        })()
+        """#, [.array(orders), .array(inventory), .object(settings), .array(clients),
+               .array(months.map { .string($0) })],
+           as: FilamentReport.self)
+    }
+
+    /// Six months of revenue against spending, and the margin, from the P&L
+    /// by month — `lib/pnl-trend.js` over `pnlByPeriod`, as the other app's
+    /// two trend charts. `input` is the shop's P&L inputs; its granularity
+    /// and span are replaced (every month, the whole book).
+    public func pnlTrend(_ input: PnlInputs, months: [String]) throws -> [PnlTrendMonth] {
+        var asked = input
+        asked.granularity = "month"
+        asked.from = nil
+        asked.to = nil
+        return try runtime.call2(
+            "(function(){var rows = KhaytPnl.pnlByPeriod(ARG0, ARG1, \(PnlInputs.context));"
+          + " var t = KhaytPnlTrend.monthlyTrend(rows, ARG13), m = KhaytPnlTrend.marginTrend(rows, ARG13);"
+          + " return t.map(function (r, i) { return { month: r.month, revenue: r.revenue,"
+          + " expenses: r.expenses, profit: r.profit, marginPct: m[i].marginPct }; });})()",
+            asked.arguments + [.array(months.map { .string($0) })],
+            as: [PnlTrendMonth].self)
+    }
+
+    /// Twelve weeks of finished work by weekday — `lib/completion-heatmap.js`.
+    /// `orders` is already filtered to the period the page shows.
+    public func completionHeatmap(orders: [JSONValue], now: Date) throws -> CompletionHeatmap {
+        try runtime.call2(#"""
+        (function () {
+          var h = KhaytCompletionHeatmap.heatmap(ARG0, { now: ARG1 });
+          h.intensity = h.matrix.map(function (row) {
+            return row.map(function (n) { return KhaytCompletionHeatmap.intensity(n, h.maxVal); });
+          });
+          return h;
+        })()
+        """#, [.array(orders), .number(now.timeIntervalSince1970 * 1000)],
+           as: CompletionHeatmap.self)
+    }
+
+    /// The box-form VAT return for `from`…`to` and its one-page document —
+    /// `lib/vat-return.js`, the module the other app's "Export VAT Return"
+    /// prints. Revenue is `orderNetRevenueBase` there and here; the currency
+    /// mark is the shared table's, as the other app's `currencySymbol`.
+    public func vatReturn(orders: [JSONValue], expenses: [JSONValue],
+                          settings: [String: JSONValue], clients: [JSONValue],
+                          currencies: [String: JSONValue], from: String, to: String,
+                          shopName: String, periodTitle: String) throws -> VatReturnDocument {
+        try runtime.call2(#"""
+        (function () {
+          var ctx = { settings: ARG2, clients: ARG3 };
+          var known = (ARG4 && Object.keys(ARG4).length) ? ARG4 : undefined;
+          var b = KhaytVatReturn.boxes(ARG0, ARG1, {
+            settings: ARG2, clients: ARG3, currencies: known, from: ARG5, to: ARG6,
+            revenueOf: function (o) { return KhaytOrderMoney.orderNetRevenueBase(o, ctx, known); },
+          });
+          var table = (globalThis.KhaytCurrencies && KhaytCurrencies.CURRENCIES) || {};
+          var cur = table[(ARG2 || {}).currency] || table.SAR || { symbol: '' };
+          b.html = KhaytVatReturn.html(b, { shopName: ARG7, periodTitle: ARG8, currencySymbol: cur.symbol });
+          return b;
+        })()
+        """#, [.array(orders), .array(expenses), .object(settings), .array(clients),
+               .object(currencies), .string(from), .string(to), .string(shopName),
+               .string(periodTitle)],
+           as: VatReturnDocument.self)
+    }
+
+    /// The shopping list from the reorder points — `lib/reorder.js
+    /// shoppingList`, low spools picked by `KhaytOrderDeduction.isLowStock`
+    /// (the shelf's own badge rule), and its text to copy.
+    public func shoppingList(spools: [JSONValue], suppliers: [JSONValue],
+                             settings: [String: JSONValue], noSupplier: String,
+                             title: String) throws -> ShoppingList {
+        try runtime.call2(#"""
+        (function () {
+          var groups = KhaytReorder.shoppingList(ARG0, ARG1, {
+            isLow: function (s) { return KhaytOrderDeduction.isLowStock(s, ARG2); },
+            noSupplier: ARG3,
+          });
+          return { groups: groups, text: KhaytReorder.shoppingListText(groups, ARG4) };
+        })()
+        """#, [.array(spools), .array(suppliers), .object(settings), .string(noSupplier),
+               .string(title)],
+           as: ShoppingList.self)
+    }
+
+    /// A test print logged against a spool — `lib/test-prints.js`: the row in
+    /// the desktop's fields, and the spool with any filament it used taken off
+    /// and its usage line written (lot stamped, as a recall reads it).
+    public func addTestPrint(_ testPrints: [JSONValue], spool: JSONValue,
+                             raw: [String: JSONValue], id: String,
+                             today: String) throws -> TestPrintChange {
+        try runtime.call2(#"""
+        (function () {
+          var input = KhaytTestPrints.normalize(ARG2, ARG4);
+          return KhaytTestPrints.addTestPrint(ARG0, ARG1, input, { id: ARG3 });
+        })()
+        """#, [.array(testPrints), spool, .object(raw), .string(id), .string(today)],
+           as: TestPrintChange.self)
+    }
+
+    /// A test print taken off the log, its grams put back on the spool.
+    public func removeTestPrint(_ testPrints: [JSONValue], spool: JSONValue?,
+                                id: String) throws -> TestPrintChange {
+        try runtime.call2("KhaytTestPrints.removeTestPrint(ARG0, ARG1, ARG2)",
+                          [.array(testPrints), spool ?? .null, .string(id)],
+                          as: TestPrintChange.self)
+    }
+
     // MARK: - Finding a printer
 
     /// A printer the network answered for.
@@ -8385,6 +8537,73 @@ public actor KhaytEngine {
             [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId),
              .string(priceId), settings.isEmpty ? .null : .object(settings)],
             as: JobEdited.self)
+    }
+
+    // MARK: - Importing a spreadsheet (`lib/csv-import.js`)
+
+    /// One field a spreadsheet column can fill.
+    public struct CsvField: Decodable, Sendable, Hashable, Identifiable {
+        public let key: String
+        public let labelKey: String
+        public let label: String
+        public let required: Bool?
+        public let type: String?
+        public var id: String { key }
+        public var isRequired: Bool { required == true }
+    }
+
+    /// A file as read: its header row, its data rows, the fields of the kind
+    /// asked for, and the column each field starts on (-1 for none).
+    public struct CsvRead: Decodable, Sendable {
+        public let headers: [String]
+        public let rows: [[String]]
+        public let fields: [CsvField]
+        public let mapping: [String: Int]
+    }
+
+    /// Read `text` for `kind` (`spools`, `clients`, `products`). `labels` are
+    /// the fields' names in the shop's language, which the columns are also
+    /// matched against.
+    public func csvRead(kind: String, text: String, labels: [String: String]) throws -> CsvRead {
+        try runtime.call2(
+            "(function(){ var C = KhaytCsvImport, t = C.parse(ARG1), f = C.FIELDS[ARG0];"
+          + " if (!f) throw new Error('unknown kind');"
+          + " return { headers: t.headers, rows: t.rows, fields: f, mapping: C.autoMap(f, t.headers, ARG2) }; })()",
+            [.string(kind), .string(text), .object(labels.mapValues(JSONValue.string))],
+            as: CsvRead.self)
+    }
+
+    /// What one row of the file does: added as a new record, or skipped as
+    /// one the book already has.
+    public struct CsvVerdict: Decodable, Sendable, Hashable {
+        public let verdict: String
+        public let id: String?
+    }
+
+    /// What importing the mapped rows into `existing` would do.
+    public struct CsvPlan: Decodable, Sendable {
+        /// The mapped rows that carry every required field, in file order.
+        public let objects: [[String: JSONValue]]
+        /// One per object, in the same order.
+        public let rows: [CsvVerdict]
+        /// The records to add, as the desktop writes them.
+        public let add: [JSONValue]
+        public let imported: Int
+        public let skipped: Int
+    }
+
+    /// `ids` are used in order, one per record added; hand in at least one
+    /// per row.
+    public func csvPlan(kind: String, rows: [[String]], mapping: [String: Int], existing: [JSONValue],
+                        today: String, settings: [String: JSONValue], ids: [String]) throws -> CsvPlan {
+        try runtime.call2(
+            "(function(){ var C = KhaytCsvImport, o = C.objects(ARG1, C.FIELDS[ARG0], ARG2);"
+          + " var p = C.plan(ARG0, o, ARG3, { today: ARG4, settings: ARG5, ids: ARG6 });"
+          + " p.objects = o; return p; })()",
+            [.string(kind), .array(rows.map { .array($0.map(JSONValue.string)) }),
+             .object(mapping.mapValues { .number(Double($0)) }), .array(existing), .string(today),
+             .object(settings), .array(ids.map(JSONValue.string))],
+            as: CsvPlan.self)
     }
 
     /// A job's edits, newest first — `lib/order-edit.js editLog`.

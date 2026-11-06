@@ -938,6 +938,12 @@ struct Inventory: View {
                                     Button(shop.words.callIt("inv.dry_log") + "\u{2026}") {
                                         shop.dryingLogFor = spool
                                     }
+                                    // And the desktop's fourth: the test prints
+                                    // run on this spool (a read too, like the
+                                    // drying log; adding one waits on writing).
+                                    Button(shop.words.callIt("inv.test_prints") + "\u{2026}") {
+                                        shop.testPrintLogFor = spool
+                                    }
                                     Button(shop.words.callIt("inv.adjust_title") + "\u{2026}") {
                                         shop.adjustingSpool = spool
                                     }
@@ -1021,6 +1027,18 @@ struct Inventory: View {
                   confirm: shop.words.callIt("common.delete"),
                   cancel: shop.words.callIt("common.cancel")) { spool in
             Task { await shop.deleteSpool(spool.id) }
+        }
+        // THE SHOPPING LIST: what is at or under its reorder point, by
+        // supplier, to copy or print — the desktop's, from the same rule
+        // (`lib/reorder.js shoppingList`). A read, so not gated on writing.
+        .screenToolbar {
+            ToolbarItem {
+                Button(shop.words.callIt("shop.title"), systemImage: "cart") {
+                    Task { await shop.askForShoppingList() }
+                }
+                .disabled(shop.spools.isEmpty || shop.engine == nil)
+                .help(shop.words.callIt("shop.title"))
+            }
         }
     }
 }

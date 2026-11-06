@@ -105,6 +105,17 @@ private struct Detail: View {
                     Divider()
                     JobStaffSection(shop: shop, job: job)
                 }
+                // The shop's post-processing steps, ticked on a job in Post —
+                // the desktop's card checklist (`order.postChecks`).
+                if JobPostChecklist.shows(shop, job) {
+                    Divider()
+                    JobPostChecklist(shop: shop, job: job)
+                }
+                // The shop's own order fields that have a value here.
+                if !JobCustomFields.rows(shop, job).isEmpty {
+                    Divider()
+                    JobCustomFields(shop: shop, job: job)
+                }
                 // What the whole object came to, for a shop looking at one
                 // leg of it. Only where there is a kit to show or a book that
                 // has kits in it — a picker offering to file a job into

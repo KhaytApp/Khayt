@@ -421,6 +421,9 @@ final class Words {
             .merging(PrintPrepWords.table) { mine, _ in mine }
             .merging(StudioWords.table) { mine, _ in mine }
             .merging(ApiTokenWords.table) { mine, _ in mine }
+            .merging(ParityWords.table) { mine, _ in mine }
+            .merging(MakerRunWords.table) { mine, _ in mine }
+            .merging(OrderFlowWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -6327,6 +6330,69 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The desktop-parity reports (`ParityReportCards.swift`), the box-form
+        // VAT return, the shopping list and the test-print log — in the
+        // other app's own words for each.
+        "an.filament_perf", "an.filament_no_data", "inv.material", "an.filament_orders",
+        "an.filament_margin", "an.filament_time_pg", "common.hours", "an.mat_usage_title",
+        "an.mat_usage_empty", "an.monthly_trend_title", "an.monthly_rev", "an.monthly_exp",
+        "an.monthly_profit_above", "an.profit_margin_title", "an.production_heatmap",
+        "an.last_12_weeks", "an.heatmap_no_data", "an.no_data", "vatReturn", "exportVatReturn",
+        "analytics.this_year", "shop.title", "shop.copy", "shop.none", "shop.no_supplier",
+        "common.print", "common.grams", "inv.test_prints", "inv.test_add", "inv.test_saved",
+        "inv.test_machine", "inv.test_type", "inv.test_result", "inv.print_temp", "inv.bed_temp",
+        "inv.test_speed", "inv.test_weight_used", "common.date", "common.notes",
+        "common.optional", "inv.spool_hist_empty",
+        "inv.test.temp_tower", "inv.test.retraction", "inv.test.first_layer", "inv.test.stringing",
+        "inv.test.overhang", "inv.test.dimensional", "inv.test.other", "inv.test.excellent",
+        "inv.test.good", "inv.test.fair", "inv.test.poor",
+        // MakerRun, the colour planner and the 3D viewer (`MakerRunBrowser`,
+        // `MakerRunPublish`, `ColourPlanSheet`, `ModelOrbit`): the desktop's
+        // own words for Bed Ready's MakerRun panel and its planner modal.
+        "mr.added", "mr.all_categories", "mr.any_material", "mr.back", "mr.browse_title",
+        "mr.by_creator", "mr.cancel", "mr.category", "mr.check_status", "mr.checking",
+        "mr.choose_category", "mr.choose_licence", "mr.close", "mr.confirm_body", "mr.confirm_go",
+        "mr.confirm_item_file", "mr.confirm_item_licence", "mr.confirm_item_title", "mr.confirm_title",
+        "mr.created_on", "mr.delete_body", "mr.delete_go", "mr.delete_half", "mr.delete_title",
+        "mr.description", "mr.download_no_licence", "mr.download_under", "mr.downloading",
+        "mr.e_category", "mr.e_description", "mr.e_licence", "mr.e_title", "mr.e_title_long",
+        "mr.err_age", "mr.err_bad_response", "mr.err_forbidden", "mr.err_forbidden_download",
+        "mr.err_generic", "mr.err_maintenance", "mr.err_mfa", "mr.err_network", "mr.err_not_found",
+        "mr.err_rate", "mr.err_relink", "mr.err_unavailable", "mr.f_category", "mr.f_description",
+        "mr.f_licence", "mr.f_material", "mr.f_nsfw", "mr.f_print_claim", "mr.f_title", "mr.files",
+        "mr.files_external", "mr.files_none", "mr.finish_upload", "mr.for_sale", "mr.for_sale_price",
+        "mr.free", "mr.image_failures", "mr.include_photo", "mr.include_thumb", "mr.incomplete",
+        "mr.lic_check", "mr.lic_commercial", "mr.lic_noncommercial", "mr.licence", "mr.licence_none",
+        "mr.licence_unmapped", "mr.listing_title", "mr.mat_flexible", "mr.mat_multi", "mr.mat_rigid",
+        "mr.material", "mr.material_unset", "mr.n_colours", "mr.next", "mr.no_picture",
+        "mr.no_results", "mr.not_verified", "mr.nsfw_note", "mr.open_page", "mr.prev", "mr.price",
+        "mr.price_any", "mr.price_free", "mr.price_sale", "mr.profile_unnamed", "mr.profiles",
+        "mr.publish_bad_ext", "mr.publish_downloaded", "mr.publish_downloaded_by",
+        "mr.publish_free_note", "mr.publish_lead", "mr.publish_next", "mr.publish_signin",
+        "mr.publish_title", "mr.publishing", "mr.reason_unknown", "mr.recheck", "mr.recreate_body",
+        "mr.recreate_go", "mr.recreate_title", "mr.retry", "mr.review_note", "mr.sale_external",
+        "mr.search_ph", "mr.showing", "mr.signin_download", "mr.skip_picture", "mr.status_draft",
+        "mr.status_gone", "mr.status_not_in_recent", "mr.status_now", "mr.status_pending",
+        "mr.status_published", "mr.status_rejected", "mr.status_unknown", "mr.step_create",
+        "mr.step_file", "mr.step_images", "mr.v_badge", "mr.v_file", "mr.v_photo", "mr.v_printer",
+        "mr.verification", "mr.verified", "mr.verified_for", "mr.verified_only", "plan.assign_first",
+        "plan.colour", "plan.cost", "plan.filament", "plan.grams", "plan.no_colours",
+        "plan.no_filaments", "plan.slot_over", "plan.slot_single", "plan.slotmap_head", "plan.title",
+        "plan.total", "plan.unassigned", "plib.swaps", "view3d.wireframe",
+        // The order-flow settings and tools (`OrderFlowViews.swift`): the
+        // post-processing checklist, post-process presets, custom order
+        // fields and Import CSV, in the desktop's own words for them.
+        "post.settings_title", "post.settings_hint", "post.checklist", "post.step_ph", "post.empty",
+        "set.post_process_presets", "set.no_presets", "common.name", "common.amount",
+        "set.custom_fields_title", "set.custom_fields_hint", "set.custom_field_ph",
+        "set.custom_fields_empty",
+        "csv.import_spools", "csv.import_clients", "csv.import_products", "csv.choose_file",
+        "csv.no_file", "csv.field", "csv.column", "csv.preview", "csv.skip", "csv.rows_to_import",
+        "csv.skipped", "csv.import_btn",
+        "inv.material", "inv.brand", "inv.color", "inv.diameter", "inv.weight_total", "inv.remaining",
+        "inv.cost_per_kg", "inv.reorder_point", "inv.location", "common.notes",
+        "cl.name_en", "cl.name_ar", "cl.phone", "cl.email", "cl.city", "cl.address", "cl.vat",
+        "cl.company", "pe.name_en", "pe.name_ar", "pe.default_margin", "cat.sku",
         // The integrations sections (`IntegrationSettings.swift`): the
         // desktop's own words for its SMS, webhook, accounting and digest
         // settings, borrowed so the two apps name each field alike.
