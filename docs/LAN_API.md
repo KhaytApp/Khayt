@@ -534,7 +534,8 @@ Pass `"machineId": null` to unassign a printer.
 A status change runs the shared status rule (`lib/order-status.js`), exactly as a move on
 the board does, in **both apps** (Nov 2026): `statusHistory` gains one entry, a completion
 stamps `completedAt`, a hold remembers when, a quote leaving the quote column is accepted,
-and moving back out of completed clears `completedAt`. A move to the status the job already
+and moving back out of completed clears `completedAt`. A quote moved to any other status gets its invoice number inside the same write (the
+board's rule; a number it already has is kept), and the advanced counter is in `settingsChanged`. A move to the status the job already
 has changes nothing.
 
 **Response 200:** `{ "ok": true, "order": { "id", "status", "machineId", "machine" } }`  

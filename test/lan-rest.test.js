@@ -279,3 +279,24 @@ test('PATCH /api/orders/:id: a machine-only change, or the status it already has
   assert.deepEqual(same.emit.payload.effects, []);
   assert.deepEqual(same.emit.payload.changed, {});
 });
+
+test('PATCH /api/orders/:id: a quote moved on gets its invoice number, once, as the board gives it', () => {
+  const b = book();
+  const out = R.orderPatch(b, 'q1', { status: 'pending' }, ctx);
+  const moved = out.store.printLog.find((o) => o.id === 'q1');
+  assert.equal(moved.invoiceNum, 'INV-2026-0002', 'numbered past INV-2026-0001, which the book holds');
+  assert.equal(moved.invoiceNumber, moved.invoiceNum);
+  assert.ok(moved.quoteAcceptedAt, 'and accepted');
+  assert.equal(out.store.settings.invNumNext, 3, 'the counter it took from, in the same write');
+  assert.equal(out.emit.payload.settingsChanged.invNumNext, 3, 'and the window is told');
+  assert.equal(b.settings.invNumNext, undefined, 'on a copy');
+  // Already numbered: kept, nothing taken.
+  const b2 = book();
+  b2.printLog[2].invoiceNum = 'INV-2026-0099';
+  const again = R.orderPatch(b2, 'q1', { status: 'pending' }, ctx);
+  assert.equal(again.store.printLog[2].invoiceNumber, 'INV-2026-0099');
+  assert.equal(again.store.settings.invNumNext, undefined);
+  // This route never cancels (not in ORDER_STATUSES); any other way out of quote is an order.
+  const c = R.orderPatch(book(), 'q1', { status: 'on_hold' }, ctx);
+  assert.ok(c.store.printLog[2].invoiceNum, 'a quote put on hold is an order on hold');
+});
