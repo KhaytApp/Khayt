@@ -9220,6 +9220,60 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.25] - 2026-11-06
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release brings most of what the Windows and Linux app could do that the Mac could not.
+
+### Added
+
+- **Requests waiting list.** Requests from your local intake form now appear under Job ▸ Job Intake…. You can follow them up, decline them, or turn one into a quote. Before this release they were saved but never shown.
+- **Full order editor (Job ▸ Order Details…).** Edit notes, internal and invoice notes, tags, courier and tracking number, delivery address, operator, discount, shipping and extra lines.
+- **Void an invoice and issue credit notes.** A credit note can't credit more than the job has left to credit.
+- **Reprints and returns.** Reprint a job billed or at your cost. Open a warranty return on a delivered job and settle it with a free replacement, a refund (a credit note) or a decline.
+- **Edit history and a timeline** for every job.
+- **Shop papers.** Print or save as PDF a packing slip, delivery note or work order. Customers get an account statement, and you can export all of a customer's invoices.
+- **Quotes.** Revise a quote and keep its earlier versions, reject one, and follow up by WhatsApp. Automatic follow-ups and overdue-invoice notices are off by default.
+- **Money and stock.**
+  - Recurring expenses come due with Add or Skip.
+  - Spools and expenses take a location, and stock can move between locations.
+  - Settings has exchange rates (with Fetch live rates), invoice numbering and loyalty tiers.
+  - Spools have a drying log and stock adjustments with a reason.
+  - There is a team activity log.
+  - The Waste screen shows waste as a share of revenue and the top waste jobs.
+  - The revenue goal shows the month-end pace.
+  - ⌘K finds spools.
+- **Integrations.**
+  - SMS through Twilio, Unifonic or your own webhook, sent by hand or as a campaign.
+  - Webhook settings with a delivery log and Resend.
+  - Paid invoices can be sent to your accounting software.
+  - Choose the email summary: your own scheduled figures, the Khayt Cloud weekly digest, or both.
+- **Reviews and storefront.** See the reviews customers leave on Khayt Cloud, delete them if you own the shop, and copy the review link. Storefront visits, carts and orders are shown too.
+- **More settings.** The workshop temperature and humidity log, a customer satisfaction card, your store's address, this month's AI spend, and closure dates.
+- **Slice and print.** Send a model straight from a job: Khayt slices it with your slicer, then sends it to the printer.
+- **Converter.**
+  - Map colours to slots or to loaded spools.
+  - Full Spectrum and band-swap options.
+  - A summary and bed-fit check before converting.
+  - Batch conversion and your custom printers.
+- **Maker Tools (Tools menu).**
+  - HueForge studio, which saves U1 3MF files and STL files.
+  - The calibration assistant.
+  - Orca filament profile installs.
+- **Tabby is told who the customer is.** A Tabby link now sends the customer's first job date and how many jobs they have completed.
+
+### Fixed
+
+- **The menu bar panel opens over a full-screen app.** Before, it opened on the desktop behind the app.
+- **The revenue goal counted VAT.** It is now net of tax and leaves out voided and not-business jobs, the same figure the Windows and Linux app now shows.
+- **Band-swap conversions did nothing on the Mac,** and the bed-fit warning never showed. Both work now.
+
+### Security
+
+- **A webhook signing secret could reach paired phones.** It was copied, unencrypted, onto each webhook subscription. That copy is no longer written, and it is removed from existing books and from everything sent to phones and the cloud.
+
 ## [4.0.0-beta.24] - 2026-11-05
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
