@@ -452,6 +452,11 @@ public actor KhaytEngine {
         // fields are recorded because those are the ones a customer can be told
         // a different answer about later.
         "order-edit",
+        // Spools, clients and products from a spreadsheet: the parse, the
+        // column matching, the duplicate tests and the records — the rules the
+        // desktop's Import CSV ran inline, so File ▸ Import CSV… builds the
+        // same records from the same file.
+        "csv-import",
         // A job that failed inspection: the fields the metrics count, the
         // defect the analytics table is built from, and the waste row.
         "qc-failure",
@@ -8385,6 +8390,73 @@ public actor KhaytEngine {
             [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId),
              .string(priceId), settings.isEmpty ? .null : .object(settings)],
             as: JobEdited.self)
+    }
+
+    // MARK: - Importing a spreadsheet (`lib/csv-import.js`)
+
+    /// One field a spreadsheet column can fill.
+    public struct CsvField: Decodable, Sendable, Hashable, Identifiable {
+        public let key: String
+        public let labelKey: String
+        public let label: String
+        public let required: Bool?
+        public let type: String?
+        public var id: String { key }
+        public var isRequired: Bool { required == true }
+    }
+
+    /// A file as read: its header row, its data rows, the fields of the kind
+    /// asked for, and the column each field starts on (-1 for none).
+    public struct CsvRead: Decodable, Sendable {
+        public let headers: [String]
+        public let rows: [[String]]
+        public let fields: [CsvField]
+        public let mapping: [String: Int]
+    }
+
+    /// Read `text` for `kind` (`spools`, `clients`, `products`). `labels` are
+    /// the fields' names in the shop's language, which the columns are also
+    /// matched against.
+    public func csvRead(kind: String, text: String, labels: [String: String]) throws -> CsvRead {
+        try runtime.call2(
+            "(function(){ var C = KhaytCsvImport, t = C.parse(ARG1), f = C.FIELDS[ARG0];"
+          + " if (!f) throw new Error('unknown kind');"
+          + " return { headers: t.headers, rows: t.rows, fields: f, mapping: C.autoMap(f, t.headers, ARG2) }; })()",
+            [.string(kind), .string(text), .object(labels.mapValues(JSONValue.string))],
+            as: CsvRead.self)
+    }
+
+    /// What one row of the file does: added as a new record, or skipped as
+    /// one the book already has.
+    public struct CsvVerdict: Decodable, Sendable, Hashable {
+        public let verdict: String
+        public let id: String?
+    }
+
+    /// What importing the mapped rows into `existing` would do.
+    public struct CsvPlan: Decodable, Sendable {
+        /// The mapped rows that carry every required field, in file order.
+        public let objects: [[String: JSONValue]]
+        /// One per object, in the same order.
+        public let rows: [CsvVerdict]
+        /// The records to add, as the desktop writes them.
+        public let add: [JSONValue]
+        public let imported: Int
+        public let skipped: Int
+    }
+
+    /// `ids` are used in order, one per record added; hand in at least one
+    /// per row.
+    public func csvPlan(kind: String, rows: [[String]], mapping: [String: Int], existing: [JSONValue],
+                        today: String, settings: [String: JSONValue], ids: [String]) throws -> CsvPlan {
+        try runtime.call2(
+            "(function(){ var C = KhaytCsvImport, o = C.objects(ARG1, C.FIELDS[ARG0], ARG2);"
+          + " var p = C.plan(ARG0, o, ARG3, { today: ARG4, settings: ARG5, ids: ARG6 });"
+          + " p.objects = o; return p; })()",
+            [.string(kind), .array(rows.map { .array($0.map(JSONValue.string)) }),
+             .object(mapping.mapValues { .number(Double($0)) }), .array(existing), .string(today),
+             .object(settings), .array(ids.map(JSONValue.string))],
+            as: CsvPlan.self)
     }
 
     /// A job's edits, newest first — `lib/order-edit.js editLog`.

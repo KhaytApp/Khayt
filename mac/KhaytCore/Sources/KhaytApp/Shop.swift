@@ -2267,6 +2267,10 @@ final class Shop {
     /// The job open in the whole order editor — notes, tags, discount,
     /// shipping, extra charges, the address and who is on it.
     var pendingDetails: PendingHold?
+    /// File ▸ Import CSV…, open on the kind of record it imports.
+    var importingCsv: CsvKind?
+    /// Go ▸ Saved Filters ▸ Save Current Filter…, asking for a name.
+    var namingFilter = false
     /// The job whose invoice is being voided.
     var pendingVoid: PendingHold?
     /// The job a credit note is being written for.

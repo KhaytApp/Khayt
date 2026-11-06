@@ -3765,5 +3765,16 @@
  "mac.of_done": "已为 {printer} 安装 {name}。重新打开 {slicer} 即可看到。",
  "mac.api_where": "脚本通过 {url} 访问这台 Mac 的局域网服务器，并以“Authorization: Bearer”发送令牌。服务器必须处于开启状态。",
  "mac.api_scopes": "权限范围",
- "mac.api_owner_only": "只有所有者可以创建或撤销 API 令牌。"
+ "mac.api_owner_only": "只有所有者可以创建或撤销 API 令牌。",
+ "mac.saved_filters": "已保存的筛选",
+ "mac.save_filter": "保存当前筛选",
+ "mac.filter_name": "筛选名称",
+ "mac.delete_saved_filter": "删除已保存的筛选",
+ "mac.filter_narrows_more": "此已保存的筛选在 Windows 和 Linux 版 Khayt 中还会按付款、标签、日期或员工筛选。此处仅应用其阶段和搜索。",
+ "mac.import_csv": "导入 CSV",
+ "mac.csv_new": "新建",
+ "mac.csv_duplicate": "账簿中已有",
+ "mac.csv_read_failed": "无法将此文件读取为文本。",
+ "mac.csv_found": "找到 {n} 行。请为每个字段匹配一列。",
+ "mac.csv_done": "已导入 {n} 项，跳过 {m} 项（账簿中已有）。"
 }

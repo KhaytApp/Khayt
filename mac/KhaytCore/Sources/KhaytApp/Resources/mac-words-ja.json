@@ -3765,5 +3765,16 @@
  "mac.of_done": "{printer} 用に {name} をインストールしました。{slicer} を開き直すと表示されます。",
  "mac.api_where": "スクリプトはこのMacのLANサーバー（{url}）に接続し、トークンを「Authorization: Bearer」として送信します。サーバーをオンにしておく必要があります。",
  "mac.api_scopes": "権限",
- "mac.api_owner_only": "APIトークンを作成・取り消しできるのはオーナーのみです。"
+ "mac.api_owner_only": "APIトークンを作成・取り消しできるのはオーナーのみです。",
+ "mac.saved_filters": "保存したフィルタ",
+ "mac.save_filter": "現在のフィルタを保存",
+ "mac.filter_name": "フィルタ名",
+ "mac.delete_saved_filter": "保存したフィルタを削除",
+ "mac.filter_narrows_more": "この保存済みフィルタは、Windows・Linux 版 Khayt では支払い、タグ、期間、担当者でも絞り込みます。ここではステージと検索のみを適用します。",
+ "mac.import_csv": "CSV を読み込む",
+ "mac.csv_new": "新規",
+ "mac.csv_duplicate": "台帳に登録済み",
+ "mac.csv_read_failed": "このファイルをテキストとして読み込めませんでした。",
+ "mac.csv_found": "{n} 行が見つかりました。各項目に列を割り当ててください。",
+ "mac.csv_done": "{n} 件を読み込み、登録済みの {m} 件をスキップしました。"
 }

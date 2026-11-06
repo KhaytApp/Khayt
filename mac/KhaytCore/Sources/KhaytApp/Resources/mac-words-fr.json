@@ -3765,5 +3765,16 @@
  "mac.of_done": "{name} installé pour {printer}. Rouvrez {slicer} pour le voir.",
  "mac.api_where": "Les scripts joignent le serveur LAN de ce Mac à {url} et envoient le jeton en « Authorization: Bearer ». Le serveur doit être activé.",
  "mac.api_scopes": "Autorisations",
- "mac.api_owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API."
+ "mac.api_owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API.",
+ "mac.saved_filters": "Filtres enregistrés",
+ "mac.save_filter": "Enregistrer le filtre actuel",
+ "mac.filter_name": "Nom du filtre",
+ "mac.delete_saved_filter": "Supprimer un filtre enregistré",
+ "mac.filter_narrows_more": "Ce filtre enregistré restreint aussi par paiement, étiquette, dates ou employé dans Khayt pour Windows et Linux. Ici, il applique son étape et sa recherche.",
+ "mac.import_csv": "Importer un CSV",
+ "mac.csv_new": "Nouveau",
+ "mac.csv_duplicate": "Déjà dans le registre",
+ "mac.csv_read_failed": "Ce fichier n’a pas pu être lu comme du texte.",
+ "mac.csv_found": "{n} lignes trouvées. Associez chaque champ à une colonne.",
+ "mac.csv_done": "{n} importés, {m} ignorés car déjà dans le registre."
 }

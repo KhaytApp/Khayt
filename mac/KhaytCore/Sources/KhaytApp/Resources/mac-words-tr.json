@@ -3765,5 +3765,16 @@
  "mac.of_done": "{name}, {printer} için kuruldu. Görmek için {slicer} uygulamasını yeniden açın.",
  "mac.api_where": "Betikler bu Mac’in LAN sunucusuna {url} adresinden ulaşır ve belirteci “Authorization: Bearer” olarak gönderir. Sunucunun açık olması gerekir.",
  "mac.api_scopes": "Yetkiler",
- "mac.api_owner_only": "API belirteçlerini yalnızca sahip oluşturabilir veya iptal edebilir."
+ "mac.api_owner_only": "API belirteçlerini yalnızca sahip oluşturabilir veya iptal edebilir.",
+ "mac.saved_filters": "Kayıtlı Filtreler",
+ "mac.save_filter": "Geçerli Filtreyi Kaydet",
+ "mac.filter_name": "Filtre adı",
+ "mac.delete_saved_filter": "Kayıtlı Filtreyi Sil",
+ "mac.filter_narrows_more": "Bu kayıtlı filtre, Windows ve Linux için Khayt'ta ödeme, etiket, tarih veya personele göre de daraltır. Burada aşamasını ve aramasını uygular.",
+ "mac.import_csv": "CSV İçe Aktar",
+ "mac.csv_new": "Yeni",
+ "mac.csv_duplicate": "Defterde zaten var",
+ "mac.csv_read_failed": "Bu dosya metin olarak okunamadı.",
+ "mac.csv_found": "{n} satır bulundu. Her alanı bir sütunla eşleştirin.",
+ "mac.csv_done": "{n} içe aktarıldı, defterde zaten olduğu için {m} atlandı."
 }

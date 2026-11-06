@@ -421,6 +421,7 @@ final class Words {
             .merging(PrintPrepWords.table) { mine, _ in mine }
             .merging(StudioWords.table) { mine, _ in mine }
             .merging(ApiTokenWords.table) { mine, _ in mine }
+            .merging(OrderFlowWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -6327,6 +6328,20 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The order-flow settings and tools (`OrderFlowViews.swift`): the
+        // post-processing checklist, post-process presets, custom order
+        // fields and Import CSV, in the desktop's own words for them.
+        "post.settings_title", "post.settings_hint", "post.checklist", "post.step_ph", "post.empty",
+        "set.post_process_presets", "set.no_presets", "common.name", "common.amount",
+        "set.custom_fields_title", "set.custom_fields_hint", "set.custom_field_ph",
+        "set.custom_fields_empty",
+        "csv.import_spools", "csv.import_clients", "csv.import_products", "csv.choose_file",
+        "csv.no_file", "csv.field", "csv.column", "csv.preview", "csv.skip", "csv.rows_to_import",
+        "csv.skipped", "csv.import_btn",
+        "inv.material", "inv.brand", "inv.color", "inv.diameter", "inv.weight_total", "inv.remaining",
+        "inv.cost_per_kg", "inv.reorder_point", "inv.location", "common.notes",
+        "cl.name_en", "cl.name_ar", "cl.phone", "cl.email", "cl.city", "cl.address", "cl.vat",
+        "cl.company", "pe.name_en", "pe.name_ar", "pe.default_margin", "cat.sku",
         // The integrations sections (`IntegrationSettings.swift`): the
         // desktop's own words for its SMS, webhook, accounting and digest
         // settings, borrowed so the two apps name each field alike.

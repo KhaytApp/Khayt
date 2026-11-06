@@ -3765,5 +3765,16 @@
  "mac.of_done": "{name} für {printer} installiert. Öffnen Sie {slicer} erneut, um es zu sehen.",
  "mac.api_where": "Skripte erreichen den LAN-Server dieses Macs unter {url} und senden das Token als „Authorization: Bearer“. Der Server muss eingeschaltet sein.",
  "mac.api_scopes": "Berechtigungen",
- "mac.api_owner_only": "Nur der Inhaber kann API-Tokens erstellen oder widerrufen."
+ "mac.api_owner_only": "Nur der Inhaber kann API-Tokens erstellen oder widerrufen.",
+ "mac.saved_filters": "Gespeicherte Filter",
+ "mac.save_filter": "Aktuellen Filter sichern",
+ "mac.filter_name": "Filtername",
+ "mac.delete_saved_filter": "Gespeicherten Filter löschen",
+ "mac.filter_narrows_more": "Dieser gespeicherte Filter grenzt in Khayt für Windows und Linux auch nach Zahlung, Schlagwort, Zeitraum oder Mitarbeiter ein. Hier wendet er Phase und Suche an.",
+ "mac.import_csv": "CSV importieren",
+ "mac.csv_new": "Neu",
+ "mac.csv_duplicate": "Bereits im Buch",
+ "mac.csv_read_failed": "Diese Datei konnte nicht als Text gelesen werden.",
+ "mac.csv_found": "{n} Zeilen gefunden. Ordnen Sie jedem Feld eine Spalte zu.",
+ "mac.csv_done": "{n} importiert, {m} übersprungen, da bereits im Buch."
 }
