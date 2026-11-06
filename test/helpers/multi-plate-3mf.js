@@ -64,6 +64,9 @@ const tr = (x, y, z = 0) => `1 0 0 0 1 0 0 0 1 ${x} ${y} ${z}`;
 /**
  * @param {object} [o]
  * @param {boolean} [o.sharedObject]  put a copy of object 9 on plate 3 as well (cannot be split)
+ * @param {string[]} [o.palette]  the project's filaments (default COLOURS); every per-filament
+ *                                setting is written at its length
+ * @param {Function} [o.objects]  given the object list, may change filaments and paint in place
  * @returns {Buffer}
  */
 function buildMultiPlate3mf(o = {}) {
@@ -82,6 +85,9 @@ function buildMultiPlate3mf(o = {}) {
     { id: 11, file: 'object_5.model', plate: 2, name: 'Sign', extruder: 4, parts: [{ id: 10, extruder: 4, name: 'Sign' }], items: [at(2, 128, 128)] },
   ];
   if (o.sharedObject) objs[3].items.push(at(2, 60, 60));
+  if (typeof o.objects === 'function') o.objects(objs);
+  const palette = Array.isArray(o.palette) ? o.palette : COLOURS;
+  const per = (a) => palette.map((_, i) => a[i % a.length]);
 
   const files = [];
   const add = (name, data) => files.push({ name, data });
@@ -135,9 +141,9 @@ function buildMultiPlate3mf(o = {}) {
     printer_model: 'Bambu Lab X1 Carbon', printer_settings_id: 'Bambu Lab X1 Carbon 0.4 nozzle',
     nozzle_diameter: ['0.4'], layer_height: '0.2',
     printable_area: ['0x0', `${BED}x0`, `${BED}x${BED}`, `0x${BED}`], printable_height: '250',
-    filament_colour: COLOURS, filament_type: ['PLA', 'PLA', 'PLA', 'PETG'],
-    filament_settings_id: ['Bambu PLA Basic @BBL X1C', 'Bambu PLA Basic @BBL X1C', 'Bambu PLA Basic @BBL X1C', 'Bambu PETG HF @BBL X1C'],
-    nozzle_temperature: ['220', '220', '220', '250'],
+    filament_colour: palette, filament_type: per(['PLA', 'PLA', 'PLA', 'PETG']),
+    filament_settings_id: per(['Bambu PLA Basic @BBL X1C', 'Bambu PLA Basic @BBL X1C', 'Bambu PLA Basic @BBL X1C', 'Bambu PETG HF @BBL X1C']),
+    nozzle_temperature: palette.length === COLOURS.length ? ['220', '220', '220', '250'] : palette.map((_, i) => String(200 + i)),
   }, null, 4));
   add('Metadata/slice_info.config', '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <header>\n    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="01.10.02.76"/>\n  </header>\n'
     + '  <plate>\n    <metadata key="index" value="3"/>\n    <metadata key="prediction" value="1200"/>\n    <metadata key="weight" value="3.10"/>\n    <object identify_id="1000" name="Sign" skipped="false" />\n    <filament id="4" tray_info_idx="GFG99" type="PETG" color="#2050E0" used_m="1.02" used_g="3.10" />\n  </plate>\n</config>\n');

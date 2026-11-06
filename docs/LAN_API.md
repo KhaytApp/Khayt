@@ -882,6 +882,28 @@ unset or short PIN is `401`.
 | 502 | `refused`: the printer said no, and `message` is what it said |
 | 503 | `busy`: the app is starting |
 
+### `POST /api/orders/{id}/photos`
+
+> **Served by both apps** (Nov 2026): the native Mac app and `lib/lan-server.js` (Windows/Linux).
+
+A paired phone adding a photo to a job. The body is the image itself (a JPEG from the phone's camera), not JSON, up to 8 MB, the desktop's own photo cap. The Mac files it exactly as its own Add Photo does (`OrderPhoto`): a 240px thumbnail inline in `printLog[].printPhotos[]`, a 1600px copy in `order-photos/` beside the book, the desktop's `{orderId}-{index}-{base36 ms}.jpg` filename, `"source": "phone"` on the record (the optional field both apps write: `printer`, `shop` or `phone`, missing on older photos), and the file written before the record. Any job status is accepted, as with the printer's own finish photo.
+
+**Requires a signed, enrolled phone**, like the printer route. The owner PIN sent bare, or an API token, is refused with `403 {"ok":false,"reason":"device-key-required"}`. A body over 1 MB is judged from the head before it is read: over 8 MB is `413 {"ok":false,"reason":"too-large"}`, an unsigned head is the 403, and it shares the large-body slots (`503 busy`).
+
+On Windows/Linux the signed body is read whole (up to the signed-body cap) before it is judged, so there is no head check and no `503 busy`; over 8 MB is still `413 too-large`.
+
+**Response 201:** `{"ok":true,"index":0,"filename":"J1-0-mh3k9x2a.jpg"}`, where `index` is the photo's position in `printPhotos`.
+
+**Refusals:** `{"ok":false,"reason":…}`
+
+| Status | `reason` |
+|---|---|
+| 404 | `not-found`: no job with that id |
+| 409 | `read-only`: this Mac cannot write the book (Mac only) |
+| 413 | `too-large`: empty, or over 8 MB |
+| 415 | `not-an-image`: not a picture this Mac can read |
+| 500 | `write-failed`, with `message` |
+
 ### `POST /api/webhook/salla` and `POST /api/webhook/zid`
 
 A storefront telling the shop it has an order. **Served by both apps** — the

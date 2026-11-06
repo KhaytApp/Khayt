@@ -1280,6 +1280,69 @@ extension Shop {
         }
     }
 
+    /// "Split into plates (one file each)": every plate of a multi-plate
+    /// project converted into a file of its own, in a folder the shop picks,
+    /// each with only the colours its plate prints with
+    /// (`Converter.convertPlates`, `lib/plate-split.js`). Every file goes into
+    /// the library as well, as a single conversion does. A plate that cannot
+    /// stand alone is said by number; the others are still written.
+    ///
+    /// `bindMeshes` when the project has more colours than the target has
+    /// slots: a plate's own colour map reads and rewrites its paint.
+    func convertModelPlates(_ file: LibraryFile, targetId: String?, extra: [String: JSONValue] = [:],
+                            bindMeshes: Bool) async {
+        guard permitted("inventory", "create") else { return }
+        clearLastOutcome()
+        guard let source = modelFile(for: file) else {
+            convertProblem = words.callIt("mac.not_found"); return
+        }
+        guard let engine else { convertProblem = "the engine is not loaded"; return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.message = words.callIt("mac.cv_split_folder")
+        panel.prompt = words.callIt("conv.batch_dest_folder")
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+
+        converting = true
+        defer { converting = false }
+        var options = extra
+        if let targetId {
+            for (key, value) in convertTarget(targetId) { options[key] = value }
+        } else { options["mode"] = .string("normalize") }
+
+        do {
+            let results = try await Converter.convertPlates(source, into: folder, options: options,
+                                                            bindMeshes: bindMeshes, engine: engine)
+            var saved = 0
+            var problems: [String] = []
+            for result in results {
+                guard let url = result.url else {
+                    problems.append(words.callIt("mac.cv_split_failed", [
+                        "n": .string(Money.quantity(Double(result.index), decimals: 0)),
+                        "why": .string(result.error ?? "")]))
+                    continue
+                }
+                saved += 1
+                // A failed import is not a failed conversion, as for one file.
+                do { _ = try await LibraryImport.add(url, shop: self, keepOriginal: true) }
+                catch let refusal as LibraryImport.Failure { problems.append(refusal.said(words)) }
+                catch { problems.append(self.said(error)) }
+            }
+            convertNote = words.callIt("mac.cv_split_done", [
+                "ok": .string(Money.quantity(Double(saved), decimals: 0)),
+                "n": .string(Money.quantity(Double(results.count), decimals: 0)),
+                "folder": .string(folder.lastPathComponent)])
+            if !problems.isEmpty { convertProblem = problems.joined(separator: "\n") }
+        } catch let refusal as Converter.Failure {
+            convertProblem = refusal.said(words)
+        } catch {
+            convertProblem = self.said(error)
+        }
+    }
+
     /// Put a model aside because another has taken its place.
     ///
     /// ARCHIVED, NOT DELETED. A job printed from this model months ago was

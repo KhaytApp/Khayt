@@ -76,9 +76,17 @@ enum OrderPhoto {
         return ("data:image/jpeg;base64," + thumb.base64EncodedString(), full)
     }
 
+    /// Where a photo came from, as both apps write it (Nov 2026): the
+    /// printer's camera at the end of a print, the shop at the desk, or a
+    /// paired phone over the LAN. Optional on the record: older photos have
+    /// none, and a reader takes a missing one as unknown.
+    enum Source: String { case printer, shop, phone }
+
     /// The record the other app writes, and reads back.
-    static func record(thumb: String, filename: String) -> JSONValue {
-        .object(["thumb": .string(thumb), "filename": .string(filename)])
+    static func record(thumb: String, filename: String, source: Source? = nil) -> JSONValue {
+        var o: [String: JSONValue] = ["thumb": .string(thumb), "filename": .string(filename)]
+        if let source { o["source"] = .string(source.rawValue) }
+        return .object(o)
     }
 
     /// The index the next photo on this job gets: its position in the job's
@@ -103,12 +111,13 @@ enum OrderPhoto {
     ///
     /// Addressed by path so the tests can run it against a copy of a store.
     static func attach(_ made: (thumb: String, full: Data), jobId: String, job: JSONValue?,
-                       folder: URL, write: (_ change: (inout [String: JSONValue]) -> Void) throws -> Void,
+                       folder: URL, source: Source? = nil,
+                       write: (_ change: (inout [String: JSONValue]) -> Void) throws -> Void,
                        at: Date = Date()) throws -> String {
         let name = filename(orderId: jobId, index: nextIndex(job), at: at)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try made.full.write(to: folder.appending(path: name))
-        try write { record in append(Self.record(thumb: made.thumb, filename: name), to: &record) }
+        try write { record in append(Self.record(thumb: made.thumb, filename: name, source: source), to: &record) }
         return name
     }
 
@@ -117,13 +126,13 @@ enum OrderPhoto {
     /// where its caller is: only the write leaves it.
     @MainActor
     static func attach(_ made: (thumb: String, full: Data), jobId: String, job: JSONValue?,
-                       folder: URL,
+                       folder: URL, source: Source? = nil,
                        write: (_ change: @escaping @Sendable (inout [String: JSONValue]) -> Void) async throws -> Void,
                        at: Date = Date()) async throws -> String {
         let name = filename(orderId: jobId, index: nextIndex(job), at: at)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try made.full.write(to: folder.appending(path: name))
-        let photo = Self.record(thumb: made.thumb, filename: name)
+        let photo = Self.record(thumb: made.thumb, filename: name, source: source)
         try await write { record in append(photo, to: &record) }
         return name
     }

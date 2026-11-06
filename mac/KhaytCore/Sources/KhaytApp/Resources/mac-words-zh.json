@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "账簿中已有",
  "mac.csv_read_failed": "无法将此文件读取为文本。",
  "mac.csv_found": "找到 {n} 行。请为每个字段匹配一列。",
- "mac.csv_done": "已导入 {n} 项，跳过 {m} 项（账簿中已有）。"
+ "mac.csv_done": "已导入 {n} 项，跳过 {m} 项（账簿中已有）。",
+ "mac.cv_split": "按打印板拆分（每块一个文件）",
+ "mac.cv_split_note": "{n} 块打印板，每块一个文件。每个文件只包含该板使用的颜色，从槽位 1 开始。颜色多于 {t} 槽位数的板会合并为最接近的颜色。",
+ "mac.cv_split_folder": "请选择存放各打印板文件的文件夹。",
+ "mac.cv_split_done": "已将 {n} 块中的 {ok} 块打印板保存到 {folder}。",
+ "mac.cv_split_failed": "打印板 {n}：{why}",
+ "mac.cv_keep_tower": "保留擦料塔（移除可变层高）",
+ "mac.cv_keep_tower_note": "Snapmaker Orca 无法在有擦料塔时切片可变层高。关闭时会关掉擦料塔；开启时保留擦料塔并移除可变层高，高度范围内的换料保留。"
 }

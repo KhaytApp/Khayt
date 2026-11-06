@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "Defterde zaten var",
  "mac.csv_read_failed": "Bu dosya metin olarak okunamadı.",
  "mac.csv_found": "{n} satır bulundu. Her alanı bir sütunla eşleştirin.",
- "mac.csv_done": "{n} içe aktarıldı, defterde zaten olduğu için {m} atlandı."
+ "mac.csv_done": "{n} içe aktarıldı, defterde zaten olduğu için {m} atlandı.",
+ "mac.cv_split": "Plakalara böl (her biri ayrı dosya)",
+ "mac.cv_split_note": "{n} plaka, her biri ayrı dosya. Her dosya yalnızca kendi plakasının kullandığı renkleri 1. yuvadan başlayarak taşır. {t} yuva sayısından fazla rengi olan plakanın renkleri en yakınlara birleştirilir.",
+ "mac.cv_split_folder": "Plaka dosyaları için bir klasör seçin.",
+ "mac.cv_split_done": "{n} plakadan {ok} tanesi {folder} klasörüne kaydedildi.",
+ "mac.cv_split_failed": "Plaka {n}: {why}",
+ "mac.cv_keep_tower": "Temizleme kulesini koru (değişken katman yüksekliğini kaldır)",
+ "mac.cv_keep_tower_note": "Snapmaker Orca, değişken katman yüksekliğini temizleme kulesiyle dilimleyemez. Kapalıyken kule kapatılır. Açıkken kule kalır ve değişken katman yüksekliği kaldırılır; yükseklik aralıkları filament değişimlerini korur."
 }

@@ -1753,7 +1753,7 @@ async function captureFinishPhotos(currCache) {
       if (!snap || !snap.ok || !snap.dataUrl) continue;   // no camera, or it did not answer
       const filename = await window.hubAPI.saveOrderPhoto(job.id, 'finish-' + Date.now().toString(36), snap.dataUrl);
       const thumb = await _finishThumb(snap.dataUrl);
-      job.printPhotos = [...(Array.isArray(job.printPhotos) ? job.printPhotos : []), { thumb, filename }];
+      job.printPhotos = [...(Array.isArray(job.printPhotos) ? job.printPhotos : []), { thumb, filename, source: 'printer' }];
       saveAll();
       const name = (machines.find((m) => m.id === mid) || {}).name || '';
       toast(t('finphoto.taken', { name, job: job.project || job.jobNumber || job.id }), 'success', 6000);

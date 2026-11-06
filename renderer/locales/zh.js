@@ -1172,6 +1172,7 @@
   "notif.print_fail_title": "{name} — 打印失败",
   "notif.print_a_printer": "您的打印机",
   "finphoto.taken": "打印完成时已在 {name} 上拍照：{job}",
+  "phonephoto.added": "已将手机上的照片添加到 {job}",
   "ntfy.section": "推送到手机 (ntfy)",
   "ntfy.enable": "通过 ntfy 发送打印机提醒",
   "ntfy.hint": "无需账户或机器人：安装 ntfy App 并订阅此主题。任何知道主题的人都能读取它，因此请使用一个别人猜不到的主题。",

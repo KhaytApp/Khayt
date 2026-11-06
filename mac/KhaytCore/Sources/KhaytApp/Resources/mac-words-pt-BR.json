@@ -3816,5 +3816,12 @@
  "mac.csv_duplicate": "Já está no livro",
  "mac.csv_read_failed": "Não foi possível ler este arquivo como texto.",
  "mac.csv_found": "{n} linhas encontradas. Associe cada campo a uma coluna.",
- "mac.csv_done": "{n} importados, {m} ignorados por já estarem no livro."
+ "mac.csv_done": "{n} importados, {m} ignorados por já estarem no livro.",
+ "mac.cv_split": "Dividir em placas (um arquivo cada)",
+ "mac.cv_split_note": "{n} placas, um arquivo cada. Cada arquivo leva só as cores com que sua placa imprime, a partir do slot 1. Uma placa com mais cores do que {t} tem slots é mesclada às mais próximas.",
+ "mac.cv_split_folder": "Escolha uma pasta para os arquivos das placas.",
+ "mac.cv_split_done": "{ok} de {n} placas salvas em {folder}.",
+ "mac.cv_split_failed": "Placa {n}: {why}",
+ "mac.cv_keep_tower": "Manter a torre de purga (remover a altura de camada variável)",
+ "mac.cv_keep_tower_note": "O Snapmaker Orca não fatia altura de camada variável com torre de purga. Desligado, a torre é desativada. Ligado, a torre fica e a altura de camada variável é removida; as faixas de altura mantêm suas trocas de filamento."
 }

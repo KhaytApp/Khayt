@@ -42,6 +42,10 @@ struct ConvertSheet: View {
     @State private var spoolEdits: [Int]?
     @State private var match: KhaytEngine.SpoolMatch?
     @State private var started = false
+    /// "Split into plates (one file each)", for a project of two plates or more.
+    @State private var splitPlates = false
+    /// Keep the prime tower and drop variable layer height (`vlhGuard`).
+    @State private var keepTower = false
     /// Which read is the newest: a target picked while the last was still
     /// reading must not have its answer overwritten by the older one.
     @State private var generation = 0
@@ -82,8 +86,16 @@ struct ConvertSheet: View {
                 } else if colours.isEmpty {
                     note(words.callIt("conv.no_colours"))
                 } else {
-                    colourPlan(preview)
+                    splitChoice(preview)
+                    if splitting {
+                        note(words.callIt("mac.cv_split_note", [
+                            "n": .string(Money.quantity(Double(preview.plates ?? 0), decimals: 0)),
+                            "t": .string(preview.targetName ?? "")]))
+                    } else {
+                        colourPlan(preview)
+                    }
                 }
+                towerChoice(preview)
             } else {
                 ProgressView(words.callIt("conv.analyzing")).controlSize(.small)
             }
@@ -176,6 +188,32 @@ struct ConvertSheet: View {
     private func note(_ text: String) -> some View {
         Text(text).font(.callout).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - One file per plate, and the prime tower
+
+    /// Offered for a retarget of a project with two plates or more that can
+    /// each stand alone (`lib/plate-split.js` `listPlatesMembers`).
+    @ViewBuilder private func splitChoice(_ p: KhaytEngine.ConvertPreview) -> some View {
+        if retargets, (p.plates ?? 0) >= 2 {
+            Toggle(words.callIt("mac.cv_split"), isOn: $splitPlates)
+        }
+    }
+
+    /// The target is Snapmaker Orca, which will not slice variable layer
+    /// height with a prime tower — the one place `vlhGuard` decides anything.
+    private var targetIsSnapmaker: Bool {
+        if shop.printerProfiles.first(where: { $0.id == targetId })?.supportsMixedFilament == true { return true }
+        return (preview?.targetName ?? "").localizedCaseInsensitiveContains("snapmaker")
+    }
+
+    @ViewBuilder private func towerChoice(_ p: KhaytEngine.ConvertPreview) -> some View {
+        if retargets, p.variableLayerHeight == true, targetIsSnapmaker {
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle(words.callIt("mac.cv_keep_tower"), isOn: $keepTower)
+                note(words.callIt("mac.cv_keep_tower_note"))
+            }
+        }
     }
 
     // MARK: - How the colours reach the printer
@@ -433,6 +471,7 @@ struct ConvertSheet: View {
         generation += 1
         let mine = generation
         preview = nil; plans = nil; problem = nil; planProblem = nil; match = nil; spoolEdits = nil
+        splitPlates = false; keepTower = false
         plan = .slots
         guard let engine = shop.engine, let source = shop.modelFile(for: request.file) else {
             problem = words.callIt("mac.not_found"); return
@@ -488,9 +527,21 @@ struct ConvertSheet: View {
     /// What this sheet adds to the conversion, or nil when it cannot convert
     /// as chosen (a spool match the converter would refuse).
     private var options: [String: JSONValue]? {
+        guard var out = colourOptions else { return nil }
+        if keepTower, retargets, preview?.variableLayerHeight == true, targetIsSnapmaker {
+            out["vlhGuard"] = .string("keep-prime-tower")
+        }
+        return out
+    }
+
+    /// Splitting into plates: each plate's own colours, so no colour plan.
+    private var splitting: Bool { splitPlates && retargets && (preview?.plates ?? 0) >= 2 }
+
+    private var colourOptions: [String: JSONValue]? {
         guard let p = preview, p.ok else { return nil }
         if p.generic == true { return [:] }
         if p.cross == true { return ["mode": .string("normalize")] }
+        if splitting { return [:] }
         switch plan {
         case .slots:
             guard !slotMap.isEmpty, slotMap != Array(0..<slotMap.count) else { return [:] }
@@ -513,6 +564,12 @@ struct ConvertSheet: View {
         let file = request.file
         let target = targetId.isEmpty ? nil : targetId
         shop.pendingConvert = nil
+        if splitting {
+            // The paint comes in only when a plate needs a colour map of its own.
+            let bind = colours.count > (preview?.maxColors ?? Int.max)
+            Task { await shop.convertModelPlates(file, targetId: target, extra: extra, bindMeshes: bind) }
+            return
+        }
         Task { await shop.convertModel(file, targetId: target, extra: extra) }
     }
 }
