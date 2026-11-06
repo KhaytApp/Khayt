@@ -26,9 +26,11 @@ import KhaytCore
 /// quote page and its approval, the order's own tracking page and survey, and
 /// `/calendar.ics`, and the other app's `/status/<id>` address for that same
 /// tracking page, the signed Salla and Zid order webhooks, and the SMSA, Aramex
-/// and Saudi Post status webhooks. It arrived one slice at a time; what has NOT
-/// been lifted is the printer webhook — which matters least here, because this
-/// app polls its printers itself.
+/// and Saudi Post status webhooks. It arrived one slice at a time; the last
+/// slice (Nov 2026) is the REST API — `/api/orders`, `/api/clients`,
+/// `/api/inventory`, `/api/waste`, `/api/waiting-list`, `/api/machines` — and
+/// the printer webhook, behind the PIN or a scoped API token
+/// (`LanServer+Rest`). The public tunnel is not here.
 ///
 /// That list is not decoration: `OnlinePaneTruthTests` reads this route table
 /// and fails the build if the Online settings pane sends a shop to the other
@@ -203,6 +205,20 @@ final class LanServer {
         var slicerMaxBytes: Int = LanServer.maxInflate
         /// Where an upload's body is streamed while it arrives.
         var slicerScratch: URL = FileManager.default.temporaryDirectory
+        /// What the REST routes read (`LanServer+Rest`): the phone's book plus
+        /// the clients and the shelf, which `/api/store` does not carry. Nil
+        /// reads `store`.
+        var restBook: (@MainActor () -> [String: JSONValue])? = nil
+        /// Run a `lib/lan-rest.js` write INSIDE the book's write and say what
+        /// it answered (`Shop.lanRestWrite`). Nil — the default — means this
+        /// server takes no REST writes, and those routes are not here: taking
+        /// changes from a script is the app's decision, as `fold` is.
+        var restWrite: ((_ op: String, _ args: [JSONValue]) async throws -> KhaytEngine.LanRestOutcome)? = nil
+        /// The printer webhook's token (`settings.lanApi.webhookToken`),
+        /// opened. Empty means the webhook refuses everybody.
+        var printerWebhookToken: String = ""
+        /// Two random bytes, hex — the random half of a new record's id.
+        var randomHex: () -> String = { LanServer.randomToken(bytes: 2) }
     }
 
     struct Request {
@@ -218,6 +234,9 @@ final class LanServer {
         /// A body streamed to disk instead of held in `body` — only a slicer
         /// upload (`LanServer+SlicerUpload`). Deleted once answered.
         var bodyFile: URL? = nil
+        /// An API token was presented, verified, and holds the scope this
+        /// route needs (`LanServer+Rest`). Set by the server, never the wire.
+        var tokenScoped = false
     }
 
     struct Response {
@@ -310,7 +329,11 @@ final class LanServer {
     /// `${ip}:wh:${channel}` keys. Its own map, so a misconfigured storefront
     /// hammering a wrong secret cannot lock the owner out of the queue, and a
     /// guessed PIN cannot lock a storefront out of delivering.
-    private var webhookFailures: [String: KhaytEngine.LanFailures] = [:]
+    var webhookFailures: [String: KhaytEngine.LanFailures] = [:]
+    /// Wrong API tokens, by visitor — the Node server's `${ip}:apitok`
+    /// bucket: their own count, so a script with a revoked token cannot lock
+    /// the owner's phone out of the PIN, nor a PIN guesser lock out a script.
+    var tokenFailures: [String: KhaytEngine.LanFailures] = [:]
     /// Signatures accepted lately, oldest first, with when each stops counting.
     ///
     /// ── SEC-010: TEN MINUTES WAS THE WHOLE DEFENCE ────────────────────────
@@ -908,6 +931,10 @@ final class LanServer {
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
+        // The REST API (`LanServer+Rest`). The ones with an id, and the
+        // printer webhook, are not advertised: a 404 is served before any gate.
+        "/api/orders", "/api/machines", "/api/inventory", "/api/waiting-list", "/api/clients",
+        "/api/waste",
     ]
 
     // MARK: - The routes
@@ -929,6 +956,18 @@ final class LanServer {
         if path.count > 1, path.hasSuffix("/") { path.removeLast() }
         if path == "/v1" || path.hasPrefix("/v1/") { path = "/api" + path.dropFirst(3) }
         let isGet = request.method == "GET" || request.method == "HEAD"
+        // ── AN API TOKEN, BEFORE ANY ROUTE (`LanServer+Rest`) ────────────
+        //
+        // As the Node server: a bearer on any route that is not always public
+        // is judged here — a wrong one is 401 and counted, one without the
+        // scope this route needs is 403 — and one that holds it stands in for
+        // the PIN on this request only.
+        var request = request
+        if !Self.isAlwaysPublic(path: path, method: request.method),
+           let bearer = ApiTokens.bearer(from: request.headers["authorization"]) {
+            if let refused = await apiTokenGate(&request, bearer: bearer, path: path) { return refused }
+        }
+        if let answered = await restRoute(request, path: path, isGet: isGet) { return answered }
 
         switch (path, isGet) {
         case ("/api/status", true):
@@ -1378,7 +1417,7 @@ final class LanServer {
         return token
     }
 
-    private func sweep(_ map: inout [String: KhaytEngine.LanFailures], now: Date) {
+    func sweep(_ map: inout [String: KhaytEngine.LanFailures], now: Date) {
         guard map.count > Self.maxFailureKeys else { return }
         let ms = now.timeIntervalSince1970 * 1000
         map = map.filter { $0.value.resetAt > ms }
@@ -2200,7 +2239,7 @@ final class LanServer {
         try? data.write(to: file, options: .atomic)
     }
 
-    private func sweepWebhookFailures(now: Date) {
+    func sweepWebhookFailures(now: Date) {
         guard webhookFailures.count > Self.maxFailureKeys else { return }
         let ms = now.timeIntervalSince1970 * 1000
         webhookFailures = webhookFailures.filter { $0.value.resetAt > ms }
@@ -2249,7 +2288,12 @@ final class LanServer {
     /// PIN-configured checks first, and no wrong-PIN count, since a 256-bit
     /// key is not a thing to guess. `headOnly` is the large-upload head,
     /// which has no body to check the signature over yet.
-    private func pinGate(_ request: Request, formPin: String? = nil, headOnly: Bool = false) async -> Response? {
+    func pinGate(_ request: Request, formPin: String? = nil, headOnly: Bool = false) async -> Response? {
+        // A scoped API token stands in for the PIN — but ONLY on a route that
+        // is part of the scope model and whose scope the token holds, which
+        // `apiTokenGate` decided before any route ran. Anywhere else the PIN
+        // still applies, so a token can never widen what it opens.
+        if request.tokenScoped && formPin == nil { return nil }
         // DNS REBINDING: a web page the owner visits can point its own name at
         // this Mac and read the book through the owner's browser, same-origin.
         // A phone or a browser reaching the shop's book uses an address, a
@@ -2682,6 +2726,8 @@ struct LanConfig: Equatable, Sendable {
     /// Mac restarted. Oct 2026 review.
     var intakeToken: String = ""
     var calendarToken: String = ""
+    /// The printer webhook's token as STORED, for the same reason.
+    var webhookToken: String = ""
 }
 
 extension Shop {
@@ -2694,7 +2740,8 @@ extension Shop {
                          storefrontSecrets: ["salla": lan.text("sallaWebhookSecret"),
                                              "zid": lan.text("zidWebhookSecret")],
                          carrierSecrets: carrierSecretsStored,
-                         intakeToken: lan.text("intakeToken"), calendarToken: lan.text("calendarToken"))
+                         intakeToken: lan.text("intakeToken"), calendarToken: lan.text("calendarToken"),
+                         webhookToken: lan.text("webhookToken"))
     }
 
     /// The address a phone is told, while the server is up.
@@ -2795,6 +2842,17 @@ extension Shop {
         host.fold = { [weak self] payload in
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             return try await self.foldFromPhone(payload)
+        }
+        // The REST API (`LanServer+Rest`): what the routes read, and their
+        // writes through the book's own write chain. The printer webhook's
+        // token is sealed on disk like the PIN, and opened here, once.
+        host.restBook = { [weak self] in self?.lanRestBook ?? [:] }
+        host.restWrite = { [weak self] op, args in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.lanRestWrite(op, args: args)
+        }
+        if !config.webhookToken.isEmpty {
+            host.printerWebhookToken = (try? await Secrets.open(config.webhookToken, for: source)) ?? ""
         }
         // Khayt as a printer in the slicer: off until the shop switches it on
         // (`SlicerKey`), asked per request so the switch needs no restart.

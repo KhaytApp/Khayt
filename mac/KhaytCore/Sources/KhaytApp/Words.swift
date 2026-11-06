@@ -420,6 +420,7 @@ final class Words {
             .merging(IntegrationWords.table) { mine, _ in mine }
             .merging(PrintPrepWords.table) { mine, _ in mine }
             .merging(StudioWords.table) { mine, _ in mine }
+            .merging(ApiTokenWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // ── The desktop's order tools (`Shop+OrderTools.swift`) ───────────
@@ -5858,13 +5859,15 @@ final class Words {
                                     + "the customer intake form, quote approval, the tracking page "
                                     + "and the calendar feed, and the same status API the Windows "
                                     + "and Linux app serves. It takes orders from Salla and Zid, and parcel "
-                                    + "updates from SMSA, Aramex and Saudi Post. Printer webhooks run in that app "
-                                    + "for now.",
+                                    + "updates from SMSA, Aramex and Saudi Post. It also answers the REST API (orders, "
+                                    + "customers, stock, the waiting list and waste) and printer webhooks, behind the "
+                                    + "PIN or an API token.",
                               "ar": "يقدّم هذا الماك قائمة الانتظار المباشرة للهواتف على شبكة Wi‑Fi الخاصة بالمحل، "
                                     + "ونموذج طلبات العملاء واعتماد عروض الأسعار وصفحة تتبّع الطلب "
                                     + "وتقويم المواعيد، ونفس واجهة الحالة التي يقدّمها تطبيق ويندوز ولينكس، "
                                     + "ويستقبل الطلبات من سلة وزد وتحديثات الشحنات من سمسا وأرامكس والبريد السعودي. "
-                                    + "أما ويب هوك الطابعات فيعمل في ذلك التطبيق حالياً."],
+                                    + "ويجيب أيضاً على واجهة REST البرمجية (الطلبات والعملاء والمخزون وقائمة الانتظار والهدر) "
+                                    + "وعلى ويب هوك الطابعات، خلف رمز PIN أو رمز واجهة برمجية."],
         "mac.cloud_key_published": ["en": "This shop's key is on Khayt Cloud now, and the book has been sent, so your other devices can sign in and sync.",
                                     "ar": "مفتاح المتجر موجود الآن على خيط السحابي، وأُرسل الدفتر، فيمكن لأجهزتك الأخرى تسجيل الدخول والمزامنة."],
         "mac.cloud_key_not_published": ["en": "Signed in, but this shop's key could not be put on Khayt Cloud, so other devices cannot sync yet. Sign in again to retry.",
@@ -6502,6 +6505,10 @@ final class Words {
         "conv.batch_target", "conv.batch_run", "conv.batch_done", "conv.batch_fail", "conv.batch_colour",
         "conv.batch_colour_merge", "conv.batch_colour_fs", "conv.batch_colour_band", "conv.batch_cross_note",
         "conv.batch_dest_folder", "common.done",
+        // API tokens (`ApiTokensSection`), in the Electron card's own words.
+        "api.section", "api.hint", "api.none", "api.label", "api.label_ph", "api.mint",
+        "api.created", "api.copy_now", "api.revoke", "api.revoke_q", "api.revoked",
+        "api.need_scope", "common.copy", "common.done",
     ]
 }
 

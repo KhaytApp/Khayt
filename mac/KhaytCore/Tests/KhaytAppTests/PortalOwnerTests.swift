@@ -85,6 +85,42 @@ struct PortalOwnerTests {
         #expect(linked == nil)
     }
 
+    @Test("a shipped order's publish carries the shipping card (Cloud #186), built by lib/portal-refresh.js")
+    func publishCarriesShipping() async throws {
+        let engine = try KhaytEngine()
+        let order: JSONValue = .object([
+            "id": .string("J7"), "status": .string("completed"), "trackingToken": .string("tok/1"),
+            "carrier": .string("aramex"), "trackingNumber": .string("AWB 42"),
+            "shippingStatus": .string("out_for_delivery"),
+            "shippingHistory": .array([.object(["status": .string("in_transit"), "at": .string("2026-11-05")])]),
+        ])
+        // The publish path PortalOwner takes: `engine.portalPayload`, then `PortalClient.publish`.
+        let request = try #require(try await engine.portalPayload(
+            order: order, settings: ["lang": .string("en")], clients: [], shopName: "Shop", shopAddress: "",
+            stages: ["Received", "Printing", "Finishing", "Done", "Ready"]))
+        let want: JSONValue = .object([
+            "carrier": .string("Aramex"), "status": .string("out_for_delivery"),
+            "trackingNumber": .string("AWB 42"),
+            "trackingUrl": .string("https://www.aramex.com/us/en/track/results?ShipmentNumber=AWB%2042"),
+        ])
+        guard case .object(let payload) = request.payload else { Issue.record("payload is not an object"); return }
+        #expect(payload["shipping"] == want)
+
+        CloudStub.reset(["PUT /v1/shops/S1/published/tok%2F1": (200, #"{"ok":true,"customerEmailLinked":true}"#)])
+        _ = try await PortalClient.publish(request, baseUrl: Self.base, shopId: "S1", token: "bear",
+                                           engine: engine, session: CloudStub.session())
+        let seen = try #require(CloudStub.seen.first)
+        guard case .object(let sent)? = Self.body(seen)["payload"] else { Issue.record("no payload sent"); return }
+        #expect(sent["shipping"] == want, "what goes over the wire")
+
+        // An order with nothing shipped publishes no card at all.
+        let plain = try #require(try await engine.portalPayload(
+            order: .object(["id": .string("J8"), "status": .string("printing"), "trackingToken": .string("t2")]),
+            settings: [:], clients: [], shopName: "Shop", shopAddress: "", stages: []))
+        guard case .object(let p2) = plain.payload else { Issue.record("payload is not an object"); return }
+        #expect(p2["shipping"] == nil)
+    }
+
     @Test("a refusal is named: viewer, another shop's link, the rate limit")
     func refusals() async throws {
         let engine = try KhaytEngine()

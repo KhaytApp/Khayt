@@ -1861,7 +1861,7 @@
  "mac.on_time": "No prazo",
  "mac.online_add_to_queue": "Adicionar à fila",
  "mac.online_already_recorded": "Este pedido já estava no livro, então nenhum segundo trabalho foi criado. Ele foi tirado da fila.",
- "mac.online_desc": "Este Mac serve a fila ao vivo para celulares na rede Wi‑Fi da loja, o formulário de entrada de clientes, a aprovação de orçamentos, a página de rastreamento e o feed de calendário, além da mesma API de status que o app para Windows e Linux serve. Ele recebe pedidos da Salla e da Zid, e atualizações de encomendas da SMSA, Aramex e Correios da Arábia Saudita. Os webhooks de impressoras rodam por enquanto naquele app.",
+ "mac.online_desc": "Este Mac serve a fila ao vivo para celulares na rede Wi‑Fi da loja, o formulário de entrada de clientes, a aprovação de orçamentos, a página de rastreamento e o feed de calendário, além da mesma API de status que o app para Windows e Linux serve. Ele recebe pedidos da Salla e da Zid, e atualizações de encomendas da SMSA, Aramex e Correios da Arábia Saudita. Ele também responde à API REST (pedidos, clientes, estoque, lista de espera e desperdício) e aos webhooks de impressoras, atrás do PIN ou de um token de API.",
  "mac.online_kept_in_queue": "O pedido foi registrado, mas não pôde ser tirado da fila na nuvem — será oferecido de novo.",
  "mac.online_none": "Nada novo da sua loja virtual.",
  "mac.online_off_shelf": "{n} da prateleira",
@@ -3762,5 +3762,8 @@
  "mac.of_installed": "Instalado",
  "mac.of_install_q": "Instalar este perfil de filamento?",
  "mac.of_install_body": "{name} é gravado na pasta de filamentos do {slicer} para {printer}.",
- "mac.of_done": "{name} instalado para {printer}. Abra o {slicer} de novo para vê-lo."
+ "mac.of_done": "{name} instalado para {printer}. Abra o {slicer} de novo para vê-lo.",
+ "mac.api_where": "Os scripts acessam o servidor LAN deste Mac em {url} e enviam o token como “Authorization: Bearer”. O servidor precisa estar ligado.",
+ "mac.api_scopes": "Permissões",
+ "mac.api_owner_only": "Somente o proprietário pode criar ou revogar tokens de API."
 }
