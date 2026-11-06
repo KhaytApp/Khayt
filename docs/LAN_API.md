@@ -50,6 +50,13 @@ Authorization: Bearer khayt_<random>
   (`settings.lanApi.apiTokens[]`: `id`, `label`, `scopes`, `createdAt`, `lastUsedAt`, and the
   SHA-256 `hash`), and its LAN server checks them with the same rules
   (`lib/api-tokens.js requiredScope`). A token minted on either computer verifies on the other.
+* **Only the owner** creates or revokes a token on the desktop too (Nov 2026): rbac
+  `security` `edit`, as on the Mac. Under the staff lock anyone else sees the list and no
+  buttons; main refuses a mint (`not_allowed`) and puts back the token list of a save from
+  any other role (`lib/api-tokens.js mayManageTokens`, `guardTokenSave`).
+* `lastUsedAt` is stamped by the desktop's LAN server when a token is used, **at most once an
+  hour** per token (`lib/api-tokens.js markUsed`), so a busy integration is not a store write
+  per request. A save from the window keeps the later of its copy and the disk's.
 * The hash never reaches a phone: `/api/store` masks `settings.lanApi.apiTokens[].hash`
   (`lib/store-secret-paths.js` PHONE_PRIVATE), and an export drops it.
 
@@ -524,11 +531,24 @@ Pass `"machineId": null` to unassign a printer.
 
 **Valid status values:** `pending`, `printing`, `post`, `qc`, `completed`, `on_hold`
 
-**Response 200:** `{ "ok": true }`  
-**Response 404:** order not found  
-**Response 400:** invalid status
+A status change runs the shared status rule (`lib/order-status.js`), exactly as a move on
+the board does, in **both apps** (Nov 2026): `statusHistory` gains one entry, a completion
+stamps `completedAt`, a hold remembers when, a quote leaving the quote column is accepted,
+and moving back out of completed clears `completedAt`. A move to the status the job already
+has changes nothing.
 
-**Desktop side effect:** `lan-order-updated` IPC → renderer updates `printLog` and UI.
+**Response 200:** `{ "ok": true, "order": { "id", "status", "machineId", "machine" } }`  
+**Response 404:** order not found  
+**Response 400:** invalid status  
+**Response 409:** the rule refused the move — `{ "error": "Move refused", "code", "params" }`,
+with `code` one of `production_paused`, `wip_blocked`, `assembly_not_assembled`,
+`assembly_parts`. Nothing is written.
+
+**Desktop side effect:** `lan-order-updated` IPC with `changed` (the fields the move changed),
+`removed` and `effects` (the rule's effects, less the toasts and the save) — the window takes
+those fields and runs the effects: the filament and packaging deduction, the status webhooks,
+the customer's message, the portal. A completion over the LAN is not asked for actual time
+and grams; the estimate is booked, as on the phone.
 
 ### `GET /api/inventory`
 
@@ -761,8 +781,17 @@ Create a simple job or quote from the companion. **Requires owner PIN.**
 
 Use `"status": "quote"` for a quote (sets expiry from desktop `quoteValidityDays`).
 
+The record is `lib/order-new.js newOrder`'s in **both apps** (Nov 2026) — the one the desk's
+calculator makes: numbered from the shop's counter (`INV-2026-0042-…`, `QUO-2026-0007-…`),
+with its invoice number, an estimated due date when none is sent, and every field a job
+has. `price` is taken as the job's total. The desktop also gives it a tracking token (and a
+quote its approval token).
+
 **Response 201:** `{ "ok": true, "order": { ... } }`  
-**Desktop side effect:** `lan-order-created` IPC.
+**Desktop side effect:** `lan-order-created` IPC with `{ order, settingsChanged }` — the
+window adds the job and takes the counters it advanced. Before Nov 2026 the window had no
+handler for this event, and its next save removed the job from the book; the same was true
+of `lan-spool-updated`, `lan-spool-deleted` and `lan-waiting-updated`, which it now takes too.
 
 The new order's id uses the shop's own prefix — `${invPrefix}-${year}-…`, the
 same one the desktop mints (`INV` unless the shop changed it), or `quotePrefix`

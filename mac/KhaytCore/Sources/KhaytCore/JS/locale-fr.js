@@ -1699,6 +1699,8 @@
   "set.elec_rate_hint": "Ce que coûte un kWh à votre atelier. Les devis, les impressions ratées et les rapports de consommation l’utilisent, sauf si un préréglage d’imprimante fixe le sien. Laissez vide pour la valeur par défaut de Khayt.",
   "set.prefs_section": "Préférences de l'application",
   "set.readonly_note": "Seul le propriétaire peut modifier les réglages. Vous pouvez les consulter ici.",
+  "apitok.owner_only": "Seul le propriétaire peut créer ou révoquer des jetons d’API.",
+  "apitok.last_used": "Dernière utilisation {date}",
   "set.language": "Langue",
   "set.content_langs": "Langues des produits",
   "set.biz_name": "Nom de l’entreprise",

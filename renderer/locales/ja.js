@@ -1699,6 +1699,8 @@
   "set.elec_rate_hint": "ショップの1kWhあたりの費用です。プリンタープリセットで個別に設定しない限り、見積もり、失敗したプリント、電力レポートで使われます。空欄にするとKhaytの既定値になります。",
   "set.prefs_section": "アプリ設定",
   "set.readonly_note": "設定を変更できるのはオーナーだけです。ここでは閲覧できます。",
+  "apitok.owner_only": "APIトークンの作成と取り消しはオーナーのみが行えます。",
+  "apitok.last_used": "最終使用 {date}",
   "set.language": "デフォルト言語",
   "set.content_langs": "商品の言語",
   "set.biz_name": "事業者名",

@@ -60,7 +60,14 @@ test('POST /api/orders: the record, the prefix and the refusals', () => {
   const out = R.orderCreate(b, { project: ' Gear ', price: '12.345', clientId: 'c1', machineId: 'm1' }, ctx);
   assert.equal(out.status, 201);
   const made = out.store.printLog[0];
-  assert.match(made.id, /^INV-2026-\d+-ab12$/);
+  // lib/order-new.js newOrder: numbered from the shop's counter, invoice number with it.
+  assert.equal(made.id, 'INV-2026-0002-ab12', 'past INV-2026-0001, which the book already holds; the host\'s tag');
+  assert.equal(made.jobNumber, 'INV-2026-0002');
+  assert.equal(made.invoiceNum, 'INV-2026-0002');
+  assert.equal(out.store.settings.invNumNext, 3, 'the counter it took from is advanced in the same write');
+  assert.equal(b.settings.invNumNext, undefined, 'on a copy');
+  assert.deepEqual(made.statusHistory.map((x) => x.status), ['pending']);
+  assert.equal(made.paymentStatus, 'unpaid');
   assert.equal(made.project, 'Gear');
   assert.equal(made.price, 12.35);
   assert.equal(made.client, 'Sara', 'the client is named from the book');
@@ -225,4 +232,50 @@ test('PATCH /api/waiting-list/:id takes the reminder day the desktop editor writ
   for (const bad of ['2026-02-30', '12/01/2026', '2026-12-01T00:00:00Z', 20261201]) {
     assert.equal(R.waitingListPatch(b, 'w1', { status: 'reminded', reminderDate: bad }, ctx).status, 400, String(bad));
   }
+});
+
+test('PATCH /api/orders/:id moves a job through the shared status rule, as the board does', () => {
+  const b = book();
+  b.printLog[1].statusHistory = [{ status: 'printing', at: '2026-11-01T08:00:00.000Z' }];
+  const out = R.orderPatch(b, 'o2', { status: 'completed' }, ctx);
+  assert.equal(out.status, 200);
+  const done = out.store.printLog[1];
+  assert.equal(done.status, 'completed');
+  assert.ok(done.completedAt, 'completedAt is stamped, as a move on the board stamps it');
+  assert.deepEqual(done.statusHistory.map((h) => h.status), ['printing', 'completed'], 'one history entry, not two');
+  const types = out.emit.payload.effects.map((e) => e.type);
+  assert.ok(types.includes('deduct_filament'), 'the host is asked to take the filament off the shelf');
+  assert.ok(!types.some((t) => t.startsWith('toast') || t === 'save'), 'nothing that only a person at the desk sees');
+  assert.equal(out.emit.payload.changed.status, 'completed');
+  assert.ok('completedAt' in out.emit.payload.changed);
+  assert.ok(!('project' in out.emit.payload.changed), 'only what the move changed travels');
+  assert.equal(b.printLog[1].status, 'printing', 'the book it was handed is unchanged');
+});
+
+test('PATCH /api/orders/:id: a move the rule refuses is a 409 with its code, and nothing is written', () => {
+  const b = book();
+  b.settings.productionPaused = true;
+  const out = R.orderPatch(b, 'o1', { status: 'printing' }, ctx);
+  assert.equal(out.status, 409);
+  assert.equal(out.body.code, 'production_paused');
+  assert.equal(out.store, undefined);
+});
+
+test('PATCH /api/orders/:id: moving out of completed clears completedAt, and the window is told to remove it', () => {
+  const b = book();
+  b.printLog[1].status = 'completed';
+  b.printLog[1].completedAt = '2026-11-02T10:00:00.000Z';
+  const out = R.orderPatch(b, 'o2', { status: 'qc' }, ctx);
+  assert.equal(out.store.printLog[1].completedAt, undefined);
+  assert.ok(out.emit.payload.removed.includes('completedAt'));
+});
+
+test('PATCH /api/orders/:id: a machine-only change, or the status it already has, asks for no effects', () => {
+  const b = book();
+  const m = R.orderPatch(b, 'o1', { machineId: null }, ctx);
+  assert.deepEqual(m.emit.payload.effects, []);
+  assert.deepEqual(Object.keys(m.emit.payload.changed).sort(), ['machine', 'machineId']);
+  const same = R.orderPatch(b, 'o1', { status: 'pending' }, ctx);
+  assert.deepEqual(same.emit.payload.effects, []);
+  assert.deepEqual(same.emit.payload.changed, {});
 });

@@ -5221,10 +5221,18 @@ function renderTelemetrySettings() {
   });
 }
 
+// Creating or revoking a token is the owner's: rbac security/edit, as on the
+// Mac. Anyone else who can read Settings sees the list and nothing to press;
+// main refuses the mint, and a save that changes the list, all the same.
+function canManageApiTokens() {
+  return typeof operatorCan !== 'function' || operatorCan('security', 'edit');
+}
+
 function renderApiTokensSettings() {
   const el = $('#apiTokensSection');
   if (!el) return;
   const toks = ((settings.lanApi || {}).apiTokens) || [];
+  const mayManage = canManageApiTokens();
 
   const list = toks.length ? toks.map(tk => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);margin-bottom:6px;flex-wrap:wrap;">
@@ -5232,13 +5240,15 @@ function renderApiTokensSettings() {
       <span style="font-size:11px;color:var(--text-muted);">${escapeHtml((tk.scopes || []).join(', ') || '—')}</span>
       <span class="grow" style="flex:1;"></span>
       <span style="font-size:11px;color:var(--text-muted);">${escapeHtml((tk.createdAt || '').split('T')[0] || '')}</span>
-      <button class="btn danger small" data-act="revoke-api-token" data-id="${escapeHtml(tk.id)}" style="margin:0;">${escapeHtml(t('api.revoke') || 'Revoke')}</button>
+      ${tk.lastUsedAt ? `<span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('apitok.last_used', { date: (() => { try { return new Date(tk.lastUsedAt).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch (_) { return String(tk.lastUsedAt).split('T')[0]; } })() }))}</span>` : ''}
+      ${mayManage ? `<button class="btn danger small" data-act="revoke-api-token" data-id="${escapeHtml(tk.id)}" style="margin:0;">${escapeHtml(t('api.revoke') || 'Revoke')}</button>` : ''}
     </div>`).join('') : `<div class="empty-state" style="padding:12px;font-size:12px;">${escapeHtml(t('api.none') || 'No API tokens yet.')}</div>`;
 
   el.innerHTML = `
     <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">${escapeHtml(t('api.hint') || 'Give an automation tool (Zapier, Make, a script) access to this shop over the local API. A token only gets the scopes you tick, and is shown once.')}</p>
     ${list}
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
+    ${mayManage ? '' : `<p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">${escapeHtml(t('apitok.owner_only'))}</p>`}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);${mayManage ? '' : 'display:none;'}">
       <label>${escapeHtml(t('api.label') || 'Label')}</label>
       <input type="text" id="apiTokLabel" placeholder="${escapeHtml(t('api.label_ph') || 'e.g. Zapier')}" style="max-width:260px;">
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">
@@ -5248,11 +5258,16 @@ function renderApiTokensSettings() {
       <button class="btn primary small" id="btnMintApiToken" style="margin-top:12px;">${escapeHtml(t('api.mint') || 'Create token')}</button>
     </div>`;
 
+  if (!mayManage) return;
   el.querySelector('#btnMintApiToken')?.addEventListener('click', async () => {
+    if (!canManageApiTokens()) return;
+    // Main reads who is signed in from the book on disk: put this window's there first.
+    if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) {} }
     const label = el.querySelector('#apiTokLabel')?.value.trim() || '';
     const scopes = Array.from(el.querySelectorAll('.apiScope:checked')).map(c => c.value);
     if (!scopes.length) { toast(t('api.need_scope') || 'Tick at least one scope', 'warning'); return; }
     const r = await window.hubAPI?.mintApiToken?.({ label, scopes });
+    if (r && r.error === 'not_allowed') { toast(t('apitok.owner_only'), 'warning'); return; }
     if (!r || !r.ok) { toast((r && r.error) || 'Could not create token', 'error'); return; }
     settings.lanApi = { ...(settings.lanApi || {}), apiTokens: [...(((settings.lanApi || {}).apiTokens) || []), r.record] };
     saveAll();
@@ -5271,8 +5286,11 @@ function renderApiTokensSettings() {
 
   el.querySelectorAll('[data-act="revoke-api-token"]').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (!canManageApiTokens()) return;
       const ok = await confirmModal(t('api.revoke_q') || 'Revoke this token? Any automation using it stops working immediately.', { danger: true });
       if (!ok) return;
+      // The save that revokes is judged by who the book on disk says is signed in.
+      if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) {} }
       settings.lanApi = { ...(settings.lanApi || {}), apiTokens: (((settings.lanApi || {}).apiTokens) || []).filter(x => x.id !== btn.dataset.id) };
       saveAll();
       renderApiTokensSettings();

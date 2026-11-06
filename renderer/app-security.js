@@ -259,6 +259,11 @@
       id: adminId,
       name: t('sec.default_admin_name'),
       role: t('op.role_admin'),
+      // The access level itself, not read off the title: lib/rbac.js
+      // roleFromLegacy knows "Admin"/"Administrator" but not the Arabic,
+      // Japanese, Turkish or Chinese title this was given, and read the
+      // shop's own owner as an operator the moment the lock went on.
+      roleKey: 'owner',
       active: true,
       hourlyRate: 0,
       pinHash,

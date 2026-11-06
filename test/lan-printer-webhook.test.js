@@ -146,7 +146,7 @@ test('a job with a history gets ONE new entry, and the held book is not touched 
   assert.equal(history.length, 2, 'the array the book held was pushed onto');
 });
 
-test('PATCH /api/orders/:id leaves an existing history exactly as it was', async () => {
+test('PATCH /api/orders/:id keeps the existing history and adds exactly one entry for the move', async () => {
   const history = [{ status: 'pending', at: '2026-10-01T07:00:00.000Z' }];
   store = { ...freshStore(), printLog: [job('pending', { statusHistory: history })] };
   const r = await fetch(`${BASE}/api/orders/J1`, {
@@ -156,7 +156,12 @@ test('PATCH /api/orders/:id leaves an existing history exactly as it was', async
   });
   assert.equal(r.status, 200);
   assert.equal(store.printLog[0].status, 'qc');
-  assert.deepEqual(store.printLog[0].statusHistory, [{ status: 'pending', at: '2026-10-01T07:00:00.000Z' }]);
+  // The move runs the shared status rule (lib/lan-rest.js orderPatch), which
+  // records it once — the window no longer adds a second entry of its own.
+  const h = store.printLog[0].statusHistory;
+  assert.deepEqual(h[0], { status: 'pending', at: '2026-10-01T07:00:00.000Z' }, 'what was there is untouched');
+  assert.equal(h.length, 2);
+  assert.equal(h[1].status, 'qc');
   const bad = await fetch(`${BASE}/api/orders/J1`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', 'x-khayt-pin': '43218765' },

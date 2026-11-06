@@ -70,6 +70,43 @@ try {
   ok(allowed.status >= 200 && allowed.status < 300, `write token on write → ${allowed.status}`);
   await window.waitForFunction(() => printLog.find(o => o.id === 'API-1')?.status === 'printing', { timeout: 8000 });
   ok(true, 'the write actually landed in the store');
+  // The move ran the shared status rule: one history entry, not one from the
+  // server and a second from the window.
+  const trail = await window.evaluate(() => (printLog.find(o => o.id === 'API-1')?.statusHistory || []).map(h => h.status));
+  ok(JSON.stringify(trail) === JSON.stringify(['printing']), `one history entry for the move (${JSON.stringify(trail)})`);
+
+  // A completion over the LAN runs the rule's effects in the window: the
+  // filament comes off the shelf, as a move to Completed on the board takes it.
+  await window.evaluate(() => {
+    inventory.push({ id: 'SP-E2E', material: 'PLA', brand: 'E2E', weight: 500, weightTotal: 1000, cost: 80 });
+    printLog.unshift({ id: 'API-2', status: 'qc', project: 'Done over LAN', date: '2026-07-20', price: 10, statusHistory: [],
+      parts: [{ name: 'p', filamentId: 'SP-E2E', printWeight: 20, qty: 1, material: 'PLA' }] });
+    return flushSave();
+  });
+  const finished = await call('/v1/orders/API-2', { method: 'PATCH', token: toks.write, body: { status: 'completed' } });
+  ok(finished.status === 200, `PATCH to completed → ${finished.status}`);
+  await window.waitForFunction(() => printLog.find(o => o.id === 'API-2')?.materialDeducted === true, { timeout: 8000 });
+  const shelf = await window.evaluate(() => ({ grams: inventory.find(s => s.id === 'SP-E2E').weight, done: printLog.find(o => o.id === 'API-2').completedAt }));
+  ok(shelf.grams === 480, `the 20 g came off the spool (${shelf.grams} g left)`);
+  ok(typeof shelf.done === 'string', 'and the job carries its completion date');
+
+  // A job made over the LAN survives the window's next save. Before, the
+  // window never took lan-order-created and its whole-book save removed it.
+  const made = await call('/v1/orders', { method: 'POST', token: toks.write, body: { project: 'From the API', price: 42 } });
+  ok(made.status === 201, `POST a job over the LAN → ${made.status}`);
+  const madeId = made.body && made.body.order && made.body.order.id;
+  ok(/^INV-\d{4}-\d{4}-[0-9a-z]{4}$/.test(String(madeId)), `numbered from the shop's counter (${madeId})`);
+  await window.waitForFunction((id) => printLog.some(o => o.id === id), madeId, { timeout: 8000 });
+  ok(true, 'the window took the new job');
+  const afterSave = await window.evaluate(async (id) => {
+    settings.shopName = (settings.shopName || 'Shop') + ' ';   // an unrelated edit at the desk
+    await flushSave();
+    const disk = await window.hubAPI.loadStore();
+    const tok = ((disk.settings.lanApi || {}).apiTokens || []).find(t => t.label === 'writer');
+    return { kept: (disk.printLog || []).some(o => o.id === id), lastUsedAt: tok && tok.lastUsedAt };
+  }, madeId);
+  ok(afterSave.kept, 'the job is still in the book after a save from the window');
+  ok(typeof afterSave.lastUsedAt === 'string' && afterSave.lastUsedAt.length > 0, `the write token's lastUsedAt is on disk, not wound back by the save (${afterSave.lastUsedAt})`);
 
   // Revoked / unknown tokens are rejected outright.
   const revoked = await call('/v1/orders', { token: toks.revoked });

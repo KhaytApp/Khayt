@@ -41,6 +41,13 @@
   const ContentLanguages = () => req('KhaytContentLanguages', './content-languages.js');
   const SpoolEdit = () => req('KhaytSpoolEdit', './spool-edit.js');
   const OrderStatus = () => req('KhaytOrderStatus', './order-status.js');
+  /** order-new reads its pricing siblings as globals: under Node, load them first. */
+  const OrderNew = () => {
+    if (!global.KhaytOrderNew && typeof require === 'function') {
+      for (const f of ['./pricing.js', './calculator-cost.js', './working-week.js']) { try { require(f); } catch (_) { /* absent: order-new says so */ } }
+    }
+    return req('KhaytOrderNew', './order-new.js');
+  };
   const StoreValidate = () => req('KhaytStoreValidate', './store-validate.js');
   const QuotePage = () => req('KhaytLanQuotePage', './lan-quote-page.js');
 
@@ -81,6 +88,12 @@
    * book it was handed exactly as it was. JSON, because a record is JSON.
    */
   const deepCopy = (record) => JSON.parse(JSON.stringify(record));
+  /** The top-level fields of `after` that differ from `before`. */
+  const changedKeys = (before, after) => {
+    const out = {};
+    for (const k of Object.keys(after || {})) if (JSON.stringify(after[k]) !== JSON.stringify((before || {})[k])) out[k] = after[k];
+    return out;
+  };
 
   // ── Spools on the wire ──────────────────────────────────────────────────
 
@@ -241,22 +254,26 @@
   /**
    * `POST /api/orders` — a job or a quote raised from outside the desk.
    *
-   * Numbered with the SAME prefix the desktop uses — `invPrefix`, or
-   * `quotePrefix` for a quote — never a key nothing writes. Everything the
-   * record is built from is read off `cur`, the book inside the write: the
-   * client's name, the machine and the queue position.
+   * The record is `lib/order-new.js newOrder`'s — the one the desk's
+   * calculator, a reprint and the Mac's own new-job sheet all make — so a job
+   * taken over the LAN is numbered from the shop's counter (`invPrefix-YYYY-
+   * NNNN`, and its invoice number with it), gets a due date estimated from the
+   * queue, a quote its validity, and every field a job has. The counters it
+   * advances are in `settings`, written back in the same write. What the LAN
+   * sends that the calculator does not (a typed customer name with no record,
+   * the material, a due date it already knows) is laid over the record.
+   *
+   * Everything is read off `cur`, the book inside the write. `ctx.tokens`
+   * (`{ tracking, quoteApproval, id }`, random bytes) is the host's to give;
+   * without it the job has no tracking token and its id tag is Math.random's.
    */
   function orderCreate(cur, raw, ctx) {
     const parsed = cleanBody(raw) || {};
     const project = str(parsed.project, 200);
     if (!project) return err(400, 'project is required');
     const asQuote = parsed.status === 'quote';
-    const status = asQuote ? 'quote' : 'pending';
     const nowMs = nowOf(ctx);
-    const now = new Date(nowMs);
-    const settings = (cur && cur.settings) || {};
-    const prefix = asQuote ? (settings.quotePrefix || 'QUO') : (settings.invPrefix || 'INV');
-    const id = `${prefix}-${now.getFullYear()}-${nowMs}-${String((ctx && ctx.rand) || '0000')}`;
+    const settings = deepCopy((cur && cur.settings) || {});
     let clientName = str(parsed.client, 200) || null;
     const clientId = wireId(parsed.clientId);
     if (clientId) {
@@ -270,53 +287,75 @@
       if (!m) return err(404, 'Machine not found');
       machineName = m.name;
     }
-    const priceIn = parsed.price != null ? +parsed.price : 0;
-    const price = Number.isFinite(priceIn) ? Math.max(0, priceIn) : 0;
+    const priceIn = parsed.price != null ? +parsed.price : null;
+    const price = priceIn != null && Number.isFinite(priceIn) ? Math.max(0, priceIn) : null;
     const dueDate = typeof parsed.dueDate === 'string' && parsed.dueDate.trim() ? parsed.dueDate.trim().slice(0, 32) : null;
-    const order = {
-      id,
-      date: localDay(nowMs),
-      timestamp: now.toISOString(),
-      project,
-      client: clientName,
-      clientId,
-      material: str(parsed.material, 120) || null,
-      price: +price.toFixed(2),
-      status,
-      statusHistory: [{ status, at: now.toISOString() }],
-      queuePos: list(cur, 'printLog').filter((o) => o && o.status === 'pending').length + 1,
-      machineId,
-      machine: machineName,
-      notes: str(parsed.notes, 500) || '',
-      dueDate,
-      paymentStatus: 'unpaid',
+    const N = OrderNew();
+    if (!N || typeof N.newOrder !== 'function') return err(500, 'The order rules could not be loaded');
+    const order = N.newOrder({
       parts: [],
-    };
-    if (asQuote) {
-      const validityDays = settings.quoteValidityDays || 7;
-      order.quoteSentAt = order.date;
-      order.quoteExpiresAt = localDay(nowMs + validityDays * 86400000);
-      order.quoteVersion = 1;
-    }
+      project,
+      clientId,
+      machineId,
+      notes: str(parsed.notes, 500) || '',
+      priceOverride: price,
+      asQuote,
+    }, {
+      settings,
+      orders: list(cur, 'printLog'),
+      clients: list(cur, 'clients'),
+      now: nowMs,
+      tokens: (ctx && ctx.tokens) || {},
+    });
+    // A host that hands in `rand` and no id bytes (the Mac's LAN server) gets
+    // the tag it gave, as before — `jobNumber-rand`, still unique per job.
+    const tok = (ctx && ctx.tokens) || {};
+    if (!tok.id && ctx && typeof ctx.rand === 'string' && /^[0-9a-z]{4}$/.test(ctx.rand)) order.id = `${order.jobNumber}-${ctx.rand}`;
+    order.client = clientName;
+    order.machine = machineName;
+    const material = str(parsed.material, 120);
+    if (material) order.material = material;
+    if (dueDate && !asQuote) order.dueDate = dueDate;
     return {
       status: 201,
       body: {
         ok: true,
         order: {
           id: order.id, project: order.project, client: order.client,
-          status: order.status, price: order.price, material: order.material,
+          status: order.status, price: order.price, material: order.material || null,
           dueDate: order.dueDate, quoteExpiresAt: order.quoteExpiresAt,
         },
       },
-      store: { ...cur, printLog: [order, ...list(cur, 'printLog')] },
-      emit: { channel: 'lan-order-created', payload: order },
+      store: { ...cur, settings, printLog: [order, ...list(cur, 'printLog')] },
+      // The counters it advanced travel with the job: a window holding its own
+      // copy of settings would otherwise save the old ones back.
+      emit: { channel: 'lan-order-created', payload: { order, settingsChanged: changedKeys((cur && cur.settings) || {}, settings) } },
     };
   }
 
   const ORDER_STATUSES = ['pending', 'printing', 'post', 'qc', 'completed', 'on_hold'];
 
-  /** `PATCH /api/orders/:id` — `{ status?, machineId? }`, nothing else. */
-  function orderPatch(cur, orderId, raw) {
+  /**
+   * What a status move over the LAN hands its host to perform. The rule's
+   * money and messaging effects, without the ones that only make sense to a
+   * person at the desk (the toasts, the Undo — the caller is not looking at a
+   * board) or that the write itself already is (save).
+   */
+  const LAN_SKIPPED_EFFECTS = new Set(['toast_updated', 'toast_updated_undoable', 'toast_delivered', 'toast_shipped', 'save']);
+
+  /**
+   * `PATCH /api/orders/:id` — `{ status?, machineId? }`, nothing else.
+   *
+   * A status change goes through `lib/order-status.js`, exactly as a move on
+   * the board does: `gate()` first (a paused shop, a hard WIP limit, an
+   * unfinished assembly are each a 409 with the rule's code), then `apply()`
+   * on a COPY — statusHistory, completedAt, the timer, quoteAcceptedAt. The
+   * effects it asks for (deduct the filament, the webhooks, the customer's
+   * message) are returned in `emit.payload.effects` for the host to run; the
+   * rule cannot run them, and neither can this file. A move to the status the
+   * job already has changes nothing and asks for nothing.
+   */
+  function orderPatch(cur, orderId, raw, ctx) {
     const parsed = cleanBody(raw) || {};
     const { status } = parsed;
     const machineIn = parsed.machineId;
@@ -325,8 +364,16 @@
     const log = [...list(cur, 'printLog')];
     const idx = log.findIndex((o) => o && o.id === orderId);
     if (idx === -1) return err(404, 'Order not found');
-    const updated = { ...log[idx] };
-    if (status) updated.status = status;
+    const updated = deepCopy(log[idx]);
+    let effects = [];
+    if (status && status !== updated.status) {
+      const S = OrderStatus();
+      const ruleCtx = { now: nowOf(ctx), settings: (cur && cur.settings) || {}, orders: log, inventory: list(cur, 'inventory') };
+      const g = S.gate(updated, status, ruleCtx);
+      if (!g.ok) return { status: 409, body: { error: 'Move refused', code: g.block && g.block.code, params: (g.block && g.block.params) || {} } };
+      const r = S.apply(updated, status, ruleCtx) || {};
+      effects = (r.effects || []).filter((e) => e && !LAN_SKIPPED_EFFECTS.has(e.type));
+    }
     // null (what the phone sends) or an empty string unassigns; anything that
     // is not a string or a number is refused rather than read as "unassign".
     if (machineIn !== undefined && machineIn !== null && typeof machineIn !== 'string'
@@ -345,12 +392,21 @@
         updated.machine = machine.name;
       }
     }
+    // What the move changed, field by field, so a host holding its own copy
+    // of the job (the desktop window) takes those and nothing else — an edit
+    // it has not saved yet is not put back by the disk's older copy.
+    const before = log[idx];
+    const changed = {};
+    for (const k of Object.keys(updated)) if (JSON.stringify(updated[k]) !== JSON.stringify(before[k])) changed[k] = updated[k];
+    const removed = Object.keys(before).filter((k) => !(k in updated));
     log[idx] = updated;
     return {
       status: 200,
       body: { ok: true, order: { id: updated.id, status: updated.status, machineId: updated.machineId, machine: updated.machine } },
       store: { ...cur, printLog: log },
-      emit: { channel: 'lan-order-updated', payload: { id: orderId, status: updated.status, machineId: updated.machineId, machine: updated.machine } },
+      // `changed`, `removed` and `effects` are additions: a host reading only the first
+      // four fields sees what it always saw.
+      emit: { channel: 'lan-order-updated', payload: { id: orderId, status: updated.status, machineId: updated.machineId, machine: updated.machine, changed, removed, effects } },
     };
   }
 
@@ -517,7 +573,12 @@
       if (hasReminder) entries[i].reminderDate = reminderDate;
       next = { ...cur, waitingList: entries };
     }
-    return { status: 200, body: { ok: true }, store: next, emit: { channel: 'lan-waiting-updated', payload: { id: itemId, status } } };
+    // `entry` (as it now stands) and `declined` let a host holding its own
+    // copy of the list take the change rather than save over it.
+    const entry = status === 'declined'
+      ? next.waitingListHistory[next.waitingListHistory.length - 1]
+      : next.waitingList[i];
+    return { status: 200, body: { ok: true }, store: next, emit: { channel: 'lan-waiting-updated', payload: { id: itemId, status, entry, declined: status === 'declined' } } };
   }
 
   /**
