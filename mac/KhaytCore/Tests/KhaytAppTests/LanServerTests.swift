@@ -298,7 +298,17 @@ struct LanServerTests {
             // LAN tests failed with -1001 on a working server — one run in
             // three. Still a ceiling, not a target: a request that does not
             // come back in five minutes is a real hang.
-            config.timeoutIntervalForRequest = 300
+            //
+            // NINE HUNDRED, not three hundred (Nov 2026). The parity batches
+            // added a few hundred more `@MainActor` tests to shard `a`
+            // (mac/test-shards.sh), which now queues ~2,800 s of main-actor
+            // work on CI. Main failed twice in a row (after #2266, and #2269),
+            // and in both runs every shard-`a` LAN test timed out at once with
+            // -1001, on a server that answers in milliseconds when the suite
+            // runs alone (141 tests in 33 s). Like `LanStallTests.patience`
+            // (600), it is the time a request may wait for its turn on a
+            // shared main thread, not how long the server takes.
+            config.timeoutIntervalForRequest = 900
             config.httpShouldSetCookies = false
             config.httpCookieAcceptPolicy = .never
             return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
