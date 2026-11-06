@@ -844,6 +844,7 @@
   "oe.duplicate": "Çoğalt",
   "oe.duplicated": "Sipariş çoğaltıldı — bitirmek için Hesaplayıcı'yı açın",
   "oe.deleted": "Sipariş silindi",
+  "env.deleted": "Ölçüm silindi",
   "oe.delete_refused_invoiced": "{id} bir fatura numarasına sahip, bu yüzden silinemez — fatura sıranızda boşluk bırakır. Bunun yerine sipariş iptal edilsin mi?",
   "oe.delete_refused_paid": "{id} için ödeme kaydedilmiş, bu yüzden silinemez. Bunun yerine sipariş iptal edilsin mi?",
   "oe.delete_refused_cancelled": "{id} zaten iptal edildi. Fatura numarası veya ödemesi olduğu için kayıtta kalır.",

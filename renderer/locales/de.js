@@ -844,6 +844,7 @@
   "oe.duplicate": "Duplizieren",
   "oe.duplicated": "Auftrag dupliziert — Rechner öffnen zum Abschließen",
   "oe.deleted": "Auftrag gelöscht",
+  "env.deleted": "Messwert gelöscht",
   "oe.delete_refused_invoiced": "{id} hat eine Rechnungsnummer und kann nicht gelöscht werden – sonst entstünde eine Lücke in Ihrer Rechnungsfolge. Stattdessen den Auftrag stornieren?",
   "oe.delete_refused_paid": "Für {id} sind Zahlungen erfasst, daher kann er nicht gelöscht werden. Stattdessen den Auftrag stornieren?",
   "oe.delete_refused_cancelled": "{id} ist bereits storniert. Er bleibt im Buch, weil er eine Rechnungsnummer oder Zahlungen hat.",

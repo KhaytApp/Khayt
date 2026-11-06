@@ -844,6 +844,7 @@
   "oe.duplicate": "Dupliquer",
   "oe.duplicated": "Commande dupliquée — ouvrir le calculateur pour terminer",
   "oe.deleted": "Commande supprimée",
+  "env.deleted": "Relevé supprimé",
   "oe.delete_refused_invoiced": "{id} a un numéro de facture : le supprimer laisserait un trou dans votre séquence de factures. Annuler la commande à la place ?",
   "oe.delete_refused_paid": "{id} a des paiements enregistrés, il ne peut donc pas être supprimé. Annuler la commande à la place ?",
   "oe.delete_refused_cancelled": "{id} est déjà annulée. Elle reste dans le registre car elle a un numéro de facture ou des paiements.",

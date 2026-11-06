@@ -844,6 +844,7 @@
   "oe.duplicate": "Duplicate",
   "oe.duplicated": "Order duplicated — open Calculator to finish",
   "oe.deleted": "Order deleted",
+  "env.deleted": "Reading deleted",
   "oe.delete_refused_invoiced": "{id} has an invoice number, so it can't be deleted — that would leave a gap in your invoice sequence. Cancel the job instead?",
   "oe.delete_refused_paid": "{id} has payments recorded, so it can't be deleted. Cancel the job instead?",
   "oe.delete_refused_cancelled": "{id} is already cancelled. It stays in the book because it has an invoice number or payments.",

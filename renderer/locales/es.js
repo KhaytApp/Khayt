@@ -844,6 +844,7 @@
   "oe.duplicate": "Duplicar",
   "oe.duplicated": "Pedido duplicado — abra la calculadora para finalizar",
   "oe.deleted": "Pedido eliminado",
+  "env.deleted": "Lectura eliminada",
   "oe.delete_refused_invoiced": "{id} tiene número de factura, así que no se puede eliminar: dejaría un hueco en tu numeración de facturas. ¿Cancelar el pedido en su lugar?",
   "oe.delete_refused_paid": "{id} tiene pagos registrados, así que no se puede eliminar. ¿Cancelar el pedido en su lugar?",
   "oe.delete_refused_cancelled": "{id} ya está cancelado. Se mantiene en el registro porque tiene número de factura o pagos.",
