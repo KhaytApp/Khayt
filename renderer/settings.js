@@ -3964,6 +3964,48 @@ function renderLoyaltyTiersSettings() {
    queue will clear, accounting for working hours.
    ============================================================ */
 
+/** The webhook delivery log: the newest deliveries, what came back, and
+ *  Resend — which sends what that attempt sent (the payload is kept on the log
+ *  line) through the same hardened transport (resendWebhookDelivery).
+ *  Each line names the address's host only: a URL can carry its own secret. */
+function openWebhookDeliveryLog() {
+  const wh = settings.webhooks || {};
+  const subs = new Map((wh.subscriptions || []).map((x) => [x.id, x]));
+  const host = (u) => { try { return new URL(u).host; } catch (_) { return ''; } };
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString(localeTag()); } catch (_) { return iso || ''; } };
+  const rows = (wh.deliveries || []).slice(-100).reverse().map((d) => {
+    const sub = subs.get(d.subscriptionId);
+    const tone = d.status === 'ok' ? 'var(--success,#159a6b)' : d.status === 'retrying' ? 'var(--warning,#b7791f)' : 'var(--danger,#c23b42)';
+    const result = d.status === 'ok' ? (d.httpStatus ? `HTTP ${d.httpStatus}` : 'OK')
+      : `${d.status}${d.httpStatus ? ' · HTTP ' + d.httpStatus : ''}${d.error && String(d.error) !== `HTTP ${d.httpStatus}` ? ' · ' + String(d.error).slice(0, 80) : ''}`;
+    return `<tr>
+      <td style="font-size:11.5px;white-space:nowrap;">${escapeHtml(fmt(d.at))}</td>
+      <td style="font-family:var(--font-mono,monospace);font-size:12px;">${escapeHtml(d.event || '')}</td>
+      <td style="font-size:12px;">${escapeHtml(sub ? host(sub.url) : '—')}</td>
+      <td style="font-size:12px;color:${tone};">${escapeHtml(result)}</td>
+      <td style="font-size:12px;text-align:center;">${escapeHtml(String(d.attempts || 1))}</td>
+      <td>${sub ? `<button type="button" class="btn small ghost" data-resend="${escapeHtml(d.id)}">${escapeHtml(t('whklog.resend'))}</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  openFormModal({
+    title: t('whklog.title'),
+    sizeLg: true,
+    noSave: true,
+    bodyHtml: rows
+      ? `<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">${escapeHtml(t('whklog.hint'))}</p>
+         <div class="table-wrap"><table><thead><tr><th>${escapeHtml(t('whklog.when'))}</th><th>${escapeHtml(t('whklog.event'))}</th><th>${escapeHtml(t('whklog.to'))}</th><th>${escapeHtml(t('whklog.result'))}</th><th>#</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : `<p style="color:var(--text-muted);">${escapeHtml(t('whklog.none'))}</p>`,
+    onMount(modal) {
+      modal.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-resend]');
+        if (!b || typeof resendWebhookDelivery !== 'function') return;
+        b.disabled = true;
+        resendWebhookDelivery(b.dataset.resend);
+      });
+    },
+  });
+}
+
 function renderWebhookSettings() {
   const el = $('#webhookSettingsSection');
   if (!el) return;
@@ -3993,8 +4035,10 @@ function renderWebhookSettings() {
         <input type="url" id="whk_${ev.key}" value="${escapeHtml((wh.events||{})[ev.key]||'')}" placeholder="https://hooks.zapier.com/...">
       </div>`).join('')}
     <button class="btn primary" id="btnSaveWebhooks" data-i18n="common.save">Save</button>
+    <button class="btn ghost" id="btnWebhookLog">${escapeHtml(t('whklog.title'))}</button>
     <button class="btn ghost small" id="btnTestWebhook" style="margin-inline-start:8px;" data-i18n="whk.test">Test (send ping)</button>`;
 
+  el.querySelector('#btnWebhookLog')?.addEventListener('click', openWebhookDeliveryLog);
   el.querySelector('#btnSaveWebhooks').addEventListener('click', () => {
     const form = {
       enabled: el.querySelector('#whk_enabled').checked,
@@ -6995,6 +7039,7 @@ function renderNtfySettings() {
     renderAccountingSyncSettings,
     renderIntegrationsSettings,
     renderDigestSettings,
+    openWebhookDeliveryLog,
     renderCloudDigest,
     renderAiSettings,
     renderSlicerSettings,

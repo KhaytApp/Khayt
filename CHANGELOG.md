@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Webhook delivery log, with Resend (Windows/Linux).** Settings › Webhooks has a Delivery log: the newest deliveries first, with the event, the address it went to (its host only, since a webhook address can carry a secret), what came back and how many tries it took, and Resend to send a delivery again.
 - **A photo of every finished print (Windows/Linux).** When a printer with a camera finishes a print, Khayt takes its snapshot and adds it to that job's photos, as the Mac does. From there it can go to your portfolio. Only a print that finished is photographed: a cancelled or failed one is not. When two jobs on one machine could be the print, no photo is taken rather than guessing.
 - **Delete an environment reading (Windows/Linux).** A reading in the environment log can now be deleted (it asks first, and Undo puts it back), as on the Mac. A mistyped 250 °C stayed in the list and its trend before.
 - **Tests: the desktop-made vault backup fixture now has the field the real cloud always sends.** `scripts/gen-vault-backup-fixture.js` wrote vault feed rows without `chunkBytes`, which the Mac's decoder requires. It now includes it, and the fixture is regenerated. A link also refuses a vault file whose listed chunk size disagrees with its own sealed record, as it already did for the chunk count and size.
