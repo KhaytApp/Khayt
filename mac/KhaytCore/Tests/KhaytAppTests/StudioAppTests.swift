@@ -148,6 +148,48 @@ struct StudioAppTests {
         #expect(model.filaments[1].td == 3)
     }
 
+    @Test("the studio starts at the approved print settings: 3.2 mm, vividness 8, lightness-first colour")
+    func approvedDefaults() {
+        let model = HueForgeModel()
+        #expect(model.settings.heightMm == 3.2)
+        #expect(model.settings.vivid == 8)
+        #expect(model.settings.chromaWeight == 0.5)
+        model.filaments = [.init(hex: "#161616", td: 0.6), .init(hex: "#C04040", td: 2), .init(hex: "#F4F4F2", td: 5)]
+        #expect(!model.blackAndWhite)
+        #expect(model.settings.vivid == 8 && model.settings.chromaWeight == 0.5)
+    }
+
+    @Test("a black-and-white stack takes the black-and-white defaults, and back")
+    func blackAndWhiteDefaults() {
+        let model = HueForgeModel()
+        model.filaments = [.init(hex: "#161616", td: 0.6), .init(hex: "#5A5B5D", td: 1), .init(hex: "#BDBEC0", td: 2), .init(hex: "#F4F4F2", td: 5)]
+        #expect(model.blackAndWhite)
+        #expect(model.settings.vivid == 6 && model.settings.chromaWeight == 1)
+        #expect(model.settings.heightMm == 3.2)
+        // One spool turned red: colour again.
+        let id = model.ids[1]
+        model.setColour(id, "#C04040")
+        #expect(!model.blackAndWhite)
+        #expect(model.settings.vivid == 8 && model.settings.chromaWeight == 0.5)
+    }
+
+    @Test("a vividness the shop chose is kept when the filaments change")
+    func movedVividStays() {
+        let model = HueForgeModel()
+        model.filaments = [.init(hex: "#161616", td: 0.6), .init(hex: "#C04040", td: 2)]
+        model.setVivid(9)
+        #expect(model.settings.vivid == 9)
+        model.filaments = [.init(hex: "#161616", td: 0.6), .init(hex: "#F4F4F2", td: 5)]
+        #expect(model.blackAndWhite)
+        #expect(model.settings.vivid == 9, "the shop's vividness was overwritten")
+        #expect(model.settings.chromaWeight == 1, "the matching still follows the filaments")
+        // and the matching is part of what re-plans
+        #expect(model.replanKey.contains("|9|1.0|"), "\(model.replanKey)")
+        model.addFilament()
+        model.setColour(model.ids[2], "#2050C0")
+        #expect(model.replanKey.contains("|9|0.5|"), "\(model.replanKey)")
+    }
+
     @Test("the export's file name follows the desktop's rule")
     func exportName() {
         let model = HueForgeModel()

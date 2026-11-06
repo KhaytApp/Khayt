@@ -123,18 +123,71 @@ public actor StudioEngine {
     }
 
     /// The settings a relief is planned with — the desktop panel's fields.
+    ///
+    /// The starting values are Bed Ready's approved portrait settings (Nov
+    /// 2026): 3.2 mm of relief, and a gentler vividness than the desktop's 9,
+    /// whose TD scale of 0.2 is so opaque that a face posterises into flat
+    /// patches. Colour plans at vividness 8 (TD scale 0.3) and matches
+    /// lightness before hue (`chromaWeight` 0.5); black and white plans at 6
+    /// (TD scale 0.5) with plain colour distance, because a stack of neutrals
+    /// has no hue to trade. `fit(neutral:keepVivid:)` moves between the two.
     public struct ReliefSettings: Codable, Sendable, Hashable {
         public var layerH = 0.08
-        public var heightMm = 2.4
+        public var heightMm = 3.2
         public var widthMm = 120.0
         public var baseLayers = 5
-        /// 1–10. The desktop maps it to the front-lit TD scale.
-        public var vivid = 9
+        /// 1–10. The desktop maps it to the front-lit TD scale (1.1 − vivid × 0.1).
+        public var vivid = Self.colourVivid
         public var smooth = 0
         /// "", "hole" or "loop".
         public var hang = ""
         public var holeMm = 4.0
+        /// `planPainting`'s chromaWeight: below 1 a pixel matches the layer at
+        /// its lightness before the one nearer its hue. Not a control: it
+        /// follows the filaments (`fit`).
+        public var chromaWeight = Self.colourChromaWeight
         public init() {}
+
+        public static let colourVivid = 8
+        public static let neutralVivid = 6
+        public static let colourChromaWeight = 0.5
+        public static let neutralChromaWeight = 1.0
+        /// The Lab chroma at or under which a filament counts as neutral. Bed
+        /// Ready's black-and-white set (#161616 … #F4F4F2) sits under 1.5; a
+        /// "cool white" or "warm grey" spool drifts a little further.
+        public static let neutralChroma = 6.0
+
+        /// Black and white: there is a filament, and every one is neutral.
+        public static func isBlackAndWhite(_ hexes: [String]) -> Bool {
+            !hexes.isEmpty && hexes.allSatisfy { labChroma($0).map { $0 <= neutralChroma } ?? false }
+        }
+
+        /// Take the defaults for a colour or a black-and-white stack. The
+        /// vividness is left alone once the shop has moved it (`keepVivid`);
+        /// the colour matching always follows the filaments.
+        public mutating func fit(neutral: Bool, keepVivid: Bool) {
+            chromaWeight = neutral ? Self.neutralChromaWeight : Self.colourChromaWeight
+            if !keepVivid { vivid = neutral ? Self.neutralVivid : Self.colourVivid }
+        }
+
+        /// CIELAB chroma (√(a² + b²), D65) of a `#RRGGBB` colour, by the same
+        /// sRGB → Lab as lib/color-mix.js. Nil for a colour that does not parse.
+        public static func labChroma(_ hex: String) -> Double? {
+            var t = hex.trimmingCharacters(in: .whitespaces)
+            if t.hasPrefix("#") { t.removeFirst() }
+            guard t.count == 6, let v = UInt32(t, radix: 16) else { return nil }
+            func lin(_ c: UInt32) -> Double {
+                let x = Double(c) / 255
+                return x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+            }
+            let r = lin(v >> 16 & 0xFF), g = lin(v >> 8 & 0xFF), b = lin(v & 0xFF)
+            let x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+            let y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            let z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+            func f(_ t: Double) -> Double { t > 0.008856 ? cbrt(t) : 7.787 * t + 16.0 / 116 }
+            let la = 500 * (f(x) - f(y)), lb = 200 * (f(y) - f(z))
+            return (la * la + lb * lb).squareRoot()
+        }
     }
 
     public struct Band: Codable, Sendable, Hashable {
@@ -485,6 +538,7 @@ public actor StudioEngine {
             layerH: o.layerH, heightMm: o.heightMm, widthMm: o.widthMm,
             baseLayers: o.baseLayers, dither: false,
             tdScale: Math.max(0.1, 1.1 - (o.vivid || 9) * 0.1),
+            chromaWeight: o.chromaWeight,
             smooth: o.smooth || 0, fixes: [],
           });
           if (!paint || !paint.bands.length) return { ok: false };

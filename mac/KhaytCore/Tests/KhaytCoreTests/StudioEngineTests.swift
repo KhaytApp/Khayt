@@ -42,8 +42,55 @@ struct StudioEngineTests {
         #expect(!plan.bands.isEmpty)
         #expect(plan.bands.allSatisfy { (0..<4).contains($0.head) && $0.z1 > $0.z0 })
         #expect(plan.slots.count <= 4)
-        #expect(plan.totalLayers == Int((2.4 / 0.08).rounded()))
+        #expect(plan.totalLayers == Int((3.2 / 0.08).rounded()))
         #expect(!plan.tiled)
+    }
+
+    @Test("the relief defaults are Bed Ready's approved ones: 3.2 mm, vividness 8 / 6, chromaWeight 0.5 / 1")
+    func approvedDefaults() throws {
+        var s = StudioEngine.ReliefSettings()
+        #expect(s.heightMm == 3.2 && s.vivid == 8 && s.chromaWeight == 0.5)
+        // vividness 8 is the approved colour TD scale 0.3, and 6 the black-and-white 0.5
+        #expect(abs((1.1 - Double(StudioEngine.ReliefSettings.colourVivid) * 0.1) - 0.3) < 1e-9)
+        #expect(abs((1.1 - Double(StudioEngine.ReliefSettings.neutralVivid) * 0.1) - 0.5) < 1e-9)
+        s.fit(neutral: true, keepVivid: false)
+        #expect(s.vivid == 6 && s.chromaWeight == 1)
+        s.fit(neutral: false, keepVivid: false)
+        #expect(s.vivid == 8 && s.chromaWeight == 0.5)
+        s.vivid = 10
+        s.fit(neutral: true, keepVivid: true)
+        #expect(s.vivid == 10 && s.chromaWeight == 1)
+        // the settings cross to the engine with the matching in them
+        let json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(s)) as? [String: Any])
+        #expect(json["chromaWeight"] as? Double == 1)
+    }
+
+    @Test("black and white means every filament is neutral, by Lab chroma")
+    func blackAndWhite() throws {
+        typealias R = StudioEngine.ReliefSettings
+        // Bed Ready's black-and-white set
+        #expect(R.isBlackAndWhite(["#161616", "#3A3A3C", "#5A5B5D", "#8B8C8E", "#BDBEC0", "#F4F4F2"]))
+        #expect(R.isBlackAndWhite(["#000000", "#FFFFFF"]))
+        #expect(!R.isBlackAndWhite(["#161616", "#C04040", "#F4F4F2"]))
+        #expect(!R.isBlackAndWhite(["#161616", "#C99B27"]))
+        #expect(!R.isBlackAndWhite([]))
+        #expect(!R.isBlackAndWhite(["#161616", "nope"]))
+        #expect(try #require(R.labChroma("#808080")) < 0.01)
+        // the Swift Lab is lib/color-mix.js's: #C04040 is a = 51.10, b = 28.67 there (chroma 58.59)
+        #expect(abs(try #require(R.labChroma("#C04040")) - 58.59) < 0.01)
+    }
+
+    @Test("the engine plans with the settings' chromaWeight")
+    func chromaWeightReachesTheEngine() async throws {
+        let engine = try StudioEngine()
+        try await engine.setPicture(Self.picture())
+        let fils = try await engine.suggest(owned: [], maxColors: 4)
+        var s = StudioEngine.ReliefSettings()
+        s.chromaWeight = 1
+        let plain = try #require(try await engine.planRelief(fils, s))
+        s.chromaWeight = 0.5
+        let weighted = try #require(try await engine.planRelief(fils, s))
+        #expect(plain.preview != weighted.preview || plain.bands != weighted.bands)
     }
 
     @Test("the 3MF carries the members a U1 project needs, thumbnails left to the app")
