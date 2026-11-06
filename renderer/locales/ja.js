@@ -1172,6 +1172,7 @@
   "notif.print_fail_title": "{name} — 印刷失敗",
   "notif.print_a_printer": "プリンター",
   "finphoto.taken": "{name} で印刷完了時に写真を撮りました：{job}",
+  "phonephoto.added": "スマートフォンの写真を {job} に追加しました",
   "ntfy.section": "スマートフォンへのプッシュ（ntfy）",
   "ntfy.enable": "ntfyでプリンターの通知を送信",
   "ntfy.hint": "アカウントもボットも不要です。ntfyアプリをインストールして、このトピックを購読してください。トピックを知っている人なら誰でも読めるため、誰も推測できないものにしてください。",

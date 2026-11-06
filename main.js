@@ -4655,6 +4655,25 @@ function rehydrateCompletions() {
   }
 }
 
+// A job photo a paired phone sends over the LAN (POST /api/orders/:id/photos),
+// filed as the order editor's Add Photo files one: a 240px JPEG thumbnail kept
+// inline on the record, and a 1600px JPEG copy in order-photos/. The same
+// 60-megapixel refusal as fitImageBuffer, before any pixels are decoded, since
+// this runs in the main process on bytes from the network.
+function encodeLanJobPhoto(buf) {
+  const { nativeImage } = require('electron');
+  const img = nativeImage.createFromBuffer(buf);
+  if (img.isEmpty()) return { ok: false, reason: 'not-an-image' };
+  const { width, height } = img.getSize();
+  if (!(width > 0 && height > 0) || (width * height) / 1e6 > 60) return { ok: false, reason: 'not-an-image' };
+  const scaled = (edge) => {
+    const k = Math.min(1, edge / Math.max(width, height));
+    return k >= 1 ? img : img.resize({ width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)), quality: 'good' });
+  };
+  const thumb = 'data:image/jpeg;base64,' + scaled(240).toJPEG(85).toString('base64');
+  return { ok: true, thumb, full: scaled(1600).toJPEG(88) };
+}
+
 const { registerLanServer } = require('./lib/lan-server');
 registerLanServer({
   fs,
@@ -4680,6 +4699,10 @@ registerLanServer({
   // Injected rather than derived inside lan-server, which has no access to
   // Electron's app paths — and so tests can point it at a temp directory.
   receiptsDir,
+  // Where a phone's job photo goes, and how it is made into the editor's two
+  // sizes (encodeLanJobPhoto above).
+  orderPhotosDir,
+  encodeJobPhoto: encodeLanJobPhoto,
   // Signed webhooks already accepted, kept 30 days so a replay is refused
   // after a restart too (lib/webhook-replay.js, SEC-010).
   webhookSeenPath: () => path.join(app.getPath('userData'), 'khayt-webhook-seen.json'),

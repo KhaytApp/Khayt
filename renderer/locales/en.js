@@ -1172,6 +1172,7 @@
   "notif.print_fail_title": "{name} — print failed",
   "notif.print_a_printer": "Your printer",
   "finphoto.taken": "Photo taken on {name} as the print finished: {job}",
+  "phonephoto.added": "Photo from your phone added to {job}",
   "ntfy.section": "Push to a phone (ntfy)",
   "ntfy.enable": "Send printer alerts through ntfy",
   "ntfy.hint": "No account or bot needed: install the ntfy app and subscribe to this topic. Anyone who knows the topic can read it, so make one nobody would guess.",
