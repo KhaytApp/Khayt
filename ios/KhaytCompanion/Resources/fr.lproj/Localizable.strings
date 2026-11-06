@@ -188,6 +188,8 @@
 "orders.queue_clear" = "La file est vide";
 "orders.pick" = "Choisissez une commande";
 "orders.pick.sub" = "Sa fiche s’ouvre ici, à côté de la liste.";
+"clients.pick" = "Choisissez un client";
+"clients.pick.sub" = "Sa fiche s’ouvre ici, à côté de la liste.";
 "inventory.pick" = "Choisissez une bobine";
 "inventory.pick.sub" = "Sa fiche s’ouvre ici, à côté de l’étagère.";
 "orders.queue_clear.sub" = "Tout est à jour : aucune commande active";

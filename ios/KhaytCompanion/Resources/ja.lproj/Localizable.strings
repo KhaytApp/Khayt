@@ -188,6 +188,8 @@
 "orders.queue_clear" = "キューは空です";
 "orders.pick" = "注文を選択";
 "orders.pick.sub" = "詳細はリストの横に表示されます。";
+"clients.pick" = "顧客を選択";
+"clients.pick.sub" = "詳細はリストの横に表示されます。";
 "inventory.pick" = "スプールを選択";
 "inventory.pick.sub" = "詳細は棚の横に表示されます。";
 "orders.queue_clear.sub" = "すべて完了 — 進行中の注文はありません";
