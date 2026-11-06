@@ -237,6 +237,11 @@ extension LibraryEditPerfTests {
             let again = await shop.recordFollowUps(["Q1"], onlyIfDue: true)
             #expect(again.isEmpty, "inside the cooldown")
             #expect(try DepositsAndRemindersTests.onDisk(url, "Q1")["followUpCount"] == .number(1))
+            // The in-memory book catches up with the disk after the write
+            // (the reload is its own hop); on a loaded runner that can lag.
+            for _ in 0..<100 where !shop.quotesToChase.isEmpty {
+                try await Task.sleep(for: .milliseconds(50))
+            }
             #expect(shop.quotesToChase.isEmpty, "off Today for the cooldown")
         }
     }
