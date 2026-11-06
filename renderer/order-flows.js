@@ -1422,6 +1422,10 @@ function renderOeExtraLinesHtml(lines) {
 function openOrderEditor(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
+  // The photos the job held when the editor opened. One that arrives while it
+  // is open (the printer's finish snapshot, a paired phone's) is not in the
+  // draft, and Save keeps it rather than writing the draft's list over it.
+  const photosAtOpen = new Set((order.printPhotos || []).map(p => p && p.filename).filter(Boolean));
   const draft = {
     notes: order.notes || '',
     internalNotes: order.internalNotes || '',
@@ -2038,7 +2042,10 @@ function openOrderEditor(orderId) {
           const thumb = await resizeImage(file, 240, 0.85);
           const full  = await resizeImage(file, 1600, 0.88);
           const idx = draft.printPhotos.length;
-          draft.printPhotos.push({ thumb, filename: null });
+          // `source`: where the photo came from. 'shop' is added here at the
+          // desk; 'printer' is the finish snapshot, 'phone' a paired phone's
+          // (lib/lan-server.js). Older photos have none.
+          draft.printPhotos.push({ thumb, filename: null, source: 'shop' });
           pendingFulls.push({ idx, dataUrl: full });
           refresh();
         } catch (err) {
@@ -2139,7 +2146,9 @@ function openOrderEditor(orderId) {
       Object.assign(order, EditRules().priorityFrom(
         draft.priorityLevel || (draft.priority ? 'high' : 'normal')));
       order.operatorId = draft.operatorId || undefined;
-      order.printPhotos = draft.printPhotos;
+      const arrived = (order.printPhotos || []).filter(p => p && p.filename && !photosAtOpen.has(p.filename)
+        && !draft.printPhotos.some(d => d && d.filename === p.filename));
+      order.printPhotos = [...draft.printPhotos, ...arrived];
       order.attachedFiles = draft.attachedFiles;
       order.courierName = draft.courierName || undefined;
       order.trackingNumber = draft.trackingNumber || undefined;

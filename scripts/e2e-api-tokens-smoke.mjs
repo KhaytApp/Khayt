@@ -16,6 +16,8 @@ import { createRequire } from 'node:module';
 // (hash-only) records into the renderer's settings, exactly as the real UI would.
 const require_ = createRequire(import.meta.url);
 const ApiTokens = require_('../lib/api-tokens.js');
+const Devices = require_('../lib/lan-devices.js');
+import crypto from 'node:crypto';
 
 const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
 
@@ -107,6 +109,48 @@ try {
   }, madeId);
   ok(afterSave.kept, 'the job is still in the book after a save from the window');
   ok(typeof afterSave.lastUsedAt === 'string' && afterSave.lastUsedAt.length > 0, `the write token's lastUsedAt is on disk, not wound back by the save (${afterSave.lastUsedAt})`);
+
+  // A paired phone adds a job photo (POST /api/orders/:id/photos, as the Mac's
+  // LanServer). Enrol the way the phone does, then send a real JPEG bigger than
+  // the 1600px copy, so Electron's encoder resizes it in the main process.
+  const pair = crypto.generateKeyPairSync('x25519');
+  const phonePub = crypto.createPublicKey(pair.privateKey).export({ type: 'spki', format: 'der' }).subarray(12).toString('base64');
+  const enrol = await fetch(`http://127.0.0.1:${E2E_LAN_PORT}/api/devices`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-khayt-pin': E2E_LAN_PIN }, body: JSON.stringify({ publicKey: phonePub, name: 'E2E phone' }) });
+  ok(enrol.status === 200, `a phone enrols with the PIN (${enrol.status})`);
+  const dev = await enrol.json();
+  const macPub = crypto.createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b656e032100', 'hex'), Buffer.from(dev.publicKey, 'base64')]), format: 'der', type: 'spki' });
+  const devKey = Devices.deriveDeviceKey(crypto.diffieHellman({ privateKey: pair.privateKey, publicKey: macPub }), dev.deviceId);
+  const photoJpeg = Buffer.from(await electronApp.evaluate(({ nativeImage }) => {
+    const w = 2400, h = 1200, px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) { px[i * 4] = i % 251; px[i * 4 + 1] = (i >> 3) % 255; px[i * 4 + 2] = 128; px[i * 4 + 3] = 255; }
+    return nativeImage.createFromBitmap(px, { width: w, height: h }).toJPEG(90).toString('base64');
+  }), 'base64');
+  const photoTarget = '/api/orders/API-1/photos';
+  const time = String(Math.floor(Date.now() / 1000)), nonce = crypto.randomBytes(16).toString('hex');
+  const photoRes = await fetch(`http://127.0.0.1:${E2E_LAN_PORT}${photoTarget}`, { method: 'POST', body: photoJpeg, headers: {
+    'content-type': 'image/jpeg', 'x-khayt-device': dev.deviceId, 'x-khayt-time': time, 'x-khayt-nonce': nonce,
+    'x-khayt-mac': Devices.requestMac(devKey, Devices.canonicalRequest('POST', photoTarget, time, nonce, photoJpeg)) } });
+  const photoOut = await photoRes.json();
+  ok(photoRes.status === 201 && photoOut.ok && photoOut.index === 0, `a paired phone adds a job photo → ${photoRes.status} ${JSON.stringify(photoOut)}`);
+  const pinOnlyPhoto = await fetch(`http://127.0.0.1:${E2E_LAN_PORT}${photoTarget}`, { method: 'POST', body: photoJpeg, headers: { 'x-khayt-pin': E2E_LAN_PIN } });
+  ok(pinOnlyPhoto.status === 403, `the PIN alone may not (${pinOnlyPhoto.status})`);
+  await window.waitForFunction(() => (printLog.find(o => o.id === 'API-1')?.printPhotos || []).length === 1, null, { timeout: 8000 });
+  const shot = await electronApp.evaluate(({ app, nativeImage }, name) => {
+    const img = nativeImage.createFromPath(app.getPath('userData') + '/order-photos/' + name);
+    return img.isEmpty() ? null : img.getSize();
+  }, photoOut.filename);
+  ok(shot && Math.max(shot.width, shot.height) === 1600, `the copy in order-photos/ is the 1600px one (${JSON.stringify(shot)})`);
+  const photoKept = await window.evaluate(async () => {
+    const thumb = printLog.find(o => o.id === 'API-1').printPhotos[0].thumb;
+    settings.shopName = (settings.shopName || 'Shop') + ' ';
+    await flushSave();
+    const disk = await window.hubAPI.loadStore();
+    const kept = (disk.printLog || []).find(o => o.id === 'API-1')?.printPhotos || [];
+    return { thumb: thumb.slice(0, 23), onDisk: kept.length, source: kept[0] && kept[0].source };
+  });
+  ok(photoKept.thumb === 'data:image/jpeg;base64,', 'the window holds the inline thumbnail');
+  ok(photoKept.onDisk === 1, 'and the photo is still on the job after a save from the window');
+  ok(photoKept.source === 'phone', `tagged as the phone's (${photoKept.source})`);
 
   // Revoked / unknown tokens are rejected outright.
   const revoked = await call('/v1/orders', { token: toks.revoked });
