@@ -1499,6 +1499,43 @@ function checkSpoolOvercommit(parts, excludeOrderId) {
   });
 }
 
+/* ── Price on the shelf (lib/material-cost.js) ───────────────
+ * What each material costs per unit, from the most recent spool of it, and
+ * whether that has moved since the first one — the Mac's MaterialCostCard.
+ * Per KILO (or litre, or sheet), from the spool's FULL weight, never from what
+ * is left on it. */
+function renderMaterialCostCard() {
+  const el = $('#materialCostCard');
+  if (!el) return;
+  const M = (typeof KhaytMaterialCost !== 'undefined') ? KhaytMaterialCost : null;
+  if (!M || settings.mode === 'enthusiast') { el.innerHTML = ''; return; }
+  let report;
+  try { report = M.materialCost({ inventory, minimum: 2 }, {}); } catch (_) { el.innerHTML = ''; return; }
+  const rows = (report && report.rows) || [];
+  // Spools with a price but no full weight cannot be priced per kilo; say what
+  // to fill in rather than leaving them silently out.
+  const unpriced = inventory.filter((sp) => sp && +sp.cost > 0 && M.rateOf(sp) == null).length;
+  const hint = unpriced ? `<p style="font-size:12px;color:var(--text-muted);margin:8px 0 0;">${escapeHtml(t('mcost.needs_full'))}</p>` : '';
+  if (!rows.length && !unpriced) { el.innerHTML = ''; return; }
+  const tot = report.totals || {};
+  const lead = tot.steepest && tot.steepest.changePct != null
+    ? `<p style="margin:4px 0 8px;${tot.steepest.changePct >= 10 ? 'color:var(--warning,#b7791f);' : 'color:var(--text-muted);'}">${escapeHtml(t('mcost.risen', { name: tot.steepest.material, pct: Math.round(tot.steepest.changePct) }))}</p>`
+    : (!tot.anyChangeKnown ? `<p style="margin:4px 0 8px;color:var(--text-muted);">${escapeHtml(t('mcost.none'))}</p>` : '');
+  const line = (r) => {
+    const count = r.spoolCount < 2 ? t('mcost.one_buy') : t(r.spoolCount === 1 ? 'mcost.spools_one' : 'mcost.spools', { n: r.spoolCount });
+    const pct = r.changePct != null && Math.abs(r.changePct) >= 1
+      ? `<span style="font-size:12px;${r.changePct > 0 ? 'color:var(--danger,#c23b42);' : 'color:var(--text-muted);'}">${r.changePct > 0 ? '▲' : '▼'} <bdi>${Math.abs(Math.round(r.changePct))}%</bdi></span>` : '';
+    return `<div style="display:flex;gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid var(--border-soft);">
+      <span style="flex:1;min-width:0;"><strong>${escapeHtml(r.material)}</strong>
+        <span style="font-size:12px;color:var(--text-muted);"> · ${escapeHtml(t('mcost.per', { unit: r.rate }))} · ${escapeHtml(count)}</span></span>
+      ${pct}<bdi style="font-variant-numeric:tabular-nums;">${escapeHtml(fmtPrice(r.perUnit))}</bdi></div>`;
+  };
+  el.innerHTML = `<div class="card" style="padding:12px 14px;margin-top:14px;">
+    <h3 class="card-head sec-title" style="margin:0;"><span class="swatch"></span>${escapeHtml(t('mcost.title'))}</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('mcost.sub'))}</p>
+    ${lead}${rows.map(line).join('')}${hint}</div>`;
+}
+
 /* ── Pipeline material demand ───────────────────────────── */
 function renderPipelineDemand() {
   const el = $('#pipelineDemand');
@@ -1651,6 +1688,7 @@ function renderInventory() {
   renderReorderAlerts();
   renderSupplierReorderList();
   renderPipelineDemand();
+  renderMaterialCostCard();
   // Per-location scope (#65 follow-up): valuation, banner, list all scope to
   // the active branch (+ unassigned legacy stock). Null = all sites.
   const activeLoc = (typeof activeLocation !== 'undefined') ? activeLocation : null;

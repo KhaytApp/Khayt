@@ -147,9 +147,21 @@ function setupKanbanDrag() {
       const newIdx = reordered.findIndex(o => o.id === target.dataset.orderId);
       const insertAt = insertBefore ? newIdx : newIdx + 1;
       reordered.splice(insertAt, 0, dragged);
+      // What each card held before, so a slipped drag is one Undo away (the
+      // Mac's job moves take back the same way).
+      const before = colOrders.map((o) => [o, o.queuePos, o.queueCol]);
       reordered.forEach((o, i) => { o.queuePos = i; o.queueCol = status; });
       saveAll();
       renderKanban();
+      toast(t('kan.reordered'), 'success', 5000, {
+        undo: () => {
+          for (const [o, pos, col] of before) {
+            if (pos === undefined) delete o.queuePos; else o.queuePos = pos;
+            if (col === undefined) delete o.queueCol; else o.queueCol = col;
+          }
+          saveAll(); renderKanban();
+        },
+      });
     });
   });
 }

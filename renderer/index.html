@@ -1125,6 +1125,8 @@
       <div id="reorderAlertsSection" style="display:none;"></div>
       <div id="supplierReorderList" style="margin-bottom:12px;"></div>
       <div id="pipelineDemand"></div>
+      <!-- What each material costs on the shelf (lib/material-cost.js), as the Mac's MaterialCostCard. -->
+      <div id="materialCostCard"></div>
       <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
         <label class="btn ghost small pro-only" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" data-i18n-title="reorder.auto_hint" title="Automatically create draft purchase orders when stock hits its reorder point"><input type="checkbox" id="chkAutoDraftPo" style="width:auto;margin:0;"> <span data-i18n="reorder.auto_toggle">Auto-draft POs</span></label>
         <button class="btn ghost small" id="btnExportInventoryCsv" title="Export inventory to CSV">📥 <span data-i18n="common.export_csv">CSV</span></button>
@@ -1317,6 +1319,8 @@
 
     <!-- ===================== EXPENSES ===================== -->
     <section id="expenses-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-expenses-tab" aria-hidden="true" tabindex="-1">
+      <!-- Recurring expenses that have come round (renderer/expenses.js renderRecurringStrip). -->
+      <div id="recurringStrip"></div>
       <div class="toolbar" style="margin-bottom:16px;">
         <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="exp.title">Expense Tracker</span></h3>
         <button class="btn small" id="btnExportExpCsv" data-i18n="exp.export_csv">Export CSV</button>
@@ -2900,6 +2904,7 @@
 <!-- An undoable status move puts back the stock it changed (reopening gives filament back). -->
 <script src="../lib/stock-undo.js"></script>
 <script src="../lib/inventory-units.js"></script>
+<script src="../lib/material-cost.js"></script>
 <script src="../lib/order-deduction.js"></script>
 <script src="../lib/lan-auth.js"></script>
 <!-- Which jobs a filament lot went into (spool history, Lot recall). -->
