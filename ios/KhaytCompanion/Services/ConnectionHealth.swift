@@ -204,7 +204,7 @@ final class ConnectionHealth: ObservableObject {
     /// (`DeviceKey`). The client paces retries.
     private func enrolThisPhone() async {
         guard api.wantsEnrolment() else { return }
-        await api.enrolDevice(name: UIDevice.current.name)
+        await api.enrolDevice(name: settings?.nameToSend ?? ConnectionSettings.defaultPhoneName)
     }
 
     /// Ask about `address`, unless the person already said no to it.
@@ -212,7 +212,8 @@ final class ConnectionHealth: ObservableObject {
         if address != declined { macMoved = address }
     }
 
-    /// The person says the new address is their Mac: move there.
+    /// The person says the new address is their Mac: move there, and ask
+    /// them for the PIN — it is never sent there by itself.
     func acceptMove() async {
         guard let settings, let address = macMoved else { return }
         settings.host = address.host
@@ -221,6 +222,11 @@ final class ConnectionHealth: ObservableObject {
         // The person vouched for this address, not for its key: pin again
         // from here rather than keep a key it could not prove.
         settings.macIdentityKey = ""
+        // And no stored PIN goes there on trust: the address could not prove
+        // it is the Mac, so the person types the PIN ("Pair again") or nothing
+        // is sent. A phone that enrolled keeps no PIN anyway.
+        settings.pin = ""
+        settings.needsPairAgain = true
         lastIdentityTry = nil
         macMoved = nil
         declined = nil

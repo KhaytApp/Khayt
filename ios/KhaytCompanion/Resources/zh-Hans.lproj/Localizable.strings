@@ -461,7 +461,7 @@
 "pair.signed_out" = "Mac 已将此 iPhone 退出登录。请使用店主 PIN 重新配对。";
 "pair.pin.title" = "店主 PIN";
 "pair.pin.body" = "Mac 或 PC 上“设置”→“在线”中的店主 PIN，至少 8 个字符。此处无法使用受理 PIN。";
-"pair.pin.foot" = "存储在 iPhone 钥匙串中，仅发送给这台 Mac。";
+"pair.pin.foot" = "仅为配对发送给这台 Mac，随后从 iPhone 删除。若电脑无法配对手机，则保存在 iPhone 钥匙串中。";
 "pair.pin.wrong" = "PIN 被拒绝。请检查 Mac 或 PC 上的“设置”→“在线”。";
 "pair.window_closed" = "请在 Mac 上点按“配对手机”（“设置”→“在线”），然后重试。";
 "pair.window_locked" = "此 iPhone 输入错误 PIN 的次数过多。请在 Mac 上再次点按“配对手机”（“设置”→“在线”），然后使用正确的 PIN 重试。";
@@ -1097,6 +1097,15 @@
 "care.part.fep_film" = "FEP 离型膜";
 "care.part.resin_tank" = "树脂槽";
 "care.part.ipa" = "异丙醇（升）";
+"pair.again.title" = "重新配对此 iPhone";
+"pair.again.line" = "输入店主 PIN 以重新连接 Mac。iPhone 从不会自行发送它。";
+"pair.again.button" = "重新配对";
+"pair.again.body" = "Mac 上「设置 → 在线」中的店主 PIN。它只会为配对发送一次到此地址，随后从 iPhone 删除。";
+"pair.phone_name" = "此 iPhone 的名称";
+"pair.phone_name.foot" = "Mac 在已配对手机列表中显示的名称，便于区分各台手机。";
+"cloud.read_only" = "只读登录";
+"cloud.read_only.line" = "此 iPhone 以查看者身份登录 Khayt Cloud，且未配对 Mac：可以查看店铺，但无法更改。";
+"cloud.read_only.refused" = "未保存：此 iPhone 的 Khayt Cloud 登录为只读。请与 Mac 配对，或使用可编辑的账户登录。";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "购物清单";
