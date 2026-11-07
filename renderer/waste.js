@@ -5,6 +5,7 @@ let wasteSearchTerm = '';
 let wasteMaterialFilter = '';
 let wasteFailureFilter = '';
 let wasteDateFilter = 'all';
+let wasteWhereBy = 'machine';
 
 (function (global) {
 /** The rule, however this file happens to be loaded — a script tag in the
@@ -17,6 +18,79 @@ const WasteEntry = (typeof globalThis !== 'undefined' && globalThis.KhaytWasteEn
    ============================================================ */
 // The list is lib/waste-entry.js's, so both apps label a failure the same way.
 const WASTE_FAILURE_TYPES = WasteEntry.FAILURE_TYPES;
+
+/** lib/failed-print-cost.js, however this file is loaded. */
+const FailedCost = () => (typeof globalThis !== 'undefined' && globalThis.KhaytFailedPrintCost)
+  || (() => { try { return require('../lib/failed-print-cost.js'); } catch (e) { return null; } })();
+
+/**
+ * What a failed attempt is costed from, for lib/failed-print-cost.js — the
+ * Mac's `failedCosting`, field for field: the machine, the shop's tariff, how
+ * long the attempt ran and how far it got, and what its plug metered.
+ *
+ * The hours are the PRINTER's when the last print that ended on the job's
+ * machine was this job's; else the job's actual time for an inspected print
+ * (it ran to the end); else the rule scales the estimate by the progress at
+ * failure — 100% for an inspected print.
+ *
+ * The energy: an inspected print finished, so its reading is already on the
+ * job and that one wins — a kept attempt for the same job is an EARLIER
+ * stopped print, and costing the whole failed print at the stopped one's
+ * reading under-costs it. A stopped print's reading was kept by the meter
+ * (`KhaytPrintEnds`, renderer/integrations.js).
+ *
+ * `spent` is the job whose kept reading this used, for the caller to consume
+ * once the waste row is saved.
+ */
+function failedCostingFor(order, opts) {
+  const o = order || {};
+  const inspected = !!(opts && opts.inspected);
+  const ends = (typeof globalThis !== 'undefined' && globalThis.KhaytPrintEnds) || null;
+  const mid = String(o.machineId || '');
+  const list = typeof machines !== 'undefined' && Array.isArray(machines) ? machines : [];
+  const machine = mid ? list.find((m) => m && m.id === mid) || null : null;
+  const lastEnd = ends && mid ? ends.endedFor(mid) : null;
+  const ended = lastEnd && lastEnd.orderId === o.id ? lastEnd : null;
+  const costing = {};
+  if (machine) costing.machine = machine;
+  // Only the tariff travels, as on the Mac: a failure is charged what the
+  // shop pays for power rather than the built-in default.
+  const tariff = typeof settings !== 'undefined' && settings ? settings.elecRate : null;
+  if (tariff !== undefined && tariff !== null && tariff !== '') costing.settings = { elecRate: tariff };
+  if (ended && ended.durationS > 0) costing.actualHours = ended.durationS / 3600;
+  else if (inspected && +o.actualPrintTime > 0) costing.actualHours = +o.actualPrintTime;
+  if (inspected) costing.progress = 100;
+  else if (ended && ended.progress > 0) costing.progress = ended.progress;
+  let spent = null;
+  if (inspected && +o.actualEnergyWh > 0) {
+    costing.energy = { wh: +o.actualEnergyWh };
+    if (o.actualEnergy && o.actualEnergy.coverage !== undefined) costing.energy.coverage = o.actualEnergy.coverage;
+  } else {
+    const attempt = ends && o.id ? ends.attemptFor(o.id) : null;
+    if (attempt) { costing.energy = attempt; spent = o.id; }
+  }
+  return { costing, spent };
+}
+
+/**
+ * Write the failed print's machine time and electricity beside its filament
+ * on the waste row (`costMachine`, `costPower`, `costFull`, …). `cost` is
+ * never changed: it stays the material figure the P&L reads. Returns the job
+ * whose kept meter reading was used, or null.
+ */
+function attachFailedCost(entry, order, opts) {
+  const FC = FailedCost();
+  if (!FC || !entry || !order) return null;
+  const { costing, spent } = failedCostingFor(order, opts);
+  FC.attach(entry, order, costing, { machine: costing.machine || null, preset: null, settings: costing.settings || null });
+  return spent;
+}
+
+/** The waste row is saved: the meter reading it used is spent. */
+function spendAttempt(orderId) {
+  const ends = (typeof globalThis !== 'undefined' && globalThis.KhaytPrintEnds) || null;
+  if (orderId && ends) ends.consumeAttempt(orderId);
+}
 
 function renderWasteLog() {
   const tbody = document.querySelector('#wasteTable tbody');
@@ -80,6 +154,7 @@ function renderWasteLog() {
       ? `<span>${escapeHtml(t('waste.pct_revenue'))}: <strong style="color:${wastePct > 5 ? 'var(--danger)' : wastePct > 2 ? 'var(--warning)' : 'var(--success)'};">${wastePct.toFixed(1)}%</strong></span>`
       : '';
     statEl.innerHTML = `
+      ${trueCostHtml(wasteFiltered, biz)}
       <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:${ftBars ? '12px' : '0'};">
         <span>${escapeHtml(t('waste.total_entries'))}: <strong>${wasteLog.length}</strong></span>
         <span>${escapeHtml(t('waste.total_weight'))}: <strong>${totalWasteGrams.toFixed(0)}g</strong></span>
@@ -88,6 +163,10 @@ function renderWasteLog() {
       </div>
       ${ftBars ? `<div style="margin-top:8px;"><div style="font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(t('waste.failure_breakdown'))}</div>${ftBars}</div>` : ''}
     `;
+    statEl.querySelector('#wasteWhereBy')?.addEventListener('change', (e) => {
+      wasteWhereBy = e.target.value;
+      renderWasteLog();
+    });
   }
 
   // Top orders by waste cost — commerce surface, business modes only
@@ -124,7 +203,7 @@ function renderWasteLog() {
   }
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">${escapeHtml(t('waste.empty'))} <button class="btn small primary" id="btnLogWasteEmpty" style="margin-inline-start:12px;">${escapeHtml(t('waste.add') || 'Log Failed Print')}</button></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:24px;">${escapeHtml(t('waste.empty'))} <button class="btn small primary" id="btnLogWasteEmpty" style="margin-inline-start:12px;">${escapeHtml(t('waste.add') || 'Log Failed Print')}</button></td></tr>`;
     // Wire up the CTA
     document.querySelector('#btnLogWasteEmpty')?.addEventListener('click', () => document.querySelector('#btnLogWaste')?.click());
     return;
@@ -140,11 +219,76 @@ function renderWasteLog() {
       <td>${ftLabel}</td>
       <td>${escapeHtml(w.reason || '—')}</td>
       <td style="text-align:right; font-variant-numeric:tabular-nums;">${fmtPrice(+w.cost || 0)}</td>
+      ${breakdownCells(w)}
       <td style="text-align:center;">
         <button class="btn danger small" data-act="del-waste" data-id="${escapeHtml(w.id)}">${escapeHtml(t('common.delete'))}</button>
       </td>
     </tr>`;
   }).join('');
+}
+
+/**
+ * A row's machine time, electricity and true cost. A dash, not a zero, on a
+ * row with no breakdown: a failure logged without a job, or before this
+ * existed, was never costed, which is not the same as costing nothing.
+ */
+function breakdownCells(w) {
+  const has = (v) => v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v));
+  const cell = (v, title) => `<td class="waste-breakdown" style="text-align:right; font-variant-numeric:tabular-nums; color:var(--text-muted);"${title ? ` title="${escapeHtml(title)}"` : ''}>${has(v) ? fmtPrice(+v) : '—'}</td>`;
+  const kwh = has(w.energyWh) && +w.energyWh > 0 ? (+w.energyWh / 1000).toFixed(2) + ' kWh' : '';
+  const full = has(w.costFull) ? +w.costFull : (+w.cost || 0);
+  return cell(w.costMachine) + cell(w.costPower, kwh)
+    + `<td class="waste-full" style="text-align:right; font-variant-numeric:tabular-nums;${has(w.costFull) ? ' font-weight:600;' : ''}">${fmtPrice(full)}</td>`;
+}
+
+/**
+ * The true cost of the shown failures (KhaytFailedPrintCost.totals) and where
+ * it went, by printer, material or customer (`byGroup`, biggest first). The
+ * same one definition of the three costs, so the groups add up to the total.
+ * Information, not a P&L figure — the note says so in those words. Drawn only
+ * once some row carries the breakdown.
+ */
+function trueCostHtml(rows, biz) {
+  const FC = FailedCost();
+  if (!FC || !rows.length) return '';
+  const tot = FC.totals(rows);
+  if (!(tot.costed > 0)) return '';
+  const line = (label, value, strong) => `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;${strong ? 'font-weight:600;' : ''}">
+      <span style="color:${strong ? 'var(--text)' : 'var(--text-muted)'};">${escapeHtml(label)}</span><span style="font-variant-numeric:tabular-nums;">${escapeHtml(value)}</span></div>`;
+  const by = (wasteWhereBy === 'customer' && !biz) ? 'machine' : wasteWhereBy;
+  const groups = FC.byGroup(rows, {
+    by,
+    orders: printLog,
+    machines: typeof machines !== 'undefined' ? machines : [],
+    spools: inventory,
+    clients: typeof clients !== 'undefined' ? clients : [],
+  }).slice(0, 5);
+  const options = [['machine', 'waste.by_printer'], ['material', 'waste.by_material']]
+    .concat(biz ? [['customer', 'waste.by_customer']] : [])
+    .map(([k, w]) => `<option value="${k}"${k === by ? ' selected' : ''}>${escapeHtml(t(w))}</option>`).join('');
+  const groupRows = groups.map((g) => line(
+    (g.unknown ? t('waste.unknown') : g.label) + ' · ' + t(g.count === 1 ? 'waste.n_failures_one' : 'waste.n_failures', { n: g.count }),
+    fmtPrice(g.full))).join('');
+  return `
+    <div id="wasteTrueCost" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border-soft);">
+      <div>
+        <div style="font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(t('waste.true_title'))}</div>
+        ${line(t('waste.filament'), fmtPrice(tot.material))}
+        ${line(t('waste.machine'), fmtPrice(tot.machine))}
+        ${line(t('waste.power'), fmtPrice(tot.power))}
+        ${tot.energyWh > 0 ? line(t('waste.energy'), (tot.energyWh / 1000).toFixed(2) + ' kWh') : ''}
+        ${line(t('waste.full'), fmtPrice(tot.full), true)}
+        <p style="font-size:11px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('waste.true_note'))}</p>
+        ${tot.costed < rows.length ? `<p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('waste.true_older'))}</p>` : ''}
+      </div>
+      <div id="wasteWhere">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <span style="font-size:11.5px;font-weight:600;color:var(--text-muted);">${escapeHtml(t('waste.where_title'))}</span>
+          <select id="wasteWhereBy" style="width:auto;font-size:12px;padding:2px 6px;">${options}</select>
+        </div>
+        ${groupRows}
+      </div>
+    </div>`;
 }
 
 function openWasteForm() {
@@ -237,9 +381,13 @@ function openWasteForm() {
         deduct:      $('#wf_deduct').checked,
       }, { id: 'w-' + Date.now().toString(36), today, inventory });
       if (made.refused) { toast(t('waste.err_material'), 'error'); return false; }
+      const ref = String(made.entry.orderId || '').trim();
+      const job = ref ? printLog.find((o) => o && o.id === ref) : null;
+      const spent = job ? attachFailedCost(made.entry, job, { inspected: false }) : null;
       wasteLog.unshift(made.entry);
 
       saveAll();
+      spendAttempt(spent);
       renderWasteLog();
       if (document.querySelector('#inventory-tab.active')) renderInventory();
       toast(t('waste.saved'), 'success');
@@ -300,8 +448,10 @@ function openLogWasteFromCard(orderId) {
         machines: typeof machines !== 'undefined' ? machines : [],
       });
       if (made.refused) { toast(t('waste.err_material'), 'error'); return false; }
+      const spent = attachFailedCost(made.entry, order, { inspected: false });
       wasteLog.unshift(made.entry);
       saveAll();
+      spendAttempt(spent);
       renderWasteLog();
       if (typeof renderInventory === 'function') renderInventory();
       toast(t('waste.saved'), 'success');
@@ -325,6 +475,9 @@ async function deleteWasteEntry(id) {
     openWasteForm,
     openLogWasteFromCard,
     deleteWasteEntry,
+    failedCostingFor,
+    attachFailedCost,
+    spendAttempt,
   };
   Object.assign(global, api);
   global.KhaytWaste = api;
