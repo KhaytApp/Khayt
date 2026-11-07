@@ -1946,6 +1946,7 @@
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;" data-i18n="mach.section_hint"></p>
         <div id="machinesList"></div>
         <button class="btn primary" id="btnAddMachine" style="margin-top:10px;" data-i18n="mach.add">+ Add Printer</button>
+        <button class="btn" id="btnPartsToBuy" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
         </div>
         <div class="card settings-card" id="nozzleWearCard">
           <div class="settings-section-head" data-i18n="nw.title">Nozzle wear reference</div>
@@ -2793,6 +2794,7 @@
 <script src="../lib/plate-nesting.js"></script>
 <script src="../lib/webhooks.js"></script>
 <script src="../lib/maintenance.js"></script>
+<script src="../lib/care-plans.js"></script>
 <!-- Printer alerts: was never loaded, so computePrinterAlerts was undefined and the
      caller in integrations.js silently returned — the whole feature was dead in the
      shipped app despite having 22 passing unit tests. -->
