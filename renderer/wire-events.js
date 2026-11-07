@@ -1688,6 +1688,7 @@ function wireEvents() {
 
   // Machine profiles (settings section)
   $('#btnAddMachine')?.addEventListener('click', () => openMachineEditor(null));
+  $('#btnPartsToBuy')?.addEventListener('click', () => openPartsToBuy());
   $('#machinesList')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
