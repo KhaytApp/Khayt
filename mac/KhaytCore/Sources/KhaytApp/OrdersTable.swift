@@ -69,6 +69,9 @@ struct OrdersTable: View {
     static let jobRowHeight: CGFloat = 20
 
     private var table: some View {
+        // Sorted ONCE per draw: `rows` is computed, and reading it twice ran
+        // the filter and the sort over every job twice (Mac review, Nov 2026).
+        let rows = self.rows
         // Asked once per draw, not per row: it walks every spool's history.
         let lots = shop.lotReasons(rows)
         // SEVERAL ROWS AT ONCE (⌘/⇧-click), for Delete…: `selectJobs` keeps

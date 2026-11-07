@@ -543,8 +543,7 @@ extension Shop {
             // Read from disk rather than from what this app is holding: the
             // screens decode two collections out of thirty-three, and a
             // comparison built from those would report thirty-one as missing.
-            let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
+            let mine = await Shop.readBookOffMain(build.storeURL)
             let collections = (try? await engine.storeCollections()) ?? []
             cloudCheck = CloudCompare.compare(here: mine, there: folded.store,
                                               collections: collections, cloudRev: reply.rev,
@@ -616,8 +615,7 @@ extension Shop {
             // the screens hold two collections out of thirty-three, and a
             // payload built from those would claim the other thirty-one are
             // gone.
-            let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
+            let mine = await Shop.readBookOffMain(build.storeURL)
             // MASKED FIRST, like the whole-book push. `machines` is an array
             // collection, so deltas carry it, and its printer access codes and
             // smart-plug passwords are sealed on disk with THIS Mac's key. Sent
@@ -831,8 +829,7 @@ extension Shop {
 
             // Say what is true now rather than what was true before: compare
             // the book as it stands against the store that was just folded in.
-            let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
+            let mine = await Shop.readBookOffMain(build.storeURL)
             let collections = (try? await engine.storeCollections()) ?? []
             await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
                                     book: mine, cloud: folded.store)
@@ -1153,6 +1150,21 @@ extension Shop {
             await load(source)
         } catch {
             spendProblem = words.callIt("mac.restore_failed") + " " + self.said(error)
+        }
+    }
+}
+
+
+extension Shop {
+    /// The whole book, read and decoded on `BookWork`'s queue — never on the
+    /// main thread. Every sync read it here three times (compare, push, pull),
+    /// and auto-sync runs 2.5 s after every write: on a 15 MB book that was a
+    /// second or more of a frozen window each time (Mac review, Nov 2026). An
+    /// unreadable book is empty, as before.
+    nonisolated static func readBookOffMain(_ url: URL) async -> [String: JSONValue] {
+        await BookWork.run {
+            (try? Data(contentsOf: url))
+                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
         }
     }
 }
