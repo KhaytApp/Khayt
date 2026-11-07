@@ -6223,6 +6223,15 @@ ipcMain.handle('hub:cloud-paylink', async (_e, { url, shopId, token, op, link, l
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+// The shop's cross-shop portal switch (Cloud "portal crossShop").
+ipcMain.handle('hub:cloud-portal-settings', async (_e, { url, shopId, token, crossShop } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    if (typeof crossShop === 'boolean') return { ok: true, ...(await cloudClient.setPortalSettings(url, shopId, token, crossShop)) };
+    return { ok: true, ...(await cloudClient.getPortalSettings(url, shopId, token)) };
+  } catch (e) { return { ok: false, error: String(e && e.message || e), reason: (e && e.reason) || null }; }
+});
+
 ipcMain.handle('hub:cloud-set-slug', async (_e, { url, shopId, token, slug } = {}) => {
   try {
     token = cloudToken(token, url);
