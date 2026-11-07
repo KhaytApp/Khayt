@@ -210,7 +210,7 @@ function renderClients() {
         <td style="font-variant-numeric: tabular-nums;">${stats.count}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--success);">${fmtPrice(stats.revenue)}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--text-dim);">${escapeHtml(stats.lastDate || t('cl.never_ordered'))}</td>
-        <td style="font-variant-numeric:tabular-nums;text-align:right;color:${balance > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${balance > 0 ? fmtPrice(balance) : '—'}</td>
+        <td style="font-variant-numeric:tabular-nums;text-align:end;color:${balance > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${balance > 0 ? fmtPrice(balance) : '—'}</td>
         <td>
           <button class="btn small" data-act="cl-history" data-id="${c.id}">${escapeHtml(t('cl.history'))}</button>
           <button class="btn small success" data-act="cl-quote" data-id="${c.id}">${escapeHtml(t('cl.quote'))}</button>
@@ -1484,7 +1484,7 @@ function exportClientPortal(clientId) {
         ${KhaytOrderStatus.isOpen(o) ? stepperHtml(o) : ''}
       </td>
       <td style="padding:8px;"><span style="background:${statusColors[o.status]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${escapeHtml(o.status)}</span></td>
-      <td style="padding:8px;text-align:right;font-weight:600;color:#4ade80;">${fmtOrderPrice(o.price, o)}</td>
+      <td style="padding:8px;text-align:end;font-weight:600;color:#4ade80;">${fmtOrderPrice(o.price, o)}</td>
       <td style="padding:8px;text-align:center;font-size:11px;color:${isPaid?'#4ade80':'#f87171'};">${isPaid ? PL.paid : PL.outstanding}</td>
     </tr>`;
   }).join('');
@@ -1512,7 +1512,7 @@ function exportClientPortal(clientId) {
     .stat-val { font-size:1.5rem; font-weight:700; color:#a78bfa; }
     .stat-lbl { font-size:11px; color:#64748b; margin-top:2px; }
     table { width:100%; border-collapse:collapse; background:#111; border-radius:8px; overflow:hidden; }
-    th { padding:10px 8px; text-align:left; font-size:11px; color:#64748b; border-bottom:1px solid #2a2a2a; }
+    th { padding:10px 8px; text-align:start; font-size:11px; color:#64748b; border-bottom:1px solid #2a2a2a; }
     @media(max-width:600px){ td,th { padding:6px 4px; font-size:11px; } }
   </style>
 </head>
@@ -1528,7 +1528,7 @@ function exportClientPortal(clientId) {
   </div>
   <table>
     <thead><tr>
-      <th>${escapeHtml(PL.date)}</th><th>${escapeHtml(PL.project)}</th><th>${escapeHtml(PL.status)}</th><th style="text-align:right;">${escapeHtml(PL.amount)}</th><th style="text-align:center;">${escapeHtml(PL.payment)}</th>
+      <th>${escapeHtml(PL.date)}</th><th>${escapeHtml(PL.project)}</th><th>${escapeHtml(PL.status)}</th><th style="text-align:end;">${escapeHtml(PL.amount)}</th><th style="text-align:center;">${escapeHtml(PL.payment)}</th>
     </tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table>

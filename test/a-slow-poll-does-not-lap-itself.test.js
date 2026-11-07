@@ -56,12 +56,16 @@ test('a stale-read poll misses the completion the fresh one sees', () => {
 /** The guard, lifted out of main.js and driven. */
 function loadGuardedPoll(onceImpl) {
   const main = read('main.js');
-  const a = main.indexOf('  let pollInFlight = false;');
+  // The flag is module-level (one poll at a time across every start), and a
+  // start whose generation is no longer the latest polls nothing.
+  assert.ok(main.includes('let printerPollInFlight = false;'), 'the in-flight guard is gone');
+  const a = main.indexOf('  const poll = async () => {\n    if (printerPollInFlight');
   assert.ok(a > 0, 'the in-flight guard is gone from the poll loop');
   const b = main.indexOf('  const pollOnce = async () => {', a);
   assert.ok(b > a, 'pollOnce is gone');
   const body = main.slice(a, b);
-  return new Function('pollOnce', `${body}; return poll;`)(onceImpl);
+  return new Function('pollOnce',
+    `let printerPollInFlight = false; const printerPollGeneration = 1, generation = 1; ${body}; return poll;`)(onceImpl);
 }
 
 test('a second tick during a slow poll is skipped, not queued', async () => {

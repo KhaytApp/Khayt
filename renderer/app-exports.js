@@ -101,8 +101,8 @@ async function exportQuoteApprovalPage(orderId) {
       <td>${i + 1}. ${escapeHtml(p.name || '')}</td>
       <td style="text-align:center;">${qty}</td>
       <td>${escapeHtml(p.material || '')}</td>
-      <td style="text-align:right;">${fmtMoney(unitPrice)} ${cur}</td>
-      <td style="text-align:right;">${fmtMoney(lineTotal)} ${cur}</td>
+      <td style="text-align:end;">${fmtMoney(unitPrice)} ${cur}</td>
+      <td style="text-align:end;">${fmtMoney(lineTotal)} ${cur}</td>
     </tr>`;
   }).join('');
 
@@ -144,10 +144,10 @@ async function exportQuoteApprovalPage(orderId) {
     .meta-block h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 4px; }
     .meta-block p { font-size: 0.95rem; color: #1a1a2e; }
     table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    th { background: #f1f3f5; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; padding: 10px 14px; text-align: left; }
+    th { background: #f1f3f5; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; padding: 10px 14px; text-align: start; }
     td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
     .total-row { font-weight: 700; background: #f8f9fa; }
-    .approve-section { margin-top: 28px; padding: 20px; background: #f0f7ff; border-radius: 8px; border-left: 4px solid ${safeCssColor(settings.invAccentColor, '#5E2E14')}; }
+    .approve-section { margin-top: 28px; padding: 20px; background: #f0f7ff; border-radius: 8px; border-inline-start: 4px solid ${safeCssColor(settings.invAccentColor, '#5E2E14')}; }
     .approve-section h2 { font-size: 1.1rem; margin-bottom: 10px; color: ${safeCssColor(settings.invAccentColor, '#5E2E14')}; }
     .approve-section p { font-size: 0.9rem; color: #333; line-height: 1.5; }
     @media (max-width: 600px) { .meta { grid-template-columns: 1fr; } .container { border-radius: 0; } }
@@ -185,18 +185,18 @@ async function exportQuoteApprovalPage(orderId) {
           <th>${escapeHtml(t('inv.description'))}</th>
           <th style="text-align:center;">${escapeHtml(t('inv.qty'))}</th>
           <th>Material</th>
-          <th style="text-align:right;">Unit Price</th>
-          <th style="text-align:right;">${escapeHtml(t('inv.line_total'))}</th>
+          <th style="text-align:end;">Unit Price</th>
+          <th style="text-align:end;">${escapeHtml(t('inv.line_total'))}</th>
         </tr></thead>
         <tbody>
           ${partsHtml || `<tr><td colspan="5">${escapeHtml(order.project || '')}</td></tr>`}
         </tbody>
         <tfoot>
           <tr class="total-row">
-            <td colspan="4" style="text-align:right;">${escapeHtml(t('inv.grand_total'))}</td>
-            <td style="text-align:right;">${fmtMoney(grandTotal)} ${cur}</td>
+            <td colspan="4" style="text-align:end;">${escapeHtml(t('inv.grand_total'))}</td>
+            <td style="text-align:end;">${fmtMoney(grandTotal)} ${cur}</td>
           </tr>
-          ${vatEnabled ? `<tr style="font-size:0.82rem;color:#888;"><td colspan="4" style="text-align:right;">VAT (${vatRate}%)</td><td style="text-align:right;">${fmtMoney(vatAmt)} ${cur}</td></tr>` : ''}
+          ${vatEnabled ? `<tr style="font-size:0.82rem;color:#888;"><td colspan="4" style="text-align:end;">VAT (${vatRate}%)</td><td style="text-align:end;">${fmtMoney(vatAmt)} ${cur}</td></tr>` : ''}
         </tfoot>
       </table>
 
@@ -244,9 +244,9 @@ function openMilestoneInvoices(orderId) {
     }
     return `<table style="width:100%;font-size:12.5px;border-collapse:collapse;">
       <thead><tr style="border-bottom:1px solid var(--border-soft);color:var(--text-muted);">
-        <th style="padding:5px 8px;text-align:left;">${escapeHtml(t('ord.milestone_label'))}</th>
-        <th style="padding:5px 8px;text-align:right;">${escapeHtml(t('ord.milestone_pct'))}</th>
-        <th style="padding:5px 8px;text-align:right;">${escapeHtml(t('ord.milestone_amount'))}</th>
+        <th style="padding:5px 8px;text-align:start;">${escapeHtml(t('ord.milestone_label'))}</th>
+        <th style="padding:5px 8px;text-align:end;">${escapeHtml(t('ord.milestone_pct'))}</th>
+        <th style="padding:5px 8px;text-align:end;">${escapeHtml(t('ord.milestone_amount'))}</th>
         <th style="padding:5px 8px;">${escapeHtml(t('ord.milestone_issued'))}</th>
         <th style="padding:5px 8px;">${escapeHtml(t('ord.milestone_due'))}</th>
         <th></th>
@@ -254,8 +254,8 @@ function openMilestoneInvoices(orderId) {
       <tbody>
         ${order.milestoneInvoices.map((m, i) => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
           <td style="padding:6px 8px;">${escapeHtml(m.label)}</td>
-          <td style="padding:6px 8px;text-align:right;">${escapeHtml(String(m.percentage))}%</td>
-          <td style="padding:6px 8px;text-align:right;">${fmtMoneyIn(m.amount, jobCurrency)}</td>
+          <td style="padding:6px 8px;text-align:end;">${escapeHtml(String(m.percentage))}%</td>
+          <td style="padding:6px 8px;text-align:end;">${fmtMoneyIn(m.amount, jobCurrency)}</td>
           <td style="padding:6px 8px;color:var(--text-muted);">${m.issuedAt ? escapeHtml(m.issuedAt) : '—'}</td>
           <td style="padding:6px 8px;"><input type="date" data-mi-due="${i}" value="${escapeHtml(m.dueDate || '')}" aria-label="${escapeHtml(t('ord.milestone_due'))}" style="${dateStyle}padding:4px 8px;font-size:12px;"></td>
           <td style="padding:6px 8px;">

@@ -85,9 +85,14 @@
   function filtered(query) {
     const list = pool();
     const q = (query || '').trim().toLowerCase();
-    let rows = q
-      ? list.filter((r) => (r.name + ' ' + (r.originalName || '') + ' ' + (r.tags || []).join(' ') + ' ' + (r.material || '')).toLowerCase().includes(q))
-      : list.slice();
+    /* A focus (Library Health's Show, or Find Similar) is a list of ids in
+     * THEIR order — the copies of one model stand together, the closest
+     * match comes first — so it narrows too and keeps that order. */
+    const focusOrder = _focus ? new Map(_focus.ids.map((id, i) => [id, i])) : null;
+    let rows = focusOrder ? list.filter((r) => focusOrder.has(r.id)) : list;
+    rows = q
+      ? rows.filter((r) => (r.name + ' ' + (r.originalName || '') + ' ' + (r.tags || []).join(' ') + ' ' + (r.material || '')).toLowerCase().includes(q))
+      : rows.slice();
     if (_tagFilter) rows = rows.filter((r) => (r.tags || []).some((tg) => tg.toLowerCase() === _tagFilter.toLowerCase()));
     /* Both axes narrow at once, deliberately: "the busts in the Saudi Kings"
      * is the question a library of hundreds is actually asked. */
@@ -95,6 +100,7 @@
     else if (_folderFilter) rows = rows.filter((r) => groupOf(r).toLowerCase() === _folderFilter.toLowerCase());
     if (_catFilter === UNFILED) rows = rows.filter((r) => !categoryOf(r));
     else if (_catFilter) rows = rows.filter((r) => categoryOf(r).toLowerCase() === _catFilter.toLowerCase());
+    if (focusOrder) return rows.sort((a, b) => focusOrder.get(a.id) - focusOrder.get(b.id));
     return rows.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
@@ -1027,6 +1033,7 @@
               <button data-act="pf-setups" data-id="${escapeHtml(rec.id)}">${_bi('nozzle', '🛠')}${escapeHtml(t('setup.title') || 'Settings that worked')}</button>
               ${typeof openModelViewer === 'function' && /^(stl|3mf)$/i.test(rec.sourceFile?.ext || '') ? `<button data-act="pf-view3d" data-id="${escapeHtml(rec.id)}">${_bi('cube', '🧊')}${escapeHtml(t('plib.view3d') || 'View in 3D')}</button>` : ''}
               ${!rec.geometryKey ? `<button data-act="pf-identify" data-id="${escapeHtml(rec.id)}" title="${escapeHtml(t('plib.identify_hint') || 'Let Khayt recognise this model when you print it again')}">${_bi('search', '🔎')}${escapeHtml(t('plib.identify') || 'Identify')}</button>` : ''}
+              ${_SIM() ? `<button data-act="pf-similar" data-id="${escapeHtml(rec.id)}" title="${escapeHtml(t('plib.sim_help'))}">${_bi('search', '🔎')}${escapeHtml(t('plib.sim_find'))}</button>` : ''}
               ${Array.isArray(rec.colors) && rec.colors.filter((c) => c && c.hex).length > 1 ? `<button data-act="pf-plan" data-id="${escapeHtml(rec.id)}">${_bi('palette', '🎨')}${escapeHtml(t('plan.title') || 'Plan colours')}</button>` : ''}
               ${rec.sourceFile?.ext === '3mf' ? `<button data-act="pf-convert" data-id="${escapeHtml(rec.id)}">${_bi('convert', '🔄')}${escapeHtml(t('conv.convert_short') || 'Convert')}</button>` : ''}
               <button data-act="pf-add-parts" data-id="${escapeHtml(rec.id)}" title="${escapeHtml(t('plib.add_parts_hint') || 'A print can be several files — a head, two arms, a torso')}">${_bi('plus', '＋')}${escapeHtml(t('plib.add_parts') || 'Add files to this print')}</button>
@@ -1159,6 +1166,7 @@
     const total = pool().length;
     if (!hasHub) return `<div class="pf-empty">${escapeHtml(t('plib.desktop_only') || 'The print-file library is available in the desktop app.')}</div>`;
     if (isGallery) return galleryHtml();
+    if (_healthOpen) return healthHtml();
     const painted = rows.slice(0, _page);
     const more = rows.length - painted.length;
     const grid = rows.length
@@ -1168,7 +1176,7 @@
              <span class="pf-more-n">${escapeHtml(t('plib.n_of_m', { n: String(painted.length), m: String(rows.length) }))}</span>
            </div>` : '')
       : `<div class="pf-empty">${escapeHtml(total ? ((_tagFilter || _folderFilter || _catFilter) ? (t('plib.no_filter_match') || 'No files match this filter.') : (t('plib.no_match') || 'No files match your search.')) : (t('plib.empty') || 'No print files yet. Add your first STL, 3MF or G-code file.'))}</div>`;
-    return archivedBarHtml() + fileBarHtml('group') + fileBarHtml('category') + tagBarHtml() + grid;
+    return focusBarHtml() + archivedBarHtml() + fileBarHtml('group') + fileBarHtml('category') + tagBarHtml() + grid;
   }
 
   /** Drop from the selection whatever the current filter, search or view
@@ -1260,6 +1268,7 @@
             </div>
             ${isGallery ? '' : `<input type="search" id="pfSearch" class="pf-search" placeholder="${escapeHtml(t('common.search') || 'Search')}" value="${escapeHtml(_query)}" aria-label="${escapeHtml(t('common.search') || 'Search')}">`}
             ${isGallery ? '' : `<button class="btn ghost${_selectMode ? ' state-on' : ''}" data-act="pf-select-toggle" aria-pressed="${_selectMode}" title="${escapeHtml(t('plib.select_hint') || 'Work on several files at once — group, categorise, tag or delete them together')}">${_bi('check', '✓')}${escapeHtml(t('plib.select') || 'Select')}</button>`}
+            ${isGallery || !_LH() ? '' : `<button class="btn ghost${_healthOpen ? ' state-on' : ''}" data-act="pf-health" aria-pressed="${_healthOpen}">${_bi('check', '✓')}${escapeHtml(t('plib.lh_title'))}</button>`}
             ${typeof openCalibration === 'function' ? `<button class="btn ghost" data-act="pf-calibrate">${_bi('target', '🎯')}${escapeHtml(t('plib.calibrate') || 'Calibrate')}</button>` : ''}
             ${_cloudOn() ? `<button class="btn ghost" data-act="pf-sync" title="${escapeHtml(t('plib.sync_hint') || 'Push this library to Khayt Cloud now, instead of waiting for the next automatic sync.')}">${_bi('cloud', '☁')}${escapeHtml(t('plib.sync') || 'Sync')}</button>` : ''}
             <button class="btn primary" data-act="pf-add" ${hasHub ? '' : 'disabled'} title="${escapeHtml(t('plib.add_multi_hint') || 'Add one or more files — select several at once')}">＋ ${escapeHtml(t('plib.add') || 'Add file')}</button>
@@ -1303,6 +1312,229 @@
     watchForMore();
   }
 
+  /* ── LIBRARY HEALTH AND FIND SIMILAR ─────────────────────────────────────
+   *
+   * Ports of the Mac's (LibraryHealthView / Shop+LibraryHealth, and
+   * Shop+LibrarySimilar). The rules are lib/library-health.js and
+   * lib/library-similar.js — JavaScript twins of the Mac's Swift — and this
+   * is only the facts in and the doors out. Every fix is a door the library
+   * already has: Show is a filter, Measure is Identify's re-read, Make
+   * Previews is the import's own thumbnail work, Locate is Identify's file
+   * picker. Nothing is merged and nothing is removed from here.
+   *
+   * The disk is asked ASYNC and a few at a time: one hub:printlib-list per
+   * model, eight in flight, never on render. A library of thousands is
+   * checked when the panel is opened or Check Again is pressed, and the
+   * grid keeps working meanwhile. */
+  const _LH = () => (typeof window !== 'undefined' && window.KhaytLibraryHealth) || null;
+  const _SIM = () => (typeof window !== 'undefined' && window.KhaytLibrarySimilar) || null;
+  let _focus = null;        // {ids, label, note}: a Health group or a Find Similar on the grid
+  let _healthOpen = false;
+  let _healthGroups = null; // null while checking
+  let _healthRun = 0;
+  let _healthBusy = '';     // the kind a Measure / Make Previews is working through
+
+  const HEALTH_TEXT = {
+    deletedByPlan: ['plib.lh_missing', 'plib.lh_missing_says'],
+    missing: ['plib.lh_missing', 'plib.lh_missing_says'],
+    unreachable: ['plib.lh_unreachable', 'plib.lh_unreachable_says'],
+    onlineUnmeasured: ['plib.lh_online', 'plib.lh_online_says'],
+    noFigures: ['plib.lh_no_figures', 'plib.lh_no_figures_says'],
+    noPicture: ['plib.lh_no_picture', 'plib.lh_no_picture_says'],
+    sameFile: ['plib.lh_same_file', 'plib.lh_same_file_says'],
+    looksSame: ['plib.lh_looks_same', 'plib.lh_looks_same_says'],
+    tooBig: ['plib.lh_too_big', 'plib.lh_too_big_says'],
+    unorganised: ['plib.lh_unorganised', 'plib.lh_unorganised_says'],
+    orphanProducts: ['plib.lh_orphans', 'plib.lh_orphans_says'],
+  };
+  const HEALTH_LIST_MAX = 8;
+  const DRAWABLE = /^(stl|3mf|gcode|gco)$/i;
+
+  function focusBarHtml() {
+    if (!_focus) return '';
+    const note = _focus.note ? `<p class="pf-focus-note">${escapeHtml(t(_focus.note))}</p>` : '';
+    return `<div class="pf-folderbar pf-focusbar" role="group">`
+      + `<span class="pf-folderchip on" id="pfFocusChip">${escapeHtml(_focus.label)} <span class="pf-tagchip-n">${_focus.ids.length}</span></span>`
+      + `<button type="button" class="pf-tagchip pf-tagclear" data-act="pf-focus-clear">✕ ${escapeHtml(t('common.clear'))}</button>`
+      + `</div>${note}`;
+  }
+
+  /** Put a list of ids on the grid, with every other narrowing off — the
+   *  question is "these", not "these, within whatever was on before". */
+  function setFocus(ids, label, note) {
+    _focus = { ids, label, note: note || '' };
+    _healthOpen = false;
+    _query = ''; _tagFilter = ''; _folderFilter = ''; _catFilter = ''; _archived = false;
+    resetPage();
+    renderPrintFiles();
+  }
+
+  function findSimilar(id) {
+    const S = _SIM(); if (!S) return;
+    const la = _LA();
+    const all = (printFiles || []).filter(Boolean).map((r) => ({
+      id: r.id, title: r.name || r.originalName || '', group: groupOf(r), tags: r.tags || [],
+      contentHash: r.contentHash || null, geometryKey: r.geometryKey || null,
+      archived: !!(la && la.isArchived(r)),
+    }));
+    const me = all.find((m) => m.id === id); if (!me) return;
+    const matches = S.ranked(me, all);
+    if (!matches.length) { toast(t('plib.sim_none', { name: me.title }), 'info'); return; }
+    // An archived model is not on the grid; its matches are.
+    setFocus((me.archived ? [] : [me.id]).concat(matches.map((m) => m.id)),
+      t('plib.sim_chip', { name: me.title }),
+      matches.some((m) => m.mirrorCaveat) ? 'plib.lh_mirror_note' : '');
+  }
+
+  function openHealth() { _healthOpen = true; renderPrintFiles(); checkHealth(); }
+  function closeHealth() { _healthOpen = false; _healthRun++; renderPrintFiles(); }
+
+  /** Where each model's bytes are: here, online (tiered or the Mac's marker),
+   *  missing, or unreachable when the library folder itself is not there —
+   *  an unplugged share is not a reason to call a thousand models gone. */
+  async function healthPresence(recs) {
+    const hub = api();
+    const out = new Map();
+    if (!hub || !hub.printLibList) { for (const r of recs) out.set(r.id, 'unknown'); return out; }
+    let reachable = true;
+    try {
+      const st = hub.printLibStatus ? await hub.printLibStatus() : null;
+      if (st && st.ok === false && (st.reason === 'missing' || st.reason === 'not-a-directory')) reachable = false;
+    } catch (_) { /* asked again per model below */ }
+    let next = 0;
+    async function worker() {
+      while (next < recs.length) {
+        const r = recs[next++];
+        const fn = r.sourceFile && r.sourceFile.filename;
+        // No file named at all (made from a printer's history): nothing to be missing.
+        if (!fn) { out.set(r.id, 'web'); continue; }
+        if (!reachable) { out.set(r.id, 'unreachable'); continue; }
+        let files = null;
+        try { files = await hub.printLibList(r.id); } catch (_) { files = null; }
+        if (!Array.isArray(files)) { out.set(r.id, 'unknown'); continue; }
+        const f = files.find((x) => x && x.filename === fn);
+        out.set(r.id, !f ? 'missing' : (f.online || f.tiered) ? 'online' : 'here');
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(8, recs.length) }, worker));
+    return out;
+  }
+
+  async function checkHealth() {
+    const H = _LH(); if (!H) return;
+    const run = ++_healthRun;
+    _healthGroups = null;
+    if (_healthOpen) renderList();
+    const la = _LA();
+    const recs = (printFiles || []).filter((r) => r && r.id);
+    // Archived models are put aside by the rule; their disk is not asked.
+    const presence = await healthPresence(recs.filter((r) => !(la && la.isArchived(r))));
+    if (run !== _healthRun) return;   // closed, or checked again, meanwhile
+    const models = recs.map((r) => {
+      const p = r.parsed || {};
+      const ext = String((r.sourceFile && r.sourceFile.ext) || '');
+      return {
+        id: r.id, title: r.name || r.originalName || '', presence: presence.get(r.id) || 'unknown',
+        contentHash: r.contentHash || null, geometryKey: r.geometryKey || null,
+        slicedMinutes: Number(p.printTimeMins) || null, slicedGrams: Number(p.filamentGrams) || null,
+        tags: r.tags || [], category: categoryOf(r), archived: !!(la && la.isArchived(r)),
+        hasPicture: DRAWABLE.test(ext)
+          ? !!(r.thumb || r.userPhoto || (r.thumbFile && !_thumbUnavailable.has(r.id)))
+          : undefined,
+      };
+    });
+    const ms = (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [];
+    const ps = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    _healthGroups = H.groups(models,
+      ms.filter((m) => m && !m.retiredAt).map((m) => ({ id: m.id, kind: m.kind, bed: m.bed })),
+      H.productFacts(ps));
+    if (_healthOpen) renderList();
+  }
+
+  const recById = (id) => (printFiles || []).find((r) => r && r.id === id);
+  const healthGroup = (kind) => (_healthGroups || []).find((g) => g.kind === kind);
+
+  function healthHtml() {
+    const head = `<div class="pf-health-head">
+        <div><h3 class="pf-health-title">${escapeHtml(t('plib.lh_title'))}</h3>
+        <p class="pf-sub">${escapeHtml(t('plib.lh_intro'))}</p></div>
+        <div class="pf-health-actions">
+          <button class="btn ghost small" data-act="pf-health-again" ${_healthGroups ? '' : 'disabled'}>${escapeHtml(t('plib.lh_check_again'))}</button>
+          <button class="btn ghost small" data-act="pf-health-back">${escapeHtml(t('plib.lh_back'))}</button>
+        </div></div>`;
+    if (!_healthGroups) return `<div class="pf-health" id="pfHealth">${head}<div class="pf-empty" id="pfHealthChecking">${escapeHtml(t('plib.lh_checking'))}</div></div>`;
+    if (!_healthGroups.length) return `<div class="pf-health" id="pfHealth">${head}<div class="pf-empty" id="pfHealthGood">${escapeHtml(t('plib.lh_all_good'))}</div></div>`;
+    return `<div class="pf-health" id="pfHealth">${head}${_healthGroups.map(healthGroupHtml).join('')}</div>`;
+  }
+
+  function healthGroupHtml(g) {
+    const [titleKey, saysKey] = HEALTH_TEXT[g.kind] || [g.kind, ''];
+    const k = escapeHtml(g.kind);
+    let items;
+    if (g.kind === 'orphanProducts') {
+      const ps = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+      items = g.productIds.map((pid) => {
+        const p = ps.find((x) => x && x.id === pid);
+        return `<li>${escapeHtml((p && p.name) || pid)}</li>`;
+      });
+    } else {
+      items = g.modelIds.map((id) => {
+        const r = recById(id);
+        const name = (r && (r.name || r.originalName)) || id;
+        const btn = g.kind === 'missing'
+          ? `<button class="btn ghost small" data-act="pf-health-locate" data-id="${escapeHtml(id)}">${escapeHtml(t('plib.lh_locate'))}</button>`
+          : `<button class="btn ghost small" data-act="pf-health-open" data-id="${escapeHtml(id)}">${escapeHtml(t('common.edit'))}</button>`;
+        return `<li data-id="${escapeHtml(id)}"><span class="pf-hg-name">${escapeHtml(name)}</span>${btn}</li>`;
+      });
+    }
+    const more = items.length > HEALTH_LIST_MAX
+      ? `<li class="pf-hg-more">${escapeHtml(t('plib.lh_more', { n: String(items.length - HEALTH_LIST_MAX) }))}</li>` : '';
+    const busy = _healthBusy === g.kind;
+    const acts = [];
+    if (g.kind !== 'orphanProducts') acts.push(`<button class="btn small" data-act="pf-health-show" data-kind="${k}">${escapeHtml(t('plib.lh_show'))}</button>`);
+    if (g.kind === 'noFigures') acts.push(`<button class="btn small" data-act="pf-health-measure" data-kind="${k}" ${busy ? 'disabled' : ''}>${escapeHtml(t('plib.lh_measure'))}</button>`);
+    if (g.kind === 'noPicture') acts.push(`<button class="btn small" data-act="pf-health-previews" data-kind="${k}" ${busy ? 'disabled' : ''}>${escapeHtml(t('plib.lh_make_previews'))}</button>`);
+    if (g.kind === 'orphanProducts') acts.push(`<button class="btn small" data-act="pf-health-catalogue">${escapeHtml(t('plib.lh_catalogue'))}</button>`);
+    return `<section class="pf-hg" data-kind="${k}">
+        <div class="pf-hg-head"><h4 class="pf-hg-title">${escapeHtml(t(titleKey))}</h4><span class="pf-tagchip-n pf-hg-n">${g.count}</span></div>
+        ${saysKey ? `<p class="pf-hg-says">${escapeHtml(t(saysKey))}</p>` : ''}
+        ${g.kind === 'looksSame' ? `<p class="pf-hg-says">${escapeHtml(t('plib.lh_mirror_note'))}</p>` : ''}
+        <ul class="pf-hg-list">${items.slice(0, HEALTH_LIST_MAX).join('')}${more}</ul>
+        <div class="pf-hg-act">${acts.join('')}</div>
+      </section>`;
+  }
+
+  function showHealthGroup(kind) {
+    const g = healthGroup(kind); if (!g) return;
+    const [titleKey] = HEALTH_TEXT[kind] || [kind];
+    setFocus(g.modelIds.slice(), t(titleKey), kind === 'looksSame' ? 'plib.lh_mirror_note' : '');
+  }
+
+  /** Measure (re-read each file) or Make Previews (draw each again), one
+   *  model at a time, then check again. The import's own work, not a copy. */
+  async function healthFixEach(kind, what) {
+    const g = healthGroup(kind); if (!g || _healthBusy) return;
+    _healthBusy = kind; renderList();
+    try {
+      for (const id of g.modelIds) {
+        const rec = recById(id); if (!rec) continue;
+        // The picture only: rebuildThumb is the card's own way back to a preview.
+        if (what === 'preview') { await rebuildThumb(rec); continue; }
+        const full = await resolveModelPath(rec);
+        if (!full) continue;
+        if (what === 'measure') rec.geometryKey = null;   // a stale key is worse than none
+        await enrichPrintFile(rec, full);
+      }
+    } finally { _healthBusy = ''; }
+    await checkHealth();
+  }
+
+  /** A missing model: the shop points at its file, through Identify's picker. */
+  async function healthLocate(id) {
+    await identifyPrintFile(id);
+    if (_healthOpen) await checkHealth();
+  }
+
   function onClick(e) {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
@@ -1332,6 +1564,17 @@
       case 'pf-conv-del':  deleteConverted(id, btn.dataset.fn); break;
       case 'pf-setups': openSetups(id); break;
       case 'pf-identify': identifyPrintFile(id); break;
+      case 'pf-similar': findSimilar(id); break;
+      case 'pf-focus-clear': _focus = null; resetPage(); renderList(); break;
+      case 'pf-health': if (_healthOpen) closeHealth(); else openHealth(); break;
+      case 'pf-health-back': closeHealth(); break;
+      case 'pf-health-again': checkHealth(); break;
+      case 'pf-health-show': showHealthGroup(btn.dataset.kind); break;
+      case 'pf-health-measure': healthFixEach(btn.dataset.kind, 'measure'); break;
+      case 'pf-health-previews': healthFixEach(btn.dataset.kind, 'preview'); break;
+      case 'pf-health-locate': healthLocate(id); break;
+      case 'pf-health-open': editPrintFile(id); break;
+      case 'pf-health-catalogue': if (window.KhaytShell && window.KhaytShell.switchTab) window.KhaytShell.switchTab('catalog-tab'); break;
       case 'pf-log-print': logPrint(id, true); break;
       case 'pf-log-fail':  logPrint(id, false); break;
       case 'pf-pick': togglePick(id); break;
