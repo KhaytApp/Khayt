@@ -438,7 +438,7 @@
   "lic.bad_link": "Die Bestätigungsseite muss eine http- oder https-Adresse sein.",
   "lic.bad_date": "Dieses Enddatum konnte nicht gelesen werden.",
   "lic.have": "Ich habe eine Lizenz zum Verkauf von Drucken",
-  "lic.have_hint": "Hält fest, dass Sie eine Lizenz zum Verkauf von Drucken dieses Modells gekauft haben, sodass Aufträge und Produkte damit nicht mehr markiert werden. Code, Seite und Enddatum sind optional.",
+  "lic.have_hint": "Viele Designer geben ein Modell für den privaten Gebrauch kostenlos ab und verkaufen eine separate Lizenz zum Verkauf von Drucken. Beim Speichern wird dieses Modell als kommerziell (vom Designer gekauft) erfasst, sodass Aufträge und Produkte damit verkauft werden können. Fügen Sie den Code oder die Seite hinzu, falls vorhanden.",
   "lic.have_saved": "Erfasst: {name} ist für den Verkauf lizenziert.",
   "plib.photo": "Foto (optional)",
   "plib.photo_failed": "Bild konnte nicht geladen werden",

@@ -438,7 +438,7 @@
   "lic.bad_link": "The verification page must be an http or https address.",
   "lic.bad_date": "That end date could not be read.",
   "lic.have": "I have a licence to sell prints",
-  "lic.have_hint": "Records that you bought a licence to sell prints of this model, so jobs and products using it are no longer flagged. The code, page and end date are optional.",
+  "lic.have_hint": "Many designers give a model away for personal use and sell a separate licence to sell prints of it. Saving records this model as Commercial (bought from the designer), so jobs and products using it can be sold. Add the code or page if you have one.",
   "lic.have_saved": "Recorded: {name} is licensed for sale.",
   "plib.photo": "Photo (optional)",
   "plib.photo_failed": "Could not load image",

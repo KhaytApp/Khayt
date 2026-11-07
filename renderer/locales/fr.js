@@ -438,7 +438,7 @@
   "lic.bad_link": "La page de vérification doit être une adresse http ou https.",
   "lic.bad_date": "Cette date de fin n’a pas pu être lue.",
   "lic.have": "J’ai une licence pour vendre des impressions",
-  "lic.have_hint": "Indique que vous avez acheté une licence pour vendre des impressions de ce modèle : les commandes et produits qui l’utilisent ne sont plus signalés. Le code, la page et la date de fin sont facultatifs.",
+  "lic.have_hint": "Beaucoup de créateurs offrent un modèle pour un usage personnel et vendent à part une licence pour en vendre des impressions. L’enregistrement indique ce modèle comme Commercial (acheté au créateur) : les commandes et produits qui l’utilisent peuvent être vendus. Ajoutez le code ou la page si vous en avez.",
   "lic.have_saved": "Enregistré : {name} est autorisé à la vente.",
   "plib.photo": "Photo (facultatif)",
   "plib.photo_failed": "Impossible de charger l'image",

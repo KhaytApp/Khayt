@@ -438,7 +438,7 @@
   "lic.bad_link": "Doğrulama sayfası bir http veya https adresi olmalıdır.",
   "lic.bad_date": "Bu bitiş tarihi okunamadı.",
   "lic.have": "Baskı satmak için lisansım var",
-  "lic.have_hint": "Bu modelin baskılarını satmak için lisans satın aldığınızı kaydeder; onu kullanan işler ve ürünler artık işaretlenmez. Kod, sayfa ve bitiş tarihi isteğe bağlıdır.",
+  "lic.have_hint": "Birçok tasarımcı bir modeli kişisel kullanım için ücretsiz verir ve baskılarını satmak için ayrı bir lisans satar. Kaydetmek bu modeli Ticari (tasarımcıdan satın alınmış) olarak kaydeder; böylece onu kullanan işler ve ürünler satılabilir. Varsa kodu veya sayfayı ekleyin.",
   "lic.have_saved": "Kaydedildi: {name} satış için lisanslı.",
   "plib.photo": "Fotoğraf (isteğe bağlı)",
   "plib.photo_failed": "Resim yüklenemedi",

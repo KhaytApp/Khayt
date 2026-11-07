@@ -439,7 +439,7 @@
   "lic.bad_link": "A página de verificação deve ser um endereço http ou https.",
   "lic.bad_date": "Não foi possível ler essa data de término.",
   "lic.have": "Tenho uma licença para vender impressões",
-  "lic.have_hint": "Registra que você comprou uma licença para vender impressões deste modelo, e os trabalhos e produtos que o usam deixam de ser sinalizados. O código, a página e a data de término são opcionais.",
+  "lic.have_hint": "Muitos designers oferecem um modelo grátis para uso pessoal e vendem à parte uma licença para vender impressões dele. Ao salvar, este modelo fica registrado como Comercial (comprada do designer), e os trabalhos e produtos que o usam podem ser vendidos. Adicione o código ou a página, se tiver.",
   "lic.have_saved": "Registrado: {name} tem licença para venda.",
   "plib.photo": "Foto (opcional)",
   "plib.photo_failed": "Não foi possível carregar a imagem",
