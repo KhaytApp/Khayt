@@ -224,7 +224,7 @@ struct SettingsView: View {
                 Task {
                     securing = true
                     defer { securing = false }
-                    switch await api.secureThisPhone(name: UIDevice.current.name) {
+                    switch await api.secureThisPhone(name: settings.nameToSend) {
                     case .enrolled: secureAnswer = L10n.tr("settings.secure.done")
                     case .closed: secureAnswer = L10n.tr("settings.secure.closed")
                     case .locked: secureAnswer = L10n.tr("pair.window_locked")
@@ -269,6 +269,7 @@ struct SettingsView: View {
                     // A port is part of an address, written as the IP beside it is: Western digits.
                     Stepper(String(format: L10n.tr("settings.port"), locale: Locale(identifier: "en_US_POSIX"), settings.port), value: $settings.port, in: 1024...65535)
                     SecureField(L10n.tr("settings.pin"), text: $settings.pin)
+                        .pinEntry()
                     Button {
                         Task { await testConnection() }
                     } label: {

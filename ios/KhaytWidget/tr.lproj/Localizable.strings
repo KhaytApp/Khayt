@@ -32,3 +32,13 @@
 /* Live Activity buttons */
 "Move to post-processing" = "Son işleme taşı";
 "Print it again" = "Yeniden yazdır";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "Bugün kazanılan";
+"Owed" = "Alacak";
+"Low stock" = "Az stok";
+"%lld unpaid" = "%lld ödenmemiş";
+"to reorder" = "sipariş edilecek";
+"Pair Khayt with your shop to see its money here." = "Parayı burada görmek için Khayt’ı dükkânınızla eşleyin.";
+"Khayt Money" = "Khayt Para";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Bugünkü kazanç, müşterilerin borcu ve az kalan stok. iPhone kilitliyken gizlenir.";

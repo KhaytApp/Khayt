@@ -18,7 +18,8 @@ final class WidgetStringsTests: XCTestCase {
     /// Every plain `Text("…")` and `metric("…", …)` literal in the widget is a key.
     /// Interpolated ones are listed in the table by hand in their `%lld` form.
     func testEveryLiteralTheWidgetShowsIsTranslated() throws {
-        let source = try ["KhaytQueueWidget.swift", "PrintActivityWidget.swift", "PrintActivityViews.swift"].map {
+        let source = try ["KhaytQueueWidget.swift", "PrintActivityWidget.swift", "PrintActivityViews.swift",
+                          "KhaytMoneyWidget.swift", "MoneyWidgetViews.swift"].map {
             try String(contentsOf: root.appending(path: "KhaytWidget/\($0)"), encoding: .utf8)
         }.joined(separator: "\n")
         let ar = try table("ar")
@@ -35,5 +36,28 @@ final class WidgetStringsTests: XCTestCase {
         XCTAssertNotNil(ar["ETA %@"])
         XCTAssertNotNil(ar["Paused at %@"])
         XCTAssertNotNil(ar["Ends %@"])
+        XCTAssertNotNil(ar["%lld unpaid"])
+    }
+
+    /// The widget ships in nine languages; a key missing from one shows English there.
+    func testEveryLanguageHoldsTheSameKeys() throws {
+        let en = Set(try table("en").keys)
+        for lang in ["ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
+            XCTAssertEqual(Set(try table(lang).keys).symmetricDifference(en).sorted(), [], "\(lang) widget table")
+        }
+    }
+
+    /// In Arabic the app's name is the Latin "Khayt": "خيط" is the word for filament.
+    /// And the Money widget's figures are net of VAT, so nothing may say VAT is included.
+    func testTheAppsNameAndNoVATIncluded() throws {
+        for (key, value) in try table("ar") {
+            XCTAssertFalse(value.contains("خيط"), "\(key): the app is \"Khayt\" in Arabic")
+            XCTAssertFalse(value.contains("شامل الضريبة"), key)
+        }
+        for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
+            for (key, value) in try table(lang) {
+                XCTAssertFalse(value.localizedCaseInsensitiveContains("VAT included"), "\(lang) \(key)")
+            }
+        }
     }
 }

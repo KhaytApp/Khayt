@@ -31,7 +31,7 @@ struct WhatsAppCard: View {
                         }
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                    Image(systemName: "chevron.forward")
                         .font(.caption).foregroundStyle(KhaytDesign.note)
                 }
                 .padding(14)

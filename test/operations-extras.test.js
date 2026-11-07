@@ -6,6 +6,7 @@ test('processRecurringOrders clones due recurring jobs', () => {
   global.uid = (p) => p + '-1';
   global.saveAll = () => {};
   global.toast = () => {};
+  global.t = (k, p) => k + (p ? JSON.stringify(p) : '');
   global.printLog = [{
     id: 'R1',
     isRecurring: true,
