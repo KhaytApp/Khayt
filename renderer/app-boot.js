@@ -323,8 +323,8 @@ if (typeof document !== 'undefined') {
  * A save still waiting out saveAll's 300 ms debounce is written FIRST — otherwise the read-back
  * would replace an edit made a moment ago to that very job.
  */
-async function mergeOrderFromDisk(id) {
-  if (typeof flushSave === 'function') await flushSave();
+async function mergeOrderFromDisk(id, opts) {
+  if ((!opts || opts.flush !== false) && typeof flushSave === 'function') await flushSave();
   const store = await window.hubAPI.loadStore();
   const fresh = store && !store.__corrupt && (store.printLog || []).find((o) => o && o.id === id);
   if (!fresh) return;
@@ -683,29 +683,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderDashboard();
         toast('📱 ' + t('ord.status_updated_phone', { id, status: order.status }), 'info', 3000);
       } else if (idx !== -1) {
-        printLog[idx].status = status;
-        if (payload.clientApprovedAt) printLog[idx].clientApprovedAt = payload.clientApprovedAt;
-        if (payload.quoteAcceptedAt) printLog[idx].quoteAcceptedAt = payload.quoteAcceptedAt;
-        if (payload.quoteApproved) {
-          const order = printLog[idx];
-          if (!order.invoiceNum) {
-            order.invoiceNum = nextInvoiceNumber();
-            order.invoiceNumber = order.invoiceNum;
+        // Every sender of this shape (the portal's quote approval, the carrier
+        // webhooks, the storefront) has ALREADY WRITTEN the record to disk.
+        // Take the written record rather than patching the status in by hand:
+        // this branch used to copy `status` alone, push a history line of its
+        // own and save the whole book — so a carrier's tracking update was
+        // written over with the window's stale copy and lost for good.
+        // No flush first: a pending save would write that stale copy back.
+        const statusBefore = printLog[idx].status;
+        (async () => {
+          try { await mergeOrderFromDisk(id, { flush: false }); } catch (e) {
+            console.warn('[lan] could not re-read the order:', e && e.message);
           }
-          fireWebhook('quote_approved', { orderId: id, project: order.project, client: order.client });
-        }
-        if (!printLog[idx].statusHistory) printLog[idx].statusHistory = [];
-        printLog[idx].statusHistory.push({ status, at: new Date().toISOString() });
-        if (printLog[idx].statusHistory.length > 200) printLog[idx].statusHistory = printLog[idx].statusHistory.slice(-200);
-        saveAll();
-        renderLogs();
-        renderKanban();
-        renderDashboard();
-        if (payload.quoteApproved) {
-          toast('✅ ' + t('ord.client_quote_approved', { id }), 'success', 4000);
-        } else {
-          toast('📱 ' + t('ord.status_updated_phone', { id, status }), 'info', 3000);
-        }
+          const order = printLog.find((o) => o && o.id === id);
+          if (!order) return;
+          if (payload.quoteApproved) {
+            if (!order.invoiceNum) {
+              order.invoiceNum = nextInvoiceNumber();
+              order.invoiceNumber = order.invoiceNum;
+              saveAll();
+            }
+            fireWebhook('quote_approved', { orderId: id, project: order.project, client: order.client });
+          }
+          renderLogs();
+          renderKanban();
+          renderDashboard();
+          if (payload.quoteApproved) {
+            toast('✅ ' + t('ord.client_quote_approved', { id }), 'success', 4000);
+          } else if (order.status !== statusBefore) {
+            toast('📱 ' + t('ord.status_updated_phone', { id, status: order.status }), 'info', 3000);
+          }
+        })();
       } else if (id && payload.project && isValidOrder(payload)) {
         // New order from Salla/Zid (or other source): add to printLog, with any
         // missing date/status read as "" like every other job.

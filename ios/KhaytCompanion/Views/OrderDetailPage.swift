@@ -85,6 +85,8 @@ struct OrderDetailPage: View {
                                quote: order.status == OrderStatus.quote.rawValue ? quote : nil,
                                currency: currency,
                                onAnswer: { answer in Task { await answerQuote(answer) } })
+                // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
+                .disabled(!api.canWrite)
             // What the print drew from the wall, when a smart plug metered
             // enough of it. Nothing at all otherwise.
             if let energy {
@@ -97,6 +99,7 @@ struct OrderDetailPage: View {
                                onRevise: { revising = quoteState },
                                onFollowUp: { Task { await followUp() } },
                                onHistory: { showingHistory = true })
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             } else if order.status == OrderStatus.quote.rawValue, !api.holdsBook {
                 // No LAN route revises or follows up a quote: say so, rather
@@ -106,6 +109,7 @@ struct OrderDetailPage: View {
             }
             if let payment {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
             // A quote or a cancelled job has no invoice; the page says why for
@@ -124,6 +128,7 @@ struct OrderDetailPage: View {
             if let shipChoices, !shipChoices.isEmpty {
                 Button { shipping = true } label: { ShipCard() }
                     .buttonStyle(.plain)
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
                     .sheet(isPresented: $shipping) {
                         ShipSheet(orderId: order.id, carriers: shipChoices) {
@@ -207,6 +212,7 @@ struct OrderDetailPage: View {
             ToolbarItem(placement: .primaryAction) {
                 if api.holdsBook, order.status != "cancelled" {
                     Button(L10n.tr("edit.title")) { Task { editing = await api.editState(orderId: order.id) } }
+                        .disabled(!api.canWrite)
                 }
             }
         }
@@ -359,7 +365,7 @@ struct ShipCard: View {
                     .foregroundStyle(KhaytDesign.note)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+            Image(systemName: "chevron.forward")
                 .font(.caption).foregroundStyle(KhaytDesign.note)
         }
         .padding(14)
@@ -422,7 +428,7 @@ struct InvoiceCard: View {
                     .foregroundStyle(KhaytDesign.note)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+            Image(systemName: "chevron.forward")
                 .font(.caption).foregroundStyle(KhaytDesign.note)
         }
         .padding(14)
@@ -679,7 +685,6 @@ struct OrderDetailContent: View {
                         Text(next == .completed ? L10n.tr("order.detail.mark_done")
                                                 : L10n.format("order.detail.move_to", next.localizedLabel))
                         Image(systemName: "arrow.forward")
-                            .flipsForRightToLeftLayoutDirection(true)
                     }
                 }
                 .font(.khayt(17, .semibold, relativeTo: .headline))

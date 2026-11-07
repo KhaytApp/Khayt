@@ -461,7 +461,7 @@
 "pair.signed_out" = "The Mac signed this phone out. Pair it again with the owner PIN.";
 "pair.pin.title" = "The owner PIN";
 "pair.pin.body" = "The owner PIN from Settings → Online on the Mac or PC, 8 characters or more. The intake PIN will not work here.";
-"pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
+"pair.pin.foot" = "Sent only to this Mac, to pair, then deleted from the phone. A computer that cannot pair a phone keeps it in the iPhone Keychain.";
 "pair.pin.wrong" = "That PIN was refused. Check Settings → Online on the Mac or PC.";
 "pair.window_closed" = "On the Mac, click Pair a phone (Settings → Online), then try again.";
 "pair.window_locked" = "Too many wrong PINs from this phone. On the Mac, click Pair a phone again (Settings → Online), then try with the right PIN.";
@@ -1097,6 +1097,15 @@
 "care.part.fep_film" = "FEP film";
 "care.part.resin_tank" = "Resin tank";
 "care.part.ipa" = "Isopropyl alcohol (litre)";
+"pair.again.title" = "Pair this phone again";
+"pair.again.line" = "Type the owner PIN to reach the Mac again. The phone never sends it by itself.";
+"pair.again.button" = "Pair again";
+"pair.again.body" = "The owner PIN from Settings → Online on the Mac. It is sent once, to this address, to pair — then deleted from the phone.";
+"pair.phone_name" = "This phone’s name";
+"pair.phone_name.foot" = "How the Mac lists this phone among its paired phones, so you can tell them apart.";
+"cloud.read_only" = "Read-only sign-in";
+"cloud.read_only.line" = "This phone is signed in to Khayt Cloud as a viewer, with no Mac paired: it shows the shop but cannot change it.";
+"cloud.read_only.refused" = "Not saved: this phone’s Khayt Cloud sign-in is read-only. Pair with the Mac, or sign in with an account that can edit.";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "Shopping list";

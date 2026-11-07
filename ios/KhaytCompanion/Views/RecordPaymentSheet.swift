@@ -51,6 +51,7 @@ struct RecordPaymentSheet: View {
                 }
                 .padding(16)
             }
+            .editsShop()
             .scrollDismissesKeyboard(.interactively)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("pay.modal_title"))

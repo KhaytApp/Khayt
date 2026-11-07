@@ -228,4 +228,53 @@ final class LocalizationCompletenessTests: XCTestCase {
         XCTAssertFalse(code.contains { $0.contains("L10n.") },
                        "KhaytModels.swift uses L10n; put the words in an extension elsewhere")
     }
+
+    /// "خيط" is the Arabic for filament, and the app is called Khayt in
+    /// Latin letters in every language (as "Khayt Cloud" already was). An
+    /// Arabic line that used the word as the app's name read "open filament",
+    /// "filament cloud". The word stays only where it means filament: these
+    /// keys. A new line that needs it names its key here, deliberately.
+    func testArabicCallsTheAppKhaytAndSaysFilamentOnlyForFilament() throws {
+        let filament: Set<String> = [
+            "settings.notify.low_stock", "notify.low_stock.title", "spool.detail.filament",
+            "spool.detail.adjust.body", "spool.lookup.body", "spool.quantity.one", "order.field.filament",
+            "feed.empty.sub", "Filament left", "Queue, late jobs, low filament",
+            "calc.add_colour", "calc.filament", "calc.no_spool",
+        ]
+        let ios = Self.appDir.deletingLastPathComponent()
+        let tables = ["KhaytCompanion/Resources", "KhaytWidget", "KhaytAlerts"].map {
+            ios.appending(path: "\($0)/ar.lproj/Localizable.strings")
+        }
+        var found: [String] = []
+        for url in tables {
+            let dict = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], url.path())
+            for (key, value) in dict where value.contains("خيط") && !filament.contains(key) {
+                found.append("\(url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent): \(key)")
+            }
+            XCTAssertFalse(dict.values.contains { $0.contains("سحابة خيط") }, "Khayt Cloud is a name: \(url.path())")
+        }
+        XCTAssertEqual(found.sorted(), [], "خيط used as the app's name; write Khayt")
+    }
+
+    /// Every permission prompt the app can raise is in all nine languages,
+    /// and the built app carries the translations (an `InfoPlist.strings`
+    /// the build left out is a prompt in English on an Arabic phone).
+    func testEveryPermissionPromptIsTranslatedAndShipped() throws {
+        let plist = try XCTUnwrap(NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/Info.plist")) as? [String: Any])
+        let keys = plist.keys.filter { $0.hasSuffix("UsageDescription") }.sorted()
+        XCTAssertTrue(keys.contains("NSCameraUsageDescription"))
+        for language in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
+            let url = Self.appDir.appending(path: "Resources/\(language).lproj/InfoPlist.strings")
+            let table = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], "\(language): no InfoPlist.strings")
+            for key in keys {
+                XCTAssertFalse((table[key] ?? "").isEmpty, "\(language): \(key) untranslated")
+            }
+            XCTAssertNotNil(Bundle.main.path(forResource: "InfoPlist", ofType: "strings", inDirectory: nil, forLocalization: language),
+                            "\(language): InfoPlist.strings is not in the built app")
+        }
+        let camera = try XCTUnwrap(plist["NSCameraUsageDescription"] as? String)
+        for use in ["label", "barcode", "receipt", "print"] {
+            XCTAssertTrue(camera.lowercased().contains(use), "the camera prompt does not mention \(use)s")
+        }
+    }
 }

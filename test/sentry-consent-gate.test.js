@@ -17,7 +17,10 @@ const path = require('path');
 const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
 
 test('Sentry drops events unless crash reporting was opted into', () => {
-  assert.match(main, /beforeSend:\s*\(event\)\s*=>\s*\(telemetryConsent\(\)\.crash\s*\?\s*event\s*:\s*null\)/,
+  // Consent first, then the scrubber (lib/main/sentry-scrub.js): an event
+  // with no consent is dropped before anything reads it.
+  const init = main.slice(main.indexOf('beforeSend:'), main.indexOf('beforeSend:') + 300);
+  assert.match(init, /beforeSend:\s*\(event\)\s*=>\s*\{\s*if \(!telemetryConsent\(\)\.crash\) return null;/,
     'no beforeSend consent gate on the Sentry init');
 });
 

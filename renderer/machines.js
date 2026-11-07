@@ -1163,12 +1163,11 @@ function openMachineEditor(machineId = null) {
         const resultEl = modal.querySelector('#apiTestResult');
         if (resultEl) resultEl.textContent = '…testing';
         try {
-          if (window.hubAPI?.startPrinterPolling) {
+          if (window.hubAPI?.probePrinter) {
+            // One question to this printer; the fleet's polling carries on.
             const testMachine = { id: draft.id, printerApi: { ...draft.printerApi } };
-            await window.hubAPI.startPrinterPolling([testMachine]);
-            const cache = await window.hubAPI.getPrinterStatus();
+            const s = await window.hubAPI.probePrinter(testMachine);
             if (resultEl) {
-              const s = cache[draft.id];
               if (s?.error) {
                 // The owner is standing in the dialog that can fix it, so this is
                 // the best possible moment to say "it moved" rather than "it timed
@@ -1394,9 +1393,11 @@ function openMachineEditor(machineId = null) {
 function refreshPrinterPolling() {
   try {
     if (!window.hubAPI?.startPrinterPolling) return;
-    const apiMachines = (typeof machines !== 'undefined' ? machines : [])
-      .filter((m) => m.printerApi && m.printerApi.type && m.printerApi.type !== 'none');
-    if (!apiMachines.length) return;
+    // The machines boot polls: active ones (a retired printer is not watched).
+    const pool = typeof activeMachines === 'function' ? activeMachines() : (typeof machines !== 'undefined' ? machines : []);
+    const apiMachines = pool.filter((m) => m && m.printerApi && m.printerApi.type && m.printerApi.type !== 'none');
+    // The last connected printer removed: stop, or it is polled until restart.
+    if (!apiMachines.length) { window.hubAPI.stopPrinterPolling?.(); return; }
     window.hubAPI.startPrinterPolling(apiMachines).then((cache) => {
       if (typeof machineStatusCache !== 'undefined') machineStatusCache = cache || {};
       if (typeof updateKanbanLiveStatus === 'function') updateKanbanLiveStatus();
@@ -1477,6 +1478,7 @@ function unretireMachine(machineId) {
   machines[i] = KhaytMachineStatus.unretire(machines[i]);
   if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
+  refreshPrinterPolling();   // a removed, retired or returned printer changes what is polled
   renderMachines();
   renderMachineDropdown();
 }
@@ -1509,6 +1511,7 @@ async function deleteMachine(machineId) {
   }
   if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
+  refreshPrinterPolling();   // a removed, retired or returned printer changes what is polled
   renderMachines();
   renderMachineDropdown();
   if (typeof refreshMachineCameras === 'function') refreshMachineCameras();

@@ -320,6 +320,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   startPrinterPolling: (machines) => ipcRenderer.invoke('hub:start-printer-polling', machines),
   stopPrinterPolling:  ()         => ipcRenderer.invoke('hub:stop-printer-polling'),
   getPrinterStatus:    ()         => ipcRenderer.invoke('hub:get-printer-status'),
+  probePrinter:        (machine)  => ipcRenderer.invoke('hub:probe-printer', machine),
   // Pause / resume / cancel the running job. Main validates the host and the
   // command name; nothing here is trusted.
   printerCommand:      (machine, command) => ipcRenderer.invoke('hub:printer-command', { machine, command }),
