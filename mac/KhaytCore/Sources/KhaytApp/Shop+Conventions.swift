@@ -378,7 +378,7 @@ extension Shop {
 
     /// The files a drop on the jobs list, or on the Dock icon, takes a job
     /// from. Machine files and the meshes this app can measure.
-    static let droppableModelKinds: Set<String> = ["3mf", "stl", "obj", "gcode"]
+    nonisolated static let droppableModelKinds: Set<String> = ["3mf", "stl", "obj", "gcode"]
 
     static func droppableModels(_ urls: [URL]) -> [URL] {
         urls.filter { $0.isFileURL && droppableModelKinds.contains($0.pathExtension.lowercased()) }
@@ -421,7 +421,10 @@ extension Shop {
             return false
         }
         shelf = .jobs(nil)
-        await startJob(fromModels: chosen, asQuote: false)
+        // A name from a `khayt://job/new` link, taken once.
+        let named = Self.pendingJobName
+        Self.pendingJobName = nil
+        await startJob(fromModels: chosen, asQuote: false, named: named)
         return true
     }
 

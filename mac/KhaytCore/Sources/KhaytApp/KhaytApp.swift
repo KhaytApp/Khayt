@@ -241,15 +241,18 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// book is open. Only model files are kept from files; the one URL scheme
     /// the app declares, khayt://, is a desktop widget's row (`DeepLink`).
     func application(_ application: NSApplication, open urls: [URL]) {
-        let links = urls.compactMap(ShopWidgetSnapshot.Link.init)
+        // `khayt://job/new` first: read as a widget link it would be "job new".
+        let jobLinks = urls.compactMap(NewJobLink.init)
+        let links = urls.filter { NewJobLink($0) == nil }.compactMap(ShopWidgetSnapshot.Link.init)
         let models = Shop.droppableModels(urls.filter(\.isFileURL))
-        guard !links.isEmpty || !models.isEmpty else { return }
+        guard !links.isEmpty || !models.isEmpty || !jobLinks.isEmpty else { return }
         MainActor.assumeIsolated {
             // The window first: with it closed (⌘W, the app kept alive by
             // Settings, Help or the kiosk) nothing was listening, and the
             // click did nothing until the window was next opened.
             ShopWindowOpener.raise()
             if !links.isEmpty { Shop.openedLinks += links }
+            if !jobLinks.isEmpty { Shop.openedJobLinks += jobLinks }
             if !models.isEmpty { Shop.openedFiles += models }
         }
     }

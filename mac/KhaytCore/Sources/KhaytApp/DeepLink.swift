@@ -59,7 +59,15 @@ extension Shop {
     /// clicks before the book opened mean the second. `windowOpenedAt` is when
     /// the taking window's `.task` began; nil from the live receiver.
     func takeOpenedLinks(windowOpenedAt: Date? = nil) {
-        guard let link = Self.openedLinks.last, engine != nil, !needsSignIn else { return }
+        guard engine != nil, !needsSignIn else { return }
+        // "Send to Khayt as a job" (`NewJobLink`) — it asks before anything.
+        if let job = Self.openedJobLinks.last {
+            Self.openedJobLinks = []
+            if !Self.isStale(arrivedAt: Self.openedLinksArrived, windowOpenedAt: windowOpenedAt) {
+                Task { await receive(job) }
+            }
+        }
+        guard let link = Self.openedLinks.last else { return }
         Self.openedLinks = []
         guard !Self.isStale(arrivedAt: Self.openedLinksArrived, windowOpenedAt: windowOpenedAt) else { return }
         follow(link)
