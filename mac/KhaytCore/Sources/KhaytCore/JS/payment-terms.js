@@ -13,11 +13,9 @@
  *   customer was before this existed, so a book that never sets terms ages
  *   exactly as it did.
  * * The due date is the INVOICE DATE plus the terms. The invoice date is the
- *   date the issued invoice prints (`lib/invoice-document.js` prints
- *   `order.date` under "Date"), else the job's timestamp — there is no
- *   separate issue stamp on an order, and inventing a field nobody writes
- *   would be a rule that never fires. Due and invoice date must agree on the
- *   paper: "Date 1 Oct · Net 30 · Due 31 Oct".
+ *   date the issued invoice prints (`invoiceDate` below: an accepted quote's
+ *   acceptance, else `order.date`, else the job's timestamp). Due and invoice
+ *   date must agree on the paper: "Date 1 Oct · Net 30 · Due 31 Oct".
  * * Overdue is PAST the due date (not on it) and not settled.
  *
  * Calendar arithmetic is on `YYYY-MM-DD` with `Date.UTC`, so no time zone and
@@ -96,12 +94,43 @@
   }
 
   /**
-   * The date the invoice is dated: `order.date`, else its `timestamp`, as the
-   * first ten characters — the same reading receivables has always aged from.
-   * '' when neither is a day.
+   * THE DAY THE INVOICE WAS ISSUED — the one date every reader of an invoice
+   * uses: the printed paper (`lib/invoice-document.js`), the due date below,
+   * the VAT summary (`lib/pnl-report.js taxPointDate`, which is this) and the
+   * accountant's CSV (`lib/accounting-rows.js`).
+   *
+   * The shop's rule (decided Oct 21 2026): VAT is due on ISSUED invoices. A
+   * plain job is invoiced when it is booked, so its day is its own `date`. A
+   * job that began as a QUOTE is given its invoice number when the customer
+   * says yes (`lib/order-new.js ensureInvoiceNumber`) while its `date` stays
+   * the quote's — so its invoice is issued on the acceptance:
+   * `quoteAcceptedAt`, else `clientApprovedAt`.
+   *
+   * Before this one rule, a quote of 28 Sep accepted on 2 Oct put its VAT in
+   * Q4 on the summary, in Q3 in the accountant's CSV, and printed 28 Sep.
+   *
+   * A stamp is a bare `YYYY-MM-DD` (the shop's own day, read as written) or
+   * an ISO instant, read as the LOCAL day it fell on — a UTC slice put a
+   * 01:00 Riyadh acceptance on the day before. A stamp that is not a day is
+   * passed over. Otherwise `date`, else `timestamp`, as the first ten
+   * characters — the reading receivables has always aged from. '' when
+   * nothing is a day.
+   *
+   * Held in Swift by `KhaytCore.PaymentTerms.invoiceDate`
+   * (`PaymentTermsParityTests`).
    */
   function invoiceDate(order) {
     if (!order || typeof order !== 'object') return '';
+    const stamp = order.quoteAcceptedAt || order.clientApprovedAt;
+    if (stamp) {
+      const text = String(stamp);
+      let day = text.slice(0, 10);
+      if (text.length > 10 && /^\d{4}-\d{2}-\d{2}T/.test(text)) {
+        const at = new Date(text);
+        if (!isNaN(at.getTime())) day = dayOf(at);
+      }
+      if (parts(day)) return day;
+    }
     const s = String(order.date || order.timestamp || '').slice(0, 10);
     return parts(s) ? s : '';
   }
