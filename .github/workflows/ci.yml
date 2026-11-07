@@ -237,6 +237,14 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:photolicence
 
+      - name: E2E smoke (energy per print from the smart plug)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:energy
+
+      - name: E2E smoke (group by colour in suggested assignments)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:swap
+
       - name: E2E smoke (order to print file link)
         run: xvfb-run -a npm run test:e2e:filelink
 
