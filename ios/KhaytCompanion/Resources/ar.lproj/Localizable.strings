@@ -451,12 +451,12 @@
 
 /* Pairing, as design/ios-v2 draws it */
 "pair.find.title" = "أي ورشة؟";
-"pair.find.body" = "أجهزة الماك التي تشغّل خيط تعلن عن نفسها على هذه الشبكة.";
+"pair.find.body" = "أجهزة الماك التي تشغّل Khayt تعلن عن نفسها على هذه الشبكة.";
 "pair.searching" = "جاري البحث";
 "pair.shop.needs_mac" = "يحتاج الماك قريباً";
 "pair.manual.why" = "لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.";
 "pair.manual.title" = "عنوان الماك";
-"pair.manual.body" = "يعرضهما خيط على السطح، في الإعدادات ← واجهة الشبكة.";
+"pair.manual.body" = "يعرضهما Khayt على السطح، في الإعدادات ← واجهة الشبكة.";
 "pair.manual.port" = "المنفذ";
 "pair.signed_out" = "سجّل الماك خروج هذا الهاتف. أقرنه من جديد برمز المالك.";
 "pair.pin.title" = "رمز المالك";
@@ -593,7 +593,7 @@
 
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
-"PUSH_TITLE" = "خيط";
+"PUSH_TITLE" = "Khayt";
 "PUSH_PRINT_FINISHED" = "انتهت طباعة";
 "PUSH_INTAKE" = "طلب جديد";
 
@@ -646,7 +646,7 @@
 /* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
 "intent.advance.done" = "نُقل %1$@ إلى %2$@.";
 "intent.advance.gone" = "هذا الطلب لم يعد في الطابور.";
-"intent.no_book" = "لا توجد ورشة في خيط على هذا الهاتف بعد.";
+"intent.no_book" = "لا توجد ورشة في Khayt على هذا الهاتف بعد.";
 "intent.filament.one" = "متبقٍّ %1$@ من %2$@، على %3$d بكرة.";
 "intent.filament.none" = "لا يوجد %@ على الرف.";
 "intent.filament.empty" = "الرف فارغ.";
@@ -666,7 +666,7 @@
 "wa.m.delivered" = "تم التسليم";
 "wa.to" = "إلى %@";
 "wa.logged_note" = "فتح واتساب يسجّل هذه الرسالة في سجل تواصل العميل. لا يُرسل واتساب شيئًا حتى تضغط إرسال فيه.";
-"wa.default_words" = "كلمات خيط الافتراضية. قوالب واتساب الخاصة بورشتك على الماك، في الإعدادات › التكاملات.";
+"wa.default_words" = "كلمات Khayt الافتراضية. قوالب واتساب الخاصة بورشتك على الماك، في الإعدادات › التكاملات.";
 "wa.open" = "افتح واتساب";
 "wa.language" = "اللغة";
 "wa.lang.ar" = "العربية";
@@ -684,7 +684,7 @@
 "wa.share_photo" = "مشاركة مع الصورة…";
 "wa.share_photo.note" = "اختر واتساب من قائمة المشاركة، ثم محادثة العميل. تُسجَّل في سجل تواصل العميل حين تُرسل إلى واتساب.";
 /* Focus filter (ShopFocusFilter) */
-"Khayt notifications" = "إشعارات خيط";
+"Khayt notifications" = "إشعارات Khayt";
 "Print finished or failed" = "انتهاء الطباعة أو فشلها";
 "New order requests" = "طلبات جديدة";
 "Queue, late jobs, low filament" = "الطابور والطلبات المتأخرة ونقص الخيط";
@@ -708,9 +708,9 @@
 "quote.file.exact" = "قاسه مُقطِّع الطباعة على الماك.";
 "quote.file.estimated" = "تقدير من شكل المجسّم.";
 "quote.file.make_quote" = "حوّله إلى عرض سعر";
-"quote.file.needs_mac" = "تسعير الملفات يحتاج تطبيق خيط للماك (alpha.63 أو أحدث) على شبكة الورشة.";
+"quote.file.needs_mac" = "تسعير الملفات يحتاج تطبيق Khayt للماك (alpha.63 أو أحدث) على شبكة الورشة.";
 "quote.file.reason.off" = "التسعير الفوري متوقف على الماك. فعّله لنموذج الطلبات في الإعدادات.";
-"quote.file.reason.unsupported" = "يسعّر خيط ملفات STL وOBJ و3MF وG-code.";
+"quote.file.reason.unsupported" = "يسعّر Khayt ملفات STL وOBJ و3MF وG-code.";
 "quote.file.reason.too-large" = "حجم الملف أكبر من 32 ميغابايت.";
 "quote.file.reason.no-numbers" = "أسعار الورشة غير مُعدّة على الماك بعد.";
 "quote.file.reason.no-price" = "لم يستطع الماك تسعير هذا الملف.";
@@ -728,11 +728,11 @@
 "photos.err.too_large" = "الصورة أكبر من أن تُرسل حتى بعد تصغيرها.";
 "photos.err.not_published" = "ليس لهذا الطلب صفحة تتبّع بعد. انشره من الماك أولاً.";
 "photos.err.viewer" = "تسجيل دخولك إلى Khayt Cloud يسمح بالعرض فقط دون التعديل.";
-"photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع خيط استخدامها. اختر JPEG أو PNG.";
+"photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع Khayt استخدامها. اختر JPEG أو PNG.";
 "photos.err.http" = "لم يقبل Khayt Cloud الصورة (خطأ %lld). حاول مرة أخرى.";
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
-"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في خيط على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";
+"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في Khayt على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";
 
 /* The calculator — priced on the phone from the shop's own book. */
 "tab.calculator" = "الحاسبة";
@@ -825,15 +825,15 @@
 "library.notes" = "ملاحظات من طباعته";
 "library.stale" = "لهذا النموذج إصدار جديد لم يقِسه الماك بعد. سعّره على شبكة الورشة، أو استخدم الحاسبة.";
 "library.not_estimable" = "يسعّر الماك نماذج STL وOBJ و3MF وG-code. استخدم الحاسبة لهذا النموذج.";
-"library.needs_mac" = "التسعير من المكتبة يحتاج الماك على شبكة الورشة بإصدار من خيط يدعمه. الحاسبة تعمل على أي حال.";
+"library.needs_mac" = "التسعير من المكتبة يحتاج الماك على شبكة الورشة بإصدار من Khayt يدعمه. الحاسبة تعمل على أي حال.";
 "library.reason.no-file" = "النموذج مسجّل على الماك لكن ملفه غير موجود.";
 "library.reason.not-found" = "هذا النموذج لم يعد في المكتبة.";
 "quote.file.unreliable" = "هذا النموذج خارج النطاق الذي يصلح له التقدير. راجع الرقم قبل إرساله.";
 "library.reason.not-configured" = "اضبط التسعير الفوري على الكمبيوتر أولًا: طابعة وخامة للتقدير.";
 "library.sample" = "الورشة التجريبية بلا ماك يقيس النماذج. افتحه في الحاسبة لتسعيره من وزنه ووقته المسجّلين.";
-"library.from_copy" = "أنت خارج الورشة: هذه مكتبتك كما كانت في آخر مزامنة مع سحابة خيط، والأسعار تُحسب على هذا الهاتف.";
+"library.from_copy" = "أنت خارج الورشة: هذه مكتبتك كما كانت في آخر مزامنة مع Khayt Cloud، والأسعار تُحسب على هذا الهاتف.";
 "library.priced_here" = "حُسب على هذا الهاتف بأسعارك. النموذج متعدد الألوان يُحسب على بكرة واحدة، فقد يختلف رقم الماك قليلًا.";
-"library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى سحابة خيط من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
+"library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى Khayt Cloud من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
 
 /* Catalogue */
 "catalogue.title" = "الكتالوج";
@@ -842,7 +842,7 @@
 "catalogue.empty" = "لا منتجات بعد. أضفها من الكتالوج على جهاز الماك.";
 "catalogue.no_match" = "لا يوجد منتج مطابق.";
 "catalogue.partial" = "تُعرض %1$lld من %2$lld منتج. ابحث عن البقية على الماك.";
-"catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع سحابة خيط أو مع جهاز الماك أولًا.";
+"catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع Khayt Cloud أو مع جهاز الماك أولًا.";
 "catalogue.in_stock" = "%lld في المخزون";
 "catalogue.out_of_stock" = "نفد المخزون";
 "catalogue.description" = "الوصف";

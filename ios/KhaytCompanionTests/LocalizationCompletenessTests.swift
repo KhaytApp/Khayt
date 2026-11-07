@@ -228,4 +228,31 @@ final class LocalizationCompletenessTests: XCTestCase {
         XCTAssertFalse(code.contains { $0.contains("L10n.") },
                        "KhaytModels.swift uses L10n; put the words in an extension elsewhere")
     }
+
+    /// "خيط" is the Arabic for filament, and the app is called Khayt in
+    /// Latin letters in every language (as "Khayt Cloud" already was). An
+    /// Arabic line that used the word as the app's name read "open filament",
+    /// "filament cloud". The word stays only where it means filament: these
+    /// keys. A new line that needs it names its key here, deliberately.
+    func testArabicCallsTheAppKhaytAndSaysFilamentOnlyForFilament() throws {
+        let filament: Set<String> = [
+            "settings.notify.low_stock", "notify.low_stock.title", "spool.detail.filament",
+            "spool.detail.adjust.body", "spool.lookup.body", "spool.quantity.one", "order.field.filament",
+            "feed.empty.sub", "Filament left", "Queue, late jobs, low filament",
+            "calc.add_colour", "calc.filament", "calc.no_spool",
+        ]
+        let ios = Self.appDir.deletingLastPathComponent()
+        let tables = ["KhaytCompanion/Resources", "KhaytWidget", "KhaytAlerts"].map {
+            ios.appending(path: "\($0)/ar.lproj/Localizable.strings")
+        }
+        var found: [String] = []
+        for url in tables {
+            let dict = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], url.path())
+            for (key, value) in dict where value.contains("خيط") && !filament.contains(key) {
+                found.append("\(url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent): \(key)")
+            }
+            XCTAssertFalse(dict.values.contains { $0.contains("سحابة خيط") }, "Khayt Cloud is a name: \(url.path())")
+        }
+        XCTAssertEqual(found.sorted(), [], "خيط used as the app's name; write Khayt")
+    }
 }
