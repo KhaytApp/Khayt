@@ -1043,3 +1043,17 @@
 "printphotos.one" = "完成的打印件照片";
 "printphotos.note" = "在电脑上添加，包括打印完成时打印机自己拍的照片。它们也会显示在电脑上的作品集中。";
 "printphotos.full_on_computer" = "这是随账本同步的小尺寸副本。全尺寸照片保存在拍摄它的电脑上。";
+"printphotos.source.printer" = "由打印机拍摄";
+"printphotos.source.shop" = "在电脑上添加";
+"printphotos.source.phone" = "从手机添加";
+"printphotos.note.add" = "在这里添加的照片会以原尺寸发送到 Mac，并进入它的作品集。打印完成时打印机拍的照片也会显示在这里。";
+"printphotos.take" = "拍照";
+"printphotos.pick" = "选择照片";
+"printphotos.sending" = "正在发送到 Mac…";
+"printphotos.why.device" = "此手机需要重新与 Mac 配对后才能添加照片。";
+"printphotos.why.not_found" = "Mac 上已没有这个订单。";
+"printphotos.why.old_mac" = "请在 Mac 上更新 Khayt，以便从手机添加照片。";
+"printphotos.why.read_only" = "Mac 上的店铺目前为只读，无法接收照片。";
+"printphotos.why.too_large" = "这张照片对 Mac 来说太大了。请换一张小一点的。";
+"printphotos.why.not_image" = "Mac 无法读取这张图片。请使用 JPEG 或 PNG。";
+"printphotos.why.unreachable" = "无法连接 Mac。添加照片需要连接店铺的 Wi-Fi。";

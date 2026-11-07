@@ -35,6 +35,8 @@ struct OrderDetailPage: View {
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     /// The job's own photos of the finished print, from the book.
     @State private var printPhotos: [JobPrintPhoto] = []
+    /// A phone the Mac enrolled can send a photo of the print (not a quote).
+    private var canAddPhoto: Bool { api.canAddJobPhoto && order.status != "quote" && order.status != "cancelled" }
     @State private var showingInvoice = false
     @State private var showingProforma = false
     /// The carriers to ship with, when this job is finished and not yet sent.
@@ -135,8 +137,12 @@ struct OrderDetailPage: View {
             }
             // The finished print, as the Mac and the desktop keep it — the
             // printer's own snapshot at the end of a print among them.
-            if !printPhotos.isEmpty {
-                PrintPhotosCard(photos: printPhotos)
+            if !printPhotos.isEmpty || canAddPhoto {
+                PrintPhotosCard(photos: printPhotos, add: canAddPhoto ? { jpeg in
+                    let reply = await api.addJobPhoto(orderId: order.id, jpeg: jpeg)
+                    printPhotos = api.printPhotos(orderId: order.id)
+                    return reply
+                } : nil)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
             // Only an order the Mac has published has a page to put a photo on.
