@@ -4292,7 +4292,7 @@
   "track.done": "完成",
   "track.ready": "可取货",
   "sms.title": "短信 / WhatsApp 通知",
-  "sms.intro": "通过 Twilio、WhatsApp Cloud API、Unifonic 或自有 Webhook，自动向客户发送订单更新短信或 WhatsApp 消息。",
+  "sms.intro": "订单更新会通过 WhatsApp Business（WhatsApp Cloud API）自动发送给已同意接收的客户。Twilio、Unifonic 和你自己的 Webhook 用于发送营销活动和你选择发送的单条消息。",
   "sms.provider": "服务商",
   "sms.none": "关闭",
   "sms.webhook": "自定义 Webhook",

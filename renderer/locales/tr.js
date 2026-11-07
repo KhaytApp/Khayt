@@ -4292,7 +4292,7 @@
   "track.done": "Tamamlandı",
   "track.ready": "Teslim alınmaya hazır",
   "sms.title": "SMS / WhatsApp Bildirimleri",
-  "sms.intro": "Twilio, WhatsApp Cloud API, Unifonic veya kendi webhook'unuz üzerinden müşterilere otomatik sipariş güncellemeleri gönderin.",
+  "sms.intro": "Sipariş güncellemeleri, kabul eden müşterilere WhatsApp Business (WhatsApp Cloud API) üzerinden otomatik gönderilir. Twilio, Unifonic ve kendi webhook’unuz kampanyaları ve sizin göndermeyi seçtiğiniz tekil mesajları gönderir.",
   "sms.provider": "Sağlayıcı",
   "sms.none": "Kapalı",
   "sms.webhook": "Özel webhook",

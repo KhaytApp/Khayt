@@ -4292,7 +4292,7 @@
   "track.done": "Terminé",
   "track.ready": "Prêt à retirer",
   "sms.title": "Notifications SMS / WhatsApp",
-  "sms.intro": "Envoyez des mises à jour de commande automatiques aux clients par SMS ou WhatsApp via Twilio, l’API WhatsApp Cloud, Unifonic ou votre propre webhook.",
+  "sms.intro": "Les mises à jour de commande partent automatiquement par WhatsApp Business (WhatsApp Cloud API) vers les clients qui les ont acceptées. Twilio, Unifonic et votre propre webhook envoient les campagnes et les messages ponctuels que vous choisissez d’envoyer.",
   "sms.provider": "Fournisseur",
   "sms.none": "Désactivé",
   "sms.webhook": "Webhook personnalisé",

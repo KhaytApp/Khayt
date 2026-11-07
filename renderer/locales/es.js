@@ -4292,7 +4292,7 @@
   "track.done": "Listo",
   "track.ready": "Listo para recoger",
   "sms.title": "Notificaciones SMS / WhatsApp",
-  "sms.intro": "Envía actualizaciones de pedidos automáticas a los clientes por SMS o WhatsApp mediante Twilio, la API de WhatsApp Cloud, Unifonic o tu propio webhook.",
+  "sms.intro": "Las novedades del pedido se envían automáticamente por WhatsApp Business (WhatsApp Cloud API) a los clientes que las aceptaron. Twilio, Unifonic y tu propio webhook envían campañas y los mensajes sueltos que tú decidas enviar.",
   "sms.provider": "Proveedor",
   "sms.none": "Desactivado",
   "sms.webhook": "Webhook personalizado",

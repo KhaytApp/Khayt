@@ -4293,7 +4293,7 @@
   "track.done": "Done",
   "track.ready": "Ready for pickup",
   "sms.title": "SMS / WhatsApp Notifications",
-  "sms.intro": "Send automated order updates to customers over SMS or WhatsApp via Twilio, the WhatsApp Cloud API, Unifonic, or your own webhook.",
+  "sms.intro": "Order updates go out automatically over WhatsApp Business (WhatsApp Cloud API) to customers who agreed to them. Twilio, Unifonic and your own webhook send campaigns and one-off messages you choose to send.",
   "sms.provider": "Provider",
   "sms.none": "Off",
   "sms.webhook": "Custom webhook",
