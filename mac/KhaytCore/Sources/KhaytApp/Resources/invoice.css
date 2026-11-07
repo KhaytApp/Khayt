@@ -522,7 +522,8 @@ html.printing-labels #label-print-area {
 .wo-checks { padding: 12px 0; }
 
 /* The stamp an invoice carries: one of PAID, VOID or CREDITED, chosen in
-   lib/invoice-document.js (VOID > CREDITED > PAID). This file is the same in
+   lib/invoice-document.js (VOID > CREDITED > PAID). PAID is the small corner
+   stamp; VOID and CREDITED are a line at the head and the word across it. This file is the same in
    all three apps (renderer, Mac, iPhone), so the stamp prints the same
    everywhere. inset-inline-end mirrors it on an Arabic invoice. */
 .inv { position: relative; }
@@ -546,8 +547,6 @@ html.printing-labels #label-print-area {
   print-color-adjust: exact;
 }
 .inv .inv-stamp.paid { color: #2bb673; }
-.inv .inv-stamp.void,
-.inv .inv-stamp.credited { color: #b91c1c; }
 /* A voided or fully credited invoice: what happened, at the head of the page… */
 .inv .inv-reversal {
   border: 2px solid #b91c1c;

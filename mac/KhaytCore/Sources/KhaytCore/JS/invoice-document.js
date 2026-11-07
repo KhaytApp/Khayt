@@ -730,10 +730,13 @@ function invoiceHtml(order, ctx) {
   const stamp = proforma ? (isPaid ? { kind: 'paid' } : null) : invoiceStampOf(order, isPaid);
   const stampWord = stamp ? t(`doc.${stamp.kind}_stamp`) : '';
   const stampDay = stamp && stamp.at ? num(formatPrintDate(stamp.at)) : '';
-  const paidStampHtml = stamp
-    ? `<div class="inv-stamp ${stamp.kind}" data-stamp="${stamp.kind}">${escapeHtml(stampWord)}</div>`
-      + (stamp.kind === 'paid' ? '' : `<div class="inv-reversal-mark" aria-hidden="true"><span>${escapeHtml(stampWord)}</span></div>`)
-    : '';
+  // PAID is the small corner stamp. A reversal is the word across the page
+  // instead: a corner stamp as well sat on the invoice number of an Arabic
+  // invoice, and said nothing the watermark did not.
+  const paidStampHtml = !stamp ? ''
+    : stamp.kind === 'paid'
+      ? `<div class="inv-stamp paid" data-stamp="paid">${escapeHtml(stampWord)}</div>`
+      : `<div class="inv-reversal-mark ${stamp.kind}" data-stamp="${stamp.kind}" aria-hidden="true"><span>${escapeHtml(stampWord)}</span></div>`;
   const reversalBanner = stamp && stamp.kind !== 'paid'
     ? `<div class="inv-reversal ${stamp.kind}" role="note"><strong>${escapeHtml(stampWord)}</strong> ${escapeHtml(t(`doc.${stamp.kind}_line`, { date: stampDay }))}${
         stamp.reason ? `<div class="inv-reversal-reason">${escapeHtml(t('doc.void_reason', { reason: stamp.reason }))}</div>` : ''}</div>`

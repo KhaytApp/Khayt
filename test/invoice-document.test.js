@@ -460,15 +460,15 @@ test('a voided invoice says so at the head of the page and across it', () => {
   const html = render(Object.assign({}, ORDER, { voidedAt: '2026-11-02T09:00:00.000Z',
     voidedReason: '<b>dup</b>', paidAmount: 1150, paymentStatus: 'paid' }), { settings: SHOP });
   assert.match(html, /class="inv-reversal void"/);
-  assert.match(html, /class="inv-reversal-mark"/);
-  assert.match(html, /class="inv-stamp void"/);
+  assert.match(html, /class="inv-reversal-mark void"/);
+  assert.match(html, /data-stamp="void"/);
   assert.doesNotMatch(html, /class="inv-stamp paid"/, 'one stamp only');
   assert.doesNotMatch(html, /<b>dup<\/b>/, 'a typed reason is text, never markup');
 });
 
 test('a credited invoice carries CREDITED and no reason line', () => {
   const html = render(Object.assign({}, ORDER, { creditedAt: '2026-11-03T09:00:00.000Z' }), { settings: SHOP });
-  assert.match(html, /class="inv-stamp credited"/);
+  assert.match(html, /data-stamp="credited"/);
   assert.match(html, /class="inv-reversal credited"/);
   assert.doesNotMatch(html, /inv-reversal-reason/);
 });
@@ -479,7 +479,7 @@ test('the stamp look is in all three copies of invoice.css', () => {
     'mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css']
     .map((f) => fs.readFileSync(path.join(root, f), 'utf8'));
   for (const css of copies) {
-    for (const rule of ['.inv .inv-stamp', '.inv .inv-stamp.void', '.inv .inv-reversal', '.inv .inv-reversal-mark']) {
+    for (const rule of ['.inv .inv-stamp', '.inv .inv-stamp.paid', '.inv .inv-reversal', '.inv .inv-reversal-mark']) {
       assert.ok(css.includes(rule), `${rule} is missing from a copy of invoice.css`);
     }
   }
