@@ -159,13 +159,17 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
   const credits = ML.credits(ids, records);
   let html = '';
   if (problems.length) {
-    html += `<div class="licence-at-sale warn" role="alert">
+    // Each model gets "I have a licence to sell prints": a free version may be
+    // NonCommercial while the designer sells a commercial licence for the same
+    // model (Turki, Nov 7). The click is wired once, below, for every caller.
+    html += `<div class="licence-at-sale warn" role="alert" data-licence-ids="${escapeHtml(JSON.stringify(ids))}">
       <strong>⚠ ${escapeHtml(t('lic.not_for_sale'))}</strong>
       ${problems.map((p) => `<div>${escapeHtml(p.reason === 'expired'
         ? t('lic.expired_line', { name: p.name, until: p.until })
         : p.reason === 'remix'
         ? t('lic.remix_line', { name: p.name, parent: p.until })
-        : t('lic.nc_line', { name: p.name }))}</div>`).join('')}
+        : t('lic.nc_line', { name: p.name }))}
+        <button type="button" class="btn-link licence-have" data-act="licence-have" data-pf="${escapeHtml(p.id)}">${escapeHtml(t('lic.have'))}</button></div>`).join('')}
     </div>`;
   }
   if (credits.length) {
@@ -179,6 +183,88 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
     </div>`;
   }
   return html;
+}
+
+/**
+ * "I have a licence to sell prints" — record a bought licence on one library
+ * model. The Mac's licence proof sheet, same fields: `licence` becomes
+ * `commercial` (the existing bought-licence shape, so lib/model-licence.js
+ * already reads it as sellable), with the optional `licenceCode`,
+ * `licenceUrl` (http/https only) and `licenceExpires` (YYYY-MM-DD, the last
+ * day it covers). On a remix the override is the remix's own.
+ */
+function openLicenceHave(printFileId, anchor) {
+  const records = typeof printFiles !== 'undefined' && Array.isArray(printFiles) ? printFiles : [];
+  const rec = records.find((r) => r && r.id === printFileId);
+  if (!rec) return;
+  const name = rec.name || rec.originalName || '';
+  // INLINE, NOT A MODAL: this is clicked inside the job and product editors,
+  // and openFormModal has one mount — a modal here would throw away the
+  // editor and everything typed into it.
+  const line = anchor && anchor.closest ? anchor.closest('div') : null;
+  if (!line || line.querySelector('.licence-have-form')) return;
+  const keepEnd = String(rec.licence || '').toLowerCase() === 'commercial' && /^\d{4}-\d{2}-\d{2}$/.test(rec.licenceExpires || '');
+  const form = document.createElement('div');
+  form.className = 'licence-have-form';
+  form.innerHTML = `
+    <div class="licence-have-title">${escapeHtml(t('lic.proof'))}</div>
+    <p class="licence-have-hint">${escapeHtml(t('lic.have_hint'))}</p>
+    <label>${escapeHtml(t('lic.code'))}<input type="text" data-lh="code" maxlength="200" value="${escapeHtml(rec.licenceCode || '')}"></label>
+    <label>${escapeHtml(t('lic.verify'))}<input type="url" data-lh="url" maxlength="500" placeholder="https://" value="${escapeHtml(rec.licenceUrl || '')}"></label>
+    <label>${escapeHtml(t('lic.until'))}<input type="date" data-lh="until" value="${keepEnd ? escapeHtml(rec.licenceExpires) : ''}"></label>
+    <p class="licence-have-hint">${escapeHtml(t('lic.proof_hint'))}</p>
+    <p class="licence-have-error" role="alert" hidden></p>
+    <div class="licence-have-actions">
+      <button type="button" class="btn ghost small" data-lh="cancel">${escapeHtml(t('common.cancel'))}</button>
+      <button type="button" class="btn primary small" data-lh="save">${escapeHtml(t('common.save'))}</button>
+    </div>`;
+  line.appendChild(form);
+  if (anchor) anchor.hidden = true;
+  form.querySelector('[data-lh="code"]').focus();
+  form.querySelector('[data-lh="cancel"]').addEventListener('click', () => {
+    form.remove();
+    if (anchor) anchor.hidden = false;
+  });
+  form.querySelector('[data-lh="save"]').addEventListener('click', () => {
+    const val = (k) => form.querySelector(`[data-lh="${k}"]`).value.trim();
+    const code = val('code'); const url = val('url'); const until = val('until');
+    const err = form.querySelector('.licence-have-error');
+    const fail = (msg) => { err.textContent = msg; err.hidden = false; };
+    if (url && !/^https?:\/\/\S+$/i.test(url)) return fail(t('lic.bad_link'));
+    if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) return fail(t('lic.bad_date'));
+    rec.licence = 'commercial';
+    // '' rather than deleted: an absent field is one a sync merge can bring
+    // back from an older copy.
+    rec.licenceCode = code;
+    rec.licenceUrl = url;
+    rec.licenceExpires = until;
+    rec.updatedAt = Date.now();
+    saveAll();
+    refreshLicenceWarnings();
+    if (typeof renderPrintFiles === 'function') { try { renderPrintFiles(); } catch (_) {} }
+    toast(t('lic.have_saved', { name }), 'success');
+  });
+}
+
+/** Redraw every open "Not licensed for sale" box from the book as it is now. */
+function refreshLicenceWarnings() {
+  document.querySelectorAll('.licence-at-sale.warn[data-licence-ids]').forEach((box) => {
+    let ids = [];
+    try { ids = JSON.parse(box.dataset.licenceIds || '[]'); } catch (_) { ids = []; }
+    const tpl = document.createElement('template');
+    tpl.innerHTML = licenceAtSaleHtml(ids);
+    const fresh = tpl.content.querySelector('.licence-at-sale.warn');
+    if (fresh) box.replaceWith(fresh); else box.remove();
+  });
+}
+
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest && e.target.closest('[data-act="licence-have"]');
+    if (!btn) return;
+    e.preventDefault();
+    openLicenceHave(btn.dataset.pf, btn);
+  });
 }
 
 /** The text "Add the credit" appends: the lead, then each credit not already written. */
@@ -557,6 +643,7 @@ function openActivityLog() {
     priorityBadgeHtml,
     formatDueDateBadge,
     licenceAtSaleHtml,
+    openLicenceHave,
     licenceCreditText,
     openCsvImportModal,
     safeBizLogo,
