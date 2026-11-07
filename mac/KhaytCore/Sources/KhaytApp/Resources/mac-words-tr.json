@@ -1233,6 +1233,8 @@
  "mac.licence_nc_line": "{name}: lisansı baskı satışına izin vermiyor.",
  "mac.licence_not_for_sale": "Satış için lisanslı değil",
  "mac.licence_proof": "Lisans kanıtı",
+ "mac.licence_have": "Baskı satma lisansım var",
+ "mac.licence_have_hint": "Birçok tasarımcı bir modeli kişisel kullanım için ücretsiz verir ve baskılarını satmak için ayrı bir lisans satar. Kaydettiğinizde bu model Ticari (tasarımcıdan satın alınmış) olarak kaydedilir; onu kullanan işler ve ürünler satılabilir. Varsa kodu veya sayfayı ekleyin.",
  "mac.licence_proof_hint": "Tasarımcının, bu modelin baskılarını satmanız için verdiği kod ve sayfa. Son günden sonra, onu kullanan her iş ve ürün artık kapsanmadığını söyler.",
  "mac.licence_remix_line": "{name}: lisansı baskı satışına izin vermeyen {parent} modelinin remiksi.",
  "mac.licence_set": "Lisansı Kaydet",

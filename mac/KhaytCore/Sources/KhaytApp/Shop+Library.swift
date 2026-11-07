@@ -1598,12 +1598,30 @@ extension Shop {
             writeProblem = words.callIt("mac.licence_whole_needs_proof"); return
         }
         editFiles(widened.union([fileId]), named: words.callIt("mac.licence_proof")) { record in
-            if case .string(let id)? = record["id"], widened.contains(id) {
-                record["licence"] = .string("commercial")
-            }
-            for (key, value) in [("licenceCode", code), ("licenceUrl", url), ("licenceExpires", expires)] {
-                if value.isEmpty { record.removeValue(forKey: key) } else { record[key] = .string(value) }
-            }
+            Self.applyLicenceProof(&record, code: code, url: url, expires: expires)
+        }
+    }
+
+    /// One record's share of `setLicenceProof`: it becomes `commercial` — bought
+    /// from the designer — and carries the proof.
+    ///
+    /// ── THE FREE VERSION AND THE PAID ONE ─────────────────────────────────
+    ///
+    /// Turki (Nov 2026): "it's always possible that there is a free version not
+    /// allowed to sell and a special commercial licence version". A model
+    /// downloaded under NonCommercial or a site's Standard Digital File
+    /// License is very often sold again by the same designer with a licence to
+    /// sell prints. The file is the same; the shop's right to sell is not. So
+    /// "I have a licence to sell prints" on a NonCommercial model records it
+    /// as bought, which overrides the free licence everywhere a sale asks
+    /// (`ModelLicence.saleProblems`, `remixProblems`). A code, page or end date
+    /// is optional for one model; widening to a whole catalogue still needs
+    /// a code or a page (above).
+    nonisolated static func applyLicenceProof(_ record: inout [String: JSONValue],
+                                              code: String, url: String, expires: String) {
+        record["licence"] = .string("commercial")
+        for (key, value) in [("licenceCode", code), ("licenceUrl", url), ("licenceExpires", expires)] {
+            if value.isEmpty { record.removeValue(forKey: key) } else { record[key] = .string(value) }
         }
     }
 

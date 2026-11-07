@@ -1233,6 +1233,8 @@
  "mac.licence_nc_line": "{name}：其许可不允许销售打印成品。",
  "mac.licence_not_for_sale": "未获销售许可",
  "mac.licence_proof": "许可证明",
+ "mac.licence_have": "我有销售打印件的许可",
+ "mac.licence_have_hint": "许多设计师免费提供模型供个人使用，同时另行出售销售打印件的许可。保存后，此模型将记录为“商用（从设计师处购买）”，使用它的任务和产品即可销售。如有许可代码或页面，请一并添加。",
  "mac.licence_proof_hint": "设计者提供给你的、用于销售此模型打印成品的代码和页面。在最后一天之后，使用它的每个订单和产品都会提示不再受许可涵盖。",
  "mac.licence_remix_line": "{name}：{parent} 的二次创作，而其许可不允许销售打印成品。",
  "mac.licence_set": "记录许可",

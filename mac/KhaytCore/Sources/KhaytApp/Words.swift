@@ -5928,6 +5928,13 @@ final class Words {
         "mac.licence_has_end": ["en": "It ends on a date (a subscription)", "ar": "ينتهي في تاريخ محدد (اشتراك)"],
         "mac.licence_until": ["en": "Covers sales until", "ar": "يغطي البيع حتى"],
         "mac.licence_lapsed": ["en": "Lapsed on", "ar": "انتهى في"],
+        "mac.licence_have": ["en": "I have a licence to sell prints", "ar": "لديّ ترخيص لبيع المطبوعات"],
+        "mac.licence_have_hint": ["en": "Many designers give a model away for personal use and sell a separate licence to sell prints of it. "
+                                        + "Saving records this model as Commercial (bought from the designer), so jobs and products using it can be sold. "
+                                        + "Add the code or page if you have one.",
+                                  "ar": "كثير من المصممين يتيحون النموذج مجاناً للاستخدام الشخصي ويبيعون ترخيصاً منفصلاً لبيع مطبوعاته. "
+                                        + "عند الحفظ يُسجَّل هذا النموذج بترخيص تجاري (مشترى من المصمم)، فيصبح بيع الطلبات والمنتجات التي تستخدمه مسموحاً. "
+                                        + "أضف الرمز أو الصفحة إن وُجدا."],
         "mac.licence_proof_hint": ["en": "The code and page the designer gave you for selling prints of this model. "
                                         + "After the last day, every job and product using it says it is no longer covered.",
                                    "ar": "الرمز والصفحة التي أعطاك إياها المصمم لبيع مطبوعات هذا النموذج. "

@@ -7,6 +7,8 @@ import KhaytCore
 struct LicenceWarning: View {
     let shop: Shop
     let problems: [ModelLicence.SaleProblem]
+    /// The model whose bought licence is being recorded.
+    @State private var proofFor: LibraryFile?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -20,11 +22,26 @@ struct LicenceWarning: View {
                      : shop.words.callIt("mac.licence_nc_line", ["name": .string(p.name)]))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                // ── THE SHOP MAY KNOW BETTER ──────────────────────────────
+                //
+                // A free download is often sold again by its designer with a
+                // licence to sell prints. The warning is a question, not a
+                // verdict: the shop that bought that licence says so here,
+                // where the sale is, instead of hunting for the model in the
+                // library. For a remix it is the remix that was licensed, so
+                // the button records the remix, never the original.
+                if shop.canMoveJobs, let file = shop.files.first(where: { $0.id == p.id }) {
+                    Button(shop.words.callIt(p.reason == "expired" ? "mac.licence_proof" : "mac.licence_have") + "…") {
+                        proofFor = file
+                    }
+                    .buttonStyle(.link).font(.caption)
+                }
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Khayt.attention.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .shopSheet(item: $proofFor) { LicenceProofSheet(shop: shop, file: $0) }
     }
 }
 
