@@ -61,7 +61,7 @@ final class WidgetSnapshotIsOneShapeTests: XCTestCase {
         let app = try source("KhaytCompanion/Services/WidgetSnapshotStore.swift")
         let widget = try source("KhaytWidget/KhaytQueueWidget.swift")
 
-        for type in ["WidgetSnapshot", "WidgetPrint"] {
+        for type in ["WidgetSnapshot", "WidgetPrint", "WidgetMoney"] {
             let inApp = try fields(of: type, in: app)
             let inWidget = try fields(of: type, in: widget)
             XCTAssertFalse(inApp.isEmpty, "\(type) has no stored properties in the app — the parse is wrong")

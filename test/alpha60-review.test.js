@@ -27,7 +27,7 @@ function mergeHelper() {
   const src = read('renderer/app-boot.js');
   const i = src.indexOf('async function mergeOrderFromDisk(');
   assert.ok(i >= 0, 'mergeOrderFromDisk not found');
-  return 'async function mergeOrderFromDisk(id) ' + body(src.slice(i).replace('async function mergeOrderFromDisk(id) ', 'x = (id) => '), 'x = (id) =>');
+  return 'async function mergeOrderFromDisk(id, opts) ' + body(src.slice(i).replace('async function mergeOrderFromDisk(id, opts) ', 'x = (id, opts) => '), 'x = (id, opts) =>');
 }
 
 test('a printer move or a survey is read back from disk, never written over from a stale copy', () => {

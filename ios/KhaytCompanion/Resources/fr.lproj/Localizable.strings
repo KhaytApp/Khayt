@@ -461,7 +461,7 @@
 "pair.signed_out" = "Le Mac a déconnecté cet iPhone. Associez-le de nouveau avec le code PIN du propriétaire.";
 "pair.pin.title" = "Le code PIN du propriétaire";
 "pair.pin.body" = "Le code PIN du propriétaire, dans Réglages → En ligne sur le Mac ou le PC, 8 caractères ou plus. Le code PIN de demande ne fonctionne pas ici.";
-"pair.pin.foot" = "Conservé dans le trousseau de l’iPhone, jamais envoyé ailleurs qu’à ce Mac.";
+"pair.pin.foot" = "Envoyé uniquement à ce Mac, pour l’association, puis effacé de l’iPhone. Pour un ordinateur qui ne sait pas associer un téléphone, il reste dans le trousseau de l’iPhone.";
 "pair.pin.wrong" = "Ce code PIN a été refusé. Vérifiez Réglages → En ligne sur le Mac ou le PC.";
 "pair.window_closed" = "Sur le Mac, cliquez sur Associer un téléphone (Réglages → En ligne), puis réessayez.";
 "pair.window_locked" = "Trop de codes PIN incorrects depuis cet iPhone. Sur le Mac, cliquez de nouveau sur Associer un téléphone (Réglages → En ligne), puis saisissez le bon code PIN.";
@@ -1097,6 +1097,15 @@
 "care.part.fep_film" = "Film FEP";
 "care.part.resin_tank" = "Bac de résine";
 "care.part.ipa" = "Alcool isopropylique (litre)";
+"pair.again.title" = "Associer de nouveau cet iPhone";
+"pair.again.line" = "Saisissez le code PIN du propriétaire pour rejoindre de nouveau le Mac. L’iPhone ne l’envoie jamais de lui-même.";
+"pair.again.button" = "Associer de nouveau";
+"pair.again.body" = "Le code PIN du propriétaire, dans Réglages → En ligne sur le Mac. Il est envoyé une fois, à cette adresse, pour l’association, puis effacé de l’iPhone.";
+"pair.phone_name" = "Nom de cet iPhone";
+"pair.phone_name.foot" = "Le nom sous lequel le Mac affiche cet iPhone parmi les téléphones associés, pour les distinguer.";
+"cloud.read_only" = "Connexion en lecture seule";
+"cloud.read_only.line" = "Cet iPhone est connecté à Khayt Cloud en tant que lecteur, sans Mac associé : il affiche l’atelier mais ne peut pas le modifier.";
+"cloud.read_only.refused" = "Non enregistré : la connexion Khayt Cloud de cet iPhone est en lecture seule. Associez-le au Mac, ou connectez-vous avec un compte autorisé à modifier.";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "Liste de courses";

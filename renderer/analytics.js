@@ -3143,16 +3143,25 @@ async function exportAnalyticsReport() {
   const completedOrders = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
   // The line below already knew both spellings and the one above did not, so
   // one report disagreed with itself about how many jobs made its own revenue.
-  const totalRev = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt)
-    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  // The jobs that make the revenue are the ones counted above — "Not
+  // business" jobs included here made the total disagree with the count.
+  const totalRev = completedOrders.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const totalOrders = pl.length;
+  // BLENDED across jobs, as the P&L rule does (lib/pnl-report.js): each job's
+  // price net of credit notes and its `costBasis` — both in the JOB's currency
+  // — converted to the shop's at the job's own rate, then summed. A mean of
+  // per-job percentages let one tiny job swing the figure.
   const avgMargin = (() => {
     const withMargin = completedOrders.filter(o => o.costBasis > 0 && +o.price > 0);
     if (!withMargin.length) return null;
-    return withMargin.reduce((s, o) => {
-      const rev = Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
-      return s + (rev > 0 ? (rev - o.costBasis) / rev * 100 : 0);
-    }, 0) / withMargin.length;
+    const toBase = (v, o) => (typeof orderToBase === 'function' ? orderToBase(v, o) : v);
+    let rev = 0, cost = 0;
+    for (const o of withMargin) {
+      const net = Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
+      if (net <= 0) continue;
+      rev += toBase(net, o); cost += toBase(+o.costBasis, o);
+    }
+    return rev > 0 ? (rev - cost) / rev * 100 : null;
   })();
   const matCount = {};
   pl.forEach(o => { if (o.material) matCount[o.material] = (matCount[o.material] || 0) + 1; });

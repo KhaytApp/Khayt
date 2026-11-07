@@ -116,10 +116,31 @@ final class ConnectionSettings: ObservableObject {
     @Published var pin: String {
         didSet {
             KeychainHelper.set(pin, for: Keys.pinKeychain)
-            // A new PIN may be a new Mac: pin its key again from there.
-            if pin != oldValue { macIdentityKey = ""; device = nil }
-            if !pin.isEmpty { signedOutByMac = false }
+            // A new PIN may be a new Mac: pin its key again from there. Not
+            // when the PIN is let go BECAUSE the phone enrolled — see
+            // `dropPinAfterEnrolment`.
+            if pin != oldValue, !droppingPin { macIdentityKey = ""; device = nil }
+            if !pin.isEmpty { signedOutByMac = false; needsPairAgain = false }
         }
+    }
+    private var droppingPin = false
+
+    /// The phone enrolled, so its requests are signed from now on: the PIN
+    /// has nothing left to do here, and a PIN kept on the phone is one a
+    /// forged reply could ask for. Gone from the Keychain, the enrolment kept.
+    func dropPinAfterEnrolment() {
+        droppingPin = true
+        defer { droppingPin = false }
+        pin = ""
+        KeychainHelper.delete(Keys.pinKeychain)
+    }
+
+    /// The Mac no longer knows this phone (`device-unknown`), or the person
+    /// moved it to an address that could not prove it is their Mac. The
+    /// phone never answers that with a PIN by itself: it waits here until the
+    /// person types the PIN again ("Pair again").
+    @Published var needsPairAgain: Bool {
+        didSet { UserDefaults.standard.set(needsPairAgain, forKey: Keys.needsPairAgain) }
     }
     /// The paired Mac's Ed25519 public key, base64 — pinned while the phone
     /// talks to it with the PIN, so a moved Mac can prove itself without the
@@ -152,6 +173,22 @@ final class ConnectionSettings: ObservableObject {
     @Published var signedOutByMac: Bool {
         didSet { UserDefaults.standard.set(signedOutByMac, forKey: Keys.signedOutByMac) }
     }
+    /// What this phone is called in the Mac's list of paired phones.
+    /// `UIDevice.current.name` is only "iPhone" without a restricted
+    /// entitlement, so every phone read "iPhone" there; the person names it
+    /// at pairing instead. See `nameToSend`.
+    @Published var phoneName: String {
+        didSet { UserDefaults.standard.set(phoneName, forKey: Keys.phoneName) }
+    }
+
+    nonisolated static let defaultPhoneName = "iPhone"
+
+    /// The name sent when the phone enrols: the one typed, or "iPhone".
+    var nameToSend: String {
+        let typed = phoneName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? Self.defaultPhoneName : String(typed.prefix(60))
+    }
+
     @Published var shopLabel: String {
         didSet { UserDefaults.standard.set(shopLabel, forKey: Keys.shopLabel) }
     }
@@ -226,6 +263,8 @@ final class ConnectionSettings: ObservableObject {
         static let countInstall = "khayt.countInstall"
         static let sampleShop = "khayt.sampleShop"
         static let signedOutByMac = "khayt.signedOutByMac"
+        static let needsPairAgain = "khayt.needsPairAgain"
+        static let phoneName = "khayt.phoneName"
     }
 
     init() {
@@ -233,9 +272,11 @@ final class ConnectionSettings: ObservableObject {
         host = defaults.string(forKey: Keys.host) ?? ""
         port = defaults.object(forKey: Keys.port) as? Int ?? 3219
         shopLabel = defaults.string(forKey: Keys.shopLabel) ?? "My Shop"
+        phoneName = defaults.string(forKey: Keys.phoneName) ?? Self.defaultPhoneName
         serviceName = defaults.string(forKey: Keys.serviceName) ?? ""
         isPaired = defaults.bool(forKey: Keys.paired)
         signedOutByMac = defaults.bool(forKey: Keys.signedOutByMac)
+        needsPairAgain = defaults.bool(forKey: Keys.needsPairAgain)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
         macIdentityKey = defaults.string(forKey: Keys.macIdentity) ?? ""
         device = KeychainHelper.get(Keys.deviceKeychain).flatMap {
@@ -307,6 +348,7 @@ final class ConnectionSettings: ObservableObject {
         device = nil
         KeychainHelper.delete(Keys.pinKeychain)
         signedOutByMac = true
+        needsPairAgain = false
         if !keepShop { isPaired = false }
     }
 
@@ -318,6 +360,7 @@ final class ConnectionSettings: ObservableObject {
         macIdentityKey = ""
         device = nil
         signedOutByMac = false
+        needsPairAgain = false
         KeychainHelper.delete(Keys.pinKeychain)
         // The offline cache holds the shop's client list, orders and inventory.
         // Dropping the PIN while leaving that on disk would mean "unpaired" only

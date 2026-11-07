@@ -3242,7 +3242,13 @@ function renderCloudSettings() {
         <button id="btnCloudPayLinkRemove" class="btn ghost small" style="display:none;">${escapeHtml(t('cloud.paylink_remove'))}</button>
         <span id="cloudPayLinkResult" style="font-size:12px;"></span>
       </div>
-      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.paylink_note'))}</p>` : ''}`}
+      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.paylink_note'))}</p>` : ''}
+      <!-- Cloud "portal crossShop": this shop's orders beside other Khayt shops in a customer's portal. -->
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="cloudCrossShop" style="width:auto;margin:0;" checked disabled>
+        <span>${escapeHtml(t('cloud.cross_shop'))}</span>
+      </label>
+      <p id="cloudCrossShopNote" style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('cloud.cross_shop_note'))}</p>`}
     ${cloudPlansHtml()}`;
 
   const result = (msg, color) => { const r = el.querySelector('#cloudResult'); if (r) { r.textContent = msg; r.style.color = color || 'var(--text-muted)'; } };
@@ -3520,6 +3526,39 @@ function renderCloudSettings() {
       if (!r?.ok) { say(r?.error || (t('cloud.slug_failed') || 'Could not save that name.'), 'var(--danger)'); return; }
       slugInput.value = r.slug;
       say(t('cloud.slug_saved') || 'Saved — your shop is reachable at that address.', 'var(--success)');
+    });
+  })();
+
+  /* Whether the shop's orders appear in a customer's portal beside other
+   * Khayt shops. The shop's setting, read from the server each time; any
+   * member sees it, only an owner or manager may change it. */
+  (async () => {
+    const box = el.querySelector('#cloudCrossShop');
+    if (!box || !window.hubAPI?.cloudPortalSettings) return;
+    const c = settings.cloud || {};
+    const note = el.querySelector('#cloudCrossShopNote');
+    const say = (msg, color) => { if (note) { note.textContent = msg; note.style.color = color || 'var(--text-muted)'; } };
+    const canEdit = ['owner', 'manager'].includes(c.role || 'owner');
+    try {
+      const r = await window.hubAPI.cloudPortalSettings({ url: c.url, shopId: c.shopId, token: c.token });
+      if (!r?.ok) { say(t('cloud.cross_shop_unavailable')); return; }
+      box.checked = r.crossShop !== false;
+      box.disabled = !canEdit;
+      if (!canEdit) say(t('cloud.cross_shop_role'));
+    } catch (e) { say(t('cloud.cross_shop_unavailable')); return; }
+    box.addEventListener('change', async () => {
+      const want = box.checked;
+      box.disabled = true;
+      const r = await window.hubAPI.cloudPortalSettings({ url: c.url, shopId: c.shopId, token: c.token, crossShop: want });
+      if (r?.ok) {
+        box.checked = r.crossShop !== false;
+        box.disabled = false;
+        say(t('cloud.cross_shop_note'));
+      } else {
+        box.checked = !want;
+        box.disabled = r?.reason === 'role';
+        say(r?.reason === 'role' ? t('cloud.cross_shop_role') : t('cloud.cross_shop_failed', { error: r?.error || '—' }), 'var(--danger)');
+      }
     });
   })();
 

@@ -51,12 +51,13 @@ struct ShipSheet: View {
                         .foregroundStyle(problem == nil ? KhaytDesign.note : KhaytDesign.late)
                 }
             }
+            .editsShop()
             .navigationTitle(L10n.tr("ship.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("common.cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("ship.create")) { Task { await save() } }.disabled(saving)
+                    Button(L10n.tr("ship.create")) { Task { await save() } }.disabled(saving || !api.canWrite)
                 }
             }
             .sheet(isPresented: $scanning) {

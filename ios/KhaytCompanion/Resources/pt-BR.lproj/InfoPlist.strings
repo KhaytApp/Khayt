@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "O Khayt usa a câmera para ler etiquetas de carretéis e códigos de barras, fotografar recibos e tirar fotos de impressões prontas.";
+"NFCReaderUsageDescription" = "O Khayt lê e grava as etiquetas NFC dos carretéis de filamento.";
+"NSLocalNetworkUsageDescription" = "O Khayt se conecta ao Khayt no seu Mac ou PC na mesma rede Wi‑Fi para mostrar a fila, o estoque e o status das impressoras.";
