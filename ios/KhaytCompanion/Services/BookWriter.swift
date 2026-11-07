@@ -364,6 +364,11 @@ struct BookWriter {
         case noAmount
         /// A revision or a follow-up for a job that is no longer a quote.
         case notAQuote
+        /// A care task this book does not hold — deleted on the Mac, or never sent.
+        case noSuchCareTask
+        /// The machine's hours are not known on this phone (`CareBook`), so a
+        /// completion would record a meter the Mac does not share.
+        case careHoursUnknown
 
         var errorDescription: String? {
             switch self {
@@ -386,8 +391,91 @@ struct BookWriter {
                 return L10n.tr("error.amount_required")
             case .notAQuote:
                 return L10n.tr("quote.not_a_quote")
+            case .noSuchCareTask:
+                return L10n.tr("care.error.no_task")
+            case .careHoursUnknown:
+                return L10n.tr("care.hours_unknown")
             }
         }
+    }
+
+    // MARK: - Printer care
+
+    /// A care task done: `KhaytMaintenance.markDone`'s two fields on the task
+    /// (`lastDoneHours`, the machine's meter now, and `lastDoneAt`), and a
+    /// line in the service log, in ONE write — as the Mac's
+    /// `Shop.markMaintenanceDone` and the desktop's Done button both write.
+    ///
+    /// Nothing else on the task moves. A deferral left on it ("not needed")
+    /// is superseded by the newer `lastDoneAt` (`activeDeferral`), so it is
+    /// not cleared, exactly as on the Mac.
+    ///
+    /// The log line is the Mac's `ServiceLogEdit.entry`: `{ id, machineId,
+    /// date, note, cost }`, the task's name, cost 0 (what it cost is typed
+    /// into the entry afterwards on the computer), newest first.
+    /// `machMaintLog` is not in the phone's working set; like `wasteLog`, a
+    /// row made here is sent because the baseline has never seen it, and the
+    /// Mac folds it in by collection name.
+    func markCareTaskDone(taskId: String, now: Date = Date()) throws {
+        let nowIso = CareRules.iso(ms: CareRules.ms(now))
+        let baseline = book.baseline()
+        let scope = book.scope()
+        try book.update { root in
+            guard case .array(var tasks)? = root["machMaintTasks"],
+                  let at = tasks.firstIndex(where: { Self.rowId($0) == taskId }),
+                  case .object(var task) = tasks[at] else { throw Refusal.noSuchCareTask }
+            let machineId = CareRules.idText(task["machineId"])
+            guard let meter = CareBook.meter(machineId: machineId, store: root, baseline: baseline, scope: scope)
+            else { throw Refusal.careHoursUnknown }
+            for (key, value) in CareRules.markDone(machineHours: meter, nowIso: nowIso) { task[key] = value }
+            StoreWriter.stamp(&task)
+            tasks[at] = .object(task)
+            root["machMaintTasks"] = .array(tasks)
+
+            var entry: [String: JSONValue] = [
+                "id": .string(Self.maintId(now: now)),
+                "machineId": .string(machineId),
+                "date": .string(Self.localDay(now)),
+                "cost": .number(0),
+                "note": .string(CareRules.str(task["name"])),
+            ]
+            StoreWriter.stamp(&entry)
+            var log: [JSONValue] = []
+            if case .array(let had)? = root["machMaintLog"] { log = had }
+            log.insert(.object(entry), at: 0)
+            root["machMaintLog"] = .array(log)
+        }
+    }
+
+    /// "Inspected, not needed": `KhaytMaintenance.deferTask`'s patch
+    /// (`inspectedAt`, `inspectedHours`, `deferUntilHours`, `deferUntilAt`)
+    /// on the task, and nothing of `markDone`'s. No service is logged —
+    /// nothing was serviced, which is the Mac's `deferMaintenanceTask` too.
+    func deferCareTask(taskId: String, now: Date = Date()) throws {
+        let nowIso = CareRules.iso(ms: CareRules.ms(now))
+        let baseline = book.baseline()
+        let scope = book.scope()
+        try book.update { root in
+            guard case .array(var tasks)? = root["machMaintTasks"],
+                  let at = tasks.firstIndex(where: { Self.rowId($0) == taskId }),
+                  case .object(var task) = tasks[at] else { throw Refusal.noSuchCareTask }
+            let machineId = CareRules.idText(task["machineId"])
+            guard let meter = CareBook.meter(machineId: machineId, store: root, baseline: baseline, scope: scope)
+            else { throw Refusal.careHoursUnknown }
+            for (key, value) in CareRules.deferTask(task, machineHours: meter, nowIso: nowIso) { task[key] = value }
+            StoreWriter.stamp(&task)
+            tasks[at] = .object(task)
+            root["machMaintTasks"] = .array(tasks)
+        }
+    }
+
+    /// The Mac's `Shop.uid("MAINT")`: the prefix, the time in base 36 and
+    /// three random characters — the id the Mac gives a service-log line.
+    static func maintId(now: Date = Date()) -> String {
+        let ms = Int(now.timeIntervalSince1970 * 1000)
+        let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
+        let tail = String((0..<3).map { _ in alphabet.randomElement()! }).uppercased()
+        return "MAINT-" + String(ms, radix: 36) + tail
     }
 
     /// Correct what is left on a spool.

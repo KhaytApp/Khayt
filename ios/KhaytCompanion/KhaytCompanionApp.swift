@@ -83,7 +83,8 @@ struct KhaytCompanionApp: App {
     /// detail pages and sheets can be photographed too. Home takes `quote`,
     /// `waste`, `expense`, `addspool`, `intake`, `settings`, `new`, `order:<id>` and
     /// `library` (or `library:<model id>`, opened on that model);
-    /// Inventory takes `spool:<id>`; Orders takes `neworder` and `pick:<id>`.
+    /// Inventory takes `spool:<id>`; Orders takes `neworder` and `pick:<id>`;
+    /// Machines takes `care:<machine id>` and `parts`.
     enum ScreenshotOpen {
         private static var used = false
         /// The request, if it starts with `prefix` and nobody has taken it yet.
