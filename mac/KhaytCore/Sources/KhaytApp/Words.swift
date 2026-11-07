@@ -3735,6 +3735,16 @@ final class Words {
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],
         "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
+        // Partial delivery and the spool switch on a job's parts (the
+        // desktop's `openPartialDeliveryModal` / `openSpoolSwitchModal`).
+        // The titles and the count line are the desktop's own `ord.*` words.
+        "mac.parts_delivered_btn": ["en": "Parts delivered", "ar": "الأجزاء المسلّمة"],
+        "mac.parts_delivered_hint": ["en": "Tick the parts the customer already has. The job stays open until the rest go.",
+                                     "ar": "حدّد الأجزاء التي استلمها العميل. يبقى العمل مفتوحًا حتى يُسلَّم الباقي."],
+        "mac.spool_switch_pick": ["en": "Choose a spool", "ar": "اختر بكرة"],
+        "mac.spool_switch_hint": ["en": "These grams come off the spool you choose now. When the job is finished they are not taken again from the part’s own spool.",
+                                  "ar": "تُخصم هذه الغرامات من البكرة التي تختارها الآن، ولا تُخصم مرة أخرى من بكرة الجزء نفسه عند إنهاء العمل."],
+        "mac.spool_switch_none": ["en": "No spool has stock left to draw from.", "ar": "لا توجد بكرة فيها مخزون للسحب منها."],
         // "Take the figures from the file this part was printed from." Short,
         // because it sits on a button beside the weight and the hours it fills.
         "mac.fill_from_file": ["en": "Fill from file", "ar": "تعبئة من الملف"],
@@ -6384,6 +6394,8 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // Partial delivery and the spool switch (`PartTrackingSheets.swift`).
+        "ord.partial_delivery", "ord.parts_delivered", "ord.spool_switch", "ord.add_spool",
         // The desktop-parity reports (`ParityReportCards.swift`), the box-form
         // VAT return, the shopping list and the test-print log — in the
         // other app's own words for each.
