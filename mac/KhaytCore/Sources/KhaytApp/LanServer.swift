@@ -1992,7 +1992,9 @@ final class LanServer {
         // by sending the record without it, or tombstone a staff member: on a
         // desktop with the operator lock on, owner rights from a phone. The
         // companion writes these seven and nothing else (BookWriter.swift), so
-        // anything else is dropped and counted as skipped. Dropped, not
+        // anything else is dropped and counted as skipped — and, since Nov
+        // 2026, as `dropped` on its own, so a phone can tell "refused, will
+        // never land" from "the Mac had a newer copy". Dropped, not
         // refused: a 4xx keeps a phone resending the same batch for ever, and
         // its real edits would be stuck behind the one it can never deliver.
         let named: (JSONValue) -> String? = {
@@ -2007,16 +2009,16 @@ final class LanServer {
         allowed["tombstones"] = JSONValue.array(tombstones)
         guard !deltas.isEmpty || !tombstones.isEmpty else {
             if dropped > 0 {
-                return .json(200, #"{"applied":0,"skipped":\#(dropped),"removed":0}"#)
+                return .json(200, #"{"applied":0,"skipped":\#(dropped),"removed":0,"dropped":\#(dropped)}"#)
             }
             // Nothing to do, and worth answering rather than writing the book
             // to say so: a write with no change still rewrites the file and
             // still rolls `.prev`.
-            return .json(200, #"{"applied":0,"skipped":0,"removed":0}"#)
+            return .json(200, #"{"applied":0,"skipped":0,"removed":0,"dropped":0}"#)
         }
         do {
             let folded = try await fold(allowed)
-            return .json(200, #"{"applied":\#(folded.applied),"skipped":\#(folded.skipped + dropped),"removed":\#(folded.removed)}"#)
+            return .json(200, #"{"applied":\#(folded.applied),"skipped":\#(folded.skipped + dropped),"removed":\#(folded.removed),"dropped":\#(dropped)}"#)
         } catch {
             // The book was not written. The phone keeps its changes and tries
             // again — which is why it must not read this as "delivered".
