@@ -2019,6 +2019,8 @@
  "mac.plan_no_links": "sem links de compartilhamento",
  "mac.plan_opens_soon": "Os upgrades abrem em breve.",
  "mac.plan_owner_only": "Somente o proprietário da loja pode alterar o plano.",
+ "mac.portal_cross_shop": "Mostrar meus pedidos no portal do cliente ao lado de outras lojas Khayt",
+ "mac.portal_cross_shop_hint": "Desligado: o cliente só vê os pedidos desta loja quando abre o portal pelas páginas desta loja.",
  "mac.paylink_title": "Link de pagamento",
  "mac.paylink_url": "Link",
  "mac.paylink_label": "Rótulo (opcional)",

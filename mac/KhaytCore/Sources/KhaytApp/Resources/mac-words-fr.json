@@ -2019,6 +2019,8 @@
  "mac.plan_no_links": "aucun lien de partage",
  "mac.plan_opens_soon": "Les mises à niveau ouvrent bientôt.",
  "mac.plan_owner_only": "Seul le propriétaire de l’atelier peut changer d’offre.",
+ "mac.portal_cross_shop": "Afficher mes commandes dans le portail client à côté des autres boutiques Khayt",
+ "mac.portal_cross_shop_hint": "Désactivé : un client ne voit les commandes de cette boutique que s’il ouvre le portail depuis les pages de cette boutique.",
  "mac.paylink_title": "Lien de paiement",
  "mac.paylink_url": "Lien",
  "mac.paylink_label": "Libellé (facultatif)",
