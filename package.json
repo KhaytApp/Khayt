@@ -117,7 +117,8 @@
     "test:e2e:cloudsignup": "node scripts/e2e-cloud-signup-smoke.mjs",
     "test:e2e:productimages": "node scripts/e2e-product-images-smoke.mjs",
     "test:e2e:elecrate": "node scripts/e2e-shop-elec-rate-smoke.mjs",
-    "test:e2e:energy": "node scripts/e2e-energy-smoke.mjs"
+    "test:e2e:energy": "node scripts/e2e-energy-smoke.mjs",
+    "test:e2e:swap": "node scripts/e2e-swap-smoke.mjs"
   },
   "dependencies": {
     "@sentry/electron": "^7.16.0",

@@ -1069,6 +1069,79 @@ function renderMachineQueues() {
    * orders via lib/scheduling.js (deterministic), show them for review, and
    * apply only on the operator's confirmation (no auto-moves).
    */
+  /**
+   * Colour-grouped running order, per machine — the Mac's SwapPlanning.
+   * lib/swap-queue.js counts the spool changes between jobs for the order the
+   * scheduler proposed and for a colour-grouped one, keeping every due date
+   * and priority. Advisory: the order is what the window SHOWS; applying still
+   * assigns printers only (the book has no queue position).
+   */
+  function swapJobOf(order) {
+    const colours = [];
+    for (const part of Array.isArray(order.parts) ? order.parts : []) {
+      if (!part) continue;
+      const file = part.printFileId ? printFiles.find((f) => f && f.id === part.printFileId) : null;
+      const list = file && Array.isArray(file.colors) ? file.colors : [];
+      if (list.length) {
+        for (const c of list) { const hex = c && (typeof c === 'string' ? c : c.hex); if (hex) colours.push({ hex }); }
+      } else if (/^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(String(part.colour || ''))) {
+        colours.push({ hex: part.colour });
+      }
+    }
+    const firstMat = (Array.isArray(order.parts) ? order.parts : []).find((p) => p && p.material);
+    const job = { id: order.id, colors: colours, material: firstMat ? firstMat.material : '',
+      printTime: +order.printTime || 0, priority: order.priority === true };
+    if (order.dueDate) job.dueDate = order.dueDate;
+    if (order.priorityLevel) job.priorityLevel = order.priorityLevel;
+    return job;
+  }
+  function swapPlansFor(assignments) {
+    const SQ = (typeof KhaytSwapQueue !== 'undefined') ? KhaytSwapQueue : null;
+    if (!SQ) return {};
+    const byMachine = {};
+    for (const a of assignments) (byMachine[a.machineId] = byMachine[a.machineId] || []).push(a);
+    const minutes = SQ.swapMinutesFrom(settings);
+    const out = {};
+    for (const [mid, rows] of Object.entries(byMachine)) {
+      rows.sort((a, b) => a.position - b.position);
+      const jobs = rows.map((r) => printLog.find((o) => o && o.id === r.orderId)).filter(Boolean);
+      if (jobs.length !== rows.length || !jobs.length) continue;
+      const m = machines.find((x) => x.id === mid) || {};
+      const live = (typeof machineStatusCache === 'object' && machineStatusCache && machineStatusCache[mid]) || {};
+      const loaded = Array.isArray(live.loaded) && live.loaded.length ? live.loaded : (Array.isArray(m.loaded) ? m.loaded : []);
+      const heads = +m.maxColors > 0 ? +m.maxColors : (loaded.length || 4);
+      const start = Math.max(0, rows[0].projectedFinishMins - (+jobs[0].printTime || 0));
+      try {
+        out[mid] = SQ.plan(jobs.map(swapJobOf), { loaded, heads, swapMinutes: minutes, startHours: start, now: Date.now() });
+      } catch (e) { console.warn('swap plan failed:', e && e.message); }
+    }
+    return out;
+  }
+  /** The scheduler's list with each machine's jobs in its grouped order (same slots). */
+  function groupedAssignments(rows, plans) {
+    const queues = {};
+    const byMachine = {};
+    for (const a of rows) (byMachine[a.machineId] = byMachine[a.machineId] || []).push(a);
+    for (const [mid, list] of Object.entries(byMachine)) {
+      list.sort((a, b) => a.position - b.position);
+      const plan = plans[mid];
+      if (!plan || !plan.changed) { queues[mid] = list; continue; }
+      const ordered = plan.order.map((id) => list.find((r) => r.orderId === id)).filter(Boolean);
+      queues[mid] = ordered.length === list.length ? ordered : list;
+    }
+    const next = {};
+    return rows.map((row) => {
+      const k = next[row.machineId] || 0;
+      next[row.machineId] = k + 1;
+      return (queues[row.machineId] || [])[k] || row;
+    });
+  }
+
+  /**
+   * Assistive print-farm scheduling: propose machine assignments for unassigned
+   * orders via lib/scheduling.js (deterministic), show them for review, and
+   * apply only on the operator's confirmation (no auto-moves).
+   */
   function openScheduleSuggestions() {
     if (typeof KhaytScheduling === 'undefined') { toast(t('common.feature_missing'), 'error'); return; }
     const schedulable = printLog.filter(o => o && (o.status === 'pending' || o.status === 'queued') && !o.machineId);
@@ -1076,21 +1149,45 @@ function renderMachineQueues() {
     const { assignments, unassignable } = KhaytScheduling.proposeSchedule(machines, schedulable, { now: Date.now() });
     const oName = (id) => { const o = printLog.find(x => x.id === id) || {}; return o.orderName || o.project || o.item || id; };
     const mName = (id) => { const m = machines.find(x => x.id === id) || {}; return m.name || id; };
-    const rows = assignments.map(a => `
+    const plans = swapPlansFor(assignments);
+    const saved = Object.values(plans).reduce((n, p) => n + (p.changed ? p.saved.swaps : 0), 0);
+    const SQ = (typeof KhaytSwapQueue !== 'undefined') ? KhaytSwapQueue : null;
+    const minutes = SQ ? SQ.swapMinutesFrom(settings) : 3;
+    const rowsHtml = (grouped) => (grouped ? groupedAssignments(assignments, plans) : assignments).map(a => {
+      const job = plans[a.machineId] && plans[a.machineId].jobs.find((j) => j.id === a.orderId);
+      const n = job && job.known !== false ? (grouped ? job.swapsPlanned : job.swapsNow) : 0;
+      return `
       <tr data-oid="${escapeHtml(a.orderId)}" data-mid="${escapeHtml(a.machineId)}">
         <td><strong>${escapeHtml(oName(a.orderId))}</strong></td>
         <td>→ ${escapeHtml(mName(a.machineId))}</td>
+        <td class="swap-adds" style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${n > 0 ? escapeHtml(t(n === 1 ? 'sched.swap_adds_one' : 'sched.swap_adds', { n })) : ''}</td>
         <td style="font-size:11px;color:var(--text-muted);">${escapeHtml(a.reason || '')}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     const unrows = unassignable.map(u => `<li>${escapeHtml(oName(u.orderId))} — <span style="color:var(--text-muted);">${escapeHtml(u.reason || '')}</span></li>`).join('');
+    const groupBox = saved > 0 ? `
+        <div id="schedSwap" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+            <input type="checkbox" id="schedGroupColour" style="width:auto;margin:0;">
+            <span>${escapeHtml(t('sched.swap_group'))}</span>
+            <span style="font-weight:400;color:var(--text-muted);">${escapeHtml(t(saved === 1 ? 'sched.swap_saves_one' : 'sched.swap_saves', { n: saved, min: Math.round(saved * minutes) }))}</span>
+          </label>
+          <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('sched.swap_estimate', { min: minutes }))}</div>
+        </div>` : '';
     openFormModal({
       title: t('sched.suggest_title') || 'Suggested assignments',
       sizeLg: true,
       saveLabel: t('sched.apply') || 'Apply all',
       bodyHtml: `
-        ${assignments.length ? `<div class="table-wrap"><table><tbody>${rows}</tbody></table></div>`
+        ${assignments.length ? `${groupBox}<div class="table-wrap"><table><tbody id="schedRows">${rowsHtml(false)}</tbody></table></div>`
           : `<p style="color:var(--text-muted);text-align:center;padding:10px 0;">${escapeHtml(t('sched.none') || 'No assignments proposed')}</p>`}
         ${unrows ? `<p style="margin-top:12px;font-weight:600;">${escapeHtml(t('sched.unassignable') || 'Could not assign')}</p><ul style="font-size:13px;">${unrows}</ul>` : ''}`,
+      onMount(modal) {
+        modal.querySelector('#schedGroupColour')?.addEventListener('change', (e) => {
+          const body = modal.querySelector('#schedRows');
+          if (body) body.innerHTML = rowsHtml(e.target.checked);
+        });
+      },
       onSave() {
         let n = 0;
         for (const a of assignments) {
