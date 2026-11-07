@@ -9325,6 +9325,22 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.27] - 2026-11-07
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release adds care plans for your printers, per-plate files for the Snapmaker U1, and photos sent from a paired iPhone.
+
+### Added
+
+- **Care plans for your printers.** A machine's schedule has Apply care plan…: pick the brand and model (Bambu Lab, Prusa, Snapmaker U1, Creality, Formlabs, Elegoo, Anycubic) and its maintenance tasks are added. Each plan links to the maker's guidance it came from, and says where a task uses Khayt's general interval instead. Tasks you already have are not duplicated, and your own intervals change only if you choose to.
+- **"Not needed".** A task you inspected and found fine can be pushed back without replacing anything, and the schedule shows when you looked.
+- **Parts to buy.** A list of the parts your care tasks will need, each with an order-by date worked out from how many hours the printer really prints. Copy it or print it.
+- **Split a multi-plate project into one file per plate (Snapmaker U1).** Each plate is saved as its own 3MF with only the filaments it uses, centred on the bed.
+- **Keep the prime tower when converting for the U1.** An option that keeps the tower and drops variable layer height instead.
+- **Photos from a paired iPhone.** A paired iPhone can add a photo of the finished print to a job. Each new photo on a job also notes whether it came from the printer, the Mac or a phone.
+
 ## [4.0.0-beta.26] - 2026-11-06
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
