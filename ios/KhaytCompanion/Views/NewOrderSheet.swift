@@ -141,6 +141,7 @@ struct NewOrderSheet: View {
                 }
                 .padding(16)
             }
+            .editsShop()
             .scrollDismissesKeyboard(.interactively)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .onAppear { if let initial, draft.project.isEmpty { draft = initial } }

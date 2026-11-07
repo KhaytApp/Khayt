@@ -58,6 +58,14 @@ enum WidgetSnapshotStore {
         #endif
     }
 
+    /// Unpairing: the widgets stop showing the shop at once.
+    static func clear() {
+        UserDefaults(suiteName: appGroupID)?.removeObject(forKey: key)
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
+
     static func load() -> WidgetSnapshot? {
         guard let data = UserDefaults(suiteName: appGroupID)?.data(forKey: key),
               let snap = try? JSONDecoder().decode(WidgetSnapshot.self, from: data) else { return nil }
