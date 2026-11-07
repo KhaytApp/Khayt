@@ -2080,8 +2080,13 @@ final class LanServer {
     /// and `suppliers` the receipt card's "Add as supplier" (Oct 2026). Before
     /// `clients` was here, that line was dropped as skipped with a 200 over
     /// LAN, the phone counted it delivered, and it never reached the book.
+    /// `machMaintTasks` and `machMaintLog` are the phone's printer care (Done /
+    /// Not needed, Nov 2026, #2288), and `waitingListHistory` an enquiry the
+    /// phone declines — the same mistake again until a test
+    /// (`PhoneWritableContractTests`) read the phone's own writer.
     nonisolated static let phoneWritable: Set<String> = [
         "printLog", "inventory", "waitingList", "expenses", "wasteLog", "clients", "suppliers",
+        "machMaintTasks", "machMaintLog", "waitingListHistory",
     ]
 
     nonisolated static let storefrontHookPath = "/api/webhook/"
