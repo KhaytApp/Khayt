@@ -198,7 +198,7 @@ struct MachinesView: View {
             // A retired machine stays in the book only so past orders can
             // name it; it is not one of the shop's machines any more.
             machines = try await api.fetchMachines().filter { !$0.isRetired }
-            care = api.printerCare()
+            care = await api.printerCare()
             #if DEBUG
             if let id = KhaytCompanionApp.ScreenshotOpen.take("care:") { openCare = id }
             if KhaytCompanionApp.ScreenshotOpen.take("parts") != nil { openCare = "" }

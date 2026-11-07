@@ -148,7 +148,7 @@ struct MachineCarePage: View {
     }
 
     private func refresh() async {
-        care = api.printerCare() ?? CareBook()
+        care = await api.printerCare() ?? CareBook()
         loaded = true
         await reload()
     }
@@ -323,7 +323,7 @@ struct PartsToBuyPage: View {
             .padding(.bottom, 18)
         }
         .scrollIndicators(.hidden)
-        .refreshable { load() }
+        .refreshable { await load() }
         .khaytScreen(title: L10n.tr("care.parts.title"))
         .toolbar {
             if !rows.isEmpty {
@@ -334,11 +334,11 @@ struct PartsToBuyPage: View {
                 }
             }
         }
-        .task { load() }
+        .task { await load() }
     }
 
-    private func load() {
-        rows = api.printerCare()?.buyList ?? []
+    private func load() async {
+        rows = await api.printerCare()?.buyList ?? []
         loaded = true
     }
 

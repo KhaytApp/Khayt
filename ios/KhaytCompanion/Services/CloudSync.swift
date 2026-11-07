@@ -186,9 +186,13 @@ struct CloudSync {
         // looked, or this is the first pull. Either way the base came down.
         if reply.base != nil || !warm {
             let whole = try await CloudReader.store(reply, dek: s.dek, engine: engine)
-            let taken = BookScope.take(from: whole.store, now: now)
+            // The cut and the library copy go over the WHOLE book, off the
+            // main actor (`OffMain`); this type is @MainActor.
+            let store = whole.store
+            let taken = try await OffMain.run { BookScope.take(from: store, now: now) }
             try await BookReader(book: book).adopt(taken.store, scope: taken.taken)
-            try? book.replaceLibrary(LibraryCopy.slimAll(whole.store["printFiles"]))
+            let book = book
+            _ = try? await OffMain.run { try book.replaceLibrary(LibraryCopy.slimAll(store["printFiles"])) }
             s.seenRev = reply.rev
             return (s, .whole(records: CompanionAPIRecordCount.of(taken.store)))
         }

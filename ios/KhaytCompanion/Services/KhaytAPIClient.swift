@@ -359,7 +359,8 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
-        let envelope = try JSONDecoder().decode(BookPull.self, from: data)
+        // A whole working set, decoded off the main actor (`OffMain`).
+        let envelope = try await OffMain.run { try JSONDecoder().decode(BookPull.self, from: data) }
         let store = envelope.store
 
         // A book with nothing in it is not a shop, it is a route that answered
@@ -675,10 +676,16 @@ final class KhaytAPIClient: ObservableObject {
     /// edit is safe on the phone before the network is involved. A failure here
     /// leaves it in the outbox, counted, and the next successful send carries
     /// it.
-    private func writeLocally(_ change: (BookWriter) throws -> Void) async throws -> Bool {
+    ///
+    /// The write itself runs off the main actor (`OffMain`): it decodes,
+    /// changes and writes the whole book, which on a shop with a history is
+    /// a stall a tap should not wait in. Writes still go one at a time —
+    /// every `StoreWriter.update` passes through its serial write chain,
+    /// whatever thread it is called from.
+    private func writeLocally(_ change: @escaping @Sendable (BookWriter) throws -> Void) async throws -> Bool {
         guard let book, book.exists else { return false }
         do {
-            try change(BookWriter(book: book))
+            try await OffMain.run { try change(BookWriter(book: book)) }
         } catch is BookWriter.Refusal {
             // The book cannot represent this one. Fall through to the desktop,
             // which either does it properly or fails honestly.
@@ -911,9 +918,14 @@ final class KhaytAPIClient: ObservableObject {
 
     /// Each machine's care tasks and the parts to buy, from this phone's book
     /// (`CareBook`). Nil with no book: care is never asked of the desktop.
-    func printerCare(now: Date = Date()) -> CareBook? {
-        guard let book, book.exists, let store = try? book.read() else { return nil }
-        return CareBook(store: store, baseline: book.baseline(), scope: book.scope(), now: now)
+    /// Read and worked out off the main actor (`OffMain`): the whole book and
+    /// its baseline are decoded for it.
+    func printerCare(now: Date = Date()) async -> CareBook? {
+        guard let book, book.exists else { return nil }
+        return try? await OffMain.run { () -> CareBook? in
+            guard let store = try? book.read() else { return nil }
+            return CareBook(store: store, baseline: book.baseline(), scope: book.scope(), now: now)
+        }
     }
 
     /// A care task done, in the book (`BookWriter.markCareTaskDone`), then sent on.
