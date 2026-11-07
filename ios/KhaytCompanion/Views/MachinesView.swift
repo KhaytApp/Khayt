@@ -44,6 +44,12 @@ struct MachinesView: View {
     /// The job printing on each machine — only where there is exactly one, as
     /// the print alerts decide it: two would be a guess.
     @State private var jobs: [String: QueueOrder] = [:]
+    /// Each machine's care tasks and the parts list, from the book — nil when
+    /// this phone keeps no book (care is never asked of the desktop).
+    @State private var care: CareBook?
+    /// Debug screenshots (`-KhaytOpen care:<machine id>` / `parts`): a
+    /// machine id, or "" for Parts to buy.
+    @State private var openCare: String?
 
     @ViewBuilder
     private func jobLink(_ m: MachineLiveStatus) -> some View {
@@ -125,6 +131,9 @@ struct MachinesView: View {
                                 VStack(spacing: 10) {
                                     MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
                                     jobLink(m)
+                                    if let care {
+                                        MachineCareLink(name: m.displayName, machineId: m.id, care: care) { await load() }
+                                    }
                                     // A print on the bed, on a printer the Mac drives.
                                     if m.hasPrinterApi, m.isPrinting || m.isPaused, !settings.isSampleShop {
                                         PrinterControls(machine: m)
@@ -155,6 +164,24 @@ struct MachinesView: View {
                 await printers.refresh()
             }
             .khaytScreen(title: L10n.tr("tab.machines"))
+            .toolbar {
+                if care != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            PartsToBuyPage()
+                        } label: {
+                            Label(L10n.tr("care.parts.title"), systemImage: "cart")
+                        }
+                    }
+                }
+            }
+            .navigationDestination(item: $openCare) { id in
+                if id.isEmpty {
+                    PartsToBuyPage()
+                } else {
+                    MachineCarePage(name: machines.first { $0.id == id }?.name ?? id, machineId: id)
+                }
+            }
             .background(KhaytDesign.ground.ignoresSafeArea())
             .task {
                 await load()
@@ -171,6 +198,11 @@ struct MachinesView: View {
             // A retired machine stays in the book only so past orders can
             // name it; it is not one of the shop's machines any more.
             machines = try await api.fetchMachines().filter { !$0.isRetired }
+            care = api.printerCare()
+            #if DEBUG
+            if let id = KhaytCompanionApp.ScreenshotOpen.take("care:") { openCare = id }
+            if KhaytCompanionApp.ScreenshotOpen.take("parts") != nil { openCare = "" }
+            #endif
             var found: [String: KhaytAPIClient.CameraAnswer] = [:]
             for m in machines { found[m.id] = await api.camera(machineId: m.id) }
             cameras = found

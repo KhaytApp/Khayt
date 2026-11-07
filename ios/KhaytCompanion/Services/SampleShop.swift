@@ -45,6 +45,24 @@ enum SampleShop {
         }
         let x1c = ("M-X1C", "Bambu X1C"), mk4 = ("M-MK4", "Prusa MK4"), saturn = ("M-SAT", "Elegoo Saturn 4")
 
+        func careTask(_ id: String, _ machine: String, _ name: String, hours: Double = 0, days: Double = 0,
+                      doneDaysAgo: Double, care: String, parts: [(String, Double)] = [],
+                      extra: [String: JSONValue] = [:]) -> JSONValue {
+            var t: [String: JSONValue] = [
+                "id": .string(id), "machineId": .string(machine), "name": .string(name),
+                "intervalHours": hours > 0 ? .number(hours) : .null,
+                "intervalDays": days > 0 ? .number(days) : .null,
+                "lastDoneHours": .number(0),
+                "lastDoneAt": .string(StoreWriter.iso(now.addingTimeInterval(-doneDaysAgo * 86_400))),
+                "careTaskId": .string(care), "rev": .number(1),
+            ]
+            if !parts.isEmpty {
+                t["parts"] = .array(parts.map { .object(["id": .string($0.0), "qty": .number($0.1)]) })
+            }
+            for (k, v) in extra { t[k] = v }
+            return .object(t)
+        }
+
         return [
             "settings": .object([
                 // `bizEn` / `bizAr` are the shop's name as the desk stores it —
@@ -78,6 +96,30 @@ enum SampleShop {
                          "status": .string("printing"), "printerApi": .object(["type": .string("prusalink")])]),
                 .object(["id": .string(saturn.0), "name": .string(saturn.1), "type": .string("resin"),
                          "status": .string("idle"), "printerApi": .object(["type": .string("none")])]),
+            ]),
+            // Printer care (`lib/maintenance.js`), dated from today so the
+            // card always shows one task overdue and one due on the X1C, one
+            // coming up, one inspected and pushed out, and parts falling due
+            // on several different days.
+            "machMaintTasks": .array([
+                careTask("MT-S1", x1c.0, "Lubricate carbon rods", days: 30, doneDaysAgo: 50,
+                         care: "carbon_rods", parts: [("oil", 1)]),
+                careTask("MT-S2", x1c.0, "Replace carbon filter", days: 90, doneDaysAgo: 100,
+                         care: "carbon_filter", parts: [("carbon_filter", 1)]),
+                careTask("MT-S3", x1c.0, "Clean build plate", hours: 50, doneDaysAgo: 3, care: "plate"),
+                careTask("MT-S4", mk4.0, "Clean and lubricate rods", days: 60, doneDaysAgo: 56,
+                         care: "rods", parts: [("grease", 1)]),
+                careTask("MT-S5", mk4.0, "Replace PTFE tube", days: 180, doneDaysAgo: 120,
+                         care: "ptfe", parts: [("ptfe_tube", 1)]),
+                careTask("MT-S6", saturn.0, "Replace FEP film", days: 60, doneDaysAgo: 30,
+                         care: "fep", parts: [("fep_film", 1)]),
+                careTask("MT-S7", saturn.0, "Change the IPA", days: 14, doneDaysAgo: 10,
+                         care: "ipa", parts: [("ipa", 2)]),
+                careTask("MT-S8", saturn.0, "Clean resin vat", days: 7, doneDaysAgo: 9, care: "vat",
+                         extra: ["inspectedAt": .string(StoreWriter.iso(now.addingTimeInterval(-86_400))),
+                                 "inspectedHours": .number(0),
+                                 "deferUntilHours": .null,
+                                 "deferUntilAt": .string(StoreWriter.iso(now.addingTimeInterval(3 * 86_400)))]),
             ]),
             "clients": .array([
                 .object(["id": .string("C-1"), "nameEn": .string("Acme Robotics"), "phone": .string("+15555550101"), "rev": .number(1)]),

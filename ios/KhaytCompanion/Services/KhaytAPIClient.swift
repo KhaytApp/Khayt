@@ -855,6 +855,31 @@ final class KhaytAPIClient: ObservableObject {
         return true
     }
 
+    // MARK: - Printer care
+
+    /// Each machine's care tasks and the parts to buy, from this phone's book
+    /// (`CareBook`). Nil with no book: care is never asked of the desktop.
+    func printerCare(now: Date = Date()) -> CareBook? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return CareBook(store: store, baseline: book.baseline(), scope: book.scope(), now: now)
+    }
+
+    /// A care task done, in the book (`BookWriter.markCareTaskDone`), then sent on.
+    func markCareTaskDone(taskId: String, now: Date = Date()) async throws {
+        guard let book, book.exists else { throw KhaytAPIError.server(L10n.tr("alert.print.needs_book")) }
+        try BookWriter(book: book).markCareTaskDone(taskId: taskId, now: now)
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
+    /// A care task inspected and not needed yet (`BookWriter.deferCareTask`), then sent on.
+    func deferCareTask(taskId: String, now: Date = Date()) async throws {
+        guard let book, book.exists else { throw KhaytAPIError.server(L10n.tr("alert.print.needs_book")) }
+        try BookWriter(book: book).deferCareTask(taskId: taskId, now: now)
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
     /// The carriers to ship a job with — the Mac's Ship sheet list (Manual
     /// last, always there) — or nil when the job is not one to ship now:
     /// unfinished, already sent or already delivered.
