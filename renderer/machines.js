@@ -1161,7 +1161,7 @@ function openMachineEditor(machineId = null) {
       modal.querySelector('#machApiSlug')?.addEventListener('input', e => { draft.printerApi.printerSlug = e.target.value; });
       modal.querySelector('#btnTestApi')?.addEventListener('click', async () => {
         const resultEl = modal.querySelector('#apiTestResult');
-        if (resultEl) resultEl.textContent = '…testing';
+        if (resultEl) resultEl.textContent = t('slicer.testing');
         try {
           if (window.hubAPI?.startPrinterPolling) {
             const testMachine = { id: draft.id, printerApi: { ...draft.printerApi } };
@@ -1567,7 +1567,7 @@ function openMaintLog(machineId) {
       return `<tr>
         <td><strong>${escapeHtml(tk.name || '')}</strong><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.every') || 'every')} ${every}</span></td>
         <td style="white-space:nowrap;color:${STATUS_COLOR[st.status] || 'var(--text-muted)'};font-weight:600;font-size:12px;" data-status="${escapeHtml(st.status)}"${st.deferred ? ' data-deferred="1"' : ''}>${escapeHtml(label)}</td>
-        <td style="white-space:nowrap;text-align:right;">
+        <td style="white-space:nowrap;text-align:end;">
           ${notNeeded}<button class="btn small" data-act="mt-done" data-id="${tk.id}">${escapeHtml(t('maint.mark_done') || 'Done')}</button>
           <button class="btn danger small" data-act="mt-del" data-id="${tk.id}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
         </td></tr>`;

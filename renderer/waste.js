@@ -105,7 +105,7 @@ function renderWasteLog() {
         return `<tr>
           <td style="font-size:12px; color:var(--text-dim);">${escapeHtml(oid)}</td>
           <td>${escapeHtml(ord ? (ord.project || '') : '—')}</td>
-          <td style="color:var(--danger); font-variant-numeric:tabular-nums; text-align:right;">${fmtPrice(cost)}</td>
+          <td style="color:var(--danger); font-variant-numeric:tabular-nums; text-align:end;">${fmtPrice(cost)}</td>
         </tr>`;
       }).join('');
       topWasteOrdersEl.innerHTML = `
@@ -115,7 +115,7 @@ function renderWasteLog() {
             <thead><tr>
               <th>${escapeHtml(t('log.order_id'))}</th>
               <th>${escapeHtml(t('ord.project'))}</th>
-              <th style="text-align:right;">${escapeHtml(t('waste.est_cost'))}</th>
+              <th style="text-align:end;">${escapeHtml(t('waste.est_cost'))}</th>
             </tr></thead>
             <tbody>${order_rows}</tbody>
           </table></div>
@@ -139,7 +139,7 @@ function renderWasteLog() {
       <td style="text-align:center;">${escapeHtml(String(w.weight || 0))}g</td>
       <td>${ftLabel}</td>
       <td>${escapeHtml(w.reason || '—')}</td>
-      <td style="text-align:right; font-variant-numeric:tabular-nums;">${fmtPrice(+w.cost || 0)}</td>
+      <td style="text-align:end; font-variant-numeric:tabular-nums;">${fmtPrice(+w.cost || 0)}</td>
       <td style="text-align:center;">
         <button class="btn danger small" data-act="del-waste" data-id="${escapeHtml(w.id)}">${escapeHtml(t('common.delete'))}</button>
       </td>

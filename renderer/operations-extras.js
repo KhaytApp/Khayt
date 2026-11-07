@@ -190,7 +190,7 @@ function processRecurringOrders() {
 
   if (created > 0) {
     saveAll();
-    setTimeout(() => toast(`Auto-created ${created} recurring order${created > 1 ? 's' : ''}`, 'success', 4000), 500);
+    setTimeout(() => toast(t(created === 1 ? 'rec.auto_created_one' : 'rec.auto_created', { n: created }), 'success', 4000), 500);
   }
 }
 
