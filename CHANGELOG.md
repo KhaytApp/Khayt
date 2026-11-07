@@ -9338,6 +9338,22 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.28] - 2026-11-07
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release lets you sell prints of a model whose free licence says no, once you have bought the designer's commercial licence.
+
+### Added
+
+- **"I have a licence to sell prints".** Many designers give a model away for personal use and sell a separate licence to sell prints of it. The "Not licensed for sale" warning on a job, quote or product now has I have a licence to sell prints… next to each model, and so does the library. Saving records the model as Commercial (bought from the designer) and clears the warning everywhere it is used. A licence code, page and end date are optional; with an end date, sales are flagged again the day after it.
+
+### Changed
+
+- **Printer care on a paired iPhone sees the whole history.** The Mac now sends each printer's total print hours with the book, so care tasks ticked off on the phone record the same hours the Mac would, even for a shop with more jobs than the phone holds.
+- **A very long tracking link is left off the customer's order page.** A tracking link over 500 characters (a long Arabic tracking number can be one) is no longer sent; the page shows the tracking number without a Track button, as Khayt Cloud already does.
+
 ## [4.0.0-beta.27] - 2026-11-07
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
