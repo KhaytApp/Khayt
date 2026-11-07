@@ -1106,3 +1106,18 @@
 "cloud.read_only" = "Anmeldung nur zum Lesen";
 "cloud.read_only.line" = "Dieses iPhone ist als Betrachter bei Khayt Cloud angemeldet und mit keinem Mac gekoppelt: Es zeigt die Werkstatt, kann sie aber nicht ändern.";
 "cloud.read_only.refused" = "Nicht gespeichert: Die Khayt-Cloud-Anmeldung dieses iPhones ist nur zum Lesen. Kopple es mit dem Mac oder melde dich mit einem Konto an, das bearbeiten darf.";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Einkaufsliste";
+"shop.none" = "Nichts zu kaufen — jedes Filament ist über dem Nachbestellpunkt.";
+"shop.no_supplier" = "Kein Lieferant";
+"shop.share" = "Liste teilen";
+"shop.hint" = "Jedes Filament am oder unter seinem Nachbestellpunkt, nach dem Lieferanten, der es verkauft. Nachbestellpunkte, Mengen und Lieferanten werden in Khayt auf dem Mac oder dem Computer festgelegt.";
+"shop.buy" = "%@ kaufen";
+"shop.have" = "%@ übrig";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Energie: %@";
+"energy.sub" = "Gemessen von der Smart-Steckdose des Druckers";
+"energy.cost" = "Strom";
+"unit.kwh" = "kWh";

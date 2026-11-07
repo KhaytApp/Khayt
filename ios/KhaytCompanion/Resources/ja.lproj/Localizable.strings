@@ -1106,3 +1106,18 @@
 "cloud.read_only" = "閲覧専用のサインイン";
 "cloud.read_only.line" = "このiPhoneは閲覧者としてKhayt Cloudにサインインしており、ペアリングされたMacがありません。ショップを表示できますが、変更はできません。";
 "cloud.read_only.refused" = "保存されませんでした。このiPhoneのKhayt Cloudサインインは閲覧専用です。Macとペアリングするか、編集できるアカウントでサインインしてください。";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "買い物リスト";
+"shop.none" = "購入するものはありません — すべてのフィラメントが再注文点を上回っています。";
+"shop.no_supplier" = "サプライヤー未設定";
+"shop.share" = "リストを共有";
+"shop.hint" = "再注文点以下のフィラメントを、販売するサプライヤーごとに表示します。再注文点・購入量・サプライヤーは Mac またはコンピュータの Khayt で設定します。";
+"shop.buy" = "%@ 購入";
+"shop.have" = "残り %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "電力量: %@";
+"energy.sub" = "プリンターのスマートプラグで計測";
+"energy.cost" = "電気代";
+"unit.kwh" = "kWh";

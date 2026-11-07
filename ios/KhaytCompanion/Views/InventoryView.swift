@@ -17,6 +17,9 @@ struct InventoryView: View {
     @State private var searchText = ""
     @State private var lowOnly = false
     @State private var openSpool: InventorySpool?
+    /// The shopping list (`ShoppingListPage`) — from the book, so offered
+    /// only when this phone holds one.
+    @State private var showShopping = false
 
     private func takeLowStockRequest() {
         guard ordersNav.pendingLowStock else { return }
@@ -87,11 +90,18 @@ struct InventoryView: View {
         .khaytScreen(title: L10n.tr("tab.inventory"))
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar {
+            if api.holdsBook {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showShopping = true } label: { Image(systemName: "cart") }
+                        .accessibilityLabel(L10n.tr("shop.title"))
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showAddSpool = true } label: { Image(systemName: "plus") }
                     .accessibilityLabel(L10n.tr("spool.add.title"))
             }
         }
+        .navigationDestination(isPresented: $showShopping) { ShoppingListPage() }
         .sheet(isPresented: $showAddSpool) {
             AddSpoolSheet { Task { await load() } }
         }
@@ -212,6 +222,7 @@ struct InventoryView: View {
             if let open = openSpool, !spools.contains(where: { $0.id == open.id }) { openSpool = nil }
             #if DEBUG
             if let id = KhaytCompanionApp.ScreenshotOpen.take("spool:") { openSpool = spools.first { $0.id == id } }
+            if KhaytCompanionApp.ScreenshotOpen.take("shopping") != nil { showShopping = true }
             #endif
         } catch {
             spools = []

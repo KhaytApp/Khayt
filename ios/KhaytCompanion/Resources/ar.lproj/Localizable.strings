@@ -1106,3 +1106,18 @@
 "cloud.read_only" = "تسجيل دخول للقراءة فقط";
 "cloud.read_only.line" = "هذا الهاتف مسجّل في Khayt Cloud بصفة مشاهد، ولا ماك مربوطًا به: يعرض الورشة لكنه لا يستطيع تعديلها.";
 "cloud.read_only.refused" = "لم يُحفظ: تسجيل دخول هذا الهاتف إلى Khayt Cloud للقراءة فقط. اربطه بالماك، أو سجّل الدخول بحساب يملك صلاحية التعديل.";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "قائمة التسوق";
+"shop.none" = "لا شيء للشراء — كل الخيوط فوق نقطة إعادة الطلب.";
+"shop.no_supplier" = "لا يوجد مورّد";
+"shop.share" = "مشاركة القائمة";
+"shop.hint" = "كل خيط عند نقطة إعادة الطلب أو دونها، مجمّعة حسب المورّد الذي يبيعه. تُضبط نقاط إعادة الطلب والكميات والمورّدون في Khayt على الماك أو الكمبيوتر.";
+"shop.buy" = "اشترِ %@";
+"shop.have" = "المتبقي %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "الطاقة: %@";
+"energy.sub" = "قاسها المقبس الذكي للطابعة";
+"energy.cost" = "الكهرباء";
+"unit.kwh" = "كيلوواط ساعة";

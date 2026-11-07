@@ -1106,3 +1106,18 @@
 "cloud.read_only" = "Salt okunur oturum";
 "cloud.read_only.line" = "Bu telefon Khayt Cloud’a görüntüleyici olarak giriş yaptı ve eşlenmiş Mac yok: atölyeyi gösterir ama değiştiremez.";
 "cloud.read_only.refused" = "Kaydedilmedi: bu telefonun Khayt Cloud oturumu salt okunur. Mac ile eşleyin ya da düzenleme yetkisi olan bir hesapla giriş yapın.";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Alışveriş listesi";
+"shop.none" = "Alınacak bir şey yok — her filament yeniden sipariş noktasının üzerinde.";
+"shop.no_supplier" = "Tedarikçi yok";
+"shop.share" = "Listeyi paylaş";
+"shop.hint" = "Yeniden sipariş noktasında veya altındaki her filament, onu satan tedarikçiye göre. Yeniden sipariş noktaları, miktarlar ve tedarikçiler Mac’te veya bilgisayarda Khayt’ta ayarlanır.";
+"shop.buy" = "%@ al";
+"shop.have" = "%@ kaldı";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Enerji: %@";
+"energy.sub" = "Yazıcının akıllı prizi ölçtü";
+"energy.cost" = "Elektrik";
+"unit.kwh" = "kWh";

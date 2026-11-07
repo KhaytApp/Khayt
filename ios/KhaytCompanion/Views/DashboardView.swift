@@ -546,7 +546,13 @@ struct DashboardView: View {
                              ("library", { showLibrary = true }), ("catalogue", { showCatalogue = true })] as [(String, () -> Void)] {
             if KhaytCompanionApp.ScreenshotOpen.take(name) != nil { show() }
         }
-        if let id = KhaytCompanionApp.ScreenshotOpen.take("order:") { openOrder = queue.first { $0.id == id } }
+        if let id = KhaytCompanionApp.ScreenshotOpen.take("order:") {
+            // An open job from the queue; a finished one from the recent jobs.
+            openOrder = queue.first { $0.id == id }
+            if openOrder == nil, let done = (try? await api.fetchRecentOrders(limit: 200))?.first(where: { $0.id == id }) {
+                openOrder = QueueOrder(entry: done)
+            }
+        }
         #endif
     }
 

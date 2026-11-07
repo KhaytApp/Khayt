@@ -35,6 +35,8 @@ struct OrderDetailPage: View {
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
     /// The job's own photos of the finished print, from the book.
     @State private var printPhotos: [JobPrintPhoto] = []
+    /// What the print drew from a metering plug, when one measured it.
+    @State private var energy: JobEnergy?
     /// A phone the Mac enrolled can send a photo of the print (not a quote).
     private var canAddPhoto: Bool { api.canAddJobPhoto && order.status != "quote" && order.status != "cancelled" }
     @State private var showingInvoice = false
@@ -65,6 +67,7 @@ struct OrderDetailPage: View {
     }
 
     var body: some View {
+        ScrollViewReader { scroller in
         ScrollView {
             // Asked where the sale is, as on the Mac: a model that may not be
             // sold, printed and handed over, has a designer on the other end.
@@ -84,6 +87,13 @@ struct OrderDetailPage: View {
                                onAnswer: { answer in Task { await answerQuote(answer) } })
                 // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
                 .disabled(!api.canWrite)
+            // What the print drew from the wall, when a smart plug metered
+            // enough of it. Nothing at all otherwise.
+            if let energy {
+                EnergyCard(energy: energy)
+                    .id("energy")
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
             if order.status == OrderStatus.quote.rawValue, let quoteState {
                 QuoteToolsCard(state: quoteState, followingUp: followingUp,
                                onRevise: { revising = quoteState },
@@ -219,6 +229,7 @@ struct OrderDetailPage: View {
             customer = api.customer(orderId: order.id)
             photoAccess = api.photoAccess(orderId: order.id)
             printPhotos = api.printPhotos(orderId: order.id)
+            energy = api.jobEnergy(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
             if order.status == OrderStatus.quote.rawValue { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
@@ -232,9 +243,15 @@ struct OrderDetailPage: View {
             }
             // `-KhaytQuoteHistory YES` on a quote: its history, for screenshots.
             if quoteState != nil, UserDefaults.standard.bool(forKey: "KhaytQuoteHistory") { showingHistory = true }
+            // `-KhaytScrollEnergy YES`: the energy card in view, for screenshots.
+            if energy != nil, UserDefaults.standard.bool(forKey: "KhaytScrollEnergy") {
+                try? await Task.sleep(for: .milliseconds(300))
+                scroller.scrollTo("energy", anchor: .center)
+            }
             #endif
         }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
+        }
     }
 
     private func loadPayment() async {
