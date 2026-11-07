@@ -2012,6 +2012,8 @@
  "mac.plan_no_links": "无分享链接",
  "mac.plan_opens_soon": "升级即将开放。",
  "mac.plan_owner_only": "只有店铺所有者才能更改套餐。",
+ "mac.portal_cross_shop": "在客户门户中与其他 Khayt 店铺一起显示我的订单",
+ "mac.portal_cross_shop_hint": "关闭：客户只有从本店自己的页面打开门户时，才能看到本店的订单。",
  "mac.paylink_title": "付款链接",
  "mac.paylink_url": "链接",
  "mac.paylink_label": "标签(可选)",

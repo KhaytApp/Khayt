@@ -2012,6 +2012,8 @@
  "mac.plan_no_links": "keine Freigabelinks",
  "mac.plan_opens_soon": "Upgrades öffnen bald.",
  "mac.plan_owner_only": "Nur der Inhaber des Shops kann den Tarif ändern.",
+ "mac.portal_cross_shop": "Meine Aufträge im Kundenportal neben anderen Khayt-Shops zeigen",
+ "mac.portal_cross_shop_hint": "Aus: Ein Kunde sieht die Aufträge dieses Shops nur, wenn er das Portal über die eigenen Seiten dieses Shops öffnet.",
  "mac.paylink_title": "Zahlungslink",
  "mac.paylink_url": "Link",
  "mac.paylink_label": "Bezeichnung (optional)",

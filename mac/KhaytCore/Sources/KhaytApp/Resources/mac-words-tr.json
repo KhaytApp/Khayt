@@ -2012,6 +2012,8 @@
  "mac.plan_no_links": "paylaşım bağlantısı yok",
  "mac.plan_opens_soon": "Yükseltmeler yakında açılıyor.",
  "mac.plan_owner_only": "Planı yalnızca dükkânın sahibi değiştirebilir.",
+ "mac.portal_cross_shop": "Siparişlerimi müşteri portalında diğer Khayt mağazalarının yanında göster",
+ "mac.portal_cross_shop_hint": "Kapalı: müşteri bu mağazanın siparişlerini yalnızca portalı bu mağazanın kendi sayfalarından açtığında görür.",
  "mac.paylink_title": "Ödeme bağlantısı",
  "mac.paylink_url": "Bağlantı",
  "mac.paylink_label": "Etiket (isteğe bağlı)",

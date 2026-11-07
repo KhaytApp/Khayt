@@ -2012,6 +2012,8 @@
  "mac.plan_no_links": "共有リンクなし",
  "mac.plan_opens_soon": "アップグレードはまもなく開始します。",
  "mac.plan_owner_only": "プランを変更できるのは、ショップのオーナーだけです。",
+ "mac.portal_cross_shop": "顧客ポータルで他の Khayt ショップと並べて自分の注文を表示",
+ "mac.portal_cross_shop_hint": "オフ：顧客は、このショップのページからポータルを開いたときだけ、このショップの注文を見られます。",
  "mac.paylink_title": "お支払いリンク",
  "mac.paylink_url": "リンク",
  "mac.paylink_label": "ラベル(任意)",
