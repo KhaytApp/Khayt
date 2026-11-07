@@ -56,7 +56,8 @@ final class CompanionNotifications: ObservableObject {
         settings: ConnectionSettings,
         livePrints: [WidgetPrint]? = nil,
         connected: Bool = true,
-        asOf: Date = Date()
+        asOf: Date = Date(),
+        money: WidgetMoney? = nil
     ) {
         // Nothing in the sample shop happens, so nothing in it is news.
         let real = !settings.isSampleShop
@@ -109,12 +110,17 @@ final class CompanionNotifications: ObservableObject {
                 updatedAt: asOf,
                 // Carry over the last known prints when a caller (e.g. a health
                 // poll) doesn't supply fresh live data, so it isn't clobbered.
-                prints: livePrints ?? WidgetSnapshotStore.load()?.prints
+                prints: livePrints ?? WidgetSnapshotStore.load()?.prints,
+                // Nil clears the Money widget: the sample shop, no book.
+                money: money
             )
         )
     }
 
-    func saveDisconnectedSnapshot(shopName: String) {
+    /// `keepMoney`: the shop is out of reach but still paired, so the Money
+    /// widget keeps its last figures (it shows their age, and greys them once
+    /// they are old). An unpaired phone keeps none of a shop's money.
+    func saveDisconnectedSnapshot(shopName: String, keepMoney: Bool = true) {
         WidgetSnapshotStore.save(
             WidgetSnapshot(
                 shopName: shopName,
@@ -125,7 +131,8 @@ final class CompanionNotifications: ObservableObject {
                 completedToday: 0,
                 connected: false,
                 updatedAt: Date(),
-                prints: nil
+                prints: nil,
+                money: keepMoney ? WidgetSnapshotStore.load()?.money : nil
             )
         )
     }
