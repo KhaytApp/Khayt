@@ -62,6 +62,12 @@ final class ShopFeed: ObservableObject {
         save()
     }
 
+    /// Unpairing: the list goes, and its file with it.
+    func clear() {
+        items = []
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
+
     private func save() {
         guard let url, let data = try? JSONEncoder().encode(items) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

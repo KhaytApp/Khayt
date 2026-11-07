@@ -64,7 +64,7 @@ struct MachinesView: View {
                         .foregroundStyle(KhaytDesign.ink)
                     if job.isRush { RushBadge() }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                    Image(systemName: "chevron.forward")
                         .font(.caption).foregroundStyle(KhaytDesign.note)
                 }
                 .font(.khayt(14, .medium, relativeTo: .subheadline))

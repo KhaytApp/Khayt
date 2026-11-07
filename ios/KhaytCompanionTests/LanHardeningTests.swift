@@ -28,6 +28,22 @@ final class LanHardeningTests: XCTestCase {
         XCTAssertEqual(health.macMoved, elsewhere, "a different address is a different question")
     }
 
+    /// Moving to an address that could not prove it holds the Mac's key
+    /// sends no stored PIN there: the person is asked to pair again.
+    func testAcceptingAMoveAsksForThePinRatherThanSendingAStoredOne() async {
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.pin, s.isPaired, s.isSampleShop, s.needsPairAgain)
+        defer { (s.host, s.port, s.pin, s.isPaired, s.isSampleShop, s.needsPairAgain) = saved }
+        s.host = "khayt-refuse.invalid"; s.port = 3219; s.pin = "12345678"; s.isPaired = true; s.isSampleShop = false
+        let health = ConnectionHealth(api: KhaytAPIClient(settings: s, withBook: false), settings: s)
+        health.offerMove(to: MacAddress(host: "khayt-moved.invalid", port: 3219))
+        await health.acceptMove()
+        XCTAssertEqual(s.host, "khayt-moved.invalid")
+        XCTAssertEqual(s.pin, "", "no stored PIN goes to an address on trust")
+        XCTAssertEqual(ConnectionSettings().pin, "", "nor stays in the Keychain to be sent later")
+        XCTAssertTrue(s.needsPairAgain, "the person types it: Pair again")
+    }
+
     // MARK: - Redirects
 
     func testARedirectIsNeverFollowed() async throws {

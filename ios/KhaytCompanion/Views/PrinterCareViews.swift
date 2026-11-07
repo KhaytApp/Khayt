@@ -106,7 +106,7 @@ struct MachineCareLink: View {
                     }
                     .font(.khayt(12.5, .semibold, relativeTo: .caption))
                 }
-                Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                Image(systemName: "chevron.forward")
                     .font(.caption).foregroundStyle(KhaytDesign.note)
             }
             .font(.khayt(14, .medium, relativeTo: .subheadline))

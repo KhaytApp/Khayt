@@ -45,6 +45,15 @@ struct PairingView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: step)
         .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        #if DEBUG
+        // `-KhaytPairStep pin`: open on the PIN step, for a screenshot.
+        .onAppear {
+            if UserDefaults.standard.string(forKey: "KhaytPairStep") == "pin" {
+                if settings.host.isEmpty { settings.host = "192.168.1.42" }
+                step = .pin
+            }
+        }
+        #endif
         // Signing in to the cloud IS setting up: the phone takes the shop from
         // there and can pair with the Mac later, from Settings.
         .onChange(of: api.cloud) { _, session in
@@ -196,10 +205,11 @@ struct PairingView: View {
             lead(L10n.tr("pair.manual.body"))
                 .padding(.bottom, 22)
             fieldLabel(L10n.tr("pair.manual.host"))
+            // An address or a name: `192.168.1.42` or `studio-mac.local`.
             TextField("192.168.1.42", text: $settings.host)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .keyboardType(.decimalPad)
+                .keyboardType(.URL)
                 .modifier(BigField())
             fieldLabel(L10n.tr("pair.manual.port")).padding(.top, 14)
             TextField("3219", text: $portText)
@@ -237,8 +247,7 @@ struct PairingView: View {
             lead(L10n.tr("pair.pin.body"))
                 .padding(.bottom, 22)
             SecureField("••••••••", text: $settings.pin)
-                .keyboardType(.numberPad)
-                .textContentType(.password)
+                .pinEntry()
                 .focused($pinFocused)
                 .font(.khayt(26, .semibold, relativeTo: .title))
                 .khaytTracking(8)
@@ -266,6 +275,12 @@ struct PairingView: View {
                     .padding(.top, 10)
             }
             foot(L10n.tr("pair.pin.foot")).padding(.top, 10)
+            fieldLabel(L10n.tr("pair.phone_name")).padding(.top, 18)
+            TextField(ConnectionSettings.defaultPhoneName, text: $settings.phoneName)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .modifier(BigField())
+            foot(L10n.tr("pair.phone_name.foot"))
             Spacer(minLength: 18)
             primary(L10n.tr("pair.connect"), busy: isConnecting,
                     disabled: settings.pin.trimmingCharacters(in: .whitespacesAndNewlines).count < 8 || isConnecting) {
@@ -301,17 +316,12 @@ struct PairingView: View {
         // PIN alone, sent on every request. So enrol here, and say what to do
         // when the window is shut. A Mac or desktop without the route (404)
         // or a failed try is not fatal: the phone enrols later by itself.
-        if settings.macIdentityKey.isEmpty, let key = await api.fetchIdentityKey() {
-            settings.macIdentityKey = key
-        }
-        if !settings.macIdentityKey.isEmpty {
-            let result = await api.enrolDevice(name: UIDevice.current.name)
-            if result == .closed || result == .locked {
-                settings.macIdentityKey = ""
-                failure = L10n.tr(result == .closed ? "pair.window_closed" : "pair.window_locked")
-                CompanionHaptics.warning()
-                return
-            }
+        // Enrolled, the phone lets the typed PIN go: its requests are signed.
+        let result = await api.enrolWithTypedPin(name: settings.nameToSend)
+        if result == .closed || result == .locked {
+            failure = L10n.tr(result == .closed ? "pair.window_closed" : "pair.window_locked")
+            CompanionHaptics.warning()
+            return
         }
 
         // ── AND THEN ASK FOR THE BOOK, BUT DO NOT INSIST ─────────────────
