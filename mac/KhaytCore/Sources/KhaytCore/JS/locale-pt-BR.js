@@ -2906,6 +2906,7 @@
   "exp.attach_receipt": "Anexar comprovante",
   "exp.open_receipt": "Ver comprovante",
   "exp.receipt_attached": "Comprovante anexado",
+  "exp.receipt_open_failed": "Não foi possível abrir o comprovante — ele pode ter sido movido ou excluído",
   "exp.receipt_add": "Adicionar a partir de recibo",
   "exp.receipt_title": "Adicionar uma despesa a partir de um recibo",
   "exp.receipt_hint": "Abra uma foto, captura de tela ou PDF de uma nota fiscal saudita e o Khayt lê o código QR: o vendedor, o total e o IVA. Você confere e escolhe a categoria antes de salvar.",

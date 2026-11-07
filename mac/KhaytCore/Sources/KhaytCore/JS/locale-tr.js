@@ -2905,6 +2905,7 @@
   "exp.attach_receipt": "Makbuz ekle",
   "exp.open_receipt": "Makbuzu görüntüle",
   "exp.receipt_attached": "Makbuz eklendi",
+  "exp.receipt_open_failed": "Makbuz açılamadı — taşınmış veya silinmiş olabilir",
   "exp.receipt_add": "Fişten ekle",
   "exp.receipt_title": "Fişten gider ekle",
   "exp.receipt_hint": "Suudi vergi faturasının fotoğrafını, ekran görüntüsünü veya PDF’ini açın; Khayt üzerindeki QR kodu okur: satıcı, toplam ve KDV. Kaydetmeden önce kontrol edip kategoriyi seçersiniz.",
