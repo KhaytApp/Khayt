@@ -1276,6 +1276,18 @@ New: [3D Print Pricing](https://3dprintpricing.pro/) · [Manuflo](https://manufl
 *Caveat, as §5–§7: vendor pages read once, not hands-on evaluations. Enough to place a
 product, not to trust a feature matrix.*
 
+### Checked against main, 2026-11-07
+
+- **AMS slot (idea 1): still a gap.** No `tray_type`, `tray_color`, `tray_uuid` or `tag_uid`
+  anywhere in `lib/`, `renderer/`, `mac/KhaytCore/Sources` or `ios/`. Still blocked on a Bambu
+  on the bench.
+- **Money widget (idea 2): still a gap.** `ios/KhaytWidget/` has the queue widget, the print
+  Live Activity and the Control Center controls; nothing shows takings, money owed or stock.
+- **khayt-mcp books tools (idea 3): still untold.** khaytapp.com describes khayt-mcp only as
+  letting "an AI assistant search your model library"; `mac/README.md` documents it the same way.
+- **R10 (idea 4): done.** Drafted in the 2026-10-26 reading; the current text is
+  [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md) (2026-11-04).
+
 ## Watch list additions — 2026-11-04 (Turki's links)
 
 Turki sent eight links with the instruction "add any potential competition to the list even
