@@ -45,6 +45,9 @@ final class KhaytAPIClient: ObservableObject {
     /// 401 as any bad token (khayt-cloud `docs/api-contract.md`). Nothing but
     /// signing in again fixes it, so Settings offers exactly that.
     @Published private(set) var cloudNeedsSignIn = false
+    /// The Mac answered a send but did not take some of the changes in it,
+    /// in a sentence, or nil. Those changes stay pending (`sendPendingChanges`).
+    @Published private(set) var macRefused: String?
 
     struct SyncMark: Equatable {
         enum Route: Equatable { case mac, cloud }
@@ -100,7 +103,9 @@ final class KhaytAPIClient: ObservableObject {
     /// `protocols` is for tests: URL protocols that answer in place of the Mac.
     /// `withBook: false` is for tests too: a client that holds no book always
     /// asks the Mac, whatever the simulator's shared container holds.
-    init(settings: ConnectionSettings, protocols: [AnyClass] = [], withBook: Bool = true) {
+    /// `book` is for tests as well: a book in a folder of the test's own.
+    init(settings: ConnectionSettings, protocols: [AnyClass] = [], withBook: Bool = true,
+         book injected: CompanionBook? = nil) {
         self.settings = settings
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
@@ -109,7 +114,7 @@ final class KhaytAPIClient: ObservableObject {
         // Every request to the Mac carries the PIN or this phone's signature,
         // so none may follow a redirect to another host — see `NoRedirects`.
         self.session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
-        let opened = withBook ? try? CompanionBook.inSharedContainer() : nil
+        let opened = injected ?? (withBook ? try? CompanionBook.inSharedContainer() : nil)
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
     }
@@ -419,10 +424,37 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
+        // A 200 is not "all of it landed". The Mac answers 200 for changes it
+        // did not take (a collection it does not accept from a phone, counted
+        // as skipped), and marking those synced lost them without a word. So
+        // nothing is marked delivered unless the Mac says it took everything;
+        // otherwise it stays pending for the next send or the cloud.
+        let refused = Self.refusedByMac(data)
+        guard refused == 0 else {
+            macRefused = L10n.format("sync.mac_refused", refused)
+            await refreshPendingCount()
+            throw KhaytAPIError.server(L10n.format("sync.mac_refused", refused))
+        }
+        macRefused = nil
         // The Mac has it. Only now do the two agree — up to what was sent.
         try book.markSynced(measured)
         await refreshPendingCount()
         return outbox.count
+    }
+
+    /// How many of the changes sent the Mac's delta reply says it did not
+    /// take: `dropped` when the Mac names it, else `skipped` — which is
+    /// conservative, since a stale edit the Mac's newer copy outranks is
+    /// skipped too. Kept pending, that one goes at the next pull, when the
+    /// Mac's copy becomes the baseline and the edit is no longer a change.
+    /// A reply that cannot be read counts as nothing refused, as before.
+    nonisolated static func refusedByMac(_ reply: Data) -> Int {
+        guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: reply) else { return 0 }
+        func count(_ key: String) -> Int? {
+            if case .number(let n)? = o[key], n.isFinite { return max(0, Int(n)) }
+            return nil
+        }
+        return count("dropped") ?? count("skipped") ?? 0
     }
 
     // MARK: - Two ways home: the Mac, then the cloud

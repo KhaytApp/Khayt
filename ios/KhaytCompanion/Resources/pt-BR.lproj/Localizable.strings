@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Não foi possível acessar o Khayt na sua rede. Verifique o Wi‑Fi e a API de rede local do computador.";
 "connection.banner.pin" = "PIN da rede local recusado. Atualize o PIN nos Ajustes para corresponder ao do computador.";
 "sync.pending" = "%d alteração(ões) neste iPhone aguardando o Mac.";
+"sync.mac_refused" = "O Mac não aceitou %d delas. Elas ficam neste iPhone e são enviadas de novo.";
 "connection.error.reach_status" = "Não foi possível acessar %@. Mesmo Wi‑Fi? Computador → Ajustes → API de rede local: ativada, escutando em todas as interfaces; anote o IP e a porta.";
 "settings.host_required" = "Digite o endereço IP do seu computador.";
 "settings.host_invalid" = "Endereço inválido. Use, por exemplo, 192.168.1.42 (não uma URL completa com http://).";

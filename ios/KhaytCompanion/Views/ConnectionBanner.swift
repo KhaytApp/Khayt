@@ -57,7 +57,8 @@ struct ConnectionBanner: View {
             switch (api.holdsBook, health.macInReach) {
             case (true, true):
                 if api.pendingCount > 0 {
-                    strip(tint: KhaytDesign.note, loud: false, title: pending, line: nil, action: false)
+                    strip(tint: api.macRefused == nil ? KhaytDesign.note : KhaytDesign.attention, loud: false,
+                          title: pending, line: api.macRefused, action: false)
                 }
             case (true, false):
                 strip(tint: KhaytDesign.note, loud: false, title: asOf,

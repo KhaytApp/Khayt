@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Impossible de joindre Khayt sur votre réseau. Vérifiez le Wi‑Fi et l’API LAN de l’ordinateur.";
 "connection.banner.pin" = "Code PIN LAN refusé. Mettez-le à jour dans les réglages pour qu’il corresponde à l’ordinateur.";
 "sync.pending" = "%d modification(s) sur cet iPhone en attente du Mac.";
+"sync.mac_refused" = "Le Mac n’en a pas accepté %d. Elles restent sur cet iPhone et seront renvoyées.";
 "connection.error.reach_status" = "Impossible de joindre %@. Même Wi‑Fi ? Ordinateur → Réglages → API LAN : activée, écoute sur toutes les interfaces, notez l’IP et le port.";
 "settings.host_required" = "Saisissez l’adresse IP de votre ordinateur.";
 "settings.host_invalid" = "Adresse non valide. Utilisez par ex. 192.168.1.42 (pas une URL complète avec http://).";

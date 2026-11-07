@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Ağınızdaki Khayt’a ulaşılamıyor. Wi‑Fi’yi ve masaüstü LAN API’sini kontrol edin.";
 "connection.banner.pin" = "LAN PIN’i reddedildi. Ayarlar’da PIN’i masaüstündekiyle eşleşecek şekilde güncelleyin.";
 "sync.pending" = "Bu iPhone’da Mac’i bekleyen %d değişiklik var.";
+"sync.mac_refused" = "Mac bunlardan %d tanesini almadı. Bu iPhone’da kalır ve yeniden gönderilir.";
 "connection.error.reach_status" = "%@ adresine ulaşılamıyor. Aynı Wi‑Fi’de misiniz? Masaüstünde Ayarlar → LAN API: etkin olsun, tüm arayüzlerde dinlesin; IP’yi ve bağlantı noktasını not edin.";
 "settings.host_required" = "Bilgisayarınızın IP adresini girin.";
 "settings.host_invalid" = "Geçersiz adres. Örneğin 192.168.1.42 biçimini kullanın (http:// ile tam URL olmasın).";

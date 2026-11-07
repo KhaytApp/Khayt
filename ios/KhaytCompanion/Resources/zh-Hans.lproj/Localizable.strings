@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "无法在你的网络上连接 Khayt。请检查 Wi‑Fi 和桌面端的局域网 API。";
 "connection.banner.pin" = "LAN PIN 被拒绝。请在设置中更新 PIN，使其与桌面端一致。";
 "sync.pending" = "此 iPhone 上有 %d 项更改，正在等待同步到 Mac。";
+"sync.mac_refused" = "Mac 未接受其中 %d 项。它们会保留在此 iPhone 上并重新发送。";
 "connection.error.reach_status" = "无法连接 %@。是否在同一 Wi‑Fi 下？请在桌面端“设置”→“LAN API”中启用，设为监听所有接口，并记下 IP 和端口。";
 "settings.host_required" = "请输入电脑的 IP 地址。";
 "settings.host_invalid" = "地址无效。请使用如 192.168.1.42 的格式（不要输入带 http:// 的完整网址）。";
