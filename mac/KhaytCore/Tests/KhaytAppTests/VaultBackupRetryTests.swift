@@ -40,7 +40,11 @@ struct VaultBackupRetryTests {
 
     @Test("closing the banner forgets the pending retry")
     func closeForgets() {
-        #expect(MenuCoverageTests.source("Banners.swift")
-            .contains("shop.moveProblem = nil; shop.vaultMissing = nil"))
+        let shop = Shop()
+        shop.vaultMissing = Shop.VaultMissing(files: [], missing: ["m1"])
+        shop.moveProblem = "One of these models has no copy in the vault yet."
+        #expect(shop.vaultMissing != nil, "setting the sentence must not drop the retry")
+        shop.moveProblem = nil      // what the banner's Close does
+        #expect(shop.vaultMissing == nil)
     }
 }

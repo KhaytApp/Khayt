@@ -134,7 +134,7 @@ struct MoveBanners: View {
                     }
                     .controlSize(.small)
                 }
-                BannerClose(words: shop.words) { shop.moveProblem = nil; shop.vaultMissing = nil }
+                BannerClose(words: shop.words) { shop.moveProblem = nil }
             }
         }
         // What adding a model had to say. A refusal — a duplicate, a kind Khayt

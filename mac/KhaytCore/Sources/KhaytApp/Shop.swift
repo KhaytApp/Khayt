@@ -3064,7 +3064,11 @@ final class Shop {
     var releaseWatchers: [Any] = []
 
     /// What stopped a move, when something did. Cleared by the next attempt.
-    var moveProblem: String?
+    /// Clearing it also forgets a pending vault "Back Up and Try Again": the
+    /// button belongs to the sentence, and must not outlive it.
+    var moveProblem: String? {
+        didSet { if moveProblem == nil { vaultMissing = nil } }
+    }
     /// WhatsApp Business updates being sent or sent this run, as "job|milestone".
     /// A send waits up to 15 s on Meta before its log line is written, and a
     /// second click in that time sent the template twice; one that Meta took
