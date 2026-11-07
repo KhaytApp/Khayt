@@ -47,6 +47,9 @@ extension Shop {
     enum LinkOutcome {
         case made(VaultLinks.Created)
         case refused(String)
+        /// Some models have no vault copy yet: the sentence, and which, so the
+        /// sheet can offer to back up just those and try again.
+        case missing(String, Set<String>)
         /// Khayt turned off this shop's share links (403 links-disabled): the
         /// sheet explains it and offers no second try.
         case turnedOff(String)
@@ -61,7 +64,7 @@ extension Shop {
             try await engine.remote.sync.pull()
             let (sources, missing) = VaultLinks.sources(recordIds: request.recordIds, state: engine.remote.sync.load())
             if !missing.isEmpty {
-                return .refused(Shop.say(words, "mac.vl_err_missing", missing.count))
+                return .missing(Shop.say(words, "mac.vl_err_missing", missing.count), Set(missing))
             }
             return .made(try await engine.links.create(sources, options: options))
         } catch VaultClient.Failure.linksDisabled {

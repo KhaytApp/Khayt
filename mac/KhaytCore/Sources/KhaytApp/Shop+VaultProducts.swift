@@ -54,20 +54,28 @@ extension Shop {
     /// "Back Up and Try Again": upload just the models the vault lacked, then
     /// ask again. Never the whole library.
     func backUpMissingAndRetry() async {
-        guard let pending = vaultMissing, canWrite, permitted("cloud", "edit") else { return }
+        guard let pending = vaultMissing else { return }
         vaultMissing = nil
         moveProblem = nil
         vaultBackingUp = true
         defer { vaultBackingUp = false }
-        guard let result = await backUpModels(only: pending.missing) else {
-            moveProblem = cloudLibraryProblem; return
-        }
-        if result.failed > 0 || result.total == 0 {
-            // Not on this Mac (online only, or gone): nothing could be sent.
-            moveProblem = Shop.say(words, "mac.vl_err_missing", max(pending.missing.count, 1))
-            return
-        }
+        if let problem = await backUpToVault(pending.missing) { moveProblem = problem; return }
         await sellAsProduct(pending.files)
+    }
+
+    /// Send just these models (record ids) up to the vault, for a product or a
+    /// share link that found them missing. Nil when every one went up; else
+    /// what to tell the shop. One model online only, or no longer on this Mac,
+    /// cannot be sent, and is said the same way the refusal said it.
+    func backUpToVault(_ missing: Set<String>) async -> String? {
+        guard canWrite, permitted("cloud", "edit") else { return moveProblem ?? words.callIt("mac.vl_err_not_allowed") }
+        guard let result = await backUpModels(only: missing) else {
+            return cloudLibraryProblem ?? words.callIt("mac.cloudlib_not_set_up")
+        }
+        if result.failed > 0 || result.total < missing.count {
+            return Shop.say(words, "mac.vl_err_missing", max(missing.count - (result.done - result.failed), 1))
+        }
+        return nil
     }
 
     private func sellAsProduct(_ files: [LibraryFile]) async {

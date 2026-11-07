@@ -14,7 +14,7 @@ struct VaultBackupRetryTests {
     func reachable() {
         let products = MenuCoverageTests.source("Shop+VaultProducts.swift")
         #expect(products.contains("vaultMissing = VaultMissing(files: files, missing: missing)"))
-        #expect(products.contains("await backUpModels(only: pending.missing)"))
+        #expect(products.contains("await backUpToVault(pending.missing)"))
         let banners = MenuCoverageTests.source("Banners.swift")
         #expect(banners.contains("shop.words.callIt(\"mac.vl_backup_retry\")"))
         #expect(banners.contains("await shop.backUpMissingAndRetry()"))
@@ -26,6 +26,16 @@ struct VaultBackupRetryTests {
         #expect(lib.contains("guard let (done, failed, total) = await backUpModels(only: nil)"))
         // Exactly one place uploads library models into the remote this way.
         #expect(lib.components(separatedBy: "try await CloudLibrary.ensureInBucket(config.remote, key: key, file: URL(fileURLWithPath: file.fullPath), engine: engine)").count == 2)
+    }
+
+    @Test("the share-link sheet offers the same, and keeps the options as filled in")
+    func shareLink() {
+        #expect(MenuCoverageTests.source("Shop+VaultLinks.swift")
+            .contains("return .missing(Shop.say(words, \"mac.vl_err_missing\", missing.count), Set(missing))"))
+        let sheet = MenuCoverageTests.source("VaultShareSheet.swift")
+        #expect(sheet.contains("case .missing(let why, let ids):"))
+        #expect(sheet.contains("let failed = await shop.backUpToVault(ids)"))
+        #expect(sheet.contains("words.callIt(\"mac.vl_backup_retry\")"))
     }
 
     @Test("closing the banner forgets the pending retry")
