@@ -897,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "欠款";
-"owed.empty" = "进行中的作业没有欠款。";
+"owed.empty" = "没有欠款。";
 "owed.total" = "%2$d 个作业共欠 %1$@";
 "owed.due" = "截止 %@";
 "owed.remind" = "通过 WhatsApp 提醒";

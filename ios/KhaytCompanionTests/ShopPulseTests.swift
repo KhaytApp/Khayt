@@ -73,15 +73,34 @@ final class ShopPulseTests: XCTestCase {
         XCTAssertEqual(today.doneToday, 1, "the job finished today is counted")
     }
 
-    func testOwedCountsOpenOrdersByTheShopsOwnRule() async throws {
-        // Owed is open work, every one of which travels — so it is always answerable.
+    func testOwedCountsEveryJobThatCanOweByTheShopsOwnRule() async throws {
         // Paid is `paidAmount`, as `lib/order-money.js` reads it; there is no
-        // status label that settles an order.
+        // status label that settles an order. A finished job still owes until
+        // it is paid (`lib/dashboard-facts.js`, the Mac's `Order.owesAtAll`).
         try load([order("C", "printing", date: "2026-09-17", price: 120),
                   order("D", "pending", date: "2026-09-17", price: 80, paid: 80),
-                  order("B", "completed", date: "2026-09-10", price: 400)], whole: false)
+                  order("B", "completed", date: "2026-09-10", price: 400),
+                  order("Q", "quote", date: "2026-09-10", price: 900),
+                  order("X", "cancelled", date: "2026-09-10", price: 700)], whole: false)
         let pulse = try await BookReader(book: book).pulse(now: now)
-        XCTAssertEqual(pulse.unpaid, 1, "the paid one owes nothing; the finished one is not open work")
-        XCTAssertEqual(pulse.owed, 120, accuracy: 0.001)
+        XCTAssertEqual(pulse.unpaid, 2, "the paid one, the quote and the cancelled job owe nothing")
+        XCTAssertEqual(pulse.owed, 520, accuracy: 0.001)
+    }
+
+    /// A job handed over and never paid for is the debt a shop most needs to
+    /// chase, and Home's Owed and its "Who owes" list both left it out.
+    func testADeliveredUnpaidJobIsOwedAndInWhoOwes() async throws {
+        var voided = order("V", "delivered", date: "2026-09-02", price: 60)
+        if case .object(var o) = voided { o["voidedAt"] = .string("2026-09-03"); voided = .object(o) }
+        try load([order("DEL", "delivered", date: "2026-09-01", price: 250, paid: 50),
+                  order("SHIP", "shipped", date: "2026-09-01", price: 30, paid: 30),
+                  voided], whole: false)
+        let reader = BookReader(book: book)
+        let pulse = try await reader.pulse(now: now)
+        XCTAssertEqual(pulse.owed, 200, accuracy: 0.001)
+        XCTAssertEqual(pulse.unpaid, 1)
+        let owing = try await reader.owing()
+        XCTAssertEqual(owing.map(\.id), ["DEL"], "the delivered job is missing from Who owes")
+        XCTAssertEqual(owing.first?.owed ?? 0, 200, accuracy: 0.001)
     }
 }

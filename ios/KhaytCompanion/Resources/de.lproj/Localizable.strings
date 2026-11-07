@@ -897,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Wer schuldet";
-"owed.empty" = "Bei offenen Aufträgen ist nichts offen.";
+"owed.empty" = "Es ist nichts offen.";
 "owed.total" = "%@ offen bei %d Aufträgen";
 "owed.due" = "Fällig %@";
 "owed.remind" = "Per WhatsApp erinnern";

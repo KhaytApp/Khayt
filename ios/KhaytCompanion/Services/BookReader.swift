@@ -173,9 +173,9 @@ actor BookReader {
         throw CompanionBook.Failure.busy
     }
 
-    /// The jobs behind Home's Owed figure, most owed first: the same open
-    /// jobs and the same shared rule (`owedByOrder`), so the list adds up to
-    /// the figure it was opened from.
+    /// The jobs behind Home's Owed figure, most owed first: the same jobs
+    /// and the same shared rule (`owedByOrder`), so the list adds up to the
+    /// figure it was opened from.
     func owing() async throws -> [OwedLine] {
         let store = try book.read()
         let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r }; return [] }()
@@ -186,10 +186,8 @@ actor BookReader {
         let currencies: [String: JSONValue] = ((try? await engine.currencies()) ?? [:]).mapValues {
             .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
         }
-        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
         let open: [[String: JSONValue]] = orders.compactMap { row in
-            guard case .object(let o) = row, case .string(let st)? = o["status"],
-                  !finished.contains(st), st != "quote" else { return nil }
+            guard case .object(let o) = row, PaymentTerms.owesAtAll(o) else { return nil }
             return o
         }
         let owedBy = try await engine.owedByOrder(open.map(JSONValue.object), settings: settings,
@@ -355,8 +353,15 @@ actor BookReader {
             return ""
         }
         let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
-        let open = orders.filter { !finished.contains(stage(of: $0)) && stage(of: $0) != "quote" }
-        let owedBy = try await engine.owedByOrder(open, settings: settings, clients: clients, currencies: currencies)
+        // Every job that can owe, finished or not — `lib/dashboard-facts.js`
+        // and the Mac's `Order.owesAtAll`: a delivered job nobody has paid
+        // for is owed. Open work only made Home's Owed short by every unpaid
+        // finished job.
+        let canOwe = orders.filter {
+            if case .object(let o) = $0 { return PaymentTerms.owesAtAll(o) }
+            return false
+        }
+        let owedBy = try await engine.owedByOrder(canOwe, settings: settings, clients: clients, currencies: currencies)
         let owing = owedBy.values.filter { $0 > 0.005 }
 
         // How far back the book's finished orders reach.

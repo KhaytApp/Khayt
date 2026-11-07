@@ -897,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "未収金";
-"owed.empty" = "進行中のジョブに未収金はありません。";
+"owed.empty" = "未収金はありません。";
 "owed.total" = "%2$d件のジョブで%1$@の未収";
 "owed.due" = "期限 %@";
 "owed.remind" = "WhatsAppでリマインド";

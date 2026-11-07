@@ -897,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Quem deve";
-"owed.empty" = "Nada a receber nos trabalhos abertos.";
+"owed.empty" = "Nada a receber.";
 "owed.total" = "%@ a receber em %d trabalhos";
 "owed.due" = "Vence %@";
 "owed.remind" = "Lembrar pelo WhatsApp";

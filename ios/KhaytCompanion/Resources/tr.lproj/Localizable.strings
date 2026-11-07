@@ -897,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Kim borçlu";
-"owed.empty" = "Açık işlerde alacak yok.";
+"owed.empty" = "Alacak yok.";
 "owed.total" = "%2$d işte %1$@ alacak";
 "owed.due" = "Vade: %@";
 "owed.remind" = "WhatsApp’tan hatırlat";
