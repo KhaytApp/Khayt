@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Bu telefonda yalnızca son işler var, bu yüzden bu hesap ekstresinde daha eski işler ve ödemeler eksik olabilir. Ekstrenin kendisi de bunu belirtir. Eksiksiz bir ekstre için Mac'te veya PC'de oluşturun.";
 "paper.statement.partial.printed" = "Bu ekstrede daha eski işler ve ödemeler eksik olabilir: yalnızca son işleri tutan bir telefonda oluşturuldu.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "İndirim (%)";
+"quote.revise.shipping" = "Kargo";
+"quote.revise.shipping_in" = "Kargo (%@)";
+"quote.revise.terms.note" = "Yeni bir indirim veya kargo ücreti teklifin fiyatını değiştirir; yukarıya yeni bir fiyat da yazarsanız o fiyat geçerli olur.";
+"quote.revise.printed_notes" = "Teklifteki notlar";
+"quote.revise.printed_notes.sub" = "Müşteri bunları teklifte görür.";

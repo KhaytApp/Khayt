@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "このiPhoneには最近の作業しか入っていないため、この取引明細書には古い作業や入金が含まれていない場合があります。明細書にもその旨が記載されます。完全なものはMacまたはPCで作成してください。";
 "paper.statement.partial.printed" = "この取引明細書には古い作業や入金が含まれていない場合があります。最近の作業のみを保存しているスマートフォンで作成されました。";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "割引（%）";
+"quote.revise.shipping" = "送料";
+"quote.revise.shipping_in" = "送料（%@）";
+"quote.revise.terms.note" = "割引や送料を変えると見積もりの価格が変わります。上で新しい価格も入力した場合はその価格になります。";
+"quote.revise.printed_notes" = "見積書に記載するメモ";
+"quote.revise.printed_notes.sub" = "お客様が見積書で見る内容です。";

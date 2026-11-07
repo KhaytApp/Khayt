@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Dieses Telefon enthält nur die neueren Aufträge, daher können ältere Aufträge und Zahlungen in diesem Kontoauszug fehlen. Das steht auch auf dem Auszug. Einen vollständigen erstellst du auf dem Mac oder PC.";
 "paper.statement.partial.printed" = "In diesem Kontoauszug können ältere Aufträge und Zahlungen fehlen: Er wurde auf einem Telefon erstellt, das nur die neueren Aufträge enthält.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Rabatt (%)";
+"quote.revise.shipping" = "Versand";
+"quote.revise.shipping_in" = "Versand (%@)";
+"quote.revise.terms.note" = "Ein neuer Rabatt oder neue Versandkosten ändern den Preis des Angebots, außer du gibst oben auch einen neuen Preis ein.";
+"quote.revise.printed_notes" = "Hinweise auf dem Angebot";
+"quote.revise.printed_notes.sub" = "Der Kunde sieht sie auf dem Angebot.";

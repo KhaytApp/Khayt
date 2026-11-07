@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Este teléfono solo guarda el trabajo reciente, así que pueden faltar trabajos y pagos más antiguos en este estado de cuenta. El propio estado de cuenta lo indica. Para uno completo, hazlo en el Mac o el PC.";
 "paper.statement.partial.printed" = "Pueden faltar trabajos y pagos más antiguos en este estado de cuenta: se hizo en un teléfono que solo guarda el trabajo reciente.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Descuento (%)";
+"quote.revise.shipping" = "Envío";
+"quote.revise.shipping_in" = "Envío (%@)";
+"quote.revise.terms.note" = "Un descuento o envío nuevo cambia el precio del presupuesto, salvo que también escribas un precio nuevo arriba.";
+"quote.revise.printed_notes" = "Notas en el presupuesto";
+"quote.revise.printed_notes.sub" = "El cliente las ve en el presupuesto.";

@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "This phone holds only recent work, so older jobs and payments may be missing from this statement. The statement says so too. For a complete one, make it on the Mac or PC.";
 "paper.statement.partial.printed" = "Some older jobs and payments may be missing from this statement: it was made on a phone that holds only recent work.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Discount (%)";
+"quote.revise.shipping" = "Shipping";
+"quote.revise.shipping_in" = "Shipping (%@)";
+"quote.revise.terms.note" = "A new discount or shipping charge changes the quote's price, unless you also type a new price above.";
+"quote.revise.printed_notes" = "Notes on the quote";
+"quote.revise.printed_notes.sub" = "The customer sees these on the quote.";

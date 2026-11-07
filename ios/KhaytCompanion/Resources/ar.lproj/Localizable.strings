@@ -1122,3 +1122,11 @@
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "لا يحمل هذا الجوال إلا الأعمال الحديثة، لذلك قد تنقص هذا الكشف أعمال ودفعات أقدم. والكشف نفسه يذكر ذلك. لكشف كامل، أنشئه على الماك أو الكمبيوتر.";
 "paper.statement.partial.printed" = "قد تنقص هذا الكشف بعض الأعمال والدفعات الأقدم، لأنه أُنشئ على جوال لا يحمل إلا الأعمال الحديثة.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "الخصم (%)";
+"quote.revise.shipping" = "الشحن";
+"quote.revise.shipping_in" = "الشحن (%@)";
+"quote.revise.terms.note" = "يغيّر الخصم أو الشحن الجديد سعر عرض السعر، إلا إذا كتبت سعرًا جديدًا في الأعلى أيضًا.";
+"quote.revise.printed_notes" = "ملاحظات على عرض السعر";
+"quote.revise.printed_notes.sub" = "يراها العميل على عرض السعر.";
