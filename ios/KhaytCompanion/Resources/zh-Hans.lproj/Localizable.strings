@@ -1112,3 +1112,10 @@
 "energy.sub" = "由打印机的智能插座计量";
 "energy.cost" = "电费";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "作废";
+"invoice.stamp.void.line" = "本发票已于%@作废，不再是付款请求。";
+"invoice.stamp.void.reason" = "原因：%@";
+"invoice.stamp.credited" = "已冲销";
+"invoice.stamp.credited.line" = "本发票已于%@全额冲销，无需再付款。";

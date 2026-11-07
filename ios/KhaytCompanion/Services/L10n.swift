@@ -89,6 +89,19 @@ enum L10n {
         return english.localizedString(forKey: key, value: key, table: nil)
     }
 
+    /// The key in `language` (`ar`, `en`, …) whatever the app's own language
+    /// is — for words printed on a paper the shop SENDS, which is written in
+    /// `contentLanguage`, not in the language the phone is set to. English
+    /// when that language does not have the key.
+    static func tr(_ key: String, language: String) -> String {
+        let missing = "\u{1}"
+        if let table = bundleFor(language) {
+            let found = table.localizedString(forKey: key, value: missing, table: nil)
+            if found != missing { return found }
+        }
+        return english.localizedString(forKey: key, value: key, table: nil)
+    }
+
     /// A string that counts something, in the chosen language's own plural
     /// forms (`Localizable.stringsdict`).
     ///

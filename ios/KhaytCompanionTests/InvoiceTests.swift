@@ -194,6 +194,72 @@ final class InvoiceTests: XCTestCase {
         XCTAssertEqual(BookReader.invoiceFilename(number: "", project: "Planter"), "Planter.pdf")
     }
 
+    // MARK: - A voided or credited invoice is stamped (Turki, Nov 2026)
+
+    func testAVoidedInvoicePrintsStampedVoidWithItsDay() async throws {
+        let r = try reader { store in
+            self.addOrder(&store, ["id": .string("S-2101"), "status": .string("completed"), "project": .string("Sign"),
+                                   "voidedAt": .string("2026-11-02T09:30:00.000Z"),
+                                   "voidedReason": .string("Duplicate invoice"), "paymentStatus": .string("voided")])
+            self.addOrder(&store, ["id": .string("S-2102"), "status": .string("completed"), "project": .string("Plain")])
+        }
+        guard case .paper(let doc, let filename) = try await r.invoice(orderId: "S-2101", language: "en") else {
+            return XCTFail("a voided invoice still prints — stamped")
+        }
+        XCTAssertTrue(doc.html.contains("data-stamp=\"void\""), "the stamp wraps the paper")
+        XCTAssertTrue(doc.html.contains("reversal-watermark"), "the word across the page")
+        XCTAssertTrue(doc.html.contains(">VOID</span>"))
+        XCTAssertTrue(doc.html.contains("This invoice was voided on November 2, 2026"), "the heading line, with the day")
+        XCTAssertTrue(doc.html.contains("Reason: Duplicate invoice"))
+        XCTAssertTrue(doc.html.contains("Sign"), "the shared document is still all there")
+        XCTAssertEqual(filename, "S-2101.pdf")
+
+        guard case .paper(let plain, _) = try await r.invoice(orderId: "S-2102", language: "en") else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertFalse(plain.html.contains("khayt-reversal"), "a standing invoice carries no stamp")
+
+        guard case .paper(let ar, _) = try await r.invoice(orderId: "S-2101", language: "ar") else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertTrue(ar.html.contains("ملغاة"), "stamped in the paper's language")
+        XCTAssertTrue(ar.html.contains("dir=\"rtl\""))
+        XCTAssertNil(ar.html.range(of: "[\u{0660}-\u{0669}]", options: .regularExpression), "Western digits")
+    }
+
+    func testAFullyCreditedInvoiceIsStampedCreditedAndAPartialCreditIsNot() async throws {
+        let r = try reader { store in
+            self.addOrder(&store, ["id": .string("S-2201"), "status": .string("completed"), "project": .string("Sign"),
+                                   "creditNotes": .array([.object(["id": .string("cn1"), "amount": .number(115)])]),
+                                   "creditedAt": .string("2026-11-03T12:00:00.000Z")])
+            self.addOrder(&store, ["id": .string("S-2202"), "status": .string("completed"), "project": .string("Half"),
+                                   "creditNotes": .array([.object(["id": .string("cn2"), "amount": .number(50)])])])
+        }
+        guard case .paper(let doc, _) = try await r.invoice(orderId: "S-2201", language: "en") else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertTrue(doc.html.contains("data-stamp=\"credited\""))
+        XCTAssertTrue(doc.html.contains(">CREDITED</span>"))
+        XCTAssertTrue(doc.html.contains("This invoice was credited in full on November 3, 2026"))
+        guard case .paper(let half, _) = try await r.invoice(orderId: "S-2202", language: "en") else {
+            return XCTFail("expected paper")
+        }
+        XCTAssertFalse(half.html.contains("khayt-reversal"), "a partial credit stamps nothing (lib/invoice-reversal.js)")
+    }
+
+    func testTheStampIsReadFromTheRecordsTheSharedRuleWrites() {
+        XCTAssertNil(InvoiceStamp.of([:]))
+        XCTAssertNil(InvoiceStamp.of(["voidedAt": .null, "creditedAt": .string("")]))
+        XCTAssertEqual(InvoiceStamp.of(["voidedAt": .string("2026-11-02T09:30:00Z"), "voidedReason": .string("Voided")]),
+                       .voided(at: "2026-11-02T09:30:00Z", reason: nil), "the rule's placeholder reason is not printed")
+        XCTAssertEqual(InvoiceStamp.of(["voidedAt": .string("2026-11-02T09:30:00Z"),
+                                        "creditedAt": .string("2026-11-01T09:30:00Z")]),
+                       .voided(at: "2026-11-02T09:30:00Z", reason: nil), "a void wins over a credit")
+        let html = InvoiceStamp.voided(at: "x", reason: "<b>").wrap("<p>doc</p>", language: "en")
+        XCTAssertTrue(html.contains("&lt;b&gt;"), "a typed reason is text, never markup")
+        XCTAssertTrue(html.hasSuffix("<p>doc</p></div>"))
+    }
+
     func testTheStylesheetIsTheDesktops() throws {
         let bundled = InvoicePaper.stylesheet
         XCTAssertTrue(bundled.contains(".inv"), "renderer/invoice.css is bundled and readable")

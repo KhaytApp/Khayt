@@ -1112,3 +1112,10 @@
 "energy.sub" = "プリンターのスマートプラグで計測";
 "energy.cost" = "電気代";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "無効";
+"invoice.stamp.void.line" = "この請求書は%@に無効になりました。お支払いの請求ではありません。";
+"invoice.stamp.void.reason" = "理由：%@";
+"invoice.stamp.credited" = "全額クレジット";
+"invoice.stamp.credited.line" = "この請求書は%@に全額クレジットノートが発行されました。お支払いいただく金額はありません。";

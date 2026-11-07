@@ -1112,3 +1112,10 @@
 "energy.sub" = "Gemessen von der Smart-Steckdose des Druckers";
 "energy.cost" = "Strom";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "STORNIERT";
+"invoice.stamp.void.line" = "Diese Rechnung wurde am %@ storniert. Sie ist keine Zahlungsaufforderung mehr.";
+"invoice.stamp.void.reason" = "Grund: %@";
+"invoice.stamp.credited" = "GUTGESCHRIEBEN";
+"invoice.stamp.credited.line" = "Diese Rechnung wurde am %@ vollständig gutgeschrieben. Es ist nichts mehr offen.";

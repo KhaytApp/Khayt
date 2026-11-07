@@ -1112,3 +1112,10 @@
 "energy.sub" = "Yazıcının akıllı prizi ölçtü";
 "energy.cost" = "Elektrik";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "İPTAL";
+"invoice.stamp.void.line" = "Bu fatura %@ tarihinde iptal edildi. Artık bir ödeme talebi değildir.";
+"invoice.stamp.void.reason" = "Neden: %@";
+"invoice.stamp.credited" = "ALACAKLANDI";
+"invoice.stamp.credited.line" = "Bu fatura %@ tarihinde tamamen alacaklandırıldı. Ödenecek bir şey kalmadı.";

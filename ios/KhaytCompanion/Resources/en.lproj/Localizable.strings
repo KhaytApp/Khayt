@@ -1112,3 +1112,10 @@
 "energy.sub" = "Metered by the printer’s smart plug";
 "energy.cost" = "Electricity";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "VOID";
+"invoice.stamp.void.line" = "This invoice was voided on %@. It is no longer a request for payment.";
+"invoice.stamp.void.reason" = "Reason: %@";
+"invoice.stamp.credited" = "CREDITED";
+"invoice.stamp.credited.line" = "This invoice was credited in full on %@. Nothing more is owed on it.";

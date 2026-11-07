@@ -1112,3 +1112,10 @@
 "energy.sub" = "Medida pela tomada inteligente da impressora";
 "energy.cost" = "Eletricidade";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "CANCELADA";
+"invoice.stamp.void.line" = "Esta fatura foi cancelada em %@. Ela não é mais uma cobrança.";
+"invoice.stamp.void.reason" = "Motivo: %@";
+"invoice.stamp.credited" = "CREDITADA";
+"invoice.stamp.credited.line" = "Esta fatura foi creditada integralmente em %@. Nada mais é devido.";

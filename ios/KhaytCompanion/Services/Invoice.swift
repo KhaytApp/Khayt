@@ -161,8 +161,14 @@ extension BookReader {
             language: language, money: money, sellerFields: fields, orders: orders) else {
             return .refused(.failed)
         }
-        return .paper(doc, filename: Self.invoiceFilename(number: proforma ? "Proforma-" + number : number,
-                                                          project: Self.text(order["project"])))
+        // A voided or fully credited invoice is printed stamped as one — see
+        // `InvoiceStamp`. The shared document has no such stamp of its own.
+        let paper = InvoiceStamp.of(order).map {
+            InvoiceDocument(html: $0.wrap(doc.html, language: language),
+                            arabicNumerals: doc.arabicNumerals, selector: doc.selector)
+        } ?? doc
+        return .paper(paper, filename: Self.invoiceFilename(number: proforma ? "Proforma-" + number : number,
+                                                            project: Self.text(order["project"])))
     }
 
     /// The rules that hold before any engine is asked: a cancelled job and a
@@ -255,5 +261,128 @@ extension BookReader {
         guard let cg = CIContext().createCGImage(scaled, from: scaled.extent),
               let png = UIImage(cgImage: cg).pngData() else { return nil }
         return "data:image/png;base64," + png.base64EncodedString()
+    }
+}
+
+/// The stamp on an invoice that has been taken back — Turki's decision
+/// (Nov 2026): a voided invoice must never print or share as a normal one.
+///
+/// ── WHERE THE RECORDS COME FROM ───────────────────────────────────────────
+///
+/// `lib/invoice-reversal.js` writes them on every computer: a void stamps
+/// `voidedAt` (and `voidedReason`); a credit note that brings the credited
+/// total up to the price stamps `creditedAt`. A partial credit stamps
+/// nothing, so it prints no stamp here either.
+///
+/// ── WHY IT IS DRAWN HERE ──────────────────────────────────────────────────
+///
+/// `lib/invoice-document.js` — the paper all three apps print — has no void
+/// or credited stamp (it has a PAID one and the proforma's watermark), and
+/// neither the desktop nor the Mac marks a voided invoice in any other way.
+/// The phone wraps the shared document rather than changing it, so the other
+/// two apps' papers are untouched until the owner decides they match; the
+/// styles are inline, as the proforma's watermark is, because
+/// `invoice.css` is the desktop's file, byte for byte.
+enum InvoiceStamp: Equatable {
+    /// `voidedAt`: the invoice was cancelled outright.
+    case voided(at: String, reason: String?)
+    /// `creditedAt`: credit notes cover the whole price.
+    case credited(at: String)
+
+    /// The stamp `order` carries, if any. A void wins over a credit: it is
+    /// the stronger statement, and a job can hold both.
+    static func of(_ order: [String: JSONValue]) -> InvoiceStamp? {
+        if let at = stampText(order["voidedAt"]) {
+            var reason = stampText(order["voidedReason"])
+            // The rule's own placeholder when nobody typed a reason.
+            if reason == "Voided" { reason = nil }
+            return .voided(at: at, reason: reason)
+        }
+        if let at = stampText(order["creditedAt"]) { return .credited(at: at) }
+        return nil
+    }
+
+    private static func stampText(_ v: JSONValue?) -> String? {
+        switch v {
+        case .string(let s)?:
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        case .number(let ms)? where ms > 0:
+            return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: ms / 1000))
+        default: return nil
+        }
+    }
+
+    /// The big word across the paper.
+    func word(language: String) -> String {
+        switch self {
+        case .voided: return L10n.tr("invoice.stamp.void", language: language)
+        case .credited: return L10n.tr("invoice.stamp.credited", language: language)
+        }
+    }
+
+    /// The line at the head of the paper: what happened, and when.
+    func line(language: String) -> String {
+        let locale = L10n.latinDigits(Locale(identifier: language))
+        switch self {
+        case .voided(let at, _):
+            return String(format: L10n.tr("invoice.stamp.void.line", language: language), locale: locale,
+                          Self.day(at, language: language))
+        case .credited(let at):
+            return String(format: L10n.tr("invoice.stamp.credited.line", language: language), locale: locale,
+                          Self.day(at, language: language))
+        }
+    }
+
+    /// The day a stamp was made, as a person reads it: the stamp is an ISO
+    /// moment, shown as the LOCAL day in the paper's language, Western digits.
+    static func day(_ stamp: String, language: String) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let date = iso.date(from: stamp) ?? plain.date(from: stamp) else { return String(stamp.prefix(10)) }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = L10n.latinDigits(Locale(identifier: language))
+        f.dateStyle = .long
+        f.timeStyle = .none
+        return f.string(from: date)
+    }
+
+    /// `html` — the shared document — with the stamp: a heading line above
+    /// it and the word across it, diagonally, on screen and on the PDF.
+    func wrap(_ html: String, language: String) -> String {
+        let dir = language == "ar" ? "rtl" : "ltr"
+        let red = "#b91c1c"
+        var reasonHtml = ""
+        if case .voided(_, let reason?) = self {
+            let format = L10n.tr("invoice.stamp.void.reason", language: language)
+            let text = String(format: format, locale: L10n.latinDigits(Locale(identifier: language)), reason)
+            reasonHtml = "<div style=\"font-weight:500; font-size:12.5px; margin-top:3px;\">\(Self.escape(text))</div>"
+        }
+        let kind: String
+        switch self {
+        case .voided: kind = "void"
+        case .credited: kind = "credited"
+        }
+        let word = Self.escape(word(language: language))
+        return """
+        <div class="khayt-reversal" data-stamp="\(kind)" style="position:relative;">\
+        <div class="reversal-banner" role="note" dir="\(dir)" style="border:2px solid \(red); color:\(red); \
+        background:#fef2f2; -webkit-print-color-adjust:exact; print-color-adjust:exact; border-radius:6px; \
+        padding:10px 14px; margin:0 0 14px; font-size:14px; font-weight:700; line-height:1.45;">\
+        <span style="letter-spacing:2px; margin-inline-end:8px;">\(word)</span> \(Self.escape(line(language: language)))\(reasonHtml)</div>\
+        <div class="reversal-watermark" aria-hidden="true" style="position:absolute; inset:0; display:flex; \
+        align-items:center; justify-content:center; pointer-events:none; z-index:5; overflow:hidden;">\
+        <span style="transform:rotate(-30deg); font-size:120px; font-weight:900; letter-spacing:10px; \
+        color:rgba(185,28,28,0.22); border:8px solid rgba(185,28,28,0.22); border-radius:18px; padding:0 28px; \
+        white-space:nowrap;">\(word)</span></div>\
+        \(html)</div>
+        """
+    }
+
+    static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
     }
 }

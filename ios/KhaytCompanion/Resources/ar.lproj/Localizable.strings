@@ -1112,3 +1112,10 @@
 "energy.sub" = "قاسها المقبس الذكي للطابعة";
 "energy.cost" = "الكهرباء";
 "unit.kwh" = "كيلوواط ساعة";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+"invoice.stamp.void" = "ملغاة";
+"invoice.stamp.void.line" = "أُلغيت هذه الفاتورة في %@، ولم تعد مطالبة بالدفع.";
+"invoice.stamp.void.reason" = "السبب: %@";
+"invoice.stamp.credited" = "إشعار دائن";
+"invoice.stamp.credited.line" = "صدر إشعار دائن بكامل قيمة هذه الفاتورة في %@، فلا يُستحق عليها شيء.";
