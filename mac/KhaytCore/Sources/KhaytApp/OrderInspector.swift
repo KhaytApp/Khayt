@@ -257,6 +257,28 @@ private struct Detail: View {
                     .font(.callout)
                     .padding(.top, 2)
             }
+            // The next thing done to this job, named — the Job menu's Move
+            // Along (or Delivered) under the eyes of whoever is reading it.
+            // Hidden exactly where those items are greyed (`Shop+NextStep`).
+            if let next = shop.nextStep(for: job.id) {
+                Button {
+                    shop.takeNextStep(job.id)
+                } label: {
+                    Label(shop.nextStepTitle(next), systemImage: Self.symbol(for: next))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    /// The destination's own symbol, so the button reads like the board.
+    private static func symbol(for step: NextStep) -> String {
+        switch step {
+        case .accept: "checkmark.seal"
+        case .move(let stage): stage.symbol
+        case .deliver: Stage.delivered.symbol
         }
     }
 

@@ -617,7 +617,7 @@ private struct JobMenu: View {
         Button(Words.upfront("queue.delivered")) {
             if let id = shop.selection { Task { await shop.markDelivered(id) } }
         }
-        .disabled(!canMove || job?.status != "completed" || job?.deliveredAt != nil)
+        .disabled(!(job.map(shop.canMarkDelivered) ?? false))
 
         Divider()
         // THE FLOOR, not one job — but reached for while looking at the board,
@@ -763,28 +763,15 @@ private struct JobMenu: View {
     /// Where "along" or "back" would put the selected job, or nil when there
     /// is nowhere to go — the ends of the progression, a job on hold, or no
     /// selection at all. Drives both the action and whether it is offered.
+    /// Move Along / Move Back's rule and path live on `Shop` (`Shop+NextStep`),
+    /// so the job inspector's "Next: ‹stage›" button is the same move.
     private func stepTarget(_ delta: Int) -> Stage? {
-        guard canMove, let job, let here = Stage.of(job) else { return nil }
-        guard let there = here.stepped(by: delta) else { return nil }
-        // The same refusal the board shows before a card is dropped. Asked
-        // here so the item is greyed rather than offered and then refused.
-        guard shop.dragRefusal(there) == nil else { return nil }
-        return there
+        guard canMove else { return nil }
+        return shop.moveAlongTarget(shop.selection, by: delta)
     }
 
-    /// One step, through the path a drop takes.
-    ///
-    /// SHIPPED IS NOT A STATUS — it is a date stamped on a job that stays
-    /// `completed` — so it is performed the only way it can be, exactly as the
-    /// board's drop handler does it, and before anything asks the gate.
     private func step(by delta: Int) {
-        guard let id = shop.selection, let there = stepTarget(delta) else { return }
-        if there == .shipped {
-            Task { await shop.markShipped(id) }
-            return
-        }
-        if let ask = shop.questionFor(id, moving: there) { ask(); return }
-        Task { await shop.moveJob(id, to: there) }
+        shop.moveAlong(shop.selection, by: delta)
     }
 
 }

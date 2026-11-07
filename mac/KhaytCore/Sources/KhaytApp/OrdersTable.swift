@@ -543,7 +543,7 @@ struct JobActions: View {
         Button(shop.words.callIt("queue.delivered")) {
             Task { await shop.markDelivered(job.id) }
         }
-        .disabled(!shop.canMoveJobs || job.status != "completed" || job.deliveredAt != nil)
+        .disabled(!shop.canMarkDelivered(job))
         Divider()
         JobRecordItems(shop: shop, job: job)
         Divider()
