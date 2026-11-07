@@ -623,6 +623,8 @@ function renderAnalytics() {
   renderPrinterUtilizationChart();
   renderPnLSection();
   renderProductProfitability();
+  renderBestUseOfPrinter();
+  renderMachineReliability();
   renderSLASection();
   renderQcSection();
   renderMachinePL();
@@ -1563,6 +1565,129 @@ function renderMachineAccuracy() {
         }).join('')}
       </div>
       ${machinePowerHtml()}
+    </div>`;
+}
+
+/**
+ * "Best use of the printer": the catalogue ranked by profit per machine hour —
+ * lib/profit-per-hour.js, the Mac's BestUseOfPrinterCard. The whole catalogue,
+ * made or not, so it is not narrowed by the date range: a product's planned
+ * rate is a property of its record. The actual rate beside it comes from the
+ * finished jobs that carry its id.
+ */
+const PPH_SHOWN = 8;
+function renderBestUseOfPrinter() {
+  const el = $('#bestUseOfPrinterSection');
+  if (!el) return;
+  if (typeof KhaytProfitPerHour === 'undefined') { el.innerHTML = ''; return; }
+  const report = KhaytProfitPerHour.productRates({
+    products: products || [], orders: printLog || [], expenses: expenses || [],
+    inventory: inventory || [], consumables: (typeof consumables !== 'undefined' ? consumables : []) || [],
+    settings,
+  }, {
+    revenueOf: orderEarnedBase, partCostOf: partTotalCost,
+    nameOf: localName, countsForBusiness: _countsForBusiness,
+  });
+  const intro = `<p style="font-size:12.5px;color:var(--text-muted);margin:0 0 8px;text-align:start;">${escapeHtml(t('an.pph_intro'))}</p>`;
+  if (!report.totals.ranked) {
+    el.innerHTML = `${intro}<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.pph_empty'))}</p>`;
+    return;
+  }
+  const rate = (v) => (v == null ? '—' : t('an.pph_rate', { amount: fmtMoney(v) }));
+  const ranked = report.rows.filter((r) => r.perHour != null);
+  const widest = Math.max(1, ...ranked.map((r) => Math.abs(r.perHour)));
+  const detail = (r) => {
+    const parts = [];
+    if (r.hours != null) parts.push(t('an.pph_hours', { n: (Math.round(r.hours * 10) / 10).toString() }));
+    if (r.price != null) parts.push(fmtMoney(r.price));
+    if (r.actual && r.actual.perHour != null) {
+      parts.push(t(r.actual.jobs === 1 ? 'an.pph_actual_jobs_one' : 'an.pph_actual_jobs',
+        { amount: fmtMoney(r.actual.perHour), n: r.actual.jobs }));
+      const drift = r.actual.hoursDriftPct;
+      if (drift != null && Math.abs(drift) >= 5) {
+        parts.push(t(drift > 0 ? 'an.pph_longer' : 'an.pph_shorter', { pct: Math.round(Math.abs(drift)) }));
+      }
+    }
+    return parts.join(' · ');
+  };
+  const unranked = report.totals.noHours + report.totals.noPrice;
+  el.innerHTML = `
+    ${intro}
+    ${report.totals.averagePerHour != null ? `<div style="font-size:13px;margin-bottom:4px;text-align:start;">${escapeHtml(t('an.pph_average', { amount: fmtMoney(report.totals.averagePerHour) }))}</div>` : ''}
+    ${report.totals.actualPerHour != null ? `<div style="font-size:12.5px;color:var(--text-muted);margin-bottom:8px;text-align:start;">${escapeHtml(t('an.pph_actual_average', { amount: fmtMoney(report.totals.actualPerHour) }))}</div>` : ''}
+    <div class="pph-rows" style="display:flex;flex-direction:column;">
+      ${ranked.slice(0, PPH_SHOWN).map((r) => {
+        const neg = r.perHour < 0;
+        const w = Math.max(4, Math.round((Math.abs(r.perHour) / widest) * 90));
+        return `
+        <div class="pph-row" style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <div style="flex:1;min-width:0;text-align:start;">
+            <div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(r.name || t('an.untagged'))}</div>
+            <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(detail(r))}</div>
+            ${r.underpriced && r.suggestedPrice != null ? `<div style="font-size:11.5px;color:var(--warning);">↑ ${escapeHtml(t('an.pph_under', { amount: fmtMoney(r.suggestedPrice) }))}</div>` : ''}
+          </div>
+          <div style="text-align:end;">
+            <div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:${neg ? 'var(--danger)' : 'inherit'};">${escapeHtml(rate(r.perHour))}</div>
+            <div style="height:3px;width:${w}px;border-radius:2px;background:${neg ? 'var(--danger)' : 'var(--primary)'};opacity:.55;margin-inline-start:auto;"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${unranked > 0 ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;text-align:start;">${escapeHtml(t('an.pph_unranked', { n: unranked }))}</div>` : ''}`;
+}
+
+/**
+ * "What gets scrapped": which machine scraps the most of what it prints, and
+ * what it keeps doing wrong — lib/machine-reliability.js, the Mac's
+ * MachineReliabilityCard. The whole book, no window, as the Mac: a scrap rate
+ * over one month of a small shop is two or three failures, not a rate. Ranked
+ * by RATE, not grams — grams always name the busiest machine.
+ */
+function renderMachineReliability() {
+  const el = $('#machineReliabilitySection');
+  if (!el) return;
+  if (typeof KhaytMachineReliability === 'undefined') { el.innerHTML = ''; return; }
+  const report = KhaytMachineReliability.machineReliability({
+    machines: machines || [], orders: printLog || [], waste: wasteLog || [],
+    from: '', to: '', unassigned: t('dash.unassigned'),
+  });
+  if (!report.rows.length) {
+    el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.no_data'))}</p>`;
+    return;
+  }
+  const faultName = (type) => {
+    const key = 'waste.ft.' + type;
+    const said = t(key);
+    return said && said !== key ? said : String(type).replace(/_/g, ' ');
+  };
+  const pct = (v) => (Math.round(v * 1000) / 10).toString();
+  const g = t('common.grams');
+  const worst = report.totals.worst;
+  el.innerHTML = `
+    ${report.totals.scrapRate != null ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-align:start;">${escapeHtml(t('an.mr_rate', { pct: pct(report.totals.scrapRate) }))}</div>` : ''}
+    ${worst && worst.worstFault ? `<div style="font-size:13px;margin-bottom:8px;text-align:start;color:${(worst.scrapRate || 0) >= 0.05 ? 'var(--warning)' : 'var(--text-muted)'};">${escapeHtml(t('an.mr_worst', { name: worst.name, fault: faultName(worst.worstFault.type) }))}</div>` : ''}
+    <div class="mr-rows" style="display:flex;flex-direction:column;">
+      ${report.rows.map((r) => {
+        const tint = r.scrapRate != null && r.scrapRate >= 0.05 ? 'var(--warning)' : '';
+        let under = t('an.mr_clean');
+        if (r.scraps > 0) {
+          under = t('an.mr_of', { scrap: String(Math.round(r.scrapGrams)), out: `${Math.round(r.grams + r.scrapGrams)} ${g}` });
+          if (r.worstFault) under += ' · ' + faultName(r.worstFault.type);
+        }
+        const w = Math.max(2, Math.round(Math.min(1, (r.scrapRate || 0) / 0.2) * 70));
+        return `
+        <div class="mr-row" style="display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${safeCssColor(r.color || '#888')};flex-shrink:0;"></span>
+          <div style="flex:1;min-width:0;text-align:start;">
+            <div style="font-size:13px;">${escapeHtml(r.name)}</div>
+            <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(under)}</div>
+          </div>
+          <div style="text-align:end;">
+            <div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;${tint ? `color:${tint};` : ''}">${r.scrapRate == null ? '—' : pct(r.scrapRate) + '%'}</div>
+            <div style="height:3px;width:${w}px;border-radius:2px;background:${tint || 'var(--primary)'};opacity:.55;margin-inline-start:auto;"></div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
@@ -3649,6 +3774,8 @@ function renderBreakEvenCard() {
     renderPrinterUtilizationChart,
     renderPnLSection,
     renderProductProfitability,
+    renderBestUseOfPrinter,
+    renderMachineReliability,
     renderSLASection,
     renderMachinePL,
     renderLocationPL,

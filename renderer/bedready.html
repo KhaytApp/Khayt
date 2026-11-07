@@ -410,9 +410,9 @@
 
           <label style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;" for="failureRate">
             <span data-i18n="calc.labor.failure">Failure buffer</span> (<span data-i18n="common.percent">%</span>)
-            <span id="failureRateHint" style="font-size:11px; color:var(--primary); font-weight:500; margin-inline-start:auto;"></span>
           </label>
           <input type="number" id="failureRate" value="0" min="0" max="100" data-tip="tip.failure_rate">
+          <div id="failureRateHint" aria-live="polite" style="font-size:11px; color:var(--primary); font-weight:500; margin-top:4px; text-align:start;"></div>
         </div>
 
         <div class="card summary">
@@ -2010,6 +2010,10 @@
 <script src="../lib/portal-owner.js"></script>
 <script src="../lib/order-email.js"></script>
 <script src="../lib/order-status.js"></script>
+<!-- The calculator's failure-allowance suggestion (build.js). -->
+<script src="../lib/failure-rate.js"></script>
+<!-- Read by inventory.js's Import from Spoolman (the button is Khayt's; the module is cheap). -->
+<script src="../lib/spoolman-import.js"></script>
 <script src="../lib/machine-status.js"></script>
 <!-- An undoable status move puts back the stock it changed (reopening gives filament back). -->
 <script src="../lib/stock-undo.js"></script>

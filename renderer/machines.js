@@ -132,8 +132,17 @@ function machineLiveDetailHtml(m) {
     add(t('mach.live_flow'), fin(s.flowFactor) ? `${s.flowFactor}%` : null);
   }
   const msg = typeof s.message === 'string' ? s.message.trim().slice(0, 140) : '';
-  if (!bits.length && !msg) return '';
-  return `<div style="font-size:11px;color:var(--text-muted);">${bits.join(' · ')}${msg ? `${bits.length ? ' · ' : ''}<span style="font-style:italic;">${escapeHtml(msg)}</span>` : ''}</div>`;
+  // WHY it is paused or failed, when the printer says (a Bambu's print_error /
+  // HMS notice, lib/bambu-faults.js via lib/bambu.js statusWithFault). Bambu's
+  // own sentence and the code to look it up by — the code is what the
+  // printer's screen and Bambu's wiki use, in any language. The Mac's
+  // ShopFloor card draws the same line.
+  const fault = typeof s.fault === 'string' ? s.fault.trim().slice(0, 200) : '';
+  const faultHtml = fault
+    ? `<div class="machine-fault" style="font-size:11px;color:var(--warning);text-align:start;">⚠ <bdi>${escapeHtml(fault)}</bdi></div>`
+    : '';
+  if (!bits.length && !msg) return faultHtml;
+  return `${faultHtml}<div style="font-size:11px;color:var(--text-muted);">${bits.join(' · ')}${msg ? `${bits.length ? ' · ' : ''}<span style="font-style:italic;">${escapeHtml(msg)}</span>` : ''}</div>`;
 }
 
 /* ── JOB CONTROL on the machine card ──────────────────────────────────────────

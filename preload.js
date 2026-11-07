@@ -328,6 +328,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
+  spoolmanFetch: (payload) => ipcRenderer.invoke('hub:spoolman-fetch', payload),
   setAppLanguage: (lang, menuStrings) => ipcRenderer.invoke('hub:set-app-language', lang, menuStrings),
   smartPlug:           (machine, action) => ipcRenderer.invoke('hub:smart-plug', { machine, action }),
   onSmartPlugAutoOff: (() => {

@@ -1901,6 +1901,7 @@ function wireEvents() {
 
   // Clients
   $('#btnImportSpoolsCsv')?.addEventListener('click', importSpoolsCsv);
+  $('#btnImportSpoolman')?.addEventListener('click', () => openSpoolmanImport());
   $('#btnImportClientsCsv')?.addEventListener('click', importClientsCsv);
   $('#btnExportClientsCsv')?.addEventListener('click', () => exportClientsCsv());
   $('#btnCampaign')?.addEventListener('click', () => openCampaignModal());

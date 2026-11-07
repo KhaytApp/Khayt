@@ -471,9 +471,9 @@
 
           <label style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;" for="failureRate">
             <span data-i18n="calc.labor.failure">Failure buffer</span> (<span data-i18n="common.percent">%</span>)
-            <span id="failureRateHint" style="font-size:11px; color:var(--primary); font-weight:500; margin-inline-start:auto;"></span>
           </label>
           <input type="number" id="failureRate" value="10" min="0" max="100" data-tip="tip.failure_rate">
+          <div id="failureRateHint" aria-live="polite" style="font-size:11px; color:var(--primary); font-weight:500; margin-top:4px; text-align:start;"></div>
         </div>
 
         <div class="card summary">
@@ -1024,6 +1024,18 @@
         <div id="productProfitSection"></div>
       </div>
 
+      <!-- What each product earns per printer hour (lib/profit-per-hour.js) — the Mac's BestUseOfPrinterCard. -->
+      <div class="card pro-only" id="bestUseOfPrinterCard" style="margin-top: 16px;">
+        <h3 class="card-head"><span class="swatch"></span><span data-i18n="an.pph_title">Best use of the printer</span></h3>
+        <div id="bestUseOfPrinterSection"></div>
+      </div>
+
+      <!-- Which machine scraps the most of what it prints (lib/machine-reliability.js) — the Mac's MachineReliabilityCard. -->
+      <div class="card pro-only" id="machineReliabilityCard" style="margin-top: 16px;">
+        <h3 class="card-head"><span class="swatch"></span><span data-i18n="an.mr_title">What gets scrapped</span></h3>
+        <div id="machineReliabilitySection"></div>
+      </div>
+
       <div class="card pro-only" style="margin-top: 16px;">
         <h3 class="card-head"><span class="swatch"></span><span data-i18n="an.sla_title">On-Time Delivery Rate</span></h3>
         <div id="slaSection"></div>
@@ -1132,6 +1144,7 @@
         <button class="btn ghost small" id="btnExportInventoryCsv" title="Export inventory to CSV">📥 <span data-i18n="common.export_csv">CSV</span></button>
         <button class="btn ghost small" id="btnSpoolLabels" title="Print QR labels for spools">🏷 <span data-i18n="lbl.print_spools">Labels</span></button>
         <button id="btnImportSpoolsCsv" class="btn small ghost" data-i18n="csv.import_spools_btn">Import CSV</button>
+        <button id="btnImportSpoolman" type="button" class="btn small ghost" data-i18n="inv.spoolman_import">Import from Spoolman</button>
       </div>
       <div class="grid">
         <div class="card warn">
@@ -2971,6 +2984,13 @@
 <script src="../lib/capacity.js"></script>
 <script src="../lib/quote-funnel.js"></script>
 <script src="../lib/product-profit.js"></script>
+<!-- Analytics "Best use of the printer" and "What gets scrapped" (the Mac's Reports). -->
+<script src="../lib/profit-per-hour.js"></script>
+<script src="../lib/machine-reliability.js"></script>
+<!-- The calculator's failure-allowance suggestion (build.js). -->
+<script src="../lib/failure-rate.js"></script>
+<!-- Inventory ▸ Import from Spoolman (inventory.js). -->
+<script src="../lib/spoolman-import.js"></script>
 <script src="../lib/customer-mix.js"></script>
 <script src="../lib/client-retention.js"></script>
 <script src="../lib/throughput.js"></script>
@@ -3068,6 +3088,8 @@
 <script src="order-flows.js"></script>
 <!-- Finishes Tabby/Tamara payments the shop sent links for; needs order-flows above. -->
 <script src="bnpl-watch.js"></script>
+<!-- Checks the customer portal for answers and deposits on focus and every 15 min; needs integrations.js. -->
+<script src="portal-watch.js"></script>
 <script src="dashboard.js"></script>
 <script src="analytics.js"></script>
 <script src="operations-extras.js"></script>
