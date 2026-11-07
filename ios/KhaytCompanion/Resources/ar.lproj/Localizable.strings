@@ -1113,11 +1113,6 @@
 "unit.kwh" = "كيلوواط ساعة";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "ملغاة";
-"invoice.stamp.void.line" = "أُلغيت هذه الفاتورة في %@، ولم تعد مطالبة بالدفع.";
-"invoice.stamp.void.reason" = "السبب: %@";
-"invoice.stamp.credited" = "إشعار دائن";
-"invoice.stamp.credited.line" = "صدر إشعار دائن بكامل قيمة هذه الفاتورة في %@، فلا يُستحق عليها شيء.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "لا يحمل هذا الجوال إلا الأعمال الحديثة، لذلك قد تنقص هذا الكشف أعمال ودفعات أقدم. والكشف نفسه يذكر ذلك. لكشف كامل، أنشئه على الماك أو الكمبيوتر.";

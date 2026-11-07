@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "VOID";
-"invoice.stamp.void.line" = "This invoice was voided on %@. It is no longer a request for payment.";
-"invoice.stamp.void.reason" = "Reason: %@";
-"invoice.stamp.credited" = "CREDITED";
-"invoice.stamp.credited.line" = "This invoice was credited in full on %@. Nothing more is owed on it.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "This phone holds only recent work, so older jobs and payments may be missing from this statement. The statement says so too. For a complete one, make it on the Mac or PC.";

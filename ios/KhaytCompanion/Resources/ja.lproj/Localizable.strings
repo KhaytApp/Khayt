@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "無効";
-"invoice.stamp.void.line" = "この請求書は%@に無効になりました。お支払いの請求ではありません。";
-"invoice.stamp.void.reason" = "理由：%@";
-"invoice.stamp.credited" = "全額クレジット";
-"invoice.stamp.credited.line" = "この請求書は%@に全額クレジットノートが発行されました。お支払いいただく金額はありません。";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "このiPhoneには最近の作業しか入っていないため、この取引明細書には古い作業や入金が含まれていない場合があります。明細書にもその旨が記載されます。完全なものはMacまたはPCで作成してください。";

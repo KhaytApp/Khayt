@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "ANULADA";
-"invoice.stamp.void.line" = "Esta factura se anuló el %@. Ya no es una solicitud de pago.";
-"invoice.stamp.void.reason" = "Motivo: %@";
-"invoice.stamp.credited" = "ABONADA";
-"invoice.stamp.credited.line" = "Esta factura se abonó por completo el %@. No queda nada pendiente.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Este teléfono solo guarda el trabajo reciente, así que pueden faltar trabajos y pagos más antiguos en este estado de cuenta. El propio estado de cuenta lo indica. Para uno completo, hazlo en el Mac o el PC.";

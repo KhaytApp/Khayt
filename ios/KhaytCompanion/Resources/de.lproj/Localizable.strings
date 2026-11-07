@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "STORNIERT";
-"invoice.stamp.void.line" = "Diese Rechnung wurde am %@ storniert. Sie ist keine Zahlungsaufforderung mehr.";
-"invoice.stamp.void.reason" = "Grund: %@";
-"invoice.stamp.credited" = "GUTGESCHRIEBEN";
-"invoice.stamp.credited.line" = "Diese Rechnung wurde am %@ vollständig gutgeschrieben. Es ist nichts mehr offen.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Dieses Telefon enthält nur die neueren Aufträge, daher können ältere Aufträge und Zahlungen in diesem Kontoauszug fehlen. Das steht auch auf dem Auszug. Einen vollständigen erstellst du auf dem Mac oder PC.";

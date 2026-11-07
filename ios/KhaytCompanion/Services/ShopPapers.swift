@@ -144,7 +144,7 @@ extension BookReader {
     /// that older records may be missing.
     nonisolated static func partialStatementNote(language: String) -> String {
         let dir = language == "ar" ? "rtl" : "ltr"
-        let text = InvoiceStamp.escape(L10n.tr("paper.statement.partial.printed", language: language))
+        let text = PaperHTML.escape(L10n.tr("paper.statement.partial.printed", language: language))
         return "<div class=\"statement-partial\" role=\"note\" dir=\"\(dir)\" style=\"border:1px solid #b45309; "
             + "background:#fffbeb; color:#92400e; -webkit-print-color-adjust:exact; print-color-adjust:exact; "
             + "border-radius:6px; padding:8px 12px; margin:0 0 12px; font-size:12.5px; font-weight:600; "

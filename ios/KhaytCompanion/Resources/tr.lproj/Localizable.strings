@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "İPTAL";
-"invoice.stamp.void.line" = "Bu fatura %@ tarihinde iptal edildi. Artık bir ödeme talebi değildir.";
-"invoice.stamp.void.reason" = "Neden: %@";
-"invoice.stamp.credited" = "ALACAKLANDI";
-"invoice.stamp.credited.line" = "Bu fatura %@ tarihinde tamamen alacaklandırıldı. Ödenecek bir şey kalmadı.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Bu telefonda yalnızca son işler var, bu yüzden bu hesap ekstresinde daha eski işler ve ödemeler eksik olabilir. Ekstrenin kendisi de bunu belirtir. Eksiksiz bir ekstre için Mac'te veya PC'de oluşturun.";

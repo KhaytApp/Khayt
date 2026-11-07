@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "CANCELADA";
-"invoice.stamp.void.line" = "Esta fatura foi cancelada em %@. Ela não é mais uma cobrança.";
-"invoice.stamp.void.reason" = "Motivo: %@";
-"invoice.stamp.credited" = "CREDITADA";
-"invoice.stamp.credited.line" = "Esta fatura foi creditada integralmente em %@. Nada mais é devido.";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "Este telefone guarda só o trabalho recente, então trabalhos e pagamentos mais antigos podem faltar neste extrato. O próprio extrato avisa isso. Para um completo, faça-o no Mac ou no PC.";

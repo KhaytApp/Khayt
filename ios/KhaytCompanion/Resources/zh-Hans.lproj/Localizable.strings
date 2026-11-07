@@ -1113,11 +1113,6 @@
 "unit.kwh" = "kWh";
 
 /* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
-"invoice.stamp.void" = "作废";
-"invoice.stamp.void.line" = "本发票已于%@作废，不再是付款请求。";
-"invoice.stamp.void.reason" = "原因：%@";
-"invoice.stamp.credited" = "已冲销";
-"invoice.stamp.credited.line" = "本发票已于%@全额冲销，无需再付款。";
 
 /* A statement made from part of the book (ShopPapers.swift) */
 "paper.statement.partial.warning" = "这部手机只保存近期的工作，因此此对账单可能缺少较早的订单和付款。对账单上也会注明这一点。如需完整的对账单，请在 Mac 或电脑上生成。";
