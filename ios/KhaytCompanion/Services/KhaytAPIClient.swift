@@ -494,8 +494,28 @@ final class KhaytAPIClient: ObservableObject {
 
     /// One round through Khayt Cloud: pull what changed, send what is pending.
     /// A viewer's sign-in only pulls. See `CloudSync` for what is never done.
+    ///
+    /// One round at a time. A pull reads the baseline, waits on the network
+    /// and the engine, and writes it back; two rounds interleaved (a screen's
+    /// refresh, the live channel and an edit's delivery, all at once) each
+    /// wrote a baseline the other had not seen, and could fold the same
+    /// changes twice or mark a send against a stale `seenRev`. A caller that
+    /// arrives while a round is running waits for that round and gets its
+    /// answer; an edit made meanwhile stays pending for the next one.
     @discardableResult
     func syncThroughCloud() async -> CloudSync.Pushed? {
+        if let running = cloudRound { return await running.value }
+        let round = Task { await self.oneCloudRound() }
+        cloudRound = round
+        let result = await round.value
+        if cloudRound == round { cloudRound = nil }
+        return result
+    }
+
+    /// The round `syncThroughCloud` callers share while it runs.
+    private var cloudRound: Task<CloudSync.Pushed?, Never>?
+
+    private func oneCloudRound() async -> CloudSync.Pushed? {
         guard let session = cloud, let book, let reader else { return nil }
         do {
             let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
