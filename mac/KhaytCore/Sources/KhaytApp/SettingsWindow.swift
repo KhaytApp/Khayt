@@ -714,6 +714,9 @@ struct PaymentsPane: View {
         var bankName = "", accountHolder = "", iban = ""
         var accepted: Set<String> = []
         var paymentInstructions = ""
+        /// Pickup on the customer's order page (`portal-refresh.js`, Cloud
+        /// #199): shown once either is filled in.
+        var pickupHours = "", pickupMapUrl = ""
         /// The rewards programme. A shop working only on this Mac could never
         /// turn it on: the switch was in the other app, so its customers'
         /// points were a screen it could not reach.
@@ -738,6 +741,7 @@ struct PaymentsPane: View {
             if case .bool(true)? = settings["loyaltyEnabled"] { on = true }
             return Draft(bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
                          accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
+                         pickupHours: r.text("pickupHours"), pickupMapUrl: r.text("pickupMapUrl"),
                          loyaltyEnabled: on, loyaltyPointsPerUnit: perUnit, loyaltyRedeemRate: rate)
         }
         @MainActor func form() -> [String: JSONValue] {
@@ -745,6 +749,7 @@ struct PaymentsPane: View {
              // In Khayt's own order, not the set's: the invoice lists them.
              "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
              "paymentInstructions": .string(paymentInstructions),
+             "pickupHours": .string(pickupHours), "pickupMapUrl": .string(pickupMapUrl),
              "loyaltyEnabled": .bool(loyaltyEnabled),
              "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
              "loyaltyRedeemRate": .number(loyaltyRedeemRate)]
@@ -777,6 +782,17 @@ struct PaymentsPane: View {
                 Section(shop.words.callIt("set.payment_instructions")) {
                     TextEditor(text: $draft.paymentInstructions).frame(height: 70).font(.body)
                 }
+                // Where and when a customer collects — on their order page,
+                // with the address the invoice already prints.
+                Section {
+                    row(shop.words.callIt("mac.pickup_hours")) { TextField("", text: $draft.pickupHours) }
+                    latinRow(shop.words.callIt("mac.pickup_map")) {
+                        LatinField(text: $draft.pickupMapUrl, placeholder: "https://", monospaced: false)
+                    }
+                    Text(shop.words.callIt("mac.pickup_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: { Text(shop.words.callIt("mac.pickup_title")) }
                 Section(shop.words.callIt("set.loyalty")) {
                     Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
                     // The two numbers only mean anything once it is on, and a

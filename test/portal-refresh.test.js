@@ -291,3 +291,28 @@ test('portal invoiceNo: a plain job with its own invPrefix shows its id; an acce
                      invoiceNumber: 'INV-2026-0031' };
   assert.equal(Portal.payloadFor(accepted, { settings }).payload.invoiceNo, 'INV-2026-0031');
 });
+
+test('pickup: shown once the shop gives hours or a map link, on an unshipped order only', () => {
+  const assert = require('node:assert/strict');
+  const Portal = require('../lib/portal-refresh.js');
+  const job = { id: 'J1', status: 'completed', date: '2026-11-01', price: 50 };
+  const ctx = (settings) => ({ settings, shopAddress: 'Riyadh, Al Olaya\nBuilding 7' });
+  // Only an address: no card — it is on the invoice already.
+  assert.equal('pickup' in Portal.payloadFor(job, ctx({})).payload, false);
+  const p = Portal.payloadFor(job, ctx({ pickupHours: 'Sat–Thu 4–10 pm',
+                                         pickupMapUrl: 'https://maps.app.goo.gl/abc' })).payload.pickup;
+  assert.deepEqual(p, { address: 'Riyadh, Al Olaya\nBuilding 7', hours: 'Sat–Thu 4–10 pm',
+                        mapUrl: 'https://maps.app.goo.gl/abc' });
+  // A map link that is not https is left out; hours alone still show the card.
+  const h = Portal.payloadFor(job, ctx({ pickupHours: 'Daily', pickupMapUrl: 'http://x' })).payload.pickup;
+  assert.deepEqual(h, { address: 'Riyadh, Al Olaya\nBuilding 7', hours: 'Daily' });
+  // Caps.
+  const long = Portal.payloadFor(job, { settings: { pickupHours: 'h'.repeat(200) }, shopAddress: 'a'.repeat(400) })
+    .payload.pickup;
+  assert.equal(long.hours.length, 120); assert.equal(long.address.length, 300);
+  // A quote, and an order a courier has, carry none.
+  const s = ctx({ pickupHours: 'Daily' });
+  assert.equal('pickup' in Portal.payloadFor({ ...job, status: 'quote' }, s).payload, false);
+  assert.equal('pickup' in Portal.payloadFor({ ...job, carrier: 'smsa' }, s).payload, false);
+  assert.equal('pickup' in Portal.payloadFor({ ...job, trackingNumber: 'X1' }, s).payload, false);
+});
