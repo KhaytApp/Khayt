@@ -461,7 +461,7 @@
 "pair.signed_out" = "MacからこのiPhoneがサインアウトされました。オーナーPINでもう一度ペアリングしてください。";
 "pair.pin.title" = "オーナーPIN";
 "pair.pin.body" = "MacまたはPCの「設定」→「オンライン」にあるオーナーPIN(8文字以上)です。受付用PINは使用できません。";
-"pair.pin.foot" = "iPhoneのキーチェーンに保存され、このMac以外には送信されません。";
+"pair.pin.foot" = "ペアリングのためにこのMacにだけ送信され、その後iPhoneから削除されます。電話をペアリングできないコンピュータの場合は、iPhoneのキーチェーンに保存されます。";
 "pair.pin.wrong" = "PINが拒否されました。MacまたはPCの「設定」→「オンライン」を確認してください。";
 "pair.window_closed" = "Macで「iPhoneをペアリング」(「設定」→「オンライン」)をクリックしてから、もう一度お試しください。";
 "pair.window_locked" = "このiPhoneから誤ったPINが何度も入力されました。Macで「iPhoneをペアリング」(「設定」→「オンライン」)をもう一度クリックし、正しいPINで試してください。";
@@ -1096,6 +1096,15 @@
 "care.part.fep_film" = "FEP フィルム";
 "care.part.resin_tank" = "レジンタンク";
 "care.part.ipa" = "イソプロピルアルコール (L)";
+"pair.again.title" = "このiPhoneをもう一度ペアリング";
+"pair.again.line" = "Macにもう一度つなぐにはオーナーPINを入力してください。iPhoneが自動で送信することはありません。";
+"pair.again.button" = "もう一度ペアリング";
+"pair.again.body" = "Macの「設定」→「オンライン」にあるオーナーPIN。ペアリングのためにこのアドレスへ一度だけ送信され、その後iPhoneから削除されます。";
+"pair.phone_name" = "このiPhoneの名前";
+"pair.phone_name.foot" = "Macのペアリング済み端末の一覧に表示される名前です。端末を見分けるのに使います。";
+"cloud.read_only" = "閲覧専用のサインイン";
+"cloud.read_only.line" = "このiPhoneは閲覧者としてKhayt Cloudにサインインしており、ペアリングされたMacがありません。ショップを表示できますが、変更はできません。";
+"cloud.read_only.refused" = "保存されませんでした。このiPhoneのKhayt Cloudサインインは閲覧専用です。Macとペアリングするか、編集できるアカウントでサインインしてください。";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "買い物リスト";
