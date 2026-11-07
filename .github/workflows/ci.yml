@@ -226,6 +226,10 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:3mfworker
 
+      - name: E2E smoke (split into plates, keep the prime tower)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:platesplit
+
       - name: E2E smoke (order to print file link)
         run: xvfb-run -a npm run test:e2e:filelink
 

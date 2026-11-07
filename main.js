@@ -4159,7 +4159,7 @@ ipcMain.handle('hub:convert-mesh', async (_e, { path: srcPath } = {}) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots, spoolMerge, spoolStrict, growToSlots, slotSpools, colorMix } = {}) => {
+ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots, spoolMerge, spoolStrict, growToSlots, slotSpools, colorMix, vlhGuard } = {}) => {
   try {
     if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
     // The converted file lands in temp first. The save dialog can only be answered after
@@ -4173,7 +4173,10 @@ ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slo
         // mf-convert, and the flag that refuses rather than writing a file nothing moved in.
         spoolMerge: spoolMerge || null, spoolStrict: !!spoolStrict,
         growToSlots: growToSlots || null, slotSpools: Array.isArray(slotSpools) ? slotSpools : null,
-        colorMix: !!colorMix },
+        colorMix: !!colorMix,
+        // Variable layer height on a Snapmaker-Orca target (lib/mf-convert.js applyVlhGuard):
+        // 'keep-layers' (the default) or 'keep-prime-tower'. Anything else is the default.
+        vlhGuard: mfVlhGuard(vlhGuard) },
     });
     if (!r.ok) { await mfDiscard(tmp); return r; }
 
@@ -4249,6 +4252,38 @@ ipcMain.handle('hub:mf-plate-extract', async (_e, { path: srcPath, plate, save }
     approvedConvertSources.add(path.resolve(dest));
     return { ok: true, path: dest, name, plate: r.plate, report: r.report };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+// "Split into plates" (lib/plate-split.js): every plate converted on its own, into a folder
+// the maker picks. The folder is asked for FIRST — a split writes several files, and there is
+// no single save dialog to answer afterwards. Each file keeps its plate name
+// ("poster-plate3.3mf"); one that already exists in the folder gets a number, never overwritten.
+function mfVlhGuard(v) { return v === 'keep-prime-tower' || v === 'keep-layers' ? v : undefined; }
+ipcMain.handle('hub:mf-split-plates', async (_e, { path: srcPath, targetId, targetProfile, process, vlhGuard } = {}) => {
+  let tmpDir = null;
+  try {
+    if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
+    const win = BrowserWindow.fromWebContents(_e.sender);
+    const pick = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
+    if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true };
+    const outDir = path.resolve(pick.filePaths[0]);
+    tmpDir = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'khayt-split-'));
+    const r = await mfRun('splitPlates', {
+      src: srcPath, maxBytes: MF_MAX_BYTES, tmpDir, sourceName: path.basename(String(srcPath)),
+      opts: { targetId, targetProfile, process, vlhGuard: mfVlhGuard(vlhGuard) },
+    });
+    if (!r || !r.ok) return r || { ok: false, error: 'Split failed.' };
+    const files = [];
+    for (const f of r.files) {
+      if (!f.ok || !f.tmpPath) { files.push({ index: f.index, name: f.name, fileName: f.fileName, ok: false, code: f.code, error: f.error }); continue; }
+      const stem = f.fileName.replace(/\.3mf$/i, '');
+      let dest = path.join(outDir, f.fileName);
+      for (let n = 2; fs.existsSync(dest) && n < 1000; n++) dest = path.join(outDir, `${stem}-${n}.3mf`);
+      await mfFinalize(f.tmpPath, dest);
+      files.push({ index: f.index, name: f.name, fileName: path.basename(dest), ok: true, outPath: dest, report: f.report });
+    }
+    return { ok: true, dir: outDir, files };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  finally { if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {} } }
 });
 app.on('will-quit', () => {
   for (const d of mfPlateDirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
