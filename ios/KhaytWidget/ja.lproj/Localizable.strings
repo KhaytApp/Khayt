@@ -32,3 +32,13 @@
 /* Live Activity buttons */
 "Move to post-processing" = "後処理へ移動";
 "Print it again" = "もう一度印刷";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "本日の売上";
+"Owed" = "未収金";
+"Low stock" = "在庫僅少";
+"%lld unpaid" = "未払い %lld 件";
+"to reorder" = "要発注";
+"Pair Khayt with your shop to see its money here." = "Khaytをお店とペアリングすると、ここに金額が表示されます。";
+"Khayt Money" = "Khayt 売上";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "本日の売上、お客様の未払い額、在庫の少ないスプール。iPhoneのロック中は金額を隠します。";
