@@ -32,10 +32,15 @@ struct KhaytQueueProvider: TimelineProvider {
         completion(KhaytQueueEntry(date: Date(), snapshot: snap))
     }
 
+    /// Now, and again the moment the snapshot turns old (`WidgetFreshness`),
+    /// so the counts grey on time with the app closed.
     func getTimeline(in context: Context, completion: @escaping (Timeline<KhaytQueueEntry>) -> Void) {
-        let entry = KhaytQueueEntry(date: Date(), snapshot: WidgetSnapshotStore.load())
-        let next = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(900)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        let now = Date()
+        let snapshot = WidgetSnapshotStore.load()
+        let entries = WidgetFreshness.entryDates(asOf: snapshot.map(WidgetFreshness.asOf), now: now)
+            .map { KhaytQueueEntry(date: $0, snapshot: snapshot) }
+        let next = now.addingTimeInterval(WidgetFreshness.staleAfter)
+        completion(Timeline(entries: entries, policy: .after(max(next, entries.last?.date ?? next))))
     }
 }
 
@@ -44,14 +49,22 @@ struct KhaytQueueWidgetView: View {
     let entry: KhaytQueueEntry
 
     var body: some View {
-        switch family {
-        case .accessoryRectangular:
-            accessory
-        case .systemMedium:
-            medium
-        default:
-            small
+        Group {
+            switch family {
+            case .accessoryRectangular:
+                accessory
+            case .systemMedium:
+                medium
+            default:
+                small
+            }
         }
+        .modifier(WidgetLatinDigits())
+    }
+
+    /// Older than `WidgetFreshness.staleAfter`: the figures grey out.
+    private func stale(_ s: WidgetSnapshot) -> Bool {
+        WidgetFreshness.isStale(WidgetFreshness.asOf(s), now: entry.date)
     }
 
     // MARK: small
@@ -62,19 +75,27 @@ struct KhaytQueueWidgetView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     header(s)
                     Spacer(minLength: 0)
-                    if let top = s.prints?.first {
-                        printRow(top, compact: true)
-                    } else {
-                        HStack(spacing: 12) {
-                            metric("Queue", s.queued)
-                            metric("Print", s.printing)
-                            metric("Done", s.completedToday)
+                    Group {
+                        if let top = s.prints?.first {
+                            printRow(top, compact: true)
+                        } else {
+                            HStack(spacing: 12) {
+                                metric("Queue", s.queued)
+                                metric("Print", s.printing)
+                                metric("Done", s.completedToday)
+                            }
                         }
                     }
+                    .opacity(WidgetFreshness.opacity(stale: stale(s)))
                     Spacer(minLength: 0)
-                    Text(statusLine(s))
-                        .font(Look.text(10, .medium))
-                        .foregroundStyle(Look.note)
+                    HStack(spacing: 4) {
+                        Text(statusLine(s))
+                            .font(Look.text(10, .medium))
+                            .foregroundStyle(Look.note)
+                            .lineLimit(1)
+                        Spacer(minLength: 2)
+                        WidgetAgeLabel(asOf: WidgetFreshness.asOf(s), now: entry.date)
+                    }
                 }
             } else {
                 empty
@@ -88,22 +109,28 @@ struct KhaytQueueWidgetView: View {
         Group {
             if let s = entry.snapshot {
                 VStack(alignment: .leading, spacing: 8) {
-                    header(s)
-                    HStack(spacing: 16) {
-                        metric("Queue", s.queued)
-                        metric("Printing", s.printing)
-                        metric("QC", s.qc)
-                        metric("Done", s.completedToday)
+                    HStack(alignment: .firstTextBaseline) {
+                        header(s)
+                        WidgetAgeLabel(asOf: WidgetFreshness.asOf(s), now: entry.date, size: 11)
                     }
-                    Rectangle().fill(Look.track).frame(height: 1)
-                    let prints = s.prints ?? []
-                    if prints.isEmpty {
-                        Text(s.connected ? "Nothing printing right now" : "Offline")
-                            .font(Look.text(12))
-                            .foregroundStyle(Look.note)
-                    } else {
-                        ForEach(prints.prefix(2)) { printRow($0, compact: false) }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 16) {
+                            metric("Queue", s.queued)
+                            metric("Printing", s.printing)
+                            metric("QC", s.qc)
+                            metric("Done", s.completedToday)
+                        }
+                        Rectangle().fill(Look.track).frame(height: 1)
+                        let prints = s.prints ?? []
+                        if prints.isEmpty {
+                            Text(s.connected ? "Nothing printing right now" : "Offline")
+                                .font(Look.text(12))
+                                .foregroundStyle(Look.note)
+                        } else {
+                            ForEach(prints.prefix(2)) { printRow($0, compact: false) }
+                        }
                     }
+                    .opacity(WidgetFreshness.opacity(stale: stale(s)))
                     Spacer(minLength: 0)
                 }
             } else {
@@ -116,18 +143,29 @@ struct KhaytQueueWidgetView: View {
 
     private var accessory: some View {
         Group {
-            if let top = entry.snapshot?.prints?.first {
+            if let s = entry.snapshot, let top = s.prints?.first {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(top.name).font(.headline).lineLimit(1)
                     ProgressView(value: Double(top.progress), total: 100)
-                    Text("\(top.progress)%" + (top.eta.map { " · \($0)" } ?? ""))
-                        .font(.caption2)
+                    HStack(spacing: 4) {
+                        Text("\(top.progress)%" + (top.eta.map { " · \($0)" } ?? ""))
+                        Spacer(minLength: 2)
+                        Text(.currentDate, format: .reference(to: WidgetFreshness.asOf(s), allowedFields: [.day, .hour, .minute], maxFieldCount: 1))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption2)
+                    .lineLimit(1)
                 }
+                .opacity(stale(s) ? 0.6 : 1)
             } else if let s = entry.snapshot {
                 VStack(alignment: .leading) {
                     Text("Khayt").font(.headline)
                     Text("\(s.queued) queued · \(s.printing) printing").font(.caption2)
+                    Text(.currentDate, format: .reference(to: WidgetFreshness.asOf(s), allowedFields: [.day, .hour, .minute], maxFieldCount: 1))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
+                .opacity(stale(s) ? 0.6 : 1)
             } else {
                 Text("Khayt").font(.headline)
             }
@@ -227,6 +265,7 @@ struct KhaytQueueWidget: Widget {
 struct KhaytWidgetBundle: WidgetBundle {
     var body: some Widget {
         KhaytQueueWidget()
+        KhaytMoneyWidget()
         PrintActivityWidget()
         LogWasteControl()
         ScanSpoolControl()
@@ -263,4 +302,18 @@ struct WidgetSnapshot: Codable {
     var connected: Bool
     var updatedAt: Date
     var prints: [WidgetPrint]?
+    var writtenAt: Date?
+    var money: WidgetMoney?
+}
+
+struct WidgetMoney: Codable, Equatable {
+    var takingsToday: Double
+    var owed: Double
+    var unpaid: Int
+    var lowStock: Int
+    var currency: String?
+    var takingsText: String
+    var owedText: String
+    var mark: String
+    var asOf: Date
 }
