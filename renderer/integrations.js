@@ -1760,6 +1760,67 @@ async function captureFinishPhotos(currCache) {
     } catch (e) { console.warn('finish photo failed:', e && e.message); }
   }
 }
+/* ── What each print drew from the wall, from its smart plug ──────────
+ * lib/print-energy.js owns the rules (the trapezoid between readings, the gap
+ * never bridged, the plug shared by two printers never metered) and names the
+ * job with the finish photo's own rule. This is the Mac's EnergyMeter: it holds
+ * the memory the rule is handed back each reading, keeps it across a restart,
+ * and writes `actualEnergyWh` onto a FINISHED print's job. A failed or
+ * cancelled print's reading is dropped: the job goes back to be printed again,
+ * and its actuals belong to the print that succeeds. */
+const ENERGY_KEY = 'khayt.energyMeters';
+const ENERGY_READ_MS = 55 * 1000;
+let _energyMemo = (() => { try { return JSON.parse(localStorage.getItem(ENERGY_KEY) || '{}') || {}; } catch (_) { return {}; } })();
+let _energyEndMemo = {};
+const _energyReadAt = {};
+let _energyBusy = false;
+function _energySave() { try { localStorage.setItem(ENERGY_KEY, JSON.stringify(_energyMemo)); } catch (_) { /* private window */ } }
+async function meterPrintEnergy(currCache) {
+  const PE = globalThis.KhaytPrintEnergy;
+  const FP = globalThis.KhaytPrintFinishPhoto;
+  if (!PE || !FP || _energyBusy) return;
+  _energyBusy = true;
+  try {
+    const shared = new Set(PE.sharedPlugIds(machines));
+    const now = Date.now();
+    for (const m of machines) {
+      if (!m || !m.id) continue;
+      const st = (currCache || {})[m.id];
+      const hasPlug = !!(m.smartPlug && m.smartPlug.type && m.smartPlug.type !== 'none' && !m.retiredAt);
+      // The END first, off the same edge the photo uses.
+      if (st && !st.error) {
+        const r = FP.track(_energyEndMemo, m.id, st);
+        _energyEndMemo = r.memo;
+        if (r.outcome) {
+          const t = PE.take(_energyMemo, m.id);
+          _energyMemo = t.memo; _energySave();
+          if (r.outcome === 'finished' && t.reading) {
+            const jobId = PE.jobFor(printLog, m.id, r.filename);
+            const job = jobId && printLog.find((o) => o && o.id === jobId);
+            const fields = job && PE.jobFields(t.reading, new Date(now).toISOString());
+            if (fields) { Object.assign(job, fields); saveAll(); }
+          }
+          continue;
+        }
+      }
+      // While a job is on, read the plug about once a minute and fold it in.
+      if (!hasPlug || !st || st.error || !PE.inJob(st.state) || !window.hubAPI?.smartPlug) continue;
+      if (now - (_energyReadAt[m.id] || 0) < ENERGY_READ_MS) continue;
+      _energyReadAt[m.id] = now;
+      const p = await window.hubAPI.smartPlug(m, 'status').catch(() => null);
+      const watts = p && p.ok && Number.isFinite(p.watts) ? p.watts : null;
+      if (p && p.ok && typeof _plugState === 'object') _plugState[m.id] = { on: p.on, watts: p.watts, at: Date.now() };
+      const t = PE.tick(_energyMemo, m.id,
+        { at: Date.now(), watts, state: st.state, filename: st.filename || '' },
+        { shared: shared.has(String(m.id)) });
+      _energyMemo = t.memo; _energySave();
+    }
+  } catch (e) {
+    console.warn('energy meter failed:', e && e.message);
+  } finally {
+    _energyBusy = false;
+  }
+}
 function _finishThumb(dataUrl) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -1780,6 +1841,7 @@ function dispatchPrinterAlerts(currCache) {
   // webhook alert engine below, and of whether it's even loaded).
   try { notifyPrintTransitions(currCache); } catch (e) { /* non-fatal */ }
   captureFinishPhotos(currCache).catch(() => {});
+  meterPrintEnergy(currCache).catch(() => {});
 
   const compute = (typeof computePrinterAlerts === 'function')
     ? computePrinterAlerts

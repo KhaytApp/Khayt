@@ -1526,7 +1526,7 @@ function renderMachineAccuracy() {
   if (!rows.length) {
     // Said, not left blank. A shop with a rack of finished prints and an empty
     // panel deserves to know the figures are waiting on a MEASURED time.
-    el.innerHTML = `<div style="margin-top:12px;"><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.accuracy_none'))}</p></div>`;
+    el.innerHTML = `<div style="margin-top:12px;"><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.accuracy_none'))}</p>${machinePowerHtml()}</div>`;
     return;
   }
 
@@ -1562,7 +1562,48 @@ function renderMachineAccuracy() {
           </div>`;
         }).join('')}
       </div>
+      ${machinePowerHtml()}
     </div>`;
+}
+
+/**
+ * Electricity quoted against electricity metered, per machine — the Mac's
+ * PowerActuals. Only prints a smart plug metered (lib/print-energy.js); the
+ * shop's real bill stays in its expenses. Empty when nothing was metered.
+ */
+function machinePowerHtml() {
+  const PE = (typeof KhaytPrintEnergy !== 'undefined') ? KhaytPrintEnergy : null;
+  const PR = (typeof KhaytPrintRates !== 'undefined') ? KhaytPrintRates : null;
+  if (!PE || !PR) return '';
+  const byId = {};
+  for (const m of machines) if (m && m.id) byId[m.id] = m;
+  const rows = PE.powerByMachine(printLog, (id) => PR.ratesFor({ machine: byId[id] || null, settings }));
+  if (!rows.length) return '';
+  const money = (v) => fmtMoney(v) + ' ' + currencySymbol();
+  const pct = (v) => (v === null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%');
+  const col = (v) => (v === null ? 'var(--text-muted)'
+    : v >= 25 ? 'var(--danger)' : v >= 10 ? 'var(--warning)' : 'var(--success)');
+  return `
+      <div id="machinePowerSection" style="margin-top:14px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">${escapeHtml(t('an.power_title'))}</div>
+        <div style="display:flex; flex-direction:column; gap:5px;">
+          ${rows.map((r) => {
+            const machine = byId[r.machineId];
+            return `
+            <div class="power-row" data-machine="${escapeHtml(r.machineId)}" style="display:flex; align-items:center; gap:10px; font-size:12.5px;">
+              <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${safeCssColor(machine?.color || '#888')}; flex-shrink:0;"></span>
+              <span style="flex:1; font-weight:500;">${escapeHtml(machine ? machine.name : r.machineId)}</span>
+              <span style="color:var(--text-muted); font-size:11px;">${escapeHtml(t('an.accuracy_measured', { n: r.sampled }))}</span>
+              <span style="color:var(--text-muted); font-size:11px;">${escapeHtml((r.wh / 1000).toFixed(2))} kWh</span>
+              <span style="color:var(--text-muted); font-size:11px;">${escapeHtml(money(r.estCost))}</span>
+              <span style="color:var(--text-muted); font-size:11px;">&rarr;</span>
+              <span style="font-size:11px;">${escapeHtml(money(r.actCost))}</span>
+              <span style="font-weight:700; min-width:52px; text-align:end; color:${col(r.deltaPct)};">${escapeHtml(pct(r.deltaPct))}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${escapeHtml(t('an.power_note'))}</div>
+      </div>`;
 }
 
 /* ============================================================

@@ -159,6 +159,23 @@ function _printerVerbOk(m, cmd) {
  * checked twice — here for the button, and again in the main process against
  * the poller's own reading — because power is never cut while the printer is
  * printing, paused, not answering or hot. */
+/**
+ * What the machine's plug measured it drawing over its recent metered prints
+ * (lib/print-energy.js `suggestPowerDraw`), with "Use this" — the Mac's
+ * machine sheet line. Nothing when fewer than three prints were metered, or
+ * when the figure already matches.
+ */
+function measuredPowerHtml(draft) {
+  const PE = (typeof KhaytPrintEnergy !== 'undefined') ? KhaytPrintEnergy : null;
+  if (!PE || !draft || !draft.id) return '';
+  const s = PE.suggestPowerDraw(printLog, draft.id);
+  if (!s || Math.round(Number(draft.powerDraw)) === s.watts) return '';
+  return `<div id="machPowerMeasured" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-top:5px;">
+        <span>${escapeHtml(t('mach.power_measured', { watts: s.watts, n: s.basedOn }))}</span>
+        <button class="btn ghost small" id="machPowerUse" type="button" data-watts="${escapeHtml(String(s.watts))}">${escapeHtml(t('mach.power_use'))}</button>
+      </div>`;
+}
+
 function smartPlugEditorHtml(draft) {
   const p = draft.smartPlug || {};
   const type = p.type || 'none';
@@ -610,6 +627,7 @@ function openMachineEditor(machineId = null) {
       </div>
       <div id="machScanResults" style="display:none;margin-top:6px;"></div>
       <div id="machPrinterModelHint" style="font-size:11px;color:var(--text-muted);margin-top:3px;">${escapeHtml(t('mach.printer_model_hint') || 'Pick a model to auto-fill nozzle, build volume, colours and power.')}</div>
+      ${measuredPowerHtml(draft)}
       <label style="margin-top:12px;">${escapeHtml(t('mach.color'))}</label>
       <div id="machColorPicker" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
         ${MACHINE_COLORS.map(c => `
@@ -844,6 +862,14 @@ function openMachineEditor(machineId = null) {
       if (!draft.nozzle) draft.nozzle = { material: 'brass', installedAt: '', gramsThreshold: KhaytNozzleWear.defaultThresholdFor('brass', settings), gramsAtInstall: 0 };
       if (!draft.printerApi) draft.printerApi = { type: 'none', host: '', port: '', apiKey: '', accessCode: '', serial: '', printerSlug: '' };
       modal.querySelector('#machName').addEventListener('input', e => { draft.name = e.target.value; });
+      // The plug's measured wattage: offered, never applied for the shop.
+      modal.querySelector('#machPowerUse')?.addEventListener('click', (e) => {
+        const w = Number(e.currentTarget.dataset.watts);
+        if (!Number.isFinite(w) || w <= 0) return;
+        draft.powerDraw = w;
+        const line = modal.querySelector('#machPowerMeasured');
+        if (line) line.textContent = t('mach.power_set', { watts: w });
+      });
 
       // Printer-model picker — auto-fill specs from the bundled catalog (works offline)
       // + the installed slicer's profiles (breadth). Selecting a model fills nozzle,
