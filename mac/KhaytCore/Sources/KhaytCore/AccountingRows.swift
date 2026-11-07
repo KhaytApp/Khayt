@@ -170,8 +170,15 @@ public enum AccountingRows {
                      : JSSemantics.truthy(o["client"]) ? JSSemantics.text(o["client"]) : ""
             }
 
+            // The day the invoice was ISSUED (`invoiceDateOf`, which is
+            // `PaymentTerms.invoiceDate`): an accepted quote's acceptance, not
+            // the quote's own `date` — the VAT summary already read it so, and
+            // the CSV put the same sale in the quarter before. No day from
+            // that rule: the stored `date`, as before.
+            let issued = PaymentTerms.invoiceDate(o)
             var row: [String: JSONValue] = [
-                "date": JSSemantics.truthy(o["date"]) ? (o["date"] ?? .string("")) : .string(""),
+                "date": !issued.isEmpty ? .string(issued)
+                    : JSSemantics.truthy(o["date"]) ? (o["date"] ?? .string("")) : .string(""),
                 "clientName": .string(name),
                 "price": .number(price.isNaN ? 0 : price),
                 "currency": .string(currency),

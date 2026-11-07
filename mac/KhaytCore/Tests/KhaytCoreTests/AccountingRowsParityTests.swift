@@ -11,7 +11,10 @@ import Testing
 struct AccountingRowsParityTests {
 
     // The document's own numbering rule, which the rows now carry.
-    private func js() throws -> JSModule { try JSModule(["order-new", "invoice-document", "accounting-rows"]) }
+    // And the invoice-date rule, which the row's `date` is (`invoiceDateOf`).
+    private func js() throws -> JSModule {
+        try JSModule(["order-new", "invoice-document", "payment-terms", "accounting-rows"])
+    }
 
     private func check(_ orders: [JSONValue], settings: [String: JSONValue],
                        clients: [JSONValue], tax: AccountingRows.Tax,
@@ -91,6 +94,31 @@ struct AccountingRowsParityTests {
         let rows = AccountingRows.invoiceRows(orders: orders, settings: [:], clients: [], tax: vat)
         guard case .object(let first)? = rows.first else { Issue.record("no row"); return }
         #expect(first["id"] == .string("INV-2026-0042"))
+    }
+
+    @Test("an accepted quote's row is dated the day it was accepted — the day its VAT is due")
+    func issuedDate() throws {
+        let js = try js()
+        func row(_ id: String, _ extra: [String: JSONValue]) -> JSONValue {
+            var o: [String: JSONValue] = ["id": .string(id), "status": .string("completed"),
+                                          "price": .number(115), "date": .string("2026-09-28")]
+            for (k, v) in extra { o[k] = v }
+            return .object(o)
+        }
+        let orders: [JSONValue] = [
+            row("QUO-1", ["quoteAcceptedAt": .string("2026-10-02"), "invoiceNumber": .string("INV-1")]),
+            row("QUO-2", ["clientApprovedAt": .string("2026-10-05")]),
+            row("QUO-3", ["quoteAcceptedAt": .string("2026-10-01T12:00:00.000Z")]),
+            row("QUO-4", ["quoteAcceptedAt": .string("yes")]),
+            row("QUO-5", ["quoteAcceptedAt": .bool(true), "clientApprovedAt": .string("2026-10-07")]),
+            row("INV-6", [:]),
+            row("INV-7", ["date": .null, "timestamp": .string("2026-09-29T08:00:00.000Z")]),
+            row("INV-8", ["date": .string("not a day")]),
+        ]
+        try check(orders, settings: [:], clients: [], tax: vat, "issued dates", js)
+        let rows = AccountingRows.invoiceRows(orders: orders, settings: [:], clients: [], tax: vat)
+        guard case .object(let first)? = rows.first else { Issue.record("no row"); return }
+        #expect(first["date"] == .string("2026-10-02"))
     }
 
     @Test("a quote is not an invoice, and an order with no price is not one either")

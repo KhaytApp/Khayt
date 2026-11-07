@@ -20,18 +20,26 @@
    * an ISO instant, read as the LOCAL day it fell on, as `kpi-rows
    * localDayOf` reads `completedAt`. REVENUE does not move: it is bucketed by
    * `date` as it always was. Only the tax follows this day.
+   *
+   * ONE RULE, NOT FOUR. This is `KhaytPaymentTerms.invoiceDate`, the day the
+   * printed invoice, its due date and the accountant's CSV all use too. It
+   * lived here alone, and the CSV and the paper went on reading `date`: a
+   * quote of 28 Sep accepted 2 Oct was Q4 here, Q3 in the CSV, and printed
+   * 28 Sep. Every host loads payment-terms (both renderer pages, the Mac's
+   * engine; Node requires it); the bare `date` below is only for a context
+   * that somehow has not.
    */
+  function paymentTerms() {
+    if (typeof global !== 'undefined' && global.KhaytPaymentTerms) return global.KhaytPaymentTerms;
+    if (typeof require === 'function') {
+      try { return require('./payment-terms.js'); } catch (e) { return null; }
+    }
+    return null;
+  }
   function taxPointDate(o) {
     if (!o || typeof o !== 'object') return '';
-    const stamp = String(o.quoteAcceptedAt || o.clientApprovedAt || '');
-    if (!stamp) return String(o.date || '').slice(0, 10);
-    if (stamp.length > 10 && /^\d{4}-\d{2}-\d{2}T/.test(stamp)) {
-      const d = new Date(stamp);
-      if (!isNaN(d.getTime())) {
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      }
-    }
-    return stamp.slice(0, 10);
+    const PT = paymentTerms();
+    return PT ? PT.invoiceDate(o) : String(o.date || '').slice(0, 10);
   }
 
   /** Finished work, in both spellings a book can hold. */
