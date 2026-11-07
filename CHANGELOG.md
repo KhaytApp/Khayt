@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Bambu Lab X1 Carbon, P1S, A1 and Creality K2 Plus projects name their slicer's own printer preset** ("… 0.4 nozzle"), so Bambu Studio and Orca open them on the installed printer profile. Same names as Bed Ready and MakerRun.
 - **Fixes from the desktop review (Windows/Linux).**
   - Saving a job no longer moves its actual start and finish times by the time-zone offset (three hours earlier per save in Saudi Arabia).
   - Moving several jobs at once now follows the same rules as moving one: print timers, completion dates, column limits, messages and webhooks. A job already in that column is left alone, and the jobs a full column or a paused production refused are counted.
