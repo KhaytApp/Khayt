@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fixes from the desktop review (Windows/Linux).**
+  - Saving a job no longer moves its actual start and finish times by the time-zone offset (three hours earlier per save in Saudi Arabia).
+  - Moving several jobs at once now follows the same rules as moving one: print timers, completion dates, column limits, messages and webhooks. A job already in that column is left alone, and the jobs a full column or a paused production refused are counted.
+  - Undo after a move restores the right job even when a new order arrived during the five seconds.
+  - A carrier's tracking update is no longer lost when the window saves next.
+  - "Test connection" on a printer no longer stops live status for the other printers.
+  - Deleting or retiring a printer stops polling it.
+  - The email digest backs off when the mail server refuses it.
+  - The report's average margin is blended across jobs, in the shop's currency, and counts business jobs only.
+- **Crash reports are scrubbed before they leave (Windows/Linux).** When crash reporting is switched on, e-mail addresses, phone numbers, IBANs, long numbers, secrets and file paths are removed from the message, the error, its stack frames, the breadcrumbs and the page address before a report is sent, as the privacy policy says. If scrubbing fails, nothing is sent.
 - **Energy per print and per machine, from the smart plug (Windows/Linux).** While a printer with a metering plug is printing, Khayt reads the plug about once a minute and adds up what the print drew; a finished print records it on its job (a cancelled or failed one does not). After three metered prints the printer editor offers the measured wattage with "Use this", and Analytics shows each machine's electricity as quoted against as metered. Same rules as the Mac (`lib/print-energy.js`): gaps are never filled in, and a plug shared by two printers is never metered.
 - **Group by colour in Suggested assignments (Windows/Linux).** When running each printer's proposed jobs in a colour-grouped order saves spool changes, the window offers "Group by colour" with the saving (at `settings.swapMinutes`, 3 minutes by default) and shows the changes each job adds. Due dates and priority come first: no job is made late to save a change. Applying still assigns printers only. Same rule as the Mac (`lib/swap-queue.js`).
 - **Mac: "I have a licence to sell prints".** A model whose free licence does not allow selling prints (NonCommercial, or a model site's Standard Digital File License) is often sold again by its designer with a licence that does. The "Not licensed for sale" warning on a job, quote or product now has **I have a licence to sell prints…** next to each model, and so does the library inspector. It opens the licence proof sheet: saving records the model as Commercial (bought from the designer), which clears the warning everywhere it is used. The code, page and end date are optional for one model. With an end date, sales are flagged again the day after it.

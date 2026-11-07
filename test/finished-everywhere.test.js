@@ -57,11 +57,6 @@ const ALLOWED = [
     snippet: "if (newStatus === 'completed' && typeof brOfferActuals === 'function') {",
     why: 'The status a card is being moved TO, which is what decides whether to offer actuals.',
   },
-  {
-    file: 'logs.js',
-    snippet: "if (status === 'completed') {",
-    why: 'The status a bulk move is heading TO: it stamps completedAt and deducts stock.',
-  },
 ];
 
 /** Every renderer script, themes included; translations are data, not logic. */
