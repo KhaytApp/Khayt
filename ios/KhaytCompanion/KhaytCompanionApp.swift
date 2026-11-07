@@ -149,7 +149,11 @@ struct KhaytCompanionApp: App {
                 .tint(KhaytDesign.accent)
                 // The design's face for everything that does not choose its own.
                 .font(.khayt(17, relativeTo: .body))
-                .task {
+                // Asked once a real shop is open — paired, or signed in from
+                // the cloud — not on a first launch before anything is set
+                // up, and not for the sample shop, which sends no alerts.
+                .task(id: settings.isPaired && !settings.isSampleShop) {
+                    guard settings.isPaired, !settings.isSampleShop else { return }
                     await CompanionNotifications.shared.requestAuthorizationIfNeeded()
                 }
                 // Nothing is polled for a screen nobody can see.

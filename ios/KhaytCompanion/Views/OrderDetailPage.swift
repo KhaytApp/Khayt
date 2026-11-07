@@ -348,7 +348,7 @@ struct ShipCard: View {
                     .foregroundStyle(KhaytDesign.note)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+            Image(systemName: "chevron.forward")
                 .font(.caption).foregroundStyle(KhaytDesign.note)
         }
         .padding(14)
@@ -411,7 +411,7 @@ struct InvoiceCard: View {
                     .foregroundStyle(KhaytDesign.note)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+            Image(systemName: "chevron.forward")
                 .font(.caption).foregroundStyle(KhaytDesign.note)
         }
         .padding(14)
@@ -668,7 +668,6 @@ struct OrderDetailContent: View {
                         Text(next == .completed ? L10n.tr("order.detail.mark_done")
                                                 : L10n.format("order.detail.move_to", next.localizedLabel))
                         Image(systemName: "arrow.forward")
-                            .flipsForRightToLeftLayoutDirection(true)
                     }
                 }
                 .font(.khayt(17, .semibold, relativeTo: .headline))
