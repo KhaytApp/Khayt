@@ -461,7 +461,7 @@
 "pair.signed_out" = "Mac bu telefonun oturumunu kapattı. Sahip PIN’iyle yeniden eşleyin.";
 "pair.pin.title" = "Sahip PIN’i";
 "pair.pin.body" = "Mac veya PC’de Ayarlar → Çevrimiçi bölümündeki, 8 veya daha fazla karakterli sahip PIN’i. Talep PIN’i burada çalışmaz.";
-"pair.pin.foot" = "iPhone Anahtar Zinciri’nde saklanır, bu Mac dışında hiçbir yere gönderilmez.";
+"pair.pin.foot" = "Yalnızca eşlemek için bu Mac’e gönderilir, sonra telefondan silinir. Telefon eşleyemeyen bir bilgisayarda iPhone Anahtar Zinciri’nde saklanır.";
 "pair.pin.wrong" = "PIN reddedildi. Mac veya PC’de Ayarlar → Çevrimiçi bölümünü kontrol edin.";
 "pair.window_closed" = "Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) tıklayın, sonra yeniden deneyin.";
 "pair.window_locked" = "Bu telefondan çok fazla yanlış PIN girildi. Mac’te Telefon Eşle’ye (Ayarlar → Çevrimiçi) yeniden tıklayın, sonra doğru PIN ile deneyin.";
@@ -1097,6 +1097,15 @@
 "care.part.fep_film" = "FEP film";
 "care.part.resin_tank" = "Reçine tankı";
 "care.part.ipa" = "İzopropil alkol (litre)";
+"pair.again.title" = "Bu telefonu yeniden eşleyin";
+"pair.again.line" = "Mac’e yeniden ulaşmak için sahip PIN’ini yazın. Telefon onu asla kendiliğinden göndermez.";
+"pair.again.button" = "Yeniden eşle";
+"pair.again.body" = "Mac’te Ayarlar → Çevrimiçi’deki sahip PIN’i. Eşlemek için bu adrese bir kez gönderilir, sonra telefondan silinir.";
+"pair.phone_name" = "Bu telefonun adı";
+"pair.phone_name.foot" = "Mac’in eşlenmiş telefonlar listesinde bu telefonun görünen adı; telefonları ayırt etmenizi sağlar.";
+"cloud.read_only" = "Salt okunur oturum";
+"cloud.read_only.line" = "Bu telefon Khayt Cloud’a görüntüleyici olarak giriş yaptı ve eşlenmiş Mac yok: atölyeyi gösterir ama değiştiremez.";
+"cloud.read_only.refused" = "Kaydedilmedi: bu telefonun Khayt Cloud oturumu salt okunur. Mac ile eşleyin ya da düzenleme yetkisi olan bir hesapla giriş yapın.";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "Alışveriş listesi";

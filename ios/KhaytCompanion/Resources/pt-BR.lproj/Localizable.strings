@@ -461,7 +461,7 @@
 "pair.signed_out" = "O Mac desconectou este iPhone. Pareie novamente com o PIN do proprietário.";
 "pair.pin.title" = "O PIN do proprietário";
 "pair.pin.body" = "O PIN do proprietário em Ajustes → Online no Mac ou PC, com 8 caracteres ou mais. O PIN de solicitações não funciona aqui.";
-"pair.pin.foot" = "Guardado no Chaveiro do iPhone, nunca enviado a outro lugar além deste Mac.";
+"pair.pin.foot" = "Enviado só para este Mac, para parear, e depois apagado do iPhone. Com um computador que não pareia telefones, fica guardado no Chaveiro do iPhone.";
 "pair.pin.wrong" = "Esse PIN foi recusado. Verifique Ajustes → Online no Mac ou PC.";
 "pair.window_closed" = "No Mac, clique em Parear um telefone (Ajustes → Online) e tente novamente.";
 "pair.window_locked" = "PINs incorretos demais deste iPhone. No Mac, clique em Parear um telefone novamente (Ajustes → Online) e tente com o PIN correto.";
@@ -1097,6 +1097,15 @@
 "care.part.fep_film" = "Filme FEP";
 "care.part.resin_tank" = "Tanque de resina";
 "care.part.ipa" = "Álcool isopropílico (litro)";
+"pair.again.title" = "Pareie este iPhone novamente";
+"pair.again.line" = "Digite o PIN do proprietário para alcançar o Mac novamente. O iPhone nunca o envia sozinho.";
+"pair.again.button" = "Parear novamente";
+"pair.again.body" = "O PIN do proprietário em Ajustes → Online no Mac. É enviado uma vez, para este endereço, para parear — e depois apagado do iPhone.";
+"pair.phone_name" = "Nome deste iPhone";
+"pair.phone_name.foot" = "É assim que o Mac mostra este iPhone na lista de telefones pareados, para diferenciá-los.";
+"cloud.read_only" = "Login somente leitura";
+"cloud.read_only.line" = "Este iPhone entrou no Khayt Cloud como leitor, sem Mac pareado: mostra a oficina, mas não pode alterá-la.";
+"cloud.read_only.refused" = "Não salvo: o login do Khayt Cloud deste iPhone é somente leitura. Pareie com o Mac ou entre com uma conta que possa editar.";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "Lista de compras";

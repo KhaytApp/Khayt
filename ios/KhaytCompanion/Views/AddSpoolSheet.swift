@@ -61,6 +61,7 @@ struct AddSpoolSheet: View {
                     }
                 }
             }
+            .editsShop()
             .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
