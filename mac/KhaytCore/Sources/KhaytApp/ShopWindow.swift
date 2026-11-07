@@ -897,6 +897,7 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingDayReport) { DayReportSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingPrintedPage) { PrintedPageSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingShoppingList) { ShoppingListSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.pendingPartsList) { PartsBuyListSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.testPrintLogFor) { TestPrintLogSheet(shop: shop, spool: $0) }
             .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
             .shopSheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }

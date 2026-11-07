@@ -3041,6 +3041,9 @@ final class Shop {
     var pendingPrintedPage: PrintedPageRequest?
     /// The shopping list, worked out when the shop asked (`ShoppingListSheet`).
     var pendingShoppingList: ShoppingListRequest?
+    /// The parts the coming maintenance needs, worked out when asked
+    /// (`PartsBuyListSheet`).
+    var pendingPartsList: PartsBuyListRequest?
     /// The spool whose test-print log is open, if any (`TestPrintLogSheet`).
     var testPrintLogFor: Spool?
 

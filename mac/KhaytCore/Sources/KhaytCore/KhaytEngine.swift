@@ -940,6 +940,10 @@ public actor KhaytEngine {
         // card, so it is shared rather than recomputed here — a second answer
         // to "which jobs count" is a second answer to when a nozzle is due.
         "maintenance",
+        // A maker's maintenance schedule per printer model, and the parts it
+        // will need and when to order them. Reads `KhaytMaintenance` at call
+        // time, so it sits after it.
+        "care-plans",
         // When the shop actually finishes work.
         // What the shelf costs, and whether that has moved.
         "material-cost",
@@ -6447,6 +6451,12 @@ public actor KhaytEngine {
             /// Whichever interval drives this task.
             public let intervalHours: Double?
             public let intervalDays: Double?
+            /// Inspected and found not needed, and pushed out — the rule's
+            /// `deferred`. Optional so a card decoded from an older shape
+            /// still decodes.
+            public var deferred: Bool? = nil
+            /// The care-plan task this record came from, when it did.
+            public var careTaskId: String? = nil
         }
 
         /// A machine with nothing scheduled yet. Still a card: the section it
@@ -6497,6 +6507,8 @@ public actor KhaytEngine {
                     daysRemaining: st.daysRemaining == null ? null : Number(st.daysRemaining),
                     intervalHours: t.intervalHours > 0 ? Number(t.intervalHours) : null,
                     intervalDays: t.intervalDays > 0 ? Number(t.intervalDays) : null,
+                    deferred: !!st.deferred,
+                    careTaskId: t.careTaskId ? String(t.careTaskId) : null,
                   };
                 }),
               };
@@ -6524,6 +6536,150 @@ public actor KhaytEngine {
             """,
             [task, .number(hours), .string(ISO8601DateFormatter().string(from: when))],
             as: [String: JSONValue].self)
+    }
+
+    /// "Inspected — not needed": the fields that push a task out without
+    /// marking it done (`KhaytMaintenance.deferTask`). Nothing of markDone's
+    /// is in the patch, so the task's history says it was never replaced.
+    public func deferMaintenance(task: JSONValue, hours: Double,
+                                 at when: Date) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytMaintenance.deferTask(ARG0, ARG1, ARG2)",
+            [task, .number(hours), .string(ISO8601DateFormatter().string(from: when))],
+            as: [String: JSONValue].self)
+    }
+
+    // MARK: - Care plans and the parts they use
+
+    /// A maker's maintenance schedule for one printer model
+    /// (`lib/care-plans.js`).
+    public struct CarePlan: Decodable, Sendable, Hashable, Identifiable {
+        public let id: String
+        public let brand: String
+        public let model: String
+        public let kind: String
+        /// The maker's maintenance page, or `starter` where none is published.
+        public let source: String
+        public let tasks: [Task]
+
+        public struct Task: Decodable, Sendable, Hashable, Identifiable {
+            public let id: String
+            public let intervalHours: Double
+            public let intervalDays: Double
+            public let parts: [PartUse]
+            /// Set when this one task's interval is not the plan source's.
+            public let source: String?
+        }
+
+        public struct PartUse: Decodable, Sendable, Hashable {
+            public let id: String
+            public let qty: Double
+        }
+    }
+
+    /// Every plan in the catalogue, in its order.
+    public func carePlans() throws -> [CarePlan] {
+        try runtime.call2("KhaytCarePlans.allPlans()", [], as: [CarePlan].self)
+    }
+
+    /// The plan a machine most likely is, from its record, or nil.
+    public func matchCarePlan(vendor: String?, model: String?, name: String?) throws -> String? {
+        let found = try runtime.call2("(KhaytCarePlans.matchPlan(ARG0, ARG1, ARG2) || '')",
+            [.string(vendor ?? ""), .string(model ?? ""), .string(name ?? "")],
+            as: String.self)
+        return found.isEmpty ? nil : found
+    }
+
+    /// What applying a plan would add, and which existing tasks it would
+    /// re-time — asked before anything is written.
+    public struct CarePlanComparison: Decodable, Sendable, Hashable {
+        public let add: [CarePlan.Task]
+        public let same: [Match]
+        public let differ: [Match]
+
+        public struct Match: Decodable, Sendable, Hashable {
+            public let recordId: String
+            public let task: CarePlan.Task
+            public let hadHours: Double?
+            public let hadDays: Double?
+        }
+    }
+
+    /// `names` is the shop's word for each catalogue task id, so a task added
+    /// from the starter menu is recognised as the same task.
+    public func compareCarePlan(tasks: [JSONValue], machineId: String, planId: String,
+                                names: [String: String]) throws -> CarePlanComparison {
+        try runtime.call2("KhaytCarePlans.comparePlan(ARG0, ARG1, ARG2, ARG3)",
+            [.array(tasks), .string(machineId), .string(planId),
+             .object(names.mapValues { .string($0) })],
+            as: CarePlanComparison.self)
+    }
+
+    /// The whole task list with the plan applied (`KhaytCarePlans.applyPlan`).
+    /// `confirm` names the existing records whose interval the plan may change.
+    public struct CarePlanApplied: Decodable, Sendable {
+        public let tasks: [JSONValue]
+        public let added: [String]
+        public let changed: [String]
+    }
+
+    public func applyCarePlan(tasks: [JSONValue], machineId: String, planId: String,
+                              names: [String: String], ids: [String: String],
+                              confirm: [String], meter: Double, at when: Date) throws -> CarePlanApplied {
+        let named: JSONValue = .object(names.mapValues { .string($0) })
+        return try runtime.call2("KhaytCarePlans.applyPlan(ARG0, ARG1)",
+            [.array(tasks), .object([
+                "machineId": .string(machineId), "planId": .string(planId),
+                "namesById": named, "names": named,
+                "ids": .object(ids.mapValues { .string($0) }),
+                "confirm": .array(confirm.map { .string($0) }),
+                "meter": .number(meter),
+                "nowIso": .string(ISO8601DateFormatter().string(from: when)),
+            ])],
+            as: CarePlanApplied.self)
+    }
+
+    /// A part the care plans use (`KhaytCarePlans.PARTS`).
+    public struct CarePart: Decodable, Sendable, Hashable, Identifiable {
+        public let id: String
+        public let unit: String
+        public let leadDays: Double
+    }
+
+    public func careParts() throws -> [CarePart] {
+        try runtime.call2("KhaytCarePlans.parts()", [], as: [CarePart].self)
+    }
+
+    /// One part to buy, for one task on one machine.
+    public struct PartsBuyRow: Decodable, Sendable, Hashable {
+        public let partId: String
+        public let unit: String
+        public let qty: Double
+        public let machineId: String
+        public let machineName: String
+        public let taskId: String
+        public let careTaskId: String?
+        public let taskName: String
+        /// ISO instants. `orderBy` is the projected due date less the part's
+        /// lead time.
+        public let dueAt: String
+        public let orderBy: String
+        public let leadDays: Double
+        /// The order-by date has already passed.
+        public let late: Bool
+        public let status: String
+    }
+
+    /// What to buy for the maintenance coming up, earliest order-by first.
+    /// Hours are the jobs' — `hoursMeter` and `hoursPerDay` inside the rule.
+    public func partsBuyList(machines: [JSONValue], tasks: [JSONValue], jobs: [JSONValue],
+                             now: Date, horizonDays: Double = 90) throws -> [PartsBuyRow] {
+        try runtime.call2("KhaytCarePlans.partsBuyList(ARG0)",
+            [.object([
+                "machines": .array(machines), "tasks": .array(tasks), "jobs": .array(jobs),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+                "horizonDays": .number(horizonDays),
+            ])],
+            as: [PartsBuyRow].self)
     }
 
     // MARK: - How much passes inspection first time
