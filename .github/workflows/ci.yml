@@ -447,7 +447,7 @@ jobs:
           # fixtures and vectors are read by named Mac tests.
           # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
           # name matches this pattern, so a new one can't be missed silently.
-          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|\.github/workflows/ci\.yml$)'
+          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
           if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 
