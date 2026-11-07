@@ -255,4 +255,26 @@ final class LocalizationCompletenessTests: XCTestCase {
         }
         XCTAssertEqual(found.sorted(), [], "خيط used as the app's name; write Khayt")
     }
+
+    /// Every permission prompt the app can raise is in all nine languages,
+    /// and the built app carries the translations (an `InfoPlist.strings`
+    /// the build left out is a prompt in English on an Arabic phone).
+    func testEveryPermissionPromptIsTranslatedAndShipped() throws {
+        let plist = try XCTUnwrap(NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/Info.plist")) as? [String: Any])
+        let keys = plist.keys.filter { $0.hasSuffix("UsageDescription") }.sorted()
+        XCTAssertTrue(keys.contains("NSCameraUsageDescription"))
+        for language in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
+            let url = Self.appDir.appending(path: "Resources/\(language).lproj/InfoPlist.strings")
+            let table = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], "\(language): no InfoPlist.strings")
+            for key in keys {
+                XCTAssertFalse((table[key] ?? "").isEmpty, "\(language): \(key) untranslated")
+            }
+            XCTAssertNotNil(Bundle.main.path(forResource: "InfoPlist", ofType: "strings", inDirectory: nil, forLocalization: language),
+                            "\(language): InfoPlist.strings is not in the built app")
+        }
+        let camera = try XCTUnwrap(plist["NSCameraUsageDescription"] as? String)
+        for use in ["label", "barcode", "receipt", "print"] {
+            XCTAssertTrue(camera.lowercased().contains(use), "the camera prompt does not mention \(use)s")
+        }
+    }
 }
