@@ -76,6 +76,25 @@ test('a tracking link that is not https is dropped', () => {
   }
 });
 
+test('a tracking link over 500 characters is dropped, as Cloud drops it', () => {
+  const was = Carriers.CARRIERS.spl.trackingUrl;
+  try {
+    const at = (n) => 'https://t.example/?n=' + 'a'.repeat(n - 21);
+    Carriers.CARRIERS.spl.trackingUrl = () => at(500);
+    assert.equal(ship({ ...shipped, carrier: 'spl' }).trackingUrl.length, 500);
+    Carriers.CARRIERS.spl.trackingUrl = () => at(501);
+    const s = ship({ ...shipped, carrier: 'spl' });
+    assert.equal('trackingUrl' in s, false);
+    assert.equal(s.trackingNumber, 'SMSA123', 'the number still shows');
+  } finally {
+    Carriers.CARRIERS.spl.trackingUrl = was;
+  }
+  // The real case: a 100-character Arabic number percent-encodes past 500.
+  const ar = ship({ ...shipped, trackingNumber: 'ع'.repeat(100) });
+  assert.equal('trackingUrl' in ar, false);
+  assert.equal(ar.trackingNumber, 'ع'.repeat(100));
+});
+
 test('a field the order does not have is left out, never null', () => {
   // A status and nothing else: no carrier, no number, so no link either.
   const onlyStatus = ship({ id: 'J', status: 'completed', shippingStatus: 'delivered' });
