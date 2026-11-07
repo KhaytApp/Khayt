@@ -61,9 +61,9 @@ final class ShopPapersAndQuotesTests: XCTestCase {
         let note = try XCTUnwrap(paper(built))
         XCTAssertFalse(note.wholePage, "drawn in the invoice's stylesheet")
         XCTAssertTrue(note.html.contains("Delivery Note"))
-        // "Deliver to" is the desktop's own: the job's title, with the linked
-        // customer's number under it.
-        XCTAssertTrue(note.html.contains("Enclosure lid"))
+        // "Deliver to" is the invoice's rule since #2276: the linked customer
+        // (not the job's description), with their number under it.
+        XCTAssertTrue(note.html.contains("Acme Robotics"), "addressed to the linked customer")
         XCTAssertTrue(note.html.contains("+15555550101"), "Acme Robotics' number")
         XCTAssertTrue(note.html.contains("S-1046"))
         XCTAssertTrue(note.html.contains("Sample Print Shop"), "the shop's name")
