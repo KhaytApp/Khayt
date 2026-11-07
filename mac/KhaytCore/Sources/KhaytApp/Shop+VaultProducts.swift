@@ -41,18 +41,55 @@ extension Shop {
         guard libraryOnVault, canWrite, permitted("cloud", "edit") else { return }
         let picked = selectedIds
         let files = picked.contains(file.id) && picked.count > 1 ? selectedFiles : [file]
+        await sellAsProduct(files)
+    }
+
+    /// The models that had no vault copy when the shop asked to sell them,
+    /// for the banner's "Back Up and Try Again".
+    struct VaultMissing: Equatable {
+        var files: [LibraryFile]
+        var missing: Set<String>
+    }
+
+    /// "Back Up and Try Again": upload just the models the vault lacked, then
+    /// ask again. Never the whole library.
+    func backUpMissingAndRetry() async {
+        guard let pending = vaultMissing, canWrite, permitted("cloud", "edit") else { return }
+        vaultMissing = nil
+        moveProblem = nil
+        vaultBackingUp = true
+        defer { vaultBackingUp = false }
+        guard let result = await backUpModels(only: pending.missing) else {
+            moveProblem = cloudLibraryProblem; return
+        }
+        if result.failed > 0 || result.total == 0 {
+            // Not on this Mac (online only, or gone): nothing could be sent.
+            moveProblem = Shop.say(words, "mac.vl_err_missing", max(pending.missing.count, 1))
+            return
+        }
+        await sellAsProduct(pending.files)
+    }
+
+    private func sellAsProduct(_ files: [LibraryFile]) async {
+        vaultMissing = nil
         guard let engine = await vaultProductsEngine() else {
             moveProblem = words.callIt("mac.vl_err_vault_off"); return
         }
         try? await engine.remote.sync.pull()
         let state = engine.remote.sync.load()
-        var ids: [String] = [], titles: [String] = []
+        var ids: [String] = [], titles: [String] = [], missing: Set<String> = []
         for f in files {
-            guard let fid = state.records[f.id], let e = state.files[fid], !e.trashed, e.row?.headVersion != nil,
-                  !ids.contains(fid) else { continue }
+            guard let fid = state.records[f.id], let e = state.files[fid], !e.trashed, e.row?.headVersion != nil else {
+                missing.insert(f.id); continue
+            }
+            guard !ids.contains(fid) else { continue }
             ids.append(fid); titles.append(f.title)
         }
-        guard !ids.isEmpty else { moveProblem = Shop.say(words, "mac.vl_err_missing", files.count); return }
+        guard !ids.isEmpty else {
+            moveProblem = Shop.say(words, "mac.vl_err_missing", files.count)
+            vaultMissing = VaultMissing(files: files, missing: missing)
+            return
+        }
         makingProduct = VaultProductRequest(fileIds: ids, titles: titles)
         showingVaultProducts = true
     }

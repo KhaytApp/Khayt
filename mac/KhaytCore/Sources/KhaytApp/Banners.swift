@@ -115,9 +115,26 @@ struct MoveBanners: View {
                 BannerClose(words: shop.words) { shop.offsite.noticeDismissed = true }
             }
         }
-        if let problem = shop.moveProblem {
+        if shop.vaultBackingUp {
+            Banner(text: shop.words.callIt("mac.vl_backing_up"), symbol: "icloud.and.arrow.up", tint: Khayt.brand) {
+                if let p = shop.cloudProgress {
+                    ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                        .progressViewStyle(.linear).frame(width: 120)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+        } else if let problem = shop.moveProblem {
             Banner(text: problem, symbol: "exclamationmark.triangle", tint: Khayt.attention) {
-                BannerClose(words: shop.words) { shop.moveProblem = nil }
+                // The vault lacked a model the shop asked to sell: offer to
+                // send just that one up and ask again, where the refusal is.
+                if shop.vaultMissing != nil {
+                    Button(shop.words.callIt("mac.vl_backup_retry")) {
+                        Task { await shop.backUpMissingAndRetry() }
+                    }
+                    .controlSize(.small)
+                }
+                BannerClose(words: shop.words) { shop.moveProblem = nil; shop.vaultMissing = nil }
             }
         }
         // What adding a model had to say. A refusal — a duplicate, a kind Khayt

@@ -2999,6 +2999,8 @@
  "mac.vl_err_links_full": "Todos los enlaces para compartir de tu plan están en uso ({n}). Revoca uno o cambia de plan.",
  "mac.vl_err_links_off": "Khayt ha desactivado los enlaces para compartir de este taller. No se puede crear ningún enlace nuevo, y los enlaces existentes del taller también están desactivados. Escribe a Khayt para preguntar por qué, o para que los reactiven.",
  "mac.vl_err_mail_off": "Khayt Cloud no puede enviar correo ahora mismo, así que un enlace no se puede limitar a direcciones de correo. Inténtalo más tarde, o comparte sin la lista de correos.",
+ "mac.vl_backup_retry": "Copiar y reintentar",
+ "mac.vl_backing_up": "Copiando el modelo al vault…",
  "mac.vl_err_missing": "{n} de estos modelos aún no tienen copia en el vault. Respáldalos e inténtalo de nuevo.",
  "mac.vl_err_missing_n1": "Uno de estos modelos aún no tiene copia en el vault. Respáldalo e inténtalo de nuevo.",
  "mac.vl_err_no_links": "Tu plan no incluye enlaces para compartir.",

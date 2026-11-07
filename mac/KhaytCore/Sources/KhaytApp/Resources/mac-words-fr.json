@@ -2999,6 +2999,8 @@
  "mac.vl_err_links_full": "Les liens de partage de votre offre sont tous utilisés ({n}). Révoquez-en un, ou changez d’offre.",
  "mac.vl_err_links_off": "Khayt a désactivé les liens de partage pour cet atelier. Aucun nouveau lien ne peut être créé, et les liens existants de l’atelier sont aussi désactivés. Écrivez à Khayt pour en demander la raison ou pour les faire réactiver.",
  "mac.vl_err_mail_off": "Khayt Cloud ne peut pas envoyer d’e-mail pour le moment ; un lien ne peut donc pas être limité à des adresses e-mail. Réessayez plus tard, ou partagez sans la liste d’e-mails.",
+ "mac.vl_backup_retry": "Sauvegarder et réessayer",
+ "mac.vl_backing_up": "Copie du modèle dans le coffre…",
  "mac.vl_err_missing": "{n} de ces modèles n’ont pas encore de copie dans le coffre. Sauvegardez-les, puis réessayez.",
  "mac.vl_err_missing_n1": "L’un de ces modèles n’a pas encore de copie dans le coffre. Sauvegardez-le, puis réessayez.",
  "mac.vl_err_no_links": "Votre offre n’inclut pas les liens de partage.",

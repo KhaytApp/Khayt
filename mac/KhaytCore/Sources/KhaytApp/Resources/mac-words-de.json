@@ -2999,6 +2999,8 @@
  "mac.vl_err_links_full": "Die Freigabelinks Ihres Tarifs sind alle belegt ({n}). Widerrufen Sie einen oder wechseln Sie den Tarif.",
  "mac.vl_err_links_off": "Khayt hat die Freigabelinks für diesen Shop ausgeschaltet. Es kann kein neuer Link erstellt werden, und die bestehenden Links des Shops sind ebenfalls ausgeschaltet. Schreiben Sie an Khayt, um nach dem Grund zu fragen oder sie wieder einschalten zu lassen.",
  "mac.vl_err_mail_off": "Khayt Cloud kann gerade keine E-Mails senden, daher kann ein Link nicht auf E-Mail-Adressen beschränkt werden. Versuchen Sie es später erneut oder teilen Sie ohne die E-Mail-Liste.",
+ "mac.vl_backup_retry": "Sichern und erneut versuchen",
+ "mac.vl_backing_up": "Modell wird in den Vault kopiert…",
  "mac.vl_err_missing": "{n} dieser Modelle haben noch keine Kopie im Vault. Sichern Sie sie und versuchen Sie es dann erneut.",
  "mac.vl_err_missing_n1": "Eines dieser Modelle hat noch keine Kopie im Vault. Sichern Sie es und versuchen Sie es dann erneut.",
  "mac.vl_err_no_links": "Ihr Tarif enthält keine Freigabelinks.",

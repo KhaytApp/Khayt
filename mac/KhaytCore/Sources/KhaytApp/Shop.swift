@@ -2124,6 +2124,11 @@ final class Shop {
     /// the library's selection (`Shop+VaultProducts.swift`).
     var showingVaultProducts = false
     var makingProduct: VaultProductRequest?
+    /// Models a product asked for that had no vault copy: the banner offers
+    /// to back up just these and try again (`backUpMissingAndRetry`).
+    var vaultMissing: VaultMissing?
+    /// That backup is under way.
+    var vaultBackingUp = false
     /// Over the plan's vault after a move down (`Shop+VaultLapse.swift`):
     /// the cloud's last word on it, nil until it has been asked.
     var vaultLapse: CloudPlans.Lapse?
