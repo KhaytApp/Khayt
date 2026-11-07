@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Every job, what was paid and what is still owed";
 "paper.refused.missing" = "This isn't in the phone's copy of the book. Pull the book again on the shop's Wi-Fi.";
 "paper.refused.quote" = "This is still a quote. Its papers come once the customer accepts it.";
-"paper.refused.partial" = "This phone holds only the newest finished jobs, so a statement made here could leave some out. Make it on the Mac or PC.";
 "paper.refused.failed" = "The paper couldn't be made. Try again, or make it on the Mac or PC.";
 "quote.tools" = "Quote";
 "quote.revise" = "Revise quote";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "Reason: %@";
 "invoice.stamp.credited" = "CREDITED";
 "invoice.stamp.credited.line" = "This invoice was credited in full on %@. Nothing more is owed on it.";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "This phone holds only recent work, so older jobs and payments may be missing from this statement. The statement says so too. For a complete one, make it on the Mac or PC.";
+"paper.statement.partial.printed" = "Some older jobs and payments may be missing from this statement: it was made on a phone that holds only recent work.";

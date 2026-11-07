@@ -17,14 +17,14 @@ import KhaytCore
 ///
 /// Showing a paper writes nothing.
 ///
-/// ── A STATEMENT NEEDS EVERY JOB ───────────────────────────────────────────
+/// ── A STATEMENT FROM PART OF THE BOOK ─────────────────────────────────────
 ///
 /// A phone carries every open job and the newest finished ones
-/// (`BookScope.workingSet`). A statement made from that would leave older
-/// work off a paper that goes to the customer and say they owe less than
-/// they do. So a statement is made only from a book that holds every job
-/// (`holdsAll("printLog")`), and otherwise refused with where to make it —
-/// as the invoice drops a loyalty badge it cannot work out honestly.
+/// (`BookScope.workingSet`), so a statement made from that can leave older
+/// work and payments off. It used to be refused; Turki decided (Nov 2026)
+/// that it is made anyway and SAYS so: the page warns before it is shared
+/// (`PaperBuild.paper`'s `partial`), and the statement itself carries a line
+/// that some older records may be missing. From a whole book: no warning.
 enum PaperSubject: Hashable {
     /// A packing slip, delivery note or work order for one job.
     case job(KhaytEngine.ShopPaper, orderId: String)
@@ -57,7 +57,9 @@ enum PaperSubject: Hashable {
 }
 
 enum PaperBuild {
-    case paper(InvoiceDocument, filename: String, wholePage: Bool)
+    /// `partial`: made from a book that does not hold every job — see the
+    /// note on `PaperSubject`. Only a statement is ever partial.
+    case paper(InvoiceDocument, filename: String, wholePage: Bool, partial: Bool)
     case refused(PaperRefusal)
 }
 
@@ -66,8 +68,6 @@ enum PaperRefusal: Equatable {
     case missing
     /// A quote is not work yet: nothing to pack, deliver or make.
     case quote
-    /// The phone holds only some of the shop's jobs; see the type's note.
-    case partialBook
     /// The shared document could not be built.
     case failed
 
@@ -75,7 +75,6 @@ enum PaperRefusal: Equatable {
         switch self {
         case .missing: return L10n.tr("paper.refused.missing")
         case .quote: return L10n.tr("paper.refused.quote")
-        case .partialBook: return L10n.tr("paper.refused.partial")
         case .failed: return L10n.tr("paper.refused.failed")
         }
     }
@@ -123,19 +122,33 @@ extension BookReader {
             }
             return .paper(InvoiceDocument(html: html, arabicNumerals: false, selector: ""),
                           filename: Self.paperFilename(kind, reference: Self.reference(order)),
-                          wholePage: subject.isWholePage)
+                          wholePage: subject.isWholePage, partial: false)
         case .statement(let clientId):
             guard let client = byId(clients, clientId) else { return .refused(.missing) }
-            guard holdsAll("printLog") else { return .refused(.partialBook) }
-            guard let html = try? await engine.statementHtml(client: .object(client), orders: orders, inputs()) else {
+            let partial = !holdsAll("printLog")
+            guard let made = try? await engine.statementHtml(client: .object(client), orders: orders, inputs()) else {
                 return .refused(.failed)
             }
+            let html = partial ? Self.partialStatementNote(language: language) + made : made
             let name = (Self.text(client["name"]).flatMap { $0.isEmpty ? nil : $0 })
                 ?? (Self.text(client["nameEn"]).flatMap { $0.isEmpty ? nil : $0 })
                 ?? (Self.text(client["nameAr"]).flatMap { $0.isEmpty ? nil : $0 }) ?? clientId
             return .paper(InvoiceDocument(html: html, arabicNumerals: false, selector: ""),
-                          filename: "statement-" + Self.safeFilePart(name) + ".pdf", wholePage: false)
+                          filename: "statement-" + Self.safeFilePart(name) + ".pdf", wholePage: false,
+                          partial: partial)
         }
+    }
+
+    /// The line printed at the head of a statement made from part of the
+    /// book, in the statement's language: the customer reading it is told
+    /// that older records may be missing.
+    nonisolated static func partialStatementNote(language: String) -> String {
+        let dir = language == "ar" ? "rtl" : "ltr"
+        let text = InvoiceStamp.escape(L10n.tr("paper.statement.partial.printed", language: language))
+        return "<div class=\"statement-partial\" role=\"note\" dir=\"\(dir)\" style=\"border:1px solid #b45309; "
+            + "background:#fffbeb; color:#92400e; -webkit-print-color-adjust:exact; print-color-adjust:exact; "
+            + "border-radius:6px; padding:8px 12px; margin:0 0 12px; font-size:12.5px; font-weight:600; "
+            + "line-height:1.45;\">\(text)</div>"
     }
 
     /// A quote has nothing to pack, deliver or make yet. A cancelled job's

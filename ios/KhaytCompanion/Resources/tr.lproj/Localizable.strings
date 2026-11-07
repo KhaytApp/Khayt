@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Tüm işler, ödenen ve hâlâ borçlu olunan";
 "paper.refused.missing" = "Bu, telefondaki defter kopyasında yok. Defteri dükkânın Wi-Fi ağında yeniden çekin.";
 "paper.refused.quote" = "Bu hâlâ bir teklif. Belgeleri müşteri kabul edince gelir.";
-"paper.refused.partial" = "Bu telefonda yalnızca en yeni biten işler var; burada hazırlanan bir ekstre bazılarını atlayabilir. Mac veya PC'de hazırlayın.";
 "paper.refused.failed" = "Belge hazırlanamadı. Yeniden deneyin ya da Mac veya PC'de hazırlayın.";
 "quote.tools" = "Teklif";
 "quote.revise" = "Teklifi revize et";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "Neden: %@";
 "invoice.stamp.credited" = "ALACAKLANDI";
 "invoice.stamp.credited.line" = "Bu fatura %@ tarihinde tamamen alacaklandırıldı. Ödenecek bir şey kalmadı.";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Bu telefonda yalnızca son işler var, bu yüzden bu hesap ekstresinde daha eski işler ve ödemeler eksik olabilir. Ekstrenin kendisi de bunu belirtir. Eksiksiz bir ekstre için Mac'te veya PC'de oluşturun.";
+"paper.statement.partial.printed" = "Bu ekstrede daha eski işler ve ödemeler eksik olabilir: yalnızca son işleri tutan bir telefonda oluşturuldu.";

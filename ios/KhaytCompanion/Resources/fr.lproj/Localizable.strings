@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Toutes les commandes, ce qui est payé et ce qui reste dû";
 "paper.refused.missing" = "Ce n’est pas dans la copie du registre sur le téléphone. Récupérez à nouveau le registre sur le Wi-Fi de l’atelier.";
 "paper.refused.quote" = "C’est encore un devis. Ses documents viendront quand le client l’aura accepté.";
-"paper.refused.partial" = "Ce téléphone ne contient que les commandes terminées les plus récentes : un relevé fait ici pourrait en oublier. Faites-le sur le Mac ou le PC.";
 "paper.refused.failed" = "Le document n’a pas pu être créé. Réessayez, ou faites-le sur le Mac ou le PC.";
 "quote.tools" = "Devis";
 "quote.revise" = "Réviser le devis";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "Motif : %@";
 "invoice.stamp.credited" = "AVOIR ÉMIS";
 "invoice.stamp.credited.line" = "Cette facture a fait l’objet d’un avoir total le %@. Plus rien n’est dû.";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Ce téléphone ne contient que les travaux récents : des travaux et paiements plus anciens peuvent manquer à ce relevé. Le relevé le précise aussi. Pour un relevé complet, faites-le sur le Mac ou le PC.";
+"paper.statement.partial.printed" = "Des travaux et paiements plus anciens peuvent manquer à ce relevé : il a été établi sur un téléphone qui ne contient que les travaux récents.";

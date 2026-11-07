@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Todos los trabajos, lo pagado y lo que aún se debe";
 "paper.refused.missing" = "Esto no está en la copia del libro del teléfono. Vuelve a traer el libro en el Wi-Fi del taller.";
 "paper.refused.quote" = "Esto sigue siendo un presupuesto. Sus documentos llegan cuando el cliente lo acepte.";
-"paper.refused.partial" = "Este teléfono solo tiene los trabajos terminados más recientes, así que un estado de cuenta hecho aquí podría dejar algunos fuera. Hazlo en el Mac o el PC.";
 "paper.refused.failed" = "No se pudo crear el documento. Inténtalo de nuevo o hazlo en el Mac o el PC.";
 "quote.tools" = "Presupuesto";
 "quote.revise" = "Revisar presupuesto";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "Motivo: %@";
 "invoice.stamp.credited" = "ABONADA";
 "invoice.stamp.credited.line" = "Esta factura se abonó por completo el %@. No queda nada pendiente.";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Este teléfono solo guarda el trabajo reciente, así que pueden faltar trabajos y pagos más antiguos en este estado de cuenta. El propio estado de cuenta lo indica. Para uno completo, hazlo en el Mac o el PC.";
+"paper.statement.partial.printed" = "Pueden faltar trabajos y pagos más antiguos en este estado de cuenta: se hizo en un teléfono que solo guarda el trabajo reciente.";

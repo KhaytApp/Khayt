@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "所有订单、已付款与仍欠款项";
 "paper.refused.missing" = "此项不在手机的账本副本中。请在店铺 Wi-Fi 下重新获取账本。";
 "paper.refused.quote" = "这仍是报价。客户接受后才有相关单据。";
-"paper.refused.partial" = "此手机只保存最新的已完成订单，在这里生成的对账单可能会遗漏部分订单。请在 Mac 或电脑上生成。";
 "paper.refused.failed" = "无法生成该单据。请重试，或在 Mac 或电脑上生成。";
 "quote.tools" = "报价";
 "quote.revise" = "修改报价";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "原因：%@";
 "invoice.stamp.credited" = "已冲销";
 "invoice.stamp.credited.line" = "本发票已于%@全额冲销，无需再付款。";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "这部手机只保存近期的工作，因此此对账单可能缺少较早的订单和付款。对账单上也会注明这一点。如需完整的对账单，请在 Mac 或电脑上生成。";
+"paper.statement.partial.printed" = "此对账单可能缺少部分较早的订单和付款：它是在只保存近期工作的手机上生成的。";

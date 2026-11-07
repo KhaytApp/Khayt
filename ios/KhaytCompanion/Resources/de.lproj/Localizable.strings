@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Alle Aufträge, was bezahlt ist und was noch offen ist";
 "paper.refused.missing" = "Das ist nicht in der Kopie des Buchs auf dem Telefon. Lade das Buch im WLAN des Shops erneut.";
 "paper.refused.quote" = "Das ist noch ein Angebot. Seine Papiere gibt es, sobald der Kunde es annimmt.";
-"paper.refused.partial" = "Dieses Telefon hat nur die neuesten abgeschlossenen Aufträge, ein hier erstellter Kontoauszug könnte also welche auslassen. Erstelle ihn auf dem Mac oder PC.";
 "paper.refused.failed" = "Das Papier konnte nicht erstellt werden. Versuche es erneut oder erstelle es auf dem Mac oder PC.";
 "quote.tools" = "Angebot";
 "quote.revise" = "Angebot überarbeiten";
@@ -1119,3 +1118,7 @@
 "invoice.stamp.void.reason" = "Grund: %@";
 "invoice.stamp.credited" = "GUTGESCHRIEBEN";
 "invoice.stamp.credited.line" = "Diese Rechnung wurde am %@ vollständig gutgeschrieben. Es ist nichts mehr offen.";
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Dieses Telefon enthält nur die neueren Aufträge, daher können ältere Aufträge und Zahlungen in diesem Kontoauszug fehlen. Das steht auch auf dem Auszug. Einen vollständigen erstellst du auf dem Mac oder PC.";
+"paper.statement.partial.printed" = "In diesem Kontoauszug können ältere Aufträge und Zahlungen fehlen: Er wurde auf einem Telefon erstellt, das nur die neueren Aufträge enthält.";

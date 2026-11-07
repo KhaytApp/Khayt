@@ -36,12 +36,12 @@ final class ShopPapersAndQuotesTests: XCTestCase {
     }
 
     private func paper(_ build: PaperBuild, file: StaticString = #filePath, line: UInt = #line)
-        -> (html: String, filename: String, wholePage: Bool)? {
-        guard case .paper(let doc, let filename, let wholePage) = build else {
+        -> (html: String, filename: String, wholePage: Bool, partial: Bool)? {
+        guard case .paper(let doc, let filename, let wholePage, let partial) = build else {
             XCTFail("expected a paper, got \(build)", file: file, line: line)
             return nil
         }
-        return (doc.html, filename, wholePage)
+        return (doc.html, filename, wholePage, partial)
     }
 
     // MARK: - Papers
@@ -127,18 +127,38 @@ final class ShopPapersAndQuotesTests: XCTestCase {
         XCTAssertFalse(statement.wholePage)
     }
 
-    func testAStatementIsRefusedFromABookThatHoldsOnlySomeJobs() async throws {
+    func testAStatementFromPartOfTheBookIsMadeAndSaysSo() async throws {
         let full = SampleShop.scope()
         var held = full.collections
         held["printLog"] = .init(whole: false, sent: 9, available: 3_140)
         let partial = BookScope.Taken(collections: held, omitted: full.omitted, takenAt: full.takenAt)
         let reader = BookReader(book: try book(scope: partial))
-        guard case .refused(let why) = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
-        else { return XCTFail("a statement from part of the book would understate what is owed") }
-        XCTAssertEqual(why, .partialBook)
-        // A job's own papers need only the job.
-        let built = try await reader.shopPaper(.job(.deliveryNote, orderId: "S-1046"), language: "en")
-        _ = try XCTUnwrap(paper(built))
+        let built = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
+        let statement = try XCTUnwrap(paper(built), "Turki, Nov 2026: made anyway, never refused")
+        XCTAssertTrue(statement.partial, "the page warns before it is shared")
+        XCTAssertTrue(statement.html.contains("Account Statement"))
+        XCTAssertTrue(statement.html.contains("Maya Chen"))
+        XCTAssertTrue(statement.html.hasPrefix("<div class=\"statement-partial\""), "the line heads the paper")
+        XCTAssertTrue(statement.html.contains(L10n.tr("paper.statement.partial.printed", language: "en")))
+        XCTAssertTrue(statement.html.contains("may be missing"), "said plainly on the paper itself")
+        let arBuild = try await reader.shopPaper(.statement(clientId: "C-3"), language: "ar")
+        let arabic = try XCTUnwrap(paper(arBuild))
+        XCTAssertTrue(arabic.html.contains(L10n.tr("paper.statement.partial.printed", language: "ar")),
+                      "in the statement's own language")
+        XCTAssertTrue(arabic.html.contains("dir=\"rtl\""))
+        // A job's own papers need only the job, and are never partial.
+        let noteBuild = try await reader.shopPaper(.job(.deliveryNote, orderId: "S-1046"), language: "en")
+        let note = try XCTUnwrap(paper(noteBuild))
+        XCTAssertFalse(note.partial)
+        XCTAssertFalse(note.html.contains("statement-partial"))
+    }
+
+    func testAStatementFromTheWholeBookCarriesNoWarning() async throws {
+        let reader = BookReader(book: try book())
+        let built = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
+        let statement = try XCTUnwrap(paper(built))
+        XCTAssertFalse(statement.partial)
+        XCTAssertFalse(statement.html.contains("statement-partial"))
     }
 
     func testAPhoneWithoutABookMakesNoPaper() async {
