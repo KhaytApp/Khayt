@@ -1233,6 +1233,8 @@
  "mac.licence_nc_line": "{name}: su licencia no permite vender impresiones.",
  "mac.licence_not_for_sale": "Sin licencia para la venta",
  "mac.licence_proof": "Prueba de licencia",
+ "mac.licence_have": "Tengo una licencia para vender impresiones",
+ "mac.licence_have_hint": "Muchos diseñadores ofrecen un modelo gratis para uso personal y venden aparte una licencia para vender sus impresiones. Al guardar, este modelo queda registrado como Comercial (comprada al diseñador), así que los trabajos y productos que lo usan se pueden vender. Añade el código o la página si los tienes.",
  "mac.licence_proof_hint": "El código y la página que te dio el diseñador para vender impresiones de este modelo. Después del último día, todos los trabajos y productos que lo usen indicarán que ya no están cubiertos.",
  "mac.licence_remix_line": "{name}: un remix de {parent}, cuya licencia no permite vender impresiones.",
  "mac.licence_set": "Registrar licencia",

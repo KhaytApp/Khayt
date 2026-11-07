@@ -479,6 +479,12 @@ struct LibraryInspector: View {
                 //
                 // "Commercial" is only as good as the receipt; the last day it
                 // covers turns amber once it has passed (`Shop.saleProblems`).
+                // The free licence says no, and the designer may sell one that
+                // says yes (`Shop.applyLicenceProof`).
+                if standing.known, standing.sellable == false, shop.canMoveJobs {
+                    Button(shop.words.callIt("mac.licence_have") + "…") { proofFor = file }
+                        .buttonStyle(.link).font(.callout)
+                }
                 if standing.licence == "commercial" {
                     if let until = file.licenceExpires, !until.isEmpty {
                         let lapsed = ModelLicence.expired(

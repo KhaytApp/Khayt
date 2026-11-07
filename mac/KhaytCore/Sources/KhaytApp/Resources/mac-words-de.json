@@ -1233,6 +1233,8 @@
  "mac.licence_nc_line": "{name}: Die Lizenz erlaubt nicht den Verkauf von Drucken.",
  "mac.licence_not_for_sale": "Nicht für den Verkauf lizenziert",
  "mac.licence_proof": "Lizenznachweis",
+ "mac.licence_have": "Ich habe eine Lizenz zum Verkauf von Drucken",
+ "mac.licence_have_hint": "Viele Designer geben ein Modell für den privaten Gebrauch kostenlos ab und verkaufen eine separate Lizenz zum Verkauf von Drucken. Beim Speichern wird dieses Modell als Kommerziell (vom Designer gekauft) erfasst, sodass Aufträge und Produkte damit verkauft werden dürfen. Fügen Sie den Code oder die Seite hinzu, falls vorhanden.",
  "mac.licence_proof_hint": "Der Code und die Seite, die der Designer Ihnen für den Verkauf von Drucken dieses Modells gegeben hat. Nach dem letzten Tag meldet jeder Auftrag und jedes Produkt, das es verwendet, dass es nicht mehr abgedeckt ist.",
  "mac.licence_remix_line": "{name}: ein Remix von {parent}, dessen Lizenz den Verkauf von Drucken nicht erlaubt.",
  "mac.licence_set": "Lizenz erfassen",

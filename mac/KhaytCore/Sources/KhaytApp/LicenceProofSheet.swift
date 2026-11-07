@@ -27,8 +27,16 @@ struct LicenceProofSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(shop.words.callIt("mac.licence_proof")).font(.headline)
+            // Reached from "I have a licence to sell prints" on a model whose
+            // free licence says no: say what saving does before it does it.
+            let override = (file.licence ?? "") != "commercial"
+            Text(shop.words.callIt(override ? "mac.licence_have" : "mac.licence_proof")).font(.headline)
             Text(file.name).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            if override {
+                Text(shop.words.callIt("mac.licence_have_hint"))
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     Text(shop.words.callIt("mac.licence_code")).foregroundStyle(.secondary)

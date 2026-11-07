@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: "I have a licence to sell prints".** A model whose free licence does not allow selling prints (NonCommercial, or a model site's Standard Digital File License) is often sold again by its designer with a licence that does. The "Not licensed for sale" warning on a job, quote or product now has **I have a licence to sell prints…** next to each model, and so does the library inspector. It opens the licence proof sheet: saving records the model as Commercial (bought from the designer), which clears the warning everywhere it is used. The code, page and end date are optional for one model. With an end date, sales are flagged again the day after it.
 - **Docs:** competitive readings of 2026-10-25, 2026-10-26 and 2026-11-01 in docs/KHAYT-COMPETITIVE-ROADMAP.md.
 
 - **Mac: care plans for common printers.** A machine's maintenance section has **Apply care plan…**. Pick the brand and model and Khayt adds that printer's maintenance schedule: Bambu Lab X1, P1, A1 and A1 mini, Prusa MK4 and Core One, Snapmaker U1, Creality K1 and Ender-3 V3, Formlabs Form 3, and Elegoo and Anycubic resin printers. The intervals come from each maker's published maintenance page, and the sheet links to it. Where the maker publishes no hours or days for a task, Khayt uses its starting interval and says so. A task the machine already has is not added twice. Its interval changes only if you tick **Use the plan's intervals**, and nothing is marked done.

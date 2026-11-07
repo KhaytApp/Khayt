@@ -27,6 +27,33 @@ struct LicenceAtSaleTests {
         #expect(shop.writeProblem == nil)
     }
 
+    @Test("a free NonCommercial model whose paid licence the shop bought is for sale")
+    func boughtOverridesTheFreeLicence() {
+        // Turki, Nov 2026: a free version not allowed to sell, and a special
+        // commercial licence version. Recording the bought licence overrides.
+        for free in ["cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl"] {
+            var record: [String: JSONValue] = ["id": .string("M"), "name": .string("Dragon"), "licence": .string(free)]
+            #expect(ModelLicence.saleProblems(["M"], records: [.object(record)], today: "2026-11-07").count == 1)
+            Shop.applyLicenceProof(&record, code: "", url: "", expires: "")
+            #expect(record["licence"] == .string("commercial"))
+            #expect(ModelLicence.saleProblems(["M"], records: [.object(record)], today: "2026-11-07").isEmpty,
+                    Comment(rawValue: "\(free) still not for sale after the licence was bought"))
+            #expect(record["licenceCode"] == nil, "a blank code is not written")
+        }
+        // A bought licence with an end date lapses the day after, as before.
+        var dated: [String: JSONValue] = ["id": .string("M"), "licence": .string("sdfl")]
+        Shop.applyLicenceProof(&dated, code: "PT-1", url: "", expires: "2026-11-06")
+        #expect(ModelLicence.saleProblems(["M"], records: [.object(dated)], today: "2026-11-07").first?.reason == "expired")
+    }
+
+    @Test("the warning offers the override where the sale is, and the library does too")
+    func overrideIsReachable() {
+        let warning = MenuCoverageTests.source("LicenceWarning.swift")
+        #expect(warning.contains("\"mac.licence_have\""))
+        #expect(warning.contains("LicenceProofSheet(shop: shop, file: $0)"))
+        #expect(MenuCoverageTests.source("LibraryInspector.swift").contains("shop.words.callIt(\"mac.licence_have\")"))
+    }
+
     @Test("the job and the product ask, and say so where the sale is")
     func askedAtTheSale() {
         #expect(MenuCoverageTests.source("OrderInspector.swift")
