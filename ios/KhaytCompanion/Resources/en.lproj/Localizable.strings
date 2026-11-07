@@ -990,6 +990,7 @@
 "customer.history" = "Finished jobs";
 "customer.history.none" = "No finished jobs on this phone.";
 "customer.history.window" = "This phone holds the newest finished jobs; the full history is on the Mac.";
+"customer.owes.window" = "From the jobs on this phone. Older jobs are on the Mac, so this may be short.";
 "customer.agreed" = "Agreed prices";
 "customer.messages" = "Messages";
 "customer.messages.none" = "No messages logged yet.";

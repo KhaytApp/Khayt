@@ -990,6 +990,7 @@
 "customer.history" = "Abgeschlossene Aufträge";
 "customer.history.none" = "Keine abgeschlossenen Aufträge auf diesem iPhone.";
 "customer.history.window" = "Dieses iPhone enthält die neuesten abgeschlossenen Aufträge; der vollständige Verlauf ist auf dem Mac.";
+"customer.owes.window" = "Aus den Aufträgen auf diesem iPhone. Ältere Aufträge sind auf dem Mac, daher kann der Betrag zu niedrig sein.";
 "customer.agreed" = "Vereinbarte Preise";
 "customer.messages" = "Nachrichten";
 "customer.messages.none" = "Noch keine Nachrichten protokolliert.";

@@ -990,6 +990,7 @@
 "customer.history" = "已完成的作业";
 "customer.history.none" = "此 iPhone 上没有已完成的作业。";
 "customer.history.window" = "此 iPhone 保存了最新已完成的作业；完整历史在 Mac 上。";
+"customer.owes.window" = "根据此 iPhone 上的作业计算。较早的作业在 Mac 上，因此金额可能偏少。";
 "customer.agreed" = "约定价格";
 "customer.messages" = "消息";
 "customer.messages.none" = "还没有记录任何消息。";

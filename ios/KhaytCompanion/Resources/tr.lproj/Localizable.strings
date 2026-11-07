@@ -990,6 +990,7 @@
 "customer.history" = "Biten işler";
 "customer.history.none" = "Bu telefonda biten iş yok.";
 "customer.history.window" = "Bu telefon en yeni biten işleri tutar; tüm geçmiş Mac’te.";
+"customer.owes.window" = "Bu iPhone’daki işlerden. Eski işler Mac’te olduğundan tutar eksik olabilir.";
 "customer.agreed" = "Anlaşılan fiyatlar";
 "customer.messages" = "Mesajlar";
 "customer.messages.none" = "Henüz kayıtlı mesaj yok.";

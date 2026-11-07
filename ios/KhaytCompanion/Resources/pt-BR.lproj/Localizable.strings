@@ -990,6 +990,7 @@
 "customer.history" = "Trabalhos concluídos";
 "customer.history.none" = "Nenhum trabalho concluído neste iPhone.";
 "customer.history.window" = "Este iPhone guarda os trabalhos concluídos mais recentes; o histórico completo está no Mac.";
+"customer.owes.window" = "Pelos trabalhos neste iPhone. Os mais antigos estão no Mac, então o valor pode ser menor que o real.";
 "customer.agreed" = "Preços combinados";
 "customer.messages" = "Mensagens";
 "customer.messages.none" = "Nenhuma mensagem registrada ainda.";

@@ -990,6 +990,7 @@
 "customer.history" = "完了したジョブ";
 "customer.history.none" = "このiPhoneに完了したジョブはありません。";
 "customer.history.window" = "このiPhoneには最新の完了済みジョブが保存されています。全履歴はMacにあります。";
+"customer.owes.window" = "このiPhoneにあるジョブから計算しています。古いジョブはMacにあるため、実際より少ない場合があります。";
 "customer.agreed" = "合意価格";
 "customer.messages" = "メッセージ";
 "customer.messages.none" = "記録されたメッセージはまだありません。";

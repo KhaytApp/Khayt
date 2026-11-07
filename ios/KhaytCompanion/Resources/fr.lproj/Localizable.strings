@@ -990,6 +990,7 @@
 "customer.history" = "Tâches terminées";
 "customer.history.none" = "Aucune tâche terminée sur cet iPhone.";
 "customer.history.window" = "Cet iPhone contient les tâches terminées les plus récentes ; l’historique complet est sur le Mac.";
+"customer.owes.window" = "D’après les tâches de cet iPhone. Les plus anciennes sont sur le Mac : le montant peut être sous-estimé.";
 "customer.agreed" = "Prix convenus";
 "customer.messages" = "Messages";
 "customer.messages.none" = "Aucun message consigné pour l’instant.";

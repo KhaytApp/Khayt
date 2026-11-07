@@ -184,3 +184,110 @@ import KhaytCore
         #expect(BookScope.trimmed(["products": .array([product])]) == ["products": .array([.object(o)])])
     }
 }
+
+/// What a cut book must keep however old it is, and how "newest" is judged
+/// (Nov 2026 review of the phone's money).
+@Suite struct BookScopeOwingAndRecencyTests {
+
+    private func job(_ id: String, _ status: String, _ date: String,
+                     _ extra: [String: JSONValue] = [:]) -> JSONValue {
+        var o: [String: JSONValue] = ["id": .string(id), "status": .string(status), "date": .string(date)]
+        for (k, v) in extra { o[k] = v }
+        return .object(o)
+    }
+
+    private func ids(_ cut: (store: [String: JSONValue], taken: BookScope.Taken)) -> Set<String> {
+        guard case .array(let kept)? = cut.store["printLog"] else { return [] }
+        return Set(kept.compactMap { row -> String? in
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { return nil }
+            return id
+        })
+    }
+
+    /// 250 paid finished jobs from 2026, newest of the lot.
+    private func recentPaid() -> [JSONValue] {
+        (0..<250).map { i in
+            job("P-\(i)", "completed", "2026-0\((i % 9) + 1)-15",
+                ["price": .number(100), "paidAmount": .number(100), "paymentStatus": .string("paid")])
+        }
+    }
+
+    @Test("a finished job that still owes money travels whatever its age")
+    func owingJobsAlwaysTravel() {
+        var orders = recentPaid()
+        orders.append(job("OWES", "delivered", "2022-03-01", ["price": .number(500), "paidAmount": .number(200),
+                                                                 "paymentStatus": .string("partial")]))
+        orders.append(job("UNPAID", "shipped", "2022-03-02", ["price": .number(80)]))
+        orders.append(job("SAYS-PAID-BUT-SHORT", "completed", "2022-03-03",
+                          ["price": .number(80), "paidAmount": .number(10), "paymentStatus": .string("paid")]))
+        // Owe nothing, by the shared rule or by their own figures: left behind.
+        orders.append(job("PAID-OLD", "completed", "2022-03-04", ["price": .number(80), "paidAmount": .number(80),
+                                                                     "paymentStatus": .string("paid")]))
+        orders.append(job("CANCELLED", "cancelled", "2022-03-05", ["price": .number(80)]))
+        orders.append(job("VOIDED", "completed", "2022-03-06", ["price": .number(80), "voidedAt": .string("2022-04-01")]))
+        orders.append(job("CREDITED", "completed", "2022-03-07", ["price": .number(80), "creditedAt": .string("2022-04-01")]))
+        orders.append(job("FREE", "completed", "2022-03-08", ["price": .number(0)]))
+
+        let cut = BookScope.take(from: ["printLog": .array(orders)])
+        let kept = ids(cut)
+        #expect(kept.contains("OWES"), "an old partly paid job was cut, and its customer's Owed came out short")
+        #expect(kept.contains("UNPAID"))
+        #expect(kept.contains("SAYS-PAID-BUT-SHORT"), "a stale paid label is not proof of payment")
+        for gone in ["PAID-OLD", "CANCELLED", "VOIDED", "CREDITED", "FREE"] {
+            #expect(!kept.contains(gone), "\(gone) owes nothing and is older than the 200 newest")
+        }
+        // The cap is still the newest 200 finished, plus what owes.
+        #expect(kept.count == 203)
+        #expect(cut.taken.collections["printLog"]?.whole == false)
+        #expect(cut.taken.collections["printLog"]?.available == 258)
+    }
+
+    @Test("newest is the latest of completed, delivered, updated and the day")
+    func recencyReadsTheLatestStamp() {
+        var orders = recentPaid()
+        // Booked in 2021, finished and delivered last week: recent history.
+        orders.append(job("LONG-JOB", "delivered", "2021-01-10",
+                          ["completedAt": .string("2026-10-28T09:00:00.000Z"),
+                           "deliveredAt": .string("2026-10-30T09:00:00.000Z")]))
+        orders.append(job("EDITED", "completed", "2021-01-11", ["updatedAt": .string("2026-10-29T09:00:00.000Z")]))
+        orders.append(job("STALE", "completed", "2021-01-12"))
+        let kept = ids(BookScope.take(from: ["printLog": .array(orders)]))
+        #expect(kept.contains("LONG-JOB"), "a job finished last week was cut because it was booked in 2021")
+        #expect(kept.contains("EDITED"))
+        #expect(!kept.contains("STALE"))
+    }
+
+    @Test("a cut book says where it was cut, and a whole one does not")
+    func theCutIsRecorded() {
+        var orders: [JSONValue] = []
+        for i in 0..<210 {
+            orders.append(job("J-\(i)", "completed", String(format: "2026-%02d-%02d", (i / 28) + 1, (i % 28) + 1)))
+        }
+        let cut = BookScope.take(from: ["printLog": .array(orders)])
+        // The ten oldest are left behind; the newest of them was 2026-01-10.
+        #expect(cut.taken.collections["printLog"]?.keptAfter == "2026-01-10")
+        let small = BookScope.take(from: ["printLog": .array(Array(orders.prefix(5)))])
+        #expect(small.taken.collections["printLog"]?.keptAfter == nil)
+    }
+
+    @Test("the meters come with the count over the cut, to add the phone's jobs to")
+    func metersHeldBesideMeters() {
+        var orders: [JSONValue] = []
+        for i in 0..<205 {
+            orders.append(job("J-\(i)", "completed", String(format: "2026-%02d-%02d", (i / 28) + 1, (i % 28) + 1),
+                              ["machineId": .string("m1"), "printTime": .number(1)]))
+        }
+        let cut = BookScope.take(from: ["printLog": .array(orders)])
+        #expect(cut.taken.meters?["m1"] == 205)
+        #expect(cut.taken.metersHeld?["m1"] == 200)
+    }
+
+    @Test("a scope from an older Mac, without the new fields, still decodes")
+    func oldScopeDecodes() throws {
+        let old = #"{"collections":{"printLog":{"whole":false,"sent":200,"available":900}},"omitted":[],"takenAt":"2026-10-01T00:00:00.000Z","meters":{"m1":12}}"#
+        let taken = try JSONDecoder().decode(BookScope.Taken.self, from: Data(old.utf8))
+        #expect(taken.collections["printLog"]?.keptAfter == nil)
+        #expect(taken.metersHeld == nil)
+        #expect(taken.meters?["m1"] == 12)
+    }
+}
