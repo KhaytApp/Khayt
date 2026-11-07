@@ -93,6 +93,10 @@ public enum BookScope {
         // pictures' thumbnails; a shop's catalogue is hundreds, not thousands.
         // The full-size photos stay on the Mac, as files beside the book.
         ("products", .whole(cap: 2_000)),
+        // The phone's printer care (Nov 2026): each machine's recurring
+        // maintenance tasks (`lib/maintenance.js`), so the phone can say what
+        // is due and tick it off. A shop has a dozen per printer, not thousands.
+        ("machMaintTasks", .whole(cap: 2_000)),
     ]
 
     /// What a pull actually contained.
@@ -122,9 +126,19 @@ public enum BookScope {
         /// never "no, there are none".
         public let omitted: [String]
         public let takenAt: String
+        /// Each machine's hours meter over the WHOLE book, by machine id —
+        /// present only when `printLog` was cut. Maintenance is measured
+        /// against the hours of every finished job (`hoursMeter` in
+        /// `lib/maintenance.js`), and a phone holding the newest 200 would
+        /// count fewer: a task would read less due than it is, and one ticked
+        /// off there would record a meter so low the Mac shows it overdue again
+        /// at once. Optional, so a scope from an older Mac still decodes.
+        public let meters: [String: Double]?
 
-        public init(collections: [String: Held], omitted: [String], takenAt: String) {
+        public init(collections: [String: Held], omitted: [String], takenAt: String,
+                    meters: [String: Double]? = nil) {
             self.collections = collections; self.omitted = omitted; self.takenAt = takenAt
+            self.meters = meters
         }
 
         /// Does this phone hold every record of `collection`?
@@ -212,7 +226,37 @@ public enum BookScope {
             .filter { $0 != "settings" && held[$0] == nil }
             .sorted()
 
-        return (out, Taken(collections: held, omitted: omitted, takenAt: StoreWriter.iso(now)))
+        // The meters, only when the jobs were cut: a phone holding them all
+        // counts them itself.
+        var meters: [String: Double]?
+        if held["printLog"]?.whole == false, case .array(let rows)? = store["printLog"] {
+            meters = hoursByMachine(rows)
+        }
+
+        return (out, Taken(collections: held, omitted: omitted, takenAt: StoreWriter.iso(now), meters: meters))
+    }
+
+    /// `KhaytMaintenance.hoursMeter` for every machine at once: the print time
+    /// of each finished job (`completed`, or the legacy `delivered`), summed
+    /// per machine, never below zero. The phone's parity test runs this
+    /// against the JavaScript.
+    public static func hoursByMachine(_ rows: [JSONValue]) -> [String: Double] {
+        var sums: [String: Double] = [:]
+        for case .object(let o) in rows {
+            guard case .string(let machine)? = o["machineId"],
+                  o["status"] == .string("completed") || o["status"] == .string("delivered") else { continue }
+            var t = 0.0
+            switch o["printTime"] {
+            case .number(let n)?: t = n.isFinite ? n : 0
+            case .string(let s)?:
+                let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                t = trimmed.isEmpty ? 0 : (Double(trimmed).flatMap { $0.isFinite ? $0 : nil } ?? 0)
+            case .bool(let b)?: t = b ? 1 : 0
+            default: t = 0
+            }
+            sums[machine, default: 0] += t
+        }
+        return sums.mapValues { max(0, $0) }
     }
 
     static func isFinished(_ row: JSONValue) -> Bool {
