@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} 个料盘",
  "mac.mc_sub": "每单位，按每种材料最近一个料盘计算。",
  "mac.mc_title": "货架价格",
+ "mac.mcp_where": "Claude Desktop 等助手从这里启动 Khayt 的只读账簿服务器：",
+ "mac.mcp_copy_setup": "复制 Claude Desktop 设置",
  "mac.mcp_share_names": "与 AI 助手共享客户姓名 (khayt-mcp)",
  "mac.mcp_share_names_hint": "关闭：连接到 khayt-mcp 的助手只会看到“客户 1”“客户 2”而非姓名。开启：它们会看到你的客户姓名。电话号码、电子邮件和地址绝不会共享。",
  "mac.measure_online": "测量在线模型",

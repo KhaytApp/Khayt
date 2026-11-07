@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} Spule",
  "mac.mc_sub": "Pro Einheit, von der jeweils jüngsten Spule jedes Materials.",
  "mac.mc_title": "Preis im Regal",
+ "mac.mcp_where": "Assistenten wie Claude Desktop starten Khayts schreibgeschützten Bücher-Server von hier:",
+ "mac.mcp_copy_setup": "Einrichtung für Claude Desktop kopieren",
  "mac.mcp_share_names": "Kundennamen mit KI-Assistenten teilen (khayt-mcp)",
  "mac.mcp_share_names_hint": "Aus: Mit khayt-mcp verbundene Assistenten sehen „Kunde 1“, „Kunde 2“ statt Namen. Ein: Sie sehen die Namen Ihrer Kunden. Telefonnummern, E-Mail-Adressen und Adressen werden nie geteilt.",
  "mac.measure_online": "Online-Modelle vermessen",

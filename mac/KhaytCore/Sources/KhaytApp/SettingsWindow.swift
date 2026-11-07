@@ -1527,6 +1527,23 @@ struct AssistantPane: View {
                         }
                     }
                     .disabled(!shop.canWrite || !shop.source.isReal)
+                    // Where the program is, and the setup an assistant needs,
+                    // ready to paste: the switch above governs a program the
+                    // shop could not find before (it was not in the app).
+                    if let mcp = Shop.mcpExecutable {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(shop.words.callIt("mac.mcp_where"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(verbatim: mcp.path)
+                                .font(.caption.monospaced()).textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button(shop.words.callIt("mac.mcp_copy_setup")) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(Shop.mcpSetup(path: mcp.path), forType: .string)
+                            }
+                            .controlSize(.small)
+                        }
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -1634,6 +1651,24 @@ struct AssistantPane: View {
 // MARK: - Customer names, to an assistant over khayt-mcp
 
 extension Shop {
+    /// `khayt-mcp` inside this app (`make-app.sh` puts it beside the app's own
+    /// executable). Nil when it is not there — a `swift run` build — so
+    /// Settings never offers a path that does not exist.
+    static var mcpExecutable: URL? {
+        let url = Bundle.main.bundleURL.appending(path: "Contents/MacOS/khayt-mcp")
+        return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
+    }
+
+    /// What an assistant's configuration needs to start it — Claude Desktop's
+    /// `claude_desktop_config.json` shape, which other MCP hosts copy.
+    nonisolated static func mcpSetup(path: String) -> String {
+        let body: [String: Any] = ["mcpServers": ["khayt": ["command": path]]]
+        guard let data = try? JSONSerialization.data(withJSONObject: body,
+                                                     options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              let text = String(data: data, encoding: .utf8) else { return path }
+        return text
+    }
+
     /// `settings.mcp.shareCustomerNames` — true only when the book says so.
     /// `khayt-mcp` reads the same key (`CustomerNames.sharing`).
     var sharesCustomerNamesWithMcp: Bool {

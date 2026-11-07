@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} bobina",
  "mac.mc_sub": "Por unidad, de la bobina más reciente de cada material.",
  "mac.mc_title": "Precio en el estante",
+ "mac.mcp_where": "Asistentes como Claude Desktop inician desde aquí el servidor de libros de solo lectura de Khayt:",
+ "mac.mcp_copy_setup": "Copiar configuración para Claude Desktop",
  "mac.mcp_share_names": "Compartir nombres de clientes con asistentes de IA (khayt-mcp)",
  "mac.mcp_share_names_hint": "Desactivado: los asistentes conectados a khayt-mcp ven «Cliente 1», «Cliente 2» en lugar de nombres. Activado: ven los nombres de tus clientes. Los teléfonos, correos y direcciones nunca se comparten.",
  "mac.measure_online": "Medir modelos en línea",

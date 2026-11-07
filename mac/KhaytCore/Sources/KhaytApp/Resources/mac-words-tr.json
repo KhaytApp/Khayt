@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} makara",
  "mac.mc_sub": "Birim başına, her malzemenin en son makarasından.",
  "mac.mc_title": "Raftaki fiyat",
+ "mac.mcp_where": "Claude Desktop gibi asistanlar Khayt'ın salt okunur defter sunucusunu buradan başlatır:",
+ "mac.mcp_copy_setup": "Claude Desktop için kurulumu kopyala",
  "mac.mcp_share_names": "Müşteri adlarını yapay zekâ asistanlarıyla paylaş (khayt-mcp)",
  "mac.mcp_share_names_hint": "Kapalı: khayt-mcp'ye bağlı asistanlar adlar yerine “Müşteri 1”, “Müşteri 2” görür. Açık: müşterilerinizin adlarını görürler. Telefon numaraları, e-postalar ve adresler asla paylaşılmaz.",
  "mac.measure_online": "Çevrimiçi modelleri ölç",
