@@ -520,3 +520,71 @@ html.printing-labels #label-print-area {
    phone, which print with this sheet alone, draw the same boxes. */
 .delivery-tracking { margin-top:12px; padding:10px 14px; background:rgba(91,156,240,0.06); border:1px solid rgba(91,156,240,0.15); border-radius:6px; font-size:12px; }
 .wo-checks { padding: 12px 0; }
+
+/* The stamp an invoice carries: one of PAID, VOID or CREDITED, chosen in
+   lib/invoice-document.js (VOID > CREDITED > PAID). This file is the same in
+   all three apps (renderer, Mac, iPhone), so the stamp prints the same
+   everywhere. inset-inline-end mirrors it on an Arabic invoice. */
+.inv { position: relative; }
+.inv .inv-stamp {
+  position: absolute;
+  top: 130px;
+  inset-inline-end: 40px;
+  transform: rotate(-12deg);
+  border: 3px solid currentColor;
+  padding: 6px 18px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  text-transform: uppercase;
+  opacity: 0.75;
+  pointer-events: none;
+  background: rgba(255,255,255,0.7);
+  z-index: 6;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.inv .inv-stamp.paid { color: #2bb673; }
+.inv .inv-stamp.void,
+.inv .inv-stamp.credited { color: #b91c1c; }
+/* A voided or fully credited invoice: what happened, at the head of the page… */
+.inv .inv-reversal {
+  border: 2px solid #b91c1c;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.inv .inv-reversal strong { letter-spacing: 2px; margin-inline-end: 8px; }
+.inv .inv-reversal-reason { font-weight: 500; font-size: 12.5px; margin-top: 3px; }
+/* …and the word across it. */
+.inv .inv-reversal-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+.inv .inv-reversal-mark span {
+  transform: rotate(-30deg);
+  font-size: 120px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  color: rgba(185,28,28,0.22);
+  border: 8px solid rgba(185,28,28,0.22);
+  border-radius: 18px;
+  padding: 0 28px;
+  white-space: nowrap;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

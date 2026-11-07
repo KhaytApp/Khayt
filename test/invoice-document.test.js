@@ -435,3 +435,61 @@ test('a proforma is titled and watermarked as one, with no QR and no invoice num
 test('without the flag the document is unchanged (the fixtures hold)', () => {
   assert.equal(render(ORDER, { settings: SHOP }, { proforma: false }), render(ORDER, { settings: SHOP }));
 });
+
+/* ── The stamp: VOID > CREDITED > PAID ────────────────────────────────────────
+   A voided or fully credited invoice printed exactly like a live one, so the
+   customer was handed a request for money nobody was owed. Turki, Nov 7:
+   "should be stamped as void". */
+
+const { invoiceStampOf } = require('../lib/invoice-document.js');
+
+test('a void beats a credit, which beats paid', () => {
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', creditedAt: '2026-11-03' }, true).kind, 'void');
+  assert.equal(invoiceStampOf({ creditedAt: '2026-11-03' }, true).kind, 'credited');
+  assert.equal(invoiceStampOf({}, true).kind, 'paid');
+  assert.equal(invoiceStampOf({}, false), null);
+  assert.equal(invoiceStampOf({ voidedAt: '  ' }, false), null, 'a blank stamp is no stamp');
+});
+
+test('the reversal rule\'s own placeholder reason is not printed', () => {
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', voidedReason: 'Voided' }, false).reason, null);
+  assert.equal(invoiceStampOf({ voidedAt: '2026-11-02', voidedReason: ' Wrong job ' }, false).reason, 'Wrong job');
+});
+
+test('a voided invoice says so at the head of the page and across it', () => {
+  const html = render(Object.assign({}, ORDER, { voidedAt: '2026-11-02T09:00:00.000Z',
+    voidedReason: '<b>dup</b>', paidAmount: 1150, paymentStatus: 'paid' }), { settings: SHOP });
+  assert.match(html, /class="inv-reversal void"/);
+  assert.match(html, /class="inv-reversal-mark"/);
+  assert.match(html, /class="inv-stamp void"/);
+  assert.doesNotMatch(html, /class="inv-stamp paid"/, 'one stamp only');
+  assert.doesNotMatch(html, /<b>dup<\/b>/, 'a typed reason is text, never markup');
+});
+
+test('a credited invoice carries CREDITED and no reason line', () => {
+  const html = render(Object.assign({}, ORDER, { creditedAt: '2026-11-03T09:00:00.000Z' }), { settings: SHOP });
+  assert.match(html, /class="inv-stamp credited"/);
+  assert.match(html, /class="inv-reversal credited"/);
+  assert.doesNotMatch(html, /inv-reversal-reason/);
+});
+
+test('the stamp look is in all three copies of invoice.css', () => {
+  const root = path.join(__dirname, '..');
+  const copies = ['renderer/invoice.css', 'ios/KhaytCompanion/Resources/invoice.css',
+    'mac/KhaytCore/Sources/KhaytApp/Resources/invoice.css']
+    .map((f) => fs.readFileSync(path.join(root, f), 'utf8'));
+  for (const css of copies) {
+    for (const rule of ['.inv .inv-stamp', '.inv .inv-stamp.void', '.inv .inv-reversal', '.inv .inv-reversal-mark']) {
+      assert.ok(css.includes(rule), `${rule} is missing from a copy of invoice.css`);
+    }
+  }
+});
+
+test('every language names the stamps', () => {
+  for (const lang of ['ar', 'de', 'en', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'locales', `${lang}.js`), 'utf8');
+    for (const key of ['doc.void_stamp', 'doc.void_line', 'doc.void_reason', 'doc.credited_stamp', 'doc.credited_line']) {
+      assert.ok(src.includes(`"${key}"`), `${lang} lacks ${key}`);
+    }
+  }
+});
