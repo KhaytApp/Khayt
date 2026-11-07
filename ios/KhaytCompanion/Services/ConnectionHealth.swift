@@ -88,7 +88,7 @@ final class ConnectionHealth: ObservableObject {
             lastStatus = nil
             lastChecked = Date()
             notifyConnectionChange()
-            if let settings { CompanionNotifications.shared.saveDisconnectedSnapshot(shopName: settings.shopLabel) }
+            if let settings { CompanionNotifications.shared.saveDisconnectedSnapshot(shopName: settings.shopLabel, keepMoney: settings.isPaired) }
             return
         }
         do {
@@ -244,6 +244,7 @@ final class ConnectionHealth: ObservableObject {
         let livePrints = ((try? await api.fetchMachinesLive()) ?? [])
             .filter { $0.isPrinting }
             .map { WidgetPrint(id: $0.id, name: $0.displayName, progress: $0.progress ?? 0, eta: $0.etaText) }
+        let asOf = connected ? Date() : (api.bookAsOf ?? Date())
         CompanionNotifications.shared.handleDashboardSnapshot(
             status: status,
             queue: queue,
@@ -251,7 +252,21 @@ final class ConnectionHealth: ObservableObject {
             settings: settings,
             livePrints: livePrints,
             connected: connected,
-            asOf: connected ? Date() : (api.bookAsOf ?? Date())
+            asOf: asOf,
+            money: await widgetMoney(settings: settings, asOf: asOf)
         )
+    }
+
+    /// The Money widget's figures (`WidgetFigures`), worked out at most once a
+    /// minute: the health poll runs every half-minute and the figures run the
+    /// shop's money rules over the whole book.
+    private var lastMoney: (at: Date, shop: String, money: WidgetMoney?)?
+
+    private func widgetMoney(settings: ConnectionSettings, asOf: Date, now: Date = Date()) async -> WidgetMoney? {
+        let shop = settings.isSampleShop ? "" : settings.shopLabel
+        if let last = lastMoney, last.shop == shop, now.timeIntervalSince(last.at) < 60 { return last.money }
+        let money = await WidgetFigures.money(api: api, settings: settings, asOf: asOf)
+        lastMoney = (now, shop, money)
+        return money
     }
 }
