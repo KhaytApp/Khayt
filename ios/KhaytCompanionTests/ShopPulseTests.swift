@@ -24,8 +24,11 @@ final class ShopPulseTests: XCTestCase {
                  "price": .number(price), "paidAmount": .number(paid), "priority": .bool(false)])
     }
 
-    private func load(_ orders: [JSONValue], whole: Bool) throws {
-        let taken = BookScope.Taken(collections: ["printLog": .init(whole: whole, sent: orders.count, available: whole ? orders.count : 999)],
+    /// `cut` is the day a cut book was cut at (`Held.keptAfter`): every job
+    /// left on the Mac is that old or older.
+    private func load(_ orders: [JSONValue], whole: Bool, cut: String? = nil) throws {
+        let taken = BookScope.Taken(collections: ["printLog": .init(whole: whole, sent: orders.count, available: whole ? orders.count : 999,
+                                                                    keptAfter: cut)],
                                     omitted: ["expenses"], takenAt: "2026-09-18T11:00:00.000Z")
         try book.replace(with: ["settings": .object(["currency": .string("SAR")]), "printLog": .array(orders), "clients": .array([])],
                          scope: taken)
@@ -35,7 +38,7 @@ final class ShopPulseTests: XCTestCase {
         // The window reaches back to 14 June: September is covered, the year is not.
         try load([order("A", "completed", date: "2026-06-14", price: 50),
                   order("B", "completed", date: "2026-09-10", price: 400),
-                  order("C", "printing", date: "2026-09-17", price: 120)], whole: false)
+                  order("C", "printing", date: "2026-09-17", price: 120)], whole: false, cut: "2026-06-13")
         let pulse = try await BookReader(book: book).pulse(now: now)
         XCTAssertNotNil(pulse.thisMonth, "the window reaches past 1 September")
         XCTAssertNil(pulse.thisYear, "it does not reach 1 January — the year lives on the Mac")
@@ -43,9 +46,28 @@ final class ShopPulseTests: XCTestCase {
     }
 
     func testAWindowThatStartsThisMonthCannotAnswerTheMonth() async throws {
-        try load([order("B", "completed", date: "2026-09-10", price: 400)], whole: false)
+        try load([order("B", "completed", date: "2026-09-10", price: 400)], whole: false, cut: "2026-09-09")
         let pulse = try await BookReader(book: book).pulse(now: now)
         XCTAssertNil(pulse.thisMonth, "a zero or a partial month here would be an answer, and a wrong one")
+        XCTAssertNil(pulse.thisYear)
+    }
+
+    /// One old job in a cut book — folded in by a cloud change, or kept
+    /// because it still owes — made "This year" read as complete.
+    func testOneOldJobDoesNotMakeTheYearComplete() async throws {
+        try load([order("OLD", "completed", date: "2021-02-01", price: 30),
+                  order("B", "completed", date: "2026-09-10", price: 400)], whole: false, cut: "2026-06-13")
+        let pulse = try await BookReader(book: book).pulse(now: now)
+        XCTAssertNotNil(pulse.thisMonth)
+        XCTAssertNil(pulse.thisYear, "the cut was made in June: January to June is on the Mac")
+    }
+
+    /// A scope from an older Mac does not say where it was cut, so only a
+    /// whole book can answer a period.
+    func testACutWithNoRecordedDayAnswersNoPeriod() async throws {
+        try load([order("OLD", "completed", date: "2021-02-01", price: 30)], whole: false)
+        let pulse = try await BookReader(book: book).pulse(now: now)
+        XCTAssertNil(pulse.thisMonth)
         XCTAssertNil(pulse.thisYear)
     }
 

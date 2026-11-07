@@ -169,8 +169,11 @@ struct CloudSync {
     func pull(_ session: CloudSession, now: Date = Date()) async throws -> (CloudSession, Pulled) {
         var s = session
         // A phone with no library copy yet takes the whole book once, which is
-        // the only pull that carries all of `printFiles`.
-        let warm = s.seenRev != nil && book.exists && book.hasLibrary
+        // the only pull that carries all of `printFiles`. So does one whose
+        // scope predates the cut's day and meter snapshot (`scopeIsCurrent`):
+        // a warm pull never rewrites the scope, so without this a phone signed
+        // in to the cloud would keep the old one for good.
+        let warm = s.seenRev != nil && book.exists && book.hasLibrary && Self.scopeIsCurrent(book.scope())
         let reply: CloudReader.Reply
         do {
             reply = try await CloudReader.pull(connection(s), token: s.token,
@@ -195,6 +198,12 @@ struct CloudSync {
             return (s, .changes(0))
         }
         let payloads = try reply.deltas.map { try SyncCrypto.store($0.blob, dek: s.dek) }
+        // The book is a working set (`BookScope`), and a change to any other
+        // collection — an expense from 2023, a print file, an audit line —
+        // folded in grew the cut book by everything the shop touched. Only
+        // the working set and what this phone writes itself go in. The
+        // library copy below takes `printFiles` from the full payloads.
+        let forBook = payloads.map { Self.within(Self.foldable, $0) }
         // Checked before the book is touched: changes folded into the book but
         // not the baseline would read as this phone's own, and be sent back.
         if case .unreadable = book.readBaseline() { throw CompanionBook.Failure.baselineUnreadable }
@@ -210,18 +219,45 @@ struct CloudSync {
         var folded: KhaytEngine.Folded?
         for _ in 1...3 {
             let local = try book.read()
-            let attempt = try await engine.foldDeltas(base: local, deltas: payloads)
+            let attempt = try await engine.foldDeltas(base: local, deltas: forBook)
             // A change carries the whole record, file paths and all: off again.
             if try book.swap(from: local, to: BookScope.trimmed(attempt.store)) { folded = attempt; break }
         }
         guard let folded else { throw CompanionBook.Failure.busy }
         // …and into the baseline, so none of it reads as pending.
         if let baseline = book.baseline() {
-            let seen = try await engine.foldDeltas(base: baseline, deltas: payloads)
+            let seen = try await engine.foldDeltas(base: baseline, deltas: forBook)
             try book.replaceBaseline(with: BookScope.trimmed(seen.store))
         }
         s.seenRev = reply.rev
         return (s, .changes(folded.applied + folded.removed))
+    }
+
+    /// Does this scope say where its job history was cut, and what the jobs
+    /// it held counted on each meter? A whole one needs neither.
+    nonisolated static func scopeIsCurrent(_ scope: BookScope.Taken?) -> Bool {
+        guard let scope else { return false }
+        if scope.isWhole("printLog") { return true }
+        return scope.collections["printLog"]?.keptAfter != nil && scope.metersHeld != nil
+    }
+
+    /// The collections a cloud change may fold into the phone's book.
+    nonisolated static let foldable: Set<String> =
+        Set(BookScope.workingSet.map(\.collection)).union(BookWriter.writesOutsideWorkingSet)
+
+    /// A delta payload with only the changes and deletes to `collections`.
+    nonisolated static func within(_ collections: Set<String>, _ payload: [String: JSONValue]) -> [String: JSONValue] {
+        func kept(_ rows: JSONValue?) -> JSONValue? {
+            guard case .array(let list)? = rows else { return rows }
+            return .array(list.filter {
+                if case .object(let o) = $0, case .string(let c)? = o["collection"] { return collections.contains(c) }
+                return false
+            })
+        }
+        var out = payload
+        if let d = kept(payload["deltas"]) { out["deltas"] = d }
+        if let t = kept(payload["tombstones"]) { out["tombstones"] = t }
+        return out
     }
 
     // MARK: - Pushing

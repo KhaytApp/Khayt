@@ -316,10 +316,11 @@ actor BookReader {
     ///
     /// The design's: a figure bounded by recency is answerable only when the
     /// book's window reaches PAST the period's start. The phone holds every
-    /// unfinished order and the newest finished ones, so "owed" (open orders)
-    /// is always answerable, and "this month" only if the oldest finished
-    /// order it holds is older than the 1st. The phone knows its oldest record,
-    /// so this is computed, never assumed — and an unanswerable figure is nil,
+    /// unfinished order, every finished one that may still owe
+    /// (`BookScope.mayOwe`) and the newest of the rest, so "owed" is always
+    /// answerable, and "this month" only if the cut left nothing behind from
+    /// the 1st on. The cut says where it was made (`Held.keptAfter`), so this
+    /// is read from the scope, never assumed — and an unanswerable figure is nil,
     /// which the screen draws as an em-dash captioned "On the Mac". Never a
     /// zero: a zero is an answer.
     ///
@@ -348,11 +349,6 @@ actor BookReader {
             .object(["symbol": .string($0.symbol), "label": .string($0.label), "pos": .string($0.pos)])
         }
 
-        func stage(of row: JSONValue) -> String {
-            if case .object(let o) = row, case .string(let st)? = o["status"] { return st }
-            return ""
-        }
-        let finished: Set<String> = ["completed", "delivered", "shipped", "cancelled"]
         // Every job that can owe, finished or not — `lib/dashboard-facts.js`
         // and the Mac's `Order.owesAtAll`: a delivered job nobody has paid
         // for is owed. Open work only made Home's Owed short by every unpaid
@@ -364,18 +360,27 @@ actor BookReader {
         let owedBy = try await engine.owedByOrder(canOwe, settings: settings, clients: clients, currencies: currencies)
         let owing = owedBy.values.filter { $0 > 0.005 }
 
-        // How far back the book's finished orders reach.
+        // How far back the book reaches: from the SCOPE, not from the oldest
+        // finished job it happens to hold. A cut book also holds old jobs
+        // that still owe, and one old job folded in by a cloud change, and
+        // either read as "this year is complete" when it was not. Every job
+        // the cut left behind is no newer than `keptAfter` by any of its
+        // stamps, so a period starting after that day is held in full. A day
+        // of margin keeps a UTC timestamp from straddling a local midnight.
+        // A scope from an older Mac has no cut day: only a whole book answers.
+        let scope = book.scope()
+        let whole = scope?.isWhole("printLog") ?? false
+        let cutDay = scope?.collections["printLog"]?.keptAfter.map { String($0.prefix(10)) }
         let dayFormat = DateFormatter()
         dayFormat.calendar = Calendar(identifier: .gregorian)
         dayFormat.locale = Locale(identifier: "en_US_POSIX")
+        dayFormat.timeZone = calendar.timeZone
         dayFormat.dateFormat = "yyyy-MM-dd"
-        let oldestFinished = orders.compactMap { row -> Date? in
-            guard finished.contains(stage(of: row)), case .object(let o) = row,
-                  case .string(let d)? = o["date"] else { return nil }
-            return dayFormat.date(from: String(d.prefix(10)))
-        }.min()
-        let whole = book.holdsAll("printLog")
-        func reaches(_ start: Date) -> Bool { whole || (oldestFinished.map { $0 <= start } ?? false) }
+        func reaches(_ start: Date) -> Bool {
+            if whole { return true }
+            guard let cutDay, let dayBefore = calendar.date(byAdding: .day, value: -1, to: start) else { return false }
+            return cutDay < dayFormat.string(from: dayBefore)
+        }
 
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
         let yearStart = calendar.date(from: calendar.dateComponents([.year], from: now)) ?? now

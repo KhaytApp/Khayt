@@ -48,6 +48,14 @@ struct BookWriter {
 
     let book: CompanionBook
 
+    /// Collections this phone writes that are NOT in `BookScope.workingSet`:
+    /// the waste log, the service log and the waiting list's history. A cloud
+    /// change to one of them is still folded in (`CloudSync.pull`), so the
+    /// phone's own rows and the shop's agree; every other collection outside
+    /// the working set is left on the Mac. A writer here to a new collection
+    /// outside the working set is added to this list.
+    static let writesOutsideWorkingSet: Set<String> = ["wasteLog", "machMaintLog", "waitingListHistory"]
+
     /// Advance or set a job's stage, by the shop's own status rule.
     ///
     /// `KhaytEngine.moveJob` is the Mac's expression: `gate`, then `apply`,
