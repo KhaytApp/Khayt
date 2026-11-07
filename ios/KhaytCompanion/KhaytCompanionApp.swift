@@ -103,12 +103,16 @@ struct KhaytCompanionApp: App {
     private static func openForScreenshots(_ api: KhaytAPIClient, settings: ConnectionSettings) {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "KhaytSampleShop") { try? api.openSampleShop() }
+        // Both take the sample shop off (its own banner would cover theirs)
+        // and give it an address, so the phone still has a shop to show.
         if defaults.bool(forKey: "KhaytReadOnly") {
             KhaytAPIClient.debugReadOnly = true
-            settings.isSampleShop = false   // its own banner would cover this one
+            settings.isSampleShop = false
+            settings.host = "192.168.1.42"
         }
         if defaults.bool(forKey: "KhaytPairAgain") {
             settings.isSampleShop = false
+            settings.host = "192.168.1.42"
             settings.needsPairAgain = true
         }
         if let tab = defaults.string(forKey: "KhaytTab") {
