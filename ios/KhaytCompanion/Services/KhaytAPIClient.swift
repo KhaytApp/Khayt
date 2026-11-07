@@ -604,6 +604,8 @@ final class KhaytAPIClient: ObservableObject {
         let push = liveActivityPush
         signOutOfCloud()
         settings.unpair()
+        // Spotlight, the feed, the widgets, delivered alerts, shared papers.
+        ShopTraces.forget()
         pendingCount = 0
         historyWindow = nil
         lastSync = nil
