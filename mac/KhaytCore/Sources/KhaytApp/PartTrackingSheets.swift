@@ -40,7 +40,7 @@ struct PartsDeliveredSheet: View {
             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
 
             if let problem {
-                Text(problem).font(.caption).foregroundStyle(.red)
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -129,7 +129,7 @@ struct SpoolSwitchSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let problem {
-                Text(problem).font(.caption).foregroundStyle(.red)
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

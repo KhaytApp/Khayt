@@ -467,7 +467,7 @@ private struct Detail: View {
                             // Already with the customer (partial delivery).
                             if part.delivered {
                                 Image(systemName: "shippingbox.fill")
-                                    .font(.caption).foregroundStyle(.green)
+                                    .font(.caption).foregroundStyle(Role.ok)
                                     .help(shop.words.callIt("ord.partial_delivery"))
                             }
                         }
@@ -532,7 +532,7 @@ private struct Detail: View {
                 Text(shop.words.callIt("ord.parts_delivered", [
                     "done": .number(Double(delivered)), "total": .number(Double(job.parts.count)),
                 ]))
-                .font(.callout).foregroundStyle(.green).monospacedDigit()
+                .font(.callout).foregroundStyle(Role.ok).monospacedDigit()
             }
             if Shop.offersPartialDelivery(job), shop.canMoveJobs {
                 Button(shop.words.callIt("mac.parts_delivered_btn") + "\u{2026}") { delivering = true }
