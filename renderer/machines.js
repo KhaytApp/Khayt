@@ -1530,11 +1530,19 @@ function openMaintLog(machineId) {
     return `<div class="table-wrap"><table><tbody>${tasks.map(tk => {
       const st = (typeof KhaytMaintenance !== 'undefined') ? KhaytMaintenance.taskStatus(tk, hours, Date.now()) : { status: 'ok' };
       const every = tk.intervalHours ? `${tk.intervalHours}h` : (tk.intervalDays ? `${tk.intervalDays}d` : '—');
+      // "Inspected, not needed yet" replaces OK while a deferral is running; once
+      // the pushed-out date comes round the task reads Soon/Due as usual.
+      const label = st.deferred && st.status === 'ok' ? t('maint.deferred') : (t('maint.status_' + st.status) || st.status);
+      // "Not needed" only on a task that is asking for attention: deferring an OK
+      // task would push it further out than the interval ever said.
+      const notNeeded = st.status !== 'ok'
+        ? `<button class="btn small" data-act="mt-defer" data-id="${tk.id}" title="${escapeHtml(t('maint.not_needed_help'))}">${escapeHtml(t('maint.not_needed'))}</button> `
+        : '';
       return `<tr>
         <td><strong>${escapeHtml(tk.name || '')}</strong><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.every') || 'every')} ${every}</span></td>
-        <td style="white-space:nowrap;color:${STATUS_COLOR[st.status] || 'var(--text-muted)'};font-weight:600;font-size:12px;">${escapeHtml(t('maint.status_' + st.status) || st.status)}</td>
+        <td style="white-space:nowrap;color:${STATUS_COLOR[st.status] || 'var(--text-muted)'};font-weight:600;font-size:12px;" data-status="${escapeHtml(st.status)}"${st.deferred ? ' data-deferred="1"' : ''}>${escapeHtml(label)}</td>
         <td style="white-space:nowrap;text-align:right;">
-          <button class="btn small" data-act="mt-done" data-id="${tk.id}">${escapeHtml(t('maint.mark_done') || 'Done')}</button>
+          ${notNeeded}<button class="btn small" data-act="mt-done" data-id="${tk.id}">${escapeHtml(t('maint.mark_done') || 'Done')}</button>
           <button class="btn danger small" data-act="mt-del" data-id="${tk.id}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
         </td></tr>`;
     }).join('')}</tbody></table></div>`;
@@ -1557,6 +1565,59 @@ function openMaintLog(machineId) {
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${list.map(st =>
         `<button type="button" class="btn small" data-act="mt-starter" data-id="${escapeHtml(st.id)}" data-h="${st.intervalHours || ''}" data-d="${st.intervalDays || ''}">${escapeHtml(t('maint.t_' + st.id))}</button>`).join('')}</div>
     </div>`;
+  }
+
+  // Care plans per printer model (lib/care-plans.js, the catalogue the Mac uses).
+  // The picker starts on the plan the machine's record matches; applying adds the
+  // plan's missing tasks counted from now and links the ones the machine already
+  // has, and changes a shop's own interval only when "use the plan's intervals" is
+  // ticked. Nothing is marked done either way.
+  const CP = (typeof KhaytCarePlans !== 'undefined') ? KhaytCarePlans : null;
+  const enWord = (k) => (globalThis.KhaytLocales && globalThis.KhaytLocales.en && globalThis.KhaytLocales.en[k]) || '';
+  function cpNamesById(planId) {
+    const p = CP && CP.plan(planId);
+    const out = {};
+    // The shop's language and English: a starter task added before a language
+    // switch is still recognised as the same task.
+    if (p) for (const tk of p.tasks) out[tk.id] = [...new Set([t('maint.t_' + tk.id), enWord('maint.t_' + tk.id)].filter(Boolean))];
+    return out;
+  }
+  const cpEvery = (h, d) => [h > 0 ? `${h}h` : '', d > 0 ? `${d}d` : ''].filter(Boolean).join(' / ') || '—';
+  const cpPartsText = (task) => (task.parts || []).map(x => `${t('maint.part_' + x.id)}${x.qty > 1 ? ' ×' + x.qty : ''}`).join(', ');
+  let cpPlanId = CP ? (CP.matchPlan(machine.vendor, machine.printerModelName || machine.printerModel, machine.name) || '') : '';
+  let cpBrand = cpPlanId ? CP.plan(cpPlanId).brand : (CP ? CP.brands()[0] : '');
+  function cpPanelHtml() {
+    if (!CP) return '';
+    const plans = CP.plansFor(cpBrand);
+    if (!plans.some(p => p.id === cpPlanId)) cpPlanId = plans[0] ? plans[0].id : '';
+    const p = CP.plan(cpPlanId);
+    const opt = (v, label, on) => `<option value="${escapeHtml(v)}"${on ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    let body = '';
+    if (p) {
+      const cmp = CP.comparePlan(machMaintTasks, machineId, p.id, cpNamesById(p.id));
+      const source = p.source === 'starter'
+        ? `<p style="font-size:12px;color:var(--text-muted);margin:8px 0;">${escapeHtml(t('maint.cp_source_starter'))}</p>`
+        : `<p style="font-size:12px;color:var(--text-muted);margin:8px 0;">${escapeHtml(t('maint.cp_source'))} <a href="#" data-act="cp-source" data-url="${escapeHtml(p.source)}">${escapeHtml(t('maint.cp_open_source'))}</a></p>`;
+      const row = (task, extra) => `<li style="margin:4px 0;"><strong>${escapeHtml(t('maint.t_' + task.id))}</strong> · ${escapeHtml(cpEvery(task.intervalHours, task.intervalDays))}${
+        task.parts && task.parts.length ? `<br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.cp_parts_used').replace('{parts}', cpPartsText(task)))}</span>` : ''}${
+        task.source === 'starter' && p.source !== 'starter' ? `<br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.cp_task_starter'))}</span>` : ''}${extra || ''}</li>`;
+      body = source
+        + (cmp.add.length ? `<ul id="cpAddList" style="margin:6px 0;padding-inline-start:18px;font-size:12.5px;">${cmp.add.map(x => row(x)).join('')}</ul>`
+          : `<p id="cpNothing" style="font-size:12.5px;margin:6px 0;">${escapeHtml(t('maint.cp_nothing'))}</p>`)
+        + (cmp.same.length ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">${escapeHtml(t('maint.cp_have'))}: ${cmp.same.map(r => escapeHtml(t('maint.t_' + r.task.id))).join(', ')}</div>` : '')
+        + (cmp.differ.length ? `<div style="margin-top:10px;font-size:12.5px;">${escapeHtml(t('maint.cp_differ_title'))}
+            <ul style="margin:4px 0;padding-inline-start:18px;">${cmp.differ.map(r => `<li>${escapeHtml(t('maint.t_' + r.task.id))}: ${escapeHtml(cpEvery(r.hadHours, r.hadDays))} → ${escapeHtml(cpEvery(r.task.intervalHours, r.task.intervalDays))}</li>`).join('')}</ul>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:4px 0;font-size:12.5px;"><input type="checkbox" id="cpUsePlan" style="width:auto;margin:0;"> <span>${escapeHtml(t('maint.cp_use_plan'))}</span></label>
+            <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.cp_differ_keep'))}</div></div>` : '');
+    }
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label style="margin:0;">${escapeHtml(t('maint.cp_brand'))}</label><select id="cpBrand">${CP.brands().map(b => opt(b, b, b === cpBrand)).join('')}</select></div>
+        <div><label style="margin:0;">${escapeHtml(t('maint.cp_model'))}</label><select id="cpPlan">${plans.map(x => opt(x.id, x.model, x.id === cpPlanId)).join('')}</select></div>
+      </div>${body}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+        <button type="button" class="btn small" data-act="cp-cancel">${escapeHtml(t('common.cancel'))}</button>
+        <button type="button" class="btn primary small" data-act="cp-apply"${p ? '' : ' disabled'}>${escapeHtml(t('maint.cp_apply_btn'))}</button>
+      </div>`;
   }
 
   openFormModal({
@@ -1587,7 +1648,11 @@ function openMaintLog(machineId) {
           <button class="btn primary small" id="btnAddMaintEntry">${escapeHtml(t('maint.add'))}</button>
         </div>
       </div>
-      <div style="margin-bottom:6px;font-weight:600;font-size:13px;">${escapeHtml(t('maint.recurring') || 'Recurring maintenance')}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-weight:600;font-size:13px;">${escapeHtml(t('maint.recurring') || 'Recurring maintenance')}</span>
+        ${CP ? `<button type="button" class="btn small" id="btnCarePlan">${escapeHtml(t('maint.cp_apply'))}</button>` : ''}
+      </div>
+      <div id="cpPanel" hidden style="background:var(--surface-2);padding:12px;border-radius:var(--radius);margin-bottom:8px;border:1px solid var(--border);"></div>
       <div style="background:var(--surface-2);padding:12px;border-radius:var(--radius);margin-bottom:8px;">
         <div id="mtStarters">${starterHtml()}</div>
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">
@@ -1610,6 +1675,44 @@ function openMaintLog(machineId) {
         const st = modal.querySelector('#mtStarters');
         if (st) st.innerHTML = starterHtml();
       };
+      const cpPanel = modal.querySelector('#cpPanel');
+      const cpPaint = () => { if (cpPanel) cpPanel.innerHTML = cpPanelHtml(); };
+      modal.querySelector('#btnCarePlan')?.addEventListener('click', () => {
+        if (!cpPanel) return;
+        cpPanel.hidden = !cpPanel.hidden;
+        if (!cpPanel.hidden) cpPaint();
+      });
+      cpPanel?.addEventListener('change', (e) => {
+        if (e.target.id === 'cpBrand') { cpBrand = e.target.value; cpPlanId = ''; cpPaint(); }
+        else if (e.target.id === 'cpPlan') { cpPlanId = e.target.value; cpPaint(); }
+      });
+      cpPanel?.addEventListener('click', (e) => {
+        const src = e.target.closest('[data-act="cp-source"]');
+        if (src) {
+          e.preventDefault();
+          if (/^https:\/\//.test(src.dataset.url || '')) window.hubAPI?.openExternal?.(src.dataset.url);
+          return;
+        }
+        if (e.target.closest('[data-act="cp-cancel"]')) { cpPanel.hidden = true; return; }
+        if (!e.target.closest('[data-act="cp-apply"]') || !cpPlanId) return;
+        const namesById = cpNamesById(cpPlanId);
+        const cmp = CP.comparePlan(machMaintTasks, machineId, cpPlanId, namesById);
+        const usePlan = !!cpPanel.querySelector('#cpUsePlan')?.checked;
+        const r = CP.applyPlan(machMaintTasks, {
+          machineId, planId: cpPlanId,
+          meter: machineHoursMeter(machineId), nowIso: new Date().toISOString(),
+          namesById,
+          nameOf: (id) => t('maint.t_' + id),
+          confirm: usePlan ? cmp.differ.map(x => x.recordId) : [],
+          newId: () => uid('MTASK'),
+        });
+        if (!r.added.length && !r.changed.length) { toast(t('maint.cp_nothing'), 'info'); cpPanel.hidden = true; return; }
+        machMaintTasks = r.tasks;
+        saveAll();
+        cpPanel.hidden = true;
+        refreshTasks();
+        toast(t('maint.cp_applied').replace('{added}', r.added.length).replace('{changed}', r.changed.length), 'success');
+      });
       modal.addEventListener('click', (e) => {
         const b = e.target.closest('[data-act="mt-starter"]');
         if (!b) return;
@@ -1639,7 +1742,18 @@ function openMaintLog(machineId) {
       modal.querySelector('#maintTasksList')?.addEventListener('click', async (e) => {
         const doneBtn = e.target.closest('[data-act="mt-done"]');
         const delBtn = e.target.closest('[data-act="mt-del"]');
-        if (doneBtn) {
+        const deferBtn = e.target.closest('[data-act="mt-defer"]');
+        if (deferBtn) {
+          // Inspected and fine: push the task out without a "done" — no log row,
+          // and lastDone* untouched, so the wear history still says when the
+          // part was really last changed.
+          const tk = machMaintTasks.find(x => x.id === deferBtn.dataset.id);
+          if (!tk) return;
+          Object.assign(tk, KhaytMaintenance.deferTask(tk, machineHoursMeter(machineId), new Date().toISOString()));
+          saveAll();
+          refreshTasks();
+          toast(t('maint.deferred'), 'success');
+        } else if (doneBtn) {
           const tk = machMaintTasks.find(x => x.id === doneBtn.dataset.id);
           if (!tk) return;
           const patch = KhaytMaintenance.markDone(tk, machineHoursMeter(machineId), new Date().toISOString());
@@ -1687,6 +1801,61 @@ function openMaintLog(machineId) {
         toast(t('maint.deleted'), 'success');
       });
     }
+  });
+}
+
+/* ============================================================
+   Parts to buy (care plans)
+   ============================================================ */
+// The parts the shop's care-plan tasks will consume in the next 90 days, with
+// the date to order each by (lib/care-plans.js partsBuyList: due dates projected
+// from each machine's last 30 days of print hours, less a typical delivery
+// time). Read-only: nothing here changes the book.
+function partsToBuyRows() {
+  if (typeof KhaytCarePlans === 'undefined') return [];
+  return KhaytCarePlans.partsBuyList({
+    machines, tasks: typeof machMaintTasks !== 'undefined' ? machMaintTasks : [],
+    jobs: printLog, now: Date.now(),
+  });
+}
+
+function partsToBuyText(rows) {
+  const day = (iso) => new Date(iso).toLocaleDateString(localeTag());
+  return [t('maint.pb_title'), ''].concat(rows.map(r =>
+    `${t('maint.part_' + r.partId)} ×${r.qty} — ${r.machineName} (${r.taskName}) — ${
+      r.late ? t('maint.pb_late') : t('maint.pb_order_by').replace('{date}', day(r.orderBy))}; ${
+      t('maint.pb_due').replace('{date}', day(r.dueAt))}`)).join('\n');
+}
+
+function openPartsToBuy() {
+  const rows = partsToBuyRows();
+  const day = (iso) => new Date(iso).toLocaleDateString(localeTag());
+  const table = rows.length ? `<div class="table-wrap"><table id="pbTable"><tbody>${rows.map(r => `
+      <tr data-part="${escapeHtml(r.partId)}">
+        <td><strong>${escapeHtml(t('maint.part_' + r.partId))}</strong> ×${r.qty}<br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.machineName)} · ${escapeHtml(r.taskName)}</span></td>
+        <td style="white-space:nowrap;font-size:12px;${r.late ? 'color:var(--danger);font-weight:600;' : ''}">${escapeHtml(r.late ? t('maint.pb_late') : t('maint.pb_order_by').replace('{date}', day(r.orderBy)))}</td>
+        <td style="white-space:nowrap;font-size:12px;color:var(--text-muted);">${escapeHtml(t('maint.pb_due').replace('{date}', day(r.dueAt)))}</td>
+      </tr>`).join('')}</tbody></table></div>`
+    : `<p id="pbNone" style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px 0;">${escapeHtml(t('maint.pb_none'))}</p>`;
+  openFormModal({
+    title: t('maint.pb_title'),
+    noSave: true,
+    sizeLg: true,
+    bodyHtml: `<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">${escapeHtml(t('maint.pb_hint'))}</p>
+      ${table}
+      ${rows.length ? `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+        <button type="button" class="btn small" id="pbCopy">${escapeHtml(t('maint.pb_copy'))}</button>
+        <button type="button" class="btn small" id="pbPrint">${escapeHtml(t('common.print'))}</button>
+      </div>` : ''}`,
+    onMount(modal) {
+      modal.querySelector('#pbCopy')?.addEventListener('click', () => { copyAndToast(partsToBuyText(rows)); });
+      modal.querySelector('#pbPrint')?.addEventListener('click', () => {
+        const area = document.getElementById('work-order-print-area');
+        if (!area) return;
+        area.innerHTML = `<div class="inv-wrap wo-wrap" dir="${document.documentElement.dir || 'ltr'}"><h2>${escapeHtml(t('maint.pb_title'))}</h2>${table}</div>`;
+        setTimeout(() => window.print(), 80);
+      });
+    },
   });
 }
 
@@ -2105,6 +2274,8 @@ function machineWearRate(m) {
     deleteMachine,
     unretireMachine,
     openMaintLog,
+    openPartsToBuy,
+    partsToBuyRows,
     machineHoursMeter,
     machineServiceStatus,
     logMachineService,
