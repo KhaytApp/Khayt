@@ -1099,3 +1099,18 @@
 "care.part.fep_film" = "FEP film";
 "care.part.resin_tank" = "Resin tank";
 "care.part.ipa" = "Isopropyl alcohol (litre)";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Shopping list";
+"shop.none" = "Nothing to buy — every filament is above its reorder point.";
+"shop.no_supplier" = "No supplier set";
+"shop.share" = "Share list";
+"shop.hint" = "Every filament at or under its reorder point, by the supplier that sells it. Reorder points, amounts and suppliers are set in Khayt on the Mac or the computer.";
+"shop.buy" = "Buy %@";
+"shop.have" = "%@ left";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Energy: %@";
+"energy.sub" = "Metered by the printer’s smart plug";
+"energy.cost" = "Electricity";
+"unit.kwh" = "kWh";

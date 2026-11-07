@@ -1099,3 +1099,18 @@
 "care.part.fep_film" = "Lámina FEP";
 "care.part.resin_tank" = "Tanque de resina";
 "care.part.ipa" = "Alcohol isopropílico (litro)";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Lista de compras";
+"shop.none" = "Nada que comprar — cada filamento está por encima de su punto de pedido.";
+"shop.no_supplier" = "Sin proveedor";
+"shop.share" = "Compartir lista";
+"shop.hint" = "Cada filamento en su punto de pedido o por debajo, por el proveedor que lo vende. Los puntos de pedido, las cantidades y los proveedores se configuran en Khayt en el Mac o el ordenador.";
+"shop.buy" = "Comprar %@";
+"shop.have" = "Quedan %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Energía: %@";
+"energy.sub" = "Medida por el enchufe inteligente de la impresora";
+"energy.cost" = "Electricidad";
+"unit.kwh" = "kWh";

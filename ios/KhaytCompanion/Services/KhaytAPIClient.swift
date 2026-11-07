@@ -928,6 +928,23 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
+    // MARK: - Shopping list and a print's energy
+
+    /// Every filament at or under its reorder point, by supplier, from this
+    /// phone's book (`ShopShoppingList`). Nil with no book: the list needs the
+    /// suppliers, which only the book carries.
+    func shoppingList(shopName: String) -> ShopShoppingList? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return ShopShoppingList(store: store, shopName: shopName)
+    }
+
+    /// What a job's print drew from a metering plug, when one measured enough
+    /// of it (`JobEnergy`). Nil otherwise, and with no book.
+    func jobEnergy(orderId: String) -> JobEnergy? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return JobEnergy.of(store: store, orderId: orderId)
+    }
+
     /// A care task done, in the book (`BookWriter.markCareTaskDone`), then sent on.
     func markCareTaskDone(taskId: String, now: Date = Date()) async throws {
         guard let book, book.exists else { throw KhaytAPIError.server(L10n.tr("alert.print.needs_book")) }

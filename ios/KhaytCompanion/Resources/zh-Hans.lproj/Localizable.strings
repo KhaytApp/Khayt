@@ -1099,3 +1099,18 @@
 "care.part.fep_film" = "FEP 离型膜";
 "care.part.resin_tank" = "树脂槽";
 "care.part.ipa" = "异丙醇（升）";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "购物清单";
+"shop.none" = "无需购买 — 每种耗材都高于其补货点。";
+"shop.no_supplier" = "未设置供应商";
+"shop.share" = "分享列表";
+"shop.hint" = "所有处于或低于补货点的耗材，按销售它的供应商分组。补货点、购买量和供应商在 Mac 或电脑上的 Khayt 中设置。";
+"shop.buy" = "购买 %@";
+"shop.have" = "剩余 %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "电量：%@";
+"energy.sub" = "由打印机的智能插座计量";
+"energy.cost" = "电费";
+"unit.kwh" = "kWh";

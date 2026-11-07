@@ -1099,3 +1099,18 @@
 "care.part.fep_film" = "Film FEP";
 "care.part.resin_tank" = "Bac de résine";
 "care.part.ipa" = "Alcool isopropylique (litre)";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Liste de courses";
+"shop.none" = "Rien à acheter — chaque filament est au-dessus de son seuil de réapprovisionnement.";
+"shop.no_supplier" = "Aucun fournisseur";
+"shop.share" = "Partager la liste";
+"shop.hint" = "Chaque filament à son seuil de réapprovisionnement ou en dessous, par le fournisseur qui le vend. Les seuils, les quantités et les fournisseurs se règlent dans Khayt sur le Mac ou l’ordinateur.";
+"shop.buy" = "Acheter %@";
+"shop.have" = "Reste %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Énergie : %@";
+"energy.sub" = "Mesurée par la prise connectée de l’imprimante";
+"energy.cost" = "Électricité";
+"unit.kwh" = "kWh";
