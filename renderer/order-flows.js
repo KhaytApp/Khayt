@@ -1419,6 +1419,51 @@ function renderOeExtraLinesHtml(lines) {
 /* ============================================================
    Order editor — notes + print photos
    ============================================================ */
+/**
+ * Put one of a job's photos on the product it was made from, as a picture of
+ * kind `print` — "the real thing", which the web store carries straight after
+ * the primary. The Mac's `Shop.useAsProductPhoto`, same shape:
+ *
+ *   - appended, never made primary (unless the product had no picture at all):
+ *     which picture leads a listing is the shop's decision;
+ *   - the same photo twice is one picture (`addImage` matches the thumbnail);
+ *   - the full file is copied when it is on disk, else the thumbnail is used —
+ *     a small real photo beats none;
+ *   - the file goes down before the record.
+ *
+ * Returns 'added' | 'already' | 'failed'.
+ */
+async function usePrintPhotoAsProductPhoto(productId, photo) {
+  const P = window.KhaytProductImages;
+  const product = (Array.isArray(products) ? products : []).find((p) => p && p.id === productId);
+  if (!P || !product || !photo || !photo.thumb) { toast(t('pe.upload_failed') || 'Could not add the photo', 'error'); return 'failed'; }
+  // On a copy: addImage normalises in place, and nothing may change on the
+  // record until the file is written.
+  const copy = { ...product, images: Array.isArray(product.images) ? product.images.map((i) => ({ ...i })) : product.images };
+  const out = P.addImage(copy, { thumbnail: photo.thumb, path: '', kind: 'print', caption: '' });
+  if (!out.added) { toast(t('oe.product_photo_already'), 'info'); return 'already'; }
+  let full = null;
+  if (photo.filename && window.hubAPI?.loadOrderPhoto) {
+    try { full = await window.hubAPI.loadOrderPhoto(photo.filename); } catch (_) { full = null; }
+  }
+  if (typeof full !== 'string' || !full.startsWith('data:image/')) full = photo.thumb;
+  try {
+    out.image.path = await window.hubAPI.saveProductImage(productId, full, out.image.id);
+  } catch (err) {
+    console.error('use as product photo:', err);
+    toast(t('pe.image_save_failed') || 'The picture could not be saved', 'error');
+    return 'failed';
+  }
+  P.syncView(out.product);
+  product.images = out.product.images;
+  product.imagePath = out.product.imagePath;
+  product.thumbnail = out.product.thumbnail;
+  saveAll();
+  if (typeof renderCatalog === 'function') renderCatalog();
+  toast(t('oe.product_photo_added'), 'success');
+  return 'added';
+}
+
 function openOrderEditor(orderId) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return;
@@ -1454,11 +1499,17 @@ function openOrderEditor(orderId) {
   const pendingFulls = []; // [{ idx, dataUrl }]
   const pendingDeletes = []; // filenames to delete from disk on save
 
+  // "Use as product photo" is offered only when the job was made from a
+  // product that is still in the catalogue (the Mac's canUseAsProductPhoto).
+  const photoProduct = order.productId
+    ? (Array.isArray(products) ? products : []).find((p) => p && p.id === order.productId) || null
+    : null;
   const photosHtml = () => {
     const cells = draft.printPhotos.map((ph, i) => `
       <div class="order-photo-cell" data-pi="${i}">
         <img src="${safeImageSrc(ph.thumb)}" alt="">
         <button class="rm" data-act="rm-photo" data-pi="${i}" aria-label="Remove" title="Remove">×</button>
+        ${photoProduct && ph.thumb ? `<button type="button" class="to-product" data-act="photo-to-product" data-pi="${i}" title="${escapeHtml(t('oe.use_as_product_photo'))}" aria-label="${escapeHtml(t('oe.use_as_product_photo'))}">★</button>` : ''}
       </div>`).join('');
     const adder = `<button type="button" class="order-photo-cell add" data-act="add-photo">${escapeHtml(t('oe.add_photo'))}</button>`;
     return cells + adder;
@@ -2018,6 +2069,12 @@ function openOrderEditor(orderId) {
       grid.addEventListener('click', (e) => {
         const add = e.target.closest('[data-act="add-photo"]');
         const rm  = e.target.closest('[data-act="rm-photo"]');
+        const toProduct = e.target.closest('[data-act="photo-to-product"]');
+        if (toProduct) {
+          const ph = draft.printPhotos[+toProduct.dataset.pi];
+          if (ph && order.productId) usePrintPhotoAsProductPhoto(order.productId, ph);
+          return;
+        }
         if (add) fileInput.click();
         if (rm) {
           const i = +rm.dataset.pi;
@@ -3137,6 +3194,7 @@ async function captureFailurePhoto(orderId) {
 }
   const api = {
     logPrint,
+    usePrintPhotoAsProductPhoto,
     promptActuals,
     // Public because it is a real operation on an order — "tell the settings
     // this used how it went" — that any completion path should be able to call,
