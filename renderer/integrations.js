@@ -488,7 +488,7 @@ async function openBnplModal(orderId) {
   const infoCards = BNPL_CATALOG.filter(s => !s.hasApi).map(s =>
     `<a href="#" class="bnpl-info-card" data-url="${escapeHtml(s.dashUrl)}" style="padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);border-inline-start:2px solid ${escapeHtml(s.color)};text-decoration:none;color:inherit;cursor:pointer;display:block;">
       <span style="font-weight:600;font-size:12px;">${escapeHtml(s.name)}</span>
-      <span style="font-size:10px;color:var(--text-muted);margin-left:6px;">${s.regions.slice(0,4).join('·')}</span>
+      <span style="font-size:10px;color:var(--text-muted);margin-inline-start:6px;">${s.regions.slice(0,4).join('·')}</span>
     </a>`
   ).join('');
 
@@ -963,7 +963,7 @@ async function exportOrderStatusPage(orderId) {
     .info-label { color: #6b7280; }
     .info-value { font-weight: 600; }
     .stepper { display: flex; align-items: flex-start; margin: 24px 0; }
-    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
+    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
     .footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
   </style>
 </head>
@@ -1037,7 +1037,7 @@ async function autoExportStatusPage(order) {
         ? `Your order is temporarily on hold.${order.holdReason ? ' Reason: ' + escapeHtml(order.holdReason) : ''}`
         : 'Your order is being processed. We\'ll notify you when it\'s ready.';
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Order Status — ${escapeHtml(jobRef(order))}</title>
-<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
+<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
 <div class="card"><div class="header"><h1>${escapeHtml(bizName)}</h1><p>Order Status Update</p></div>
 <div class="body"><div class="stepper">${connectors}</div>
 <div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(jobRef(order))}</span></div>
@@ -1438,7 +1438,7 @@ async function publishOrderToCloudPortal(orderId) {
   const isQuote = kind === 'quote';
 
   const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail, intakeId });
-  if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
+  if (!r.ok) { toast(t('cloud.publish_failed', { error: r.error || '—' }), 'error', 8000); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 
   const portalUrl = KhaytPortalOwner.portalUrl(c.url, pubToken);
@@ -1507,7 +1507,7 @@ async function publishOrderToCloudPortal(orderId) {
       modal.querySelector('#cpUnpub')?.addEventListener('click', async () => {
         const u = await window.hubAPI.cloudUnpublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken });
         if (u.ok) { order.cloudPublished = false; saveAll(); toast(t('cloud.portal_unpublished') || 'Link unpublished', 'success'); }
-        else toast('✗ ' + (u.error || 'failed'), 'error');
+        else toast(t('cloud.unpublish_failed', { error: u.error || '—' }), 'error', 8000);
       });
     },
   });

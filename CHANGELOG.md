@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Arabic layout and wording fixes (Windows/Linux).** Tables and panels in Analytics, Inventory, Expenses, Clients, Settings and Waste now line up from the right in Arabic: their inline styles say start and end instead of left and right, and a test keeps it that way. Twelve messages that were English in every language are translated, and the cloud-publish and team-join errors now say what to check.
 - **Choose whether your orders appear beside other Khayt shops in a customer's portal (Windows/Linux).** Settings › Online has "Show my orders in customers' portal beside other Khayt shops", on by default. When it is off, a customer sees your shop's orders only from your own pages. Only the owner or a manager can change it; other members see it, unticked or ticked, without being able to change it. Needs Khayt Cloud's portal settings.
 - **Bambu Lab X1 Carbon, P1S, A1 and Creality K2 Plus projects name their slicer's own printer preset** ("… 0.4 nozzle"), so Bambu Studio and Orca open them on the installed printer profile. Same names as Bed Ready and MakerRun.
 - **Fixes from the desktop review (Windows/Linux).**
