@@ -88,9 +88,14 @@ async function autoSendEmailNotification(order, newStatus) {
 // Re-entrancy guard for the periodic digest send. Declared here (where it's used)
 // — it must live in integrations.js's top-level scope, not another module's IIFE.
 let _digestInFlight = false;
+// A refused send waits before it is tried again — 5 minutes, doubling to 6
+// hours — rather than every 5-minute tick (288 tries a day at a mail server
+// that already said no). In memory: a restart tries once more.
+let _digestRetryAt = 0;
+let _digestBackoffMs = 0;
 
 async function checkAndSendDigest() {
-  if (_digestInFlight) return;
+  if (_digestInFlight || Date.now() < _digestRetryAt) return;
   if (typeof KhaytEmailDigest === 'undefined') return;
   const cfg = settings.emailConfig;
   if (!settings.emailDigest?.enabled || !cfg || cfg.provider === 'none') return;
@@ -103,10 +108,17 @@ async function checkAndSendDigest() {
   const subject = KhaytEmailDigest.subject(shopName(), KhaytEmailDigest.frequencyOf(settings.emailDigest));
   _digestInFlight = true;
   try {
-    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
+    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg })
+      .catch((e) => ({ ok: false, error: e && e.message }));
     if (result?.ok) {
       settings.emailDigest = KhaytEmailDigest.sent(settings, when.periodKey);
       saveAll();
+      _digestBackoffMs = 0;
+      _digestRetryAt = 0;
+    } else if (result) {
+      _digestBackoffMs = Math.min(6 * 3600 * 1000, _digestBackoffMs ? _digestBackoffMs * 2 : 5 * 60 * 1000);
+      _digestRetryAt = Date.now() + _digestBackoffMs;
+      console.warn('[digest] not sent:', result.error || 'refused', '— next try in', Math.round(_digestBackoffMs / 60000), 'min');
     }
   } finally {
     _digestInFlight = false;
