@@ -3004,6 +3004,8 @@
  "mac.vl_err_links_full": "你套餐的分享链接已全部用完（{n}）。请撤销一个，或更换套餐。",
  "mac.vl_err_links_off": "Khayt 已关闭此店铺的分享链接。无法创建新链接，店铺现有的链接也已关闭。请联系 Khayt 询问原因，或请求重新开启。",
  "mac.vl_err_mail_off": "Khayt Cloud 目前无法发送电子邮件，因此无法将链接限定给电子邮件地址。请稍后重试，或不使用电子邮件名单进行分享。",
+ "mac.vl_backup_retry": "备份并重试",
+ "mac.vl_backing_up": "正在将模型复制到保险库…",
  "mac.vl_err_missing": "其中 {n} 个模型在保管库中还没有副本。请先备份，然后重试。",
  "mac.vl_err_missing_n1": "其中一个模型在保管库中还没有副本。请先备份，然后重试。",
  "mac.vl_err_no_links": "你的套餐不包含分享链接。",

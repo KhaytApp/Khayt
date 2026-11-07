@@ -3004,6 +3004,8 @@
  "mac.vl_err_links_full": "Planınızın paylaşım bağlantılarının hepsi kullanımda ({n}). Birini iptal edin veya planı değiştirin.",
  "mac.vl_err_links_off": "Khayt bu dükkân için paylaşım bağlantılarını kapattı. Yeni bağlantı oluşturulamaz ve dükkânın mevcut bağlantıları da kapatılır. Nedenini sormak veya yeniden açtırmak için Khayt'e yazın.",
  "mac.vl_err_mail_off": "Khayt Cloud şu anda e-posta gönderemiyor, bu yüzden bağlantı e-posta adresleriyle sınırlanamaz. Daha sonra yeniden deneyin veya e-posta listesi olmadan paylaşın.",
+ "mac.vl_backup_retry": "Yedekle ve yeniden dene",
+ "mac.vl_backing_up": "Model kasaya kopyalanıyor…",
  "mac.vl_err_missing": "Bu modellerden {n} tanesinin kasada henüz kopyası yok. Yedekleyin, sonra yeniden deneyin.",
  "mac.vl_err_missing_n1": "Bu modellerden birinin kasada henüz kopyası yok. Yedekleyin, sonra yeniden deneyin.",
  "mac.vl_err_no_links": "Planınız paylaşım bağlantılarını içermiyor.",

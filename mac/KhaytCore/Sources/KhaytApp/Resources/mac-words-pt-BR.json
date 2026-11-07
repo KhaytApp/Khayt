@@ -3004,6 +3004,8 @@
  "mac.vl_err_links_full": "Todos os links de compartilhamento do seu plano estão em uso ({n}). Revogue um ou mude de plano.",
  "mac.vl_err_links_off": "O Khayt desativou os links de compartilhamento desta loja. Nenhum novo link pode ser criado, e os links existentes da loja também estão desativados. Escreva ao Khayt para perguntar o motivo ou pedir que sejam reativados.",
  "mac.vl_err_mail_off": "O Khayt Cloud não consegue enviar e-mail agora, então um link não pode ser limitado a endereços de e-mail. Tente mais tarde ou compartilhe sem a lista de e-mails.",
+ "mac.vl_backup_retry": "Fazer backup e tentar de novo",
+ "mac.vl_backing_up": "Copiando o modelo para o Vault…",
  "mac.vl_err_missing": "{n} destes modelos ainda não têm cópia no Vault. Faça backup deles e tente novamente.",
  "mac.vl_err_missing_n1": "Um destes modelos ainda não tem cópia no Vault. Faça backup dele e tente novamente.",
  "mac.vl_err_no_links": "Seu plano não inclui links de compartilhamento.",
