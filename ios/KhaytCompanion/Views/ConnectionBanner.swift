@@ -45,6 +45,13 @@ struct ConnectionBanner: View {
             .background(KhaytDesign.attention.opacity(0.12))
         } else if let moved = health.macMoved {
             moveStrip(moved)
+        } else if settings.needsPairAgain {
+            pairAgainStrip
+                .sheet(isPresented: $pairingAgain) { PairAgainSheet() }
+        } else if !api.canWrite {
+            // A viewer's cloud sign-in, no Mac: every screen says it reads only.
+            ReadOnlyNote()
+                .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
         } else if health.state == .pinTooShort {
             strip(tint: KhaytDesign.attention, loud: true,
                   title: L10n.tr("connection.pin_too_short"), line: L10n.tr("pair.pin.too_short"),

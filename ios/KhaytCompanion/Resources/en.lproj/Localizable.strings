@@ -1103,3 +1103,6 @@
 "pair.again.body" = "The owner PIN from Settings → Online on the Mac. It is sent once, to this address, to pair — then deleted from the phone.";
 "pair.phone_name" = "This phone’s name";
 "pair.phone_name.foot" = "How the Mac lists this phone among its paired phones, so you can tell them apart.";
+"cloud.read_only" = "Read-only sign-in";
+"cloud.read_only.line" = "This phone is signed in to Khayt Cloud as a viewer, with no Mac paired: it shows the shop but cannot change it.";
+"cloud.read_only.refused" = "Not saved: this phone’s Khayt Cloud sign-in is read-only. Pair with the Mac, or sign in with an account that can edit.";

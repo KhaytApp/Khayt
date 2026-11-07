@@ -1103,3 +1103,6 @@
 "pair.again.body" = "Die Inhaber-PIN aus Einstellungen → Online auf dem Mac. Sie wird einmal an diese Adresse gesendet, um zu koppeln, und dann vom iPhone gelöscht.";
 "pair.phone_name" = "Name dieses iPhones";
 "pair.phone_name.foot" = "So führt der Mac dieses iPhone unter seinen gekoppelten Telefonen, damit du sie unterscheiden kannst.";
+"cloud.read_only" = "Anmeldung nur zum Lesen";
+"cloud.read_only.line" = "Dieses iPhone ist als Betrachter bei Khayt Cloud angemeldet und mit keinem Mac gekoppelt: Es zeigt die Werkstatt, kann sie aber nicht ändern.";
+"cloud.read_only.refused" = "Nicht gespeichert: Die Khayt-Cloud-Anmeldung dieses iPhones ist nur zum Lesen. Kopple es mit dem Mac oder melde dich mit einem Konto an, das bearbeiten darf.";

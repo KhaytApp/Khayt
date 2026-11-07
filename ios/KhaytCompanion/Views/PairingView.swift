@@ -45,6 +45,15 @@ struct PairingView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: step)
         .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+        #if DEBUG
+        // `-KhaytPairStep pin`: open on the PIN step, for a screenshot.
+        .onAppear {
+            if UserDefaults.standard.string(forKey: "KhaytPairStep") == "pin" {
+                if settings.host.isEmpty { settings.host = "192.168.1.42" }
+                step = .pin
+            }
+        }
+        #endif
         // Signing in to the cloud IS setting up: the phone takes the shop from
         // there and can pair with the Mac later, from Settings.
         .onChange(of: api.cloud) { _, session in

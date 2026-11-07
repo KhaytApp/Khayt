@@ -1103,3 +1103,6 @@
 "pair.again.body" = "Mac 上「设置 → 在线」中的店主 PIN。它只会为配对发送一次到此地址，随后从 iPhone 删除。";
 "pair.phone_name" = "此 iPhone 的名称";
 "pair.phone_name.foot" = "Mac 在已配对手机列表中显示的名称，便于区分各台手机。";
+"cloud.read_only" = "只读登录";
+"cloud.read_only.line" = "此 iPhone 以查看者身份登录 Khayt Cloud，且未配对 Mac：可以查看店铺，但无法更改。";
+"cloud.read_only.refused" = "未保存：此 iPhone 的 Khayt Cloud 登录为只读。请与 Mac 配对，或使用可编辑的账户登录。";

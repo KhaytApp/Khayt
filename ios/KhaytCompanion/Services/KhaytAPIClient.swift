@@ -1,3 +1,4 @@
+import Combine
 import CryptoKit
 import Foundation
 import KhaytCore
@@ -31,7 +32,45 @@ final class KhaytAPIClient: ObservableObject {
     private var lanLiveRetryAt: Date?
 
     /// This phone's own Khayt Cloud sign-in, when it has one — see `CloudSession`.
-    @Published private(set) var cloud: CloudSession? = CloudSession.load()
+    @Published private(set) var cloud: CloudSession? = CloudSession.load() {
+        didSet { gateEdits() }
+    }
+
+    // MARK: - A viewer's sign-in
+
+    /// Whether this phone may edit the shop. Not when its only way to the
+    /// shop is a VIEWER's cloud sign-in: the cloud takes no writes from one,
+    /// and with no Mac paired an edit kept here would be lost at the next
+    /// pull. A paired Mac takes the phone's edits whatever the cloud role.
+    var canWrite: Bool {
+        #if DEBUG
+        if Self.debugReadOnly { return false }
+        #endif
+        return Self.mayEdit(cloudRole: cloud?.role, macPaired: macPaired, sample: settings.isSampleShop)
+    }
+
+    /// A Mac this phone can deliver to: an address, and a PIN or an enrolment.
+    private var macPaired: Bool {
+        settings.isConfigured && (settings.device != nil || !settings.pin.isEmpty)
+    }
+
+    #if DEBUG
+    /// `-KhaytReadOnly YES` on the launch line: the read-only state, for a
+    /// screenshot. Debug builds only.
+    static var debugReadOnly = false
+    #endif
+
+    nonisolated static func mayEdit(cloudRole: String?, macPaired: Bool, sample: Bool) -> Bool {
+        sample || macPaired || cloudRole.map { $0 != "viewer" } ?? true
+    }
+
+    /// Tell the book whether edits are refused, and why. Every edit on the
+    /// phone, whichever screen or intent makes it, goes through the book.
+    private func gateEdits() {
+        CompanionBook.editsRefused = canWrite ? nil : L10n.tr("cloud.read_only.refused")
+    }
+
+    private var settingsWatch: AnyCancellable?
     /// Set by `PrintActivities`; its tokens are registered again after a sign-in.
     weak var liveActivityPush: LiveActivityPush?
     /// Which way the book last went home, and when. Said on screen because a
@@ -112,6 +151,12 @@ final class KhaytAPIClient: ObservableObject {
         let opened = withBook ? try? CompanionBook.inSharedContainer() : nil
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
+        gateEdits()
+        // Pairing a Mac (or letting it go) changes whether edits have
+        // somewhere to go. `objectWillChange` fires before the change lands.
+        settingsWatch = settings.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor in self?.gateEdits() }
+        }
     }
 
     /// Read from this phone's own records when it has them, and ask the desktop

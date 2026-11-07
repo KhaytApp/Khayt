@@ -54,6 +54,20 @@ import KhaytCore
  */
 struct CompanionBook {
 
+    /// ── A VIEWER'S SIGN-IN EDITS NOTHING ─────────────────────────────────
+    ///
+    /// Signed in to Khayt Cloud as a viewer, with no Mac paired, an edit had
+    /// nowhere to go: the cloud takes no writes from a viewer and there is no
+    /// Mac to deliver to. It was saved here all the same, shown as done, and
+    /// lost at the next pull. So while this is set — by `KhaytAPIClient`, which
+    /// knows the role and the pairing — every edit below is refused with it as
+    /// the reason. Pulls and folds (`replace`, `swap`) are not edits and pass.
+    nonisolated(unsafe) static var editsRefused: String?
+
+    private func refuseIfReadOnly() throws {
+        if let why = Self.editsRefused { throw KhaytAPIError.server(why) }
+    }
+
     /// The folder this book lives in.
     ///
     /// Injectable for one reason: a write path whose only trial run was on a
@@ -292,6 +306,7 @@ struct CompanionBook {
     /// `owns` is `true` and `whoHasIt` is never consulted — see the note at the
     /// top about why that is honest on a phone rather than a stub.
     func update(_ mutate: (inout [String: JSONValue]) throws -> Void) throws {
+        try refuseIfReadOnly()
         try StoreWriter.update(storeURL: url,
                                owns: { true },
                                whoHasIt: { nil },
@@ -348,6 +363,7 @@ struct CompanionBook {
     /// here rather than in `StoreWriter.updateRecord`, which the Mac shares.
     func updateRecord(collection: String, id: String,
                       change: (inout [String: JSONValue]) -> Void) throws {
+        try refuseIfReadOnly()
         struct Unchanged: Error {}
         do {
             try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
@@ -385,6 +401,7 @@ struct CompanionBook {
     /// Several at once, in ONE write: either every record lands or none does.
     /// Ten boxes booked in are not left as six when the fourth write fails.
     func appendRecords(collection: String, records: [[String: JSONValue]]) throws {
+        try refuseIfReadOnly()
         var ids = Set<String>()
         for record in records {
             guard case .string(let id)? = record["id"], !id.isEmpty else {
@@ -414,6 +431,7 @@ struct CompanionBook {
     /// `queuePos`, which a count taken before the write could get wrong.
     func insertRecord(collection: String, atFront: Bool,
                       make: ([JSONValue]) throws -> [String: JSONValue]) throws {
+        try refuseIfReadOnly()
         try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
             var rows: [JSONValue] = []
             if case .array(let had)? = root[collection] { rows = had }

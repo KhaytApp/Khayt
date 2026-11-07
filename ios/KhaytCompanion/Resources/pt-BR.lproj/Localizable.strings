@@ -1103,3 +1103,6 @@
 "pair.again.body" = "O PIN do proprietário em Ajustes → Online no Mac. É enviado uma vez, para este endereço, para parear — e depois apagado do iPhone.";
 "pair.phone_name" = "Nome deste iPhone";
 "pair.phone_name.foot" = "É assim que o Mac mostra este iPhone na lista de telefones pareados, para diferenciá-los.";
+"cloud.read_only" = "Login somente leitura";
+"cloud.read_only.line" = "Este iPhone entrou no Khayt Cloud como leitor, sem Mac pareado: mostra a oficina, mas não pode alterá-la.";
+"cloud.read_only.refused" = "Não salvo: o login do Khayt Cloud deste iPhone é somente leitura. Pareie com o Mac ou entre com uma conta que possa editar.";

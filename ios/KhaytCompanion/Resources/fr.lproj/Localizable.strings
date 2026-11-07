@@ -1103,3 +1103,6 @@
 "pair.again.body" = "Le code PIN du propriétaire, dans Réglages → En ligne sur le Mac. Il est envoyé une fois, à cette adresse, pour l’association, puis effacé de l’iPhone.";
 "pair.phone_name" = "Nom de cet iPhone";
 "pair.phone_name.foot" = "Le nom sous lequel le Mac affiche cet iPhone parmi les téléphones associés, pour les distinguer.";
+"cloud.read_only" = "Connexion en lecture seule";
+"cloud.read_only.line" = "Cet iPhone est connecté à Khayt Cloud en tant que lecteur, sans Mac associé : il affiche l’atelier mais ne peut pas le modifier.";
+"cloud.read_only.refused" = "Non enregistré : la connexion Khayt Cloud de cet iPhone est en lecture seule. Associez-le au Mac, ou connectez-vous avec un compte autorisé à modifier.";

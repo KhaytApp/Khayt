@@ -1103,3 +1103,6 @@
 "pair.again.body" = "El PIN del propietario de Ajustes → En línea en el Mac. Se envía una vez, a esta dirección, para emparejar, y luego se borra del iPhone.";
 "pair.phone_name" = "Nombre de este iPhone";
 "pair.phone_name.foot" = "Así aparece este iPhone en la lista de teléfonos emparejados del Mac, para distinguirlos.";
+"cloud.read_only" = "Sesión de solo lectura";
+"cloud.read_only.line" = "Este iPhone ha iniciado sesión en Khayt Cloud como lector, sin ningún Mac emparejado: muestra el taller pero no puede cambiarlo.";
+"cloud.read_only.refused" = "No se guardó: la sesión de Khayt Cloud de este iPhone es de solo lectura. Empareja con el Mac o inicia sesión con una cuenta que pueda editar.";

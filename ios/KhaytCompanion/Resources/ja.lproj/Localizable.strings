@@ -1103,3 +1103,6 @@
 "pair.again.body" = "Macの「設定」→「オンライン」にあるオーナーPIN。ペアリングのためにこのアドレスへ一度だけ送信され、その後iPhoneから削除されます。";
 "pair.phone_name" = "このiPhoneの名前";
 "pair.phone_name.foot" = "Macのペアリング済み端末の一覧に表示される名前です。端末を見分けるのに使います。";
+"cloud.read_only" = "閲覧専用のサインイン";
+"cloud.read_only.line" = "このiPhoneは閲覧者としてKhayt Cloudにサインインしており、ペアリングされたMacがありません。ショップを表示できますが、変更はできません。";
+"cloud.read_only.refused" = "保存されませんでした。このiPhoneのKhayt Cloudサインインは閲覧専用です。Macとペアリングするか、編集できるアカウントでサインインしてください。";

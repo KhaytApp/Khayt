@@ -82,11 +82,14 @@ struct OrderDetailPage: View {
                                quote: order.status == OrderStatus.quote.rawValue ? quote : nil,
                                currency: currency,
                                onAnswer: { answer in Task { await answerQuote(answer) } })
+                // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
+                .disabled(!api.canWrite)
             if order.status == OrderStatus.quote.rawValue, let quoteState {
                 QuoteToolsCard(state: quoteState, followingUp: followingUp,
                                onRevise: { revising = quoteState },
                                onFollowUp: { Task { await followUp() } },
                                onHistory: { showingHistory = true })
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             } else if order.status == OrderStatus.quote.rawValue, !api.holdsBook {
                 // No LAN route revises or follows up a quote: say so, rather
@@ -96,6 +99,7 @@ struct OrderDetailPage: View {
             }
             if let payment {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
             // A quote or a cancelled job has no invoice; the page says why for
@@ -114,6 +118,7 @@ struct OrderDetailPage: View {
             if let shipChoices, !shipChoices.isEmpty {
                 Button { shipping = true } label: { ShipCard() }
                     .buttonStyle(.plain)
+                    .disabled(!api.canWrite)
                     .padding(.horizontal, 16).padding(.bottom, 16)
                     .sheet(isPresented: $shipping) {
                         ShipSheet(orderId: order.id, carriers: shipChoices) {
@@ -197,6 +202,7 @@ struct OrderDetailPage: View {
             ToolbarItem(placement: .primaryAction) {
                 if api.holdsBook, order.status != "cancelled" {
                     Button(L10n.tr("edit.title")) { Task { editing = await api.editState(orderId: order.id) } }
+                        .disabled(!api.canWrite)
                 }
             }
         }

@@ -74,7 +74,7 @@ struct KhaytCompanionApp: App {
         PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()
         #if DEBUG
-        Self.openForScreenshots(apiClient)
+        Self.openForScreenshots(apiClient, settings: s)
         #endif
     }
 
@@ -98,9 +98,19 @@ struct KhaytCompanionApp: App {
     /// `-KhaytSampleShop YES -KhaytTab orders` on the launch line: the sample
     /// shop, opened on that tab, so every screen can be photographed from the
     /// command line (`simctl launch`) without a tap. Debug builds only.
-    private static func openForScreenshots(_ api: KhaytAPIClient) {
+    /// `-KhaytReadOnly YES` (with the sample shop) shows a viewer's read-only
+    /// sign-in, and `-KhaytPairAgain YES` the "Pair this phone again" strip.
+    private static func openForScreenshots(_ api: KhaytAPIClient, settings: ConnectionSettings) {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "KhaytSampleShop") { try? api.openSampleShop() }
+        if defaults.bool(forKey: "KhaytReadOnly") {
+            KhaytAPIClient.debugReadOnly = true
+            settings.isSampleShop = false   // its own banner would cover this one
+        }
+        if defaults.bool(forKey: "KhaytPairAgain") {
+            settings.isSampleShop = false
+            settings.needsPairAgain = true
+        }
         if let tab = defaults.string(forKey: "KhaytTab") {
             defaults.set(tab, forKey: "khayt.pending.tab")
         }
