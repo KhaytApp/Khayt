@@ -282,6 +282,32 @@ import KhaytCore
         #expect(cut.taken.metersHeld?["m1"] == 200)
     }
 
+    @Test("the owing set has its own ceiling, and says where it was cut")
+    func owingIsCapped() {
+        // A shop that never records payments: every finished job "may owe".
+        var orders: [JSONValue] = []
+        for i in 0..<1_100 {
+            orders.append(job("U-\(i)", "completed", String(format: "20%02d-%02d-%02d", 20 + i / 336, (i / 28) % 12 + 1, (i % 28) + 1),
+                              ["price": .number(50)]))
+        }
+        let cut = BookScope.take(from: ["printLog": .array(orders)])
+        let held = cut.taken.collections["printLog"]
+        #expect(held?.sent == BookScope.owingCap, "a book with no payments recorded travelled whole")
+        #expect(held?.whole == false)
+        #expect(held?.available == 1_100)
+        #expect(held?.keptAfter != nil, "the phone was not told the owing set was cut")
+        #expect(!ids(cut).contains("U-0"), "the oldest went first")
+        #expect(ids(cut).contains("U-1099"))
+    }
+
+    @Test("with no stored status, a job paid its bare price may still owe tax on top")
+    func noStatusLeavesRoomForTax() {
+        #expect(BookScope.mayOwe(job("A", "completed", "2026-01-01", ["price": .number(100), "paidAmount": .number(100)])))
+        #expect(!BookScope.mayOwe(job("B", "completed", "2026-01-01", ["price": .number(100), "paidAmount": .number(125)])))
+        #expect(!BookScope.mayOwe(job("C", "completed", "2026-01-01", ["price": .number(100), "paidAmount": .number(100),
+                                                                       "paymentStatus": .string("paid")])))
+    }
+
     @Test("a scope from an older Mac, without the new fields, still decodes")
     func oldScopeDecodes() throws {
         let old = #"{"collections":{"printLog":{"whole":false,"sent":200,"available":900}},"omitted":[],"takenAt":"2026-10-01T00:00:00.000Z","meters":{"m1":12}}"#

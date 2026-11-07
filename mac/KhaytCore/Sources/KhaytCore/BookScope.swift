@@ -228,11 +228,21 @@ public enum BookScope {
                 // its age. A customer's Owed on the phone is summed over the
                 // jobs it holds; one old unpaid job left on the Mac made it
                 // short with nothing on screen to say so.
-                let open = rows.filter { !isFinished($0) || mayOwe($0) }
+                //
+                // The owing set has its own ceiling: a shop that never records
+                // payments has every finished job "may owe", and without one
+                // the phone got the whole book. When it bites, the newest
+                // owing jobs travel and keptAfter says the rest are older.
+                let open = rows.filter { !isFinished($0) }
+                let owing = rows.filter { isFinished($0) && mayOwe($0) }
+                    .sorted { recency($0) > recency($1) }
                 let closed = rows.filter { isFinished($0) && !mayOwe($0) }
                     .sorted { recency($0) > recency($1) }
-                if closed.count > n { keptAfter = recency(closed[n]) }
-                kept = open + closed.prefix(n)
+                var leftNewest: [String] = []
+                if owing.count > owingCap { leftNewest.append(recency(owing[owingCap])) }
+                if closed.count > n { leftNewest.append(recency(closed[n])) }
+                keptAfter = leftNewest.max()
+                kept = open + owing.prefix(owingCap) + closed.prefix(n)
             case .newest(let n):
                 kept = Array(rows.sorted { recency($0) > recency($1) }.prefix(n))
             }
@@ -289,6 +299,12 @@ public enum BookScope {
         return finished.contains(status)
     }
 
+    /// How many finished-but-may-owe jobs travel beyond the open ones.
+    public static let owingCap = 1_000
+    /// The highest sales-tax rate `mayOwe` allows for when a job has no
+    /// stored payment status (KSA is 15%).
+    public static let maxTaxOnTop = 0.25
+
     /// Could this finished job still owe the shop money?
     ///
     /// The shared rule decides what a job owes (`KhaytOrderMoney`), and it
@@ -298,7 +314,9 @@ public enum BookScope {
     /// credited invoice) or that charges nothing does not, and a job owes
     /// nothing only when its own figures say it is paid in full AND its stored
     /// `paymentStatus` (`lib/order-payment.js` `statusOf`, which counts tax and
-    /// credit notes) does not say otherwise. Anything else travels.
+    /// credit notes) does not say otherwise. Anything else travels — up to
+    /// `owingCap`, newest first. A heuristic: it can over-send, and past the
+    /// cap it under-sends (and the scope says so through `keptAfter`).
     public static func mayOwe(_ row: JSONValue) -> Bool {
         guard case .object(let o) = row, PaymentTerms.owesAtAll(o) else { return false }
         func number(_ v: JSONValue?) -> Double {
@@ -311,8 +329,18 @@ public enum BookScope {
         let price = number(o["price"])
         guard price > 0.005 else { return false }
         let paid = number(o["paidAmount"]) + number(o["giftCardDiscount"])
-        if case .string(let status)? = o["paymentStatus"], status == "unpaid" || status == "partial" { return true }
-        return paid + 0.005 < price
+        // The stored status was worked out against what was BILLED (tax and
+        // credit notes included), so it decides when present — except a
+        // "paid" that its own figures contradict (a price raised after the
+        // status was stamped), which travels.
+        if case .string(let status)? = o["paymentStatus"] {
+            if status == "unpaid" || status == "partial" { return true }
+            if status == "paid" { return paid + 0.005 < price }
+        }
+        // No status: compare against the price with room for tax on top. A
+        // tax-on-top shop paid exactly `price` still owes the tax, and a cut
+        // has no settings to know the rate, so this errs towards sending.
+        return paid + 0.005 < price * (1 + maxTaxOnTop)
     }
 
     /// What sorts "newest": the latest of the job's own day (`date`) and the
