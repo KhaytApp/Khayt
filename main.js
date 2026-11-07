@@ -47,7 +47,21 @@ if (!isBedReady && SENTRY_DSN && (app.isPackaged || process.env.SENTRY_DSN)) {
       // the store is read. beforeSend fires when the event does, by which point
       // lanServerStore is populated. Fails CLOSED — if consent is unknown, such
       // as a crash during startup, the event is dropped rather than sent.
-      beforeSend: (event) => (telemetryConsent().crash ? event : null),
+      //
+      // And SCRUBBED, as /privacy says crash reports are: e-mails, phone
+      // numbers, IBANs, long digit runs, secrets and paths come out of the
+      // message, exceptions, frames, breadcrumbs, request URL and extras
+      // (lib/main/sentry-scrub.js). If scrubbing fails, nothing is sent.
+      beforeSend: (event) => {
+        if (!telemetryConsent().crash) return null;
+        try { return require('./lib/main/sentry-scrub.js').scrubSentryEvent(event); } catch (_) { return null; }
+      },
+      beforeBreadcrumb: (crumb) => {
+        try {
+          const one = require('./lib/main/sentry-scrub.js').scrubSentryEvent({ breadcrumbs: [crumb] });
+          return one.breadcrumbs[0];
+        } catch (_) { return null; }
+      },
     });
   } catch (e) { console.error('Sentry init:', e && e.message); sentry = null; }
 }
@@ -5138,8 +5152,18 @@ async function diagnoseMovedPrinters(machineList) {
   }
 }
 
+/* Which start is the live one. A start awaits its first poll before it sets
+ * its interval, so two starts close together (boot's, whose first poll waits
+ * 5 s per printer that is off, and a machine save) would BOTH set one — and
+ * the first interval, overwritten, was never cleared: two pollers, each with
+ * its own in-flight flag, racing for the completion edge. Only the latest
+ * start may set the interval, and only one poll runs at a time across all. */
+let printerPollGeneration = 0;
+let printerPollInFlight = false;
+
 ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
-  if (printerPollInterval) clearInterval(printerPollInterval);
+  const generation = ++printerPollGeneration;
+  if (printerPollInterval) { clearInterval(printerPollInterval); printerPollInterval = null; }
   // TRUST BOUNDARY: the `machines` array is renderer-supplied and is NOT
   // re-validated against the persisted store here (doing so would require
   // threading the store + machine identity through this handler). The SSRF
@@ -5173,14 +5197,13 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
    * Skipping a tick rather than queueing it: the next one is thirty seconds
    * away and the data it wants is "what is the printer doing now", so a queued
    * poll would only ask a stale question late. */
-  let pollInFlight = false;
   const poll = async () => {
-    if (pollInFlight) return;
-    pollInFlight = true;
+    if (printerPollInFlight || generation !== printerPollGeneration) return;
+    printerPollInFlight = true;
     try {
       await pollOnce();
     } finally {
-      pollInFlight = false;
+      printerPollInFlight = false;
     }
   };
   const pollOnce = async () => {
@@ -5211,12 +5234,32 @@ ipcMain.handle('hub:start-printer-polling', async (_e, machines) => {
     diagnoseMovedPrinters(machineList).catch(() => { /* never break polling */ });
   };
   await poll();
+  // A later start took over while this one's first poll ran: it owns the interval.
+  if (generation !== printerPollGeneration) return printerStatusCache;
+  if (printerPollInterval) clearInterval(printerPollInterval);
   printerPollInterval = setInterval(poll, 30000);
   return printerStatusCache;
 });
 
 ipcMain.handle('hub:stop-printer-polling', () => {
+  printerPollGeneration++;
   if (printerPollInterval) { clearInterval(printerPollInterval); printerPollInterval = null; }
+});
+
+/* "Test connection" in the machine editor: ask ONE printer once, through the
+ * same host allowlist, and touch neither the cache nor the fleet's polling.
+ * The test used to restart polling with the draft machine alone, so every
+ * other printer went unpolled — frozen status, no stall alerts, no finish
+ * photos, no completions captured — until the dialog was saved. */
+ipcMain.handle('hub:probe-printer', async (_e, machine) => {
+  const m = machine && typeof machine === 'object' ? machine : null;
+  if (!m || !m.printerApi?.type || m.printerApi.type === 'none') return null;
+  const before = printerStatusCache[m.id];
+  try {
+    return mergePollSuccess(before, await fetchPrinterStatus(m), Date.now());
+  } catch (e) {
+    return mergePollFailure(before, e.message, Date.now());
+  }
 });
 
 ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
@@ -6178,6 +6221,15 @@ ipcMain.handle('hub:cloud-paylink', async (_e, { url, shopId, token, op, link, l
     if (op === 'delete') return { ok: true, ...(await cloudClient.deletePayLink(url, shopId, token)) };
     return { ok: true, ...(await cloudClient.getPayLink(url, shopId, token)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+// The shop's cross-shop portal switch (Cloud "portal crossShop").
+ipcMain.handle('hub:cloud-portal-settings', async (_e, { url, shopId, token, crossShop } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    if (typeof crossShop === 'boolean') return { ok: true, ...(await cloudClient.setPortalSettings(url, shopId, token, crossShop)) };
+    return { ok: true, ...(await cloudClient.getPortalSettings(url, shopId, token)) };
+  } catch (e) { return { ok: false, error: String(e && e.message || e), reason: (e && e.reason) || null }; }
 });
 
 ipcMain.handle('hub:cloud-set-slug', async (_e, { url, shopId, token, slug } = {}) => {

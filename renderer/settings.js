@@ -1407,12 +1407,12 @@ async function openStorefrontModal() {
         <input class="sfShow" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.on_store'))}" type="checkbox" style="width:auto;margin:0;" ${p.storefrontHidden ? '' : 'checked'}>${escapeHtml(t('store.on_store'))}
       </label>
       <span style="flex:1;min-width:90px;font-size:12.5px;">${escapeHtml(nm)}</span>
-      <input class="sfPrice" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(cur)}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escapeHtml(p.price != null ? String(p.price) : (p.basePrice != null ? String(p.basePrice) : '0'))}" value="${escapeHtml(sf.prices[p.id] != null ? String(sf.prices[p.id]) : '')}" style="width:72px;font-size:12.5px;text-align:right;" title="${escapeHtml(cur)}">
+      <input class="sfPrice" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(cur)}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escapeHtml(p.price != null ? String(p.price) : (p.basePrice != null ? String(p.basePrice) : '0'))}" value="${escapeHtml(sf.prices[p.id] != null ? String(sf.prices[p.id]) : '')}" style="width:72px;font-size:12.5px;text-align:end;" title="${escapeHtml(cur)}">
       <input class="sfCat" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.category_ph') || 'category')}" type="text" maxlength="60" placeholder="${escapeHtml((typeof productCategoryOf === 'function' ? productCategoryOf(p) : (p.category || '')) || t('store.category_ph') || 'category')}" value="${escapeHtml(sf.categories[p.id] || '')}" list="sfCatList" style="width:96px;font-size:12px;">
       <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="${escapeHtml(t('store.sold_out') || 'Sold out')}">
         <input class="sfSold" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.sold_out') || 'Sold out')}" type="checkbox" style="width:auto;margin:0;" ${sf.soldOut[p.id] ? 'checked' : ''}>${escapeHtml(t('store.sold_out') || 'Sold out')}
       </label>
-      <input class="sfStock" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.stock_qty'))}" type="number" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(t('store.stock_qty'))}" value="${escapeHtml(sf.stockQty[p.id] != null ? String(sf.stockQty[p.id]) : '')}" title="${escapeHtml(t('store.stock_hint'))}" style="width:64px;font-size:12.5px;text-align:right;">
+      <input class="sfStock" data-pid="${escapeHtml(p.id)}" aria-label="${escapeHtml(nm || p.id)} — ${escapeHtml(t('store.stock_qty'))}" type="number" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(t('store.stock_qty'))}" value="${escapeHtml(sf.stockQty[p.id] != null ? String(sf.stockQty[p.id]) : '')}" title="${escapeHtml(t('store.stock_hint'))}" style="width:64px;font-size:12.5px;text-align:end;">
       <input class="sfOpts" data-pid="${escapeHtml(p.id)}" type="text" maxlength="240" placeholder="${escapeHtml(t('store.options_ph') || 'Options — Color: Black, White; Size: S, M')}" value="${escapeHtml(sf.options[p.id] || '')}" title="${escapeHtml(t('store.options_hint') || 'Optional product choices. Format: Group: value, value; Group: value')}" style="flex-basis:100%;font-size:12px;">
     </div>`;
   }).join('') || `<p style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('store.no_products') || 'Add products to your catalog first')}</p>`;
@@ -1542,7 +1542,7 @@ async function openStorefrontModal() {
         row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
         row.innerHTML = `
           <input class="shLabel" type="text" maxlength="60" placeholder="${escapeHtml(t('store.ship_label_ph') || 'e.g. Courier, Pickup')}" value="${escapeHtml(m.label || '')}" style="flex:1;font-size:12.5px;">
-          <input class="shPrice" type="number" min="0" step="0.01" placeholder="0" value="${escapeHtml(m.price != null && m.price !== '' ? String(m.price) : '')}" style="width:80px;font-size:12.5px;text-align:right;" title="${escapeHtml(cur)}">
+          <input class="shPrice" type="number" min="0" step="0.01" placeholder="0" value="${escapeHtml(m.price != null && m.price !== '' ? String(m.price) : '')}" style="width:80px;font-size:12.5px;text-align:end;" title="${escapeHtml(cur)}">
           <button type="button" class="btn danger small shDel" style="font-size:11px;" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">✕</button>`;
         row.querySelector('.shDel').addEventListener('click', () => row.remove());
         return row;
@@ -3242,7 +3242,13 @@ function renderCloudSettings() {
         <button id="btnCloudPayLinkRemove" class="btn ghost small" style="display:none;">${escapeHtml(t('cloud.paylink_remove'))}</button>
         <span id="cloudPayLinkResult" style="font-size:12px;"></span>
       </div>
-      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.paylink_note'))}</p>` : ''}`}
+      <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('cloud.paylink_note'))}</p>` : ''}
+      <!-- Cloud "portal crossShop": this shop's orders beside other Khayt shops in a customer's portal. -->
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="cloudCrossShop" style="width:auto;margin:0;" checked disabled>
+        <span>${escapeHtml(t('cloud.cross_shop'))}</span>
+      </label>
+      <p id="cloudCrossShopNote" style="font-size:11.5px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('cloud.cross_shop_note'))}</p>`}
     ${cloudPlansHtml()}`;
 
   const result = (msg, color) => { const r = el.querySelector('#cloudResult'); if (r) { r.textContent = msg; r.style.color = color || 'var(--text-muted)'; } };
@@ -3361,9 +3367,9 @@ function renderCloudSettings() {
         <label>${escapeHtml(t('team.code') || 'Invite code')}</label><input id="joinCode" autocomplete="off" style="text-transform:uppercase;">`,
       onSave: async (modal) => {
         const code = modal.querySelector('#joinCode').value.trim();
-        if (!code) { toast(t('team.code') || 'Invite code', 'error'); return false; }
+        if (!code) { toast(t('team.code_required'), 'error'); return false; }
         const r = await window.hubAPI.cloudAcceptInvite({ url: f.url, email: f.email, password: f.password, code });
-        if (!r.ok) { toast('✗ ' + (r.error || 'join failed'), 'error'); return false; }
+        if (!r.ok) { toast(t('team.join_failed', { error: r.error || '—' }), 'error', 8000); return false; }
         if (!r.keyset) { toast(t('team.no_keyset') || 'The owner hasn’t set up sync yet — ask them to enable Khayt Cloud first.', 'error'); return false; }
         settings.cloud = { enabled: true, url: f.url, email: f.email, shopId: r.shopId, token: r.token, keyset: r.keyset, lastServerRev: 0, verified: false, role: r.role || 'operator' };
         syncScopeToShop(); // this store now has a shop id — see app-state.js
@@ -3520,6 +3526,39 @@ function renderCloudSettings() {
       if (!r?.ok) { say(r?.error || (t('cloud.slug_failed') || 'Could not save that name.'), 'var(--danger)'); return; }
       slugInput.value = r.slug;
       say(t('cloud.slug_saved') || 'Saved — your shop is reachable at that address.', 'var(--success)');
+    });
+  })();
+
+  /* Whether the shop's orders appear in a customer's portal beside other
+   * Khayt shops. The shop's setting, read from the server each time; any
+   * member sees it, only an owner or manager may change it. */
+  (async () => {
+    const box = el.querySelector('#cloudCrossShop');
+    if (!box || !window.hubAPI?.cloudPortalSettings) return;
+    const c = settings.cloud || {};
+    const note = el.querySelector('#cloudCrossShopNote');
+    const say = (msg, color) => { if (note) { note.textContent = msg; note.style.color = color || 'var(--text-muted)'; } };
+    const canEdit = ['owner', 'manager'].includes(c.role || 'owner');
+    try {
+      const r = await window.hubAPI.cloudPortalSettings({ url: c.url, shopId: c.shopId, token: c.token });
+      if (!r?.ok) { say(t('cloud.cross_shop_unavailable')); return; }
+      box.checked = r.crossShop !== false;
+      box.disabled = !canEdit;
+      if (!canEdit) say(t('cloud.cross_shop_role'));
+    } catch (e) { say(t('cloud.cross_shop_unavailable')); return; }
+    box.addEventListener('change', async () => {
+      const want = box.checked;
+      box.disabled = true;
+      const r = await window.hubAPI.cloudPortalSettings({ url: c.url, shopId: c.shopId, token: c.token, crossShop: want });
+      if (r?.ok) {
+        box.checked = r.crossShop !== false;
+        box.disabled = false;
+        say(t('cloud.cross_shop_note'));
+      } else {
+        box.checked = !want;
+        box.disabled = r?.reason === 'role';
+        say(r?.reason === 'role' ? t('cloud.cross_shop_role') : t('cloud.cross_shop_failed', { error: r?.error || '—' }), 'var(--danger)');
+      }
     });
   })();
 
@@ -3890,7 +3929,7 @@ function renderOperatorLockSettings() {
       } else if (!pin) {
         op.pinHash = '';
         saveAll();
-        toast('PIN cleared', 'info', 1800);
+        toast(t('ops.pin_cleared'), 'info', 1800);
       }
     });
   });
@@ -4820,7 +4859,7 @@ function renderZatcaPhase2Settings() {
       logEl.innerHTML = `<p style="color:var(--text-muted);margin:0;">${escapeHtml(t('zatca2.log_empty') || 'No submission attempts yet.')}</p>`;
     } else {
       logEl.innerHTML = `<table style="width:100%;border-collapse:collapse;">
-        <thead><tr style="text-align:left;color:var(--text-muted);">
+        <thead><tr style="text-align:start;color:var(--text-muted);">
           <th style="padding:4px 6px;">${escapeHtml(t('inv.date') || 'Date')}</th>
           <th style="padding:4px 6px;">${escapeHtml(t('inv.invoice_no') || 'Invoice')}</th>
           <th style="padding:4px 6px;">${escapeHtml(t('common.status') || 'Status')}</th>
@@ -5439,7 +5478,7 @@ function renderSavedFilterPresets() {
       const r = $('#logRangeFilter');  if (r) r.value = logRangeFilter;
       const sr = $('#logSearch');      if (sr) sr.value = logSearchTerm;
       renderLogs();
-      toast(`Filter "${f.name}" loaded`, 'success', 1800);
+      toast(t('filter.loaded', { name: f.name }), 'success', 1800);
     });
   });
   el.querySelectorAll('[data-del-filter]').forEach(btn => {
@@ -5474,7 +5513,7 @@ function saveCurrentFilterPreset() {
       settings.savedFilters = [...(settings.savedFilters || []), preset];
       saveAll();
       renderSavedFilterPresets();
-      toast(`Preset "${name}" saved ✓`, 'success');
+      toast(t('filter.saved', { name }), 'success');
     }
   });
 }

@@ -87,11 +87,37 @@ enum JobSearch {
     private static var indexedAt: Date?
 
     /// Hand Spotlight the jobs the phone holds, at most every ten minutes.
-    static func index(now: Date = Date()) async {
+    ///
+    /// The jobs indexed last time go first. Indexing only ADDS: a job cut
+    /// from the book, deleted on the Mac, or from the sample shop the phone
+    /// opened before its real one, stayed findable for good.
+    static func index(now: Date = Date(), into spotlight: any JobIndex = CSSearchableIndex.default()) async {
         if let last = indexedAt, now.timeIntervalSince(last) < 600 { return }
         indexedAt = now
-        let jobs = await JobSearchQuery.all()
-        guard !jobs.isEmpty else { return }
-        try? await CSSearchableIndex.default().indexAppEntities(jobs)
+        await reindex(await JobSearchQuery.all(), into: spotlight)
     }
+
+    static func reindex(_ jobs: [JobSearchEntity], into spotlight: any JobIndex) async {
+        try? await spotlight.deleteJobs()
+        guard !jobs.isEmpty else { return }
+        try? await spotlight.indexJobs(jobs)
+    }
+
+    /// Unpairing: nothing of the shop stays in Spotlight, and the next shop
+    /// is indexed at once rather than ten minutes on.
+    static func forget(_ spotlight: CSSearchableIndex = .default()) {
+        indexedAt = nil
+        spotlight.deleteAllSearchableItems(completionHandler: nil)
+    }
+}
+
+/// Where the jobs go: Spotlight, or a test's stand-in.
+protocol JobIndex {
+    func deleteJobs() async throws
+    func indexJobs(_ jobs: [JobSearchEntity]) async throws
+}
+
+extension CSSearchableIndex: JobIndex {
+    func deleteJobs() async throws { try await deleteAppEntities(ofType: JobSearchEntity.self) }
+    func indexJobs(_ jobs: [JobSearchEntity]) async throws { try await indexAppEntities(jobs) }
 }

@@ -113,7 +113,7 @@ final class DeviceKeyTests: XCTestCase {
         guard let saved else { return }
         let s = ConnectionSettings()
         s.host = saved.host; s.port = saved.port; s.pin = saved.pin; s.isPaired = saved.paired; s.isSampleShop = saved.sample
-        s.macIdentityKey = saved.identity; s.device = saved.device; s.signedOutByMac = false
+        s.macIdentityKey = saved.identity; s.device = saved.device; s.signedOutByMac = false; s.needsPairAgain = false
         StubMac.reset()
     }
 
@@ -176,16 +176,91 @@ final class DeviceKeyTests: XCTestCase {
         catch { XCTAssertEqual(error.localizedDescription, L10n.tr("pair.window_locked")) }
     }
 
-    func testAMacThatForgotThePhoneGetsThePinAndAFreshEnrolment() async throws {
+    func testThePinIsGoneOnceThePhoneEnrols() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        let enrolled = await api.enrolDevice(name: "Test iPhone")
+        XCTAssertEqual(enrolled, .enrolled)
+        XCTAssertEqual(s.pin, "", "signed from here on: no PIN kept for a reply to ask for")
+        XCTAssertEqual(ConnectionSettings().pin, "", "gone from the Keychain too")
+        XCTAssertNotNil(s.device, "letting the PIN go keeps the enrolment")
+        XCTAssertFalse(s.macIdentityKey.isEmpty, "and the pinned key")
+        XCTAssertFalse(api.wantsEnrolment())
+        let key = await api.fetchIdentityKey()
+        XCTAssertNotNil(key, "and the phone still talks to its Mac, signed")
+    }
+
+    func testAProvenMacThatForgotThePhoneAsksThePersonNeverSendsThePin() async throws {
         let s = pairedSettings()
         let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         _ = await api.enrolDevice(name: "Test iPhone")
         StubMac.knowsDevice = false
         let fetched = await api.fetchIdentityKey()
-        XCTAssertNotNil(fetched, "the request still succeeds, with the PIN")
-        XCTAssertEqual(StubMac.seen.suffix(2).map { $0.pin != nil }, [false, true])
+        XCTAssertNil(fetched, "the request fails rather than fall back to the PIN")
+        XCTAssertTrue(StubMac.seen.allSatisfy { $0.path == "/api/devices" || $0.pin == nil },
+                      "no x-khayt-pin after enrolment, on any request")
+        XCTAssertEqual(StubMac.seen.last?.path, "/api/proof", "the refusal was checked against the pinned key")
+        XCTAssertTrue(s.needsPairAgain, "the person is asked to pair again")
+        XCTAssertNotNil(s.device)
+        do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("an unknown phone was let in") }
+        catch { guard case .unauthorized? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
+
+        // "Pair again": the PIN the person types, then a fresh enrolment.
+        StubMac.knowsDevice = true
+        let again = try await api.pairAgain(pin: "12345678", name: "Test iPhone")
+        XCTAssertEqual(again, .enrolled)
+        XCTAssertFalse(s.needsPairAgain)
+        XCTAssertEqual(s.pin, "", "let go again once enrolled")
+    }
+
+    func testAnUnprovenDeviceUnknownChangesNothingAndSendsNoPin() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        let device = s.device
+        StubMac.knowsDevice = false
+        for proof in [StubMac.Proof.forged, .missing] {
+            StubMac.proof = proof
+            let fetched = await api.fetchIdentityKey()
+            XCTAssertNil(fetched)
+            XCTAssertFalse(s.needsPairAgain, "\(proof): an impostor or a network fault is not a reason to re-pair")
+            XCTAssertEqual(s.device, device, "\(proof): the enrolment is kept")
+            XCTAssertTrue(StubMac.seen.allSatisfy { $0.path == "/api/devices" || $0.pin == nil }, "\(proof): no PIN sent")
+            do { _ = try await api.lanRequest(path: "/api/queue", method: "GET"); XCTFail("\(proof): answered") }
+            catch {
+                guard case .transport? = error as? KhaytAPIError else { return XCTFail("\(proof): \(error)") }
+            }
+        }
+        StubMac.knowsDevice = true
+        StubMac.proof = .genuine
+        let key = await api.fetchIdentityKey()
+        XCTAssertNotNil(key, "the real Mac takes the kept enrolment")
+    }
+
+    /// The Mac lists phones by the name they enrol with; `UIDevice.name` is
+    /// "iPhone" on every phone, so the person names it.
+    func testThePhoneEnrolsUnderTheNameThePersonGaveIt() async {
+        let s = pairedSettings()
+        let had = s.phoneName
+        defer { s.phoneName = had }
+        s.phoneName = "  Front desk  "
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolWithTypedPin(name: s.nameToSend)
+        XCTAssertEqual(StubMac.enrolledName, "Front desk")
+        s.phoneName = " "
+        XCTAssertEqual(s.nameToSend, "iPhone", "blank is the default, not nothing")
+        s.phoneName = String(repeating: "x", count: 80)
+        XCTAssertEqual(s.nameToSend.count, 60)
+    }
+
+    func testAPairAgainWithAWrongPinIsRefused() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
+        _ = await api.enrolDevice(name: "Test iPhone")
+        s.needsPairAgain = true
+        do { _ = try await api.pairAgain(pin: "00000000", name: "Test iPhone"); XCTFail("a wrong PIN paired") }
+        catch { guard case .unauthorized? = error as? KhaytAPIError else { return XCTFail("\(error)") } }
         XCTAssertNil(s.device)
-        XCTAssertTrue(api.wantsEnrolment())
     }
 
     func testAPhoneSignedOutOnTheMacForgetsThePinAndDoesNotComeBackByItself() async throws {
@@ -243,6 +318,7 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertNotNil(s.device)
         s.macIdentityKey = Curve25519.Signing.PrivateKey().publicKey.rawRepresentation.base64EncodedString()
         XCTAssertNil(s.device, "signed for another identity")
+        s.pin = "12345678"   // let go at the first enrolment
         s.macIdentityKey = StubMac.identity.publicKey.rawRepresentation.base64EncodedString()
         _ = await api.enrolDevice(name: "Test iPhone")
         XCTAssertNotNil(s.device)
@@ -264,12 +340,17 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     /// This phone shut out of the open window after too many wrong PINs.
     nonisolated(unsafe) static var pairingLocked = false
     nonisolated(unsafe) static var clockAhead: TimeInterval = 0
+    /// What answers `/api/proof`: the pinned Mac, an impostor, or nothing.
+    enum Proof { case genuine, forged, missing }
+    nonisolated(unsafe) static var proof = Proof.genuine
+    /// The name the phone gave when it enrolled.
+    nonisolated(unsafe) static var enrolledName: String?
     nonisolated(unsafe) static var key: SymmetricKey?
     static let identity = Curve25519.Signing.PrivateKey()
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false; proof = .genuine; enrolledName = nil
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -292,7 +373,13 @@ final class StubMac: URLProtocol, @unchecked Sendable {
             client?.urlProtocolDidFinishLoading(self)
             return
         }
-        if Self.pairingClosed, url.path() == "/api/devices" {
+        if url.path() == "/api/proof" {
+            let nonce = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "nonce" })?.value ?? ""
+            let signer = Self.proof == .forged ? Curve25519.Signing.PrivateKey() : Self.identity
+            let sig = try! signer.signature(for: MacIdentity.message(nonce: nonce)).base64EncodedString()
+            answer = Self.proof == .missing ? (404, ["error": "not found"]) : (200, ["alg": "ed25519", "sig": sig])
+        } else if Self.pairingClosed, url.path() == "/api/devices" {
             // Before the PIN is looked at, as the Mac does.
             answer = (403, ["reason": "pairing-closed", "error": "On the Mac, click Pair a phone, then try again"])
         } else if let device = request.value(forHTTPHeaderField: "x-khayt-device") {
@@ -329,12 +416,15 @@ final class StubMac: URLProtocol, @unchecked Sendable {
 
     private func route(_ path: String, body: Data?) -> (Int, Any) {
         switch path {
+        case "/api/queue":
+            return (200, [Any]())
         case "/api/identity":
             return (200, ["alg": "ed25519", "publicKey": Self.identity.publicKey.rawRepresentation.base64EncodedString()])
         case "/api/devices" where Self.hasRoute:
             guard let body, let ask = try? JSONSerialization.jsonObject(with: body) as? [String: String],
                   let phonePublic = ask["publicKey"], let raw = Data(base64Encoded: phonePublic),
                   let phone = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw) else { return (400, ["error": "bad"]) }
+            Self.enrolledName = ask["name"]
             let mine = Curve25519.KeyAgreement.PrivateKey()
             let macPublic = mine.publicKey.rawRepresentation.base64EncodedString()
             let shared = try! mine.sharedSecretFromKeyAgreement(with: phone)
