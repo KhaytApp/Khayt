@@ -1712,14 +1712,34 @@ final class KhaytAPIClient: ObservableObject {
         guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin, contentType: contentType) }
 
         let (data, response) = try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
-        guard (response as? HTTPURLResponse)?.statusCode == 401 else { return (data, response) }
+        let status = (response as? HTTPURLResponse)?.statusCode
+        if let status, (200...299).contains(status), settings.needsPairAgain {
+            // A signed request went through: whatever said this phone was
+            // unknown was not the Mac, or the Mac has taken it back.
+            settings.needsPairAgain = false
+        }
+        guard status == 401 else { return (data, response) }
         switch DeviceKey.refusal(data) {
         case .unknown?:
-            // Removed on the Mac (its PIN changed, or it was let go): back to
-            // the PIN for this one, and enrol again from scratch.
-            settings.device = nil
-            enrolNotBefore = nil
-            return try await send(url, method: method, body: body, auth: .pin, contentType: contentType)
+            // ── NEVER THE PIN IN ANSWER TO A 401 ─────────────────────────
+            //
+            // Removed on the Mac (its PIN changed, or it was let go) — or so
+            // says a reply nobody signed, which anything on the shop's Wi-Fi
+            // can send. Answering it with the PIN, as this once did, handed
+            // the PIN in the clear to whoever asked.
+            //
+            // So the answerer first proves it holds the PINNED Mac key
+            // (`/api/proof`, a fresh nonce, no PIN). Proven: the Mac really
+            // forgot this phone, the request fails and the phone says it needs
+            // pairing again — only the person, typing the PIN, sends it. Not
+            // proven, or no answer: an impostor or a network fault. Nothing
+            // changes, no PIN goes anywhere, and the enrolment is kept.
+            let key = settings.macIdentityKey
+            if !key.isEmpty, await proves(host: settings.host, port: settings.port, key: key) {
+                settings.needsPairAgain = true
+                throw KhaytAPIError.unauthorized
+            }
+            throw KhaytAPIError.transport(URLError(.userAuthenticationRequired))
         case .clock(let now)?:
             clockOffset = TimeInterval(now) - Date().timeIntervalSince1970
             return try await send(url, method: method, body: body, auth: .device(device), contentType: contentType)
@@ -1874,7 +1894,38 @@ final class KhaytAPIClient: ObservableObject {
                                                     sig: answer.sig, phonePrivate: phone,
                                                     identityKey: identity) else { return .failed }
         settings.device = credential
+        // Signed from here on: the PIN is not kept for a reply to ask for.
+        settings.dropPinAfterEnrolment()
         return .enrolled
+    }
+
+    /// After the person typed the PIN (pairing, or "Pair again"): pin the
+    /// Mac's key, then enrol. Nil when the Mac has no key to give or no
+    /// device route: the phone pairs on the PIN, as an older desktop needs.
+    /// A shut or locked pairing window lets the pinned key go again, so the
+    /// next try starts clean.
+    func enrolWithTypedPin(name: String) async -> Enrolment? {
+        if settings.macIdentityKey.isEmpty, let key = await fetchIdentityKey() {
+            settings.macIdentityKey = key
+        }
+        guard !settings.macIdentityKey.isEmpty else { return nil }
+        let result = await enrolDevice(name: name)
+        if result == .closed || result == .locked { settings.macIdentityKey = "" }
+        return result
+    }
+
+    /// "Pair again", from the banner: the Mac no longer knows this phone, or
+    /// it moved to an address that could not prove itself. The PIN is the
+    /// one just typed, sent where the person chose to send it — never one
+    /// the phone kept.
+    func pairAgain(pin: String, name: String) async throws -> Enrolment? {
+        // A new PIN lets the old enrolment and pinned key go (see
+        // `ConnectionSettings.pin`), so this asks with the PIN itself — and
+        // asks the Mac, not the book, which would say yes to any PIN.
+        settings.pin = pin.trimmingCharacters(in: .whitespacesAndNewlines)
+        let (data, response) = try await request(path: "/api/queue", method: "GET", body: nil, requiresPin: true)
+        try ensureOK(data, response)
+        return await enrolWithTypedPin(name: name)
     }
 
     private func ensureOK(_ data: Data, _ response: URLResponse) throws {

@@ -73,10 +73,40 @@ struct ConnectionBanner: View {
         }
     }
 
+    @State private var pairingAgain = false
+
+    /// The Mac proved it no longer knows this phone, or it moved to an
+    /// address that could not prove itself. No PIN is sent by itself: the
+    /// person types it, in `PairAgainSheet`.
+    private var pairAgainStrip: some View {
+        HStack(spacing: 10) {
+            Circle().fill(KhaytDesign.attention).frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L10n.tr("pair.again.title"))
+                    .font(.khayt(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.attention)
+                Text(L10n.tr("pair.again.line"))
+                    .font(.khayt(11, relativeTo: .caption2))
+                    .foregroundStyle(KhaytDesign.textDim)
+            }
+            Spacer(minLength: 0)
+            Button(L10n.tr("pair.again.button")) { pairingAgain = true }
+                .font(.khayt(12, .semibold, relativeTo: .caption))
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(KhaytDesign.attention, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(.horizontal, KhaytDesign.pad)
+        .padding(.vertical, 7)
+        .background(KhaytDesign.attention.opacity(0.14))
+        .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+    }
+
     private var pending: String { L10n.format("sync.pending", api.pendingCount) }
 
-    /// The paired Mac's name answers at a new address. Moving sends the PIN
-    /// there, so it waits for the person — see `ConnectionHealth.followTheMac`.
+    /// The paired Mac's name answers at a new address. Moving there asks the
+    /// person for the PIN (no stored one is sent), so it waits for them — see `ConnectionHealth.followTheMac`.
     private func moveStrip(_ moved: MacAddress) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {

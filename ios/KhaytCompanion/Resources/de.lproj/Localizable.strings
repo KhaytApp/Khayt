@@ -461,7 +461,7 @@
 "pair.signed_out" = "Der Mac hat dieses iPhone abgemeldet. Koppele es erneut mit der Inhaber-PIN.";
 "pair.pin.title" = "Die Inhaber-PIN";
 "pair.pin.body" = "Die Inhaber-PIN aus Einstellungen → Online auf dem Mac oder PC, mindestens 8 Zeichen. Die Anfrage-PIN funktioniert hier nicht.";
-"pair.pin.foot" = "Wird im Schlüsselbund des iPhones gespeichert und nur an diesen Mac gesendet.";
+"pair.pin.foot" = "Wird nur an diesen Mac gesendet, um zu koppeln, und dann vom iPhone gelöscht. Für einen Computer, der kein Telefon koppeln kann, bleibt sie im Schlüsselbund des iPhones.";
 "pair.pin.wrong" = "Diese PIN wurde abgelehnt. Prüfe Einstellungen → Online auf dem Mac oder PC.";
 "pair.window_closed" = "Klicke auf dem Mac auf „Telefon koppeln“ (Einstellungen → Online) und versuche es erneut.";
 "pair.window_locked" = "Zu viele falsche PINs von diesem iPhone. Klicke auf dem Mac erneut auf „Telefon koppeln“ (Einstellungen → Online) und gib dann die richtige PIN ein.";
@@ -1097,3 +1097,9 @@
 "care.part.fep_film" = "FEP-Folie";
 "care.part.resin_tank" = "Harztank";
 "care.part.ipa" = "Isopropanol (Liter)";
+"pair.again.title" = "Dieses iPhone erneut koppeln";
+"pair.again.line" = "Gib die Inhaber-PIN ein, um den Mac wieder zu erreichen. Das iPhone sendet sie nie von selbst.";
+"pair.again.button" = "Erneut koppeln";
+"pair.again.body" = "Die Inhaber-PIN aus Einstellungen → Online auf dem Mac. Sie wird einmal an diese Adresse gesendet, um zu koppeln, und dann vom iPhone gelöscht.";
+"pair.phone_name" = "Name dieses iPhones";
+"pair.phone_name.foot" = "So führt der Mac dieses iPhone unter seinen gekoppelten Telefonen, damit du sie unterscheiden kannst.";
