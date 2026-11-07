@@ -1778,14 +1778,20 @@ async function captureFinishPhotos(currCache) {
  * job with the finish photo's own rule. This is the Mac's EnergyMeter: it holds
  * the memory the rule is handed back each reading, keeps it across a restart,
  * and writes `actualEnergyWh` onto a FINISHED print's job. A failed or
- * cancelled print's reading is dropped: the job goes back to be printed again,
- * and its actuals belong to the print that succeeds. */
+ * cancelled print's reading is kept a day for the waste row the shop logs
+ * against it (`KhaytPrintEnds.attemptFor`), never written on the job: the job
+ * goes back to be printed again, and its actuals belong to the print that
+ * succeeds. In memory only, as on the Mac — a failure logged after a restart
+ * is costed at the machine's wattage instead. */
 const ENERGY_KEY = 'khayt.energyMeters';
 const ENERGY_READ_MS = 55 * 1000;
 let _energyMemo = (() => { try { return JSON.parse(localStorage.getItem(ENERGY_KEY) || '{}') || {}; } catch (_) { return {}; } })();
 let _energyEndMemo = {};
 const _energyReadAt = {};
 let _energyBusy = false;
+/* How each print ended, and a failed print's reading, live in
+ * renderer/print-ends.js (KhaytPrintEnds) — the waste forms read them in both
+ * windows. */
 function _energySave() { try { localStorage.setItem(ENERGY_KEY, JSON.stringify(_energyMemo)); } catch (_) { /* private window */ } }
 async function meterPrintEnergy(currCache) {
   const PE = globalThis.KhaytPrintEnergy;
@@ -1801,16 +1807,24 @@ async function meterPrintEnergy(currCache) {
       const hasPlug = !!(m.smartPlug && m.smartPlug.type && m.smartPlug.type !== 'none' && !m.retiredAt);
       // The END first, off the same edge the photo uses.
       if (st && !st.error) {
+        const before = _energyEndMemo[m.id] || {};
         const r = FP.track(_energyEndMemo, m.id, st);
         _energyEndMemo = r.memo;
         if (r.outcome) {
+          const jobId = PE.jobFor(printLog, m.id, r.filename) || null;
+          // How far it got: what the printer says now, else its last word
+          // while printing — some firmware zero the progress on a cancel.
+          const progress = Number(st.progress) > 0 ? Number(st.progress)
+            : (Number(before.progress) > 0 ? Number(before.progress) : null);
+          if (globalThis.KhaytPrintEnds) KhaytPrintEnds.recordEnd(m.id, { orderId: jobId, outcome: r.outcome, durationS: r.durationS || null, progress, at: now });
           const t = PE.take(_energyMemo, m.id);
           _energyMemo = t.memo; _energySave();
           if (r.outcome === 'finished' && t.reading) {
-            const jobId = PE.jobFor(printLog, m.id, r.filename);
             const job = jobId && printLog.find((o) => o && o.id === jobId);
             const fields = job && PE.jobFields(t.reading, new Date(now).toISOString());
             if (fields) { Object.assign(job, fields); saveAll(); }
+          } else if (t.reading && jobId) {
+            if (globalThis.KhaytPrintEnds) KhaytPrintEnds.keepAttempt(m.id, { orderId: jobId, reading: t.reading, at: now });
           }
           continue;
         }

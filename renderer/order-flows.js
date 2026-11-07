@@ -753,7 +753,7 @@ function isoToLocalInput(iso) {
  *  inspector + timestamp. The rule is lib/qc-failure.js's, so Bed Ready's
  *  failures carry the same fields — its defects had no severity at all. */
 function recordQcFailure(order, failure) {
-  return QcFailureRules().record(order, failure, {
+  const out = QcFailureRules().record(order, failure, {
     now: Date.now(),
     inventory,
     wasteLog,
@@ -766,6 +766,15 @@ function recordQcFailure(order, failure) {
     machines: typeof machines !== 'undefined' ? machines : [],
     today: typeof localDateStr === 'function' ? localDateStr() : '',
   });
+  // THE WHOLE COST, beside the filament: a QC failure is a print that RAN TO
+  // THE END, so all of its machine time and power went into a part nobody can
+  // sell (lib/failed-print-cost.js, renderer/waste.js). `cost` is untouched.
+  // The caller saves; the kept meter reading, if one was used, is spent then.
+  if (out && out.waste && typeof attachFailedCost === 'function') {
+    const spent = attachFailedCost(out.waste, order, { inspected: true });
+    if (spent && typeof spendAttempt === 'function') spendAttempt(spent);
+  }
+  return out;
 }
 
 /**
