@@ -1097,3 +1097,18 @@
 "care.part.fep_film" = "غشاء FEP";
 "care.part.resin_tank" = "حوض راتنج";
 "care.part.ipa" = "كحول أيزوبروبيل (لتر)";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "قائمة التسوق";
+"shop.none" = "لا شيء للشراء — كل الخيوط فوق نقطة إعادة الطلب.";
+"shop.no_supplier" = "لا يوجد مورّد";
+"shop.share" = "مشاركة القائمة";
+"shop.hint" = "كل خيط عند نقطة إعادة الطلب أو دونها، مجمّعة حسب المورّد الذي يبيعه. تُضبط نقاط إعادة الطلب والكميات والمورّدون في Khayt على الماك أو الكمبيوتر.";
+"shop.buy" = "اشترِ %@";
+"shop.have" = "المتبقي %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "الطاقة: %@";
+"energy.sub" = "قاسها المقبس الذكي للطابعة";
+"energy.cost" = "الكهرباء";
+"unit.kwh" = "كيلوواط ساعة";
