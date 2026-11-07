@@ -390,6 +390,29 @@ function renderSmsNotificationSettings() {
           <div><label style="margin-top:0;">Access Token</label><input id="smsWaToken" type="password" value="${v(cfg.token)}" placeholder="EAA…" style="font-size:12.5px;"></div>
         </div>
         <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('wab.hint'))}</p>
+        ${(() => {
+          // Which approved template each milestone sends by itself — the
+          // Mac's WhatsAppBusinessSettings, writing the same
+          // settings.whatsappTemplates { ready: { name, langs: ['ar','en'] } }.
+          // A step left empty sends nothing.
+          const WMsg = KhaytWhatsappMessage;
+          const map = settings.whatsappTemplates || {};
+          const rows = WMsg.MILESTONES.map((m) => {
+            const tp = map[m] || {};
+            const langs = Array.isArray(tp.langs) ? tp.langs.join(', ') : '';
+            return `<span style="font-size:12px;align-self:center;">${escapeHtml(t('cu.m_' + m))}</span>
+              <input data-wab-name="${m}" value="${v(tp.name)}" placeholder="${v(WMsg.SUGGESTED_TEMPLATES[m])}" style="font-size:12.5px;">
+              <input data-wab-langs="${m}" value="${v(langs)}" placeholder="ar, en" style="font-size:12.5px;">`;
+          }).join('');
+          return `<label style="margin-top:12px;">${escapeHtml(t('cu.templates'))}</label>
+            <p style="font-size:11.5px;color:var(--text-muted);margin:2px 0 4px;">${escapeHtml(t('cu.templates_hint'))}</p>
+            <p style="font-size:11.5px;color:var(--text-muted);margin:0;">${escapeHtml(t('cu.params_basic'))}</p>
+            <p style="font-size:11.5px;color:var(--text-muted);margin:0 0 6px;">${escapeHtml(t('cu.m_shipped'))}: ${escapeHtml(t('cu.params_shipped'))}</p>
+            <div id="wabTemplates" style="display:grid;grid-template-columns:auto minmax(0,1fr) 110px;gap:6px 8px;">
+              <span></span><span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(t('cu.template_name'))}</span><span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(t('cu.langs'))}</span>
+              ${rows}
+            </div>`;
+        })()}
       </div>
       <div data-prov="unifonic" style="${prov === 'unifonic' ? '' : 'display:none;'}">
         <div class="inline-pair">
@@ -431,8 +454,36 @@ function renderSmsNotificationSettings() {
     secret:       secretInputSave((settings.smsConfig || {}).secret, el.querySelector('#smsHookSecret')?.value),
   });
 
+  // The templates as typed: `{ map, problem }`. Checked before saving with
+  // the shapes lib/whatsapp-send.js accepts — a name WhatsApp would refuse is a
+  // step that silently never sends (the Mac's `invalid`).
+  const splitLangs = (typed) => String(typed || '').split(/[,،\s]+/).map((x) => x.trim()).filter(Boolean);
+  const collectTemplates = () => {
+    const map = {};
+    for (const m of KhaytWhatsappMessage.MILESTONES) {
+      const name = (el.querySelector(`[data-wab-name="${m}"]`)?.value || '').trim();
+      const langs = splitLangs(el.querySelector(`[data-wab-langs="${m}"]`)?.value);
+      if (!name) continue;
+      if (!KhaytWhatsappSend.isTemplateName(name)) return { map, problem: t('cu.bad_name') };
+      if (!langs.length) return { map, problem: t('cu.needs_template') };
+      if (!langs.every((l) => KhaytWhatsappSend.isLanguage(l))) return { map, problem: t('cu.bad_lang') };
+      map[m] = { name, langs };
+    }
+    return { map, problem: '' };
+  };
+
   el.querySelector('#btnSaveSmsCfg')?.addEventListener('click', () => {
-    settings.smsConfig = collect();
+    const cfg = collect();
+    if (cfg.provider === 'whatsapp_cloud') {
+      const tpl = collectTemplates();
+      if (tpl.problem) {
+        const res = el.querySelector('#smsTestResult');
+        res.textContent = '✗ ' + tpl.problem; res.style.color = 'var(--danger)';
+        return;
+      }
+      settings.whatsappTemplates = tpl.map;
+    }
+    settings.smsConfig = cfg;
     saveAll();
     toast(t('common.save'), 'success');
   });

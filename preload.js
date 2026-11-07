@@ -264,6 +264,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudCatalogPublish: (opts) => ipcRenderer.invoke('hub:cloud-catalog-publish', opts),
   cloudReviewSummary: (opts) => ipcRenderer.invoke('hub:cloud-review-summary', opts),
   cloudListReviews:   (opts) => ipcRenderer.invoke('hub:cloud-list-reviews', opts),
+  cloudWhatsappHook:  (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-hook', opts),
+  cloudWhatsappStatuses: (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-statuses', opts),
   cloudDeleteReview:  (opts) => ipcRenderer.invoke('hub:cloud-delete-review', opts),
   cloudRequestReset: (opts) => ipcRenderer.invoke('hub:cloud-request-reset', opts),
   cloudResetPassword: (opts) => ipcRenderer.invoke('hub:cloud-reset-password', opts),

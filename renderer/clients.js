@@ -774,6 +774,27 @@ function openClientEditor(clientId = null) {
         <span>${escapeHtml(t('camp.opt_out') || 'Exclude from marketing campaigns')}</span>
       </label>
       ${(() => {
+        // Consent to ORDER UPDATES on WhatsApp (whatsappOptIn, lib/whatsapp-
+        // message.js optedIn): the shop's WhatsApp Business account sends a
+        // job's received/ready/shipped/delivered template only to a customer
+        // ticked here. The Mac's CustomerSheet writes the same { at, how }; the
+        // date it was first given stays when only "how" changes.
+        const o = KhaytWhatsappMessage.optedIn(draft) ? draft.whatsappOptIn : null;
+        const how = (o && o.how) || 'asked';
+        const HOW = KhaytWhatsappMessage.OPT_IN_HOW;
+        const hows = HOW.includes(how) ? HOW : [...HOW, how];
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+            <input type="checkbox" id="ceWabUpdates" style="width:auto;margin:0;" ${o ? 'checked' : ''}>
+            <span>${escapeHtml(t('cu.opt_in'))}</span>
+          </label>
+          <select id="ceWabUpdatesHow" style="width:auto;font-size:12px;${o ? '' : 'display:none;'}">
+            ${hows.map((h) => `<option value="${escapeHtml(h)}" ${h === how ? 'selected' : ''}>${escapeHtml(HOW.includes(h) ? t('ce.wab_how_' + h) : h)}</option>`).join('')}
+          </select>
+          ${o ? `<span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(t('ce.wab_since', { day: localDateStr(new Date(o.at)) }))}</span>` : ''}
+        </div>`;
+      })()}
+      ${(() => {
         // Consent to OFFERS on WhatsApp, kept apart from consent to order
         // updates (whatsappOptIn): the shop's WhatsApp Business account sends a
         // campaign only to a customer ticked here. The date it was first given
@@ -837,6 +858,10 @@ function openClientEditor(clientId = null) {
     onMount(modal) {
       modal.querySelector('#ceWabOffers')?.addEventListener('change', (e) => {
         const how = modal.querySelector('#ceWabOffersHow');
+        if (how) how.style.display = e.target.checked ? '' : 'none';
+      });
+      modal.querySelector('#ceWabUpdates')?.addEventListener('change', (e) => {
+        const how = modal.querySelector('#ceWabUpdatesHow');
         if (how) how.style.display = e.target.checked ? '' : 'none';
       });
       modal.querySelectorAll('[data-f]').forEach(input => {
@@ -1024,6 +1049,12 @@ function openClientEditor(clientId = null) {
         draft.whatsappMarketingOptIn = { ...(was || {}), at: was ? was.at : new Date().toISOString(),
           how: modal.querySelector('#ceWabOffersHow')?.value || 'asked' };
       } else delete draft.whatsappMarketingOptIn;
+      const upd = modal.querySelector('#ceWabUpdates');
+      if (upd && upd.checked) {
+        const was = KhaytWhatsappMessage.optedIn(draft) ? draft.whatsappOptIn : null;
+        draft.whatsappOptIn = { ...(was || {}), at: was ? was.at : new Date().toISOString(),
+          how: modal.querySelector('#ceWabUpdatesHow')?.value || 'asked' };
+      } else if (upd) delete draft.whatsappOptIn;
       draft.currency = modal.querySelector('#ceCurrency')?.value || null;
       draft.creditLimit = Math.max(0, num(modal.querySelector('#ceCreditLimit')?.value, 0)) || 0;
       // Payment terms (lib/payment-terms.js): whole days, 0 = due on receipt.
