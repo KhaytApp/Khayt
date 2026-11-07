@@ -125,4 +125,30 @@ final class ShopPulseTests: XCTestCase {
         XCTAssertEqual(owing.map(\.id), ["DEL"], "the delivered job is missing from Who owes")
         XCTAssertEqual(owing.first?.owed ?? 0, 200, accuracy: 0.001)
     }
+
+    /// End of Day's waste and hours: a figure only when the phone holds the
+    /// whole log, never the lines that happen to be on it.
+    func testEndOfDayShowsWasteAndHoursOnlyFromAWholeLog() async throws {
+        let today = Calendar.book.dayString(Date())
+        let store: [String: JSONValue] = [
+            "settings": .object(["currency": .string("SAR")]), "printLog": .array([]), "clients": .array([]),
+            "wasteLog": .array([.object(["id": .string("W-1"), "date": .string(today), "grams": .number(12)])]),
+            "timeEntries": .array([]),
+        ]
+        let cut = BookScope.Taken(collections: ["printLog": .init(whole: true, sent: 0, available: nil)],
+                                  omitted: ["timeEntries", "wasteLog"], takenAt: "2026-11-07T00:00:00.000Z")
+        try book.replace(with: store, scope: cut)
+        var day = try await BookReader(book: book).endOfDay()
+        XCTAssertFalse(day.holdsWaste, "the phone's own waste lines are not the day's waste")
+        XCTAssertFalse(day.holdsTime)
+
+        let whole = BookScope.Taken(collections: ["printLog": .init(whole: true, sent: 0, available: nil),
+                                                  "wasteLog": .init(whole: true, sent: 1, available: nil),
+                                                  "timeEntries": .init(whole: true, sent: 0, available: nil)],
+                                    omitted: [], takenAt: "2026-11-07T00:00:00.000Z")
+        try book.replace(with: store, scope: whole)
+        day = try await BookReader(book: book).endOfDay()
+        XCTAssertTrue(day.holdsWaste)
+        XCTAssertTrue(day.holdsTime)
+    }
 }

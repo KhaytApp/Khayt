@@ -221,7 +221,11 @@ actor BookReader {
         let report = EndOfDay.report(day: Calendar.book.dayString(now), orders: orders, facts: facts,
                                      waste: rows("wasteLog") ?? [], time: rows("timeEntries") ?? [],
                                      dayOf: { Calendar.localDay(ofInstant: $0) })
-        return DayReport(report: report, holdsWaste: rows("wasteLog") != nil, holdsTime: rows("timeEntries") != nil)
+        // Held means held WHOLE, by the scope. The waste log is not in the
+        // working set: a phone has it only as the lines it logged itself and
+        // the ones a cloud change brought, and a total of those read as the
+        // day's waste when it was a part of it.
+        return DayReport(report: report, holdsWaste: book.holdsAll("wasteLog"), holdsTime: book.holdsAll("timeEntries"))
     }
 
     /// One customer's page. Their jobs are those linked by `clientId`, and
@@ -715,8 +719,9 @@ struct OrderFacts: Equatable, Sendable {
 }
 
 /// Today, closed — the Mac's End of Day Report (`EndOfDay` in KhaytCore),
-/// with whether the phone holds the waste log and the time entries (it does
-/// not today: those figures are the Mac's).
+/// with whether the phone holds ALL of the waste log and the time entries
+/// (`CompanionBook.holdsAll`; a phone normally does not, and those figures
+/// are the Mac's).
 struct DayReport: Sendable {
     let report: EndOfDay
     let holdsWaste: Bool
