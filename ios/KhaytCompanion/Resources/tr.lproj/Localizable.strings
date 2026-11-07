@@ -1097,3 +1097,18 @@
 "care.part.fep_film" = "FEP film";
 "care.part.resin_tank" = "Reçine tankı";
 "care.part.ipa" = "İzopropil alkol (litre)";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Alışveriş listesi";
+"shop.none" = "Alınacak bir şey yok — her filament yeniden sipariş noktasının üzerinde.";
+"shop.no_supplier" = "Tedarikçi yok";
+"shop.share" = "Listeyi paylaş";
+"shop.hint" = "Yeniden sipariş noktasında veya altındaki her filament, onu satan tedarikçiye göre. Yeniden sipariş noktaları, miktarlar ve tedarikçiler Mac’te veya bilgisayarda Khayt’ta ayarlanır.";
+"shop.buy" = "%@ al";
+"shop.have" = "%@ kaldı";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Enerji: %@";
+"energy.sub" = "Yazıcının akıllı prizi ölçtü";
+"energy.cost" = "Elektrik";
+"unit.kwh" = "kWh";
