@@ -188,23 +188,30 @@ extension Shop {
             moveProblem = why
             return nil
         case .paper(let doc, let number):
-            let paper = InvoicePaper(document: doc)
-            // A hang guard, not a speed limit: a PDF asked for before WebKit
-            // has laid the page out is blank.
-            for _ in 0..<6000 where !paper.drawn { try? await Task.sleep(for: .milliseconds(100)) }
-            do {
-                let dir = URL(fileURLWithPath: NSTemporaryDirectory())
-                    .appending(path: "khayt-share-\(UUID().uuidString)")
-                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                let job = orders.first { $0.id == id }
-                let url = dir.appending(path: InvoiceSheet.filename(job, words: words, number: number))
-                try await paper.pdf().write(to: url, options: .atomic)
-                Telemetry.feature(.invoiceExported, in: self)
-                return url
-            } catch {
-                moveProblem = words.callIt("mac.export_failed") + " " + self.said(error)
-                return nil
-            }
+            let job = orders.first { $0.id == id }
+            return await sharablePdf(InvoicePaper(document: doc),
+                                     named: InvoiceSheet.filename(job, words: words, number: number))
+        }
+    }
+
+    /// A drawn invoice written to a folder of its own under the temporary
+    /// directory, as `name`. File ▸ Share… and the invoice sheet's Share… and
+    /// Send with Pay Link all hand the system this file.
+    func sharablePdf(_ paper: InvoicePaper, named name: String) async -> URL? {
+        // A hang guard, not a speed limit: a PDF asked for before WebKit
+        // has laid the page out is blank.
+        for _ in 0..<6000 where !paper.drawn { try? await Task.sleep(for: .milliseconds(100)) }
+        do {
+            let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appending(path: "khayt-share-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let url = dir.appending(path: name)
+            try await paper.pdf().write(to: url, options: .atomic)
+            Telemetry.feature(.invoiceExported, in: self)
+            return url
+        } catch {
+            moveProblem = words.callIt("mac.export_failed") + " " + self.said(error)
+            return nil
         }
     }
 
@@ -212,7 +219,8 @@ extension Shop {
     /// holds can be released while its menu is still on screen.
     @MainActor private static var picker: NSSharingServicePicker?
 
-    static func presentSharePicker(_ items: [URL]) {
+    /// `items` are URLs and, for a message, its text as a `String`.
+    static func presentSharePicker(_ items: [Any]) {
         guard !items.isEmpty, let window = NSApp.keyWindow ?? NSApp.mainWindow,
               let view = window.contentView else { return }
         let picker = NSSharingServicePicker(items: items)

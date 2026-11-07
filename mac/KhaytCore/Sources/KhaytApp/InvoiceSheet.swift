@@ -22,6 +22,8 @@ struct InvoiceSheet: View {
     /// The number the document prints, as `KhaytInvoiceDocument.documentNumber`
     /// answered it once the job was numbered (if it was owed one).
     @State private var number: String?
+    /// What Send with Pay Link would ask for; nil hides the button.
+    @State private var payPlan: KhaytEngine.ReminderPlan?
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
 
@@ -70,6 +72,16 @@ struct InvoiceSheet: View {
                 Spacer()
                 Button(shop.words.callIt("common.close")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
+                // The system's share picker on this very paper — the file
+                // File ▸ Share… hands over (`Shop.sharablePdf`).
+                Button(shop.words.callIt("mac.share") + "\u{2026}") { Task { await share() } }
+                    .disabled(paper?.drawn != true)
+                // Only when the job owes money AND the shop has a pay link
+                // (`Shop.payLinkPlan`, from `lib/payment-reminder.js`).
+                if let payPlan {
+                    Button(shop.words.callIt("mac.send_pay_link")) { Task { await sendPayLink(payPlan) } }
+                        .disabled(paper?.drawn != true)
+                }
                 Button(shop.words.callIt("mac.save_pdf")) { save() }
                     .keyboardShortcut(.defaultAction)
                     // Asking WebKit for a PDF before it has laid the document
@@ -78,7 +90,27 @@ struct InvoiceSheet: View {
             }
             .padding(16)
         }
-        .task(id: subject.id) { await build() }
+        .task(id: subject.id) {
+            await build()
+            payPlan = await shop.payLinkPlan(for: subject.id)
+        }
+    }
+
+    /// The paper as a PDF file under the name Save PDF would offer.
+    private func sharable() async -> URL? {
+        guard let paper else { return nil }
+        let url = await shop.sharablePdf(paper, named: fileName)
+        if url == nil { saved = shop.moveProblem }
+        return url
+    }
+
+    private func share() async {
+        guard let url = await sharable() else { return }
+        Shop.presentSharePicker([url])
+    }
+
+    private func sendPayLink(_ plan: KhaytEngine.ReminderPlan) async {
+        saved = await shop.sendWithPayLink(subject.id, plan: plan) { await sharable() }
     }
 
     /// The paper, through `Shop.invoiceDocument` — the one path File ▸ Print…
@@ -103,14 +135,7 @@ struct InvoiceSheet: View {
         guard let paper else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        var name = (subject.proforma ? "Proforma-" : "") + Self.filename(job, words: shop.words, number: number)
-        // Each milestone of a job is its own paper: one name apiece, so saving the
-        // second does not offer to replace the first.
-        if let part = subject.milestone.flatMap({ id in shop.milestones(of: subject.id).first { $0.id == id } }) {
-            let tail = part.label.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
-            name = String(name.dropLast(4)) + "-" + tail + ".pdf"
-        }
-        panel.nameFieldStringValue = name
+        panel.nameFieldStringValue = fileName
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             do {
@@ -121,6 +146,18 @@ struct InvoiceSheet: View {
                 saved = error.localizedDescription
             }
         }
+    }
+
+    /// This paper's file name. A proforma says so, and each milestone of a job
+    /// is its own paper: one name apiece, so saving the second does not offer
+    /// to replace the first.
+    private var fileName: String {
+        var name = (subject.proforma ? "Proforma-" : "") + Self.filename(job, words: shop.words, number: number)
+        if let part = subject.milestone.flatMap({ id in shop.milestones(of: subject.id).first { $0.id == id } }) {
+            let tail = part.label.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            name = String(name.dropLast(4)) + "-" + tail + ".pdf"
+        }
+        return name
     }
 
     /// What the file is called.

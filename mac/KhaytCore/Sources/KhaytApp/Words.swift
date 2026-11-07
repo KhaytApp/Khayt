@@ -4523,6 +4523,15 @@ final class Words {
         // One step along the way work goes, without naming the stage.
         "mac.move_along":    ["en": "Move Along",   "ar": "تقديم"],
         "mac.move_back":     ["en": "Move Back",    "ar": "إرجاع"],
+        // The job inspector's one big button: the next thing done to a job,
+        // named. `{stage}` is the shared stage word (`Stage.key`). Arabic
+        // reads «التالي: …», not «تقديم», which is ambiguous on a quote.
+        "mac.next_stage":    ["en": "Next: {stage}", "ar": "التالي: {stage}"],
+        "mac.accept_quote":  ["en": "Accept Quote",  "ar": "قبول عرض السعر"],
+        "mac.mark_delivered": ["en": "Mark Delivered", "ar": "تحديد كمُسلَّم"],
+        // The invoice sheet: open WhatsApp (or the share picker) with the
+        // amount owed and the shop's pay link (`lib/payment-reminder.js`).
+        "mac.send_pay_link": ["en": "Send with Pay Link", "ar": "إرسال مع رابط الدفع"],
         // The other shelf. Every other `cons.` word is in the shared
         // catalogue already, with its Arabic; these two are this sheet's own.
         "cons.unit_ph":      ["en": "each / ml / roll", "ar": "حبة / مل / لفة"],
