@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} carretel",
  "mac.mc_sub": "Por unidade, do carretel mais recente de cada material.",
  "mac.mc_title": "Preço na prateleira",
+ "mac.mcp_where": "Assistentes como o Claude Desktop iniciam daqui o servidor de livros somente leitura do Khayt:",
+ "mac.mcp_copy_setup": "Copiar configuração para o Claude Desktop",
  "mac.mcp_share_names": "Compartilhar nomes de clientes com assistentes de IA (khayt-mcp)",
  "mac.mcp_share_names_hint": "Desativado: os assistentes conectados ao khayt-mcp veem “Cliente 1”, “Cliente 2” em vez de nomes. Ativado: veem os nomes dos seus clientes. Telefones, e-mails e endereços nunca são compartilhados.",
  "mac.measure_online": "Medir modelos online",

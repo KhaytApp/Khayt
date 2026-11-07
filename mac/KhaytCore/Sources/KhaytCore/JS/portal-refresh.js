@@ -227,6 +227,13 @@
       },
       paid: isPaid(o, c.settings),
     };
+    // A quote's last day (Cloud #190): /p says "Valid until" and, once it has
+    // passed, offers no Approve/Decline. `eta` stays the job's due date, which
+    // is what an older server shows — so a quote sent without this simply
+    // never expires there, as before. The shop's local day, as stored.
+    if (isQuote && typeof o.quoteExpiresAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.quoteExpiresAt)) {
+      payload.validUntil = o.quoteExpiresAt;
+    }
 
     // WHAT THE CUSTOMER IS ASKED FOR, not the bare price. On a shop that adds
     // tax on top the price is the pre-tax figure: the portal read "100.00"

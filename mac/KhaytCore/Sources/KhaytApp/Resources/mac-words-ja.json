@@ -1570,6 +1570,8 @@
  "mac.mc_spools_one": "{n} 個のスプール",
  "mac.mc_sub": "素材ごとに、直近のスプールから算出した単価です。",
  "mac.mc_title": "棚の価格",
+ "mac.mcp_where": "Claude Desktop などのアシスタントは、ここから Khayt の読み取り専用ブックサーバーを起動します:",
+ "mac.mcp_copy_setup": "Claude Desktop 用の設定をコピー",
  "mac.mcp_share_names": "顧客名をAIアシスタントと共有（khayt-mcp）",
  "mac.mcp_share_names_hint": "オフ：khayt-mcpに接続したアシスタントには、名前ではなく「顧客1」「顧客2」と表示されます。オン：顧客の名前が見えます。電話番号、メール、住所は共有されません。",
  "mac.measure_online": "オンラインのモデルを計測",

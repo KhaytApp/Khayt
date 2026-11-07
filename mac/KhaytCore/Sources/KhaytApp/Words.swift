@@ -3560,6 +3560,9 @@ final class Words {
                               "ar": "حذف المفتاح المحفوظ"],
         // `settings.mcp.shareCustomerNames` — what the books tools in
         // `khayt-mcp` may say about a customer. Off unless the shop turns it on.
+        "mac.mcp_where": ["en": "Assistants such as Claude Desktop start Khayt's read-only books server from here:",
+                          "ar": "تشغّل المساعدات مثل Claude Desktop خادم دفاتر خيط للقراءة فقط من هنا:"],
+        "mac.mcp_copy_setup": ["en": "Copy Setup for Claude Desktop", "ar": "نسخ الإعداد لـ Claude Desktop"],
         "mac.mcp_share_names": ["en": "Share customer names with AI assistants (khayt-mcp)",
                                 "ar": "مشاركة أسماء العملاء مع مساعدي الذكاء الاصطناعي (khayt-mcp)"],
         "mac.mcp_share_names_hint": ["en": "Off: assistants connected to khayt-mcp see “Customer 1”, “Customer 2” instead of names. On: they see your customers’ names. Phone numbers, emails and addresses are never shared.",

@@ -291,3 +291,15 @@ test('portal invoiceNo: a plain job with its own invPrefix shows its id; an acce
                      invoiceNumber: 'INV-2026-0031' };
   assert.equal(Portal.payloadFor(accepted, { settings }).payload.invoiceNo, 'INV-2026-0031');
 });
+
+test('a quote carries its last day as validUntil; a job and a bad date do not', () => {
+  const Portal = require('../lib/portal-refresh.js');
+  const q = Portal.payloadFor({ id: 'Q1', status: 'quote', date: '2026-11-01', dueDate: '2026-11-20',
+                                quoteExpiresAt: '2026-11-08', price: 100 }, { settings: {} }).payload;
+  require('node:assert/strict').equal(q.validUntil, '2026-11-08');
+  require('node:assert/strict').equal(q.eta, '2026-11-20', 'eta stays the due date, for older servers');
+  const job = Portal.payloadFor({ id: 'J1', status: 'printing', quoteExpiresAt: '2026-11-08' }, { settings: {} }).payload;
+  require('node:assert/strict').equal('validUntil' in job, false);
+  const bad = Portal.payloadFor({ id: 'Q2', status: 'quote', quoteExpiresAt: '8/11/2026' }, { settings: {} }).payload;
+  require('node:assert/strict').equal('validUntil' in bad, false);
+});
