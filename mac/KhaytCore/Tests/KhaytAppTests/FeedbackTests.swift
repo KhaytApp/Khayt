@@ -135,11 +135,20 @@ import KhaytCore
         // A distinct value at every path, and one sealed value at a path no
         // list names — the backstop for a secret nobody registered.
         var planted: [String] = []
-        for (index, path) in paths.enumerated() {
+        // A plugin's secrets are PER DEVICE (store-secret-paths
+        // PER_DEVICE_PATHS): removed on the way out, not masked, so they are
+        // checked below rather than expected back as the mask.
+        let masked = paths.filter { !$0.hasPrefix("settings.plugins[]") }
+        for (index, path) in masked.enumerated() {
             let value = "planted-secret-\(index)-x7"
             planted.append(value)
             Self.plant(&root, path: path, value: .string(value))
         }
+        Self.plant(&root, path: "settings.plugins", value: .array([.object([
+            "id": .string("sa.lamha"), "enabled": .bool(true),
+            "secrets": .object(["apiKey": .string("planted-plugin-secret-2f")]),
+        ])]))
+        planted.append("planted-plugin-secret-2f")
         Self.plant(&root, path: "settings.someoneForgot.key", value: .string("__enc__c2VhbGVk"))
         planted.append("__enc__c2VhbGVk")
 
@@ -185,12 +194,20 @@ import KhaytCore
             #expect(!bytes.contains(value), "book.json carries \(value)")
         }
         let back = try JSONDecoder().decode([String: JSONValue].self, from: data)
-        for path in paths {
+        for path in masked {
             for found in Self.values(back, path: path) {
                 #expect(found == Self.mask, "\(path) is not masked in book.json")
             }
             #expect(!Self.values(back, path: path).isEmpty, "\(path) went missing rather than masked")
         }
+        // The plugin is in the book; its secrets are not, not even as a mask.
+        guard case .object(let settingsBack)? = back["settings"],
+              case .array(let pluginsBack)? = settingsBack["plugins"],
+              case .object(let pluginBack)? = pluginsBack.first else {
+            Issue.record("the plugin went missing"); return
+        }
+        #expect(pluginBack["secrets"] == nil, "a plugin's secrets left the device")
+        #expect(pluginBack["id"] == .string("sa.lamha"))
         // Gone, not masked: a mask would be adopted AS the token.
         for key in ["trackingToken", "quoteApprovalToken", "surveyToken"] {
             #expect(!bytes.contains("\"\(key)\""), "book.json still has \(key)")
