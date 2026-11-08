@@ -152,6 +152,8 @@ final class OrderBookingTests: XCTestCase {
                                             machines: machines, existing: [], clients: saved)
         XCTAssertEqual(fx["currency"], .string("USD"))
         XCTAssertEqual(fx["price"], .number(32.13), "120.5 SAR / 3.75")
+        XCTAssertEqual(fx["fxRate"], .number(3.75), "the rate in force when the job was made, as lib keeps it")
+        XCTAssertNil(o["fxRate"], "a job in the shop's own money carries no rate")
     }
 
     /// A name typed exactly is linked when one saved customer has it, and

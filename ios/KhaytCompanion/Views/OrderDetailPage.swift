@@ -53,7 +53,7 @@ struct OrderDetailPage: View {
     @State private var paper: PaperSubject?
     /// A quote's version, follow-ups and kept versions, from the book.
     @State private var quoteState: KhaytAPIClient.QuoteState?
-    @State private var revising: KhaytAPIClient.QuoteState?
+    @State private var revising: RevisingQuote?
     @State private var showingHistory = false
     @State private var followingUp = false
     @Environment(\.openURL) private var openURL
@@ -96,7 +96,7 @@ struct OrderDetailPage: View {
             }
             if order.status == OrderStatus.quote.rawValue, let quoteState {
                 QuoteToolsCard(state: quoteState, followingUp: followingUp,
-                               onRevise: { revising = quoteState },
+                               onRevise: { Task { await startRevising() } },
                                onFollowUp: { Task { await followUp() } },
                                onHistory: { showingHistory = true })
                     .disabled(!api.canWrite)
@@ -186,9 +186,12 @@ struct OrderDetailPage: View {
         .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
         .navigationDestination(isPresented: $showingProforma) { InvoicePage(orderId: order.id, proforma: true) }
         .navigationDestination(item: $paper) { ShopPaperPage(subject: $0) }
-        .sheet(item: Binding(get: { revising.map { RevisingQuote(state: $0) } },
-                             set: { if $0 == nil { revising = nil } })) { r in
-            ReviseQuoteSheet(orderId: order.id, start: r.state, currency: currency) { await quoteRevised() }
+        .sheet(item: $revising) { r in
+            // Revise is the Edit sheet with the quote's own terms below
+            // (`EditOrderSheet`'s note).
+            EditOrderSheet(orderId: order.id, start: r.edit, currency: currency, revising: r.state) {
+                await quoteRevised()
+            }
         }
         .sheet(isPresented: $showingHistory) {
             if let quoteState { QuoteHistorySheet(state: quoteState, currency: currency) }
@@ -243,6 +246,8 @@ struct OrderDetailPage: View {
             }
             // `-KhaytQuoteHistory YES` on a quote: its history, for screenshots.
             if quoteState != nil, UserDefaults.standard.bool(forKey: "KhaytQuoteHistory") { showingHistory = true }
+            // `-KhaytRevise YES` on a quote: its Revise sheet, for screenshots.
+            if quoteState != nil, UserDefaults.standard.bool(forKey: "KhaytRevise") { await startRevising() }
             // `-KhaytScrollEnergy YES`: the energy card in view, for screenshots.
             if energy != nil, UserDefaults.standard.bool(forKey: "KhaytScrollEnergy") {
                 try? await Task.sleep(for: .milliseconds(300))
@@ -261,6 +266,12 @@ struct OrderDetailPage: View {
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
         if payment != nil, UserDefaults.standard.bool(forKey: "KhaytPaySheet") { recordingPayment = true }
         #endif
+    }
+
+    /// Open Revise on the quote as the book holds it now.
+    private func startRevising() async {
+        guard let state = quoteState, let edit = await api.editState(orderId: order.id) else { return }
+        revising = RevisingQuote(state: state, edit: edit)
     }
 
     /// A revision landed: the quote's tools, its price and the list under
@@ -805,6 +816,7 @@ private struct StageStepper: View {
 /// The Edit sheet's subject, identified for `.sheet(item:)`.
 private struct RevisingQuote: Identifiable {
     let state: KhaytAPIClient.QuoteState
+    let edit: KhaytAPIClient.OrderEditState
     var id: Int { state.version }
 }
 

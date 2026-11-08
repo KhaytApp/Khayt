@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Impossible de joindre Khayt sur votre réseau. Vérifiez le Wi‑Fi et l’API LAN de l’ordinateur.";
 "connection.banner.pin" = "Code PIN LAN refusé. Mettez-le à jour dans les réglages pour qu’il corresponde à l’ordinateur.";
 "sync.pending" = "%d modification(s) sur cet iPhone en attente du Mac.";
+"sync.mac_refused" = "Le Mac n’en a pas accepté %d. Elles restent sur cet iPhone et seront renvoyées.";
 "connection.error.reach_status" = "Impossible de joindre %@. Même Wi‑Fi ? Ordinateur → Réglages → API LAN : activée, écoute sur toutes les interfaces, notez l’IP et le port.";
 "settings.host_required" = "Saisissez l’adresse IP de votre ordinateur.";
 "settings.host_invalid" = "Adresse non valide. Utilisez par ex. 192.168.1.42 (pas une URL complète avec http://).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Qui doit de l’argent";
-"owed.empty" = "Rien n’est dû sur les tâches ouvertes.";
+"owed.empty" = "Rien n’est dû.";
 "owed.total" = "%@ dû sur %d tâches";
 "owed.due" = "Échéance %@";
 "owed.remind" = "Relancer sur WhatsApp";
@@ -989,6 +990,7 @@
 "customer.history" = "Tâches terminées";
 "customer.history.none" = "Aucune tâche terminée sur cet iPhone.";
 "customer.history.window" = "Cet iPhone contient les tâches terminées les plus récentes ; l’historique complet est sur le Mac.";
+"customer.owes.window" = "D’après les tâches de cet iPhone. Les plus anciennes sont sur le Mac : le montant peut être sous-estimé.";
 "customer.agreed" = "Prix convenus";
 "customer.messages" = "Messages";
 "customer.messages.none" = "Aucun message consigné pour l’instant.";
@@ -1019,7 +1021,6 @@
 "paper.statement.sub" = "Toutes les commandes, ce qui est payé et ce qui reste dû";
 "paper.refused.missing" = "Ce n’est pas dans la copie du registre sur le téléphone. Récupérez à nouveau le registre sur le Wi-Fi de l’atelier.";
 "paper.refused.quote" = "C’est encore un devis. Ses documents viendront quand le client l’aura accepté.";
-"paper.refused.partial" = "Ce téléphone ne contient que les commandes terminées les plus récentes : un relevé fait ici pourrait en oublier. Faites-le sur le Mac ou le PC.";
 "paper.refused.failed" = "Le document n’a pas pu être créé. Réessayez, ou faites-le sur le Mac ou le PC.";
 "quote.tools" = "Devis";
 "quote.revise" = "Réviser le devis";
@@ -1121,3 +1122,17 @@
 "energy.sub" = "Mesurée par la prise connectée de l’imprimante";
 "energy.cost" = "Électricité";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Ce téléphone ne contient que les travaux récents : des travaux et paiements plus anciens peuvent manquer à ce relevé. Le relevé le précise aussi. Pour un relevé complet, faites-le sur le Mac ou le PC.";
+"paper.statement.partial.printed" = "Des travaux et paiements plus anciens peuvent manquer à ce relevé : il a été établi sur un téléphone qui ne contient que les travaux récents.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Remise (%)";
+"quote.revise.shipping" = "Livraison";
+"quote.revise.shipping_in" = "Livraison (%@)";
+"quote.revise.terms.note" = "Une nouvelle remise ou un nouveau coût de livraison change le prix du devis, sauf si vous saisissez aussi un nouveau prix plus haut.";
+"quote.revise.printed_notes" = "Notes sur le devis";
+"quote.revise.printed_notes.sub" = "Le client les voit sur le devis.";

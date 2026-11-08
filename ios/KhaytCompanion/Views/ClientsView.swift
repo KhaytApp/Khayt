@@ -40,6 +40,8 @@ struct ClientsView: View {
     /// only offers to call, so there is no page to put beside the list.
     private var isSplit: Bool { widthClass == .regular && api.holdsBook }
     @State private var openClientId: String?
+    /// `-KhaytOpen statement:<client id>`: that customer's statement, for screenshots.
+    @State private var statementFor: String?
 
     var body: some View {
         if isSplit {
@@ -83,6 +85,13 @@ struct ClientsView: View {
         .task {
             await load()
             didLoad = true
+            #if DEBUG
+            if let id = KhaytCompanionApp.ScreenshotOpen.take("statement:") { statementFor = id }
+            #endif
+        }
+        .navigationDestination(isPresented: Binding(get: { statementFor != nil },
+                                                    set: { if !$0 { statementFor = nil } })) {
+            if let id = statementFor { ShopPaperPage(subject: .statement(clientId: id)) }
         }
         .confirmationDialog(contactFor?.displayName ?? "", isPresented: contactShown, titleVisibility: .visible,
                             presenting: contactFor) { client in

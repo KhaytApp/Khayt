@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "No se puede acceder a Khayt en tu red. Revisa el Wi‑Fi y la API de red local del ordenador.";
 "connection.banner.pin" = "PIN de red local rechazado. Actualiza el PIN en Ajustes para que coincida con el del ordenador.";
 "sync.pending" = "%d cambio(s) en este iPhone en espera del Mac.";
+"sync.mac_refused" = "El Mac no aceptó %d de ellos. Se quedan en este iPhone y se vuelven a enviar.";
 "connection.error.reach_status" = "No se puede acceder a %@. ¿Misma red Wi‑Fi? Ordenador → Ajustes → API de red local: activada, escuchando en todas las interfaces; anota la IP y el puerto.";
 "settings.host_required" = "Introduce la dirección IP de tu ordenador.";
 "settings.host_invalid" = "Dirección no válida. Usa, por ejemplo, 192.168.1.42 (no una URL completa con http://).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Quién debe";
-"owed.empty" = "No se debe nada en los trabajos abiertos.";
+"owed.empty" = "No se debe nada.";
 "owed.total" = "%@ pendientes en %d trabajos";
 "owed.due" = "Vence %@";
 "owed.remind" = "Recordar por WhatsApp";
@@ -989,6 +990,7 @@
 "customer.history" = "Trabajos terminados";
 "customer.history.none" = "No hay trabajos terminados en este iPhone.";
 "customer.history.window" = "Este iPhone guarda los trabajos terminados más recientes; el historial completo está en el Mac.";
+"customer.owes.window" = "Según los trabajos de este iPhone. Los más antiguos están en el Mac, así que puede quedarse corto.";
 "customer.agreed" = "Precios acordados";
 "customer.messages" = "Mensajes";
 "customer.messages.none" = "Aún no hay mensajes registrados.";
@@ -1019,7 +1021,6 @@
 "paper.statement.sub" = "Todos los trabajos, lo pagado y lo que aún se debe";
 "paper.refused.missing" = "Esto no está en la copia del libro del teléfono. Vuelve a traer el libro en el Wi-Fi del taller.";
 "paper.refused.quote" = "Esto sigue siendo un presupuesto. Sus documentos llegan cuando el cliente lo acepte.";
-"paper.refused.partial" = "Este teléfono solo tiene los trabajos terminados más recientes, así que un estado de cuenta hecho aquí podría dejar algunos fuera. Hazlo en el Mac o el PC.";
 "paper.refused.failed" = "No se pudo crear el documento. Inténtalo de nuevo o hazlo en el Mac o el PC.";
 "quote.tools" = "Presupuesto";
 "quote.revise" = "Revisar presupuesto";
@@ -1121,3 +1122,17 @@
 "energy.sub" = "Medida por el enchufe inteligente de la impresora";
 "energy.cost" = "Electricidad";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Este teléfono solo guarda el trabajo reciente, así que pueden faltar trabajos y pagos más antiguos en este estado de cuenta. El propio estado de cuenta lo indica. Para uno completo, hazlo en el Mac o el PC.";
+"paper.statement.partial.printed" = "Pueden faltar trabajos y pagos más antiguos en este estado de cuenta: se hizo en un teléfono que solo guarda el trabajo reciente.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Descuento (%)";
+"quote.revise.shipping" = "Envío";
+"quote.revise.shipping_in" = "Envío (%@)";
+"quote.revise.terms.note" = "Un descuento o envío nuevo cambia el precio del presupuesto, salvo que también escribas un precio nuevo arriba.";
+"quote.revise.printed_notes" = "Notas en el presupuesto";
+"quote.revise.printed_notes.sub" = "El cliente las ve en el presupuesto.";
