@@ -357,6 +357,11 @@ contextBridge.exposeInMainWorld('hubAPI', {
 
   // Round 12: Outbound webhooks
   fireWebhook: (url, event, payload, secret) => ipcRenderer.invoke('hub:fire-webhook', { url, event, payload, secret }),
+  // Connectors (plugins v1): check a manifest before installing it, which
+  // installed ones are reviewed, and run one (an action press or an event).
+  pluginCheck: (manifest) => ipcRenderer.invoke('hub:plugin-check', manifest),
+  pluginReviewed: (manifests) => ipcRenderer.invoke('hub:plugin-reviewed', manifests),
+  pluginSend: (req) => ipcRenderer.invoke('hub:plugin-send', req),
 
   // Round 12: Embedded LAN REST API
   startLanServer: (config) => ipcRenderer.invoke('hub:start-lan-server', config),
