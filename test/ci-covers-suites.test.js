@@ -52,10 +52,9 @@ const e2eScripts = Object.keys(pkg.scripts)
  * An entry here is a decision; an absence is an accident.
  */
 const ELSEWHERE = {
-  // Path-filtered workflow: ios-contract.yml runs it on changes to ios/**,
-  // lib/lan-server.js and scripts/ios-contract-*. CLAUDE.md explains why it is
-  // deliberately not a required check — a path-filtered job that never reports
-  // would block every PR that does not touch those paths.
+  // Needs a macOS runner with an iOS 27 SDK, so it lives in ios-contract.yml,
+  // whose `ios-relevant` job skips it on PRs that touch nothing the phone
+  // builds from (CLAUDE.md, "Required: LAN server and companion models").
   'test:ios-contract': '.github/workflows/ios-contract.yml',
 };
 

@@ -3,60 +3,59 @@
 # and `xcodebuild` never sees a real server response. A renamed JSON key passes
 # both and empties a screen on the phone.
 #
-# macOS minutes are expensive, so this runs only when one side of the contract
-# actually moves. The paths list is repeated rather than shared via a YAML
-# anchor because the Actions parser does not expand aliases.
+# REQUIRED on main since Nov 2026 ("LAN server and companion models"). A
+# required check must always report, so this workflow has NO path filter: an
+# unfiltered workflow always runs, and `ios-relevant` below decides whether the
+# expensive job does anything. A job skipped by its own `if:` still reports,
+# and a required check counts a skip as passing (the `Mac app tests` pattern in
+# ci.yml). Every push to main runs it regardless.
+#
+# Why required: Nov 8 2026, a KhaytCore signature change (#2327) merged with
+# the phone's build broken on main and every required check green.
 name: iOS contract
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'ios/**'
-      # ── THE PHONE SHIPS A PACKAGE THAT LIVES UNDER mac/ ────────────────
-      #
-      # `mac/KhaytCore` builds for iOS and `ios/KhaytCompanion` links it, so
-      # the phone's business logic is Mac-side source. A commit that adds
-      # `import AppKit` to it is an ordinary macOS change: `swift build` stays
-      # green, `swift test` stays green, every Mac screen keeps working, and
-      # the iOS app stops compiling. Without this line the one check that
-      # would have said so does not run on the commit that did it.
-      - 'mac/KhaytCore/**'
-      - 'lib/lan-server.js'
-      # The fixture reads the desktop's STATUSES out of this file, so a status
-      # added here is what widens the capture and breaks the phone's enum. The
-      # check could not fire on the change that breaks it until this was listed:
-      # `shipped` went in, this workflow never ran, and the companion shipped
-      # with no case for it.
-      - 'renderer/analytics.js'
-      - 'scripts/ios-contract-*'
-      - '.github/workflows/ios-contract.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'ios/**'
-      # ── THE PHONE SHIPS A PACKAGE THAT LIVES UNDER mac/ ────────────────
-      #
-      # `mac/KhaytCore` builds for iOS and `ios/KhaytCompanion` links it, so
-      # the phone's business logic is Mac-side source. A commit that adds
-      # `import AppKit` to it is an ordinary macOS change: `swift build` stays
-      # green, `swift test` stays green, every Mac screen keeps working, and
-      # the iOS app stops compiling. Without this line the one check that
-      # would have said so does not run on the commit that did it.
-      - 'mac/KhaytCore/**'
-      - 'lib/lan-server.js'
-      # The fixture reads the desktop's STATUSES out of this file, so a status
-      # added here is what widens the capture and breaks the phone's enum. The
-      # check could not fire on the change that breaks it until this was listed:
-      # `shipped` went in, this workflow never ran, and the companion shipped
-      # with no case for it.
-      - 'renderer/analytics.js'
-      - 'scripts/ios-contract-*'
-      - '.github/workflows/ios-contract.yml'
 
 jobs:
+  ios-relevant:
+    name: Does this touch the iPhone app?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          # IPHONE-RELEVANT PATHS (the old workflow path filter):
+          # - ios/: the app itself.
+          # - mac/KhaytCore/: the phone links this package, and its business logic
+          #   is Mac-side source. A commit that adds `import AppKit` to it, or
+          #   changes a public signature the phone calls, keeps every Mac check
+          #   green and stops the iOS app compiling. lib/ reaches the phone only
+          #   through the synced copies in mac/KhaytCore/Sources/KhaytCore/JS.
+          # - lib/lan-server.js and renderer/analytics.js: the fixture reads the
+          #   desktop's responses and STATUSES from these (`shipped` once went in
+          #   with no case on the phone).
+          pattern='^(ios/|mac/KhaytCore/|lib/lan-server\.js$|renderer/analytics\.js$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
+          if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
   contract:
     name: LAN server and companion models
+    needs: ios-relevant
+    if: needs.ios-relevant.outputs.run == 'true'
     # iOS 27 is the companion's minimum (Oct 2026), so it builds with an iOS 27
     # SDK. `macos-latest` (macos-26) tops out at Xcode 26.6 / iOS 26.5; GitHub's
     # `xcode-27` image (public preview) has Xcode 27.0 as default and iOS 27.0
