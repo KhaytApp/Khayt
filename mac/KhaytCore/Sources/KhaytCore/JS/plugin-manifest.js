@@ -82,7 +82,15 @@
   const FIELD_ATTACH = ['order', 'customer', 'machine', 'spool'];
   const ACTION_KINDS = ['post', 'open'];
   const SECRET_KINDS = ['apiKey', 'token', 'password', 'signingKey', 'url'];
-  const SCOPES = ['orders.read', 'customers.read', 'fields.write', 'jobs.status'];
+  // v1 has ONE scope. A v1 connector runs on the developer's server and
+  // cannot reach the shop: what it learns is exactly the fields it sends
+  // (shown field by field on the consent sheet), and the only thing it can do
+  // to the book is fill its own fields from a reply. Reading jobs or customers
+  // and moving a job need a token the shop issues, which arrives with the
+  // Cloud relay (v2). Until then they are REFUSED, not accepted-and-ignored,
+  // so no shop is asked to consent to something nothing delivers.
+  const SCOPES = ['fields.write'];
+  const RESERVED_SCOPES = ['orders.read', 'customers.read', 'jobs.status'];
   // Order events only in v1: each carries one job, so `order.*` and
   // `customer.*` mean something. A subset of lib/webhook-bus.js EVENTS (a test
   // holds it there).
@@ -92,9 +100,26 @@
   ];
   const BODY_FORMATS = ['khayt-v1', 'json-template'];
 
-  const LIMITS = { domains: 10, secrets: 5, fields: 20, actions: 10, events: 10, send: 30, label: 80, description: 300, url: 500 };
+  // ── SETTINGS: WHAT THE SHOP TYPES IN ONCE ─────────────────────────────
+  //
+  // A courier needs the shop's own sender name, phone and address; a log
+  // needs a sheet name. Those are typed into the connector's settings by the
+  // shop, stored with it (`settings.plugins[].config`, synced like the
+  // grant), and referenced as `{config.<key>}`. They are NOT secrets — those
+  // stay in `secrets[]` and the device's Keychain.
+  //
+  // `kind` says what the value IS, from a closed list, and the lib maps it to
+  // the App Privacy category — a sender phone is a phone number, whoever's it
+  // is. The developer never names a category.
+  const SETTING_TYPES = ['text', 'number', 'bool', 'enum'];
+  const SETTING_KINDS = {
+    name: 'contact.name', phone: 'contact.phone', email: 'contact.email',
+    address: 'contact.address', text: 'content.other',
+  };
+
+  const LIMITS = { domains: 10, secrets: 5, fields: 20, actions: 10, events: 10, send: 30, label: 80, description: 300, url: 500, settings: 10, settingValue: 500 };
   const TOP_KEYS = ['khayt', 'id', 'name', 'publisher', 'version', 'description', 'homepage',
-    'domains', 'secrets', 'fields', 'actions', 'events', 'scopes', 'signature'];
+    'domains', 'secrets', 'settings', 'fields', 'actions', 'events', 'scopes', 'signature'];
 
   const ID_RE = /^[a-z0-9]+(\.[a-z0-9][a-z0-9-]*)+$/;
   const KEY_RE = /^[a-z][a-zA-Z0-9_]{0,31}$/;
@@ -167,6 +192,10 @@
     if (ref.startsWith('secret.')) {
       if (!ctx.allowSecret) errors.push(`${where}: a secret cannot appear here`);
       else if (!ctx.secretNames.has(ref.slice(7))) errors.push(`${where}: no secret named "${ref.slice(7)}"`);
+      return;
+    }
+    if (ref.startsWith('config.')) {
+      if (!ctx.settingsByKey.has(ref.slice(7))) errors.push(`${where}: no setting named "${ref.slice(7)}"`);
       return;
     }
     if (ref.startsWith('field.')) {
@@ -254,6 +283,31 @@
       if (!SECRET_KINDS.includes(s.kind)) errors.push(`${w}.kind: one of ${SECRET_KINDS.join(', ')}`);
     });
 
+    const settingsList = checkArray(errors, m, 'settings', LIMITS.settings);
+    const settingsByKey = new Map();
+    settingsList.forEach((st, i) => {
+      const w = `settings[${i}]`;
+      if (!isObj(st)) { errors.push(`${w}: an object`); return; }
+      checkOnly(errors, w, st, ['key', 'label', 'type', 'kind', 'options', 'required']);
+      if (!KEY_RE.test(String(st.key))) errors.push(`${w}.key: a short identifier`);
+      else if (settingsByKey.has(st.key)) errors.push(`${w}.key: "${st.key}" twice`);
+      else settingsByKey.set(st.key, st);
+      checkLabel(errors, `${w}.label`, st.label);
+      if (!SETTING_TYPES.includes(st.type)) errors.push(`${w}.type: one of ${SETTING_TYPES.join(', ')}`);
+      if (st.kind !== undefined && !Object.prototype.hasOwnProperty.call(SETTING_KINDS, st.kind)) {
+        errors.push(`${w}.kind: one of ${Object.keys(SETTING_KINDS).join(', ')}`);
+      }
+      if (st.kind !== undefined && st.kind !== 'text' && st.type !== 'text') errors.push(`${w}.kind: only a text setting can be a ${st.kind}`);
+      if (st.required !== undefined && typeof st.required !== 'boolean') errors.push(`${w}.required: true or false`);
+      if (st.type === 'enum') {
+        if (!Array.isArray(st.options) || !st.options.length || st.options.length > 30) errors.push(`${w}.options: 1 to 30 choices`);
+        else st.options.forEach((o, j) => {
+          if (!isObj(o) || typeof o.value !== 'string' || !o.value) errors.push(`${w}.options[${j}]: {"value", "label"}`);
+          else { checkOnly(errors, `${w}.options[${j}]`, o, ['value', 'label']); checkLabel(errors, `${w}.options[${j}].label`, o.label); }
+        });
+      } else if (st.options !== undefined) errors.push(`${w}.options: only for enum`);
+    });
+
     const fields = checkArray(errors, m, 'fields', LIMITS.fields);
     const fieldsByKey = new Map();
     fields.forEach((f, i) => {
@@ -288,7 +342,7 @@
       const sources = PLACEMENT_SOURCES[a.placement];
       if (!sources) { errors.push(`${w}.placement: one of ${Object.keys(PLACEMENT_SOURCES).join(', ')}`); return; }
       if (!ACTION_KINDS.includes(a.kind)) { errors.push(`${w}.kind: "post" or "open"`); return; }
-      const ctx = { placement: a.placement, sources,fieldsByKey, secretNames, allowSecret: a.kind === 'post' };
+      const ctx = { placement: a.placement, sources, fieldsByKey, settingsByKey, secretNames, allowSecret: a.kind === 'post' };
       checkUrl(errors, `${w}.url`, a.url, domains, ctx);
       if (a.kind === 'open') {
         for (const k of ['send', 'body', 'auth', 'signWith', 'response']) if (a[k] !== undefined) errors.push(`${w}.${k}: an "open" button only opens its URL`);
@@ -320,7 +374,7 @@
       if (!isObj(e)) { errors.push(`${w}: an object`); return; }
       checkOnly(errors, w, e, ['event', 'url', 'send', 'body', 'auth', 'signWith']);
       if (!EVENTS.includes(e.event)) errors.push(`${w}.event: one of ${EVENTS.join(', ')}`);
-      const ctx = { placement: 'order', sources: PLACEMENT_SOURCES.order, fieldsByKey, secretNames, allowSecret: true };
+      const ctx = { placement: 'order', sources: PLACEMENT_SOURCES.order, fieldsByKey, settingsByKey, secretNames, allowSecret: true };
       checkUrl(errors, `${w}.url`, e.url, domains, ctx);
       const send = e.send === undefined ? [] : e.send;
       if (!Array.isArray(send) || send.length > LIMITS.send) errors.push(`${w}.send: a list of up to ${LIMITS.send} fields`);
@@ -331,7 +385,10 @@
     });
 
     const scopes = checkArray(errors, m, 'scopes', SCOPES.length);
-    scopes.forEach((s, i) => { if (!SCOPES.includes(s)) errors.push(`scopes[${i}]: one of ${SCOPES.join(', ')}`); });
+    scopes.forEach((s, i) => {
+      if (RESERVED_SCOPES.includes(s)) errors.push(`scopes[${i}]: "${s}" arrives with the Cloud relay; a connector cannot reach the shop yet`);
+      else if (!SCOPES.includes(s)) errors.push(`scopes[${i}]: one of ${SCOPES.join(', ')}`);
+    });
     // A reply that fills fields is a write to the book, so it is asked for —
     // and shown on the consent screen — like any other write.
     if (actions.some(a => isObj(a) && a.response !== undefined) && !scopes.includes('fields.write')) {
@@ -368,9 +425,13 @@
     return m ? m[1] : '';
   }
 
-  /** The category a reference is declared under. */
-  function categoryOf(ref) {
+  /** The category a reference is declared under. `m` is needed for a `config.` ref. */
+  function categoryOf(ref, m) {
     if (String(ref).startsWith('field.')) return OWN_FIELD_CATEGORY;
+    if (String(ref).startsWith('config.')) {
+      const st = (isObj(m) && Array.isArray(m.settings) ? m.settings : []).find(x => isObj(x) && x.key === String(ref).slice(7));
+      return st ? SETTING_KINDS[st.kind || 'text'] || null : null;
+    }
     return SENDABLE_FIELDS[ref] ? SENDABLE_FIELDS[ref].category : null;
   }
 
@@ -388,7 +449,7 @@
       const h = hostOf(t && t.url);
       if (h) domains.add(h);
     }
-    const categories = new Set(Array.from(fields).map(categoryOf).filter(Boolean));
+    const categories = new Set(Array.from(fields).map(f => categoryOf(f, m)).filter(Boolean));
     return {
       version: String((m && m.version) || ''),
       fields: Array.from(fields).sort(),
@@ -437,7 +498,7 @@
     }
     return Array.from(byHost.keys()).sort().map(host => ({
       host,
-      fields: Array.from(byHost.get(host)).sort().map(key => ({ key, category: categoryOf(key) })),
+      fields: Array.from(byHost.get(host)).sort().map(key => ({ key, category: categoryOf(key, m) })),
     }));
   }
 
@@ -462,6 +523,13 @@
       errors.push('entry: id and version must be the manifest\'s');
     }
     if (e.config !== undefined && !isObj(e.config)) errors.push('config: an object');
+    if (isObj(e.config) && isObj(e.manifest)) {
+      const known = new Set((Array.isArray(e.manifest.settings) ? e.manifest.settings : []).filter(isObj).map(x => x.key));
+      for (const [k, v] of Object.entries(e.config)) {
+        if (!known.has(k)) errors.push(`config.${k}: not a setting of this connector`);
+        else if (typeof v === 'string' && v.length > LIMITS.settingValue) errors.push(`config.${k}: longer than ${LIMITS.settingValue} characters`);
+      }
+    }
     // A grant can only narrow what the signed manifest declares. A book edited
     // to grant a host or scope the manifest never named would otherwise widen
     // what may be sent without a new signature or a new consent.
@@ -508,7 +576,7 @@
     const key = { type: 'string', pattern: KEY_RE.source };
     const url = { type: 'string', maxLength: LIMITS.url, pattern: '^https://[a-z0-9.-]+(/|\\?|#|$)' };
     const send = { type: 'array', maxItems: LIMITS.send, items: { type: 'string',
-      anyOf: [{ enum: Object.keys(SENDABLE_FIELDS) }, { pattern: '^field\\.[a-z][a-zA-Z0-9_]{0,31}$' }] } };
+      anyOf: [{ enum: Object.keys(SENDABLE_FIELDS) }, { pattern: '^(field|config)\\.[a-z][a-zA-Z0-9_]{0,31}$' }] } };
     const body = { type: 'object', additionalProperties: false, required: ['format'],
       properties: { format: { enum: BODY_FORMATS }, template: { type: 'object' } } };
     const auth = { type: 'object', additionalProperties: false, required: ['header', 'secret'],
@@ -530,6 +598,12 @@
         homepage: { type: 'string', pattern: '^https://' },
         signature: { type: 'string', pattern: '^[A-Za-z0-9+/]{86}==$' },
         domains: { type: 'array', maxItems: LIMITS.domains, uniqueItems: true, items: { type: 'string', pattern: HOST_RE.source } },
+        settings: { type: 'array', maxItems: LIMITS.settings, items: { type: 'object', additionalProperties: false,
+          required: ['key', 'label', 'type'],
+          properties: { key, label, type: { enum: SETTING_TYPES }, kind: { enum: Object.keys(SETTING_KINDS) },
+            required: { type: 'boolean' },
+            options: { type: 'array', minItems: 1, maxItems: 30, items: { type: 'object', additionalProperties: false,
+              required: ['value', 'label'], properties: { value: { type: 'string', minLength: 1 }, label } } } } } },
         secrets: { type: 'array', maxItems: LIMITS.secrets, items: { type: 'object', additionalProperties: false,
           required: ['name', 'label', 'kind'], properties: { name: key, label, kind: { enum: SECRET_KINDS } } } },
         fields: { type: 'array', maxItems: LIMITS.fields, items: { type: 'object', additionalProperties: false,
@@ -553,7 +627,7 @@
 
   const api = {
     MANIFEST_VERSION, SIGNING_KEYS, SENDABLE_FIELDS, OWN_FIELD_CATEGORY, PLACEMENT_SOURCES,
-    FIELD_TYPES, FIELD_ATTACH, ACTION_KINDS, SECRET_KINDS, SCOPES, EVENTS, BODY_FORMATS, LIMITS, TOP_KEYS,
+    FIELD_TYPES, FIELD_ATTACH, SETTING_TYPES, SETTING_KINDS, ACTION_KINDS, SECRET_KINDS, SCOPES, RESERVED_SCOPES, EVENTS, BODY_FORMATS, LIMITS, TOP_KEYS,
     validateManifest, permissionsOf, diffPermissions, grantFor, consentRows, categoryOf, checkEntry, mayWriteFields,
     canonicalJSON, manifestJsonSchema, isAllowedHost, placeholders,
   };

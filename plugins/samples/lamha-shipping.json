@@ -1,0 +1,163 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.lamha",
+  "name": {
+    "en": "Lamha shipping",
+    "ar": "شحن لمحة"
+  },
+  "description": {
+    "en": "Records a job as an order in your Lamha account, ready for you to book a courier there. It never books or pays for a shipment by itself.",
+    "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "homepage": "https://khaytapp.com/developers/samples/",
+  "domains": [
+    "app.lamha.sa"
+  ],
+  "secrets": [
+    {
+      "name": "apiToken",
+      "label": {
+        "en": "Lamha API token",
+        "ar": "رمز واجهة لمحة"
+      },
+      "kind": "token"
+    }
+  ],
+  "settings": [
+    {
+      "key": "senderName",
+      "label": {
+        "en": "Sender name",
+        "ar": "اسم المرسل"
+      },
+      "type": "text",
+      "kind": "name",
+      "required": true
+    },
+    {
+      "key": "senderPhone",
+      "label": {
+        "en": "Sender phone",
+        "ar": "جوال المرسل"
+      },
+      "type": "text",
+      "kind": "phone",
+      "required": true
+    },
+    {
+      "key": "senderCity",
+      "label": {
+        "en": "Sender city",
+        "ar": "مدينة المرسل"
+      },
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "senderAddress",
+      "label": {
+        "en": "Sender address",
+        "ar": "عنوان المرسل"
+      },
+      "type": "text",
+      "kind": "address",
+      "required": true
+    },
+    {
+      "key": "carrierId",
+      "label": {
+        "en": "Lamha carrier ID",
+        "ar": "رقم شركة الشحن في لمحة"
+      },
+      "type": "text",
+      "required": true
+    }
+  ],
+  "fields": [
+    {
+      "key": "city",
+      "label": {
+        "en": "City (for shipping)",
+        "ar": "المدينة (للشحن)"
+      },
+      "type": "text",
+      "attach": "customer"
+    },
+    {
+      "key": "lamhaOrderId",
+      "label": {
+        "en": "Lamha order",
+        "ar": "طلب لمحة"
+      },
+      "type": "text",
+      "attach": "order"
+    }
+  ],
+  "actions": [
+    {
+      "id": "record",
+      "label": {
+        "en": "Send to Lamha",
+        "ar": "إرسال إلى لمحة"
+      },
+      "placement": "order",
+      "kind": "post",
+      "url": "https://app.lamha.sa/api/v2/create-order",
+      "auth": {
+        "header": "X-LAMHA-TOKEN",
+        "secret": "apiToken"
+      },
+      "body": {
+        "format": "json-template",
+        "template": {
+          "order_id": "{order.number}",
+          "reference_id": "{order.id}",
+          "date": "{order.date}",
+          "total": "{order.total}",
+          "payment_method": "prepaid",
+          "ShipmentCurrency": "{order.currency}",
+          "create_shippment": false,
+          "carrier_id": "{config.carrierId}",
+          "parcels": "1",
+          "shipper": {
+            "name": "{config.senderName}",
+            "phone": "{config.senderPhone}",
+            "Country": "SA",
+            "City": "{config.senderCity}",
+            "AddressLine1": "{config.senderAddress}"
+          },
+          "customer": {
+            "name": "{customer.name}",
+            "phone": "{customer.phone}",
+            "phone1": "{customer.phone}",
+            "email": "{customer.email}",
+            "Country": "SA",
+            "City": "{field.city}",
+            "AddressLine1": "{customer.address}"
+          },
+          "items": [
+            {
+              "name": "{order.title}",
+              "quantity": "{order.qty}",
+              "amount": "{order.total}",
+              "weight": "1"
+            }
+          ]
+        }
+      },
+      "response": {
+        "fields": {
+          "lamhaOrderId": "order_id"
+        }
+      }
+    }
+  ],
+  "scopes": [
+    "fields.write"
+  ],
+  "signature": "uEvUTXLm919sfDumQmBR9GMxOz2eMw2wIgJaUBdQB1hNeaG/IQReW9z8ujqkQLJTS9HE/5+56nEKizC0r39uCQ=="
+}

@@ -75,7 +75,7 @@ struct ConnectorsTests {
     @Test("only exactly a declared https host, with no user in the URL")
     func host() throws {
         for bad in ["https://evil.example.org/x", "https://sub.api.example.com/x", "http://api.example.com/x",
-                    "https://u:p@api.example.com/x"] {
+                    "https://u:p@api.example.com/x", "https://api.example.com:8443/x"] {
             #expect(throws: (any Error).self, Comment(rawValue: bad)) {
                 try Connectors.post(from: Self.post(["url": .string(bad)]), manifest: Self.manifest(),
                                     event: "e", secrets: [:], delivery: "d1", now: Date())
@@ -84,6 +84,9 @@ struct ConnectorsTests {
         let open: JSONValue = .object(["ok": .bool(true), "method": .string("OPEN"),
                                        "url": .string("https://api.example.com/t/1")])
         #expect(try Connectors.link(from: open, manifest: Self.manifest()).absoluteString == "https://api.example.com/t/1")
+        let explicit443: JSONValue = .object(["ok": .bool(true), "method": .string("OPEN"),
+                                              "url": .string("https://api.example.com:443/t/1")])
+        #expect((try? Connectors.link(from: explicit443, manifest: Self.manifest())) != nil)
         #expect(throws: Connectors.Refusal.notBuilt("host not declared")) {
             try Connectors.link(from: .object(["ok": .bool(false), "error": .string("host not declared")]),
                                 manifest: Self.manifest())

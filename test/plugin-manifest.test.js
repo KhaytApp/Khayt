@@ -46,7 +46,7 @@ function base() {
       { id: 'track', label: { en: 'Track' }, placement: 'order', kind: 'open',
         url: 'https://track.example.com/t/{field.awb}' },
     ],
-    scopes: ['orders.read', 'fields.write'],
+    scopes: ['fields.write'],
   };
 }
 
@@ -169,14 +169,22 @@ test('an update that asks for more pauses the plugin; asking for less does not',
   m = base(); m.domains.push('new.example.com'); m.actions[1].url = 'https://new.example.com/t/{field.awb}';
   m.domains = m.domains.filter(d => d !== 'track.example.com');
   assert.deepEqual(M.diffPermissions(granted, m).domains, ['new.example.com']);
-  m = base(); m.scopes.push('jobs.status');
-  assert.deepEqual(M.diffPermissions(granted, m).scopes, ['jobs.status']);
+  m = base();
+  assert.deepEqual(M.diffPermissions(Object.assign({}, granted, { scopes: [] }), m).scopes, ['fields.write']);
   m = base(); m.actions[0].send = ['order.number'];
   assert.equal(M.diffPermissions(granted, m).widened, false);
 });
 
-test('v1 scopes are exactly the four the privacy page names', () => {
-  assert.deepEqual(M.SCOPES.slice().sort(), ['customers.read', 'fields.write', 'jobs.status', 'orders.read']);
+test('v1 has one scope; reading the shop and moving jobs wait for the Cloud relay', () => {
+  // A v1 connector cannot reach the shop, so a scope that would let it is
+  // refused rather than shown on a consent sheet that promises nothing real.
+  assert.deepEqual(M.SCOPES, ['fields.write']);
+  assert.deepEqual(M.RESERVED_SCOPES.slice().sort(), ['customers.read', 'jobs.status', 'orders.read']);
+  for (const s of M.RESERVED_SCOPES) {
+    const m = base(); m.scopes.push(s);
+    assert.ok(M.validateManifest(m).errors.some(e => e.includes(`"${s}"`) && e.includes('Cloud relay')), s);
+  }
+  assert.deepEqual(M.manifestJsonSchema().properties.scopes.items.enum, ['fields.write']);
 });
 
 test('plugin events are a subset of the event bus', () => {
@@ -265,7 +273,7 @@ test('a reply fills only its own fields, of the right type', () => {
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: { nested: 1 }, kg: 'heavy' } }, entry), {});
   assert.deepEqual(P.applyResponse(m, 'nope', { data: { awb: 'A1' } }, entry), {});
   // No fields.write granted, no entry, or a paused entry: nothing is written.
-  const noWrite = Object.assign({}, entry, { granted: Object.assign({}, entry.granted, { scopes: ['orders.read'] }) });
+  const noWrite = Object.assign({}, entry, { granted: Object.assign({}, entry.granted, { scopes: [] }) });
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }, noWrite), {});
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }), {});
   const widened = clone(m); widened.version = '1.3.0'; widened.actions[0].send.push('customer.email');
@@ -279,7 +287,7 @@ test('an unknown trigger builds nothing', () => {
 });
 
 test('a reply that writes fields must ask for fields.write', () => {
-  const m = base(); m.scopes = ['orders.read'];
+  const m = base(); m.scopes = [];
   assert.ok(M.validateManifest(m).errors.some(e => e.includes('fields.write')));
 });
 
@@ -304,7 +312,7 @@ test('every shipped sample is signed by a published key, and tampering breaks it
   const { verify } = require('../scripts/sign-connector');
   for (const { file, m } of samples) {
     assert.ok(verify(m), `${file} is not signed by a key in SIGNING_KEYS`);
-    const t = clone(m); t.domains = t.domains.concat([]); t.events[0].url += 'x';
+    const t = clone(m); (t.events || t.actions)[0].url += 'x';
     assert.equal(verify(t), null, `${file}: a changed URL still verified`);
     const w = clone(m); w.name.en += ' ';
     assert.equal(verify(w), null);
@@ -329,4 +337,74 @@ test('a customer as the editors save it: nameEn/nameAr and an address book', () 
     url: 'https://api.example.com/v1/cards', send: ['customer.name'] });
   data = JSON.parse(P.payloadFor(m, { action: 'card' }, { customer: saved }).body).data;
   assert.equal(data['customer.name'], 'نورة');
+});
+
+// ── settings and the Lamha showcase ───────────────────────────────────────
+
+test('settings: typed, kinded, capped; categories come from the kind', () => {
+  const m = base();
+  m.settings = [
+    { key: 'sender', label: { en: 'Sender' }, type: 'text', kind: 'phone', required: true },
+    { key: 'sheet', label: { en: 'Sheet' }, type: 'text' },
+  ];
+  m.actions[0].send.push('config.sender', 'config.sheet');
+  assert.deepEqual(M.validateManifest(m).errors, []);
+  const rows = M.consentRows(m).find(r => r.host === 'api.example.com').fields;
+  assert.deepEqual(rows.filter(f => f.key.startsWith('config.')),
+    [{ key: 'config.sender', category: 'contact.phone' }, { key: 'config.sheet', category: 'content.other' }]);
+  for (const bad of [
+    x => { x.settings[0].kind = 'contact.phone'; },        // categories are the lib's
+    x => { x.settings[0].type = 'number'; },               // only text can be a phone
+    x => { x.settings[1].secret = true; },
+    x => { x.actions[0].send.push('config.nope'); },
+  ]) { const c = clone(m); bad(c); assert.equal(M.validateManifest(c).ok, false); }
+  // A config value in an open link is listed under that link's host.
+  const o = clone(m); o.actions[1].url = 'https://track.example.com/t/{config.sheet}';
+  assert.deepEqual(M.validateManifest(o).errors, []);
+  assert.ok(M.consentRows(o).find(r => r.host === 'track.example.com').fields.some(f => f.key === 'config.sheet'));
+});
+
+test('a required setting left empty stops the request and says which', () => {
+  const m = base();
+  m.settings = [{ key: 'sender', label: { en: 'Sender' }, type: 'text', required: true }];
+  m.actions[0].send.push('config.sender');
+  assert.deepEqual(P.payloadFor(m, { action: 'ship' }, { order, customer, config: {} }),
+    { ok: false, error: 'setting sender is not set' });
+  // Over the cap is unset, not truncated.
+  assert.equal(P.payloadFor(m, { action: 'ship' }, { order, customer, config: { sender: 'x'.repeat(501) } }).ok, false);
+  const ok = P.payloadFor(m, { action: 'ship' }, { order, customer, config: { sender: 'Athar' } });
+  assert.equal(JSON.parse(ok.body).data['config.sender'], 'Athar');
+  // A stored value that is not a setting, or too long, fails the entry check.
+  const entry = { id: m.id, version: m.version, enabled: true, manifest: m, granted: M.grantFor(m), config: { other: 1 } };
+  assert.equal(M.checkEntry(entry).ok, false);
+});
+
+test('Lamha: the request is Lamha\'s create-order shape and books no shipment', () => {
+  const lamha = samples.find(s => s.file === 'lamha-shipping.json').m;
+  const customerRec = { id: 'c9', nameEn: 'Sara A.', phone: '+966500000000', email: 's@example.com',
+    addresses: [{ label: 'Home', address: 'King Fahd Rd' }], plugins: { 'app.khayt.samples.lamha': { city: 'Riyadh' } } };
+  const job = { id: 'INV-2026-0107-ab12', invoiceNumber: 'INV-2026-0107', date: '2026-11-08', project: 'Bracket set',
+    price: 115.5, currency: 'SAR', qty: 2 };
+  const config = { senderName: 'Athar Tuwaiq', senderPhone: '+966511111111', senderCity: 'Riyadh',
+    senderAddress: 'Tuwaiq St', carrierId: '7' };
+  const r = P.payloadFor(lamha, { action: 'record' }, { order: job, customer: customerRec, config });
+  assert.equal(r.ok, true);
+  assert.equal(r.url, 'https://app.lamha.sa/api/v2/create-order');
+  assert.deepEqual(r.auth, { header: 'X-LAMHA-TOKEN', scheme: '', secret: 'apiToken' });
+  const body = JSON.parse(r.body);
+  assert.equal(body.create_shippment, false, 'the sample must never book a shipment');
+  assert.equal(body.order_id, 'INV-2026-0107');
+  assert.equal(body.total, 115.5);
+  assert.deepEqual(body.shipper, { name: 'Athar Tuwaiq', phone: '+966511111111', Country: 'SA', City: 'Riyadh', AddressLine1: 'Tuwaiq St' });
+  assert.deepEqual(body.customer, { name: 'Sara A.', phone: '+966500000000', phone1: '+966500000000',
+    email: 's@example.com', Country: 'SA', City: 'Riyadh', AddressLine1: 'King Fahd Rd' });
+  assert.deepEqual(body.items, [{ name: 'Bracket set', quantity: 2, amount: 115.5, weight: '1' }]);
+  // Lamha's answer (fixture from the studio's integration): order_id → the job's own field.
+  const entry = { id: lamha.id, version: lamha.version, enabled: true, manifest: lamha, granted: M.grantFor(lamha), config };
+  assert.deepEqual(P.applyResponse(lamha, 'record', { success: true, order_id: 48213 }, entry), { lamhaOrderId: '48213' });
+  // No sender set: nothing is sent.
+  assert.equal(P.payloadFor(lamha, { action: 'record' }, { order: job, customer: customerRec, config: {} }).ok, false);
+  // The consent screen files the sender's details as contact info.
+  const cats = M.permissionsOf(lamha).categories;
+  for (const c of ['contact.name', 'contact.phone', 'contact.address', 'contact.email']) assert.ok(cats.includes(c), c);
 });
