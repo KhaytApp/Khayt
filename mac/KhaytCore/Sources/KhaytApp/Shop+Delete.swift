@@ -66,6 +66,27 @@ extension Shop {
         return words.callIt(reason == "paid" ? "mac.delete_job_paid" : "mac.delete_job_invoiced")
     }
 
+    /// What the job inspector offers at its foot for taking a job away — the
+    /// same doors as the job's menu, decided by the same rule
+    /// (`lib/record-delete.js` through `deleteVerdicts`): Delete… when the job
+    /// may go, Cancel Job with the reason when it may not, and only the
+    /// reason for a job already cancelled.
+    enum InspectorRemoval: Equatable {
+        case delete
+        case cancel(why: String)
+        case refused(why: String)
+        case none
+    }
+
+    func inspectorRemoval(for id: Order.ID) -> InspectorRemoval {
+        guard let job = orders.first(where: { $0.id == id }) else { return .none }
+        guard deleteVerdicts != nil else { return .none }
+        if let why = jobDeleteRefusal(id) {
+            return job.status == "cancelled" ? .refused(why: why) : .cancel(why: why)
+        }
+        return .delete
+    }
+
     /// Why this customer may not be deleted — "Has 3 jobs" — or nil.
     ///
     /// The count is the larger of what this screen shows (`Customer.orders`,

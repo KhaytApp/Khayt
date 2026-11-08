@@ -5944,6 +5944,7 @@ function loadSettingsIntoForm() {
   // Round 12: Webhooks
   renderWebhookSettings();
   renderEventWebhookSettings();
+  if (typeof renderPluginSettings === 'function') renderPluginSettings();
   // Round 12: Fixed costs / break-even
   renderFixedCostSettings();
   // Online (customer intake)

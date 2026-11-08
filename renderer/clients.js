@@ -848,6 +848,7 @@ function openClientEditor(clientId = null) {
       <span style="font-weight:600; font-size:12.5px;">⭐ ${escapeHtml(t('loyalty.points') || 'Loyalty points')}: ${clientLoyaltyAvailable(existing.id)}</span>
       <button type="button" id="btnRedeemLoyalty" class="btn small">${escapeHtml(t('loyalty.redeem_btn') || 'Redeem for store credit')}</button>
     </div>` : ''}
+    ${typeof pluginEditorHtml === 'function' ? pluginEditorHtml('customer', draft) : ''}
   `;
 
   openFormModal({
@@ -856,6 +857,23 @@ function openClientEditor(clientId = null) {
     sizeLg: false,
     bodyHtml,
     onMount(modal) {
+      // A customer button sends the customer as saved, so an unsaved new one
+      // has nothing for it to send yet.
+      if (typeof wirePluginEditor === 'function') wirePluginEditor(modal, 'customer', () => ({
+        customer: existing ? clients.find(c => c.id === draft.id) || draft : draft,
+        write: (rec) => {
+          const saved = clients.find(c => c.id === draft.id);
+          for (const target of [draft, saved].filter(Boolean)) {
+            if (rec.plugins) target.plugins = rec.plugins; else delete target.plugins;
+          }
+          if (saved) saveAll();
+          modal.querySelectorAll('.plg-editor [data-plugin-field]').forEach((inp) => {
+            const [id, key] = inp.dataset.pluginField.split('|');
+            const v = ((draft.plugins || {})[id] || {})[key];
+            if (inp.type === 'checkbox') inp.checked = v === true; else inp.value = v === undefined ? '' : String(v);
+          });
+        },
+      }));
       modal.querySelector('#ceWabOffers')?.addEventListener('change', (e) => {
         const how = modal.querySelector('#ceWabOffersHow');
         if (how) how.style.display = e.target.checked ? '' : 'none';
@@ -1064,6 +1082,10 @@ function openClientEditor(clientId = null) {
       draft.source = modal.querySelector('[data-f="source"]')?.value || 'other';
       draft.priceList = (draft.priceList || []).filter(pl => pl.product.trim() || pl.price > 0);
       draft.addresses = (draft.addresses || []).filter(a => a.label.trim() || a.address.trim());
+      if (typeof readPluginEditor === 'function') {
+        const withPlugins = readPluginEditor(modal, 'customer', draft);
+        if (withPlugins.plugins) draft.plugins = withPlugins.plugins; else delete draft.plugins;
+      }
       const idx = clients.findIndex(c => c.id === draft.id);
       if (idx >= 0) clients[idx] = draft;
       else clients.push(draft);

@@ -1831,6 +1831,8 @@ function openOrderEditor(orderId) {
       `).join('')}
     </div>` : ''}
 
+    ${typeof pluginEditorHtml === 'function' ? pluginEditorHtml('order', order) : ''}
+
     <details style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <summary style="font-size:12.5px; font-weight:600; cursor:pointer; color:var(--primary);">
         💬 Internal Notes${(order.comments || []).length > 0 ? ` <span style="background:var(--primary);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;">${(order.comments || []).length}</span>` : ''}
@@ -1846,6 +1848,20 @@ function openOrderEditor(orderId) {
     bodyHtml,
     onMount(modal) {
       modal.querySelector('#oeOpenMilestones')?.addEventListener('click', () => openMilestoneInvoices(order.id));
+      // A connector's buttons send the job as it is saved; a reply that fills
+      // its fields is written to the job and shown in the open editor.
+      if (typeof wirePluginEditor === 'function') wirePluginEditor(modal, 'order', () => ({
+        order, customer: customerOfOrder(order),
+        write: (rec) => {
+          if (rec.plugins) order.plugins = rec.plugins; else delete order.plugins;
+          saveAll();
+          modal.querySelectorAll('.plg-editor [data-plugin-field]').forEach((inp) => {
+            const [id, key] = inp.dataset.pluginField.split('|');
+            const v = ((order.plugins || {})[id] || {})[key];
+            if (inp.type === 'checkbox') inp.checked = v === true; else inp.value = v === undefined ? '' : String(v);
+          });
+        },
+      }));
       const plSel = modal.querySelector('[data-f="priorityLevel"]');
       if (plSel) plSel.addEventListener('change', (e) => {
         // Both fields, from one answer: a job that is urgent on one screen and
@@ -2275,6 +2291,10 @@ function openOrderEditor(orderId) {
         for (const f of pendingDeletes) {
           try { await window.hubAPI.deleteOrderPhoto(f); } catch (_) {}
         }
+      }
+      if (typeof readPluginEditor === 'function') {
+        const withPlugins = readPluginEditor(document.querySelector('.plg-editor[data-plugin-attach="order"]')?.closest('.modal'), 'order', order);
+        if (withPlugins.plugins) order.plugins = withPlugins.plugins; else delete order.plugins;
       }
       order.notes = draft.notes;
       order.internalNotes = draft.internalNotes || undefined;

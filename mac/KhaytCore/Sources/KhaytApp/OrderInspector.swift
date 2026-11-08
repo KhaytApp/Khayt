@@ -222,6 +222,11 @@ private struct Detail: View {
                 }
                 .buttonStyle(.link)
                 .font(.callout)
+                // Taking the job away, at the foot of the panel where a shop
+                // looks for it. The job's menu always had these; the panel did
+                // not, and "I can't delete" was the result (Nov 8 2026). Same
+                // rule, same question, same Cancel — no new way to delete.
+                InspectorRemovalRow(shop: shop, job: job)
             }
             .padding(16)
         }
@@ -806,6 +811,39 @@ struct AddPrintPhoto: View {
                 guard let data = try? Data(contentsOf: url) else { return }
                 await shop.addPhoto(to: job, from: data)
             }
+        }
+    }
+}
+
+/// Delete… or, where the rule refuses, the reason and Cancel Job.
+private struct InspectorRemovalRow: View {
+    let shop: Shop
+    let job: Order
+
+    var body: some View {
+        switch shop.inspectorRemoval(for: job.id) {
+        case .delete:
+            Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                shop.askToDeleteJobs([job.id])
+            }
+            .buttonStyle(.link)
+            .font(.callout)
+            .foregroundStyle(Khayt.late)
+            .disabled(!shop.mayDeleteJobs)
+        case .cancel(let why):
+            HStack(spacing: 10) {
+                Button(shop.words.callIt("mac.cancel_job")) {
+                    Task { await shop.cancelInstead(job.id) }
+                }
+                .buttonStyle(.link)
+                .disabled(!shop.canMoveJobs)
+                Text(why).foregroundStyle(.secondary)
+            }
+            .font(.callout)
+        case .refused(let why):
+            Text(why).font(.callout).foregroundStyle(.secondary)
+        case .none:
+            EmptyView()
         }
     }
 }
