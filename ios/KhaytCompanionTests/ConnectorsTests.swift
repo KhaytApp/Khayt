@@ -190,10 +190,8 @@ final class ConnectorsTests: XCTestCase {
             XCTAssertThrowsError(try ConnectorRules.prepare(payload: open(url), manifest: m, action: track,
                                                             secrets: [:], delivery: "d", now: Date()), url)
         }
-        // A port the shared check lets through on its own: the phone's gap check is still needed.
-        XCTAssertNoThrow(try Connectors.post(from: post("https://courier.example.com:8443/x"), manifest: m, event: "book",
-                                             secrets: [:], delivery: "d", now: Date()),
-                         "the shared check now refuses a port: drop ConnectorRules.refusePort")
+        // :8443 is refused above by the phone; Mac #2331 adds the same check to the
+        // shared Connectors.checkHost, after which ConnectorRules.refusePort can go.
     }
 
     // MARK: The customer as the book keeps it
