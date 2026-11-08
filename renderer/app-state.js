@@ -65,6 +65,12 @@ function migrateLanApiSettings() {
   if (settings.zidWebhookSecret && !settings.lanApi.zidWebhookSecret) {
     settings.lanApi.zidWebhookSecret = settings.zidWebhookSecret;
   }
+  // Copied, so the old top-level key goes: it is not a masked secret, so it
+  // sat in the book in the clear, in every backup and sync (lib/store-io.js
+  // migrateLanApiSecrets does the same on the main side). Only once lanApi
+  // holds a value — the mask counts, it means the real one is on disk.
+  if (settings.lanApi.sallaWebhookSecret) delete settings.sallaWebhookSecret;
+  if (settings.lanApi.zidWebhookSecret) delete settings.zidWebhookSecret;
 }
 /**
  * One-time migration to the 2.6 theme consolidation (7 legacy designs → 3).

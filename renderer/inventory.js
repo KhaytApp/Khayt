@@ -157,6 +157,106 @@ function importSpoolsCsv() {
   _csvImportOf('spools', 'csv.import_spools', 'Import Spools from CSV', () => renderInventory());
 }
 
+/* ============================================================
+   Import from Spoolman — the Mac's SpoolmanSheet.
+   The main process reads Spoolman (hub:spoolman-fetch: on this network only,
+   read-only, no redirects); lib/spoolman-import.js says what each spool
+   becomes and skips the ones already brought across (`spoolmanId`), so an
+   import run twice is one import. The address is remembered on this computer,
+   not in the book — another computer may reach Spoolman differently.
+   ============================================================ */
+const SPOOLMAN_ADDRESS_KEY = 'khayt.spoolmanAddress';
+
+function _spoolmanErrorText(r) {
+  const code = (r && r.code) || 'network';
+  if (code === 'no_address') return t('inv.spoolman_err_address');
+  if (code === 'not_lan') return t('inv.spoolman_err_not_lan', { host: r.host || '' });
+  if (code === 'refused') return t('inv.spoolman_err_refused', { status: r.status || 0 });
+  if (code === 'not_spoolman') return t('inv.spoolman_err_not_spoolman');
+  return t('inv.spoolman_err_network', { error: (r && r.error) || '' });
+}
+
+/** What adding `spools` to the shelf now would do — re-planned at each step, on the newest shelf. */
+function _spoolmanPlan(spools) {
+  return KhaytSpoolmanImport.plan(spools, inventory, { mintId: () => uid('INV'), today: localDateStr() });
+}
+
+function _spoolmanPreviewText(plan) {
+  const sk = plan.skipped;
+  return t('inv.spoolman_preview', {
+    added: plan.add.length, already: sk.already, skipped: sk.archived + sk.unnamed,
+  });
+}
+
+function openSpoolmanImport() {
+  if (typeof KhaytSpoolmanImport === 'undefined' || !window.hubAPI?.spoolmanFetch) return;
+  if (typeof operatorCan === 'function' && !operatorCan('inventory', 'create')) {
+    toast(t('inv.spoolman_not_allowed'), 'error');
+    return;
+  }
+  let saved = '';
+  try { saved = localStorage.getItem(SPOOLMAN_ADDRESS_KEY) || ''; } catch (_) { /* storage unavailable */ }
+  let fetched = null;   // { address, spools } once Spoolman answered
+  openFormModal({
+    title: t('inv.spoolman_import'),
+    saveLabel: t('inv.spoolman_go'),
+    sizeLg: false,
+    bodyHtml: `
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px;text-align:start;">${escapeHtml(t('inv.spoolman_hint'))}</p>
+      <label for="smAddress">${escapeHtml(t('inv.spoolman_address'))}</label>
+      <input id="smAddress" type="text" spellcheck="false" placeholder="192.168.1.20:7912" value="${escapeHtml(saved)}" dir="ltr">
+      <p id="smStatus" aria-live="polite" style="font-size:13px;margin-top:10px;min-height:16px;text-align:start;"></p>`,
+    onMount(modal) {
+      // A changed address is a new question: back to "Import".
+      modal.querySelector('#smAddress')?.addEventListener('input', () => {
+        fetched = null;
+        const btn = modal.querySelector('[data-act="save"]') || document.querySelector('#modalMount [data-act="save"]');
+        if (btn) btn.textContent = t('inv.spoolman_go');
+        modal.querySelector('#smStatus').textContent = '';
+      });
+    },
+    onSave: async (modal) => {
+      const status = modal.querySelector('#smStatus');
+      const btn = document.querySelector('#modalMount [data-act="save"]');
+      const address = modal.querySelector('#smAddress').value.trim();
+      if (fetched && fetched.address === address) {
+        // Second press: add what the preview said, against the shelf as it is NOW.
+        const plan = _spoolmanPlan(fetched.spools);
+        if (!plan.add.length) { status.textContent = _spoolmanPreviewText(plan); return false; }
+        inventory.push(...plan.add);
+        saveAll();
+        renderInventory();
+        toast(t('inv.spoolman_done', {
+          added: plan.add.length, already: plan.skipped.already,
+          skipped: plan.skipped.archived + plan.skipped.unnamed,
+        }), 'success', 7000);
+        return true;
+      }
+      status.style.color = 'var(--text-muted)';
+      status.textContent = t('inv.spoolman_reading');
+      if (btn) btn.disabled = true;
+      let r;
+      try { r = await window.hubAPI.spoolmanFetch({ url: address }); }
+      catch (e) { r = { ok: false, code: 'network', error: String((e && e.message) || e) }; }
+      if (btn) btn.disabled = false;
+      if (!r || !r.ok) {
+        status.style.color = 'var(--danger)';
+        status.textContent = _spoolmanErrorText(r);
+        return false;
+      }
+      try { localStorage.setItem(SPOOLMAN_ADDRESS_KEY, address); } catch (_) { /* storage unavailable */ }
+      fetched = { address, spools: r.spools || [] };
+      const plan = _spoolmanPlan(fetched.spools);
+      status.style.color = '';
+      status.textContent = _spoolmanPreviewText(plan);
+      if (btn && plan.add.length) {
+        btn.textContent = t(plan.add.length === 1 ? 'inv.spoolman_add_one' : 'inv.spoolman_add', { n: plan.add.length });
+      }
+      return false;
+    },
+  });
+}
+
 function importClientsCsv() {
   _csvImportOf('clients', 'csv.import_clients', 'Import Clients from CSV', () => renderClients());
 }
@@ -4888,6 +4988,7 @@ async function printSpoolLabel(itemId) {
     openStockTransferModal,
     printSpoolLabel,
     importSpoolsCsv,
+    openSpoolmanImport,
     importClientsCsv,
     importProductsCsv,
     openFilamentCatalog,
