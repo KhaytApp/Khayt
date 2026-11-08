@@ -311,3 +311,22 @@ test('every shipped sample is signed by a published key, and tampering breaks it
   }
   for (const k of M.SIGNING_KEYS) assert.equal(Buffer.from(k.key, 'base64').length, 32, k.id);
 });
+
+test('a customer as the editors save it: nameEn/nameAr and an address book', () => {
+  const saved = { id: 'c2', nameEn: '', nameAr: 'نورة', phone: '+966511111111',
+    addresses: [{ id: 'A1', label: 'Home', address: '' }, { id: 'A2', label: 'Work', address: 'Olaya St, Riyadh' }] };
+  let data = JSON.parse(P.payloadFor(base(), { action: 'ship' }, { order, customer: saved }).body).data;
+  assert.equal(data['customer.name'], 'نورة');
+  assert.equal(data['customer.address'], 'Olaya St, Riyadh');
+  // English first, then Arabic, then a CSV `name`; a plain address wins over the book.
+  data = JSON.parse(P.payloadFor(base(), { action: 'ship' }, { order,
+    customer: { nameEn: 'Noura', nameAr: 'نورة', name: 'old', address: 'Plain', addresses: [{ address: 'Book' }] } }).body).data;
+  assert.equal(data['customer.name'], 'Noura');
+  assert.equal(data['customer.address'], 'Plain');
+  // A customer button has no order to fall back on, and still gets the name.
+  const m = base();
+  m.actions.push({ id: 'card', label: { en: 'Card' }, placement: 'customer', kind: 'post',
+    url: 'https://api.example.com/v1/cards', send: ['customer.name'] });
+  data = JSON.parse(P.payloadFor(m, { action: 'card' }, { customer: saved }).body).data;
+  assert.equal(data['customer.name'], 'نورة');
+});
