@@ -624,6 +624,9 @@ struct LanServerTests {
         #expect(reply.status == 200, Comment(rawValue: reply.text))
         #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
         #expect(reply.text.contains("\"skipped\":4"), Comment(rawValue: reply.text))
+        // Refused for the collection, not stale: said on its own too, so the
+        // phone keeps nothing pending that can never land.
+        #expect(reply.text.contains("\"dropped\":4"), Comment(rawValue: reply.text))
 
         guard case .array(let ops)? = bench.book.value["operators"], ops.count == 1,
               case .object(let op) = ops[0] else {
@@ -644,6 +647,7 @@ struct LanServerTests {
             headers: ["x-khayt-pin": "24682468"])
         #expect(only.status == 200)
         #expect(only.text.contains("\"skipped\":1"))
+        #expect(only.text.contains("\"dropped\":1"))
         #expect(bench.foldCalls.n == calls, "the book was rewritten for a batch with nothing to write")
     }
 

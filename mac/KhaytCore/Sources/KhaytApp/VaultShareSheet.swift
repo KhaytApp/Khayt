@@ -44,6 +44,8 @@ struct VaultShareSheet: View {
     @State private var note = ""
     @State private var working = false
     @State private var problem: String?
+    /// The models the vault lacked when the link was asked for.
+    @State private var missing: Set<String> = []
     @State private var made: VaultLink?
     @State private var madePassword = false
     @State private var secretKept = true
@@ -135,6 +137,13 @@ struct VaultShareSheet: View {
             if let problem {
                 Text(problem).font(.callout).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
+                // Send just those models up, then make the link with the
+                // options as filled in — never the whole library.
+                if !missing.isEmpty, made == nil {
+                    Button(words.callIt("mac.vl_backup_retry")) { Task { await backUpAndRetry() } }
+                        .controlSize(.small)
+                        .disabled(working)
+                }
             }
         } footer: {
             HStack {
@@ -266,10 +275,22 @@ struct VaultShareSheet: View {
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
+    private func backUpAndRetry() async {
+        let ids = missing
+        working = true
+        problem = words.callIt("mac.vl_backing_up")
+        missing = []
+        let failed = await shop.backUpToVault(ids)
+        working = false
+        if let failed { problem = failed; return }
+        await create()
+    }
+
     private func create() async {
         guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true
         problem = nil
+        missing = []
         defer { working = false }
         let options = VaultLinks.Options(maxDownloads: limitDownloads ? downloads : nil,
                                          perFile: limitDownloads && perFile,
@@ -287,6 +308,9 @@ struct VaultShareSheet: View {
             password = ""
         case .refused(let why):
             problem = why
+        case .missing(let why, let ids):
+            problem = why
+            missing = ids
         case .turnedOff(let why):
             turnedOff = why
         }
