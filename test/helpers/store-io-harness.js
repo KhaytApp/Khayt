@@ -46,12 +46,27 @@ function harness() {
   return io;
 }
 
-/** Build a store with one value at a dotted path. `machines[]` is supported. */
+/**
+ * Where a dotted path lands in a store: `a.b[].c` is the first element of the
+ * array at `a.b` (`machines[]` or `settings.plugins[]`), and a trailing `{}`
+ * is one value of the object there. Returns [root, keys].
+ */
+function locate(store, path, create) {
+  const p = path.endsWith('{}') ? path.slice(0, -2) + '.k1' : path;
+  if (!p.includes('[].')) return [store, p.split('.')];
+  const [head, tail] = p.split('[].');
+  let cur = store;
+  const hk = head.split('.');
+  for (const k of hk.slice(0, -1)) cur = cur[k] || (create ? (cur[k] = {}) : {});
+  const last = hk[hk.length - 1];
+  if (!Array.isArray(cur[last]) && create) cur[last] = [{ id: 'ITEM-1' }];
+  return [(cur[last] || [])[0] || {}, tail.split('.')];
+}
+
+/** Build a store with one value at a dotted path. Any `x[]` and a trailing `{}` are supported. */
 function storeWith(path, value) {
   const store = { settings: {}, machines: [{ id: 'MACH-1', printerApi: {} }] };
-  const [root, keys] = path.includes('[].')
-    ? [store.machines[0], path.split('[].')[1].split('.')]
-    : [store, path.split('.')];
+  const [root, keys] = locate(store, path, true);
   let cur = root;
   for (const k of keys.slice(0, -1)) cur = cur[k] || (cur[k] = {});
   cur[keys[keys.length - 1]] = value;
@@ -59,9 +74,7 @@ function storeWith(path, value) {
 }
 
 function valueAt(store, path) {
-  const [root, keys] = path.includes('[].')
-    ? [store.machines[0], path.split('[].')[1].split('.')]
-    : [store, path.split('.')];
+  const [root, keys] = locate(store, path, false);
   let cur = root;
   for (const k of keys) { if (!cur || typeof cur !== 'object') return undefined; cur = cur[k]; }
   return cur;

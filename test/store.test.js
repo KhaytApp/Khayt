@@ -207,7 +207,8 @@ function place(root, path, value) {
     for (const item of cur[last]) place(item, tail, value);
     return;
   }
-  const keys = path.split('.');
+  // A trailing `{}` is every value of an object: plant one.
+  const keys = (path.endsWith('{}') ? path.slice(0, -2) + '.k1' : path).split('.');
   let cur = root;
   for (const k of keys.slice(0, -1)) cur = (cur[k] ||= {});
   cur[keys[keys.length - 1]] = value;

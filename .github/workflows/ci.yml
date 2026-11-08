@@ -393,6 +393,10 @@ jobs:
       - name: E2E smoke (durable webhook retry)
         run: xvfb-run -a npm run test:e2e:webhookretry
 
+      - name: E2E smoke (event webhook through the bus)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:eventwebhook
+
       # These two were defined as npm scripts and wired to nothing. `npm test`
       # runs the UNIT suite only, so a suite that is not named here does not run
       # anywhere — it is a file that looks like coverage and is not.
