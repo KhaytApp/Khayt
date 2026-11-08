@@ -188,6 +188,11 @@ function pluginConsent(manifest, { readOnly = false } = {}) {
       const f = (manifest.fields || []).find((x) => x.key === key.slice(6));
       return f ? pluginLabel(f.label) : key;
     }
+    // One of the connector's own settings (manifest settings[]), by its label.
+    if (key.startsWith('config.')) {
+      const st = (manifest.settings || []).find((x) => x.key === key.slice(7));
+      return st ? pluginLabel(st.label) : key;
+    }
     const w = t('plg.f.' + key);
     return w && w !== 'plg.f.' + key ? w : key;
   };
