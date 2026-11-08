@@ -75,6 +75,10 @@ enum SampleShop {
                 "enableVat": .bool(false), "language": .string("en"),
                 // Counted stock for two of the catalogue; the rest is not stocked.
                 "storefront": .object(["stockQty": .object(["PROD-S1": .number(6), "PROD-S2": .number(0)])]),
+                // Two connectors, approved on the Mac: a courier with buttons
+                // on a job and a customer, and a Slack one whose new version
+                // waits for approval — so both states can be screenshotted.
+                "plugins": sampleConnectors,
             ]),
             // The catalogue: one with a picture, a rounded price, an override,
             // one never stocked — so every line of the screen is drawn.
@@ -124,7 +128,8 @@ enum SampleShop {
                                  "deferUntilAt": .string(StoreWriter.iso(now.addingTimeInterval(3 * 86_400)))]),
             ]),
             "clients": .array([
-                .object(["id": .string("C-1"), "nameEn": .string("Acme Robotics"), "phone": .string("+15555550101"), "rev": .number(1)]),
+                .object(["id": .string("C-1"), "nameEn": .string("Acme Robotics"), "phone": .string("+15555550101"), "rev": .number(1),
+                         "plugins": .object([courierId: .object(["account": .string("ACME-77")])])]),
                 .object(["id": .string("C-2"), "nameEn": .string("Northside Dental"), "email": .string("lab@example.com"), "rev": .number(1)]),
                 .object(["id": .string("C-3"), "nameEn": .string("Maya Chen"), "phone": .string("+15555550142"), "rev": .number(1)]),
                 .object(["id": .string("C-4"), "nameEn": .string("Tabletop Guild"), "rev": .number(1)]),
@@ -142,7 +147,8 @@ enum SampleShop {
                           .object(["qty": .number(16), "printFileId": .string("PF-sample-terrain")]),
                           .object(["qty": .number(8), "printFileId": .string("PF-sample-tile-base")]),
                       ])]),
-                order("S-1046", "post", "Enclosure lid", "Acme Robotics", "C-1", placed: -5, due: 0, price: 95, paid: 95, material: "ABS", qty: 1),
+                order("S-1046", "post", "Enclosure lid", "Acme Robotics", "C-1", placed: -5, due: 0, price: 95, paid: 95, material: "ABS", qty: 1,
+                      extra: ["plugins": .object([courierId: .object(["awb": .string("EX-48213")])])]),
                 order("S-1047", "qc", "Bracket v3", "Omar Haddad", "C-5", placed: -6, due: 1, price: 60, paid: 0, material: "PETG", qty: 2),
                 // Two quotes waiting on the customer, so the Quotes list and
                 // a quote's Approve and Decline can be seen. A quote has no
@@ -225,6 +231,12 @@ enum SampleShop {
     /// A spool with what is left under all of its names, as the shop's own
     /// writers leave it: `weight` (the store's, which the shared rules read),
     /// `weightRemaining` and `weightTotal` (the wire's).
+    /// The sample connectors' `settings.plugins` (`Connectors.swift`).
+    static let courierId = "app.khayt.samples.courier"
+    static var sampleConnectors: JSONValue {
+        (try? JSONValue.parse(Data(#"[{"id":"app.khayt.samples.courier","manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.courier","name":{"en":"Courier booking","ar":"حجز المندوب"},"publisher":"Khayt samples","version":"1.0.0","domains":["courier.example.com"],"secrets":[{"name":"apiKey","label":{"en":"API key","ar":"مفتاح API"},"kind":"apiKey"}],"fields":[{"key":"awb","label":{"en":"Waybill","ar":"بوليصة الشحن"},"type":"text","attach":"order"},{"key":"account","label":{"en":"Courier account","ar":"حساب المندوب"},"type":"text","attach":"customer"}],"actions":[{"id":"book","label":{"en":"Book a pickup","ar":"حجز استلام"},"placement":"order","kind":"post","url":"https://courier.example.com/v1/pickups","send":["order.number","order.title","customer.name","customer.phone","customer.address"],"auth":{"header":"Authorization","scheme":"Bearer","secret":"apiKey"},"response":{"fields":{"awb":"data.waybill"}}},{"id":"track","label":{"en":"Track on the courier's site","ar":"التتبع في موقع المندوب"},"placement":"order","kind":"open","url":"https://courier.example.com/track?ref={field.awb}"},{"id":"account","label":{"en":"Open courier account","ar":"فتح حساب المندوب"},"placement":"customer","kind":"open","url":"https://courier.example.com/accounts?email={customer.email}"}]},"granted":{"version":"1.0.0","fields":["customer.address","customer.email","customer.name","customer.phone","field.awb","order.number","order.title"],"domains":["courier.example.com"],"scopes":[]},"reviewed":true},{"id":"app.khayt.samples.slack","manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.slack","name":{"en":"Slack alerts","ar":"تنبيهات Slack"},"description":{"en":"Posts a message to a Slack channel when a job comes in or is paid."},"publisher":"Khayt","version":"1.0.0","domains":["hooks.slack.com"],"secrets":[{"name":"webhookPath","label":{"en":"Webhook path (the part after /services/)"},"kind":"url"}],"events":[{"event":"order_created","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"New job {order.number}: {order.title} for {customer.name} ({order.total} {order.currency})"}}},{"event":"payment_received","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"Paid: {order.number} ({order.total} {order.currency})"}}}]},"granted":{"version":"0.9.0","fields":[],"domains":[],"scopes":[]}}]"#.utf8))) ?? .array([])
+    }
+
     private static func spool(_ id: String, _ brand: String, _ material: String, _ hex: String,
                               left: Double, of total: Double, cost: Double,
                               extra: [String: JSONValue] = [:]) -> JSONValue {

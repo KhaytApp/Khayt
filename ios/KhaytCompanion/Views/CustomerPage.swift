@@ -40,6 +40,7 @@ struct CustomerPage: View {
                             .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
                     }
                     messages(s)
+                    ConnectorsCard(place: .customer(client.id))
                 } else if loaded {
                     Text(L10n.tr("customer.needs_book"))
                         .font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
