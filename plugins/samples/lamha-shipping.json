@@ -157,9 +157,7 @@
     }
   ],
   "scopes": [
-    "orders.read",
-    "customers.read",
     "fields.write"
   ],
-  "signature": "z0Y6n7LEeM6Bx7MPwvf1ko4ThLwk6TJYCTquSGx2U3vw8KwQNsD+zOHTe0iCIFyI2sm7jA0kMfb0iD6nY1DfBg=="
+  "signature": "uEvUTXLm919sfDumQmBR9GMxOz2eMw2wIgJaUBdQB1hNeaG/IQReW9z8ujqkQLJTS9HE/5+56nEKizC0r39uCQ=="
 }

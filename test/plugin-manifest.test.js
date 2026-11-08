@@ -46,7 +46,7 @@ function base() {
       { id: 'track', label: { en: 'Track' }, placement: 'order', kind: 'open',
         url: 'https://track.example.com/t/{field.awb}' },
     ],
-    scopes: ['orders.read', 'fields.write'],
+    scopes: ['fields.write'],
   };
 }
 
@@ -169,14 +169,22 @@ test('an update that asks for more pauses the plugin; asking for less does not',
   m = base(); m.domains.push('new.example.com'); m.actions[1].url = 'https://new.example.com/t/{field.awb}';
   m.domains = m.domains.filter(d => d !== 'track.example.com');
   assert.deepEqual(M.diffPermissions(granted, m).domains, ['new.example.com']);
-  m = base(); m.scopes.push('jobs.status');
-  assert.deepEqual(M.diffPermissions(granted, m).scopes, ['jobs.status']);
+  m = base();
+  assert.deepEqual(M.diffPermissions(Object.assign({}, granted, { scopes: [] }), m).scopes, ['fields.write']);
   m = base(); m.actions[0].send = ['order.number'];
   assert.equal(M.diffPermissions(granted, m).widened, false);
 });
 
-test('v1 scopes are exactly the four the privacy page names', () => {
-  assert.deepEqual(M.SCOPES.slice().sort(), ['customers.read', 'fields.write', 'jobs.status', 'orders.read']);
+test('v1 has one scope; reading the shop and moving jobs wait for the Cloud relay', () => {
+  // A v1 connector cannot reach the shop, so a scope that would let it is
+  // refused rather than shown on a consent sheet that promises nothing real.
+  assert.deepEqual(M.SCOPES, ['fields.write']);
+  assert.deepEqual(M.RESERVED_SCOPES.slice().sort(), ['customers.read', 'jobs.status', 'orders.read']);
+  for (const s of M.RESERVED_SCOPES) {
+    const m = base(); m.scopes.push(s);
+    assert.ok(M.validateManifest(m).errors.some(e => e.includes(`"${s}"`) && e.includes('Cloud relay')), s);
+  }
+  assert.deepEqual(M.manifestJsonSchema().properties.scopes.items.enum, ['fields.write']);
 });
 
 test('plugin events are a subset of the event bus', () => {
@@ -265,7 +273,7 @@ test('a reply fills only its own fields, of the right type', () => {
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: { nested: 1 }, kg: 'heavy' } }, entry), {});
   assert.deepEqual(P.applyResponse(m, 'nope', { data: { awb: 'A1' } }, entry), {});
   // No fields.write granted, no entry, or a paused entry: nothing is written.
-  const noWrite = Object.assign({}, entry, { granted: Object.assign({}, entry.granted, { scopes: ['orders.read'] }) });
+  const noWrite = Object.assign({}, entry, { granted: Object.assign({}, entry.granted, { scopes: [] }) });
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }, noWrite), {});
   assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }), {});
   const widened = clone(m); widened.version = '1.3.0'; widened.actions[0].send.push('customer.email');
@@ -279,7 +287,7 @@ test('an unknown trigger builds nothing', () => {
 });
 
 test('a reply that writes fields must ask for fields.write', () => {
-  const m = base(); m.scopes = ['orders.read'];
+  const m = base(); m.scopes = [];
   assert.ok(M.validateManifest(m).errors.some(e => e.includes('fields.write')));
 });
 
