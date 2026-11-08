@@ -5588,6 +5588,14 @@ ipcMain.handle('hub:set-app-language', (_e, lang, strings) => {
 ipcMain.handle('hub:printer-history', async (_e, { machine, limit } = {}) =>
   fetchPrinterHistory(machine, limit));
 
+// Inventory ▸ Import from Spoolman. Read-only, on this network only (the same
+// guard as a printer host), no redirects, 8 s a page — lib/main/spoolman-fetch.js.
+// The window maps the rows with lib/spoolman-import.js and adds them.
+ipcMain.handle('hub:spoolman-fetch', async (_e, { url } = {}) => {
+  try { return await require('./lib/main/spoolman-fetch').fetchSpoolman(url); }
+  catch (e) { return { ok: false, code: 'network', error: String((e && e.message) || e) }; }
+});
+
 
 /**
  * The filament stock a machine runs, for turning extruded millimetres into
@@ -6621,6 +6629,25 @@ ipcMain.handle('hub:cloud-list-reviews', async (_e, { url, shopId, token, limit 
     token = cloudToken(token, url);
     return { ok: true, reviews: await cloudClient.listReviews(url, shopId, token, limit) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+// WhatsApp delivery reports, read from the cloud the way the Mac reads them
+// (WhatsAppReports.swift): whether the shop's hook is set up, then the reports
+// after this device's place. The token resolves for the saved server only.
+ipcMain.handle('hub:cloud-whatsapp-hook', async (_e, { url, shopId, token } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.getWhatsappHook(url, shopId, token);
+    return { ok: r.status === 200, status: r.status, hook: r.hook };
+  } catch (e) { return { ok: false, status: 0, error: String(e && e.message || e) }; }
+});
+
+ipcMain.handle('hub:cloud-whatsapp-statuses', async (_e, { url, shopId, token, since } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.listWhatsappStatuses(url, shopId, token, since);
+    return { ok: r.status === 200, status: r.status, items: r.items, nextSince: r.nextSince };
+  } catch (e) { return { ok: false, status: 0, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-delete-review', async (_e, { url, shopId, token, reviewId } = {}) => {

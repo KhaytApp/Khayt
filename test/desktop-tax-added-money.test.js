@@ -63,8 +63,9 @@ test('profit and the five business reports count what was earned, as on the Mac'
   const a = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
   // Three machine-profit views, product profit and break-even (#1718); the
   // forecast, client sources, client value, customer mix and cost trends (#1725);
-  // operator time tracking (lib/operators.js), which read the typed price.
-  assert.equal((a.match(/revenueOf: orderEarnedBase/g) || []).length, 11);
+  // operator time tracking (lib/operators.js), which read the typed price;
+  // and profit per printer hour (lib/profit-per-hour.js).
+  assert.equal((a.match(/revenueOf: orderEarnedBase/g) || []).length, 12);
   assert.match(a, /machMap\[o\.machineId\]\.revenue \+= orderEarnedBase\(o\);/);
   for (const mod of ['KhaytForecast.forecast(', 'KhaytClientValue.clientValue(', 'KhaytCustomerMix.customerMix(', 'KhaytCostTrends.costTrends(', 'KhaytClientSources.byClient(']) {
     const at = a.indexOf(mod);

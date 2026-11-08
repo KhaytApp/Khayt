@@ -265,6 +265,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudCatalogPublish: (opts) => ipcRenderer.invoke('hub:cloud-catalog-publish', opts),
   cloudReviewSummary: (opts) => ipcRenderer.invoke('hub:cloud-review-summary', opts),
   cloudListReviews:   (opts) => ipcRenderer.invoke('hub:cloud-list-reviews', opts),
+  cloudWhatsappHook:  (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-hook', opts),
+  cloudWhatsappStatuses: (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-statuses', opts),
   cloudDeleteReview:  (opts) => ipcRenderer.invoke('hub:cloud-delete-review', opts),
   cloudRequestReset: (opts) => ipcRenderer.invoke('hub:cloud-request-reset', opts),
   cloudResetPassword: (opts) => ipcRenderer.invoke('hub:cloud-reset-password', opts),
@@ -330,6 +332,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printerPlate:        (machine) => ipcRenderer.invoke('hub:printer-plate', { machine }),
   printerExcludeObject: (machine, name) => ipcRenderer.invoke('hub:printer-exclude-object', { machine, name }),
   printerHistory: (payload) => ipcRenderer.invoke('hub:printer-history', payload),
+  spoolmanFetch: (payload) => ipcRenderer.invoke('hub:spoolman-fetch', payload),
   setAppLanguage: (lang, menuStrings) => ipcRenderer.invoke('hub:set-app-language', lang, menuStrings),
   smartPlug:           (machine, action) => ipcRenderer.invoke('hub:smart-plug', { machine, action }),
   onSmartPlugAutoOff: (() => {

@@ -449,7 +449,14 @@ function reportStatusGate(decision) {
  * completion is not, because it has already deducted filament and packaging
  * that putting the row back would not return to the shelf.
  */
-function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
+function runStatusEffects(order, effects, { prevTier, undo, toastText, before } = {}) {
+  // The job as it was, for the customer's update: handed in where the caller
+  // kept a copy, otherwise read back from the history line before the one this
+  // move just wrote (lib/customer-updates.js). Every move — a column, the Job
+  // menu, QC, a phone's or the LAN API's, the Shipped and Delivered buttons —
+  // comes through here, so this is the one place it is sent from.
+  const was = before !== undefined ? before
+    : (typeof KhaytCustomerUpdates !== 'undefined' ? KhaytCustomerUpdates.beforeOf(order) : null);
   for (const e of effects) {
     switch (e.type) {
       case 'activity_log':
@@ -491,6 +498,11 @@ function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
       default:
         console.warn('[order-status] no handler for effect', e.type);
     }
+  }
+  // After the write, as the Mac sends it (Shop.deliverMove): a message about
+  // a job that was not saved is worse than no message.
+  if (effects.some((e) => e.type === 'save') && typeof sendOwedCustomerUpdate === 'function') {
+    sendOwedCustomerUpdate(order, was);
   }
 }
 
@@ -580,6 +592,7 @@ function updateStatus(id, newStatus) {
   });
   showStatusNotices(out.notices);
   runStatusEffects(order, out.effects, {
+    before: _undoSnap,
     undo: _undoIdx >= 0 ? () => {
       _stock.restore();
       restoreOrderSnapshot(_undoSnap);
@@ -632,6 +645,7 @@ function holdOrder(id) {
       });
       showStatusNotices(out.notices);
       runStatusEffects(order, out.effects, {
+        before: _undoSnap,
         undo: _undoIdx >= 0 ? () => {
           _stock.restore();
           restoreOrderSnapshot(_undoSnap);
@@ -1284,6 +1298,7 @@ function openShipModal(orderId) {
         }
       }
 
+      const _beforeShip = structuredClone(order);
       KhaytShipment.create(order, { carrier: carrierId, service, trackingNumber, source, labelUrl, meta },
         new Date().toISOString());
 
@@ -1295,6 +1310,9 @@ function openShipModal(orderId) {
       renderKanban(); renderLogs();
       if (typeof republishPortalIfPublished === 'function') republishPortalIfPublished(order.id);
       toast(t('ship.created') || 'Shipment created', 'success');
+      // Not a status move, so runStatusEffects never sees it — the Mac's
+      // `ship` sends from the same place.
+      if (typeof sendOwedCustomerUpdate === 'function') sendOwedCustomerUpdate(order, _beforeShip);
       return true;
     }
   });
@@ -1659,6 +1677,9 @@ function openOrderEditor(orderId) {
     })()}
     <label style="margin-top:10px;">${escapeHtml(t('oe.delivery_address'))}</label>
     <textarea data-f="deliveryAddress" rows="2" style="resize:vertical; min-height:48px;" placeholder="…">${escapeHtml(draft.deliveryAddress)}</textarea>
+    ${/* The updates this job's customer was sent, with Meta's delivery report
+         on each, and a send button for one still owed (renderer/customer-updates.js). */
+      typeof customerUpdatesHtml === 'function' ? customerUpdatesHtml(order) : ''}
 
     ${(() => {
       // Feature 8 (new 8-pack): Loyalty tier auto-discount
