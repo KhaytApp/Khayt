@@ -1813,6 +1813,15 @@ final class Words {
         "mac.vault_over_err": ["en": "Your shop is over its plan's storage, so new share links and product changes are paused. Upgrade or delete files.",
           "ar": "تجاوزت مطبعتك مساحة التخزين في خطتها، لذا توقف إنشاء روابط المشاركة الجديدة وتعديل المنتجات. يمكنك ترقية الخطة أو حذف ملفات."],
         "mac.plan_owner_only": ["en": "Only the shop’s owner can change the plan.", "ar": "لا يغيّر الخطة إلا مالك المطبعة."],
+        "mac.portal_cross_shop": ["en": "Show my orders in customers' portal beside other Khayt shops",
+                                  "ar": "إظهار طلباتي في بوابة العملاء بجانب متاجر خيط الأخرى"],
+        "mac.portal_cross_shop_hint": ["en": "Off: a customer sees this shop's orders only when they open the portal from this shop's own pages.",
+                                       "ar": "عند الإيقاف: يرى العميل طلبات هذا المتجر فقط عندما يفتح البوابة من صفحات المتجر نفسه."],
+        "mac.pickup_title": ["en": "Pickup", "ar": "الاستلام"],
+        "mac.pickup_hours": ["en": "Pickup hours", "ar": "أوقات الاستلام"],
+        "mac.pickup_map": ["en": "Map link", "ar": "رابط الخريطة"],
+        "mac.pickup_hint": ["en": "Shown with your address on the customer's order page while the order is not with a courier. Leave both empty to show no pickup card.",
+                            "ar": "تظهر مع عنوانك في صفحة طلب العميل ما دام الطلب ليس مع شركة شحن. اتركهما فارغين لإخفاء بطاقة الاستلام."],
         "mac.paylink_title": ["en": "Payment link", "ar": "رابط الدفع"],
         "mac.paylink_url": ["en": "Link", "ar": "الرابط"],
         "mac.paylink_label": ["en": "Label (optional)", "ar": "التسمية (اختياري)"],
@@ -3560,6 +3569,9 @@ final class Words {
                               "ar": "حذف المفتاح المحفوظ"],
         // `settings.mcp.shareCustomerNames` — what the books tools in
         // `khayt-mcp` may say about a customer. Off unless the shop turns it on.
+        "mac.mcp_where": ["en": "Assistants such as Claude Desktop start Khayt's read-only books server from here:",
+                          "ar": "تشغّل المساعدات مثل Claude Desktop خادم دفاتر خيط للقراءة فقط من هنا:"],
+        "mac.mcp_copy_setup": ["en": "Copy Setup for Claude Desktop", "ar": "نسخ الإعداد لـ Claude Desktop"],
         "mac.mcp_share_names": ["en": "Share customer names with AI assistants (khayt-mcp)",
                                 "ar": "مشاركة أسماء العملاء مع مساعدي الذكاء الاصطناعي (khayt-mcp)"],
         "mac.mcp_share_names_hint": ["en": "Off: assistants connected to khayt-mcp see “Customer 1”, “Customer 2” instead of names. On: they see your customers’ names. Phone numbers, emails and addresses are never shared.",
@@ -3735,6 +3747,16 @@ final class Words {
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],
         "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
+        // Partial delivery and the spool switch on a job's parts (the
+        // desktop's `openPartialDeliveryModal` / `openSpoolSwitchModal`).
+        // The titles and the count line are the desktop's own `ord.*` words.
+        "mac.parts_delivered_btn": ["en": "Parts delivered", "ar": "الأجزاء المسلّمة"],
+        "mac.parts_delivered_hint": ["en": "Tick the parts the customer already has. The job stays open until the rest go.",
+                                     "ar": "حدّد الأجزاء التي استلمها العميل. يبقى العمل مفتوحًا حتى يُسلَّم الباقي."],
+        "mac.spool_switch_pick": ["en": "Choose a spool", "ar": "اختر بكرة"],
+        "mac.spool_switch_hint": ["en": "These grams come off the spool you choose now. When the job is finished they are not taken again from the part’s own spool.",
+                                  "ar": "تُخصم هذه الغرامات من البكرة التي تختارها الآن، ولا تُخصم مرة أخرى من بكرة الجزء نفسه عند إنهاء العمل."],
+        "mac.spool_switch_none": ["en": "No spool has stock left to draw from.", "ar": "لا توجد بكرة فيها مخزون للسحب منها."],
         // "Take the figures from the file this part was printed from." Short,
         // because it sits on a button beside the weight and the hours it fills.
         "mac.fill_from_file": ["en": "Fill from file", "ar": "تعبئة من الملف"],
@@ -3793,6 +3815,8 @@ final class Words {
         "mac.vl_private_explain": ["en": "The part after # unlocks the files. It stays on this Mac and in the link you send; Khayt Cloud never receives it.", "ar": "الجزء الذي بعد علامة # هو مفتاح الملفات. يبقى على هذا الماك وفي الرابط الذي ترسله، ولا يصل إلى خيط السحابي أبدًا."],
         "mac.vl_err_not_allowed": ["en": "This sign-in cannot make or change share links.", "ar": "تسجيل الدخول هذا لا يسمح بإنشاء روابط المشاركة أو تعديلها."],
         "mac.vl_err_vault_off": ["en": "Share links need the library to be kept in your Khayt Vault.", "ar": "روابط المشاركة تتطلب أن تكون المكتبة محفوظة في خزنة خيط."],
+        "mac.vl_backup_retry": ["en": "Back Up and Try Again", "ar": "انسخ احتياطياً وحاول مجدداً"],
+        "mac.vl_backing_up": ["en": "Copying the model to the vault…", "ar": "جارٍ نسخ النموذج إلى الخزنة…"],
         "mac.vl_err_missing": ["en": "{n} of these models have no copy in the vault yet. Back them up, then try again.", "ar": "{n} من هذه النماذج ليست لها نسخة في الخزنة بعد. انسخها احتياطيًا ثم حاول مرة أخرى."],
         "mac.vl_err_missing_n1": ["en": "One of these models has no copy in the vault yet. Back it up, then try again.", "ar": "أحد هذه النماذج ليست له نسخة في الخزنة بعد. انسخه احتياطيًا ثم حاول مرة أخرى."],
         "mac.vl_err_not_in_vault": ["en": "A file in this link is no longer in the vault.", "ar": "أحد الملفات في هذا الرابط لم يعد في الخزنة."],
@@ -6384,6 +6408,8 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // Partial delivery and the spool switch (`PartTrackingSheets.swift`).
+        "ord.partial_delivery", "ord.parts_delivered", "ord.spool_switch", "ord.add_spool",
         // The desktop-parity reports (`ParityReportCards.swift`), the box-form
         // VAT return, the shopping list and the test-print log — in the
         // other app's own words for each.

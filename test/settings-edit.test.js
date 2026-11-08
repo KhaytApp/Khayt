@@ -827,3 +827,14 @@ test('holidays: a form without them keeps them; a form with them has them cleane
   assert.deepEqual(apply(held, { holidays: ['2026-12-01', '2026-09-23', '2026-12-01', 'x'] }, CTX).holidays, ['2026-09-23', '2026-12-01']);
   assert.deepEqual(apply(held, { holidays: [] }, CTX).holidays, [], 'the last one removed is none, not the old list');
 });
+
+test('pickup hours are capped and a map link must be https', () => {
+  const assert = require('node:assert/strict');
+  const SE = require('../lib/settings-edit.js');
+  const fn = (s, f) => SE.apply(s, f, { year: 2026 });
+  assert.equal(typeof fn, 'function', 'settings-edit exports changed');
+  const out = fn({}, { pickupHours: '  ' + 'x'.repeat(150), pickupMapUrl: 'javascript:alert(1)' });
+  assert.equal(out.pickupHours.length, 120);
+  assert.equal(out.pickupMapUrl, '');
+  assert.equal(fn({}, { pickupMapUrl: ' https://maps.app.goo.gl/abc ' }).pickupMapUrl, 'https://maps.app.goo.gl/abc');
+});
