@@ -198,7 +198,7 @@ function logPrint(asQuote = false) {
   // Round 12 — Webhook: order_created
   const newOrder = printLog[0];
   if (newOrder) {
-    fireWebhook('order_created', { orderId: newOrder.id, project: newOrder.project, status: newOrder.status, price: newOrder.price });
+    fireStatusWebhook('order_created', newOrder);
     fireOrderWebhook('created', newOrder);
     if (asQuote) autoSendEmailNotification(newOrder, 'quote');
   }
@@ -1473,10 +1473,7 @@ function runPaymentEffects(order, effects) {
       case 'toast_cleared': toast(t('pay.cleared'), 'success'); break;
       case 'toast_refused': toast(t(e.key), 'error'); break;
       case 'webhook':
-        fireWebhook(e.event, {
-          orderId: order.id, amount: order.paidAmount,
-          paymentStatus: order.paymentStatus, client: order.client,
-        });
+        fireStatusWebhook(e.event, order);
         break;
       case 'order_webhook': fireOrderWebhook(e.event, order); break;
       case 'email': autoSendEmailNotification(order, e.status); break;

@@ -161,6 +161,18 @@ function webhookSubscriptions() {
   return wh.subscriptions;
 }
 
+/**
+ * Every subscription a stored retry or a resend may go to: the stored ones
+ * (on or off — the caller checks) and the event webhook, derived from its
+ * settings with its masked secret, which the main process fills in by URL.
+ */
+function liveWebhookSubscriptions() {
+  const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
+  const stored = Array.isArray((settings.webhooks || {}).subscriptions) ? settings.webhooks.subscriptions : [];
+  const ev = Bus && Bus.eventWebhookSubscription ? Bus.eventWebhookSubscription(settings) : null;
+  return ev ? stored.concat({ ...ev, secret: (settings.eventWebhooks || {}).secret || '' }) : stored;
+}
+
 function recordWebhookDelivery(entry) {
   const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
   if (!Bus) return;
@@ -183,12 +195,17 @@ function disableWebhookSubscription(subId, reason) {
 async function deliverWebhook(sub, body, attempt = 1) {
   const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
   if (!Bus) return;
+  // The event webhook's body IS its envelope (lib/webhooks.js), with no
+  // `payload` inside: what is logged, retried and resent is the whole body,
+  // or a retry after a restart would send an empty one.
+  const isEnvelope = Bus.isEventWebhook ? Bus.isEventWebhook(sub) : String(sub.id || '').startsWith('event:');
+  const kept = isEnvelope ? body : (body.payload || {});
   let status, error;
   try {
     // A subscription with no secret of its own signs with the shop's one
     // signing secret (`KhaytWebhookBus.subscriptionSecret`) — the Mac stores
     // none per subscription. The event webhook keeps its own.
-    const secret = String(sub.id || '').startsWith('event:') ? (sub.secret || '')
+    const secret = isEnvelope ? (sub.secret || '')
       : Bus.subscriptionSecret(sub, settings.webhooks);
     const r = await window.hubAPI?.fireWebhook?.(sub.url, body.event, body, secret);
     status = r && r.status;
@@ -203,7 +220,7 @@ async function deliverWebhook(sub, body, attempt = 1) {
     httpStatus: status || null, attempts: attempt, error: error || null,
     // Kept so a resend sends what this attempt did (`resendWebhookDelivery`
     // reads it; nothing wrote it before).
-    payload: body.payload || {},
+    payload: kept,
   }));
   if (okDelivered) { clearPendingWebhook(body.id); return; }
   // A consumer answering 410 Gone is telling us to stop for good.
@@ -211,7 +228,7 @@ async function deliverWebhook(sub, body, attempt = 1) {
   if (Bus.shouldRetry(status, attempt)) {
     const delay = Bus.backoffDelayMs(attempt + 1);
     // Persist the retry BEFORE arming the timer, so a quit mid-backoff resumes on launch.
-    persistPendingWebhook({ id: body.id, subscriptionId: sub.id, event: body.event, payload: body.payload, attempt: attempt + 1 }, delay);
+    persistPendingWebhook({ id: body.id, subscriptionId: sub.id, event: body.event, payload: kept, attempt: attempt + 1 }, delay);
     setTimeout(() => { deliverWebhook(sub, body, attempt + 1); }, delay);
   } else {
     clearPendingWebhook(body.id);
@@ -247,10 +264,13 @@ function resumePendingWebhooks() {
   const wh = settings.webhooks || {};
   const pending = Array.isArray(wh.pending) ? wh.pending : [];
   if (!pending.length) return;
-  const subById = new Map((wh.subscriptions || []).map(s => [s.id, s]));
+  // The event webhook is in here too (derived, never stored), so its retries
+  // survive a restart; they used to be dropped at boot for want of a match.
+  const subById = new Map(liveWebhookSubscriptions().map(s => [s.id, s]));
   const fire = (p) => {
     const sub = subById.get(p.subscriptionId);
     if (!sub || sub.enabled === false) { clearPendingWebhook(p.id); return; }
+    if (Bus.isEventWebhook && Bus.isEventWebhook(sub)) { deliverWebhook(sub, p.payload || {}, p.attempt || 1); return; }
     deliverWebhook(sub, { id: p.id, event: p.event, version: 1, timestamp: new Date().toISOString(), payload: p.payload || {} }, p.attempt || 1);
   };
   for (const p of Bus.duePending(pending)) fire(p);
@@ -289,11 +309,12 @@ async function fireWebhook(eventName, payload) {
 function resendWebhookDelivery(deliveryId) {
   const wh = settings.webhooks || {};
   const rec = (wh.deliveries || []).find(d => d.id === deliveryId);
-  const sub = (wh.subscriptions || []).find(s => s.id === (rec && rec.subscriptionId));
+  const sub = liveWebhookSubscriptions().find(s => s.id === (rec && rec.subscriptionId));
   if (!rec || !sub) return;
   const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
   if (!Bus) return;
-  deliverWebhook(sub, Bus.buildDeliveryBody(rec.event, rec.payload || {}, rec.id + '_resend'));
+  if (Bus.isEventWebhook && Bus.isEventWebhook(sub)) deliverWebhook(sub, rec.payload || {});
+  else deliverWebhook(sub, Bus.buildDeliveryBody(rec.event, rec.payload || {}, rec.id + '_resend'));
   toast(t('webhook.resent') || 'Resent', 'info');
 }
 
@@ -1942,15 +1963,7 @@ function firePrinterAlert(alert) {
   }
 
   // Webhook (reuses fireWebhook with a dedicated event name)
-  fireWebhook('printer_alert', {
-    machineId: alert.machineId,
-    type: alert.type,
-    state: alert.state,
-    filename: alert.filename,
-    progress: alert.progress,
-    message: alert.message,
-    at: new Date().toISOString(),
-  });
+  if (typeof KhaytWebhookBus !== 'undefined') fireWebhook('printer_alert', KhaytWebhookBus.printerAlertPayload(alert));
 
   // Email digest recipient (reuses hub:send-email; only when an SMTP/provider is configured)
   const cfg = settings.emailConfig;

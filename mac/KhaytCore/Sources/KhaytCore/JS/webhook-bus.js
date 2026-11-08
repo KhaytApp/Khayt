@@ -102,6 +102,15 @@
     if (event === 'order_shipped') {
       return { orderId: o.id, project: o.project, carrier: o.carrier, trackingNumber: o.trackingNumber };
     }
+    // A new job, and a payment recorded: the keys, in order, the desktop has
+    // always sent (renderer/order-flows.js), moved here with the catalogue
+    // (`eventCatalogue`) so its example is built by the same code that sends.
+    if (event === 'order_created') {
+      return { orderId: o.id, project: o.project, status: o.status, price: o.price };
+    }
+    if (event === 'payment_received') {
+      return { orderId: o.id, amount: o.paidAmount, paymentStatus: o.paymentStatus, client: o.client };
+    }
     return { orderId: o.id, project: o.project, newStatus: newStatus, client: o.client };
   }
 
@@ -341,6 +350,151 @@
     return { found: true, secret: usable ? own : String(wh.secret || '') };
   }
 
+  /** A printer alert (lib/printer-alerts.js) as a delivery carries it. */
+  function printerAlertPayload(alert, nowIso) {
+    const a = alert || {};
+    return {
+      machineId: a.machineId, type: a.type, state: a.state, filename: a.filename,
+      progress: a.progress, message: a.message, at: nowIso || new Date().toISOString(),
+    };
+  }
+
+  /* ── The event catalogue ──────────────────────────────────────────────
+   *
+   * What a subscriber (a plugin, a Zapier hook, khaytapp.com's API docs) can
+   * listen to and what each delivery carries. Every example is BUILT by the
+   * writer that sends it — `statusPayload`, `printerAlertPayload`, and for the
+   * event webhook `lib/webhooks.js buildWebhookEvent` — so the docs cannot
+   * describe a field the app does not send. An event no app sends yet says so
+   * (`sent: false`) and has no example rather than an invented one.
+   *
+   * `version` is the delivery body's (`buildDeliveryBody`); a breaking change
+   * to an event's payload is a new version, never a rename under a live URL.
+   */
+  const SAMPLE_ORDER = Object.freeze({
+    id: 'ORD-1042', project: 'Bracket set', client: 'Sara A.', status: 'printing',
+    price: 180, paidAmount: 180, paymentStatus: 'paid', carrier: 'smsa', trackingNumber: '290012345678',
+    qcStatus: 'failed', reprintOf: null,
+  });
+  const SAMPLE_ALERT = Object.freeze({
+    machineId: 'm_x1c', type: 'error', state: 'FAILED', filename: 'bracket.3mf', progress: 42,
+    message: 'Filament ran out. Please load new filament. (0300_8004)',
+  });
+  const SAMPLE_AT = '2026-11-08T09:00:00.000Z';
+  const NOT_SENT_YET = ['quote_created', 'low_stock', 'intake_submitted'];
+
+  function typeOf(v) {
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'array';
+    return typeof v;
+  }
+
+  function eventCatalogue() {
+    const events = EVENTS.map((event) => {
+      if (NOT_SENT_YET.includes(event)) return { event, version: 1, format: 'delivery-v1', sent: false, fields: [], example: null };
+      const payload = event === 'printer_alert' ? printerAlertPayload(SAMPLE_ALERT, SAMPLE_AT)
+        : statusPayload(event, SAMPLE_ORDER, event === 'status_changed' ? 'completed' : undefined);
+      // JSON drops an undefined key, so the fields listed are the ones on the wire.
+      const wire = JSON.parse(JSON.stringify(payload));
+      return {
+        event, version: 1, format: 'delivery-v1', sent: true,
+        fields: Object.keys(wire).map((key) => ({ key, type: typeOf(wire[key]) })),
+        example: buildDeliveryBody(event, wire, 'dlv_example_' + event, SAMPLE_AT),
+      };
+    });
+    const W = (typeof globalThis !== 'undefined' && globalThis.KhaytWebhooks) ||
+      (typeof require === 'function' ? (() => { try { return require('./webhooks.js'); } catch (_) { return null; } })() : null);
+    const envelope = Object.keys(EVENT_WEBHOOK_EVENTS).map((sw) => {
+      const ex = W ? W.buildWebhookEvent(sw, Object.assign({}, SAMPLE_ORDER, { dueDate: '2026-11-12' }),
+        { at: SAMPLE_AT, shopName: 'Khayt', clientName: 'Sara A.', currency: 'SAR' }) : null;
+      return { event: ex ? ex.event : 'order.' + sw, sameMomentAs: EVENT_WEBHOOK_EVENTS[sw], format: ORDER_ENVELOPE_V1, example: ex };
+    });
+    return { events, orderEnvelope: envelope };
+  }
+
+  /* ── The event webhook, folded in ─────────────────────────────────────
+   *
+   * `settings.eventWebhooks` is the older, separate system: one https URL,
+   * its own signing secret, a switch per event (created / status / paid), and
+   * its own envelope (`lib/webhooks.js buildWebhookEvent`, `order.status`).
+   * The plugin bus (Nov 2026) delivers through ONE fan-out, so the event
+   * webhook joins it as a subscription DERIVED AT READ TIME:
+   *
+   *  - never written to `subscriptions[]`. A second computer on an older
+   *    build still reads `eventWebhooks`, and a persisted copy would be a
+   *    one-way door: two places holding one URL, edited apart.
+   *  - `format: 'order-envelope-v1'` — its consumers verify the bytes they
+   *    have always received, so the body stays `buildWebhookEvent`'s, byte
+   *    for byte, and the event names on the wire stay `order.created` etc.
+   *  - no secret of its own here. It signs with `eventWebhooks.secret`,
+   *    which the main process fills in from the sealed store by URL
+   *    (`signingSecretFor`, main.js `resolveStoreSecretFor`).
+   *  - its own switch. It has never depended on `settings.webhooks.enabled`.
+   */
+  const EVENT_WEBHOOK_ID = 'event:legacy';
+  const ORDER_ENVELOPE_V1 = 'order-envelope-v1';
+  /** Event-webhook switch → the bus event it is the same moment as. */
+  const EVENT_WEBHOOK_EVENTS = Object.freeze({
+    created: 'order_created', status: 'status_changed', paid: 'payment_received',
+  });
+
+  /**
+   * The event webhook as a subscription, or null when it would send nothing:
+   * off, no https URL, or every event switched off. A missing switch is on,
+   * as `fireOrderWebhook` has always read it.
+   */
+  function eventWebhookSubscription(settings) {
+    const ew = (settings && settings.eventWebhooks) || {};
+    const url = String(ew.url || '').trim();
+    if (!ew.enabled || !/^https:\/\//i.test(url)) return null;
+    const sw = ew.events || {};
+    const events = Object.keys(EVENT_WEBHOOK_EVENTS)
+      .filter((k) => sw[k] !== false).map((k) => EVENT_WEBHOOK_EVENTS[k]);
+    if (!events.length) return null;
+    return { id: EVENT_WEBHOOK_ID, url, events, enabled: true, format: ORDER_ENVELOPE_V1 };
+  }
+
+  // "The same address", for dedupe: scheme, host and path, a trailing slash
+  // and the host's case ignored (lib/secret-destination.js urlKey).
+  function sameUrl(a, b) {
+    const key = (v) => {
+      try { const u = new URL(String(v || '').trim()); return `${u.protocol}//${u.host.toLowerCase()}${u.pathname.replace(/\/+$/, '')}${u.search}`; } catch (_) { return ''; }
+    };
+    const ka = key(a);
+    return !!ka && ka === key(b);
+  }
+
+  /**
+   * Every subscription a delivery fans out to, read from the settings and
+   * never stored: the bus's own (or what the legacy `events{}` map makes)
+   * when the bus is on, then the event webhook.
+   *
+   * DEDUPED BY URL AND EVENT. A shop that pointed both systems at one
+   * address has been getting the same moment twice, once in each envelope.
+   * The bus subscription keeps the event — it is the one the shop can see
+   * and edit in the subscriptions list — and the event webhook drops it;
+   * an event webhook left with nothing is left out.
+   */
+  function effectiveSubscriptions(settings) {
+    const s = settings || {};
+    const wh = s.webhooks || {};
+    const bus = !wh.enabled ? [] : (Array.isArray(wh.subscriptions) && wh.subscriptions.length
+      ? wh.subscriptions : migrateLegacyWebhooks(wh));
+    const out = bus.slice();
+    const ev = eventWebhookSubscription(s);
+    if (ev) {
+      const live = bus.filter((b) => b && b.enabled !== false && sameUrl(b.url, ev.url) && Array.isArray(b.events));
+      const events = ev.events.filter((e) => !live.some((b) => b.events.includes(e)));
+      if (events.length) out.push(Object.assign({}, ev, { events }));
+    }
+    return out;
+  }
+
+  /** Is this subscription the derived event webhook? */
+  function isEventWebhook(sub) {
+    return !!sub && (sub.id === EVENT_WEBHOOK_ID || sub.format === ORDER_ENVELOPE_V1);
+  }
+
   /**
    * A line of the delivery log. The payload is kept with it (the desktop's
    * `resendWebhookDelivery` already read `rec.payload`, which nothing wrote),
@@ -362,6 +516,9 @@
     statusPayload, buildWireBody,
     subscriptionSecret, legacyEvents, isSubscriptionUrl, editSubscription, withSubscriptions,
     fromLegacyForm, signingSecretFor, deliveryRecord,
+    EVENT_WEBHOOK_ID, ORDER_ENVELOPE_V1, EVENT_WEBHOOK_EVENTS,
+    eventWebhookSubscription, effectiveSubscriptions, isEventWebhook,
+    printerAlertPayload, eventCatalogue,
     backoffDelayMs, shouldRetry, isGone, appendDelivery, deliveriesFor,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

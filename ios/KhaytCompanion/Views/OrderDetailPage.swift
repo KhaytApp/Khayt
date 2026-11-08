@@ -150,6 +150,13 @@ struct OrderDetailPage: View {
                 ContactCard(client: customer)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            // The shop's connectors: their buttons for a job, and their own
+            // fields on it (read-only). Nothing is drawn without one.
+            if api.holdsBook {
+                ConnectorsCard(place: .order(order.id),
+                               outer: EdgeInsets(top: 0, leading: 16, bottom: 16, trailing: 16))
+                    .id("connectors")
+            }
             // The finished print, as the Mac and the desktop keep it — the
             // printer's own snapshot at the end of a print among them.
             if !printPhotos.isEmpty || canAddPhoto {
@@ -249,6 +256,11 @@ struct OrderDetailPage: View {
             // `-KhaytRevise YES` on a quote: its Revise sheet, for screenshots.
             if quoteState != nil, UserDefaults.standard.bool(forKey: "KhaytRevise") { await startRevising() }
             // `-KhaytScrollEnergy YES`: the energy card in view, for screenshots.
+            // `-KhaytScrollConnectors YES`: the connectors card in view, for screenshots.
+            if UserDefaults.standard.bool(forKey: "KhaytScrollConnectors") {
+                try? await Task.sleep(for: .milliseconds(600))
+                scroller.scrollTo("connectors", anchor: .center)
+            }
             if energy != nil, UserDefaults.standard.bool(forKey: "KhaytScrollEnergy") {
                 try? await Task.sleep(for: .milliseconds(300))
                 scroller.scrollTo("energy", anchor: .center)
