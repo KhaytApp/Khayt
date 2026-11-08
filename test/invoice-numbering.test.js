@@ -73,6 +73,43 @@ test('a new year restarts the sequence at one', () => {
   assert.equal(nextInvoiceNumber(), `INV-${YEAR}-0002`);
 });
 
+test('a format with no year in it never restarts: INV-0057 is followed by INV-0058 in January', () => {
+  // The number carries no year, so a January reset printed INV-0001 again —
+  // a duplicate tax-invoice number — once the new year reached it.
+  const N = require('../lib/order-new.js');
+  const fmt = '{prefix}-{seq4}';
+  // The counter alone, no book.
+  const s = { invNumPrefix: 'INV', invNumFormat: fmt, invNumYear: 2026, invNumNext: 58 };
+  assert.equal(N.allocateInvoiceNumber(s, 2027), 'INV-0058');
+  assert.equal(s.invNumNext, 59);
+  // A counter that DID reset (or was never moved on this computer): the book's
+  // 2026 numbers still count, whichever year they were dated in.
+  const book = [
+    { id: 'INV-2026-0057', invoiceNumber: 'INV-0057', date: '2026-12-30' },
+    { id: 'INV-2026-0001', invoiceNumber: 'INV-0001', date: '2026-01-02' },
+  ];
+  const fresh = { invNumPrefix: 'INV', invNumFormat: fmt, invNumYear: 2027, invNumNext: 1 };
+  assert.equal(N.allocateInvoiceNumber(fresh, 2027, book), 'INV-0058');
+  // And every number issued across the turn of the year is new.
+  const t = { invNumPrefix: 'INV', invNumFormat: fmt, invNumYear: 2026, invNumNext: 1 };
+  const seen = new Set();
+  for (const year of [2026, 2026, 2026, 2027, 2027, 2028]) {
+    const n = N.allocateInvoiceNumber(t, year);
+    assert.ok(!seen.has(n), `duplicate ${n} in ${year}`);
+    seen.add(n);
+  }
+  // `newOrder`'s path (`allocateInvoice`) is the same rule.
+  const u = { invNumPrefix: 'INV', invNumFormat: fmt, invNumYear: 2026, invNumNext: 58 };
+  assert.equal(N.allocateInvoice(u, 2027).number, 'INV-0058');
+});
+
+test('a format WITH the year still restarts each January', () => {
+  const N = require('../lib/order-new.js');
+  const s = { invNumPrefix: 'INV', invNumFormat: '{prefix}-{year}-{seq4}', invNumYear: 2026, invNumNext: 58 };
+  assert.equal(N.allocateInvoiceNumber(s, 2027,
+    [{ invoiceNumber: 'INV-2026-0057', date: '2026-12-30' }]), 'INV-2027-0001');
+});
+
 test('the year comes from the local calendar, not UTC', () => {
   // Same class as the date fixes: on 31 December a shop east of London would
   // otherwise still be issuing last year's sequence for the first hours of the

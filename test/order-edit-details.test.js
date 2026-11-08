@@ -66,7 +66,9 @@ test('repriceTerms keeps a discounted job\'s base and the agreed part amounts', 
   assert.equal(o.priceBeforeDiscount, 200);
   const agreed = { price: 150, shippingCost: 0, agreedAmount: 50 };
   E.repriceTerms(agreed, { shippingCost: 20 }, {});
-  assert.equal(agreed.price, 220, 'the agreed amount is added on top, never discounted');
+  // 100 costed + 50 agreed + 20 shipping — the agreed 50 counted ONCE
+  // (this test said 220 while the rule added it a second time).
+  assert.equal(agreed.price, 170, 'the agreed amount is added once, never discounted');
 });
 
 test('repriceTerms does nothing when none of the three moved', () => {

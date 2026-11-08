@@ -205,9 +205,10 @@ extension Shop {
     }
 
     /// Start a job or a quote from library models. Says why when it cannot.
-    func startJob(fromModels files: [LibraryFile], asQuote: Bool) async {
+    func startJob(fromModels files: [LibraryFile], asQuote: Bool, named: String? = nil) async {
         guard canMoveJobs else { moveProblem = words.callIt("mac.move_sample"); return }
-        if let seed = await jobFromModels(files, asQuote: asQuote) {
+        if var seed = await jobFromModels(files, asQuote: asQuote) {
+            if let named, !named.trimmingCharacters(in: .whitespaces).isEmpty { seed.project = named }
             // Some of a selection had nothing to quote: the sheet opens on
             // the rest, and the ones left out are named rather than dropped.
             if let skipped = productProblem { moveProblem = skipped }

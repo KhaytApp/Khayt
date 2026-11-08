@@ -906,6 +906,9 @@ final class Shop {
         do {
             let root: [String: JSONValue]
             var library: (items: [LibraryFile], skipped: [String])?
+            // The jobs and their print history, decoded with the library off
+            // the main thread when the book was read from disk.
+            var preDecoded: (orders: (items: [Order], skipped: [String]), history: [String: PrintHistory.Entry])?
             // The library write on screen when this book was read. Moved on
             // by the time the rows below are taken, a write has landed in
             // between, and its rows are the newer ones.
@@ -941,14 +944,21 @@ final class Shop {
                 // to correct it. So each read notes, on the chain, how many
                 // library writes it already holds; one older than what is on
                 // screen is read again.
-                var read: (root: [String: JSONValue], files: [LibraryFile], skipped: [String], holds: Int)
+                var read: BookRead
                 var tries = 0
                 repeat {
-                    read = try await BookWork.run { () throws -> ([String: JSONValue], [LibraryFile], [String], Int) in
+                    read = try await BookWork.run { () throws -> BookRead in
                         let holds = StoreWriter.serialised { LibraryWritten.current }
                         let raw = try StoreReader(build: build).raw
                         let files = Self.decodeFiles(raw)
-                        return (raw, files.items, files.skipped, holds)
+                        // The jobs too, and what each model's jobs say: on a
+                        // 5,000-job book these held the main thread on every
+                        // reload, and every phone fold and cloud pull reloads
+                        // (Mac review, Nov 2026). A job that will not decode
+                        // is reported as before, so nil only on a thrown read.
+                        return BookRead(root: raw, files: files.items, skipped: files.skipped, holds: holds,
+                                        orders: try? Self.decodeOrders(raw),
+                                        history: PrintHistory.byFile(Self.rows(raw, "printLog")))
                     }
                     if let hook = Self.afterBookReadForTests { await hook() }
                     // A later load started while this one was reading: it has
@@ -958,6 +968,7 @@ final class Shop {
                 } while read.holds < libraryShownSequence && tries < 10
                 root = read.root
                 library = (items: read.files, skipped: read.skipped)
+                if let orders = read.orders { preDecoded = (orders, read.history) }
                 // This book is now the library on screen: a write it already
                 // holds, heard late, patches from THIS, never from older rows.
                 libraryShownSequence = max(libraryShownSequence, read.holds)
@@ -976,7 +987,7 @@ final class Shop {
             libraryShownRows = Self.rows(root, "printFiles")
             libraryEpoch += 1
             readMark = libraryEpoch
-            let decoded = try Self.decodeOrders(root)
+            let decoded = try preDecoded?.orders ?? Self.decodeOrders(root)
             orders = decoded.items
             skipped = decoded.skipped
             machines = Self.decode(root, "machines", as: Machine.self)
@@ -985,7 +996,7 @@ final class Shop {
             let decodedFiles = library ?? Self.decodeFiles(root)
             // The jobs this book holds, before the models are shown: what
             // each model's finished jobs say is put on it as it goes up.
-            printHistory = PrintHistory.byFile(Self.rows(root, "printLog"))
+            printHistory = preDecoded?.history ?? PrintHistory.byFile(Self.rows(root, "printLog"))
             files = withPrintHistory(decodedFiles.items)
             skipped += decodedFiles.skipped
             // In the same breath, not after the seconds of work below: a
@@ -3482,4 +3493,15 @@ final class Shop {
     /// catalogue on the first keystroke. An engine, not a flag: a new engine
     /// starts without it.
     @ObservationIgnored var filamentCatalogEngine: ObjectIdentifier?
+}
+
+
+/// One read of the book from disk, decoded off the main thread (`load`).
+struct BookRead: Sendable {
+    var root: [String: JSONValue]
+    var files: [LibraryFile]
+    var skipped: [String]
+    var holds: Int
+    var orders: (items: [Order], skipped: [String])?
+    var history: [String: PrintHistory.Entry]
 }

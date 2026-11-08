@@ -1813,6 +1813,13 @@ final class Words {
         "mac.vault_over_err": ["en": "Your shop is over its plan's storage, so new share links and product changes are paused. Upgrade or delete files.",
           "ar": "تجاوزت مطبعتك مساحة التخزين في خطتها، لذا توقف إنشاء روابط المشاركة الجديدة وتعديل المنتجات. يمكنك ترقية الخطة أو حذف ملفات."],
         "mac.plan_owner_only": ["en": "Only the shop’s owner can change the plan.", "ar": "لا يغيّر الخطة إلا مالك المطبعة."],
+        "mac.joblink_ask_title": ["en": "Start a job from this file?", "ar": "بدء طلب من هذا الملف؟"],
+        "mac.joblink_ask": ["en": "A link asked Khayt to start a job from “{file}” in your Downloads folder. Khayt will add it to your library and open New Job; nothing is saved until you press Save.",
+                            "ar": "طلب رابط من خيط بدء طلب من «{file}» في مجلد التنزيلات. سيضيفه خيط إلى مكتبتك ويفتح «طلب جديد»، ولن يُحفظ شيء حتى تضغط «حفظ»."],
+        "mac.joblink_start": ["en": "Start Job", "ar": "بدء الطلب"],
+        "mac.joblink_missing_title": ["en": "The file isn't in Downloads", "ar": "الملف ليس في التنزيلات"],
+        "mac.joblink_missing": ["en": "Khayt couldn't find “{file}” in your Downloads folder, or it has changed since the link was made. Download it again, or drag the file onto Khayt.",
+                                "ar": "لم يجد خيط «{file}» في مجلد التنزيلات، أو تغيّر منذ إنشاء الرابط. نزّله مجدداً، أو اسحب الملف إلى خيط."],
         "mac.portal_cross_shop": ["en": "Show my orders in customers' portal beside other Khayt shops",
                                   "ar": "إظهار طلباتي في بوابة العملاء بجانب متاجر خيط الأخرى"],
         "mac.portal_cross_shop_hint": ["en": "Off: a customer sees this shop's orders only when they open the portal from this shop's own pages.",
@@ -4547,6 +4554,15 @@ final class Words {
         // One step along the way work goes, without naming the stage.
         "mac.move_along":    ["en": "Move Along",   "ar": "تقديم"],
         "mac.move_back":     ["en": "Move Back",    "ar": "إرجاع"],
+        // The job inspector's one big button: the next thing done to a job,
+        // named. `{stage}` is the shared stage word (`Stage.key`). Arabic
+        // reads «التالي: …», not «تقديم», which is ambiguous on a quote.
+        "mac.next_stage":    ["en": "Next: {stage}", "ar": "التالي: {stage}"],
+        "mac.accept_quote":  ["en": "Accept Quote",  "ar": "قبول عرض السعر"],
+        "mac.mark_delivered": ["en": "Mark Delivered", "ar": "تحديد كمُسلَّم"],
+        // The invoice sheet: open WhatsApp (or the share picker) with the
+        // amount owed and the shop's pay link (`lib/payment-reminder.js`).
+        "mac.send_pay_link": ["en": "Send with Pay Link", "ar": "إرسال مع رابط الدفع"],
         // The other shelf. Every other `cons.` word is in the shared
         // catalogue already, with its Arabic; these two are this sheet's own.
         "cons.unit_ph":      ["en": "each / ml / roll", "ar": "حبة / مل / لفة"],

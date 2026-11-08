@@ -62,12 +62,12 @@ struct Customer: Identifiable, Hashable, Sendable {
                 // missed SAR 1,000 of a SAR 10,000 plan is SAR 1,000 overdue,
                 // as `receivables.js` ages each instalment on its own.
                 let late = job.instalments.reduce(0.0) { due, row in
-                    !row.paid && PaymentTerms.isPastDue(invoiceDate: row.dueDate.isEmpty ? job.date : row.dueDate,
+                    !row.paid && PaymentTerms.isPastDue(invoiceDate: row.dueDate.isEmpty ? job.invoiceDay : row.dueDate,
                                                         terms: 0, today: today) ? due + row.amount : due
                 }
                 return sum + min(late, job.owed)
             }
-            let late = PaymentTerms.isPastDue(invoiceDate: job.date, terms: paymentTermsDays, today: today)
+            let late = PaymentTerms.isPastDue(invoiceDate: job.invoiceDay, terms: paymentTermsDays, today: today)
             return late ? sum + job.owed : sum
         }
     }
