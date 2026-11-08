@@ -157,6 +157,106 @@ function importSpoolsCsv() {
   _csvImportOf('spools', 'csv.import_spools', 'Import Spools from CSV', () => renderInventory());
 }
 
+/* ============================================================
+   Import from Spoolman — the Mac's SpoolmanSheet.
+   The main process reads Spoolman (hub:spoolman-fetch: on this network only,
+   read-only, no redirects); lib/spoolman-import.js says what each spool
+   becomes and skips the ones already brought across (`spoolmanId`), so an
+   import run twice is one import. The address is remembered on this computer,
+   not in the book — another computer may reach Spoolman differently.
+   ============================================================ */
+const SPOOLMAN_ADDRESS_KEY = 'khayt.spoolmanAddress';
+
+function _spoolmanErrorText(r) {
+  const code = (r && r.code) || 'network';
+  if (code === 'no_address') return t('inv.spoolman_err_address');
+  if (code === 'not_lan') return t('inv.spoolman_err_not_lan', { host: r.host || '' });
+  if (code === 'refused') return t('inv.spoolman_err_refused', { status: r.status || 0 });
+  if (code === 'not_spoolman') return t('inv.spoolman_err_not_spoolman');
+  return t('inv.spoolman_err_network', { error: (r && r.error) || '' });
+}
+
+/** What adding `spools` to the shelf now would do — re-planned at each step, on the newest shelf. */
+function _spoolmanPlan(spools) {
+  return KhaytSpoolmanImport.plan(spools, inventory, { mintId: () => uid('INV'), today: localDateStr() });
+}
+
+function _spoolmanPreviewText(plan) {
+  const sk = plan.skipped;
+  return t('inv.spoolman_preview', {
+    added: plan.add.length, already: sk.already, skipped: sk.archived + sk.unnamed,
+  });
+}
+
+function openSpoolmanImport() {
+  if (typeof KhaytSpoolmanImport === 'undefined' || !window.hubAPI?.spoolmanFetch) return;
+  if (typeof operatorCan === 'function' && !operatorCan('inventory', 'create')) {
+    toast(t('inv.spoolman_not_allowed'), 'error');
+    return;
+  }
+  let saved = '';
+  try { saved = localStorage.getItem(SPOOLMAN_ADDRESS_KEY) || ''; } catch (_) { /* storage unavailable */ }
+  let fetched = null;   // { address, spools } once Spoolman answered
+  openFormModal({
+    title: t('inv.spoolman_import'),
+    saveLabel: t('inv.spoolman_go'),
+    sizeLg: false,
+    bodyHtml: `
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px;text-align:start;">${escapeHtml(t('inv.spoolman_hint'))}</p>
+      <label for="smAddress">${escapeHtml(t('inv.spoolman_address'))}</label>
+      <input id="smAddress" type="text" spellcheck="false" placeholder="192.168.1.20:7912" value="${escapeHtml(saved)}" dir="ltr">
+      <p id="smStatus" aria-live="polite" style="font-size:13px;margin-top:10px;min-height:16px;text-align:start;"></p>`,
+    onMount(modal) {
+      // A changed address is a new question: back to "Import".
+      modal.querySelector('#smAddress')?.addEventListener('input', () => {
+        fetched = null;
+        const btn = modal.querySelector('[data-act="save"]') || document.querySelector('#modalMount [data-act="save"]');
+        if (btn) btn.textContent = t('inv.spoolman_go');
+        modal.querySelector('#smStatus').textContent = '';
+      });
+    },
+    onSave: async (modal) => {
+      const status = modal.querySelector('#smStatus');
+      const btn = document.querySelector('#modalMount [data-act="save"]');
+      const address = modal.querySelector('#smAddress').value.trim();
+      if (fetched && fetched.address === address) {
+        // Second press: add what the preview said, against the shelf as it is NOW.
+        const plan = _spoolmanPlan(fetched.spools);
+        if (!plan.add.length) { status.textContent = _spoolmanPreviewText(plan); return false; }
+        inventory.push(...plan.add);
+        saveAll();
+        renderInventory();
+        toast(t('inv.spoolman_done', {
+          added: plan.add.length, already: plan.skipped.already,
+          skipped: plan.skipped.archived + plan.skipped.unnamed,
+        }), 'success', 7000);
+        return true;
+      }
+      status.style.color = 'var(--text-muted)';
+      status.textContent = t('inv.spoolman_reading');
+      if (btn) btn.disabled = true;
+      let r;
+      try { r = await window.hubAPI.spoolmanFetch({ url: address }); }
+      catch (e) { r = { ok: false, code: 'network', error: String((e && e.message) || e) }; }
+      if (btn) btn.disabled = false;
+      if (!r || !r.ok) {
+        status.style.color = 'var(--danger)';
+        status.textContent = _spoolmanErrorText(r);
+        return false;
+      }
+      try { localStorage.setItem(SPOOLMAN_ADDRESS_KEY, address); } catch (_) { /* storage unavailable */ }
+      fetched = { address, spools: r.spools || [] };
+      const plan = _spoolmanPlan(fetched.spools);
+      status.style.color = '';
+      status.textContent = _spoolmanPreviewText(plan);
+      if (btn && plan.add.length) {
+        btn.textContent = t(plan.add.length === 1 ? 'inv.spoolman_add_one' : 'inv.spoolman_add', { n: plan.add.length });
+      }
+      return false;
+    },
+  });
+}
+
 function importClientsCsv() {
   _csvImportOf('clients', 'csv.import_clients', 'Import Clients from CSV', () => renderClients());
 }
@@ -615,16 +715,16 @@ async function openFilamentScanner() {
           style="width:100%; max-height:280px; border-radius:var(--radius); background:#000; display:block;"></video>
         <div style="position:absolute;inset:0;pointer-events:none;border-radius:var(--radius);box-shadow:inset 0 0 0 3px rgba(91,156,240,0.4);"></div>
         <div style="position:absolute;inset:20%;pointer-events:none;">
-          <div style="position:absolute;top:0;left:0;width:20px;height:20px;border-top:3px solid var(--primary);border-left:3px solid var(--primary);border-radius:2px 0 0 0;"></div>
-          <div style="position:absolute;top:0;right:0;width:20px;height:20px;border-top:3px solid var(--primary);border-right:3px solid var(--primary);border-radius:0 2px 0 0;"></div>
-          <div style="position:absolute;bottom:0;left:0;width:20px;height:20px;border-bottom:3px solid var(--primary);border-left:3px solid var(--primary);border-radius:0 0 0 2px;"></div>
-          <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-bottom:3px solid var(--primary);border-right:3px solid var(--primary);border-radius:0 0 2px 0;"></div>
+          <div style="position:absolute;top:0;left:0;width:20px;height:20px;border-top:3px solid var(--primary);border-inline-start:3px solid var(--primary);border-radius:2px 0 0 0;"></div>
+          <div style="position:absolute;top:0;right:0;width:20px;height:20px;border-top:3px solid var(--primary);border-inline-end:3px solid var(--primary);border-radius:0 2px 0 0;"></div>
+          <div style="position:absolute;bottom:0;left:0;width:20px;height:20px;border-bottom:3px solid var(--primary);border-inline-start:3px solid var(--primary);border-radius:0 0 0 2px;"></div>
+          <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-bottom:3px solid var(--primary);border-inline-end:3px solid var(--primary);border-radius:0 0 2px 0;"></div>
         </div>
       </div>
       <p id="scanStatus" style="margin:8px 0 4px; font-size:12.5px; color:var(--text-muted); text-align:center;">
         ${escapeHtml(t('scan.aim') || 'Point camera at the QR code or barcode on the spool…')}
       </p>
-      <div id="scanResultCamera" style="display:none; margin-top:10px; padding:14px; background:var(--surface-2); border:1px solid var(--primary); border-radius:var(--radius); text-align:left;"></div>
+      <div id="scanResultCamera" style="display:none; margin-top:10px; padding:14px; background:var(--surface-2); border:1px solid var(--primary); border-radius:var(--radius); text-align:start;"></div>
       <div style="display:flex; gap:6px; margin-top:12px;">
         <input id="scanManual" type="text" autocomplete="off" placeholder="${escapeHtml(t('scan.manual_ph') || 'or scan / type a code (spool · order)')}"
           style="flex:1; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:13px;">
@@ -1749,7 +1849,7 @@ function openStockAdjustModal(itemId) {
             <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
               <span>${escapeHtml(adj.date)}</span>
               <span style="color:${adj.type === 'add' ? 'var(--success)' : 'var(--danger)'};">${adj.type === 'add' ? '+' : '-'}${escapeHtml(String(adj.amount))}g</span>
-              <span style="flex:1; text-align:right; color:var(--text-muted);">${escapeHtml(adj.reason || '')}</span>
+              <span style="flex:1; text-align:end; color:var(--text-muted);">${escapeHtml(adj.reason || '')}</span>
             </div>`).join('')}
         </div>
       </div>`;
@@ -1820,7 +1920,7 @@ function openSpoolHistory(itemId) {
             <td style="font-family:var(--font-num); font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(h.date || '')}</td>
             <td>${orderLabel}</td>
             <td dir="auto" style="font-size:12px; color:var(--text-dim);">${escapeHtml(h.lot || '')}</td>
-            <td style="text-align:right; font-variant-numeric:tabular-nums;">${(+h.weightUsed || 0).toFixed(0)}g</td>
+            <td style="text-align:end; font-variant-numeric:tabular-nums;">${(+h.weightUsed || 0).toFixed(0)}g</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
@@ -1930,7 +2030,7 @@ function openLotRecall(lot) {
             <td style="font-family:var(--font-num); font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(j.date || '')}</td>
             <td>${jobCell}</td>
             <td>${escapeHtml(j.client || '')}</td>
-            <td style="text-align:right; font-variant-numeric:tabular-nums;">${(+j.grams || 0).toFixed(0)}g</td>
+            <td style="text-align:end; font-variant-numeric:tabular-nums;">${(+j.grams || 0).toFixed(0)}g</td>
             <td style="font-size:12px; color:var(--text-dim);">${notes}</td>
           </tr>`;
         }).join('')}</tbody>
@@ -2666,7 +2766,7 @@ function openSupplierEditor(id) {
         r.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
         r.innerHTML = `
           <input class="spMat" type="text" maxlength="60" placeholder="${escapeHtml(t('sup.price_material_ph') || 'Material (e.g. PLA)')}" value="${escapeHtml(p.material || '')}" style="flex:1;font-size:12.5px;">
-          <input class="spPk" type="number" min="0" step="0.01" placeholder="0" value="${escapeHtml(p.pricePerKg != null && p.pricePerKg !== '' ? String(p.pricePerKg) : '')}" style="width:90px;font-size:12.5px;text-align:right;" title="${escapeHtml(cur)}/kg">
+          <input class="spPk" type="number" min="0" step="0.01" placeholder="0" value="${escapeHtml(p.pricePerKg != null && p.pricePerKg !== '' ? String(p.pricePerKg) : '')}" style="width:90px;font-size:12.5px;text-align:end;" title="${escapeHtml(cur)}/kg">
           <button type="button" class="btn danger small spDel" style="font-size:11px;" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">✕</button>`;
         r.querySelector('.spDel').addEventListener('click', () => r.remove());
         return r;
@@ -2795,7 +2895,7 @@ function openSupplierHistory(supplierId) {
           </tbody>
         </table>
       </div>
-      <div style="margin-top:10px; text-align:right; font-weight:600; font-size:14px;">
+      <div style="margin-top:10px; text-align:end; font-weight:600; font-size:14px;">
         ${escapeHtml(t('sup.hist_total'))}: ${fmtPrice(totalSpent)}
       </div>`;
 
@@ -3660,7 +3760,7 @@ function openProductEditor(productId = null) {
              placeholder="${escapeHtml(t('pe.price_override_ph') || 'auto')}"
              title="${escapeHtml(t('pe.price_override_hint') || 'A price you type here is used as-is and ignores the rounding above. Clear it to go back to the calculated price.')}"
              value="${draft.priceOverride != null ? escapeHtml(String(draft.priceOverride)) : ''}"
-             style="width:96px; font-size:12.5px; text-align:right;">
+             style="width:96px; font-size:12.5px; text-align:end;">
     </div>
 
     <div style="display:flex; align-items:center; margin-top:14px; gap:10px;">
@@ -4289,10 +4389,10 @@ async function batchGenPOs() {
         <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
           <table style="width:100%;font-size:12px;border-collapse:collapse;">
             <thead><tr style="color:var(--text-muted);">
-              <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('po.supplier'))}</th>
-              <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('po.item'))}</th>
-              <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('po.current'))}</th>
-              <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('po.order_qty'))}</th>
+              <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('po.supplier'))}</th>
+              <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('po.item'))}</th>
+              <th style="text-align:end;padding:4px 6px;">${escapeHtml(t('po.current'))}</th>
+              <th style="text-align:end;padding:4px 6px;">${escapeHtml(t('po.order_qty'))}</th>
             </tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
@@ -4888,6 +4988,7 @@ async function printSpoolLabel(itemId) {
     openStockTransferModal,
     printSpoolLabel,
     importSpoolsCsv,
+    openSpoolmanImport,
     importClientsCsv,
     importProductsCsv,
     openFilamentCatalog,

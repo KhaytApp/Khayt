@@ -296,6 +296,13 @@ enum SampleShop {
         for (key, value) in store where key != "settings" {
             if case .array(let rows) = value { held[key] = .init(whole: true, sent: rows.count, available: nil) }
         }
+        #if DEBUG
+        // `-KhaytPartialBook YES`: the sample as a phone holding only the
+        // newest finished jobs, so the partial-book screens can be photographed.
+        if UserDefaults.standard.bool(forKey: "KhaytPartialBook"), let jobs = held["printLog"] {
+            held["printLog"] = .init(whole: false, sent: jobs.sent, available: jobs.sent + 120)
+        }
+        #endif
         return BookScope.Taken(collections: held, omitted: [], takenAt: StoreWriter.iso(now))
     }
 

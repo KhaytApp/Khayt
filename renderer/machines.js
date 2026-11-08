@@ -132,8 +132,17 @@ function machineLiveDetailHtml(m) {
     add(t('mach.live_flow'), fin(s.flowFactor) ? `${s.flowFactor}%` : null);
   }
   const msg = typeof s.message === 'string' ? s.message.trim().slice(0, 140) : '';
-  if (!bits.length && !msg) return '';
-  return `<div style="font-size:11px;color:var(--text-muted);">${bits.join(' · ')}${msg ? `${bits.length ? ' · ' : ''}<span style="font-style:italic;">${escapeHtml(msg)}</span>` : ''}</div>`;
+  // WHY it is paused or failed, when the printer says (a Bambu's print_error /
+  // HMS notice, lib/bambu-faults.js via lib/bambu.js statusWithFault). Bambu's
+  // own sentence and the code to look it up by — the code is what the
+  // printer's screen and Bambu's wiki use, in any language. The Mac's
+  // ShopFloor card draws the same line.
+  const fault = typeof s.fault === 'string' ? s.fault.trim().slice(0, 200) : '';
+  const faultHtml = fault
+    ? `<div class="machine-fault" style="font-size:11px;color:var(--warning);text-align:start;">⚠ <bdi>${escapeHtml(fault)}</bdi></div>`
+    : '';
+  if (!bits.length && !msg) return faultHtml;
+  return `${faultHtml}<div style="font-size:11px;color:var(--text-muted);">${bits.join(' · ')}${msg ? `${bits.length ? ' · ' : ''}<span style="font-style:italic;">${escapeHtml(msg)}</span>` : ''}</div>`;
 }
 
 /* ── JOB CONTROL on the machine card ──────────────────────────────────────────
@@ -1161,14 +1170,13 @@ function openMachineEditor(machineId = null) {
       modal.querySelector('#machApiSlug')?.addEventListener('input', e => { draft.printerApi.printerSlug = e.target.value; });
       modal.querySelector('#btnTestApi')?.addEventListener('click', async () => {
         const resultEl = modal.querySelector('#apiTestResult');
-        if (resultEl) resultEl.textContent = '…testing';
+        if (resultEl) resultEl.textContent = t('slicer.testing');
         try {
-          if (window.hubAPI?.startPrinterPolling) {
+          if (window.hubAPI?.probePrinter) {
+            // One question to this printer; the fleet's polling carries on.
             const testMachine = { id: draft.id, printerApi: { ...draft.printerApi } };
-            await window.hubAPI.startPrinterPolling([testMachine]);
-            const cache = await window.hubAPI.getPrinterStatus();
+            const s = await window.hubAPI.probePrinter(testMachine);
             if (resultEl) {
-              const s = cache[draft.id];
               if (s?.error) {
                 // The owner is standing in the dialog that can fix it, so this is
                 // the best possible moment to say "it moved" rather than "it timed
@@ -1394,9 +1402,11 @@ function openMachineEditor(machineId = null) {
 function refreshPrinterPolling() {
   try {
     if (!window.hubAPI?.startPrinterPolling) return;
-    const apiMachines = (typeof machines !== 'undefined' ? machines : [])
-      .filter((m) => m.printerApi && m.printerApi.type && m.printerApi.type !== 'none');
-    if (!apiMachines.length) return;
+    // The machines boot polls: active ones (a retired printer is not watched).
+    const pool = typeof activeMachines === 'function' ? activeMachines() : (typeof machines !== 'undefined' ? machines : []);
+    const apiMachines = pool.filter((m) => m && m.printerApi && m.printerApi.type && m.printerApi.type !== 'none');
+    // The last connected printer removed: stop, or it is polled until restart.
+    if (!apiMachines.length) { window.hubAPI.stopPrinterPolling?.(); return; }
     window.hubAPI.startPrinterPolling(apiMachines).then((cache) => {
       if (typeof machineStatusCache !== 'undefined') machineStatusCache = cache || {};
       if (typeof updateKanbanLiveStatus === 'function') updateKanbanLiveStatus();
@@ -1477,6 +1487,7 @@ function unretireMachine(machineId) {
   machines[i] = KhaytMachineStatus.unretire(machines[i]);
   if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
+  refreshPrinterPolling();   // a removed, retired or returned printer changes what is polled
   renderMachines();
   renderMachineDropdown();
 }
@@ -1509,6 +1520,7 @@ async function deleteMachine(machineId) {
   }
   if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
+  refreshPrinterPolling();   // a removed, retired or returned printer changes what is polled
   renderMachines();
   renderMachineDropdown();
   if (typeof refreshMachineCameras === 'function') refreshMachineCameras();
@@ -1567,7 +1579,7 @@ function openMaintLog(machineId) {
       return `<tr>
         <td><strong>${escapeHtml(tk.name || '')}</strong><br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('maint.every') || 'every')} ${every}</span></td>
         <td style="white-space:nowrap;color:${STATUS_COLOR[st.status] || 'var(--text-muted)'};font-weight:600;font-size:12px;" data-status="${escapeHtml(st.status)}"${st.deferred ? ' data-deferred="1"' : ''}>${escapeHtml(label)}</td>
-        <td style="white-space:nowrap;text-align:right;">
+        <td style="white-space:nowrap;text-align:end;">
           ${notNeeded}<button class="btn small" data-act="mt-done" data-id="${tk.id}">${escapeHtml(t('maint.mark_done') || 'Done')}</button>
           <button class="btn danger small" data-act="mt-del" data-id="${tk.id}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
         </td></tr>`;

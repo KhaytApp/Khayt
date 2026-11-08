@@ -80,7 +80,11 @@ test('finish, reopen, undo, finish: the shelf ends where one print leaves it', (
 test('every undoable move that gives material back also restores the stock', () => {
   const flows = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'order-flows.js'), 'utf8');
   const br = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'bedready-queue.js'), 'utf8');
-  assert.equal((flows.match(/returnMaterial: true/g) || []).length, 2, 'updateStatus and holdOrder');
+  // updateStatus and holdOrder are undoable; moveOrdersTo (the bulk bar)
+  // gives material back too but offers no Undo, so it needs no stock capture.
+  assert.equal((flows.match(/returnMaterial: true/g) || []).length, 3, 'updateStatus, holdOrder and moveOrdersTo');
+  const bulk = flows.slice(flows.indexOf('function moveOrdersTo('), flows.indexOf('function updateStatus('));
+  assert.ok(!/undo:/.test(bulk), 'a bulk move offers no Undo');
   assert.equal((flows.match(/_stock\.restore\(\);/g) || []).length, 2);
   assert.equal((flows.match(/_stock\.seal\(\);/g) || []).length, 2);
   assert.match(br, /returnMaterial: !!stock/);

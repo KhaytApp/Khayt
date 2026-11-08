@@ -300,7 +300,7 @@ async function exportInvoicePDF(orderId, { askWhere = true, openAfter = true } =
     return finalPath;
   } catch (e) {
     console.error(e);
-    toast('PDF error', 'error');
+    toast(t('inv.pdf_failed'), 'error', 6000);
     return null;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = t('inv.export_pdf') || 'Export PDF'; }

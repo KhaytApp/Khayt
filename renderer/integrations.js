@@ -88,9 +88,14 @@ async function autoSendEmailNotification(order, newStatus) {
 // Re-entrancy guard for the periodic digest send. Declared here (where it's used)
 // — it must live in integrations.js's top-level scope, not another module's IIFE.
 let _digestInFlight = false;
+// A refused send waits before it is tried again — 5 minutes, doubling to 6
+// hours — rather than every 5-minute tick (288 tries a day at a mail server
+// that already said no). In memory: a restart tries once more.
+let _digestRetryAt = 0;
+let _digestBackoffMs = 0;
 
 async function checkAndSendDigest() {
-  if (_digestInFlight) return;
+  if (_digestInFlight || Date.now() < _digestRetryAt) return;
   if (typeof KhaytEmailDigest === 'undefined') return;
   const cfg = settings.emailConfig;
   if (!settings.emailDigest?.enabled || !cfg || cfg.provider === 'none') return;
@@ -103,10 +108,17 @@ async function checkAndSendDigest() {
   const subject = KhaytEmailDigest.subject(shopName(), KhaytEmailDigest.frequencyOf(settings.emailDigest));
   _digestInFlight = true;
   try {
-    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
+    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg })
+      .catch((e) => ({ ok: false, error: e && e.message }));
     if (result?.ok) {
       settings.emailDigest = KhaytEmailDigest.sent(settings, when.periodKey);
       saveAll();
+      _digestBackoffMs = 0;
+      _digestRetryAt = 0;
+    } else if (result) {
+      _digestBackoffMs = Math.min(6 * 3600 * 1000, _digestBackoffMs ? _digestBackoffMs * 2 : 5 * 60 * 1000);
+      _digestRetryAt = Date.now() + _digestBackoffMs;
+      console.warn('[digest] not sent:', result.error || 'refused', '— next try in', Math.round(_digestBackoffMs / 60000), 'min');
     }
   } finally {
     _digestInFlight = false;
@@ -476,7 +488,7 @@ async function openBnplModal(orderId) {
   const infoCards = BNPL_CATALOG.filter(s => !s.hasApi).map(s =>
     `<a href="#" class="bnpl-info-card" data-url="${escapeHtml(s.dashUrl)}" style="padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);border-inline-start:2px solid ${escapeHtml(s.color)};text-decoration:none;color:inherit;cursor:pointer;display:block;">
       <span style="font-weight:600;font-size:12px;">${escapeHtml(s.name)}</span>
-      <span style="font-size:10px;color:var(--text-muted);margin-left:6px;">${s.regions.slice(0,4).join('·')}</span>
+      <span style="font-size:10px;color:var(--text-muted);margin-inline-start:6px;">${s.regions.slice(0,4).join('·')}</span>
     </a>`
   ).join('');
 
@@ -951,7 +963,7 @@ async function exportOrderStatusPage(orderId) {
     .info-label { color: #6b7280; }
     .info-value { font-weight: 600; }
     .stepper { display: flex; align-items: flex-start; margin: 24px 0; }
-    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
+    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
     .footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
   </style>
 </head>
@@ -1025,7 +1037,7 @@ async function autoExportStatusPage(order) {
         ? `Your order is temporarily on hold.${order.holdReason ? ' Reason: ' + escapeHtml(order.holdReason) : ''}`
         : 'Your order is being processed. We\'ll notify you when it\'s ready.';
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Order Status — ${escapeHtml(jobRef(order))}</title>
-<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
+<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
 <div class="card"><div class="header"><h1>${escapeHtml(bizName)}</h1><p>Order Status Update</p></div>
 <div class="body"><div class="stepper">${connectors}</div>
 <div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(jobRef(order))}</span></div>
@@ -1426,7 +1438,7 @@ async function publishOrderToCloudPortal(orderId) {
   const isQuote = kind === 'quote';
 
   const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail, intakeId });
-  if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
+  if (!r.ok) { toast(t('cloud.publish_failed', { error: r.error || '—' }), 'error', 8000); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 
   const portalUrl = KhaytPortalOwner.portalUrl(c.url, pubToken);
@@ -1469,13 +1481,9 @@ async function publishOrderToCloudPortal(orderId) {
         resp.textContent = t('cloud.portal_checking') || 'Checking…'; resp.style.color = 'var(--text-muted)';
         const lst = await window.hubAPI.cloudPublishedList({ url: c.url, shopId: c.shopId, token: c.token });
         if (!lst.ok) { resp.textContent = '✗ ' + (lst.error || 'failed'); resp.style.color = 'var(--danger)'; return; }
-        // `lib/portal-owner.js responseFor` reads the customer's answer.
-        const said = KhaytPortalOwner.responseFor(lst.items, pubToken, order);
+        // The same function the automatic look runs (portal-watch.js).
+        const said = applyPortalResponse(order, lst.items, pubToken, { quiet: false });
         const paid = said.paid;
-        // A paid deposit is RECORDED, once (`recordPortalPayment` keys it on the
-        // provider's reference), through the shop's own payment rule — not only
-        // said here and then typed in again by hand.
-        if (paid) recordPortalDepositFrom(lst.items, pubToken, order);
         const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
         if (said.response === 'none') {
           resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
@@ -1485,20 +1493,46 @@ async function publishOrderToCloudPortal(orderId) {
         const approved = said.response === 'approved';
         resp.textContent = (approved ? '✓ ' : '✗ ') + (approved ? (t('cloud.portal_approved') || 'Customer approved the quote') : (t('cloud.portal_declined') || 'Customer declined the quote')) + paidNote;
         resp.style.color = approved ? 'var(--success)' : 'var(--danger)';
-        // Close the loop: an approved quote advances the order to Pending via the
-        // normal status-change path (history, webhooks, re-renders all fire).
-        if (said.advance && typeof updateStatus === 'function') {
-          updateStatus(order.id, 'pending');
+        if (said.advanced) {
           resp.textContent = '✓ ' + (t('cloud.portal_approved_advanced') || 'Customer approved — order moved to Pending') + paidNote;
         }
       });
       modal.querySelector('#cpUnpub')?.addEventListener('click', async () => {
         const u = await window.hubAPI.cloudUnpublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken });
         if (u.ok) { order.cloudPublished = false; saveAll(); toast(t('cloud.portal_unpublished') || 'Link unpublished', 'success'); }
-        else toast('✗ ' + (u.error || 'failed'), 'error');
+        else toast(t('cloud.unpublish_failed', { error: u.error || '—' }), 'error', 8000);
       });
     },
   });
+}
+
+/**
+ * What the customer did with one job's portal link, acted on: a paid deposit
+ * is RECORDED, once (`recordPortalPayment` keys it on the provider's
+ * reference), through the shop's own payment rule; an approved quote advances
+ * to Pending via the normal status-change path (history, webhooks, re-renders
+ * all fire). Run by the sheet's "Check response" button and by the automatic
+ * look (portal-watch.js) alike.
+ *
+ * `opts.quiet`: the automatic look says only what changed (a toast for an
+ * advanced quote). `opts.mayMove`: false leaves an approved quote for the
+ * person who may move jobs. Returns `responseFor`'s answer plus `advanced`.
+ */
+function applyPortalResponse(order, items, pubToken, opts) {
+  const o = opts || {};
+  // `lib/portal-owner.js responseFor` reads the customer's answer.
+  const said = KhaytPortalOwner.responseFor(items, pubToken, order);
+  if (said.paid) recordPortalDepositFrom(items, pubToken, order);
+  let advanced = false;
+  if (said.advance && o.mayMove !== false && typeof updateStatus === 'function') {
+    updateStatus(order.id, 'pending');
+    advanced = order.status === 'pending';
+    if (advanced && o.quiet) {
+      const ref = order.project || (typeof jobRef === 'function' ? jobRef(order) : order.id);
+      toast(`${t('cloud.portal_approved_advanced')} · ${ref}`, 'success', 8000);
+    }
+  }
+  return { ...said, advanced };
 }
 
 /**
@@ -1682,9 +1716,13 @@ function notifyPrintTransitions(currCache) {
     const machine = (typeof machines !== 'undefined') ? machines.find((m) => m.id === mid) : null;
     const name = (machine && (machine.name || machine.label)) || t('notif.print_a_printer') || 'Your printer';
     const fn = c.filename ? String(c.filename).replace(/[\r\n\t]/g, ' ').slice(0, 120) : '';
+    // The printer's own reason (a Bambu print_error / HMS notice, decoded by
+    // lib/bambu-faults.js in the main process) — said with the pause or the
+    // failure, so the notice sends someone to the right part of the machine.
+    const fault = typeof c.fault === 'string' ? c.fault.replace(/[\r\n\t]/g, ' ').trim().slice(0, 200) : '';
     if (paused) {
       // Told once per pause; a resume puts it back to printing and re-arms it.
-      if (prev === 'printing') { _printPhase[mid] = 'paused'; sendPrintNotice('paused', name, fn); }
+      if (prev === 'printing') { _printPhase[mid] = 'paused'; sendPrintNotice('paused', name, fn, fault); }
       return;
     }
     if ((prev === 'printing' || prev === 'paused') && isDone) {
@@ -1693,8 +1731,8 @@ function notifyPrintTransitions(currCache) {
       sendPrintNotice('finished', name, fn);
     } else if ((prev === 'printing' || prev === 'paused') && isError) {
       _printPhase[mid] = 'error';
-      if (local) _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), fn || (c.error ? String(c.error).slice(0, 120) : ''));
-      sendPrintNotice('failed', name, fn);
+      if (local) _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), [fn, fault].filter(Boolean).join('\n') || (c.error ? String(c.error).slice(0, 120) : ''));
+      sendPrintNotice('failed', name, fn, fault);
     }
   });
 }
@@ -1703,7 +1741,7 @@ function notifyPrintTransitions(currCache) {
  *  only when the shop switched that notice on for it. The file name is left
  *  out unless the shop ticked "include job and file names" for that channel,
  *  because a file is often named after the customer. */
-function sendPrintNotice(kind, machineName, filename) {
+function sendPrintNotice(kind, machineName, filename, fault) {
   const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
   if (!AR) return;
   const routes = AR.routes(kind, settings);
@@ -1713,12 +1751,12 @@ function sendPrintNotice(kind, machineName, filename) {
   const icon = kind === 'finished' ? '✅' : kind === 'failed' ? '❌' : '⏸';
   const tg = settings.telegram || {};
   if (routes.telegram && window.hubAPI?.sendTelegram) {
-    const message = `${icon} ${title}` + (names.telegram && filename ? '\n' + filename : '');
+    const message = `${icon} ${title}` + (fault ? '\n' + fault : '') + (names.telegram && filename ? '\n' + filename : '');
     window.hubAPI.sendTelegram({ botToken: tg.botToken, chatId: tg.chatId, message })
       .catch(e => console.warn('Telegram print notice failed:', e));
   }
   if (routes.ntfy && window.hubAPI?.sendNtfy) {
-    window.hubAPI.sendNtfy({ type: kind, title, body: names.ntfy ? filename : '' })
+    window.hubAPI.sendNtfy({ type: kind, title, body: [fault || '', names.ntfy ? filename : ''].filter(Boolean).join('\n') })
       .then(r => { if (r && !r.ok) console.warn('ntfy print notice failed:', r.error); })
       .catch(e => console.warn('ntfy print notice failed:', e));
   }

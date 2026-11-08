@@ -36,12 +36,12 @@ final class ShopPapersAndQuotesTests: XCTestCase {
     }
 
     private func paper(_ build: PaperBuild, file: StaticString = #filePath, line: UInt = #line)
-        -> (html: String, filename: String, wholePage: Bool)? {
-        guard case .paper(let doc, let filename, let wholePage) = build else {
+        -> (html: String, filename: String, wholePage: Bool, partial: Bool)? {
+        guard case .paper(let doc, let filename, let wholePage, let partial) = build else {
             XCTFail("expected a paper, got \(build)", file: file, line: line)
             return nil
         }
-        return (doc.html, filename, wholePage)
+        return (doc.html, filename, wholePage, partial)
     }
 
     // MARK: - Papers
@@ -127,18 +127,38 @@ final class ShopPapersAndQuotesTests: XCTestCase {
         XCTAssertFalse(statement.wholePage)
     }
 
-    func testAStatementIsRefusedFromABookThatHoldsOnlySomeJobs() async throws {
+    func testAStatementFromPartOfTheBookIsMadeAndSaysSo() async throws {
         let full = SampleShop.scope()
         var held = full.collections
         held["printLog"] = .init(whole: false, sent: 9, available: 3_140)
         let partial = BookScope.Taken(collections: held, omitted: full.omitted, takenAt: full.takenAt)
         let reader = BookReader(book: try book(scope: partial))
-        guard case .refused(let why) = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
-        else { return XCTFail("a statement from part of the book would understate what is owed") }
-        XCTAssertEqual(why, .partialBook)
-        // A job's own papers need only the job.
-        let built = try await reader.shopPaper(.job(.deliveryNote, orderId: "S-1046"), language: "en")
-        _ = try XCTUnwrap(paper(built))
+        let built = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
+        let statement = try XCTUnwrap(paper(built), "Turki, Nov 2026: made anyway, never refused")
+        XCTAssertTrue(statement.partial, "the page warns before it is shared")
+        XCTAssertTrue(statement.html.contains("Account Statement"))
+        XCTAssertTrue(statement.html.contains("Maya Chen"))
+        XCTAssertTrue(statement.html.hasPrefix("<div class=\"statement-partial\""), "the line heads the paper")
+        XCTAssertTrue(statement.html.contains(L10n.tr("paper.statement.partial.printed", language: "en")))
+        XCTAssertTrue(statement.html.contains("may be missing"), "said plainly on the paper itself")
+        let arBuild = try await reader.shopPaper(.statement(clientId: "C-3"), language: "ar")
+        let arabic = try XCTUnwrap(paper(arBuild))
+        XCTAssertTrue(arabic.html.contains(L10n.tr("paper.statement.partial.printed", language: "ar")),
+                      "in the statement's own language")
+        XCTAssertTrue(arabic.html.contains("dir=\"rtl\""))
+        // A job's own papers need only the job, and are never partial.
+        let noteBuild = try await reader.shopPaper(.job(.deliveryNote, orderId: "S-1046"), language: "en")
+        let note = try XCTUnwrap(paper(noteBuild))
+        XCTAssertFalse(note.partial)
+        XCTAssertFalse(note.html.contains("statement-partial"))
+    }
+
+    func testAStatementFromTheWholeBookCarriesNoWarning() async throws {
+        let reader = BookReader(book: try book())
+        let built = try await reader.shopPaper(.statement(clientId: "C-3"), language: "en")
+        let statement = try XCTUnwrap(paper(built))
+        XCTAssertFalse(statement.partial)
+        XCTAssertFalse(statement.html.contains("statement-partial"))
     }
 
     func testAPhoneWithoutABookMakesNoPaper() async {
@@ -213,14 +233,60 @@ final class ShopPapersAndQuotesTests: XCTestCase {
     }
 
     func testTheReviseSheetSendsOnlyWhatMoved() {
-        let start = KhaytAPIClient.QuoteState(version: 1, followUpCount: 0, followUpSentAt: nil,
-                                              price: 340, notes: "ABS", revisions: [])
-        XCTAssertTrue(KhaytAPIClient.revisionFields(start: start, price: 340, notes: "ABS").isEmpty)
-        let moved = KhaytAPIClient.revisionFields(start: start, price: 300, notes: "ABS, black")
+        let edit = KhaytAPIClient.OrderEditState(dueDate: "2026-11-20", priorityLevel: "normal", price: 340)
+        let quote = KhaytAPIClient.QuoteState(version: 1, followUpCount: 0, followUpSentAt: nil,
+                                              price: 340, notes: "ABS", revisions: [],
+                                              invoiceNotes: "Ships in a week", discountPct: 10, shippingCost: 0)
+        func fields(due: String? = "2026-11-20", level: String = "normal", price: Double? = 340,
+                    discount: String = "10", shipping: String = "", notes: String = "ABS",
+                    printed: String = "Ships in a week") -> [String: JSONValue] {
+            EditOrderSheet.reviseFields(start: edit, quote: quote, due: due, level: level, price: price,
+                                        discount: discount, shipping: shipping, notes: notes, invoiceNotes: printed)
+        }
+        XCTAssertTrue(fields().isEmpty, "a sheet opened and saved unchanged sends nothing")
+        let moved = fields(due: nil, level: "urgent", price: 300, discount: "", shipping: "25",
+                           notes: "ABS, black", printed: "Ships in 3 days")
+        XCTAssertEqual(moved["dueDate"], .null)
+        XCTAssertEqual(moved["priorityLevel"], .string("urgent"))
         XCTAssertEqual(moved["price"], .number(300))
+        XCTAssertEqual(moved["discountPct"], .number(0), "an emptied discount box is no discount")
+        XCTAssertEqual(moved["shippingCost"], .number(25))
         XCTAssertEqual(moved["notes"], .string("ABS, black"))
-        XCTAssertNil(KhaytAPIClient.revisionFields(start: start, price: nil, notes: "ABS")["price"],
-                     "an unreadable price leaves the price alone")
+        XCTAssertEqual(moved["invoiceNotes"], .string("Ships in 3 days"))
+        XCTAssertNil(fields(price: nil)["price"], "an unreadable price leaves the price alone")
+        XCTAssertNil(fields(discount: "abc")["discountPct"], "an unreadable discount leaves it alone")
+        XCTAssertEqual(EditOrderSheet.plain(10), "10")
+        XCTAssertEqual(EditOrderSheet.plain(0), "")
+        XCTAssertEqual(EditOrderSheet.plain(12.5), "12.50")
+    }
+
+    func testRevisingCoversEveryFieldTheEditorWritesAndKeepsTheVersion() async throws {
+        let b = try book()
+        let engine = try await BookReader(book: b).sharedEngine()
+        let fields: [String: JSONValue] = [
+            "dueDate": .string("2026-12-01"), "priorityLevel": .string("urgent"),
+            "discountPct": .number(10), "shippingCost": .number(20),
+            "notes": .string("Thicker walls"), "invoiceNotes": .string("Ships in 3 days"),
+        ]
+        let wrote = try await BookWriter(book: b).reviseQuote(orderId: "S-1048", fields: fields, engine: engine)
+        XCTAssertTrue(wrote)
+        let after = try order(b, "S-1048")
+        XCTAssertEqual(after["quoteVersion"], .number(2), "a version kept, as Revise always has")
+        guard case .array(let kept)? = after["quoteRevisions"], case .object(let first)? = kept.first else {
+            return XCTFail("the quote as it was is kept")
+        }
+        XCTAssertEqual(first["price"], .number(340))
+        XCTAssertEqual(after["status"], .string("quote"), "still a quote, so the customer is asked again")
+        XCTAssertEqual(after["dueDate"], .string("2026-12-01"))
+        XCTAssertEqual(after["priorityLevel"], .string("urgent"))
+        XCTAssertEqual(after["priority"], .bool(true), "the priority is a pair")
+        XCTAssertEqual(after["discountPct"], .number(10))
+        XCTAssertEqual(after["shippingCost"], .number(20))
+        XCTAssertEqual(after["notes"], .string("Thicker walls"))
+        XCTAssertEqual(after["invoiceNotes"], .string("Ships in 3 days"))
+        guard case .array(let edits)? = after["editHistory"], !edits.isEmpty else {
+            return XCTFail("the tracked fields are written in the job's history")
+        }
     }
 
     // MARK: - Follow-up

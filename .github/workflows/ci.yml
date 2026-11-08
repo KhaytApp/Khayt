@@ -245,6 +245,22 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:swap
 
+      - name: E2E smoke (parity batch — failure rate, analytics, Spoolman, portal check)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:paritybatch
+
+      - name: E2E smoke (automatic customer updates through WhatsApp Business)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:customerupdates
+
+      - name: E2E smoke (library health and find similar)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:libraryhealth
+
+      - name: E2E smoke (desktop review fixes)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:reviewfixes
+
       - name: E2E smoke (true cost of a failed print)
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:failedcost
@@ -451,7 +467,7 @@ jobs:
           # fixtures and vectors are read by named Mac tests.
           # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
           # name matches this pattern, so a new one can't be missed silently.
-          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|\.github/workflows/ci\.yml$)'
+          pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
           if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 

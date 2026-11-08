@@ -31,6 +31,10 @@ private struct Detail: View {
     let split: TaxSplit?
     @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
     @State private var editing: Order.Part?
+    /// The partial-delivery sheet (`PartsDeliveredSheet`).
+    @State private var delivering = false
+    /// The part a spool switch is being recorded for (`SpoolSwitchSheet`).
+    @State private var switching: SpoolSwitchTarget?
     /// Carrier names, for the Shipment section. Read once, and only for a job
     /// that has a carrier.
     @State private var carriers: [KhaytEngine.CarrierChoice] = []
@@ -233,6 +237,17 @@ private struct Detail: View {
         .shopSheet(item: $editing) { part in
             EditPartSheet(shop: shop, orderId: job.id, part: part)
         }
+        .shopSheet(isPresented: $delivering) {
+            PartsDeliveredSheet(shop: shop, job: job)
+        }
+        .shopSheet(item: $switching) { target in
+            SpoolSwitchSheet(shop: shop, job: job, target: target)
+        }
+    }
+
+    /// A spool's name for a switch line, or its id when it is off the shelf.
+    private func spoolName(_ id: String) -> String {
+        shop.spools.first { $0.id == id }?.material ?? id
     }
 
     private var header: some View {
@@ -466,13 +481,35 @@ private struct Detail: View {
         DetailSection(shop.words.callIt("mac.parts")) {
             // By position: a part with no id of its own is given a fresh one on
             // every read, and keying on that would rebuild the rows each reload.
-            ForEach(Array(job.parts.enumerated()), id: \.offset) { _, part in
+            ForEach(Array(job.parts.enumerated()), id: \.offset) { index, part in
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(part.name).lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(part.name).lineLimit(1)
+                            // Already with the customer (partial delivery).
+                            if part.delivered {
+                                Image(systemName: "shippingbox.fill")
+                                    .font(.caption).foregroundStyle(Role.ok)
+                                    .help(shop.words.callIt("ord.partial_delivery"))
+                            }
+                        }
                         Text(part.colour.isEmpty ? part.material : "\(part.material) · \(part.colour)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        // Grams this part's print took from other rolls (a
+                        // spool switch), each already off that roll.
+                        ForEach(Array(part.additionalSpools.enumerated()), id: \.offset) { _, extra in
+                            Text(verbatim: "+ \(spoolName(extra.spoolId)) · \(Money.grams(extra.weight)) \(shop.words.callIt("common.grams"))")
+                                .font(.caption2).monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        if Shop.offersSpoolSwitch(job), shop.canSwitchSpools {
+                            Button(shop.words.callIt("ord.add_spool") + "\u{2026}") {
+                                switching = SpoolSwitchTarget(id: index, part: part, partCount: job.parts.count)
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                        }
                     }
                     Spacer(minLength: 8)
                     VStack(alignment: .trailing, spacing: 1) {
@@ -501,9 +538,29 @@ private struct Detail: View {
                 .contextMenu {
                     Button(shop.words.callIt("mac.edit_part") + "\u{2026}") { editing = part }
                         .disabled(!shop.canMoveJobs)
+                    if Shop.offersSpoolSwitch(job) {
+                        Button(shop.words.callIt("ord.add_spool") + "\u{2026}") {
+                            switching = SpoolSwitchTarget(id: index, part: part, partCount: job.parts.count)
+                        }
+                        .disabled(!shop.canSwitchSpools)
+                    }
                 }
             }
             DetailLine(shop.words.callIt("mac.machine_time"), Money.quantity(job.printTime, decimals: 1) + " " + shop.words.callIt("mac.unit_h"), dim: true)
+            // "N of M parts delivered" — the desktop's card badge — once any
+            // part has gone to the customer.
+            let delivered = Shop.partsDelivered(job)
+            if delivered > 0 {
+                Text(shop.words.callIt("ord.parts_delivered", [
+                    "done": .number(Double(delivered)), "total": .number(Double(job.parts.count)),
+                ]))
+                .font(.callout).foregroundStyle(Role.ok).monospacedDigit()
+            }
+            if Shop.offersPartialDelivery(job), shop.canMoveJobs {
+                Button(shop.words.callIt("mac.parts_delivered_btn") + "\u{2026}") { delivering = true }
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
         }
     }
 }

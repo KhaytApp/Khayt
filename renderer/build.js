@@ -247,29 +247,24 @@ function saveBuildDraft() {
 /* ============================================================
    Calculator
    ============================================================ */
-// Returns { rate, n } suggestion from waste history for a machine+material pair,
-// or null if there is insufficient data (< 5 completed jobs).
+// The failure allowance the shop's own history suggests for a machine and a
+// material — lib/failure-rate.js, the rule the Mac's FailureHint asks: failed
+// attempts ÷ attempts over the last 90 days, most specific scope with enough
+// evidence first. Returns that module's answer, or null when it is not loaded
+// or there is no history at all.
 function suggestedFailureRate(machineId, material) {
-  if (!machineId || !material) return null;
-  const mat = material.toLowerCase();
-  const completed = printLog.filter(o =>
-    o.machineId === machineId &&
-    // A delivered job is a job this machine finished. Leaving it out shrank
-    // the denominator and inflated the failure rate this suggests — which is
-    // a figure that goes straight into what a customer is quoted.
-    KhaytOrderStatus.isFinished(o) &&
-    ((o.material || '').toLowerCase() === mat ||
-     (o.parts || []).some(p => (p.material || '').toLowerCase() === mat))
-  );
-  if (completed.length < 5) return null;
-  const wastes = wasteLog.filter(w =>
-    w.machineId === machineId &&
-    (w.material || '').toLowerCase() === mat
-  );
-  const rate = Math.round((wastes.length / completed.length) * 1000) / 10;
-  return { rate, n: completed.length };
+  const FR = (typeof KhaytFailureRate !== 'undefined') ? KhaytFailureRate : null;
+  if (!FR) return null;
+  const today = localDateStr();
+  const s = FR.suggest({ orders: printLog, wasteLog }, { today, machineId: machineId || '', material: material || '' });
+  return s && s.attempts > 0 ? s : null;
 }
 
+/**
+ * The suggestion beside the failure field, with "Use this" — never applied on
+ * its own: a price that moved because the app decided the shop fails more
+ * often than it thought is a price nobody can explain to a customer.
+ */
 function updateFailureRateHint() {
   const hint = $('#failureRateHint');
   if (!hint) return;
@@ -277,12 +272,27 @@ function updateFailureRateHint() {
   const filamentSel = $('#filamentSelect');
   const material = filamentSel?.options[filamentSel.selectedIndex]?.dataset?.material ||
     (filamentSel?.value ? (inventory.find(i => i.id === filamentSel.value)?.material || '') : '');
-  const sugg = suggestedFailureRate(machineId, material);
-  if (sugg) {
-    hint.textContent = `↗ ${t('calc.fail_suggested') || 'suggested'}: ${sugg.rate}% (${sugg.n} ${t('an.jobs') || 'jobs'})`;
-  } else {
-    hint.textContent = '';
+  const s = suggestedFailureRate(machineId, material);
+  if (!s) { hint.innerHTML = ''; return; }
+  if (!s.enough || s.pct == null) {
+    hint.innerHTML = `<span style="color:var(--text-muted);">${escapeHtml(t(s.attempts === 1 ? 'calc.fail_too_few_one' : 'calc.fail_too_few', { n: s.attempts, min: s.minSample }))}</span>`;
+    return;
   }
+  const pct = s.pct;
+  const field = $('#failureRate');
+  const current = field ? parseFloat(field.value) : NaN;
+  const offer = !Number.isFinite(current) || Math.abs(current - pct) > 0.05;
+  hint.innerHTML = `
+    <span>${escapeHtml(t('calc.fail_suggest', { pct: String(pct), n: s.attempts }))}</span>
+    ${offer ? `<button type="button" class="btn small ghost" id="btnUseFailureRate" style="margin-inline-start:6px;">${escapeHtml(t('calc.fail_use'))}</button>` : ''}
+    <div style="color:var(--text-muted);font-size:10.5px;">${escapeHtml(t('calc.fail_scope_' + s.scope))}</div>`;
+  hint.querySelector('#btnUseFailureRate')?.addEventListener('click', () => {
+    if (!field) return;
+    field.value = String(pct);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    updateFailureRateHint();
+  });
 }
 
 /* computePartBaseCost, getActivePriceTier, computePartBreakdown — lib/calculator-cost.js */
@@ -1911,7 +1921,7 @@ function updateResinFieldsVisibility() {
       title: t('ai.assistant_title') || 'Ask Khayt AI',
       saveLabel: t('ai.assistant_ask') || 'Ask',
       bodyHtml: `
-        <div id="aiChatLog" style="max-height:320px;overflow-y:auto;margin-bottom:10px;padding-right:4px;"></div>
+        <div id="aiChatLog" style="max-height:320px;overflow-y:auto;margin-bottom:10px;padding-inline-end:4px;"></div>
         <input type="text" id="aiAskQ" placeholder="${escapeHtml(t('ai.assistant_ph') || 'Ask about orders, revenue, stock…')}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
           ${sugg.map((s) => `<button type="button" class="btn ghost small aiSug" data-q="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}

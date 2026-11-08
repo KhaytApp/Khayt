@@ -284,7 +284,7 @@ function openTimeEntryModal(orderId) {
       const hours   = parseFloat(modal.querySelector('#teHours').value) || 0;
       const date    = modal.querySelector('#teDate').value || today;
       const notes   = modal.querySelector('#teNotes').value.trim();
-      if (!opId)    { toast('Select an operator', 'error'); return false; }
+      if (!opId)    { toast(t('ops.select_operator'), 'error'); return false; }
       if (hours <= 0) { toast(t('shift.hours_positive'), 'error'); return false; }
       const rate = +op?.hourlyRate || 0;
       timeEntries.push({
@@ -454,7 +454,7 @@ function openPinPadModal(afterUnlock) {
         closePinPad();
         renderOperatorLockSettings();
         applyOperatorPermissions();
-        toast(`Switched to ${op.name}`, 'success', 1800);
+        toast(t('ops.switched_to', { name: op.name }), 'success', 1800);
         if (afterUnlock) afterUnlock();
         return;
       }
@@ -509,7 +509,7 @@ function openPinPadModal(afterUnlock) {
       closePinPad();
       renderOperatorLockSettings();
       applyOperatorPermissions();
-      toast(`Switched to ${op.name}`, 'success', 1800);
+      toast(t('ops.switched_to', { name: op.name }), 'success', 1800);
       if (afterUnlock) afterUnlock();
     });
   };

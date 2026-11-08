@@ -70,9 +70,12 @@ test('every desktop path that moves a job calls it', () => {
   // number and moving the quote out again leaves no gap in the sequence.
   assert.ok(upd.indexOf('ensureOrderInvoiceNumber(order, newStatus);\n  const _undoIdx')
     > 0, 'numbered before the Undo snapshot');
+  // The batch bar goes through moveOrdersTo, which numbers before the rule moves it.
   const logs = read('renderer/logs.js');
   const batch = logs.slice(logs.indexOf('async function batchMoveStatus('), logs.indexOf('async function batchAssignMachine('));
-  assert.ok(batch.indexOf('ensureOrderInvoiceNumber(o, status)') < batch.indexOf('o.status = status'),
-    'the batch bar numbers before it overwrites the status');
-  assert.ok(batch.includes('ensureOrderInvoiceNumber(o, status)'));
+  assert.ok(batch.includes('moveOrdersTo(ids, status)'), 'the batch bar moves through moveOrdersTo');
+  const bulk = flows.slice(flows.indexOf('function moveOrdersTo('), flows.indexOf('function updateStatus('));
+  assert.ok(bulk.indexOf('ensureOrderInvoiceNumber(order, newStatus)') > 0
+    && bulk.indexOf('ensureOrderInvoiceNumber(order, newStatus)') < bulk.indexOf('StatusRules().apply('),
+    'the batch bar numbers before the rule moves the job');
 });

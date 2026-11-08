@@ -26,6 +26,11 @@ extension KhaytAPIClient {
         var price: Double
         var notes: String
         var revisions: [KhaytEngine.QuoteRevision]
+        /// The quote's terms the Revise sheet also changes (`lib/order-edit.js`
+        /// `applyDetails`): the notes printed on it, the discount and shipping.
+        var invoiceNotes = ""
+        var discountPct = 0.0
+        var shippingCost = 0.0
     }
 
     private func quoteRow(_ orderId: String) -> JSONValue? {
@@ -50,18 +55,14 @@ extension KhaytAPIClient {
         if case .string(let s)? = o["followUpSentAt"], !s.isEmpty { sentAt = s }
         var notes = ""
         if case .string(let s)? = o["notes"] { notes = s }
+        var invoiceNotes = ""
+        if case .string(let s)? = o["invoiceNotes"] { invoiceNotes = s }
         return QuoteState(version: max(1, Int(number(o["quoteVersion"]))),
                           followUpCount: max(0, Int(number(o["followUpCount"]))),
                           followUpSentAt: sentAt, price: number(o["price"]), notes: notes,
-                          revisions: (try? await engine.quoteRevisions(order: row)) ?? [])
-    }
-
-    /// Only what moved: a key left out is left alone by the rule.
-    nonisolated static func revisionFields(start: QuoteState, price: Double?, notes: String) -> [String: JSONValue] {
-        var out: [String: JSONValue] = [:]
-        if let price, price >= 0, abs(price - start.price) > 0.004 { out["price"] = .number(price) }
-        if notes != start.notes { out["notes"] = .string(notes) }
-        return out
+                          revisions: (try? await engine.quoteRevisions(order: row)) ?? [],
+                          invoiceNotes: invoiceNotes, discountPct: number(o["discountPct"]),
+                          shippingCost: number(o["shippingCost"]))
     }
 
     /// Revise a quote from the book (`BookWriter.reviseQuote`), and send it on.

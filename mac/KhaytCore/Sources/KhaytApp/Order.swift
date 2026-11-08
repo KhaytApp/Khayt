@@ -426,9 +426,33 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         /// machine, which is why the caller falls back to the newest completion
         /// and the sheet names which print it is offering.
         let fileRef: String?
+        /// Handed to the customer ahead of the rest of the order — the
+        /// desktop's partial delivery (`renderer/order-flows.js`). `true` or
+        /// absent in the book; never written as `false` here.
+        let delivered: Bool
+        /// Grams this part's print took from OTHER spools, written by the
+        /// spool-switch flow as it draws them. The deduction at completion
+        /// leaves these grams off the part's own spool (`claimsFor` in
+        /// `lib/order-deduction.js`), so they are not charged twice.
+        let additionalSpools: [ExtraSpool]
+
+        /// One `parts[i].additionalSpools` entry: `{spoolId, weight}`.
+        struct ExtraSpool: Decodable, Hashable, Sendable {
+            let spoolId: String
+            let weight: Double
+
+            private enum CodingKeys: String, CodingKey { case spoolId, weight }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                spoolId = (try? c.decodeIfPresent(String.self, forKey: .spoolId)) ?? nil ?? ""
+                weight = (try? c.decodeIfPresent(Double.self, forKey: .weight)) ?? nil ?? 0
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case id, name, material, qty, printWeight, supportWeight, unitCost, colour, printFileId, fileRef
+            case delivered, additionalSpools
         }
 
         init(from decoder: Decoder) throws {
@@ -443,6 +467,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
             colour = try c.decodeIfPresent(String.self, forKey: .colour) ?? ""
             printFileId = try c.decodeIfPresent(String.self, forKey: .printFileId)
             fileRef = try c.decodeIfPresent(String.self, forKey: .fileRef)
+            // Read leniently: a malformed flag or list is a part that shows
+            // nothing extra, never a job that fails to load.
+            delivered = ((try? c.decodeIfPresent(Bool.self, forKey: .delivered)) ?? nil) ?? false
+            additionalSpools = ((try? c.decodeIfPresent([ExtraSpool].self, forKey: .additionalSpools)) ?? nil) ?? []
         }
     }
 

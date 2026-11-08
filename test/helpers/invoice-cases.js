@@ -118,6 +118,20 @@ const CASES = [
     order: Object.assign({}, ORDER, { parts: [] }),
     opts: { settings: SHOP },
   },
+  {
+    // Stamped VOID, with the date and the reason typed at the head of the
+    // page. Paid as well: VOID wins over PAID.
+    name: 'voided-ar',
+    order: Object.assign({}, ORDER, { paidAmount: 1150, paymentStatus: 'voided',
+      voidedAt: '2026-11-02T09:00:00.000Z', voidedReason: 'Duplicate invoice' }),
+    opts: { settings: Object.assign({}, SHOP, { contentLangs: ['ar', 'en'] }), language: 'ar' },
+  },
+  {
+    // Fully credited: CREDITED, and no reason line.
+    name: 'credited-en',
+    order: Object.assign({}, ORDER, { creditedAt: '2026-11-03T09:00:00.000Z' }),
+    opts: { settings: SHOP },
+  },
 ];
 
 module.exports = { CASES, SHOP, ORDER, PARTS };

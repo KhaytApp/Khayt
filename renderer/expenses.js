@@ -290,7 +290,7 @@ function showLinkedExpenses(orderId) {
           <td style="color:var(--text-muted); font-size:12.5px;">${escapeHtml(e.note || '')}</td>
         </tr>`).join('')}</tbody>
       </table></div>
-      <div style="text-align:right; font-size:13px; font-weight:600; margin-top:10px; color:var(--danger);">
+      <div style="text-align:end; font-size:13px; font-weight:600; margin-top:10px; color:var(--danger);">
         ${escapeHtml(t('exp.sum.expenses'))}: ${fmtPrice(total)}
       </div>`;
   openFormModal({
@@ -497,9 +497,9 @@ function renderExpenseBudgets() {
     const barColor = pct >= 100 ? 'var(--danger)' : pct >= 70 ? 'var(--warning)' : 'var(--success)';
     return `<tr>
       <td><span class="exp-cat-badge cat-${escapeHtml(c)}">${escapeHtml(expCatLabel(c))}</span></td>
-      <td style="font-variant-numeric:tabular-nums; text-align:right;">${fmtPrice(budget)}</td>
-      <td style="font-variant-numeric:tabular-nums; text-align:right; color:${pct >= 100 ? 'var(--danger)' : 'inherit'};">${fmtPrice(spent)}</td>
-      <td style="font-variant-numeric:tabular-nums; text-align:right; color:${remaining >= 0 ? 'var(--success)' : 'var(--danger)'};">${remaining >= 0 ? fmtPrice(remaining) : '−' + fmtPrice(-remaining)}</td>
+      <td style="font-variant-numeric:tabular-nums; text-align:end;">${fmtPrice(budget)}</td>
+      <td style="font-variant-numeric:tabular-nums; text-align:end; color:${pct >= 100 ? 'var(--danger)' : 'inherit'};">${fmtPrice(spent)}</td>
+      <td style="font-variant-numeric:tabular-nums; text-align:end; color:${remaining >= 0 ? 'var(--success)' : 'var(--danger)'};">${remaining >= 0 ? fmtPrice(remaining) : '−' + fmtPrice(-remaining)}</td>
       <td style="min-width:120px; padding-inline-start:12px;">
         <div style="background:rgba(255,255,255,0.08); border-radius:4px; height:8px; overflow:hidden;">
           <div style="background:${barColor}; width:${pct.toFixed(1)}%; height:100%; border-radius:4px; transition:width 0.3s;"></div>
@@ -512,9 +512,9 @@ function renderExpenseBudgets() {
   el.innerHTML = `<div class="table-wrap"><table style="width:100%;">
     <thead><tr>
       <th>${escapeHtml(t('exp.category'))}</th>
-      <th style="text-align:right;">${escapeHtml(t('exp.budget_col'))}</th>
-      <th style="text-align:right;">${escapeHtml(t('exp.actual_col'))}</th>
-      <th style="text-align:right;">${escapeHtml(t('exp.remaining_col'))}</th>
+      <th style="text-align:end;">${escapeHtml(t('exp.budget_col'))}</th>
+      <th style="text-align:end;">${escapeHtml(t('exp.actual_col'))}</th>
+      <th style="text-align:end;">${escapeHtml(t('exp.remaining_col'))}</th>
       <th style="padding-inline-start:12px;">Progress</th>
     </tr></thead>
     <tbody>${rows}</tbody>

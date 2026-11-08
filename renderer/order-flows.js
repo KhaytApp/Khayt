@@ -449,7 +449,14 @@ function reportStatusGate(decision) {
  * completion is not, because it has already deducted filament and packaging
  * that putting the row back would not return to the shelf.
  */
-function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
+function runStatusEffects(order, effects, { prevTier, undo, toastText, before } = {}) {
+  // The job as it was, for the customer's update: handed in where the caller
+  // kept a copy, otherwise read back from the history line before the one this
+  // move just wrote (lib/customer-updates.js). Every move — a column, the Job
+  // menu, QC, a phone's or the LAN API's, the Shipped and Delivered buttons —
+  // comes through here, so this is the one place it is sent from.
+  const was = before !== undefined ? before
+    : (typeof KhaytCustomerUpdates !== 'undefined' ? KhaytCustomerUpdates.beforeOf(order) : null);
   for (const e of effects) {
     switch (e.type) {
       case 'activity_log':
@@ -492,10 +499,61 @@ function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
         console.warn('[order-status] no handler for effect', e.type);
     }
   }
+  // After the write, as the Mac sends it (Shop.deliverMove): a message about
+  // a job that was not saved is worse than no message.
+  if (effects.some((e) => e.type === 'save') && typeof sendOwedCustomerUpdate === 'function') {
+    sendOwedCustomerUpdate(order, was);
+  }
 }
 
 /** The consumables list, or none on a page without it. */
 const _consumables = () => ((typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : []);
+
+/**
+ * Put an Undo snapshot back WHERE THE JOB IS NOW. The list moves under an open
+ * toast — a LAN, storefront or subscription order is unshifted onto it — so
+ * the index taken at the move can name a different job five seconds later,
+ * and writing the snapshot there replaced that job with a copy of this one.
+ */
+function restoreOrderSnapshot(snap) {
+  const i = printLog.findIndex((o) => o && o.id === snap.id);
+  if (i >= 0) printLog[i] = snap;
+}
+
+/**
+ * Move several jobs at once, through the same rules as one move
+ * (lib/order-status.js gate + apply): the timers, the stamps, the WIP and
+ * assembly gates, the filament, the messages and webhooks. The bulk bar used
+ * to set the status and history itself, so a job moved to Printing had no
+ * timer, a reopened one kept its completion, and an already-completed job
+ * fired its emails again.
+ *
+ * A job already in the column is left alone; a job the gate refuses is
+ * skipped and counted. No actuals prompt (one per job would be a queue of
+ * dialogs): a bulk completion is recorded from the estimates, as before.
+ * Per-job toasts and renders are folded into one of each.
+ * @returns {{ moved: number, skipped: number }}
+ */
+function moveOrdersTo(ids, newStatus) {
+  let moved = 0, skipped = 0;
+  const quiet = new Set(['render', 'toast_updated', 'toast_delivered', 'toast_shipped', 'toast_updated_undoable']);
+  for (const id of ids) {
+    const order = printLog.find((o) => o && o.id === id);
+    if (!order || order.status === newStatus) continue;
+    const decision = StatusRules().gate(order, newStatus, { orders: printLog, settings });
+    if (!decision.ok) { skipped++; continue; }
+    ensureOrderInvoiceNumber(order, newStatus);
+    const prevTier = order.clientId ? getClientTier(order.clientId) : null;
+    const out = StatusRules().apply(order, newStatus, {
+      now: Date.now(), inventory, consumables: _consumables(), returnMaterial: true,
+    });
+    showStatusNotices(out.notices);
+    runStatusEffects(order, out.effects.filter((e) => !quiet.has(e.type)), { prevTier });
+    moved++;
+  }
+  saveAll();
+  return { moved, skipped };
+}
 
 function updateStatus(id, newStatus) {
   const order = printLog.find(o => o.id === id);
@@ -534,9 +592,10 @@ function updateStatus(id, newStatus) {
   });
   showStatusNotices(out.notices);
   runStatusEffects(order, out.effects, {
+    before: _undoSnap,
     undo: _undoIdx >= 0 ? () => {
       _stock.restore();
-      printLog[_undoIdx] = _undoSnap;
+      restoreOrderSnapshot(_undoSnap);
       saveAll();
       renderKanban(); renderLogs(); renderAnalytics();
       if (typeof renderDashboard === 'function') renderDashboard();
@@ -586,9 +645,10 @@ function holdOrder(id) {
       });
       showStatusNotices(out.notices);
       runStatusEffects(order, out.effects, {
+        before: _undoSnap,
         undo: _undoIdx >= 0 ? () => {
           _stock.restore();
-          printLog[_undoIdx] = _undoSnap;
+          restoreOrderSnapshot(_undoSnap);
           saveAll();
           renderKanban(); renderLogs(); renderAnalytics();
           if (typeof renderDashboard === 'function') renderDashboard();
@@ -692,6 +752,17 @@ function qcPassOrder(orderId) {
 
 // Record a QC failure on the order: waste row (unchanged accounting), qcStatus,
 // a defect entry, inspector + timestamp. Pure of any post-decision routing.
+/** An ISO stamp as a `datetime-local` value in the window's own time zone
+ *  ("2026-11-07T13:00"), or '' when there is none. A datetime-local box is
+ *  read as LOCAL time, so it must be filled in local time too. */
+function isoToLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 /** Record a QC failure on the order: waste row, qcStatus, a defect entry,
  *  inspector + timestamp. The rule is lib/qc-failure.js's, so Bed Ready's
  *  failures carry the same fields — its defects had no severity at all. */
@@ -1227,6 +1298,7 @@ function openShipModal(orderId) {
         }
       }
 
+      const _beforeShip = structuredClone(order);
       KhaytShipment.create(order, { carrier: carrierId, service, trackingNumber, source, labelUrl, meta },
         new Date().toISOString());
 
@@ -1238,6 +1310,9 @@ function openShipModal(orderId) {
       renderKanban(); renderLogs();
       if (typeof republishPortalIfPublished === 'function') republishPortalIfPublished(order.id);
       toast(t('ship.created') || 'Shipment created', 'success');
+      // Not a status move, so runStatusEffects never sees it — the Mac's
+      // `ship` sends from the same place.
+      if (typeof sendOwedCustomerUpdate === 'function') sendOwedCustomerUpdate(order, _beforeShip);
       return true;
     }
   });
@@ -1602,6 +1677,9 @@ function openOrderEditor(orderId) {
     })()}
     <label style="margin-top:10px;">${escapeHtml(t('oe.delivery_address'))}</label>
     <textarea data-f="deliveryAddress" rows="2" style="resize:vertical; min-height:48px;" placeholder="…">${escapeHtml(draft.deliveryAddress)}</textarea>
+    ${/* The updates this job's customer was sent, with Meta's delivery report
+         on each, and a send button for one still owed (renderer/customer-updates.js). */
+      typeof customerUpdatesHtml === 'function' ? customerUpdatesHtml(order) : ''}
 
     ${(() => {
       // Feature 8 (new 8-pack): Loyalty tier auto-discount
@@ -1697,11 +1775,11 @@ function openOrderEditor(orderId) {
       <div class="inline-pair">
         <div>
           <label style="margin-top:0;">${escapeHtml(t('oe.printing_started_at'))}</label>
-          <input type="datetime-local" id="oePrintingStartedAt" value="${order.printingStartedAt ? order.printingStartedAt.slice(0,16) : ''}">
+          <input type="datetime-local" id="oePrintingStartedAt" value="${escapeHtml(isoToLocalInput(order.printingStartedAt))}">
         </div>
         <div>
           <label style="margin-top:0;">${escapeHtml(t('oe.completed_at_actual'))}</label>
-          <input type="datetime-local" id="oeCompletedAt" value="${order.completedAt ? order.completedAt.slice(0,16) : ''}">
+          <input type="datetime-local" id="oeCompletedAt" value="${escapeHtml(isoToLocalInput(order.completedAt))}">
         </div>
       </div>
     </details>
@@ -2225,13 +2303,19 @@ function openOrderEditor(orderId) {
       // Feature 2: Persist actual timestamps
       const psaEl = document.getElementById('oePrintingStartedAt');
       const cmpEl = document.getElementById('oeCompletedAt');
-      if (psaEl && psaEl.value) {
-        order.printingStartedAt = new Date(psaEl.value).toISOString();
-      } else if (psaEl && !psaEl.value) {
-        // keep existing if present and field left blank intentionally only clear if was never set
+      // Written back only when the shop changed the field: the box shows the
+      // stamp in LOCAL time to the minute, and re-reading an untouched box
+      // would drop the seconds at best. (It used to show the UTC clock and
+      // read it back as local, so every save moved both stamps by the UTC
+      // offset — three hours earlier per save in Riyadh.) A blank box keeps
+      // what is there.
+      if (psaEl && psaEl.value && psaEl.value !== isoToLocalInput(order.printingStartedAt)) {
+        const d = new Date(psaEl.value);
+        if (!isNaN(d)) order.printingStartedAt = d.toISOString();
       }
-      if (cmpEl && cmpEl.value) {
-        order.completedAt = new Date(cmpEl.value).toISOString();
+      if (cmpEl && cmpEl.value && cmpEl.value !== isoToLocalInput(order.completedAt)) {
+        const d = new Date(cmpEl.value);
+        if (!isNaN(d)) order.completedAt = d.toISOString();
       }
       // What the collected rows do to the order's cash figures — the deposit
       // that must not be overwritten, the base that must not be double-counted,
@@ -3219,6 +3303,9 @@ async function captureFailurePhoto(orderId) {
     qcPassOrder,
     qcFailOrder,
     recordQcFailure,
+    isoToLocalInput,
+    moveOrdersTo,
+    restoreOrderSnapshot,
     measuredWasteFor,
     promptScrapOrReprint,
     createLinkedReprint,

@@ -674,6 +674,49 @@ async function testConverter(window) {
  * with the app actually running: the record on disk, naming the live process.
  * Delete `acquireStoreOwnership()` from main.js and this fails.
  */
+/**
+ * Restore a backup through the real IPC: the window gets the masked copy, the
+ * backup's secret lands on disk, and the window's follow-up save keeps it.
+ * hub:restore-backup used to call a decryptStoreSecrets main.js no longer
+ * imported, so every restore failed; and before that it handed the window
+ * every credential in the clear.
+ */
+async function testRestoreBackupKeepsItsSecrets(window) {
+  const SECRET = 'e2e-backup-ai-key';
+  const MASK = '__KHAYT_MASKED__';
+  const storeFile = path.join(userData, 'khayt-store.json');
+  const onDisk = JSON.parse(fs.readFileSync(storeFile, 'utf8'));
+  const backupName = '2000-01-01.json';
+  fs.mkdirSync(path.join(userData, 'backups'), { recursive: true });
+  fs.writeFileSync(path.join(userData, 'backups', backupName), JSON.stringify({
+    ...onDisk,
+    settings: { ...(onDisk.settings || {}), shopName: 'E2E Restored', ai: { apiKey: SECRET } },
+  }));
+
+  const json = await window.evaluate((f) => window.hubAPI.restoreBackup(f), backupName);
+  if (!json) throw new Error('hub:restore-backup returned nothing — restore is broken');
+  if (json.includes(SECRET)) throw new Error('hub:restore-backup handed the window a decrypted secret');
+  const masked = JSON.parse(json);
+  if (masked.settings?.ai?.apiKey !== MASK) throw new Error(`restored apiKey not masked: ${masked.settings?.ai?.apiKey}`);
+
+  // What the disk holds, decrypted by the app's own keychain where it sealed it.
+  const diskSecret = async () => {
+    const v = JSON.parse(fs.readFileSync(storeFile, 'utf8')).settings?.ai?.apiKey;
+    if (typeof v === 'string' && v.startsWith('__enc__')) {
+      return electronApp.evaluate(({ safeStorage }, s) => safeStorage.decryptString(Buffer.from(s.slice(7), 'base64')), v);
+    }
+    return v;
+  };
+  const disk = JSON.parse(fs.readFileSync(storeFile, 'utf8'));
+  if (disk.settings?.shopName !== 'E2E Restored') throw new Error('the restored store was not written to disk');
+  if (await diskSecret() !== SECRET) throw new Error('the backup\'s secret is not on disk after a restore');
+
+  // The window then saves what it restored — masks and all.
+  const saved = await window.evaluate((m) => window.hubAPI.saveStore(m), masked);
+  if (!saved?.ok) throw new Error(`save after restore failed: ${JSON.stringify(saved)}`);
+  if (await diskSecret() !== SECRET) throw new Error('the save after a restore lost the backup\'s secret');
+}
+
 function testStoreOwnership() {
   const lockFile = path.join(userData, StoreLock.LOCK_FILENAME);
   if (!fs.existsSync(lockFile)) {
@@ -748,6 +791,7 @@ try {
   await testInvoiceCellsTakePaperInk(window);
   await testClientCurrencyQuote(window);
   await testToastButtonClickable(window);
+  await testRestoreBackupKeepsItsSecrets(window);
   const owner = testStoreOwnership();
 
   console.log(
