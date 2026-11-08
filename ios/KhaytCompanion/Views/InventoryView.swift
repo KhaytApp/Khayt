@@ -46,10 +46,12 @@ struct InventoryView: View {
 
     var body: some View {
         if isSplit {
-            NavigationSplitView {
+            // ListBesidePage, as Orders and Customers: a NavigationSplitView
+            // sidebar drew an inline title and a sidebar button here, unlike
+            // every other tab's large title.
+            ListBesidePage {
                 listPage
-                    .navigationSplitViewColumnWidth(min: 340, ideal: 400)
-            } detail: {
+            } page: {
                 NavigationStack {
                     if let spool = openSpool {
                         detailPage(spool)

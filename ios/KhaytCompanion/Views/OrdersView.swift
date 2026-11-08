@@ -104,7 +104,7 @@ struct OrdersView: View {
     var body: some View {
         if isSplit {
             ListBesidePage {
-                NavigationStack { listPage }
+                listPage
             } page: {
                 NavigationStack {
                     if let order = openOrder {
