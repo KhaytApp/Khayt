@@ -46,7 +46,7 @@ function base() {
       { id: 'track', label: { en: 'Track' }, placement: 'order', kind: 'open',
         url: 'https://track.example.com/t/{field.awb}' },
     ],
-    scopes: ['orders.read'],
+    scopes: ['orders.read', 'fields.write'],
   };
 }
 
@@ -132,8 +132,12 @@ test('a reply can only fill the plugin\'s own fields, on the same record', () =>
 });
 
 test('every sendable field has an Apple privacy category, and the developer cannot pick one', () => {
+  // Exactly what the iPhone's App Privacy label declares (Turki added Other
+  // User Contact Info for customer.company, Nov 8 2026). Adding a category
+  // here means changing the label and the /privacy page first.
   const allowed = new Set(['contact.name', 'contact.phone', 'contact.email', 'contact.address', 'contact.other',
     'purchase.history', 'content.other']);
+  assert.deepEqual(new Set(Object.values(M.SENDABLE_FIELDS).map(s => s.category).concat([M.OWN_FIELD_CATEGORY])), allowed);
   for (const [k, s] of Object.entries(M.SENDABLE_FIELDS)) {
     assert.ok(allowed.has(s.category), k);
     assert.ok(['order', 'customer'].includes(s.from), k);
@@ -165,8 +169,8 @@ test('an update that asks for more pauses the plugin; asking for less does not',
   m = base(); m.domains.push('new.example.com'); m.actions[1].url = 'https://new.example.com/t/{field.awb}';
   m.domains = m.domains.filter(d => d !== 'track.example.com');
   assert.deepEqual(M.diffPermissions(granted, m).domains, ['new.example.com']);
-  m = base(); m.scopes.push('fields.write');
-  assert.deepEqual(M.diffPermissions(granted, m).scopes, ['fields.write']);
+  m = base(); m.scopes.push('jobs.status');
+  assert.deepEqual(M.diffPermissions(granted, m).scopes, ['jobs.status']);
   m = base(); m.actions[0].send = ['order.number'];
   assert.equal(M.diffPermissions(granted, m).widened, false);
 });
@@ -256,12 +260,54 @@ test('a reply fills only its own fields, of the right type', () => {
   const m = base();
   m.fields.push({ key: 'weight', label: { en: 'Weight' }, type: 'number', attach: 'order' });
   m.actions[0].response.fields.weight = 'data.kg';
-  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1', kg: '2.5', status: 'x' } }), { awb: 'A1', weight: 2.5 });
-  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: { nested: 1 }, kg: 'heavy' } }), {});
-  assert.deepEqual(P.applyResponse(m, 'nope', { data: { awb: 'A1' } }), {});
+  const entry = { id: m.id, version: m.version, enabled: true, manifest: m, granted: M.grantFor(m) };
+  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1', kg: '2.5', status: 'x' } }, entry), { awb: 'A1', weight: 2.5 });
+  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: { nested: 1 }, kg: 'heavy' } }, entry), {});
+  assert.deepEqual(P.applyResponse(m, 'nope', { data: { awb: 'A1' } }, entry), {});
+  // No fields.write granted, no entry, or a paused entry: nothing is written.
+  const noWrite = Object.assign({}, entry, { granted: Object.assign({}, entry.granted, { scopes: ['orders.read'] }) });
+  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }, noWrite), {});
+  assert.deepEqual(P.applyResponse(m, 'ship', { data: { awb: 'A1' } }), {});
+  const widened = clone(m); widened.version = '1.3.0'; widened.actions[0].send.push('customer.email');
+  assert.deepEqual(P.applyResponse(widened, 'ship', { data: { awb: 'A1' } },
+    Object.assign({}, entry, { manifest: widened, version: '1.3.0' })), {});
 });
 
 test('an unknown trigger builds nothing', () => {
   assert.equal(P.payloadFor(base(), { action: 'nope' }, { order }).ok, false);
   assert.equal(P.payloadFor(base(), { event: 'order_created' }, { order }).ok, false);
+});
+
+test('a reply that writes fields must ask for fields.write', () => {
+  const m = base(); m.scopes = ['orders.read'];
+  assert.ok(M.validateManifest(m).errors.some(e => e.includes('fields.write')));
+});
+
+test('a stored entry: the manifest travels whole, and a grant cannot exceed it', () => {
+  const m = base();
+  const entry = { id: m.id, version: m.version, enabled: true, manifest: m, granted: M.grantFor(m), config: {} };
+  assert.deepEqual(M.checkEntry(entry), { ok: true, errors: [], paused: false });
+  // A book edited to grant a host the signed manifest never named.
+  const forged = clone(entry); forged.granted.domains.push('evil.example.org');
+  const r = M.checkEntry(forged);
+  assert.equal(r.ok, false); assert.equal(r.paused, true);
+  assert.ok(r.errors.some(e => e.includes('evil.example.org')));
+  // A stored "reviewed" flag is not a thing.
+  assert.equal(M.checkEntry(Object.assign({}, entry, { reviewed: true })).ok, false);
+  // Never granted: paused until the shop agrees.
+  assert.equal(M.checkEntry(Object.assign({}, entry, { granted: undefined })).paused, true);
+  // id/version must be the manifest's.
+  assert.equal(M.checkEntry(Object.assign({}, entry, { version: '9.9.9' })).ok, false);
+});
+
+test('every shipped sample is signed by a published key, and tampering breaks it', () => {
+  const { verify } = require('../scripts/sign-connector');
+  for (const { file, m } of samples) {
+    assert.ok(verify(m), `${file} is not signed by a key in SIGNING_KEYS`);
+    const t = clone(m); t.domains = t.domains.concat([]); t.events[0].url += 'x';
+    assert.equal(verify(t), null, `${file}: a changed URL still verified`);
+    const w = clone(m); w.name.en += ' ';
+    assert.equal(verify(w), null);
+  }
+  for (const k of M.SIGNING_KEYS) assert.equal(Buffer.from(k.key, 'base64').length, 32, k.id);
 });
