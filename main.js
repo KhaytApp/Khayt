@@ -5588,6 +5588,14 @@ ipcMain.handle('hub:set-app-language', (_e, lang, strings) => {
 ipcMain.handle('hub:printer-history', async (_e, { machine, limit } = {}) =>
   fetchPrinterHistory(machine, limit));
 
+// Inventory ▸ Import from Spoolman. Read-only, on this network only (the same
+// guard as a printer host), no redirects, 8 s a page — lib/main/spoolman-fetch.js.
+// The window maps the rows with lib/spoolman-import.js and adds them.
+ipcMain.handle('hub:spoolman-fetch', async (_e, { url } = {}) => {
+  try { return await require('./lib/main/spoolman-fetch').fetchSpoolman(url); }
+  catch (e) { return { ok: false, code: 'network', error: String((e && e.message) || e) }; }
+});
+
 
 /**
  * The filament stock a machine runs, for turning extruded millimetres into
