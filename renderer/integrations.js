@@ -1481,13 +1481,9 @@ async function publishOrderToCloudPortal(orderId) {
         resp.textContent = t('cloud.portal_checking') || 'Checking…'; resp.style.color = 'var(--text-muted)';
         const lst = await window.hubAPI.cloudPublishedList({ url: c.url, shopId: c.shopId, token: c.token });
         if (!lst.ok) { resp.textContent = '✗ ' + (lst.error || 'failed'); resp.style.color = 'var(--danger)'; return; }
-        // `lib/portal-owner.js responseFor` reads the customer's answer.
-        const said = KhaytPortalOwner.responseFor(lst.items, pubToken, order);
+        // The same function the automatic look runs (portal-watch.js).
+        const said = applyPortalResponse(order, lst.items, pubToken, { quiet: false });
         const paid = said.paid;
-        // A paid deposit is RECORDED, once (`recordPortalPayment` keys it on the
-        // provider's reference), through the shop's own payment rule — not only
-        // said here and then typed in again by hand.
-        if (paid) recordPortalDepositFrom(lst.items, pubToken, order);
         const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
         if (said.response === 'none') {
           resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
@@ -1497,10 +1493,7 @@ async function publishOrderToCloudPortal(orderId) {
         const approved = said.response === 'approved';
         resp.textContent = (approved ? '✓ ' : '✗ ') + (approved ? (t('cloud.portal_approved') || 'Customer approved the quote') : (t('cloud.portal_declined') || 'Customer declined the quote')) + paidNote;
         resp.style.color = approved ? 'var(--success)' : 'var(--danger)';
-        // Close the loop: an approved quote advances the order to Pending via the
-        // normal status-change path (history, webhooks, re-renders all fire).
-        if (said.advance && typeof updateStatus === 'function') {
-          updateStatus(order.id, 'pending');
+        if (said.advanced) {
           resp.textContent = '✓ ' + (t('cloud.portal_approved_advanced') || 'Customer approved — order moved to Pending') + paidNote;
         }
       });
@@ -1511,6 +1504,35 @@ async function publishOrderToCloudPortal(orderId) {
       });
     },
   });
+}
+
+/**
+ * What the customer did with one job's portal link, acted on: a paid deposit
+ * is RECORDED, once (`recordPortalPayment` keys it on the provider's
+ * reference), through the shop's own payment rule; an approved quote advances
+ * to Pending via the normal status-change path (history, webhooks, re-renders
+ * all fire). Run by the sheet's "Check response" button and by the automatic
+ * look (portal-watch.js) alike.
+ *
+ * `opts.quiet`: the automatic look says only what changed (a toast for an
+ * advanced quote). `opts.mayMove`: false leaves an approved quote for the
+ * person who may move jobs. Returns `responseFor`'s answer plus `advanced`.
+ */
+function applyPortalResponse(order, items, pubToken, opts) {
+  const o = opts || {};
+  // `lib/portal-owner.js responseFor` reads the customer's answer.
+  const said = KhaytPortalOwner.responseFor(items, pubToken, order);
+  if (said.paid) recordPortalDepositFrom(items, pubToken, order);
+  let advanced = false;
+  if (said.advance && o.mayMove !== false && typeof updateStatus === 'function') {
+    updateStatus(order.id, 'pending');
+    advanced = order.status === 'pending';
+    if (advanced && o.quiet) {
+      const ref = order.project || (typeof jobRef === 'function' ? jobRef(order) : order.id);
+      toast(`${t('cloud.portal_approved_advanced')} · ${ref}`, 'success', 8000);
+    }
+  }
+  return { ...said, advanced };
 }
 
 /**
@@ -1694,9 +1716,13 @@ function notifyPrintTransitions(currCache) {
     const machine = (typeof machines !== 'undefined') ? machines.find((m) => m.id === mid) : null;
     const name = (machine && (machine.name || machine.label)) || t('notif.print_a_printer') || 'Your printer';
     const fn = c.filename ? String(c.filename).replace(/[\r\n\t]/g, ' ').slice(0, 120) : '';
+    // The printer's own reason (a Bambu print_error / HMS notice, decoded by
+    // lib/bambu-faults.js in the main process) — said with the pause or the
+    // failure, so the notice sends someone to the right part of the machine.
+    const fault = typeof c.fault === 'string' ? c.fault.replace(/[\r\n\t]/g, ' ').trim().slice(0, 200) : '';
     if (paused) {
       // Told once per pause; a resume puts it back to printing and re-arms it.
-      if (prev === 'printing') { _printPhase[mid] = 'paused'; sendPrintNotice('paused', name, fn); }
+      if (prev === 'printing') { _printPhase[mid] = 'paused'; sendPrintNotice('paused', name, fn, fault); }
       return;
     }
     if ((prev === 'printing' || prev === 'paused') && isDone) {
@@ -1705,8 +1731,8 @@ function notifyPrintTransitions(currCache) {
       sendPrintNotice('finished', name, fn);
     } else if ((prev === 'printing' || prev === 'paused') && isError) {
       _printPhase[mid] = 'error';
-      if (local) _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), fn || (c.error ? String(c.error).slice(0, 120) : ''));
-      sendPrintNotice('failed', name, fn);
+      if (local) _firePrintNotification('⚠️ ' + (t('notif.print_fail_title', { name }) || (name + ' — print failed')), [fn, fault].filter(Boolean).join('\n') || (c.error ? String(c.error).slice(0, 120) : ''));
+      sendPrintNotice('failed', name, fn, fault);
     }
   });
 }
@@ -1715,7 +1741,7 @@ function notifyPrintTransitions(currCache) {
  *  only when the shop switched that notice on for it. The file name is left
  *  out unless the shop ticked "include job and file names" for that channel,
  *  because a file is often named after the customer. */
-function sendPrintNotice(kind, machineName, filename) {
+function sendPrintNotice(kind, machineName, filename, fault) {
   const AR = (typeof KhaytAlertRoutes !== 'undefined') ? KhaytAlertRoutes : null;
   if (!AR) return;
   const routes = AR.routes(kind, settings);
@@ -1725,12 +1751,12 @@ function sendPrintNotice(kind, machineName, filename) {
   const icon = kind === 'finished' ? '✅' : kind === 'failed' ? '❌' : '⏸';
   const tg = settings.telegram || {};
   if (routes.telegram && window.hubAPI?.sendTelegram) {
-    const message = `${icon} ${title}` + (names.telegram && filename ? '\n' + filename : '');
+    const message = `${icon} ${title}` + (fault ? '\n' + fault : '') + (names.telegram && filename ? '\n' + filename : '');
     window.hubAPI.sendTelegram({ botToken: tg.botToken, chatId: tg.chatId, message })
       .catch(e => console.warn('Telegram print notice failed:', e));
   }
   if (routes.ntfy && window.hubAPI?.sendNtfy) {
-    window.hubAPI.sendNtfy({ type: kind, title, body: names.ntfy ? filename : '' })
+    window.hubAPI.sendNtfy({ type: kind, title, body: [fault || '', names.ntfy ? filename : ''].filter(Boolean).join('\n') })
       .then(r => { if (r && !r.ok) console.warn('ntfy print notice failed:', r.error); })
       .catch(e => console.warn('ntfy print notice failed:', e));
   }

@@ -214,6 +214,7 @@ const {
   maskStoreSecretsForRenderer,
   mergeStoreSecretsFromDisk,
   writeStoreToDisk,
+  restoreSnapshotToDisk,
   atomicWriteStore,
   recoverStoreRaw,
   syncLanServerStoreFromDisk,
@@ -704,11 +705,20 @@ ipcMain.handle('hub:pick-and-save-order-file', async (event, orderId) => {
   return { filename, originalName, size: stat.size };
 });
 
-ipcMain.handle('hub:open-order-file', async (_e, filename) => {
-  const full = path.join(orderFilesDir(), path.basename(filename || ''));
-  if (filename && fs.existsSync(full)) await shell.openPath(full);
-  return true;
-});
+// Opening an attachment is "open this document", never "run this program". The
+// picker offers All Files, so the folder can hold anything: only a kind on
+// SafeFilePath.ATTACHMENT_EXTS is handed to the OS, and only where it REALLY is.
+async function openAttachmentIn(dir, filename) {
+  if (!filename) return { ok: false, error: 'No file' };
+  const r = SafeFilePath.realFileWithin(path.join(dir, path.basename(String(filename))), {
+    dirs: [dir], exts: SafeFilePath.ATTACHMENT_EXTS, fs, path,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  await shell.openPath(r.real);
+  return { ok: true };
+}
+
+ipcMain.handle('hub:open-order-file', async (_e, filename) => openAttachmentIn(orderFilesDir(), filename));
 
 ipcMain.handle('hub:delete-order-file', async (_e, filename) => {
   const full = path.join(orderFilesDir(), path.basename(filename || ''));
@@ -752,11 +762,7 @@ ipcMain.handle('hub:pick-and-save-product-doc', async (event, productId) => {
   return { filename, originalName, size: stat.size };
 });
 
-ipcMain.handle('hub:open-product-doc', async (_e, filename) => {
-  const full = path.join(productDocsDir(), path.basename(filename || ''));
-  if (filename && fs.existsSync(full)) await shell.openPath(full);
-  return true;
-});
+ipcMain.handle('hub:open-product-doc', async (_e, filename) => openAttachmentIn(productDocsDir(), filename));
 
 ipcMain.handle('hub:delete-product-doc', async (_e, filename) => {
   const full = path.join(productDocsDir(), path.basename(filename || ''));
@@ -1004,17 +1010,40 @@ ipcMain.handle('hub:list-backups', async () => {
   return upgradeBackup.backupsToList(entries);
 });
 
-// Read a backup file by path (Feature 6)
+// Restore a backup, a restore point or an off-site copy. The MAIN process puts
+// it on disk, secrets and all (lib/store-io.js restoreSnapshotToDisk), and the
+// window is handed the masked copy to load — exactly what hub:load-store gives
+// it. The window's own save afterwards finds the backup's secrets on disk
+// behind every mask. Returns the masked store as JSON, or null.
+//
+// These handlers used to call a decryptStoreSecrets that main.js stopped
+// importing when store-io.js was extracted, so every restore threw a
+// ReferenceError and reported "could not read the backup".
+async function restoreSnapshotForWindow(parsed, event, label) {
+  if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
+    console.error(`${label}: the store on disk is from a newer ${FLAVOR_NAME}; not restoring over it`);
+    return null;
+  }
+  // A backup written by a newer build holds collections this one would drop.
+  if (parsed && typeof parsed.version === 'number' && parsed.version > STORE_VERSION) {
+    console.error(`${label}: the backup is from a newer ${FLAVOR_NAME} (v${parsed.version}); not restoring it with v${STORE_VERSION}`);
+    return null;
+  }
+  // Decrypting the backup and sealing it again are both keychain work. Explain once first.
+  await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
+  const r = await restoreSnapshotToDisk(parsed);
+  if (!r.ok) { console.error(`${label}:`, r.error); return null; }
+  machineSecrets.forget();          // a printer's key may have changed with it
+  _diskStoreVersion = typeof r.masked.version === 'number' ? r.masked.version : _diskStoreVersion;
+  return JSON.stringify(r.masked);
+}
+
 ipcMain.handle('hub:restore-backup', async (event, backupPath) => {
   const safe = path.join(backupsDir(), path.basename(String(backupPath || '')));
   if (!fs.existsSync(safe)) return null;
   try {
-    const content = await fs.promises.readFile(safe, 'utf8');
-    const parsed = safeJsonParse(content);
-    // Restoring a backup decrypts its secrets → a real keychain read. Explain once first.
-    await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
-    const decrypted = decryptStoreSecrets(JSON.parse(JSON.stringify(parsed)));
-    return JSON.stringify(decrypted);
+    const parsed = safeJsonParse(await fs.promises.readFile(safe, 'utf8'));
+    return await restoreSnapshotForWindow(parsed, event, 'hub:restore-backup');
   } catch (e) {
     console.error('hub:restore-backup error:', e);
     return null;
@@ -1060,9 +1089,8 @@ ipcMain.handle('hub:read-restore-point', async (event, filename) => {
   if (!fs.existsSync(safe)) return null;
   try {
     const parsed = safeJsonParse(await fs.promises.readFile(safe, 'utf8'));
-    // Reading a restore point decrypts its secrets → a keychain read. Explain once first.
-    await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
-    return JSON.stringify(decryptStoreSecrets(JSON.parse(JSON.stringify(parsed))));
+    // Only ever called to restore it (renderer/settings.js openRestorePointsModal).
+    return await restoreSnapshotForWindow(parsed, event, 'hub:read-restore-point');
   } catch (e) { console.error('hub:read-restore-point error:', e); return null; }
 });
 
@@ -1090,6 +1118,42 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
   const result = await dialog.showOpenDialog(win, { filters, properties: ['openFile'] });
   if (result.canceled || !result.filePaths.length) return null;
   return result.filePaths[0];
+});
+
+// --- An expense's receipt, kept in the app's own folder ---
+// A receipt used to be filed as the path it was picked from, and hub:open-file
+// only opens what is under userData or temp — so the 📎 on an expense never
+// opened a receipt picked from Downloads or Desktop, and the path carried this
+// computer's user folder into the book on every device. It is copied in
+// instead and filed RELATIVE to userData (`receipts/<id>.pdf`); hub:open-file
+// resolves that. Only a picture or a PDF, the receipt pickers' own filter.
+// The same folder the phone's receipts land in (receiptsDir, above).
+const RECEIPT_MAX_BYTES = 64 * 1024 * 1024;
+async function fileReceiptCopy(src) {
+  const r = SafeFilePath.realFileWithin(src, { exts: SafeFilePath.RECEIPT_EXTS, fs, path });
+  if (!r.ok) return null;
+  const st = await fs.promises.stat(r.real);
+  if (st.size > RECEIPT_MAX_BYTES) return null;
+  const ext = path.extname(r.real).slice(1).toLowerCase();
+  const name = `receipt-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  await fs.promises.copyFile(r.real, path.join(receiptsDir(), name), fs.constants.COPYFILE_EXCL);
+  return `receipts/${name}`;
+}
+
+ipcMain.handle('hub:pick-receipt', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    filters: [{ name: 'Images/PDF', extensions: SafeFilePath.RECEIPT_EXTS.slice() }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  try {
+    const stored = await fileReceiptCopy(result.filePaths[0]);
+    return stored ? { ok: true, path: stored } : { ok: false, error: 'unsupported' };
+  } catch (e) {
+    console.error('hub:pick-receipt:', e);
+    return { ok: false, error: String((e && e.message) || e) };
+  }
 });
 
 // --- Add from receipt: the QR code on a photo, screenshot or PDF of a Saudi
@@ -1133,7 +1197,9 @@ ipcMain.handle('hub:read-receipt-qr', async (event) => {
         : img;
       const s = scaled.getSize();
       const code = Find.findCode(Find.bgraToRgba(scaled.toBitmap()), s.width, s.height, jsQR);
-      if (code) return { ok: true, path: filePath, code };
+      // The picture is the receipt the expense is filed with: kept in the
+      // app's folder, as hub:pick-receipt keeps one (null if it cannot be).
+      if (code) return { ok: true, path: await fileReceiptCopy(filePath).catch(() => null), code };
     }
     return { ok: false, path: filePath, reason: 'none_found' };
   } catch (e) {
@@ -1540,16 +1606,25 @@ ipcMain.handle('hub:print-order-file', async (_e, { orderFile, machine, slicerPa
   finally { rmDir(outDir); }
 });
 
-// --- Open file path — restricted to app userData and system temp directories ---
+// --- Open a file the app keeps — a vault file, a status page, a receipt ---
+// Confined to userData and temp, checked where the file REALLY is, and only a
+// document, picture or print file: the folder check alone let a `.hta`, `.bat`
+// or `.command` in there be launched by its OS handler.
+// A RELATIVE path is one the app filed under userData (a receipt's
+// `receipts/<id>.pdf`), resolved here so the book never carries this
+// computer's user folder to the shop's other devices.
+const OPEN_FILE_EXTS = Object.freeze([...new Set([...SafeFilePath.OPENABLE_EXTS, ...SafeFilePath.ATTACHMENT_EXTS])]);
 ipcMain.handle('hub:open-file', async (_e, filePath) => {
-  const s = path.resolve(String(filePath || ''));
-  const allowed = [
-    path.resolve(app.getPath('userData')),
-    path.resolve(app.getPath('temp')),
-  ];
-  const confined = allowed.some(dir => s.startsWith(dir + path.sep) || s === dir);
-  if (confined && fs.existsSync(s)) await shell.openPath(s);
-  return true;
+  const raw = String(filePath || '');
+  if (!raw) return { ok: false, error: 'No file' };
+  const full = path.isAbsolute(raw) ? raw : path.join(app.getPath('userData'), raw);
+  const r = SafeFilePath.realFileWithin(full, {
+    dirs: [app.getPath('userData'), app.getPath('temp')],
+    exts: OPEN_FILE_EXTS, fs, path,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  await shell.openPath(r.real);
+  return { ok: true };
 });
 
 // --- Save HTML to temp and open (Feature 7) ---
@@ -1873,10 +1948,12 @@ require('./lib/main/offsite-backup.js').registerOffsiteBackup({
   app, ipcMain, dialog, BrowserWindow,
   getDek: () => (cloudBackend ? cloudDek : null),
   readBookBytes: () => { try { return fs.readFileSync(dataFilePath()); } catch (_) { return null; } },
+  // Only reached by hub:offsite-restore: restored on disk here, masked for the window.
   decryptForWindow: async (bytes, event) => {
     const parsed = safeJsonParse(Buffer.from(bytes).toString('utf8'));
-    await maybeShowKeychainExplanation(BrowserWindow.fromWebContents(event.sender));
-    return JSON.stringify(decryptStoreSecrets(JSON.parse(JSON.stringify(parsed))));
+    const json = await restoreSnapshotForWindow(parsed, event, 'hub:offsite-restore');
+    if (!json) throw new Error('The off-site copy could not be restored');
+    return json;
   },
   libraryBucket: () => {
     const b = printLibS3();
@@ -5587,6 +5664,14 @@ ipcMain.handle('hub:set-app-language', (_e, lang, strings) => {
 
 ipcMain.handle('hub:printer-history', async (_e, { machine, limit } = {}) =>
   fetchPrinterHistory(machine, limit));
+
+// Inventory ▸ Import from Spoolman. Read-only, on this network only (the same
+// guard as a printer host), no redirects, 8 s a page — lib/main/spoolman-fetch.js.
+// The window maps the rows with lib/spoolman-import.js and adds them.
+ipcMain.handle('hub:spoolman-fetch', async (_e, { url } = {}) => {
+  try { return await require('./lib/main/spoolman-fetch').fetchSpoolman(url); }
+  catch (e) { return { ok: false, code: 'network', error: String((e && e.message) || e) }; }
+});
 
 
 /**

@@ -78,3 +78,38 @@ test('main.js routes all three handlers through it', () => {
     assert.match(body, /SafeFilePath\.realFileWithin\(/, h);
   }
 });
+
+test('nothing the OS would RUN is on the attachment or receipt lists', () => {
+  const { ATTACHMENT_EXTS, RECEIPT_EXTS } = require('../lib/safe-file-path');
+  const runnable = ['exe', 'msi', 'bat', 'cmd', 'com', 'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf',
+    'hta', 'scr', 'pif', 'lnk', 'url', 'jar', 'sh', 'command', 'app', 'desktop', 'appimage',
+    'reg', 'cpl', 'msc', 'dmg', 'pkg', 'html', 'htm', 'svg', 'xml', 'terminal', 'workflow'];
+  for (const ext of runnable) {
+    assert.ok(!ATTACHMENT_EXTS.includes(ext), `.${ext} would be launched by "open"`);
+    assert.ok(!RECEIPT_EXTS.includes(ext), `.${ext} is not a receipt`);
+  }
+  assert.deepEqual([...RECEIPT_EXTS].sort(), ['jpeg', 'jpg', 'pdf', 'png']);
+});
+
+test('the open handlers in main.js check the real file and its type, not just the folder', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const body = (channel) => {
+    const at = src.indexOf(`ipcMain.handle('${channel}'`);
+    assert.ok(at >= 0, `${channel} is gone`);
+    return src.slice(at, src.indexOf('\n});', at) + 4);
+  };
+  for (const ch of ['hub:open-order-file', 'hub:open-product-doc']) {
+    assert.match(body(ch), /openAttachmentIn\(/, `${ch} opens without the type check`);
+  }
+  assert.match(body('hub:open-file'), /SafeFilePath\.realFileWithin\(/);
+  const helper = src.slice(src.indexOf('async function openAttachmentIn('));
+  assert.match(helper.slice(0, 600), /realFileWithin\([\s\S]*ATTACHMENT_EXTS/);
+});
+
+test('an executable dropped in an attachment folder is refused', () => {
+  const { ATTACHMENT_EXTS } = require('../lib/safe-file-path');
+  fs.writeFileSync(path.join(allowed, 'invoice.hta'), '<script>');
+  assert.equal(check(path.join(allowed, 'invoice.hta'), ATTACHMENT_EXTS).ok, false);
+  assert.equal(check(path.join(allowed, 'run.command'), ATTACHMENT_EXTS).ok, false);
+  assert.equal(check(path.join(allowed, 'part.stl'), ATTACHMENT_EXTS).ok, true);
+});
