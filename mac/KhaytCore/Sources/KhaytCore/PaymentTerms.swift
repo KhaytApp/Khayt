@@ -7,8 +7,9 @@ import Foundation
 /// engine. The JavaScript stays the specification: `PaymentTermsParityTests`
 /// loads the real `lib/` file and refuses any disagreement.
 ///
-/// THE RULE: due = invoice date (`order.date`, else its `timestamp`, first ten
-/// characters — the date the invoice prints) + the customer's
+/// THE RULE: due = invoice date (`invoiceDate`: an accepted quote's
+/// acceptance, else `order.date`, else its `timestamp`, first ten characters —
+/// the date the invoice prints) + the customer's
 /// `paymentTermsDays`. Absent, zero, negative or unreadable terms are 0, due on
 /// receipt. Overdue is PAST the due date — not on it — and not settled.
 ///
@@ -93,9 +94,46 @@ public enum PaymentTerms {
         return utc.dateComponents([.day], from: a, to: b).day
     }
 
-    /// The date the invoice is dated: `date`, else `timestamp`, first ten
-    /// characters. "" when neither is a day.
+    /// The day the invoice was ISSUED — `invoiceDate` in `lib/payment-terms.js`,
+    /// the one day the VAT summary, the accountant's CSV, the printed paper
+    /// and the due date all use (VAT is due on issued invoices, Oct 21 2026).
+    ///
+    /// A job that began as a quote is invoiced when it is accepted:
+    /// `quoteAcceptedAt`, else `clientApprovedAt` (JavaScript's `a || b`) — a
+    /// bare `YYYY-MM-DD` read as written, an ISO instant as the LOCAL day it
+    /// fell on (`Calendar.book`, the zone the JavaScript's `Date` reads in). A
+    /// stamp that is not a day is passed over. Otherwise `date`, else
+    /// `timestamp`, first ten characters. "" when nothing is a day.
     public static func invoiceDate(_ order: [String: JSONValue]) -> String {
+        let stamp: JSONValue? = JSSemantics.truthy(order["quoteAcceptedAt"]) ? order["quoteAcceptedAt"]
+            : JSSemantics.truthy(order["clientApprovedAt"]) ? order["clientApprovedAt"] : nil
+        if let stamp {
+            let text = JSSemantics.text(stamp)
+            var dayText = String(text.prefix(10))
+            if text.count > 10, isInstantShaped(text), let at = Calendar.instant(text) {
+                dayText = Calendar.book.dayString(at)
+            }
+            if day(dayText) != nil { return dayText }
+        }
+        return storedDate(order)
+    }
+
+    /// `^\d{4}-\d{2}-\d{2}T` — the shape the JavaScript hands to `new Date`.
+    private static func isInstantShaped(_ s: String) -> Bool {
+        let b = Array(s.utf8.prefix(11))
+        guard b.count == 11 else { return false }
+        for (i, c) in b.enumerated() {
+            switch i {
+            case 4, 7: if c != UInt8(ascii: "-") { return false }
+            case 10: if c != UInt8(ascii: "T") { return false }
+            default: if c < 48 || c > 57 { return false }
+            }
+        }
+        return true
+    }
+
+    /// `date`, else `timestamp`, first ten characters — "" when not a day.
+    private static func storedDate(_ order: [String: JSONValue]) -> String {
         // JavaScript's `date || timestamp`: the first TRUTHY one. A truthy value
         // that is not a string (a number, an object) is never a day once
         // `String()` has had it, so it reads as "" rather than falling through.

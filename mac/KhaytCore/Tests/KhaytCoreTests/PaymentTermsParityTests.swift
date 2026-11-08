@@ -98,6 +98,42 @@ struct PaymentTermsParityTests {
         }
     }
 
+    /// What an acceptance has been stamped as: the shop's bare day, an instant
+    /// in UTC and with an offset (late enough in the UTC day that the local
+    /// day differs east of London), and the values that are not days at all.
+    private let stamps: [JSONValue?] = [
+        nil, .null, .string(""), .string("2026-10-02"), .string("2026-10-02T09:00:00.000Z"),
+        .string("2026-09-30T22:30:00.000Z"), .string("2026-09-30T23:30:00+03:00"),
+        .string("2026-10-01T01:30:00Z"), .string("2026-02-30"), .string("yes"),
+        .bool(true), .bool(false), .number(0), .number(20261002),
+        .array([.string("2026-10-03")]), .object([:]),
+    ]
+
+    @Test("an accepted quote is invoiced on its acceptance, read the same way in both")
+    func acceptanceMatches() throws {
+        let js = try js()
+        for accepted in stamps {
+            for approved in [nil, JSONValue.string("2026-10-04"), .string("2026-10-04T21:45:00Z")] as [JSONValue?] {
+                for date in [nil, JSONValue.string("2026-09-28")] as [JSONValue?] {
+                    var extra: [String: JSONValue] = ["status": .string("completed")]
+                    if let accepted { extra["quoteAcceptedAt"] = accepted }
+                    if let approved { extra["clientApprovedAt"] = approved }
+                    let o = order(date: date, timestamp: .string("2026-09-28T07:00:00Z"), extra: extra)
+                    let theirs = try js.value("KhaytPaymentTerms.invoiceDate(ARG0)", [.object(o)])
+                    #expect(theirs == .string(PaymentTerms.invoiceDate(o)), Comment(rawValue: "invoiceDate \(o)"))
+                    let c = customer(.number(30))
+                    let theirDue = try js.value("KhaytPaymentTerms.dueDate(ARG0, ARG1)", [.object(o), .object(c)])
+                    #expect(theirDue == .string(PaymentTerms.dueDate(order: o, customer: c)),
+                            Comment(rawValue: "dueDate \(o)"))
+                }
+            }
+        }
+        // The example the rule exists for: quoted 28 Sep, accepted 2 Oct.
+        let quote: [String: JSONValue] = ["date": .string("2026-09-28"), "quoteAcceptedAt": .string("2026-10-02")]
+        #expect(PaymentTerms.invoiceDate(quote) == "2026-10-02")
+        #expect(PaymentTerms.dueDate(order: quote, customer: customer(.number(30))) == "2026-11-01")
+    }
+
     @Test("work that cannot owe is never overdue, in both")
     func cannotOweMatches() throws {
         let js = try js()

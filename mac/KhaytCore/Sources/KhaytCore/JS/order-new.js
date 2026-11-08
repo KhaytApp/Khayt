@@ -105,14 +105,14 @@
    * `patterns` are anchored regexes whose first group is the sequence.
    * Only 1–6 digits count, so a phone- or LAN-minted id
    * (`INV-2026-<13-digit ms>-<hex>`) never drags a counter into the
-   * trillions. `sameYear`, when given, limits the scan to jobs dated in it —
-   * for a format with no {year} in it, which still restarts every January.
+   * trillions. Every job in the book is scanned: a pattern with the year in
+   * it only matches that year's numbers, and a format with no {year} is one
+   * series across all years (`allocateInvoice`).
    */
-  function highestSeq(orders, patterns, fields, sameYear) {
+  function highestSeq(orders, patterns, fields) {
     let max = 0;
     for (const o of arrayOf(orders)) {
       if (!o || typeof o !== 'object') continue;
-      if (sameYear && !String(o.date || o.timestamp || '').startsWith(String(sameYear))) continue;
       for (const f of fields) {
         const v = o[f];
         if (typeof v !== 'string' || !v) continue;
@@ -153,8 +153,12 @@
     const prefix = settings.invNumPrefix || 'INV';
     const fmt = settings.invNumFormat || '{prefix}-{year}-{seq4}';
     const numbered = formatPattern(fmt, prefix, year);
-    const yearless = fmt.indexOf('{year}') === -1 ? year : null;
-    let seen = numbered ? highestSeq(orders, [numbered], ['invoiceNumber', 'invoiceNum'], yearless) : 0;
+    // A format with {year} in it only matches this year's numbers, so the scan
+    // is this year's by construction. A format WITHOUT one (`{prefix}-{seq4}`)
+    // is one series that never restarts (`allocateInvoice`), so every year's
+    // numbers count: limiting it to this year handed 2027 INV-0001 when 2026
+    // had already printed INV-0001 … INV-0057.
+    let seen = numbered ? highestSeq(orders, [numbered], ['invoiceNumber', 'invoiceNum']) : 0;
     // A plain job's id and job number carry the same sequence under the
     // shop's own prefix (`invPrefix`), which differs from `invNumPrefix` the
     // moment a shop changes one of them.
@@ -167,14 +171,18 @@
    * four-digit sequence, which a new job's number is built from.
    */
   function allocateInvoice(settings, year, orders) {
-    if ((settings.invNumYear || year) !== year) {
+    const fmt = settings.invNumFormat || '{prefix}-{year}-{seq4}';
+    // The January reset is what "{year}-0001" promises, and ONLY that: the
+    // year in the number keeps INV-2026-0001 and INV-2027-0001 apart. A format
+    // with no {year} has nothing to keep them apart, so resetting it printed
+    // a second INV-0001 — a duplicate tax-invoice number — every January.
+    if (fmt.indexOf('{year}') !== -1 && (settings.invNumYear || year) !== year) {
       settings.invNumYear = year;
       settings.invNumNext = 1;
     }
     catchUpInvoiceCounter(settings, year, orders);
     const prefix = settings.invNumPrefix || 'INV';
     const seq4 = String(settings.invNumNext || 1).padStart(4, '0');
-    const fmt = settings.invNumFormat || '{prefix}-{year}-{seq4}';
     const number = fmt.replace('{prefix}', prefix).replace('{year}', year).replace('{seq4}', seq4);
     settings.invNumNext = (settings.invNumNext || 1) + 1;
     settings.invNumYear = year;
@@ -184,9 +192,11 @@
   /**
    * The next formal invoice number, advancing the counter.
    *
-   * The counter resets on 1 January, which is what "{year}-0001" promises. A
-   * shop that keeps its own format gets it honoured; the default is the one
-   * every existing invoice already carries.
+   * The counter resets on 1 January, which is what "{year}-0001" promises —
+   * for a format WITH {year} in it. A format without one never resets: its
+   * numbers carry no year to tell 2026's INV-0001 from 2027's. A shop that
+   * keeps its own format gets it honoured; the default is the one every
+   * existing invoice already carries.
    *
    * `orders`, when given, is the book: the counter first moves past every
    * number already in it (see `highestSeq`), so a number another computer

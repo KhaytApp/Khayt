@@ -38,6 +38,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// screen that shows a job's reference shows this; `id` stays the key.
     var reference: String { (jobNumber?.isEmpty == false ? jobNumber : nil) ?? id }
     let date: String
+    /// The day this job's invoice was ISSUED — `PaymentTerms.invoiceDate`
+    /// (`lib/payment-terms.js`): a job that began as a quote is invoiced when
+    /// it was accepted, not on the quote's `date`. What its due date counts
+    /// from; "" when the job holds no day at all.
+    let invoiceDay: String
     let status: String
     let project: String
     let client: String
@@ -199,7 +204,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, jobNumber, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
+        case id, jobNumber, date, timestamp, quoteAcceptedAt, clientApprovedAt, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
@@ -290,6 +295,14 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // Everything below reads the way `lib/` reads it — see "NINE FIELDS THE
         // OTHER APP DOES NOT REQUIRE" above.
         date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
+        // The day its invoice was issued, by the shared rule — read from the
+        // four fields that rule reads, leniently, so a stray value in one of
+        // them can never make the job unreadable.
+        var dated: [String: JSONValue] = [:]
+        for key in [CodingKeys.date, .timestamp, .quoteAcceptedAt, .clientApprovedAt] {
+            if let v = try? c.decodeIfPresent(JSONValue.self, forKey: key) { dated[key.rawValue] = v }
+        }
+        invoiceDay = PaymentTerms.invoiceDate(dated)
         status = try c.decodeIfPresent(String.self, forKey: .status) ?? ""
         project = try c.decodeIfPresent(String.self, forKey: .project) ?? ""
         client = try c.decodeIfPresent(String.self, forKey: .client) ?? ""

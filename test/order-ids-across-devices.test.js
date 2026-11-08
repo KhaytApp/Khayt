@@ -143,13 +143,15 @@ test('the counter never goes backwards', () => {
   assert.equal(N.allocateInvoiceNumber(s, 2026, [{ invoiceNumber: 'INV-2026-0004' }]), 'INV-2026-0090');
 });
 
-test('a shop format without the year only counts this year', () => {
+test('a shop format without the year counts every year: it is one series', () => {
+  // INV-0400 was printed last December; with no year in the number, a fresh
+  // January count would print INV-0004 … INV-0400 a second time.
   const s = { invNumNext: 1, invNumYear: 2026, invNumFormat: '{prefix}-{seq4}' };
   const n = N.allocateInvoiceNumber(s, 2026, [
     { invoiceNumber: 'INV-0400', date: '2025-12-30' },
     { invoiceNumber: 'INV-0003', date: '2026-01-04' },
   ]);
-  assert.equal(n, 'INV-0004');
+  assert.equal(n, 'INV-0401');
 });
 
 test('without the book the counter behaves as it always did', () => {
