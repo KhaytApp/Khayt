@@ -129,11 +129,16 @@ public enum Connectors {
         return Post(url: url, body: bytes, headers: headers)
     }
 
-    /// https, no user or password, and exactly a host the manifest declares —
-    /// no subdomain, which is what the consent screen promised.
+    /// https, no user or password, no port but 443, and exactly a host the
+    /// manifest declares — no subdomain, which is what the consent screen
+    /// promised.
     static func checkHost(_ url: URL, manifest: JSONValue) throws {
         let host = (url.host ?? "").lowercased()
-        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil, !host.isEmpty else {
+        // No port but 443: the manifest declares hosts, and a host is not a
+        // host-and-any-port. The lib refuses a port when it builds the URL;
+        // this guard does not lean on that.
+        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil, !host.isEmpty,
+              url.port == nil || url.port == 443 else {
             throw Refusal.undeclaredHost(host)
         }
         guard case .object(let m) = manifest, case .array(let domains)? = m["domains"],
