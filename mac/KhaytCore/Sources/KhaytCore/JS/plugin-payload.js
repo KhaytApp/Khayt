@@ -48,6 +48,21 @@
    */
   function valueOf(manifest, ref, ctx) {
     const c = ctx || {};
+    if (ref.startsWith('config.')) {
+      // What the shop typed into the connector's settings (`entry.config`,
+      // handed in as ctx.config). Checked against the setting's type and
+      // capped: a value of the wrong shape, or a pasted blob, is unset.
+      const key = ref.slice(7);
+      const st = (manifest.settings || []).find(x => x.key === key);
+      const v = st && isObj(c.config) ? c.config[key] : undefined;
+      if (!st || v === undefined || v === null || v === '') return null;
+      switch (st.type) {
+        case 'number': return typeof v === 'number' && Number.isFinite(v) ? v : null;
+        case 'bool': return typeof v === 'boolean' ? v : null;
+        case 'enum': return (st.options || []).some(o => o.value === v) ? v : null;
+        default: return typeof v === 'string' && v.length <= M.LIMITS.settingValue ? v : null;
+      }
+    }
     if (ref.startsWith('field.')) {
       const key = ref.slice(6);
       const f = (manifest.fields || []).find(x => x.key === key);
@@ -120,6 +135,19 @@
     return null;
   }
 
+  /** Every reference a trigger makes: send, URL and template placeholders. */
+  function triggerRefs(def) {
+    const refs = new Set(Array.isArray(def.send) ? def.send.map(String) : []);
+    String(def.url || '').replace(PLACEHOLDER_RE, (_, r) => { refs.add(r); return ''; });
+    const walk = (t) => {
+      if (typeof t === 'string') t.replace(PLACEHOLDER_RE, (_, r) => { refs.add(r); return ''; });
+      else if (Array.isArray(t)) t.forEach(walk);
+      else if (isObj(t)) Object.values(t).forEach(walk);
+    };
+    if (isObj(def.body)) walk(def.body.template);
+    return refs;
+  }
+
   function hostOf(url) {
     const m = /^https:\/\/([^/?#{}]+)/.exec(String(url || ''));
     return m ? m[1] : '';
@@ -166,6 +194,13 @@
   function payloadFor(manifest, trigger, ctx) {
     const t = triggerOf(manifest, trigger);
     if (!t) return { ok: false, error: 'no such action or event' };
+    // A required setting this trigger uses and the shop has not filled in:
+    // say which, rather than send a request the receiver will refuse.
+    for (const st of (manifest.settings || [])) {
+      if (st.required && triggerRefs(t.def).has('config.' + st.key) && valueOf(manifest, 'config.' + st.key, ctx) === null) {
+        return { ok: false, error: `setting ${st.key} is not set` };
+      }
+    }
     const u = urlFor(manifest, trigger, ctx);
     if (!u.ok) return u;
     if (t.kind === 'action' && t.def.kind === 'open') return { ok: true, method: 'OPEN', url: u.url };

@@ -24,7 +24,7 @@ struct PluginManifestEngineTests {
     @Test("every shipped sample validates in the engine")
     func samplesValidate() async throws {
         let engine = try KhaytEngine()
-        for name in ["slack-notifier", "discord-notifier", "sheets-log"] {
+        for name in ["slack-notifier", "discord-notifier", "sheets-log", "lamha-shipping"] {
             let r = try await engine.pluginValidate(try Self.sample(name))
             #expect(Self.at(r, "ok") == .bool(true), Comment(rawValue: "\(name): \(r)"))
         }
@@ -59,7 +59,7 @@ struct PluginManifestEngineTests {
             return try? Curve25519.Signing.PublicKey(rawRepresentation: raw)
         }
         #expect(!keys.isEmpty)
-        for name in ["slack-notifier", "discord-notifier", "sheets-log"] {
+        for name in ["slack-notifier", "discord-notifier", "sheets-log", "lamha-shipping"] {
             let m = try Self.sample(name)
             guard case .string(let b64)? = Self.at(m, "signature"), let sig = Data(base64Encoded: b64) else {
                 Issue.record("\(name) has no signature"); continue
