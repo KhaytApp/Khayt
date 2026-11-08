@@ -77,39 +77,71 @@ final class ConnectorsTests: XCTestCase {
         let full = try await engine.pluginGrant(slack)
         var narrow = full
         if case .object(var g) = narrow { g["fields"] = .array([]); narrow = .object(g) }
+        let entry = Self.entry(slack, granted: narrow)
 
-        let wide = try await engine.pluginDiff(granted: narrow, manifest: slack)
-        XCTAssertTrue(ConnectorRules.isPaused(granted: narrow, diff: wide))
-        let entry: [String: JSONValue] = ["id": .string("app.khayt.samples.slack"), "manifest": slack, "granted": narrow]
-        XCTAssertEqual(ConnectorRules.connector(entry: entry, valid: true, diff: wide, reviewed: true)?.status, .paused)
+        let paused = try await engine.pluginCheckEntry(.object(entry))
+        XCTAssertEqual(ConnectorRules.connector(entry: entry, check: paused, reviewed: true)?.status, .paused)
 
-        let same = try await engine.pluginDiff(granted: full, manifest: slack)
-        XCTAssertFalse(ConnectorRules.isPaused(granted: full, diff: same))
         var granted = entry
         granted["granted"] = full
-        XCTAssertEqual(ConnectorRules.connector(entry: granted, valid: true, diff: same, reviewed: true)?.status, .active)
+        let fine = try await engine.pluginCheckEntry(.object(granted))
+        XCTAssertEqual(ConnectorRules.connector(entry: granted, check: fine, reviewed: true)?.status, .active)
+        // Signed and granted, but not reviewed: still nothing.
+        XCTAssertEqual(ConnectorRules.connector(entry: granted, check: fine, reviewed: false)?.status, .notReviewed)
+        // Turned off on the Mac.
+        var off = granted
+        off["enabled"] = .bool(false)
+        let offCheck = try await engine.pluginCheckEntry(.object(off))
+        XCTAssertEqual(ConnectorRules.connector(entry: off, check: offCheck, reviewed: true)?.status, .off)
+        // No check at all is not a working connector.
+        XCTAssertEqual(ConnectorRules.connector(entry: granted, check: nil, reviewed: true)?.status, .invalid)
+    }
 
-        // Never granted is paused; an unreadable manifest is not usable at all.
-        XCTAssertTrue(ConnectorRules.isPaused(granted: nil, diff: same))
-        XCTAssertEqual(ConnectorRules.connector(entry: granted, valid: false, diff: same)?.status, .invalid)
+    /// A grant wider than the signed manifest, or a stray key, is refused
+    /// by the shared check: the connector is invalid, not merely paused.
+    func testAnEntryTheSharedCheckRefusesIsInvalid() async throws {
+        let engine = try KhaytEngine()
+        let slack = try Self.sample("slack-notifier")
+        let full = try await engine.pluginGrant(slack)
+        guard case .object(var g) = full else { return XCTFail() }
+        g["domains"] = .array([.string("hooks.slack.com"), .string("evil.example.org")])
+        let wider = Self.entry(slack, granted: .object(g))
+        let check = try await engine.pluginCheckEntry(.object(wider))
+        XCTAssertEqual(ConnectorRules.connector(entry: wider, check: check, reviewed: true)?.status, .invalid)
+
+        var flagged = Self.entry(slack, granted: full)
+        flagged["reviewed"] = .bool(true)
+        let flaggedCheck = try await engine.pluginCheckEntry(.object(flagged))
+        XCTAssertEqual(ConnectorRules.connector(entry: flagged, check: flaggedCheck, reviewed: true)?.status, .invalid)
     }
 
     /// The sample shop's two connectors: one to press, one waiting on the Mac.
     func testTheSampleShopHasOneActiveAndOnePausedConnector() async throws {
         let engine = try KhaytEngine()
+        let keys = await ConnectorRules.signingKeys(engine)
         guard case .array(let rows) = SampleShop.sampleConnectors else { return XCTFail("no sample connectors") }
         var status: [String: Connector.Status] = [:]
+        var signed: [String: Bool] = [:]
         for case .object(let e) in rows {
             let m = try XCTUnwrap(e["manifest"])
-            let valid = try await engine.pluginValidate(m)
-            guard case .object(let v) = valid else { return XCTFail() }
-            let diff = try await engine.pluginDiff(granted: e["granted"] ?? .null, manifest: m)
-            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, valid: v["ok"] == .bool(true), diff: diff,
-                                                            reviewed: SampleShop.isSampleConnector(e)))
+            let check = try await engine.pluginCheckEntry(.object(e))
+            let canonical = try await engine.pluginCanonicalJSON(m)
+            let real = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys)
+            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check,
+                                                            reviewed: real || SampleShop.isSampleConnector(e)))
             status[c.id] = c.status
+            signed[c.id] = real
         }
         XCTAssertEqual(status[SampleShop.courierId], .active)
         XCTAssertEqual(status["app.khayt.samples.slack"], .paused)
+        // The Slack one is reviewed by Khayt's real signature, not the bypass;
+        // the bypass covers the courier alone.
+        XCTAssertEqual(signed["app.khayt.samples.slack"], true)
+        XCTAssertEqual(signed[SampleShop.courierId], false)
+        guard case .object(let slackEntry) = rows[1] else { return XCTFail() }
+        XCTAssertFalse(SampleShop.isSampleConnector(slackEntry))
+        // And it is the shipped sample, byte for byte as JSON.
+        XCTAssertEqual(slackEntry["manifest"], try Self.sample("slack-notifier"))
     }
 
     /// The courier's POST, built by the shared rule, passes the phone's guard.
@@ -244,9 +276,32 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical,
                                                 keys: [("k2", pub(other)), ("bad", "!!"), ("k1", pub(key))]))
 
-        // No keys at all (today's `signingKeys`): nothing verifies.
+        // No keys at all: nothing verifies.
         XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: []))
-        XCTAssertTrue(ConnectorRules.signingKeys.isEmpty, "switch to engine.pluginSigningKeys() when Mac PR 2 lands")
+    }
+
+    /// The shipped samples are signed with Khayt's key, and the engine's keys
+    /// verify them. One field changed and they do not.
+    func testTheShippedSamplesVerifyAgainstKhaytsRealKeys() async throws {
+        let engine = try KhaytEngine()
+        let keys = await ConnectorRules.signingKeys(engine)
+        XCTAssertFalse(keys.isEmpty, "lib SIGNING_KEYS")
+        for name in ["slack-notifier", "discord-notifier", "sheets-log"] {
+            let m = try Self.sample(name)
+            let canonical = try await engine.pluginCanonicalJSON(m)
+            XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys), name)
+
+            guard case .object(var o) = m else { return XCTFail() }
+            o["publisher"] = .string("Not Khayt")
+            let changed = try await engine.pluginCanonicalJSON(.object(o))
+            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(o), canonical: changed, keys: keys), name)
+            // Nor does the old signature over the changed bytes pass with a
+            // different domain swapped in.
+            guard case .object(var d) = m else { return XCTFail() }
+            d["domains"] = .array([.string("evil.example.org")])
+            let swapped = try await engine.pluginCanonicalJSON(.object(d))
+            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(d), canonical: swapped, keys: keys), name)
+        }
     }
 
     func testABadOrShortSignatureOrKeyIsNotReviewed() async throws {
@@ -269,15 +324,21 @@ final class ConnectorsTests: XCTestCase {
                                                  keys: [("short", Data(repeating: 2, count: 16).base64EncodedString()), ("junk", "%%%")]))
     }
 
-    /// A book can say `reviewed: true` (or `devMode`); the phone does not listen.
-    func testAStoredReviewedFlagIsIgnored() throws {
+    /// A book can say `reviewed: true` (or `devMode`); the phone does not
+    /// listen. The shared check refuses the key outright, and even a status
+    /// worked out without that check is not reviewed from a flag.
+    func testAStoredReviewedFlagIsIgnored() async throws {
+        let engine = try KhaytEngine()
         guard case .array(let rows) = SampleShop.sampleConnectors, case .object(var e) = rows[0] else { return XCTFail() }
+        let ok: JSONValue = .object(["ok": .bool(true), "errors": .array([]), "paused": .bool(false)])
+        XCTAssertEqual(ConnectorRules.connector(entry: e, check: ok)?.status, .notReviewed, "no signature, no review")
         e["reviewed"] = .bool(true)
         e["devMode"] = .bool(true)
-        let diff: JSONValue = .object(["fields": .array([]), "domains": .array([]), "scopes": .array([]), "widened": .bool(false)])
-        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, valid: true, diff: diff))
+        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: ok))
         XCTAssertFalse(c.reviewed)
         XCTAssertEqual(c.status, .notReviewed)
+        let check = try await engine.pluginCheckEntry(.object(e))
+        XCTAssertEqual(ConnectorRules.connector(entry: e, check: check, reviewed: true)?.status, .invalid)
         // And the sample shop's own path: an entry that is not exactly its own is not one.
         XCTAssertFalse(SampleShop.isSampleConnector(e))
     }
@@ -286,7 +347,8 @@ final class ConnectorsTests: XCTestCase {
     @MainActor
     func testANotReviewedConnectorSendsNothing() async throws {
         let c = Connector(id: "com.example.ship", name: "Ship", publisher: "Example", version: "1.0.0",
-                          manifest: .object([:]), granted: .object([:]), status: .notReviewed, reviewed: false,
+                          manifest: .object([:]), granted: .object([:]), entry: .object([:]),
+                          status: .notReviewed, reviewed: false,
                           secrets: [], fields: [],
                           actions: [.init(id: "go", label: "Go", placement: "order", kind: "post", url: "https://courier.example.com/")],
                           domains: domains)
@@ -317,12 +379,21 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertEqual(ConnectorRules.context(action: post, order: nil, customer: nil) { _ in nil }.missing, "apiKey")
     }
 
-    /// A reply is read only when the shop granted `fields.write`.
-    func testAReplyIsReadOnlyWithFieldsWrite() {
-        XCTAssertTrue(ConnectorRules.mayReadReply(granted: .object(["scopes": .array([.string("orders.read"), .string("fields.write")])])))
-        XCTAssertFalse(ConnectorRules.mayReadReply(granted: .object(["scopes": .array([.string("orders.read")])])))
-        XCTAssertFalse(ConnectorRules.mayReadReply(granted: .object([:])))
-        XCTAssertFalse(ConnectorRules.mayReadReply(granted: nil))
+    /// The shared rule maps a reply into the connector's fields only when the
+    /// stored entry grants `fields.write` (and is not paused); the phone
+    /// hands it the entry and shows what comes back.
+    func testTheEngineMapsAReplyOnlyWithFieldsWrite() async throws {
+        let engine = try KhaytEngine()
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
+              let m = e["manifest"] else { return XCTFail() }
+        let reply: JSONValue = .object(["data": .object(["waybill": .string("EX-1")])])
+        let granted = try await engine.pluginApplyResponse(m, actionId: "book", reply: reply, entry: .object(e))
+        XCTAssertEqual(granted, .object(["awb": .string("EX-1")]))
+
+        var narrow = e
+        if case .object(var g)? = e["granted"] { g["scopes"] = .array([]); narrow["granted"] = .object(g) }
+        let refused = try await engine.pluginApplyResponse(m, actionId: "book", reply: reply, entry: .object(narrow))
+        XCTAssertEqual(refused, .object([:]))
     }
 
     // MARK: Helpers
@@ -333,9 +404,16 @@ final class ConnectorsTests: XCTestCase {
         return try JSONValue.parse(Data(contentsOf: url))
     }
 
+    /// A stored entry for `manifest`, in the shape the Mac writes.
+    static func entry(_ manifest: JSONValue, granted: JSONValue) -> [String: JSONValue] {
+        guard case .object(let m) = manifest else { return [:] }
+        return ["id": m["id"] ?? .null, "version": m["version"] ?? .null, "enabled": .bool(true),
+                "manifest": manifest, "granted": granted, "config": .object([:])]
+    }
+
     static func connector(id: String = "com.example.ship", granted: JSONValue?) -> Connector {
         Connector(id: id, name: "Ship", publisher: "Example", version: "1.0.0", manifest: .object([:]),
-                  granted: granted, status: .active, reviewed: true,
+                  granted: granted, entry: .object([:]), status: .active, reviewed: true,
                   secrets: [], fields: [], actions: [], domains: [])
     }
 }
