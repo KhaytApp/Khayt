@@ -124,7 +124,8 @@
     "test:e2e:libraryhealth": "node scripts/e2e-library-health-smoke.mjs",
     "test:e2e:reviewfixes": "node scripts/e2e-review-fixes-smoke.mjs",
     "test:e2e:failedcost": "node scripts/e2e-failed-cost-smoke.mjs",
-    "test:e2e:pickup": "node scripts/e2e-pickup-settings-smoke.mjs"
+    "test:e2e:pickup": "node scripts/e2e-pickup-settings-smoke.mjs",
+    "test:e2e:invoicestamp": "node scripts/e2e-invoice-stamp-smoke.mjs"
   },
   "dependencies": {
     "@sentry/electron": "^7.16.0",

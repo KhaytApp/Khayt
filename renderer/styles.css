@@ -1577,24 +1577,6 @@ tbody tr:hover { background: var(--surface-2); }
 .inv .pm-pill.applepay { color: #000;    border-color: rgba(0,0,0,0.4); }
 .inv .pm-pill.visa     { color: #1a4ca0; border-color: rgba(26,76,160,0.4); }
 
-/* "Paid" stamp on invoice */
-.inv .paid-stamp {
-  position: absolute;
-  top: 130px;
-  inset-inline-end: 40px;
-  transform: rotate(-12deg);
-  border: 3px solid var(--success, #2bb673);
-  color: var(--success, #2bb673);
-  padding: 6px 18px;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  border-radius: 4px;
-  text-transform: uppercase;
-  opacity: 0.7;
-  pointer-events: none;
-  background: rgba(255,255,255,0.7);
-}
 .inv-wrap { position: relative; }
 
 /* Invoice action toolbar (above the invoice in the log row triggers) */
