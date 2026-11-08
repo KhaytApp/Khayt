@@ -2936,6 +2936,7 @@
   "exp.attach_receipt": "Joindre un reçu",
   "exp.open_receipt": "Voir le reçu",
   "exp.receipt_attached": "Reçu joint",
+  "exp.receipt_open_failed": "Impossible d’ouvrir le reçu — il a peut-être été déplacé ou supprimé",
   "exp.receipt_add": "Ajouter depuis un reçu",
   "exp.receipt_title": "Ajouter une dépense depuis un reçu",
   "exp.receipt_hint": "Ouvrez une photo, une capture ou un PDF d’une facture fiscale saoudienne et Khayt lit son code QR : le vendeur, le total et la TVA. Vous vérifiez et choisissez la catégorie avant l’enregistrement.",

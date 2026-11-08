@@ -2936,6 +2936,7 @@
   "exp.attach_receipt": "Adjuntar recibo",
   "exp.open_receipt": "Ver recibo",
   "exp.receipt_attached": "Recibo adjunto",
+  "exp.receipt_open_failed": "No se pudo abrir el recibo: puede que se haya movido o eliminado",
   "exp.receipt_add": "Añadir desde recibo",
   "exp.receipt_title": "Añadir un gasto desde un recibo",
   "exp.receipt_hint": "Abre una foto, captura o PDF de una factura fiscal saudí y Khayt lee su código QR: el vendedor, el total y el IVA. Lo revisas y eliges la categoría antes de guardarlo.",

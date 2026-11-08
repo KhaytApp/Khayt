@@ -2936,6 +2936,7 @@
   "exp.attach_receipt": "附上收据",
   "exp.open_receipt": "查看收据",
   "exp.receipt_attached": "收据已附上",
+  "exp.receipt_open_failed": "无法打开收据——它可能已被移动或删除",
   "exp.receipt_add": "从收据添加",
   "exp.receipt_title": "从收据添加费用",
   "exp.receipt_hint": "打开沙特税务发票的照片、截图或 PDF，Khayt 会读取上面的二维码——卖方、总额和增值税。保存前请核对并选择类别。",

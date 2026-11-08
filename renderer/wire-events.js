@@ -1038,21 +1038,28 @@ function wireEvents() {
     if (btn) { deleteExpense(btn.dataset.id); return; }
     const receiptBtn = e.target.closest('[data-act="open-receipt"]');
     if (receiptBtn && window.hubAPI?.openFile) {
-      await window.hubAPI.openFile(receiptBtn.dataset.path);
+      const p = receiptBtn.dataset.path;
+      let r = await window.hubAPI.openFile(p);
+      // A receipt filed before receipts were copied in is the absolute path it
+      // was picked from — Downloads, Desktop, Documents — which hub:open-path
+      // opens (pictures and PDFs only, where the file really is).
+      if (r && r.ok === false && window.hubAPI?.openPath && /^(\/|[A-Za-z]:[\\/])/.test(p || '')) {
+        r = await window.hubAPI.openPath(p);
+      }
+      if (r && r.ok === false) toast(t('exp.receipt_open_failed'), 'error');
     }
   });
-  // Receipt picker
+  // Receipt picker — copied into the app's own folder by the main process
+  // (hub:pick-receipt), so the 📎 can open it later from any folder it came from.
   const btnExpReceipt = $('#btnExpReceipt');
   if (btnExpReceipt) {
     btnExpReceipt.addEventListener('click', async () => {
-      if (!window.hubAPI?.pickFile) return;
-      const filePath = await window.hubAPI.pickFile({
-        filters: [{ name: 'Images/PDF', extensions: ['jpg','jpeg','png','pdf'] }]
-      });
-      if (filePath) {
-        setExpenseReceipt(filePath);
-        toast(t('exp.receipt_attached'), 'success', 2000);
-      }
+      if (!window.hubAPI?.pickReceipt) return;
+      const r = await window.hubAPI.pickReceipt();
+      if (!r) return;
+      if (!r.ok) { toast(t('oe.attach_failed'), 'error'); return; }
+      setExpenseReceipt(r.path);
+      toast(t('exp.receipt_attached'), 'success', 2000);
     });
   }
   $('#btnExpFromReceipt')?.addEventListener('click', () => openReceiptQr());
