@@ -1021,7 +1021,6 @@
 "paper.statement.sub" = "所有订单、已付款与仍欠款项";
 "paper.refused.missing" = "此项不在手机的账本副本中。请在店铺 Wi-Fi 下重新获取账本。";
 "paper.refused.quote" = "这仍是报价。客户接受后才有相关单据。";
-"paper.refused.partial" = "此手机只保存最新的已完成订单，在这里生成的对账单可能会遗漏部分订单。请在 Mac 或电脑上生成。";
 "paper.refused.failed" = "无法生成该单据。请重试，或在 Mac 或电脑上生成。";
 "quote.tools" = "报价";
 "quote.revise" = "修改报价";
@@ -1123,3 +1122,17 @@
 "energy.sub" = "由打印机的智能插座计量";
 "energy.cost" = "电费";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "这部手机只保存近期的工作，因此此对账单可能缺少较早的订单和付款。对账单上也会注明这一点。如需完整的对账单，请在 Mac 或电脑上生成。";
+"paper.statement.partial.printed" = "此对账单可能缺少部分较早的订单和付款：它是在只保存近期工作的手机上生成的。";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "折扣（%）";
+"quote.revise.shipping" = "运费";
+"quote.revise.shipping_in" = "运费（%@）";
+"quote.revise.terms.note" = "新的折扣或运费会改变报价的价格，除非你也在上方输入了新价格。";
+"quote.revise.printed_notes" = "报价单上的备注";
+"quote.revise.printed_notes.sub" = "客户会在报价单上看到这些内容。";

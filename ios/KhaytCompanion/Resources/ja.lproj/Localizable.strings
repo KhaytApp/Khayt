@@ -1021,7 +1021,6 @@
 "paper.statement.sub" = "すべての注文、支払済み額と未払い額";
 "paper.refused.missing" = "これはこのiPhoneの帳簿のコピーにありません。お店のWi-Fiで帳簿をもう一度取得してください。";
 "paper.refused.quote" = "これはまだ見積もりです。お客様が承認すると書類を作成できます。";
-"paper.refused.partial" = "このiPhoneには最新の完了済み注文しかないため、ここで作る明細書では一部が漏れる可能性があります。MacかPCで作成してください。";
 "paper.refused.failed" = "書類を作成できませんでした。もう一度試すか、MacかPCで作成してください。";
 "quote.tools" = "見積もり";
 "quote.revise" = "見積もりを修正";
@@ -1123,3 +1122,17 @@
 "energy.sub" = "プリンターのスマートプラグで計測";
 "energy.cost" = "電気代";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "このiPhoneには最近の作業しか入っていないため、この取引明細書には古い作業や入金が含まれていない場合があります。明細書にもその旨が記載されます。完全なものはMacまたはPCで作成してください。";
+"paper.statement.partial.printed" = "この取引明細書には古い作業や入金が含まれていない場合があります。最近の作業のみを保存しているスマートフォンで作成されました。";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "割引（%）";
+"quote.revise.shipping" = "送料";
+"quote.revise.shipping_in" = "送料（%@）";
+"quote.revise.terms.note" = "割引や送料を変えると見積もりの価格が変わります。上で新しい価格も入力した場合はその価格になります。";
+"quote.revise.printed_notes" = "見積書に記載するメモ";
+"quote.revise.printed_notes.sub" = "お客様が見積書で見る内容です。";
