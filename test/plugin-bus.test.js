@@ -120,6 +120,7 @@ test('the moved payloads keep their key order (consumers verify the bytes)', () 
 
 const plugin = (secrets, domains = ['api.lamha.sa']) => ({
   id: 'sa.lamha', version: '1.0.0', enabled: true, config: { account: '42' }, secrets,
+  manifest: { id: 'sa.lamha', version: '1.0.0', domains: ['api.lamha.sa', 'lamha.sa'] },
   granted: { version: '1.0.0', fields: ['customer.phone'], domains, scopes: [] },
 });
 
@@ -159,8 +160,11 @@ test('saving puts a masked plugin secret back from disk, and drops it when the g
   io.putOnDisk({ settings: { plugins: [plugin({ apiKey: 'real', signing: 'sig' })] } });
   const same = io.mergeStoreSecretsFromDisk({ settings: { plugins: [plugin({ apiKey: MASK, signing: 'typed-new' })] } });
   assert.deepEqual(same.settings.plugins[0].secrets, { apiKey: 'real', signing: 'typed-new' });
-  const moved = io.mergeStoreSecretsFromDisk({ settings: { plugins: [plugin({ apiKey: MASK }, ['api.lamha.sa', 'evil.example'])] } });
+  const moved = io.mergeStoreSecretsFromDisk({ settings: { plugins: [plugin({ apiKey: MASK }, ['api.lamha.sa', 'lamha.sa'])] } });
   assert.deepEqual(moved.settings.plugins[0].secrets, {}, 'a new domain means entering the secret again');
+  // A host the manifest does not declare reaches nothing, so it moves nothing either.
+  const undeclared = io.mergeStoreSecretsFromDisk({ settings: { plugins: [plugin({ apiKey: MASK }, ['api.lamha.sa', 'evil.example'])] } });
+  assert.deepEqual(undeclared.settings.plugins[0].secrets, { apiKey: 'real' });
 });
 
 test('a plugin secret goes only to exactly an https host the shop granted', () => {
@@ -173,5 +177,10 @@ test('a plugin secret goes only to exactly an https host the shop granted', () =
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://notlamha.sa/'), false);
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://lamha.sa.evil.example/'), false);
   assert.equal(SecretDestination.pluginDestinationAllowed(plugin({}, []), 'https://lamha.sa/'), false);
-  assert.equal(SecretDestination.pluginKey(plugin({}, ['B.example.', 'a.example', 'a.example'])), 'a.example,b.example');
+  // Only hosts the manifest declares: a grant edited in the synced book
+  // cannot widen where a secret goes.
+  assert.equal(SecretDestination.pluginDestinationAllowed(plugin({}, ['evil.example']), 'https://evil.example/'), false);
+  assert.equal(SecretDestination.pluginDestinationAllowed({ granted: { domains: ['lamha.sa'] } }, 'https://lamha.sa/'), false, 'no manifest, no destination');
+  const both = plugin({}, ['LAMHA.sa.', 'api.lamha.sa', 'lamha.sa', 'evil.example']);
+  assert.equal(SecretDestination.pluginKey(both), 'api.lamha.sa,lamha.sa');
 });
