@@ -199,3 +199,63 @@ test('the secret in a Slack-style URL path reaches only the declared host', asyn
   const traversal = entryOf(signedSlack, { secrets: { webhookPath: '../../evil' } });
   assert.equal((await S.send({ entry: traversal, trigger: { event: 'order_created' }, records, delivery: DLV }, { keys: KEYS, postPinned: post })).ok, false);
 });
+
+// ── the Lamha showcase, as Khayt ships it ──────────────────────────────────
+// The sample in plugins/samples is signed with Khayt's own key, so this runs
+// against lib/plugin-manifest.js SIGNING_KEYS, not the throwaway one. It
+// mirrors test/plugin-manifest.test.js "Lamha: the request is Lamha's
+// create-order shape…" through the desktop's transport.
+
+test('Lamha sample: installs, sends Lamha\'s create-order body as it is, and fills lamhaOrderId', async () => {
+  const P = require('../lib/plugin-payload.js');
+  const sample = require('../plugins/samples/lamha-shipping.json');
+  assert.equal(S.checkInstall(sample).ok, true, 'the shipped sample verifies against Khayt\'s keys');
+  assert.equal(S.checkInstall(Object.assign({}, sample, { version: '1.0.1' })).error, 'unreviewed');
+
+  const customer = { id: 'c9', nameEn: 'Sara A.', phone: '+966500000000', email: 's@example.com',
+    addresses: [{ label: 'Home', address: 'King Fahd Rd' }], plugins: { [sample.id]: { city: 'Riyadh' } } };
+  const order = { id: 'INV-2026-0107-ab12', invoiceNumber: 'INV-2026-0107', date: '2026-11-08', project: 'Bracket set',
+    price: 115.5, currency: 'SAR', qty: 2 };
+  const config = { senderName: 'Athar Tuwaiq', senderPhone: '+966511111111', senderCity: 'Riyadh',
+    senderAddress: 'Tuwaiq St', carrierId: '7' };
+  const entry = Object.assign(H.consentedEntry(null, sample), { config, secrets: { apiToken: 'lamha-tok' } });
+  assert.equal(H.stateOf(entry, true), 'on');
+  const press = H.actionsFor({ plugins: [entry] }, 'order', () => true).map((a) => a.action.id);
+  assert.deepEqual(press, ['record']);
+
+  const post = fakePost({ ok: true, status: 200, text: JSON.stringify({ success: true, order_id: 48213 }) });
+  const r = await S.send({ entry, trigger: { action: 'record' }, records: { order, customer }, delivery: DLV }, { postPinned: post });
+  assert.equal(r.ok, true);
+  const call = post.calls[0];
+  assert.equal(call.url, 'https://app.lamha.sa/api/v2/create-order');
+  // Lamha's own header, the token bare; no Khayt signature (no signWith).
+  assert.equal(call.headers['X-LAMHA-TOKEN'], 'lamha-tok');
+  assert.equal(call.headers['X-Khayt-Event'], 'record');
+  assert.equal(call.headers['X-Khayt-Delivery'], DLV);
+  assert.ok(!('X-Khayt-Signature' in call.headers) && !('Authorization' in call.headers));
+  // The body is payloadFor's string, byte for byte.
+  const expected = P.payloadFor(sample, { action: 'record' }, { order, customer, config, secrets: entry.secrets });
+  assert.equal(call.body, expected.body);
+  const body = JSON.parse(call.body);
+  assert.equal(body.create_shippment, false, 'the sample must never book a shipment');
+  assert.equal(body.order_id, 'INV-2026-0107');
+  assert.deepEqual(body.shipper, { name: 'Athar Tuwaiq', phone: '+966511111111', Country: 'SA', City: 'Riyadh', AddressLine1: 'Tuwaiq St' });
+
+  // The reply fills the job's own field, as the window does with it.
+  const values = P.applyResponse(sample, 'record', r.reply, entry);
+  assert.deepEqual(values, { lamhaOrderId: '48213' });
+  const job = H.withFieldValues(order, entry, 'order', values);
+  assert.equal(job.plugins[sample.id].lamhaOrderId, '48213');
+
+  // Each required setting left empty: nothing is sent, and the refusal names it.
+  for (const key of Object.keys(config)) {
+    const partial = Object.assign({}, config); delete partial[key];
+    const p2 = fakePost();
+    const no = await S.send({ entry: Object.assign({}, entry, { config: partial }), trigger: { action: 'record' }, records: { order, customer }, delivery: DLV }, { postPinned: p2 });
+    assert.deepEqual([no.ok, no.refused, p2.calls.length], [false, `setting ${key} is not set`, 0]);
+  }
+  // No token on this device: nothing is sent.
+  const p3 = fakePost();
+  const noKey = await S.send({ entry: Object.assign({}, entry, { secrets: {} }), trigger: { action: 'record' }, records: { order, customer }, delivery: DLV }, { postPinned: p3 });
+  assert.deepEqual([noKey.refused, p3.calls.length], ['secret "apiToken" is not set', 0]);
+});

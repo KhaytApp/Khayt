@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "Seine Schlüssel bleiben auf diesem Computer. Gesendet wird erst, wenn du eine seiner Schaltflächen drückst oder ein Ereignis eintritt, auf das er hört.",
   "plg.agree_install": "Zustimmen und installieren",
   "plg.err_refused": "Nicht gesendet: {why}",
+  "plg.err_setting": "Nicht gesendet: „{name}“ in den Einstellungen dieses Connectors ausfüllen",
+  "plg.err_secret": "Nicht gesendet: den Schlüssel „{name}“ für diesen Connector eintragen",
   "plg.err_failed": "Der Dienst des Konnektors hat es nicht angenommen: {why}",
   "plg.sent": "Gesendet",
   "plg.f.order.id": "Auftrags-ID",

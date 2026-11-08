@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "Anahtarları bu bilgisayarda kalır. Düğmelerinden birine basana ya da dinlediği bir olay gerçekleşene kadar hiçbir şey gönderilmez.",
   "plg.agree_install": "Onayla ve kur",
   "plg.err_refused": "Gönderilmedi: {why}",
+  "plg.err_setting": "Gönderilmedi: bu bağlayıcının ayarlarında “{name}” alanını doldurun",
+  "plg.err_secret": "Gönderilmedi: bu bağlayıcıya “{name}” anahtarını ekleyin",
   "plg.err_failed": "Bağlayıcının hizmeti kabul etmedi: {why}",
   "plg.sent": "Gönderildi",
   "plg.f.order.id": "İş kimliği",

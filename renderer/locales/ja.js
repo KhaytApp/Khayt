@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "キーはこのコンピュータに残ります。ボタンを押すか、コネクタが待ち受けるイベントが起きるまで、何も送信されません。",
   "plg.agree_install": "同意してインストール",
   "plg.err_refused": "送信されませんでした：{why}",
+  "plg.err_setting": "送信されませんでした：このコネクタの設定で「{name}」を入力してください",
+  "plg.err_secret": "送信されませんでした：このコネクタに「{name}」のキーを追加してください",
   "plg.err_failed": "コネクタのサービスが受け付けませんでした：{why}",
   "plg.sent": "送信しました",
   "plg.f.order.id": "注文 ID",
