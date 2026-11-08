@@ -9383,6 +9383,28 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.29] - 2026-11-08
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release tells customers where and when to collect, keeps a model you sell backed up, and tracks a job delivered in parts.
+
+### Added
+
+- **Pickup on the customer's order page.** Settings ▸ Payments has a Pickup section with pickup hours and a map link (https only). Once either is filled in, an order that is not with a courier shows a Pickup card with your address, the hours and a map button. Quotes never show it.
+- **A quote says how long it is valid.** The customer's quote page shows its last day and stops offering Approve and Decline once it has passed.
+- **Partial delivery.** A job with several parts can record which parts were delivered and when.
+- **Spool switch.** When a part's print ran out and finished on another roll, Add spool… records the second roll, so both are charged for what they gave.
+- **Back Up and Try Again.** Selling a model as a vault product, or sharing it, needs its copy in the vault. When one is missing, the message now has a button that backs up just those models and tries again.
+- **The books server for AI assistants is in the app.** Settings ▸ Assistant has Copy Setup for Claude Desktop, which points Claude Desktop at the read-only server bundled inside Khayt.
+- **Choose whether your orders show beside other shops in a customer's portal.** Settings ▸ Online, on by default; the owner or a manager can change it.
+
+### Changed
+
+- **Printer care and declined enquiries from a paired iPhone now reach the Mac**, and the phone is told how many of its changes the Mac did not accept.
+- **HueForge exports for the Snapmaker U1 print PLA at PLA temperatures.**
+
 ## [4.0.0-beta.28] - 2026-11-07
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
