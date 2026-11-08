@@ -23,7 +23,7 @@ final class SampleShopTests: XCTestCase {
         XCTAssertTrue(queue.contains(where: \.isOverdue), "one job is late, so Home's late rail shows")
         let spools = try await reader.inventory()
         XCTAssertEqual(spools.count, 6)
-        XCTAssertEqual(spools.filter(\.isLowStock).count, 2)
+        XCTAssertEqual(spools.filter(\.isLowStock).count, 3, "three low, from three suppliers, so the shopping list has something to show")
         let clients = try await reader.clients()
         let waiting = try await reader.waitingList()
         let machines = try await reader.machines()

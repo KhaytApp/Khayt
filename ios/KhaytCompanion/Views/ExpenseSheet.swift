@@ -89,6 +89,7 @@ struct ExpenseSheet: View {
                 }
                 .padding(16)
             }
+            .editsShop()
             .scrollDismissesKeyboard(.interactively)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("exp.title"))

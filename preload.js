@@ -260,11 +260,14 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudMembersList: (opts) => ipcRenderer.invoke('hub:cloud-members-list', opts),
   cloudGetSlug:    (opts) => ipcRenderer.invoke('hub:cloud-get-slug', opts),
   cloudSetSlug:    (opts) => ipcRenderer.invoke('hub:cloud-set-slug', opts),
+  cloudPortalSettings: (opts) => ipcRenderer.invoke('hub:cloud-portal-settings', opts),
   cloudPayLink:    (opts) => ipcRenderer.invoke('hub:cloud-paylink', opts),
   cloudMemberRemove: (opts) => ipcRenderer.invoke('hub:cloud-member-remove', opts),
   cloudCatalogPublish: (opts) => ipcRenderer.invoke('hub:cloud-catalog-publish', opts),
   cloudReviewSummary: (opts) => ipcRenderer.invoke('hub:cloud-review-summary', opts),
   cloudListReviews:   (opts) => ipcRenderer.invoke('hub:cloud-list-reviews', opts),
+  cloudWhatsappHook:  (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-hook', opts),
+  cloudWhatsappStatuses: (opts) => ipcRenderer.invoke('hub:cloud-whatsapp-statuses', opts),
   cloudDeleteReview:  (opts) => ipcRenderer.invoke('hub:cloud-delete-review', opts),
   cloudRequestReset: (opts) => ipcRenderer.invoke('hub:cloud-request-reset', opts),
   cloudResetPassword: (opts) => ipcRenderer.invoke('hub:cloud-reset-password', opts),
@@ -320,6 +323,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   startPrinterPolling: (machines) => ipcRenderer.invoke('hub:start-printer-polling', machines),
   stopPrinterPolling:  ()         => ipcRenderer.invoke('hub:stop-printer-polling'),
   getPrinterStatus:    ()         => ipcRenderer.invoke('hub:get-printer-status'),
+  probePrinter:        (machine)  => ipcRenderer.invoke('hub:probe-printer', machine),
   // Pause / resume / cancel the running job. Main validates the host and the
   // command name; nothing here is trusted.
   printerCommand:      (machine, command) => ipcRenderer.invoke('hub:printer-command', { machine, command }),

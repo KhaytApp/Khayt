@@ -32,3 +32,13 @@
 /* Live Activity buttons */
 "Move to post-processing" = "Move to post-processing";
 "Print it again" = "Print it again";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "Earned today";
+"Owed" = "Owed";
+"Low stock" = "Low stock";
+"%lld unpaid" = "%lld unpaid";
+"to reorder" = "to reorder";
+"Pair Khayt with your shop to see its money here." = "Pair Khayt with your shop to see its money here.";
+"Khayt Money" = "Khayt Money";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked.";

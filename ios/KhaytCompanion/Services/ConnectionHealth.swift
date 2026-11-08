@@ -88,7 +88,7 @@ final class ConnectionHealth: ObservableObject {
             lastStatus = nil
             lastChecked = Date()
             notifyConnectionChange()
-            if let settings { CompanionNotifications.shared.saveDisconnectedSnapshot(shopName: settings.shopLabel) }
+            if let settings { CompanionNotifications.shared.saveDisconnectedSnapshot(shopName: settings.shopLabel, keepMoney: settings.isPaired) }
             return
         }
         do {
@@ -204,7 +204,7 @@ final class ConnectionHealth: ObservableObject {
     /// (`DeviceKey`). The client paces retries.
     private func enrolThisPhone() async {
         guard api.wantsEnrolment() else { return }
-        await api.enrolDevice(name: UIDevice.current.name)
+        await api.enrolDevice(name: settings?.nameToSend ?? ConnectionSettings.defaultPhoneName)
     }
 
     /// Ask about `address`, unless the person already said no to it.
@@ -212,7 +212,8 @@ final class ConnectionHealth: ObservableObject {
         if address != declined { macMoved = address }
     }
 
-    /// The person says the new address is their Mac: move there.
+    /// The person says the new address is their Mac: move there, and ask
+    /// them for the PIN — it is never sent there by itself.
     func acceptMove() async {
         guard let settings, let address = macMoved else { return }
         settings.host = address.host
@@ -221,6 +222,11 @@ final class ConnectionHealth: ObservableObject {
         // The person vouched for this address, not for its key: pin again
         // from here rather than keep a key it could not prove.
         settings.macIdentityKey = ""
+        // And no stored PIN goes there on trust: the address could not prove
+        // it is the Mac, so the person types the PIN ("Pair again") or nothing
+        // is sent. A phone that enrolled keeps no PIN anyway.
+        settings.pin = ""
+        settings.needsPairAgain = true
         lastIdentityTry = nil
         macMoved = nil
         declined = nil
@@ -244,6 +250,7 @@ final class ConnectionHealth: ObservableObject {
         let livePrints = ((try? await api.fetchMachinesLive()) ?? [])
             .filter { $0.isPrinting }
             .map { WidgetPrint(id: $0.id, name: $0.displayName, progress: $0.progress ?? 0, eta: $0.etaText) }
+        let asOf = connected ? Date() : (api.bookAsOf ?? Date())
         CompanionNotifications.shared.handleDashboardSnapshot(
             status: status,
             queue: queue,
@@ -251,7 +258,21 @@ final class ConnectionHealth: ObservableObject {
             settings: settings,
             livePrints: livePrints,
             connected: connected,
-            asOf: connected ? Date() : (api.bookAsOf ?? Date())
+            asOf: asOf,
+            money: await widgetMoney(settings: settings, asOf: asOf)
         )
+    }
+
+    /// The Money widget's figures (`WidgetFigures`), worked out at most once a
+    /// minute: the health poll runs every half-minute and the figures run the
+    /// shop's money rules over the whole book.
+    private var lastMoney: (at: Date, shop: String, money: WidgetMoney?)?
+
+    private func widgetMoney(settings: ConnectionSettings, asOf: Date, now: Date = Date()) async -> WidgetMoney? {
+        let shop = settings.isSampleShop ? "" : settings.shopLabel
+        if let last = lastMoney, last.shop == shop, now.timeIntervalSince(last.at) < 60 { return last.money }
+        let money = await WidgetFigures.money(api: api, settings: settings, asOf: asOf)
+        lastMoney = (now, shop, money)
+        return money
     }
 }

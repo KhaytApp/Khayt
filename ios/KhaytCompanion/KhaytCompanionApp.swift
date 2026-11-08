@@ -74,7 +74,7 @@ struct KhaytCompanionApp: App {
         PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()
         #if DEBUG
-        Self.openForScreenshots(apiClient)
+        Self.openForScreenshots(apiClient, settings: s)
         #endif
     }
 
@@ -82,9 +82,10 @@ struct KhaytCompanionApp: App {
     /// `-KhaytOpen <what>` on the launch line: one screen opened once, so the
     /// detail pages and sheets can be photographed too. Home takes `quote`,
     /// `waste`, `expense`, `addspool`, `intake`, `settings`, `new`, `order:<id>` and
-    /// `library` (or `library:<model id>`, opened on that model);
-    /// Inventory takes `spool:<id>`; Orders takes `neworder` and `pick:<id>`;
-    /// Machines takes `care:<machine id>` and `parts`.
+    /// `library` (or `library:<model id>`, opened on that model), and
+    /// `order:<id>` opens a finished job too, from the recent jobs;
+    /// Inventory takes `spool:<id>` and `shopping`; Orders takes `neworder`
+    /// and `pick:<id>`; Machines takes `care:<machine id>` and `parts`.
     enum ScreenshotOpen {
         private static var used = false
         /// The request, if it starts with `prefix` and nobody has taken it yet.
@@ -98,9 +99,23 @@ struct KhaytCompanionApp: App {
     /// `-KhaytSampleShop YES -KhaytTab orders` on the launch line: the sample
     /// shop, opened on that tab, so every screen can be photographed from the
     /// command line (`simctl launch`) without a tap. Debug builds only.
-    private static func openForScreenshots(_ api: KhaytAPIClient) {
+    /// `-KhaytReadOnly YES` (with the sample shop) shows a viewer's read-only
+    /// sign-in, and `-KhaytPairAgain YES` the "Pair this phone again" strip.
+    private static func openForScreenshots(_ api: KhaytAPIClient, settings: ConnectionSettings) {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "KhaytSampleShop") { try? api.openSampleShop() }
+        // Both take the sample shop off (its own banner would cover theirs)
+        // and give it an address, so the phone still has a shop to show.
+        if defaults.bool(forKey: "KhaytReadOnly") {
+            KhaytAPIClient.debugReadOnly = true
+            settings.isSampleShop = false
+            settings.host = "192.168.1.42"
+        }
+        if defaults.bool(forKey: "KhaytPairAgain") {
+            settings.isSampleShop = false
+            settings.host = "192.168.1.42"
+            settings.needsPairAgain = true
+        }
         if let tab = defaults.string(forKey: "KhaytTab") {
             defaults.set(tab, forKey: "khayt.pending.tab")
         }
@@ -139,7 +154,11 @@ struct KhaytCompanionApp: App {
                 .tint(KhaytDesign.accent)
                 // The design's face for everything that does not choose its own.
                 .font(.khayt(17, relativeTo: .body))
-                .task {
+                // Asked once a real shop is open — paired, or signed in from
+                // the cloud — not on a first launch before anything is set
+                // up, and not for the sample shop, which sends no alerts.
+                .task(id: settings.isPaired && !settings.isSampleShop) {
+                    guard settings.isPaired, !settings.isSampleShop else { return }
                     await CompanionNotifications.shared.requestAuthorizationIfNeeded()
                 }
                 // Nothing is polled for a screen nobody can see.

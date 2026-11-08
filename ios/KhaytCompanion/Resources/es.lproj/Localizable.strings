@@ -461,7 +461,7 @@
 "pair.signed_out" = "El Mac cerró la sesión de este iPhone. Vuelve a emparejarlo con el PIN del propietario.";
 "pair.pin.title" = "El PIN del propietario";
 "pair.pin.body" = "El PIN del propietario de Ajustes → En línea en el Mac o PC, de 8 caracteres o más. El PIN de solicitudes no funciona aquí.";
-"pair.pin.foot" = "Se guarda en el llavero del iPhone y solo se envía a este Mac.";
+"pair.pin.foot" = "Se envía solo a este Mac, para emparejar, y luego se borra del iPhone. Con un ordenador que no puede emparejar un teléfono, se guarda en el llavero del iPhone.";
 "pair.pin.wrong" = "Se rechazó ese PIN. Revisa Ajustes → En línea en el Mac o PC.";
 "pair.window_closed" = "En el Mac, haz clic en Emparejar un teléfono (Ajustes → En línea) y vuelve a intentarlo.";
 "pair.window_locked" = "Demasiados PIN incorrectos desde este iPhone. En el Mac, haz clic otra vez en Emparejar un teléfono (Ajustes → En línea) y prueba con el PIN correcto.";
@@ -1097,3 +1097,27 @@
 "care.part.fep_film" = "Lámina FEP";
 "care.part.resin_tank" = "Tanque de resina";
 "care.part.ipa" = "Alcohol isopropílico (litro)";
+"pair.again.title" = "Vuelve a emparejar este iPhone";
+"pair.again.line" = "Escribe el PIN del propietario para volver a llegar al Mac. El iPhone nunca lo envía por su cuenta.";
+"pair.again.button" = "Emparejar de nuevo";
+"pair.again.body" = "El PIN del propietario de Ajustes → En línea en el Mac. Se envía una vez, a esta dirección, para emparejar, y luego se borra del iPhone.";
+"pair.phone_name" = "Nombre de este iPhone";
+"pair.phone_name.foot" = "Así aparece este iPhone en la lista de teléfonos emparejados del Mac, para distinguirlos.";
+"cloud.read_only" = "Sesión de solo lectura";
+"cloud.read_only.line" = "Este iPhone ha iniciado sesión en Khayt Cloud como lector, sin ningún Mac emparejado: muestra el taller pero no puede cambiarlo.";
+"cloud.read_only.refused" = "No se guardó: la sesión de Khayt Cloud de este iPhone es de solo lectura. Empareja con el Mac o inicia sesión con una cuenta que pueda editar.";
+
+/* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
+"shop.title" = "Lista de compras";
+"shop.none" = "Nada que comprar — cada filamento está por encima de su punto de pedido.";
+"shop.no_supplier" = "Sin proveedor";
+"shop.share" = "Compartir lista";
+"shop.hint" = "Cada filamento en su punto de pedido o por debajo, por el proveedor que lo vende. Los puntos de pedido, las cantidades y los proveedores se configuran en Khayt en el Mac o el ordenador.";
+"shop.buy" = "Comprar %@";
+"shop.have" = "Quedan %@";
+
+/* A print's energy (lib/print-energy.js energyWhOf) */
+"energy.used" = "Energía: %@";
+"energy.sub" = "Medida por el enchufe inteligente de la impresora";
+"energy.cost" = "Electricidad";
+"unit.kwh" = "kWh";

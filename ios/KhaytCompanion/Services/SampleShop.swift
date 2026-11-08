@@ -70,6 +70,8 @@ enum SampleShop {
                 // update read "thank you for your order with ."
                 "shopName": .string(label), "bizEn": .string(label), "bizAr": .string("ورشة الطباعة التجريبية"),
                 "currency": .string("USD"),
+                // What a kWh costs the shop, so a metered print shows its cost.
+                "elecRate": .number(0.18),
                 "enableVat": .bool(false), "language": .string("en"),
                 // Counted stock for two of the catalogue; the rest is not stocked.
                 "storefront": .object(["stockQty": .object(["PROD-S1": .number(6), "PROD-S2": .number(0)])]),
@@ -152,19 +154,45 @@ enum SampleShop {
                 // Placed and finished today, so Home's This month and This
                 // year have takings on the first day of a month or a year, and
                 // Done today counts it.
+                // Two finished prints a smart plug metered (`lib/print-energy.js`
+                // `jobFields`), so the job page shows the energy and its cost —
+                // one whole, one missing a few minutes and scaled up — and one
+                // metered too little, which shows nothing.
                 order("S-1038", "completed", "Planter", "Maya Chen", "C-3", placed: 0, due: 0, price: 35, paid: 35, material: "PLA", qty: 1,
-                      extra: ["completedAt": .string(f.string(from: now) + "T08:30:00.000Z")]),
-                order("S-1036", "completed", "Gear housing", "Acme Robotics", "C-1", placed: -12, due: -5, price: 150, paid: 150, material: "Nylon", qty: 3),
-                order("S-1031", "completed", "Crown models", "Northside Dental", "C-2", placed: -20, due: -14, price: 310, paid: 310, material: "Resin", qty: 8),
+                      machine: mk4,
+                      extra: ["completedAt": .string(f.string(from: now) + "T08:30:00.000Z"),
+                              "actualPrintTime": .number(2.6),
+                              "actualEnergyWh": .number(318.4),
+                              "actualEnergy": energy(coveredS: 9_540, spanS: 9_540, samples: 160)]),
+                order("S-1036", "completed", "Gear housing", "Acme Robotics", "C-1", placed: -12, due: -5, price: 150, paid: 150, material: "Nylon", qty: 3,
+                      machine: x1c,
+                      extra: ["actualPrintTime": .number(9.4),
+                              "actualEnergyWh": .number(1_712.6),
+                              "actualEnergy": energy(coveredS: 33_100, spanS: 34_480, samples: 552, gaps: 1)]),
+                order("S-1031", "completed", "Crown models", "Northside Dental", "C-2", placed: -20, due: -14, price: 310, paid: 310, material: "Resin", qty: 8,
+                      machine: saturn,
+                      extra: ["actualEnergyWh": .number(96.2),
+                              "actualEnergy": energy(coveredS: 4_100, spanS: 10_800, samples: 70, gaps: 3)]),
                 order("S-1024", "completed", "Dice tower", "Tabletop Guild", "C-4", placed: -40, due: -33, price: 55, paid: 55, material: "PLA", qty: 1),
             ]),
+            // Three low, each bought from someone else, so the shopping list
+            // (`lib/reorder.js shoppingList`) has three suppliers: the PLA by
+            // the price list that sells it, the ABS and the resin by their
+            // own supplier.
             "inventory": .array([
                 spool("SP-201", "Bambu", "PLA", "#1B1B1F", left: 180, of: 1000, cost: 19.99),
                 spool("SP-202", "Polymaker", "PETG", "#2F6DB5", left: 640, of: 1000, cost: 22.50),
                 spool("SP-203", "Prusament", "PLA", "#E8662A", left: 910, of: 1000, cost: 29.99),
-                spool("SP-204", "eSun", "ABS", "#F2F2F0", left: 120, of: 1000, cost: 18.00),
-                spool("SP-205", "Elegoo", "Resin", "#9AA3AD", left: 480, of: 1000, cost: 35.00),
+                spool("SP-204", "eSun", "ABS", "#F2F2F0", left: 120, of: 1000, cost: 18.00,
+                      extra: ["supplierId": .string("SUP-2")]),
+                spool("SP-205", "Elegoo", "Resin", "#9AA3AD", left: 150, of: 1000, cost: 35.00,
+                      extra: ["supplierId": .string("SUP-3"), "reorderQty": .number(2000)]),
                 spool("SP-206", "Polymaker", "Nylon", "#C9B79C", left: 750, of: 750, cost: 42.00),
+            ]),
+            "suppliers": .array([
+                supplier("SUP-1", "Bambu Lab Store", prices: [("PLA", 19.99), ("PETG", 21.99)], leadDays: 6),
+                supplier("SUP-2", "Filament Depot", prices: [], leadDays: 3),
+                supplier("SUP-3", "Elegoo Official", prices: [], leadDays: 10),
             ]),
             // The calculator's saved presets and the consumables shelf, so the
             // sample prices a part the way a real shop's book would.
@@ -194,11 +222,33 @@ enum SampleShop {
         ]
     }
 
+    /// A spool with what is left under all of its names, as the shop's own
+    /// writers leave it: `weight` (the store's, which the shared rules read),
+    /// `weightRemaining` and `weightTotal` (the wire's).
     private static func spool(_ id: String, _ brand: String, _ material: String, _ hex: String,
-                              left: Double, of total: Double, cost: Double) -> JSONValue {
-        .object(["id": .string(id), "brand": .string(brand), "material": .string(material),
-                 "color": .string(hex), "weightRemaining": .number(left), "weightTotal": .number(total),
-                 "cost": .number(cost), "rev": .number(1)])
+                              left: Double, of total: Double, cost: Double,
+                              extra: [String: JSONValue] = [:]) -> JSONValue {
+        var o: [String: JSONValue] = [
+            "id": .string(id), "brand": .string(brand), "material": .string(material),
+            "color": .string(hex), "weight": .number(left), "weightRemaining": .number(left),
+            "weightTotal": .number(total), "cost": .number(cost), "rev": .number(1)]
+        for (k, v) in extra { o[k] = v }
+        return .object(o)
+    }
+
+    /// A supplier in the shape every app writes one (`BookWriter.addSupplier`).
+    private static func supplier(_ id: String, _ name: String, prices: [(String, Double)], leadDays: Double) -> JSONValue {
+        .object(["id": .string(id), "name": .string(name), "vat": .string(""), "category": .string("filament"),
+                 "phone": .string(""), "website": .string(""), "notes": .string(""),
+                 "priceList": .array(prices.map { .object(["material": .string($0.0), "pricePerKg": .number($0.1)]) }),
+                 "leadDays": .number(leadDays), "purchases": .array([]), "rev": .number(1)])
+    }
+
+    /// A smart plug's reading as `lib/print-energy.js` `jobFields` writes it.
+    private static func energy(coveredS: Double, spanS: Double, samples: Int, gaps: Int = 0) -> JSONValue {
+        .object(["source": .string("plug"), "coveredS": .number(coveredS), "spanS": .number(spanS),
+                 "coverage": .number((min(1, coveredS / spanS) * 1000).rounded() / 1000),
+                 "samples": .number(Double(samples)), "gaps": .number(Double(gaps)), "at": .null])
     }
 
     /// Every collection held whole — the sample is the entire shop.

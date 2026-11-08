@@ -408,8 +408,10 @@ test('margin figures net credit notes in the order\'s own currency', () => {
   assert.match(read('lib/pnl-report.js'), /money\.orderToBase\(cost, o, moneyCtx, known\)/,
     'and prices the cost in the same currency');
   assert.match(read('renderer/analytics.js'),
-    /const rev = Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,
+    /const net = Math\.max\(0, \(\+o\.price \|\| 0\) - orderCreditedRaw\(o\)\);/,
     'the exported average margin must net credit notes');
+  assert.match(read('renderer/analytics.js'), /rev \+= toBase\(net, o\); cost \+= toBase\(\+o\.costBasis, o\);/,
+    'and convert price and cost alike, at the job\'s own rate');
   assert.match(read('renderer/logs.js'),
     /const gross = \(\+o\.price \|\| 0\) - \(\+o\.shippingCost \|\| 0\) - credited;/,
     'the orders-log margin column must net credit notes');
