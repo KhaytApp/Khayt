@@ -409,3 +409,28 @@ test('a job started on an EMPTY head raises the runout: the idle poll before it 
   const pausedOut = { [M]: { state: 'paused', progress: 47, filamentOut: true } };
   assert.deepEqual(types(computePrinterAlerts(pausedOut, printing({ filamentOut: true }), fullSettings(), T0)), []);
 });
+
+/* ── Bambu FAILED: an error, unless the printer says it was cancelled ── */
+
+test('a Bambu print that fails on its own raises an error with its reason', () => {
+  const prev = { m1: { state: 'Printing', progress: 62 } };
+  const curr = { m1: { state: 'Failed', progress: 62,
+    fault: 'The nozzle is clogged with filament. (0300_8016)' } };
+  const res = computePrinterAlerts(prev, curr, fullSettings(), T0);
+  assert.deepEqual(types(res), ['error']);
+  assert.match(res.alerts[0].message, /Failed — The nozzle is clogged/);
+});
+
+test('a Bambu FAILED with no reason given is still an error', () => {
+  assert.equal(isErrorState({ state: 'Failed' }), true);
+  assert.equal(isErrorState({ state: 'Failed', fault: null }), true);
+});
+
+test('a print the shop cancelled on a Bambu (FAILED + cancel code) raises nothing', () => {
+  for (const fault of ['The task was canceled. (0300_400C)', 'Printing was cancelled. (0500_400E)',
+    'The task was canceled. (0300_400C) (+1 more)']) {
+    const prev = { m1: { state: 'Printing', progress: 30 } };
+    const curr = { m1: { state: 'Failed', progress: 30, fault } };
+    assert.deepEqual(types(computePrinterAlerts(prev, curr, fullSettings(), T0)), [], fault);
+  }
+});
