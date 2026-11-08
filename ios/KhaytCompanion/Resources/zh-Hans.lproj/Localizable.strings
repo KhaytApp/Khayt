@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "此店铺没有连接器。";
 "connectors.list.footer" = "连接器在 Mac 上添加和批准。其密钥只保存在此 iPhone 上，从不同步。";
 "connectors.badge.reviewed" = "已审核";
-"connectors.badge.dev" = "开发者模式";
 "connectors.status.active" = "已启用";
 "connectors.status.paused" = "已暂停";
 "connectors.keys.set" = "密钥已设置";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "无法连接 %@。未发送任何内容。";
 "connectors.error.server" = "服务返回 %d。此 iPhone 上未做任何更改。";
 "connectors.sample" = "在示例店铺中，任何内容都不会离开此 iPhone，因此连接器不会发送或打开任何内容。与 Mac 配对后即可使用。";
+"connectors.not_reviewed" = "未审核 — 按钮已关闭";
+"connectors.off" = "已在 Mac 上关闭";
+"connectors.status.not_reviewed" = "未审核";
+"connectors.status.off" = "已关闭";
+"connectors.status.invalid" = "无法读取";
 "connectors.yes" = "是";
 "connectors.no" = "否";
 "connectors.data.order.id" = "任务 ID";

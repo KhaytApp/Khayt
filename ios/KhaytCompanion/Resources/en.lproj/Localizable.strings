@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "No connectors in this shop.";
 "connectors.list.footer" = "Connectors are added and approved on your Mac. Their keys stay on this iPhone and are never synced.";
 "connectors.badge.reviewed" = "Reviewed";
-"connectors.badge.dev" = "Developer mode";
 "connectors.status.active" = "Active";
 "connectors.status.paused" = "Paused";
 "connectors.keys.set" = "Keys set";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "Couldn’t reach %@. Nothing was sent.";
 "connectors.error.server" = "The service answered %d. Nothing on this iPhone was changed.";
 "connectors.sample" = "In the sample shop nothing leaves this phone, so connectors don’t send or open anything. Pair with your Mac to use them.";
+"connectors.not_reviewed" = "Not reviewed — buttons are off";
+"connectors.off" = "Turned off on your Mac";
+"connectors.status.not_reviewed" = "Not reviewed";
+"connectors.status.off" = "Off";
+"connectors.status.invalid" = "Can’t be read";
 "connectors.yes" = "Yes";
 "connectors.no" = "No";
 "connectors.data.order.id" = "Job ID";

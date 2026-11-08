@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "Bu dükkânda bağlayıcı yok.";
 "connectors.list.footer" = "Bağlayıcılar Mac’inizde eklenir ve onaylanır. Anahtarları bu iPhone’da kalır ve asla eşzamanlanmaz.";
 "connectors.badge.reviewed" = "İncelendi";
-"connectors.badge.dev" = "Geliştirici modu";
 "connectors.status.active" = "Etkin";
 "connectors.status.paused" = "Duraklatıldı";
 "connectors.keys.set" = "Anahtarlar girildi";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "%@ adresine ulaşılamadı. Hiçbir şey gönderilmedi.";
 "connectors.error.server" = "Hizmet %d yanıtını verdi. Bu iPhone’da hiçbir şey değişmedi.";
 "connectors.sample" = "Örnek dükkânda hiçbir şey bu telefondan çıkmaz; bu yüzden bağlayıcılar bir şey göndermez ya da açmaz. Kullanmak için Mac’inizle eşleştirin.";
+"connectors.not_reviewed" = "İncelenmedi — düğmeler kapalı";
+"connectors.off" = "Mac’inizde kapatıldı";
+"connectors.status.not_reviewed" = "İncelenmedi";
+"connectors.status.off" = "Kapalı";
+"connectors.status.invalid" = "Okunamıyor";
 "connectors.yes" = "Evet";
 "connectors.no" = "Hayır";
 "connectors.data.order.id" = "İş kimliği";

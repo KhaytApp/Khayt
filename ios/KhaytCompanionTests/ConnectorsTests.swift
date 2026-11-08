@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 import KhaytCore
 @testable import KhaytCompanion
@@ -80,13 +81,13 @@ final class ConnectorsTests: XCTestCase {
         let wide = try await engine.pluginDiff(granted: narrow, manifest: slack)
         XCTAssertTrue(ConnectorRules.isPaused(granted: narrow, diff: wide))
         let entry: [String: JSONValue] = ["id": .string("app.khayt.samples.slack"), "manifest": slack, "granted": narrow]
-        XCTAssertEqual(ConnectorRules.connector(entry: entry, valid: true, diff: wide)?.status, .paused)
+        XCTAssertEqual(ConnectorRules.connector(entry: entry, valid: true, diff: wide, reviewed: true)?.status, .paused)
 
         let same = try await engine.pluginDiff(granted: full, manifest: slack)
         XCTAssertFalse(ConnectorRules.isPaused(granted: full, diff: same))
         var granted = entry
         granted["granted"] = full
-        XCTAssertEqual(ConnectorRules.connector(entry: granted, valid: true, diff: same)?.status, .active)
+        XCTAssertEqual(ConnectorRules.connector(entry: granted, valid: true, diff: same, reviewed: true)?.status, .active)
 
         // Never granted is paused; an unreadable manifest is not usable at all.
         XCTAssertTrue(ConnectorRules.isPaused(granted: nil, diff: same))
@@ -103,7 +104,8 @@ final class ConnectorsTests: XCTestCase {
             let valid = try await engine.pluginValidate(m)
             guard case .object(let v) = valid else { return XCTFail() }
             let diff = try await engine.pluginDiff(granted: e["granted"] ?? .null, manifest: m)
-            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, valid: v["ok"] == .bool(true), diff: diff))
+            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, valid: v["ok"] == .bool(true), diff: diff,
+                                                            reviewed: SampleShop.isSampleConnector(e)))
             status[c.id] = c.status
         }
         XCTAssertEqual(status[SampleShop.courierId], .active)
@@ -200,6 +202,129 @@ final class ConnectorsTests: XCTestCase {
         }
     }
 
+    // MARK: Reviewed: Khayt's signature, never a stored flag
+
+    /// A manifest signed with a key made here, over the engine's canonical bytes.
+    private func signed(_ key: Curve25519.Signing.PrivateKey) async throws -> (manifest: JSONValue, engine: KhaytEngine) {
+        let engine = try KhaytEngine()
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
+              case .object(var m)? = e["manifest"] else { throw XCTSkip("no sample") }
+        let canonical = try await engine.pluginCanonicalJSON(.object(m))
+        let sig = try key.signature(for: Data(canonical.utf8))
+        m["signature"] = .string(sig.base64EncodedString())
+        // The canonical bytes leave the signature out.
+        let again = try await engine.pluginCanonicalJSON(.object(m))
+        XCTAssertEqual(again, canonical)
+        return (.object(m), engine)
+    }
+
+    private func pub(_ key: Curve25519.Signing.PrivateKey) -> String {
+        key.publicKey.rawRepresentation.base64EncodedString()
+    }
+
+    func testASignatureFromKhaytsKeyIsReviewed() async throws {
+        let key = Curve25519.Signing.PrivateKey()
+        let (m, engine) = try await signed(key)
+        let canonical = try await engine.pluginCanonicalJSON(m)
+        guard case .object(let o) = m, case .string(let sig)? = o["signature"] else { return XCTFail() }
+        XCTAssertEqual(sig.count, 88)
+        XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: [("k1", pub(key))]))
+
+        // One field changed after signing: the bytes are not the ones signed.
+        var tampered = o
+        tampered["publisher"] = .string("Someone else")
+        let tamperedBytes = try await engine.pluginCanonicalJSON(.object(tampered))
+        XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(tampered), canonical: tamperedBytes, keys: [("k1", pub(key))]))
+
+        // Another key.
+        let other = Curve25519.Signing.PrivateKey()
+        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: [("k2", pub(other))]))
+
+        // Two keys, one of them right: enough.
+        XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical,
+                                                keys: [("k2", pub(other)), ("bad", "!!"), ("k1", pub(key))]))
+
+        // No keys at all (today's `signingKeys`): nothing verifies.
+        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: []))
+        XCTAssertTrue(ConnectorRules.signingKeys.isEmpty, "switch to engine.pluginSigningKeys() when Mac PR 2 lands")
+    }
+
+    func testABadOrShortSignatureOrKeyIsNotReviewed() async throws {
+        let key = Curve25519.Signing.PrivateKey()
+        let (m, engine) = try await signed(key)
+        let canonical = try await engine.pluginCanonicalJSON(m)
+        guard case .object(let o) = m, case .string(let sig)? = o["signature"] else { return XCTFail() }
+        let keys = [(id: "k1", key: pub(key))]
+        for bad in ["", "not base64 at all", String(sig.dropLast(4)), Data(repeating: 1, count: 32).base64EncodedString(),
+                    String(repeating: "A", count: 86) + "=="] {
+            var x = o
+            x["signature"] = .string(bad)
+            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(x), canonical: canonical, keys: keys), bad)
+        }
+        var none = o
+        none.removeValue(forKey: "signature")
+        XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(none), canonical: canonical, keys: keys))
+        // A key that is not 32 bytes, or not base64.
+        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical,
+                                                 keys: [("short", Data(repeating: 2, count: 16).base64EncodedString()), ("junk", "%%%")]))
+    }
+
+    /// A book can say `reviewed: true` (or `devMode`); the phone does not listen.
+    func testAStoredReviewedFlagIsIgnored() throws {
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(var e) = rows[0] else { return XCTFail() }
+        e["reviewed"] = .bool(true)
+        e["devMode"] = .bool(true)
+        let diff: JSONValue = .object(["fields": .array([]), "domains": .array([]), "scopes": .array([]), "widened": .bool(false)])
+        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, valid: true, diff: diff))
+        XCTAssertFalse(c.reviewed)
+        XCTAssertEqual(c.status, .notReviewed)
+        // And the sample shop's own path: an entry that is not exactly its own is not one.
+        XCTAssertFalse(SampleShop.isSampleConnector(e))
+    }
+
+    /// Not reviewed: the buttons are off and a tap sends nothing.
+    @MainActor
+    func testANotReviewedConnectorSendsNothing() async throws {
+        let c = Connector(id: "com.example.ship", name: "Ship", publisher: "Example", version: "1.0.0",
+                          manifest: .object([:]), granted: .object([:]), status: .notReviewed, reviewed: false,
+                          secrets: [], fields: [],
+                          actions: [.init(id: "go", label: "Go", placement: "order", kind: "post", url: "https://courier.example.com/")],
+                          domains: domains)
+        XCTAssertFalse(c.isActive, "the card disables a button unless isActive")
+        XCTAssertEqual(ConnectorRules.disabledReason(c), L10n.tr("connectors.not_reviewed"))
+        let api = KhaytAPIClient(settings: ConnectionSettings(), withBook: false)
+        let outcome = await api.runConnector(c, action: c.actions[0], at: .order("S-1"))
+        XCTAssertEqual(outcome, .failed(L10n.tr("connectors.not_reviewed")))
+    }
+
+    // MARK: What goes into the engine
+
+    func testAnOpenLinkIsNeverGivenASecret() {
+        var asked: [String] = []
+        let open = Connector.Action(id: "o", label: "O", placement: "order", kind: "open",
+                                    url: "https://courier.example.com/{secret.apiKey}")
+        let made = ConnectorRules.context(action: open, order: ["id": .string("1")], customer: nil) { asked.append($0); return "k" }
+        guard case .object(let ctx) = made.context else { return XCTFail() }
+        XCTAssertNil(ctx["secrets"])
+        XCTAssertNil(made.missing)
+        XCTAssertEqual(asked, [], "the Keychain is not even read for a link")
+
+        let post = Connector.Action(id: "p", label: "P", placement: "order", kind: "post",
+                                    url: "https://courier.example.com/{secret.apiKey}")
+        let sent = ConnectorRules.context(action: post, order: nil, customer: nil) { _ in "k" }
+        guard case .object(let pctx) = sent.context else { return XCTFail() }
+        XCTAssertEqual(pctx["secrets"], .object(["apiKey": .string("k")]))
+        XCTAssertEqual(ConnectorRules.context(action: post, order: nil, customer: nil) { _ in nil }.missing, "apiKey")
+    }
+
+    /// A reply is read only when the shop granted `fields.write`.
+    func testAReplyIsReadOnlyWithFieldsWrite() {
+        XCTAssertTrue(ConnectorRules.mayReadReply(granted: .object(["scopes": .array([.string("orders.read"), .string("fields.write")])])))
+        XCTAssertFalse(ConnectorRules.mayReadReply(granted: .object(["scopes": .array([.string("orders.read")])])))
+        XCTAssertFalse(ConnectorRules.mayReadReply(granted: .object([:])))
+        XCTAssertFalse(ConnectorRules.mayReadReply(granted: nil))
+    }
+
     // MARK: Helpers
 
     static func sample(_ name: String) throws -> JSONValue {
@@ -210,7 +335,7 @@ final class ConnectorsTests: XCTestCase {
 
     static func connector(id: String = "com.example.ship", granted: JSONValue?) -> Connector {
         Connector(id: id, name: "Ship", publisher: "Example", version: "1.0.0", manifest: .object([:]),
-                  granted: granted, status: .active, reviewed: false, devMode: false,
+                  granted: granted, status: .active, reviewed: true,
                   secrets: [], fields: [], actions: [], domains: [])
     }
 }

@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "Keine Connectoren in diesem Shop.";
 "connectors.list.footer" = "Connectoren werden auf deinem Mac hinzugefügt und genehmigt. Ihre Schlüssel bleiben auf diesem iPhone und werden nie synchronisiert.";
 "connectors.badge.reviewed" = "Geprüft";
-"connectors.badge.dev" = "Entwicklermodus";
 "connectors.status.active" = "Aktiv";
 "connectors.status.paused" = "Pausiert";
 "connectors.keys.set" = "Schlüssel gesetzt";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "%@ nicht erreichbar. Nichts wurde gesendet.";
 "connectors.error.server" = "Der Dienst antwortete %d. Auf diesem iPhone wurde nichts geändert.";
 "connectors.sample" = "Im Beispiel-Shop verlässt nichts dieses iPhone, daher senden oder öffnen Connectoren nichts. Koppel dein iPhone mit deinem Mac, um sie zu nutzen.";
+"connectors.not_reviewed" = "Nicht geprüft – Tasten sind aus";
+"connectors.off" = "Auf deinem Mac ausgeschaltet";
+"connectors.status.not_reviewed" = "Nicht geprüft";
+"connectors.status.off" = "Aus";
+"connectors.status.invalid" = "Nicht lesbar";
 "connectors.yes" = "Ja";
 "connectors.no" = "Nein";
 "connectors.data.order.id" = "Auftrags-ID";

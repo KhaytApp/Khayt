@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "Aucun connecteur dans cet atelier.";
 "connectors.list.footer" = "Les connecteurs s’ajoutent et s’approuvent sur votre Mac. Leurs clés restent sur cet iPhone et ne sont jamais synchronisées.";
 "connectors.badge.reviewed" = "Vérifié";
-"connectors.badge.dev" = "Mode développeur";
 "connectors.status.active" = "Actif";
 "connectors.status.paused" = "En pause";
 "connectors.keys.set" = "Clés saisies";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "Impossible de joindre %@. Rien n’a été envoyé.";
 "connectors.error.server" = "Le service a répondu %d. Rien n’a été modifié sur cet iPhone.";
 "connectors.sample" = "Dans l’atelier d’exemple, rien ne quitte cet iPhone : les connecteurs n’envoient et n’ouvrent rien. Associez votre Mac pour les utiliser.";
+"connectors.not_reviewed" = "Non vérifié — boutons désactivés";
+"connectors.off" = "Désactivé sur votre Mac";
+"connectors.status.not_reviewed" = "Non vérifié";
+"connectors.status.off" = "Désactivé";
+"connectors.status.invalid" = "Illisible";
 "connectors.yes" = "Oui";
 "connectors.no" = "Non";
 "connectors.data.order.id" = "ID du travail";

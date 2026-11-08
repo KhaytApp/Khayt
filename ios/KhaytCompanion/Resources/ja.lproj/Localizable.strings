@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "このお店にはコネクタがありません。";
 "connectors.list.footer" = "コネクタはMacで追加・承認します。キーはこのiPhoneにだけ保存され、同期されることはありません。";
 "connectors.badge.reviewed" = "審査済み";
-"connectors.badge.dev" = "開発者モード";
 "connectors.status.active" = "有効";
 "connectors.status.paused" = "一時停止中";
 "connectors.keys.set" = "キー設定済み";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "%@ に接続できませんでした。何も送信されていません。";
 "connectors.error.server" = "サービスの応答は %d でした。このiPhoneでは何も変更されていません。";
 "connectors.sample" = "サンプルショップでは何もこのiPhoneの外に出ないため、コネクタは送信もリンクを開くこともしません。使うにはMacとペアリングしてください。";
+"connectors.not_reviewed" = "未審査 — ボタンはオフです";
+"connectors.off" = "Macでオフになっています";
+"connectors.status.not_reviewed" = "未審査";
+"connectors.status.off" = "オフ";
+"connectors.status.invalid" = "読み取れません";
 "connectors.yes" = "はい";
 "connectors.no" = "いいえ";
 "connectors.data.order.id" = "ジョブID";

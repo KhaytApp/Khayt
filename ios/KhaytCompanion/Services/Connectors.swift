@@ -35,7 +35,9 @@ import KhaytCore
  * forgets both the keys and these confirmations.
  */
 struct Connector: Identifiable, Equatable, Sendable {
-    enum Status: Equatable, Sendable { case active, paused, invalid }
+    /// Strongest first: an unreadable manifest, one turned off on the Mac,
+    /// one not reviewed by Khayt, one waiting for the shop to agree to more.
+    enum Status: Equatable, Sendable { case active, paused, notReviewed, off, invalid }
 
     struct Secret: Equatable, Sendable {
         let name: String
@@ -67,13 +69,14 @@ struct Connector: Identifiable, Equatable, Sendable {
     let manifest: JSONValue
     let granted: JSONValue?
     let status: Status
+    /// Khayt's signature over the manifest verifies (`ConnectorRules.isReviewed`).
     let reviewed: Bool
-    let devMode: Bool
     let secrets: [Secret]
     let fields: [Field]
     let actions: [Action]
     let domains: [String]
 
+    /// Whether its buttons work: active, and nothing else. Every send checks it.
     var isActive: Bool { status == .active }
 }
 
@@ -85,7 +88,17 @@ enum ConnectorRules {
 
     /// The connectors in a book's settings, with their status worked out.
     /// `diff` is `pluginDiff(granted:manifest:)`; `valid` is `pluginValidate`'s `ok`.
-    static func connector(entry: [String: JSONValue], valid: Bool, diff: JSONValue?) -> Connector? {
+    ///
+    /// An entry is `{id, version, enabled, manifest, granted, config}`, with
+    /// the full signed manifest under `manifest`. Anything else on it (a
+    /// `reviewed` or `devMode` flag, a desktop `secrets{}`) is ignored: a
+    /// stored flag is something anyone with the book can write.
+    ///
+    /// `reviewed` is `isReviewed(manifest:canonical:keys:)`, worked out by the
+    /// caller (the canonical bytes come from the engine). The entry itself is
+    /// never asked.
+    static func connector(entry: [String: JSONValue], valid: Bool, diff: JSONValue?,
+                          reviewed: Bool = false) -> Connector? {
         guard case .object(let m)? = entry["manifest"] else { return nil }
         let id = text(m["id"]) ?? text(entry["id"]) ?? ""
         guard !id.isEmpty else { return nil }
@@ -95,7 +108,8 @@ enum ConnectorRules {
         }()
         let status: Connector.Status
         if !valid { status = .invalid }
-        else if entry["enabled"] == .bool(false) { status = .paused }
+        else if entry["enabled"] == .bool(false) { status = .off }
+        else if !reviewed { status = .notReviewed }
         else { status = isPaused(granted: granted, diff: diff) ? .paused : .active }
 
         let secrets: [Connector.Secret] = list(m["secrets"]).compactMap {
@@ -118,9 +132,87 @@ enum ConnectorRules {
         if case .array(let d)? = m["domains"] { domains = d.compactMap { if case .string(let s) = $0 { s } else { nil } } }
         return Connector(id: id, name: label(m["name"]) ?? id, publisher: text(m["publisher"]) ?? "",
                          version: text(m["version"]) ?? "", manifest: .object(m), granted: granted,
-                         status: status, reviewed: entry["reviewed"] == .bool(true),
-                         devMode: entry["devMode"] == .bool(true),
+                         status: status, reviewed: reviewed,
                          secrets: secrets, fields: fields, actions: actions, domains: domains)
+    }
+
+    /// Khayt's connector signing keys: `{id, key}`, `key` base64 of the raw
+    /// 32-byte ed25519 public key.
+    ///
+    /// EMPTY UNTIL MAC PR 2: switch this to `engine.pluginSigningKeys()` when
+    /// it lands (the one place the phone reads the keys). With no keys nothing
+    /// verifies, so every connector in a book reads "Not reviewed" and its
+    /// buttons stay off.
+    static var signingKeys: [(id: String, key: String)] { [] }
+
+    /// Whether Khayt reviewed this connector: the manifest's `signature`
+    /// (standard base64 with padding, 88 characters, of the 64-byte ed25519
+    /// signature) verifies over `canonical` (the UTF-8 of
+    /// `engine.pluginCanonicalJSON(manifest)`, which leaves `signature` out)
+    /// under ANY of `keys`.
+    ///
+    /// It never reads a stored `reviewed` flag: anyone with the book can write
+    /// one. Developer-mode connectors never reach the book, so the phone has
+    /// no such state.
+    static func isReviewed(manifest: JSONValue, canonical: String, keys: [(id: String, key: String)]) -> Bool {
+        guard case .object(let m) = manifest, case .string(let sig)? = m["signature"], sig.count == 88,
+              let signature = Data(base64Encoded: sig), signature.count == 64 else { return false }
+        let bytes = Data(canonical.utf8)
+        for k in keys {
+            guard let raw = Data(base64Encoded: k.key), raw.count == 32,
+                  let key = try? Curve25519.Signing.PublicKey(rawRepresentation: raw) else { continue }
+            if key.isValidSignature(signature, for: bytes) { return true }
+        }
+        return false
+    }
+
+    /// Whether a reply may be mapped into the connector's fields: only when
+    /// the shop granted `fields.write`.
+    static func mayReadReply(granted: JSONValue?) -> Bool {
+        guard case .object(let g)? = granted, case .array(let scopes)? = g["scopes"] else { return false }
+        return scopes.contains(.string("fields.write"))
+    }
+
+    /// What the engine is given for one tap: the records, and (for a POST
+    /// only) the secrets its URL fills in. An "open" link never gets a
+    /// secret, whatever its URL says; the lib refuses one too, and this is
+    /// the phone's own lock. `secret` reads this phone's Keychain; a missing
+    /// one is returned by name.
+    static func context(action: Connector.Action, order: [String: JSONValue]?, customer: [String: JSONValue]?,
+                        secret: (String) -> String?) -> (context: JSONValue, missing: String?) {
+        var ctx: [String: JSONValue] = [:]
+        if let order { ctx["order"] = .object(order) }
+        if let customer { ctx["customer"] = .object(customer) }
+        guard action.kind == "post" else { return (.object(ctx), nil) }
+        var urlSecrets: [String: JSONValue] = [:]
+        for name in secretsInURL(action.url) {
+            guard let v = secret(name) else { return (.object(ctx), name) }
+            urlSecrets[name] = .string(v)
+        }
+        if !urlSecrets.isEmpty { ctx["secrets"] = .object(urlSecrets) }
+        return (.object(ctx), nil)
+    }
+
+    /// A status in one word or two, for a list row or a badge.
+    static func statusName(_ s: Connector.Status) -> String {
+        switch s {
+        case .active: return L10n.tr("connectors.status.active")
+        case .paused: return L10n.tr("connectors.status.paused")
+        case .notReviewed: return L10n.tr("connectors.status.not_reviewed")
+        case .off: return L10n.tr("connectors.status.off")
+        case .invalid: return L10n.tr("connectors.status.invalid")
+        }
+    }
+
+    /// Why a connector's buttons are off, or nil when they work.
+    static func disabledReason(_ c: Connector) -> String? {
+        switch c.status {
+        case .active: return nil
+        case .paused: return L10n.tr("connectors.paused")
+        case .notReviewed: return L10n.tr("connectors.not_reviewed")
+        case .off: return L10n.tr("connectors.off")
+        case .invalid: return L10n.tr("connectors.error.build")
+        }
     }
 
     /// Paused: never granted, or the manifest asks for more than the grant.
@@ -347,7 +439,17 @@ extension KhaytAPIClient {
             var valid = false
             if case .object(let r)? = try? await engine.pluginValidate(m) { valid = r["ok"] == .bool(true) }
             let diff = try? await engine.pluginDiff(granted: e["granted"] ?? .null, manifest: m)
-            if let c = ConnectorRules.connector(entry: e, valid: valid, diff: diff) { out.append(c) }
+            var reviewed = false
+            if let canonical = try? await engine.pluginCanonicalJSON(m) {
+                reviewed = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: ConnectorRules.signingKeys)
+            }
+            #if DEBUG
+            // The sample shop's own connectors, for screenshots: only while
+            // the sample shop is open, and only an entry identical to the one
+            // `SampleShop` made. A real book is never the sample shop.
+            if isSampleShop && SampleShop.isSampleConnector(e) { reviewed = true }
+            #endif
+            if let c = ConnectorRules.connector(entry: e, valid: valid, diff: diff, reviewed: reviewed) { out.append(c) }
         }
         return out
     }
@@ -387,7 +489,7 @@ extension KhaytAPIClient {
 
     /// Run one button. The caller has already had this phone's confirmation.
     func runConnector(_ c: Connector, action: Connector.Action, at place: ConnectorPlace) async -> ConnectorOutcome {
-        guard c.isActive else { return .failed(L10n.tr("connectors.paused")) }
+        if let why = ConnectorRules.disabledReason(c) { return .failed(why) }
         // The sample shop promises nothing leaves the phone: not a request,
         // and not a link carrying its made-up records either.
         guard !isSampleShop else { return .failed(L10n.tr("connectors.sample")) }
@@ -395,21 +497,16 @@ extension KhaytAPIClient {
         guard let reader, let engine = try? await reader.sharedEngine() else { return .failed(L10n.tr("connectors.error.build")) }
 
         let records = connectorRecords(place)
-        var ctx: [String: JSONValue] = [:]
-        if let o = records.order { ctx["order"] = .object(o) }
-        if let cu = records.customer { ctx["customer"] = .object(cu) }
-        // Only the secrets this URL fills in go into the engine.
-        var urlSecrets: [String: JSONValue] = [:]
-        for name in ConnectorRules.secretsInURL(action.url) {
-            guard let v = ConnectorKeys.get(c.id, name) else {
-                return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
-            }
-            urlSecrets[name] = .string(v)
+        // Only the secrets a POST URL fills in go into the engine; none for a link.
+        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer) {
+            ConnectorKeys.get(c.id, $0)
         }
-        if !urlSecrets.isEmpty { ctx["secrets"] = .object(urlSecrets) }
+        if let name = made.missing {
+            return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
+        }
 
         guard case .object(let p)? = try? await engine.pluginPayload(
-                c.manifest, trigger: .object(["action": .string(action.id)]), context: .object(ctx)),
+                c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context),
               p["ok"] == .bool(true), let urlText = ConnectorRules.text(p["url"]) else {
             return .failed(L10n.tr("connectors.error.build"))
         }
@@ -462,7 +559,8 @@ extension KhaytAPIClient {
         // fields. Shown, NOT written: the Mac does not take a phone's writes
         // under `plugins.<id>` yet.
         var lines: [String] = []
-        if !data.isEmpty, let reply = try? JSONValue.parse(data),
+        // Only with `fields.write` granted is the reply read at all.
+        if ConnectorRules.mayReadReply(granted: c.granted), !data.isEmpty, let reply = try? JSONValue.parse(data),
            case .object(let mapped)? = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply) {
             for key in mapped.keys.sorted() {
                 guard let field = c.fields.first(where: { $0.key == key }), let v = mapped[key] else { continue }

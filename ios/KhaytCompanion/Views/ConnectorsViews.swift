@@ -24,7 +24,8 @@ struct ConnectorsCard: View {
     }
 
     private var shown: [Connector] {
-        connectors.filter { c in c.status != .invalid && (!actions(c).isEmpty || !fields(c).isEmpty) }
+        // One turned off on the Mac, or unreadable, is not drawn here at all.
+        connectors.filter { c in c.status != .invalid && c.status != .off && (!actions(c).isEmpty || !fields(c).isEmpty) }
     }
 
     var body: some View {
@@ -76,8 +77,8 @@ struct ConnectorsCard: View {
             Text(c.name)
                 .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
                 .foregroundStyle(KhaytDesign.ink)
-            if c.status == .paused {
-                Text(L10n.tr("connectors.paused"))
+            if let why = ConnectorRules.disabledReason(c) {
+                Text(why)
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.attention)
             }
@@ -281,10 +282,9 @@ struct ConnectorRow: View {
                         .foregroundStyle(KhaytDesign.ink)
                         .lineLimit(1)
                     if connector.reviewed { ConnectorBadge(text: L10n.tr("connectors.badge.reviewed"), tone: KhaytDesign.done) }
-                    if connector.devMode { ConnectorBadge(text: L10n.tr("connectors.badge.dev"), tone: KhaytDesign.attention) }
                 }
                 Text([connector.publisher,
-                      L10n.tr(connector.status == .active ? "connectors.status.active" : "connectors.status.paused"),
+                      ConnectorRules.statusName(connector.status),
                       connector.secrets.isEmpty ? "" : L10n.tr(keysMissing ? "connectors.keys.missing" : "connectors.keys.set")]
                         .filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.khayt(12, relativeTo: .caption))
@@ -339,14 +339,13 @@ struct ConnectorSettingsPage: View {
                     Text(L10n.format("connectors.version", connector.version))
                         .font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
                     HStack(spacing: 6) {
-                        ConnectorBadge(text: L10n.tr(connector.isActive ? "connectors.status.active" : "connectors.status.paused"),
+                        ConnectorBadge(text: ConnectorRules.statusName(connector.status),
                                        tone: connector.isActive ? KhaytDesign.done : KhaytDesign.attention)
                         if connector.reviewed { ConnectorBadge(text: L10n.tr("connectors.badge.reviewed"), tone: KhaytDesign.done) }
-                        if connector.devMode { ConnectorBadge(text: L10n.tr("connectors.badge.dev"), tone: KhaytDesign.attention) }
                     }
                     .padding(.top, 4)
-                    if connector.status == .paused {
-                        Text(L10n.tr("connectors.paused"))
+                    if let why = ConnectorRules.disabledReason(connector) {
+                        Text(why)
                             .font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.attention)
                             .padding(.top, 4)
                     }

@@ -1153,7 +1153,6 @@
 "connectors.list.empty" = "Nenhum conector nesta oficina.";
 "connectors.list.footer" = "Conectores são adicionados e aprovados no seu Mac. As chaves ficam neste iPhone e nunca são sincronizadas.";
 "connectors.badge.reviewed" = "Revisado";
-"connectors.badge.dev" = "Modo desenvolvedor";
 "connectors.status.active" = "Ativo";
 "connectors.status.paused" = "Pausado";
 "connectors.keys.set" = "Chaves definidas";
@@ -1174,6 +1173,11 @@
 "connectors.error.network" = "Não foi possível acessar %@. Nada foi enviado.";
 "connectors.error.server" = "O serviço respondeu %d. Nada mudou neste iPhone.";
 "connectors.sample" = "Na oficina de exemplo nada sai deste iPhone, então os conectores não enviam nem abrem nada. Pareie com seu Mac para usá-los.";
+"connectors.not_reviewed" = "Não revisado — botões desativados";
+"connectors.off" = "Desativado no seu Mac";
+"connectors.status.not_reviewed" = "Não revisado";
+"connectors.status.off" = "Desativado";
+"connectors.status.invalid" = "Ilegível";
 "connectors.yes" = "Sim";
 "connectors.no" = "Não";
 "connectors.data.order.id" = "ID do trabalho";
