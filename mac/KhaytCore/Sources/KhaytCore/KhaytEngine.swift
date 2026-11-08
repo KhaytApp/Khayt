@@ -1172,9 +1172,11 @@ public actor KhaytEngine {
         // Connectors (plugins v1): the manifest contract and the bytes a
         // button or event sends. The phone runs these too, so a request is
         // identical on every device. `plugin-payload` reads
-        // `KhaytPluginManifest` at load, so it comes second.
+        // `KhaytPluginManifest` at load, so it comes second; `plugin-host`
+        // (which connectors are live, and how an entry changes) third.
         "plugin-manifest",
         "plugin-payload",
+        "plugin-host",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -8432,6 +8434,35 @@ public actor KhaytEngine {
     /// A stored `settings.plugins[]` entry checked: `{ok, errors, paused}`.
     public func pluginCheckEntry(_ entry: JSONValue) throws -> JSONValue {
         try runtime.call2("globalThis.KhaytPluginManifest.checkEntry(ARG0)", [entry], as: JSONValue.self)
+    }
+
+    // ── Installed connectors — lib/plugin-host.js, the same rules the desktop keeps ──
+
+    /// The entry once the shop has agreed to `manifest`: granted exactly what
+    /// it was shown, keeping `prev`'s settings and on/off switch.
+    public func pluginConsentedEntry(prev: JSONValue, manifest: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.consentedEntry(ARG0, ARG1)", [prev, manifest], as: JSONValue.self)
+    }
+
+    /// `settings.plugins` with `entry` in its place (by id), or added.
+    public func pluginWithEntry(_ plugins: JSONValue, entry: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withEntry(ARG0, ARG1)", [plugins, entry], as: JSONValue.self)
+    }
+
+    /// `settings.plugins` without the connector `id`.
+    public func pluginWithoutEntry(_ plugins: JSONValue, id: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withoutEntry(ARG0, ARG1)", [plugins, .string(id)], as: JSONValue.self)
+    }
+
+    /// 'invalid', 'unreviewed', 'paused', 'off' or 'on'. `reviewed` is the
+    /// signature verdict (`Connectors.reviewedBy`), never a stored flag.
+    public func pluginStateOf(_ entry: JSONValue, reviewed: Bool) throws -> String {
+        try runtime.call2("globalThis.KhaytPluginHost.stateOf(ARG0, ARG1)", [entry, .bool(reviewed)], as: String.self)
+    }
+
+    /// A manifest label in `lang`, else English, else the first one.
+    public func pluginLabel(_ label: JSONValue, lang: String) throws -> String {
+        try runtime.call2("globalThis.KhaytPluginHost.labelOf(ARG0, ARG1)", [label, .string(lang)], as: String.self)
     }
 
     /// The ed25519 public keys that make a manifest "reviewed": `[{id, key}]`,

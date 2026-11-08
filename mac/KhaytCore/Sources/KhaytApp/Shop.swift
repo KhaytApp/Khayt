@@ -3085,6 +3085,12 @@ final class Shop {
     /// second click in that time sent the template twice; one that Meta took
     /// but whose log line could not be written would be offered again.
     var whatsAppSending: Set<String> = []
+    // Stored for connectors (Shop+Connectors.swift).
+    /// Where this Mac keeps connector keys: its Keychain, or memory in tests.
+    var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
+    /// The connector a file asked to install, waiting on the shop's OK.
+    var connectorOffer: ConnectorOffer?
+
     // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
     /// Texts in flight or sent this run, as "job|milestone" — one click, one text.
     var smsSending: Set<String> = []

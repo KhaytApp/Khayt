@@ -198,6 +198,11 @@ struct IntegrationsPane: View {
                 EventWebhookSettings(shop: shop)
                 AccountingSyncSettings(shop: shop)
 
+                // Connectors: other services, reached through a manifest Khayt
+                // signed, with the shop's consent field by field. Saves itself:
+                // the entry goes in the book, the keys in this Mac's Keychain.
+                ConnectorSettings(shop: shop)
+
                 // The shop's own messages, on the page where the rest of
                 // reaching a customer lives. They are a COLLECTION rather than
                 // a setting, so they save on their own rather than through the
