@@ -161,8 +161,11 @@ extension BookReader {
             language: language, money: money, sellerFields: fields, orders: orders) else {
             return .refused(.failed)
         }
+        // A voided or fully credited invoice comes back stamped as one: the
+        // shared document picks the stamp (`invoiceStampOf`, VOID > CREDITED >
+        // PAID) and invoice.css draws it, the same in all three apps.
         return .paper(doc, filename: Self.invoiceFilename(number: proforma ? "Proforma-" + number : number,
-                                                          project: Self.text(order["project"])))
+                                                            project: Self.text(order["project"])))
     }
 
     /// The rules that hold before any engine is asked: a cancelled job and a
@@ -255,5 +258,13 @@ extension BookReader {
         guard let cg = CIContext().createCGImage(scaled, from: scaled.extent),
               let png = UIImage(cgImage: cg).pngData() else { return nil }
         return "data:image/png;base64," + png.base64EncodedString()
+    }
+}
+
+/// Text for HTML the phone writes around a shared paper.
+enum PaperHTML {
+    static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
     }
 }

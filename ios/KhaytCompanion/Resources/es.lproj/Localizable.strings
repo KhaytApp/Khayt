@@ -1019,7 +1019,6 @@
 "paper.statement.sub" = "Todos los trabajos, lo pagado y lo que aún se debe";
 "paper.refused.missing" = "Esto no está en la copia del libro del teléfono. Vuelve a traer el libro en el Wi-Fi del taller.";
 "paper.refused.quote" = "Esto sigue siendo un presupuesto. Sus documentos llegan cuando el cliente lo acepte.";
-"paper.refused.partial" = "Este teléfono solo tiene los trabajos terminados más recientes, así que un estado de cuenta hecho aquí podría dejar algunos fuera. Hazlo en el Mac o el PC.";
 "paper.refused.failed" = "No se pudo crear el documento. Inténtalo de nuevo o hazlo en el Mac o el PC.";
 "quote.tools" = "Presupuesto";
 "quote.revise" = "Revisar presupuesto";
@@ -1121,3 +1120,17 @@
 "energy.sub" = "Medida por el enchufe inteligente de la impresora";
 "energy.cost" = "Electricidad";
 "unit.kwh" = "kWh";
+
+/* A voided or fully credited invoice, stamped (Invoice.swift InvoiceStamp) */
+
+/* A statement made from part of the book (ShopPapers.swift) */
+"paper.statement.partial.warning" = "Este teléfono solo guarda el trabajo reciente, así que pueden faltar trabajos y pagos más antiguos en este estado de cuenta. El propio estado de cuenta lo indica. Para uno completo, hazlo en el Mac o el PC.";
+"paper.statement.partial.printed" = "Pueden faltar trabajos y pagos más antiguos en este estado de cuenta: se hizo en un teléfono que solo guarda el trabajo reciente.";
+
+/* Revise covers every field the order editor writes (EditOrderSheet revising) */
+"quote.revise.discount" = "Descuento (%)";
+"quote.revise.shipping" = "Envío";
+"quote.revise.shipping_in" = "Envío (%@)";
+"quote.revise.terms.note" = "Un descuento o envío nuevo cambia el precio del presupuesto, salvo que también escribas un precio nuevo arriba.";
+"quote.revise.printed_notes" = "Notas en el presupuesto";
+"quote.revise.printed_notes.sub" = "El cliente las ve en el presupuesto.";

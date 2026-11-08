@@ -16,7 +16,7 @@ struct InvoicePage: View {
                   failure: InvoiceRefusal.failed.message) {
             switch await api.invoice(orderId: orderId, proforma: proforma) {
             case .refused(let why): return .refused(why.message)
-            case .paper(let doc, let filename): return .paper(doc, filename: filename, wholePage: false)
+            case .paper(let doc, let filename): return .paper(doc, filename: filename, wholePage: false, warning: nil)
             }
         }
     }
@@ -32,7 +32,9 @@ struct ShopPaperPage: View {
         PaperPage(title: subject.title, failure: PaperRefusal.failed.message) {
             switch await api.shopPaper(subject) {
             case .refused(let why): return .refused(why.message)
-            case .paper(let doc, let filename, let wholePage): return .paper(doc, filename: filename, wholePage: wholePage)
+            case .paper(let doc, let filename, let wholePage, let partial):
+                return .paper(doc, filename: filename, wholePage: wholePage,
+                              warning: partial ? L10n.tr("paper.statement.partial.warning") : nil)
             }
         }
     }
@@ -42,7 +44,8 @@ struct ShopPaperPage: View {
 /// PDF — the invoice's page, for every paper the phone makes.
 struct PaperPage: View {
     enum Loaded {
-        case paper(InvoiceDocument, filename: String, wholePage: Bool)
+        /// `warning`: said on the page, above the paper, before it is shared.
+        case paper(InvoiceDocument, filename: String, wholePage: Bool, warning: String?)
         case refused(String)
     }
 
@@ -55,6 +58,7 @@ struct PaperPage: View {
     @State private var refusal: String?
     @State private var file: URL?
     @State private var making = false
+    @State private var warning: String?
 
     var body: some View {
         ZStack {
@@ -63,9 +67,12 @@ struct PaperPage: View {
                 ContentUnavailableView(title, systemImage: "doc.text",
                                        description: Text(refusal))
             } else {
-                InvoiceWebView(paper: paper)
-                    .opacity(paper.drawn ? 1 : 0)
-                if !paper.drawn { ProgressView() }
+                VStack(spacing: 0) {
+                    if let warning { PaperWarning(text: warning) }
+                    InvoiceWebView(paper: paper)
+                        .opacity(paper.drawn ? 1 : 0)
+                        .overlay { if !paper.drawn { ProgressView() } }
+                }
             }
         }
         .navigationTitle(title)
@@ -89,7 +96,8 @@ struct PaperPage: View {
         switch await load() {
         case .refused(let why):
             refusal = why
-        case .paper(let doc, let filename, let wholePage):
+        case .paper(let doc, let filename, let wholePage, let warning):
+            self.warning = warning
             paper.show(doc, filename: filename, wholePage: wholePage)
             // The PDF is made as soon as the paper is laid out, so the share
             // button is ready by the time a thumb reaches it.
@@ -104,6 +112,26 @@ struct PaperPage: View {
         defer { making = false }
         file = paper.pdfFile()
         if file == nil { refusal = failure }
+    }
+}
+
+/// What the shop is told before it shares a paper that may not be the whole
+/// story — a statement from a phone that holds only recent work.
+struct PaperWarning: View {
+    let text: String
+
+    var body: some View {
+        Label {
+            Text(text).font(.khayt(13, .medium, relativeTo: .footnote))
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+        }
+        .foregroundStyle(KhaytDesign.late)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(KhaytDesign.late.opacity(0.12))
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -240,6 +240,7 @@ final class LocalizationCompletenessTests: XCTestCase {
             "spool.detail.adjust.body", "spool.lookup.body", "spool.quantity.one", "order.field.filament",
             "feed.empty.sub", "Filament left", "Queue, late jobs, low filament",
             "calc.add_colour", "calc.filament", "calc.no_spool",
+            "shop.hint",  // the shopping list: "every filament at or under its reorder point"
         ]
         let ios = Self.appDir.deletingLastPathComponent()
         let tables = ["KhaytCompanion/Resources", "KhaytWidget", "KhaytAlerts"].map {
