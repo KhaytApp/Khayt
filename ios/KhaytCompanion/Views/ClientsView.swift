@@ -46,7 +46,7 @@ struct ClientsView: View {
     var body: some View {
         if isSplit {
             ListBesidePage {
-                NavigationStack { listPage }
+                listPage
             } page: {
                 NavigationStack {
                     if let id = openClientId, let client = clients.first(where: { $0.id == id }) {

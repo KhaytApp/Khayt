@@ -8,6 +8,13 @@ import SwiftUI
 /// `columnVisibility: .all` included), and the unfolded Duo is narrower still.
 /// Apple's Duo guidance is a list beside its detail, always, and on a
 /// partly-folded Duo the divide sits at the fold, each side in its own region.
+///
+/// The list gets its own `NavigationStack` here. Inside it, the unfolded Duo
+/// reports an 84 pt trailing safe area — the side tab bar's — although in a
+/// left-to-right layout the list is nowhere near that bar (measured Nov 8:
+/// the column 0 pt, its content 84 pt). Customers' names were cut short by
+/// it. The list drops that inset inside its stack; the page, which does touch
+/// the bar, keeps it.
 struct ListBesidePage<ListPane: View, PagePane: View>: View {
     private let list: ListPane
     private let page: PagePane
@@ -32,7 +39,10 @@ struct ListBesidePage<ListPane: View, PagePane: View>: View {
     var body: some View {
         let s = Self.split(total: width, fold: fold)
         HStack(spacing: 0) {
-            list.frame(width: s.list)
+            NavigationStack {
+                list.ignoresSafeArea(.container, edges: .trailing)
+            }
+            .frame(width: s.list)
             // The fold is kept clear of anything to tap; flat, a hairline.
             Rectangle()
                 .fill(fold == nil ? KhaytDesign.hairline : KhaytDesign.ground)
