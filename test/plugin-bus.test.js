@@ -163,10 +163,12 @@ test('saving puts a masked plugin secret back from disk, and drops it when the g
   assert.deepEqual(moved.settings.plugins[0].secrets, {}, 'a new domain means entering the secret again');
 });
 
-test('a plugin secret goes only to an https host the shop granted', () => {
+test('a plugin secret goes only to exactly an https host the shop granted', () => {
   const p = plugin({}, ['lamha.sa']);
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://lamha.sa/v1/ship'), true);
-  assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://api.lamha.sa/v1'), true);
+  assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://LAMHA.sa./v1'), true);
+  assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://api.lamha.sa/v1'), false, 'a subdomain is another host');
+  assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://user:pw@lamha.sa/'), false, 'no userinfo');
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'http://lamha.sa/v1'), false);
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://notlamha.sa/'), false);
   assert.equal(SecretDestination.pluginDestinationAllowed(p, 'https://lamha.sa.evil.example/'), false);
