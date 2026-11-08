@@ -1875,8 +1875,8 @@ function renderPnLSection() {
     <div style="overflow-x:auto;">
       <table style="width:100%; border-collapse:collapse; font-size:13px;">
         <thead>
-          <tr style="color:var(--text-muted); text-align:right;">
-            <th style="text-align:left; padding:4px 8px;">${escapeHtml(t('an.pnl_period'))}</th>
+          <tr style="color:var(--text-muted); text-align:end;">
+            <th style="text-align:start; padding:4px 8px;">${escapeHtml(t('an.pnl_period'))}</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_orders'))}</th>
             <th style="padding:4px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
             <th style="padding:4px 8px;">${escapeHtml(t('pnl.cogs'))} (${cur})</th>
@@ -1893,15 +1893,15 @@ function renderPnLSection() {
             const netCol = r.net >= 0 ? 'var(--success)' : 'var(--danger)';
             return `<tr style="border-top:1px solid rgba(255,255,255,0.06);">
               <td style="padding:6px 8px; font-weight:600;">${escapeHtml(r.period)}</td>
-              <td style="padding:6px 8px; text-align:right;">${r.orders}</td>
-              <td style="padding:6px 8px; text-align:right; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
-              <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.cogs || 0)}</td>
-              <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
-              ${hasWaste ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.waste > 0 ? '−' + fmtMoney(r.waste) : '—'}</td>` : ''}
-              ${hasDep ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
-              ${hasLabour ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
-              <td style="padding:6px 8px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
-              <td style="padding:6px 8px; text-align:right; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>
+              <td style="padding:6px 8px; text-align:end;">${r.orders}</td>
+              <td style="padding:6px 8px; text-align:end; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
+              <td style="padding:6px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.cogs || 0)}</td>
+              <td style="padding:6px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
+              ${hasWaste ? `<td style="padding:6px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">${r.waste > 0 ? '−' + fmtMoney(r.waste) : '—'}</td>` : ''}
+              ${hasDep ? `<td style="padding:6px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
+              ${hasLabour ? `<td style="padding:6px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
+              <td style="padding:6px 8px; text-align:end; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
+              <td style="padding:6px 8px; text-align:end; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -1970,12 +1970,12 @@ function renderProductProfitability() {
     <div class="table-wrap">
       <table style="width:100%; border-collapse:collapse; font-size:13px;">
         <thead>
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:start;">
             <th style="padding:6px 8px;" data-i18n="an.product_col">${escapeHtml(t('an.product_col'))}</th>
             <th style="padding:6px 8px; text-align:center;" data-i18n="an.orders">${escapeHtml(t('an.orders'))}</th>
-            <th style="padding:6px 8px; text-align:right;" data-i18n="an.revenue">${escapeHtml(t('an.revenue'))}</th>
-            <th style="padding:6px 8px; text-align:right;" data-i18n="an.cost_col">${escapeHtml(t('an.cost_col'))}</th>
-            <th style="padding:6px 8px; text-align:right;" data-i18n="an.margin_col">${escapeHtml(t('an.margin_col'))}</th>
+            <th style="padding:6px 8px; text-align:end;" data-i18n="an.revenue">${escapeHtml(t('an.revenue'))}</th>
+            <th style="padding:6px 8px; text-align:end;" data-i18n="an.cost_col">${escapeHtml(t('an.cost_col'))}</th>
+            <th style="padding:6px 8px; text-align:end;" data-i18n="an.margin_col">${escapeHtml(t('an.margin_col'))}</th>
             <th style="padding:6px 8px; width:120px;" data-i18n="an.revenue_bar">${escapeHtml(t('an.revenue_bar'))}</th>
           </tr>
         </thead>
@@ -1988,9 +1988,9 @@ function renderProductProfitability() {
             return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
               <td style="padding:7px 8px; font-weight:500;">${escapeHtml(r.name)}</td>
               <td style="padding:7px 8px; text-align:center;">${r.count}</td>
-              <td style="padding:7px 8px; text-align:right; font-variant-numeric:tabular-nums;">${fmtPrice(r.revenue)}</td>
-              <td style="padding:7px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.cost > 0 ? fmtPrice(r.cost) : '—'}</td>
-              <td style="padding:7px 8px; text-align:right; font-weight:600; color:${marginCol};">${marginStr}</td>
+              <td style="padding:7px 8px; text-align:end; font-variant-numeric:tabular-nums;">${fmtPrice(r.revenue)}</td>
+              <td style="padding:7px 8px; text-align:end; color:var(--danger); font-variant-numeric:tabular-nums;">${r.cost > 0 ? fmtPrice(r.cost) : '—'}</td>
+              <td style="padding:7px 8px; text-align:end; font-weight:600; color:${marginCol};">${marginStr}</td>
               <td style="padding:7px 8px;">
                 <div style="background:rgba(255,255,255,0.08);border-radius:3px;height:8px;">
                   <div style="background:var(--primary);width:${barPct}%;height:100%;border-radius:3px;transition:width 0.4s;"></div>
@@ -2188,16 +2188,16 @@ function renderMachinePL() {
       <table class="machine-pl-table" style="width:100%; border-collapse:collapse; font-size:13px;">
         <thead>
           <tr style="color:var(--text-muted);">
-            <th style="text-align:left; padding:6px 8px;">Machine</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.pnl_orders'))}</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.mat_cost_col'))} (${cur})</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.linked_exp_col'))} (${cur})</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.maint_cost_col'))} (${cur})</th>
-            ${hasDep ? `<th style="text-align:right; padding:6px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
-            ${hasLabour ? `<th style="text-align:right; padding:6px 8px;">${escapeHtml(t('pnl.labour'))} (${cur})</th>` : ''}
-            <th style="text-align:right; padding:6px 8px; font-weight:700;">${escapeHtml(t('an.net_col'))} (${cur})</th>
-            <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.margin_col'))}</th>
+            <th style="text-align:start; padding:6px 8px;">${escapeHtml(t('doc.machine'))}</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.pnl_orders'))}</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.revenue'))} (${cur})</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.mat_cost_col'))} (${cur})</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.linked_exp_col'))} (${cur})</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.maint_cost_col'))} (${cur})</th>
+            ${hasDep ? `<th style="text-align:end; padding:6px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
+            ${hasLabour ? `<th style="text-align:end; padding:6px 8px;">${escapeHtml(t('pnl.labour'))} (${cur})</th>` : ''}
+            <th style="text-align:end; padding:6px 8px; font-weight:700;">${escapeHtml(t('an.net_col'))} (${cur})</th>
+            <th style="text-align:end; padding:6px 8px;">${escapeHtml(t('an.margin_col'))}</th>
           </tr>
         </thead>
         <tbody>
@@ -2214,15 +2214,15 @@ function renderMachinePL() {
                 <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${safeCssColor(r.color)};margin-inline-end:6px;vertical-align:middle;"></span>
                 <strong>${escapeHtml(r.name)}</strong>
               </td>
-              <td style="text-align:right; padding:6px 8px;">${r.jobs}</td>
-              <td style="text-align:right; padding:6px 8px; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
-              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.materialCost)}</td>
-              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>
-              <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintenance)}</td>
-              ${hasDep ? `<td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
-              ${hasLabour ? `<td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
-              <td style="text-align:right; padding:6px 8px; font-weight:700; color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric:tabular-nums;">${fmtMoney(net)}</td>
-              <td style="text-align:right; padding:6px 8px; font-weight:600; color:${marginCol};">${margin === null ? '—' : margin.toFixed(1) + '%'}</td>
+              <td style="text-align:end; padding:6px 8px;">${r.jobs}</td>
+              <td style="text-align:end; padding:6px 8px; font-variant-numeric:tabular-nums;">${fmtMoney(r.revenue)}</td>
+              <td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.materialCost)}</td>
+              <td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>
+              <td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintenance)}</td>
+              ${hasDep ? `<td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
+              ${hasLabour ? `<td style="text-align:end; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
+              <td style="text-align:end; padding:6px 8px; font-weight:700; color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric:tabular-nums;">${fmtMoney(net)}</td>
+              <td style="text-align:end; padding:6px 8px; font-weight:600; color:${marginCol};">${margin === null ? '—' : margin.toFixed(1) + '%'}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -2311,11 +2311,11 @@ function renderLocationPL() {
     const netCol = r.net >= 0 ? `<span style="color:var(--success)">${cur}${fmtMoney(r.net)}</span>` : `<span style="color:var(--danger)">${cur}${fmtMoney(r.net)}</span>`;
     return `<tr>
       <td><strong>${escapeHtml(r.name)}</strong></td>
-      <td style="text-align:right;">${r.orders}</td>
-      <td style="text-align:right;">${cur}${fmtMoney(r.revenue)}</td>
-      <td style="text-align:right;">${cur}${fmtMoney(r.costs)}</td>
-      <td style="text-align:right;">${netCol}</td>
-      <td style="text-align:right;">${margin}</td>
+      <td style="text-align:end;">${r.orders}</td>
+      <td style="text-align:end;">${cur}${fmtMoney(r.revenue)}</td>
+      <td style="text-align:end;">${cur}${fmtMoney(r.costs)}</td>
+      <td style="text-align:end;">${netCol}</td>
+      <td style="text-align:end;">${margin}</td>
     </tr>`;
   }).join('');
 
@@ -2324,12 +2324,12 @@ function renderLocationPL() {
     <div style="overflow-x:auto;">
       <table style="width:100%;font-size:12px;border-collapse:collapse;">
         <thead><tr style="color:var(--text-muted);font-size:11px;">
-          <th style="text-align:left;padding:4px 8px;">${t('an.location')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('an.orders')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('an.location_revenue')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('an.location_expenses')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('an.location_profit')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('an.margin')}</th>
+          <th style="text-align:start;padding:4px 8px;">${t('an.location')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('an.orders')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('an.location_revenue')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('an.location_expenses')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('an.location_profit')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('an.margin')}</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -2385,9 +2385,9 @@ function renderSupplierPriceHistory() {
   // Best-price comparison table (one row per material and unit)
   const tableRows = groups.map(g => `<tr>
       <td>${label(g)}</td>
-      <td style="color:var(--success);text-align:right;">${cur}${g.best.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.best.supplier)}</span></td>
-      <td style="color:var(--danger);text-align:right;">${cur}${g.worst.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.worst.supplier)}</span></td>
-      <td style="text-align:right;">${g.count}</td>
+      <td style="color:var(--success);text-align:end;">${cur}${g.best.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.best.supplier)}</span></td>
+      <td style="color:var(--danger);text-align:end;">${cur}${g.worst.price.toFixed(2)} <span style="font-size:10px;color:var(--text-muted);">${escapeHtml(g.worst.supplier)}</span></td>
+      <td style="text-align:end;">${g.count}</td>
     </tr>`).join('');
 
   container.innerHTML = `
@@ -2397,10 +2397,10 @@ function renderSupplierPriceHistory() {
     <div style="overflow-x:auto;">
       <table style="width:100%;font-size:12px;border-collapse:collapse;">
         <thead><tr style="color:var(--text-muted);font-size:11px;">
-          <th style="text-align:left;padding:4px 8px;">${t('sup.material_type')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('sup.best_price')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('sup.highest_price')}</th>
-          <th style="text-align:right;padding:4px 8px;">${t('sup.purchase_count')}</th>
+          <th style="text-align:start;padding:4px 8px;">${t('sup.material_type')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('sup.best_price')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('sup.highest_price')}</th>
+          <th style="text-align:end;padding:4px 8px;">${t('sup.purchase_count')}</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -3143,16 +3143,25 @@ async function exportAnalyticsReport() {
   const completedOrders = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o));
   // The line below already knew both spellings and the one above did not, so
   // one report disagreed with itself about how many jobs made its own revenue.
-  const totalRev = pl.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt)
-    .reduce((s, o) => s + orderNetRevenueBase(o), 0);
+  // The jobs that make the revenue are the ones counted above — "Not
+  // business" jobs included here made the total disagree with the count.
+  const totalRev = completedOrders.reduce((s, o) => s + orderNetRevenueBase(o), 0);
   const totalOrders = pl.length;
+  // BLENDED across jobs, as the P&L rule does (lib/pnl-report.js): each job's
+  // price net of credit notes and its `costBasis` — both in the JOB's currency
+  // — converted to the shop's at the job's own rate, then summed. A mean of
+  // per-job percentages let one tiny job swing the figure.
   const avgMargin = (() => {
     const withMargin = completedOrders.filter(o => o.costBasis > 0 && +o.price > 0);
     if (!withMargin.length) return null;
-    return withMargin.reduce((s, o) => {
-      const rev = Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
-      return s + (rev > 0 ? (rev - o.costBasis) / rev * 100 : 0);
-    }, 0) / withMargin.length;
+    const toBase = (v, o) => (typeof orderToBase === 'function' ? orderToBase(v, o) : v);
+    let rev = 0, cost = 0;
+    for (const o of withMargin) {
+      const net = Math.max(0, (+o.price || 0) - orderCreditedRaw(o));
+      if (net <= 0) continue;
+      rev += toBase(net, o); cost += toBase(+o.costBasis, o);
+    }
+    return rev > 0 ? (rev - cost) / rev * 100 : null;
   })();
   const matCount = {};
   pl.forEach(o => { if (o.material) matCount[o.material] = (matCount[o.material] || 0) + 1; });
@@ -3177,7 +3186,7 @@ async function exportAnalyticsReport() {
   body { font-family:-apple-system,'Segoe UI',sans-serif; font-size:11pt; color:#111; background:#fff; padding:15mm 20mm; }
   .report-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10mm; border-bottom:2.5px solid ${accentColor}; padding-bottom:6mm; }
   .shop-name { font-size:20pt; font-weight:800; color:${accentColor}; }
-  .report-meta { text-align:right; font-size:9.5pt; color:#666; line-height:1.7; }
+  .report-meta { text-align:end; font-size:9.5pt; color:#666; line-height:1.7; }
   .report-title { font-size:14pt; font-weight:700; color:#111; margin-bottom:1mm; }
   .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10mm; }
   .kpi-card { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:10px 14px; }
@@ -3186,7 +3195,7 @@ async function exportAnalyticsReport() {
   .report-section { margin-bottom:8mm; page-break-inside:avoid; }
   h4 { font-size:11pt; font-weight:700; color:#444; margin:6mm 0 3mm; }
   table { width:100%; border-collapse:collapse; font-size:9.5pt; }
-  th { background:${accentColor}; color:#fff; padding:5px 8px; text-align:left; font-size:8.5pt; }
+  th { background:${accentColor}; color:#fff; padding:5px 8px; text-align:start; font-size:8.5pt; }
   td { padding:5px 8px; border-bottom:0.3mm solid #e5e7eb; }
   tr:nth-child(even) td { background:#f9fafb; }
   svg text { font-family:-apple-system,'Segoe UI',sans-serif !important; }
@@ -3427,20 +3436,20 @@ function renderAgedReceivables() {
       <div style="font-size:12px;font-weight:600;color:${bucketColors[label]};margin-bottom:6px;padding:4px 8px;background:rgba(0,0,0,0.1);border-radius:4px;">${escapeHtml(t('an.aged_bucket_days', { label }))} — ${escapeHtml(t('an.aged_orders_n', { n: items.length }))}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="color:var(--text-dim);">
-          <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_order'))}</th>
-          <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_project'))}</th>
-          <th style="text-align:left;padding:4px 6px;">${escapeHtml(t('an.aged_col_client'))}</th>
-          <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_owed'))}</th>
-          <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_due'))}</th>
-          <th style="text-align:right;padding:4px 6px;">${escapeHtml(t('an.aged_col_days'))}</th>
+          <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('an.aged_col_order'))}</th>
+          <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('an.aged_col_project'))}</th>
+          <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('an.aged_col_client'))}</th>
+          <th style="text-align:end;padding:4px 6px;">${escapeHtml(t('an.aged_col_owed'))}</th>
+          <th style="text-align:end;padding:4px 6px;">${escapeHtml(t('an.aged_col_due'))}</th>
+          <th style="text-align:end;padding:4px 6px;">${escapeHtml(t('an.aged_col_days'))}</th>
         </tr></thead>
         <tbody>${items.map(i => `<tr style="border-top:1px solid var(--border);">
           <td style="padding:5px 6px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(jobRef(i.id))}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.project||'—')}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.client||'—')}</td>
-          <td style="padding:5px 6px;text-align:right;color:var(--danger);font-weight:600;">${fmtPrice(i.owed)}</td>
-          <td style="padding:5px 6px;text-align:right;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(i.due || '—')}</td>
-          <td style="padding:5px 6px;text-align:right;color:${i.overdue === false ? 'var(--text-muted)' : bucketColors[label]};">${i.overdue === false ? escapeHtml(t('an.aged_not_yet_due')) : i.days}</td>
+          <td style="padding:5px 6px;text-align:end;color:var(--danger);font-weight:600;">${fmtPrice(i.owed)}</td>
+          <td style="padding:5px 6px;text-align:end;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(i.due || '—')}</td>
+          <td style="padding:5px 6px;text-align:end;color:${i.overdue === false ? 'var(--text-muted)' : bucketColors[label]};">${i.overdue === false ? escapeHtml(t('an.aged_not_yet_due')) : i.days}</td>
         </tr>`).join('')}</tbody>
       </table></div>`;
   });
@@ -3486,7 +3495,7 @@ function renderSurveyAnalytics() {
     <div style="display:flex;flex-direction:column;gap:4px;">
       ${S.spread.map(({ stars: r, count: n, pct }) => {
         return `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;">
-          <span style="width:18px;text-align:right;">${r}⭐</span>
+          <span style="width:18px;text-align:end;">${r}⭐</span>
           <div style="flex:1;background:var(--bg);border-radius:4px;height:14px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:4px;transition:width .4s;"></div>
           </div>
@@ -3587,14 +3596,14 @@ function renderBreakEvenCard() {
     </div>` : '<p style="color:var(--text-muted);font-size:12.5px;margin-bottom:12px;">Not enough order history to compute break-even. Add more completed orders.</p>'}
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <thead><tr style="color:var(--text-dim);">
-        <th style="text-align:left;padding:4px 6px;">Fixed Cost</th>
-        <th style="text-align:right;padding:4px 6px;">Monthly Amount</th>
+        <th style="text-align:start;padding:4px 6px;">Fixed Cost</th>
+        <th style="text-align:end;padding:4px 6px;">Monthly Amount</th>
         <th style="padding:4px 6px;"></th>
       </tr></thead>
       <tbody>
         ${fixedCosts.map((c, i) => `<tr style="border-top:1px solid var(--border);">
           <td style="padding:6px;">${escapeHtml(c.name)}</td>
-          <td style="padding:6px;text-align:right;color:var(--danger);">${fmtPrice(c.amount)}</td>
+          <td style="padding:6px;text-align:end;color:var(--danger);">${fmtPrice(c.amount)}</td>
           <td style="padding:6px;"><button class="btn danger small" data-del-cost="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">✕</button></td>
         </tr>`).join('')}
       </tbody>

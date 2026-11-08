@@ -119,6 +119,9 @@
     "test:e2e:elecrate": "node scripts/e2e-shop-elec-rate-smoke.mjs",
     "test:e2e:energy": "node scripts/e2e-energy-smoke.mjs",
     "test:e2e:swap": "node scripts/e2e-swap-smoke.mjs",
+    "test:e2e:customerupdates": "node scripts/e2e-customer-updates-smoke.mjs",
+    "test:e2e:libraryhealth": "node scripts/e2e-library-health-smoke.mjs",
+    "test:e2e:reviewfixes": "node scripts/e2e-review-fixes-smoke.mjs",
     "test:e2e:failedcost": "node scripts/e2e-failed-cost-smoke.mjs"
   },
   "dependencies": {
