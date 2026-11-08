@@ -51,6 +51,7 @@
     "test:e2e:telemetry": "node scripts/e2e-telemetry-smoke.mjs",
     "test:e2e:webhookretry": "node scripts/e2e-webhook-durable-smoke.mjs",
     "test:e2e:eventwebhook": "node scripts/e2e-event-webhook-fold-smoke.mjs",
+    "test:e2e:connectors": "node scripts/e2e-connectors-smoke.mjs",
     "prestart": "node scripts/ensure-electron.js",
     "start": "electron .",
     "install:electron": "node scripts/install-electron-await.js",

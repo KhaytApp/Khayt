@@ -2297,6 +2297,12 @@
         </div>
 
         <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="plg.title">Connectors</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="plg.hint">Connect Khayt to other services with a connector reviewed by Khayt. Before it is installed you see exactly which fields it sends and to which address; its keys stay on this computer.</p>
+        <div id="pluginSection"></div>
+        </div>
+
+        <div class="card settings-card">
         <div class="settings-section-head" data-i18n="telegramNotifications">Telegram Notifications</div>
         <div id="telegramSettingsContainer"></div>
         </div>
@@ -2922,6 +2928,11 @@
 <script src="../lib/privacy.js"></script>
 <script src="../lib/assembly.js"></script>
 <script src="../lib/webhook-bus.js"></script>
+<!-- Connectors (plugins v1): the contract, the payload builder and the host
+     rules, in that order (each reads the one before at load). -->
+<script src="../lib/plugin-manifest.js"></script>
+<script src="../lib/plugin-payload.js"></script>
+<script src="../lib/plugin-host.js"></script>
 <script src="../lib/telemetry-scrub.js"></script>
 <script src="../lib/webcam.js"></script>
 <script src="../lib/csv-bundle.js"></script>
@@ -3123,6 +3134,7 @@
 <script src="dashboard.js"></script>
 <script src="analytics.js"></script>
 <script src="operations-extras.js"></script>
+<script src="plugins.js"></script>
 <script src="tour.js"></script>
 <script src="coach-tips.js"></script>
 <script src="wire-events.js"></script>

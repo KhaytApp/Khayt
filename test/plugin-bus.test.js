@@ -91,10 +91,24 @@ test('each example is the bytes the sender builds, and the fields are its keys',
     assert.deepEqual(e.fields.map((f) => f.key), Object.keys(e.example.payload), e.event);
     for (const f of e.fields) assert.equal(typeof f.type, 'string');
   }
+  const qc = Bus.eventCatalogue().events.find((e) => e.event === 'qc_failed');
+  assert.equal(qc.fields.find((f) => f.key === 'reprintOf').type, 'string|null', 'a field the writer may null says so');
+  assert.equal(qc.example.payload.reprintOf, 'ORD-1001', 'and the example shows a real value');
   const created = Bus.eventCatalogue().events.find((e) => e.event === 'order_created');
   assert.deepEqual(Object.keys(created.example.payload), ['orderId', 'project', 'status', 'price']);
   const paid = Bus.eventCatalogue().events.find((e) => e.event === 'payment_received');
   assert.deepEqual(Object.keys(paid.example.payload), ['orderId', 'amount', 'paymentStatus', 'client']);
+});
+
+test('each example carries the wire body the transport signs (buildWireBody around it)', () => {
+  const c = Bus.eventCatalogue();
+  for (const e of c.events.filter((x) => x.sent)) {
+    assert.deepEqual(Object.keys(e.wire), ['event', 'payload', 'timestamp']);
+    assert.equal(e.wire.event, e.event);
+    assert.deepEqual(e.wire.payload, e.example);
+    assert.equal(typeof e.wire.timestamp, 'number');
+  }
+  for (const e of c.orderEnvelope) assert.deepEqual(e.wire.payload, e.example);
 });
 
 test('the order envelope examples are lib/webhooks.js buildWebhookEvent output', () => {

@@ -97,6 +97,7 @@ const upgradeBackup = require('./lib/upgrade-backup');
 const safeNames = require('./lib/safe-names');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
 const webhookSend = require('./lib/webhook-send');
+const pluginSend = require('./lib/main/plugin-send');
 const { parseGcodeText } = require('./lib/gcode-parse');
 const moonrakerHistory = require('./lib/moonraker-history');
 // Reading a Klipper printer's answer — shared with the Mac app, which polls the
@@ -7112,6 +7113,41 @@ ipcMain.handle('hub:cloud-snapshot-get', async (_e, { id } = {}) => {
     if (!snap) return { ok: false, error: 'Snapshot not found' };
     return { ok: true, ...snap };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+// ── Connectors (plugins v1) ─────────────────────────────────────────────
+// The window decides when a connector runs; whether, where and with which
+// secret is decided here (lib/main/plugin-send.js). The entry is read from
+// DISK — its secrets are in the clear only here — and the window's records
+// are the ones it shows, which may be newer than the last save.
+ipcMain.handle('hub:plugin-check', async (_e, manifest) => {
+  try { return pluginSend.checkInstall(manifest); }
+  catch (e) { return { ok: false, error: 'invalid' }; }
+});
+// Which installed connectors are reviewed, by id. The window shows the state;
+// it is never stored, so a book edited elsewhere cannot claim it.
+ipcMain.handle('hub:plugin-reviewed', async (_e, manifests) => {
+  const out = {};
+  for (const m of (Array.isArray(manifests) ? manifests : []).slice(0, 100)) {
+    if (m && typeof m.id === 'string') out[m.id] = !!pluginSend.reviewedBy(m);
+  }
+  return out;
+});
+ipcMain.handle('hub:plugin-send', async (_e, req) => {
+  try {
+    const r = req && typeof req === 'object' ? req : {};
+    const disk = readStoreDecryptedFromDisk();
+    const entry = ((disk && disk.settings && disk.settings.plugins) || []).find((p) => p && p.id === r.id);
+    const trigger = r.action ? { action: String(r.action) } : { event: String(r.event || '') };
+    const out = await pluginSend.send({ entry, trigger, records: r.records || {}, delivery: r.delivery });
+    if (out.ok && out.method === 'OPEN') {
+      if (!isAllowedExternalUrl(out.url)) return { ok: false, refused: 'url' };
+      await shell.openExternal(out.url);
+    }
+    return out;
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
 });
 
 ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, payload, secret }) => {
