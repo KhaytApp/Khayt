@@ -249,6 +249,22 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:paritybatch
 
+      - name: E2E smoke (automatic customer updates through WhatsApp Business)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:customerupdates
+
+      - name: E2E smoke (library health and find similar)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:libraryhealth
+
+      - name: E2E smoke (desktop review fixes)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:reviewfixes
+
+      - name: E2E smoke (true cost of a failed print)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:failedcost
+
       - name: E2E smoke (order to print file link)
         run: xvfb-run -a npm run test:e2e:filelink
 

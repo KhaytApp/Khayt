@@ -12,6 +12,9 @@ import Foundation
 struct PrintActivityMoveIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Move a finished print on"
     static let isDiscoverable = false
+    /// Moves a job in the shop's book: not from a locked phone, like
+    /// `AdvanceJobIntent`. The Lock Screen asks for Face ID first.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Machine") var machineId: String
     /// "post" or "reprint".

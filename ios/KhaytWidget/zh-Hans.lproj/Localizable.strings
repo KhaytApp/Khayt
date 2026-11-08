@@ -32,3 +32,13 @@
 /* Live Activity buttons */
 "Move to post-processing" = "移至后处理";
 "Print it again" = "重新打印";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "今日收入";
+"Owed" = "待收款";
+"Low stock" = "库存不足";
+"%lld unpaid" = "%lld 笔未付款";
+"to reorder" = "待补货";
+"Pair Khayt with your shop to see its money here." = "将 Khayt 与你的店铺配对，即可在此查看金额。";
+"Khayt Money" = "Khayt 收支";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "今日收入、客户欠款和库存不足的线材。iPhone 锁定时隐藏金额。";

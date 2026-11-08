@@ -862,6 +862,9 @@
                 <th data-i18n="waste.failure_type">Failure Type</th>
                 <th data-i18n="waste.reason">Reason</th>
                 <th style="text-align:right;" data-i18n="waste.est_cost">Est. Cost</th>
+                <th style="text-align:right;" data-i18n="waste.machine">Machine time</th>
+                <th style="text-align:right;" data-i18n="waste.power">Electricity</th>
+                <th style="text-align:right;" data-i18n="waste.full">True cost</th>
                 <th></th>
               </tr>
             </thead>
@@ -1912,6 +1915,8 @@
      Before settings-edit, which reads its MAX_ELEC_RATE bound. It looks
      KhaytDepreciation up when called, so loading ahead of that is fine. -->
 <script src="../lib/print-rates.js"></script>
+<!-- A failed print's machine time and electricity beside its filament (waste.js). -->
+<script src="../lib/failed-print-cost.js"></script>
 <!-- Before settings-edit, which asks it which print-risk schedules are
      allowed rather than keeping a second list. Same reason tax.js is here. -->
 <script src="../lib/print-risk.js"></script>
@@ -2075,6 +2080,8 @@
 <script src="../lib/webcam.js"></script>
 <script src="machines.js"></script>
 <script src="labels.js"></script>
+<!-- How each print ended, for costing a failure (waste.js; integrations.js writes it). -->
+<script src="print-ends.js"></script>
 <script src="waste.js"></script>
 <script src="calibration.js"></script>
 <script src="webgl-viewer.js"></script>
@@ -2102,6 +2109,10 @@
 <script src="../lib/thumb-store.js"></script>
 <!-- The delete question asks lib/print-library-tier.js deleteChoice. -->
 <script src="../lib/print-library-tier.js"></script>
+<!-- Library Health and Find Similar: ports of the Mac rules (print-fit for "too big"). -->
+<script src="../lib/print-fit.js"></script>
+<script src="../lib/library-health.js"></script>
+<script src="../lib/library-similar.js"></script>
 <script src="printfiles.js"></script>
 <script src="filament-swatches.js"></script>
 <script src="colorstudio.js"></script>

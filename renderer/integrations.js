@@ -88,9 +88,14 @@ async function autoSendEmailNotification(order, newStatus) {
 // Re-entrancy guard for the periodic digest send. Declared here (where it's used)
 // — it must live in integrations.js's top-level scope, not another module's IIFE.
 let _digestInFlight = false;
+// A refused send waits before it is tried again — 5 minutes, doubling to 6
+// hours — rather than every 5-minute tick (288 tries a day at a mail server
+// that already said no). In memory: a restart tries once more.
+let _digestRetryAt = 0;
+let _digestBackoffMs = 0;
 
 async function checkAndSendDigest() {
-  if (_digestInFlight) return;
+  if (_digestInFlight || Date.now() < _digestRetryAt) return;
   if (typeof KhaytEmailDigest === 'undefined') return;
   const cfg = settings.emailConfig;
   if (!settings.emailDigest?.enabled || !cfg || cfg.provider === 'none') return;
@@ -103,10 +108,17 @@ async function checkAndSendDigest() {
   const subject = KhaytEmailDigest.subject(shopName(), KhaytEmailDigest.frequencyOf(settings.emailDigest));
   _digestInFlight = true;
   try {
-    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg });
+    const result = await window.hubAPI?.sendEmail?.({ to, subject, body, smtpConfig: cfg })
+      .catch((e) => ({ ok: false, error: e && e.message }));
     if (result?.ok) {
       settings.emailDigest = KhaytEmailDigest.sent(settings, when.periodKey);
       saveAll();
+      _digestBackoffMs = 0;
+      _digestRetryAt = 0;
+    } else if (result) {
+      _digestBackoffMs = Math.min(6 * 3600 * 1000, _digestBackoffMs ? _digestBackoffMs * 2 : 5 * 60 * 1000);
+      _digestRetryAt = Date.now() + _digestBackoffMs;
+      console.warn('[digest] not sent:', result.error || 'refused', '— next try in', Math.round(_digestBackoffMs / 60000), 'min');
     }
   } finally {
     _digestInFlight = false;
@@ -476,7 +488,7 @@ async function openBnplModal(orderId) {
   const infoCards = BNPL_CATALOG.filter(s => !s.hasApi).map(s =>
     `<a href="#" class="bnpl-info-card" data-url="${escapeHtml(s.dashUrl)}" style="padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);border-inline-start:2px solid ${escapeHtml(s.color)};text-decoration:none;color:inherit;cursor:pointer;display:block;">
       <span style="font-weight:600;font-size:12px;">${escapeHtml(s.name)}</span>
-      <span style="font-size:10px;color:var(--text-muted);margin-left:6px;">${s.regions.slice(0,4).join('·')}</span>
+      <span style="font-size:10px;color:var(--text-muted);margin-inline-start:6px;">${s.regions.slice(0,4).join('·')}</span>
     </a>`
   ).join('');
 
@@ -951,7 +963,7 @@ async function exportOrderStatusPage(orderId) {
     .info-label { color: #6b7280; }
     .info-value { font-weight: 600; }
     .stepper { display: flex; align-items: flex-start; margin: 24px 0; }
-    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
+    .message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }
     .footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
   </style>
 </head>
@@ -1025,7 +1037,7 @@ async function autoExportStatusPage(order) {
         ? `Your order is temporarily on hold.${order.holdReason ? ' Reason: ' + escapeHtml(order.holdReason) : ''}`
         : 'Your order is being processed. We\'ll notify you when it\'s ready.';
     const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Order Status — ${escapeHtml(jobRef(order))}</title>
-<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-left: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
+<style>* { box-sizing: border-box; margin: 0; padding: 0; }body { font-family: -apple-system, sans-serif; background: #f9fafb; color: #111827; padding: 24px 16px; }.card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; overflow: hidden; }.header { background: ${accentColor}; color: #fff; padding: 24px; }.header h1 { font-size: 22px; font-weight: 700; }.body { padding: 24px; }.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; }.info-label { color: #6b7280; }.info-value { font-weight: 600; }.stepper { display: flex; align-items: flex-start; margin: 24px 0; }.message { background: ${isReady ? '#d1fae5' : '#fffbeb'}; border-inline-start: 4px solid ${isReady ? '#10b981' : '#f59e0b'}; padding: 14px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; color: #374151; }.footer { text-align: center; padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }</style></head><body>
 <div class="card"><div class="header"><h1>${escapeHtml(bizName)}</h1><p>Order Status Update</p></div>
 <div class="body"><div class="stepper">${connectors}</div>
 <div class="info-row"><span class="info-label">Order #</span><span class="info-value">${escapeHtml(jobRef(order))}</span></div>
@@ -1426,7 +1438,7 @@ async function publishOrderToCloudPortal(orderId) {
   const isQuote = kind === 'quote';
 
   const r = await window.hubAPI.cloudPublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken, kind, payload, customerEmail, intakeId });
-  if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
+  if (!r.ok) { toast(t('cloud.publish_failed', { error: r.error || '—' }), 'error', 8000); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 
   const portalUrl = KhaytPortalOwner.portalUrl(c.url, pubToken);
@@ -1488,7 +1500,7 @@ async function publishOrderToCloudPortal(orderId) {
       modal.querySelector('#cpUnpub')?.addEventListener('click', async () => {
         const u = await window.hubAPI.cloudUnpublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken });
         if (u.ok) { order.cloudPublished = false; saveAll(); toast(t('cloud.portal_unpublished') || 'Link unpublished', 'success'); }
-        else toast('✗ ' + (u.error || 'failed'), 'error');
+        else toast(t('cloud.unpublish_failed', { error: u.error || '—' }), 'error', 8000);
       });
     },
   });
@@ -1792,14 +1804,20 @@ async function captureFinishPhotos(currCache) {
  * job with the finish photo's own rule. This is the Mac's EnergyMeter: it holds
  * the memory the rule is handed back each reading, keeps it across a restart,
  * and writes `actualEnergyWh` onto a FINISHED print's job. A failed or
- * cancelled print's reading is dropped: the job goes back to be printed again,
- * and its actuals belong to the print that succeeds. */
+ * cancelled print's reading is kept a day for the waste row the shop logs
+ * against it (`KhaytPrintEnds.attemptFor`), never written on the job: the job
+ * goes back to be printed again, and its actuals belong to the print that
+ * succeeds. In memory only, as on the Mac — a failure logged after a restart
+ * is costed at the machine's wattage instead. */
 const ENERGY_KEY = 'khayt.energyMeters';
 const ENERGY_READ_MS = 55 * 1000;
 let _energyMemo = (() => { try { return JSON.parse(localStorage.getItem(ENERGY_KEY) || '{}') || {}; } catch (_) { return {}; } })();
 let _energyEndMemo = {};
 const _energyReadAt = {};
 let _energyBusy = false;
+/* How each print ended, and a failed print's reading, live in
+ * renderer/print-ends.js (KhaytPrintEnds) — the waste forms read them in both
+ * windows. */
 function _energySave() { try { localStorage.setItem(ENERGY_KEY, JSON.stringify(_energyMemo)); } catch (_) { /* private window */ } }
 async function meterPrintEnergy(currCache) {
   const PE = globalThis.KhaytPrintEnergy;
@@ -1815,16 +1833,24 @@ async function meterPrintEnergy(currCache) {
       const hasPlug = !!(m.smartPlug && m.smartPlug.type && m.smartPlug.type !== 'none' && !m.retiredAt);
       // The END first, off the same edge the photo uses.
       if (st && !st.error) {
+        const before = _energyEndMemo[m.id] || {};
         const r = FP.track(_energyEndMemo, m.id, st);
         _energyEndMemo = r.memo;
         if (r.outcome) {
+          const jobId = PE.jobFor(printLog, m.id, r.filename) || null;
+          // How far it got: what the printer says now, else its last word
+          // while printing — some firmware zero the progress on a cancel.
+          const progress = Number(st.progress) > 0 ? Number(st.progress)
+            : (Number(before.progress) > 0 ? Number(before.progress) : null);
+          if (globalThis.KhaytPrintEnds) KhaytPrintEnds.recordEnd(m.id, { orderId: jobId, outcome: r.outcome, durationS: r.durationS || null, progress, at: now });
           const t = PE.take(_energyMemo, m.id);
           _energyMemo = t.memo; _energySave();
           if (r.outcome === 'finished' && t.reading) {
-            const jobId = PE.jobFor(printLog, m.id, r.filename);
             const job = jobId && printLog.find((o) => o && o.id === jobId);
             const fields = job && PE.jobFields(t.reading, new Date(now).toISOString());
             if (fields) { Object.assign(job, fields); saveAll(); }
+          } else if (t.reading && jobId) {
+            if (globalThis.KhaytPrintEnds) KhaytPrintEnds.keepAttempt(m.id, { orderId: jobId, reading: t.reading, at: now });
           }
           continue;
         }

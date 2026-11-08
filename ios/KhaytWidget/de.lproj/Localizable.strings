@@ -32,3 +32,13 @@
 /* Live Activity buttons */
 "Move to post-processing" = "In die Nachbearbeitung verschieben";
 "Print it again" = "Erneut drucken";
+
+/* Money widget (KhaytMoneyWidget.swift, MoneyWidgetViews.swift) */
+"Earned today" = "Heute verdient";
+"Owed" = "Offen";
+"Low stock" = "Wenig Bestand";
+"%lld unpaid" = "%lld unbezahlt";
+"to reorder" = "nachbestellen";
+"Pair Khayt with your shop to see its money here." = "Verbinde Khayt mit deinem Shop, um hier seine Zahlen zu sehen.";
+"Khayt Money" = "Khayt Geld";
+"Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Heutige Einnahmen, offene Beträge der Kunden und wenig Bestand. Ausgeblendet, solange dein iPhone gesperrt ist.";

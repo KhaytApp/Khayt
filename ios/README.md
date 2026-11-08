@@ -6,7 +6,9 @@ a live view of it.
 
 It holds a **working set** of the shop's records and reads from that, so the screens
 work with the desktop switched off, and it runs the shop's own business logic through
-`mac/KhaytCore` rather than asking for every figure. No cloud sync.
+`mac/KhaytCore` rather than asking for every figure. Away from the shop's Wi‑Fi it
+keeps in step through **Khayt Cloud** (sign in from Settings; the cloud copy is
+end-to-end encrypted with the shop's passphrase). A viewer's sign-in only reads.
 
 The sentence that used to be here said "no local business database". That stopped
 being true; see [docs/IOS_COMPANION.md](../docs/IOS_COMPANION.md) for what replaced it.
@@ -15,8 +17,9 @@ being true; see [docs/IOS_COMPANION.md](../docs/IOS_COMPANION.md) for what repla
 
 | Area | Implementation |
 |------|----------------|
-| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN. Manual address entry kept for desktops that do not advertise |
-| **Connection health** | Polls `GET /api/status` + PIN check |
+| **Pairing** | Pick the shop off the Wi-Fi (Bonjour `_khayt._tcp`), then the owner PIN and a name for the phone. The phone enrols a device key and deletes the PIN; later requests are signed. Manual address entry kept for desktops that do not advertise |
+| **Connection health** | Polls `GET /api/status`; a Mac that forgot the phone (proved with its pinned key) asks the person to pair again — the PIN is never sent by itself |
+| **Khayt Cloud** | Sync, live printers, push alerts and Live Activities when the Mac is out of reach |
 | **Production queue** | View kanban orders, advance or set status, **assign machine** (`PATCH /api/orders/:id`) |
 | **New order** | Create orders from the app (`POST /api/orders`) |
 | **Live monitoring** | Real-time printer progress / temps (`GET /api/machines/live`) |
@@ -28,7 +31,8 @@ being true; see [docs/IOS_COMPANION.md](../docs/IOS_COMPANION.md) for what repla
 
 ## Out of scope (v2)
 
-Calculator, ZATCA, invoicing, analytics, full settings, offline-first DB.
+ZATCA, analytics, full settings. (The calculator, invoices and the offline book
+have since been built.)
 
 Use the **LAN PWA** (Add to Home Screen) for a zero-install alternative; native adds NFC, Keychain, and a future App Store path.
 

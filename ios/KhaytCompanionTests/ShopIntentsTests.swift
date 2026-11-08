@@ -25,4 +25,13 @@ final class ShopIntentsTests: XCTestCase {
         XCTAssertEqual(FilamentLeftIntent.answer(shelf, material: nil), "PETG: 500 g · PLA: 180 g")
         XCTAssertEqual(FilamentLeftIntent.answer([], material: nil), "The shelf is empty.")
     }
+
+    /// Every intent that writes the book waits for the phone to be unlocked —
+    /// the Live Activity's button included, which sits on the Lock Screen.
+    func testIntentsThatWriteTheBookNeedAnUnlockedPhone() {
+        for (name, policy) in [("AdvanceJobIntent", AdvanceJobIntent.authenticationPolicy),
+                               ("PrintActivityMoveIntent", PrintActivityMoveIntent.authenticationPolicy)] {
+            guard case .requiresAuthentication = policy else { return XCTFail("\(name) runs from a locked phone") }
+        }
+    }
 }

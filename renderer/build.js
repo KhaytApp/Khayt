@@ -1921,7 +1921,7 @@ function updateResinFieldsVisibility() {
       title: t('ai.assistant_title') || 'Ask Khayt AI',
       saveLabel: t('ai.assistant_ask') || 'Ask',
       bodyHtml: `
-        <div id="aiChatLog" style="max-height:320px;overflow-y:auto;margin-bottom:10px;padding-right:4px;"></div>
+        <div id="aiChatLog" style="max-height:320px;overflow-y:auto;margin-bottom:10px;padding-inline-end:4px;"></div>
         <input type="text" id="aiAskQ" placeholder="${escapeHtml(t('ai.assistant_ph') || 'Ask about orders, revenue, stock…')}">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
           ${sugg.map((s) => `<button type="button" class="btn ghost small aiSug" data-q="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}

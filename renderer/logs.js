@@ -473,39 +473,22 @@ async function batchMoveStatus() {
   if (!status) { toast(t('batch.move_to_hint'), 'info'); return; }
   const ids = [...selectedOrders];
   if (ids.length === 0) return;
+  const label = $('#batchStatusSelect')?.selectedOptions?.[0]?.textContent?.trim() || status;
   const ok = await confirmModal(
-    `Move ${ids.length} order(s) to "${status}"?`,
+    t(ids.length === 1 ? 'batch.move_confirm_one' : 'batch.move_confirm', { n: ids.length, status: label }),
     { danger: status === 'completed' || status === 'on_hold' }
   );
   if (!ok) return;
-  const now = new Date().toISOString();
-  for (const id of ids) {
-    const o = printLog.find(x => x.id === id);
-    if (!o) continue;
-    ensureOrderInvoiceNumber(o, status);
-    o.status = status;
-    if (!o.statusHistory) o.statusHistory = [];
-    o.statusHistory.push({ status, at: now });
-    if (o.statusHistory.length > 200) o.statusHistory = o.statusHistory.slice(-200);
-    if (status === 'completed') {
-      if (!o.completedAt) o.completedAt = now;
-      deductFilamentForOrder(o, { skipRender: true });
-      deductPackagingConsumables(o);
-      if (o.clientId) autoExportStatusPage(o);
-      autoSendEmailNotification(o, 'completed');
-      fireStatusWebhook('status_changed', o, 'completed');
-      fireStatusWebhook('order_delivered', o);
-      fireOrderWebhook('status', o);
-    }
-  }
+  // Through the status rules, as a single move goes (renderer/order-flows.js).
+  const { moved, skipped } = moveOrdersTo(ids, status);
   renderInventory();
-  saveAll();
   selectedOrders.clear();
   renderBatchBar();
   renderKanban();
   renderLogs();
   renderDashboard();
-  toast(t('batch.moved', { n: ids.length }), 'success');
+  toast(t('batch.moved', { n: moved }), 'success');
+  if (skipped) toast(t(skipped === 1 ? 'batch.skipped_one' : 'batch.skipped', { n: skipped }), 'warning', 5000);
 }
 
 async function batchAssignMachine() {
