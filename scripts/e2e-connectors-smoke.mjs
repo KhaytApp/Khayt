@@ -92,7 +92,14 @@ try {
   await window.evaluate(() => flushSave());
   await window.waitForTimeout(600);
   const onDisk = fs.readFileSync(path.join(userData, 'khayt-store.json'), 'utf8');
-  if (onDisk.includes('live-key-123')) fail('the connector key is on disk in the clear');
+  // Sealed wherever the platform can seal (a CI Linux runner has no keyring,
+  // and every secret there is stored as it is); kept on disk either way.
+  const canSeal = await electronApp.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
+  if (canSeal && onDisk.includes('live-key-123')) fail('the connector key is on disk in the clear');
+  const diskKey = JSON.parse(onDisk).settings.plugins[0].secrets?.apiKey;
+  if (typeof diskKey !== 'string' || !diskKey) fail('the connector key was not saved');
+  const windowKey = await window.evaluate(() => window.hubAPI.loadStore().then((j) => (typeof j === 'string' ? JSON.parse(j) : j).settings.plugins[0].secrets?.apiKey).catch(() => null));
+  if (windowKey && windowKey.includes('live-key-123')) fail('the window was handed the connector key');
 
   // ── the job editor: its field and button; a press fills the field ──
   await window.evaluate(() => {
