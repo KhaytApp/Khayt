@@ -132,10 +132,12 @@ test('a reply can only fill the plugin\'s own fields, on the same record', () =>
 });
 
 test('every sendable field has an Apple privacy category, and the developer cannot pick one', () => {
-  // Exactly what the iPhone's App Privacy label declares. Adding a category
-  // here means changing the label (and the /privacy page) first.
-  const allowed = new Set(['contact.name', 'contact.phone', 'contact.email', 'contact.address',
+  // Exactly what the iPhone's App Privacy label declares (Turki added Other
+  // User Contact Info for customer.company, Nov 8 2026). Adding a category
+  // here means changing the label and the /privacy page first.
+  const allowed = new Set(['contact.name', 'contact.phone', 'contact.email', 'contact.address', 'contact.other',
     'purchase.history', 'content.other']);
+  assert.deepEqual(new Set(Object.values(M.SENDABLE_FIELDS).map(s => s.category).concat([M.OWN_FIELD_CATEGORY])), allowed);
   for (const [k, s] of Object.entries(M.SENDABLE_FIELDS)) {
     assert.ok(allowed.has(s.category), k);
     assert.ok(['order', 'customer'].includes(s.from), k);

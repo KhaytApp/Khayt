@@ -64,6 +64,7 @@
     'order.carrier':        { from: 'order', path: 'carrier',        type: 'text',   category: 'purchase.history' },
     'order.trackingNumber': { from: 'order', path: 'trackingNumber', type: 'text',   category: 'purchase.history' },
     'customer.name':        { from: 'customer', path: 'name',        type: 'text',   category: 'contact.name' },
+    'customer.company':     { from: 'customer', path: 'company',     type: 'text',   category: 'contact.other' },
     'customer.phone':       { from: 'customer', path: 'phone',       type: 'text',   category: 'contact.phone' },
     'customer.email':       { from: 'customer', path: 'email',       type: 'text',   category: 'contact.email' },
     'customer.address':     { from: 'customer', path: 'address',     type: 'text',   category: 'contact.address' },
