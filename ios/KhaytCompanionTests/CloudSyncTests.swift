@@ -176,6 +176,54 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertEqual(waiting, 0, "what came from the cloud is not an edit made here")
     }
 
+    /// The phone holds a working set. A change to anything else — an audit
+    /// line, a staff record — grew the cut book by whatever the shop touched;
+    /// a change to a log the phone writes itself still comes in.
+    func testAWarmPullFoldsOnlyTheWorkingSetAndWhatThePhoneWrites() async throws {
+        try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
+        var (s, _) = try await sync().pull(session)
+        let stamp = JSONValue.object(["rev": .number(0), "ts": .string("")])
+        try cloud.append(["deltas": .array([
+            .object(["collection": .string("auditLog"), "record": .object(["id": .string("A-1"), "rev": .number(1)])]),
+            .object(["collection": .string("operators"), "record": .object(["id": .string("OP-1"), "rev": .number(1)])]),
+            .object(["collection": .string("wasteLog"), "record": .object(["id": .string("W-1"), "grams": .number(5),
+                                                                            "rev": .number(1)])]),
+            .object(["collection": .string("printLog"), "record": .object(["id": .string("O-0"), "status": .string("qc"),
+                                                                            "rev": .number(2)])]),
+        ]), "tombstones": .array([
+            .object(["collection": .string("auditLog"), "id": .string("A-0"), "deletedAt": .string("2026-11-01T00:00:00.000Z")]),
+        ]), "cursor": stamp])
+        (s, _) = try await sync().pull(s)
+        let held = try book.read()
+        XCTAssertNil(held["auditLog"], "a collection the phone neither carries nor writes was folded in")
+        XCTAssertNil(held["operators"])
+        if case .array(let waste)? = held["wasteLog"] { XCTAssertEqual(waste.count, 1) } else { XCTFail("the waste log is the phone's own") }
+        XCTAssertEqual(try order("O-0")?["status"], .string("qc"))
+        if case .array(let stones)? = held["tombstones"] {
+            XCTAssertFalse(stones.contains { if case .object(let t) = $0 { return t["collection"] == .string("auditLog") }; return false })
+        }
+        let waiting = try await pending()
+        XCTAssertEqual(waiting, 0)
+    }
+
+    /// A scope from before the cut recorded its day and meter snapshot is
+    /// replaced by one whole pull — a warm pull never rewrites the scope.
+    func testAnOldScopeIsReplacedByOneWholePull() async throws {
+        try cloud.setBase(shop(orders: 3, finished: 450), rev: 7)
+        var (s, _) = try await sync().pull(session)
+        XCTAssertNotNil(book.scope()?.collections["printLog"]?.keptAfter, "the cut says where it was made")
+        XCTAssertNotNil(book.scope()?.metersHeld)
+        var pulled: CloudSync.Pulled
+        (s, pulled) = try await sync().pull(s)
+        XCTAssertEqual(pulled, .changes(0), "a current scope pulls warm")
+
+        book.writeScope(BookScope.Taken(collections: ["printLog": .init(whole: false, sent: 203, available: 453)],
+                                        omitted: [], takenAt: "2026-10-01T00:00:00.000Z", meters: [:]))
+        (s, pulled) = try await sync().pull(s)
+        guard case .whole = pulled else { return XCTFail("an old scope pulled warm: \(pulled)") }
+        XCTAssertNotNil(book.scope()?.collections["printLog"]?.keptAfter)
+    }
+
     func testAnEditGoesUpAsOneAppendedChange() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
