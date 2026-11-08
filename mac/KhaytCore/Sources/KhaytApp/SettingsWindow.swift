@@ -714,6 +714,9 @@ struct PaymentsPane: View {
         var bankName = "", accountHolder = "", iban = ""
         var accepted: Set<String> = []
         var paymentInstructions = ""
+        /// Pickup on the customer's order page (`portal-refresh.js`, Cloud
+        /// #199): shown once either is filled in.
+        var pickupHours = "", pickupMapUrl = ""
         /// The rewards programme. A shop working only on this Mac could never
         /// turn it on: the switch was in the other app, so its customers'
         /// points were a screen it could not reach.
@@ -738,6 +741,7 @@ struct PaymentsPane: View {
             if case .bool(true)? = settings["loyaltyEnabled"] { on = true }
             return Draft(bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
                          accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
+                         pickupHours: r.text("pickupHours"), pickupMapUrl: r.text("pickupMapUrl"),
                          loyaltyEnabled: on, loyaltyPointsPerUnit: perUnit, loyaltyRedeemRate: rate)
         }
         @MainActor func form() -> [String: JSONValue] {
@@ -745,6 +749,7 @@ struct PaymentsPane: View {
              // In Khayt's own order, not the set's: the invoice lists them.
              "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
              "paymentInstructions": .string(paymentInstructions),
+             "pickupHours": .string(pickupHours), "pickupMapUrl": .string(pickupMapUrl),
              "loyaltyEnabled": .bool(loyaltyEnabled),
              "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
              "loyaltyRedeemRate": .number(loyaltyRedeemRate)]
@@ -777,6 +782,17 @@ struct PaymentsPane: View {
                 Section(shop.words.callIt("set.payment_instructions")) {
                     TextEditor(text: $draft.paymentInstructions).frame(height: 70).font(.body)
                 }
+                // Where and when a customer collects — on their order page,
+                // with the address the invoice already prints.
+                Section {
+                    row(shop.words.callIt("mac.pickup_hours")) { TextField("", text: $draft.pickupHours) }
+                    latinRow(shop.words.callIt("mac.pickup_map")) {
+                        LatinField(text: $draft.pickupMapUrl, placeholder: "https://", monospaced: false)
+                    }
+                    Text(shop.words.callIt("mac.pickup_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: { Text(shop.words.callIt("mac.pickup_title")) }
                 Section(shop.words.callIt("set.loyalty")) {
                     Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
                     // The two numbers only mean anything once it is on, and a
@@ -1527,6 +1543,23 @@ struct AssistantPane: View {
                         }
                     }
                     .disabled(!shop.canWrite || !shop.source.isReal)
+                    // Where the program is, and the setup an assistant needs,
+                    // ready to paste: the switch above governs a program the
+                    // shop could not find before (it was not in the app).
+                    if let mcp = Shop.mcpExecutable {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(shop.words.callIt("mac.mcp_where"))
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(verbatim: mcp.path)
+                                .font(.caption.monospaced()).textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button(shop.words.callIt("mac.mcp_copy_setup")) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(Shop.mcpSetup(path: mcp.path), forType: .string)
+                            }
+                            .controlSize(.small)
+                        }
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -1634,6 +1667,24 @@ struct AssistantPane: View {
 // MARK: - Customer names, to an assistant over khayt-mcp
 
 extension Shop {
+    /// `khayt-mcp` inside this app (`make-app.sh` puts it beside the app's own
+    /// executable). Nil when it is not there — a `swift run` build — so
+    /// Settings never offers a path that does not exist.
+    static var mcpExecutable: URL? {
+        let url = Bundle.main.bundleURL.appending(path: "Contents/MacOS/khayt-mcp")
+        return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
+    }
+
+    /// What an assistant's configuration needs to start it — Claude Desktop's
+    /// `claude_desktop_config.json` shape, which other MCP hosts copy.
+    nonisolated static func mcpSetup(path: String) -> String {
+        let body: [String: Any] = ["mcpServers": ["khayt": ["command": path]]]
+        guard let data = try? JSONSerialization.data(withJSONObject: body,
+                                                     options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              let text = String(data: data, encoding: .utf8) else { return path }
+        return text
+    }
+
     /// `settings.mcp.shareCustomerNames` — true only when the book says so.
     /// `khayt-mcp` reads the same key (`CustomerNames.sharing`).
     var sharesCustomerNamesWithMcp: Bool {
