@@ -26,7 +26,7 @@ import KhaytCore
  * ── TWO CONSENTS ──────────────────────────────────────────────────────────
  *
  * The book's: `settings.plugins[].granted`, decided on the Mac. If the
- * manifest now asks for more (`pluginDiff(...).widened`), the connector is
+ * manifest now asks for more (`pluginCheckEntry(...).paused`), the connector is
  * PAUSED and sends nothing until the Mac agrees again.
  *
  * This phone's: before the first send from this iPhone, the person sees what
@@ -68,6 +68,9 @@ struct Connector: Identifiable, Equatable, Sendable {
     let version: String
     let manifest: JSONValue
     let granted: JSONValue?
+    /// The stored `settings.plugins[]` entry, as the book has it: what
+    /// `pluginApplyResponse` checks its fields.write grant against.
+    let entry: JSONValue
     let status: Status
     /// Khayt's signature over the manifest verifies (`ConnectorRules.isReviewed`).
     let reviewed: Bool
@@ -87,17 +90,20 @@ enum ConnectorRules {
     // MARK: Reading the book
 
     /// The connectors in a book's settings, with their status worked out.
-    /// `diff` is `pluginDiff(granted:manifest:)`; `valid` is `pluginValidate`'s `ok`.
+    /// `check` is `engine.pluginCheckEntry(entry)`: `{ok, errors, paused}`.
     ///
     /// An entry is `{id, version, enabled, manifest, granted, config}`, with
-    /// the full signed manifest under `manifest`. Anything else on it (a
-    /// `reviewed` or `devMode` flag, a desktop `secrets{}`) is ignored: a
-    /// stored flag is something anyone with the book can write.
+    /// the full signed manifest under `manifest`. The shared check refuses any
+    /// other key (a `reviewed` or `devMode` flag among them), a manifest that
+    /// does not validate, an id or version that is not the manifest's, and a
+    /// grant wider than the manifest declares: each is `.invalid`. Its
+    /// `paused` is the manifest asking for more than the grant.
     ///
     /// `reviewed` is `isReviewed(manifest:canonical:keys:)`, worked out by the
-    /// caller (the canonical bytes come from the engine). The entry itself is
-    /// never asked.
-    static func connector(entry: [String: JSONValue], valid: Bool, diff: JSONValue?,
+    /// caller (the canonical bytes come from the engine), and is a separate
+    /// requirement: a valid, granted connector Khayt has not signed still sends
+    /// nothing.
+    static func connector(entry: [String: JSONValue], check: JSONValue?,
                           reviewed: Bool = false) -> Connector? {
         guard case .object(let m)? = entry["manifest"] else { return nil }
         let id = text(m["id"]) ?? text(entry["id"]) ?? ""
@@ -106,11 +112,16 @@ enum ConnectorRules {
             if case .object? = entry["granted"] { return entry["granted"] }
             return nil
         }()
+        var ok = false, paused = true
+        if case .object(let c)? = check {
+            ok = c["ok"] == .bool(true)
+            paused = c["paused"] != .bool(false)
+        }
         let status: Connector.Status
-        if !valid { status = .invalid }
+        if !ok { status = .invalid }
         else if entry["enabled"] == .bool(false) { status = .off }
         else if !reviewed { status = .notReviewed }
-        else { status = isPaused(granted: granted, diff: diff) ? .paused : .active }
+        else { status = paused ? .paused : .active }
 
         let secrets: [Connector.Secret] = list(m["secrets"]).compactMap {
             guard let n = text($0["name"]) else { return nil }
@@ -132,18 +143,21 @@ enum ConnectorRules {
         if case .array(let d)? = m["domains"] { domains = d.compactMap { if case .string(let s) = $0 { s } else { nil } } }
         return Connector(id: id, name: label(m["name"]) ?? id, publisher: text(m["publisher"]) ?? "",
                          version: text(m["version"]) ?? "", manifest: .object(m), granted: granted,
+                         entry: .object(entry),
                          status: status, reviewed: reviewed,
                          secrets: secrets, fields: fields, actions: actions, domains: domains)
     }
 
     /// Khayt's connector signing keys: `{id, key}`, `key` base64 of the raw
-    /// 32-byte ed25519 public key.
-    ///
-    /// EMPTY UNTIL MAC PR 2: switch this to `engine.pluginSigningKeys()` when
-    /// it lands (the one place the phone reads the keys). With no keys nothing
-    /// verifies, so every connector in a book reads "Not reviewed" and its
-    /// buttons stay off.
-    static var signingKeys: [(id: String, key: String)] { [] }
+    /// 32-byte ed25519 public key — `lib/plugin-manifest.js` SIGNING_KEYS,
+    /// through the engine. The one place the phone reads them.
+    static func signingKeys(_ engine: KhaytEngine) async -> [(id: String, key: String)] {
+        let rows = (try? await engine.pluginSigningKeys()) ?? []
+        return rows.compactMap {
+            guard case .object(let o) = $0, let id = text(o["id"]), let key = text(o["key"]) else { return nil }
+            return (id, key)
+        }
+    }
 
     /// Whether Khayt reviewed this connector: the manifest's `signature`
     /// (standard base64 with padding, 88 characters, of the 64-byte ed25519
@@ -164,13 +178,6 @@ enum ConnectorRules {
             if key.isValidSignature(signature, for: bytes) { return true }
         }
         return false
-    }
-
-    /// Whether a reply may be mapped into the connector's fields: only when
-    /// the shop granted `fields.write`.
-    static func mayReadReply(granted: JSONValue?) -> Bool {
-        guard case .object(let g)? = granted, case .array(let scopes)? = g["scopes"] else { return false }
-        return scopes.contains(.string("fields.write"))
     }
 
     /// What the engine is given for one tap: the records, and (for a POST
@@ -213,17 +220,6 @@ enum ConnectorRules {
         case .off: return L10n.tr("connectors.off")
         case .invalid: return L10n.tr("connectors.error.build")
         }
-    }
-
-    /// Paused: never granted, or the manifest asks for more than the grant.
-    static func isPaused(granted: JSONValue?, diff: JSONValue?) -> Bool {
-        guard granted != nil else { return true }
-        guard case .object(let d)? = diff else { return true }
-        if d["widened"] == .bool(true) { return true }
-        for k in ["fields", "domains", "scopes"] {
-            if case .array(let a)? = d[k], !a.isEmpty { return true }
-        }
-        return false
     }
 
     /// The entries in `settings.plugins`, each an object.
@@ -433,15 +429,14 @@ extension KhaytAPIClient {
               case .object(let settings)? = store["settings"] else { return [] }
         let entries = ConnectorRules.entries(settings: settings)
         guard !entries.isEmpty, let engine = try? await reader.sharedEngine() else { return [] }
+        let keys = await ConnectorRules.signingKeys(engine)
         var out: [Connector] = []
         for e in entries {
             guard let m = e["manifest"] else { continue }
-            var valid = false
-            if case .object(let r)? = try? await engine.pluginValidate(m) { valid = r["ok"] == .bool(true) }
-            let diff = try? await engine.pluginDiff(granted: e["granted"] ?? .null, manifest: m)
+            let check = try? await engine.pluginCheckEntry(.object(e))
             var reviewed = false
             if let canonical = try? await engine.pluginCanonicalJSON(m) {
-                reviewed = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: ConnectorRules.signingKeys)
+                reviewed = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys)
             }
             #if DEBUG
             // The sample shop's own connectors, for screenshots: only while
@@ -449,7 +444,7 @@ extension KhaytAPIClient {
             // `SampleShop` made. A real book is never the sample shop.
             if isSampleShop && SampleShop.isSampleConnector(e) { reviewed = true }
             #endif
-            if let c = ConnectorRules.connector(entry: e, valid: valid, diff: diff, reviewed: reviewed) { out.append(c) }
+            if let c = ConnectorRules.connector(entry: e, check: check, reviewed: reviewed) { out.append(c) }
         }
         return out
     }
@@ -559,9 +554,11 @@ extension KhaytAPIClient {
         // fields. Shown, NOT written: the Mac does not take a phone's writes
         // under `plugins.<id>` yet.
         var lines: [String] = []
-        // Only with `fields.write` granted is the reply read at all.
-        if ConnectorRules.mayReadReply(granted: c.granted), !data.isEmpty, let reply = try? JSONValue.parse(data),
-           case .object(let mapped)? = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply) {
+        // The shared rule maps nothing unless the stored entry grants
+        // fields.write and is not paused.
+        if !data.isEmpty, let reply = try? JSONValue.parse(data),
+           case .object(let mapped)? = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id,
+                                                                             reply: reply, entry: c.entry) {
             for key in mapped.keys.sorted() {
                 guard let field = c.fields.first(where: { $0.key == key }), let v = mapped[key] else { continue }
                 lines.append("\(field.label): \(ConnectorRules.display(v, field: field))")
