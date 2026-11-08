@@ -295,6 +295,9 @@ function fireStatusWebhook(eventName, order, newStatus) {
 }
 
 async function fireWebhook(eventName, payload) {
+  // Connectors listening to this event (renderer/plugins.js) — their own
+  // switch, independent of the shop's webhooks being on.
+  if (typeof firePluginEvent === 'function') firePluginEvent(eventName, payload && payload.orderId);
   const wh = settings.webhooks;
   if (!wh?.enabled) return;
   const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
