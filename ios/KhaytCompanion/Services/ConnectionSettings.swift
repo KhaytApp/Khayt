@@ -377,6 +377,9 @@ final class ConnectionSettings: ObservableObject {
         // And the cloud sign-in: a device token and the shop's data key are a
         // way back into everything the book held.
         CloudSession.forget()
+        // And the connectors' keys and this phone's confirmations: a key is a
+        // way into the shop's own services, and lives only on this phone.
+        ConnectorTraces.forget()
     }
 }
 
@@ -423,5 +426,27 @@ enum KeychainHelper {
             kSecAttrAccount as String: key
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    /// Every item whose account starts with `prefix` — the connectors' keys,
+    /// at Unpair. Returns how many went.
+    @discardableResult
+    static func deleteAll(prefix: String) -> Int {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var items: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &items) == errSecSuccess,
+              let rows = items as? [[String: Any]] else { return 0 }
+        var removed = 0
+        for row in rows {
+            guard let account = row[kSecAttrAccount as String] as? String, account.hasPrefix(prefix) else { continue }
+            delete(account)
+            removed += 1
+        }
+        return removed
     }
 }
