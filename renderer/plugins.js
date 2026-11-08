@@ -64,12 +64,21 @@ function renderPluginSettings() {
           <span class="plg-state" data-state="${state}" style="margin-inline-start:auto;font-size:11.5px;font-weight:600;">${escapeHtml(stateWord(state))}</span>
         </div>
         ${m.description ? `<p style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(pluginLabel(m.description))}</p>` : ''}
+        ${(m.settings || []).map((st) => {
+          const v = (entry.config || {})[st.key];
+          const lab = `<label style="margin-top:10px;">${escapeHtml(pluginLabel(st.label))}${st.required ? ' *' : ''}</label>`;
+          if (st.type === 'bool') return `<label style="display:flex;align-items:center;gap:8px;margin-top:10px;"><input type="checkbox" style="width:auto;margin:0;" data-plugin-config="${escapeHtml(st.key)}" ${v === true ? 'checked' : ''}> ${escapeHtml(pluginLabel(st.label))}</label>`;
+          if (st.type === 'enum') return lab + `<select data-plugin-config="${escapeHtml(st.key)}"><option value=""></option>${(st.options || []).map((o) =>
+            `<option value="${escapeHtml(o.value)}" ${v === o.value ? 'selected' : ''}>${escapeHtml(pluginLabel(o.label))}</option>`).join('')}</select>`;
+          return lab + `<input type="${st.type === 'number' ? 'number' : 'text'}" data-plugin-config="${escapeHtml(st.key)}" value="${escapeHtml(v === undefined || v === null ? '' : String(v))}">`;
+        }).join('')}
         ${(m.secrets || []).map((s) => `
           <label style="margin-top:10px;">${escapeHtml(pluginLabel(s.label))}</label>
           <input type="password" autocomplete="off" data-plugin-secret="${escapeHtml(s.name)}"
             value="${escapeHtml((entry.secrets || {})[s.name] || '')}" placeholder="${escapeHtml(t('plg.secret_ph'))}">`).join('')}
         ${missing.length && state === 'on' ? `<p style="font-size:11.5px;color:var(--warning,#b45309);margin:6px 0 0;">${escapeHtml(t('plg.keys_missing'))}</p>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          ${(m.settings || []).length ? `<button class="btn small" type="button" data-plugin-act="save-config">${escapeHtml(t('common.save'))}</button>` : ''}
           ${(m.secrets || []).length ? `<button class="btn small" type="button" data-plugin-act="save-keys">${escapeHtml(t('plg.save_keys'))}</button>` : ''}
           ${state === 'paused' ? `<button class="btn primary small" type="button" data-plugin-act="consent">${escapeHtml(t('plg.review_agree'))}</button>` : ''}
           ${state === 'on' || state === 'off' ? `<button class="btn ghost small" type="button" data-plugin-act="toggle">${escapeHtml(state === 'on' ? t('plg.turn_off') : t('plg.turn_on'))}</button>` : ''}
@@ -105,6 +114,20 @@ function renderPluginSettings() {
       settings.plugins = PluginHost().withEntry(settings.plugins, Object.assign({}, entry, { secrets }));
       saveAll();
       toast(t('plg.keys_saved'), 'success');
+    } else if (act === 'save-config') {
+      // The connector's settings (manifest settings[]): synced with the book
+      // and not secret, each checked against its declared type.
+      const config = Object.assign({}, entry.config || {});
+      row.querySelectorAll('[data-plugin-config]').forEach((inp) => {
+        const st = (entry.manifest.settings || []).find((x) => x.key === inp.dataset.pluginConfig);
+        if (!st) return;
+        const v = PluginHost().coerceField(st, inp.type === 'checkbox' ? inp.checked : inp.value.trim());
+        if (v === undefined || (st.type === 'bool' && v === false && !st.required)) delete config[st.key];
+        else config[st.key] = v;
+      });
+      settings.plugins = PluginHost().withEntry(settings.plugins, Object.assign({}, entry, { config }));
+      saveAll();
+      toast(t('webhook.saved') || 'Saved', 'success');
     } else if (act === 'consent') {
       if (await pluginConsent(entry.manifest)) {
         settings.plugins = PluginHost().withEntry(settings.plugins, PluginHost().consentedEntry(entry, entry.manifest));
