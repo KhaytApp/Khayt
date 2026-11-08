@@ -8422,9 +8422,22 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginPayload.payloadFor(ARG0, ARG1, ARG2)", [manifest, trigger, context], as: JSONValue.self)
     }
 
-    /// A reply mapped into the plugin's own fields only.
-    public func pluginApplyResponse(_ manifest: JSONValue, actionId: String, reply: JSONValue) throws -> JSONValue {
-        try runtime.call2("globalThis.KhaytPluginPayload.applyResponse(ARG0, ARG1, ARG2)", [manifest, .string(actionId), reply], as: JSONValue.self)
+    /// A reply mapped into the plugin's own fields only — and nothing unless
+    /// the stored `entry` grants fields.write and is not paused.
+    public func pluginApplyResponse(_ manifest: JSONValue, actionId: String, reply: JSONValue, entry: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginPayload.applyResponse(ARG0, ARG1, ARG2, ARG3)",
+                          [manifest, .string(actionId), reply, entry], as: JSONValue.self)
+    }
+
+    /// A stored `settings.plugins[]` entry checked: `{ok, errors, paused}`.
+    public func pluginCheckEntry(_ entry: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.checkEntry(ARG0)", [entry], as: JSONValue.self)
+    }
+
+    /// The ed25519 public keys that make a manifest "reviewed": `[{id, key}]`,
+    /// key = base64 of the raw 32 bytes. Any one verifying is enough.
+    public func pluginSigningKeys() throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytPluginManifest.SIGNING_KEYS.slice()", [], as: [JSONValue].self)
     }
 
     /// Every scope a token can be granted, in the desktop's order.

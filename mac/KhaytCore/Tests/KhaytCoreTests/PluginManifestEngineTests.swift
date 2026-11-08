@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import KhaytCore
@@ -48,5 +49,24 @@ struct PluginManifestEngineTests {
         #expect(Self.at(perms, "domains") == .array([.string("hooks.slack.com")]))
         let diff = try await engine.pluginDiff(granted: try await engine.pluginGrant(slack), manifest: slack)
         #expect(Self.at(diff, "widened") == .bool(false))
+    }
+
+    @Test("a shipped sample's signature verifies with CryptoKit against the published key")
+    func signaturesVerifyInSwift() async throws {
+        let engine = try KhaytEngine()
+        let keys = try await engine.pluginSigningKeys().compactMap { k -> Curve25519.Signing.PublicKey? in
+            guard case .string(let b64)? = Self.at(k, "key"), let raw = Data(base64Encoded: b64) else { return nil }
+            return try? Curve25519.Signing.PublicKey(rawRepresentation: raw)
+        }
+        #expect(!keys.isEmpty)
+        for name in ["slack-notifier", "discord-notifier", "sheets-log"] {
+            let m = try Self.sample(name)
+            guard case .string(let b64)? = Self.at(m, "signature"), let sig = Data(base64Encoded: b64) else {
+                Issue.record("\(name) has no signature"); continue
+            }
+            let bytes = Data(try await engine.pluginCanonicalJSON(m).utf8)
+            #expect(keys.contains { $0.isValidSignature(sig, for: bytes) }, Comment(rawValue: name))
+            #expect(!keys.contains { $0.isValidSignature(sig, for: bytes + Data(" ".utf8)) })
+        }
     }
 }
