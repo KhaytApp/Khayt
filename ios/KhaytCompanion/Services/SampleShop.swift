@@ -75,9 +75,9 @@ enum SampleShop {
                 "enableVat": .bool(false), "language": .string("en"),
                 // Counted stock for two of the catalogue; the rest is not stocked.
                 "storefront": .object(["stockQty": .object(["PROD-S1": .number(6), "PROD-S2": .number(0)])]),
-                // Two connectors, approved on the Mac: a courier with buttons
-                // on a job and a customer (first: `isSampleConnector`), and the
-                // signed Slack sample with a narrower grant, so it is paused.
+                // Two connectors, approved on the Mac: the signed Lamha sample
+                // with its button on a job, and the signed Slack sample with a
+                // narrower grant, so it is paused.
                 "plugins": sampleConnectors,
             ]),
             // The catalogue: one with a picture, a rounded price, an override,
@@ -129,7 +129,7 @@ enum SampleShop {
             ]),
             "clients": .array([
                 .object(["id": .string("C-1"), "nameEn": .string("Acme Robotics"), "phone": .string("+15555550101"), "rev": .number(1),
-                         "plugins": .object([courierId: .object(["account": .string("ACME-77")])])]),
+                         "plugins": .object([lamhaId: .object(["city": .string("Riyadh")])])]),
                 .object(["id": .string("C-2"), "nameEn": .string("Northside Dental"), "email": .string("lab@example.com"), "rev": .number(1)]),
                 .object(["id": .string("C-3"), "nameEn": .string("Maya Chen"), "phone": .string("+15555550142"), "rev": .number(1)]),
                 .object(["id": .string("C-4"), "nameEn": .string("Tabletop Guild"), "rev": .number(1)]),
@@ -148,7 +148,7 @@ enum SampleShop {
                           .object(["qty": .number(8), "printFileId": .string("PF-sample-tile-base")]),
                       ])]),
                 order("S-1046", "post", "Enclosure lid", "Acme Robotics", "C-1", placed: -5, due: 0, price: 95, paid: 95, material: "ABS", qty: 1,
-                      extra: ["plugins": .object([courierId: .object(["awb": .string("EX-48213")])])]),
+                      extra: ["plugins": .object([lamhaId: .object(["lamhaOrderId": .string("48213")])])]),
                 order("S-1047", "qc", "Bracket v3", "Omar Haddad", "C-5", placed: -6, due: 1, price: 60, paid: 0, material: "PETG", qty: 2),
                 // Two quotes waiting on the customer, so the Quotes list and
                 // a quote's Approve and Decline can be seen. A quote has no
@@ -228,30 +228,204 @@ enum SampleShop {
         ]
     }
 
+    /// The sample connectors' `settings.plugins` (`Connectors.swift`). Both
+    /// are Khayt's real signed samples, reviewed by their signature like any
+    /// other connector — the sample shop has no way round that.
+    ///
+    /// Lamha (`plugins/samples/lamha-shipping.json`, `lamhaManifestJSON`) is
+    /// granted everything it asks for (`lib/plugin-manifest.js` `grantFor`),
+    /// with its settings filled in as a shop would on the Mac, so it is active
+    /// and its button shows on a job. Slack's grant is narrower than its
+    /// manifest, so it is paused.
+    static let lamhaId = "app.khayt.samples.lamha"
+
+    static var sampleConnectors: JSONValue {
+        let lamha = (try? JSONValue.parse(Data(lamhaManifestJSON.utf8))) ?? .null
+        let granted = (try? JSONValue.parse(Data(#"{"version":"1.0.0","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
+        let lamhaEntry: JSONValue = .object([
+            "id": .string(lamhaId), "version": .string("1.0.0"), "enabled": .bool(true),
+            "manifest": lamha, "granted": granted,
+            "config": .object(["senderName": .string("Khayt sample studio"), "senderPhone": .string("+966511234567"),
+                               "senderCity": .string("Riyadh"), "senderAddress": .string("King Fahd Rd, Al Olaya"),
+                               "carrierId": .string("1")]),
+        ])
+        let slack = (try? JSONValue.parse(Data(#"{"id":"app.khayt.samples.slack","version":"1.0.0","enabled":true,"manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.slack","name":{"en":"Slack alerts","ar":"تنبيهات Slack"},"description":{"en":"Posts a message to a Slack channel when a job comes in or is paid."},"publisher":"Khayt","version":"1.0.0","domains":["hooks.slack.com"],"secrets":[{"name":"webhookPath","label":{"en":"Webhook path (the part after /services/)"},"kind":"url"}],"events":[{"event":"order_created","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"New job {order.number}: {order.title} for {customer.name} ({order.total} {order.currency})"}}},{"event":"payment_received","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"Paid: {order.number} ({order.total} {order.currency})"}}}],"signature":"GKAez8Nc3hke6WN/yOF54cWiv+R8uttlIbxI9LGdOka5mNO5G7XglQivKIw4EDVaJIC2vRdW0k3dZePE5blPCQ=="},"granted":{"version":"1.0.0","fields":[],"domains":["hooks.slack.com"],"scopes":[]},"config":{}}"#.utf8))) ?? .null
+        return .array([lamhaEntry, slack])
+    }
+
+    /// `plugins/samples/lamha-shipping.json`, byte for byte, so Khayt's
+    /// signature over it verifies against the bundled signing key
+    /// (`ConnectorsTests` checks it against the file).
+    static let lamhaManifestJSON = #"""
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.lamha",
+  "name": {
+    "en": "Lamha shipping",
+    "ar": "شحن لمحة"
+  },
+  "description": {
+    "en": "Records a job as an order in your Lamha account, ready for you to book a courier there. It never books or pays for a shipment by itself.",
+    "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "homepage": "https://khaytapp.com/developers/samples/",
+  "domains": [
+    "app.lamha.sa"
+  ],
+  "secrets": [
+    {
+      "name": "apiToken",
+      "label": {
+        "en": "Lamha API token",
+        "ar": "رمز واجهة لمحة"
+      },
+      "kind": "token"
+    }
+  ],
+  "settings": [
+    {
+      "key": "senderName",
+      "label": {
+        "en": "Sender name",
+        "ar": "اسم المرسل"
+      },
+      "type": "text",
+      "kind": "name",
+      "required": true
+    },
+    {
+      "key": "senderPhone",
+      "label": {
+        "en": "Sender phone",
+        "ar": "جوال المرسل"
+      },
+      "type": "text",
+      "kind": "phone",
+      "required": true
+    },
+    {
+      "key": "senderCity",
+      "label": {
+        "en": "Sender city",
+        "ar": "مدينة المرسل"
+      },
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "senderAddress",
+      "label": {
+        "en": "Sender address",
+        "ar": "عنوان المرسل"
+      },
+      "type": "text",
+      "kind": "address",
+      "required": true
+    },
+    {
+      "key": "carrierId",
+      "label": {
+        "en": "Lamha carrier ID",
+        "ar": "رقم شركة الشحن في لمحة"
+      },
+      "type": "text",
+      "required": true
+    }
+  ],
+  "fields": [
+    {
+      "key": "city",
+      "label": {
+        "en": "City (for shipping)",
+        "ar": "المدينة (للشحن)"
+      },
+      "type": "text",
+      "attach": "customer"
+    },
+    {
+      "key": "lamhaOrderId",
+      "label": {
+        "en": "Lamha order",
+        "ar": "طلب لمحة"
+      },
+      "type": "text",
+      "attach": "order"
+    }
+  ],
+  "actions": [
+    {
+      "id": "record",
+      "label": {
+        "en": "Send to Lamha",
+        "ar": "إرسال إلى لمحة"
+      },
+      "placement": "order",
+      "kind": "post",
+      "url": "https://app.lamha.sa/api/v2/create-order",
+      "auth": {
+        "header": "X-LAMHA-TOKEN",
+        "secret": "apiToken"
+      },
+      "body": {
+        "format": "json-template",
+        "template": {
+          "order_id": "{order.number}",
+          "reference_id": "{order.id}",
+          "date": "{order.date}",
+          "total": "{order.total}",
+          "payment_method": "prepaid",
+          "ShipmentCurrency": "{order.currency}",
+          "create_shippment": false,
+          "carrier_id": "{config.carrierId}",
+          "parcels": "1",
+          "shipper": {
+            "name": "{config.senderName}",
+            "phone": "{config.senderPhone}",
+            "Country": "SA",
+            "City": "{config.senderCity}",
+            "AddressLine1": "{config.senderAddress}"
+          },
+          "customer": {
+            "name": "{customer.name}",
+            "phone": "{customer.phone}",
+            "phone1": "{customer.phone}",
+            "email": "{customer.email}",
+            "Country": "SA",
+            "City": "{field.city}",
+            "AddressLine1": "{customer.address}"
+          },
+          "items": [
+            {
+              "name": "{order.title}",
+              "quantity": "{order.qty}",
+              "amount": "{order.total}",
+              "weight": "1"
+            }
+          ]
+        }
+      },
+      "response": {
+        "fields": {
+          "lamhaOrderId": "order_id"
+        }
+      }
+    }
+  ],
+  "scopes": [
+    "fields.write"
+  ],
+  "signature": "uEvUTXLm919sfDumQmBR9GMxOz2eMw2wIgJaUBdQB1hNeaG/IQReW9z8ujqkQLJTS9HE/5+56nEKizC0r39uCQ=="
+}
+
+"""#
+
     /// A spool with what is left under all of its names, as the shop's own
     /// writers leave it: `weight` (the store's, which the shared rules read),
     /// `weightRemaining` and `weightTotal` (the wire's).
-    /// The sample connectors' `settings.plugins` (`Connectors.swift`).
-    static let courierId = "app.khayt.samples.courier"
-    /// Whether `entry` is exactly the sample shop's courier connector.
-    ///
-    /// The courier is the one sample with buttons, and no manifest Khayt has
-    /// signed has buttons yet (`plugins/samples/` are event connectors), so it
-    /// is unsigned and would read "Not reviewed". Only the DEBUG sample shop
-    /// asks (`KhaytAPIClient.connectors`), and only while it is open, to count
-    /// this one entry as reviewed for screenshots. A real book is never the
-    /// sample shop, whatever its entries say. The Slack one is the real signed
-    /// sample (`plugins/samples/slack-notifier.json`) and is reviewed by its
-    /// signature like any other; its grant is narrower, so it is paused.
-    static func isSampleConnector(_ entry: [String: JSONValue]) -> Bool {
-        guard case .array(let rows) = sampleConnectors, let courier = rows.first else { return false }
-        return courier == .object(entry)
-    }
-
-    static var sampleConnectors: JSONValue {
-        (try? JSONValue.parse(Data(#"[{"id":"app.khayt.samples.courier","version":"1.0.0","enabled":true,"manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.courier","name":{"en":"Courier booking","ar":"حجز المندوب"},"publisher":"Khayt samples","version":"1.0.0","domains":["courier.example.com"],"secrets":[{"name":"apiKey","label":{"en":"API key","ar":"مفتاح API"},"kind":"apiKey"}],"fields":[{"key":"awb","label":{"en":"Waybill","ar":"بوليصة الشحن"},"type":"text","attach":"order"},{"key":"account","label":{"en":"Courier account","ar":"حساب المندوب"},"type":"text","attach":"customer"}],"actions":[{"id":"book","label":{"en":"Book a pickup","ar":"حجز استلام"},"placement":"order","kind":"post","url":"https://courier.example.com/v1/pickups","send":["order.number","order.title","customer.name","customer.phone","customer.address"],"auth":{"header":"Authorization","scheme":"Bearer","secret":"apiKey"},"response":{"fields":{"awb":"data.waybill"}}},{"id":"track","label":{"en":"Track on the courier's site","ar":"التتبع في موقع المندوب"},"placement":"order","kind":"open","url":"https://courier.example.com/track?ref={field.awb}"},{"id":"account","label":{"en":"Open courier account","ar":"فتح حساب المندوب"},"placement":"customer","kind":"open","url":"https://courier.example.com/accounts?email={customer.email}"}],"scopes":["fields.write"]},"granted":{"version":"1.0.0","fields":["customer.address","customer.email","customer.name","customer.phone","field.awb","order.number","order.title"],"domains":["courier.example.com"],"scopes":["fields.write"]},"config":{}},{"id":"app.khayt.samples.slack","version":"1.0.0","enabled":true,"manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.slack","name":{"en":"Slack alerts","ar":"تنبيهات Slack"},"description":{"en":"Posts a message to a Slack channel when a job comes in or is paid."},"publisher":"Khayt","version":"1.0.0","domains":["hooks.slack.com"],"secrets":[{"name":"webhookPath","label":{"en":"Webhook path (the part after /services/)"},"kind":"url"}],"events":[{"event":"order_created","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"New job {order.number}: {order.title} for {customer.name} ({order.total} {order.currency})"}}},{"event":"payment_received","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"Paid: {order.number} ({order.total} {order.currency})"}}}],"signature":"GKAez8Nc3hke6WN/yOF54cWiv+R8uttlIbxI9LGdOka5mNO5G7XglQivKIw4EDVaJIC2vRdW0k3dZePE5blPCQ=="},"granted":{"version":"1.0.0","fields":[],"domains":["hooks.slack.com"],"scopes":[]},"config":{}}]"#.utf8))) ?? .array([])
-    }
-
     private static func spool(_ id: String, _ brand: String, _ material: String, _ hex: String,
                               left: Double, of total: Double, cost: Double,
                               extra: [String: JSONValue] = [:]) -> JSONValue {
