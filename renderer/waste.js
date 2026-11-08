@@ -184,7 +184,7 @@ function renderWasteLog() {
         return `<tr>
           <td style="font-size:12px; color:var(--text-dim);">${escapeHtml(oid)}</td>
           <td>${escapeHtml(ord ? (ord.project || '') : '—')}</td>
-          <td style="color:var(--danger); font-variant-numeric:tabular-nums; text-align:right;">${fmtPrice(cost)}</td>
+          <td style="color:var(--danger); font-variant-numeric:tabular-nums; text-align:end;">${fmtPrice(cost)}</td>
         </tr>`;
       }).join('');
       topWasteOrdersEl.innerHTML = `
@@ -194,7 +194,7 @@ function renderWasteLog() {
             <thead><tr>
               <th>${escapeHtml(t('log.order_id'))}</th>
               <th>${escapeHtml(t('ord.project'))}</th>
-              <th style="text-align:right;">${escapeHtml(t('waste.est_cost'))}</th>
+              <th style="text-align:end;">${escapeHtml(t('waste.est_cost'))}</th>
             </tr></thead>
             <tbody>${order_rows}</tbody>
           </table></div>
@@ -218,7 +218,7 @@ function renderWasteLog() {
       <td style="text-align:center;">${escapeHtml(String(w.weight || 0))}g</td>
       <td>${ftLabel}</td>
       <td>${escapeHtml(w.reason || '—')}</td>
-      <td style="text-align:right; font-variant-numeric:tabular-nums;">${fmtPrice(+w.cost || 0)}</td>
+      <td style="text-align:end; font-variant-numeric:tabular-nums;">${fmtPrice(+w.cost || 0)}</td>
       ${breakdownCells(w)}
       <td style="text-align:center;">
         <button class="btn danger small" data-act="del-waste" data-id="${escapeHtml(w.id)}">${escapeHtml(t('common.delete'))}</button>
@@ -234,11 +234,11 @@ function renderWasteLog() {
  */
 function breakdownCells(w) {
   const has = (v) => v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v));
-  const cell = (v, title) => `<td class="waste-breakdown" style="text-align:right; font-variant-numeric:tabular-nums; color:var(--text-muted);"${title ? ` title="${escapeHtml(title)}"` : ''}>${has(v) ? fmtPrice(+v) : '—'}</td>`;
+  const cell = (v, title) => `<td class="waste-breakdown" style="text-align:end; font-variant-numeric:tabular-nums; color:var(--text-muted);"${title ? ` title="${escapeHtml(title)}"` : ''}>${has(v) ? fmtPrice(+v) : '—'}</td>`;
   const kwh = has(w.energyWh) && +w.energyWh > 0 ? (+w.energyWh / 1000).toFixed(2) + ' kWh' : '';
   const full = has(w.costFull) ? +w.costFull : (+w.cost || 0);
   return cell(w.costMachine) + cell(w.costPower, kwh)
-    + `<td class="waste-full" style="text-align:right; font-variant-numeric:tabular-nums;${has(w.costFull) ? ' font-weight:600;' : ''}">${fmtPrice(full)}</td>`;
+    + `<td class="waste-full" style="text-align:end; font-variant-numeric:tabular-nums;${has(w.costFull) ? ' font-weight:600;' : ''}">${fmtPrice(full)}</td>`;
 }
 
 /**

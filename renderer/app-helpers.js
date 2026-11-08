@@ -320,9 +320,9 @@ function openCsvImportModal({ title, fields, onImport }) {
         <table style="width:100%;font-size:12px;border-collapse:collapse;">
           <thead>
             <tr style="background:var(--bg-alt);">
-              <th style="padding:6px 8px;text-align:left;">${escapeHtml(t('csv.field') || 'Field')}</th>
-              <th style="padding:6px 8px;text-align:left;">${escapeHtml(t('csv.column') || 'CSV Column')}</th>
-              <th style="padding:6px 8px;text-align:left;color:var(--text-muted);">${escapeHtml(t('csv.preview') || 'Preview')}</th>
+              <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('csv.field') || 'Field')}</th>
+              <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('csv.column') || 'CSV Column')}</th>
+              <th style="padding:6px 8px;text-align:start;color:var(--text-muted);">${escapeHtml(t('csv.preview') || 'Preview')}</th>
             </tr>
           </thead>
           <tbody>
