@@ -87,13 +87,15 @@ if a principal is explicitly listed, and none is.
   `git merge origin/main`) and a push. Expect this: with checks taking ~5 minutes and `main`
   moving several times an hour, a PR can go `BEHIND` *while its own checks are running*.
 
-### Deliberately *not* required: `iOS contract`
+### Required: `LAN server and companion models` (the iPhone build and tests)
 
-`.github/workflows/ios-contract.yml` is path-filtered to `ios/**`, `lib/lan-server.js` and
-`scripts/ios-contract-*`. On a PR touching none of those the workflow never runs, so the check
-never reports — and a required check that never reports blocks the PR forever. Leave it out
-unless the filters are removed. The required checks all live in `ci.yml`, which has no path
-filters and therefore always reports.
+`.github/workflows/ios-contract.yml` builds KhaytCore for iOS, builds the iPhone app and runs its
+unit tests. It used to be path-filtered and optional, because a required check that never reports
+blocks a PR forever. Since Nov 2026 the workflow has **no path filter**. Its `ios-relevant` job
+decides, like `mac-relevant` in ci.yml, and the iPhone job is SKIPPED by its own `if:` when a PR
+touches nothing the phone builds from. A skipped job still reports, and a required check counts it
+as passing. The relevant paths are `ios/`, `mac/KhaytCore/`, `lib/lan-server.js`,
+`renderer/analytics.js` and `scripts/ios-contract-*`.
 
 ## Sign-off is enforced — commit with `-s`
 
@@ -138,10 +140,9 @@ xcodebuild -scheme KhaytCore -destination 'generic/platform=iOS' \
   -derivedDataPath /tmp/kc-ios build          # from mac/KhaytCore
 ```
 
-`.github/workflows/ios-contract.yml` runs that on CI and its path filter now
-includes `mac/KhaytCore/**`, so a Mac-side change that breaks the phone reports
-on the PR that made it. It is still **not** a required check — see the section
-above for why a path-filtered check must stay optional.
+`.github/workflows/ios-contract.yml` runs that on CI for any PR touching
+`mac/KhaytCore/`, so a Mac-side change that breaks the phone fails a required
+check on the PR that made it.
 
 **Moving logic out of JavaScript into Swift is the common case here, and it is
 fine** — that is what the `Mac: work out X natively` commits do. Put the Swift in
