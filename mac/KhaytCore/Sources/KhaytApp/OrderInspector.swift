@@ -828,7 +828,7 @@ private struct InspectorRemovalRow: View {
             }
             .buttonStyle(.link)
             .font(.callout)
-            .foregroundStyle(.red)
+            .foregroundStyle(Khayt.late)
             .disabled(!shop.mayDeleteJobs)
         case .cancel(let why):
             HStack(spacing: 10) {
