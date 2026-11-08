@@ -6623,6 +6623,25 @@ ipcMain.handle('hub:cloud-list-reviews', async (_e, { url, shopId, token, limit 
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+// WhatsApp delivery reports, read from the cloud the way the Mac reads them
+// (WhatsAppReports.swift): whether the shop's hook is set up, then the reports
+// after this device's place. The token resolves for the saved server only.
+ipcMain.handle('hub:cloud-whatsapp-hook', async (_e, { url, shopId, token } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.getWhatsappHook(url, shopId, token);
+    return { ok: r.status === 200, status: r.status, hook: r.hook };
+  } catch (e) { return { ok: false, status: 0, error: String(e && e.message || e) }; }
+});
+
+ipcMain.handle('hub:cloud-whatsapp-statuses', async (_e, { url, shopId, token, since } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.listWhatsappStatuses(url, shopId, token, since);
+    return { ok: r.status === 200, status: r.status, items: r.items, nextSince: r.nextSince };
+  } catch (e) { return { ok: false, status: 0, error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('hub:cloud-delete-review', async (_e, { url, shopId, token, reviewId } = {}) => {
   try {
     token = cloudToken(token, url);

@@ -989,6 +989,9 @@ async function loadAll() {
   // Overdue-invoice payment reminders (opt-in): same cadence.
   if (typeof processPaymentReminders === 'function') processPaymentReminders();
   if (typeof startPaymentReminderTimer === 'function') startPaymentReminderTimer();
+  // WhatsApp delivery reports from Khayt Cloud, every two minutes as on the
+  // Mac. Quiet without a cloud; Bed Ready ships no customer-updates module.
+  if (typeof startWhatsappReportPolling === 'function') startWhatsappReportPolling();
 }
 
 function pruneExpiredNotifs() {
