@@ -2936,6 +2936,7 @@
   "exp.attach_receipt": "Beleg anhängen",
   "exp.open_receipt": "Beleg anzeigen",
   "exp.receipt_attached": "Beleg angehängt",
+  "exp.receipt_open_failed": "Der Beleg konnte nicht geöffnet werden – er wurde möglicherweise verschoben oder gelöscht",
   "exp.receipt_add": "Aus Beleg hinzufügen",
   "exp.receipt_title": "Ausgabe aus einem Beleg hinzufügen",
   "exp.receipt_hint": "Öffnen Sie ein Foto, einen Screenshot oder ein PDF einer saudischen Steuerrechnung, und Khayt liest den QR-Code darauf — Verkäufer, Gesamtbetrag und MwSt. Sie prüfen alles und wählen die Kategorie, bevor gespeichert wird.",

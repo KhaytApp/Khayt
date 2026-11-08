@@ -2937,6 +2937,7 @@
   "exp.attach_receipt": "Attach receipt",
   "exp.open_receipt": "View receipt",
   "exp.receipt_attached": "Receipt attached",
+  "exp.receipt_open_failed": "Could not open the receipt — it may have been moved or deleted",
   "exp.receipt_add": "Add from receipt",
   "exp.receipt_title": "Add an expense from a receipt",
   "exp.receipt_hint": "Open a photo, screenshot or PDF of a Saudi tax invoice and Khayt reads the QR code on it — the seller, the total and the VAT. You check it and choose the category before it is saved.",

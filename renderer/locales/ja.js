@@ -2936,6 +2936,7 @@
   "exp.attach_receipt": "領収書を添付",
   "exp.open_receipt": "領収書を表示",
   "exp.receipt_attached": "領収書を添付しました",
+  "exp.receipt_open_failed": "領収書を開けませんでした。移動または削除された可能性があります",
   "exp.receipt_add": "領収書から追加",
   "exp.receipt_title": "領収書から経費を追加",
   "exp.receipt_hint": "サウジアラビアの税務請求書の写真・スクリーンショット・PDFを開くと、Khayt がQRコードから販売者・合計・VATを読み取ります。保存前に内容を確認し、カテゴリーを選んでください。",

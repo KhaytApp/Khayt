@@ -175,6 +175,14 @@
       "owner": "khaytapp",
       "repo": "Khayt"
     },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "enableCookieEncryption": true,
+      "resetAdHocDarwinSignature": true
+    },
     "directories": {
       "output": "build",
       "buildResources": "assets"
