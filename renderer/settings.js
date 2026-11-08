@@ -5878,6 +5878,10 @@ function loadSettingsIntoForm() {
   if (pcEl) pcEl.value = settings.defaultPackagingCost ?? 0;
   const piEl = $('#set_paymentInstructions');
   if (piEl) piEl.value = settings.paymentInstructions ?? '';
+  for (const k of ['pickupHours', 'pickupMapUrl']) {
+    const el = $('#set_' + k);
+    if (el) el.value = settings[k] ?? '';
+  }
   // WIP limits
   const wipCols = ['pending', 'printing', 'post', 'qc'];
   wipCols.forEach(col => {
@@ -6178,7 +6182,7 @@ function readSettingsForm() {
     budgets: Object.fromEntries(EXP_CATEGORIES.map(c => [c, opt(`#set_budget_${c}`)])),
     workingHours: Object.fromEntries(['mon','tue','wed','thu','fri','sat','sun'].map(d => [d, opt(`#wh_${d}`)])),
     operatorLock: tick('#set_operatorLock'), loyaltyEnabled: tick('#set_loyaltyEnabled'),
-    paymentInstructions: opt('#set_paymentInstructions'), betaUpdates: tick('#set_betaUpdates'),
+    paymentInstructions: opt('#set_paymentInstructions'), pickupHours: opt('#set_pickupHours'), pickupMapUrl: opt('#set_pickupMapUrl'), betaUpdates: tick('#set_betaUpdates'),
     quoteValidityDays: opt('#set_quoteValidityDays'),
     leadTime: group([
       ['finishingDays', '#set_leadFinishingDays'], ['dispatchDays', '#set_leadDispatchDays'],

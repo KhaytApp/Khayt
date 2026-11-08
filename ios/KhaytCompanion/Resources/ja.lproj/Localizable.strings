@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "ネットワーク上のKhaytに接続できません。Wi‑Fiとデスクトップ版のLAN APIを確認してください。";
 "connection.banner.pin" = "LAN PINが拒否されました。設定でデスクトップ版と同じPINに更新してください。";
 "sync.pending" = "このiPhoneにある%d件の変更がMacへの送信待ちです。";
+"sync.mac_refused" = "Macは%d件を受け取りませんでした。このiPhoneに残り、再送信されます。";
 "connection.error.reach_status" = "%@ に接続できません。同じWi‑Fiですか？デスクトップ版の「設定」→「LAN API」で、有効にし、すべてのインターフェースで待ち受けるよう設定して、IPアドレスとポートを確認してください。";
 "settings.host_required" = "コンピュータのIPアドレスを入力してください。";
 "settings.host_invalid" = "アドレスが正しくありません。192.168.1.42 のように入力してください(http:// 付きのURLは不可)。";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "未収金";
-"owed.empty" = "進行中のジョブに未収金はありません。";
+"owed.empty" = "未収金はありません。";
 "owed.total" = "%2$d件のジョブで%1$@の未収";
 "owed.due" = "期限 %@";
 "owed.remind" = "WhatsAppでリマインド";
@@ -989,6 +990,7 @@
 "customer.history" = "完了したジョブ";
 "customer.history.none" = "このiPhoneに完了したジョブはありません。";
 "customer.history.window" = "このiPhoneには最新の完了済みジョブが保存されています。全履歴はMacにあります。";
+"customer.owes.window" = "このiPhoneにあるジョブから計算しています。古いジョブはMacにあるため、実際より少ない場合があります。";
 "customer.agreed" = "合意価格";
 "customer.messages" = "メッセージ";
 "customer.messages.none" = "記録されたメッセージはまだありません。";
