@@ -187,6 +187,7 @@ swift build -c release --product KhaytPreview --package-path "$PKG"
 swift build -c release --product KhaytWidgets --package-path "$PKG"
 swift build -c release --product KhaytSafari --package-path "$PKG"
 swift build -c release --product khayt-browser-host --package-path "$PKG"
+swift build -c release --product khayt-mcp --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -505,6 +506,19 @@ SAFENTS
 # extension (`BrowserHosts`). Signed before the app, which seals it in.
 HOST_BIN="$APP/Contents/MacOS/khayt-browser-host"
 cp "$PKG/.build/release/khayt-browser-host" "$HOST_BIN"
+
+# ── KHAYT-MCP: THE BOOK, READ-ONLY, FOR AN ASSISTANT ────────────────────────
+#
+# An MCP server over stdio that an assistant (Claude Desktop and others) starts
+# itself. Settings ▸ Assistant has had its "share customer names" switch since
+# it was written, but the program was never put in the app — the switch
+# governed nothing a shop could run (website review, Nov 2026). Beside the app's
+# own executable, like the browser host, so `Bundle.main` is the app and the
+# rules bundle in Contents/Resources is found. Not sandboxed, hardened, no
+# entitlements: it only reads the book. Settings shows its path to paste into
+# the assistant.
+MCP_BIN="$APP/Contents/MacOS/khayt-mcp"
+cp "$PKG/.build/release/khayt-mcp" "$MCP_BIN"
 HOST_ENTS="$PKG/.build/browser-host.entitlements"
 cat > "$HOST_ENTS" <<HOSTENTS
 <?xml version="1.0" encoding="UTF-8"?>
@@ -941,6 +955,14 @@ if ! HOST_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
       --identifier app.khayt.mac.browser-host --entitlements "$HOST_ENTS" "$HOST_BIN" 2>&1)"; then
   echo "codesign failed for khayt-browser-host:"
   echo "$HOST_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# khayt-mcp: its own identifier and the hardened runtime, nothing else.
+if ! MCP_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --identifier app.khayt.mac.mcp "$MCP_BIN" 2>&1)"; then
+  echo "codesign failed for khayt-mcp:"
+  echo "$MCP_SIGN_ERR" | sed 's/^/  /'
   exit 1
 fi
 

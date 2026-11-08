@@ -125,6 +125,7 @@ struct OnlinePane: View {
                 CloudLibrarySettings(shop: shop)
                 CloudPlanSettings(shop: shop)
                 PayLinkSettings(shop: shop)
+                PortalCrossShopSetting(shop: shop)
                 ShopSlugSettings(shop: shop)
                 BnplSettings(shop: shop)
                 // The weekly cloud digest is chosen with the other email

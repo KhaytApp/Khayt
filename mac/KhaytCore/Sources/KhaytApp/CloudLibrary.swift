@@ -936,17 +936,32 @@ extension Shop {
     func backUpWholeLibrary() async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
+        guard let (done, failed, total) = await backUpModels(only: nil) else { return }
+        cloudLibraryNote = words.callIt("mac.cloudlib_backed_up_all", ["n": .number(Double(done - failed)),
+                                                              "total": .number(Double(total))])
+        if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
+    }
+
+    /// Back up the models named (record ids), or every model when `only` is
+    /// nil — the same upload, proof and sync record as the whole library. Nil
+    /// when the online copy is not set up (and `cloudLibraryProblem` says so).
+    ///
+    /// For "One of these models has no copy in the vault yet. Back it up, then
+    /// try again", which used to send the shop to Settings to upload the WHOLE
+    /// library — hours for a big one — to sell a single model.
+    func backUpModels(only: Set<String>?) async -> (done: Int, failed: Int, total: Int)? {
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
-            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
+            cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return nil
         }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
+        let folderIds = modelIdsByFolder()
         let all = CloudLibrary.ownFoldersOnly(
             await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value,
             printFiles: fileRows, orders: orderRows)
             .filter { !$0.filename.hasSuffix(".cloud") }
+            .filter { only == nil || folderIds[$0.id ?? ""].map { only!.contains($0) } == true }
         var done = 0, failed = 0
-        let folderIds = modelIdsByFolder()
         var proved: FileStates = [:]
         let remote = libraryRemoteId
         for file in all {
@@ -963,9 +978,7 @@ extension Shop {
             done += 1
         }
         recordSync(proved)
-        cloudLibraryNote = words.callIt("mac.cloudlib_backed_up_all", ["n": .number(Double(done - failed)),
-                                                              "total": .number(Double(all.count))])
-        if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
+        return (done, failed, all.count)
     }
 
     /// What the shared rule plans, with what the book knows folded in: the

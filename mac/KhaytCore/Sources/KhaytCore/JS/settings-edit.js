@@ -267,6 +267,14 @@
     out.fixedCosts = s.fixedCosts || [];
     out.savedFilters = s.savedFilters || [];
     if (has(f, 'paymentInstructions')) out.paymentInstructions = f.paymentInstructions ?? s.paymentInstructions ?? '';
+    // Pickup details for the customer's order page (`portal-refresh.js`
+    // payload.pickup, Cloud #199): opening hours as the shop writes them, and a
+    // map link — https only, or nothing, since the page turns it into a button.
+    if (has(f, 'pickupHours')) out.pickupHours = String(f.pickupHours ?? '').trim().slice(0, 120);
+    if (has(f, 'pickupMapUrl')) {
+      const u = String(f.pickupMapUrl ?? '').trim();
+      out.pickupMapUrl = /^https:\/\/[^\s]+$/i.test(u) && u.length <= 500 ? u : '';
+    }
     out.betaAcknowledged = true;
     if (has(f, 'betaUpdates')) out.betaUpdates = !!f.betaUpdates;
     if (has(f, 'quoteValidityDays')) out.quoteValidityDays = Math.max(1, num(f.quoteValidityDays, 7));
