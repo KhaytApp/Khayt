@@ -3518,6 +3518,22 @@ summary.icon .pf-ico, summary.icon .br-ico { margin-inline-end: 0; }
 [data-app="bedready"] .pf-thumb-icon { color: var(--text-muted); }
 .pf-empty { padding: 48px 16px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border); border-radius: 12px; }
 
+/* Library Health + Find Similar (a focus on the grid) */
+.pf-focusbar { align-items: center; }
+.pf-focus-note { margin: -6px 0 14px; font-size: 12px; color: var(--text-muted); }
+.pf-health-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; margin-block-end: 14px; }
+.pf-health-title { margin: 0 0 4px; font-size: 16px; }
+.pf-health-actions { display: flex; gap: 6px; }
+.pf-hg { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-block-end: 10px; background: var(--bg-elev, var(--bg)); }
+.pf-hg-head { display: flex; align-items: baseline; gap: 8px; }
+.pf-hg-title { margin: 0; font-size: 14px; }
+.pf-hg-says { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
+.pf-hg-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.pf-hg-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.pf-hg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pf-hg-more { color: var(--text-muted); }
+.pf-hg-act { display: flex; flex-wrap: wrap; gap: 6px; margin-block-start: 10px; }
+
 /* ── Colour Studio (matcher + blend/gradient) ─────────────── */
 .cs-head { margin-bottom: 14px; }
 .cs-title { font-size: 19px; margin: 0 0 4px; }
