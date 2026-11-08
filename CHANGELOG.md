@@ -9432,6 +9432,27 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.30] - 2026-11-08
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release moves a job along in one click, shares an invoice straight from its sheet, starts a job from a converter's file, and fixes invoice numbers, dates and re-pricing.
+
+### Added
+
+- **"Next: ‹stage›" in the job inspector.** One button moves a job to its next stage; a finished job offers Mark delivered.
+- **Share and Send with Pay Link on the invoice sheet.** Share the invoice PDF anywhere, or send it with the shop's payment link.
+- **"Send to Khayt" from a converter.** A `khayt://job/new` link starts a job from a file you just downloaded, after checking its name and SHA-256 and asking you first.
+- **VOID, CREDITED and PAID stamps on invoices.** A voided or credited invoice now says so across the page, as on the iPhone and the Windows/Linux app.
+
+### Fixed
+
+- **Editing a job's shipping, discount or extra charges no longer charges the wrong price.**
+- **No duplicate invoice numbers each January** when the number format has no year.
+- **An accepted quote's invoice has one date everywhere** (P&L, accounting export and the invoice itself).
+- **No more pauses after saving on a big shop:** reading the book for cloud sync and at launch moved off the main thread.
+
 ## [4.0.0-beta.29] - 2026-11-08
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
