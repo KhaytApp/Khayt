@@ -2119,6 +2119,20 @@
             <textarea id="set_paymentInstructions" rows="3" style="resize:vertical;" placeholder="Bank name, IBAN, Mada/STCPay..."></textarea>
           </div>
         </div>
+
+        <div class="settings-section-head" data-i18n="set.pickup_title" style="margin-top:16px;">Pickup</div>
+        <div class="inline-pair">
+          <div>
+            <label data-i18n="set.pickup_hours" for="set_pickupHours">Pickup hours</label>
+            <input type="text" id="set_pickupHours" maxlength="120">
+          </div>
+          <div>
+            <label data-i18n="set.pickup_map" for="set_pickupMapUrl">Map link</label>
+            <input type="url" id="set_pickupMapUrl" maxlength="500" placeholder="https://" dir="ltr">
+          </div>
+        </div>
+        <p class="settings-hint" data-i18n="set.pickup_hint">Shown with your address on the customer's order page while the order is not with a courier. Leave both empty to show no pickup card.</p>
+
         </div>
 
         <div class="card settings-card">

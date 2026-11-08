@@ -319,6 +319,8 @@ function defaultSettings() {
     postProcessPresets:   [],           // [{ name, amount }]
     defaultPackagingCost: 0,
     paymentInstructions:  '',           // Shown in client portal and invoices
+    pickupHours:          '',           // Customer order page pickup card (portal-refresh payload.pickup)
+    pickupMapUrl:         '',           // https map link for that card, or empty
     // Job templates — full calculator config presets
     jobTemplates:         [],
     // Resin exposure profile presets
