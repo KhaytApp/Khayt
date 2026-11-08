@@ -41,10 +41,21 @@
     return /print/i.test(String(state || ''));
   }
 
+  // Bambu's two "cancelled" print_error codes (lib/bambu-faults.js). A Bambu
+  // printer reports FAILED for a print the shop cancelled as well as for one
+  // that went wrong; the reason it gives is the only way to tell them apart.
+  const CANCELLED_FAULT = /\((?:0300_400C|0500_400E)\)/;
+
   function isErrorState(s) {
     if (!s) return false;
     if (s.error) return true;
-    return /error|fault|halt|attention/i.test(String(s.state || ''));
+    const state = String(s.state || '');
+    if (/error|fault|halt|attention/i.test(state)) return true;
+    // "Failed" (Bambu FAILED) is an error unless the printer says it was a
+    // cancel. It was never matched at all, so a Bambu print that failed on
+    // its own raised no alert.
+    if (/fail/i.test(state)) return !CANCELLED_FAULT.test(String(s.fault || ''));
+    return false;
   }
 
   // A poll "failed" when main.js stored an { error } object (host unreachable etc.).
