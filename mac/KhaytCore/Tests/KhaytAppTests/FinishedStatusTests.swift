@@ -90,6 +90,8 @@ struct FinishedStatusTests {
          "A cache key. It has to change when the answer would, which moving a job in or out of completed does."),
         ("case .string(let state)? = job[\"status\"], state == \"completed\",",
          "The maintenance card's cache key, same reason: the real meter is KhaytMaintenance.hoursMeter."),
+        ("canMoveJobs && job.status == \"completed\" && job.deliveredAt == nil",
+         "Offers Mark Delivered. An older book's \"delivered\" status is already handed over, so it must NOT match."),
     ]
 
     @Test("no screen decides on its own what finished means")
