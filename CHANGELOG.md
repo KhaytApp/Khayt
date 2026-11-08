@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Docs:** weekly competitive review, 2026-11-08.
 - **A voided or credited invoice says so (Windows/Linux).** A voided invoice prints VOID across the page and a credited one CREDITED, each with a line at the top saying when it happened (and why, for a void). A paid invoice keeps its PAID corner stamp. It is the shared document's stamp and look (`invoiceStampOf`, invoice.css), the same as on the Mac and iPhone; the old desktop-only PAID style is gone.
 - **Pickup hours and a map link on the customer's order page (Windows/Linux).** Settings ▸ Operations has a **Pickup** section beside the payment instructions, with **Pickup hours** and a **Map link** (https only; anything else is dropped). The customer's order page then shows them with your address while the order is not with a courier. A quote, or a job with a carrier or tracking number, gets no pickup card, and leaving both empty shows none. Same settings and rules as the Mac (`pickupHours`, `pickupMapUrl`, `lib/settings-edit.js` and `lib/portal-refresh.js`).
 - **iPhone: less waiting on the main thread with a large book.** Reading the book from the Mac, cutting the first Khayt Cloud download, saving an edit and working out printer care now run in the background, so the screen keeps responding on a shop with a long history.
