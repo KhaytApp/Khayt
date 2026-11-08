@@ -1169,6 +1169,12 @@ public actor KhaytEngine {
         "completion-heatmap",
         "vat-return",
         "test-prints",
+        // Connectors (plugins v1): the manifest contract and the bytes a
+        // button or event sends. The phone runs these too, so a request is
+        // identical on every device. `plugin-payload` reads
+        // `KhaytPluginManifest` at load, so it comes second.
+        "plugin-manifest",
+        "plugin-payload",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -8375,6 +8381,50 @@ public actor KhaytEngine {
     public func apiTokenScope(path: String, method: String) throws -> String? {
         try runtime.call2("globalThis.KhaytApiTokenScopes.requiredScope(ARG0, ARG1)",
                           [.string(path), .string(method)], as: String?.self)
+    }
+
+    // ── Connectors (plugins v1) — lib/plugin-manifest.js, lib/plugin-payload.js ──
+
+    /// `validateManifest`: `{ok, errors}`. The only way a manifest gets in.
+    public func pluginValidate(_ manifest: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.validateManifest(ARG0)", [manifest], as: JSONValue.self)
+    }
+
+    /// What a manifest asks for: fields, domains, scopes and privacy categories.
+    public func pluginPermissions(_ manifest: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.permissionsOf(ARG0)", [manifest], as: JSONValue.self)
+    }
+
+    /// What `manifest` asks for beyond the stored grant; `widened` pauses the plugin.
+    public func pluginDiff(granted: JSONValue, manifest: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.diffPermissions(ARG0, ARG1)", [granted, manifest], as: JSONValue.self)
+    }
+
+    /// The grant to store once the shop agrees (`settings.plugins[].granted`).
+    public func pluginGrant(_ manifest: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.grantFor(ARG0)", [manifest], as: JSONValue.self)
+    }
+
+    /// The consent screen: one row per host, with the fields that go there.
+    public func pluginConsentRows(_ manifest: JSONValue) throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytPluginManifest.consentRows(ARG0)", [manifest], as: [JSONValue].self)
+    }
+
+    /// The bytes an ed25519 manifest signature is over.
+    public func pluginCanonicalJSON(_ manifest: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytPluginManifest.canonicalJSON(ARG0)", [manifest], as: String.self)
+    }
+
+    /// The request a button or event makes — identical on every device.
+    /// `trigger` is `{action: id}` or `{event: name}`; `context` is
+    /// `{order, customer, secrets?}` (secrets only for a URL that holds one).
+    public func pluginPayload(_ manifest: JSONValue, trigger: JSONValue, context: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginPayload.payloadFor(ARG0, ARG1, ARG2)", [manifest, trigger, context], as: JSONValue.self)
+    }
+
+    /// A reply mapped into the plugin's own fields only.
+    public func pluginApplyResponse(_ manifest: JSONValue, actionId: String, reply: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginPayload.applyResponse(ARG0, ARG1, ARG2)", [manifest, .string(actionId), reply], as: JSONValue.self)
     }
 
     /// Every scope a token can be granted, in the desktop's order.
