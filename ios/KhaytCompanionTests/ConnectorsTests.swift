@@ -1,4 +1,3 @@
-import CryptoKit
 import XCTest
 import KhaytCore
 @testable import KhaytCompanion
@@ -9,47 +8,7 @@ final class ConnectorsTests: XCTestCase {
 
     private let domains = ["courier.example.com"]
 
-    // MARK: The URL guard
-
-    func testOnlyHttpsToADeclaredHostGoes() throws {
-        XCTAssertEqual(try ConnectorRules.guardURL("https://courier.example.com/v1/x?a=1", domains: domains).get().host(),
-                       "courier.example.com")
-        XCTAssertNotNil(try? ConnectorRules.guardURL("https://Courier.Example.com/", domains: domains).get(),
-                        "a host's case is not a different host")
-    }
-
-    func testAnyOtherSchemeIsRefused() {
-        for url in ["http://courier.example.com/", "javascript:alert(1)", "file:///etc/hosts",
-                    "khayt://order/1", "ftp://courier.example.com/", "not a url", ""] {
-            guard case .failure(.notHTTPS) = ConnectorRules.guardURL(url, domains: domains) else {
-                return XCTFail("\(url) was let through")
-            }
-        }
-    }
-
-    func testAnUndeclaredHostCredentialsOrAPortAreRefused() {
-        let cases = ["https://evil.example.org/", "https://courier.example.com.evil.org/",
-                     "https://user:pw@courier.example.com/", "https://courier.example.com:8443/",
-                     "https://sub.courier.example.com/"]
-        for url in cases {
-            guard case .failure(.undeclaredHost) = ConnectorRules.guardURL(url, domains: domains) else {
-                return XCTFail("\(url) was let through")
-            }
-        }
-    }
-
-    // MARK: What the phone adds
-
-    /// The well-known HMAC-SHA256 vector: key "key", the quick brown fox.
-    func testSignatureIsLowercaseHexHmacSha256OfTheBodyBytes() {
-        let sig = ConnectorRules.signature(body: Data("The quick brown fox jumps over the lazy dog".utf8), key: "key")
-        XCTAssertEqual(sig, "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8")
-    }
-
-    func testAuthHeaderIsSchemeSpaceSecretOrTheSecretAlone() {
-        XCTAssertEqual(ConnectorRules.authValue(scheme: "Bearer", secret: "abc"), "Bearer abc")
-        XCTAssertEqual(ConnectorRules.authValue(scheme: "", secret: "abc"), "abc")
-    }
+    // MARK: The phone's keys
 
     func testAKeyLivesInItsOwnKeychainItem() {
         XCTAssertEqual(ConnectorRules.keychainName(pluginId: "com.example.ship", secret: "apiKey"),
@@ -126,7 +85,7 @@ final class ConnectorsTests: XCTestCase {
             let m = try XCTUnwrap(e["manifest"])
             let check = try await engine.pluginCheckEntry(.object(e))
             let canonical = try await engine.pluginCanonicalJSON(m)
-            let real = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys)
+            let real = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
             let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check,
                                                             reviewed: real || SampleShop.isSampleConnector(e)))
             status[c.id] = c.status
@@ -144,16 +103,130 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertEqual(slackEntry["manifest"], try Self.sample("slack-notifier"))
     }
 
-    /// The courier's POST, built by the shared rule, passes the phone's guard.
-    func testTheEngineBuiltRequestPassesTheGuard() async throws {
+    // MARK: The request, through the shared code
+
+    /// The courier's sample manifest with a signing key on "book", so every
+    /// header the shared code adds can be seen.
+    private func signedCourier() throws -> JSONValue {
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
+              case .object(var m)? = e["manifest"], case .array(var actions)? = m["actions"],
+              case .object(var book) = actions[0], case .array(var secrets)? = m["secrets"] else { throw XCTSkip("no sample") }
+        secrets.append(.object(["name": .string("signingKey"), "label": .object(["en": .string("Signing key")]),
+                                "kind": .string("signingKey")]))
+        book["signWith"] = .string("signingKey")
+        actions[0] = .object(book)
+        m["actions"] = .array(actions)
+        m["secrets"] = .array(secrets)
+        return .object(m)
+    }
+
+    private static let book = Connector.Action(id: "book", label: "Book", placement: "order", kind: "post",
+                                               url: "https://courier.example.com/v1/pickups")
+
+    func testATapReadsOnlyTheSecretsItsActionNeeds() throws {
+        let m = try signedCourier()
+        XCTAssertEqual(ConnectorRules.secretNames(for: Self.book, manifest: m), ["apiKey", "signingKey"])
+        let slack = Connector.Action(id: "x", label: "X", placement: "order", kind: "post",
+                                     url: "https://hooks.slack.com/services/{secret.webhookPath}")
+        XCTAssertEqual(ConnectorRules.secretNames(for: slack, manifest: .object([:])), ["webhookPath"])
+        let open = Connector.Action(id: "track", label: "T", placement: "order", kind: "open",
+                                    url: "https://courier.example.com/{secret.apiKey}")
+        XCTAssertEqual(ConnectorRules.secretNames(for: open, manifest: m), [], "a link needs no key")
+    }
+
+    /// A POST goes out with the shared headers: the auth header, the three
+    /// signature headers and the delivery id, from `KhaytCore.Connectors`.
+    func testAPostCarriesTheSharedHeaders() async throws {
+        let engine = try KhaytEngine()
+        let m = try signedCourier()
+        let order: JSONValue = .object(["invoiceNumber": .string("INV-1"), "project": .string("Rack"), "client": .string("Noura")])
+        let payload = try await engine.pluginPayload(m, trigger: .object(["action": .string("book")]),
+                                                     context: .object(["order": order]))
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let prepared = try ConnectorRules.prepare(payload: payload, manifest: m, action: Self.book,
+                                                  secrets: ["apiKey": "k1", "signingKey": "s1"], delivery: "dlv_test", now: now)
+        guard case .post(let post) = prepared else { return XCTFail("\(prepared)") }
+        XCTAssertEqual(post.url.absoluteString, "https://courier.example.com/v1/pickups")
+        let h = Dictionary(post.headers.map { ($0.name, $0.value) }, uniquingKeysWith: { a, _ in a })
+        XCTAssertEqual(h["Authorization"], "Bearer k1")
+        XCTAssertEqual(h["X-Khayt-Event"], "book", "a press is named by its action id")
+        XCTAssertEqual(h["X-Khayt-Delivery"], "dlv_test")
+        XCTAssertEqual(h["X-Khayt-Timestamp"], "1800000000")
+        XCTAssertEqual(h["X-Khayt-Signature"]?.count, 64)
+        XCTAssertEqual(h["X-Khayt-Signature-V2"]?.count, 64)
+        // The same request the Mac would build from the same payload.
+        let mac = try Connectors.post(from: payload, manifest: m, event: "book",
+                                      secrets: ["apiKey": "k1", "signingKey": "s1"], delivery: "dlv_test", now: now)
+        XCTAssertEqual(post, mac)
+
+        XCTAssertThrowsError(try ConnectorRules.prepare(payload: payload, manifest: m, action: Self.book,
+                                                        secrets: ["apiKey": "k1"], delivery: "d", now: now)) {
+            XCTAssertEqual($0 as? Connectors.Refusal, .missingSecret("signingKey"))
+        }
+    }
+
+    /// The shared check refuses another host and a user name; the phone adds
+    /// a port, which the shared check does not look at.
+    func testAnUndeclaredHostAUserOrAPortIsRefused() throws {
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
+              let m = e["manifest"] else { return XCTFail() }
+        func post(_ url: String) -> JSONValue {
+            .object(["ok": .bool(true), "method": .string("POST"), "url": .string(url), "body": .string("{}"),
+                     "auth": .null, "signWith": .null])
+        }
+        func open(_ url: String) -> JSONValue {
+            .object(["ok": .bool(true), "method": .string("OPEN"), "url": .string(url)])
+        }
+        let track = Connector.Action(id: "track", label: "T", placement: "order", kind: "open", url: "")
+        XCTAssertNoThrow(try ConnectorRules.prepare(payload: post("https://courier.example.com/x"), manifest: m,
+                                                    action: Self.book, secrets: [:], delivery: "d", now: Date()))
+        XCTAssertEqual(try ConnectorRules.prepare(payload: open("https://courier.example.com/t?a=1"), manifest: m,
+                                                  action: track, secrets: [:], delivery: "d", now: Date()),
+                       .open(URL(string: "https://courier.example.com/t?a=1")!))
+        for url in ["https://evil.example.org/x", "https://sub.courier.example.com/x", "http://courier.example.com/x",
+                    "https://user:pw@courier.example.com/x", "https://courier.example.com:8443/x"] {
+            XCTAssertThrowsError(try ConnectorRules.prepare(payload: post(url), manifest: m, action: Self.book,
+                                                            secrets: [:], delivery: "d", now: Date()), url)
+            XCTAssertThrowsError(try ConnectorRules.prepare(payload: open(url), manifest: m, action: track,
+                                                            secrets: [:], delivery: "d", now: Date()), url)
+        }
+        // A port the shared check lets through on its own: the phone's gap check is still needed.
+        XCTAssertNoThrow(try Connectors.post(from: post("https://courier.example.com:8443/x"), manifest: m, event: "book",
+                                             secrets: [:], delivery: "d", now: Date()),
+                         "the shared check now refuses a port: drop ConnectorRules.refusePort")
+    }
+
+    // MARK: The customer as the book keeps it
+
+    /// The editors save `nameEn`/`nameAr` and an `addresses[]` book; the
+    /// phone hands the customer record over as it is, and the shared rule
+    /// reads those.
+    func testACustomerWithAnArabicNameOnlyAndAnAddressBookIsSent() async throws {
         let engine = try KhaytEngine()
         guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
               let m = e["manifest"] else { return XCTFail() }
-        let order: JSONValue = .object(["invoiceNumber": .string("INV-1"), "project": .string("Rack"), "client": .string("Noura")])
-        let p = try await engine.pluginPayload(m, trigger: .object(["action": .string("book")]), context: .object(["order": order]))
-        guard case .object(let r) = p, case .string(let url)? = r["url"] else { return XCTFail("\(p)") }
-        XCTAssertEqual(r["method"], .string("POST"))
-        XCTAssertNotNil(try? ConnectorRules.guardURL(url, domains: domains).get())
+        let customer: [String: JSONValue] = [
+            "id": .string("C-9"), "nameAr": .string("نورة العتيبي"), "phone": .string("+966500000000"),
+            "addresses": .array([.object(["label": .string("Home"), "address": .string("")]),
+                                 .object(["label": .string("Work"), "address": .string("King Fahd Rd, Riyadh")])]),
+        ]
+        let order: [String: JSONValue] = ["id": .string("J-1"), "invoiceNumber": .string("INV-9"), "project": .string("Rack")]
+        let made = ConnectorRules.context(action: Self.book, order: order, customer: customer) { _ in nil }
+        let payload = try await engine.pluginPayload(m, trigger: .object(["action": .string("book")]), context: made.context)
+        guard case .object(let p) = payload, case .string(let body)? = p["body"],
+              case .object(let sent) = try JSONValue.parse(Data(body.utf8)), case .object(let data)? = sent["data"] else {
+            return XCTFail("\(payload)")
+        }
+        XCTAssertEqual(data["customer.name"], .string("نورة العتيبي"))
+        XCTAssertEqual(data["customer.address"], .string("King Fahd Rd, Riyadh"), "the first address that has one")
+
+        // An English name wins over the Arabic one, as lib/customer-records.js nameOf.
+        var both = customer
+        both["nameEn"] = .string("Noura Alotaibi")
+        let again = ConnectorRules.context(action: Self.book, order: order, customer: both) { _ in nil }
+        let p2 = try await engine.pluginPayload(m, trigger: .object(["action": .string("book")]), context: again.context)
+        guard case .object(let q) = p2, case .string(let b2)? = q["body"] else { return XCTFail() }
+        XCTAssertTrue(b2.contains("Noura Alotaibi"))
     }
 
     // MARK: This phone's confirmation
@@ -236,50 +309,6 @@ final class ConnectorsTests: XCTestCase {
 
     // MARK: Reviewed: Khayt's signature, never a stored flag
 
-    /// A manifest signed with a key made here, over the engine's canonical bytes.
-    private func signed(_ key: Curve25519.Signing.PrivateKey) async throws -> (manifest: JSONValue, engine: KhaytEngine) {
-        let engine = try KhaytEngine()
-        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
-              case .object(var m)? = e["manifest"] else { throw XCTSkip("no sample") }
-        let canonical = try await engine.pluginCanonicalJSON(.object(m))
-        let sig = try key.signature(for: Data(canonical.utf8))
-        m["signature"] = .string(sig.base64EncodedString())
-        // The canonical bytes leave the signature out.
-        let again = try await engine.pluginCanonicalJSON(.object(m))
-        XCTAssertEqual(again, canonical)
-        return (.object(m), engine)
-    }
-
-    private func pub(_ key: Curve25519.Signing.PrivateKey) -> String {
-        key.publicKey.rawRepresentation.base64EncodedString()
-    }
-
-    func testASignatureFromKhaytsKeyIsReviewed() async throws {
-        let key = Curve25519.Signing.PrivateKey()
-        let (m, engine) = try await signed(key)
-        let canonical = try await engine.pluginCanonicalJSON(m)
-        guard case .object(let o) = m, case .string(let sig)? = o["signature"] else { return XCTFail() }
-        XCTAssertEqual(sig.count, 88)
-        XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: [("k1", pub(key))]))
-
-        // One field changed after signing: the bytes are not the ones signed.
-        var tampered = o
-        tampered["publisher"] = .string("Someone else")
-        let tamperedBytes = try await engine.pluginCanonicalJSON(.object(tampered))
-        XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(tampered), canonical: tamperedBytes, keys: [("k1", pub(key))]))
-
-        // Another key.
-        let other = Curve25519.Signing.PrivateKey()
-        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: [("k2", pub(other))]))
-
-        // Two keys, one of them right: enough.
-        XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical,
-                                                keys: [("k2", pub(other)), ("bad", "!!"), ("k1", pub(key))]))
-
-        // No keys at all: nothing verifies.
-        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: []))
-    }
-
     /// The shipped samples are signed with Khayt's key, and the engine's keys
     /// verify them. One field changed and they do not.
     func testTheShippedSamplesVerifyAgainstKhaytsRealKeys() async throws {
@@ -289,39 +318,19 @@ final class ConnectorsTests: XCTestCase {
         for name in ["slack-notifier", "discord-notifier", "sheets-log"] {
             let m = try Self.sample(name)
             let canonical = try await engine.pluginCanonicalJSON(m)
-            XCTAssertTrue(ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys), name)
+            XCTAssertEqual(Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys), "khayt-2026-11", name)
 
             guard case .object(var o) = m else { return XCTFail() }
             o["publisher"] = .string("Not Khayt")
             let changed = try await engine.pluginCanonicalJSON(.object(o))
-            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(o), canonical: changed, keys: keys), name)
+            XCTAssertNil(Connectors.reviewedBy(manifest: .object(o), canonical: changed, keys: keys), name)
             // Nor does the old signature over the changed bytes pass with a
             // different domain swapped in.
             guard case .object(var d) = m else { return XCTFail() }
             d["domains"] = .array([.string("evil.example.org")])
             let swapped = try await engine.pluginCanonicalJSON(.object(d))
-            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(d), canonical: swapped, keys: keys), name)
+            XCTAssertNil(Connectors.reviewedBy(manifest: .object(d), canonical: swapped, keys: keys), name)
         }
-    }
-
-    func testABadOrShortSignatureOrKeyIsNotReviewed() async throws {
-        let key = Curve25519.Signing.PrivateKey()
-        let (m, engine) = try await signed(key)
-        let canonical = try await engine.pluginCanonicalJSON(m)
-        guard case .object(let o) = m, case .string(let sig)? = o["signature"] else { return XCTFail() }
-        let keys = [(id: "k1", key: pub(key))]
-        for bad in ["", "not base64 at all", String(sig.dropLast(4)), Data(repeating: 1, count: 32).base64EncodedString(),
-                    String(repeating: "A", count: 86) + "=="] {
-            var x = o
-            x["signature"] = .string(bad)
-            XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(x), canonical: canonical, keys: keys), bad)
-        }
-        var none = o
-        none.removeValue(forKey: "signature")
-        XCTAssertFalse(ConnectorRules.isReviewed(manifest: .object(none), canonical: canonical, keys: keys))
-        // A key that is not 32 bytes, or not base64.
-        XCTAssertFalse(ConnectorRules.isReviewed(manifest: m, canonical: canonical,
-                                                 keys: [("short", Data(repeating: 2, count: 16).base64EncodedString()), ("junk", "%%%")]))
     }
 
     /// A book can say `reviewed: true` (or `devMode`); the phone does not

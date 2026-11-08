@@ -9,9 +9,10 @@ import KhaytCore
  * the book at `settings.plugins[]` — plus the developer's own https service.
  * The phone runs nothing it downloaded (App Review 2.5.2): every button and
  * field is drawn by Khayt, every request is built by the shared rule
- * (`lib/plugin-payload.js`, through `KhaytEngine.pluginPayload`), and this
- * file only adds what the phone alone holds — the keys in its Keychain and
- * the HMAC over the body — and sends it.
+ * (`lib/plugin-payload.js`, through `KhaytEngine.pluginPayload`), its
+ * headers and host check by the Mac's own code (`KhaytCore.Connectors`:
+ * auth, X-Khayt-Signature/-Timestamp/-Signature-V2, X-Khayt-Delivery), and
+ * this file only opens the keys the tap needs from its Keychain and sends it.
  *
  * ── WHAT THE PHONE DOES NOT DO ────────────────────────────────────────────
  *
@@ -72,7 +73,7 @@ struct Connector: Identifiable, Equatable, Sendable {
     /// `pluginApplyResponse` checks its fields.write grant against.
     let entry: JSONValue
     let status: Status
-    /// Khayt's signature over the manifest verifies (`ConnectorRules.isReviewed`).
+    /// Khayt's signature over the manifest verifies (`Connectors.reviewedBy`, shared with the Mac).
     let reviewed: Bool
     let secrets: [Secret]
     let fields: [Field]
@@ -99,7 +100,7 @@ enum ConnectorRules {
     /// grant wider than the manifest declares: each is `.invalid`. Its
     /// `paused` is the manifest asking for more than the grant.
     ///
-    /// `reviewed` is `isReviewed(manifest:canonical:keys:)`, worked out by the
+    /// `reviewed` is `Connectors.reviewedBy(...) != nil`, worked out by the
     /// caller (the canonical bytes come from the engine), and is a separate
     /// requirement: a valid, granted connector Khayt has not signed still sends
     /// nothing.
@@ -148,36 +149,12 @@ enum ConnectorRules {
                          secrets: secrets, fields: fields, actions: actions, domains: domains)
     }
 
-    /// Khayt's connector signing keys: `{id, key}`, `key` base64 of the raw
-    /// 32-byte ed25519 public key — `lib/plugin-manifest.js` SIGNING_KEYS,
-    /// through the engine. The one place the phone reads them.
-    static func signingKeys(_ engine: KhaytEngine) async -> [(id: String, key: String)] {
-        let rows = (try? await engine.pluginSigningKeys()) ?? []
-        return rows.compactMap {
-            guard case .object(let o) = $0, let id = text(o["id"]), let key = text(o["key"]) else { return nil }
-            return (id, key)
-        }
-    }
-
-    /// Whether Khayt reviewed this connector: the manifest's `signature`
-    /// (standard base64 with padding, 88 characters, of the 64-byte ed25519
-    /// signature) verifies over `canonical` (the UTF-8 of
-    /// `engine.pluginCanonicalJSON(manifest)`, which leaves `signature` out)
-    /// under ANY of `keys`.
-    ///
-    /// It never reads a stored `reviewed` flag: anyone with the book can write
-    /// one. Developer-mode connectors never reach the book, so the phone has
-    /// no such state.
-    static func isReviewed(manifest: JSONValue, canonical: String, keys: [(id: String, key: String)]) -> Bool {
-        guard case .object(let m) = manifest, case .string(let sig)? = m["signature"], sig.count == 88,
-              let signature = Data(base64Encoded: sig), signature.count == 64 else { return false }
-        let bytes = Data(canonical.utf8)
-        for k in keys {
-            guard let raw = Data(base64Encoded: k.key), raw.count == 32,
-                  let key = try? Curve25519.Signing.PublicKey(rawRepresentation: raw) else { continue }
-            if key.isValidSignature(signature, for: bytes) { return true }
-        }
-        return false
+    /// Khayt's connector signing keys: `[{id, key}]`, `key` base64 of the
+    /// raw 32-byte ed25519 public key (`lib/plugin-manifest.js`
+    /// SIGNING_KEYS, through the engine). The one place the phone reads them;
+    /// whether a manifest verifies is `Connectors.reviewedBy`, shared with the Mac.
+    static func signingKeys(_ engine: KhaytEngine) async -> [JSONValue] {
+        (try? await engine.pluginSigningKeys()) ?? []
     }
 
     /// What the engine is given for one tap: the records, and (for a POST
@@ -245,36 +222,53 @@ enum ConnectorRules {
 
     // MARK: Before anything leaves
 
-    enum Refusal: Error, Equatable {
-        /// Not https (or not a URL at all).
-        case notHTTPS
-        /// A host the manifest did not declare.
-        case undeclaredHost(String)
+    /// Every secret one tap needs, by name: for a POST, those its URL fills
+    /// in, its `auth.secret` and its `signWith`, read from the manifest's own
+    /// action. An "open" link needs none. Only these are read from the Keychain.
+    static func secretNames(for action: Connector.Action, manifest: JSONValue) -> [String] {
+        guard action.kind == "post" else { return [] }
+        var names = secretsInURL(action.url)
+        if case .object(let m) = manifest, case .array(let actions)? = m["actions"] {
+            for case .object(let a) in actions where a["id"] == .string(action.id) {
+                if case .object(let auth)? = a["auth"], let n = text(auth["secret"]) { names.append(n) }
+                if let n = text(a["signWith"]) { names.append(n) }
+            }
+        }
+        var seen = Set<String>()
+        return names.filter { seen.insert($0).inserted }
     }
 
-    /// The last check before a request or a link: https, to a declared host,
-    /// with no credentials or port slipped in — even though the shared rule
-    /// built it. The rule is trusted; a second lock costs nothing.
-    static func guardURL(_ string: String, domains: [String]) -> Result<URL, Refusal> {
-        guard let url = URL(string: string), let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              comps.scheme?.lowercased() == "https" else { return .failure(.notHTTPS) }
-        let host = (comps.host ?? "").lowercased()
-        guard !host.isEmpty, comps.user == nil, comps.password == nil,
-              comps.port == nil || comps.port == 443 else { return .failure(.undeclaredHost(host)) }
-        guard domains.contains(host) else { return .failure(.undeclaredHost(host)) }
-        return .success(url)
+    /// What one tap comes to, once the shared code has checked it.
+    enum Prepared: Equatable {
+        case open(URL)
+        case post(Connectors.Post)
     }
 
-    /// `X-Khayt-Signature`: lowercase hex HMAC-SHA256 of the exact body bytes.
-    static func signature(body: Data, key: String) -> String {
-        let mac = HMAC<SHA256>.authenticationCode(for: body, using: SymmetricKey(data: Data(key.utf8)))
-        return mac.map { String(format: "%02x", $0) }.joined()
+    /// The request a built payload makes, through the shared code
+    /// (`KhaytCore.Connectors`): `link` for an "open" button, `post` for a
+    /// POST, with the auth and signature headers the Mac sends too. `event`
+    /// is the action's id, as the Mac names a press. Both re-check https, the
+    /// exact declared host and no user or password.
+    ///
+    /// ONE CHECK OF THE PHONE'S OWN: a port. The shared `checkHost` does not
+    /// look at one (the lib refuses a port when it builds the URL, so it
+    /// cannot arrive today); a URL with a port other than 443 is refused here
+    /// too, until the shared check covers it.
+    static func prepare(payload: JSONValue, manifest: JSONValue, action: Connector.Action,
+                        secrets: [String: String], delivery: String, now: Date) throws -> Prepared {
+        if case .object(let p) = payload, p["method"] == .string("OPEN") {
+            let url = try Connectors.link(from: payload, manifest: manifest)
+            try refusePort(url)
+            return .open(url)
+        }
+        let post = try Connectors.post(from: payload, manifest: manifest, event: action.id,
+                                       secrets: secrets, delivery: delivery, now: now)
+        try refusePort(post.url)
+        return .post(post)
     }
 
-    /// The auth header's value: `"<scheme> <secret>"`, or the secret alone
-    /// when the manifest names no scheme.
-    static func authValue(scheme: String, secret: String) -> String {
-        scheme.isEmpty ? secret : "\(scheme) \(secret)"
+    private static func refusePort(_ url: URL) throws {
+        if let port = url.port, port != 443 { throw Connectors.Refusal.undeclaredHost("\(url.host ?? ""):\(port)") }
     }
 
     /// The Keychain item a connector's secret lives in, on this phone only.
@@ -436,7 +430,7 @@ extension KhaytAPIClient {
             let check = try? await engine.pluginCheckEntry(.object(e))
             var reviewed = false
             if let canonical = try? await engine.pluginCanonicalJSON(m) {
-                reviewed = ConnectorRules.isReviewed(manifest: m, canonical: canonical, keys: keys)
+                reviewed = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
             }
             #if DEBUG
             // The sample shop's own connectors, for screenshots: only while
@@ -492,49 +486,46 @@ extension KhaytAPIClient {
         guard let reader, let engine = try? await reader.sharedEngine() else { return .failed(L10n.tr("connectors.error.build")) }
 
         let records = connectorRecords(place)
-        // Only the secrets a POST URL fills in go into the engine; none for a link.
-        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer) {
-            ConnectorKeys.get(c.id, $0)
+        // Only the secrets this tap needs are read from the Keychain; none
+        // for a link. The URL's go into the engine, the rest stay in Swift.
+        var secrets: [String: String] = [:]
+        for name in ConnectorRules.secretNames(for: action, manifest: c.manifest) {
+            guard let v = ConnectorKeys.get(c.id, name) else {
+                return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
+            }
+            secrets[name] = v
         }
-        if let name = made.missing {
-            return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
-        }
+        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer) { secrets[$0] }
 
-        guard case .object(let p)? = try? await engine.pluginPayload(
-                c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context),
-              p["ok"] == .bool(true), let urlText = ConnectorRules.text(p["url"]) else {
+        guard let payload = try? await engine.pluginPayload(
+                c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context) else {
             return .failed(L10n.tr("connectors.error.build"))
         }
-        let url: URL
-        switch ConnectorRules.guardURL(urlText, domains: c.domains) {
-        case .success(let u): url = u
-        case .failure(.notHTTPS): return .failed(L10n.tr("connectors.error.scheme"))
-        case .failure(.undeclaredHost(let h)): return .failed(L10n.format("connectors.error.host", h))
+        let prepared: ConnectorRules.Prepared
+        do {
+            prepared = try ConnectorRules.prepare(payload: payload, manifest: c.manifest, action: action,
+                                                  secrets: secrets, delivery: Connectors.newDeliveryId(), now: Date())
+        } catch let refusal as Connectors.Refusal {
+            switch refusal {
+            case .notBuilt: return .failed(L10n.tr("connectors.error.build"))
+            case .undeclaredHost(let h) where h.isEmpty: return .failed(L10n.tr("connectors.error.scheme"))
+            case .undeclaredHost(let h): return .failed(L10n.format("connectors.error.host", h))
+            case .missingSecret(let n): return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, n)))
+            }
+        } catch {
+            return .failed(L10n.tr("connectors.error.build"))
         }
 
-        if ConnectorRules.text(p["method"]) == "OPEN" { return .open(url) }
-        guard ConnectorRules.text(p["method"]) == "POST" else { return .failed(L10n.tr("connectors.error.build")) }
-
-        let body = Data((ConnectorRules.text(p["body"]) ?? "").utf8)
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        let post: Connectors.Post
+        switch prepared {
+        case .open(let url): return .open(url)
+        case .post(let p): post = p
+        }
+        var request = URLRequest(url: post.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue(ConnectorRules.text(p["contentType"]) ?? "application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = post.body
         request.httpShouldHandleCookies = false
-        if case .object(let auth)? = p["auth"], let header = ConnectorRules.text(auth["header"]),
-           let name = ConnectorRules.text(auth["secret"]) {
-            guard let secret = ConnectorKeys.get(c.id, name) else {
-                return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
-            }
-            request.setValue(ConnectorRules.authValue(scheme: ConnectorRules.text(auth["scheme"]) ?? "", secret: secret),
-                             forHTTPHeaderField: header)
-        }
-        if let name = ConnectorRules.text(p["signWith"]) {
-            guard let key = ConnectorKeys.get(c.id, name) else {
-                return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, name)))
-            }
-            request.setValue(ConnectorRules.signature(body: body, key: key), forHTTPHeaderField: "X-Khayt-Signature")
-        }
+        for h in post.headers { request.setValue(h.value, forHTTPHeaderField: h.name) }
 
         let session = URLSession(configuration: .ephemeral)
         defer { session.finishTasksAndInvalidate() }
@@ -544,7 +535,7 @@ extension KhaytAPIClient {
             // body and the key to a host the shop never agreed to.
             (data, response) = try await session.data(for: request, delegate: NoRedirects())
         } catch {
-            return .failed(L10n.format("connectors.error.network", url.host() ?? ""))
+            return .failed(L10n.format("connectors.error.network", post.url.host() ?? ""))
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
