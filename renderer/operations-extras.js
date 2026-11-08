@@ -234,6 +234,15 @@ function fireOrderWebhook(type, order) {
     const w = settings.eventWebhooks;
     if (!w || !w.enabled || !/^https:\/\//i.test(w.url || '')) return;
     if (w.events && w.events[type] === false) return;
+    // ONE FAN-OUT. The event webhook is a subscription the bus derives from
+    // these settings (KhaytWebhookBus.effectiveSubscriptions), so a shop that
+    // pointed the subscriptions list at the same URL for the same moment gets
+    // it once, not once per system. Never stored; see lib/webhook-bus.js.
+    const Bus = (typeof KhaytWebhookBus !== 'undefined') ? KhaytWebhookBus : null;
+    const busEvent = Bus && Bus.EVENT_WEBHOOK_EVENTS ? Bus.EVENT_WEBHOOK_EVENTS[type] : null;
+    const sub = Bus && Bus.effectiveSubscriptions
+      ? Bus.effectiveSubscriptions(settings).find((s) => Bus.isEventWebhook(s)) : null;
+    if (busEvent && Bus && !(sub && sub.events.includes(busEvent))) return;
     const client = order.clientId ? clients.find((c) => c.id === order.clientId) : null;
     const payload = KhaytWebhooks.buildWebhookEvent(type, order, {
       at: new Date().toISOString(),
@@ -246,8 +255,8 @@ function fireOrderWebhook(type, order) {
     // exhausted. This used to be one shot with the failure fully swallowed, so an
     // order_paid / order_shipped event feeding a shop's fulfilment automation vanished on
     // any transient blip — while the OTHER webhook system got the durable treatment.
-    if (typeof deliverWebhook === 'function' && typeof KhaytWebhookBus !== 'undefined') {
-      deliverWebhook({ url: w.url, secret: w.secret, id: w.id || `event:${type}` }, payload);
+    if (typeof deliverWebhook === 'function' && sub) {
+      deliverWebhook({ ...sub, secret: w.secret }, payload);
     } else {
       Promise.resolve(window.hubAPI.webhookPost({ url: w.url, secret: w.secret, payload }))
         .catch((e) => console.error('order webhook failed:', e));
