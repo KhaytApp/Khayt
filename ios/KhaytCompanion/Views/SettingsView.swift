@@ -43,6 +43,10 @@ struct SettingsView: View {
                             .foregroundStyle(KhaytDesign.brand)
                             .frame(minHeight: 44)
                     }
+                    if api.holdsBook {
+                        eyebrow(L10n.tr("connectors.title"))
+                        ConnectorsSettingsSection()
+                    }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard
                     eyebrow(L10n.tr("settings.connection"))
