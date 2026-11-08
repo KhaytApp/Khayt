@@ -31,6 +31,19 @@
 (function () {
   const MANIFEST_VERSION = 1;
 
+  // ── WHO MAY SAY "REVIEWED" ─────────────────────────────────────────────
+  //
+  // ed25519 public keys (base64 of the raw 32 bytes). A manifest is reviewed
+  // when its `signature` verifies, over the UTF-8 of `canonicalJSON`, against
+  // ANY of these — a list, so the key can rotate without stranding what was
+  // signed before. The private half lives in the owner's login Keychain
+  // ("Khayt connector signing key") and is used only by
+  // scripts/sign-connector.js. Verifying is the platform's job (CryptoKit,
+  // node:crypto); this module stays free of crypto.
+  const SIGNING_KEYS = [
+    { id: 'khayt-2026-11', key: 'LGzEHSMW6OGkgSXgYvP9egtqAVSUn+xIyoSxiPDO8sE=' },
+  ];
+
   // ── WHAT A CONNECTOR MAY SEND ──────────────────────────────────────────
   //
   // `from` is the record the value is read from, `path` the field on it (the
@@ -319,6 +332,11 @@
 
     const scopes = checkArray(errors, m, 'scopes', SCOPES.length);
     scopes.forEach((s, i) => { if (!SCOPES.includes(s)) errors.push(`scopes[${i}]: one of ${SCOPES.join(', ')}`); });
+    // A reply that fills fields is a write to the book, so it is asked for —
+    // and shown on the consent screen — like any other write.
+    if (actions.some(a => isObj(a) && a.response !== undefined) && !scopes.includes('fields.write')) {
+      errors.push('scopes: an action with a "response" needs "fields.write"');
+    }
 
     // A declared host nothing uses is a host the consent screen would show for
     // no reason — and a reason to ask what it is for.
@@ -423,6 +441,47 @@
     }));
   }
 
+  /**
+   * One installed connector as the book stores it (`settings.plugins[]`):
+   * { id, version, enabled, manifest, granted, config }, plus `secrets` on
+   * the desktop only (stripped before a book reaches a phone or the cloud).
+   * The manifest travels whole, signature inside, because a phone has no
+   * catalogue of its own. Whether it is REVIEWED is never stored — a stored
+   * flag can be written by anyone; the platform verifies the signature.
+   *
+   * Returns { ok, errors, paused } — `paused` when the manifest asks for more
+   * than was granted, which every device honours.
+   */
+  function checkEntry(e) {
+    const errors = [];
+    if (!isObj(e)) return { ok: false, errors: ['an entry is an object'], paused: true };
+    checkOnly(errors, 'entry', e, ['id', 'version', 'enabled', 'manifest', 'granted', 'config', 'secrets']);
+    const v = validateManifest(e.manifest);
+    v.errors.forEach(x => errors.push('manifest: ' + x));
+    if (isObj(e.manifest) && (e.id !== e.manifest.id || e.version !== e.manifest.version)) {
+      errors.push('entry: id and version must be the manifest\'s');
+    }
+    if (e.config !== undefined && !isObj(e.config)) errors.push('config: an object');
+    // A grant can only narrow what the signed manifest declares. A book edited
+    // to grant a host or scope the manifest never named would otherwise widen
+    // what may be sent without a new signature or a new consent.
+    if (isObj(e.granted) && isObj(e.manifest)) {
+      const declared = permissionsOf(e.manifest);
+      for (const k of ['fields', 'domains', 'scopes']) {
+        const extra = (Array.isArray(e.granted[k]) ? e.granted[k] : []).filter(x => !declared[k].includes(x));
+        if (extra.length) errors.push(`granted.${k}: ${extra.join(', ')} not in the manifest`);
+      }
+    }
+    const paused = errors.length > 0 || diffPermissions(e.granted, e.manifest).widened;
+    return { ok: errors.length === 0, errors, paused };
+  }
+
+  /** May a reply be written into this plugin's fields? Only with fields.write granted. */
+  function mayWriteFields(entry) {
+    return isObj(entry) && isObj(entry.granted) && Array.isArray(entry.granted.scopes)
+      && entry.granted.scopes.includes('fields.write') && !checkEntry(entry).paused;
+  }
+
   /** Sorted keys, no whitespace, `signature` left out: the bytes that are signed. */
   function canonicalJSON(m) {
     const walk = (v) => {
@@ -493,9 +552,9 @@
   }
 
   const api = {
-    MANIFEST_VERSION, SENDABLE_FIELDS, OWN_FIELD_CATEGORY, PLACEMENT_SOURCES,
+    MANIFEST_VERSION, SIGNING_KEYS, SENDABLE_FIELDS, OWN_FIELD_CATEGORY, PLACEMENT_SOURCES,
     FIELD_TYPES, FIELD_ATTACH, ACTION_KINDS, SECRET_KINDS, SCOPES, EVENTS, BODY_FORMATS, LIMITS, TOP_KEYS,
-    validateManifest, permissionsOf, diffPermissions, grantFor, consentRows, categoryOf,
+    validateManifest, permissionsOf, diffPermissions, grantFor, consentRows, categoryOf, checkEntry, mayWriteFields,
     canonicalJSON, manifestJsonSchema, isAllowedHost, placeholders,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
