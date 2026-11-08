@@ -265,6 +265,41 @@ struct DeleteJobsAndCustomersTests {
         #expect(shop.orders.contains { $0.id == quote.id })
     }
 
+    @Test("the inspector offers Delete for a quote and Cancel Job, with the reason, for an invoiced or paid job")
+    func inspector() async throws {
+        let shop = await MacConventionsTests.sample()
+        let verdicts = try #require(shop.deleteVerdicts)
+        let quote = try #require(shop.orders.first { $0.status == "quote" && verdicts.orders[$0.id] == nil })
+        #expect(shop.inspectorRemoval(for: quote.id) == .delete)
+        // An invoiced job, judged by the rule itself (lib/record-delete.js
+        // invoiced()): the same job with no number may go; given an invoice
+        // number, the panel offers Cancel Job with the reason instead.
+        let job = try #require(shop.orders.first { $0.status != "quote" && $0.status != "cancelled" })
+        let engine = try KhaytEngine()
+        let bare: JSONValue = .object(["id": .string(job.id), "status": .string(job.status)])
+        let numbered: JSONValue = .object(["id": .string(job.id), "status": .string(job.status),
+                                           "invoiceNumber": .string("INV-2026-0042")])
+        shop.deleteVerdicts = try await engine.deleteVerdicts(orders: [bare], clients: [], giftCards: [])
+        #expect(shop.inspectorRemoval(for: job.id) == .delete)
+        shop.deleteVerdicts = try await engine.deleteVerdicts(orders: [numbered], clients: [], giftCards: [])
+        #expect(shop.inspectorRemoval(for: job.id) == .cancel(why: shop.words.callIt("mac.delete_job_invoiced")))
+        shop.deleteVerdicts = verdicts
+        let paid = try #require(shop.orders.first { verdicts.orders[$0.id] == "paid" && $0.status != "cancelled" })
+        #expect(shop.inspectorRemoval(for: paid.id) == .cancel(why: shop.words.callIt("mac.delete_job_paid")))
+        if let cancelled = shop.orders.first(where: { $0.status == "cancelled" && verdicts.orders[$0.id] != nil }) {
+            guard case .refused = shop.inspectorRemoval(for: cancelled.id) else {
+                Issue.record("a cancelled job is offered Cancel again"); return
+            }
+        }
+        #expect(shop.inspectorRemoval(for: "no-such-job") == .none)
+        // The panel goes through the same doors as the menu: the question, and Cancel.
+        let panel = try QuoteSheetStatusTests.source("OrderInspector.swift")
+        #expect(panel.contains("InspectorRemovalRow(shop: shop, job: job)"))
+        #expect(panel.contains("shop.askToDeleteJobs([job.id])"))
+        #expect(panel.contains("shop.cancelInstead(job.id)"))
+        #expect(!panel.contains("deleteJobs(["), "the panel deletes without the question")
+    }
+
     @Test("the refusal sentences have English and Arabic")
     func translated() {
         for key in ["mac.delete_job_invoiced", "mac.delete_job_paid", "mac.cancel_job", "mac.delete_refused",
