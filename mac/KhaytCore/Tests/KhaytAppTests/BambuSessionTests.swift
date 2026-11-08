@@ -412,6 +412,10 @@ struct BambuSessionTests {
         // The cache the alert rules read has no `error` for a printer that answered.
         let entry = PrinterWatch.cacheEntry(status, at: Date())
         #expect(entry["error"] == nil)
+        // …but it does carry the fault, as main.js does: `printer-alerts`
+        // reads it to tell a cancelled print (0300_400C) from a failed one.
+        #expect(entry["fault"] == .string(fault))
+        #expect(PrinterWatch.cacheEntry(try #require(cleared), at: Date())["fault"] == nil)
     }
 
     // MARK: S11 — SDCP

@@ -93,6 +93,11 @@ final class PrinterWatch {
         // `filamentOut === true` is news). Absent when the printer cannot say,
         // which the module reads the same as false — not a reason to walk over.
         if let out = status.filamentOut { entry["filamentOut"] = .bool(out) }
+        // What the printer says is wrong (`lib/bambu-faults.js` faultText), as
+        // main.js passes it. The error rule reads it to tell a print the shop
+        // cancelled (0300_400C / 0500_400E) from one that failed — without
+        // it every cancelled Bambu print would alert as an error.
+        if let fault = status.fault, !fault.isEmpty { entry["fault"] = .string(fault) }
         return entry
     }
 
