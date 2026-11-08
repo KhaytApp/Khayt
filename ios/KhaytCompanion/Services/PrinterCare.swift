@@ -476,7 +476,12 @@ enum CareRules {
 /// So, when the jobs were cut, the meter is the one the Mac (or the cloud
 /// pull) measured over the whole book (`BookScope.Taken.meters`), plus what
 /// the jobs on this phone have added since — the phone's own count less the
-/// same count over the book as it arrived. A cut book from a Mac too old to
+/// same count over the jobs it held at that moment (`Taken.metersHeld`). That
+/// snapshot does not move afterwards, so a finished job adds its hours however
+/// it arrived: finished here, or folded in from a cloud change. (Measured
+/// against the baseline, as before, a cloud change landed in the book AND the
+/// baseline and never moved the meter.) A scope from a Mac too old to send
+/// the snapshot falls back to the baseline. A cut book from a Mac too old to
 /// send meters has no meter: its hours are unknown, and the card says so
 /// rather than show a number that is wrong.
 struct CareBook {
@@ -509,7 +514,12 @@ struct CareBook {
         let here = CareRules.hoursMeter(local, machineId: machineId)
         if scope?.isWhole("printLog") == true { return here }
         guard let measured = scope?.meters else { return nil }
-        let arrived = baseline.map { CareRules.hoursMeter(rows($0, "printLog"), machineId: machineId) } ?? here
+        let arrived: Double
+        if let held = scope?.metersHeld {
+            arrived = held[machineId] ?? 0
+        } else {
+            arrived = baseline.map { CareRules.hoursMeter(rows($0, "printLog"), machineId: machineId) } ?? here
+        }
         return max(0, (measured[machineId] ?? 0) + here - arrived)
     }
 

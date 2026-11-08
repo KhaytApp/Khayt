@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Khayt ist in deinem Netzwerk nicht erreichbar. Prüfe das WLAN und die LAN-API am Desktop.";
 "connection.banner.pin" = "LAN-PIN abgelehnt. Aktualisiere die PIN in den Einstellungen passend zum Desktop.";
 "sync.pending" = "%d Änderung(en) auf diesem iPhone warten auf den Mac.";
+"sync.mac_refused" = "Der Mac hat %d davon nicht übernommen. Sie bleiben auf diesem iPhone und werden erneut gesendet.";
 "connection.error.reach_status" = "%@ ist nicht erreichbar. Gleiches WLAN? Desktop → Einstellungen → LAN-API: aktiviert, auf allen Schnittstellen, IP und Port notieren.";
 "settings.host_required" = "Gib die IP-Adresse deines Computers ein.";
 "settings.host_invalid" = "Ungültige Adresse. Beispiel: 192.168.1.42 (keine vollständige URL mit http://).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Wer schuldet";
-"owed.empty" = "Bei offenen Aufträgen ist nichts offen.";
+"owed.empty" = "Es ist nichts offen.";
 "owed.total" = "%@ offen bei %d Aufträgen";
 "owed.due" = "Fällig %@";
 "owed.remind" = "Per WhatsApp erinnern";
@@ -989,6 +990,7 @@
 "customer.history" = "Abgeschlossene Aufträge";
 "customer.history.none" = "Keine abgeschlossenen Aufträge auf diesem iPhone.";
 "customer.history.window" = "Dieses iPhone enthält die neuesten abgeschlossenen Aufträge; der vollständige Verlauf ist auf dem Mac.";
+"customer.owes.window" = "Aus den Aufträgen auf diesem iPhone. Ältere Aufträge sind auf dem Mac, daher kann der Betrag zu niedrig sein.";
 "customer.agreed" = "Vereinbarte Preise";
 "customer.messages" = "Nachrichten";
 "customer.messages.none" = "Noch keine Nachrichten protokolliert.";

@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Ağınızdaki Khayt’a ulaşılamıyor. Wi‑Fi’yi ve masaüstü LAN API’sini kontrol edin.";
 "connection.banner.pin" = "LAN PIN’i reddedildi. Ayarlar’da PIN’i masaüstündekiyle eşleşecek şekilde güncelleyin.";
 "sync.pending" = "Bu iPhone’da Mac’i bekleyen %d değişiklik var.";
+"sync.mac_refused" = "Mac bunlardan %d tanesini almadı. Bu iPhone’da kalır ve yeniden gönderilir.";
 "connection.error.reach_status" = "%@ adresine ulaşılamıyor. Aynı Wi‑Fi’de misiniz? Masaüstünde Ayarlar → LAN API: etkin olsun, tüm arayüzlerde dinlesin; IP’yi ve bağlantı noktasını not edin.";
 "settings.host_required" = "Bilgisayarınızın IP adresini girin.";
 "settings.host_invalid" = "Geçersiz adres. Örneğin 192.168.1.42 biçimini kullanın (http:// ile tam URL olmasın).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Kim borçlu";
-"owed.empty" = "Açık işlerde alacak yok.";
+"owed.empty" = "Alacak yok.";
 "owed.total" = "%2$d işte %1$@ alacak";
 "owed.due" = "Vade: %@";
 "owed.remind" = "WhatsApp’tan hatırlat";
@@ -989,6 +990,7 @@
 "customer.history" = "Biten işler";
 "customer.history.none" = "Bu telefonda biten iş yok.";
 "customer.history.window" = "Bu telefon en yeni biten işleri tutar; tüm geçmiş Mac’te.";
+"customer.owes.window" = "Bu iPhone’daki işlerden. Eski işler Mac’te olduğundan tutar eksik olabilir.";
 "customer.agreed" = "Anlaşılan fiyatlar";
 "customer.messages" = "Mesajlar";
 "customer.messages.none" = "Henüz kayıtlı mesaj yok.";

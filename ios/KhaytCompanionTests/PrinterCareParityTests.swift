@@ -432,6 +432,41 @@ final class PrinterCareBookTests: XCTestCase {
         XCTAssertEqual(try record("machMaintTasks", "T1")["lastDoneHours"], .number(904))
     }
 
+    /// A cut book as a current Mac (or the phone's own cloud pull) sends it:
+    /// 900 hours over the whole book, 10 of them on the one job sent.
+    private func cutWithSnapshot() throws {
+        let arrived = shop(jobs: [job("J1", 10)], tasks: [nozzle])
+        var held = whole(arrived).collections
+        held["printLog"] = .init(whole: false, sent: 1, available: 400)
+        try book.replace(with: arrived, scope: BookScope.Taken(collections: held, omitted: [], takenAt: "2026-11-07T00:00:00.000Z",
+                                                               meters: ["M1": 900], metersHeld: ["M1": 10]))
+        try book.replaceBaseline(with: arrived)
+    }
+
+    /// A cloud change folds into the book AND the baseline (`CloudSync.pull`),
+    /// so a meter measured against the baseline never moved for it — on a
+    /// phone signed in to the cloud the meter froze at the last Mac pull.
+    func testAFinishedJobArrivingByCloudChangeRaisesTheMeter() throws {
+        try cutWithSnapshot()
+        let after: [JSONValue] = [job("J1", 10), job("J5", 6)]
+        try book.update { root in root["printLog"] = .array(after) }
+        var baseline = try XCTUnwrap(book.baseline())
+        baseline["printLog"] = .array(after)
+        try book.replaceBaseline(with: baseline)
+
+        let care = CareBook(store: try book.read(), baseline: book.baseline(), scope: book.scope(), now: Date())
+        XCTAssertEqual(care.meters["M1"] ?? nil, 906, "the cloud's finished job did not move the meter")
+    }
+
+    func testAJobFinishedOnThePhoneRaisesTheMeter() throws {
+        try cutWithSnapshot()
+        try book.update { root in root["printLog"] = .array([job("J1", 10), job("J9", 4)]) }
+        let care = CareBook(store: try book.read(), baseline: book.baseline(), scope: book.scope(), now: Date())
+        XCTAssertEqual(care.meters["M1"] ?? nil, 904)
+        try BookWriter(book: book).markCareTaskDone(taskId: "T1")
+        XCTAssertEqual(try record("machMaintTasks", "T1")["lastDoneHours"], .number(904))
+    }
+
     func testACutBookWithNoMetersRefusesRatherThanGuess() throws {
         let store = shop(jobs: [job("J1", 10)], tasks: [nozzle])
         var held = whole(store).collections

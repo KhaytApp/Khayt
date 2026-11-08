@@ -84,6 +84,9 @@ final class KhaytAPIClient: ObservableObject {
     /// 401 as any bad token (khayt-cloud `docs/api-contract.md`). Nothing but
     /// signing in again fixes it, so Settings offers exactly that.
     @Published private(set) var cloudNeedsSignIn = false
+    /// The Mac answered a send but did not take some of the changes in it,
+    /// in a sentence, or nil. Those changes stay pending (`sendPendingChanges`).
+    @Published private(set) var macRefused: String?
 
     struct SyncMark: Equatable {
         enum Route: Equatable { case mac, cloud }
@@ -139,7 +142,9 @@ final class KhaytAPIClient: ObservableObject {
     /// `protocols` is for tests: URL protocols that answer in place of the Mac.
     /// `withBook: false` is for tests too: a client that holds no book always
     /// asks the Mac, whatever the simulator's shared container holds.
-    init(settings: ConnectionSettings, protocols: [AnyClass] = [], withBook: Bool = true) {
+    /// `book` is for tests as well: a book in a folder of the test's own.
+    init(settings: ConnectionSettings, protocols: [AnyClass] = [], withBook: Bool = true,
+         book injected: CompanionBook? = nil) {
         self.settings = settings
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
@@ -148,7 +153,7 @@ final class KhaytAPIClient: ObservableObject {
         // Every request to the Mac carries the PIN or this phone's signature,
         // so none may follow a redirect to another host — see `NoRedirects`.
         self.session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
-        let opened = withBook ? try? CompanionBook.inSharedContainer() : nil
+        let opened = injected ?? (withBook ? try? CompanionBook.inSharedContainer() : nil)
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
         gateEdits()
@@ -399,7 +404,8 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
-        let envelope = try JSONDecoder().decode(BookPull.self, from: data)
+        // A whole working set, decoded off the main actor (`OffMain`).
+        let envelope = try await OffMain.run { try JSONDecoder().decode(BookPull.self, from: data) }
         let store = envelope.store
 
         // A book with nothing in it is not a shop, it is a route that answered
@@ -464,10 +470,37 @@ final class KhaytAPIClient: ObservableObject {
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
+        // A 200 is not "all of it landed". The Mac answers 200 for changes it
+        // did not take (a collection it does not accept from a phone, counted
+        // as skipped), and marking those synced lost them without a word. So
+        // nothing is marked delivered unless the Mac says it took everything;
+        // otherwise it stays pending for the next send or the cloud.
+        let refused = Self.refusedByMac(data)
+        guard refused == 0 else {
+            macRefused = L10n.format("sync.mac_refused", refused)
+            await refreshPendingCount()
+            throw KhaytAPIError.server(L10n.format("sync.mac_refused", refused))
+        }
+        macRefused = nil
         // The Mac has it. Only now do the two agree — up to what was sent.
         try book.markSynced(measured)
         await refreshPendingCount()
         return outbox.count
+    }
+
+    /// How many of the changes sent the Mac's delta reply says it did not
+    /// take: `dropped` when the Mac names it, else `skipped` — which is
+    /// conservative, since a stale edit the Mac's newer copy outranks is
+    /// skipped too. Kept pending, that one goes at the next pull, when the
+    /// Mac's copy becomes the baseline and the edit is no longer a change.
+    /// A reply that cannot be read counts as nothing refused, as before.
+    nonisolated static func refusedByMac(_ reply: Data) -> Int {
+        guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: reply) else { return 0 }
+        func count(_ key: String) -> Int? {
+            if case .number(let n)? = o[key], n.isFinite { return max(0, Int(n)) }
+            return nil
+        }
+        return count("dropped") ?? count("skipped") ?? 0
     }
 
     // MARK: - Two ways home: the Mac, then the cloud
@@ -507,8 +540,28 @@ final class KhaytAPIClient: ObservableObject {
 
     /// One round through Khayt Cloud: pull what changed, send what is pending.
     /// A viewer's sign-in only pulls. See `CloudSync` for what is never done.
+    ///
+    /// One round at a time. A pull reads the baseline, waits on the network
+    /// and the engine, and writes it back; two rounds interleaved (a screen's
+    /// refresh, the live channel and an edit's delivery, all at once) each
+    /// wrote a baseline the other had not seen, and could fold the same
+    /// changes twice or mark a send against a stale `seenRev`. A caller that
+    /// arrives while a round is running waits for that round and gets its
+    /// answer; an edit made meanwhile stays pending for the next one.
     @discardableResult
     func syncThroughCloud() async -> CloudSync.Pushed? {
+        if let running = cloudRound { return await running.value }
+        let round = Task { await self.oneCloudRound() }
+        cloudRound = round
+        let result = await round.value
+        if cloudRound == round { cloudRound = nil }
+        return result
+    }
+
+    /// The round `syncThroughCloud` callers share while it runs.
+    private var cloudRound: Task<CloudSync.Pushed?, Never>?
+
+    private func oneCloudRound() async -> CloudSync.Pushed? {
         guard let session = cloud, let book, let reader else { return nil }
         do {
             let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
@@ -670,10 +723,16 @@ final class KhaytAPIClient: ObservableObject {
     /// edit is safe on the phone before the network is involved. A failure here
     /// leaves it in the outbox, counted, and the next successful send carries
     /// it.
-    private func writeLocally(_ change: (BookWriter) throws -> Void) async throws -> Bool {
+    ///
+    /// The write itself runs off the main actor (`OffMain`): it decodes,
+    /// changes and writes the whole book, which on a shop with a history is
+    /// a stall a tap should not wait in. Writes still go one at a time —
+    /// every `StoreWriter.update` passes through its serial write chain,
+    /// whatever thread it is called from.
+    private func writeLocally(_ change: @escaping @Sendable (BookWriter) throws -> Void) async throws -> Bool {
         guard let book, book.exists else { return false }
         do {
-            try change(BookWriter(book: book))
+            try await OffMain.run { try change(BookWriter(book: book)) }
         } catch is BookWriter.Refusal {
             // The book cannot represent this one. Fall through to the desktop,
             // which either does it properly or fails honestly.
@@ -906,9 +965,14 @@ final class KhaytAPIClient: ObservableObject {
 
     /// Each machine's care tasks and the parts to buy, from this phone's book
     /// (`CareBook`). Nil with no book: care is never asked of the desktop.
-    func printerCare(now: Date = Date()) -> CareBook? {
-        guard let book, book.exists, let store = try? book.read() else { return nil }
-        return CareBook(store: store, baseline: book.baseline(), scope: book.scope(), now: now)
+    /// Read and worked out off the main actor (`OffMain`): the whole book and
+    /// its baseline are decoded for it.
+    func printerCare(now: Date = Date()) async -> CareBook? {
+        guard let book, book.exists else { return nil }
+        return try? await OffMain.run { () -> CareBook? in
+            guard let store = try? book.read() else { return nil }
+            return CareBook(store: store, baseline: book.baseline(), scope: book.scope(), now: now)
+        }
     }
 
     // MARK: - Shopping list and a print's energy

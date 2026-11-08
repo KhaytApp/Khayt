@@ -123,7 +123,7 @@ final class ConnectionHealth: ObservableObject {
         } catch let err as KhaytAPIError {
             lastStatus = nil
             if case .unauthorized = err { state = .unauthorized }
-            if case .pinTooShort = err { state = .pinTooShort }
+            else if case .pinTooShort = err { state = .pinTooShort }
             else { state = .unreachable }
             lastChecked = Date()
             notifyConnectionChange()

@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Cannot reach Khayt on your network. Check Wi‑Fi and desktop LAN API.";
 "connection.banner.pin" = "LAN PIN rejected. Update PIN in Settings to match desktop.";
 "sync.pending" = "%d change(s) on this phone, waiting for the Mac.";
+"sync.mac_refused" = "The Mac did not take %d of them. They stay on this phone and are sent again.";
 "connection.error.reach_status" = "Cannot reach %@. Same Wi‑Fi? Desktop → Settings → LAN API: enabled, listen on all interfaces, note the IP and port.";
 "settings.host_required" = "Enter your computer's IP address.";
 "settings.host_invalid" = "Invalid address. Use e.g. 192.168.1.42 (not a full URL with http://).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Who owes";
-"owed.empty" = "Nothing is owed on open jobs.";
+"owed.empty" = "Nothing is owed.";
 "owed.total" = "%@ owed on %d jobs";
 "owed.due" = "Due %@";
 "owed.remind" = "Remind on WhatsApp";
@@ -989,6 +990,7 @@
 "customer.history" = "Finished jobs";
 "customer.history.none" = "No finished jobs on this phone.";
 "customer.history.window" = "This phone holds the newest finished jobs; the full history is on the Mac.";
+"customer.owes.window" = "From the jobs on this phone. Older jobs are on the Mac, so this may be short.";
 "customer.agreed" = "Agreed prices";
 "customer.messages" = "Messages";
 "customer.messages.none" = "No messages logged yet.";

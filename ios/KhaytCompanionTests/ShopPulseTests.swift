@@ -24,8 +24,11 @@ final class ShopPulseTests: XCTestCase {
                  "price": .number(price), "paidAmount": .number(paid), "priority": .bool(false)])
     }
 
-    private func load(_ orders: [JSONValue], whole: Bool) throws {
-        let taken = BookScope.Taken(collections: ["printLog": .init(whole: whole, sent: orders.count, available: whole ? orders.count : 999)],
+    /// `cut` is the day a cut book was cut at (`Held.keptAfter`): every job
+    /// left on the Mac is that old or older.
+    private func load(_ orders: [JSONValue], whole: Bool, cut: String? = nil) throws {
+        let taken = BookScope.Taken(collections: ["printLog": .init(whole: whole, sent: orders.count, available: whole ? orders.count : 999,
+                                                                    keptAfter: cut)],
                                     omitted: ["expenses"], takenAt: "2026-09-18T11:00:00.000Z")
         try book.replace(with: ["settings": .object(["currency": .string("SAR")]), "printLog": .array(orders), "clients": .array([])],
                          scope: taken)
@@ -35,7 +38,7 @@ final class ShopPulseTests: XCTestCase {
         // The window reaches back to 14 June: September is covered, the year is not.
         try load([order("A", "completed", date: "2026-06-14", price: 50),
                   order("B", "completed", date: "2026-09-10", price: 400),
-                  order("C", "printing", date: "2026-09-17", price: 120)], whole: false)
+                  order("C", "printing", date: "2026-09-17", price: 120)], whole: false, cut: "2026-06-13")
         let pulse = try await BookReader(book: book).pulse(now: now)
         XCTAssertNotNil(pulse.thisMonth, "the window reaches past 1 September")
         XCTAssertNil(pulse.thisYear, "it does not reach 1 January — the year lives on the Mac")
@@ -43,9 +46,28 @@ final class ShopPulseTests: XCTestCase {
     }
 
     func testAWindowThatStartsThisMonthCannotAnswerTheMonth() async throws {
-        try load([order("B", "completed", date: "2026-09-10", price: 400)], whole: false)
+        try load([order("B", "completed", date: "2026-09-10", price: 400)], whole: false, cut: "2026-09-09")
         let pulse = try await BookReader(book: book).pulse(now: now)
         XCTAssertNil(pulse.thisMonth, "a zero or a partial month here would be an answer, and a wrong one")
+        XCTAssertNil(pulse.thisYear)
+    }
+
+    /// One old job in a cut book — folded in by a cloud change, or kept
+    /// because it still owes — made "This year" read as complete.
+    func testOneOldJobDoesNotMakeTheYearComplete() async throws {
+        try load([order("OLD", "completed", date: "2021-02-01", price: 30),
+                  order("B", "completed", date: "2026-09-10", price: 400)], whole: false, cut: "2026-06-13")
+        let pulse = try await BookReader(book: book).pulse(now: now)
+        XCTAssertNotNil(pulse.thisMonth)
+        XCTAssertNil(pulse.thisYear, "the cut was made in June: January to June is on the Mac")
+    }
+
+    /// A scope from an older Mac does not say where it was cut, so only a
+    /// whole book can answer a period.
+    func testACutWithNoRecordedDayAnswersNoPeriod() async throws {
+        try load([order("OLD", "completed", date: "2021-02-01", price: 30)], whole: false)
+        let pulse = try await BookReader(book: book).pulse(now: now)
+        XCTAssertNil(pulse.thisMonth)
         XCTAssertNil(pulse.thisYear)
     }
 
@@ -73,15 +95,60 @@ final class ShopPulseTests: XCTestCase {
         XCTAssertEqual(today.doneToday, 1, "the job finished today is counted")
     }
 
-    func testOwedCountsOpenOrdersByTheShopsOwnRule() async throws {
-        // Owed is open work, every one of which travels — so it is always answerable.
+    func testOwedCountsEveryJobThatCanOweByTheShopsOwnRule() async throws {
         // Paid is `paidAmount`, as `lib/order-money.js` reads it; there is no
-        // status label that settles an order.
+        // status label that settles an order. A finished job still owes until
+        // it is paid (`lib/dashboard-facts.js`, the Mac's `Order.owesAtAll`).
         try load([order("C", "printing", date: "2026-09-17", price: 120),
                   order("D", "pending", date: "2026-09-17", price: 80, paid: 80),
-                  order("B", "completed", date: "2026-09-10", price: 400)], whole: false)
+                  order("B", "completed", date: "2026-09-10", price: 400),
+                  order("Q", "quote", date: "2026-09-10", price: 900),
+                  order("X", "cancelled", date: "2026-09-10", price: 700)], whole: false)
         let pulse = try await BookReader(book: book).pulse(now: now)
-        XCTAssertEqual(pulse.unpaid, 1, "the paid one owes nothing; the finished one is not open work")
-        XCTAssertEqual(pulse.owed, 120, accuracy: 0.001)
+        XCTAssertEqual(pulse.unpaid, 2, "the paid one, the quote and the cancelled job owe nothing")
+        XCTAssertEqual(pulse.owed, 520, accuracy: 0.001)
+    }
+
+    /// A job handed over and never paid for is the debt a shop most needs to
+    /// chase, and Home's Owed and its "Who owes" list both left it out.
+    func testADeliveredUnpaidJobIsOwedAndInWhoOwes() async throws {
+        var voided = order("V", "delivered", date: "2026-09-02", price: 60)
+        if case .object(var o) = voided { o["voidedAt"] = .string("2026-09-03"); voided = .object(o) }
+        try load([order("DEL", "delivered", date: "2026-09-01", price: 250, paid: 50),
+                  order("SHIP", "shipped", date: "2026-09-01", price: 30, paid: 30),
+                  voided], whole: false)
+        let reader = BookReader(book: book)
+        let pulse = try await reader.pulse(now: now)
+        XCTAssertEqual(pulse.owed, 200, accuracy: 0.001)
+        XCTAssertEqual(pulse.unpaid, 1)
+        let owing = try await reader.owing()
+        XCTAssertEqual(owing.map(\.id), ["DEL"], "the delivered job is missing from Who owes")
+        XCTAssertEqual(owing.first?.owed ?? 0, 200, accuracy: 0.001)
+    }
+
+    /// End of Day's waste and hours: a figure only when the phone holds the
+    /// whole log, never the lines that happen to be on it.
+    func testEndOfDayShowsWasteAndHoursOnlyFromAWholeLog() async throws {
+        let today = Calendar.book.dayString(Date())
+        let store: [String: JSONValue] = [
+            "settings": .object(["currency": .string("SAR")]), "printLog": .array([]), "clients": .array([]),
+            "wasteLog": .array([.object(["id": .string("W-1"), "date": .string(today), "grams": .number(12)])]),
+            "timeEntries": .array([]),
+        ]
+        let cut = BookScope.Taken(collections: ["printLog": .init(whole: true, sent: 0, available: nil)],
+                                  omitted: ["timeEntries", "wasteLog"], takenAt: "2026-11-07T00:00:00.000Z")
+        try book.replace(with: store, scope: cut)
+        var day = try await BookReader(book: book).endOfDay()
+        XCTAssertFalse(day.holdsWaste, "the phone's own waste lines are not the day's waste")
+        XCTAssertFalse(day.holdsTime)
+
+        let whole = BookScope.Taken(collections: ["printLog": .init(whole: true, sent: 0, available: nil),
+                                                  "wasteLog": .init(whole: true, sent: 1, available: nil),
+                                                  "timeEntries": .init(whole: true, sent: 0, available: nil)],
+                                    omitted: [], takenAt: "2026-11-07T00:00:00.000Z")
+        try book.replace(with: store, scope: whole)
+        day = try await BookReader(book: book).endOfDay()
+        XCTAssertTrue(day.holdsWaste)
+        XCTAssertTrue(day.holdsTime)
     }
 }

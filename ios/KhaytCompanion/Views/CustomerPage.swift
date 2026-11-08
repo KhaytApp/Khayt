@@ -124,6 +124,14 @@ struct CustomerPage: View {
                 .font(.khaytDisplay(34, .bold, relativeTo: .title).monospacedDigit())
                 .tracking(-0.8)
                 .foregroundStyle(s.isOverLimit ? KhaytDesign.late : (s.owed > 0.005 ? KhaytDesign.attention : KhaytDesign.done))
+            // Summed over the jobs this phone holds. A cut book keeps every
+            // job that may still owe (`BookScope.mayOwe`), so this is rarely
+            // short — but a book from an older Mac does not, and the figure
+            // must not read as the whole story when it may not be.
+            if s.historyWindowed {
+                Text(L10n.tr("customer.owes.window"))
+                    .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
+            }
             if s.creditLimit > 0 {
                 Text(L10n.format(s.isOverLimit ? "customer.over_limit" : "customer.limit",
                                  Money.text(s.creditLimit, s.currency)))

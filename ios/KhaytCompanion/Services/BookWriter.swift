@@ -48,6 +48,14 @@ struct BookWriter {
 
     let book: CompanionBook
 
+    /// Collections this phone writes that are NOT in `BookScope.workingSet`:
+    /// the waste log, the service log and the waiting list's history. A cloud
+    /// change to one of them is still folded in (`CloudSync.pull`), so the
+    /// phone's own rows and the shop's agree; every other collection outside
+    /// the working set is left on the Mac. A writer here to a new collection
+    /// outside the working set is added to this list.
+    static let writesOutsideWorkingSet: Set<String> = ["wasteLog", "machMaintLog", "waitingListHistory"]
+
     /// Advance or set a job's stage, by the shop's own status rule.
     ///
     /// `KhaytEngine.moveJob` is the Mac's expression: `gate`, then `apply`,
@@ -1108,10 +1116,21 @@ struct BookWriter {
         // number wearing EUR.
         if let code = linkedCurrency, code != shopCurrency {
             var rate = 0.0
-            if case .object(let rates)? = settings["exchangeRates"], case .number(let r)? = rates[code] { rate = r }
+            if case .object(let rates)? = settings["exchangeRates"] {
+                switch rates[code] {
+                case .number(let r)?: rate = r.isFinite ? r : 0
+                case .string(let r)?: rate = Double(r.trimmingCharacters(in: .whitespaces)) ?? 0
+                default: break
+                }
+            }
             if rate > 0 {
                 order["price"] = .number((price / rate * 100).rounded() / 100)
                 order["currency"] = .string(code)
+                // The rate the price was converted at, as `lib/order-new.js`
+                // keeps it: a document that states the amount in the shop's
+                // currency (the ZATCA QR's riyals) uses the rate the customer
+                // was quoted at, not whatever Settings holds on reprint day.
+                order["fxRate"] = .number(rate)
             } else {
                 order["currency"] = .string(shopCurrency)
             }

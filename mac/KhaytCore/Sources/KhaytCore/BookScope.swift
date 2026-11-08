@@ -50,7 +50,8 @@ public enum BookScope {
         /// Every record, up to a ceiling that exists only so a pathological book
         /// cannot hand a phone something it has no business holding.
         case whole(cap: Int)
-        /// Every unfinished order, plus the newest `n` finished ones.
+        /// Every unfinished order, every finished one that may still owe money
+        /// (`mayOwe`), plus the newest `n` of the rest.
         case openPlusNewest(Int)
         /// The newest `n` by the record's own day (`recency`), wherever in the
         /// list they sit. Newest-first is only a convention: a row folded in
@@ -114,9 +115,16 @@ public enum BookScope {
             /// Present when `whole` is false: how many the Mac actually holds,
             /// so the phone can say "200 of 3,140" rather than "200".
             public let available: Int?
+            /// Present when an `openPlusNewest` cut left finished records
+            /// behind: the latest `recency` of any record it left. Every
+            /// record left behind is this old or older, so a period that starts
+            /// after this day is held in full. Optional, so a scope from an
+            /// older Mac still decodes (and then no period is known whole).
+            public let keptAfter: String?
 
-            public init(whole: Bool, sent: Int, available: Int?) {
+            public init(whole: Bool, sent: Int, available: Int?, keptAfter: String? = nil) {
                 self.whole = whole; self.sent = sent; self.available = available
+                self.keptAfter = keptAfter
             }
         }
 
@@ -134,11 +142,19 @@ public enum BookScope {
         /// off there would record a meter so low the Mac shows it overdue again
         /// at once. Optional, so a scope from an older Mac still decodes.
         public let meters: [String: Double]?
+        /// The same count over the jobs the cut HOLDS, at the same moment —
+        /// present beside `meters`. The phone's meter is `meters` plus what its
+        /// own count has grown by since: its count now less this. Measured
+        /// against the baseline instead, a finished job that arrived by cloud
+        /// change landed in both and never moved the meter. Optional, so a
+        /// scope from an older Mac still decodes.
+        public let metersHeld: [String: Double]?
 
         public init(collections: [String: Held], omitted: [String], takenAt: String,
-                    meters: [String: Double]? = nil) {
+                    meters: [String: Double]? = nil, metersHeld: [String: Double]? = nil) {
             self.collections = collections; self.omitted = omitted; self.takenAt = takenAt
             self.meters = meters
+            self.metersHeld = metersHeld
         }
 
         /// Does this phone hold every record of `collection`?
@@ -203,21 +219,37 @@ public enum BookScope {
                 continue
             }
             let kept: [JSONValue]
+            var keptAfter: String?
             switch slice {
             case .whole(let cap):
                 kept = Array(rows.prefix(cap))
             case .openPlusNewest(let n):
+                // Open work, and finished work that may still owe — whatever
+                // its age. A customer's Owed on the phone is summed over the
+                // jobs it holds; one old unpaid job left on the Mac made it
+                // short with nothing on screen to say so.
+                //
+                // The owing set has its own ceiling: a shop that never records
+                // payments has every finished job "may owe", and without one
+                // the phone got the whole book. When it bites, the newest
+                // owing jobs travel and keptAfter says the rest are older.
                 let open = rows.filter { !isFinished($0) }
-                let closed = rows.filter { isFinished($0) }
+                let owing = rows.filter { isFinished($0) && mayOwe($0) }
                     .sorted { recency($0) > recency($1) }
-                    .prefix(n)
-                kept = open + closed
+                let closed = rows.filter { isFinished($0) && !mayOwe($0) }
+                    .sorted { recency($0) > recency($1) }
+                var leftNewest: [String] = []
+                if owing.count > owingCap { leftNewest.append(recency(owing[owingCap])) }
+                if closed.count > n { leftNewest.append(recency(closed[n])) }
+                keptAfter = leftNewest.max()
+                kept = open + owing.prefix(owingCap) + closed.prefix(n)
             case .newest(let n):
                 kept = Array(rows.sorted { recency($0) > recency($1) }.prefix(n))
             }
             held[collection] = .init(whole: kept.count == rows.count,
                                      sent: kept.count,
-                                     available: kept.count == rows.count ? nil : rows.count)
+                                     available: kept.count == rows.count ? nil : rows.count,
+                                     keptAfter: kept.count == rows.count ? nil : keptAfter)
             out[collection] = .array(kept.map { trimmed($0, in: collection) })
         }
 
@@ -229,11 +261,14 @@ public enum BookScope {
         // The meters, only when the jobs were cut: a phone holding them all
         // counts them itself.
         var meters: [String: Double]?
+        var metersHeld: [String: Double]?
         if held["printLog"]?.whole == false, case .array(let rows)? = store["printLog"] {
             meters = hoursByMachine(rows)
+            if case .array(let kept)? = out["printLog"] { metersHeld = hoursByMachine(kept) }
         }
 
-        return (out, Taken(collections: held, omitted: omitted, takenAt: StoreWriter.iso(now), meters: meters))
+        return (out, Taken(collections: held, omitted: omitted, takenAt: StoreWriter.iso(now),
+                           meters: meters, metersHeld: metersHeld))
     }
 
     /// `KhaytMaintenance.hoursMeter` for every machine at once: the print time
@@ -264,14 +299,62 @@ public enum BookScope {
         return finished.contains(status)
     }
 
-    /// What sorts "newest" — the shop's own day stamp, with `updatedAt` behind
-    /// it for a record that has none. Both are ISO-ish and compare as strings;
-    /// `date` is "2026-07-02" and `updatedAt` is the full timestamp, so they are
-    /// never compared against each other, only within their own kind.
+    /// How many finished-but-may-owe jobs travel beyond the open ones.
+    public static let owingCap = 1_000
+    /// The highest sales-tax rate `mayOwe` allows for when a job has no
+    /// stored payment status (KSA is 15%).
+    public static let maxTaxOnTop = 0.25
+
+    /// Could this finished job still owe the shop money?
+    ///
+    /// The shared rule decides what a job owes (`KhaytOrderMoney`), and it
+    /// needs the engine, the settings and the currencies — none of which a cut
+    /// has. So this errs towards keeping: a job that cannot owe at all
+    /// (`PaymentTerms.owesAtAll`: a quote, a cancelled job, a voided or
+    /// credited invoice) or that charges nothing does not, and a job owes
+    /// nothing only when its own figures say it is paid in full AND its stored
+    /// `paymentStatus` (`lib/order-payment.js` `statusOf`, which counts tax and
+    /// credit notes) does not say otherwise. Anything else travels — up to
+    /// `owingCap`, newest first. A heuristic: it can over-send, and past the
+    /// cap it under-sends (and the scope says so through `keptAfter`).
+    public static func mayOwe(_ row: JSONValue) -> Bool {
+        guard case .object(let o) = row, PaymentTerms.owesAtAll(o) else { return false }
+        func number(_ v: JSONValue?) -> Double {
+            switch v {
+            case .number(let n)?: return n.isFinite ? n : 0
+            case .string(let s)?: return Double(s.trimmingCharacters(in: .whitespaces)) ?? 0
+            default: return 0
+            }
+        }
+        let price = number(o["price"])
+        guard price > 0.005 else { return false }
+        let paid = number(o["paidAmount"]) + number(o["giftCardDiscount"])
+        // The stored status was worked out against what was BILLED (tax and
+        // credit notes included), so it decides when present — except a
+        // "paid" that its own figures contradict (a price raised after the
+        // status was stamped), which travels.
+        if case .string(let status)? = o["paymentStatus"] {
+            if status == "unpaid" || status == "partial" { return true }
+            if status == "paid" { return paid + 0.005 < price }
+        }
+        // No status: compare against the price with room for tax on top. A
+        // tax-on-top shop paid exactly `price` still owes the tax, and a cut
+        // has no settings to know the rate, so this errs towards sending.
+        return paid + 0.005 < price * (1 + maxTaxOnTop)
+    }
+
+    /// What sorts "newest": the latest of the job's own day (`date`) and the
+    /// moments it was completed, delivered and last changed. A job booked in
+    /// 2021 and finished last week is recent history, and ranking it by its
+    /// booking day alone cut it first. A day ("2026-07-02") and a timestamp
+    /// ("2026-07-02T09:00:00.000Z") compare as strings by day first, so the
+    /// latest of them is the latest day.
     static func recency(_ row: JSONValue) -> String {
         guard case .object(let o) = row else { return "" }
-        if case .string(let date)? = o["date"] { return date }
-        if case .string(let updated)? = o["updatedAt"] { return String(updated.prefix(10)) }
-        return ""
+        var latest = ""
+        for key in ["date", "completedAt", "deliveredAt", "updatedAt"] {
+            if case .string(let stamp)? = o[key], stamp > latest { latest = stamp }
+        }
+        return latest
     }
 }

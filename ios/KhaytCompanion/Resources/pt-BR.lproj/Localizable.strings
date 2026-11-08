@@ -18,6 +18,7 @@
 "connection.banner.unreachable" = "Não foi possível acessar o Khayt na sua rede. Verifique o Wi‑Fi e a API de rede local do computador.";
 "connection.banner.pin" = "PIN da rede local recusado. Atualize o PIN nos Ajustes para corresponder ao do computador.";
 "sync.pending" = "%d alteração(ões) neste iPhone aguardando o Mac.";
+"sync.mac_refused" = "O Mac não aceitou %d delas. Elas ficam neste iPhone e são enviadas de novo.";
 "connection.error.reach_status" = "Não foi possível acessar %@. Mesmo Wi‑Fi? Computador → Ajustes → API de rede local: ativada, escutando em todas as interfaces; anote o IP e a porta.";
 "settings.host_required" = "Digite o endereço IP do seu computador.";
 "settings.host_invalid" = "Endereço inválido. Use, por exemplo, 192.168.1.42 (não uma URL completa com http://).";
@@ -896,7 +897,7 @@
 
 /* Who owes */
 "owed.title" = "Quem deve";
-"owed.empty" = "Nada a receber nos trabalhos abertos.";
+"owed.empty" = "Nada a receber.";
 "owed.total" = "%@ a receber em %d trabalhos";
 "owed.due" = "Vence %@";
 "owed.remind" = "Lembrar pelo WhatsApp";
@@ -989,6 +990,7 @@
 "customer.history" = "Trabalhos concluídos";
 "customer.history.none" = "Nenhum trabalho concluído neste iPhone.";
 "customer.history.window" = "Este iPhone guarda os trabalhos concluídos mais recentes; o histórico completo está no Mac.";
+"customer.owes.window" = "Pelos trabalhos neste iPhone. Os mais antigos estão no Mac, então o valor pode ser menor que o real.";
 "customer.agreed" = "Preços combinados";
 "customer.messages" = "Mensagens";
 "customer.messages.none" = "Nenhuma mensagem registrada ainda.";
