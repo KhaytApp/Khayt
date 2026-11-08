@@ -123,7 +123,8 @@
     "test:e2e:customerupdates": "node scripts/e2e-customer-updates-smoke.mjs",
     "test:e2e:libraryhealth": "node scripts/e2e-library-health-smoke.mjs",
     "test:e2e:reviewfixes": "node scripts/e2e-review-fixes-smoke.mjs",
-    "test:e2e:failedcost": "node scripts/e2e-failed-cost-smoke.mjs"
+    "test:e2e:failedcost": "node scripts/e2e-failed-cost-smoke.mjs",
+    "test:e2e:pickup": "node scripts/e2e-pickup-settings-smoke.mjs"
   },
   "dependencies": {
     "@sentry/electron": "^7.16.0",

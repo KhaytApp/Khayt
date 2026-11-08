@@ -265,6 +265,10 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:failedcost
 
+      - name: E2E smoke (pickup hours and map link reach the order page)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:pickup
+
       - name: E2E smoke (order to print file link)
         run: xvfb-run -a npm run test:e2e:filelink
 
