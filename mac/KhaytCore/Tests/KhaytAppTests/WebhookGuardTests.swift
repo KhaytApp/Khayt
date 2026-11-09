@@ -413,7 +413,7 @@ struct WebhookWiringTests {
         // The delivery is a hand-written HTTP/1.1 POST on a pinned socket: it
         // cannot follow anything, and a 3xx is refused as the answer.
         let client = try Self.code("WebhookClient.swift")
-        #expect(client.contains("if (300..<400).contains(status) { throw Failure.redirected }"),
+        #expect(client.contains("if (300..<400).contains(answer.status) { throw Failure.redirected }"),
                 "a 3xx is no longer refused")
         #expect(!client.contains("URLSession"),
                 "a URLSession resolves the name again and follows redirects")

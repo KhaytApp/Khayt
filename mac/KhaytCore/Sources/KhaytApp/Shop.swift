@@ -3090,6 +3090,9 @@ final class Shop {
     var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
     /// The connector a file asked to install, waiting on the shop's OK.
     var connectorOffer: ConnectorOffer?
+    /// How a connector's POST leaves this Mac. Nil is `WebhookClient`; tests
+    /// put a stand-in here so no request reaches the network.
+    var connectorPost: Shop.ConnectorPost?
 
     // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
     /// Texts in flight or sent this run, as "job|milestone" — one click, one text.

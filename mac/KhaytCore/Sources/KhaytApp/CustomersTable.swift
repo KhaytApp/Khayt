@@ -329,6 +329,11 @@ struct CustomerInspector: View {
                             .font(.caption).foregroundStyle(.secondary)
                         LayerRule()
                     }
+                    // A connector's buttons and fields, on a customer written
+                    // down (hidden until connectors ship).
+                    if ConnectorsSwitch.isOn(), let record = person.record {
+                        ConnectorSection(shop: shop, attach: "customer", recordId: record.id)
+                    }
                     DetailSection(shop.words.callIt("mac.money")) {
                         DetailLine(shop.words.callIt("mac.billed"), Money.text(person.billed, shop.currency))
                         DetailLine(shop.words.callIt("mac.paid"), Money.text(person.paid, shop.currency), dim: true)

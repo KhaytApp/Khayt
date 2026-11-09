@@ -81,6 +81,20 @@ enum WebhookClient {
     /// are for. Returns the HTTP status, or throws for a fault.
     static func post(_ payload: Data, to url: URL, headers: [(String, String)],
                      engine: KhaytEngine) async throws -> Int {
+        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: 0).status
+    }
+
+    /// The same POST, through the same guards, with the answer's body read too
+    /// (up to `keep` bytes): a connector's reply fills its own fields. `body`
+    /// is nil when the answer was longer than `keep` or could not be read as
+    /// HTTP — the status still stands.
+    static func postReading(_ payload: Data, to url: URL, headers: [(String, String)],
+                            engine: KhaytEngine, timeout: TimeInterval, keep: Int) async throws -> (status: Int, body: Data?) {
+        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: keep)
+    }
+
+    private static func exchange(_ payload: Data, to url: URL, headers: [(String, String)],
+                                 engine: KhaytEngine, timeout: TimeInterval, keep: Int) async throws -> (status: Int, body: Data?) {
         guard let host = url.host, !host.isEmpty else { throw Failure.blocked("") }
         // https ONLY, which is what the other app allows. Plain http would
         // carry a shop's order data and its HMAC across the network in the
@@ -110,10 +124,10 @@ enum WebhookClient {
         var last: Error = Failure.refused("\(host) could not be reached")
         for address in resolved {
             do {
-                let status = try await pinnedPost(url, host: host, address: address,
-                                                  message: head + payload, timeout: timeout)
-                if (300..<400).contains(status) { throw Failure.redirected }
-                return status
+                let answer = try await pinnedPost(url, host: host, address: address,
+                                                  message: head + payload, timeout: timeout, keep: keep)
+                if (300..<400).contains(answer.status) { throw Failure.redirected }
+                return answer
             } catch let failure as Failure {
                 throw failure
             } catch let sent as Unanswered {
@@ -215,7 +229,8 @@ enum WebhookClient {
     /// WHERE to connect separately from WHO to expect there. It follows no
     /// redirect and resolves nothing.
     nonisolated static func pinnedPost(_ url: URL, host: String, address: String,
-                                       message: Data, timeout: TimeInterval) async throws -> Int {
+                                       message: Data, timeout: TimeInterval,
+                                       keep: Int = 0) async throws -> (status: Int, body: Data?) {
         let tls = NWProtocolTLS.Options()
         sec_protocol_options_set_tls_server_name(tls.securityProtocolOptions, host)
         sec_protocol_options_add_tls_application_protocol(tls.securityProtocolOptions, "http/1.1")
@@ -228,8 +243,8 @@ enum WebhookClient {
         let once = Once()
 
         return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, Error>) in
-                let finish: @Sendable (Result<Int, Error>) -> Void = { result in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(status: Int, body: Data?), Error>) in
+                let finish: @Sendable (Result<(status: Int, body: Data?), Error>) -> Void = { result in
                     guard once.claim() else { return }
                     connection.cancel()
                     continuation.resume(with: result)
@@ -241,7 +256,15 @@ enum WebhookClient {
                     connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) {
                         data, _, complete, error in
                         let buffer = buffer + (data ?? Data())
-                        if let code = statusCode(buffer) { finish(.success(code)); return }
+                        // Status only: the first line is the answer.
+                        if keep == 0, let code = statusCode(buffer) { finish(.success((code, nil))); return }
+                        if keep > 0, let code = statusCode(buffer) {
+                            // `Connection: close`: the answer ends when the
+                            // server closes, or when it is too long to keep.
+                            if complete || error != nil { finish(.success((code, HTTPReply.body(buffer)))); return }
+                            if buffer.count > keep + 16_384 { finish(.success((code, nil))); return }
+                            read(buffer); return
+                        }
                         if let error { finish(.failure(Unanswered(why: "\(error)"))); return }
                         if complete || buffer.count > 16_384 {
                             finish(.failure(Unanswered(why: "no HTTP status line")))
@@ -344,5 +367,49 @@ enum WebhookClient {
             node = current.pointee.ai_next
         }
         return out
+    }
+}
+
+/// The body of an HTTP/1.1 answer read to its end: by `Content-Length`, by
+/// chunks, or to the close. Nil when it is not a complete answer.
+enum HTTPReply {
+    nonisolated static func body(_ raw: Data) -> Data? {
+        guard let split = raw.firstRange(of: Data("\r\n\r\n".utf8)),
+              let head = String(data: raw[..<split.lowerBound], encoding: .utf8)?.lowercased() else { return nil }
+        let rest = Data(raw[split.upperBound...])
+        let lines = head.split(separator: "\r\n").dropFirst()
+        func header(_ name: String) -> String? {
+            for line in lines {
+                let parts = line.split(separator: ":", maxSplits: 1)
+                if parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces) == name {
+                    return parts[1].trimmingCharacters(in: .whitespaces)
+                }
+            }
+            return nil
+        }
+        if let te = header("transfer-encoding"), te.contains("chunked") { return dechunk(rest) }
+        if let cl = header("content-length").flatMap(Int.init) {
+            guard cl >= 0, rest.count >= cl else { return nil }
+            return Data(rest.prefix(cl))
+        }
+        return rest
+    }
+
+    nonisolated static func dechunk(_ data: Data) -> Data? {
+        var out = Data()
+        var i = data.startIndex
+        let crlf = Data("\r\n".utf8)
+        while true {
+            guard let end = data[i...].firstRange(of: crlf),
+                  let line = String(data: data[i..<end.lowerBound], encoding: .ascii) else { return nil }
+            let hex = line.split(separator: ";").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+            guard let size = Int(hex, radix: 16), size >= 0 else { return nil }
+            let start = end.upperBound
+            if size == 0 { return out }
+            guard data.distance(from: start, to: data.endIndex) >= size + 2 else { return nil }
+            let stop = data.index(start, offsetBy: size)
+            out.append(data[start..<stop])
+            i = data.index(stop, offsetBy: 2)
+        }
     }
 }

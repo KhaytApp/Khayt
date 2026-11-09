@@ -199,6 +199,10 @@ private struct Detail: View {
                         }
                     }
                 }
+                // A connector's buttons and fields (hidden until connectors ship).
+                if ConnectorsSwitch.isOn() {
+                    ConnectorSection(shop: shop, attach: "order", recordId: job.id)
+                }
                 if !job.notes.isEmpty {
                     Divider()
                     DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
