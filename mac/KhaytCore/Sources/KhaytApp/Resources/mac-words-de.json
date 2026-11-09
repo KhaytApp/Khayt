@@ -3895,5 +3895,9 @@
  "mac.cp_part_rail_lube": "Schmierset für Linearschienen",
  "mac.cp_part_fep_film": "FEP-Folie",
  "mac.cp_part_resin_tank": "Harztank",
- "mac.cp_part_ipa": "Isopropanol (Liter)"
+ "mac.cp_part_ipa": "Isopropanol (Liter)",
+ "mac.nav_cloud": "Khayt Cloud",
+ "mac.cloud_account": "Konto",
+ "mac.cloud_not_connected": "Dieser Mac ist nicht bei Khayt Cloud angemeldet. Melde dich an, um das Buch des Geschäfts mit seinen anderen Computern und Telefonen zu synchronisieren.",
+ "mac.cloud_settings": "Khayt Cloud-Einstellungen"
 }

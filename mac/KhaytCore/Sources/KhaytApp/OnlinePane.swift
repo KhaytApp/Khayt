@@ -123,7 +123,8 @@ struct OnlinePane: View {
                 // Drive here, under Online. It saves itself as it changes, so
                 // the Save bar below is not its business.
                 CloudLibrarySettings(shop: shop)
-                CloudPlanSettings(shop: shop)
+                // The Khayt Cloud plan is in Settings › Khayt Cloud (`CloudPane`),
+                // beside the sign-in it needs.
                 PayLinkSettings(shop: shop)
                 PortalCrossShopSetting(shop: shop)
                 ShopSlugSettings(shop: shop)

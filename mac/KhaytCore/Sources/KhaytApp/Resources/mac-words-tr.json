@@ -3895,5 +3895,9 @@
  "mac.cp_part_rail_lube": "Lineer ray yağlama seti",
  "mac.cp_part_fep_film": "FEP film",
  "mac.cp_part_resin_tank": "Reçine tankı",
- "mac.cp_part_ipa": "İzopropil alkol (litre)"
+ "mac.cp_part_ipa": "İzopropil alkol (litre)",
+ "mac.nav_cloud": "Khayt Cloud",
+ "mac.cloud_account": "Hesap",
+ "mac.cloud_not_connected": "Bu Mac Khayt Cloud’da oturum açmamış. Dükkânın defterini diğer bilgisayar ve telefonlarıyla eşitlemek için oturum açın.",
+ "mac.cloud_settings": "Khayt Cloud Ayarları"
 }

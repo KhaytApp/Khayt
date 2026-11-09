@@ -51,12 +51,16 @@ struct SettingsTests {
         let shop = try await Self.sample()
         var draft = InvoicePane.Draft.read(shop.settingsDict, shop: shop)
         draft.currency = "EUR"; draft.enableVat = true; draft.vatRate = 19; draft.taxMode = "exclusive"
-        draft.enableZatca = false; draft.invPrefix = "FAC"; draft.quotePrefix = "DEV"
+        draft.enableZatca = false; draft.quotePrefix = "DEV"
         draft.invTemplate = "minimal"; draft.invoiceBilingual = "both"; draft.invoiceSecondLang = "fr"
         draft.invAccent = "#123456"
         for key in draft.content.keys { draft.content[key] = "edited " + key }
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
         #expect(InvoicePane.Draft.read(out, shop: shop) == draft)
+        // The job-number prefix is Invoice numbering's now (`NumberPrefixes`):
+        // this pane saving must never overwrite it with a stale copy.
+        #expect(draft.form()["invPrefix"] == nil)
+        #expect(out["invPrefix"] == shop.settingsDict["invPrefix"])
         // And the profile the invoice is computed from agrees with the legacy
         // fields — the rule's whole reason for rebuilding `tax`.
         let tax = Self.object(out["tax"])

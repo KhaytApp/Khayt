@@ -280,10 +280,15 @@ extension Shop {
 
     /// The invoice counter: prefix, next number and format, or `reset` for a
     /// new year's count from 1.
-    func saveInvoiceNumbering(_ form: [String: JSONValue]) async {
+    /// `prefixes` is `NumberPrefixes.patch`: the job and tax-invoice prefixes
+    /// as Settings shows them (one field writing both, or two), written in the
+    /// same save as the counter. Neither touches a number already issued.
+    func saveInvoiceNumbering(_ form: [String: JSONValue], prefixes: [String: JSONValue] = [:]) async {
         let year = Calendar.book.component(.year, from: Date())
         await writeOwnSettings { settings, engine in
-            try await engine.invoiceNumbering(settings, form: form, year: year)
+            var next = try await engine.invoiceNumbering(settings, form: form, year: year)
+            for (key, value) in prefixes where key == "invPrefix" || key == "invNumPrefix" { next[key] = value }
+            return next
         }
     }
 

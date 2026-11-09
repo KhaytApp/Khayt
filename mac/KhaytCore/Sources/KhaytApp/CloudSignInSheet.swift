@@ -15,6 +15,9 @@ import KhaytCore
 /// and lets it go, the way `CloudCheckSheet` does.
 struct CloudSignInSheet: View {
     let shop: Shop
+    /// Open on the password reset, for Settings › Khayt Cloud's "Forgot the
+    /// password?" — the address and account still prefill underneath.
+    var startInReset = false
     @Environment(\.dismiss) private var dismiss
 
     @State private var url = ""
@@ -121,7 +124,7 @@ struct CloudSignInSheet: View {
         }
         .padding(18)
         .frame(width: 460)
-        .onAppear(perform: prefill)
+        .onAppear { prefill(); if startInReset { resetting = true } }
         .shopSheet(isPresented: $resetting) { reset }
     }
 

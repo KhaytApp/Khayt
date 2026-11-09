@@ -4583,6 +4583,13 @@ final class Words {
         "mac.wholesale":           ["en": "Wholesale", "ar": "جملة"],
         "mac.how_it_prints":       ["en": "How it prints", "ar": "كيف يُطبع"],
         "mac.cloud_sign_in":       ["en": "Sign in to the cloud", "ar": "تسجيل الدخول إلى السحابة"],
+        // Settings › Khayt Cloud (`CloudPane`, Nov 2026): the account was
+        // reachable only from the Book menu and a right-click on the sidebar.
+        "mac.nav_cloud":           ["en": "Khayt Cloud", "ar": "سحابة خيط"],
+        "mac.cloud_account":       ["en": "Account", "ar": "الحساب"],
+        "mac.cloud_settings":      ["en": "Khayt Cloud Settings", "ar": "إعدادات سحابة خيط"],
+        "mac.cloud_not_connected": ["en": "This Mac is not signed in to Khayt Cloud. Sign in to sync the shop's book with its other computers and phones.",
+                                    "ar": "هذا الماك غير مسجّل الدخول إلى سحابة خيط. سجّل الدخول لمزامنة دفتر المتجر مع أجهزته الأخرى وهواتفه."],
         "mac.cloud_sign_out":   ["en": "Sign out of the cloud", "ar": "تسجيل الخروج من السحابة"],
         "mac.cloud_sign_out_do": ["en": "Sign out", "ar": "تسجيل الخروج"],
         "mac.cloud_sign_out_q": ["en": "Sign out of Khayt Cloud on this Mac? The book stays, and so does the cloud copy.", "ar": "تسجيل الخروج من سحابة خيط على هذا الماك؟ يبقى الدفتر وتبقى النسخة السحابية."],
