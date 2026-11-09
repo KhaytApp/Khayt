@@ -35,6 +35,11 @@ extension Shop {
             let reviewed = await connectorReviewedBy(Self.object(entry)["manifest"] ?? .null) != nil
             if (try? await engine.pluginStateOf(entry, reviewed: reviewed)) == "on" { out.append(entry) }
         }
+        // This Mac's dev connectors, in developer mode only: the review is
+        // what developer mode waives (`DevConnectors`).
+        for entry in runningDevConnectors where (try? await engine.pluginStateOf(entry, reviewed: true)) == "on" {
+            out.append(entry)
+        }
         return out
     }
 
@@ -65,7 +70,8 @@ extension Shop {
     func connectorFields(attach: String, plugins: JSONValue?) async -> [ConnectorFieldRow] {
         guard ConnectorsSwitch.isOn() else { return [] }
         let live = Set(await liveConnectors().compactMap { Shop.plainString(Self.object($0)["id"]) })
-        return Self.fieldRows(connectorEntries, live: live, attach: attach, plugins: plugins, lang: words.language)
+        return Self.fieldRows(connectorEntries + runningDevConnectors, live: live, attach: attach,
+                              plugins: plugins, lang: words.language)
     }
 
     nonisolated static func fieldRows(_ entries: [JSONValue], live: Set<String>, attach: String,
@@ -446,6 +452,9 @@ extension Shop {
     /// resumes on the next launch (`runIntegrationsPass`).
     private func settleConnectorEvent(_ item: ConnectorQueued, retryAfterMs: Double?) async {
         // lock: system — the retry queue of an event the shop's own action already sent
+        // A dev connector's event is sent once: its id never goes into the
+        // book, and the queue is the book's (`DevConnectors`).
+        if isDevConnector(item.id) { return }
         guard let engine, let build = source.build else { return }
         let had = settingsDict["pluginOutbox"] ?? .array([])
         if retryAfterMs == nil, case .array(let rows) = had,

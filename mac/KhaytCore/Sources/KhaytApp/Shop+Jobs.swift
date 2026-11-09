@@ -2634,7 +2634,7 @@ extension Shop {
         if let asked = move.webhookEffects, !asked.isEmpty {
             let clientName = emailClientName(for: changedOrder, in: clients)
             owed = (try? await engine.webhookDeliveries(
-                order: .object(changedOrder), effects: asked, settings: settings,
+                order: .object(changedOrder), effects: asked, settings: DevConnectors.withDev(settings),
                 shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
                 clientName: clientName, currency: shopCurrencyOf(settings),
                 at: ISO8601DateFormatter().string(from: Date()),

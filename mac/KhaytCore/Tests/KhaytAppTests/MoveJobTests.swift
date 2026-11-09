@@ -1301,7 +1301,14 @@ struct MoveOnARealBookTests {
         let logBefore = MoveJobTests.rows(before, "auditLog").count
         let logAfter = MoveJobTests.rows(after, "auditLog")
         #expect(logAfter.count == logBefore + 1, "one line, not none and not two")
-        #expect(MoveJobTests.string(logAfter.last?["detail"]) == "\(job.id) → \(job.to.rawValue)")
+        // The line names the job as the shop does, by its job number when it
+        // has one (`lib/order-status.js`), which a real book's jobs do.
+        let named: String = switch MoveJobTests.row(before, "printLog", job.id)?["jobNumber"] {
+        case .string(let s)? where !s.isEmpty: s
+        case .number(let n)? where n != 0: n == n.rounded() ? String(Int64(n)) : String(n)
+        default: job.id
+        }
+        #expect(MoveJobTests.string(logAfter.last?["detail"]) == "\(named) → \(job.to.rawValue)")
         #expect(MoveJobTests.string(logAfter.last?["id"])?.hasPrefix("AL-") == true)
 
         // And every other ORDER, too: only the one row.

@@ -27,7 +27,7 @@ extension Shop {
         let owed = (try? await engine.webhookDeliveries(
             order: .object(job),
             effects: [WebhookEffect(kind: "webhook", event: "quote_approved", newStatus: nil)],
-            settings: settings,
+            settings: DevConnectors.withDev(settings),
             shopName: Self.plainString(settings["bizEn"]) ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
             clientName: Self.emailClientName(for: job, in: clientRows),
             currency: Self.shopCurrencyOf(settings),
