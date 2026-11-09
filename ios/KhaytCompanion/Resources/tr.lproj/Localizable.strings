@@ -1203,6 +1203,8 @@
 "connectors.data.order.date" = "Sipariş tarihi";
 "connectors.data.order.carrier" = "Kargo firması";
 "connectors.data.order.trackingnumber" = "Takip numarası";
+"connectors.data.order.amountdue" = "Ödenecek tutar";
+"connectors.data.order.amountdueminor" = "Ödenecek tutar (en küçük birim)";
 "connectors.data.customer.name" = "Müşteri adı";
 "connectors.data.customer.company" = "Şirket";
 "connectors.data.customer.phone" = "Telefon numarası";

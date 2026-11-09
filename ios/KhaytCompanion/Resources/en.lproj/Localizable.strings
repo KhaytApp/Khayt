@@ -1203,6 +1203,8 @@
 "connectors.data.order.date" = "Order date";
 "connectors.data.order.carrier" = "Carrier";
 "connectors.data.order.trackingnumber" = "Tracking number";
+"connectors.data.order.amountdue" = "Amount due";
+"connectors.data.order.amountdueminor" = "Amount due (minor units)";
 "connectors.data.customer.name" = "Customer name";
 "connectors.data.customer.company" = "Company";
 "connectors.data.customer.phone" = "Phone number";
