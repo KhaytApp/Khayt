@@ -108,6 +108,31 @@ struct Connector: Identifiable, Equatable, Sendable {
     var isActive: Bool { status == .active }
 }
 
+/// Whether connectors have launched on the phone.
+enum ConnectorLaunch {
+    /// THE LAUNCH-DAY SWITCH. False until khaytapp.com/privacy describes
+    /// connectors (website #147 live): until then a release build's sample
+    /// shop holds no connector (`SampleShop.shippedSampleConnectors`) and no
+    /// build shows the "set them up on your Mac" hint, so no TestFlight or App
+    /// Store build shows the feature early. On launch day this one line
+    /// becomes `true` in the build that goes to App Review, and the sample
+    /// shop is how a reviewer, who has no Mac, sees a connector: Settings ▸
+    /// Connectors, the Lamha button on a job, its consent sheet and a
+    /// simulated reply (`SampleShop.simulatedReply`). DEBUG builds (tests,
+    /// screenshots) always hold the sample connectors.
+    static let launched = false
+
+    /// Settings' one line where the connectors would be, for a phone that
+    /// reads its book from Khayt Cloud and has never read the Mac's settings
+    /// (`KhaytAPIClient.macSettingsAt`): the cloud carries no settings, so a
+    /// connector set up on the Mac reaches this phone only from the Mac.
+    /// Never before launch, never over a connector list, never without a book.
+    static func showsMacHint(launched: Bool = launched, cloud: Bool, macSettingsAt: Date?,
+                             connectorsEmpty: Bool, holdsBook: Bool) -> Bool {
+        launched && cloud && macSettingsAt == nil && connectorsEmpty && holdsBook
+    }
+}
+
 /// The phone's rules for connectors, apart from any screen — so they can be
 /// tested without a book, a network or a Keychain.
 enum ConnectorRules {
