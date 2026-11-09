@@ -40,10 +40,40 @@ fs.writeFileSync(file, JSON.stringify(MANIFEST));
 
 let electronApp;
 try {
+  // ── switched off by default: no card, no fields or buttons, nothing sent ──
+  // Connectors ship on one day on every device; until then a build shows
+  // none and the main process refuses, whatever the window asks.
+  {
+    delete process.env.KHAYT_CONNECTORS;
+    const off = await launchApp(userData);
+    electronApp = off.electronApp;
+    await dismissWizard(off.window);
+    const seen = await off.window.evaluate(async () => {
+      await loadPluginsEnabled();
+      settings.plugins = [{ id: 'x', manifest: { id: 'x', fields: [{ key: 'k', attach: 'order', type: 'text', label: 'K' }], actions: [] } }];
+      const r = {
+        enabled: await window.hubAPI.pluginsEnabled(),
+        cardHidden: document.getElementById('pluginCard')?.hidden,
+        editor: pluginEditorHtml('order', {}),
+        send: await window.hubAPI.pluginSend({ id: 'x', action: 'a', delivery: 'dlv_x', records: {} }),
+        check: await window.hubAPI.pluginCheck({ id: 'x', signature: 'A' }),
+      };
+      settings.plugins = [];
+      return r;
+    });
+    if (seen.enabled !== false || seen.cardHidden !== true || seen.editor !== '') fail(`connectors are not switched off: ${JSON.stringify(seen)}`);
+    if (seen.send?.refused !== 'off' || seen.check?.ok !== false) fail(`main does not refuse while off: ${JSON.stringify(seen)}`);
+    await electronApp.close();
+    electronApp = null;
+  }
+
+  // ── a developer's build: KHAYT_CONNECTORS=1 ──
+  process.env.KHAYT_CONNECTORS = '1';
   const launched = await launchApp(userData);
   electronApp = launched.electronApp;
   const window = launched.window;
   await dismissWizard(window);
+  if (!(await window.evaluate(() => loadPluginsEnabled()))) fail('KHAYT_CONNECTORS=1 did not switch connectors on');
 
   // Main's verdicts, stubbed: reviewed for this id only; sends are recorded.
   await electronApp.evaluate(({ ipcMain }) => {
