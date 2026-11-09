@@ -100,6 +100,25 @@
   ];
   const BODY_FORMATS = ['khayt-v1', 'json-template'];
 
+  // ── REFRESH: ASKING FOR NEWS ON OPEN JOBS ─────────────────────────────
+  //
+  // A courier knows when a parcel moved; the shop does not, until someone
+  // presses a button. `refresh` (v1.1, at most one per connector) is a
+  // request the computer holding the book makes on its own, every `every`
+  // minutes, for each OPEN job whose `when` field (one of the connector's own
+  // job fields, like the courier's order id) is filled in. It carries only
+  // what the manifest declares — every {…} in its URL, `send` and template,
+  // listed on the consent sheet like a button's — and its reply can fill only
+  // the connector's own job fields, from the paths `response` names.
+  //
+  // It runs only on a computer holding the book lock (a Mac or the desktop);
+  // the lock is a file beside the book on a computer's own disk, so a phone
+  // never holds it, and a phone never runs refresh in any case. Never more
+  // often than every 15 minutes, at most 50 jobs a run, least recently
+  // checked first (lib/plugin-host.js refreshJobs).
+  const REFRESH_METHODS = ['GET', 'POST'];
+  const REFRESH = { minEvery: 15, maxEvery: 1440, jobsPerRun: 50 };
+
   // ── SETTINGS: WHAT THE SHOP TYPES IN ONCE ─────────────────────────────
   //
   // A courier needs the shop's own sender name, phone and address; a log
@@ -119,7 +138,7 @@
 
   const LIMITS = { domains: 10, secrets: 5, fields: 20, actions: 10, events: 10, send: 30, label: 80, description: 300, url: 500, settings: 10, settingValue: 500 };
   const TOP_KEYS = ['khayt', 'id', 'name', 'publisher', 'version', 'description', 'homepage',
-    'domains', 'secrets', 'settings', 'fields', 'actions', 'events', 'scopes', 'signature'];
+    'domains', 'secrets', 'settings', 'fields', 'actions', 'events', 'refresh', 'scopes', 'signature'];
 
   const ID_RE = /^[a-z0-9]+(\.[a-z0-9][a-z0-9-]*)+$/;
   const KEY_RE = /^[a-z][a-zA-Z0-9_]{0,31}$/;
@@ -248,6 +267,30 @@
   }
 
   /**
+   * A `response`: which of the connector's own fields on `placement` a reply
+   * fills, and from which path in it. Nothing else can be named.
+   */
+  function checkResponse(errors, where, response, placement, fieldsByKey) {
+    if (response === undefined) return;
+    if (!isObj(response) || !isObj(response.fields)) { errors.push(`${where}: {"fields": {"<own field>": "path.in.reply"}}`); return; }
+    checkOnly(errors, where, response, ['fields']);
+    if (!Object.keys(response.fields).length) errors.push(`${where}.fields: name at least one field`);
+    for (const [k, p] of Object.entries(response.fields)) {
+      const f = fieldsByKey.get(k);
+      if (!f) errors.push(`${where}.fields: no field named "${k}" — a reply can only fill the plugin's own fields`);
+      else if (f.attach !== placement) errors.push(`${where}.fields.${k}: is on a ${f.attach}, the reply is about a ${placement}`);
+      if (typeof p !== 'string' || !/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,5}$/.test(p)) errors.push(`${where}.fields.${k}: a dotted path, like "data.tracking"`);
+    }
+  }
+
+  /** Every trigger in a manifest that sends something: buttons, events, and the refresh. */
+  function triggersOf(m) {
+    const out = (Array.isArray(m && m.actions) ? m.actions : []).concat(Array.isArray(m && m.events) ? m.events : []);
+    if (isObj(m) && isObj(m.refresh)) out.push(m.refresh);
+    return out;
+  }
+
+  /**
    * Check a manifest. Returns { ok, errors }. Every rule is a refusal with a
    * sentence, because the person reading it is a developer at a terminal.
    */
@@ -354,25 +397,14 @@
       checkBody(errors, `${w}.body`, a.body, ctx);
       checkAuth(errors, `${w}.auth`, a.auth, ctx);
       if (a.signWith !== undefined && !secretNames.has(a.signWith)) errors.push(`${w}.signWith: no secret named "${a.signWith}"`);
-      if (a.response !== undefined) {
-        if (!isObj(a.response) || !isObj(a.response.fields)) errors.push(`${w}.response: {"fields": {"<own field>": "path.in.reply"}}`);
-        else {
-          checkOnly(errors, `${w}.response`, a.response, ['fields']);
-          for (const [k, p] of Object.entries(a.response.fields)) {
-            const f = fieldsByKey.get(k);
-            if (!f) errors.push(`${w}.response.fields: no field named "${k}" — a reply can only fill the plugin's own fields`);
-            else if (f.attach !== a.placement) errors.push(`${w}.response.fields.${k}: is on a ${f.attach}, the button is on a ${a.placement}`);
-            if (typeof p !== 'string' || !/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,5}$/.test(p)) errors.push(`${w}.response.fields.${k}: a dotted path, like "data.tracking"`);
-          }
-        }
-      }
+      checkResponse(errors, `${w}.response`, a.response, a.placement, fieldsByKey);
     });
 
     const events = checkArray(errors, m, 'events', LIMITS.events);
     events.forEach((e, i) => {
       const w = `events[${i}]`;
       if (!isObj(e)) { errors.push(`${w}: an object`); return; }
-      checkOnly(errors, w, e, ['event', 'url', 'send', 'body', 'auth', 'signWith']);
+      checkOnly(errors, w, e, ['event', 'url', 'send', 'body', 'auth', 'signWith', 'response']);
       if (!EVENTS.includes(e.event)) errors.push(`${w}.event: one of ${EVENTS.join(', ')}`);
       const ctx = { placement: 'order', sources: PLACEMENT_SOURCES.order, fieldsByKey, settingsByKey, secretNames, allowSecret: true };
       checkUrl(errors, `${w}.url`, e.url, domains, ctx);
@@ -382,7 +414,41 @@
       checkBody(errors, `${w}.body`, e.body, ctx);
       checkAuth(errors, `${w}.auth`, e.auth, ctx);
       if (e.signWith !== undefined && !secretNames.has(e.signWith)) errors.push(`${w}.signWith: no secret named "${e.signWith}"`);
+      // An event is about one job, so its reply can fill that job's fields.
+      checkResponse(errors, `${w}.response`, e.response, 'order', fieldsByKey);
     });
+
+    if (m.refresh !== undefined) {
+      const r = m.refresh;
+      const w = 'refresh';
+      if (!isObj(r)) errors.push(`${w}: an object`);
+      else {
+        checkOnly(errors, w, r, ['every', 'when', 'method', 'url', 'send', 'body', 'auth', 'signWith', 'response']);
+        if (!Number.isInteger(r.every) || r.every < REFRESH.minEvery || r.every > REFRESH.maxEvery) {
+          errors.push(`${w}.every: whole minutes, ${REFRESH.minEvery} to ${REFRESH.maxEvery}`);
+        }
+        const when = fieldsByKey.get(String(r.when));
+        if (!when) errors.push(`${w}.when: one of the connector's own job fields — a job is checked only when it is filled in`);
+        else if (when.attach !== 'order') errors.push(`${w}.when: "${r.when}" is on a ${when.attach}; refresh checks jobs`);
+        const method = r.method === undefined ? 'POST' : r.method;
+        if (!REFRESH_METHODS.includes(method)) errors.push(`${w}.method: "GET" or "POST"`);
+        const ctx = { placement: 'order', sources: PLACEMENT_SOURCES.order, fieldsByKey, settingsByKey, secretNames, allowSecret: true };
+        checkUrl(errors, `${w}.url`, r.url, domains, ctx);
+        if (method === 'GET') {
+          for (const k of ['send', 'body']) if (r[k] !== undefined) errors.push(`${w}.${k}: a GET has no body; put what it needs in the URL`);
+        } else {
+          const send = r.send === undefined ? [] : r.send;
+          if (!Array.isArray(send) || send.length > LIMITS.send) errors.push(`${w}.send: a list of up to ${LIMITS.send} fields`);
+          else send.forEach((ref, j) => checkRef(errors, `${w}.send[${j}]`, String(ref), Object.assign({}, ctx, { allowSecret: false })));
+          checkBody(errors, `${w}.body`, r.body, ctx);
+        }
+        checkAuth(errors, `${w}.auth`, r.auth, ctx);
+        if (r.signWith !== undefined && !secretNames.has(r.signWith)) errors.push(`${w}.signWith: no secret named "${r.signWith}"`);
+        // A refresh that fills nothing would send the shop's data for no use.
+        if (r.response === undefined) errors.push(`${w}.response: required — a refresh exists to fill the connector's own fields`);
+        else checkResponse(errors, `${w}.response`, r.response, 'order', fieldsByKey);
+      }
+    }
 
     const scopes = checkArray(errors, m, 'scopes', SCOPES.length);
     scopes.forEach((s, i) => {
@@ -394,15 +460,21 @@
     if (actions.some(a => isObj(a) && a.response !== undefined) && !scopes.includes('fields.write')) {
       errors.push('scopes: an action with a "response" needs "fields.write"');
     }
+    if (events.some(e => isObj(e) && e.response !== undefined) && !scopes.includes('fields.write')) {
+      errors.push('scopes: an event with a "response" needs "fields.write"');
+    }
+    if (m.refresh !== undefined && !scopes.includes('fields.write')) {
+      errors.push('scopes: "refresh" needs "fields.write"');
+    }
 
     // A declared host nothing uses is a host the consent screen would show for
     // no reason — and a reason to ask what it is for.
     const used = new Set();
-    for (const t of actions.concat(events)) {
+    for (const t of triggersOf(m)) {
       const mm = isObj(t) && typeof t.url === 'string' && /^https:\/\/([^/?#{}]+)/.exec(t.url);
       if (mm) used.add(mm[1]);
     }
-    domains.forEach(d => { if (isAllowedHost(d) && !used.has(d)) errors.push(`domains: "${d}" is not used by any action or event`); });
+    domains.forEach(d => { if (isAllowedHost(d) && !used.has(d)) errors.push(`domains: "${d}" is not used by any action, event or refresh`); });
 
     return { ok: errors.length === 0, errors };
   }
@@ -443,20 +515,29 @@
   function permissionsOf(m) {
     const fields = new Set();
     const domains = new Set();
-    const triggers = (Array.isArray(m && m.actions) ? m.actions : []).concat(Array.isArray(m && m.events) ? m.events : []);
-    for (const t of triggers) {
+    for (const t of triggersOf(m)) {
       refsOf(t).forEach(r => fields.add(r));
       const h = hostOf(t && t.url);
       if (h) domains.add(h);
     }
     const categories = new Set(Array.from(fields).map(f => categoryOf(f, m)).filter(Boolean));
-    return {
+    const out = {
       version: String((m && m.version) || ''),
       fields: Array.from(fields).sort(),
       domains: Array.from(domains).sort(),
       scopes: Array.from(new Set(Array.isArray(m && m.scopes) ? m.scopes : [])).sort(),
       categories: Array.from(categories).sort(),
     };
+    // How often it may check on its own, in minutes — only when it does.
+    const every = refreshEvery(m);
+    if (every) out.refresh = every;
+    return out;
+  }
+
+  /** A manifest's refresh interval in minutes (never under the floor), or 0 for none. */
+  function refreshEvery(m) {
+    if (!isObj(m) || !isObj(m.refresh) || !Number.isFinite(Number(m.refresh.every))) return 0;
+    return Math.max(REFRESH.minEvery, Math.floor(Number(m.refresh.every)));
   }
 
   /**
@@ -471,14 +552,20 @@
     const has = k => new Set(Array.isArray(g[k]) ? g[k] : []);
     const more = k => want[k].filter(x => !has(k).has(x));
     const out = { fields: more('fields'), domains: more('domains'), scopes: more('scopes') };
-    out.widened = out.fields.length > 0 || out.domains.length > 0 || out.scopes.length > 0;
+    // A refresh the shop never agreed to, or one that checks more often than
+    // it agreed to, is asking for more. Checking less often is not.
+    const grantedEvery = Number(g.refresh);
+    out.refresh = !!want.refresh && !(Number.isFinite(grantedEvery) && grantedEvery > 0 && grantedEvery <= want.refresh);
+    out.widened = out.fields.length > 0 || out.domains.length > 0 || out.scopes.length > 0 || out.refresh;
     return out;
   }
 
   /** The grant to store once a shop agrees: exactly what it was shown. */
   function grantFor(manifest) {
     const p = permissionsOf(manifest);
-    return { version: p.version, fields: p.fields, domains: p.domains, scopes: p.scopes };
+    const g = { version: p.version, fields: p.fields, domains: p.domains, scopes: p.scopes };
+    if (p.refresh) g.refresh = p.refresh;
+    return g;
   }
 
   /**
@@ -489,8 +576,7 @@
    */
   function consentRows(m) {
     const byHost = new Map();
-    const triggers = (Array.isArray(m && m.actions) ? m.actions : []).concat(Array.isArray(m && m.events) ? m.events : []);
-    for (const t of triggers) {
+    for (const t of triggersOf(m)) {
       const h = hostOf(t && t.url);
       if (!h) continue;
       if (!byHost.has(h)) byHost.set(h, new Set());
@@ -500,6 +586,20 @@
       host,
       fields: Array.from(byHost.get(host)).sort().map(key => ({ key, category: categoryOf(key, m) })),
     }));
+  }
+
+  /**
+   * The consent sheet's refresh line (`plg.consent_refresh`), or null when
+   * the connector never checks on its own: how often, which host, and the
+   * field that decides which jobs — its label in `lang`, else English.
+   */
+  function refreshConsent(m, lang) {
+    const every = refreshEvery(m);
+    if (!every) return null;
+    const host = hostOf(m.refresh.url);
+    const f = (Array.isArray(m.fields) ? m.fields : []).find(x => isObj(x) && x.key === m.refresh.when);
+    const label = f && isObj(f.label) ? (f.label[lang] || f.label[String(lang || '').split('-')[0]] || f.label.en || f.key) : String(m.refresh.when || '');
+    return { every, host, field: m.refresh.when, fieldLabel: label };
   }
 
   /**
@@ -538,6 +638,9 @@
       for (const k of ['fields', 'domains', 'scopes']) {
         const extra = (Array.isArray(e.granted[k]) ? e.granted[k] : []).filter(x => !declared[k].includes(x));
         if (extra.length) errors.push(`granted.${k}: ${extra.join(', ')} not in the manifest`);
+      }
+      if (e.granted.refresh !== undefined && !(Number.isInteger(e.granted.refresh) && e.granted.refresh >= REFRESH.minEvery)) {
+        errors.push(`granted.refresh: whole minutes, at least ${REFRESH.minEvery}`);
       }
     }
     const paused = errors.length > 0 || diffPermissions(e.granted, e.manifest).widened;
@@ -581,6 +684,8 @@
       properties: { format: { enum: BODY_FORMATS }, template: { type: 'object' } } };
     const auth = { type: 'object', additionalProperties: false, required: ['header', 'secret'],
       properties: { header: { type: 'string' }, scheme: { type: 'string' }, secret: key } };
+    const response = { type: 'object', additionalProperties: false, required: ['fields'],
+      properties: { fields: { type: 'object', minProperties: 1, additionalProperties: { type: 'string' } } } };
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://khaytapp.com/schemas/plugin-manifest-v1.json',
@@ -614,12 +719,13 @@
         actions: { type: 'array', maxItems: LIMITS.actions, items: { type: 'object', additionalProperties: false,
           required: ['id', 'label', 'placement', 'kind', 'url'],
           properties: { id: key, label, placement: { enum: Object.keys(PLACEMENT_SOURCES) }, kind: { enum: ACTION_KINDS },
-            url, send, body, auth, signWith: key,
-            response: { type: 'object', additionalProperties: false, required: ['fields'],
-              properties: { fields: { type: 'object', additionalProperties: { type: 'string' } } } } } } },
+            url, send, body, auth, signWith: key, response } } },
         events: { type: 'array', maxItems: LIMITS.events, items: { type: 'object', additionalProperties: false,
           required: ['event', 'url'],
-          properties: { event: { enum: EVENTS }, url, send, body, auth, signWith: key } } },
+          properties: { event: { enum: EVENTS }, url, send, body, auth, signWith: key, response } } },
+        refresh: { type: 'object', additionalProperties: false, required: ['every', 'when', 'url', 'response'],
+          properties: { every: { type: 'integer', minimum: REFRESH.minEvery, maximum: REFRESH.maxEvery }, when: key,
+            method: { enum: REFRESH_METHODS }, url, send, body, auth, signWith: key, response } },
         scopes: { type: 'array', uniqueItems: true, items: { enum: SCOPES } },
       },
     };
@@ -628,7 +734,8 @@
   const api = {
     MANIFEST_VERSION, SIGNING_KEYS, SENDABLE_FIELDS, OWN_FIELD_CATEGORY, PLACEMENT_SOURCES,
     FIELD_TYPES, FIELD_ATTACH, SETTING_TYPES, SETTING_KINDS, ACTION_KINDS, SECRET_KINDS, SCOPES, RESERVED_SCOPES, EVENTS, BODY_FORMATS, LIMITS, TOP_KEYS,
-    validateManifest, permissionsOf, diffPermissions, grantFor, consentRows, categoryOf, checkEntry, mayWriteFields,
+    REFRESH, REFRESH_METHODS,
+    validateManifest, permissionsOf, diffPermissions, grantFor, consentRows, refreshConsent, refreshEvery, categoryOf, checkEntry, mayWriteFields,
     canonicalJSON, manifestJsonSchema, isAllowedHost, placeholders,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

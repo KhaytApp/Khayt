@@ -63,6 +63,7 @@ extension Shop {
         guard let build = source.build, StoreLock.weOwnIt(build) else { return }
         await retryDueWebhooks()
         await retryDueConnectorEvents()
+        await refreshConnectors()
         await retryFailedAccountingPushes()
         await sendDigestIfDue()
     }

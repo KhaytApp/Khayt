@@ -176,8 +176,18 @@ extension Shop {
             },
             scopes: scopes,
             replacing: installed.flatMap { Shop.plainString(Self.object($0)["version"]) },
-            dev: dev)
+            dev: dev,
+            refreshLine: Self.refreshLine((try? await engine.pluginRefreshConsent(manifest, lang: words.language)) ?? .null,
+                                          words: words))
         return nil
+    }
+
+    /// The consent sheet's line for a connector that checks on its own.
+    static func refreshLine(_ consent: JSONValue, words: Words) -> String? {
+        let c = object(consent)
+        guard let every = Shop.plainNumber(c["every"]), every > 0, let host = Shop.plainString(c["host"]) else { return nil }
+        return words.callIt("plg.consent_refresh", ["n": .string(String(Int(every))), "host": .string(host),
+                                                    "field": .string(Shop.plainString(c["fieldLabel"]) ?? "")])
     }
 
     /// The shop agreed: store the entry, granted exactly what it was shown.
@@ -357,6 +367,9 @@ struct ConnectorOffer: Identifiable, Equatable {
     let replacing: String?
     /// Loaded in developer mode: kept on this Mac only (`DevConnectors`).
     var dev: Bool = false
+    /// "Every 30 min … checks api.example.com …" (`plg.consent_refresh`), for
+    /// a connector that checks open jobs on its own; nil when it never does.
+    var refreshLine: String? = nil
 
     struct Row: Equatable, Identifiable {
         var id: String { host }

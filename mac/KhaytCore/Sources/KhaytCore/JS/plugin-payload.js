@@ -132,7 +132,15 @@
       const e = (manifest.events || []).find(x => x.event === t.event);
       return e ? { def: e, kind: 'event', id: e.event } : null;
     }
+    if (t.refresh) {
+      return isObj(manifest.refresh) ? { def: manifest.refresh, kind: 'refresh', id: true } : null;
+    }
     return null;
+  }
+
+  /** The record a trigger's reply is about: a button's placement; an event or a refresh is about a job. */
+  function placementOf(t) {
+    return t.kind === 'action' ? t.def.placement : 'order';
   }
 
   /** Every reference a trigger makes: send, URL and template placeholders. */
@@ -204,6 +212,11 @@
     const u = urlFor(manifest, trigger, ctx);
     if (!u.ok) return u;
     if (t.kind === 'action' && t.def.kind === 'open') return { ok: true, method: 'OPEN', url: u.url };
+    const auth = t.def.auth ? { header: t.def.auth.header, scheme: t.def.auth.scheme || '', secret: t.def.auth.secret } : null;
+    // A GET refresh carries nothing but its URL (and Khayt's own headers).
+    if (t.kind === 'refresh' && t.def.method === 'GET') {
+      return { ok: true, method: 'GET', url: u.url, body: '', auth, signWith: t.def.signWith || null };
+    }
 
     const format = (t.def.body && t.def.body.format) || 'khayt-v1';
     let body;
@@ -226,7 +239,7 @@
       url: u.url,
       contentType: 'application/json',
       body,
-      auth: t.def.auth ? { header: t.def.auth.header, scheme: t.def.auth.scheme || '', secret: t.def.auth.secret } : null,
+      auth,
       signWith: t.def.signWith || null,
     };
   }
@@ -254,19 +267,25 @@
 
   /**
    * A reply, mapped into the plugin's own fields: { key: value }. Only the
-   * fields the action's `response` names, each checked against its type; a
+   * fields the trigger's `response` names, each checked against its type; a
    * value of the wrong shape is dropped, not guessed at. `entry` is the
    * stored `settings.plugins[]` row: nothing is written unless it grants
    * fields.write and is not paused.
+   *
+   * `trigger` is `{action}`, `{event}` or `{refresh: true}` — or, as before
+   * v1.1, a button's id alone.
    */
-  function applyResponse(manifest, actionId, reply, entry) {
-    const a = (manifest.actions || []).find(x => x.id === actionId);
+  function applyResponse(manifest, trigger, reply, entry) {
+    const t = triggerOf(manifest, typeof trigger === 'string' ? { action: trigger } : trigger);
     const out = {};
-    if (!a || !isObj(a.response) || !isObj(a.response.fields) || !isObj(reply)) return out;
+    if (!t || (t.kind === 'action' && t.def.kind === 'open')) return out;
+    const a = t.def;
+    if (!isObj(a.response) || !isObj(a.response.fields) || !isObj(reply)) return out;
     // The shop granted fields.write, and the grant still covers this manifest.
     if (!M.mayWriteFields(entry)) return out;
+    const placement = placementOf(t);
     for (const [key, path] of Object.entries(a.response.fields)) {
-      const f = (manifest.fields || []).find(x => x.key === key && x.attach === a.placement);
+      const f = (manifest.fields || []).find(x => x.key === key && x.attach === placement);
       if (!f) continue;
       const v = coerce(f, readPath(reply, String(path)));
       if (v !== undefined) out[key] = v;

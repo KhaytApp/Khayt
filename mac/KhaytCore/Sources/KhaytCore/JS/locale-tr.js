@@ -5347,6 +5347,7 @@
   "plg.consent_link_only": "Orada bir sayfa açar; defterinizden hiçbir şey göndermez.",
   "plg.consent_scopes": "Ayrıca şunları yapabilir",
   "plg.consent_keys_here": "Anahtarları bu bilgisayarda kalır. Düğmelerinden birine basana ya da dinlediği bir olay gerçekleşene kadar hiçbir şey gönderilmez.",
+  "plg.consent_refresh": "Bu bilgisayar defterinizi açık tuttuğu sürece her {n} dakikada bir, “{field}” alanı dolu açık işler için {host} adresinden güncelleme ister ve yanıttan yalnızca kendi alanlarını doldurur.",
   "plg.agree_install": "Onayla ve kur",
   "plg.dev_mode": "Geliştirici modu (yalnızca bu bilgisayar)",
   "plg.dev_hint": "Bağlayıcı geliştirmek için: Khayt incelemesi olmadan bir .khaytplugin dosyasından yükleyin. Yalnızca bu bilgisayarda çalışır ve diğer cihazlarınızla asla eşitlenmez.",

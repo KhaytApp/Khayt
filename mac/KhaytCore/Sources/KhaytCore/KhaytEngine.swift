@@ -8427,8 +8427,33 @@ public actor KhaytEngine {
     /// A reply mapped into the plugin's own fields only — and nothing unless
     /// the stored `entry` grants fields.write and is not paused.
     public func pluginApplyResponse(_ manifest: JSONValue, actionId: String, reply: JSONValue, entry: JSONValue) throws -> JSONValue {
+        try pluginApplyResponse(manifest, trigger: .object(["action": .string(actionId)]), reply: reply, entry: entry)
+    }
+
+    /// The same for any trigger: `{action}`, `{event}` or `{refresh: true}`.
+    /// An event's or a refresh's reply fills the JOB's own fields.
+    public func pluginApplyResponse(_ manifest: JSONValue, trigger: JSONValue, reply: JSONValue, entry: JSONValue) throws -> JSONValue {
         try runtime.call2("globalThis.KhaytPluginPayload.applyResponse(ARG0, ARG1, ARG2, ARG3)",
-                          [manifest, .string(actionId), reply, entry], as: JSONValue.self)
+                          [manifest, trigger, reply, entry], as: JSONValue.self)
+    }
+
+    /// The consent sheet's refresh line: `{every, host, field, fieldLabel}`,
+    /// or null for a connector that never checks on its own.
+    public func pluginRefreshConsent(_ manifest: JSONValue, lang: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginManifest.refreshConsent(ARG0, ARG1)", [manifest, .string(lang)], as: JSONValue.self)
+    }
+
+    /// Is a connector's refresh due? `lastRunMs` 0 means never.
+    public func pluginRefreshDue(_ refresh: JSONValue, lastRunMs: Double, nowMs: Double) throws -> Bool {
+        try runtime.call2("globalThis.KhaytPluginHost.refreshDue(ARG0, ARG1, ARG2)",
+                          [refresh, .number(lastRunMs), .number(nowMs)], as: Bool.self)
+    }
+
+    /// The open jobs one refresh run asks about, least recently asked first,
+    /// at most 50. `checkedAt` maps a job id to ms.
+    public func pluginRefreshJobs(_ printLog: JSONValue, entry: JSONValue, checkedAt: [String: Double]) throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytPluginHost.refreshJobs(ARG0, ARG1, ARG2)",
+                          [printLog, entry, .object(checkedAt.mapValues(JSONValue.number))], as: [JSONValue].self)
     }
 
     /// A stored `settings.plugins[]` entry checked: `{ok, errors, paused}`.

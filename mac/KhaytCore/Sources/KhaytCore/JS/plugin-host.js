@@ -203,6 +203,71 @@
     });
   }
 
+  // ── REFRESH ──────────────────────────────────────────────────────────
+  //
+  // What a computer holding the book does on its own (lib/plugin-manifest.js
+  // REFRESH says what refresh is and where it may run). These say which
+  // connectors check, whether one is due, and which jobs it asks about; the
+  // host keeps the clock — when each connector last ran and when each job was
+  // last asked about — wherever it likes, OUT of the book, because a time
+  // stamped into a synced book every quarter hour is a write every device
+  // would sync for nothing.
+
+  /** Connectors that are on and whose manifest has a `refresh`: [{ entry, refresh }]. */
+  function refreshTargets(settings, isReviewed) {
+    return liveEntries(settings, isReviewed)
+      .filter((entry) => isObj(entry.manifest.refresh))
+      .map((entry) => ({ entry, refresh: entry.manifest.refresh }));
+  }
+
+  /**
+   * Is a connector's refresh due? `lastRunMs` is when it last ran (anything
+   * unreadable counts as never). Never more often than every
+   * `REFRESH.minEvery` minutes, whatever the manifest says.
+   */
+  function refreshDue(refresh, lastRunMs, nowMs) {
+    const every = M.refreshEvery({ refresh });
+    if (!every) return false;
+    const last = Number(lastRunMs);
+    if (!Number.isFinite(last) || last <= 0) return true;
+    // A clock set back is not a reason to wait days.
+    if (last > nowMs) return true;
+    return nowMs - last >= every * 60000;
+  }
+
+  /**
+   * A job refresh may ask about: not cancelled, not archived, not voided and
+   * not delivered (a delivery is a date stamp on a completed job, and the
+   * legacy `delivered` status means the same).
+   */
+  function isOpenJob(o) {
+    return isObj(o) && typeof o.id === 'string' && !!o.id
+      && o.status !== 'cancelled' && o.status !== 'delivered'
+      && !o.archived && !o.voidedAt && !o.deliveredAt;
+  }
+
+  /**
+   * The jobs one run asks about: open, with the connector's `when` field
+   * filled in, least recently asked about first (`checkedAt` maps a job id to
+   * ms; a job never asked about goes first), then by id so the order is the
+   * same on every computer. At most `REFRESH.jobsPerRun`.
+   */
+  function refreshJobs(printLog, entry, checkedAt) {
+    const r = isObj(entry && entry.manifest) ? entry.manifest.refresh : null;
+    if (!isObj(r) || typeof r.when !== 'string') return [];
+    const seen = isObj(checkedAt) ? checkedAt : {};
+    const at = (id) => { const n = Number(seen[id]); return Number.isFinite(n) ? n : -Infinity; };
+    return (Array.isArray(printLog) ? printLog : [])
+      .filter((o) => {
+        if (!isOpenJob(o)) return false;
+        const mine = isObj(o.plugins) && isObj(o.plugins[entry.id]) ? o.plugins[entry.id] : null;
+        const v = mine ? mine[r.when] : undefined;
+        return v !== undefined && v !== null && v !== '' && v !== false;
+      })
+      .sort((a, b) => (at(a.id) - at(b.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .slice(0, M.REFRESH.jobsPerRun);
+  }
+
   /** The secrets a connector declares that this device has not been given. */
   function missingSecrets(entry) {
     const have = isObj(entry && entry.secrets) ? entry.secrets : {};
@@ -268,6 +333,7 @@
     consentedEntry, updatedEntry, withEntry, withoutEntry, stateOf, liveEntries,
     actionsFor, eventTargets, fieldsFor, coerceField, withFieldValues, missingSecrets, labelOf, deliveryId,
     phoneRecord, withConfig, withQueued, withoutQueued, dueQueued, OUTBOX_CAP,
+    refreshTargets, refreshDue, refreshJobs, isOpenJob,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPluginHost = api;

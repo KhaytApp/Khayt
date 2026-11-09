@@ -3100,6 +3100,11 @@ final class Shop {
     /// Connector event deliveries being sent right now, so a retry pass does
     /// not send one twice at once.
     var connectorInFlight: Set<String> = []
+    /// A connector refresh pass is running (`Shop+ConnectorRefresh.swift`).
+    var connectorRefreshing = false
+    /// When each open job was last asked about by a refresh: connector id →
+    /// job id → ms. In memory on purpose — never stamped into the book.
+    var connectorRefreshChecked: [String: [String: Double]] = [:]
 
     // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
     /// Texts in flight or sent this run, as "job|milestone" — one click, one text.

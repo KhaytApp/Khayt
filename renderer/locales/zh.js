@@ -5347,6 +5347,7 @@
   "plg.consent_link_only": "在那里打开一个页面；不会发送你账本中的任何内容。",
   "plg.consent_scopes": "它还可以",
   "plg.consent_keys_here": "它的密钥只保存在这台电脑上。在你按下它的按钮或它监听的事件发生之前，不会发送任何内容。",
+  "plg.consent_refresh": "只要这台电脑打开着你的账本，它每 {n} 分钟就会向 {host} 查询带有“{field}”的未完成任务的更新，并用回复填写它自己的字段。",
   "plg.agree_install": "同意并安装",
   "plg.dev_mode": "开发者模式（仅限这台电脑）",
   "plg.dev_hint": "用于开发连接器：无需 Khayt 审核，从 .khaytplugin 文件载入。仅在这台电脑上运行，绝不会同步到你的其他设备。",

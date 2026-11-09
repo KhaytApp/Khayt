@@ -258,6 +258,10 @@ struct ConnectorConsentSheet: View {
                      + offer.scopes.map { shop.words.callIt("plg.scope." + $0) }.joined(separator: ", "))
                     .font(.callout)
             }
+            if let line = offer.refreshLine {
+                Label(line, systemImage: "arrow.triangle.2.circlepath").font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(shop.words.callIt("plg.consent_keys_here")).font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()

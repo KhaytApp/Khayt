@@ -60,11 +60,15 @@ public enum Connectors {
         }
     }
 
-    /// A POST, ready for `WebhookClient.post` (or the phone's sender).
+    /// A request, ready for `WebhookClient` (or the phone's sender): a POST,
+    /// or — for a refresh that says so — a GET with an empty body.
     public struct Post: Equatable, Sendable {
         public let url: URL
         public let body: Data
         public let headers: [Header]
+        /// "POST" or "GET". Only a refresh is ever a GET, and a phone never
+        /// runs a refresh.
+        public var method: String = "POST"
     }
 
     public struct Header: Equatable, Sendable {
@@ -100,13 +104,15 @@ public enum Connectors {
     public static func post(from payload: JSONValue, manifest: JSONValue, event: String,
                             secrets: [String: String], delivery: String, now: Date) throws -> Post {
         guard case .object(let p) = payload, p["ok"] == .bool(true) else { throw Refusal.notBuilt(reason(payload)) }
-        guard p["method"] == .string("POST"),
+        guard case .string(let method)? = p["method"], method == "POST" || method == "GET",
               case .string(let s)? = p["url"], let url = URL(string: s),
               case .string(let body)? = p["body"] else { throw Refusal.notBuilt("not a POST") }
         try checkHost(url, manifest: manifest)
+        // A GET carries nothing but its URL: no body and no body's type.
+        guard method == "POST" || body.isEmpty else { throw Refusal.notBuilt("a GET has no body") }
         let bytes = Data(body.utf8)
-        var headers = [Header("Content-Type", "application/json"), Header("X-Khayt-Event", event),
-                       Header("X-Khayt-Delivery", delivery)]
+        var headers = method == "POST" ? [Header("Content-Type", "application/json")] : []
+        headers += [Header("X-Khayt-Event", event), Header("X-Khayt-Delivery", delivery)]
 
         if case .object(let auth)? = p["auth"],
            case .string(let name)? = auth["header"], case .string(let secretName)? = auth["secret"] {
@@ -126,7 +132,7 @@ public enum Connectors {
             headers.append(Header("X-Khayt-Timestamp", stamp))
             headers.append(Header("X-Khayt-Signature-V2", hex(Data((stamp + ".").utf8) + bytes)))
         }
-        return Post(url: url, body: bytes, headers: headers)
+        return Post(url: url, body: bytes, headers: headers, method: method)
     }
 
     /// https, no user or password, no port but 443, and exactly a host the
