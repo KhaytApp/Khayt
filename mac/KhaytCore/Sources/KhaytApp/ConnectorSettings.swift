@@ -36,7 +36,7 @@ struct ConnectorSettings: View {
             guard case .success(let url) = picked else { return }
             Task { result = await offer(url) }
         }
-        .sheet(item: Binding(get: { shop.connectorOffer }, set: { if $0 == nil { shop.connectorOffer = nil } })) { offer in
+        .shopSheet(item: Binding(get: { shop.connectorOffer }, set: { if $0 == nil { shop.connectorOffer = nil } })) { offer in
             ConnectorConsentSheet(shop: shop, offer: offer) { said in
                 result = said
                 Task { await reload() }
