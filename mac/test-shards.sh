@@ -48,6 +48,8 @@ PERF='LibraryEditPerfTests'
 SPLIT='^KhaytAppTests\.[A-N]'
 OUT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/khayt-test-shards"
 rm -rf "$OUT" && mkdir -p "$OUT"
+# Crash reports written after this moment are this run's (see mac/crash-reports.py).
+touch "$OUT/started"
 
 shard() {
   local name=$1 niceness=$2; shift 2
@@ -82,5 +84,13 @@ if [ "$failed" != 0 ]; then
   echo
   echo "FAILED:"
   grep -hE "✘|error:|fatal|Fatal|crashed|signal" "$OUT"/*.log | grep -v "^$" | head -200
+  # A shard that died of a signal stops mid-line and rarely says why; macOS's
+  # crash report does, to the file and line.
+  if grep -q "exited with unexpected signal" "$OUT"/*.log; then
+    echo
+    echo "CRASH REPORTS:"
+    sleep 10   # ReportCrash writes the report a moment after the process dies
+    python3 mac/crash-reports.py "$OUT/started"
+  fi
   exit 1
 fi
