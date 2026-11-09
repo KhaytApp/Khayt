@@ -468,6 +468,54 @@ struct LanServerTests {
         #expect(settings["shopName"] == .string("Ward"), "masking took something that was not a secret")
     }
 
+    /// Cloud deltas never carry settings, so a phone that refreshes from Khayt
+    /// Cloud learns of a connector installed here (or a currency changed here)
+    /// only from this. It must be `/api/store`'s settings exactly — the same
+    /// mask, the same gate — and never `{}`, which the phone would take as
+    /// "the shop has no settings".
+    @Test("the shop's settings alone, masked as /api/store masks them, behind the PIN")
+    func settingsAlone() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"),
+            "currency": .string("SAR"),
+            "telegram": .object(["botToken": .string("__enc__BOTSECRET")]),
+            "plugins": .array([.object([
+                "id": .string("app.khayt.samples.lamha"), "version": .string("1.0.0"), "enabled": .bool(true),
+                "config": .object(["carrierId": .string("7")]),
+                "secrets": .object(["apiToken": .string("test-token-not-real")]),
+            ])]),
+        ])
+
+        #expect(try await bench.get("/api/store/settings").status == 401, "the settings must not be open on the LAN")
+        #expect(try await bench.get("/api/store/settings?pin=24682468").status == 401, "a PIN in the URL is not the header")
+
+        struct Body: Decodable { let settings: [String: JSONValue]; let servedAt: String }
+        let reply = try await bench.get("/api/store/settings", headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        let body = try #require(try? JSONDecoder().decode(Body.self, from: Data(reply.text.utf8)))
+        #expect(!body.servedAt.isEmpty)
+        #expect(!reply.text.contains("BOTSECRET") && !reply.text.contains("test-token-not-real"),
+                "a secret left the Mac")
+
+        // Exactly what /api/store sends as settings: one mask, not two.
+        struct Store: Decodable { let store: [String: JSONValue] }
+        let store = try await bench.get("/api/store", headers: ["x-khayt-pin": "24682468"])
+        let book = try #require(try? JSONDecoder().decode(Store.self, from: Data(store.text.utf8)))
+        #expect(book.store["settings"] == .object(body.settings))
+        guard case .array(let plugins)? = body.settings["plugins"] else { Issue.record("no connectors sent"); return }
+        #expect(plugins.count == 1)
+
+        // The documented `/v1` name is the same route.
+        #expect(try await bench.get("/v1/store/settings", headers: ["x-khayt-pin": "24682468"]).status == 200)
+
+        // A book with no settings to send is a 500, never `{}`.
+        bench.book.value["settings"] = .object([:])
+        let empty = try await bench.get("/api/store/settings", headers: ["x-khayt-pin": "24682468"])
+        #expect(empty.status == 500, Comment(rawValue: empty.text))
+    }
+
     @Test("`?scope=whole` still exists for the caller that genuinely wants everything")
     func wholeOnRequest() async throws {
         let bench = try await Bench()

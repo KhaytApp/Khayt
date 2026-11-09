@@ -420,6 +420,32 @@ never "there are none". A collection the shop simply does not have comes back as
 not an empty book: a client that accepted `{}` would replace a shop it already had
 with nothing.
 
+### `GET /api/store/settings`
+
+The shop's settings on their own, for a client that refreshes its records
+elsewhere. **Requires owner PIN.** Also served as `/v1/store/settings`.
+
+> **Served by the native Mac app only.** Cloud deltas never carry `settings`, so
+> a phone that refreshes from Khayt Cloud learns of a connector installed on the
+> Mac (`settings.plugins`), or a currency or tax mode changed there, only from
+> this route. The phone reads it after a refresh round whenever the Mac answers.
+
+**Response 200**
+
+```json
+{ "settings": { "shopName": "…", "plugins": [ … ] }, "servedAt": "2026-11-09T14:00:00.000Z" }
+```
+
+`settings` is exactly what `GET /api/store` sends as `store.settings`: the same
+mask, so every path in `lib/store-secret-paths.js` (connector secrets, PIN hashes,
+sealed tokens) is masked or withheld here too.
+
+**Response 401 / 429** — as `GET /api/store`.
+
+**Response 500** — `{"error":"The settings could not be prepared to send"}`, also
+when the book has no settings. Never `{}`: the phone replaces its settings with
+what this returns.
+
 ### `POST /api/store/deltas`
 
 A paired client's changes, folded into the shop's book. **Requires owner PIN.**
