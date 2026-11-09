@@ -83,4 +83,12 @@ struct PhoneConnectorValuesTests {
         guard case .object(let p)? = Self.record(out)["plugins"] else { Issue.record("plugins gone"); return }
         #expect(p["app.khayt.samples.lamha"] == .object(["lamhaOrderId": .string("OLD")]))
     }
+    @Test("the phone coerces a field value as the Mac does")
+    func coerce() async throws {
+        let (engine, _) = try await Self.setup()
+        let number: JSONValue = .object(["key": .string("n"), "label": .object(["en": .string("N")]),
+                                         "type": .string("number"), "attach": .string("order")])
+        #expect(try await engine.pluginCoerceField(number, raw: .string("3")) == .number(3))
+        #expect(try await engine.pluginCoerceField(number, raw: .string("")) == .null)
+    }
 }

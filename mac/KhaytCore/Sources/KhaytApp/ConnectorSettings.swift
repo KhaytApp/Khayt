@@ -203,3 +203,15 @@ struct ConnectorConsentSheet: View {
         .frame(width: 480)
     }
 }
+
+/// Connectors stay hidden from shops until v1 ships on all three apps the same
+/// day as the /privacy page that describes them. The desktop's switch is
+/// `KHAYT_CONNECTORS=1`; the Mac takes the same variable, or
+/// `defaults write <bundle id> KhaytConnectors -bool YES` for a build opened
+/// from Finder. Remove this gate on launch day.
+enum ConnectorsSwitch {
+    nonisolated static func isOn(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                 defaults: UserDefaults = .standard) -> Bool {
+        environment["KHAYT_CONNECTORS"] == "1" || defaults.bool(forKey: "KhaytConnectors")
+    }
+}
