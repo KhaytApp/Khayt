@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "تعذّر الوصول إلى %@. لم يُرسل شيء.";
 "connectors.error.server" = "ردّت الخدمة بالرمز %d. لم يتغيّر شيء على هذا الآيفون.";
 "connectors.sample" = "في الورشة التجريبية لا يغادر شيء هذا الهاتف، لذا لا ترسل الموصِّلات ولا تفتح شيئًا. اقرن الهاتف بجهاز Mac لاستخدامها.";
+"connectors.sample.simulated" = "الورشة التجريبية: لم يُرسَل شيء. الورشة الحقيقية ترسل هذه الحقول إلى %@.";
 "connectors.not_reviewed" = "لم تتم مراجعته — الأزرار متوقفة";
 "connectors.off" = "متوقف من جهاز Mac";
 "connectors.status.not_reviewed" = "لم تتم مراجعته";

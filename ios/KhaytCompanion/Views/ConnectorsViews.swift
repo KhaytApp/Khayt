@@ -184,6 +184,11 @@ struct ConnectorsCard: View {
             message = (saved ? said : said + "\n" + L10n.tr("connectors.reply.not_saved"), saved)
             // The reply's fields are on the record now: show them.
             if saved, !reply.isEmpty { await load() }
+        case .simulated(let hosts, let reply):
+            var said = L10n.format("connectors.sample.simulated", hosts.joined(separator: ", "))
+            if !reply.isEmpty { said += "\n" + reply.joined(separator: "\n") }
+            message = (said, true)
+            if !reply.isEmpty { await load() }
         case .failed(let why):
             message = (why, false)
         }
