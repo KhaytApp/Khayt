@@ -35,6 +35,52 @@
 
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
 
+  // ISO 4217 minor-unit exponents that are not 2. Every other code has 2.
+  const MINOR_EXPONENT = { KWD: 3, BHD: 3, OMR: 3, TND: 3, JOD: 3, IQD: 3, LYD: 3, JPY: 0, KRW: 0, CLP: 0, ISK: 0, VND: 0 };
+  function minorExponent(code) {
+    const e = MINOR_EXPONENT[String(code || '').toUpperCase()];
+    return e === undefined ? 2 : e;
+  }
+
+  // lib/order-money.js, looked up when asked for: the desktop window loads it
+  // AFTER this file, and the Mac and phone load it as a global.
+  function orderMoney() {
+    if (typeof globalThis !== 'undefined' && globalThis.KhaytOrderMoney) return globalThis.KhaytOrderMoney;
+    try {
+      // Node: its siblings are globals it consults by name — tax for the
+      // shop's VAT mode, business-scope for "not business" and split parents.
+      require('./tax.js'); require('./business-scope.js');
+      return require('./order-money.js');
+    } catch (e) { return null; }
+  }
+
+  /**
+   * What the customer still owes on this job, in its own currency and rounded
+   * to that currency's minor unit: `{ amount, minor, currency }`, or null
+   * without a job. `ctx.settings` makes it mode-aware; without it the price is
+   * the bill (order-money's own fallback).
+   */
+  function amountDue(ctx) {
+    const c = ctx || {};
+    if (!isObj(c.order)) return null;
+    const OM = orderMoney();
+    if (!OM) return null;
+    const mctx = { settings: isObj(c.settings) ? c.settings : undefined, clients: isObj(c.customer) ? [c.customer] : [] };
+    const currency = OM.orderCurrency(c.order, mctx);
+    const exp = minorExponent(currency);
+    const owed = Number(OM.orderOwedRaw(c.order, mctx)) || 0;
+    const minor = Math.max(0, Math.round(owed * Math.pow(10, exp)));
+    return { amount: minor / Math.pow(10, exp), minor, currency };
+  }
+
+  /** `{now.epochMs}` / `{now.plusDays.N.epochMs}` from the clock the platform handed in. */
+  function nowValue(ref, ctx) {
+    const days = M.nowDays(ref);
+    const now = ctx && Number(ctx.nowMs);
+    if (days < 0 || !Number.isFinite(now) || now <= 0) return null;
+    return Math.floor(now) + days * 86400000;
+  }
+
   /** The value a plugin's own field holds on a record. */
   function fieldValue(record, pluginId, key) {
     const p = isObj(record) && isObj(record.plugins) && isObj(record.plugins[pluginId]) ? record.plugins[pluginId] : null;
@@ -62,6 +108,11 @@
         case 'enum': return (st.options || []).some(o => o.value === v) ? v : null;
         default: return typeof v === 'string' && v.length <= M.LIMITS.settingValue ? v : null;
       }
+    }
+    if (ref.startsWith('now.')) return nowValue(ref, c);
+    if (ref === 'order.amountDue' || ref === 'order.amountDueMinor') {
+      const d = amountDue(c);
+      return d ? (ref === 'order.amountDue' ? d.amount : d.minor) : null;
     }
     if (ref.startsWith('field.')) {
       const key = ref.slice(6);
@@ -209,10 +260,20 @@
         return { ok: false, error: `setting ${st.key} is not set` };
       }
     }
+    // A time this trigger uses with no clock handed in: an expiry of 1970 is
+    // worse than not sending.
+    for (const ref of triggerRefs(t.def)) {
+      if (ref.startsWith('now.') && nowValue(ref, ctx) === null) return { ok: false, error: 'no clock was given' };
+      // Without the shop's settings an exclusive shop's bill reads as its
+      // pre-tax price: a payment link for the wrong amount. Refuse instead.
+      if ((ref === 'order.amountDue' || ref === 'order.amountDueMinor') && !isObj(ctx && ctx.settings)) {
+        return { ok: false, error: 'the shop settings were not given' };
+      }
+    }
     const u = urlFor(manifest, trigger, ctx);
     if (!u.ok) return u;
     if (t.kind === 'action' && t.def.kind === 'open') return { ok: true, method: 'OPEN', url: u.url };
-    const auth = t.def.auth ? { header: t.def.auth.header, scheme: t.def.auth.scheme || '', secret: t.def.auth.secret } : null;
+    const auth = t.def.auth ? authOf(t.def.auth) : null;
     // A GET refresh carries nothing but its URL (and Khayt's own headers).
     if (t.kind === 'refresh' && t.def.method === 'GET') {
       return { ok: true, method: 'GET', url: u.url, body: '', auth, signWith: t.def.signWith || null };
@@ -242,6 +303,49 @@
       auth,
       signWith: t.def.signWith || null,
     };
+  }
+
+  /**
+   * The auth a platform adds: `{ header, scheme, secret, encode }`. With
+   * encode "basic" the scheme is "Basic" unless the manifest named one.
+   */
+  function authOf(a) {
+    const out = { header: a.header, scheme: a.scheme || '', secret: a.secret };
+    if (a.encode === 'basic') { out.encode = 'basic'; if (!out.scheme) out.scheme = 'Basic'; }
+    return out;
+  }
+
+  // Base64 of a string's UTF-8 bytes. JavaScriptCore has no Buffer, and
+  // btoa only takes Latin-1.
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function base64Utf8(str) {
+    const bytes = [];
+    for (const ch of String(str)) {
+      const cp = ch.codePointAt(0);
+      if (cp < 0x80) bytes.push(cp);
+      else if (cp < 0x800) bytes.push(0xc0 | (cp >> 6), 0x80 | (cp & 63));
+      else if (cp < 0x10000) bytes.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+      else bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+    }
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 3) {
+      const n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0);
+      out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63]
+        + (i + 1 < bytes.length ? B64[(n >> 6) & 63] : '=') + (i + 2 < bytes.length ? B64[n & 63] : '=');
+    }
+    return out;
+  }
+
+  /**
+   * The auth header's value for `auth` (from payloadFor) and the secret's
+   * value — the one line every platform must agree on. Null for a secret
+   * that is not a non-empty single-line string.
+   */
+  function authHeaderValue(auth, secretValue) {
+    if (!isObj(auth) || typeof secretValue !== 'string' || !secretValue || /[\r\n]/.test(secretValue)) return null;
+    let v = secretValue;
+    if (auth.encode === 'basic') v = base64Utf8(v.includes(':') ? v : v + ':');
+    return auth.scheme ? `${auth.scheme} ${v}` : v;
   }
 
   function readPath(obj, path) {
@@ -293,7 +397,7 @@
     return out;
   }
 
-  const api = { PAYLOAD_VERSION, payloadFor, urlFor, applyResponse, valueOf, fieldValue };
+  const api = { PAYLOAD_VERSION, payloadFor, urlFor, applyResponse, valueOf, fieldValue, amountDue, minorExponent, authHeaderValue, base64Utf8 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPluginPayload = api;
 })();

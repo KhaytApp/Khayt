@@ -58,6 +58,20 @@ struct ConnectorsTests {
         }
     }
 
+    /// The same bytes `lib/plugin-payload.js authHeaderValue` gives
+    /// (test/plugin-v11-lib.test.js): a key with no colon gets one.
+    @Test("encode basic: base64 of key + \":\", or of user:password as it is")
+    func basicAuth() throws {
+        let basic = Self.post(["auth": .object(["header": .string("Authorization"), "scheme": .string("Basic"),
+                                                "secret": .string("apiKey"), "encode": .string("basic")])])
+        let p = try Connectors.post(from: basic, manifest: Self.manifest(), event: "link",
+                                    secrets: ["apiKey": "sk_test_abc"], delivery: "d1", now: Date())
+        #expect(p.headers.contains(.init("Authorization", "Basic c2tfdGVzdF9hYmM6")))
+        let q = try Connectors.post(from: basic, manifest: Self.manifest(), event: "link",
+                                    secrets: ["apiKey": "user:pässword"], delivery: "d1", now: Date())
+        #expect(q.headers.contains(.init("Authorization", "Basic " + Data("user:pässword".utf8).base64EncodedString())))
+    }
+
     @Test("signWith gives the same three headers a Khayt webhook carries")
     func signature() throws {
         let p = try Connectors.post(from: Self.post(["signWith": .string("key")]), manifest: Self.manifest(),

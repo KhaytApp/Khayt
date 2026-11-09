@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "Date du travail",
   "plg.f.order.carrier": "Transporteur",
   "plg.f.order.trackingNumber": "Numéro de suivi",
+  "plg.f.order.amountDue": "Montant dû",
+  "plg.f.order.amountDueMinor": "Montant dû (unité minimale)",
   "plg.f.customer.name": "Nom du client",
   "plg.f.customer.company": "Société du client",
   "plg.f.customer.phone": "Téléphone du client",

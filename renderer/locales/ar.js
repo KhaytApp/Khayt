@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "تاريخ الطلب",
   "plg.f.order.carrier": "شركة الشحن",
   "plg.f.order.trackingNumber": "رقم التتبع",
+  "plg.f.order.amountDue": "المبلغ المستحق",
+  "plg.f.order.amountDueMinor": "المبلغ المستحق (بأصغر وحدة)",
   "plg.f.customer.name": "اسم العميل",
   "plg.f.customer.company": "شركة العميل",
   "plg.f.customer.phone": "هاتف العميل",

@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "订单日期",
   "plg.f.order.carrier": "承运商",
   "plg.f.order.trackingNumber": "运单号",
+  "plg.f.order.amountDue": "应付金额",
+  "plg.f.order.amountDueMinor": "应付金额（最小单位）",
   "plg.f.customer.name": "客户姓名",
   "plg.f.customer.company": "客户公司",
   "plg.f.customer.phone": "客户电话",
