@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "このサイトを開くだけで、帳簿からは何も送信しません。";
 "connectors.consent.confirmed" = "このiPhoneから許可済み。";
 "connectors.consent.not_confirmed" = "このiPhoneではまだ使用されていません。最初の送信前に確認します。";
-"connectors.list.empty" = "このお店にはコネクタがありません。";
 "connectors.list.footer" = "コネクタはMacで追加・承認します。キーはこのiPhoneにだけ保存され、同期されることはありません。";
 "connectors.badge.reviewed" = "審査済み";
 "connectors.status.active" = "有効";

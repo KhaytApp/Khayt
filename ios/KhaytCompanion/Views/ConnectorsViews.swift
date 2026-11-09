@@ -408,21 +408,27 @@ struct ConnectorConsentList: View {
 
 /// Settings ▸ Connectors: the book's connectors, read-only apart from this
 /// phone's own keys. Adding and approving one is the Mac's.
-struct ConnectorsSettingsSection: View {
+///
+/// WITH NO CONNECTOR IN THE BOOK IT DRAWS NOTHING, heading included: the
+/// Mac and desktop ship connectors switched off, and no build may show the
+/// feature before khaytapp.com/privacy describes it.
+struct ConnectorsSettingsSection<Heading: View>: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @State private var connectors: [Connector] = []
     @State private var tick = 0
+    @ViewBuilder var heading: () -> Heading
 
     var body: some View {
+        Group {
+            if !connectors.isEmpty { list }
+        }
+        .task(id: tick) { connectors = await api.connectors() }
+    }
+
+    private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
+            heading()
             VStack(spacing: 0) {
-                if connectors.isEmpty {
-                    Text(L10n.tr("connectors.list.empty"))
-                        .font(.khayt(13.5, relativeTo: .footnote))
-                        .foregroundStyle(KhaytDesign.note)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
                 ForEach(Array(connectors.enumerated()), id: \.element.id) { i, c in
                     NavigationLink {
                         ConnectorSettingsPage(connector: c) { tick += 1 }
@@ -440,7 +446,6 @@ struct ConnectorsSettingsSection: View {
                 .padding(.horizontal, 2)
                 .padding(.top, 9)
         }
-        .task(id: tick) { connectors = await api.connectors() }
     }
 }
 

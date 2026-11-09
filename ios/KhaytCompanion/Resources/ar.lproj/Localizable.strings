@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "يفتح هذا الموقع فقط، ولا يرسل شيئًا من دفترك.";
 "connectors.consent.confirmed" = "مسموح من هذا الآيفون.";
 "connectors.consent.not_confirmed" = "لم يُستخدم من هذا الآيفون بعد. يسألك Khayt قبل أول إرسال.";
-"connectors.list.empty" = "لا توجد موصِّلات في هذه الورشة.";
 "connectors.list.footer" = "تُضاف الموصِّلات ويُوافَق عليها من جهاز Mac. مفاتيحها تبقى على هذا الآيفون ولا تُزامَن أبدًا.";
 "connectors.badge.reviewed" = "تمت مراجعته";
 "connectors.status.active" = "نشط";

@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "Ouvre ce site. N’envoie rien de votre registre.";
 "connectors.consent.confirmed" = "Autorisé depuis cet iPhone.";
 "connectors.consent.not_confirmed" = "Pas encore utilisé depuis cet iPhone. Khayt demande avant le premier envoi.";
-"connectors.list.empty" = "Aucun connecteur dans cet atelier.";
 "connectors.list.footer" = "Les connecteurs s’ajoutent et s’approuvent sur votre Mac. Leurs clés restent sur cet iPhone et ne sont jamais synchronisées.";
 "connectors.badge.reviewed" = "Vérifié";
 "connectors.status.active" = "Actif";

@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "Abre este sitio. No envía nada de tu libro.";
 "connectors.consent.confirmed" = "Permitido desde este iPhone.";
 "connectors.consent.not_confirmed" = "Aún no se ha usado desde este iPhone. Khayt pregunta antes del primer envío.";
-"connectors.list.empty" = "No hay conectores en este taller.";
 "connectors.list.footer" = "Los conectores se añaden y aprueban en tu Mac. Sus claves se quedan en este iPhone y nunca se sincronizan.";
 "connectors.badge.reviewed" = "Revisado";
 "connectors.status.active" = "Activo";
