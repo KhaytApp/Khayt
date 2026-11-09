@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "Auftragsdatum",
   "plg.f.order.carrier": "Versanddienst",
   "plg.f.order.trackingNumber": "Sendungsnummer",
+  "plg.f.order.amountDue": "Offener Betrag",
+  "plg.f.order.amountDueMinor": "Offener Betrag (kleinste Einheit)",
   "plg.f.customer.name": "Kundenname",
   "plg.f.customer.company": "Firma des Kunden",
   "plg.f.customer.phone": "Telefon des Kunden",

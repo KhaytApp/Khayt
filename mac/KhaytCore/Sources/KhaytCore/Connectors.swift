@@ -119,7 +119,14 @@ public enum Connectors {
             guard let value = secrets[secretName], !value.isEmpty else { throw Refusal.missingSecret(secretName) }
             var scheme = ""
             if case .string(let s)? = auth["scheme"] { scheme = s }
-            headers.append(Header(name, scheme.isEmpty ? value : "\(scheme) \(value)"))
+            // `encode: "basic"` (lib/plugin-payload.js authHeaderValue): HTTP
+            // Basic, base64 of "user:password"; a secret with no colon is the
+            // user name with an empty password, so ":" is added.
+            var sent = value
+            if auth["encode"] == .string("basic") {
+                sent = Data((value.contains(":") ? value : value + ":").utf8).base64EncodedString()
+            }
+            headers.append(Header(name, scheme.isEmpty ? sent : "\(scheme) \(sent)"))
         }
         if case .string(let signWith)? = p["signWith"] {
             guard let value = secrets[signWith], !value.isEmpty else { throw Refusal.missingSecret(signWith) }

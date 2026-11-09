@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "Fecha del trabajo",
   "plg.f.order.carrier": "Transportista",
   "plg.f.order.trackingNumber": "Número de seguimiento",
+  "plg.f.order.amountDue": "Importe pendiente",
+  "plg.f.order.amountDueMinor": "Importe pendiente (unidad mínima)",
   "plg.f.customer.name": "Nombre del cliente",
   "plg.f.customer.company": "Empresa del cliente",
   "plg.f.customer.phone": "Teléfono del cliente",

@@ -5372,6 +5372,8 @@
   "plg.f.order.date": "注文日",
   "plg.f.order.carrier": "配送業者",
   "plg.f.order.trackingNumber": "追跡番号",
+  "plg.f.order.amountDue": "未払い金額",
+  "plg.f.order.amountDueMinor": "未払い金額（最小単位）",
   "plg.f.customer.name": "顧客名",
   "plg.f.customer.company": "顧客の会社",
   "plg.f.customer.phone": "顧客の電話番号",

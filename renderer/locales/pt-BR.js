@@ -5373,6 +5373,8 @@
   "plg.f.order.date": "Data do pedido",
   "plg.f.order.carrier": "Transportadora",
   "plg.f.order.trackingNumber": "Código de rastreio",
+  "plg.f.order.amountDue": "Valor devido",
+  "plg.f.order.amountDueMinor": "Valor devido (menor unidade)",
   "plg.f.customer.name": "Nome do cliente",
   "plg.f.customer.company": "Empresa do cliente",
   "plg.f.customer.phone": "Telefone do cliente",

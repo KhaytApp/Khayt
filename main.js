@@ -7180,7 +7180,7 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
     const disk = readStoreDecryptedFromDisk();
     const entry = ((disk && disk.settings && disk.settings.plugins) || []).find((p) => p && p.id === r.id);
     const trigger = r.action ? { action: String(r.action) } : { event: String(r.event || '') };
-    const out = await pluginSend.send({ entry, trigger, records: r.records || {}, delivery: r.delivery });
+    const out = await pluginSend.send({ entry, trigger, records: r.records || {}, delivery: r.delivery, settings: disk && disk.settings });
     if (out.ok && out.method === 'OPEN') {
       if (!isAllowedExternalUrl(out.url)) return { ok: false, refused: 'url' };
       await shell.openExternal(out.url);
