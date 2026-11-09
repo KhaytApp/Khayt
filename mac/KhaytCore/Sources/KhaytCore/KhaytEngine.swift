@@ -8460,6 +8460,12 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginHost.stateOf(ARG0, ARG1)", [entry, .bool(reviewed)], as: String.self)
     }
 
+    /// The entry with the shop's settings for it changed (`entry.config`):
+    /// declared keys only, each checked by type; empty removes one.
+    public func pluginWithConfig(_ entry: JSONValue, values: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withConfig(ARG0, ARG1)", [entry, values], as: JSONValue.self)
+    }
+
     /// `record` with `values` (key → raw) written into the connector's own
     /// fields on `attach`, each checked by type; an empty value removes it.
     public func pluginWithFieldValues(_ record: JSONValue, entry: JSONValue, attach: String,

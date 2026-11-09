@@ -54,9 +54,51 @@ extension Shop {
                 version: Shop.plainString(e["version"]) ?? "",
                 state: state,
                 secrets: declared.map { .init(name: $0.name, label: Self.connectorLabel($0.label, words.language, fallback: $0.name),
-                                              held: held.contains($0.name)) }))
+                                              held: held.contains($0.name)) },
+                settings: Self.settingRows(entry, lang: words.language)))
         }
         return out
+    }
+
+    /// A connector's settings as the form shows them, with what is saved.
+    nonisolated static func settingRows(_ entry: JSONValue, lang: String) -> [ConnectorRow.Setting] {
+        let e = object(entry)
+        let saved = object(e["config"])
+        guard case .array(let list)? = object(e["manifest"])["settings"] else { return [] }
+        return list.compactMap { item in
+            let st = object(item)
+            guard case .string(let key)? = st["key"], case .string(let type)? = st["type"] else { return nil }
+            var options: [ConnectorRow.Setting.Option] = []
+            if case .array(let opts)? = st["options"] {
+                options = opts.compactMap { o in
+                    guard case .string(let v)? = object(o)["value"] else { return nil }
+                    return .init(value: v, label: connectorLabel(object(o)["label"], lang, fallback: v))
+                }
+            }
+            let value: String
+            switch saved[key] {
+            case .string(let s)?: value = s
+            case .number(let n)?: value = n == n.rounded() && abs(n) < 1e15 ? String(Int64(n)) : String(n)
+            case .bool(let b)?: value = b ? "true" : ""
+            default: value = ""
+            }
+            return .init(key: key, label: connectorLabel(st["label"], lang, fallback: key), type: type,
+                         required: st["required"] == .bool(true), options: options, value: value)
+        }
+    }
+
+    /// The shop's settings for a connector, saved into the book (synced, not
+    /// secret). Returns false when nothing was written.
+    func saveConnectorSettings(_ id: String, _ values: [String: String], ticks: [String: Bool]) async -> Bool {
+        guard let engine else { return false }
+        var raw: [String: JSONValue] = values.mapValues { .string($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        for (k, v) in ticks { raw[k] = .bool(v) }
+        let sent = JSONValue.object(raw)
+        return await writeConnectors { plugins in
+            guard let entry = Self.entry(in: plugins, id: id) else { return plugins }
+            let next = try await engine.pluginWithConfig(entry, values: sent)
+            return try await engine.pluginWithEntry(plugins, entry: next)
+        }
     }
 
     // MARK: - Installing
@@ -282,5 +324,22 @@ struct ConnectorRow: Identifiable, Equatable {
         let held: Bool
     }
 
+    var settings: [Setting] = []
+
+    /// One of the shop's settings for this connector (manifest `settings[]`).
+    struct Setting: Equatable, Identifiable {
+        var id: String { key }
+        let key: String
+        let label: String
+        /// text, number, bool or enum.
+        let type: String
+        let required: Bool
+        let options: [Option]
+        /// As saved; "" for none, "true" for a ticked box.
+        let value: String
+        struct Option: Equatable, Hashable { let value: String; let label: String }
+    }
+
     var keysMissing: Bool { secrets.contains { !$0.held } }
+    var settingsMissing: Bool { settings.contains { $0.required && $0.value.isEmpty } }
 }
