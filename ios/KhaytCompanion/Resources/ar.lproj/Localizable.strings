@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "ورشة الماك على Khayt Cloud (آخر 6)";
 "diag.none" = "لا شيء";
 "diag.records" = "السجلات: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "حساب Khayt Cloud هذا لورشة غير ورشة الماك. سجّل الدخول باسم %@.";
+"cloud.wrong_shop" = "حساب Khayt Cloud هذا لورشة غير ورشة الماك. سجّل الدخول بالحساب الذي يستخدمه الماك.";
+"cloud.empty_shop" = "نسخة هذه الورشة على Khayt Cloud فارغة. احتفظ هاتفك بنسخته.";
+"cloud.adopt.action" = "استخدم هذه الورشة بدلًا منها";
+"cloud.adopt.title" = "استخدام ورشة Khayt Cloud هذه؟";
+"cloud.adopt.message" = "ستحلّ ورشة هذا الحساب على Khayt Cloud محلّ الورشة الموجودة على هذا الهاتف. لا يمكن التراجع عن ذلك على هذا الهاتف.";
+"cloud.adopt.confirm" = "استبدل الورشة على هذا الهاتف";
+"diag.cloud_refused" = "آخر سحب مرفوض من Khayt Cloud";
+"diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
+"diag.refused.empty" = "مرفوض: نسخة فارغة";
