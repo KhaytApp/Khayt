@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Macのクラウドショップ（末尾6文字）";
 "diag.none" = "なし";
 "diag.records" = "レコード：%ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "このKhayt CloudアカウントはMacとは別のショップです。%@ でサインインしてください。";
+"cloud.wrong_shop" = "このKhayt CloudアカウントはMacとは別のショップです。Macが使っているアカウントでサインインしてください。";
+"cloud.empty_shop" = "Khayt Cloud上のこのショップのコピーは空です。iPhoneは自分のコピーを保持しました。";
+"cloud.adopt.action" = "代わりにこのショップを使う";
+"cloud.adopt.title" = "このKhayt Cloudのショップを使いますか？";
+"cloud.adopt.message" = "このiPhoneのショップが、Khayt Cloud上のこのアカウントのショップに置き換えられます。このiPhoneでは元に戻せません。";
+"cloud.adopt.confirm" = "このiPhoneのショップを置き換える";
+"diag.cloud_refused" = "最後に拒否したクラウドの取得";
+"diag.refused.wrong_shop" = "拒否：別のショップ";
+"diag.refused.empty" = "拒否：空";

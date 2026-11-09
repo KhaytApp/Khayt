@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Mac 的云端店铺（后 6 位）";
 "diag.none" = "无";
 "diag.records" = "记录：%ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "此 Khayt Cloud 账户与你的 Mac 不是同一个店铺。请以 %@ 登录。";
+"cloud.wrong_shop" = "此 Khayt Cloud 账户与你的 Mac 不是同一个店铺。请使用你的 Mac 所用的账户登录。";
+"cloud.empty_shop" = "Khayt Cloud 上此店铺的副本是空的。你的 iPhone 保留了自己的副本。";
+"cloud.adopt.action" = "改用此店铺";
+"cloud.adopt.title" = "使用此 Khayt Cloud 店铺？";
+"cloud.adopt.message" = "此 iPhone 上的店铺将被此账户在 Khayt Cloud 上的店铺替换。此操作在此 iPhone 上无法撤销。";
+"cloud.adopt.confirm" = "替换此 iPhone 上的店铺";
+"diag.cloud_refused" = "最近一次被拒绝的云端拉取";
+"diag.refused.wrong_shop" = "已拒绝：店铺不符";
+"diag.refused.empty" = "已拒绝：为空";

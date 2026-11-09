@@ -46,6 +46,22 @@ struct CloudSync {
         case whole(records: Int)
         /// Changes since the last pull, folded in.
         case changes(Int)
+        /// A whole pull that was NOT adopted: the book, baseline, library and
+        /// scope are as they were, and `seenRev` is unchanged.
+        case refused(Refusal)
+    }
+
+    /// Why a whole pull was not adopted. Adopting REPLACES the phone's book,
+    /// and a sign-in to the wrong account once replaced a paired Mac's book —
+    /// every job, client and connector — with another account's empty shop.
+    enum Refusal: Equatable, Sendable {
+        /// The book says it is linked to a different shop (`settings.cloud.shopId`,
+        /// the Mac's own) than this sign-in. `email` is that shop's owner
+        /// email, MASKED (`maskedEmail`), when the book holds one.
+        case wrongShop(macShop: String, email: String?)
+        /// The cloud's copy holds no orders, customers, spools or machines
+        /// (`CompanionAPIRecordCount.core`), and the book does.
+        case emptyShop
     }
 
     enum Pushed: Equatable {
@@ -57,6 +73,8 @@ struct CloudSync {
         case needsTheMac
         /// A viewer's sign-in: it reads and never sends.
         case readOnly
+        /// The pull before the send was refused (`Refusal`): nothing was sent.
+        case refused(Refusal)
     }
 
     // MARK: - Signing in
@@ -179,17 +197,37 @@ struct CloudSync {
             reply = try await CloudReader.pull(connection(s), token: s.token,
                                                since: warm ? s.seenRev : nil, fetch: fetch)
         } catch CloudReader.Failure.noStoreYet {
+            s.adoptOtherShop = false
             return (s, .nothingYet)
         }
 
         // Behind the base — the chain was compacted since this phone last
         // looked, or this is the first pull. Either way the base came down.
         if reply.base != nil || !warm {
+            // "Use this shop instead" is good for this one pull, whatever it
+            // brings; the caller saves the session this returns.
+            let override = s.adoptOtherShop
+            s.adoptOtherShop = false
+            // What the phone holds now, read before anything replaces it.
+            let current = book.exists ? (try? book.read()) : nil
+            if !override, let current, let refusal = Self.shopRefusal(book: current, cloudShop: s.shopId) {
+                SyncDiagnostics.refused(.wrongShop, cloudShopId: s.shopId, at: now)
+                return (s, .refused(refusal))
+            }
             let whole = try await CloudReader.store(reply, dek: s.dek, engine: engine)
             // The cut and the library copy go over the WHOLE book, off the
             // main actor (`OffMain`); this type is @MainActor.
             let store = whole.store
             let taken = try await OffMain.run { BookScope.take(from: store, now: now) }
+            // An empty copy over a book that holds something is data loss
+            // whichever shop it is, so the same shop is refused it too.
+            // "Empty" is the shop's core collections only (`core`): a new
+            // shop's default category or settings do not make it a shop.
+            if !override, let current, CompanionAPIRecordCount.core(taken.store) == 0,
+               CompanionAPIRecordCount.core(current) > 0 {
+                SyncDiagnostics.refused(.empty, cloudShopId: s.shopId, at: now)
+                return (s, .refused(.emptyShop))
+            }
             try await BookReader(book: book).adopt(taken.store, scope: taken.taken)
             let book = book
             _ = try? await OffMain.run { try book.replaceLibrary(LibraryCopy.slimAll(store["printFiles"])) }
@@ -199,6 +237,7 @@ struct CloudSync {
             return (s, .whole(records: records))
         }
 
+        s.adoptOtherShop = false
         guard !reply.deltas.isEmpty else {
             s.seenRev = reply.rev
             SyncDiagnostics.record(.cloudDelta)
@@ -241,6 +280,42 @@ struct CloudSync {
         return (s, .changes(folded.applied + folded.removed))
     }
 
+    /// The shop a book says it is linked to — `settings.cloud.shopId`, which
+    /// the Mac writes when it connects — and the owner email beside it.
+    /// A masked value (`__KHAYT_MASKED__`) is no email.
+    nonisolated static func linkedShop(_ store: [String: JSONValue]) -> (shopId: String?, email: String?) {
+        guard case .object(let settings)? = store["settings"],
+              case .object(let cloud)? = settings["cloud"] else { return (nil, nil) }
+        var id: String?
+        if case .string(let v)? = cloud["shopId"], !v.isEmpty { id = v }
+        var email: String?
+        if case .string(let v)? = cloud["email"], !v.isEmpty, v != Self.secretMask { email = v }
+        return (id, email)
+    }
+
+    nonisolated static let secretMask = "__KHAYT_MASKED__"
+
+    /// `.wrongShop` when the book names a shop and it is not `cloudShop`;
+    /// nil when they match or the book names none.
+    nonisolated static func shopRefusal(book store: [String: JSONValue], cloudShop: String) -> Refusal? {
+        let linked = linkedShop(store)
+        guard let mac = linked.shopId, mac != cloudShop else { return nil }
+        return .wrongShop(macShop: mac, email: maskedEmail(linked.email))
+    }
+
+    /// An email as a hint, never the address: `turki@gmail.com` is
+    /// `t***@g***.com`. Nil for no email, a masked one, or one that is not
+    /// an address.
+    nonisolated static func maskedEmail(_ email: String?) -> String? {
+        guard let email = email?.trimmingCharacters(in: .whitespacesAndNewlines), email != secretMask,
+              let at = email.lastIndex(of: "@") else { return nil }
+        let local = email[..<at], domain = email[email.index(after: at)...]
+        guard let l = local.first, let d = domain.first, d != "." else { return nil }
+        let parts = domain.split(separator: ".", omittingEmptySubsequences: true)
+        guard parts.count >= 2, let tld = parts.last else { return nil }
+        return "\(l)***@\(d)***.\(tld)"
+    }
+
     /// Does this scope say where its job history was cut, and what the jobs
     /// it held counted on each meter? A whole one needs neither.
     nonisolated static func scopeIsCurrent(_ scope: BookScope.Taken?) -> Bool {
@@ -274,7 +349,10 @@ struct CloudSync {
     /// the cloud as it is; a race is pulled again and retried once.
     func push(_ session: CloudSession) async throws -> (CloudSession, Pushed) {
         guard session.canWrite else { return (session, .readOnly) }
-        var (s, _) = try await pull(session)
+        var (s, pulled) = try await pull(session)
+        // Nothing goes up over a pull that was refused: `seenRev` would be
+        // the other shop's, or none.
+        if case .refused(let why) = pulled { return (s, .refused(why)) }
         for attempt in 0..<2 {
             guard let baseline = book.baseline() else { return (s, .nothingToSend) }
             // Measured from a snapshot, and that snapshot is what `markSynced`
@@ -290,7 +368,8 @@ struct CloudSync {
                 s.seenRev = sent.rev
                 return (s, .sent(count: sent.count, rev: sent.rev))
             } catch CloudWriter.Failure.moved where attempt == 0 {
-                (s, _) = try await pull(s)
+                (s, pulled) = try await pull(s)
+                if case .refused(let why) = pulled { return (s, .refused(why)) }
             } catch CloudWriter.Failure.chainFull, CloudWriter.Failure.notAccepted {
                 return (s, .needsTheMac)
             } catch CloudWriter.Failure.readOnly {
@@ -306,6 +385,19 @@ enum CompanionAPIRecordCount {
     static func of(_ store: [String: JSONValue]) -> Int {
         store.values.reduce(0) { total, value in
             if case .array(let rows) = value { return total + rows.count }
+            return total
+        }
+    }
+
+    /// The collections that make a shop a shop: orders, customers, spools
+    /// and machines. What the empty-pull guard counts, in the cloud's copy
+    /// and in the book alike.
+    static let coreCollections = ["printLog", "clients", "inventory", "machines"]
+
+    /// Records in `coreCollections` alone.
+    static func core(_ store: [String: JSONValue]) -> Int {
+        coreCollections.reduce(0) { total, key in
+            if case .array(let rows)? = store[key] { return total + rows.count }
             return total
         }
     }

@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Mac’in bulut atölyesi (son 6)";
 "diag.none" = "Yok";
 "diag.records" = "kayıt: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "Bu Khayt Cloud hesabı, Mac’inizdekinden farklı bir atölyeye ait. %@ olarak oturum açın.";
+"cloud.wrong_shop" = "Bu Khayt Cloud hesabı, Mac’inizdekinden farklı bir atölyeye ait. Mac’inizin kullandığı hesapla oturum açın.";
+"cloud.empty_shop" = "Khayt Cloud’da bu atölyenin boş bir kopyası var. Telefonunuz kendi kopyasını korudu.";
+"cloud.adopt.action" = "Bunun yerine bu atölyeyi kullan";
+"cloud.adopt.title" = "Bu Khayt Cloud atölyesi kullanılsın mı?";
+"cloud.adopt.message" = "Bu telefondaki atölye, bu hesabın Khayt Cloud’daki atölyesiyle değiştirilir. Bu telefonda geri alınamaz.";
+"cloud.adopt.confirm" = "Bu telefondaki atölyeyi değiştir";
+"diag.cloud_refused" = "Son reddedilen bulut çekimi";
+"diag.refused.wrong_shop" = "reddedildi: başka atölye";
+"diag.refused.empty" = "reddedildi: boş";

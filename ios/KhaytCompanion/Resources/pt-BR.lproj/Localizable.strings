@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Oficina na nuvem do Mac (últimos 6)";
 "diag.none" = "Nenhuma";
 "diag.records" = "registros: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "Esta conta do Khayt Cloud é de uma oficina diferente da do seu Mac. Entre como %@.";
+"cloud.wrong_shop" = "Esta conta do Khayt Cloud é de uma oficina diferente da do seu Mac. Entre com a conta que o seu Mac usa.";
+"cloud.empty_shop" = "O Khayt Cloud tem uma cópia vazia desta oficina. Seu iPhone manteve a própria.";
+"cloud.adopt.action" = "Usar esta oficina";
+"cloud.adopt.title" = "Usar esta oficina do Khayt Cloud?";
+"cloud.adopt.message" = "A oficina deste iPhone é substituída pela oficina desta conta no Khayt Cloud. Não dá para desfazer neste iPhone.";
+"cloud.adopt.confirm" = "Substituir a oficina deste iPhone";
+"diag.cloud_refused" = "Último download da nuvem recusado";
+"diag.refused.wrong_shop" = "recusado: outra oficina";
+"diag.refused.empty" = "recusado: vazio";

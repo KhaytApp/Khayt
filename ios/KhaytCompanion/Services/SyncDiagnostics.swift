@@ -62,6 +62,12 @@ enum SyncDiagnostics {
         }
     }
 
+    /// A whole cloud pull that was not adopted (`CloudSync.Refusal`).
+    enum Refusal: String, CaseIterable, Sendable {
+        case wrongShop = "wrong-shop"
+        case empty = "empty"
+    }
+
     enum Keys {
         static let sources = "khayt.diag.sources"
         static let lastSource = "khayt.diag.lastSource"
@@ -72,8 +78,11 @@ enum SyncDiagnostics {
         static let macFailedAt = "khayt.diag.macFailedAt"
         static let counts = "khayt.diag.counts"
         static let cloudShop = "khayt.diag.cloudShop"
+        static let refused = "khayt.diag.refused"
+        static let refusedAt = "khayt.diag.refusedAt"
+        static let refusedShop = "khayt.diag.refusedShop"
         static let all = [sources, lastSource, lastSourceAt, macSettings, macSettingsAt, macAnsweredAt, macFailedAt,
-                          counts, cloudShop]
+                          counts, cloudShop, refused, refusedAt, refusedShop]
     }
 
     /// UserDefaults is thread-safe; these are called from the main actor and
@@ -116,6 +125,15 @@ enum SyncDiagnostics {
         if let t = tail(shopId) { defaults.set(t, forKey: Keys.cloudShop) }
     }
 
+    /// A whole cloud pull was refused: what, when, and the tail of the cloud
+    /// shop that offered it. The book is untouched, so no source is recorded.
+    static func refused(_ why: Refusal, cloudShopId: String, at date: Date = Date()) {
+        defaults.set(why.rawValue, forKey: Keys.refused)
+        defaults.set(date, forKey: Keys.refusedAt)
+        if let t = tail(cloudShopId) { defaults.set(t, forKey: Keys.refusedShop) }
+        else { defaults.removeObject(forKey: Keys.refusedShop) }
+    }
+
     static func forget() { for k in Keys.all { defaults.removeObject(forKey: k) } }
 
     /// What is recorded now.
@@ -131,6 +149,10 @@ enum SyncDiagnostics {
         var records: [Source: Int] = [:]
         /// The tail of the shop id the last cloud round ran for.
         var cloudShopTail: String?
+        /// The last whole cloud pull refused, when, and the cloud shop's tail.
+        var refused: Refusal?
+        var refusedAt: Date?
+        var refusedShopTail: String?
     }
 
     static func recorded() -> Recorded {
@@ -148,6 +170,9 @@ enum SyncDiagnostics {
             if let s = Source(rawValue: k), let n = v as? Int { r.records[s] = n }
         }
         r.cloudShopTail = defaults.string(forKey: Keys.cloudShop)
+        r.refused = defaults.string(forKey: Keys.refused).flatMap(Refusal.init(rawValue:))
+        r.refusedAt = defaults.object(forKey: Keys.refusedAt) as? Date
+        r.refusedShopTail = defaults.string(forKey: Keys.refusedShop)
         return r
     }
 }

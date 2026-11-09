@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Atelier cloud du Mac (6 derniers)";
 "diag.none" = "Aucun";
 "diag.records" = "enregistrements : %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "Ce compte Khayt Cloud correspond à un autre atelier que celui de votre Mac. Connectez-vous en tant que %@.";
+"cloud.wrong_shop" = "Ce compte Khayt Cloud correspond à un autre atelier que celui de votre Mac. Connectez-vous avec le compte qu’utilise votre Mac.";
+"cloud.empty_shop" = "Khayt Cloud détient une copie vide de cet atelier. Votre iPhone a gardé la sienne.";
+"cloud.adopt.action" = "Utiliser plutôt cet atelier";
+"cloud.adopt.title" = "Utiliser cet atelier Khayt Cloud ?";
+"cloud.adopt.message" = "L’atelier de cet iPhone est remplacé par l’atelier de ce compte dans Khayt Cloud. Impossible d’annuler sur cet iPhone.";
+"cloud.adopt.confirm" = "Remplacer l’atelier de cet iPhone";
+"diag.cloud_refused" = "Dernière récupération cloud refusée";
+"diag.refused.wrong_shop" = "refusée : autre atelier";
+"diag.refused.empty" = "refusée : vide";
