@@ -1996,13 +1996,13 @@
              storefront and the product feeds are the online surface, and
              automation is WhatsApp templates and scheduled email.
 
-             `pro-only` is carried onto the cards themselves ON PURPOSE. The
-             Automation nav item is pro-only and the Online one is biz-only, so
-             moving these without the class would newly expose cloud sync and the
-             storefront directory to Simple mode. Where a feature appears is a
-             layout question; who can see it is a product one, and this change is
-             only answering the first. -->
-        <div class="card settings-card pro-only">
+             The storefront directory keeps `pro-only` on its card, ON PURPOSE:
+             the Automation nav item was pro-only and the Online one is biz-only.
+             Khayt Cloud does NOT, since Nov 2026: with it pro-only a Simple shop
+             had no way to sign in, sign up or sync at all, while the same pane
+             showed it the LAN REST API. Sync is the one connection every shop
+             needs (desktop-settings-menus-review.md, §0). -->
+        <div class="card settings-card" id="cloudSettingsCard">
         <div class="settings-section-head" data-i18n="set.cloud_title">Khayt Cloud (sync)</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.cloud_hint">Opt-in, end-to-end-encrypted backup/sync of your shop to your own Khayt Cloud server. The server only stores encrypted data; your sync passphrase (never uploaded) is the key.</p>
         <div id="cloudSettingsSection"></div>
@@ -2386,7 +2386,7 @@
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input type="text" id="set_plibRoot" readonly placeholder="This Mac (default)" style="flex:1; min-width:220px;">
           <button class="btn" id="btnPlibRoot" data-i18n="set.plib_choose">Choose…</button>
-          <button class="btn ghost" id="btnPlibRootClear" data-i18n="set.plib_use_default">Use this Mac</button>
+          <button class="btn ghost" id="btnPlibRootClear" data-i18n="set.plib_use_default">Use this computer</button>
         </div>
         <label style="margin-top:12px;" data-i18n="set.plib_loc_mirror">Also keep a copy in (backup)</label>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
