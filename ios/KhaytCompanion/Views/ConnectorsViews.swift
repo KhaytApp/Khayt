@@ -363,6 +363,26 @@ struct ConnectorSettingsPage: View {
                     foot(L10n.tr("connectors.key.footer"))
                 }
 
+                if !connector.settings.isEmpty {
+                    eyebrow(L10n.tr("connectors.settings.title"))
+                    VStack(spacing: 0) {
+                        ForEach(Array(connector.settings.enumerated()), id: \.element.key) { i, st in
+                            settingRow(st, last: i == connector.settings.count - 1)
+                        }
+                    }
+                    .card()
+                    let missing = ConnectorRules.missingSettings(connector)
+                    if !missing.isEmpty {
+                        Text(L10n.format("connectors.settings.missing", ListFormatter.localizedString(byJoining: missing)))
+                            .font(.khayt(12.5, relativeTo: .footnote))
+                            .foregroundStyle(KhaytDesign.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 2)
+                            .padding(.top, 9)
+                    }
+                    foot(L10n.tr("connectors.settings.footer"))
+                }
+
                 eyebrow(L10n.tr("connectors.consent.title"))
                 if !rows.isEmpty { ConnectorConsentList(connector: connector, rows: rows) }
                 foot(L10n.tr(ConnectorRules.isConfirmed(connector) ? "connectors.consent.confirmed" : "connectors.consent.not_confirmed"))
@@ -416,6 +436,26 @@ struct ConnectorSettingsPage: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 16).padding(.vertical, 10)
         .frame(minHeight: 56)
+        .overlay(alignment: .bottom) {
+            if !last { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+        }
+    }
+
+    /// A shop setting, read-only: its label and the value the Mac saved,
+    /// drawn like a connector's own field on a job.
+    private func settingRow(_ st: Connector.Setting, last: Bool) -> some View {
+        let value = ConnectorRules.settingValue(st, in: connector)
+        return HStack(alignment: .firstTextBaseline) {
+            Text(st.label).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+            Spacer(minLength: 8)
+            Text(value ?? L10n.tr("connectors.settings.not_set"))
+                .font(.khayt(13.5, .medium, relativeTo: .footnote))
+                .foregroundStyle(value == nil ? (st.required ? KhaytDesign.attention : KhaytDesign.note) : KhaytDesign.ink)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .frame(minHeight: 44)
         .overlay(alignment: .bottom) {
             if !last { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
         }

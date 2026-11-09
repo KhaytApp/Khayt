@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "Ilegível";
 "connectors.yes" = "Sim";
 "connectors.no" = "Não";
+"connectors.settings.title" = "Ajustes da loja";
+"connectors.settings.not_set" = "Não definido";
+"connectors.settings.footer" = "Valem para a loja toda e são editados no seu Mac ou PC, não neste iPhone.";
+"connectors.settings.missing" = "Os botões não enviam nada até que %@ seja definido no seu Mac ou PC.";
+"connectors.error.setting" = "Defina “%@” para este conector no seu Mac ou PC primeiro. Nada foi enviado.";
 "connectors.data.order.id" = "ID do trabalho";
 "connectors.data.order.number" = "Número da fatura";
 "connectors.data.order.title" = "Título do trabalho";

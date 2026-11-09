@@ -55,6 +55,15 @@ struct Connector: Identifiable, Equatable, Sendable {
         let options: [String: String]
     }
 
+    /// One of the shop's settings for the connector (`settings[]`): typed
+    /// on the Mac, kept in the book at `entry.config`, read-only here.
+    struct Setting: Equatable, Sendable {
+        let key: String
+        let label: String
+        let type: String
+        let required: Bool
+    }
+
     struct Action: Equatable, Sendable, Identifiable {
         let id: String
         let label: String
@@ -79,6 +88,9 @@ struct Connector: Identifiable, Equatable, Sendable {
     let fields: [Field]
     let actions: [Action]
     let domains: [String]
+    var settings: [Setting] = []
+    /// The book's `entry.config`: the settings' values, as the Mac saved them.
+    var config: [String: JSONValue] = [:]
 
     /// Whether its buttons work: active, and nothing else. Every send checks it.
     var isActive: Bool { status == .active }
@@ -140,13 +152,21 @@ enum ConnectorRules {
             return .init(id: a, label: label($0["label"]) ?? a, placement: text($0["placement"]) ?? "",
                          kind: text($0["kind"]) ?? "", url: text($0["url"]) ?? "")
         }
+        let settings: [Connector.Setting] = list(m["settings"]).compactMap {
+            guard let k = text($0["key"]) else { return nil }
+            return .init(key: k, label: label($0["label"]) ?? k, type: text($0["type"]) ?? "text",
+                         required: $0["required"] == .bool(true))
+        }
+        var config: [String: JSONValue] = [:]
+        if case .object(let o)? = entry["config"] { config = o }
         var domains: [String] = []
         if case .array(let d)? = m["domains"] { domains = d.compactMap { if case .string(let s) = $0 { s } else { nil } } }
         return Connector(id: id, name: label(m["name"]) ?? id, publisher: text(m["publisher"]) ?? "",
                          version: text(m["version"]) ?? "", manifest: .object(m), granted: granted,
                          entry: .object(entry),
                          status: status, reviewed: reviewed,
-                         secrets: secrets, fields: fields, actions: actions, domains: domains)
+                         secrets: secrets, fields: fields, actions: actions, domains: domains,
+                         settings: settings, config: config)
     }
 
     /// Khayt's connector signing keys: `[{id, key}]`, `key` base64 of the
@@ -157,14 +177,17 @@ enum ConnectorRules {
         (try? await engine.pluginSigningKeys()) ?? []
     }
 
-    /// What the engine is given for one tap: the records, and (for a POST
+    /// What the engine is given for one tap: the records, the shop's settings
+    /// for the connector (`entry.config`, as `ctx.config`; `{}` when it has
+    /// none — the lib then refuses a required one by name), and (for a POST
     /// only) the secrets its URL fills in. An "open" link never gets a
     /// secret, whatever its URL says; the lib refuses one too, and this is
     /// the phone's own lock. `secret` reads this phone's Keychain; a missing
     /// one is returned by name.
     static func context(action: Connector.Action, order: [String: JSONValue]?, customer: [String: JSONValue]?,
+                        config: [String: JSONValue] = [:],
                         secret: (String) -> String?) -> (context: JSONValue, missing: String?) {
-        var ctx: [String: JSONValue] = [:]
+        var ctx: [String: JSONValue] = ["config": .object(config)]
         if let order { ctx["order"] = .object(order) }
         if let customer { ctx["customer"] = .object(customer) }
         guard action.kind == "post" else { return (.object(ctx), nil) }
@@ -248,27 +271,15 @@ enum ConnectorRules {
     /// (`KhaytCore.Connectors`): `link` for an "open" button, `post` for a
     /// POST, with the auth and signature headers the Mac sends too. `event`
     /// is the action's id, as the Mac names a press. Both re-check https, the
-    /// exact declared host and no user or password.
-    ///
-    /// ONE CHECK OF THE PHONE'S OWN: a port. The shared `checkHost` does not
-    /// look at one (the lib refuses a port when it builds the URL, so it
-    /// cannot arrive today); a URL with a port other than 443 is refused here
-    /// too, until the shared check covers it.
+    /// exact declared host, no user or password and no port but 443 — all in
+    /// the shared `Connectors.checkHost`; the phone adds no check of its own.
     static func prepare(payload: JSONValue, manifest: JSONValue, action: Connector.Action,
                         secrets: [String: String], delivery: String, now: Date) throws -> Prepared {
         if case .object(let p) = payload, p["method"] == .string("OPEN") {
-            let url = try Connectors.link(from: payload, manifest: manifest)
-            try refusePort(url)
-            return .open(url)
+            return .open(try Connectors.link(from: payload, manifest: manifest))
         }
-        let post = try Connectors.post(from: payload, manifest: manifest, event: action.id,
-                                       secrets: secrets, delivery: delivery, now: now)
-        try refusePort(post.url)
-        return .post(post)
-    }
-
-    private static func refusePort(_ url: URL) throws {
-        if let port = url.port, port != 443 { throw Connectors.Refusal.undeclaredHost("\(url.host ?? ""):\(port)") }
+        return .post(try Connectors.post(from: payload, manifest: manifest, event: action.id,
+                                         secrets: secrets, delivery: delivery, now: now))
     }
 
     /// The Keychain item a connector's secret lives in, on this phone only.
@@ -323,11 +334,15 @@ enum ConnectorRules {
         return nil
     }
 
-    /// A field reference (`order.number`, `field.tracking`) in plain words.
+    /// A field reference (`order.number`, `field.tracking`, `config.sender`) in plain words.
     static func fieldName(_ ref: String, in c: Connector?) -> String {
         if ref.hasPrefix("field.") {
             let key = String(ref.dropFirst(6))
             return c?.fields.first(where: { $0.key == key })?.label ?? key
+        }
+        if ref.hasPrefix("config.") {
+            let key = String(ref.dropFirst(7))
+            return c?.settings.first(where: { $0.key == key })?.label ?? key
         }
         let k = "connectors.data." + ref.lowercased()
         let t = L10n.tr(k)
@@ -349,6 +364,30 @@ enum ConnectorRules {
     private static func list(_ v: JSONValue?, strings: Bool) -> [String] {
         guard case .array(let a)? = v else { return [] }
         return a.compactMap { if case .string(let s) = $0 { s } else { nil } }
+    }
+
+    /// A setting's value from `entry.config` as text, or nil when it is not
+    /// set (missing, null or empty — what the lib counts as unset).
+    static func settingValue(_ s: Connector.Setting, in c: Connector) -> String? {
+        switch c.config[s.key] {
+        case .string(let v)?: return v.isEmpty ? nil : v
+        case .number(let n)?: return n.formatted(.number.locale(L10n.locale))
+        case .bool(let b)?: return L10n.tr(b ? "connectors.yes" : "connectors.no")
+        default: return nil
+        }
+    }
+
+    /// The required settings the Mac has not filled in, by label: a button
+    /// that uses one is refused by the shared rule until they are.
+    static func missingSettings(_ c: Connector) -> [String] {
+        c.settings.filter { $0.required && settingValue($0, in: c) == nil }.map(\.label)
+    }
+
+    /// The setting key in the lib's "setting <key> is not set", else nil.
+    static func unsetSetting(_ error: String) -> String? {
+        guard error.hasPrefix("setting "), error.hasSuffix(" is not set") else { return nil }
+        let key = error.dropFirst(8).dropLast(11)
+        return key.isEmpty ? nil : String(key)
     }
 
     /// A field value as text, for a read-only row.
@@ -432,12 +471,6 @@ extension KhaytAPIClient {
             if let canonical = try? await engine.pluginCanonicalJSON(m) {
                 reviewed = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
             }
-            #if DEBUG
-            // The sample shop's own connectors, for screenshots: only while
-            // the sample shop is open, and only an entry identical to the one
-            // `SampleShop` made. A real book is never the sample shop.
-            if isSampleShop && SampleShop.isSampleConnector(e) { reviewed = true }
-            #endif
             if let c = ConnectorRules.connector(entry: e, check: check, reviewed: reviewed) { out.append(c) }
         }
         return out
@@ -495,7 +528,8 @@ extension KhaytAPIClient {
             }
             secrets[name] = v
         }
-        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer) { secrets[$0] }
+        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer,
+                                          config: c.config) { secrets[$0] }
 
         guard let payload = try? await engine.pluginPayload(
                 c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context) else {
@@ -507,7 +541,13 @@ extension KhaytAPIClient {
                                                   secrets: secrets, delivery: Connectors.newDeliveryId(), now: Date())
         } catch let refusal as Connectors.Refusal {
             switch refusal {
-            case .notBuilt: return .failed(L10n.tr("connectors.error.build"))
+            case .notBuilt(let why):
+                // A required setting the Mac has not filled in, by its label.
+                if let key = ConnectorRules.unsetSetting(why) {
+                    let name = c.settings.first(where: { $0.key == key })?.label ?? key
+                    return .failed(L10n.format("connectors.error.setting", name))
+                }
+                return .failed(L10n.tr("connectors.error.build"))
             case .undeclaredHost(let h) where h.isEmpty: return .failed(L10n.tr("connectors.error.scheme"))
             case .undeclaredHost(let h): return .failed(L10n.format("connectors.error.host", h))
             case .missingSecret(let n): return .failed(L10n.format("connectors.error.key_missing", secretLabel(c, n)))
