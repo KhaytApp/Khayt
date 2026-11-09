@@ -139,7 +139,7 @@ extension Shop {
             NSWorkspace.shared.open(url)
             #endif
             return (true, "")
-        case .failed(let why):
+        case .failed(let why, _):
             return (false, words.callIt("plg.err_failed", ["why": .string(why)]))
         case .sent(let values):
             if case .object(let v) = values, !v.isEmpty {
@@ -206,7 +206,21 @@ extension Shop {
         case open(URL)
         /// Sent and accepted; `values` is what the reply fills in (maybe none).
         case sent(JSONValue)
-        case failed(String)
+        /// Sent and not accepted, or not answered (`status` nil).
+        case failed(String, status: Int?)
+    }
+
+    /// What made a connector send: a button, or an event on a job.
+    enum ConnectorTrigger: Equatable, Sendable {
+        case action(String)
+        case event(String)
+        var json: JSONValue {
+            switch self {
+            case .action(let id): return .object(["action": .string(id)])
+            case .event(let name): return .object(["event": .string(name)])
+            }
+        }
+        var name: String { switch self { case .action(let s), .event(let s): return s } }
     }
 
     typealias ConnectorPost = @Sendable (Connectors.Post) async throws -> (status: Int, body: Data?)
@@ -225,6 +239,16 @@ extension Shop {
     nonisolated static func connectorSend(entry: JSONValue, actionId: String, order: JSONValue?, customer: JSONValue?,
                                           secrets: [String: String], engine: KhaytEngine, post: ConnectorPost,
                                           now: Date) async -> ConnectorOutcome {
+        await connectorSend(entry: entry, trigger: .action(actionId), order: order, customer: customer, secrets: secrets,
+                            engine: engine, post: post, now: now, delivery: Connectors.newDeliveryId())
+    }
+
+    /// Build, send and read one button press or event. The entry must
+    /// already be live. A reply fills fields for a BUTTON only, as on the
+    /// desktop: an event is a notice, and its answer is not read into the book.
+    nonisolated static func connectorSend(entry: JSONValue, trigger: ConnectorTrigger, order: JSONValue?, customer: JSONValue?,
+                                          secrets: [String: String], engine: KhaytEngine, post: ConnectorPost,
+                                          now: Date, delivery: String) async -> ConnectorOutcome {
         let e = object(entry)
         let manifest = e["manifest"] ?? .null
         var ctx: [String: JSONValue] = [
@@ -233,7 +257,7 @@ extension Shop {
         ]
         if let order { ctx["order"] = order }
         if let customer { ctx["customer"] = customer }
-        guard let payload = try? await engine.pluginPayload(manifest, trigger: .object(["action": .string(actionId)]),
+        guard let payload = try? await engine.pluginPayload(manifest, trigger: trigger.json,
                                                            context: .object(ctx)) else {
             return .refused("payload")
         }
@@ -243,8 +267,8 @@ extension Shop {
         }
         let request: Connectors.Post
         do {
-            request = try Connectors.post(from: payload, manifest: manifest, event: actionId, secrets: secrets,
-                                          delivery: Connectors.newDeliveryId(), now: now)
+            request = try Connectors.post(from: payload, manifest: manifest, event: trigger.name, secrets: secrets,
+                                          delivery: delivery, now: now)
         } catch let refusal as Connectors.Refusal {
             if case .missingSecret(let name) = refusal { return .refused("secret \"\(name)\" is not set") }
             return .refused(refusal.description)
@@ -253,9 +277,10 @@ extension Shop {
         }
         let answer: (status: Int, body: Data?)
         do { answer = try await post(request) }
-        catch let failure as WebhookClient.Failure { return .failed(failure.errorDescription ?? "\(failure)") }
-        catch { return .failed(error.localizedDescription) }
-        guard (200..<300).contains(answer.status) else { return .failed("HTTP \(answer.status)") }
+        catch let failure as WebhookClient.Failure { return .failed(failure.errorDescription ?? "\(failure)", status: nil) }
+        catch { return .failed(error.localizedDescription, status: nil) }
+        guard (200..<300).contains(answer.status) else { return .failed("HTTP \(answer.status)", status: answer.status) }
+        guard case .action(let actionId) = trigger else { return .sent(.object([:])) }
         guard let body = answer.body, let reply = try? JSONValue.decode(JSONValue.self, from: body),
               case .object = reply,
               let values = try? await engine.pluginApplyResponse(manifest, actionId: actionId, reply: reply, entry: entry) else {
@@ -314,5 +339,146 @@ extension Shop {
         }
         guard let root, let record = Self.record(in: root, collection, id: id) else { return nil }
         return Self.object(record)["plugins"]
+    }
+}
+
+// MARK: - Events
+
+/// A connector event waiting to be sent, as `settings.pluginOutbox` keeps it
+/// (`lib/plugin-host.js` withQueued): the same delivery id on every attempt.
+struct ConnectorQueued: Equatable, Sendable {
+    let delivery: String
+    let id: String
+    let event: String
+    let orderId: String
+    let attempt: Int
+
+    var json: JSONValue {
+        .object(["delivery": .string(delivery), "id": .string(id), "event": .string(event),
+                 "orderId": .string(orderId), "attempt": .number(Double(attempt))])
+    }
+
+    init(delivery: String, id: String, event: String, orderId: String, attempt: Int) {
+        self.delivery = delivery; self.id = id; self.event = event; self.orderId = orderId; self.attempt = attempt
+    }
+
+    init?(_ value: JSONValue) {
+        let o = Shop.object(value)
+        guard let d = Shop.plainString(o["delivery"]), let id = Shop.plainString(o["id"]),
+              let ev = Shop.plainString(o["event"]), let order = Shop.plainString(o["orderId"]) else { return nil }
+        self.init(delivery: d, id: id, event: ev, orderId: order, attempt: Int(Shop.plainNumber(o["attempt"]) ?? 1))
+    }
+}
+
+@MainActor
+extension Shop {
+
+    /// What `fire` hands over: the connector items among a move's deliveries.
+    /// Each is sent once now; a failure worth retrying waits in the outbox on
+    /// the webhook ladder (`lib/webhook-bus.js`), with the same delivery id.
+    func deliverConnectorEvents(_ items: [KhaytEngine.WebhookDelivery]) async {
+        for item in Self.connectorEvents(items, switchedOn: ConnectorsSwitch.isOn()) {
+            await sendConnectorEvent(item)
+        }
+    }
+
+    /// The events to send now, each with a fresh delivery id. NONE while
+    /// connectors are switched off (`ConnectorsSwitch`): nothing is sent and
+    /// nothing is queued, because the queue is written only after a send.
+    nonisolated static func connectorEvents(_ items: [KhaytEngine.WebhookDelivery], switchedOn: Bool) -> [ConnectorQueued] {
+        guard switchedOn else { return [] }
+        return items.compactMap { one in
+            guard let id = one.connector, let orderId = one.orderId, !orderId.isEmpty else { return nil }
+            return ConnectorQueued(delivery: Connectors.newDeliveryId(), id: id, event: one.event, orderId: orderId, attempt: 1)
+        }
+    }
+
+    /// Send every queued connector event whose time has come.
+    func retryDueConnectorEvents() async {
+        guard ConnectorsSwitch.isOn(), let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        let due = (try? await engine.pluginDue(settingsDict["pluginOutbox"] ?? .array([]),
+                                               nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
+        for item in due.compactMap(ConnectorQueued.init) where !connectorInFlight.contains(item.delivery) {
+            await sendConnectorEvent(item)
+        }
+    }
+
+    /// One attempt at one event.
+    func sendConnectorEvent(_ item: ConnectorQueued) async {
+        // Checked here too, not only by the callers: this is the one place a
+        // connector event leaves the Mac or reaches the queue.
+        guard ConnectorsSwitch.isOn() else { return }
+        guard let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
+        guard !connectorInFlight.contains(item.delivery) else { return }
+        connectorInFlight.insert(item.delivery)
+        defer { connectorInFlight.remove(item.delivery) }
+
+        // Switched off, removed, paused or no longer signed since: dropped,
+        // never sent. So is an event about a job that is gone.
+        guard let entry = await liveConnectors().first(where: { Self.object($0)["id"] == .string(item.id) }),
+              let root = try? await BookWork.run({
+                  try JSONValue.decode([String: JSONValue].self, from: Data(contentsOf: build.storeURL))
+              }),
+              let order = Self.record(in: root, "printLog", id: item.orderId) else {
+            await settleConnectorEvent(item, retryAfterMs: nil)
+            return
+        }
+        let customer = Shop.plainString(Self.object(order)["clientId"]).flatMap { Self.record(in: root, "clients", id: $0) }
+        var secrets: [String: String] = [:]
+        for n in Self.connectorSecretsDeclared(Self.object(entry)["manifest"] ?? .null).map(\.name) {
+            if let v = await connectorSecrets.value(pluginId: item.id, name: n), !v.isEmpty { secrets[n] = v }
+        }
+        let outcome = await Self.connectorSend(entry: entry, trigger: .event(item.event), order: order, customer: customer,
+                                               secrets: secrets, engine: engine,
+                                               post: connectorPost ?? Self.realConnectorPost(engine),
+                                               now: Date(), delivery: item.delivery)
+        guard case .failed(_, let status) = outcome,
+              let next = try? await engine.webhookNext(status: status ?? 0, attempt: item.attempt), next.retry else {
+            // Sent, refused (it will not get better by waiting), or out of tries.
+            await settleConnectorEvent(item, retryAfterMs: nil)
+            return
+        }
+        await settleConnectorEvent(item, retryAfterMs: next.afterMs)
+    }
+
+    /// The outbox after one attempt: the item queued for its next try, or
+    /// gone. Queued BEFORE anything waits on it, so a quit mid-backoff
+    /// resumes on the next launch (`runIntegrationsPass`).
+    private func settleConnectorEvent(_ item: ConnectorQueued, retryAfterMs: Double?) async {
+        // lock: system — the retry queue of an event the shop's own action already sent
+        guard let engine, let build = source.build else { return }
+        let had = settingsDict["pluginOutbox"] ?? .array([])
+        if retryAfterMs == nil, case .array(let rows) = had,
+           !rows.contains(where: { Self.object($0)["delivery"] == .string(item.delivery) }) { return }
+        let at = retryAfterMs.map { Date().addingTimeInterval($0 / 1000) }
+        let next = ConnectorQueued(delivery: item.delivery, id: item.id, event: item.event, orderId: item.orderId,
+                                   attempt: item.attempt + 1)
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                let list = settings["pluginOutbox"] ?? .array([])
+                if let at {
+                    settings["pluginOutbox"] = try await engine.pluginQueued(list, item: next.json,
+                                                                             nextAttemptAt: StoreWriter.iso(at))
+                } else {
+                    settings["pluginOutbox"] = try await engine.pluginUnqueued(list, delivery: item.delivery)
+                }
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            return
+        }
+        // The early rungs (30 s, 2 min) come before the regular pass.
+        if let retryAfterMs, retryAfterMs <= 600_000 {
+            Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(Int(retryAfterMs) + 500))
+                await self?.retryDueConnectorEvents()
+            }
+        }
     }
 }

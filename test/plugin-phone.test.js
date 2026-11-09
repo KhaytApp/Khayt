@@ -91,3 +91,18 @@ test('a connector\'s settings take only declared keys, each checked by type', ()
   assert.equal(H.withConfig(e, { name: 'x'.repeat(900) }).config.name.length, 500);
   assert.deepEqual(H.withConfig(e, { name: '' }).config, { count: 2 });
 });
+
+test('the connector event outbox: one per delivery, newest 200, due by time', () => {
+  let q = H.withQueued([], { delivery: 'dlv_a', id: 'x', event: 'status_changed', orderId: 'J-1', attempt: 2 }, '2026-11-09T10:00:00Z');
+  q = H.withQueued(q, { delivery: 'dlv_a', id: 'x', event: 'status_changed', orderId: 'J-1', attempt: 3 }, '2026-11-09T11:00:00Z');
+  assert.equal(q.length, 1, 'a retry doubled its delivery');
+  assert.equal(q[0].attempt, 3);
+  q = H.withQueued(q, { delivery: 'dlv_b', id: 'x', event: 'order_shipped', orderId: 'J-2', attempt: 2 }, 'garbage');
+  assert.deepEqual(H.dueQueued(q, Date.parse('2026-11-09T10:30:00Z')).map((p) => p.delivery), ['dlv_b']);
+  assert.deepEqual(H.dueQueued(q, Date.parse('2026-11-09T11:00:00Z')).map((p) => p.delivery), ['dlv_a', 'dlv_b']);
+  assert.deepEqual(H.withoutQueued(q, 'dlv_a').map((p) => p.delivery), ['dlv_b']);
+  let big = [];
+  for (let i = 0; i < 250; i++) big = H.withQueued(big, { delivery: 'dlv_' + i }, 'x');
+  assert.equal(big.length, 200);
+  assert.equal(big[0].delivery, 'dlv_50');
+});

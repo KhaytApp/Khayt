@@ -8460,6 +8460,22 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginHost.stateOf(ARG0, ARG1)", [entry, .bool(reviewed)], as: String.self)
     }
 
+    /// `settings.pluginOutbox` with `item` queued for `nextAttemptAt` (one per delivery).
+    public func pluginQueued(_ list: JSONValue, item: JSONValue, nextAttemptAt: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withQueued(ARG0, ARG1, ARG2)",
+                          [list, item, .string(nextAttemptAt)], as: JSONValue.self)
+    }
+
+    /// `settings.pluginOutbox` without `delivery`.
+    public func pluginUnqueued(_ list: JSONValue, delivery: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withoutQueued(ARG0, ARG1)", [list, .string(delivery)], as: JSONValue.self)
+    }
+
+    /// The queued connector events whose time has come.
+    public func pluginDue(_ list: JSONValue, nowMs: Double) throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytPluginHost.dueQueued(ARG0, ARG1)", [list, .number(nowMs)], as: [JSONValue].self)
+    }
+
     /// The entry with the shop's settings for it changed (`entry.config`):
     /// declared keys only, each checked by type; empty removes one.
     public func pluginWithConfig(_ entry: JSONValue, values: JSONValue) throws -> JSONValue {
@@ -15600,6 +15616,11 @@ public actor KhaytEngine {
         public let payload: JSONValue?
         /// The attempt this is: 1 for a first send, more for a retry.
         public let attempt: Int?
+        /// Set for a CONNECTOR listening to this event (`lib/plugin-host.js`
+        /// eventTargets), not a webhook: the connector's id and the job. Its
+        /// request is built and sent by the connector path, never `url`.
+        public let connector: String?
+        public let orderId: String?
     }
 
     /// Every webhook a move owes, to every consumer that asked for it.
@@ -15622,6 +15643,18 @@ public actor KhaytEngine {
               var settings = a.settings || {}, out = [];
               for (var i = 0; i < a.effects.length; i++) {
                 var e = a.effects[i];
+                if (e.kind === 'webhook' && typeof KhaytPluginHost !== 'undefined') {
+                  // Connectors listening to this event: their own switch,
+                  // independent of the shop's webhooks being on (the
+                  // desktop's fireWebhook does the same). The signature is
+                  // checked where it is sent.
+                  var targets = KhaytPluginHost.eventTargets(settings, e.event);
+                  for (var t = 0; t < targets.length; t++) {
+                    out.push({ url: '', secret: '', event: e.event, deliveryId: '', body: null, attempt: 1,
+                               connector: String(targets[t].entry.id),
+                               orderId: String((a.order && a.order.id) || '') });
+                  }
+                }
                 if (e.kind === 'webhook') {
                   // The subscription bus. Off entirely unless the shop switched
                   // it on, and then only the subscriptions listening for THIS

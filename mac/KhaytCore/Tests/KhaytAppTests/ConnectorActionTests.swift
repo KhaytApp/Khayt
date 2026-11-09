@@ -26,7 +26,7 @@ struct ConnectorActionTests {
     }
 
     static let order: JSONValue = .object([
-        "id": .string("J-1"), "number": .string("1001"), "date": .string("2026-11-09"), "total": .number(115),
+        "id": .string("J-1"), "invoiceNumber": .string("1001"), "date": .string("2026-11-09"), "total": .number(115),
         "currency": .string("SAR"), "title": .string("Bracket"), "qty": .number(1), "clientId": .string("C-1"), "rev": .number(3),
     ])
     static let customer: JSONValue = .object([
@@ -97,7 +97,7 @@ struct ConnectorActionTests {
         let bad = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
                                            secrets: ["apiToken": "t"], engine: engine,
                                            post: { _ in (401, Data(#"{"order_id":"X"}"#.utf8)) }, now: Date())
-        #expect(bad == .failed("HTTP 401"))
+        #expect(bad == .failed("HTTP 401", status: 401))
         let html = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
                                             secrets: ["apiToken": "t"], engine: engine,
                                             post: { _ in (200, Data("<html>ok</html>".utf8)) }, now: Date())
