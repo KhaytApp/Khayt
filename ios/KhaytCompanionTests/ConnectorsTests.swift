@@ -75,10 +75,13 @@ final class ConnectorsTests: XCTestCase {
     }
 
     /// The sample shop's two connectors: one to press, one waiting on the Mac.
+    /// Both are Khayt's real signed samples, verified the way any book's
+    /// connector is (`KhaytAPIClient.connectors`): no bypass.
     func testTheSampleShopHasOneActiveAndOnePausedConnector() async throws {
         let engine = try KhaytEngine()
         let keys = await ConnectorRules.signingKeys(engine)
         guard case .array(let rows) = SampleShop.sampleConnectors else { return XCTFail("no sample connectors") }
+        XCTAssertEqual(rows.count, 2)
         var status: [String: Connector.Status] = [:]
         var signed: [String: Bool] = [:]
         for case .object(let e) in rows {
@@ -86,31 +89,71 @@ final class ConnectorsTests: XCTestCase {
             let check = try await engine.pluginCheckEntry(.object(e))
             let canonical = try await engine.pluginCanonicalJSON(m)
             let real = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
-            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check,
-                                                            reviewed: real || SampleShop.isSampleConnector(e)))
+            let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check, reviewed: real))
             status[c.id] = c.status
             signed[c.id] = real
         }
-        XCTAssertEqual(status[SampleShop.courierId], .active)
+        XCTAssertEqual(status[SampleShop.lamhaId], .active)
         XCTAssertEqual(status["app.khayt.samples.slack"], .paused)
-        // The Slack one is reviewed by Khayt's real signature, not the bypass;
-        // the bypass covers the courier alone.
+        XCTAssertEqual(signed[SampleShop.lamhaId], true)
         XCTAssertEqual(signed["app.khayt.samples.slack"], true)
-        XCTAssertEqual(signed[SampleShop.courierId], false)
-        guard case .object(let slackEntry) = rows[1] else { return XCTFail() }
-        XCTAssertFalse(SampleShop.isSampleConnector(slackEntry))
-        // And it is the shipped sample, byte for byte as JSON.
+        // And they are the shipped samples: Lamha byte for byte, Slack as JSON.
+        guard case .object(let lamhaEntry) = rows[0], case .object(let slackEntry) = rows[1] else { return XCTFail() }
+        let file = try String(contentsOf: Self.sampleURL("lamha-shipping"), encoding: .utf8)
+        XCTAssertEqual(SampleShop.lamhaManifestJSON, file)
+        XCTAssertEqual(lamhaEntry["manifest"], try Self.sample("lamha-shipping"))
         XCTAssertEqual(slackEntry["manifest"], try Self.sample("slack-notifier"))
+        // Granted exactly what lib's grantFor gives, with fields.write only.
+        let grant = try await engine.pluginGrant(try Self.sample("lamha-shipping"))
+        XCTAssertEqual(lamhaEntry["granted"], grant)
+        guard case .object(let g)? = lamhaEntry["granted"] else { return XCTFail() }
+        XCTAssertEqual(g["scopes"], .array([.string("fields.write")]))
+    }
+
+    /// The sample's Lamha button builds its request from the sample records
+    /// and the entry's settings, as the Mac would.
+    func testTheSampleLamhaButtonBuildsWithTheSettings() async throws {
+        let engine = try KhaytEngine()
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0] else { return XCTFail() }
+        let check = try await engine.pluginCheckEntry(.object(e))
+        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check, reviewed: true))
+        XCTAssertEqual(c.actions.map(\.id), ["record"])
+        XCTAssertEqual(c.settings.map(\.key), ["senderName", "senderPhone", "senderCity", "senderAddress", "carrierId"])
+        XCTAssertEqual(ConnectorRules.missingSettings(c), [])
+        let store = SampleShop.book()
+        func row(_ k: String, _ id: String) -> [String: JSONValue]? {
+            guard case .array(let a)? = store[k] else { return nil }
+            for case .object(let o) in a where o["id"] == .string(id) { return o }
+            return nil
+        }
+        let order = try XCTUnwrap(row("printLog", "S-1041"))
+        let customer = try XCTUnwrap(row("clients", "C-1"))
+        XCTAssertEqual(ConnectorRules.fieldValue(customer, pluginId: c.id, key: "city"), .string("Riyadh"))
+        XCTAssertEqual(ConnectorRules.fieldValue(row("printLog", "S-1046"), pluginId: c.id, key: "lamhaOrderId"),
+                       .string("48213"))
+        let action = c.actions[0]
+        let made = ConnectorRules.context(action: action, order: order, customer: customer, config: c.config) { _ in "t" }
+        let payload = try await engine.pluginPayload(c.manifest, trigger: .object(["action": .string("record")]),
+                                                     context: made.context)
+        guard case .object(let p) = payload, case .string(let body)? = p["body"],
+              case .object(let sent) = try JSONValue.parse(Data(body.utf8)),
+              case .object(let shipper)? = sent["shipper"], case .object(let to)? = sent["customer"] else {
+            return XCTFail("\(payload)")
+        }
+        XCTAssertEqual(shipper["name"], .string("Khayt sample studio"))
+        XCTAssertEqual(shipper["City"], .string("Riyadh"))
+        XCTAssertEqual(sent["carrier_id"], .string("1"))
+        XCTAssertEqual(sent["create_shippment"], .bool(false))
+        XCTAssertEqual(to["City"], .string("Riyadh"))
     }
 
     // MARK: The request, through the shared code
 
-    /// The courier's sample manifest with a signing key on "book", so every
+    /// The local courier manifest with a signing key on "book", so every
     /// header the shared code adds can be seen.
     private func signedCourier() throws -> JSONValue {
-        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
-              case .object(var m)? = e["manifest"], case .array(var actions)? = m["actions"],
-              case .object(var book) = actions[0], case .array(var secrets)? = m["secrets"] else { throw XCTSkip("no sample") }
+        guard case .object(var m) = Self.courier, case .array(var actions)? = m["actions"],
+              case .object(var book) = actions[0], case .array(var secrets)? = m["secrets"] else { throw XCTSkip("no courier") }
         secrets.append(.object(["name": .string("signingKey"), "label": .object(["en": .string("Signing key")]),
                                 "kind": .string("signingKey")]))
         book["signWith"] = .string("signingKey")
@@ -165,11 +208,10 @@ final class ConnectorsTests: XCTestCase {
         }
     }
 
-    /// The shared check refuses another host and a user name; the phone adds
-    /// a port, which the shared check does not look at.
+    /// The shared check refuses another host, a user name and any port but
+    /// 443; the phone has no check of its own on top.
     func testAnUndeclaredHostAUserOrAPortIsRefused() throws {
-        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
-              let m = e["manifest"] else { return XCTFail() }
+        let m = Self.courier
         func post(_ url: String) -> JSONValue {
             .object(["ok": .bool(true), "method": .string("POST"), "url": .string(url), "body": .string("{}"),
                      "auth": .null, "signWith": .null])
@@ -190,8 +232,14 @@ final class ConnectorsTests: XCTestCase {
             XCTAssertThrowsError(try ConnectorRules.prepare(payload: open(url), manifest: m, action: track,
                                                             secrets: [:], delivery: "d", now: Date()), url)
         }
-        // :8443 is refused above by the phone; Mac #2331 adds the same check to the
-        // shared Connectors.checkHost, after which ConnectorRules.refusePort can go.
+        // :8443 is refused by the shared KhaytCore.Connectors itself, the Mac's
+        // own path, not by anything the phone adds; :443 spelled out is fine.
+        XCTAssertThrowsError(try Connectors.link(from: open("https://courier.example.com:8443/t"), manifest: m)) {
+            guard case .undeclaredHost? = $0 as? Connectors.Refusal else { return XCTFail("\($0)") }
+        }
+        XCTAssertThrowsError(try Connectors.post(from: post("https://courier.example.com:8443/x"), manifest: m,
+                                                 event: "book", secrets: [:], delivery: "d", now: Date()))
+        XCTAssertNoThrow(try Connectors.link(from: open("https://courier.example.com:443/t"), manifest: m))
     }
 
     // MARK: The customer as the book keeps it
@@ -201,8 +249,7 @@ final class ConnectorsTests: XCTestCase {
     /// reads those.
     func testACustomerWithAnArabicNameOnlyAndAnAddressBookIsSent() async throws {
         let engine = try KhaytEngine()
-        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
-              let m = e["manifest"] else { return XCTFail() }
+        let m = Self.courier
         let customer: [String: JSONValue] = [
             "id": .string("C-9"), "nameAr": .string("نورة العتيبي"), "phone": .string("+966500000000"),
             "addresses": .array([.object(["label": .string("Home"), "address": .string("")]),
@@ -336,7 +383,7 @@ final class ConnectorsTests: XCTestCase {
     /// worked out without that check is not reviewed from a flag.
     func testAStoredReviewedFlagIsIgnored() async throws {
         let engine = try KhaytEngine()
-        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(var e) = rows[0] else { return XCTFail() }
+        var e = Self.entry(Self.courier, granted: .object([:]))
         let ok: JSONValue = .object(["ok": .bool(true), "errors": .array([]), "paused": .bool(false)])
         XCTAssertEqual(ConnectorRules.connector(entry: e, check: ok)?.status, .notReviewed, "no signature, no review")
         e["reviewed"] = .bool(true)
@@ -346,8 +393,6 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertEqual(c.status, .notReviewed)
         let check = try await engine.pluginCheckEntry(.object(e))
         XCTAssertEqual(ConnectorRules.connector(entry: e, check: check, reviewed: true)?.status, .invalid)
-        // And the sample shop's own path: an entry that is not exactly its own is not one.
-        XCTAssertFalse(SampleShop.isSampleConnector(e))
     }
 
     /// Not reviewed: the buttons are off and a tap sends nothing.
@@ -386,6 +431,49 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertEqual(ConnectorRules.context(action: post, order: nil, customer: nil) { _ in nil }.missing, "apiKey")
     }
 
+    /// The entry's settings go in as `ctx.config` (an empty object when it
+    /// has none), and the shared rule refuses a required one left unset.
+    func testTheEntrysConfigGoesIntoThePayload() async throws {
+        let open = Connector.Action(id: "o", label: "O", placement: "order", kind: "open", url: "")
+        guard case .object(let none) = ConnectorRules.context(action: open, order: nil, customer: nil) { _ in nil }.context
+        else { return XCTFail() }
+        XCTAssertEqual(none["config"], .object([:]))
+
+        let engine = try KhaytEngine()
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0] else { return XCTFail() }
+        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: nil))
+        let record = c.actions[0]
+        let order: [String: JSONValue] = ["id": .string("J-1"), "invoiceNumber": .string("INV-1"), "project": .string("Lid")]
+        let made = ConnectorRules.context(action: record, order: order, customer: nil, config: c.config) { _ in nil }
+        guard case .object(let ctx) = made.context else { return XCTFail() }
+        XCTAssertEqual(ctx["config"], e["config"])
+        let built = try await engine.pluginPayload(c.manifest, trigger: .object(["action": .string("record")]),
+                                                   context: made.context)
+        guard case .object(let b) = built else { return XCTFail() }
+        XCTAssertEqual(b["ok"], .bool(true), "\(built)")
+
+        // Without the Mac's settings: refused, by the setting's key, and the
+        // phone names it by its label.
+        var unset = c.config
+        unset["senderName"] = .string("")
+        let bare = ConnectorRules.context(action: record, order: order, customer: nil, config: unset) { _ in nil }
+        let refused = try await engine.pluginPayload(c.manifest, trigger: .object(["action": .string("record")]),
+                                                     context: bare.context)
+        guard case .object(let r) = refused else { return XCTFail() }
+        XCTAssertEqual(r["ok"], .bool(false))
+        XCTAssertEqual(r["error"], .string("setting senderName is not set"))
+        XCTAssertEqual(ConnectorRules.unsetSetting("setting senderName is not set"), "senderName")
+        XCTAssertNil(ConnectorRules.unsetSetting("not a link"))
+        var emptied = e
+        emptied["config"] = .object(["senderName": .string("")])
+        let partial = try XCTUnwrap(ConnectorRules.connector(entry: emptied, check: nil))
+        XCTAssertEqual(ConnectorRules.missingSettings(partial),
+                       ["senderName", "senderPhone", "senderCity", "senderAddress", "carrierId"]
+                        .compactMap { k in partial.settings.first { $0.key == k }?.label })
+        XCTAssertEqual(ConnectorRules.fieldName("config.senderCity", in: partial),
+                       partial.settings.first { $0.key == "senderCity" }?.label)
+    }
+
     /// The shared rule maps a reply into the connector's fields only when the
     /// stored entry grants `fields.write` (and is not paused); the phone
     /// hands it the entry and shows what comes back.
@@ -393,23 +481,30 @@ final class ConnectorsTests: XCTestCase {
         let engine = try KhaytEngine()
         guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0],
               let m = e["manifest"] else { return XCTFail() }
-        let reply: JSONValue = .object(["data": .object(["waybill": .string("EX-1")])])
-        let granted = try await engine.pluginApplyResponse(m, actionId: "book", reply: reply, entry: .object(e))
-        XCTAssertEqual(granted, .object(["awb": .string("EX-1")]))
+        let reply: JSONValue = .object(["success": .bool(true), "order_id": .number(48213)])
+        let granted = try await engine.pluginApplyResponse(m, actionId: "record", reply: reply, entry: .object(e))
+        XCTAssertEqual(granted, .object(["lamhaOrderId": .string("48213")]))
 
         var narrow = e
         if case .object(var g)? = e["granted"] { g["scopes"] = .array([]); narrow["granted"] = .object(g) }
-        let refused = try await engine.pluginApplyResponse(m, actionId: "book", reply: reply, entry: .object(narrow))
+        let refused = try await engine.pluginApplyResponse(m, actionId: "record", reply: reply, entry: .object(narrow))
         XCTAssertEqual(refused, .object([:]))
     }
 
     // MARK: Helpers
 
-    static func sample(_ name: String) throws -> JSONValue {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    static func sampleURL(_ name: String) -> URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "plugins/samples/\(name).json")
-        return try JSONValue.parse(Data(contentsOf: url))
     }
+
+    static func sample(_ name: String) throws -> JSONValue {
+        try JSONValue.parse(Data(contentsOf: sampleURL(name)))
+    }
+
+    /// An unsigned courier manifest for the tests that need what no signed
+    /// sample has: an "open" button and a customer button.
+    static let courier: JSONValue = (try? JSONValue.parse(Data(#"{"khayt":{"manifest":1},"id":"com.example.courier","name":{"en":"Courier booking","ar":"حجز المندوب"},"publisher":"Example","version":"1.0.0","domains":["courier.example.com"],"secrets":[{"name":"apiKey","label":{"en":"API key","ar":"مفتاح API"},"kind":"apiKey"}],"fields":[{"key":"awb","label":{"en":"Waybill","ar":"بوليصة الشحن"},"type":"text","attach":"order"},{"key":"account","label":{"en":"Courier account","ar":"حساب المندوب"},"type":"text","attach":"customer"}],"actions":[{"id":"book","label":{"en":"Book a pickup","ar":"حجز استلام"},"placement":"order","kind":"post","url":"https://courier.example.com/v1/pickups","send":["order.number","order.title","customer.name","customer.phone","customer.address"],"auth":{"header":"Authorization","scheme":"Bearer","secret":"apiKey"},"response":{"fields":{"awb":"data.waybill"}}},{"id":"track","label":{"en":"Track on the courier's site","ar":"التتبع في موقع المندوب"},"placement":"order","kind":"open","url":"https://courier.example.com/track?ref={field.awb}"},{"id":"account","label":{"en":"Open courier account","ar":"فتح حساب المندوب"},"placement":"customer","kind":"open","url":"https://courier.example.com/accounts?email={customer.email}"}],"scopes":["fields.write"]}"#.utf8))) ?? .null
 
     /// A stored entry for `manifest`, in the shape the Mac writes.
     static func entry(_ manifest: JSONValue, granted: JSONValue) -> [String: JSONValue] {

@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "تتعذّر قراءته";
 "connectors.yes" = "نعم";
 "connectors.no" = "لا";
+"connectors.settings.title" = "إعدادات المتجر";
+"connectors.settings.not_set" = "غير مُعيّن";
+"connectors.settings.footer" = "تُضبط للمتجر كله، وتُعدَّل على جهاز Mac أو الكمبيوتر، لا على هذا الـ iPhone.";
+"connectors.settings.missing" = "لن ترسل أزراره شيئًا حتى يُضبط %@ على جهاز Mac أو الكمبيوتر.";
+"connectors.error.setting" = "اضبط «%@» لهذه الأداة على جهاز Mac أو الكمبيوتر أولًا. لم يُرسل شيء.";
 "connectors.data.order.id" = "رقم الطلب";
 "connectors.data.order.number" = "رقم الفاتورة";
 "connectors.data.order.title" = "عنوان الطلب";

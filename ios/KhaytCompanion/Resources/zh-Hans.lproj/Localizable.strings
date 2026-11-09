@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "无法读取";
 "connectors.yes" = "是";
 "connectors.no" = "否";
+"connectors.settings.title" = "商店设置";
+"connectors.settings.not_set" = "未设置";
+"connectors.settings.footer" = "适用于整个商店，需在 Mac 或 PC 上编辑，而非此 iPhone。";
+"connectors.settings.missing" = "在 Mac 或 PC 上设置 %@ 之前，它的按钮不会发送任何内容。";
+"connectors.error.setting" = "请先在 Mac 或 PC 上为此连接器设置“%@”。未发送任何内容。";
 "connectors.data.order.id" = "任务 ID";
 "connectors.data.order.number" = "发票号码";
 "connectors.data.order.title" = "任务标题";

@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "読み取れません";
 "connectors.yes" = "はい";
 "connectors.no" = "いいえ";
+"connectors.settings.title" = "ショップの設定";
+"connectors.settings.not_set" = "未設定";
+"connectors.settings.footer" = "ショップ全体の設定で、この iPhone ではなく Mac または PC で編集します。";
+"connectors.settings.missing" = "Mac または PC で %@ を設定するまで、ボタンからは送信されません。";
+"connectors.error.setting" = "先に Mac または PC でこのコネクタの「%@」を設定してください。何も送信されていません。";
 "connectors.data.order.id" = "ジョブID";
 "connectors.data.order.number" = "請求書番号";
 "connectors.data.order.title" = "ジョブ名";

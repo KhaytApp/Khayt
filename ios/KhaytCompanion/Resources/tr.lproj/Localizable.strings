@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "Okunamıyor";
 "connectors.yes" = "Evet";
 "connectors.no" = "Hayır";
+"connectors.settings.title" = "Mağaza ayarları";
+"connectors.settings.not_set" = "Ayarlanmadı";
+"connectors.settings.footer" = "Tüm mağaza için geçerlidir; bu iPhone’da değil, Mac’inizde veya PC’nizde düzenlenir.";
+"connectors.settings.missing" = "%@ Mac’inizde veya PC’nizde ayarlanana kadar düğmeleri bir şey göndermez.";
+"connectors.error.setting" = "Önce Mac’inizde veya PC’nizde bu bağlayıcı için “%@” ayarını yapın. Hiçbir şey gönderilmedi.";
 "connectors.data.order.id" = "İş kimliği";
 "connectors.data.order.number" = "Fatura numarası";
 "connectors.data.order.title" = "İş başlığı";

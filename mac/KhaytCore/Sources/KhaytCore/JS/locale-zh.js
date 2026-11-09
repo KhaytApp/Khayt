@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "它的密钥只保存在这台电脑上。在你按下它的按钮或它监听的事件发生之前，不会发送任何内容。",
   "plg.agree_install": "同意并安装",
   "plg.err_refused": "未发送：{why}",
+  "plg.err_setting": "未发送：请在此连接器的设置中填写“{name}”",
+  "plg.err_secret": "未发送：请为此连接器添加“{name}”密钥",
   "plg.err_failed": "连接器的服务未接受：{why}",
   "plg.sent": "已发送",
   "plg.f.order.id": "订单 ID",

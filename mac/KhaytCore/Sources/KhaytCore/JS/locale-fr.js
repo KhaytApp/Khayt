@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "Ses clés restent sur cet ordinateur. Rien n’est envoyé tant que vous n’appuyez pas sur l’un de ses boutons ou qu’un événement qu’il écoute ne se produit.",
   "plg.agree_install": "Accepter et installer",
   "plg.err_refused": "Non envoyé : {why}",
+  "plg.err_setting": "Non envoyé : renseignez « {name} » dans les réglages de ce connecteur",
+  "plg.err_secret": "Non envoyé : ajoutez la clé « {name} » à ce connecteur",
   "plg.err_failed": "Le service du connecteur ne l’a pas accepté : {why}",
   "plg.sent": "Envoyé",
   "plg.f.order.id": "ID du travail",

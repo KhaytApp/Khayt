@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "Can’t be read";
 "connectors.yes" = "Yes";
 "connectors.no" = "No";
+"connectors.settings.title" = "Shop settings";
+"connectors.settings.not_set" = "Not set";
+"connectors.settings.footer" = "Set for the whole shop, and edited on your Mac or PC, not on this iPhone.";
+"connectors.settings.missing" = "Its buttons won’t send until %@ is set on your Mac or PC.";
+"connectors.error.setting" = "Set “%@” for this connector on your Mac or PC first. Nothing was sent.";
 "connectors.data.order.id" = "Job ID";
 "connectors.data.order.number" = "Invoice number";
 "connectors.data.order.title" = "Job title";
