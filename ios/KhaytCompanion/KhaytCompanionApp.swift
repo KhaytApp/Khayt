@@ -169,6 +169,9 @@ struct KhaytCompanionApp: App {
                     // dropped connection left the Mac's pushes reaching nobody
                     // for the rest of the print. Each opening hands them over again.
                     if phase == .active {
+                        // A book made or deleted while away (the share
+                        // extension, a background round) shows on return.
+                        api.refreshHoldsBook()
                         Task { await activities.push.sendAll() }
                         Task { await activeCount.tick() }
                     }
