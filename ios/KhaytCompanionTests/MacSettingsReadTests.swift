@@ -29,6 +29,7 @@ final class MacSettingsReadTests: XCTestCase {
     override func tearDownWithError() throws {
         if let saved, let s = settings { (s.host, s.port, s.pin, s.isPaired, s.isSampleShop) = saved }
         UserDefaults.standard.removeObject(forKey: KhaytAPIClient.macSettingsAtKey)
+        SyncDiagnostics.forget()
         SettingsMac.reset()
         try? FileManager.default.removeItem(at: dir)
     }

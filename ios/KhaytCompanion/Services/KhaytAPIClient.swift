@@ -445,6 +445,7 @@ final class KhaytAPIClient: ObservableObject {
         }
         // The whole book carries the Mac's settings: as good as a settings read.
         noteMacSettings()
+        SyncDiagnostics.record(.macStore)
         await refreshPendingCount()
         return Self.recordCount(in: store)
     }
@@ -559,7 +560,29 @@ final class KhaytAPIClient: ObservableObject {
             lastSync = SyncMark(route: .mac, at: Date())
             pulled = true
         }
-        if settings.isConfigured, !pulled { await refreshMacSettings(into: book) }
+        if !settings.isConfigured {
+            SyncDiagnostics.record(.skipped(.notConfigured))
+        } else if pulled {
+            SyncDiagnostics.record(.skipped(.pulled))
+        } else {
+            await refreshMacSettings(into: book)
+        }
+    }
+
+    /// Settings ▸ Diagnostics' "Refresh now": one round at once, whatever the
+    /// once-a-minute throttle says.
+    func refreshNow() async {
+        guard let book, canSync else { return }
+        await refreshEverywhere(book)
+        lastRefresh = Date()
+    }
+
+    /// The Diagnostics sheet's rows (`BookDiagnostics`): counts and states only.
+    func diagnostics() async -> BookDiagnostics {
+        BookDiagnostics.make(holdsBook: holdsBook, book: book, connectors: await connectors(),
+                             recorded: SyncDiagnostics.recorded(), isPaired: settings.isPaired,
+                             isConfigured: settings.isConfigured, cloudSignedIn: cloud != nil,
+                             isSampleShop: settings.isSampleShop)
     }
 
     /// What `GET /api/store/settings` sends: the shop's settings, masked as
@@ -573,15 +596,18 @@ final class KhaytAPIClient: ObservableObject {
     /// PIN or signature as `/api/store`. Empty when the reply holds none.
     /// Throws for anything but a 2xx — an older Mac answers 404.
     func fetchMacSettings() async throws -> [String: JSONValue] {
+        let (status, data) = try await getMacSettings()
+        guard (200...299).contains(status) else { throw try decodeAPIError(data, status: status) }
+        return try JSONDecoder().decode(MacSettingsReply.self, from: data).settings ?? [:]
+    }
+
+    private func getMacSettings() async throws -> (status: Int, data: Data) {
         let (data, response) = try await request(path: "/api/store/settings", method: "GET",
                                                  body: nil, requiresPin: true)
         guard let http = response as? HTTPURLResponse else {
             throw KhaytAPIError.transport(URLError(.badServerResponse))
         }
-        guard (200...299).contains(http.statusCode) else {
-            throw try decodeAPIError(data, status: http.statusCode)
-        }
-        return try JSONDecoder().decode(MacSettingsReply.self, from: data).settings ?? [:]
+        return (http.statusCode, data)
     }
 
     /// Read the Mac's settings into the book and its baseline
@@ -590,11 +616,28 @@ final class KhaytAPIClient: ObservableObject {
     /// settings landed.
     @discardableResult
     func refreshMacSettings(into book: CompanionBook) async -> Bool {
-        guard settings.isConfigured, !settings.isSampleShop, book.exists,
-              let fetched = try? await fetchMacSettings(), !fetched.isEmpty else { return false }
-        guard (try? await OffMain.run({ try book.adoptSettings(fetched) })) == true else { return false }
+        func done(_ outcome: SyncDiagnostics.SettingsOutcome) -> Bool {
+            SyncDiagnostics.record(outcome)
+            return outcome == .ok
+        }
+        guard settings.isConfigured else { return done(.skipped(.notConfigured)) }
+        guard !settings.isSampleShop else { return done(.skipped(.sampleShop)) }
+        guard book.exists else { return done(.skipped(.noBook)) }
+        let status: Int, data: Data
+        do {
+            (status, data) = try await getMacSettings()
+        } catch KhaytAPIError.unauthorized {
+            return done(.http(401))
+        } catch {
+            return done(.transport)
+        }
+        guard (200...299).contains(status) else { return done(.http(status)) }
+        guard let fetched = try? JSONDecoder().decode(MacSettingsReply.self, from: data).settings,
+              !fetched.isEmpty else { return done(.empty) }
+        guard (try? await OffMain.run({ try book.adoptSettings(fetched) })) == true else { return done(.unwritten) }
         noteMacSettings()
-        return true
+        SyncDiagnostics.record(.macSettings)
+        return done(.ok)
     }
 
     /// After an edit: to the Mac if it takes it, otherwise through the cloud.
@@ -1993,8 +2036,11 @@ final class KhaytAPIClient: ObservableObject {
         }
 
         do {
-            return try await session.data(for: req)
+            let answer = try await session.data(for: req)
+            SyncDiagnostics.macAnswered()
+            return answer
         } catch {
+            SyncDiagnostics.macFailed()
             throw KhaytAPIError.transport(error)
         }
     }
