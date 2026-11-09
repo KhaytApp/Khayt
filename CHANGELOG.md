@@ -9476,6 +9476,30 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.32] - 2026-11-09
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release gives Khayt Cloud its own place in Settings and in the File menu, shows the invoice prefix as one field, adds two licences for library models, and lets a paired iPhone that syncs through Khayt Cloud pick up the shop's settings from this Mac.
+
+### Added
+
+- **Settings › Khayt Cloud.** Who is signed in, the sync status, Sign in…, Forgot the password?, Check the cloud…, Lock, and Sign out…, all in one pane. The Khayt Cloud plan moved here from Online, and off-site backups moved here from Preferences.
+- **File › Khayt Cloud**, with the same account items and a link to the pane. They are also still in the Book menu for this release.
+- **Licences: "For personal use only"**, and a **licence note** of up to 500 characters on any model. A model using it is "Not licensed for sale" on jobs, quotes and products, like NonCommercial. The note is kept when this Mac edits the model, and travels in a model bundle.
+- **An iPhone that syncs through Khayt Cloud gets the shop's settings from this Mac** — its connectors, currency and tax — over the shop's Wi-Fi, behind the same PIN as before. Nothing new goes to Khayt Cloud.
+
+### Changed
+
+- **The invoice prefix is one field while the job number and the tax invoice share it**, under Invoice numbering. When they differ it shows two: "Job number prefix" and "Tax invoice prefix". The separate prefix field under Invoice is gone. Numbers already issued never change.
+- **Every Khayt Cloud menu item now needs the owner's permission**, as the sidebar already did, and Sign in… is greyed out once this Mac is signed in and unlocked.
+- **Wording:** the local network server and the library's default folder now say "this computer" rather than "this Mac", the same as on Windows and Linux.
+
+### Not switched on yet
+
+- **Connectors** stay hidden until they launch on the Mac, Windows/Linux and iPhone together with the published privacy text.
+
 ## [4.0.0-beta.31] - 2026-11-09
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
