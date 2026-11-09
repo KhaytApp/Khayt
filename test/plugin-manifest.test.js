@@ -20,6 +20,12 @@ const samplesDir = path.join(__dirname, '..', 'plugins', 'samples');
 const samples = fs.readdirSync(samplesDir).filter(f => f.endsWith('.json'))
   .map(f => ({ file: f, m: JSON.parse(fs.readFileSync(path.join(samplesDir, f), 'utf8')) }));
 
+// Drafts waiting for Khayt's signature. They must validate like the shipped
+// ones, and carry no signature: signing one moves it up into samples/.
+const unsignedDir = path.join(samplesDir, 'unsigned');
+const unsigned = fs.readdirSync(unsignedDir).filter(f => f.endsWith('.json'))
+  .map(f => ({ file: f, m: JSON.parse(fs.readFileSync(path.join(unsignedDir, f), 'utf8')) }));
+
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
 function base() {
@@ -61,6 +67,17 @@ test('the base manifest and every shipped sample pass', () => {
   assert.deepEqual(M.validateManifest(base()).errors, []);
   assert.ok(samples.length >= 3);
   for (const { file, m } of samples) assert.deepEqual(M.validateManifest(m).errors, [], file);
+});
+
+test('every unsigned draft validates, is unsigned, and does not clash with a shipped sample', () => {
+  assert.ok(unsigned.length >= 1);
+  const shippedIds = new Set(samples.map(s => s.m.id));
+  for (const { file, m } of unsigned) {
+    assert.deepEqual(M.validateManifest(m).errors, [], file);
+    assert.equal(m.signature, undefined, `${file}: a signed draft belongs in plugins/samples/`);
+    assert.ok(!shippedIds.has(m.id), `${file}: id ${m.id} is already shipped`);
+    assert.ok(!samples.some(s => s.file === file), `${file} is in both folders`);
+  }
 });
 
 test('unknown keys are refused at every level, so nothing rides in unlisted', () => {
