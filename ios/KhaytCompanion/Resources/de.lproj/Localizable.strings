@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "%@ nicht erreichbar. Nichts wurde gesendet.";
 "connectors.error.server" = "Der Dienst antwortete %d. Auf diesem iPhone wurde nichts geändert.";
 "connectors.sample" = "Im Beispiel-Shop verlässt nichts dieses iPhone, daher senden oder öffnen Connectoren nichts. Koppel dein iPhone mit deinem Mac, um sie zu nutzen.";
+"connectors.sample.simulated" = "Beispiel-Shop: Es wurde nichts gesendet. Ein echter Shop sendet diese Felder an %@.";
 "connectors.not_reviewed" = "Nicht geprüft – Tasten sind aus";
 "connectors.off" = "Auf deinem Mac ausgeschaltet";
 "connectors.status.not_reviewed" = "Nicht geprüft";

@@ -500,6 +500,10 @@ extension KhaytAPIClient {
         /// by label. `saved` is false when they could not be written on the
         /// record (the send still happened).
         case sent(reply: [String], saved: Bool = true)
+        /// The sample shop: nothing was sent. `hosts` are where a real shop's
+        /// tap would go; `reply` is the sample reply's fields, written on the
+        /// sample record.
+        case simulated(hosts: [String], reply: [String])
         case failed(String)
     }
 
@@ -559,11 +563,17 @@ extension KhaytAPIClient {
     /// Run one button. The caller has already had this phone's confirmation.
     func runConnector(_ c: Connector, action: Connector.Action, at place: ConnectorPlace) async -> ConnectorOutcome {
         if let why = ConnectorRules.disabledReason(c) { return .failed(why) }
-        // The sample shop promises nothing leaves the phone: not a request,
-        // and not a link carrying its made-up records either.
-        guard !isSampleShop else { return .failed(L10n.tr("connectors.sample")) }
         guard action.placement == place.placement else { return .failed(L10n.tr("connectors.error.build")) }
         guard let reader, let engine = try? await reader.sharedEngine() else { return .failed(L10n.tr("connectors.error.build")) }
+        // The sample shop promises nothing leaves the phone: not a request,
+        // and not a link carrying its made-up records either. A POST is
+        // walked through instead (how App Review sees a connector, having no
+        // Mac): built by the shared code, so a missing setting is refused as
+        // in a real shop, then answered by `SampleShop.simulatedReply`.
+        if isSampleShop {
+            guard action.kind == "post" else { return .failed(L10n.tr("connectors.sample")) }
+            return await simulateSampleConnector(c, action: action, at: place, engine: engine)
+        }
 
         let records = connectorRecords(place)
         // Only the secrets this tap needs are read from the Keychain; none
@@ -645,6 +655,43 @@ extension KhaytAPIClient {
             await deliverPending()
         }
         return .sent(reply: lines, saved: saved)
+    }
+
+    /// The sample shop's tap: no key is read and no request is made. The
+    /// payload is still built, so the flow refuses what a real one would.
+    private func simulateSampleConnector(_ c: Connector, action: Connector.Action, at place: ConnectorPlace,
+                                         engine: KhaytEngine) async -> ConnectorOutcome {
+        let records = connectorRecords(place)
+        let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer,
+                                          config: c.config) { _ in nil }
+        guard let payload = try? await engine.pluginPayload(
+                c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context) else {
+            return .failed(L10n.tr("connectors.error.build"))
+        }
+        // The whole shared check, with stand-in keys (none is read from the
+        // Keychain); the request it builds is dropped, never sent.
+        var standIns: [String: String] = [:]
+        for name in ConnectorRules.secretNames(for: action, manifest: c.manifest) { standIns[name] = "sample" }
+        do {
+            _ = try ConnectorRules.prepare(payload: payload, manifest: c.manifest, action: action,
+                                           secrets: standIns, delivery: Connectors.newDeliveryId(), now: Date())
+        } catch Connectors.Refusal.notBuilt(let why) {
+            if let key = ConnectorRules.unsetSetting(why) {
+                let name = c.settings.first(where: { $0.key == key })?.label ?? key
+                return .failed(L10n.format("connectors.error.setting", name))
+            }
+            return .failed(L10n.tr("connectors.error.build"))
+        } catch {
+            return .failed(L10n.tr("connectors.error.build"))
+        }
+        var mapped: JSONValue?
+        if let reply = SampleShop.simulatedReply(connectorId: c.id, actionId: action.id) {
+            mapped = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply, entry: c.entry)
+        }
+        if let book, book.exists {
+            _ = await Self.saveReply(mapped, connector: c, at: place, book: book, engine: engine)
+        }
+        return .simulated(hosts: c.domains, reply: Self.replyLines(mapped, connector: c))
     }
 
     /// A reply's mapped fields as "Label: value" lines, by key.

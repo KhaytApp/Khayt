@@ -242,15 +242,33 @@ enum SampleShop {
     /// manifest, so it is paused.
     static let lamhaId = "app.khayt.samples.lamha"
 
-    /// What the sample shop's book holds: the sample connectors in a DEBUG
-    /// build, none in a release build (connectors stay out of sight until
-    /// khaytapp.com/privacy describes them).
+    /// THE LAUNCH-DAY SWITCH. False until khaytapp.com/privacy describes
+    /// connectors (website #147 live): until then a release build's sample
+    /// shop holds no connector, so no TestFlight or App Store build shows the
+    /// feature early. On launch day this becomes `true` in the build that goes
+    /// to App Review, and the sample shop is how a reviewer, who has no Mac,
+    /// sees a connector: Settings ▸ Connectors, the Lamha button on a job, its
+    /// consent sheet and a simulated reply (`simulatedReply`). DEBUG builds
+    /// (tests, screenshots) always hold them.
+    static let connectorsPublished = false
+
+    /// What the sample shop's book holds: the sample connectors once
+    /// `connectorsPublished` (or in DEBUG), none before.
     static var shippedSampleConnectors: JSONValue {
         #if DEBUG
         sampleConnectors
         #else
-        .array([])
+        connectorsPublished ? sampleConnectors : .array([])
         #endif
+    }
+
+    /// What a sample connector's service would answer, so the sample shop can
+    /// show the whole flow while sending nothing: Lamha's create-order reply
+    /// (its `order_id` lands in the job's Lamha order field through the shared
+    /// mapping). Nil for an action with no reply to show.
+    static func simulatedReply(connectorId: String, actionId: String) -> JSONValue? {
+        guard connectorId == lamhaId, actionId == "record" else { return nil }
+        return .object(["success": .bool(true), "order_id": .number(48214)])
     }
 
     static var sampleConnectors: JSONValue {
