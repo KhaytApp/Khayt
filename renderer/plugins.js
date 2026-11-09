@@ -133,18 +133,15 @@ function renderPluginSettings() {
       toast(t('plg.keys_saved'), 'success');
     } else if (act === 'save-config') {
       // The connector's settings (manifest settings[]): synced with the book
-      // and not secret, each checked against its declared type.
-      const config = Object.assign({}, entry.config || {});
+      // and not secret. lib/plugin-host.js withConfig keeps declared keys
+      // only, each checked against its type — the Mac's rule too.
+      const values = {};
       row.querySelectorAll('[data-plugin-config]').forEach((inp) => {
-        const st = (entry.manifest.settings || []).find((x) => x.key === inp.dataset.pluginConfig);
-        if (!st) return;
-        const v = PluginHost().coerceField(st, inp.type === 'checkbox' ? inp.checked : inp.value.trim());
-        if (v === undefined || (st.type === 'bool' && v === false && !st.required)) delete config[st.key];
-        else config[st.key] = v;
+        values[inp.dataset.pluginConfig] = inp.type === 'checkbox' ? inp.checked : inp.value.trim();
       });
-      settings.plugins = PluginHost().withEntry(settings.plugins, Object.assign({}, entry, { config }));
+      settings.plugins = PluginHost().withEntry(settings.plugins, PluginHost().withConfig(entry, values));
       saveAll();
-      toast(t('webhook.saved') || 'Saved', 'success');
+      toast(t('plib.saved'), 'success');
     } else if (act === 'consent') {
       if (await pluginConsent(entry.manifest)) {
         settings.plugins = PluginHost().withEntry(settings.plugins, PluginHost().consentedEntry(entry, entry.manifest));
