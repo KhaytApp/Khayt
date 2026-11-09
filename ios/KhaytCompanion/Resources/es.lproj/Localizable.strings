@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Taller en la nube del Mac (últimos 6)";
 "diag.none" = "Ninguno";
 "diag.records" = "registros: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "Esta cuenta de Khayt Cloud es de un taller distinto al de tu Mac. Inicia sesión como %@.";
+"cloud.wrong_shop" = "Esta cuenta de Khayt Cloud es de un taller distinto al de tu Mac. Inicia sesión con la cuenta que usa tu Mac.";
+"cloud.empty_shop" = "Khayt Cloud tiene una copia vacía de este taller. Tu iPhone conservó la suya.";
+"cloud.adopt.action" = "Usar este taller en su lugar";
+"cloud.adopt.title" = "¿Usar este taller de Khayt Cloud?";
+"cloud.adopt.message" = "El taller de este iPhone se sustituye por el taller de esta cuenta en Khayt Cloud. No se puede deshacer en este iPhone.";
+"cloud.adopt.confirm" = "Sustituir el taller de este iPhone";
+"diag.cloud_refused" = "Última descarga de la nube rechazada";
+"diag.refused.wrong_shop" = "rechazada: otro taller";
+"diag.refused.empty" = "rechazada: vacía";

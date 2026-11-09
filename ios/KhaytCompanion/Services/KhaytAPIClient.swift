@@ -555,7 +555,11 @@ final class KhaytAPIClient: ObservableObject {
             lastSync = SyncMark(route: .mac, at: Date())
         }
         var cloudDone = false
-        if cloud != nil { cloudDone = await syncThroughCloud() != nil }
+        if cloud != nil {
+            // A refused round adopted nothing: the Mac's book still comes down.
+            let round = await syncThroughCloud()
+            if case .refused? = round { cloudDone = false } else { cloudDone = round != nil }
+        }
         var pulled = false
         if !cloudDone, settings.isConfigured, (try? await pullBook(into: book)) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
@@ -676,7 +680,10 @@ final class KhaytAPIClient: ObservableObject {
     private var cloudRound: Task<CloudSync.Pushed?, Never>?
 
     private func oneCloudRound() async -> CloudSync.Pushed? {
-        guard let session = cloud, let book, let reader else { return nil }
+        guard var session = cloud, let book, let reader else { return nil }
+        // "Use this shop instead" is for a phone with no Mac: a paired phone
+        // takes the Mac's shop or none, whatever was stored.
+        if session.adoptOtherShop, settings.isConfigured { session.adoptOtherShop = false }
         SyncDiagnostics.cloudRound(shopId: session.shopId)
         do {
             let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
@@ -686,11 +693,18 @@ final class KhaytAPIClient: ObservableObject {
                 let result = try await sync.push(session)
                 next = result.0; pushed = result.1
             } else {
-                next = try await sync.pull(session).0
-                pushed = .readOnly
+                let result = try await sync.pull(session)
+                next = result.0
+                if case .refused(let why) = result.1 { pushed = .refused(why) } else { pushed = .readOnly }
             }
             next.save()
             cloud = next
+            if case .refused(let why) = pushed {
+                // Nothing was adopted or sent: not a sync, and said as such.
+                cloudProblem = Self.refusalText(why)
+                cloudNeedsSignIn = false
+                return pushed
+            }
             lastSync = SyncMark(route: .cloud, at: Date())
             cloudProblem = pushed == .needsTheMac ? L10n.tr("cloud.needs_mac") : nil
             cloudNeedsSignIn = false
@@ -778,7 +792,14 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     /// Sign this phone in to the shop's cloud, and take its first pull.
-    func signInToCloud(url: String, email: String, password: String, passphrase: String) async throws {
+    ///
+    /// Returns why that pull was refused, if it was (`CloudSync.Refusal`), so
+    /// the sign-in sheet can say so and offer a way out. A sign-in whose shop
+    /// is not the one the book is linked to is caught here, before any pull,
+    /// push registration or Live Activity token reaches that other shop.
+    @discardableResult
+    func signInToCloud(url: String, email: String, password: String, passphrase: String) async throws
+        -> CloudSync.Refusal? {
         guard let reader else { throw KhaytAPIError.notConfigured }
         let engine = try await reader.sharedEngine()
         let session = try await CloudSync.signIn(url: url, email: email, password: password,
@@ -787,9 +808,49 @@ final class KhaytAPIClient: ObservableObject {
         cloud = session
         cloudNeedsSignIn = false
         cloudProblem = nil
+        if let refusal = signedInToAnotherShop(session) {
+            SyncDiagnostics.refused(.wrongShop, cloudShopId: session.shopId)
+            cloudProblem = Self.refusalText(refusal)
+            return refusal
+        }
         await registerForPush()
         await liveActivityPush?.sendAll()
-        await syncThroughCloud()
+        if case .refused(let why)? = await syncThroughCloud() { return why }
+        return nil
+    }
+
+    /// `.wrongShop` when the book on this phone is linked to a different
+    /// shop than `session` — the check `CloudSync.pull` makes before adopting,
+    /// made at sign-in too.
+    func signedInToAnotherShop(_ session: CloudSession) -> CloudSync.Refusal? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return CloudSync.shopRefusal(book: store, cloudShop: session.shopId)
+    }
+
+    /// May "Use this shop instead" be offered? Only with no Mac paired: a
+    /// paired phone signs in with the Mac's account or unpairs.
+    var mayAdoptOtherShop: Bool { cloud != nil && !settings.isConfigured }
+
+    /// "Use this shop instead", confirmed: the NEXT whole pull adopts the
+    /// signed-in shop over the book, once. False, and nothing changed, when a
+    /// Mac is paired or no one is signed in. The caller runs the round.
+    @discardableResult
+    func useThisCloudShop() -> Bool {
+        guard mayAdoptOtherShop, var session = cloud else { return false }
+        session.adoptOtherShop = true
+        session.save()
+        cloud = session
+        cloudProblem = nil
+        return true
+    }
+
+    /// A refused pull, as the sentence a person reads.
+    static func refusalText(_ refusal: CloudSync.Refusal) -> String {
+        switch refusal {
+        case .wrongShop(_, let email?): return L10n.format("cloud.wrong_shop.as", email)
+        case .wrongShop: return L10n.tr("cloud.wrong_shop")
+        case .emptyShop: return L10n.tr("cloud.empty_shop")
+        }
     }
 
     func signOutOfCloud() {

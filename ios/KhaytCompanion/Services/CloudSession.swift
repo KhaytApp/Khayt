@@ -34,6 +34,12 @@ struct CloudSession: Equatable, Sendable {
     /// The cloud's head revision as of this phone's last pull; `?since=` asks
     /// for the changes after it. Nil means the next pull is a cold one.
     var seenRev: Int?
+    /// "Use this shop instead", chosen after a sign-in that named a different
+    /// shop than the book's (`CloudSync.Refusal.wrongShop`). It lets ONE whole
+    /// pull adopt this shop over the book anyway; `CloudSync.pull` clears it,
+    /// so it never outlives that pull. Only offered with no Mac paired — a
+    /// phone paired with a Mac takes the Mac's shop or none.
+    var adoptOtherShop: Bool = false
 
     static let defaultURL = "https://cloud.khaytapp.com"
 
@@ -48,6 +54,7 @@ struct CloudSession: Equatable, Sendable {
         static let shopId = "khayt.cloud.shopId"
         static let role = "khayt.cloud.role"
         static let seenRev = "khayt.cloud.seenRev"
+        static let adoptOtherShop = "khayt.cloud.adoptOtherShop"
     }
 
     static var defaults: UserDefaults {
@@ -63,7 +70,8 @@ struct CloudSession: Equatable, Sendable {
               !dek.isEmpty else { return nil }
         let seen = defaults.object(forKey: Keys.seenRev) as? Int
         return CloudSession(url: url, shopId: shopId, token: token, dek: dek,
-                            role: defaults.string(forKey: Keys.role) ?? "owner", seenRev: seen)
+                            role: defaults.string(forKey: Keys.role) ?? "owner", seenRev: seen,
+                            adoptOtherShop: defaults.bool(forKey: Keys.adoptOtherShop))
     }
 
     func save(defaults: UserDefaults = Self.defaults) {
@@ -73,6 +81,7 @@ struct CloudSession: Equatable, Sendable {
         defaults.set(shopId, forKey: Keys.shopId)
         defaults.set(role, forKey: Keys.role)
         if let seenRev { defaults.set(seenRev, forKey: Keys.seenRev) } else { defaults.removeObject(forKey: Keys.seenRev) }
+        if adoptOtherShop { defaults.set(true, forKey: Keys.adoptOtherShop) } else { defaults.removeObject(forKey: Keys.adoptOtherShop) }
     }
 
     /// Sign this phone out of the cloud: the token, the key and the cursor go.
@@ -81,6 +90,6 @@ struct CloudSession: Equatable, Sendable {
     static func forget(defaults: UserDefaults = Self.defaults) {
         KeychainHelper.delete(Keys.token)
         KeychainHelper.delete(Keys.dek)
-        for key in [Keys.url, Keys.shopId, Keys.role, Keys.seenRev] { defaults.removeObject(forKey: key) }
+        for key in [Keys.url, Keys.shopId, Keys.role, Keys.seenRev, Keys.adoptOtherShop] { defaults.removeObject(forKey: key) }
     }
 }

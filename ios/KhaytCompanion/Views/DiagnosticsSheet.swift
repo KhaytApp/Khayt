@@ -64,6 +64,9 @@ struct DiagnosticsSheet: View {
         Section(header: Text(L10n.tr("diag.section.sources"))) {
             row("diag.last_source", d.recorded.last.map { Self.sourceName($0) + " · " + when(d.recorded.lastAt) }
                 ?? L10n.tr("diag.never"))
+            row("diag.cloud_refused", d.recorded.refused.map {
+                Self.refusedValue($0, when: when(d.recorded.refusedAt), shopTail: d.recorded.refusedShopTail)
+            } ?? L10n.tr("diag.never"))
             ForEach(SyncDiagnostics.Source.allCases, id: \.self) { source in
                 row(Self.sourceName(source), Self.sourceValue(when(d.recorded.sources[source]),
                                                               records: d.recorded.records[source]), key: false)
@@ -108,6 +111,12 @@ struct DiagnosticsSheet: View {
     static func sourceValue(_ when: String, records: Int?) -> String {
         guard let records else { return when }
         return when + " · " + L10n.format("diag.records", records)
+    }
+
+    /// "refused: wrong shop · 2 min. ago · …1ec56f"
+    static func refusedValue(_ r: SyncDiagnostics.Refusal, when: String, shopTail: String?) -> String {
+        let name = L10n.tr(r == .wrongShop ? "diag.refused.wrong_shop" : "diag.refused.empty")
+        return [name, when, shopTail.map { "…" + $0 }].compactMap { $0 }.joined(separator: " · ")
     }
 
     static func sourceName(_ s: SyncDiagnostics.Source) -> String {

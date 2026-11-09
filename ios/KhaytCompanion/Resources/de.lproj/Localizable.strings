@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Cloud-Werkstatt des Mac (letzte 6)";
 "diag.none" = "Keine";
 "diag.records" = "Einträge: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "Dieses Khayt Cloud-Konto gehört zu einer anderen Werkstatt als dein Mac. Melde dich als %@ an.";
+"cloud.wrong_shop" = "Dieses Khayt Cloud-Konto gehört zu einer anderen Werkstatt als dein Mac. Melde dich mit dem Konto an, das dein Mac verwendet.";
+"cloud.empty_shop" = "Khayt Cloud hat eine leere Kopie dieser Werkstatt. Dein iPhone hat seine eigene behalten.";
+"cloud.adopt.action" = "Stattdessen diese Werkstatt verwenden";
+"cloud.adopt.title" = "Diese Khayt Cloud-Werkstatt verwenden?";
+"cloud.adopt.message" = "Die Werkstatt auf diesem iPhone wird durch die Werkstatt dieses Kontos in Khayt Cloud ersetzt. Das lässt sich auf diesem iPhone nicht rückgängig machen.";
+"cloud.adopt.confirm" = "Werkstatt auf diesem iPhone ersetzen";
+"diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
+"diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
+"diag.refused.empty" = "abgelehnt: leer";

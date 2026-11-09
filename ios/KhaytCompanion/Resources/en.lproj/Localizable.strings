@@ -1257,3 +1257,15 @@
 "diag.mac_shop" = "Mac's cloud shop (last 6)";
 "diag.none" = "None";
 "diag.records" = "records: %ld";
+
+/* A cloud pull refused: wrong shop or empty copy. */
+"cloud.wrong_shop.as" = "This Khayt Cloud account is a different shop than your Mac's. Sign in as %@.";
+"cloud.wrong_shop" = "This Khayt Cloud account is a different shop than your Mac's. Sign in with the account your Mac uses.";
+"cloud.empty_shop" = "Khayt Cloud has an empty copy of this shop. Your phone kept its own.";
+"cloud.adopt.action" = "Use this shop instead";
+"cloud.adopt.title" = "Use this Khayt Cloud shop?";
+"cloud.adopt.message" = "The shop on this phone is replaced by this account's shop in Khayt Cloud. This cannot be undone on this phone.";
+"cloud.adopt.confirm" = "Replace the shop on this phone";
+"diag.cloud_refused" = "Last refused cloud pull";
+"diag.refused.wrong_shop" = "refused: wrong shop";
+"diag.refused.empty" = "refused: empty";
