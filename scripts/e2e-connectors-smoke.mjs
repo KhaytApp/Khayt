@@ -31,6 +31,7 @@ const MANIFEST = {
     auth: { header: 'Authorization', scheme: 'Bearer', secret: 'apiKey' },
     response: { fields: { awb: 'shipment.awb' } } }],
   events: [{ event: 'order_shipped', url: 'https://api.lamha.sa/v1/events', send: ['order.id'] }],
+  settings: [{ key: 'senderCity', label: { en: 'Sender city' }, type: 'text' }],
   scopes: ['fields.write'],
   signature: 'A'.repeat(86) + '==',
 };
@@ -130,6 +131,13 @@ try {
   if (typeof diskKey !== 'string' || !diskKey) fail('the connector key was not saved');
   const windowKey = await window.evaluate(() => window.hubAPI.loadStore().then((j) => (typeof j === 'string' ? JSON.parse(j) : j).settings.plugins[0].secrets?.apiKey).catch(() => null));
   if (windowKey && windowKey.includes('live-key-123')) fail('the window was handed the connector key');
+
+  // ── its settings: saved by the shared rule, and the toast says Saved ──
+  await window.fill('.plg-row [data-plugin-config="senderCity"]', '  Riyadh ');
+  await window.click('.plg-row [data-plugin-act="save-config"]');
+  const cfg = await window.evaluate(() => ({ config: settings.plugins[0].config, toast: [...document.querySelectorAll('#toastContainer .toast')].map((x) => x.textContent).pop() }));
+  if (cfg.config.senderCity !== 'Riyadh') fail(`settings not saved: ${JSON.stringify(cfg.config)}`);
+  if (cfg.toast !== 'Saved') fail(`save-config toast: ${cfg.toast}`);
 
   // ── the job editor: its field and button; a press fills the field ──
   await window.evaluate(() => {
