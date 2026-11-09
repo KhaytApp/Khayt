@@ -12,7 +12,7 @@
     "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
   },
   "publisher": "Khayt",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homepage": "https://khaytapp.com/developers/samples/",
   "domains": [
     "app.lamha.sa"
@@ -70,11 +70,104 @@
     {
       "key": "carrierId",
       "label": {
-        "en": "Lamha carrier ID",
-        "ar": "رقم شركة الشحن في لمحة"
+        "en": "Lamha carrier",
+        "ar": "شركة الشحن في لمحة"
       },
-      "type": "text",
-      "required": true
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "2",
+          "label": {
+            "en": "Aramex (delivery)",
+            "ar": "أرامكس (توصيل)"
+          }
+        },
+        {
+          "value": "24",
+          "label": {
+            "en": "Aramex (pickup from branch)",
+            "ar": "أرامكس (استلام من الفرع)"
+          }
+        },
+        {
+          "value": "26",
+          "label": {
+            "en": "Aramex (international)",
+            "ar": "أرامكس (دولي)"
+          }
+        },
+        {
+          "value": "7",
+          "label": {
+            "en": "SMSA (delivery)",
+            "ar": "سمسا (توصيل)"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "J&T Express V2",
+            "ar": "جي آند تي إكسبرس V2"
+          }
+        },
+        {
+          "value": "3",
+          "label": {
+            "en": "J&T Express (free returns)",
+            "ar": "جي آند تي إكسبرس (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "27",
+          "label": {
+            "en": "iMile",
+            "ar": "آي مايل"
+          }
+        },
+        {
+          "value": "4",
+          "label": {
+            "en": "iMile (free returns)",
+            "ar": "آي مايل (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "29",
+          "label": {
+            "en": "Delex",
+            "ar": "ديلكس"
+          }
+        },
+        {
+          "value": "11",
+          "label": {
+            "en": "AyMakan",
+            "ar": "أي مكان"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "RedBox (lockers)",
+            "ar": "ريدبوكس (خزائن)"
+          }
+        },
+        {
+          "value": "6",
+          "label": {
+            "en": "Delivery Now (free returns)",
+            "ar": "ديليفري ناو (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "18",
+          "label": {
+            "en": "Wepik (free returns)",
+            "ar": "ويبك (رجيع مجاني)"
+          }
+        }
+      ]
     }
   ],
   "fields": [
@@ -159,5 +252,5 @@
   "scopes": [
     "fields.write"
   ],
-  "signature": "uEvUTXLm919sfDumQmBR9GMxOz2eMw2wIgJaUBdQB1hNeaG/IQReW9z8ujqkQLJTS9HE/5+56nEKizC0r39uCQ=="
+  "signature": "xDouxy4XoY73QjkuhcWs8nZIqd9xOIteT9eYaNfb5PLPd3w1mMuHnMuOABWcASfV5jbNYgKfALvCxVa/UwB5DQ=="
 }
