@@ -3895,5 +3895,9 @@
  "mac.cp_part_rail_lube": "Kit de lubrification du rail linéaire",
  "mac.cp_part_fep_film": "Film FEP",
  "mac.cp_part_resin_tank": "Bac de résine",
- "mac.cp_part_ipa": "Alcool isopropylique (litre)"
+ "mac.cp_part_ipa": "Alcool isopropylique (litre)",
+ "mac.nav_cloud": "Khayt Cloud",
+ "mac.cloud_account": "Compte",
+ "mac.cloud_not_connected": "Ce Mac n’est pas connecté à Khayt Cloud. Connectez-vous pour synchroniser le registre de l’atelier avec ses autres ordinateurs et téléphones.",
+ "mac.cloud_settings": "Réglages de Khayt Cloud"
 }

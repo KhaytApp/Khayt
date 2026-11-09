@@ -3895,5 +3895,9 @@
  "mac.cp_part_rail_lube": "直线导轨润滑套装",
  "mac.cp_part_fep_film": "FEP 离型膜",
  "mac.cp_part_resin_tank": "树脂槽",
- "mac.cp_part_ipa": "异丙醇（升）"
+ "mac.cp_part_ipa": "异丙醇（升）",
+ "mac.nav_cloud": "Khayt Cloud",
+ "mac.cloud_account": "账户",
+ "mac.cloud_not_connected": "这台 Mac 尚未登录 Khayt Cloud。登录后即可将店铺账本与其他电脑和手机同步。",
+ "mac.cloud_settings": "Khayt Cloud 设置"
 }

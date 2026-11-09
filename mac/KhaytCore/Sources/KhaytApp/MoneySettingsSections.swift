@@ -116,10 +116,15 @@ struct ExchangeRatesSection: View {
 /// which numbers are missing.
 struct InvoiceNumberingSection: View {
     @Bindable var shop: Shop
+    /// The tax-invoice prefix, or THE prefix while the two are one
+    /// (`NumberPrefixes`, lib/number-prefixes.js).
     @State private var prefix = "INV"
+    /// The job-number prefix, shown only while it differs from the invoice's.
+    @State private var jobPrefix = "INV"
+    @State private var split = false
     @State private var next = 1
     @State private var format = "{prefix}-{year}-{seq4}"
-    @State private var opened: (prefix: String, next: Int, format: String) = ("INV", 1, "{prefix}-{year}-{seq4}")
+    @State private var opened: (prefix: String, job: String, next: Int, format: String) = ("INV", "INV", 1, "{prefix}-{year}-{seq4}")
     @State private var gaps: [Int]?
 
     /// The formats both apps offer — `KhaytSettingsEdit.INV_NUM_FORMATS`.
@@ -134,14 +139,32 @@ struct InvoiceNumberingSection: View {
     }
 
     private var year: Int { Calendar.book.component(.year, from: Date()) }
-    private var dirty: Bool { prefix != opened.prefix || next != opened.next || format != opened.format }
+    private var dirty: Bool {
+        prefix != opened.prefix || jobPrefix != opened.job || next != opened.next || format != opened.format
+    }
 
     var body: some View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 8) {
             Text(words.callIt("set.inv_num_title")).font(.headline)
-            latinRow(words.callIt("set.inv_num_prefix")) {
-                TextField("", text: $prefix).frame(width: 120)
+            // ONE prefix while the job number and the tax invoice share it —
+            // nearly every shop — and two honestly named ones when they do
+            // not. Both used to be shown, in two panes, each called the
+            // invoice prefix (Nov 2026 review).
+            if split {
+                latinRow(words.callIt("set.job_number_prefix")) {
+                    TextField("", text: $jobPrefix).frame(width: 120)
+                }
+                latinRow(words.callIt("set.tax_invoice_prefix")) {
+                    TextField("", text: $prefix).frame(width: 120)
+                }
+            } else {
+                latinRow(words.callIt("set.invoice_prefix")) {
+                    TextField("", text: $prefix).frame(width: 120)
+                }
+            }
+            if prefix != opened.prefix || jobPrefix != opened.job {
+                Text(words.callIt("set.prefix_future_note")).font(.caption).foregroundStyle(.secondary)
             }
             row(words.callIt("set.inv_num_next")) {
                 TextField("", value: $next, format: .number.locale(Money.digits).grouping(.never))
@@ -169,9 +192,10 @@ struct InvoiceNumberingSection: View {
                 Spacer()
                 Button(words.callIt("mac.revert")) { reset() }.disabled(!dirty)
                 Button(words.callIt("common.save")) {
-                    let form: [String: JSONValue] = ["prefix": .string(prefix), "next": .number(Double(next)),
-                                                     "format": .string(format)]
-                    Task { await shop.saveInvoiceNumbering(form) }
+                    let form: [String: JSONValue] = ["next": .number(Double(next)), "format": .string(format)]
+                    let prefixes = split ? NumberPrefixes.patch(job: jobPrefix, taxInvoice: prefix)
+                                         : NumberPrefixes.patch(shared: prefix)
+                    Task { await shop.saveInvoiceNumbering(form, prefixes: prefixes) }
                 }
                 .disabled(!dirty || !mayEdit(shop))
             }
@@ -192,12 +216,16 @@ struct InvoiceNumberingSection: View {
 
     private func reset() {
         let s = shop.settingsDict
-        let p = Shop.plainString(s["invNumPrefix"]).flatMap { $0.isEmpty ? nil : $0 } ?? "INV"
+        let p: String, j: String
+        switch NumberPrefixes.view(s) {
+        case .shared(let one): p = one; j = one; split = false
+        case .split(let job, let taxInvoice): p = taxInvoice; j = job; split = true
+        }
         let n = max(1, Int(Shop.plainNumber(s["invNumNext"]) ?? 1))
         let stored = Shop.plainString(s["invNumFormat"]) ?? ""
         let f = Self.formats.contains(stored) ? stored : Self.formats[0]
-        opened = (p, n, f)
-        prefix = p; next = n; format = f
+        opened = (p, j, n, f)
+        prefix = p; jobPrefix = j; next = n; format = f
     }
 }
 

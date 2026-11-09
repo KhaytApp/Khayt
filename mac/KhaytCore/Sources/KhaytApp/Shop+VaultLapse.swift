@@ -143,7 +143,7 @@ struct VaultLapseNotice: View {
                             .controlSize(.small).padding(.top, 2)
                     case .settings:
                         SettingsLink { Text(words.callIt("mac.plan_upgrade") + "\u{2026}") }
-                            .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .online })
+                            .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .cloud })
                             .controlSize(.small).padding(.top, 2)
                     case .none:
                         EmptyView()
@@ -182,7 +182,7 @@ struct VaultLapseBanner: View {
                     HStack(spacing: 8) {
                         VaultOnlyOffer(shop: shop, compact: true)
                         SettingsLink { Text(shop.words.callIt("mac.plan_upgrade") + "\u{2026}") }
-                            .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .online })
+                            .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .cloud })
                     }
                 }
             }

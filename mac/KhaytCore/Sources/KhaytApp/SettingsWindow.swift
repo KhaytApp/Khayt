@@ -5,7 +5,7 @@ import KhaytCore
 
 /// The panes of the Settings window, in the order Khayt's own page has them.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case business, invoice, payments, operations, integrations, slicers, online, assistant, preferences
+    case business, invoice, payments, operations, integrations, slicers, online, cloud, assistant, preferences
     var id: String { rawValue }
 
     /// The pane's name, as the Electron page's navigation says it.
@@ -18,6 +18,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .integrations: "mac.nav_integrations"
         case .slicers:      "mac.nav_slicers"
         case .online:       "mac.nav_online"
+        case .cloud:        "mac.nav_cloud"
         case .assistant:    "set.ai_master"
         case .preferences:  "mac.preferences"
         }
@@ -32,13 +33,14 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .integrations: "shippingbox"
         case .slicers:      "cube.transparent"
         case .online:       "wifi"
+        case .cloud:        "icloud"
         case .assistant:    "sparkles"
         case .preferences:  "slider.horizontal.3"
         }
     }
 }
 
-/// The shop's own settings — ⌘, — in nine panes.
+/// The shop's own settings — ⌘, — in ten panes.
 ///
 /// A SIDEBAR, not toolbar tabs. Nine tabs need about 680pt in English and more
 /// in Arabic, and the window is 600pt of pane: AppKit put whatever did not fit
@@ -106,6 +108,7 @@ struct SettingsWindow: View {
         case .integrations: IntegrationsPane(shop: shop)
         case .slicers:      SlicersPane(shop: shop)
         case .online:       OnlinePane(shop: shop)
+        case .cloud:        CloudPane(shop: shop)
         case .assistant:    AssistantPane(shop: shop)
         case .preferences:  PreferencesPane(shop: shop)
         }
@@ -478,7 +481,10 @@ struct InvoicePane: View {
         /// "quarterly" unless it is a monthly filer.
         var vatFilingFrequency = "quarterly"
         var enableZatca = false
-        var invPrefix = "INV", quotePrefix = "QUO"
+        // The job-number prefix is NOT here: Invoice numbering shows it with
+        // the tax-invoice prefix, as one field while they agree
+        // (`NumberPrefixes`). Two fields in two panes each said "invoice prefix".
+        var quotePrefix = "QUO"
         var invTemplate = "classic"
         var invoiceBilingual = "auto", invoiceSecondLang = "ar"
         var invAccent = "#5E2E14"
@@ -494,7 +500,7 @@ struct InvoicePane: View {
                 taxMode: Shop.taxMode(settings),
                 vatFilingFrequency: r.text("vatFilingFrequency", "quarterly") == "monthly" ? "monthly" : "quarterly",
                 enableZatca: r.onUnlessOff("enableZatca"),
-                invPrefix: r.text("invPrefix", "INV"), quotePrefix: r.text("quotePrefix", "QUO"),
+                quotePrefix: r.text("quotePrefix", "QUO"),
                 invTemplate: r.text("invTemplate", "classic"),
                 invoiceBilingual: r.text("invoiceBilingual", "auto"),
                 invoiceSecondLang: r.text("invoiceSecondLang", "ar"),
@@ -507,7 +513,7 @@ struct InvoicePane: View {
              "enableVat": .bool(enableVat), "vatRate": .number(vatRate), "taxMode": .string(taxMode),
              "vatFilingFrequency": .string(vatFilingFrequency),
              "enableZatca": .bool(enableZatca),
-             "invPrefix": .string(invPrefix), "quotePrefix": .string(quotePrefix),
+             "quotePrefix": .string(quotePrefix),
              "invTemplate": .string(invTemplate), "invoiceBilingual": .string(invoiceBilingual),
              "invoiceSecondLang": .string(invoiceSecondLang), "invAccent": .string(invAccent),
              "content": .object(content.mapValues(JSONValue.string))]
@@ -590,7 +596,6 @@ struct InvoicePane: View {
                     }
                 }
                 Section(shop.words.callIt("set.invoice_section")) {
-                    latinRow(shop.words.callIt("set.invoice_prefix")) { TextField("", text: $draft.invPrefix).frame(width: 120) }
                     latinRow(shop.words.callIt("set.quote_prefix")) { TextField("", text: $draft.quotePrefix).frame(width: 120) }
                     row(shop.words.callIt("set.inv_template")) {
                         Picker("", selection: $draft.invTemplate) {
@@ -1363,8 +1368,8 @@ struct PreferencesPane: View {
                 }
                 LibraryLocationSettings(shop: shop)
                 // Online storage (Google Drive, a bucket) is under Online,
-                // where shops looked for it — see `OnlinePane`.
-                OffsiteBackupSettings(shop: shop)
+                // where shops looked for it — see `OnlinePane`. Off-site
+                // backups moved to Settings › Khayt Cloud (`CloudPane`).
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,

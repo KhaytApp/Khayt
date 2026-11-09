@@ -3895,5 +3895,9 @@
  "mac.cp_part_rail_lube": "Kit de lubrificação do trilho linear",
  "mac.cp_part_fep_film": "Filme FEP",
  "mac.cp_part_resin_tank": "Tanque de resina",
- "mac.cp_part_ipa": "Álcool isopropílico (litro)"
+ "mac.cp_part_ipa": "Álcool isopropílico (litro)",
+ "mac.nav_cloud": "Khayt Cloud",
+ "mac.cloud_account": "Conta",
+ "mac.cloud_not_connected": "Este Mac não está conectado ao Khayt Cloud. Entre para sincronizar o livro da loja com os outros computadores e celulares.",
+ "mac.cloud_settings": "Ajustes do Khayt Cloud"
 }
