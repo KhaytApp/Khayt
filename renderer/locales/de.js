@@ -5347,6 +5347,7 @@
   "plg.consent_link_only": "Öffnet dort eine Seite; sendet nichts aus deinem Buch.",
   "plg.consent_scopes": "Er darf außerdem",
   "plg.consent_keys_here": "Seine Schlüssel bleiben auf diesem Computer. Gesendet wird erst, wenn du eine seiner Schaltflächen drückst oder ein Ereignis eintritt, auf das er hört.",
+  "plg.consent_refresh": "Alle {n} Min. fragt es, solange dieser Computer dein Buch geöffnet hat, bei {host} nach Neuigkeiten zu offenen Aufträgen mit „{field}“ und füllt aus der Antwort seine eigenen Felder aus.",
   "plg.agree_install": "Zustimmen und installieren",
   "plg.dev_mode": "Entwicklermodus (nur dieser Computer)",
   "plg.dev_hint": "Zum Bauen eines Connectors: aus einer .khaytplugin-Datei laden, ohne Prüfung durch Khayt. Läuft nur auf diesem Computer und wird nie mit deinen anderen Geräten synchronisiert.",

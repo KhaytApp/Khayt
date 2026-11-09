@@ -5348,6 +5348,7 @@
   "plg.consent_link_only": "Opens a page there; sends nothing from your book.",
   "plg.consent_scopes": "It may also",
   "plg.consent_keys_here": "Its keys stay on this computer. Nothing is sent until you press one of its buttons or an event it listens to happens.",
+  "plg.consent_refresh": "Every {n} min, while this computer has your book open, it checks {host} for updates on open jobs that have “{field}”, and fills in its own fields from the reply.",
   "plg.agree_install": "Agree and install",
   "plg.dev_mode": "Developer mode (this computer only)",
   "plg.dev_hint": "For building a connector: load it from a .khaytplugin file without Khayt's review. It runs on this computer only and is never synced to your other devices.",

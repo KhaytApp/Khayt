@@ -216,17 +216,26 @@ extension Shop {
         case failed(String, status: Int?)
     }
 
-    /// What made a connector send: a button, or an event on a job.
+    /// What made a connector send: a button, an event on a job, or a
+    /// refresh asking about one.
     enum ConnectorTrigger: Equatable, Sendable {
         case action(String)
         case event(String)
+        case refresh
         var json: JSONValue {
             switch self {
             case .action(let id): return .object(["action": .string(id)])
             case .event(let name): return .object(["event": .string(name)])
+            case .refresh: return .object(["refresh": .bool(true)])
             }
         }
-        var name: String { switch self { case .action(let s), .event(let s): return s } }
+        /// `X-Khayt-Event`: the button's id, the event's name, or "refresh".
+        var name: String {
+            switch self {
+            case .action(let s), .event(let s): return s
+            case .refresh: return "refresh"
+            }
+        }
     }
 
     typealias ConnectorPost = @Sendable (Connectors.Post) async throws -> (status: Int, body: Data?)
@@ -237,7 +246,8 @@ extension Shop {
     nonisolated static func realConnectorPost(_ engine: KhaytEngine) -> ConnectorPost {
         { post in
             try await WebhookClient.postReading(post.body, to: post.url, headers: post.headers.map { ($0.name, $0.value) },
-                                                engine: engine, timeout: connectorTimeout, keep: connectorReplyMax)
+                                                engine: engine, timeout: connectorTimeout, keep: connectorReplyMax,
+                                                method: post.method)
         }
     }
 
@@ -249,9 +259,10 @@ extension Shop {
                             engine: engine, post: post, now: now, delivery: Connectors.newDeliveryId())
     }
 
-    /// Build, send and read one button press or event. The entry must
-    /// already be live. A reply fills fields for a BUTTON only, as on the
-    /// desktop: an event is a notice, and its answer is not read into the book.
+    /// Build, send and read one button press, event or refresh. The entry
+    /// must already be live. A reply fills the connector's own fields only
+    /// where the manifest gave that trigger a `response` (v1.1: events and
+    /// refresh too, onto the job), and only with fields.write granted.
     nonisolated static func connectorSend(entry: JSONValue, trigger: ConnectorTrigger, order: JSONValue?, customer: JSONValue?,
                                           secrets: [String: String], engine: KhaytEngine, post: ConnectorPost,
                                           now: Date, delivery: String) async -> ConnectorOutcome {
@@ -286,10 +297,9 @@ extension Shop {
         catch let failure as WebhookClient.Failure { return .failed(failure.errorDescription ?? "\(failure)", status: nil) }
         catch { return .failed(error.localizedDescription, status: nil) }
         guard (200..<300).contains(answer.status) else { return .failed("HTTP \(answer.status)", status: answer.status) }
-        guard case .action(let actionId) = trigger else { return .sent(.object([:])) }
         guard let body = answer.body, let reply = try? JSONValue.decode(JSONValue.self, from: body),
               case .object = reply,
-              let values = try? await engine.pluginApplyResponse(manifest, actionId: actionId, reply: reply, entry: entry) else {
+              let values = try? await engine.pluginApplyResponse(manifest, trigger: trigger.json, reply: reply, entry: entry) else {
             return .sent(.object([:]))
         }
         return .sent(values)
@@ -438,6 +448,11 @@ extension Shop {
                                                secrets: secrets, engine: engine,
                                                post: connectorPost ?? Self.realConnectorPost(engine),
                                                now: Date(), delivery: item.delivery)
+        // v1.1: an event whose manifest gives it a `response` fills the job's
+        // own fields from the reply, as a button's does.
+        if case .sent(let values) = outcome, case .object(let v) = values, !v.isEmpty {
+            _ = await writeConnectorReplies(entry: entry, replies: [ConnectorReply(jobId: item.orderId, values: values)])
+        }
         guard case .failed(_, let status) = outcome,
               let next = try? await engine.webhookNext(status: status ?? 0, attempt: item.attempt), next.retry else {
             // Sent, refused (it will not get better by waiting), or out of tries.

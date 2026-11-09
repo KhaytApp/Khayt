@@ -3987,6 +3987,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ### Added
 
+- **(Connectors v1.1, shared + Mac) A connector can check open jobs on its own,
+  and an event's reply can fill the job's fields.** A manifest may now carry
+  one `refresh`: every `every` minutes (15 to 1440), the computer that has the
+  book open asks the connector's service about each open job whose `when`
+  field (one of the connector's own job fields, like a courier's order id) is
+  filled in, and fills the connector's own job fields from the reply. It can be
+  a GET (just its URL) or a POST, and it sends only what the manifest declares,
+  listed on the consent sheet by host like a button's. The sheet gets one more
+  line saying how often, where, and which jobs. It needs `fields.write`. It
+  never runs more often than every 15 minutes, asks about at most 50 jobs a
+  run (least recently checked first), and skips cancelled, archived, voided
+  and delivered jobs. It runs only on the Mac holding the book lock, with
+  connectors switched on, and never on the iPhone. Adding a refresh to an
+  installed connector, or making it check more often, pauses the connector
+  until the shop agrees again. Events may now carry a `response` too, which
+  fills the job's own connector fields like a button's reply. When each
+  connector last ran is kept on the Mac, not in the book, so the book is not
+  written every quarter hour. The desktop follows in its own PR.
+  (`lib/plugin-manifest.js`, `lib/plugin-payload.js`, `lib/plugin-host.js`,
+  `Shop+ConnectorRefresh.swift`; `plg.consent_refresh` in 9 languages.)
+
 - **(Mac) A printer's smart plug: switch it from Khayt, and let it turn off
   after a print.** A machine's Connection tab now takes the plug it sits on:
   Shelly (Gen 1, and Plus/Pro), Tasmota, or a Home Assistant switch. The

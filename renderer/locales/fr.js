@@ -5347,6 +5347,7 @@
   "plg.consent_link_only": "Ouvre une page là-bas ; n’envoie rien de votre registre.",
   "plg.consent_scopes": "Il peut aussi",
   "plg.consent_keys_here": "Ses clés restent sur cet ordinateur. Rien n’est envoyé tant que vous n’appuyez pas sur l’un de ses boutons ou qu’un événement qu’il écoute ne se produit.",
+  "plg.consent_refresh": "Toutes les {n} min, tant que cet ordinateur a votre registre ouvert, il interroge {host} sur les travaux ouverts qui ont « {field} » et remplit ses propres champs avec la réponse.",
   "plg.agree_install": "Accepter et installer",
   "plg.dev_mode": "Mode développeur (cet ordinateur uniquement)",
   "plg.dev_hint": "Pour créer un connecteur : chargez-le depuis un fichier .khaytplugin sans la vérification de Khayt. Il ne fonctionne que sur cet ordinateur et n’est jamais synchronisé avec vos autres appareils.",

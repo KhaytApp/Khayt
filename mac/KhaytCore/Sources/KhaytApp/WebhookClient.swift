@@ -89,12 +89,14 @@ enum WebhookClient {
     /// is nil when the answer was longer than `keep` or could not be read as
     /// HTTP — the status still stands.
     static func postReading(_ payload: Data, to url: URL, headers: [(String, String)],
-                            engine: KhaytEngine, timeout: TimeInterval, keep: Int) async throws -> (status: Int, body: Data?) {
-        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: keep)
+                            engine: KhaytEngine, timeout: TimeInterval, keep: Int,
+                            method: String = "POST") async throws -> (status: Int, body: Data?) {
+        try await exchange(payload, to: url, headers: headers, engine: engine, timeout: timeout, keep: keep, method: method)
     }
 
     private static func exchange(_ payload: Data, to url: URL, headers: [(String, String)],
-                                 engine: KhaytEngine, timeout: TimeInterval, keep: Int) async throws -> (status: Int, body: Data?) {
+                                 engine: KhaytEngine, timeout: TimeInterval, keep: Int,
+                                 method: String = "POST") async throws -> (status: Int, body: Data?) {
         guard let host = url.host, !host.isEmpty else { throw Failure.blocked("") }
         // https ONLY, which is what the other app allows. Plain http would
         // carry a shop's order data and its HMAC across the network in the
@@ -117,7 +119,9 @@ enum WebhookClient {
         // have let URLSession resolve it on its own, unchecked.
         guard !resolved.isEmpty else { throw Failure.refused("\(host) did not resolve") }
 
-        let head = requestHead(url, host: host, headers: headers, length: payload.count)
+        // POST, or a connector refresh's GET (and a GET sends no body).
+        guard method == "POST" || (method == "GET" && payload.isEmpty) else { throw Failure.blocked(method) }
+        let head = requestHead(url, host: host, headers: headers, length: payload.count, method: method)
 
         // The checked addresses, in the resolver's order; the first that
         // connects takes the delivery. Every one of them passed layer two.
@@ -191,7 +195,7 @@ enum WebhookClient {
     /// LF are taken out of every value: an event name or a path is not the
     /// place to start a second header.
     nonisolated static func requestHead(_ url: URL, host: String, headers: [(String, String)],
-                                        length: Int) -> Data {
+                                        length: Int, method: String = "POST") -> Data {
         // By SCALAR: "\r\n" is one Character in Swift, equal to neither.
         let clean = { (s: String) in
             String(String.UnicodeScalarView(s.unicodeScalars.filter { $0 != "\r" && $0 != "\n" }))
@@ -201,9 +205,11 @@ enum WebhookClient {
         if let q = url.query(percentEncoded: true), !q.isEmpty { target += "?" + q }
         let name = host.contains(":") ? "[\(host)]" : host
         let authority = url.port.map { $0 == 443 ? name : "\(name):\($0)" } ?? name
-        var lines = ["POST \(clean(target)) HTTP/1.1", "Host: \(clean(authority))"]
+        let verb = method == "GET" ? "GET" : "POST"
+        var lines = ["\(verb) \(clean(target)) HTTP/1.1", "Host: \(clean(authority))"]
         for (k, v) in headers { lines.append("\(clean(k)): \(clean(v))") }
-        lines += ["Content-Length: \(length)", "Connection: close", "User-Agent: Khayt", "", ""]
+        if verb == "POST" { lines.append("Content-Length: \(length)") }
+        lines += ["Connection: close", "User-Agent: Khayt", "", ""]
         return Data(lines.joined(separator: "\r\n").utf8)
     }
 
