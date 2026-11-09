@@ -1180,6 +1180,11 @@
 "connectors.status.invalid" = "Nicht lesbar";
 "connectors.yes" = "Ja";
 "connectors.no" = "Nein";
+"connectors.settings.title" = "Shop-Einstellungen";
+"connectors.settings.not_set" = "Nicht festgelegt";
+"connectors.settings.footer" = "Gelten für den ganzen Shop und werden auf deinem Mac oder PC bearbeitet, nicht auf diesem iPhone.";
+"connectors.settings.missing" = "Die Tasten senden erst, wenn %@ auf deinem Mac oder PC festgelegt ist.";
+"connectors.error.setting" = "Lege zuerst „%@“ für diesen Connector auf deinem Mac oder PC fest. Es wurde nichts gesendet.";
 "connectors.data.order.id" = "Auftrags-ID";
 "connectors.data.order.number" = "Rechnungsnummer";
 "connectors.data.order.title" = "Auftragstitel";
