@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "Não foi possível acessar %@. Nada foi enviado.";
 "connectors.error.server" = "O serviço respondeu %d. Nada mudou neste iPhone.";
 "connectors.sample" = "Na oficina de exemplo nada sai deste iPhone, então os conectores não enviam nem abrem nada. Pareie com seu Mac para usá-los.";
+"connectors.sample.simulated" = "Oficina de exemplo: nada foi enviado. Uma oficina real envia estes campos para %@.";
 "connectors.not_reviewed" = "Não revisado — botões desativados";
 "connectors.off" = "Desativado no seu Mac";
 "connectors.status.not_reviewed" = "Não revisado";

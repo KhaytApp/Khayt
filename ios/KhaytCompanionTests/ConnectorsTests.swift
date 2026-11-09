@@ -147,6 +147,43 @@ final class ConnectorsTests: XCTestCase {
         XCTAssertEqual(to["City"], .string("Riyadh"))
     }
 
+    /// How App Review (no Mac) sees a connector: the sample shop's tap runs
+    /// the whole shared check with stand-in keys, sends nothing, and fills the
+    /// job's Lamha order from the sample reply through the shared mapping.
+    func testTheSampleShopWalksThroughASendWithoutSending() async throws {
+        let engine = try KhaytEngine()
+        guard case .array(let rows) = SampleShop.sampleConnectors, case .object(let e) = rows[0] else { return XCTFail() }
+        let check = try await engine.pluginCheckEntry(.object(e))
+        let c = try XCTUnwrap(ConnectorRules.connector(entry: e, check: check, reviewed: true))
+        let action = c.actions[0]
+        let store = SampleShop.book()
+        guard case .array(let jobs)? = store["printLog"], case .object(let order)? = jobs.first(where: {
+            if case .object(let o) = $0 { return o["id"] == .string("S-1041") } else { return false }
+        }) else { return XCTFail("no S-1041") }
+        let made = ConnectorRules.context(action: action, order: order, customer: nil, config: c.config) { _ in nil }
+        let payload = try await engine.pluginPayload(c.manifest, trigger: .object(["action": .string("record")]),
+                                                     context: made.context)
+        let standIns = Dictionary(uniqueKeysWithValues: ConnectorRules.secretNames(for: action, manifest: c.manifest)
+            .map { ($0, "sample") })
+        let prepared = try ConnectorRules.prepare(payload: payload, manifest: c.manifest, action: action,
+                                                  secrets: standIns, delivery: Connectors.newDeliveryId(), now: Date())
+        guard case .post(let post) = prepared else { return XCTFail("\(prepared)") }
+        XCTAssertEqual(post.url.host(), "app.lamha.sa")
+
+        let reply = try XCTUnwrap(SampleShop.simulatedReply(connectorId: c.id, actionId: action.id))
+        let mapped = try await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply, entry: c.entry)
+        XCTAssertEqual(mapped, .object(["lamhaOrderId": .string("48214")]))
+        XCTAssertEqual(KhaytAPIClient.replyLines(mapped, connector: c).count, 1)
+        XCTAssertNil(SampleShop.simulatedReply(connectorId: "app.khayt.samples.slack", actionId: "record"))
+    }
+
+    /// Release builds hold no sample connector until launch day, when this
+    /// flips with khaytapp.com/privacy (#147) live. Update this test then.
+    func testTheSampleConnectorsWaitForLaunchDay() {
+        XCTAssertFalse(SampleShop.connectorsPublished,
+                       "flip only in the launch build, once khaytapp.com/privacy describes connectors")
+    }
+
     // MARK: The request, through the shared code
 
     /// The local courier manifest with a signing key on "book", so every

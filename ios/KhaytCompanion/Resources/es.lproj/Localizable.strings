@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "No se pudo contactar con %@. No se envió nada.";
 "connectors.error.server" = "El servicio respondió %d. No se cambió nada en este iPhone.";
 "connectors.sample" = "En el taller de ejemplo nada sale de este iPhone, así que los conectores no envían ni abren nada. Vincula tu Mac para usarlos.";
+"connectors.sample.simulated" = "Taller de ejemplo: no se envió nada. Un taller real envía estos campos a %@.";
 "connectors.not_reviewed" = "Sin revisar: los botones están desactivados";
 "connectors.off" = "Desactivado en tu Mac";
 "connectors.status.not_reviewed" = "Sin revisar";
