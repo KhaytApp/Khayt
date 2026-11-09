@@ -8460,6 +8460,24 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginHost.stateOf(ARG0, ARG1)", [entry, .bool(reviewed)], as: String.self)
     }
 
+    /// A value typed into a connector's own field, checked against its type
+    /// (`field` is one of the manifest's `fields[]`); `.null` when it does not
+    /// fit, which means "no value". The phone and the Mac coerce alike.
+    public func pluginCoerceField(_ field: JSONValue, raw: JSONValue) throws -> JSONValue {
+        try runtime.call2("(function(f, r) { const v = globalThis.KhaytPluginHost.coerceField(f, r); return v === undefined ? null : v; })(ARG0, ARG1)",
+                          [field, raw], as: JSONValue.self)
+    }
+
+    /// A record a paired phone sent, with `plugins` held to what the phone may
+    /// change: the declared `attach` fields of a connector that is on and in
+    /// `reviewedIds`; everything else as `held` (this Mac's copy) has it.
+    public func pluginPhoneRecord(_ incoming: JSONValue, held: JSONValue, settings: JSONValue,
+                                  attach: String, reviewedIds: [String]) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.phoneRecord(ARG0, ARG1, ARG2, ARG3, ARG4)",
+                          [incoming, held, settings, .string(attach), .array(reviewedIds.map(JSONValue.string))],
+                          as: JSONValue.self)
+    }
+
     /// A manifest label in `lang`, else English, else the first one.
     public func pluginLabel(_ label: JSONValue, lang: String) throws -> String {
         try runtime.call2("globalThis.KhaytPluginHost.labelOf(ARG0, ARG1)", [label, .string(lang)], as: String.self)
