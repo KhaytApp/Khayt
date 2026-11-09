@@ -290,6 +290,27 @@ function wirePluginEditor(modal, attach, getRecords) {
 }
 
 /**
+ * Why nothing was sent, in the shop's words. A setting or key that is not
+ * filled in comes back from lib/plugin-payload.js and the main process as the
+ * developer's key ("setting senderPhone is not set"); the shop is shown the
+ * label the manifest gives it, in their language.
+ */
+function pluginRefusalText(entry, why) {
+  const m = entry && entry.manifest;
+  const set = /^setting (\S+) is not set$/.exec(String(why || ''));
+  if (set && m) {
+    const s = (m.settings || []).find((x) => x.key === set[1]);
+    if (s) return t('plg.err_setting', { name: pluginLabel(s.label) || s.key });
+  }
+  const sec = /^secret "([^"]+)" is not set$/.exec(String(why || ''));
+  if (sec && m) {
+    const s = (m.secrets || []).find((x) => x.name === sec[1]);
+    if (s) return t('plg.err_secret', { name: pluginLabel(s.label) || s.name });
+  }
+  return t('plg.err_refused', { why: why || '?' });
+}
+
+/**
  * A button pressed. Never retried (a press is the shop's, and a second one
  * is theirs to make). A reply fills the connector's own fields only with
  * fields.write granted (lib/plugin-manifest.js mayWriteFields).
@@ -302,7 +323,7 @@ async function runPluginAction(id, actionId, attach, recs) {
   const r = await window.hubAPI.pluginSend({ id, action: actionId, delivery: pluginDeliveryId(),
     records: { order: recs.order, customer: recs.customer } });
   if (!r || (!r.ok && r.refused)) {
-    toast(t('plg.err_refused', { why: (r && r.refused) || '?' }), 'error', 6000);
+    toast(pluginRefusalText(entry, r && r.refused), 'error', 6000);
     return r;
   }
   if (r.method === 'OPEN') return r;

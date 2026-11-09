@@ -5338,6 +5338,8 @@
   "plg.consent_keys_here": "Its keys stay on this computer. Nothing is sent until you press one of its buttons or an event it listens to happens.",
   "plg.agree_install": "Agree and install",
   "plg.err_refused": "Not sent: {why}",
+  "plg.err_setting": "Not sent: fill in “{name}” in this connector's settings",
+  "plg.err_secret": "Not sent: add the “{name}” key to this connector",
   "plg.err_failed": "The connector's service did not accept it: {why}",
   "plg.sent": "Sent",
   "plg.f.order.id": "Job ID",

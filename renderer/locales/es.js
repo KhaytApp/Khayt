@@ -5337,6 +5337,8 @@
   "plg.consent_keys_here": "Sus claves se quedan en este ordenador. No se envía nada hasta que pulses uno de sus botones o ocurra un evento que escucha.",
   "plg.agree_install": "Aceptar e instalar",
   "plg.err_refused": "No enviado: {why}",
+  "plg.err_setting": "No enviado: completa «{name}» en los ajustes de este conector",
+  "plg.err_secret": "No enviado: añade la clave «{name}» a este conector",
   "plg.err_failed": "El servicio del conector no lo aceptó: {why}",
   "plg.sent": "Enviado",
   "plg.f.order.id": "ID del trabajo",

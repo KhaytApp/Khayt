@@ -5338,6 +5338,8 @@
   "plg.consent_keys_here": "As chaves dele ficam neste computador. Nada é enviado até você apertar um dos botões dele ou acontecer um evento que ele acompanha.",
   "plg.agree_install": "Concordar e instalar",
   "plg.err_refused": "Não enviado: {why}",
+  "plg.err_setting": "Não enviado: preencha “{name}” nas configurações deste conector",
+  "plg.err_secret": "Não enviado: adicione a chave “{name}” a este conector",
   "plg.err_failed": "O serviço do conector não aceitou: {why}",
   "plg.sent": "Enviado",
   "plg.f.order.id": "ID do pedido",

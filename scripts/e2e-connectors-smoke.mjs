@@ -125,6 +125,16 @@ try {
   const ev = (await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event === 'order_shipped');
   if (ev.length !== 1 || ev[0].delivery === press.delivery) fail(`event delivery: ${JSON.stringify(ev)}`);
 
+  // ── a refusal names the setting or key by its label, in the shop's language ──
+  const said = await window.evaluate(() => {
+    const entry = { manifest: { settings: [{ key: 'senderPhone', label: { en: 'Sender phone', ar: 'جوال المرسل' }, type: 'text' }],
+      secrets: [{ name: 'apiKey', label: { en: 'API key' }, kind: 'apiKey' }] } };
+    return [pluginRefusalText(entry, 'setting senderPhone is not set'), pluginRefusalText(entry, 'secret "apiKey" is not set'), pluginRefusalText(entry, 'host')];
+  });
+  if (!said[0].includes('Sender phone') || said[0].includes('senderPhone')) fail(`setting refusal: ${said[0]}`);
+  if (!said[1].includes('API key')) fail(`secret refusal: ${said[1]}`);
+  if (!said[2].includes('host')) fail(`other refusal: ${said[2]}`);
+
   // ── off means off ──
   await window.evaluate(() => { settings.plugins[0].enabled = false; saveAll(); });
   await window.evaluate(() => fireStatusWebhook('order_shipped', printLog.find((o) => o.id === 'ORD-c1')));
