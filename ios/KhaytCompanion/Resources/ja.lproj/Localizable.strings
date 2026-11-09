@@ -1151,6 +1151,7 @@
 "connectors.consent.confirmed" = "このiPhoneから許可済み。";
 "connectors.consent.not_confirmed" = "このiPhoneではまだ使用されていません。最初の送信前に確認します。";
 "connectors.list.footer" = "コネクタはMacで追加・承認します。キーはこのiPhoneにだけ保存され、同期されることはありません。";
+"connectors.settings.hint_mac" = "Macで設定したコネクタは、Macの近くでKhaytを一度開くとここに表示されます。";
 "connectors.badge.reviewed" = "審査済み";
 "connectors.status.active" = "有効";
 "connectors.status.paused" = "一時停止中";

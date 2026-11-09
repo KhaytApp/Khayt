@@ -1151,6 +1151,7 @@
 "connectors.consent.confirmed" = "مسموح من هذا الآيفون.";
 "connectors.consent.not_confirmed" = "لم يُستخدم من هذا الآيفون بعد. يسألك Khayt قبل أول إرسال.";
 "connectors.list.footer" = "تُضاف الموصِّلات ويُوافَق عليها من جهاز Mac. مفاتيحها تبقى على هذا الآيفون ولا تُزامَن أبدًا.";
+"connectors.settings.hint_mac" = "تظهر هنا الموصِّلات التي تُعدّها على الماك بعد أن يُفتح Khayt قرب الماك مرة واحدة.";
 "connectors.badge.reviewed" = "تمت مراجعته";
 "connectors.status.active" = "نشط";
 "connectors.status.paused" = "متوقف";

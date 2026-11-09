@@ -1151,6 +1151,7 @@
 "connectors.consent.confirmed" = "Bu iPhone’dan izin verildi.";
 "connectors.consent.not_confirmed" = "Bu iPhone’dan henüz kullanılmadı. Khayt ilk gönderimden önce sorar.";
 "connectors.list.footer" = "Bağlayıcılar Mac’inizde eklenir ve onaylanır. Anahtarları bu iPhone’da kalır ve asla eşzamanlanmaz.";
+"connectors.settings.hint_mac" = "Mac’inizde kurduğunuz bağlayıcılar, Khayt Mac’inizin yakınında bir kez açıldıktan sonra burada görünür.";
 "connectors.badge.reviewed" = "İncelendi";
 "connectors.status.active" = "Etkin";
 "connectors.status.paused" = "Duraklatıldı";

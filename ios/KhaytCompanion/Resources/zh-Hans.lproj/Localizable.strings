@@ -1151,6 +1151,7 @@
 "connectors.consent.confirmed" = "已在此 iPhone 上允许。";
 "connectors.consent.not_confirmed" = "尚未在此 iPhone 上使用。首次发送前 Khayt 会询问。";
 "connectors.list.footer" = "连接器在 Mac 上添加和批准。其密钥只保存在此 iPhone 上，从不同步。";
+"connectors.settings.hint_mac" = "你在 Mac 上设置的连接器，会在 Khayt 于 Mac 附近打开一次后显示在这里。";
 "connectors.badge.reviewed" = "已审核";
 "connectors.status.active" = "已启用";
 "connectors.status.paused" = "已暂停";

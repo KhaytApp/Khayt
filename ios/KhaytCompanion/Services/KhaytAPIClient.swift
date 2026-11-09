@@ -84,6 +84,24 @@ final class KhaytAPIClient: ObservableObject {
     /// 401 as any bad token (khayt-cloud `docs/api-contract.md`). Nothing but
     /// signing in again fixes it, so Settings offers exactly that.
     @Published private(set) var cloudNeedsSignIn = false
+    /// When this phone last read the Mac's settings — a settings read
+    /// (`refreshMacSettings`) or a whole `/api/store` pull — or nil if it never
+    /// has. Kept across launches; Unpair forgets it. A phone that reads its
+    /// book from the cloud and has no date here has never seen the Mac's
+    /// connectors (`ConnectorLaunch.showsMacHint`).
+    @Published private(set) var macSettingsAt: Date? =
+        UserDefaults.standard.object(forKey: KhaytAPIClient.macSettingsAtKey) as? Date
+    nonisolated static let macSettingsAtKey = "khayt.mac.settingsAt"
+
+    private func noteMacSettings(at date: Date = Date()) {
+        macSettingsAt = date
+        UserDefaults.standard.set(date, forKey: Self.macSettingsAtKey)
+    }
+
+    /// Changes whenever a sync lands — a round home, or the Mac's settings
+    /// read after it — for a view that reloads from the book then.
+    var syncLanded: [Date] { [lastSync?.at, macSettingsAt].compactMap { $0 } }
+
     /// The Mac answered a send but did not take some of the changes in it,
     /// in a sentence, or nil. Those changes stay pending (`sendPendingChanges`).
     @Published private(set) var macRefused: String?
@@ -425,6 +443,8 @@ final class KhaytAPIClient: ObservableObject {
         } else {
             try book.replace(with: store, scope: envelope.scope)
         }
+        // The whole book carries the Mac's settings: as good as a settings read.
+        noteMacSettings()
         await refreshPendingCount()
         return Self.recordCount(in: store)
     }
@@ -517,14 +537,64 @@ final class KhaytAPIClient: ObservableObject {
     /// everything the Mac has sent and everything the phone has, so it is the
     /// copy that is never behind this phone. The Mac's book is taken only when
     /// the cloud cannot be reached.
-    private func refreshEverywhere(_ book: CompanionBook) async {
+    ///
+    /// ── SETTINGS COME FROM THE MAC ───────────────────────────────────────
+    ///
+    /// A cloud change carries records, never `settings` (`changesToSend` has
+    /// nowhere to put them), so a phone refreshed from the cloud never learnt
+    /// of a connector installed on the Mac. After the round, a phone paired
+    /// with a Mac reads the Mac's settings alone (`refreshMacSettings`) —
+    /// unless the Mac's whole book came down in this round, which has them.
+    /// It runs AFTER the cloud round on purpose: a whole cloud pull (a cold
+    /// phone — just re-paired or signed in) adopts the cloud's store, whose
+    /// settings hold no `plugins`, and the Mac's read must be the one that wins.
+    func refreshEverywhere(_ book: CompanionBook) async {
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
-        if cloud != nil, await syncThroughCloud() != nil { return }
-        if settings.isConfigured, (try? await pullBook(into: book)) != nil {
+        var cloudDone = false
+        if cloud != nil { cloudDone = await syncThroughCloud() != nil }
+        var pulled = false
+        if !cloudDone, settings.isConfigured, (try? await pullBook(into: book)) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
+            pulled = true
         }
+        if settings.isConfigured, !pulled { await refreshMacSettings(into: book) }
+    }
+
+    /// What `GET /api/store/settings` sends: the shop's settings, masked as
+    /// `/api/store` masks them, and when the Mac served them.
+    private struct MacSettingsReply: Decodable {
+        let settings: [String: JSONValue]?
+        let servedAt: String?
+    }
+
+    /// The Mac's settings, alone: `GET /api/store/settings`, with the same
+    /// PIN or signature as `/api/store`. Empty when the reply holds none.
+    /// Throws for anything but a 2xx — an older Mac answers 404.
+    func fetchMacSettings() async throws -> [String: JSONValue] {
+        let (data, response) = try await request(path: "/api/store/settings", method: "GET",
+                                                 body: nil, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else {
+            throw KhaytAPIError.transport(URLError(.badServerResponse))
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw try decodeAPIError(data, status: http.statusCode)
+        }
+        return try JSONDecoder().decode(MacSettingsReply.self, from: data).settings ?? [:]
+    }
+
+    /// Read the Mac's settings into the book and its baseline
+    /// (`CompanionBook.adoptSettings`). Silent: a 404 (an older Mac), a 500, no
+    /// answer or an empty reply leaves the book exactly as it was. True when
+    /// settings landed.
+    @discardableResult
+    func refreshMacSettings(into book: CompanionBook) async -> Bool {
+        guard settings.isConfigured, !settings.isSampleShop, book.exists,
+              let fetched = try? await fetchMacSettings(), !fetched.isEmpty else { return false }
+        guard (try? await OffMain.run({ try book.adoptSettings(fetched) })) == true else { return false }
+        noteMacSettings()
+        return true
     }
 
     /// After an edit: to the Mac if it takes it, otherwise through the cloud.
@@ -707,6 +777,7 @@ final class KhaytAPIClient: ObservableObject {
         pendingCount = 0
         historyWindow = nil
         lastSync = nil
+        macSettingsAt = nil
         Task { await push?.forgetShop(session: session) }
     }
 

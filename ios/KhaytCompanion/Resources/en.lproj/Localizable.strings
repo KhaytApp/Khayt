@@ -1151,6 +1151,7 @@
 "connectors.consent.confirmed" = "Allowed from this iPhone.";
 "connectors.consent.not_confirmed" = "Not used from this iPhone yet. Khayt asks before the first send.";
 "connectors.list.footer" = "Connectors are added and approved on your Mac. Their keys stay on this iPhone and are never synced.";
+"connectors.settings.hint_mac" = "Connectors you set up on your Mac appear here after Khayt opens near your Mac once.";
 "connectors.badge.reviewed" = "Reviewed";
 "connectors.status.active" = "Active";
 "connectors.status.paused" = "Paused";
