@@ -20,9 +20,21 @@ import KhaytCore
  * - Send on an event (`{event: …}` triggers), in the background, or by
  *   itself: only a person tapping a connector's button sends anything.
  * - Open a link inside the app: an "open" button goes to Safari, https only.
- * - Write the connector's own fields (`plugins.<id>.<key>` on a record): the
- *   Mac's delta gate does not take those from a phone yet, so they are shown
- *   read-only, and a reply's fields are shown, not written.
+ *
+ * ── THE CONNECTOR'S OWN FIELDS ARE WRITTEN, ONLY FOR AN ACTIVE ONE ────────
+ *
+ * A connector's own fields (`plugins.<id>.<key>` on a job or a customer) are
+ * written on the phone: typed in on the card (`ConnectorRules.canEditFields`:
+ * an active connector, on a phone that may edit), and a 2xx reply's mapped
+ * fields (`pluginApplyResponse`, which maps nothing without fields.write) are
+ * saved on the record the button was pressed on, as well as shown. Both go
+ * through `BookWriter.setConnectorValues`, which keeps every other key and
+ * every other connector's values and never drops `plugins`. The Mac takes
+ * them (`lib/plugin-host.js` `phoneRecord`) only for a connector that is on
+ * there and whose signature verifies there, only for the fields it declares
+ * for that record, each checked by `coerceField` — the phone runs the same
+ * `coerceField` first (`ConnectorRules.coerce`). A reply that cannot be saved still
+ * counts as sent, and says so.
  *
  * ── TWO CONSENTS ──────────────────────────────────────────────────────────
  *
@@ -211,6 +223,13 @@ enum ConnectorRules {
         }
     }
 
+    /// Whether a connector's own fields can be typed in on this phone: an
+    /// active connector (`isActive`), on a phone that may edit the shop
+    /// (`KhaytAPIClient.canWrite`). Otherwise they are shown read-only.
+    static func canEditFields(_ c: Connector, canWrite: Bool) -> Bool {
+        c.isActive && canWrite
+    }
+
     /// Why a connector's buttons are off, or nil when they work.
     static func disabledReason(_ c: Connector) -> String? {
         switch c.status {
@@ -390,6 +409,28 @@ enum ConnectorRules {
         return key.isEmpty ? nil : String(key)
     }
 
+    /// The manifest's own `fields[]` entry for a field, as lib reads it.
+    static func manifestField(_ field: Connector.Field, in c: Connector) -> JSONValue? {
+        guard case .object(let m) = c.manifest, case .array(let fs)? = m["fields"] else { return nil }
+        return fs.first {
+            if case .object(let f) = $0 { return f["key"] == .string(field.key) && f["attach"] == .string(field.attach) }
+            return false
+        }
+    }
+
+    /// A value for one of a connector's own fields, checked against its type
+    /// by lib's own `coerceField` (`lib/plugin-host.js`, through
+    /// `KhaytEngine.pluginCoerceField`) — the rule the Mac's `phoneRecord`
+    /// runs on everything a phone sends under `plugins`. The ONE place the
+    /// phone coerces. nil means "no value": the key is removed. A field the
+    /// manifest does not hold, or an engine that cannot answer, is nil too.
+    static func coerce(_ field: Connector.Field, _ raw: JSONValue?, in c: Connector,
+                       engine: KhaytEngine) async -> JSONValue? {
+        guard let raw, let f = manifestField(field, in: c),
+              let v = try? await engine.pluginCoerceField(f, raw: raw), v != .null else { return nil }
+        return v
+    }
+
     /// A field value as text, for a read-only row.
     static func display(_ v: JSONValue, field: Connector.Field) -> String {
         switch v {
@@ -444,15 +485,21 @@ extension KhaytAPIClient {
         var placement: String {
             switch self { case .order: "order"; case .customer: "customer" }
         }
+
+        /// The job's or the customer's id.
+        var recordId: String {
+            switch self { case .order(let id), .customer(let id): id }
+        }
     }
 
     /// What a tap came to.
     enum ConnectorOutcome: Equatable {
         /// Open this https link in Safari.
         case open(URL)
-        /// Sent. `reply` is the connector's fields as the reply would fill
-        /// them, by label — shown, not written (see the top of this file).
-        case sent(reply: [String])
+        /// Sent. `reply` is the connector's fields as the reply filled them,
+        /// by label. `saved` is false when they could not be written on the
+        /// record (the send still happened).
+        case sent(reply: [String], saved: Bool = true)
         case failed(String)
     }
 
@@ -582,20 +629,70 @@ extension KhaytAPIClient {
             return .failed(L10n.format("connectors.error.server", status))
         }
         // The reply, mapped by the shared rule into the connector's own
-        // fields. Shown, NOT written: the Mac does not take a phone's writes
-        // under `plugins.<id>` yet.
-        var lines: [String] = []
-        // The shared rule maps nothing unless the stored entry grants
-        // fields.write and is not paused.
-        if !data.isEmpty, let reply = try? JSONValue.parse(data),
-           case .object(let mapped)? = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id,
-                                                                             reply: reply, entry: c.entry) {
-            for key in mapped.keys.sorted() {
-                guard let field = c.fields.first(where: { $0.key == key }), let v = mapped[key] else { continue }
-                lines.append("\(field.label): \(ConnectorRules.display(v, field: field))")
-            }
+        // fields, then written on the record and shown. The shared rule maps
+        // nothing unless the stored entry grants fields.write and is not paused.
+        var mapped: JSONValue?
+        if !data.isEmpty, let reply = try? JSONValue.parse(data) {
+            mapped = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply, entry: c.entry)
         }
-        return .sent(reply: lines)
+        let lines = Self.replyLines(mapped, connector: c)
+        var saved = lines.isEmpty
+        if let book, book.exists {
+            saved = await Self.saveReply(mapped, connector: c, at: place, book: book, engine: engine)
+        }
+        if saved, !lines.isEmpty {
+            await refreshPendingCount()
+            await deliverPending()
+        }
+        return .sent(reply: lines, saved: saved)
+    }
+
+    /// A reply's mapped fields as "Label: value" lines, by key.
+    nonisolated static func replyLines(_ mapped: JSONValue?, connector c: Connector) -> [String] {
+        guard case .object(let m)? = mapped else { return [] }
+        return m.keys.sorted().compactMap { key in
+            guard let field = c.fields.first(where: { $0.key == key }), let v = m[key] else { return nil }
+            return "\(field.label): \(ConnectorRules.display(v, field: field))"
+        }
+    }
+
+    /// Write a reply's mapped fields (`pluginApplyResponse`'s answer) on the
+    /// record the button was pressed on. Nothing mapped is nothing to write,
+    /// and counts as saved. False when the write failed — the send happened
+    /// all the same.
+    nonisolated static func saveReply(_ mapped: JSONValue?, connector c: Connector, at place: ConnectorPlace,
+                          book: CompanionBook, engine: KhaytEngine) async -> Bool {
+        guard case .object(let values)? = mapped, !values.isEmpty else { return true }
+        do {
+            try await BookWriter(book: book).setConnectorValues(values, connector: c, attach: place.placement,
+                                                                recordId: place.recordId, engine: engine)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Type a connector's own field values on a job or a customer
+    /// (`BookWriter.setConnectorValues`), and send them on with the phone's
+    /// other edits. Only an active connector's, on a phone that may edit.
+    func setConnectorFields(_ c: Connector, at place: ConnectorPlace, values: [String: JSONValue]) async throws {
+        guard ConnectorRules.canEditFields(c, canWrite: canWrite) else {
+            throw KhaytAPIError.server(ConnectorRules.disabledReason(c) ?? L10n.tr("connectors.error.build"))
+        }
+        guard let book, book.exists, let reader else { throw BookWriter.Refusal.noSuchRecord }
+        let engine = try await reader.sharedEngine()
+        let changed = try await BookWriter(book: book).setConnectorValues(values, connector: c, attach: place.placement,
+                                                                          recordId: place.recordId, engine: engine)
+        guard changed else { return }
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
+    /// `ConnectorRules.coerce` with this book's engine, for a sheet that
+    /// greys out Save on a value the field would not take.
+    func coerceConnectorField(_ field: Connector.Field, _ raw: JSONValue, in c: Connector) async -> JSONValue? {
+        guard let reader, let engine = try? await reader.sharedEngine() else { return nil }
+        return await ConnectorRules.coerce(field, raw, in: c, engine: engine)
     }
 
     private func secretLabel(_ c: Connector, _ name: String) -> String {

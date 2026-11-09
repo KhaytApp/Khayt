@@ -2,7 +2,8 @@ import SwiftUI
 import KhaytCore
 
 /// A job's or a customer's connectors: each active one's buttons for this
-/// place, and its own fields, read-only. Drawn by Khayt from the manifest —
+/// place, and its own fields — editable for an active connector on a phone
+/// that may edit, read-only otherwise. Drawn by Khayt from the manifest —
 /// nothing in it came from the connector but words. See `Connectors.swift`.
 struct ConnectorsCard: View {
     let place: KhaytAPIClient.ConnectorPlace
@@ -16,6 +17,13 @@ struct ConnectorsCard: View {
     @State private var running: String?
     @State private var message: (text: String, ok: Bool)?
     @State private var confirming: Pending?
+    @State private var editing: FieldEdit?
+
+    struct FieldEdit: Identifiable {
+        let connector: Connector
+        let field: Connector.Field
+        var id: String { connector.id + "/" + field.key }
+    }
 
     struct Pending: Identifiable {
         let connector: Connector
@@ -61,6 +69,12 @@ struct ConnectorsCard: View {
                 Task { await run(p.connector, p.action) }
             }
         }
+        .sheet(item: $editing) { e in
+            ConnectorFieldSheet(connector: e.connector, field: e.field, place: place,
+                                value: ConnectorRules.fieldValue(record, pluginId: e.connector.id, key: e.field.key)) {
+                Task { await load() }
+            }
+        }
     }
 
     private func actions(_ c: Connector) -> [Connector.Action] {
@@ -83,15 +97,14 @@ struct ConnectorsCard: View {
                     .foregroundStyle(KhaytDesign.attention)
             }
             ForEach(fields(c), id: \.key) { f in
-                HStack(alignment: .firstTextBaseline) {
-                    Text(f.label).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
-                    Spacer(minLength: 8)
-                    Text(ConnectorRules.fieldValue(record, pluginId: c.id, key: f.key)
-                            .map { ConnectorRules.display($0, field: f) } ?? "—")
-                        .font(.khayt(13.5, .medium, relativeTo: .footnote))
-                        .foregroundStyle(KhaytDesign.ink)
-                        .multilineTextAlignment(.trailing)
-                        .textSelection(.enabled)
+                if ConnectorRules.canEditFields(c, canWrite: api.canWrite) {
+                    Button { editing = FieldEdit(connector: c, field: f) } label: {
+                        fieldRow(c, f, editable: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(L10n.tr("connectors.field.edit"))
+                } else {
+                    fieldRow(c, f, editable: false)
                 }
             }
             if !actions(c).isEmpty {
@@ -116,6 +129,27 @@ struct ConnectorsCard: View {
                 }
             }
         }
+    }
+
+    private func fieldRow(_ c: Connector, _ f: Connector.Field, editable: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(f.label).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+            Spacer(minLength: 8)
+            Text(ConnectorRules.fieldValue(record, pluginId: c.id, key: f.key)
+                    .map { ConnectorRules.display($0, field: f) } ?? "—")
+                .font(.khayt(13.5, .medium, relativeTo: .footnote))
+                .foregroundStyle(KhaytDesign.ink)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+            if editable {
+                Image(systemName: "pencil")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(minHeight: editable ? 32 : nil)
+        .contentShape(Rectangle())
     }
 
     private func load() async {
@@ -144,11 +178,154 @@ struct ConnectorsCard: View {
         case .open(let url):
             // Safari, never inside the app.
             openURL(url)
-        case .sent(let reply):
-            message = (reply.isEmpty ? L10n.tr("connectors.sent")
-                       : L10n.format("connectors.sent.reply", reply.joined(separator: "\n")), true)
+        case .sent(let reply, let saved):
+            let said = reply.isEmpty ? L10n.tr("connectors.sent")
+                : L10n.format("connectors.sent.reply", reply.joined(separator: "\n"))
+            message = (saved ? said : said + "\n" + L10n.tr("connectors.reply.not_saved"), saved)
+            // The reply's fields are on the record now: show them.
+            if saved, !reply.isEmpty { await load() }
         case .failed(let why):
             message = (why, false)
+        }
+    }
+}
+
+/// Type one of a connector's own fields on a job or a customer, by its type:
+/// text, a number, yes/no, a choice from its options, or a date. Saved
+/// through `KhaytAPIClient.setConnectorFields`, checked as the Mac checks it.
+struct ConnectorFieldSheet: View {
+    let connector: Connector
+    let field: Connector.Field
+    let place: KhaytAPIClient.ConnectorPlace
+    let value: JSONValue?
+    let onSaved: () -> Void
+
+    @EnvironmentObject private var api: KhaytAPIClient
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var flag = false
+    @State private var choice = ""
+    @State private var day = Date()
+    @State private var saving = false
+    @State private var failure: String?
+
+    /// What Save would write; nil is "no value" (the key is cleared).
+    private var draft: JSONValue? {
+        switch field.type {
+        case "bool": return .bool(flag)
+        case "enum": return choice.isEmpty ? nil : .string(choice)
+        case "date": return .string(BookWriter.localDay(day))
+        case "number":
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { return nil }
+            if let n = Double(t) { return .number(n) }
+            let f = NumberFormatter()
+            f.locale = L10n.locale
+            f.numberStyle = .decimal
+            return f.number(from: t).map { .number($0.doubleValue) } ?? .string(t)
+        default:
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : .string(t)
+        }
+    }
+
+    /// Typed, but not something the field takes (a number that isn't one),
+    /// by lib's own `coerceField`.
+    @State private var invalid = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    editor
+                } footer: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let failure { Text(failure).foregroundStyle(KhaytDesign.late) }
+                        Text(L10n.format("connectors.field.footer", connector.name))
+                    }
+                }
+                if value != nil {
+                    Section {
+                        Button(L10n.tr("connectors.field.clear"), role: .destructive) { save(.null) }
+                            .disabled(saving)
+                    }
+                }
+            }
+            .navigationTitle(field.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("common.cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.tr("common.save")) { save(draft ?? .null) }
+                        .disabled(saving || invalid)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .onAppear(perform: fill)
+        .task(id: draft) {
+            guard let d = draft else { invalid = false; return }
+            invalid = await api.coerceConnectorField(field, d, in: connector) == nil
+        }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        switch field.type {
+        case "bool":
+            Toggle(field.label, isOn: $flag)
+        case "enum":
+            Picker(field.label, selection: $choice) {
+                Text("—").tag("")
+                ForEach(field.options.sorted { $0.value < $1.value }, id: \.key) { o in
+                    Text(o.value).tag(o.key)
+                }
+            }
+        case "date":
+            DatePicker(field.label, selection: $day, displayedComponents: .date)
+                .environment(\.calendar, Calendar(identifier: .gregorian))
+        case "number":
+            TextField(field.label, text: $text)
+                .keyboardType(.decimalPad)
+        default:
+            TextField(field.label, text: $text, axis: .vertical)
+                .lineLimit(1...4)
+        }
+    }
+
+    private func fill() {
+        switch value {
+        case .string(let s)?:
+            text = s
+            choice = field.options[s] != nil ? s : ""
+            let f = DateFormatter()
+            f.calendar = Calendar(identifier: .gregorian)
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd"
+            if field.type == "date", let d = f.date(from: String(s.prefix(10))) { day = d }
+        case .number(let n)?:
+            text = n.formatted(.number.locale(L10n.locale).grouping(.never))
+        case .bool(let b)?:
+            flag = b
+        default:
+            break
+        }
+    }
+
+    private func save(_ v: JSONValue) {
+        saving = true
+        failure = nil
+        Task {
+            defer { saving = false }
+            do {
+                try await api.setConnectorFields(connector, at: place, values: [field.key: v])
+                onSaved()
+                dismiss()
+            } catch {
+                failure = error.localizedDescription
+            }
         }
     }
 }
@@ -231,21 +408,27 @@ struct ConnectorConsentList: View {
 
 /// Settings ▸ Connectors: the book's connectors, read-only apart from this
 /// phone's own keys. Adding and approving one is the Mac's.
-struct ConnectorsSettingsSection: View {
+///
+/// WITH NO CONNECTOR IN THE BOOK IT DRAWS NOTHING, heading included: the
+/// Mac and desktop ship connectors switched off, and no build may show the
+/// feature before khaytapp.com/privacy describes it.
+struct ConnectorsSettingsSection<Heading: View>: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @State private var connectors: [Connector] = []
     @State private var tick = 0
+    @ViewBuilder var heading: () -> Heading
 
     var body: some View {
+        Group {
+            if !connectors.isEmpty { list }
+        }
+        .task(id: tick) { connectors = await api.connectors() }
+    }
+
+    private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
+            heading()
             VStack(spacing: 0) {
-                if connectors.isEmpty {
-                    Text(L10n.tr("connectors.list.empty"))
-                        .font(.khayt(13.5, relativeTo: .footnote))
-                        .foregroundStyle(KhaytDesign.note)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
                 ForEach(Array(connectors.enumerated()), id: \.element.id) { i, c in
                     NavigationLink {
                         ConnectorSettingsPage(connector: c) { tick += 1 }
@@ -263,7 +446,6 @@ struct ConnectorsSettingsSection: View {
                 .padding(.horizontal, 2)
                 .padding(.top, 9)
         }
-        .task(id: tick) { connectors = await api.connectors() }
     }
 }
 

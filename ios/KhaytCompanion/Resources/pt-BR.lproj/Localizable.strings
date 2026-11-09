@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "Abre este site. Não envia nada do seu livro.";
 "connectors.consent.confirmed" = "Permitido neste iPhone.";
 "connectors.consent.not_confirmed" = "Ainda não usado neste iPhone. O Khayt pergunta antes do primeiro envio.";
-"connectors.list.empty" = "Nenhum conector nesta oficina.";
 "connectors.list.footer" = "Conectores são adicionados e aprovados no seu Mac. As chaves ficam neste iPhone e nunca são sincronizadas.";
 "connectors.badge.reviewed" = "Revisado";
 "connectors.status.active" = "Ativo";
@@ -1185,6 +1184,11 @@
 "connectors.settings.footer" = "Valem para a loja toda e são editados no seu Mac ou PC, não neste iPhone.";
 "connectors.settings.missing" = "Os botões não enviam nada até que %@ seja definido no seu Mac ou PC.";
 "connectors.error.setting" = "Defina “%@” para este conector no seu Mac ou PC primeiro. Nada foi enviado.";
+"connectors.reply.not_saved" = "Não foi possível salvar a resposta neste iPhone. Copie-a para o campo manualmente.";
+"connectors.field.clear" = "Limpar";
+"connectors.field.footer" = "Salvo neste iPhone e enviado ao seu Mac com suas outras alterações. Seu Mac só o mantém enquanto %@ estiver ativado nele.";
+"connectors.field.edit" = "Editar";
+"connectors.error.no_record" = "Este trabalho ou cliente ainda não está neste iPhone. Nada foi salvo.";
 "connectors.data.order.id" = "ID do trabalho";
 "connectors.data.order.number" = "Número da fatura";
 "connectors.data.order.title" = "Título do trabalho";
