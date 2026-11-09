@@ -184,9 +184,48 @@
     return 'dlv_' + String(randomUUID()).toLowerCase();
   }
 
+  /**
+   * A record a paired phone sent, with its connector values held to what the
+   * phone may change. Each connector that is on (`reviewedIds` names the ones
+   * whose signature this Mac verified) takes the phone's values for the
+   * fields it declares on `attach` ('order' or 'customer'), checked by
+   * `coerceField`. Everything else under `plugins` stays as `held` (this
+   * Mac's copy of the record) has it: an id with no connector, a connector
+   * that is off or paused, a key nobody declared. So a phone can fill a
+   * connector's field and save its reply, and cannot invent a connector's
+   * values or wipe one that is switched off.
+   *
+   * A record with no `plugins` key at all keeps every value `held` has: an
+   * older phone build that does not know the field must not clear it. To
+   * clear a connector's last value, the phone sends `plugins: {}`.
+   */
+  function phoneRecord(incoming, held, settings, attach, reviewedIds) {
+    if (!isObj(incoming)) return incoming;
+    if (!Object.prototype.hasOwnProperty.call(incoming, 'plugins')) {
+      const kept = Object.assign({}, incoming);
+      if (isObj(held) && isObj(held.plugins)) kept.plugins = held.plugins;
+      return kept;
+    }
+    const sent = isObj(incoming.plugins) ? incoming.plugins : {};
+    const out = Object.assign({}, incoming);
+    if (isObj(held) && isObj(held.plugins)) out.plugins = held.plugins; else delete out.plugins;
+    const ok = new Set(Array.isArray(reviewedIds) ? reviewedIds : []);
+    let rec = out;
+    for (const entry of liveEntries(settings, (e) => ok.has(e.id))) {
+      const mine = isObj(sent[entry.id]) ? sent[entry.id] : {};
+      const values = {};
+      for (const field of (entry.manifest.fields || [])) {
+        if (field.attach === attach) values[field.key] = mine[field.key];
+      }
+      rec = withFieldValues(rec, entry, attach, values);
+    }
+    return rec;
+  }
+
   const api = {
     consentedEntry, updatedEntry, withEntry, withoutEntry, stateOf, liveEntries,
     actionsFor, eventTargets, fieldsFor, coerceField, withFieldValues, missingSecrets, labelOf, deliveryId,
+    phoneRecord,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPluginHost = api;

@@ -2984,13 +2984,64 @@ extension Shop {
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             recordingDeletes: false
         ) { root in
-            let folded = try await engine.foldDeltas(base: root, deltas: [payload])
+            let guarded = await Self.phoneConnectorValues(payload, root: root, engine: engine)
+            let folded = try await engine.foldDeltas(base: root, deltas: [guarded])
             root = folded.store
             result = folded
         }
         await load(source)
         guard let result else { throw CocoaError(.fileWriteUnknown) }
         return result
+    }
+
+    /// A phone's batch with each job's and customer's connector values held to
+    /// what a phone may change (`lib/plugin-host.js` phoneRecord): the declared
+    /// fields of a connector that is on and whose signature verifies here.
+    /// Anything else under `plugins` stays as this Mac's copy has it.
+    nonisolated static func phoneConnectorValues(_ payload: [String: JSONValue], root: [String: JSONValue],
+                                                 engine: KhaytEngine) async -> [String: JSONValue] {
+        guard case .array(let deltas)? = payload["deltas"] else { return payload }
+        let settings = root["settings"] ?? .null
+        var reviewed: [String] = []
+        if case .object(let st) = settings, case .array(let entries)? = st["plugins"],
+           let keys = try? await engine.pluginSigningKeys() {
+            for entry in entries {
+                guard case .object(let e) = entry, case .string(let id)? = e["id"], let manifest = e["manifest"],
+                      let canonical = try? await engine.pluginCanonicalJSON(manifest),
+                      Connectors.reviewedBy(manifest: manifest, canonical: canonical, keys: keys) != nil else { continue }
+                reviewed.append(id)
+            }
+        }
+        let attachFor = ["printLog": "order", "clients": "customer"]
+        var heldBy: [String: [String: JSONValue]] = [:]
+        for coll in attachFor.keys {
+            guard case .array(let rows)? = root[coll] else { continue }
+            var byId: [String: JSONValue] = [:]
+            for row in rows { if case .object(let o) = row, case .string(let id)? = o["id"] { byId[id] = row } }
+            heldBy[coll] = byId
+        }
+        var out: [JSONValue] = []
+        for delta in deltas {
+            guard case .object(var d) = delta, case .string(let coll)? = d["collection"],
+                  let attach = attachFor[coll], let record = d["record"], case .object(let r) = record else {
+                out.append(delta); continue
+            }
+            var held: JSONValue = .null
+            if case .string(let id)? = r["id"] { held = heldBy[coll]?[id] ?? .null }
+            // Fail closed: a record the rule could not read keeps this Mac's values.
+            if let checked = try? await engine.pluginPhoneRecord(record, held: held, settings: settings,
+                                                                 attach: attach, reviewedIds: reviewed) {
+                d["record"] = checked
+            } else {
+                var kept = r
+                if case .object(let h) = held, let p = h["plugins"] { kept["plugins"] = p } else { kept.removeValue(forKey: "plugins") }
+                d["record"] = .object(kept)
+            }
+            out.append(.object(d))
+        }
+        var guarded = payload
+        guarded["deltas"] = .array(out)
+        return guarded
     }
 
     func recordIntake(_ entry: JSONValue) async throws {
