@@ -459,6 +459,50 @@ struct CompanionBook {
         try data.write(to: baselineURL, options: [.atomic, Self.baselineProtection])
     }
 
+    /// Put the Mac's `settings` into the book AND the baseline, leaving every
+    /// record and every other key as it is. Returns false, changing nothing,
+    /// for an empty `settings` (never replace something with nothing) or a
+    /// phone with no book yet.
+    ///
+    /// ── WHY BOTH, AND WHY WHOLE ──────────────────────────────────────────
+    ///
+    /// `settings` is one object the phone only reads: no outbox carries it
+    /// (`changesToSend` covers revisioned records; its `settingsDiffer` is
+    /// never sent), and nothing on the phone writes a key under it — a pull
+    /// (`BookReader.adopt`) takes the upstream copy whole. So it is replaced
+    /// whole here too, and written into the baseline as well, so the book
+    /// and the baseline agree about it and nothing reads as pending.
+    ///
+    /// The book is swapped (`swap`), retried, like a cloud pull's fold: an
+    /// edit made on another screen between the read and the write is kept,
+    /// and stays pending against the baseline.
+    @discardableResult
+    func adoptSettings(_ settings: [String: JSONValue]) throws -> Bool {
+        guard !settings.isEmpty, exists else { return false }
+        // Checked before the book is touched: settings changed in the book but
+        // not the baseline would be a difference nobody made.
+        let baseline: [String: JSONValue]?
+        switch readBaseline() {
+        case .held(let held): baseline = held
+        case .unreadable: throw Failure.baselineUnreadable
+        case .absent: baseline = nil
+        }
+        var swapped = false
+        for _ in 1...3 {
+            let local = try read()
+            if local["settings"] == .object(settings) { swapped = true; break }
+            var next = local
+            next["settings"] = .object(settings)
+            if try swap(from: local, to: next) { swapped = true; break }
+        }
+        guard swapped else { throw Failure.busy }
+        if var baseline {
+            baseline["settings"] = .object(settings)
+            try replaceBaseline(with: baseline)
+        }
+        return true
+    }
+
     /// Upstream has taken everything in `sent` — the book as it was when the
     /// outbox was measured, NOT as it is now.
     ///

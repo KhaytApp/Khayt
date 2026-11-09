@@ -61,7 +61,8 @@ struct ConnectorsCard: View {
                 Color.clear.frame(height: 0)
             }
         }
-        .task { await load() }
+        // Again whenever a sync lands: a connector the Mac added or turned off.
+        .task(id: api.syncLanded) { await load() }
         .sheet(item: $confirming) { p in
             ConnectorConfirmSheet(connector: p.connector) {
                 ConnectorRules.confirm(p.connector)
@@ -416,18 +417,49 @@ struct ConnectorConsentList: View {
 ///
 /// WITH NO CONNECTOR IN THE BOOK IT DRAWS NOTHING, heading included: the
 /// Mac and desktop ship connectors switched off, and no build may show the
-/// feature before khaytapp.com/privacy describes it.
+/// feature before khaytapp.com/privacy describes it. From launch day
+/// (`ConnectorLaunch.launched`), a phone that reads its book from the cloud
+/// and has never read the Mac's settings shows one line instead, saying the
+/// Mac's connectors arrive once Khayt opens near it.
 struct ConnectorsSettingsSection<Heading: View>: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @State private var connectors: [Connector] = []
+    @State private var loaded = false
     @State private var tick = 0
     @ViewBuilder var heading: () -> Heading
 
+    /// Reloaded when the list changes here and whenever a sync lands.
+    private struct Reload: Equatable {
+        let tick: Int
+        let synced: [Date]
+    }
+
     var body: some View {
         Group {
-            if !connectors.isEmpty { list }
+            if !connectors.isEmpty {
+                list
+            } else if loaded, ConnectorLaunch.showsMacHint(cloud: api.cloud != nil, macSettingsAt: api.macSettingsAt,
+                                                           connectorsEmpty: true, holdsBook: api.holdsBook) {
+                macHint
+            }
         }
-        .task(id: tick) { connectors = await api.connectors() }
+        .task(id: Reload(tick: tick, synced: api.syncLanded)) {
+            connectors = await api.connectors()
+            loaded = true
+        }
+    }
+
+    /// One line where the list would be, for a phone that reads its book
+    /// from the cloud and has not yet met its Mac (`ConnectorLaunch.showsMacHint`).
+    private var macHint: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            heading()
+            Text(L10n.tr("connectors.settings.hint_mac"))
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+        }
     }
 
     private var list: some View {
