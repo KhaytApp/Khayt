@@ -1333,6 +1333,12 @@
   let _healthGroups = null; // null while checking
   let _healthRun = 0;
   let _healthBusy = '';     // the kind a Measure / Make Previews is working through
+  // The duplicate check: models never hashed, read in the background, one at a
+  // time. Planned by lib/library-hash-plan.js from what the health check saw.
+  const _HP = () => (typeof window !== 'undefined' && window.KhaytLibraryHashPlan) || null;
+  const _healthSizes = new Map();   // id -> bytes on disk, from the health check
+  let _hashPlan = null;             // { todo, later, skipped } or null
+  let _hashRun = null;              // { done, total, stop } while a run is going
 
   const HEALTH_TEXT = {
     deletedByPlan: ['plib.lh_missing', 'plib.lh_missing_says'],
@@ -1387,7 +1393,7 @@
   }
 
   function openHealth() { _healthOpen = true; renderPrintFiles(); checkHealth(); }
-  function closeHealth() { _healthOpen = false; _healthRun++; renderPrintFiles(); }
+  function closeHealth() { stopHashCheck(); _healthOpen = false; _healthRun++; renderPrintFiles(); }
 
   /** Where each model's bytes are: here, online (tiered or the Mac's marker),
    *  missing, or unreachable when the library folder itself is not there —
@@ -1414,6 +1420,7 @@
         if (!Array.isArray(files)) { out.set(r.id, 'unknown'); continue; }
         const f = files.find((x) => x && x.filename === fn);
         out.set(r.id, !f ? 'missing' : (f.online || f.tiered) ? 'online' : 'here');
+        if (f && Number(f.size) > 0) _healthSizes.set(r.id, Number(f.size));
       }
     }
     await Promise.all(Array.from({ length: Math.min(8, recs.length) }, worker));
@@ -1445,6 +1452,14 @@
     });
     const ms = (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [];
     const ps = (typeof products !== 'undefined' && Array.isArray(products)) ? products : [];
+    const HP = _HP();
+    _hashPlan = HP ? HP.plan(recs.map((r) => ({
+      id: r.id, filename: r.sourceFile && r.sourceFile.filename, size: _healthSizes.get(r.id),
+      presence: presence.get(r.id), contentHash: r.contentHash || null,
+      archived: !!(la && la.isArchived(r)), linked: !!(r.externalPath || r.archiveMember),
+      // createdAt is a number on the desktop and an ISO string from the Mac.
+      addedAt: (typeof r.createdAt === 'number' ? r.createdAt : Date.parse(r.createdAt)) || 0,
+    }))) : null;
     _healthGroups = H.groups(models,
       ms.filter((m) => m && !m.retiredAt).map((m) => ({ id: m.id, kind: m.kind, bed: m.bed })),
       H.productFacts(ps));
@@ -1462,9 +1477,67 @@
           <button class="btn ghost small" data-act="pf-health-again" ${_healthGroups ? '' : 'disabled'}>${escapeHtml(t('plib.lh_check_again'))}</button>
           <button class="btn ghost small" data-act="pf-health-back">${escapeHtml(t('plib.lh_back'))}</button>
         </div></div>`;
+    const hashLine = hashLineHtml();
+    if (_healthGroups && hashLine) return `<div class="pf-health" id="pfHealth">${head}${hashLine}${_healthGroups.map(healthGroupHtml).join('')}</div>`;
     if (!_healthGroups) return `<div class="pf-health" id="pfHealth">${head}<div class="pf-empty" id="pfHealthChecking">${escapeHtml(t('plib.lh_checking'))}</div></div>`;
     if (!_healthGroups.length) return `<div class="pf-health" id="pfHealth">${head}<div class="pf-empty" id="pfHealthGood">${escapeHtml(t('plib.lh_all_good'))}</div></div>`;
     return `<div class="pf-health" id="pfHealth">${head}${_healthGroups.map(healthGroupHtml).join('')}</div>`;
+  }
+
+  /** "N models have never been checked for duplicates", with Check them /
+   *  Stop. Reads and writes nothing until pressed. */
+  function hashLineHtml() {
+    if (_hashRun) {
+      return `<div class="pf-hash-line" id="pfHashLine" role="status">`
+        + `<span>${escapeHtml(t('plib.lh_hash_running', { done: String(_hashRun.done), n: String(_hashRun.total) }))}</span>`
+        + `<button class="btn ghost small" data-act="pf-hash-stop">${escapeHtml(t('plib.lh_hash_stop'))}</button></div>`;
+    }
+    if (!_hashPlan || !_hashPlan.todo.length) return '';
+    const n = _hashPlan.todo.length + _hashPlan.later;
+    return `<div class="pf-hash-line" id="pfHashLine">`
+      + `<span>${escapeHtml(t('plib.lh_hash_line', { n: String(n) }))}</span>`
+      + `<button class="btn small" data-act="pf-hash-go">${escapeHtml(t('plib.lh_hash_go'))}</button></div>`;
+  }
+
+  /** Hash what the plan says, newest first, one file at a time. Writes ONLY
+   *  contentHash (lib/library-hash-plan.js patchFor), saving as it goes, so a
+   *  Stop or a quit loses at most the file being read and the next run picks
+   *  up the rest. Never deletes, merges or moves anything. */
+  async function runHashCheck() {
+    const HP = _HP(); const hub = api();
+    if (!HP || !hub || !hub.printLibHash || _hashRun || !_hashPlan) return;
+    const todo = _hashPlan.todo.slice();
+    const run = { done: 0, total: todo.length, stop: false };
+    _hashRun = run; renderList();
+    let unsaved = 0;
+    try {
+      for (const item of todo) {
+        if (run.stop) break;
+        let read = null;
+        try { read = await hub.printLibHash(item.id, item.filename); } catch (_) { read = null; }
+        if (run.stop) break;
+        const rec = recById(item.id);
+        const patch = read && read.ok ? HP.patchFor(rec, { contentHash: read.contentHash, filename: item.filename }) : null;
+        if (patch) {
+          rec.contentHash = patch.contentHash;
+          rec.updatedAt = Date.now();
+          if (++unsaved >= 10) { saveAll(); unsaved = 0; }
+        }
+        run.done++;
+        if (_healthOpen) renderList();
+      }
+    } finally {
+      if (unsaved) saveAll();
+      _hashRun = null;
+    }
+    await checkHealth();
+  }
+
+  function stopHashCheck() {
+    if (!_hashRun) return;
+    _hashRun.stop = true;
+    const hub = api();
+    if (hub && hub.printLibHashStop) hub.printLibHashStop().catch(() => {});
   }
 
   function healthGroupHtml(g) {
@@ -1569,6 +1642,8 @@
       case 'pf-health': if (_healthOpen) closeHealth(); else openHealth(); break;
       case 'pf-health-back': closeHealth(); break;
       case 'pf-health-again': checkHealth(); break;
+      case 'pf-hash-go': runHashCheck(); break;
+      case 'pf-hash-stop': stopHashCheck(); break;
       case 'pf-health-show': showHealthGroup(btn.dataset.kind); break;
       case 'pf-health-measure': healthFixEach(btn.dataset.kind, 'measure'); break;
       case 'pf-health-previews': healthFixEach(btn.dataset.kind, 'preview'); break;
