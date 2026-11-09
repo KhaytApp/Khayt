@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "Impossible de joindre %@. Rien n’a été envoyé.";
 "connectors.error.server" = "Le service a répondu %d. Rien n’a été modifié sur cet iPhone.";
 "connectors.sample" = "Dans l’atelier d’exemple, rien ne quitte cet iPhone : les connecteurs n’envoient et n’ouvrent rien. Associez votre Mac pour les utiliser.";
+"connectors.sample.simulated" = "Atelier d’exemple : rien n’a été envoyé. Un vrai atelier envoie ces champs à %@.";
 "connectors.not_reviewed" = "Non vérifié — boutons désactivés";
 "connectors.off" = "Désactivé sur votre Mac";
 "connectors.status.not_reviewed" = "Non vérifié";

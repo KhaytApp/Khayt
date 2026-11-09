@@ -155,7 +155,7 @@ struct EditSelectionMenu: View {
 
     private var provenanceMenu: some View {
         Menu {
-            ForEach(ModelLicence.all) { licence in
+            ForEach(ModelLicence.all.filter { $0.id != "custom" }) { licence in
                 Button {
                     Task { await shop.fileSelection(licence: licence.id) }
                 } label: {

@@ -63,3 +63,21 @@ test('the block: a remix of a non-commercial original says so', () => {
   assert.match(html, /lic\.not_for_sale/);
   assert.match(html, /lic\.remix_line\{"name":"Owl, hollow","parent":"Owl"\}/);
 });
+
+test('the block: personal warns like NC; custom shows its note and no verdict', () => {
+  require('../lib/model-licence.js');
+  global.t = (k, p) => k + (p ? JSON.stringify(p) : '');
+  global.escapeHtml = (s) => String(s).replace(/</g, '&lt;');
+  global.localDateStr = () => '2026-11-09';
+  global.printFiles = [
+    { id: 'P', name: 'Vase', licence: 'personal' },
+    { id: 'C', name: 'Bust', licence: 'custom', licenceNote: 'Up to 50 a year <b>' },
+  ];
+  const H = require('../renderer/app-helpers.js');
+  assert.match(H.licenceAtSaleHtml(['P']), /lic\.nc_line\{"name":"Vase"\}/);
+  const c = H.licenceAtSaleHtml(['C']);
+  assert.match(c, /licence-at-sale custom/);
+  assert.match(c, /lic\.custom_title/);
+  assert.match(c, /Bust: Up to 50 a year &lt;b>/);
+  assert.doesNotMatch(c, /lic\.not_for_sale/);
+});

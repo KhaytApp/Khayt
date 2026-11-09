@@ -83,7 +83,7 @@ extension Shop {
         return (try? await engine.webhookDeliveries(
             order: order,
             effects: [WebhookEffect(kind: "webhook", event: "qc_failed", newStatus: nil)],
-            settings: settings,
+            settings: DevConnectors.withDev(settings),
             shopName: Self.plainString(settings["bizEn"]) ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
             clientName: "", currency: Self.shopCurrencyOf(settings),
             at: ISO8601DateFormatter().string(from: Date()),

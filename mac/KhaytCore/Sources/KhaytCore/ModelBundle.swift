@@ -64,7 +64,7 @@ public enum ModelBundle {
         "name", "originalName", "material", "category", "tags", "group", "testedNotes",
         "source", "licence", "licenceUrl", "parsed", "colors", "swapCount",
         "geometryKey", "geometryReader", "contentHash", "setups",
-        "sourceUrl", "sourceSite", "sourceLicenceText", "sourceNote",
+        "sourceUrl", "sourceSite", "sourceLicenceText", "sourceNote", "licenceNote",
     ]
 
     /// What an import takes back: `exported` minus what the import measures
@@ -342,7 +342,7 @@ public enum ModelBundle {
     public static func checkedFields(_ record: [String: JSONValue], keys: Set<String> = importable,
                                      includeCost: Bool = false) -> [String: JSONValue] {
         let texts: Set<String> = ["name", "originalName", "material", "category", "testedNotes", "source",
-                                  "licence", "sourceSite", "sourceLicenceText", "sourceNote",
+                                  "licence", "sourceSite", "sourceLicenceText", "sourceNote", "licenceNote",
                                   "contentHash", "geometryKey", "geometryReader"]
         let links: Set<String> = ["licenceUrl", "sourceUrl"]
         func capped(_ v: JSONValue?, _ max: Double) -> JSONValue? {
@@ -354,7 +354,11 @@ public enum ModelBundle {
             guard let v = record[key] else { continue }
             switch (key, v) {
             case (_, .string(let s)) where texts.contains(key):
-                let cut = String(plain(s).prefix(key == "name" ? 200 : 4000)).trimmingCharacters(in: .whitespacesAndNewlines)
+                // A licence note is capped by the shared rule (`capNote`,
+                // UTF-16 units); a manifest's word is not trusted.
+                let cut = key == "licenceNote"
+                    ? ModelLicence.capNote(plain(s))
+                    : String(plain(s).prefix(key == "name" ? 200 : 4000)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !cut.isEmpty { out[key] = .string(cut) }
             case (_, .string(let s)) where links.contains(key):
                 if let link = WebSave.https(s) { out[key] = .string(link) }

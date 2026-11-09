@@ -796,7 +796,7 @@ extension Shop {
             // a silent non-send, which is the worse of the two.
             if let asked = done.webhookEffects, !asked.isEmpty {
                 owed = (try? await engine.webhookDeliveries(
-                    order: done.order, effects: asked, settings: settings,
+                    order: done.order, effects: asked, settings: DevConnectors.withDev(settings),
                     shopName: Self.plainString(settings["bizEn"])
                         ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
                     clientName: Self.emailClientName(for: Self.asObject(done.order) ?? [:],
@@ -1216,7 +1216,7 @@ extension Shop {
         return (try? await engine.webhookDeliveries(
             order: after,
             effects: [WebhookEffect(kind: "webhook", event: "order_shipped", newStatus: nil)],
-            settings: settings,
+            settings: DevConnectors.withDev(settings),
             shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
             clientName: emailClientName(for: asObject(after) ?? [:], in: rows(root, "clients")),
             currency: shopCurrencyOf(settings),

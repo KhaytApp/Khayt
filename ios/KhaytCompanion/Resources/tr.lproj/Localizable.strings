@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "%@ adresine ulaşılamadı. Hiçbir şey gönderilmedi.";
 "connectors.error.server" = "Hizmet %d yanıtını verdi. Bu iPhone’da hiçbir şey değişmedi.";
 "connectors.sample" = "Örnek dükkânda hiçbir şey bu telefondan çıkmaz; bu yüzden bağlayıcılar bir şey göndermez ya da açmaz. Kullanmak için Mac’inizle eşleştirin.";
+"connectors.sample.simulated" = "Örnek dükkân: hiçbir şey gönderilmedi. Gerçek bir dükkân bu alanları %@ adresine gönderir.";
 "connectors.not_reviewed" = "İncelenmedi — düğmeler kapalı";
 "connectors.off" = "Mac’inizde kapatıldı";
 "connectors.status.not_reviewed" = "İncelenmedi";

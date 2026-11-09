@@ -12,6 +12,9 @@ struct ConnectorSettings: View {
 
     @State private var rows: [ConnectorRow] = []
     @State private var importing = false
+    /// The open-file panel is for a `.khaytplugin` (developer mode), not a signed file.
+    @State private var importingDev = false
+    @AppStorage(DevConnectors.modeKey) private var devMode = false
     @State private var result: String?
     @State private var keys: [String: [String: String]] = [:]
     @State private var removing: ConnectorRow?
@@ -28,15 +31,22 @@ struct ConnectorSettings: View {
             }
             ForEach(rows) { row in connector(row) }
             HStack {
-                Button(shop.words.callIt("plg.install")) { importing = true }
+                Button(shop.words.callIt("plg.install")) { importingDev = false; importing = true }
+                if devMode {
+                    Button(shop.words.callIt("plg.dev_load")) { importingDev = true; importing = true }
+                }
                 if let result { Text(result).font(.callout).foregroundStyle(.secondary) }
                 Spacer()
             }
+            Toggle(shop.words.callIt("plg.dev_mode"), isOn: $devMode)
+            Text(shop.words.callIt("plg.dev_hint")).font(.caption).foregroundStyle(.secondary)
         }
         .disabled(!mayWrite)
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { picked in
+        .fileImporter(isPresented: $importing,
+                      allowedContentTypes: importingDev ? Self.devTypes : [.json]) { picked in
             guard case .success(let url) = picked else { return }
-            Task { result = await offer(url) }
+            let dev = importingDev
+            Task { result = await offer(url, dev: dev) }
         }
         .shopSheet(item: Binding(get: { shop.connectorOffer }, set: { if $0 == nil { shop.connectorOffer = nil } })) { offer in
             ConnectorConsentSheet(shop: shop, offer: offer) { said in
@@ -58,6 +68,13 @@ struct ConnectorSettings: View {
             }
         }
         .task(id: shop.settingsValue) { await reload() }
+        .onChange(of: shop.devConnectorsRev) { Task { await reload() } }
+        .onChange(of: devMode) { Task { await reload() } }
+    }
+
+    /// A `.khaytplugin`, or the plain `.json` it was written as.
+    static var devTypes: [UTType] {
+        [UTType(filenameExtension: DevConnectors.fileExtension, conformingTo: .json), .json].compactMap { $0 }
     }
 
     @ViewBuilder
@@ -70,6 +87,10 @@ struct ConnectorSettings: View {
                 Text(shop.words.callIt("plg.state_" + row.state))
                     .font(.caption)
                     .foregroundStyle(row.state == "on" ? Khayt.done : row.state == "off" ? Khayt.note : Khayt.attention)
+            }
+            if row.dev {
+                Label(shop.words.callIt("plg.dev_badge"), systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(Khayt.attention)
             }
             if row.state == "on" || row.state == "off" {
                 if row.keysMissing {
@@ -129,7 +150,7 @@ struct ConnectorSettings: View {
                 if row.state == "paused", let manifest = manifest(row.id) {
                     // Asks for more than was agreed: show it again and ask.
                     Button(shop.words.callIt("plg.review_agree")) {
-                        Task { result = await offer(manifest) }
+                        Task { result = await offer(manifest, dev: row.dev) }
                     }
                 }
                 Button(shop.words.callIt("plg.remove"), role: .destructive) { removing = row }
@@ -166,21 +187,21 @@ struct ConnectorSettings: View {
     }
 
     private func manifest(_ id: String) -> JSONValue? {
-        shop.connectorEntries.first { Shop.object($0)["id"] == .string(id) }.map { Shop.object($0)["manifest"] ?? .null }
+        shop.anyConnectorEntry(id).map { Shop.object($0)["manifest"] ?? .null }
     }
 
-    private func offer(_ url: URL) async -> String? {
+    private func offer(_ url: URL, dev: Bool) async -> String? {
         let opened = url.startAccessingSecurityScopedResource()
         defer { if opened { url.stopAccessingSecurityScopedResource() } }
         // A manifest is small; anything big is not one.
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 256 * 1024,
               let data = try? Data(contentsOf: url) else { return shop.words.callIt("plg.err_invalid") }
-        return await shop.offerConnector(data)
+        return await shop.offerConnector(data, dev: dev)
     }
 
-    private func offer(_ manifest: JSONValue) async -> String? {
+    private func offer(_ manifest: JSONValue, dev: Bool) async -> String? {
         guard let data = try? JSONEncoder().encode(manifest) else { return shop.words.callIt("plg.err_invalid") }
-        return await shop.offerConnector(data)
+        return await shop.offerConnector(data, dev: dev)
     }
 
     private func reload() async { rows = await shop.connectorRows() }
@@ -202,8 +223,16 @@ struct ConnectorConsentSheet: View {
                 Text(offer.name).font(.title3.weight(.semibold))
                 Text(offer.version).foregroundStyle(.secondary)
                 Spacer()
-                Label(shop.words.callIt("plg.reviewed_by_khayt"), systemImage: "checkmark.seal")
-                    .font(.callout).foregroundStyle(Khayt.done)
+                if offer.dev {
+                    Label(shop.words.callIt("plg.dev_badge"), systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(Khayt.attention)
+                } else {
+                    Label(shop.words.callIt("plg.reviewed_by_khayt"), systemImage: "checkmark.seal")
+                        .font(.callout).foregroundStyle(Khayt.done)
+                }
+            }
+            if offer.dev {
+                Text(shop.words.callIt("plg.dev_warning")).font(.callout).foregroundStyle(Khayt.attention)
             }
             Text(shop.words.callIt("plg.consent_lead")).font(.callout)
             ScrollView {
