@@ -377,11 +377,19 @@ extension Shop {
     /// Each is sent once now; a failure worth retrying waits in the outbox on
     /// the webhook ladder (`lib/webhook-bus.js`), with the same delivery id.
     func deliverConnectorEvents(_ items: [KhaytEngine.WebhookDelivery]) async {
-        guard ConnectorsSwitch.isOn() else { return }
-        for one in items {
-            guard let id = one.connector, let orderId = one.orderId, !orderId.isEmpty else { continue }
-            await sendConnectorEvent(ConnectorQueued(delivery: Connectors.newDeliveryId(), id: id, event: one.event,
-                                                     orderId: orderId, attempt: 1))
+        for item in Self.connectorEvents(items, switchedOn: ConnectorsSwitch.isOn()) {
+            await sendConnectorEvent(item)
+        }
+    }
+
+    /// The events to send now, each with a fresh delivery id. NONE while
+    /// connectors are switched off (`ConnectorsSwitch`): nothing is sent and
+    /// nothing is queued, because the queue is written only after a send.
+    nonisolated static func connectorEvents(_ items: [KhaytEngine.WebhookDelivery], switchedOn: Bool) -> [ConnectorQueued] {
+        guard switchedOn else { return [] }
+        return items.compactMap { one in
+            guard let id = one.connector, let orderId = one.orderId, !orderId.isEmpty else { return nil }
+            return ConnectorQueued(delivery: Connectors.newDeliveryId(), id: id, event: one.event, orderId: orderId, attempt: 1)
         }
     }
 
@@ -397,6 +405,9 @@ extension Shop {
 
     /// One attempt at one event.
     func sendConnectorEvent(_ item: ConnectorQueued) async {
+        // Checked here too, not only by the callers: this is the one place a
+        // connector event leaves the Mac or reaches the queue.
+        guard ConnectorsSwitch.isOn() else { return }
         guard let engine, let build = source.build, StoreLock.weOwnIt(build) else { return }
         guard !connectorInFlight.contains(item.delivery) else { return }
         connectorInFlight.insert(item.delivery)

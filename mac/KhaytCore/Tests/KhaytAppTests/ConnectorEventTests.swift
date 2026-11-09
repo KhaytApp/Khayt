@@ -103,4 +103,27 @@ struct ConnectorEventTests {
         #expect(try await engine.pluginDue(list, nowMs: 0).isEmpty)
         #expect(try await engine.pluginUnqueued(list, delivery: "dlv_q") == .array([]))
     }
+    @Test("with connectors switched off, a move's connector items send nothing and queue nothing")
+    func switchedOff() async throws {
+        let (engine, entry) = try await Self.discord()
+        let owed = try await engine.webhookDeliveries(
+            order: Self.order, effects: [WebhookEffect(kind: "webhook", event: "order_shipped", newStatus: nil)],
+            settings: ["plugins": .array([entry])], shopName: "Studio", clientName: "", currency: "SAR",
+            at: "2026-11-09T10:00:00Z", nowMs: 1_800_000_000_000)
+        #expect(owed.count == 1, "the fixture must produce an item, or the next line proves nothing")
+        #expect(Shop.connectorEvents(owed, switchedOn: false).isEmpty, "an event left a Mac with connectors off")
+        #expect(Shop.connectorEvents(owed, switchedOn: true).map(\.id) == ["app.khayt.samples.discord"])
+        // Every way in checks the switch: the move's hand-off, the retry pass,
+        // and the one function that sends or writes the queue.
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop+ConnectorActions.swift"), encoding: .utf8)
+        for fn in ["func retryDueConnectorEvents() async {\n        guard ConnectorsSwitch.isOn()",
+                   "func sendConnectorEvent(_ item: ConnectorQueued) async {"] {
+            #expect(source.contains(fn), Comment(rawValue: fn))
+        }
+        let send = try #require(source.range(of: "func sendConnectorEvent(_ item: ConnectorQueued) async {"))
+        let head = source[send.upperBound...].prefix(400)
+        #expect(head.contains("guard ConnectorsSwitch.isOn() else { return }"), "sendConnectorEvent no longer checks the switch first")
+    }
 }
