@@ -5,6 +5,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **Library: "For personal use only" and "Custom terms" licences, and a licence note (all apps).** A model's licence menu has two more choices. **For personal use only** is for a designer's own words with no named licence. It cannot be sold, and a job, quote or product using it says "Not licensed for sale", the same as NonCommercial. **Custom terms** is for terms Khayt cannot read. It never says a print may be sold, and never that it may not. Instead, the job and product editors show the model's licence note, so whoever sells it reads the terms. Any model can carry a **Licence note** of up to 500 characters (`licenceNote`), cut the same way on every app, never in the middle of an emoji. The rule is the shared `lib/model-licence.js` (`customTerms`, `NOTE_MAX`), with the Mac's `ModelLicence` kept in step and checked against it. On the Mac, **For personal use only** is in the licence menu now. **Custom terms** follows once the Mac can write and show the note. The note is written on Windows/Linux and kept when the Mac edits the model. A Mac model bundle carries it, capped at 500 characters when imported. New words are in all 9 languages.
+- **iPhone: the sample shop can show a connector from start to finish, for App Review (switched off until launch).** An App Review tester has no Mac, so a connector installed on a Mac is something they can never see. On launch day the sample shop will hold the signed Lamha sample again: one switch, `SampleShop.connectorsPublished`, flipped in the build that goes to review once khaytapp.com/privacy describes connectors. Tapping "Send to Lamha" in the sample shop still sends nothing. The request is built and checked by the same shared code as a real one, with stand-in keys, so a missing setting is refused just as it would be. Then a sample reply fills the job's Lamha order, and the phone says "Sample shop: nothing was sent. A real shop sends these fields to app.lamha.sa." Until the switch flips, a release build's sample shop holds no connectors, as before.
+- **Mac: developer mode for building a connector (not switched on for anyone yet).** Settings ▸ Integrations ▸ Connectors has a "Developer mode (this Mac only)" switch. With it on, "Load a .khaytplugin…" installs a connector Khayt has not signed, after the same consent sheet with a "Not reviewed by Khayt — this Mac only" warning. Its buttons, fields and events work on this Mac only. The entry is kept in this Mac's own preferences, never in the book, so it is never synced to the desktop or the iPhone. It cannot use an id the shop already installed, and a failed event is not retried, because the retry queue lives in the book. Turning developer mode off keeps the entry but stops it running. This completes connectors v1 on the Mac. New `plg.dev_*` text in all nine languages.
 - **Connectors: an SMSA Express sample, waiting for Khayt's signature (not switched on yet).** `plugins/samples/unsigned/smsa-shipping.json` adds a **Create SMSA shipment** button to a job. It sends SMSA's B2C new-shipment request, with the declared value, parcel count and weight as JSON numbers, and fills the job's own SMSA tracking number from SMSA's `sawb`. It fills no label: SMSA returns the label only as a PDF file, so the shop prints it from its SMSA account. The `apikey` header and the request shape come from the community client `haniusif/smsaexpress`, because SMSA publishes no public API docs, and stay unverified until SMSA confirms them. The test runs against a recorded reply, not a live account. Drafts in `plugins/samples/unsigned/` must pass the same checks as the shipped samples and carry no signature; once signed, a draft moves up into `plugins/samples/`.
 - **Mac: connectors hear a job's events (not switched on for anyone yet).** When a job is moved, paid, shipped or approved on the Mac, every connector that is switched on, signed by Khayt and listening for that event (such as the Discord sample's "order shipped") is sent its own request. This happens even when the shop's own webhooks are off, the same as on the desktop. The request is built exactly as on the other apps and goes through the same guarded sender as webhooks. A connector's answer to an event is not written into the book. Only a button's answer fills fields. A failed send is retried on the webhook schedule (30 seconds, 2 minutes, 10 minutes, an hour) with the same delivery id. The retry queue (`settings.pluginOutbox`, the desktop's) is saved before the wait, so quitting the app does not lose it. An event for a connector since switched off or removed, or for a job that is gone, is dropped and never sent. The queue rules are shared in `lib/plugin-host.js` (`withQueued`, `withoutQueued`, `dueQueued`).
 - **Connectors on Windows/Linux: saving a connector's settings says "Saved", and uses the Mac's rule.** It said "Webhooks saved". The values now go through the shared `withConfig` (`lib/plugin-host.js`): only the settings the connector declares, each checked against its type, and an empty or unticked optional one is removed. Connectors are still switched off for shops.
@@ -9468,6 +9470,25 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.31] - 2026-11-09
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release lets you delete or cancel a job straight from its panel and stops a cancelled Bambu print being reported as a failure. It also carries connectors, which stay switched off until they launch on every device on the same day.
+
+### Added
+
+- **Delete… and Cancel Job at the foot of a job's panel.** A quote or a job never invoiced or paid can be deleted there; an invoiced or paid job offers Cancel Job instead, so invoice numbers keep no gaps.
+
+### Fixed
+
+- **A print you cancelled on a Bambu is no longer reported as a failed print.**
+
+### Not switched on yet
+
+- **Connectors** (install a connector Khayt signed, its buttons and fields on jobs and customers, its settings, its events, and a developer mode for building one on this Mac). They are hidden until connectors launch on the Mac, Windows/Linux and iPhone together with the published privacy text.
 
 ## [4.0.0-beta.30] - 2026-11-08
 

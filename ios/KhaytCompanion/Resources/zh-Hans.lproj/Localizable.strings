@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "无法连接 %@。未发送任何内容。";
 "connectors.error.server" = "服务返回 %d。此 iPhone 上未做任何更改。";
 "connectors.sample" = "在示例店铺中，任何内容都不会离开此 iPhone，因此连接器不会发送或打开任何内容。与 Mac 配对后即可使用。";
+"connectors.sample.simulated" = "示例店铺：未发送任何内容。真实店铺会将这些字段发送到 %@。";
 "connectors.not_reviewed" = "未审核 — 按钮已关闭";
 "connectors.off" = "已在 Mac 上关闭";
 "connectors.status.not_reviewed" = "未审核";

@@ -1172,6 +1172,7 @@
 "connectors.error.network" = "%@ に接続できませんでした。何も送信されていません。";
 "connectors.error.server" = "サービスの応答は %d でした。このiPhoneでは何も変更されていません。";
 "connectors.sample" = "サンプルショップでは何もこのiPhoneの外に出ないため、コネクタは送信もリンクを開くこともしません。使うにはMacとペアリングしてください。";
+"connectors.sample.simulated" = "サンプルショップ：何も送信していません。実際のショップでは、これらの項目を %@ に送信します。";
 "connectors.not_reviewed" = "未審査 — ボタンはオフです";
 "connectors.off" = "Macでオフになっています";
 "connectors.status.not_reviewed" = "未審査";

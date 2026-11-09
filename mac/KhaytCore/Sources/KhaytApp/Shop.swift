@@ -3090,6 +3090,10 @@ final class Shop {
     var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
     /// The connector a file asked to install, waiting on the shop's OK.
     var connectorOffer: ConnectorOffer?
+    /// Where this Mac keeps its dev connectors (`DevConnectors`); tests use their own suite.
+    var devConnectorDefaults: UserDefaults = .standard
+    /// Bumped on every write to the dev connectors, which the book's reload never sees.
+    var devConnectorsRev = 0
     /// How a connector's POST leaves this Mac. Nil is `WebhookClient`; tests
     /// put a stand-in here so no request reaches the network.
     var connectorPost: Shop.ConnectorPost?

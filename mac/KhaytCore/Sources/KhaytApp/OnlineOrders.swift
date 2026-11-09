@@ -593,7 +593,7 @@ extension Shop {
             job = done.order
             if let asked = done.webhookEffects, !asked.isEmpty, case .object(let o) = job {
                 webhooks = (try? await engine.webhookDeliveries(
-                    order: job, effects: asked, settings: settingsNow,
+                    order: job, effects: asked, settings: DevConnectors.withDev(settingsNow),
                     shopName: plainString(settingsNow["bizEn"])
                         ?? plainString(settingsNow["bizAr"]) ?? "Khayt",
                     clientName: emailClientName(for: o, in: clients),
