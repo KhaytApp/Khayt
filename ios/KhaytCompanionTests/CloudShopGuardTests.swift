@@ -171,6 +171,33 @@ final class CloudShopGuardTests: XCTestCase {
         XCTAssertEqual(onDisk(), before)
     }
 
+    /// A new shop is not empty of everything: a default expense category,
+    /// settings. It is still empty of orders, customers, spools and machines.
+    func testACopyHoldingOnlyADefaultRecordIsStillEmpty() async throws {
+        try macBook()
+        var fresh = shop(orders: 0)
+        fresh["expenseCategories"] = .array([.object(["id": .string("cat-1"), "name": .string("Filament")])])
+        fresh["machines"] = .array([])
+        XCTAssertGreaterThan(CompanionAPIRecordCount.of(fresh), 0)
+        XCTAssertEqual(CompanionAPIRecordCount.core(fresh), 0)
+        try cloud.setBase(fresh, rev: 1)
+        let before = onDisk()
+        let (s, pulled) = try await sync().pull(session(Self.macShop))
+        XCTAssertEqual(pulled, .refused(.emptyShop))
+        XCTAssertNil(s.seenRev)
+        XCTAssertEqual(onDisk(), before)
+    }
+
+    func testABookWithOnlyADefaultRecordTakesAnEmptyPull() async throws {
+        var held = shop(orders: 0)
+        held["expenseCategories"] = .array([.object(["id": .string("cat-1"), "name": .string("Filament")])])
+        try book.replace(with: held, scope: nil)
+        try cloud.setBase(shop(orders: 0), rev: 1)
+        let (s, pulled) = try await sync().pull(session(Self.otherShop))
+        guard case .whole = pulled else { return XCTFail("\(pulled)") }
+        XCTAssertEqual(s.seenRev, 1)
+    }
+
     func testAnEmptyPullOntoNoBookIsAdopted() async throws {
         XCTAssertFalse(book.exists)
         try cloud.setBase(shop(orders: 0), rev: 1)

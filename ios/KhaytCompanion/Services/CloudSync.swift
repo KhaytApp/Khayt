@@ -59,7 +59,8 @@ struct CloudSync {
         /// the Mac's own) than this sign-in. `email` is that shop's owner
         /// email, MASKED (`maskedEmail`), when the book holds one.
         case wrongShop(macShop: String, email: String?)
-        /// The cloud's copy holds no records, and the book does.
+        /// The cloud's copy holds no orders, customers, spools or machines
+        /// (`CompanionAPIRecordCount.core`), and the book does.
         case emptyShop
     }
 
@@ -220,8 +221,10 @@ struct CloudSync {
             let taken = try await OffMain.run { BookScope.take(from: store, now: now) }
             // An empty copy over a book that holds something is data loss
             // whichever shop it is, so the same shop is refused it too.
-            if !override, let current, CompanionAPIRecordCount.of(taken.store) == 0,
-               CompanionAPIRecordCount.of(current) > 0 {
+            // "Empty" is the shop's core collections only (`core`): a new
+            // shop's default category or settings do not make it a shop.
+            if !override, let current, CompanionAPIRecordCount.core(taken.store) == 0,
+               CompanionAPIRecordCount.core(current) > 0 {
                 SyncDiagnostics.refused(.empty, cloudShopId: s.shopId, at: now)
                 return (s, .refused(.emptyShop))
             }
@@ -382,6 +385,19 @@ enum CompanionAPIRecordCount {
     static func of(_ store: [String: JSONValue]) -> Int {
         store.values.reduce(0) { total, value in
             if case .array(let rows) = value { return total + rows.count }
+            return total
+        }
+    }
+
+    /// The collections that make a shop a shop: orders, customers, spools
+    /// and machines. What the empty-pull guard counts, in the cloud's copy
+    /// and in the book alike.
+    static let coreCollections = ["printLog", "clients", "inventory", "machines"]
+
+    /// Records in `coreCollections` alone.
+    static func core(_ store: [String: JSONValue]) -> Int {
+        coreCollections.reduce(0) { total, key in
+            if case .array(let rows)? = store[key] { return total + rows.count }
             return total
         }
     }
