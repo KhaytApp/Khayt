@@ -5374,6 +5374,7 @@
   "plg.f.order.trackingNumber": "追跡番号",
   "plg.f.order.amountDue": "未払い金額",
   "plg.f.order.amountDueMinor": "未払い金額（最小単位）",
+  "plg.f.order.amountDueCurrency": "未払い金額の通貨",
   "plg.f.customer.name": "顧客名",
   "plg.f.customer.company": "顧客の会社",
   "plg.f.customer.phone": "顧客の電話番号",

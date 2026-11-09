@@ -5374,6 +5374,7 @@
   "plg.f.order.trackingNumber": "Sendungsnummer",
   "plg.f.order.amountDue": "Offener Betrag",
   "plg.f.order.amountDueMinor": "Offener Betrag (kleinste Einheit)",
+  "plg.f.order.amountDueCurrency": "Währung des offenen Betrags",
   "plg.f.customer.name": "Kundenname",
   "plg.f.customer.company": "Firma des Kunden",
   "plg.f.customer.phone": "Telefon des Kunden",

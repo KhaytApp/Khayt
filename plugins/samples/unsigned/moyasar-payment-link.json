@@ -1,0 +1,77 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.moyasar",
+  "name": {
+    "en": "Moyasar payment link",
+    "ar": "رابط دفع ميسّر"
+  },
+  "description": {
+    "en": "Creates a Moyasar invoice for what is still owed on a job and fills in its payment link to send to the customer. Use your test key until you are ready.",
+    "ar": "ينشئ فاتورة ميسّر بالمبلغ المتبقي على العمل ويملأ رابط الدفع لإرساله للعميل. استخدم مفتاح الاختبار حتى تكون جاهزًا."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "homepage": "https://khaytapp.com/developers/samples/",
+  "domains": [
+    "api.moyasar.com"
+  ],
+  "secrets": [
+    {
+      "name": "secretKey",
+      "label": {
+        "en": "Moyasar secret key (sk_test_… or sk_live_…)",
+        "ar": "المفتاح السري لميسّر (sk_test_… أو sk_live_…)"
+      },
+      "kind": "apiKey"
+    }
+  ],
+  "fields": [
+    {
+      "key": "paymentLinkUrl",
+      "label": {
+        "en": "Payment link",
+        "ar": "رابط الدفع"
+      },
+      "type": "text",
+      "attach": "order"
+    }
+  ],
+  "actions": [
+    {
+      "id": "paymentLink",
+      "label": {
+        "en": "Create Moyasar payment link",
+        "ar": "إنشاء رابط دفع ميسّر"
+      },
+      "placement": "order",
+      "kind": "post",
+      "url": "https://api.moyasar.com/v1/invoices",
+      "auth": {
+        "header": "Authorization",
+        "secret": "secretKey",
+        "encode": "basic"
+      },
+      "body": {
+        "format": "json-template",
+        "template": {
+          "amount": "{order.amountDueMinor}",
+          "currency": "{order.amountDueCurrency}",
+          "description": "{order.number} {order.title}",
+          "metadata": {
+            "khayt_order": "{order.id}"
+          }
+        }
+      },
+      "response": {
+        "fields": {
+          "paymentLinkUrl": "url"
+        }
+      }
+    }
+  ],
+  "scopes": [
+    "fields.write"
+  ]
+}
