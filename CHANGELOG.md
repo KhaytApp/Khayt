@@ -9469,6 +9469,25 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.31] - 2026-11-09
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release lets you delete or cancel a job straight from its panel and stops a cancelled Bambu print being reported as a failure. It also carries connectors, which stay switched off until they launch on every device on the same day.
+
+### Added
+
+- **Delete… and Cancel Job at the foot of a job's panel.** A quote or a job never invoiced or paid can be deleted there; an invoiced or paid job offers Cancel Job instead, so invoice numbers keep no gaps.
+
+### Fixed
+
+- **A print you cancelled on a Bambu is no longer reported as a failed print.**
+
+### Not switched on yet
+
+- **Connectors** (install a connector Khayt signed, its buttons and fields on jobs and customers, its settings, its events, and a developer mode for building one on this Mac). They are hidden until connectors launch on the Mac, Windows/Linux and iPhone together with the published privacy text.
+
 ## [4.0.0-beta.30] - 2026-11-08
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
