@@ -1185,6 +1185,11 @@
 "connectors.settings.footer" = "تُضبط للمتجر كله، وتُعدَّل على جهاز Mac أو الكمبيوتر، لا على هذا الـ iPhone.";
 "connectors.settings.missing" = "لن ترسل أزراره شيئًا حتى يُضبط %@ على جهاز Mac أو الكمبيوتر.";
 "connectors.error.setting" = "اضبط «%@» لهذه الأداة على جهاز Mac أو الكمبيوتر أولًا. لم يُرسل شيء.";
+"connectors.reply.not_saved" = "تعذّر حفظ الرد على هذا الآيفون. انسخه إلى الحقل يدويًا.";
+"connectors.field.clear" = "مسح";
+"connectors.field.footer" = "يُحفظ على هذا الآيفون ويُرسل إلى الماك مع تغييراتك الأخرى. يحتفظ به الماك ما دام %@ مفعّلًا عليه.";
+"connectors.field.edit" = "تعديل";
+"connectors.error.no_record" = "هذه المهمة أو هذا العميل غير موجود على هذا الآيفون بعد. لم يُحفظ شيء.";
 "connectors.data.order.id" = "رقم الطلب";
 "connectors.data.order.number" = "رقم الفاتورة";
 "connectors.data.order.title" = "عنوان الطلب";

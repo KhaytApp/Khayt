@@ -1185,6 +1185,11 @@
 "connectors.settings.footer" = "适用于整个商店，需在 Mac 或 PC 上编辑，而非此 iPhone。";
 "connectors.settings.missing" = "在 Mac 或 PC 上设置 %@ 之前，它的按钮不会发送任何内容。";
 "connectors.error.setting" = "请先在 Mac 或 PC 上为此连接器设置“%@”。未发送任何内容。";
+"connectors.reply.not_saved" = "无法在此 iPhone 上保存回复。请手动复制到该字段。";
+"connectors.field.clear" = "清除";
+"connectors.field.footer" = "保存在此 iPhone 上，并随你的其他更改发送到 Mac。只有在 Mac 上启用 %@ 时，Mac 才会保留它。";
+"connectors.field.edit" = "编辑";
+"connectors.error.no_record" = "此作业或客户尚未在此 iPhone 上。未保存任何内容。";
 "connectors.data.order.id" = "任务 ID";
 "connectors.data.order.number" = "发票号码";
 "connectors.data.order.title" = "任务标题";

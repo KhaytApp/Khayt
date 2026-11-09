@@ -1185,6 +1185,11 @@
 "connectors.settings.footer" = "Valables pour toute la boutique, ils se modifient sur votre Mac ou PC, pas sur cet iPhone.";
 "connectors.settings.missing" = "Ses boutons n’enverront rien tant que %@ n’est pas défini sur votre Mac ou PC.";
 "connectors.error.setting" = "Définissez d’abord « %@ » pour ce connecteur sur votre Mac ou PC. Rien n’a été envoyé.";
+"connectors.reply.not_saved" = "La réponse n’a pas pu être enregistrée sur cet iPhone. Recopiez-la dans le champ.";
+"connectors.field.clear" = "Effacer";
+"connectors.field.footer" = "Enregistré sur cet iPhone et envoyé à votre Mac avec vos autres modifications. Votre Mac ne le garde que si %@ y est activé.";
+"connectors.field.edit" = "Modifier";
+"connectors.error.no_record" = "Ce travail ou ce client n’est pas encore sur cet iPhone. Rien n’a été enregistré.";
 "connectors.data.order.id" = "ID du travail";
 "connectors.data.order.number" = "Numéro de facture";
 "connectors.data.order.title" = "Titre du travail";

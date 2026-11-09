@@ -1185,6 +1185,11 @@
 "connectors.settings.footer" = "Tüm mağaza için geçerlidir; bu iPhone’da değil, Mac’inizde veya PC’nizde düzenlenir.";
 "connectors.settings.missing" = "%@ Mac’inizde veya PC’nizde ayarlanana kadar düğmeleri bir şey göndermez.";
 "connectors.error.setting" = "Önce Mac’inizde veya PC’nizde bu bağlayıcı için “%@” ayarını yapın. Hiçbir şey gönderilmedi.";
+"connectors.reply.not_saved" = "Yanıt bu iPhone’a kaydedilemedi. Alana elle kopyalayın.";
+"connectors.field.clear" = "Temizle";
+"connectors.field.footer" = "Bu iPhone’a kaydedilir ve diğer değişikliklerinizle birlikte Mac’inize gönderilir. Mac’iniz bunu yalnızca %@ orada açıkken tutar.";
+"connectors.field.edit" = "Düzenle";
+"connectors.error.no_record" = "Bu iş veya müşteri henüz bu iPhone’da yok. Hiçbir şey kaydedilmedi.";
 "connectors.data.order.id" = "İş kimliği";
 "connectors.data.order.number" = "Fatura numarası";
 "connectors.data.order.title" = "İş başlığı";

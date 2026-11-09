@@ -1185,6 +1185,11 @@
 "connectors.settings.footer" = "Gelten für den ganzen Shop und werden auf deinem Mac oder PC bearbeitet, nicht auf diesem iPhone.";
 "connectors.settings.missing" = "Die Tasten senden erst, wenn %@ auf deinem Mac oder PC festgelegt ist.";
 "connectors.error.setting" = "Lege zuerst „%@“ für diesen Connector auf deinem Mac oder PC fest. Es wurde nichts gesendet.";
+"connectors.reply.not_saved" = "Die Antwort konnte auf diesem iPhone nicht gespeichert werden. Übertrage sie von Hand ins Feld.";
+"connectors.field.clear" = "Löschen";
+"connectors.field.footer" = "Auf diesem iPhone gespeichert und mit deinen anderen Änderungen an deinen Mac gesendet. Dein Mac übernimmt es nur, solange %@ dort eingeschaltet ist.";
+"connectors.field.edit" = "Bearbeiten";
+"connectors.error.no_record" = "Dieser Auftrag oder Kunde ist noch nicht auf diesem iPhone. Es wurde nichts gespeichert.";
 "connectors.data.order.id" = "Auftrags-ID";
 "connectors.data.order.number" = "Rechnungsnummer";
 "connectors.data.order.title" = "Auftragstitel";
