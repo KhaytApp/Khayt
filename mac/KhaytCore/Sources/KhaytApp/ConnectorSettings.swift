@@ -15,6 +15,8 @@ struct ConnectorSettings: View {
     @State private var result: String?
     @State private var keys: [String: [String: String]] = [:]
     @State private var removing: ConnectorRow?
+    /// Settings being typed, per connector: key → text ("true"/"" for a box).
+    @State private var drafts: [String: [String: String]] = [:]
 
     private var mayWrite: Bool { shop.lockAllows("settings", "edit") && shop.source.build != nil }
 
@@ -79,6 +81,33 @@ struct ConnectorSettings: View {
                         .textFieldStyle(.roundedBorder)
                 }
             }
+            if row.state == "on" || row.state == "off", !row.settings.isEmpty {
+                ForEach(row.settings) { st in setting(row, st) }
+                HStack(spacing: 12) {
+                    Button(shop.words.callIt("common.save")) {
+                        Task {
+                            let draft = drafts[row.id] ?? [:]
+                            var texts: [String: String] = [:], ticks: [String: Bool] = [:]
+                            for st in row.settings {
+                                guard let v = draft[st.key] else { continue }
+                                if st.type == "bool" { ticks[st.key] = v == "true" } else { texts[st.key] = v }
+                            }
+                            if await shop.saveConnectorSettings(row.id, texts, ticks: ticks) {
+                                drafts[row.id] = nil
+                                result = shop.words.callIt("plib.saved")
+                                await reload()
+                            }
+                        }
+                    }
+                    .disabled((drafts[row.id] ?? [:]).isEmpty)
+                    if let missing = row.settings.first(where: { $0.required && $0.value.isEmpty }) {
+                        Text(shop.words.callIt("plg.err_setting", ["name": .string(missing.label)]))
+                            .font(.caption).foregroundStyle(Khayt.attention)
+                    }
+                    Spacer()
+                }
+                .font(.callout)
+            }
             HStack(spacing: 12) {
                 if !row.secrets.isEmpty, row.state == "on" || row.state == "off" {
                     Button(shop.words.callIt("plg.save_keys")) {
@@ -111,6 +140,25 @@ struct ConnectorSettings: View {
             .font(.callout)
         }
         .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func setting(_ row: ConnectorRow, _ st: ConnectorRow.Setting) -> some View {
+        let text = Binding<String>(get: { drafts[row.id]?[st.key] ?? st.value },
+                                   set: { drafts[row.id, default: [:]][st.key] = $0 })
+        let title = st.required ? "\(st.label) (\(shop.words.callIt("common.required")))" : st.label
+        switch st.type {
+        case "bool":
+            Toggle(title, isOn: Binding(get: { text.wrappedValue == "true" }, set: { text.wrappedValue = $0 ? "true" : "" }))
+        case "enum":
+            Picker(title, selection: text) {
+                Text("").tag("")
+                ForEach(st.options, id: \.value) { Text($0.label).tag($0.value) }
+            }
+        default:
+            TextField(title, text: text, prompt: Text(st.label))
+                .textFieldStyle(.roundedBorder)
+        }
     }
 
     private func keyBinding(_ id: String, _ name: String) -> Binding<String> {

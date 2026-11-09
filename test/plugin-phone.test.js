@@ -77,3 +77,17 @@ test('the entries above are valid, so the cases test the rule and not a broken f
   assert.equal(H.stateOf(ship, true), 'on');
   assert.equal(H.stateOf(off, true), 'off');
 });
+
+test('a connector\'s settings take only declared keys, each checked by type', () => {
+  const m = Object.assign({}, ship.manifest, { settings: [
+    { key: 'name', label: { en: 'Name' }, type: 'text', required: true },
+    { key: 'count', label: { en: 'Count' }, type: 'number' },
+    { key: 'live', label: { en: 'Live' }, type: 'bool' },
+  ] });
+  const e = Object.assign({}, ship, { manifest: m, config: { name: 'Old', count: 2 } });
+  const next = H.withConfig(e, { name: '  Studio ', count: 'x', live: false, nope: 'y' });
+  assert.deepEqual(next.config, { name: '  Studio ' }, 'a bad number or an unticked optional box was kept');
+  assert.deepEqual(e.config, { name: 'Old', count: 2 }, 'the old entry was changed in place');
+  assert.equal(H.withConfig(e, { name: 'x'.repeat(900) }).config.name.length, 500);
+  assert.deepEqual(H.withConfig(e, { name: '' }).config, { count: 2 });
+});
