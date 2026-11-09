@@ -65,7 +65,8 @@ struct DiagnosticsSheet: View {
             row("diag.last_source", d.recorded.last.map { Self.sourceName($0) + " · " + when(d.recorded.lastAt) }
                 ?? L10n.tr("diag.never"))
             ForEach(SyncDiagnostics.Source.allCases, id: \.self) { source in
-                row(Self.sourceName(source), when(d.recorded.sources[source]), key: false)
+                row(Self.sourceName(source), Self.sourceValue(when(d.recorded.sources[source]),
+                                                              records: d.recorded.records[source]), key: false)
             }
         }
         Section(header: Text(L10n.tr("diag.section.mac"))) {
@@ -78,6 +79,8 @@ struct DiagnosticsSheet: View {
             row("diag.paired", yes(d.isPaired))
             row("diag.configured", yes(d.isConfigured))
             row("diag.cloud", yes(d.cloudSignedIn))
+            row("diag.cloud_shop", d.cloudShopTail.map { "…" + $0 } ?? L10n.tr("diag.none"))
+            row("diag.mac_shop", d.macShopTail.map { "…" + $0 } ?? L10n.tr("diag.none"))
             row("diag.sample", yes(d.isSampleShop))
             row("diag.app", d.version + " (" + d.build + ")")
         }
@@ -100,6 +103,11 @@ struct DiagnosticsSheet: View {
         f.locale = L10n.locale
         f.unitsStyle = .short
         return f.localizedString(for: date, relativeTo: Date())
+    }
+
+    static func sourceValue(_ when: String, records: Int?) -> String {
+        guard let records else { return when }
+        return when + " · " + L10n.format("diag.records", records)
     }
 
     static func sourceName(_ s: SyncDiagnostics.Source) -> String {

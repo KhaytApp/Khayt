@@ -1253,3 +1253,7 @@
 "diag.cloud" = "Sesión iniciada en Khayt Cloud";
 "diag.sample" = "Taller de ejemplo";
 "diag.app" = "App";
+"diag.cloud_shop" = "Taller en la nube (últimos 6)";
+"diag.mac_shop" = "Taller en la nube del Mac (últimos 6)";
+"diag.none" = "Ninguno";
+"diag.records" = "registros: %ld";

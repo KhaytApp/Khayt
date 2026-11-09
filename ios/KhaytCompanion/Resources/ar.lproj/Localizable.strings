@@ -1253,3 +1253,7 @@
 "diag.cloud" = "مسجّل الدخول إلى Khayt Cloud";
 "diag.sample" = "الورشة التجريبية";
 "diag.app" = "التطبيق";
+"diag.cloud_shop" = "ورشة Khayt Cloud (آخر 6)";
+"diag.mac_shop" = "ورشة الماك على Khayt Cloud (آخر 6)";
+"diag.none" = "لا شيء";
+"diag.records" = "السجلات: %ld";

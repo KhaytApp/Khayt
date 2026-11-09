@@ -1253,3 +1253,7 @@
 "diag.cloud" = "Conectado ao Khayt Cloud";
 "diag.sample" = "Oficina de exemplo";
 "diag.app" = "App";
+"diag.cloud_shop" = "Oficina na nuvem (últimos 6)";
+"diag.mac_shop" = "Oficina na nuvem do Mac (últimos 6)";
+"diag.none" = "Nenhuma";
+"diag.records" = "registros: %ld";

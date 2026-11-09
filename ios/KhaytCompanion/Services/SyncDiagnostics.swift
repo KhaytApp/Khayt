@@ -70,14 +70,22 @@ enum SyncDiagnostics {
         static let macSettingsAt = "khayt.diag.macSettingsAt"
         static let macAnsweredAt = "khayt.diag.macAnsweredAt"
         static let macFailedAt = "khayt.diag.macFailedAt"
-        static let all = [sources, lastSource, lastSourceAt, macSettings, macSettingsAt, macAnsweredAt, macFailedAt]
+        static let counts = "khayt.diag.counts"
+        static let cloudShop = "khayt.diag.cloudShop"
+        static let all = [sources, lastSource, lastSourceAt, macSettings, macSettingsAt, macAnsweredAt, macFailedAt,
+                          counts, cloudShop]
     }
 
     /// UserDefaults is thread-safe; these are called from the main actor and
     /// from `OffMain` work alike.
     nonisolated(unsafe) static var defaults: UserDefaults = .standard
 
-    static func record(_ source: Source, at date: Date = Date()) {
+    /// `records`: how many records it brought, where the source says
+    /// (`mac-store`: what `pullBook` returns; `cloud-whole`: what it adopted).
+    static func record(_ source: Source, records: Int? = nil, at date: Date = Date()) {
+        var counts = defaults.dictionary(forKey: Keys.counts) ?? [:]
+        counts[source.rawValue] = records
+        defaults.set(counts, forKey: Keys.counts)
         var all = defaults.dictionary(forKey: Keys.sources) ?? [:]
         all[source.rawValue] = date
         defaults.set(all, forKey: Keys.sources)
@@ -95,6 +103,19 @@ enum SyncDiagnostics {
     /// A request to the paired Mac failed below HTTP: no route, no answer.
     static func macFailed(at date: Date = Date()) { defaults.set(date, forKey: Keys.macFailedAt) }
 
+    /// The last 6 characters of an id — enough to tell two shops apart on a
+    /// screen, never the id itself.
+    static func tail(_ id: String?) -> String? {
+        guard let id, !id.isEmpty else { return nil }
+        return String(id.suffix(6))
+    }
+
+    /// A cloud round ran for this shop: keep its id's tail, so the sheet can
+    /// still say which shop after a sign-out. The whole id is never stored here.
+    static func cloudRound(shopId: String) {
+        if let t = tail(shopId) { defaults.set(t, forKey: Keys.cloudShop) }
+    }
+
     static func forget() { for k in Keys.all { defaults.removeObject(forKey: k) } }
 
     /// What is recorded now.
@@ -106,6 +127,10 @@ enum SyncDiagnostics {
         var macSettingsAt: Date?
         var macAnsweredAt: Date?
         var macFailedAt: Date?
+        /// Records each source brought, for those that say.
+        var records: [Source: Int] = [:]
+        /// The tail of the shop id the last cloud round ran for.
+        var cloudShopTail: String?
     }
 
     static func recorded() -> Recorded {
@@ -119,6 +144,10 @@ enum SyncDiagnostics {
         r.macSettingsAt = defaults.object(forKey: Keys.macSettingsAt) as? Date
         r.macAnsweredAt = defaults.object(forKey: Keys.macAnsweredAt) as? Date
         r.macFailedAt = defaults.object(forKey: Keys.macFailedAt) as? Date
+        for (k, v) in defaults.dictionary(forKey: Keys.counts) ?? [:] {
+            if let s = Source(rawValue: k), let n = v as? Int { r.records[s] = n }
+        }
+        r.cloudShopTail = defaults.string(forKey: Keys.cloudShop)
         return r
     }
 }
@@ -143,13 +172,20 @@ struct BookDiagnostics: Equatable, Sendable {
     var isConfigured: Bool
     var cloudSignedIn: Bool
     var isSampleShop: Bool
+    /// Last 6 characters of the signed-in session's shop id, else of the one
+    /// the last cloud round ran for (kept after a sign-out).
+    var cloudShopTail: String?
+    /// Last 6 characters of `settings.cloud.shopId` in the book: the shop the
+    /// Mac is linked to.
+    var macShopTail: String?
     var version: String
     var build: String
 
     /// The book's half, read from disk. A missing or unreadable book is
     /// "no settings, no entries", never a guess.
-    static func book(_ book: CompanionBook?) -> (exists: Bool, baseline: Baseline, settings: Bool, plugins: Int) {
-        guard let book else { return (false, .absent, false, 0) }
+    static func book(_ book: CompanionBook?) -> (exists: Bool, baseline: Baseline, settings: Bool, plugins: Int,
+                                                 macShopTail: String?) {
+        guard let book else { return (false, .absent, false, 0, nil) }
         let baseline: Baseline = {
             switch book.readBaseline() {
             case .held: return .held
@@ -158,15 +194,19 @@ struct BookDiagnostics: Equatable, Sendable {
             }
         }()
         guard book.exists, let store = try? book.read(), case .object(let s)? = store["settings"] else {
-            return (book.exists, baseline, false, 0)
+            return (book.exists, baseline, false, 0, nil)
         }
         let plugins: Int = { if case .array(let rows)? = s["plugins"] { return rows.count }; return 0 }()
-        return (true, baseline, true, plugins)
+        var macShop: String?
+        if case .object(let cloud)? = s["cloud"], case .string(let id)? = cloud["shopId"] {
+            macShop = SyncDiagnostics.tail(id)
+        }
+        return (true, baseline, true, plugins, macShop)
     }
 
     static func make(holdsBook: Bool, book: CompanionBook?, connectors: [Connector],
                      recorded: SyncDiagnostics.Recorded, isPaired: Bool, isConfigured: Bool,
-                     cloudSignedIn: Bool, isSampleShop: Bool,
+                     cloudSignedIn: Bool, isSampleShop: Bool, cloudShopId: String? = nil,
                      info: [String: Any]? = Bundle.main.infoDictionary) -> BookDiagnostics {
         let b = Self.book(book)
         var byStatus: [Connector.Status: Int] = [:]
@@ -175,6 +215,7 @@ struct BookDiagnostics: Equatable, Sendable {
             holdsBook: holdsBook, bookExists: b.exists, baseline: b.baseline, settingsPresent: b.settings,
             pluginEntries: b.plugins, connectorCount: connectors.count, byStatus: byStatus, recorded: recorded,
             isPaired: isPaired, isConfigured: isConfigured, cloudSignedIn: cloudSignedIn, isSampleShop: isSampleShop,
+            cloudShopTail: SyncDiagnostics.tail(cloudShopId) ?? recorded.cloudShopTail, macShopTail: b.macShopTail,
             version: info?["CFBundleShortVersionString"] as? String ?? "?",
             build: info?["CFBundleVersion"] as? String ?? "?")
     }

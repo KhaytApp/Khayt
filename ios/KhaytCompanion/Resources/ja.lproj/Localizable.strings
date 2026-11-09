@@ -1253,3 +1253,7 @@
 "diag.cloud" = "Khayt Cloudにサインイン済み";
 "diag.sample" = "サンプルショップ";
 "diag.app" = "アプリ";
+"diag.cloud_shop" = "クラウドのショップ（末尾6文字）";
+"diag.mac_shop" = "Macのクラウドショップ（末尾6文字）";
+"diag.none" = "なし";
+"diag.records" = "レコード：%ld";

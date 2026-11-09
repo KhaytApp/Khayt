@@ -194,8 +194,9 @@ struct CloudSync {
             let book = book
             _ = try? await OffMain.run { try book.replaceLibrary(LibraryCopy.slimAll(store["printFiles"])) }
             s.seenRev = reply.rev
-            SyncDiagnostics.record(.cloudWhole)
-            return (s, .whole(records: CompanionAPIRecordCount.of(taken.store)))
+            let records = CompanionAPIRecordCount.of(taken.store)
+            SyncDiagnostics.record(.cloudWhole, records: records)
+            return (s, .whole(records: records))
         }
 
         guard !reply.deltas.isEmpty else {

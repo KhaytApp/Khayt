@@ -1253,3 +1253,7 @@
 "diag.cloud" = "Bei Khayt Cloud angemeldet";
 "diag.sample" = "Beispielwerkstatt";
 "diag.app" = "App";
+"diag.cloud_shop" = "Cloud-Werkstatt (letzte 6)";
+"diag.mac_shop" = "Cloud-Werkstatt des Mac (letzte 6)";
+"diag.none" = "Keine";
+"diag.records" = "Einträge: %ld";

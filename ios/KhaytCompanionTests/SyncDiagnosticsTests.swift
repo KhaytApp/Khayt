@@ -76,9 +76,11 @@ final class SyncDiagnosticsTests: XCTestCase {
         let taken = BookScope.take(from: shop(plugins: try plugins()))
         SettingsMac.store = .reply(200, try JSONEncoder().encode(Pull(whole: false, scope: taken.taken, store: taken.store)))
         let api = client()
-        try await api.pullBook(into: book)
+        let count = try await api.pullBook(into: book)
         let r = SyncDiagnostics.recorded()
         XCTAssertEqual(r.last, .macStore)
+        XCTAssertEqual(r.records[.macStore], count, "the count pullBook returned")
+        XCTAssertEqual(count, 1)
         XCTAssertNotNil(r.sources[.macStore])
         XCTAssertNotNil(r.lastAt)
         XCTAssertNotNil(r.macAnsweredAt, "the Mac answered")
@@ -95,8 +97,10 @@ final class SyncDiagnosticsTests: XCTestCase {
         let session = CloudSession(url: "https://cloud.test", shopId: "shop_1", token: "tok",
                                    dek: key, role: "owner", seenRev: nil)
         let (warm, cold) = try await sync.pull(session)
-        guard case .whole = cold else { return XCTFail("\(cold)") }
+        guard case .whole(let adopted) = cold else { return XCTFail("\(cold)") }
         XCTAssertEqual(SyncDiagnostics.recorded().last, .cloudWhole)
+        XCTAssertEqual(SyncDiagnostics.recorded().records[.cloudWhole], adopted, "the count it adopted")
+        XCTAssertEqual(adopted, 1)
         XCTAssertNil(SyncDiagnostics.recorded().sources[.cloudDelta])
 
         let (_, changes) = try await sync.pull(warm)
@@ -105,6 +109,43 @@ final class SyncDiagnosticsTests: XCTestCase {
         XCTAssertEqual(r.last, .cloudDelta, "a warm pull with nothing new still records itself")
         XCTAssertNotNil(r.sources[.cloudWhole], "the last of each kind is kept")
         XCTAssertNotNil(r.sources[.cloudDelta])
+        XCTAssertNil(r.records[.cloudDelta], "a change carries no count of the book")
+        XCTAssertEqual(r.records[.cloudWhole], 1, "kept beside the newer source")
+    }
+
+    // MARK: Which shop
+
+    func testShopIdsShowOnlyTheirLastSixCharacters() throws {
+        XCTAssertEqual(SyncDiagnostics.tail("shop_8f3a91c2d7"), "91c2d7")
+        XCTAssertEqual(SyncDiagnostics.tail("abc"), "abc")
+        XCTAssertNil(SyncDiagnostics.tail(""))
+        XCTAssertNil(SyncDiagnostics.tail(nil))
+
+        // A cloud round keeps the tail only, and it outlives a sign-out.
+        SyncDiagnostics.cloudRound(shopId: "shop_8f3a91c2d7")
+        XCTAssertEqual(SyncDiagnostics.defaults.string(forKey: SyncDiagnostics.Keys.cloudShop), "91c2d7")
+        let all = SyncDiagnostics.defaults.dictionaryRepresentation().values.compactMap { $0 as? String }
+        XCTAssertFalse(all.contains { $0.contains("shop_8f3a91c2d7") }, "the whole id is never stored")
+        let signedOut = BookDiagnostics.make(holdsBook: false, book: nil, connectors: [],
+                                             recorded: SyncDiagnostics.recorded(), isPaired: false,
+                                             isConfigured: false, cloudSignedIn: false, isSampleShop: false)
+        XCTAssertEqual(signedOut.cloudShopTail, "91c2d7")
+        // The live session wins over the kept one.
+        let signedIn = BookDiagnostics.make(holdsBook: false, book: nil, connectors: [],
+                                            recorded: SyncDiagnostics.recorded(), isPaired: false, isConfigured: false,
+                                            cloudSignedIn: true, isSampleShop: false, cloudShopId: "shop_000000zz99xx")
+        XCTAssertEqual(signedIn.cloudShopTail, "zz99xx")
+        SyncDiagnostics.forget()
+        XCTAssertNil(SyncDiagnostics.recorded().cloudShopTail, "Unpair forgets it")
+
+        // The Mac's shop comes from the book's settings.cloud.shopId, last 6 only.
+        var store = shop()
+        store["settings"] = .object(["shopName": .string("Ward"),
+                                     "cloud": .object(["enabled": .bool(true), "shopId": .string("shop_mac123456")])])
+        try book.replace(with: store, scope: nil)
+        XCTAssertEqual(BookDiagnostics.book(book).macShopTail, "123456")
+        try book.replace(with: shop(), scope: nil)
+        XCTAssertNil(BookDiagnostics.book(book).macShopTail, "no cloud link in the book, nothing shown")
     }
 
     // MARK: The settings read
@@ -168,6 +209,7 @@ final class SyncDiagnosticsTests: XCTestCase {
         SyncDiagnostics.record(.http(404))
         SyncDiagnostics.macAnswered()
         SyncDiagnostics.macFailed()
+        SyncDiagnostics.cloudRound(shopId: "shop_abcdef123456")
         XCTAssertNotEqual(SyncDiagnostics.recorded(), SyncDiagnostics.Recorded())
         SyncDiagnostics.forget()
         XCTAssertEqual(SyncDiagnostics.recorded(), SyncDiagnostics.Recorded())

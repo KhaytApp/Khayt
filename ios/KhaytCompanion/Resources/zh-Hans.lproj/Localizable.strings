@@ -1253,3 +1253,7 @@
 "diag.cloud" = "已登录 Khayt Cloud";
 "diag.sample" = "示例店铺";
 "diag.app" = "应用";
+"diag.cloud_shop" = "云端店铺（后 6 位）";
+"diag.mac_shop" = "Mac 的云端店铺（后 6 位）";
+"diag.none" = "无";
+"diag.records" = "记录：%ld";

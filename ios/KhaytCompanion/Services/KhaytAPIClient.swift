@@ -445,9 +445,10 @@ final class KhaytAPIClient: ObservableObject {
         }
         // The whole book carries the Mac's settings: as good as a settings read.
         noteMacSettings()
-        SyncDiagnostics.record(.macStore)
+        let count = Self.recordCount(in: store)
+        SyncDiagnostics.record(.macStore, records: count)
         await refreshPendingCount()
-        return Self.recordCount(in: store)
+        return count
     }
 
     /// What `GET /api/store` sends: the records, and what was left behind.
@@ -582,7 +583,7 @@ final class KhaytAPIClient: ObservableObject {
         BookDiagnostics.make(holdsBook: holdsBook, book: book, connectors: await connectors(),
                              recorded: SyncDiagnostics.recorded(), isPaired: settings.isPaired,
                              isConfigured: settings.isConfigured, cloudSignedIn: cloud != nil,
-                             isSampleShop: settings.isSampleShop)
+                             isSampleShop: settings.isSampleShop, cloudShopId: cloud?.shopId)
     }
 
     /// What `GET /api/store/settings` sends: the shop's settings, masked as
@@ -676,6 +677,7 @@ final class KhaytAPIClient: ObservableObject {
 
     private func oneCloudRound() async -> CloudSync.Pushed? {
         guard let session = cloud, let book, let reader else { return nil }
+        SyncDiagnostics.cloudRound(shopId: session.shopId)
         do {
             let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
             var next = session
