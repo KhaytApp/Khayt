@@ -443,6 +443,13 @@ struct ConnectorsSettingsSection<Heading: View>: View {
             } else if loaded, ConnectorLaunch.showsMacHint(cloud: api.cloud != nil, macSettingsAt: api.macSettingsAt,
                                                            connectorsEmpty: true, holdsBook: api.holdsBook) {
                 macHint
+            } else {
+                // Something for `.task` to hang on, taking no room. Without it
+                // the Group is EMPTY until the list loads, SwiftUI never runs
+                // `.task` on an empty Group, and so the list never loads: the
+                // section drew nothing on every phone (Nov 9, TestFlight
+                // 202611091812). `ConnectorsCard` hangs its task the same way.
+                Color.clear.frame(height: 0)
             }
         }
         .task(id: Reload(tick: tick, synced: api.syncLanded, holdsBook: api.holdsBook)) {
