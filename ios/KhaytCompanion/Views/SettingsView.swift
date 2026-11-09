@@ -44,8 +44,9 @@ struct SettingsView: View {
                             .frame(minHeight: 44)
                     }
                     if api.holdsBook {
-                        eyebrow(L10n.tr("connectors.title"))
-                        ConnectorsSettingsSection()
+                        // Draws nothing, not even its heading, until the book
+                        // holds a connector (gated off until /privacy says so).
+                        ConnectorsSettingsSection { eyebrow(L10n.tr("connectors.title")) }
                     }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard

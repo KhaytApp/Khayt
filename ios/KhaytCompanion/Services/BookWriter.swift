@@ -377,6 +377,8 @@ struct BookWriter {
         /// The machine's hours are not known on this phone (`CareBook`), so a
         /// completion would record a meter the Mac does not share.
         case careHoursUnknown
+        /// A job or customer this book does not hold, for a connector's field.
+        case noSuchRecord
 
         var errorDescription: String? {
             switch self {
@@ -403,6 +405,8 @@ struct BookWriter {
                 return L10n.tr("care.error.no_task")
             case .careHoursUnknown:
                 return L10n.tr("care.hours_unknown")
+            case .noSuchRecord:
+                return L10n.tr("connectors.error.no_record")
             }
         }
     }
@@ -865,6 +869,71 @@ struct BookWriter {
             log.append(entry)
             record["commLog"] = .array(log)
         }
+    }
+
+    // MARK: - A connector's own fields
+
+    /// The collection a connector field's `attach` lives in: a job's are on
+    /// its `printLog` record, a customer's on its `clients` record.
+    static let connectorCollections: [String: String] = ["order": "printLog", "customer": "clients"]
+
+    /// Set one connector's own field values on a job (`attach` "order") or a
+    /// customer ("customer"): `record.plugins[<connector id>][<key>]`, what
+    /// the Mac's `lib/plugin-host.js` `phoneRecord` takes from a phone.
+    ///
+    /// `values` is by field key, each checked by lib's own `coerceField`
+    /// (`ConnectorRules.coerce`, through the engine) before anything is
+    /// written; a value it makes nothing of (empty, `.null`, a choice that is
+    /// not offered, a number that is not one) REMOVES the key. A key the
+    /// connector does not declare for `attach` is ignored, as the Mac ignores
+    /// it. Every other key on the record, and every other connector's values,
+    /// stay as they are. Returns whether anything changed.
+    ///
+    /// `plugins` is never dropped once the record has it: a record sent with
+    /// no `plugins` key tells the Mac "this phone does not know about these",
+    /// and it keeps its own values — so a value cleared here would come back.
+    /// Clearing a connector's last value leaves `"plugins": {}` (the id gone),
+    /// which the Mac reads as "clear it".
+    @discardableResult
+    func setConnectorValues(_ values: [String: JSONValue], connector: Connector, attach: String,
+                            recordId: String, engine: KhaytEngine) async throws -> Bool {
+        var checked: [String: JSONValue] = [:]
+        for field in connector.fields where field.attach == attach {
+            guard let raw = values[field.key] else { continue }
+            checked[field.key] = await ConnectorRules.coerce(field, raw, in: connector, engine: engine) ?? .null
+        }
+        guard let collection = Self.connectorCollections[attach],
+              Self.rows(try book.read(), collection).contains(where: { Self.rowId($0) == recordId }) else {
+            throw Refusal.noSuchRecord
+        }
+        var changed = false
+        try book.updateRecord(collection: collection, id: recordId) { record in
+            let next = Self.withConnectorValues(record, connectorId: connector.id, values: checked)
+            changed = next != record
+            record = next
+        }
+        return changed
+    }
+
+    /// The record with already-checked `values` merged into
+    /// `plugins[<connectorId>]`, `.null` removing a key — the pure half of
+    /// `setConnectorValues`, the phone's copy of lib's `withFieldValues`
+    /// except that `plugins` is kept even when it empties.
+    static func withConnectorValues(_ record: [String: JSONValue], connectorId: String,
+                                    values: [String: JSONValue]) -> [String: JSONValue] {
+        var all: [String: JSONValue] = [:]
+        if case .object(let p)? = record["plugins"] { all = p }
+        var mine: [String: JSONValue] = [:]
+        if case .object(let m)? = all[connectorId] { mine = m }
+        for (key, v) in values {
+            if v == .null { mine.removeValue(forKey: key) } else { mine[key] = v }
+        }
+        if mine.isEmpty { all.removeValue(forKey: connectorId) } else { all[connectorId] = .object(mine) }
+        var out = record
+        // Nothing to keep and nothing there before: leave the record as it was.
+        if all.isEmpty && record["plugins"] == nil { return out }
+        out["plugins"] = .object(all)
+        return out
     }
 
     // MARK: - Booking a roll in

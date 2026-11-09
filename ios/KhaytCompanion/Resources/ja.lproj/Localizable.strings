@@ -1150,7 +1150,6 @@
 "connectors.consent.nothing" = "このサイトを開くだけで、帳簿からは何も送信しません。";
 "connectors.consent.confirmed" = "このiPhoneから許可済み。";
 "connectors.consent.not_confirmed" = "このiPhoneではまだ使用されていません。最初の送信前に確認します。";
-"connectors.list.empty" = "このお店にはコネクタがありません。";
 "connectors.list.footer" = "コネクタはMacで追加・承認します。キーはこのiPhoneにだけ保存され、同期されることはありません。";
 "connectors.badge.reviewed" = "審査済み";
 "connectors.status.active" = "有効";
@@ -1185,6 +1184,11 @@
 "connectors.settings.footer" = "ショップ全体の設定で、この iPhone ではなく Mac または PC で編集します。";
 "connectors.settings.missing" = "Mac または PC で %@ を設定するまで、ボタンからは送信されません。";
 "connectors.error.setting" = "先に Mac または PC でこのコネクタの「%@」を設定してください。何も送信されていません。";
+"connectors.reply.not_saved" = "返信をこのiPhoneに保存できませんでした。手動でフィールドにコピーしてください。";
+"connectors.field.clear" = "消去";
+"connectors.field.footer" = "このiPhoneに保存され、ほかの変更と一緒にMacに送られます。Macでは%@がオンのあいだだけ保持されます。";
+"connectors.field.edit" = "編集";
+"connectors.error.no_record" = "このジョブまたは顧客はまだこのiPhoneにありません。何も保存されませんでした。";
 "connectors.data.order.id" = "ジョブID";
 "connectors.data.order.number" = "請求書番号";
 "connectors.data.order.title" = "ジョブ名";

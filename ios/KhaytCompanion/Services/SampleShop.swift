@@ -78,7 +78,10 @@ enum SampleShop {
                 // Two connectors, approved on the Mac: the signed Lamha sample
                 // with its button on a job, and the signed Slack sample with a
                 // narrower grant, so it is paused.
-                "plugins": sampleConnectors,
+                // DEBUG builds only (tests, screenshots): a TestFlight or App
+                // Store build's sample shop shows no connector until
+                // khaytapp.com/privacy describes them.
+                "plugins": shippedSampleConnectors,
             ]),
             // The catalogue: one with a picture, a rounded price, an override,
             // one never stocked — so every line of the screen is drawn.
@@ -238,6 +241,17 @@ enum SampleShop {
     /// and its button shows on a job. Slack's grant is narrower than its
     /// manifest, so it is paused.
     static let lamhaId = "app.khayt.samples.lamha"
+
+    /// What the sample shop's book holds: the sample connectors in a DEBUG
+    /// build, none in a release build (connectors stay out of sight until
+    /// khaytapp.com/privacy describes them).
+    static var shippedSampleConnectors: JSONValue {
+        #if DEBUG
+        sampleConnectors
+        #else
+        .array([])
+        #endif
+    }
 
     static var sampleConnectors: JSONValue {
         let lamha = (try? JSONValue.parse(Data(lamhaManifestJSON.utf8))) ?? .null
