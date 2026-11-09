@@ -157,6 +157,9 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
   const problems = ML.saleProblems(ids, records, localDateStr())
     .concat(typeof ML.remixProblems === 'function' ? ML.remixProblems(ids, records) : []);
   const credits = ML.credits(ids, records);
+  // A custom licence is never "may be sold" and never "may not": the person
+  // selling is shown the shop's own note on its terms instead.
+  const custom = typeof ML.customTerms === 'function' ? ML.customTerms(ids, records) : [];
   let html = '';
   if (problems.length) {
     // Each model gets "I have a licence to sell prints": a free version may be
@@ -170,6 +173,12 @@ function licenceAtSaleHtml(printFileIds, { creditButton = false, written = '' } 
         ? t('lic.remix_line', { name: p.name, parent: p.until })
         : t('lic.nc_line', { name: p.name }))}
         <button type="button" class="btn-link licence-have" data-act="licence-have" data-pf="${escapeHtml(p.id)}">${escapeHtml(t('lic.have'))}</button></div>`).join('')}
+    </div>`;
+  }
+  if (custom.length) {
+    html += `<div class="licence-at-sale custom">
+      <strong>${escapeHtml(t('lic.custom_title'))}</strong>
+      ${custom.map((c) => `<div dir="auto">${escapeHtml(c.name)}${c.note ? `: ${escapeHtml(c.note)}` : ''}</div>`).join('')}
     </div>`;
   }
   if (credits.length) {

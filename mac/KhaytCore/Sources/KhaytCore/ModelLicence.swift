@@ -28,9 +28,11 @@ public enum ModelLicence {
     /// folded into `commercial`.
     public struct Licence: Sendable, Equatable, Identifiable, Hashable {
         public let id: String
-        public let commercial: Bool
+        /// Nil for `custom`: recorded, but terms Khayt cannot read.
+        public let commercial: Bool?
         public let attribution: Bool
-        public let derivatives: Bool
+        /// Nil for `custom`, as `commercial`.
+        public let derivatives: Bool?
         public let share: Bool
     }
 
@@ -48,9 +50,17 @@ public enum ModelLicence {
         // Digital File License"): personal printing; a sale needs the
         // designer's permission. See `lib/model-licence.js`.
         .init(id: "sdfl", commercial: false, attribution: false, derivatives: true, share: false),
+        // "For personal use only" under no named licence: no sale, warned as NC.
+        .init(id: "personal", commercial: false, attribution: false, derivatives: true, share: false),
         // Bought from the designer, which overrides whatever the free licence said.
         .init(id: "commercial", commercial: true, attribution: false, derivatives: true, share: false),
+        // The designer's own terms, written in `licenceNote`. Never "may be
+        // sold": the sale screens show the note instead (`customTerms`).
+        .init(id: "custom", commercial: nil, attribution: false, derivatives: nil, share: false),
     ]
+
+    /// The longest `licenceNote` kept, in characters (`NOTE_MAX`).
+    public static let noteMax = 500
 
     /// `str()` in the original is trim-if-a-string, so a number, a null or a
     /// missing field all read as the empty string rather than as their text.
@@ -73,7 +83,7 @@ public enum ModelLicence {
 
     /// May a shop sell a print of this? Nil when nobody has recorded a licence
     /// — which is not the same as "no", and must not be shown as one.
-    public static func sellable(_ licence: String?) -> Bool? { find(licence)?.commercial }
+    public static func sellable(_ licence: String?) -> Bool? { find(licence)?.commercial ?? nil }
 
     /// Must the designer be credited when it is shown or sold?
     public static func needsAttribution(_ licence: String?) -> Bool {
@@ -82,7 +92,7 @@ public enum ModelLicence {
 
     /// May it be modified — rescaled, remixed, cut up?
     public static func allowsDerivatives(_ licence: String?) -> Bool? {
-        find(licence)?.derivatives
+        find(licence)?.derivatives ?? nil
     }
 
     /// What a shop should be told about one model, in facts rather than a
@@ -104,14 +114,14 @@ public enum ModelLicence {
         let found = byId(str(fields["licence"]))
         return Standing(known: found != nil, licence: found?.id ?? "",
                         source: str(fields["source"]),
-                        sellable: found?.commercial,
+                        sellable: found?.commercial ?? nil,
                         // `attribution` and `share` fall back to FALSE where
                         // `sellable` and `derivatives` fall back to nil. That
                         // asymmetry is the original's, and it is right: an
                         // unknown model owes nobody a credit yet, but whether
                         // it may be sold is genuinely unanswered.
                         attribution: found?.attribution ?? false,
-                        derivatives: found?.derivatives,
+                        derivatives: found?.derivatives ?? nil,
                         share: found?.share ?? false)
     }
 
@@ -238,6 +248,38 @@ public enum ModelLicence {
             if url.isEmpty, isAddress { url = source }
             out.append(.init(id: key, name: name, designer: isAddress ? "" : source,
                              licence: found.id, url: url))
+        }
+        return out
+    }
+
+    /// One model behind a sale whose licence is `custom`, with the shop's note.
+    public struct CustomTerms: Equatable, Sendable {
+        public let id: String
+        public let name: String
+        public let note: String
+    }
+
+    /// The models behind a sale whose licence is `custom`, each with its
+    /// `licenceNote` (trimmed, at most `noteMax` UTF-16 units, as JavaScript's
+    /// `slice` counts), in the order asked. Never a verdict: the screen shows
+    /// the note. Kept in step with `customTerms` in lib/model-licence.js.
+    public static func customTerms(_ ids: [String], records: [JSONValue]) -> [CustomTerms] {
+        var seen = Set<String>()
+        var out: [CustomTerms] = []
+        for raw in ids {
+            let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !key.isEmpty, seen.insert(key).inserted,
+                  let record = records.first(where: {
+                      if case .object(let o) = $0 { return str(o["id"]) == key } else { return false }
+                  }), case .object(let o) = record,
+                  str(o["licence"]).lowercased() == "custom" else { continue }
+            var name = str(o["name"])
+            if name.isEmpty { name = str(o["originalName"]) }
+            let note = str(o["licenceNote"])
+            let cut = note.utf16.count > noteMax
+                ? (String(note.utf16.prefix(noteMax)) ?? String(decoding: Array(note.utf16.prefix(noteMax)), as: UTF16.self))
+                : note
+            out.append(.init(id: key, name: name, note: cut))
         }
         return out
     }

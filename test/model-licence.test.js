@@ -70,6 +70,8 @@ test('every licence in the list can be looked up by its own id', () => {
   const all = L.list();
   assert.ok(all.length >= 9);
   for (const entry of all) {
+    // `custom` resolves (standing.known) to null: its terms are the shop's note.
+    if (entry.id === 'custom') { assert.equal(L.standing({ licence: entry.id }).known, true); continue; }
     assert.equal(typeof L.sellable(entry.id), 'boolean',
       `${entry.id} is offered in the menu and cannot be resolved`);
   }
@@ -170,4 +172,40 @@ test('a remix of a library model that may not be sold is not for sale either', (
   ]);
   assert.deepEqual(L.remixProblems([], lib), []);
   assert.deepEqual(L.remixProblems(['R'], null), []);
+});
+
+test('personal is not for sale, warned like NonCommercial', () => {
+  assert.equal(L.sellable('personal'), false);
+  assert.equal(L.sellable('Personal '), false);
+  const out = L.saleProblems(['P'], [{ id: 'P', name: 'Vase', licence: 'personal' }], '2026-11-09');
+  assert.deepEqual(out, [{ id: 'P', name: 'Vase', licence: 'personal', reason: 'not-commercial' }]);
+  assert.equal(L.needsAttribution('personal'), false);
+});
+
+test('custom is recorded but never answers "may be sold", and never "may not"', () => {
+  assert.equal(L.sellable('custom'), null);
+  assert.equal(L.allowsDerivatives('custom'), null);
+  const s = L.standing({ licence: 'CUSTOM' });
+  assert.deepEqual([s.known, s.licence, s.sellable, s.derivatives], [true, 'custom', null, null]);
+  const lib = [{ id: 'C', name: 'Bust', licence: 'custom', licenceNote: 'Sell up to 50 a year' }];
+  assert.deepEqual(L.saleProblems(['C'], lib, '2026-11-09'), []);
+  assert.deepEqual(L.notForSale(lib), []);
+  assert.equal(L.sellableOn(lib[0], '2026-11-09'), null);
+  // No licence in the list may ever say an unreadable licence is for sale.
+  for (const l of L.list()) if (l.id === 'custom') assert.notEqual(l.commercial, true);
+});
+
+test('customTerms: the shop\'s own note for each custom model, trimmed and capped, in order', () => {
+  const lib = [
+    { id: 'C', name: 'Bust', licence: 'custom', licenceNote: '  Sell up to 50 prints a year.  ' },
+    { id: 'N', originalName: 'bare.stl', licence: 'Custom' },
+    { id: 'L', name: 'Long', licence: 'custom', licenceNote: 'x'.repeat(900) },
+    { id: 'P', name: 'Vase', licence: 'personal', licenceNote: 'not custom' },
+  ];
+  const out = L.customTerms(['N', 'C', 'P', 'C', 'L', 'missing'], lib);
+  assert.deepEqual(out.map((c) => c.id), ['N', 'C', 'L']);
+  assert.deepEqual(out[0], { id: 'N', name: 'bare.stl', note: '' });
+  assert.equal(out[1].note, 'Sell up to 50 prints a year.');
+  assert.equal(out[2].note.length, L.NOTE_MAX);
+  assert.deepEqual(L.customTerms(null, null), []);
 });

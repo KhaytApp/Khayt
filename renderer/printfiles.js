@@ -2953,6 +2953,9 @@
             </select>
           </div>
         </div>
+        <label style="margin-top:10px;" for="pfLicenceNote">${escapeHtml(t('plib.licence_note'))}</label>
+        <textarea id="pfLicenceNote" rows="2" dir="auto" maxlength="${(window.KhaytModelLicence && window.KhaytModelLicence.NOTE_MAX) || 500}"
+          placeholder="${escapeHtml(t('plib.licence_note_ph'))}">${escapeHtml(rec.licenceNote || '')}</textarea>
         <label style="margin-top:10px;">${escapeHtml(t('plib.consumables_per_print') || 'Consumables per print')}</label>
         <div id="pfConsumables"></div>
         <button type="button" class="btn ghost small" id="pfAddConsumable" style="margin-top:4px;font-size:12px;">${escapeHtml(t('calc.add_consumable') || '+ Add consumable')}</button>
@@ -3055,6 +3058,10 @@
         rec.testedNotes = modal.querySelector('#pfNotes').value.trim();
         rec.source = modal.querySelector('#pfSource').value.trim();
         rec.licence = modal.querySelector('#pfLicence').value;
+        // '' rather than deleted, like the licence proof: an absent field is one
+        // a sync merge can bring back from an older copy.
+        rec.licenceNote = modal.querySelector('#pfLicenceNote').value.trim()
+          .slice(0, (window.KhaytModelLicence && window.KhaytModelLicence.NOTE_MAX) || 500);
         const ph = modal._getPhoto ? modal._getPhoto() : null;
         // `userPhotoRemoved` tells the Mac not to put a picture it found in a
         // linked folder back on a model the shop cleared (Shop+LinkedSort.swift
