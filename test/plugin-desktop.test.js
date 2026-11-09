@@ -259,3 +259,57 @@ test('Lamha sample: installs, sends Lamha\'s create-order body as it is, and fil
   const noKey = await S.send({ entry: Object.assign({}, entry, { secrets: {} }), trigger: { action: 'record' }, records: { order, customer }, delivery: DLV }, { postPinned: p3 });
   assert.deepEqual([noKey.refused, p3.calls.length], ['secret "apiToken" is not set', 0]);
 });
+
+// SMSA's header name and body come from the community client
+// haniusif/smsaexpress (SMSA publishes no public API docs): unverified until
+// SMSA confirms. The draft is unsigned, so it is signed here with the test key.
+test('SMSA draft: sends SMSA\'s b2c shape with numbers as numbers, and fills smsaAwb from sawb', async () => {
+  const P = require('../lib/plugin-payload.js');
+  const sample = sign(Object.assign({}, require('../plugins/samples/unsigned/smsa-shipping.json')));
+  const customer = { id: 'c9', nameEn: 'Sara A.', phone: '+966500000000', email: 's@example.com',
+    addresses: [{ label: 'Home', address: 'King Fahd Rd' }], plugins: { [sample.id]: { city: 'Riyadh' } } };
+  const order = { id: 'INV-2026-0107-ab12', invoiceNumber: 'INV-2026-0107', date: '2026-11-08', project: 'Bracket set',
+    price: 115.5, currency: 'SAR', qty: 2 };
+  const config = { senderName: 'Athar Tuwaiq', senderPhone: '+966511111111', senderCity: 'Riyadh',
+    senderAddress: 'Tuwaiq St', parcelWeightKg: 1.5 };
+  const entry = Object.assign(H.consentedEntry(null, sample), { config, secrets: { apiKey: 'smsa-test-key' } });
+  assert.equal(H.stateOf(entry, true), 'on');
+  assert.deepEqual(H.actionsFor({ plugins: [entry] }, 'order', () => true).map((a) => a.action.id), ['ship']);
+
+  // A fixture of SMSA's reply: the label is a base64 PDF, so only the AWB is kept.
+  const reply = { sawb: '231200021000', createDate: '2026-11-09T10:00:00',
+    shipmentParcelsCount: 1, waybills: [{ awb: '231200021000', awbFile: 'JVBERi0xLjQK' }] };
+  const post = fakePost({ ok: true, status: 200, text: JSON.stringify(reply) });
+  const r = await S.send({ entry, trigger: { action: 'ship' }, records: { order, customer }, delivery: DLV }, { keys: KEYS, postPinned: post });
+  assert.equal(r.ok, true);
+  const call = post.calls[0];
+  assert.equal(call.url, 'https://ecomapis.smsaexpress.com/api/shipment/b2c/new');
+  assert.equal(call.headers.apikey, 'smsa-test-key', 'the key bare, in SMSA\'s apikey header');
+  assert.ok(!('X-Khayt-Signature' in call.headers) && !('Authorization' in call.headers));
+  const expected = P.payloadFor(sample, { action: 'ship' }, { order, customer, config, secrets: entry.secrets });
+  assert.equal(call.body, expected.body);
+  const body = JSON.parse(call.body);
+  // SMSA refuses money and counts sent as strings.
+  for (const k of ['DeclaredValue', 'CODAmount', 'Parcels', 'Weight']) assert.equal(typeof body[k], 'number', k);
+  assert.deepEqual([body.DeclaredValue, body.CODAmount, body.Parcels, body.Weight], [115.5, 0, 1, 1.5]);
+  assert.equal(body.OrderNumber, 'INV-2026-0107');
+  assert.deepEqual(body.ConsigneeAddress, { ContactName: 'Sara A.', ContactPhoneNumber: '+966500000000',
+    Country: 'SA', City: 'Riyadh', AddressLine1: 'King Fahd Rd' });
+  assert.deepEqual(body.ShipperAddress, { ContactName: 'Athar Tuwaiq', ContactPhoneNumber: '+966511111111',
+    Country: 'SA', City: 'Riyadh', AddressLine1: 'Tuwaiq St' });
+  assert.ok(!JSON.stringify(body).includes('smsa-test-key'), 'the key never rides in the body');
+
+  const values = P.applyResponse(sample, 'ship', r.reply, entry);
+  assert.deepEqual(values, { smsaAwb: '231200021000' });
+  assert.equal(H.withFieldValues(order, entry, 'order', values).plugins[sample.id].smsaAwb, '231200021000');
+
+  for (const key of Object.keys(config)) {
+    const partial = Object.assign({}, config); delete partial[key];
+    const p2 = fakePost();
+    const no = await S.send({ entry: Object.assign({}, entry, { config: partial }), trigger: { action: 'ship' }, records: { order, customer }, delivery: DLV }, { keys: KEYS, postPinned: p2 });
+    assert.deepEqual([no.ok, no.refused, p2.calls.length], [false, `setting ${key} is not set`, 0]);
+  }
+  const p3 = fakePost();
+  const noKey = await S.send({ entry: Object.assign({}, entry, { secrets: {} }), trigger: { action: 'ship' }, records: { order, customer }, delivery: DLV }, { keys: KEYS, postPinned: p3 });
+  assert.deepEqual([noKey.refused, p3.calls.length], ['secret "apiKey" is not set', 0]);
+});

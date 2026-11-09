@@ -1,0 +1,154 @@
+{
+  "khayt": {
+    "manifest": 1
+  },
+  "id": "app.khayt.samples.smsa",
+  "name": {
+    "en": "SMSA Express shipping",
+    "ar": "شحن سمسا إكسبريس"
+  },
+  "description": {
+    "en": "Creates an SMSA Express shipment for a job and fills in its tracking number. Print the label from your SMSA account.",
+    "ar": "ينشئ شحنة سمسا إكسبريس للعمل ويملأ رقم التتبع. اطبع البوليصة من حسابك في سمسا."
+  },
+  "publisher": "Khayt",
+  "version": "1.0.0",
+  "homepage": "https://khaytapp.com/developers/samples/",
+  "domains": [
+    "ecomapis.smsaexpress.com"
+  ],
+  "secrets": [
+    {
+      "name": "apiKey",
+      "label": {
+        "en": "SMSA API key",
+        "ar": "مفتاح واجهة سمسا"
+      },
+      "kind": "apiKey"
+    }
+  ],
+  "settings": [
+    {
+      "key": "senderName",
+      "label": {
+        "en": "Sender name",
+        "ar": "اسم المرسل"
+      },
+      "type": "text",
+      "kind": "name",
+      "required": true
+    },
+    {
+      "key": "senderPhone",
+      "label": {
+        "en": "Sender phone",
+        "ar": "جوال المرسل"
+      },
+      "type": "text",
+      "kind": "phone",
+      "required": true
+    },
+    {
+      "key": "senderCity",
+      "label": {
+        "en": "Sender city",
+        "ar": "مدينة المرسل"
+      },
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "senderAddress",
+      "label": {
+        "en": "Sender address",
+        "ar": "عنوان المرسل"
+      },
+      "type": "text",
+      "kind": "address",
+      "required": true
+    },
+    {
+      "key": "parcelWeightKg",
+      "label": {
+        "en": "Parcel weight (kg)",
+        "ar": "وزن الطرد (كجم)"
+      },
+      "type": "number",
+      "required": true
+    }
+  ],
+  "fields": [
+    {
+      "key": "city",
+      "label": {
+        "en": "City (for shipping)",
+        "ar": "المدينة (للشحن)"
+      },
+      "type": "text",
+      "attach": "customer"
+    },
+    {
+      "key": "smsaAwb",
+      "label": {
+        "en": "SMSA tracking number",
+        "ar": "رقم تتبع سمسا"
+      },
+      "type": "text",
+      "attach": "order"
+    }
+  ],
+  "actions": [
+    {
+      "id": "ship",
+      "label": {
+        "en": "Create SMSA shipment",
+        "ar": "إنشاء شحنة سمسا"
+      },
+      "placement": "order",
+      "kind": "post",
+      "url": "https://ecomapis.smsaexpress.com/api/shipment/b2c/new",
+      "auth": {
+        "header": "apikey",
+        "secret": "apiKey"
+      },
+      "body": {
+        "format": "json-template",
+        "template": {
+          "OrderNumber": "{order.number}",
+          "DeclaredValue": "{order.total}",
+          "CODAmount": 0,
+          "Parcels": 1,
+          "ShipDate": "{order.date}",
+          "ShipmentCurrency": "{order.currency}",
+          "Weight": "{config.parcelWeightKg}",
+          "WeightUnit": "KG",
+          "ContentDescription": "{order.title}",
+          "WaybillType": "PDF",
+          "ServiceCode": "EDDL",
+          "ConsigneeAddress": {
+            "ContactName": "{customer.name}",
+            "ContactPhoneNumber": "{customer.phone}",
+            "Country": "SA",
+            "City": "{field.city}",
+            "AddressLine1": "{customer.address}"
+          },
+          "ShipperAddress": {
+            "ContactName": "{config.senderName}",
+            "ContactPhoneNumber": "{config.senderPhone}",
+            "Country": "SA",
+            "City": "{config.senderCity}",
+            "AddressLine1": "{config.senderAddress}"
+          }
+        }
+      },
+      "response": {
+        "fields": {
+          "smsaAwb": "sawb"
+        }
+      }
+    }
+  ],
+  "scopes": [
+    "fields.write"
+  ]
+}
