@@ -8460,6 +8460,14 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginHost.stateOf(ARG0, ARG1)", [entry, .bool(reviewed)], as: String.self)
     }
 
+    /// `record` with `values` (key → raw) written into the connector's own
+    /// fields on `attach`, each checked by type; an empty value removes it.
+    public func pluginWithFieldValues(_ record: JSONValue, entry: JSONValue, attach: String,
+                                      values: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withFieldValues(ARG0, ARG1, ARG2, ARG3)",
+                          [record, entry, .string(attach), values], as: JSONValue.self)
+    }
+
     /// A value typed into a connector's own field, checked against its type
     /// (`field` is one of the manifest's `fields[]`); `.null` when it does not
     /// fit, which means "no value". The phone and the Mac coerce alike.

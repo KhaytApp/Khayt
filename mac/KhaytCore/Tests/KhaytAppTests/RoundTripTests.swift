@@ -737,6 +737,7 @@ struct RoundTripTests {
         "saveLibrarySearch": "writes only settings.librarySavedSearches, inside the write chain, as LibrarySavedSearch.encode of the list read back leniently; every other settings key goes back as read, and LibraryEditPerfTests.savedSearchWritePath proves bizEn survives",
         "editFiles": "a library edit hands one closure per field the shop changed; it never re-encodes a record",
         "saveSeen": "the LAN server's replay list, a file of its own; not a record in the book",
+        "saveConnectorFields": "writes only a connector's own values under record.plugins, through lib/plugin-host.js withFieldValues; ConnectorActionTests.reply proves only declared fields land and the rev goes up",
         "saveConnectorKeys": "never writes the book: puts a connector's keys in this Mac's Keychain, one item per declared name; ConnectorInstallTests.keys proves only declared names are kept and none reach the book",
         "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",
         "saveLocation": "sets name and address on the stored record in place (Shop.writeLocation) and never re-encodes it; LocationsTests.editKeepsFields proves every other field survives",
