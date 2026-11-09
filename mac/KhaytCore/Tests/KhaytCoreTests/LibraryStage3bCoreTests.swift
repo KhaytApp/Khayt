@@ -387,6 +387,15 @@ struct LibraryStage3bCoreTests {
         #expect(ModelBundle.checkedFields(["licenceUrl": .string("javascript:alert(1)")])["licenceUrl"] == nil)
     }
 
+    @Test("a bundle carries the licence note, capped as the shared rule caps it")
+    func licenceNoteTravelsCapped() {
+        #expect(ModelBundle.exported.contains("licenceNote") && ModelBundle.importable.contains("licenceNote"))
+        #expect(!ModelBundle.neverExported.contains("licenceNote"))
+        let f = ModelBundle.checkedFields(["licenceNote": .string("  " + String(repeating: "a", count: 900) + "  ")])
+        #expect(f["licenceNote"] == .string(String(repeating: "a", count: ModelLicence.noteMax)))
+        #expect(ModelBundle.checkedFields(["licenceNote": .string("   ")])["licenceNote"] == nil)
+    }
+
     @Test("a manifest's time and grams are capped, and its text loses control and format characters")
     func capsAndPlainText() {
         let f = ModelBundle.checkedFields([

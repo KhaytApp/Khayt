@@ -29,8 +29,8 @@ struct ModelLicenceParityTests {
     /// Every id the module knows, plus the ways a record can say nothing.
     private let inputs = [
         "own", "cc0", "cc-by", "cc-by-sa", "cc-by-nd",
-        "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl", "commercial",
-        "SDFL", "", "  ", "CC-BY", "  cc-by-nc  ", "CC0", "Commercial",
+        "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "sdfl", "personal", "commercial", "custom",
+        "SDFL", "Personal", " CUSTOM ", "", "  ", "CC-BY", "  cc-by-nc  ", "CC0", "Commercial",
         "cc", "cc-by-nc-sa-4.0", "mit", "gpl", "cc_by", "ccby",
         "cc-by ", "nc", "own ", "OWN", "unknown", "null", "0", "false",
     ]
@@ -84,13 +84,13 @@ struct ModelLicenceParityTests {
         #expect(rows.count == ModelLicence.all.count)
         for (row, mine) in zip(rows, ModelLicence.all) {
             guard case .object(let o) = row else { Issue.record("row is not an object"); continue }
-            func flag(_ k: String) -> Bool { if case .bool(let b)? = o[k] { return b }; return false }
+            func flag(_ k: String) -> Bool? { if case .bool(let b)? = o[k] { return b }; return nil }
             var id = ""; if case .string(let s)? = o["id"] { id = s }
             #expect(id == mine.id)
             #expect(flag("commercial") == mine.commercial, Comment(rawValue: "commercial of \(id)"))
-            #expect(flag("attribution") == mine.attribution, Comment(rawValue: "attribution of \(id)"))
+            #expect(flag("attribution") ?? false == mine.attribution, Comment(rawValue: "attribution of \(id)"))
             #expect(flag("derivatives") == mine.derivatives, Comment(rawValue: "derivatives of \(id)"))
-            #expect(flag("share") == mine.share, Comment(rawValue: "share of \(id)"))
+            #expect(flag("share") ?? false == mine.share, Comment(rawValue: "share of \(id)"))
         }
     }
 
@@ -185,5 +185,55 @@ struct ModelLicenceParityTests {
         #expect(problems.map(\.id) == ["A", "B"], "unfilled, own and a live bought licence are not problems")
         #expect(problems.map(\.reason) == ["not-commercial", "expired"])
         #expect(problems[1].name == "dragon.3mf", "a model with no title is named by its file")
+    }
+
+    @Test("personal is not for sale; custom is never for sale and never refused, and shows its note")
+    func personalAndCustom() throws {
+        let js = try js()
+        #expect(ModelLicence.sellable("personal") == false)
+        #expect(ModelLicence.sellable("custom") == nil)
+        #expect(ModelLicence.standing(source: nil, licence: "custom").known == true)
+        let long = String(repeating: "é", count: 600)
+        let library: [JSONValue] = [
+            .object(["id": .string("P"), "name": .string("Vase"), "licence": .string("personal")]),
+            .object(["id": .string("C"), "name": .string("Bust"), "licence": .string("custom"),
+                     "licenceNote": .string("  Sell up to 50 prints a year.  ")]),
+            .object(["id": .string("L"), "originalName": .string("long.stl"), "licence": .string("Custom"),
+                     "licenceNote": .string(long)]),
+        ]
+        let problems = ModelLicence.saleProblems(["P", "C", "L"], records: library, today: "2026-11-09")
+        #expect(problems.map(\.id) == ["P"])
+        #expect(problems.map(\.reason) == ["not-commercial"])
+        let mine = ModelLicence.customTerms(["C", "P", "L", "C"], records: library)
+        #expect(mine.map(\.id) == ["C", "L"])
+        #expect(mine[0].note == "Sell up to 50 prints a year.")
+        #expect(mine[1].name == "long.stl" && mine[1].note.utf16.count == ModelLicence.noteMax)
+        let theirs = try js.value("KhaytModelLicence.customTerms(ARG0, ARG1)",
+                                  [.array(["C", "P", "L", "C"].map(JSONValue.string)), .array(library)])
+        guard case .array(let rows) = theirs else { Issue.record("not an array"); return }
+        #expect(rows.count == mine.count)
+        for (row, m) in zip(rows, mine) {
+            guard case .object(let o) = row else { continue }
+            #expect(o["id"] == .string(m.id) && o["name"] == .string(m.name) && o["note"] == .string(m.note))
+        }
+        #expect(try js.value("KhaytModelLicence.NOTE_MAX", []) == .number(Double(ModelLicence.noteMax)))
+    }
+
+    @Test("capNote: trimmed, cut in UTF-16 units, never half an emoji, the same as the JS")
+    func capNoteMatches() throws {
+        let js = try js()
+        let cases = ["  hi  ", String(repeating: "😀", count: 400), "a" + String(repeating: "😀", count: 300),
+                     String(repeating: "e\u{301}", count: 300), ""]
+        for c in cases {
+            let mine = ModelLicence.capNote(c)
+            #expect(mine.utf16.count <= ModelLicence.noteMax)
+            let theirs = try js.value("KhaytModelLicence.capNote(ARG0)", [.string(c)])
+            #expect(theirs == .string(mine), Comment(rawValue: "\(c.prefix(8))…"))
+        }
+        #expect(ModelLicence.capNote(String(repeating: "😀", count: 400)).utf16.count == 500)
+        #expect(ModelLicence.capNote("a" + String(repeating: "😀", count: 300)).utf16.count == 499)
+        // The bundle import keeps what the rule keeps.
+        let f = ModelBundle.checkedFields(["licenceNote": .string(String(repeating: "😀", count: 400))])
+        #expect(f["licenceNote"] == .string(ModelLicence.capNote(String(repeating: "😀", count: 400))))
     }
 }

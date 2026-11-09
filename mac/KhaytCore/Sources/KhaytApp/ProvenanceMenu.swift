@@ -37,7 +37,7 @@ struct ProvenanceMenu: View {
             if count == 0 {
                 Text(shop.words.callIt("mac.pick_a_model"))
             } else {
-                ForEach(ModelLicence.all) { licence in
+                ForEach(ModelLicence.all.filter { $0.id != "custom" }) { licence in
                     Button {
                         Task { await shop.fileSelection(licence: licence.id) }
                     } label: {
