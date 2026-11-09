@@ -63,6 +63,45 @@ try {
 
   console.log('✅ Help menu present with all four destinations');
 
+  // Settings… (Ctrl+, / ⌘,) and Help ▸ Check for Updates… reach the window's
+  // own controls. Clicked through the real MenuItem, so the IPC from main to
+  // the renderer is what is under test, not a direct call.
+  if (!items.includes('Check for Updates…')) throw new Error(`Help has no "Check for Updates…": ${items.join(' | ')}`);
+  const clickMenuItem = (label) => electronApp.evaluate(({ Menu, BrowserWindow }, label) => {
+    const walk = (m) => { for (const it of m.items) { if (it.label === label) return it; const s = it.submenu && walk(it.submenu); if (s) return s; } return null; };
+    const it = walk(Menu.getApplicationMenu());
+    if (!it) return null;
+    it.click(undefined, BrowserWindow.getAllWindows()[0]);
+    return it.accelerator || '';
+  }, label);
+  const page = await electronApp.firstWindow();
+  await page.evaluate(() => { const w = document.querySelector('#setup-wizard'); if (w) w.style.display = 'none'; window.KhaytShell?.switchTab?.('dashboard-tab'); });
+  const acc = await clickMenuItem('Settings…');
+  if (acc === null) throw new Error('no "Settings…" item in any menu');
+  if (acc !== 'CmdOrCtrl+,') throw new Error(`Settings… has accelerator "${acc}", want CmdOrCtrl+,`);
+  await page.waitForFunction(() => document.querySelector('#settings-tab')?.classList.contains('active'), null, { timeout: 10_000 });
+  console.log('✅ Settings… (CmdOrCtrl+,) opens Settings');
+
+  // Packaged builds drop Reload, but this one is unpackaged: what must hold on
+  // every build is that Windows/Linux have no Ctrl+W that closes the only window.
+  if (process.platform !== 'darwin') {
+    const all = Object.values(menu).flat();
+    if (all.includes('close')) throw new Error('Window ▸ Close (Ctrl+W) is back on Windows/Linux');
+  }
+
+  // A Simple shop can reach Khayt Cloud (it was pro-only, so it could not).
+  const cloudInSimple = await page.evaluate(() => {
+    settings.mode = 'simple'; applyMode();
+    openSettingsSection('online');
+    const visible = !!document.querySelector('#cloudSettingsSection')?.offsetParent;
+    const portHidden = !document.querySelector('#lan_port')?.offsetParent;
+    settings.mode = 'professional'; applyMode();
+    return { visible, portHidden };
+  });
+  if (!cloudInSimple.visible) throw new Error('Khayt Cloud is hidden from Simple mode');
+  if (!cloudInSimple.portHidden) throw new Error('the LAN REST port shows in Simple mode');
+  console.log('✅ Simple mode: Khayt Cloud shown, LAN developer controls hidden');
+
   // Bed Ready ships from this same main.js. Its users have never heard of Khayt,
   // so the subreddit item must not be there — and the website must be its own.
   // Asserting the Khayt build alone would pass with the flavour branch deleted.
