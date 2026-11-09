@@ -3510,6 +3510,7 @@ summary.icon .pf-ico, summary.icon .br-ico { margin-inline-end: 0; }
 .pf-hg-head { display: flex; align-items: baseline; gap: 8px; }
 .pf-hg-title { margin: 0; font-size: 14px; }
 .pf-hg-says { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
+.pf-hash-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 12px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border-soft); font-size: 12.5px; }
 .pf-hg-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .pf-hg-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 .pf-hg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

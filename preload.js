@@ -162,6 +162,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibUnpackZip:  (srcPath)           => ipcRenderer.invoke('hub:printlib-unpack-zip', { srcPath }),
   printLibUnpackCleanup: (dir)            => ipcRenderer.invoke('hub:printlib-unpack-cleanup', dir),
   printLibList:       (id)                => ipcRenderer.invoke('hub:printlib-list', id),
+  printLibHash:       (id, filename)      => ipcRenderer.invoke('hub:printlib-hash', id, filename),
+  printLibHashStop:   ()                  => ipcRenderer.invoke('hub:printlib-hash-stop'),
   printLibDelete:     (fullPath)          => ipcRenderer.invoke('hub:printlib-delete', fullPath),
   printLibDeletePlan:   (ids)             => ipcRenderer.invoke('hub:printlib-delete-plan', ids),
   printLibRemoveLocal:  (id)              => ipcRenderer.invoke('hub:printlib-remove-local', id),

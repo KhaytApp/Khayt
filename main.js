@@ -98,6 +98,7 @@ const safeNames = require('./lib/safe-names');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
 const webhookSend = require('./lib/webhook-send');
 const pluginSend = require('./lib/main/plugin-send');
+const streamHash = require('./lib/main/stream-hash');
 const { parseGcodeText } = require('./lib/gcode-parse');
 const moonrakerHistory = require('./lib/moonraker-history');
 // Reading a Klipper printer's answer — shared with the Mac app, which polls the
@@ -3681,6 +3682,37 @@ ipcMain.handle('hub:printlib-list', async (_e, id) => {
   // working with the bucket unreachable, which is why it reads sidecars off the
   // disk rather than asking the bucket what it holds.
   return PLT.mergeListing(entries, await printLibSidecarMap(dir), await printLibOnlineMap(dir));
+});
+
+/**
+ * Hash one library model's file for Library Health's duplicate check
+ * (lib/library-hash-plan.js plans the run; this reads one file). Read in
+ * chunks (lib/main/stream-hash.js), only inside the library, never a tiered
+ * or online-only placeholder (reading one would fetch it), and never over
+ * PRINT_FILE_MAX_BYTES. Answers the hash; writing it is the window's, which
+ * writes contentHash and nothing else. `hub:printlib-hash-stop` stops the
+ * file being read, so Stop is immediate even on a 1 GB model.
+ */
+let printLibHashAbort = null;
+ipcMain.handle('hub:printlib-hash', async (_e, id, filename) => {
+  const name = path.basename(String(filename || ''));
+  if (!id || !name || name !== String(filename) || PLT.isSidecar(name) || PLT.isOnlineMarker(name)) {
+    return { ok: false, error: 'not-a-file' };
+  }
+  const full = path.join(printLibItemDir(String(id)), name);
+  if (!printLibContains(full)) return { ok: false, error: 'not-a-file' };
+  if (printLibHashAbort) printLibHashAbort.abort();
+  const ctl = new AbortController();
+  printLibHashAbort = ctl;
+  try {
+    return await streamHash.hashFile(full, { maxBytes: PRINT_FILE_MAX_BYTES, signal: ctl.signal });
+  } finally {
+    if (printLibHashAbort === ctl) printLibHashAbort = null;
+  }
+});
+ipcMain.handle('hub:printlib-hash-stop', () => {
+  if (printLibHashAbort) printLibHashAbort.abort();
+  return true;
 });
 
 ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
