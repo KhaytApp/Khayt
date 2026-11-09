@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   bedreadyCover:        (url) => ipcRenderer.invoke('hub:bedready-cover', { url }),
   bedreadyOpenSignIn:   () => ipcRenderer.invoke('hub:bedready-open-signin'),
   bedreadyUnlink:       () => ipcRenderer.invoke('hub:bedready-unlink'),
+  // The menu bar's commands (main.js sendMenuCommand): 'open-settings', 'check-updates'.
+  onMenuCommand:        (cb) => { ipcRenderer.on('hub:menu-command', (_e, cmd) => { try { cb(String(cmd || '')); } catch { /* noop */ } }); },
   onBedreadyLinked:     (cb) => { ipcRenderer.on('bedready-linked', () => { try { cb(); } catch { /* noop */ } }); },
   // MakerRun catalogue (Bed Ready only; main registers these only in that flavor). Browse the public
   // catalogue, download a design into a print-file record, publish a record as a new listing. The
@@ -162,6 +164,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibUnpackZip:  (srcPath)           => ipcRenderer.invoke('hub:printlib-unpack-zip', { srcPath }),
   printLibUnpackCleanup: (dir)            => ipcRenderer.invoke('hub:printlib-unpack-cleanup', dir),
   printLibList:       (id)                => ipcRenderer.invoke('hub:printlib-list', id),
+  printLibHash:       (id, filename)      => ipcRenderer.invoke('hub:printlib-hash', id, filename),
+  printLibHashStop:   ()                  => ipcRenderer.invoke('hub:printlib-hash-stop'),
   printLibDelete:     (fullPath)          => ipcRenderer.invoke('hub:printlib-delete', fullPath),
   printLibDeletePlan:   (ids)             => ipcRenderer.invoke('hub:printlib-delete-plan', ids),
   printLibRemoveLocal:  (id)              => ipcRenderer.invoke('hub:printlib-remove-local', id),

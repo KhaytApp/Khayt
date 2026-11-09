@@ -84,6 +84,24 @@ final class KhaytAPIClient: ObservableObject {
     /// 401 as any bad token (khayt-cloud `docs/api-contract.md`). Nothing but
     /// signing in again fixes it, so Settings offers exactly that.
     @Published private(set) var cloudNeedsSignIn = false
+    /// When this phone last read the Mac's settings — a settings read
+    /// (`refreshMacSettings`) or a whole `/api/store` pull — or nil if it never
+    /// has. Kept across launches; Unpair forgets it. A phone that reads its
+    /// book from the cloud and has no date here has never seen the Mac's
+    /// connectors (`ConnectorLaunch.showsMacHint`).
+    @Published private(set) var macSettingsAt: Date? =
+        UserDefaults.standard.object(forKey: KhaytAPIClient.macSettingsAtKey) as? Date
+    nonisolated static let macSettingsAtKey = "khayt.mac.settingsAt"
+
+    private func noteMacSettings(at date: Date = Date()) {
+        macSettingsAt = date
+        UserDefaults.standard.set(date, forKey: Self.macSettingsAtKey)
+    }
+
+    /// Changes whenever a sync lands — a round home, or the Mac's settings
+    /// read after it — for a view that reloads from the book then.
+    var syncLanded: [Date] { [lastSync?.at, macSettingsAt].compactMap { $0 } }
+
     /// The Mac answered a send but did not take some of the changes in it,
     /// in a sentence, or nil. Those changes stay pending (`sendPendingChanges`).
     @Published private(set) var macRefused: String?
@@ -113,15 +131,29 @@ final class KhaytAPIClient: ObservableObject {
     /// the Mac is out of reach or not yet reachable, is a working phone.
     var canSync: Bool { settings.isConfigured || cloud != nil }
 
-    /// Does this phone hold a book at all?
-    var holdsBook: Bool { reader?.holdsAnyBook ?? false }
+    /// Does this phone hold a book at all? Published, so a screen gated on
+    /// it redraws when a book arrives (a pull, a cloud round, the sample shop)
+    /// or goes (unpair) without a relaunch. Kept by `refreshHoldsBook()`.
+    @Published private(set) var holdsBook: Bool = false
+
+    /// The same question asked of the disk, now: for a gate that must not
+    /// trust a value that waits for its next refresh.
+    nonisolated var holdsBookOnDisk: Bool { reader?.holdsAnyBook ?? false }
+
+    /// Recompute `holdsBook` from the disk. Called after every path that can
+    /// create or delete the book; assigns only on a change, so it never
+    /// redraws a screen for nothing.
+    func refreshHoldsBook() {
+        let now = holdsBookOnDisk
+        if holdsBook != now { holdsBook = now }
+    }
 
     /// Whether the book on this phone holds ALL of a collection, so a total
     /// drawn from it is the shop's total and not the phone's.
     func holdsAll(_ collection: String) -> Bool { reader?.holdsAll(collection) ?? false }
 
     /// The book's scope, when there is a book. See `BookReader.scope()`.
-    var bookScope: BookScope.Taken? { holdsBook ? reader?.scope() : nil }
+    var bookScope: BookScope.Taken? { holdsBookOnDisk ? reader?.scope() : nil }
 
     /// How old the book is: the later of its last pull and the last sync.
     var bookAsOf: Date? {
@@ -156,6 +188,7 @@ final class KhaytAPIClient: ObservableObject {
         let opened = injected ?? (withBook ? try? CompanionBook.inSharedContainer() : nil)
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
+        _holdsBook = Published(initialValue: opened?.exists ?? false)
         gateEdits()
         // Pairing a Mac (or letting it go) changes whether edits have
         // somewhere to go. `objectWillChange` fires before the change lands.
@@ -313,6 +346,7 @@ final class KhaytAPIClient: ObservableObject {
         settings.serviceName = ""
         settings.isSampleShop = true
         settings.isPaired = true
+        refreshHoldsBook()
     }
 
     func fetchLivePrinters(now: Date = Date()) async throws -> LiveSnapshot {
@@ -425,8 +459,13 @@ final class KhaytAPIClient: ObservableObject {
         } else {
             try book.replace(with: store, scope: envelope.scope)
         }
+        refreshHoldsBook()
+        // The whole book carries the Mac's settings: as good as a settings read.
+        noteMacSettings()
+        let count = Self.recordCount(in: store)
+        SyncDiagnostics.record(.macStore, records: count)
         await refreshPendingCount()
-        return Self.recordCount(in: store)
+        return count
     }
 
     /// What `GET /api/store` sends: the records, and what was left behind.
@@ -517,14 +556,111 @@ final class KhaytAPIClient: ObservableObject {
     /// everything the Mac has sent and everything the phone has, so it is the
     /// copy that is never behind this phone. The Mac's book is taken only when
     /// the cloud cannot be reached.
-    private func refreshEverywhere(_ book: CompanionBook) async {
+    ///
+    /// ── SETTINGS COME FROM THE MAC ───────────────────────────────────────
+    ///
+    /// A cloud change carries records, never `settings` (`changesToSend` has
+    /// nowhere to put them), so a phone refreshed from the cloud never learnt
+    /// of a connector installed on the Mac. After the round, a phone paired
+    /// with a Mac reads the Mac's settings alone (`refreshMacSettings`) —
+    /// unless the Mac's whole book came down in this round, which has them.
+    /// It runs AFTER the cloud round on purpose: a whole cloud pull (a cold
+    /// phone — just re-paired or signed in) adopts the cloud's store, whose
+    /// settings hold no `plugins`, and the Mac's read must be the one that wins.
+    func refreshEverywhere(_ book: CompanionBook) async {
         if settings.isConfigured, (try? await sendPendingChanges()) != nil {
             lastSync = SyncMark(route: .mac, at: Date())
         }
-        if cloud != nil, await syncThroughCloud() != nil { return }
-        if settings.isConfigured, (try? await pullBook(into: book)) != nil {
-            lastSync = SyncMark(route: .mac, at: Date())
+        var cloudDone = false
+        if cloud != nil {
+            // A refused round adopted nothing: the Mac's book still comes down.
+            let round = await syncThroughCloud()
+            if case .refused? = round { cloudDone = false } else { cloudDone = round != nil }
         }
+        var pulled = false
+        if !cloudDone, settings.isConfigured, (try? await pullBook(into: book)) != nil {
+            lastSync = SyncMark(route: .mac, at: Date())
+            pulled = true
+        }
+        if !settings.isConfigured {
+            SyncDiagnostics.record(.skipped(.notConfigured))
+        } else if pulled {
+            SyncDiagnostics.record(.skipped(.pulled))
+        } else {
+            await refreshMacSettings(into: book)
+        }
+        refreshHoldsBook()
+    }
+
+    /// Settings ▸ Diagnostics' "Refresh now": one round at once, whatever the
+    /// once-a-minute throttle says.
+    func refreshNow() async {
+        guard let book, canSync else { return }
+        await refreshEverywhere(book)
+        lastRefresh = Date()
+    }
+
+    /// The Diagnostics sheet's rows (`BookDiagnostics`): counts and states only.
+    func diagnostics() async -> BookDiagnostics {
+        BookDiagnostics.make(holdsBook: holdsBookOnDisk, book: book, connectors: await connectors(),
+                             recorded: SyncDiagnostics.recorded(), isPaired: settings.isPaired,
+                             isConfigured: settings.isConfigured, cloudSignedIn: cloud != nil,
+                             isSampleShop: settings.isSampleShop, cloudShopId: cloud?.shopId)
+    }
+
+    /// What `GET /api/store/settings` sends: the shop's settings, masked as
+    /// `/api/store` masks them, and when the Mac served them.
+    private struct MacSettingsReply: Decodable {
+        let settings: [String: JSONValue]?
+        let servedAt: String?
+    }
+
+    /// The Mac's settings, alone: `GET /api/store/settings`, with the same
+    /// PIN or signature as `/api/store`. Empty when the reply holds none.
+    /// Throws for anything but a 2xx — an older Mac answers 404.
+    func fetchMacSettings() async throws -> [String: JSONValue] {
+        let (status, data) = try await getMacSettings()
+        guard (200...299).contains(status) else { throw try decodeAPIError(data, status: status) }
+        return try JSONDecoder().decode(MacSettingsReply.self, from: data).settings ?? [:]
+    }
+
+    private func getMacSettings() async throws -> (status: Int, data: Data) {
+        let (data, response) = try await request(path: "/api/store/settings", method: "GET",
+                                                 body: nil, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else {
+            throw KhaytAPIError.transport(URLError(.badServerResponse))
+        }
+        return (http.statusCode, data)
+    }
+
+    /// Read the Mac's settings into the book and its baseline
+    /// (`CompanionBook.adoptSettings`). Silent: a 404 (an older Mac), a 500, no
+    /// answer or an empty reply leaves the book exactly as it was. True when
+    /// settings landed.
+    @discardableResult
+    func refreshMacSettings(into book: CompanionBook) async -> Bool {
+        func done(_ outcome: SyncDiagnostics.SettingsOutcome) -> Bool {
+            SyncDiagnostics.record(outcome)
+            return outcome == .ok
+        }
+        guard settings.isConfigured else { return done(.skipped(.notConfigured)) }
+        guard !settings.isSampleShop else { return done(.skipped(.sampleShop)) }
+        guard book.exists else { return done(.skipped(.noBook)) }
+        let status: Int, data: Data
+        do {
+            (status, data) = try await getMacSettings()
+        } catch KhaytAPIError.unauthorized {
+            return done(.http(401))
+        } catch {
+            return done(.transport)
+        }
+        guard (200...299).contains(status) else { return done(.http(status)) }
+        guard let fetched = try? JSONDecoder().decode(MacSettingsReply.self, from: data).settings,
+              !fetched.isEmpty else { return done(.empty) }
+        guard (try? await OffMain.run({ try book.adoptSettings(fetched) })) == true else { return done(.unwritten) }
+        noteMacSettings()
+        SyncDiagnostics.record(.macSettings)
+        return done(.ok)
     }
 
     /// After an edit: to the Mac if it takes it, otherwise through the cloud.
@@ -562,7 +698,11 @@ final class KhaytAPIClient: ObservableObject {
     private var cloudRound: Task<CloudSync.Pushed?, Never>?
 
     private func oneCloudRound() async -> CloudSync.Pushed? {
-        guard let session = cloud, let book, let reader else { return nil }
+        guard var session = cloud, let book, let reader else { return nil }
+        // "Use this shop instead" is for a phone with no Mac: a paired phone
+        // takes the Mac's shop or none, whatever was stored.
+        if session.adoptOtherShop, settings.isConfigured { session.adoptOtherShop = false }
+        SyncDiagnostics.cloudRound(shopId: session.shopId)
         do {
             let sync = CloudSync(book: book, engine: try await reader.sharedEngine())
             var next = session
@@ -571,11 +711,20 @@ final class KhaytAPIClient: ObservableObject {
                 let result = try await sync.push(session)
                 next = result.0; pushed = result.1
             } else {
-                next = try await sync.pull(session).0
-                pushed = .readOnly
+                let result = try await sync.pull(session)
+                next = result.0
+                if case .refused(let why) = result.1 { pushed = .refused(why) } else { pushed = .readOnly }
             }
             next.save()
             cloud = next
+            // A whole pull can be this phone's first book.
+            refreshHoldsBook()
+            if case .refused(let why) = pushed {
+                // Nothing was adopted or sent: not a sync, and said as such.
+                cloudProblem = Self.refusalText(why)
+                cloudNeedsSignIn = false
+                return pushed
+            }
             lastSync = SyncMark(route: .cloud, at: Date())
             cloudProblem = pushed == .needsTheMac ? L10n.tr("cloud.needs_mac") : nil
             cloudNeedsSignIn = false
@@ -663,7 +812,14 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     /// Sign this phone in to the shop's cloud, and take its first pull.
-    func signInToCloud(url: String, email: String, password: String, passphrase: String) async throws {
+    ///
+    /// Returns why that pull was refused, if it was (`CloudSync.Refusal`), so
+    /// the sign-in sheet can say so and offer a way out. A sign-in whose shop
+    /// is not the one the book is linked to is caught here, before any pull,
+    /// push registration or Live Activity token reaches that other shop.
+    @discardableResult
+    func signInToCloud(url: String, email: String, password: String, passphrase: String) async throws
+        -> CloudSync.Refusal? {
         guard let reader else { throw KhaytAPIError.notConfigured }
         let engine = try await reader.sharedEngine()
         let session = try await CloudSync.signIn(url: url, email: email, password: password,
@@ -672,9 +828,49 @@ final class KhaytAPIClient: ObservableObject {
         cloud = session
         cloudNeedsSignIn = false
         cloudProblem = nil
+        if let refusal = signedInToAnotherShop(session) {
+            SyncDiagnostics.refused(.wrongShop, cloudShopId: session.shopId)
+            cloudProblem = Self.refusalText(refusal)
+            return refusal
+        }
         await registerForPush()
         await liveActivityPush?.sendAll()
-        await syncThroughCloud()
+        if case .refused(let why)? = await syncThroughCloud() { return why }
+        return nil
+    }
+
+    /// `.wrongShop` when the book on this phone is linked to a different
+    /// shop than `session` — the check `CloudSync.pull` makes before adopting,
+    /// made at sign-in too.
+    func signedInToAnotherShop(_ session: CloudSession) -> CloudSync.Refusal? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        return CloudSync.shopRefusal(book: store, cloudShop: session.shopId)
+    }
+
+    /// May "Use this shop instead" be offered? Only with no Mac paired: a
+    /// paired phone signs in with the Mac's account or unpairs.
+    var mayAdoptOtherShop: Bool { cloud != nil && !settings.isConfigured }
+
+    /// "Use this shop instead", confirmed: the NEXT whole pull adopts the
+    /// signed-in shop over the book, once. False, and nothing changed, when a
+    /// Mac is paired or no one is signed in. The caller runs the round.
+    @discardableResult
+    func useThisCloudShop() -> Bool {
+        guard mayAdoptOtherShop, var session = cloud else { return false }
+        session.adoptOtherShop = true
+        session.save()
+        cloud = session
+        cloudProblem = nil
+        return true
+    }
+
+    /// A refused pull, as the sentence a person reads.
+    static func refusalText(_ refusal: CloudSync.Refusal) -> String {
+        switch refusal {
+        case .wrongShop(_, let email?): return L10n.format("cloud.wrong_shop.as", email)
+        case .wrongShop: return L10n.tr("cloud.wrong_shop")
+        case .emptyShop: return L10n.tr("cloud.empty_shop")
+        }
     }
 
     func signOutOfCloud() {
@@ -702,11 +898,14 @@ final class KhaytAPIClient: ObservableObject {
         let push = liveActivityPush
         signOutOfCloud()
         settings.unpair()
+        // `settings.unpair()` deleted the book.
+        refreshHoldsBook()
         // Spotlight, the feed, the widgets, delivered alerts, shared papers.
         ShopTraces.forget()
         pendingCount = 0
         historyWindow = nil
         lastSync = nil
+        macSettingsAt = nil
         Task { await push?.forgetShop(session: session) }
     }
 
@@ -1258,7 +1457,7 @@ final class KhaytAPIClient: ObservableObject {
     /// What the shop sells, from the book this phone keeps: the Mac's prices,
     /// the small picture each product carries, and counted stock.
     func fetchCatalogue() async throws -> CataloguePage {
-        guard let reader, holdsBook else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
+        guard let reader, holdsBookOnDisk else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
         return try await reader.catalogue(language: L10n.contentLanguage)
     }
 
@@ -1266,7 +1465,7 @@ final class KhaytAPIClient: ObservableObject {
 
     /// A job's invoice, built from the book this phone keeps — or why not.
     func invoice(orderId: String, proforma: Bool = false) async -> InvoiceBuild {
-        guard let reader, holdsBook else { return .refused(.missing) }
+        guard let reader, holdsBookOnDisk else { return .refused(.missing) }
         return (try? await reader.invoice(orderId: orderId, language: L10n.contentLanguage,
                                           proforma: proforma))
             ?? .refused(.failed)
@@ -1922,8 +2121,11 @@ final class KhaytAPIClient: ObservableObject {
         }
 
         do {
-            return try await session.data(for: req)
+            let answer = try await session.data(for: req)
+            SyncDiagnostics.macAnswered()
+            return answer
         } catch {
+            SyncDiagnostics.macFailed()
             throw KhaytAPIError.transport(error)
         }
     }

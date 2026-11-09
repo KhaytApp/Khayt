@@ -2484,7 +2484,7 @@ async function renderPrintLibLocation() {
     statusEl.style.color = 'var(--danger)';
     return;
   }
-  const where = st.isCustom ? st.root : (t('set.plib_this_mac') || 'this Mac');
+  const where = st.isCustom ? st.root : (t('set.plib_this_mac') || 'this computer');
   const mirrorNote = st.mirror
     ? ' · ' + (st.mirrorOk === false
       ? (t('set.plib_mirror_missing') || 'backup folder not reachable')
@@ -4462,6 +4462,11 @@ function renderLanApiSettings() {
   if (!el) return;
   migrateLanApiSettings();
   const lan = settings.lanApi || {};
+  // Simple mode hides the developer controls: the port, the legacy intake PIN,
+  // the printer webhook token, the Salla/Zid secrets and the internet tunnel.
+  // Each is hidden only while it is unused, so a Simple shop that already set
+  // one (a tunnel left running, say) can still see it and turn it off.
+  const devOnly = (inUse) => (inUse ? "" : " pro-only");
 
   el.innerHTML = `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:14px;">
@@ -4469,7 +4474,7 @@ function renderLanApiSettings() {
       <span data-i18n="lan.enabled">Enable LAN REST API</span>
     </label>
     <div class="inline-pair">
-      <div>
+      <div class="lan-dev${devOnly((lan.port || 3219) !== 3219)}">
         <label data-i18n="lan.port">Port</label>
         <input type="number" id="lan_port" value="${lan.port || 3219}" min="1024" max="65535">
       </div>
@@ -4478,7 +4483,7 @@ function renderLanApiSettings() {
         <input type="password" id="lan_pin" value="${escapeHtml(secretInputValue(lan.pin))}" minlength="8" maxlength="64" placeholder="${escapeHtml(secretFieldPlaceholder(lan.pin) || t('lan.pin_placeholder', { n: 8 }))}" autocomplete="off">
       </div>
     </div>
-    <div class="inline-pair" style="margin-top:10px;">
+    <div class="inline-pair lan-dev${devOnly(!!lan.intakePin)}" style="margin-top:10px;">
       <div>
         <label data-i18n="lan.intake_pin">Intake form PIN (customers)</label>
         <input type="text" id="lan_intake_pin" value="${escapeHtml(secretInputValue(lan.intakePin))}" maxlength="12" placeholder="${escapeHtml(secretFieldPlaceholder(lan.intakePin) || 'Auto-generated on start')}" autocomplete="off" style="font-family:monospace;letter-spacing:.1em;">
@@ -4490,7 +4495,7 @@ function renderLanApiSettings() {
       <input type="checkbox" id="lan_bind_lan" style="width:auto;margin:3px 0 0;" ${lan.bindLan || settings.onlineEnabled ? 'checked' : ''}>
       <span>
         <span data-i18n="lan.bind_lan">Listen on all network interfaces (LAN)</span>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:400;" data-i18n="lan.bind_lan_hint">Required for phones and other computers on your shop Wi‑Fi. Off = this Mac only.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;font-weight:400;" data-i18n="lan.bind_lan_hint">Required for phones and other computers on your shop Wi‑Fi. Off = this computer only.</div>
       </span>
     </label>
     <div style="font-size:11px;color:var(--text-muted);margin:4px 0 10px;padding:8px 10px;background:var(--bg-elev);border-radius:var(--radius);word-break:break-all;">
@@ -4554,7 +4559,7 @@ function renderLanApiSettings() {
         <div style="font-size:11px;color:var(--text-muted);margin-top:8px;" data-i18n="lan.iq_note">A model nobody has sliced is priced from its shape alone, which can be well out on a sparse or heavily supported part. The customer is always shown which of the two they are looking at.</div>
       </div>
     </div>
-    <div class="inline-pair" style="margin-top:10px;">
+    <div class="inline-pair lan-dev${devOnly(!!lan.webhookToken)}" style="margin-top:10px;">
       <div style="flex:1;">
         <label data-i18n="lan.webhook_token">Printer Webhook Token</label>
         <div style="display:flex;gap:6px;">
@@ -4564,7 +4569,7 @@ function renderLanApiSettings() {
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" data-i18n="lan.webhook_token_hint">Used to authenticate printer webhook calls</div>
       </div>
     </div>
-    <div class="inline-pair" style="margin-top:10px;">
+    <div class="inline-pair lan-dev${devOnly(!!(lan.sallaWebhookSecret || lan.zidWebhookSecret))}" style="margin-top:10px;">
       <div style="flex:1;">
         <label data-i18n="lan.salla_secret">Salla webhook secret</label>
         <input type="password" id="lan_salla_secret" value="${escapeHtml(secretInputValue(lan.sallaWebhookSecret))}" placeholder="${escapeHtml(secretFieldPlaceholder(lan.sallaWebhookSecret) || 'From Salla dashboard')}" autocomplete="off">
@@ -4591,7 +4596,7 @@ function renderLanApiSettings() {
       <button class="btn ghost" id="btnStartLan" data-i18n="lan.start">Start server</button>
       <button class="btn ghost" id="btnStopLan"  data-i18n="lan.stop">Stop server</button>
     </div>
-    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+    <div class="lan-dev${devOnly(!!lan.tunnelEnabled)}" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:10px;">
         <input type="checkbox" id="lan_tunnel_enabled" style="width:auto;margin:0;" ${lan.tunnelEnabled ? 'checked' : ''}>
         <span data-i18n="lan.tunnel_enable">Enable remote tunnel (via localtunnel.me)</span>

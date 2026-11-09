@@ -180,7 +180,7 @@ final class ConnectorsTests: XCTestCase {
     /// Release builds hold no sample connector until launch day, when this
     /// flips with khaytapp.com/privacy (#147) live. Update this test then.
     func testTheSampleConnectorsWaitForLaunchDay() {
-        XCTAssertFalse(SampleShop.connectorsPublished,
+        XCTAssertFalse(ConnectorLaunch.launched,
                        "flip only in the launch build, once khaytapp.com/privacy describes connectors")
     }
 

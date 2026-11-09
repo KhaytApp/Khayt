@@ -64,6 +64,12 @@ struct KhaytCommands: Commands {
             CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
             // One model out as a `.khaytbundle`, and back in (`Shop+ModelBundle`).
             CommandGroup(after: .importExport) { ModelBundleCommands().environment(shop).disabled(shop.needsSignIn) }
+            // File ▸ Khayt Cloud: the account, where a document app keeps
+            // what happens to its document (Nov 2026 review).
+            CommandGroup(after: .importExport) {
+                Menu(Words.upfront("mac.nav_cloud")) { CloudMenuItems(withSettings: true) }
+                    .environment(shop).disabled(shop.needsSignIn)
+            }
         }
 
         CommandGroup(replacing: .appInfo) {
@@ -258,29 +264,11 @@ private struct BookMenu: View {
             Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
         }
 
-        // Signing in, which is what a book carried to a new Mac needs first:
-        // the saved token is sealed against the Keychain of the machine that
-        // obtained it, so it arrives unreadable and every cloud item below goes
-        // quiet. NOT disabled on `cloudConnected` — a shop whose token cannot
-        // be opened still counts as connected, and that is exactly when this is
-        // the item you want.
-        Button(Words.upfront("mac.cloud_sign_in") + "\u{2026}") { shop.signingIntoCloud = true }
-
-        Button(Words.upfront("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
-            .disabled(!shop.cloudConnected)
-        // The way back out of automatic sync, and the only one there is.
-        //
-        // The data key is held for the life of the app so pushes can happen in
-        // the background; a shop leaving a Mac somewhere it does not control
-        // needs to be able to take it away again without quitting. Disabled
-        // rather than hidden when nothing is unlocked, so the item teaches what
-        // it does before it is ever needed.
-        Button(Words.upfront("mac.lock_cloud")) { shop.forgetCloudKey() }
-            .disabled(!shop.cloudUnlocked)
-        // Signing out is not locking: Lock keeps the shop signed in and only
-        // drops the key; this stops syncing on this Mac altogether.
-        Button(Words.upfront("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
-            .disabled(!shop.cloudConnected)
+        // The cloud account. Also under File ▸ Khayt Cloud and in Settings ›
+        // Khayt Cloud (Nov 2026 review); kept here for one release so a shop
+        // that learned it here still finds it. One view, so the two menus
+        // cannot drift apart.
+        CloudMenuItems()
         Button(Words.upfront("mac.export_copy")) {
             Task { await shop.exportForSharing() }
         }
@@ -936,5 +924,43 @@ private struct ModelViewCommands: View {
                 .keyboardShortcut("4", modifiers: [.command, .option])
         }
         .disabled(off)
+    }
+}
+
+/// The cloud account's menu items, for the Book menu and File ▸ Khayt Cloud.
+///
+/// Gated as the sidebar and Settings › Khayt Cloud are: the cloud is the
+/// owner's (`cloud` in lib/rbac.js). The menus used to offer Sign Out to
+/// anyone, and `signOutOfCloud` refused only afterwards.
+private struct CloudMenuItems: View {
+    @Environment(Shop.self) private var shop
+    var withSettings = false
+
+    var body: some View {
+        let owner = shop.lockAllows("cloud", "edit")
+        // Signing in is what a book carried to a new Mac needs first: the saved
+        // token is sealed against the Keychain of the machine that obtained
+        // it, so it arrives unreadable and every item below goes quiet. NOT
+        // disabled merely on `cloudConnected` — a shop whose key cannot be
+        // opened still counts as connected, and that is exactly when this is
+        // the item you want. Disabled only once connected AND unlocked, when
+        // there is nothing left for it to do.
+        Button(Words.upfront("mac.cloud_sign_in") + "\u{2026}") { shop.signingIntoCloud = true }
+            .disabled(!owner || (shop.cloudConnected && shop.cloudUnlocked))
+        Button(Words.upfront("mac.check_cloud") + "\u{2026}") { shop.checkingCloud = true }
+            .disabled(!owner || !shop.cloudConnected)
+        // The way back out of automatic sync without quitting: the data key is
+        // held for the life of the app so pushes can happen in the background.
+        Button(Words.upfront("mac.lock_cloud")) { shop.forgetCloudKey() }
+            .disabled(!owner || !shop.cloudUnlocked)
+        // Signing out is not locking: Lock keeps the shop signed in and only
+        // drops the key; this stops syncing on this Mac altogether.
+        Button(Words.upfront("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
+            .disabled(!owner || !shop.cloudConnected)
+        if withSettings {
+            Divider()
+            SettingsLink { Text(Words.upfront("mac.cloud_settings") + "\u{2026}") }
+                .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .cloud })
+        }
     }
 }

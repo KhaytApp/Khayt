@@ -98,6 +98,7 @@ const safeNames = require('./lib/safe-names');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
 const webhookSend = require('./lib/webhook-send');
 const pluginSend = require('./lib/main/plugin-send');
+const streamHash = require('./lib/main/stream-hash');
 const { parseGcodeText } = require('./lib/gcode-parse');
 const moonrakerHistory = require('./lib/moonraker-history');
 // Reading a Klipper printer's answer — shared with the Mac app, which polls the
@@ -3681,6 +3682,37 @@ ipcMain.handle('hub:printlib-list', async (_e, id) => {
   // working with the bucket unreachable, which is why it reads sidecars off the
   // disk rather than asking the bucket what it holds.
   return PLT.mergeListing(entries, await printLibSidecarMap(dir), await printLibOnlineMap(dir));
+});
+
+/**
+ * Hash one library model's file for Library Health's duplicate check
+ * (lib/library-hash-plan.js plans the run; this reads one file). Read in
+ * chunks (lib/main/stream-hash.js), only inside the library, never a tiered
+ * or online-only placeholder (reading one would fetch it), and never over
+ * PRINT_FILE_MAX_BYTES. Answers the hash; writing it is the window's, which
+ * writes contentHash and nothing else. `hub:printlib-hash-stop` stops the
+ * file being read, so Stop is immediate even on a 1 GB model.
+ */
+let printLibHashAbort = null;
+ipcMain.handle('hub:printlib-hash', async (_e, id, filename) => {
+  const name = path.basename(String(filename || ''));
+  if (!id || !name || name !== String(filename) || PLT.isSidecar(name) || PLT.isOnlineMarker(name)) {
+    return { ok: false, error: 'not-a-file' };
+  }
+  const full = path.join(printLibItemDir(String(id)), name);
+  if (!printLibContains(full)) return { ok: false, error: 'not-a-file' };
+  if (printLibHashAbort) printLibHashAbort.abort();
+  const ctl = new AbortController();
+  printLibHashAbort = ctl;
+  try {
+    return await streamHash.hashFile(full, { maxBytes: PRINT_FILE_MAX_BYTES, signal: ctl.signal });
+  } finally {
+    if (printLibHashAbort === ctl) printLibHashAbort = null;
+  }
+});
+ipcMain.handle('hub:printlib-hash-stop', () => {
+  if (printLibHashAbort) printLibHashAbort.abort();
+  return true;
 });
 
 ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
@@ -7328,6 +7360,7 @@ app.on('web-contents-created', (_event, wc) => {
 
 // Help-menu destinations. Kept as named constants so the menu below reads as a
 // list of places rather than a wall of URLs, and so a typo is in one place.
+const appMenu = require('./lib/main/app-menu');
 const KHAYT_SITE = 'https://khaytapp.com';
 const BEDREADY_SITE = 'https://bedready.io';
 const KHAYT_SUBREDDIT = 'https://www.reddit.com/r/khayt';
@@ -7351,63 +7384,27 @@ function openHelpLink(url) {
   shell.openExternal(target).catch((e) => console.error('help link failed:', e));
 }
 
+/**
+ * A menu item that asks the renderer to do what one of its own buttons does —
+ * so the command has one implementation, in the window, and the menu is only a
+ * second way to reach it.
+ */
+function sendMenuCommand(cmd) {
+  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send('hub:menu-command', cmd);
+}
+
 function buildMenu() {
-  const isMac = process.platform === 'darwin';
-  const template = [
-    ...(isMac ? [{
-      // Electron derives app.name from package.json ("khayt"), so these role items would otherwise read
-      // "About khayt" / "Hide khayt" / "Quit khayt" — even in Bed Ready. Override the name-bearing labels
-      // with the flavor's product name (Bed Ready / Khayt). Deliberately NOT app.setName(): that would
-      // repoint app.getPath('userData') from …/khayt and orphan every user's data.
-      label: FLAVOR_NAME,
-      submenu: [
-        { role: 'about', label: `About ${FLAVOR_NAME}` }, { type: 'separator' },
-        { role: 'services' }, { type: 'separator' },
-        { role: 'hide', label: `Hide ${FLAVOR_NAME}` }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
-        { role: 'quit', label: `Quit ${FLAVOR_NAME}` }
-      ]
-    }] : []),
-    { label: 'File', submenu: [ isMac ? { role: 'close' } : { role: 'quit' } ] },
-    {
-      label: 'Edit', submenu: [
-        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
-        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'View', submenu: [
-        { role: 'reload' }, { role: 'forceReload' },
-        ...(!app.isPackaged ? [{ role: 'toggleDevTools' }] : []),
-        { type: 'separator' },
-        { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
-      label: 'Window', submenu: [
-        { role: 'minimize' }, { role: 'zoom' },
-        ...(isMac ? [ { type: 'separator' }, { role: 'front' } ] : [ { role: 'close' } ])
-      ]
-    },
-    {
-      // There was no Help menu at all, so a shop that wanted the docs, the
-      // release notes, or somewhere to report a bug had nowhere in the app to
-      // find any of them.
-      role: 'help',
-      submenu: [
-        { label: `${FLAVOR_NAME} Website`, click: () => openHelpLink(isBedReady ? BEDREADY_SITE : KHAYT_SITE) },
-        // The subreddit belongs to Khayt. Bed Ready is a separate brand to the
-        // people running it, and putting "r/khayt" in their Help menu would be
-        // the first they had heard of the other product.
-        ...(isBedReady ? [] : [
-          { label: 'Community — r/khayt', click: () => openHelpLink(KHAYT_SUBREDDIT) },
-        ]),
-        { type: 'separator' },
-        { label: 'Release Notes', click: () => openHelpLink(`${KHAYT_REPO}/releases`) },
-        { label: 'Report an Issue', click: () => openHelpLink(`${KHAYT_REPO}/issues/new`) },
-      ]
-    }
-  ];
+  const template = appMenu.menuTemplate({
+    isMac: process.platform === 'darwin',
+    isPackaged: app.isPackaged,
+    isBedReady,
+    flavorName: FLAVOR_NAME,
+    links: { site: isBedReady ? BEDREADY_SITE : KHAYT_SITE, subreddit: KHAYT_SUBREDDIT, repo: KHAYT_REPO },
+    openHelpLink,
+    sendMenuCommand,
+  });
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 

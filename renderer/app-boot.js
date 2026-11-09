@@ -463,6 +463,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   wireUpdateUI({ getCurrentVersion: () => currentVersion });
 
+  // ── The menu bar's commands (main.js sendMenuCommand) ────────────────────
+  // Each does exactly what the window's own control does, so a menu item can
+  // never drift from the button it stands in for.
+  window.hubAPI?.onMenuCommand?.((cmd) => {
+    const open = (typeof openSettingsSection === 'function') ? openSettingsSection : window.KhaytShell?.openSettingsSection;
+    if (cmd === 'open-settings') {
+      if (open) open(document.querySelector('.settings-nav-item.active')?.dataset.settingsSection || 'biz');
+    } else if (cmd === 'check-updates') {
+      const btn = document.getElementById('btnCheckForUpdates');
+      if (!btn) return;
+      if (open) open('data');
+      btn.scrollIntoView({ block: 'center' });
+      if (!btn.disabled) btn.click();
+    }
+  });
+
   // ── Manual "Check for updates" button in Settings ────────────────────────
   (function wireCheckForUpdatesBtn() {
     const btn = document.getElementById('btnCheckForUpdates');

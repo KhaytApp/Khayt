@@ -945,7 +945,7 @@ final class LanServer {
     /// one is not routed, so the list cannot drift from the table below.
     nonisolated static let endpoints = [
         "/", "/session", "/intake", "/manifest.json", "/sw.js",
-        "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/deltas",
+        "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/settings", "/api/store/deltas",
         "/api/identity", "/api/proof", "/api/devices",
         "/api/library", "/api/library/:id/thumb", "/api/library/:id/estimate",
         "/api/intake", "/api/intake/estimate", "/api/survey",
@@ -1113,6 +1113,32 @@ final class LanServer {
             let now = host.now()
             guard let body = await PinWork.run({ Self.storeBody(masked: masked, whole: whole, now: now) }) else {
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)
+            }
+            return .json(200, body)
+
+        // ── THE SHOP'S SETTINGS, ON THEIR OWN ─────────────────────────────
+        //
+        // Cloud deltas never carry `settings` ("settings stay on this Mac"),
+        // and a phone signed in to Khayt Cloud refreshes from the cloud. So a
+        // connector installed here (`settings.plugins`), a currency or a tax
+        // mode changed here, reached such a phone only when it re-paired and
+        // took the whole book. This is the small read it makes instead, after
+        // a refresh round, whenever this Mac answers (Nov 2026: connectors
+        // launch gate; not put in the cloud copy, which /privacy describes).
+        //
+        // Exactly the settings `/api/store` already hands the phone: the
+        // same `storeForPhone` mask (every path in `lib/store-secret-paths.js`,
+        // connector secrets included), behind the same PIN gate. A copy that
+        // cannot be prepared is a 500, never `{}` — the phone replaces its
+        // settings with what this says.
+        case ("/api/store/settings", true):
+            if let refused = await pinGate(request) { return refused }
+            guard let masked = try? await engine.storeForPhone(host.store()) else {
+                return .json(500, #"{"error":"The settings could not be prepared to send"}"#)
+            }
+            let now = host.now()
+            guard let body = await PinWork.run({ Self.settingsBody(masked: masked, now: now) }) else {
+                return .json(500, #"{"error":"The settings could not be prepared to send"}"#)
             }
             return .json(200, body)
 
@@ -1944,6 +1970,20 @@ final class LanServer {
                 collections: [:], omitted: [], takenAt: StoreWriter.iso(now)))
             : BookScope.take(from: masked, now: now)
         return envelope(store: cut.store, taken: cut.taken, whole: whole)
+    }
+
+    /// `{ settings, servedAt }` for `/api/store/settings`: the masked book's
+    /// settings object, whole. Nil (so a 500) when it has none to send — a
+    /// phone told `{}` would replace the shop's settings with nothing.
+    nonisolated static func settingsBody(masked: [String: JSONValue], now: Date) -> String? {
+        guard case .object(let settings)? = masked["settings"], !settings.isEmpty else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(JSONValue.object([
+            "settings": .object(settings),
+            "servedAt": .string(StoreWriter.iso(now)),
+        ])) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// `{ scope, store }` — what travelled, and the description of what did not.

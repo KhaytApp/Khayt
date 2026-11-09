@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var testOK = false
 
     @State private var showConnection = false
+    @State private var showDiagnostics = false
 
     var body: some View {
         NavigationStack {
@@ -63,6 +64,15 @@ struct SettingsView: View {
                         .foregroundStyle(KhaytDesign.note)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .padding(.top, 14)
+                    // The app's version. A long press opens Diagnostics: what the
+                    // syncs last did, as counts and states (`BookDiagnostics`).
+                    Text(L10n.format("settings.version", DiagnosticsSheet.version, DiagnosticsSheet.build))
+                        .font(.khayt(11.5, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.note)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture { showDiagnostics = true }
+                        .accessibilityAction(named: L10n.tr("diag.title")) { showDiagnostics = true }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -77,6 +87,7 @@ struct SettingsView: View {
             .khaytScreen(title: L10n.tr("tab.settings"))
             .background(KhaytDesign.ground.ignoresSafeArea())
             .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
+            .sheet(isPresented: $showDiagnostics) { DiagnosticsSheet() }
         }
     }
 
