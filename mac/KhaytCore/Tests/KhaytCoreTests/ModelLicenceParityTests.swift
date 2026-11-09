@@ -218,4 +218,22 @@ struct ModelLicenceParityTests {
         }
         #expect(try js.value("KhaytModelLicence.NOTE_MAX", []) == .number(Double(ModelLicence.noteMax)))
     }
+
+    @Test("capNote: trimmed, cut in UTF-16 units, never half an emoji, the same as the JS")
+    func capNoteMatches() throws {
+        let js = try js()
+        let cases = ["  hi  ", String(repeating: "😀", count: 400), "a" + String(repeating: "😀", count: 300),
+                     String(repeating: "e\u{301}", count: 300), ""]
+        for c in cases {
+            let mine = ModelLicence.capNote(c)
+            #expect(mine.utf16.count <= ModelLicence.noteMax)
+            let theirs = try js.value("KhaytModelLicence.capNote(ARG0)", [.string(c)])
+            #expect(theirs == .string(mine), Comment(rawValue: "\(c.prefix(8))…"))
+        }
+        #expect(ModelLicence.capNote(String(repeating: "😀", count: 400)).utf16.count == 500)
+        #expect(ModelLicence.capNote("a" + String(repeating: "😀", count: 300)).utf16.count == 499)
+        // The bundle import keeps what the rule keeps.
+        let f = ModelBundle.checkedFields(["licenceNote": .string(String(repeating: "😀", count: 400))])
+        #expect(f["licenceNote"] == .string(ModelLicence.capNote(String(repeating: "😀", count: 400))))
+    }
 }

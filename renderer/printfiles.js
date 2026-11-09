@@ -3060,8 +3060,9 @@
         rec.licence = modal.querySelector('#pfLicence').value;
         // '' rather than deleted, like the licence proof: an absent field is one
         // a sync merge can bring back from an older copy.
-        rec.licenceNote = modal.querySelector('#pfLicenceNote').value.trim()
-          .slice(0, (window.KhaytModelLicence && window.KhaytModelLicence.NOTE_MAX) || 500);
+        rec.licenceNote = window.KhaytModelLicence
+          ? window.KhaytModelLicence.capNote(modal.querySelector('#pfLicenceNote').value)
+          : modal.querySelector('#pfLicenceNote').value.trim().slice(0, 500);
         const ph = modal._getPhoto ? modal._getPhoto() : null;
         // `userPhotoRemoved` tells the Mac not to put a picture it found in a
         // linked folder back on a model the shop cleared (Shop+LinkedSort.swift

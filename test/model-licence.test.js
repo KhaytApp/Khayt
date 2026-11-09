@@ -209,3 +209,14 @@ test('customTerms: the shop\'s own note for each custom model, trimmed and cappe
   assert.equal(out[2].note.length, L.NOTE_MAX);
   assert.deepEqual(L.customTerms(null, null), []);
 });
+
+test('capNote: trimmed, cut in UTF-16 units, never half an emoji', () => {
+  assert.equal(L.capNote('  hi  '), 'hi');
+  assert.equal(L.capNote(null), '');
+  const emoji = '😀'.repeat(400);              // 800 UTF-16 units
+  assert.equal(L.capNote(emoji).length, 500);  // 250 whole emoji
+  const odd = 'a' + '😀'.repeat(300);           // the cut at 500 lands mid-pair
+  const cut = L.capNote(odd);
+  assert.equal(cut.length, 499);
+  assert.ok(!/[\uD800-\uDBFF]$/.test(cut), 'a lone high surrogate was kept');
+});

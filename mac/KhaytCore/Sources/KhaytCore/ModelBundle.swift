@@ -354,10 +354,10 @@ public enum ModelBundle {
             guard let v = record[key] else { continue }
             switch (key, v) {
             case (_, .string(let s)) where texts.contains(key):
-                // A licence note is trimmed THEN capped, as the shared rule
-                // does (`ModelLicence.noteMax`); a manifest's word is not trusted.
+                // A licence note is capped by the shared rule (`capNote`,
+                // UTF-16 units); a manifest's word is not trusted.
                 let cut = key == "licenceNote"
-                    ? String(plain(s).trimmingCharacters(in: .whitespacesAndNewlines).prefix(ModelLicence.noteMax))
+                    ? ModelLicence.capNote(plain(s))
                     : String(plain(s).prefix(key == "name" ? 200 : 4000)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !cut.isEmpty { out[key] = .string(cut) }
             case (_, .string(let s)) where links.contains(key):

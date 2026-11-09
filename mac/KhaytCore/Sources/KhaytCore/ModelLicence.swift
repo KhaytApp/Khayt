@@ -59,8 +59,20 @@ public enum ModelLicence {
         .init(id: "custom", commercial: nil, attribution: false, derivatives: nil, share: false),
     ]
 
-    /// The longest `licenceNote` kept, in characters (`NOTE_MAX`).
+    /// The longest `licenceNote` kept, in UTF-16 units (`NOTE_MAX`, what
+    /// JavaScript's `slice` counts), so both apps keep the same value.
     public static let noteMax = 500
+
+    /// A licence note as it is kept: trimmed, then cut to `noteMax` UTF-16
+    /// units, stepping back one when the cut would leave half of a surrogate
+    /// pair. `capNote` in lib/model-licence.js is the same rule.
+    public static func capNote(_ note: String) -> String {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.utf16.count > noteMax else { return trimmed }
+        var units = Array(trimmed.utf16.prefix(noteMax))
+        if let last = units.last, UTF16.isLeadSurrogate(last) { units.removeLast() }
+        return String(decoding: units, as: UTF16.self)
+    }
 
     /// `str()` in the original is trim-if-a-string, so a number, a null or a
     /// missing field all read as the empty string rather than as their text.
@@ -260,8 +272,7 @@ public enum ModelLicence {
     }
 
     /// The models behind a sale whose licence is `custom`, each with its
-    /// `licenceNote` (trimmed, at most `noteMax` UTF-16 units, as JavaScript's
-    /// `slice` counts), in the order asked. Never a verdict: the screen shows
+    /// `licenceNote` (`capNote`), in the order asked. Never a verdict: the screen shows
     /// the note. Kept in step with `customTerms` in lib/model-licence.js.
     public static func customTerms(_ ids: [String], records: [JSONValue]) -> [CustomTerms] {
         var seen = Set<String>()
@@ -275,11 +286,7 @@ public enum ModelLicence {
                   str(o["licence"]).lowercased() == "custom" else { continue }
             var name = str(o["name"])
             if name.isEmpty { name = str(o["originalName"]) }
-            let note = str(o["licenceNote"])
-            let cut = note.utf16.count > noteMax
-                ? (String(note.utf16.prefix(noteMax)) ?? String(decoding: Array(note.utf16.prefix(noteMax)), as: UTF16.self))
-                : note
-            out.append(.init(id: key, name: name, note: cut))
+            out.append(.init(id: key, name: name, note: capNote(str(o["licenceNote"]))))
         }
         return out
     }

@@ -73,5 +73,5 @@ test('the non-commercial licences say they cannot be sold, in every language', (
 test('the model editor keeps a licence note, trimmed and capped by the shared rule', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'printfiles.js'), 'utf8');
   assert.match(src, /<textarea id="pfLicenceNote"[^>]*maxlength="\$\{\(window\.KhaytModelLicence && window\.KhaytModelLicence\.NOTE_MAX\) \|\| 500\}"/);
-  assert.match(src, /rec\.licenceNote = modal\.querySelector\('#pfLicenceNote'\)\.value\.trim\(\)\s*\.slice\(0, \(window\.KhaytModelLicence && window\.KhaytModelLicence\.NOTE_MAX\) \|\| 500\);/);
+  assert.match(src, /rec\.licenceNote = window\.KhaytModelLicence\s*\? window\.KhaytModelLicence\.capNote\(modal\.querySelector\('#pfLicenceNote'\)\.value\)/);
 });
