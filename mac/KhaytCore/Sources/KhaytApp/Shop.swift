@@ -3093,6 +3093,9 @@ final class Shop {
     /// How a connector's POST leaves this Mac. Nil is `WebhookClient`; tests
     /// put a stand-in here so no request reaches the network.
     var connectorPost: Shop.ConnectorPost?
+    /// Connector event deliveries being sent right now, so a retry pass does
+    /// not send one twice at once.
+    var connectorInFlight: Set<String> = []
 
     // Stored for "Integrations sent from this Mac" (Shop+Integrations.swift).
     /// Texts in flight or sent this run, as "job|milestone" — one click, one text.

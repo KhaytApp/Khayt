@@ -2236,8 +2236,12 @@ extension Shop {
     /// IS moved and the book says so. Undoing a correct write because a
     /// consumer was down would be the wrong trade. The shop is TOLD, which is
     /// the whole point of the app having refused these moves before.
-    func fire(_ deliveries: [KhaytEngine.WebhookDelivery]) async {
+    func fire(_ all: [KhaytEngine.WebhookDelivery]) async {
         guard engine != nil else { return }
+        // A connector listening to the event is not a webhook: its request is
+        // its own (`deliverConnectorEvents`), and it has no URL here.
+        await deliverConnectorEvents(all.filter { $0.connector != nil })
+        let deliveries = all.filter { $0.connector == nil }
         var sent = 0
         var tries: [WebhookTry] = []
         for one in deliveries {

@@ -62,6 +62,7 @@ extension Shop {
     func runIntegrationsPass() async {
         guard let build = source.build, StoreLock.weOwnIt(build) else { return }
         await retryDueWebhooks()
+        await retryDueConnectorEvents()
         await retryFailedAccountingPushes()
         await sendDigestIfDue()
     }
