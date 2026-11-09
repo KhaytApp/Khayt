@@ -29,6 +29,24 @@ extension Shop {
         return []
     }
 
+    /// This Mac's dev connectors (`DevConnectors`), running or not. Never the book's.
+    var devConnectorEntries: [JSONValue] { DevConnectors.entries(defaults: devConnectorDefaults) }
+
+    /// The dev connectors that may run now, beside the book's.
+    var runningDevConnectors: [JSONValue] {
+        DevConnectors.running(besides: connectorEntries, defaults: devConnectorDefaults)
+    }
+
+    /// A dev connector, not one the shop installed (the shop's wins on the same id).
+    func isDevConnector(_ id: String) -> Bool {
+        Self.entry(in: .array(connectorEntries), id: id) == nil && Self.entry(in: .array(devConnectorEntries), id: id) != nil
+    }
+
+    /// An installed connector by id: the book's, else this Mac's dev one.
+    func anyConnectorEntry(_ id: String) -> JSONValue? {
+        Self.entry(in: .array(connectorEntries), id: id) ?? Self.entry(in: .array(devConnectorEntries), id: id)
+    }
+
     /// The id of the Khayt key a manifest's signature verifies against, or nil.
     func connectorReviewedBy(_ manifest: JSONValue) async -> String? {
         guard let engine,
@@ -41,10 +59,15 @@ extension Shop {
     func connectorRows() async -> [ConnectorRow] {
         guard let engine else { return [] }
         var out: [ConnectorRow] = []
-        for entry in connectorEntries {
+        let devOn = DevConnectors.isOn(defaults: devConnectorDefaults)
+        let book = connectorEntries
+        let bookIds = Set(book.compactMap { Shop.plainString(Self.object($0)["id"]) })
+        let dev = devConnectorEntries.filter { !bookIds.contains(Shop.plainString(Self.object($0)["id"]) ?? "") }
+        for (entry, isDev) in book.map({ ($0, false) }) + dev.map({ ($0, true) }) {
             guard case .object(let e) = entry, case .string(let id)? = e["id"] else { continue }
             let manifest = e["manifest"] ?? .null
-            let reviewed = await connectorReviewedBy(manifest) != nil
+            // Developer mode waives the review for a dev entry, and only while on.
+            let reviewed = isDev ? devOn : await connectorReviewedBy(manifest) != nil
             let state = (try? await engine.pluginStateOf(entry, reviewed: reviewed)) ?? "invalid"
             let declared = Self.connectorSecretsDeclared(manifest)
             let held = await connectorSecrets.held(pluginId: id, names: declared.map(\.name))
@@ -55,7 +78,8 @@ extension Shop {
                 state: state,
                 secrets: declared.map { .init(name: $0.name, label: Self.connectorLabel($0.label, words.language, fallback: $0.name),
                                               held: held.contains($0.name)) },
-                settings: Self.settingRows(entry, lang: words.language)))
+                settings: Self.settingRows(entry, lang: words.language),
+                dev: isDev))
         }
         return out
     }
@@ -94,7 +118,7 @@ extension Shop {
         var raw: [String: JSONValue] = values.mapValues { .string($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
         for (k, v) in ticks { raw[k] = .bool(v) }
         let sent = JSONValue.object(raw)
-        return await writeConnectors { plugins in
+        return await writeConnectors(dev: isDevConnector(id)) { plugins in
             guard let entry = Self.entry(in: plugins, id: id) else { return plugins }
             let next = try await engine.pluginWithConfig(entry, values: sent)
             return try await engine.pluginWithEntry(plugins, entry: next)
@@ -109,7 +133,9 @@ extension Shop {
     ///
     /// Only a manifest Khayt has signed is offered: an unreviewed one is
     /// refused here, before anything about it is shown as if it were real.
-    func offerConnector(_ data: Data) async -> String? {
+    /// `dev` is a `.khaytplugin` loaded in developer mode: offered signed or
+    /// not, kept on this Mac only, and never over a connector the shop has.
+    func offerConnector(_ data: Data, dev: Bool = false) async -> String? {
         guard let engine else { return words.callIt("mac.move_no_engine") }
         guard let manifest = try? JSONDecoder().decode(JSONValue.self, from: data),
               case .object(let m) = manifest,
@@ -118,11 +144,17 @@ extension Shop {
               case .string(let id)? = m["id"] else {
             return words.callIt("plg.err_invalid")
         }
-        guard let reviewer = await connectorReviewedBy(manifest) else { return words.callIt("plg.err_unreviewed") }
+        let reviewer = await connectorReviewedBy(manifest)
+        if dev {
+            guard DevConnectors.isOn(defaults: devConnectorDefaults) else { return words.callIt("plg.err_unreviewed") }
+            guard Self.entry(in: .array(connectorEntries), id: id) == nil else { return words.callIt("plg.dev_taken") }
+        } else if reviewer == nil {
+            return words.callIt("plg.err_unreviewed")
+        }
         let rows = (try? await engine.pluginConsentRows(manifest)) ?? []
         var scopes: [String] = []
         if case .array(let s)? = m["scopes"] { scopes = s.compactMap { if case .string(let v) = $0 { v } else { nil } } }
-        let installed = connectorEntries.first { Self.object($0)["id"] == .string(id) }
+        let installed = Self.entry(in: .array(dev ? devConnectorEntries : connectorEntries), id: id)
         connectorOffer = ConnectorOffer(
             manifestId: id,
             name: Self.connectorLabel(m["name"], words.language, fallback: id),
@@ -143,7 +175,8 @@ extension Shop {
                 return .init(host: Shop.plainString(r["host"]) ?? "", fields: fields)
             },
             scopes: scopes,
-            replacing: installed.flatMap { Shop.plainString(Self.object($0)["version"]) })
+            replacing: installed.flatMap { Shop.plainString(Self.object($0)["version"]) },
+            dev: dev)
         return nil
     }
 
@@ -154,8 +187,16 @@ extension Shop {
         guard let offer = connectorOffer, let engine else { return words.callIt("mac.move_no_engine") }
         // The signature is checked again at the moment of writing, on the very
         // bytes being stored — not trusted from when the sheet opened.
-        guard await connectorReviewedBy(offer.manifest) != nil else { return words.callIt("plg.err_unreviewed") }
-        let ok = await writeConnectors { plugins in
+        if offer.dev {
+            guard DevConnectors.isOn(defaults: devConnectorDefaults),
+                  Self.entry(in: .array(connectorEntries), id: offer.manifestId) == nil else {
+                connectorOffer = nil
+                return words.callIt("plg.err_unreviewed")
+            }
+        } else {
+            guard await connectorReviewedBy(offer.manifest) != nil else { return words.callIt("plg.err_unreviewed") }
+        }
+        let ok = await writeConnectors(dev: offer.dev) { plugins in
             try await Self.withConsented(offer.manifest, in: plugins, engine: engine)
         }
         connectorOffer = nil
@@ -165,7 +206,7 @@ extension Shop {
 
     /// Switch an installed connector on or off. Its fields stay on the records.
     func setConnector(_ id: String, enabled: Bool) async {
-        _ = await writeConnectors { plugins in
+        _ = await writeConnectors(dev: isDevConnector(id)) { plugins in
             guard case .array(var rows) = plugins,
                   let i = rows.firstIndex(where: { Self.object($0)["id"] == .string(id) }),
                   case .object(var e) = rows[i] else { return plugins }
@@ -178,9 +219,9 @@ extension Shop {
     /// Remove a connector, and its keys from this Mac. What it filled in on
     /// jobs and customers stays: those values are the shop's.
     func removeConnector(_ id: String) async {
-        let manifest = connectorEntries.first { Self.object($0)["id"] == .string(id) }.map { Self.object($0)["manifest"] ?? .null }
+        let manifest = anyConnectorEntry(id).map { Self.object($0)["manifest"] ?? .null }
         guard let engine else { return }
-        let ok = await writeConnectors { plugins in try await engine.pluginWithoutEntry(plugins, id: id) }
+        let ok = await writeConnectors(dev: isDevConnector(id)) { plugins in try await engine.pluginWithoutEntry(plugins, id: id) }
         if ok, let manifest {
             await connectorSecrets.removeAll(pluginId: id, names: Self.connectorSecretsDeclared(manifest).map(\.name))
         }
@@ -192,7 +233,7 @@ extension Shop {
         // lock: the keys are this Mac's, not the book's, but giving a connector
         // the means to act for the shop is a settings change like any other.
         guard permitted("settings", "edit") else { return false }
-        guard let entry = connectorEntries.first(where: { Self.object($0)["id"] == .string(id) }) else { return false }
+        guard let entry = anyConnectorEntry(id) else { return false }
         let declared = Set(Self.connectorSecretsDeclared(Self.object(entry)["manifest"] ?? .null).map(\.name))
         for (name, value) in values where declared.contains(name) {
             let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -214,8 +255,21 @@ extension Shop {
     }
 
     /// One read-modify-write of `settings.plugins`, on the book as it is on disk.
-    private func writeConnectors(_ change: @escaping (JSONValue) async throws -> JSONValue) async -> Bool {
+    /// With `dev`, the same change made to this Mac's dev connectors instead:
+    /// nothing in the book moves.
+    private func writeConnectors(dev: Bool = false,
+                                 _ change: @escaping (JSONValue) async throws -> JSONValue) async -> Bool {
         guard permitted("settings", "edit") else { return false }
+        if dev {
+            do {
+                DevConnectors.save(try await change(.array(devConnectorEntries)), defaults: devConnectorDefaults)
+                devConnectorsRev += 1
+                return true
+            } catch {
+                settingsProblem = said(error)
+                return false
+            }
+        }
         guard let build = source.build else { settingsProblem = words.callIt("mac.move_sample"); return false }
         do {
             try await StoreWriter.update(
@@ -293,13 +347,16 @@ struct ConnectorOffer: Identifiable, Equatable {
     let name: String
     let version: String
     /// The Khayt key that signed it — the sheet says "Reviewed by Khayt".
-    let reviewedBy: String
+    /// Nil only for a dev connector (`dev`).
+    let reviewedBy: String?
     let manifest: JSONValue
     /// One per address: the fields that go there, labelled, with their category.
     let rows: [Row]
     let scopes: [String]
     /// The installed version this replaces, if any.
     let replacing: String?
+    /// Loaded in developer mode: kept on this Mac only (`DevConnectors`).
+    var dev: Bool = false
 
     struct Row: Equatable, Identifiable {
         var id: String { host }
@@ -325,6 +382,8 @@ struct ConnectorRow: Identifiable, Equatable {
     }
 
     var settings: [Setting] = []
+    /// A dev connector: this Mac only, not reviewed by Khayt (`DevConnectors`).
+    var dev: Bool = false
 
     /// One of the shop's settings for this connector (manifest `settings[]`).
     struct Setting: Equatable, Identifiable {

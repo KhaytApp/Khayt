@@ -361,7 +361,7 @@ extension Shop {
                 }
                 if let asked = done.webhookEffects, !asked.isEmpty {
                     owed = (try? await engine.webhookDeliveries(
-                        order: done.order, effects: asked, settings: settings,
+                        order: done.order, effects: asked, settings: DevConnectors.withDev(settings),
                         shopName: Self.plainString(settings["bizEn"])
                             ?? Self.plainString(settings["bizAr"]) ?? "Khayt",
                         clientName: Self.emailClientName(for: Self.asObject(done.order) ?? [:], in: clients),
