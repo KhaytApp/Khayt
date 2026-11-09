@@ -38,11 +38,28 @@ function customerOfOrder(order) {
   return order && order.clientId ? (clients || []).find((c) => c && c.id === order.clientId) : undefined;
 }
 
+/* ── Switched off until they ship ────────────────────────────────────── */
+
+// The main process decides (main.js CONNECTORS_ON). Until it has said yes,
+// this window shows no connector anywhere, fires no event and resumes no
+// retry; main refuses each request anyway.
+let pluginsOn = false;
+async function loadPluginsEnabled() {
+  try { pluginsOn = !!(window.hubAPI?.pluginsEnabled && await window.hubAPI.pluginsEnabled()); }
+  catch (_) { pluginsOn = false; }
+  const card = document.getElementById('pluginCard');
+  if (card) card.hidden = !pluginsOn;
+  if (pluginsOn) renderPluginSettings();
+  return pluginsOn;
+}
+
 /* ── Settings › Automation › Connectors ─────────────────────────────── */
 
 function renderPluginSettings() {
   const el = $('#pluginSection');
-  if (!el || !PluginHost()) return;
+  const card = document.getElementById('pluginCard');
+  if (card) card.hidden = !pluginsOn;
+  if (!el || !PluginHost() || !pluginsOn) return;
   const list = Array.isArray(settings.plugins) ? settings.plugins : [];
   const stateWord = (s) => t('plg.state_' + s);
   el.innerHTML = `
@@ -229,7 +246,7 @@ function pluginConsent(manifest, { readOnly = false } = {}) {
 /** The Connectors block for an editor: the fields connectors add, then their buttons. */
 function pluginEditorHtml(attach, record) {
   const H = PluginHost();
-  if (!H) return '';
+  if (!H || !pluginsOn) return '';
   const fields = H.fieldsFor(settings, attach, pluginIsReviewed);
   const actions = H.actionsFor(settings, attach, pluginIsReviewed);
   if (!fields.length && !actions.length) return '';
@@ -349,7 +366,7 @@ async function runPluginAction(id, actionId, attach, recs) {
 function firePluginEvent(eventName, orderId) {
   try {
     const H = PluginHost();
-    if (!H || !orderId) return;
+    if (!H || !orderId || !pluginsOn) return;
     const targets = H.eventTargets(settings, eventName, pluginIsReviewed);
     for (const { entry } of targets) {
       deliverPluginEvent({ delivery: pluginDeliveryId(), id: entry.id, event: eventName, orderId, attempt: 1 });
@@ -391,6 +408,7 @@ function clearPluginOutbox(delivery) {
 
 /** At launch: retries left from the last run, due ones now, the rest on their timers. */
 async function resumePluginOutbox() {
+  if (!(await loadPluginsEnabled())) return;
   await refreshPluginReviewed();
   const list = Array.isArray(settings.pluginOutbox) ? settings.pluginOutbox.slice() : [];
   for (const item of list) {

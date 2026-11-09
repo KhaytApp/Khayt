@@ -7120,7 +7120,14 @@ ipcMain.handle('hub:cloud-snapshot-get', async (_e, { id } = {}) => {
 // secret is decided here (lib/main/plugin-send.js). The entry is read from
 // DISK — its secrets are in the clear only here — and the window's records
 // are the ones it shows, which may be newer than the last save.
+// Connectors reach shops on the same day on every device, with the published
+// /privacy text (Turki, Nov 8). Until then they are switched off here, and
+// only a developer launching with KHAYT_CONNECTORS=1 sees them. Off means the
+// window shows nothing and these handlers refuse, whatever the window asks.
+const CONNECTORS_ON = process.env.KHAYT_CONNECTORS === '1';
+ipcMain.handle('hub:plugins-enabled', () => CONNECTORS_ON);
 ipcMain.handle('hub:plugin-check', async (_e, manifest) => {
+  if (!CONNECTORS_ON) return { ok: false, error: 'off' };
   try { return pluginSend.checkInstall(manifest); }
   catch (e) { return { ok: false, error: 'invalid' }; }
 });
@@ -7128,12 +7135,14 @@ ipcMain.handle('hub:plugin-check', async (_e, manifest) => {
 // it is never stored, so a book edited elsewhere cannot claim it.
 ipcMain.handle('hub:plugin-reviewed', async (_e, manifests) => {
   const out = {};
+  if (!CONNECTORS_ON) return out;
   for (const m of (Array.isArray(manifests) ? manifests : []).slice(0, 100)) {
     if (m && typeof m.id === 'string') out[m.id] = !!pluginSend.reviewedBy(m);
   }
   return out;
 });
 ipcMain.handle('hub:plugin-send', async (_e, req) => {
+  if (!CONNECTORS_ON) return { ok: false, refused: 'off' };
   try {
     const r = req && typeof req === 'object' ? req : {};
     const disk = readStoreDecryptedFromDisk();
