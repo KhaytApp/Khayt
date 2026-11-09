@@ -188,7 +188,7 @@ extension KhaytAPIClient {
 
     /// One of the shop's papers, built from the book this phone keeps — or why not.
     func shopPaper(_ subject: PaperSubject) async -> PaperBuild {
-        guard let reader, holdsBook else { return .refused(.missing) }
+        guard let reader, holdsBookOnDisk else { return .refused(.missing) }
         return (try? await reader.shopPaper(subject, language: L10n.contentLanguage)) ?? .refused(.failed)
     }
 }

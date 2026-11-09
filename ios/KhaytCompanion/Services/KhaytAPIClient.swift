@@ -131,15 +131,29 @@ final class KhaytAPIClient: ObservableObject {
     /// the Mac is out of reach or not yet reachable, is a working phone.
     var canSync: Bool { settings.isConfigured || cloud != nil }
 
-    /// Does this phone hold a book at all?
-    var holdsBook: Bool { reader?.holdsAnyBook ?? false }
+    /// Does this phone hold a book at all? Published, so a screen gated on
+    /// it redraws when a book arrives (a pull, a cloud round, the sample shop)
+    /// or goes (unpair) without a relaunch. Kept by `refreshHoldsBook()`.
+    @Published private(set) var holdsBook: Bool = false
+
+    /// The same question asked of the disk, now: for a gate that must not
+    /// trust a value that waits for its next refresh.
+    nonisolated var holdsBookOnDisk: Bool { reader?.holdsAnyBook ?? false }
+
+    /// Recompute `holdsBook` from the disk. Called after every path that can
+    /// create or delete the book; assigns only on a change, so it never
+    /// redraws a screen for nothing.
+    func refreshHoldsBook() {
+        let now = holdsBookOnDisk
+        if holdsBook != now { holdsBook = now }
+    }
 
     /// Whether the book on this phone holds ALL of a collection, so a total
     /// drawn from it is the shop's total and not the phone's.
     func holdsAll(_ collection: String) -> Bool { reader?.holdsAll(collection) ?? false }
 
     /// The book's scope, when there is a book. See `BookReader.scope()`.
-    var bookScope: BookScope.Taken? { holdsBook ? reader?.scope() : nil }
+    var bookScope: BookScope.Taken? { holdsBookOnDisk ? reader?.scope() : nil }
 
     /// How old the book is: the later of its last pull and the last sync.
     var bookAsOf: Date? {
@@ -174,6 +188,7 @@ final class KhaytAPIClient: ObservableObject {
         let opened = injected ?? (withBook ? try? CompanionBook.inSharedContainer() : nil)
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
+        _holdsBook = Published(initialValue: opened?.exists ?? false)
         gateEdits()
         // Pairing a Mac (or letting it go) changes whether edits have
         // somewhere to go. `objectWillChange` fires before the change lands.
@@ -331,6 +346,7 @@ final class KhaytAPIClient: ObservableObject {
         settings.serviceName = ""
         settings.isSampleShop = true
         settings.isPaired = true
+        refreshHoldsBook()
     }
 
     func fetchLivePrinters(now: Date = Date()) async throws -> LiveSnapshot {
@@ -443,6 +459,7 @@ final class KhaytAPIClient: ObservableObject {
         } else {
             try book.replace(with: store, scope: envelope.scope)
         }
+        refreshHoldsBook()
         // The whole book carries the Mac's settings: as good as a settings read.
         noteMacSettings()
         let count = Self.recordCount(in: store)
@@ -572,6 +589,7 @@ final class KhaytAPIClient: ObservableObject {
         } else {
             await refreshMacSettings(into: book)
         }
+        refreshHoldsBook()
     }
 
     /// Settings ▸ Diagnostics' "Refresh now": one round at once, whatever the
@@ -584,7 +602,7 @@ final class KhaytAPIClient: ObservableObject {
 
     /// The Diagnostics sheet's rows (`BookDiagnostics`): counts and states only.
     func diagnostics() async -> BookDiagnostics {
-        BookDiagnostics.make(holdsBook: holdsBook, book: book, connectors: await connectors(),
+        BookDiagnostics.make(holdsBook: holdsBookOnDisk, book: book, connectors: await connectors(),
                              recorded: SyncDiagnostics.recorded(), isPaired: settings.isPaired,
                              isConfigured: settings.isConfigured, cloudSignedIn: cloud != nil,
                              isSampleShop: settings.isSampleShop, cloudShopId: cloud?.shopId)
@@ -699,6 +717,8 @@ final class KhaytAPIClient: ObservableObject {
             }
             next.save()
             cloud = next
+            // A whole pull can be this phone's first book.
+            refreshHoldsBook()
             if case .refused(let why) = pushed {
                 // Nothing was adopted or sent: not a sync, and said as such.
                 cloudProblem = Self.refusalText(why)
@@ -878,6 +898,8 @@ final class KhaytAPIClient: ObservableObject {
         let push = liveActivityPush
         signOutOfCloud()
         settings.unpair()
+        // `settings.unpair()` deleted the book.
+        refreshHoldsBook()
         // Spotlight, the feed, the widgets, delivered alerts, shared papers.
         ShopTraces.forget()
         pendingCount = 0
@@ -1435,7 +1457,7 @@ final class KhaytAPIClient: ObservableObject {
     /// What the shop sells, from the book this phone keeps: the Mac's prices,
     /// the small picture each product carries, and counted stock.
     func fetchCatalogue() async throws -> CataloguePage {
-        guard let reader, holdsBook else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
+        guard let reader, holdsBookOnDisk else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
         return try await reader.catalogue(language: L10n.contentLanguage)
     }
 
@@ -1443,7 +1465,7 @@ final class KhaytAPIClient: ObservableObject {
 
     /// A job's invoice, built from the book this phone keeps — or why not.
     func invoice(orderId: String, proforma: Bool = false) async -> InvoiceBuild {
-        guard let reader, holdsBook else { return .refused(.missing) }
+        guard let reader, holdsBookOnDisk else { return .refused(.missing) }
         return (try? await reader.invoice(orderId: orderId, language: L10n.contentLanguage,
                                           proforma: proforma))
             ?? .refused(.failed)

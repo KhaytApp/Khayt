@@ -428,10 +428,12 @@ struct ConnectorsSettingsSection<Heading: View>: View {
     @State private var tick = 0
     @ViewBuilder var heading: () -> Heading
 
-    /// Reloaded when the list changes here and whenever a sync lands.
+    /// Reloaded when the list changes here, whenever a sync lands, and when
+    /// a book arrives or goes.
     private struct Reload: Equatable {
         let tick: Int
         let synced: [Date]
+        let holdsBook: Bool
     }
 
     var body: some View {
@@ -443,7 +445,7 @@ struct ConnectorsSettingsSection<Heading: View>: View {
                 macHint
             }
         }
-        .task(id: Reload(tick: tick, synced: api.syncLanded)) {
+        .task(id: Reload(tick: tick, synced: api.syncLanded, holdsBook: api.holdsBook)) {
             connectors = await api.connectors()
             loaded = true
         }
