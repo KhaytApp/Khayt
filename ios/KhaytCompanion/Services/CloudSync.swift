@@ -194,11 +194,14 @@ struct CloudSync {
             let book = book
             _ = try? await OffMain.run { try book.replaceLibrary(LibraryCopy.slimAll(store["printFiles"])) }
             s.seenRev = reply.rev
-            return (s, .whole(records: CompanionAPIRecordCount.of(taken.store)))
+            let records = CompanionAPIRecordCount.of(taken.store)
+            SyncDiagnostics.record(.cloudWhole, records: records)
+            return (s, .whole(records: records))
         }
 
         guard !reply.deltas.isEmpty else {
             s.seenRev = reply.rev
+            SyncDiagnostics.record(.cloudDelta)
             return (s, .changes(0))
         }
         let payloads = try reply.deltas.map { try SyncCrypto.store($0.blob, dek: s.dek) }
@@ -234,6 +237,7 @@ struct CloudSync {
             try book.replaceBaseline(with: BookScope.trimmed(seen.store))
         }
         s.seenRev = reply.rev
+        SyncDiagnostics.record(.cloudDelta)
         return (s, .changes(folded.applied + folded.removed))
     }
 

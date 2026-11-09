@@ -644,7 +644,7 @@ async function startLanServer() {
     else if (res.calendarTokenGenerated) settings.lanApi.calendarToken = STORE_SECRET_MASK;
     saveAll();
     const loopbackWarn = res.loopbackOnly
-      ? `<div style="font-size:11px;color:var(--warn);margin-top:6px;">${escapeHtml(t('lan.loopback_warn') || 'Listening on this Mac only — enable “Listen on all network interfaces” for other devices on Wi‑Fi.')}</div>`
+      ? `<div style="font-size:11px;color:var(--warn);margin-top:6px;">${escapeHtml(t('lan.loopback_warn') || 'Listening on this computer only — enable “Listen on all network interfaces” for other devices on Wi‑Fi.')}</div>`
       : `<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('lan.same_wifi_hint') || 'Other devices: same Wi‑Fi, open this URL. Test intake: /intake')}</div>`;
     if (statusRow) {
       statusRow.innerHTML = `🟢 Active at <a href="#" class="lan-url-link" data-url="${escapeHtml(res.url)}" style="color:var(--primary);">${escapeHtml(res.url)}</a>${loopbackWarn}`;
