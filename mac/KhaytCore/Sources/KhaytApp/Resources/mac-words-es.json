@@ -1028,7 +1028,7 @@
  "mac.late": "con retraso",
  "mac.late_tile": "Con retraso",
  "mac.layer_of": "Capa {layer} de {total}",
- "mac.lead_from_hours": "Las horas al día y los días a la semana vienen de Horario laboral, arriba.",
+ "mac.lead_from_hours": "Las horas al día y los días a la semana vienen de Horario laboral, en Ajustes › Tienda.",
  "mac.lead_time_last": "Plazo de entrega más reciente",
  "mac.leave_group": "Volver a toda la biblioteca",
  "mac.ledger": "Libro mayor",
@@ -3899,5 +3899,11 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "Cuenta",
  "mac.cloud_not_connected": "Este Mac no ha iniciado sesión en Khayt Cloud. Inicia sesión para sincronizar el libro del taller con sus otros ordenadores y teléfonos.",
- "mac.cloud_settings": "Ajustes de Khayt Cloud"
+ "mac.cloud_settings": "Ajustes de Khayt Cloud",
+ "mac.nav_general": "General",
+ "mac.nav_shop": "Tienda",
+ "mac.nav_pricing": "Precios e impuestos",
+ "mac.nav_team": "Equipo y acceso",
+ "mac.set_group_workshop": "Taller",
+ "mac.set_group_online": "En línea"
 }

@@ -2998,7 +2998,7 @@ final class Shop {
     var vatFiledProblem: String?
     /// Which pane the Settings window shows. On the shop so a snapshot run can
     /// turn the pages.
-    var settingsPane: SettingsPane = .business
+    var settingsPane: SettingsPane = .general
     /// Which half of the Reports screen is showing.
     var reportPage: ReportPage = .profit
     /// The P&L by quarter (the table's word for it) or by month. A view
