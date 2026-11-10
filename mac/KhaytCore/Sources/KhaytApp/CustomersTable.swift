@@ -156,6 +156,23 @@ struct CustomersTable: View {
         }
         // ⌫ asks to delete the chosen customers — or says why it may not.
         .onDeleteCommand { shop.askToDeleteFrontmost() }
+        // ── ADD, ALWAYS ──────────────────────────────────────────────────────
+        //
+        // In the system-sidebar window (the default since the redesign) the
+        // only ways in were File ▸ New Customer and the empty screen's button,
+        // which goes once the first customer exists. The navy strip had its
+        // "+" (`ScreenActions`), the default window had none (Nov 10).
+        .screenToolbar {
+            ToolbarItem {
+                Button {
+                    shop.editingCustomer = Shop.newCustomer()
+                } label: {
+                    Label(shop.words.callIt("mac.new_customer"), systemImage: "plus")
+                }
+                .disabled(!shop.canMoveJobs)
+                .help(shop.canMoveJobs ? shop.words.callIt("mac.new_customer") : shop.lockedReason)
+            }
+        }
         .overlay {
             if rows.isEmpty {
                 if !shop.search.isEmpty {

@@ -28,6 +28,8 @@ struct CustomerSheet: View {
 
     @State private var draft: Client
     @State private var agreements: [AgreementRow]
+    /// The address book being edited (`Client.addresses`).
+    @State private var addresses: [ClientAddress]
     @State private var schedule: Recurring
     @State private var hasEnd: Bool
     /// The terms are a number of days the presets do not offer, so the field
@@ -73,6 +75,7 @@ struct CustomerSheet: View {
         let opened = Self.opening(existing)
         _draft = State(initialValue: opened.draft)
         _agreements = State(initialValue: opened.agreements)
+        _addresses = State(initialValue: opened.addresses)
         _schedule = State(initialValue: opened.schedule)
         _hasEnd = State(initialValue: opened.schedule.endDate != nil)
         _customTerms = State(initialValue: !PaymentTerms.presets.contains(existing.paymentTermsDays))
@@ -83,6 +86,7 @@ struct CustomerSheet: View {
         var draft: Client
         var agreements: [AgreementRow]
         var schedule: Recurring
+        var addresses: [ClientAddress] = []
     }
 
     /// A customer, as this sheet opens it. The one mapping from the record to
@@ -91,7 +95,8 @@ struct CustomerSheet: View {
     static func opening(_ client: Client) -> Opened {
         Opened(draft: client,
                agreements: client.priceList.map(AgreementRow.init),
-               schedule: client.recurring ?? .fresh)
+               schedule: client.recurring ?? .fresh,
+               addresses: client.addresses)
     }
 
     /// The customer Save hands the shop — blank price rows dropped, as the
@@ -100,6 +105,8 @@ struct CustomerSheet: View {
         opened.draft
             .replacing(priceList: opened.agreements.map(\.agreement).filter { !$0.isBlank })
             .replacing(recurring: opened.schedule)
+            // Blank rows dropped, as the desktop's save drops them.
+            .replacing(addresses: opened.addresses.filter { !$0.isBlank })
     }
 
     private var isNew: Bool { shop.clients.allSatisfy { $0.id != existing.id } }
@@ -117,6 +124,8 @@ struct CustomerSheet: View {
                 .font(.headline)
             details
             Divider()
+            addressBook
+            Divider()
             priceAgreements
             Divider()
             standingOrder
@@ -131,7 +140,7 @@ struct CustomerSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
                     let saving = Self.saving(Opened(draft: draft, agreements: agreements,
-                                                    schedule: schedule))
+                                                    schedule: schedule, addresses: addresses))
                     // The customer as it opened, for what an untouched save writes:
                     // a new one has nothing to compare with.
                     let opened = isNew ? nil : existing
@@ -407,6 +416,32 @@ struct CustomerSheet: View {
     /// — "bracket" covers "Wall bracket, steel" — and the figure becomes what
     /// that part costs on the job. Rows with neither a word nor a price are
     /// dropped on Save, as the other app drops them.
+    // MARK: - The address book
+
+    /// Where this customer receives things: label and address per row, the
+    /// first being the default — what a courier connector sends as the
+    /// customer's address. Until Nov 10 only the desktop could write it, so a
+    /// shop on the Mac could not ship to anyone through Lamha.
+    private var addressBook: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shop.words.callIt("ce.address_book")).font(.subheadline.weight(.semibold))
+            ForEach($addresses.byID) { $row in
+                HStack(spacing: 8) {
+                    TextField(shop.words.callIt("ce.addr_label"), text: $row.label)
+                        .textFieldStyle(.roundedBorder).frame(width: 150)
+                    TextField(shop.words.callIt("ce.addr_address"), text: $row.address)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        addresses.removeAll { $0.id == row.id }
+                    } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.plain)
+                        .help(shop.words.callIt("common.delete"))
+                }
+            }
+            Button(shop.words.callIt("ce.addr_add")) { addresses.append(ClientAddress()) }
+        }
+    }
+
     private var priceAgreements: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("ce.price_list")).font(.subheadline.weight(.semibold))

@@ -6546,6 +6546,7 @@ final class Words {
         // A customer's price agreements, standing order and communications
         // log — the words on Khayt's own customer editor, borrowed so the two
         // editors call one thing by one name.
+        "ce.address_book", "ce.addr_label", "ce.addr_address", "ce.addr_add",
         "ce.price_list", "ce.price_list_empty", "ce.price_list_hint", "ce.pl_product",
         "ce.pl_price", "ce.pl_note", "ce.pl_autofill",
         "ce.wab_offers",
