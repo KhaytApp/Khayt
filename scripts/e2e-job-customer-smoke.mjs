@@ -91,7 +91,9 @@ try {
   ok(/another currency/i.test(note), `a customer in another currency is warned about (${note})`);
   await save();
   const moved = await window.evaluate(() => printLog.find((o) => o.id === 'J-jc-open'));
-  ok(moved.clientId === 'CLI-jc-k' && moved.price === 100 && !moved.currency, 'the job keeps its price and currency');
+  // A SAR job carried no `currency`, and one without it is read in its
+  // customer's: left blank it would read as 100 KWD. The rule writes SAR on it.
+  ok(moved.clientId === 'CLI-jc-k' && moved.price === 100 && moved.currency === 'SAR', `the job keeps its price and currency (${moved.currency})`);
 
   console.log('e2e-job-customer: ok');
 } catch (err) {
