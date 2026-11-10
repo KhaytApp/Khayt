@@ -72,3 +72,13 @@ test('every pane and group name is translated in all 9 languages', () => {
     for (const k of keys) assert.match(src, new RegExp(`"${k.replace('.', '\\.')}": "[^"]+"`), `${lang} ${k}`);
   }
 });
+
+test('loyalty is shown in Simple mode: neither its card nor its pane is pro-only or biz-only (Turki, Nov 10)', () => {
+  const at = html.indexOf('id="settingsLoyaltyCard"');
+  assert.ok(at > 0 && html.indexOf('set_loyaltyEnabled', at) > at, 'the loyalty card has its id');
+  const cardTag = html.slice(html.lastIndexOf('<div', at), html.indexOf('>', at) + 1);
+  const p = html.lastIndexOf('<div class="settings-panel', at);
+  const paneTag = html.slice(p, html.indexOf('>', p) + 1);
+  for (const tag of [cardTag, paneTag]) assert.doesNotMatch(tag, /\b(pro-only|biz-only)\b/, tag);
+  assert.match(paneTag, /id="settings-panel-pricing"/, 'in Pricing & Tax, as on the Mac');
+});

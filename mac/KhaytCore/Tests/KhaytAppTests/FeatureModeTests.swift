@@ -151,15 +151,16 @@ struct FeatureModeTests {
             + "card and the two draft menu items all must"))
     }
 
-    /// AND WHY LOYALTY IS NOT GATED, although the tier table calls it
-    /// Professional.
+    /// AND LOYALTY IS NOT GATED, on either app (Turki, Nov 10: loyalty is
+    /// shown in Simple mode on both).
     ///
-    /// The loyalty settings card in `renderer/index.html` carries no
-    /// `pro-only` class, so a Simple shop can switch the rewards programme on
-    /// in the other window. Gating it here would hide from that shop something
-    /// it has and is using — the same disagreement, from the other end. If the
-    /// other app ever gates it, this test is the place that says so.
-    @Test("loyalty is deliberately not gated here, because the other app does not gate it")
+    /// The tier table calls it Professional, but gating it here while the
+    /// other window offers it would hide from a Simple shop something it has
+    /// and is using. Until Nov 10 the other app DID gate it: the card had no
+    /// `pro-only` class of its own, but it sat inside the pro-only Access
+    /// panel, and a check of the text just before the switch never saw the
+    /// panel. This one reads the card's own tag AND the pane that holds it.
+    @Test("loyalty is not gated here, and neither its card nor its pane is gated in the other app")
     func loyaltyIsNotGated() throws {
         #expect(!Shop.gatedFeatures.contains("loyalty"))
         let html = try String(
@@ -168,14 +169,24 @@ struct FeatureModeTests {
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent().appending(path: "renderer/index.html"),
             encoding: .utf8)
-        // The card the switch lives in. If it grows a `pro-only` class this
-        // fails, and the answer is to gate it here rather than to loosen this.
-        guard let at = html.range(of: "set_loyaltyEnabled") else {
-            Issue.record("the loyalty switch has moved — this check has rotted"); return
+        guard let card = html.range(of: "id=\"settingsLoyaltyCard\""),
+              html[card.upperBound...].range(of: "set_loyaltyEnabled") != nil else {
+            Issue.record("the loyalty card has moved or lost its id — this check has rotted"); return
         }
-        let card = html[html.index(at.lowerBound, offsetBy: -600)..<at.lowerBound]
-        #expect(!card.contains("pro-only"),
-                "the other app now hides loyalty from Simple shops, so this app must too")
+        // The card's own opening tag.
+        guard let open = html[..<card.lowerBound].range(of: "<div", options: .backwards) else {
+            Issue.record("no tag around the loyalty card — this check has rotted"); return
+        }
+        let cardTag = html[open.lowerBound..<card.upperBound]
+        #expect(!cardTag.contains("pro-only"), "the other app hides the loyalty card from Simple shops")
+        // The settings pane that holds it: the last one opened before the card.
+        guard let pane = html[..<card.lowerBound].range(of: "<div class=\"settings-panel", options: .backwards),
+              let paneEnd = html[pane.upperBound...].firstIndex(of: ">") else {
+            Issue.record("the loyalty card is in no settings pane — this check has rotted"); return
+        }
+        let paneTag = html[pane.lowerBound...paneEnd]
+        #expect(!paneTag.contains("pro-only"),
+                "the other app hides the pane loyalty is in from Simple shops: \(paneTag)")
     }
 
     @Test("an enthusiast book is read as Simple, and keeps its customers")
