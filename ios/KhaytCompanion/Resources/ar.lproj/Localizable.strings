@@ -1203,6 +1203,9 @@
 "connectors.data.order.date" = "تاريخ الطلب";
 "connectors.data.order.carrier" = "شركة الشحن";
 "connectors.data.order.trackingnumber" = "رقم التتبع";
+"connectors.data.order.amountdue" = "المبلغ المستحق";
+"connectors.data.order.amountdueminor" = "المبلغ المستحق (بأصغر وحدة)";
+"connectors.data.order.amountduecurrency" = "عملة المبلغ المستحق";
 "connectors.data.customer.name" = "اسم العميل";
 "connectors.data.customer.company" = "الشركة";
 "connectors.data.customer.phone" = "رقم الهاتف";

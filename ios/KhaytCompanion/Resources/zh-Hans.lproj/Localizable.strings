@@ -1203,6 +1203,9 @@
 "connectors.data.order.date" = "下单日期";
 "connectors.data.order.carrier" = "承运商";
 "connectors.data.order.trackingnumber" = "运单号";
+"connectors.data.order.amountdue" = "应付金额";
+"connectors.data.order.amountdueminor" = "应付金额（最小单位）";
+"connectors.data.order.amountduecurrency" = "应付金额币种";
 "connectors.data.customer.name" = "客户名称";
 "connectors.data.customer.company" = "公司";
 "connectors.data.customer.phone" = "电话号码";

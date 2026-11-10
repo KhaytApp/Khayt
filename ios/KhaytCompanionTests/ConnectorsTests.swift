@@ -383,7 +383,7 @@ final class ConnectorsTests: XCTestCase {
         let re = try NSRegularExpression(pattern: #"^\s*'((?:order|customer)\.[A-Za-z]+)':\s*\{ from:"#, options: .anchorsMatchLines)
         let keys = re.matches(in: text, range: NSRange(text.startIndex..., in: text))
             .compactMap { Range($0.range(at: 1), in: text).map { String(text[$0]) } }
-        XCTAssertEqual(keys.count, 17)
+        XCTAssertEqual(keys.count, 20)
         for k in keys {
             XCTAssertNotEqual(ConnectorRules.fieldName(k, in: nil), k, "\(k) has no words")
         }
