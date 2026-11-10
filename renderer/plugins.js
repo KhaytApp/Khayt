@@ -419,8 +419,12 @@ async function runPluginAction(id, actionId, attach, recs) {
     recs.write(PluginHost().withFieldValues(recs[attach], entry, attach, values));
   }
   if (verdict.kind === 'unconfirmed') {
-    const f = (entry.manifest.fields || []).find((x) => x.key === verdict.fields[0] && x.attach === attach);
-    toast(t('plg.sent_unconfirmed', { name, field: f ? pluginLabel(f.label) : verdict.fields[0] }), 'warning', 8000);
+    // Every field the manifest says the reply fills, by its declared label.
+    const labels = verdict.fields.map((k) => {
+      const f = (entry.manifest.fields || []).find((x) => x.key === k && x.attach === attach);
+      return f ? pluginLabel(f.label) : k;
+    });
+    toast(t('plg.sent_unconfirmed', { name, field: labels.join(', ') }), 'warning', 8000);
     return Object.assign({}, r, { verdict });
   }
   toast(t('plg.sent'), 'success');
