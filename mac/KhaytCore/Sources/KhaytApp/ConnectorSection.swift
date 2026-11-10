@@ -43,9 +43,15 @@ struct ConnectorSection: View {
                             HStack(spacing: 8) {
                                 ForEach(buttons) { button in
                                     Button(button.label) { Task { await press(button) } }
-                                        .disabled(busy != nil || !shop.canWrite)
+                                        .disabled(busy != nil || !shop.canWrite || button.blockedWhy != nil)
+                                        .help(button.blockedWhy ?? "")
                                 }
                                 if busy != nil { ProgressView().controlSize(.small) }
+                            }
+                            // Said beside the button, not only on hover: the
+                            // shop has to know why it cannot press it.
+                            if let why = buttons.compactMap(\.blockedWhy).first {
+                                Text(why).font(.callout).foregroundStyle(.secondary)
                             }
                         }
                         if let said, !said.text.isEmpty {
@@ -64,7 +70,7 @@ struct ConnectorSection: View {
     }
 
     private func reload() async {
-        buttons = await shop.connectorButtons(placement: attach)
+        buttons = await shop.connectorButtons(placement: attach, jobId: jobId)
         let plugins = await shop.connectorValues(collection: collection, id: recordId)
         fields = await shop.connectorFields(attach: attach, plugins: plugins)
         typed = [:]

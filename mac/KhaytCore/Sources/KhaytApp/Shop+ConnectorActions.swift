@@ -43,10 +43,33 @@ extension Shop {
         return out
     }
 
-    /// The buttons for a job (`order`) or a customer (`customer`).
-    func connectorButtons(placement: String) async -> [ConnectorButton] {
+    /// The buttons for a job (`order`) or a customer (`customer`). On a job
+    /// with no customer record, a button that sends anything about the
+    /// customer carries why it is greyed out (`usesCustomer`).
+    func connectorButtons(placement: String, jobId: String? = nil) async -> [ConnectorButton] {
         guard ConnectorsSwitch.isOn() else { return [] }
-        return Self.buttons(in: await liveConnectors(), placement: placement, lang: words.language)
+        let entries = await liveConnectors()
+        var out = Self.buttons(in: entries, placement: placement, lang: words.language)
+        guard placement == "order", let jobId, let engine, !(await connectorJobHasCustomer(jobId)) else { return out }
+        for i in out.indices {
+            guard let entry = entries.first(where: { Self.object($0)["id"] == .string(out[i].entryId) }) else { continue }
+            let manifest = Self.object(entry)["manifest"] ?? .null
+            if (try? await engine.pluginUsesCustomer(manifest, trigger: .object(["action": .string(out[i].actionId)]))) == true {
+                out[i].blockedWhy = words.callIt("plg.no_customer")
+            }
+        }
+        return out
+    }
+
+    /// Whether a job names a customer record that is in the book.
+    func connectorJobHasCustomer(_ jobId: String) async -> Bool {
+        guard let build = source.build,
+              let root = try? await BookWork.run({
+                  try JSONValue.decode([String: JSONValue].self, from: Data(contentsOf: build.storeURL))
+              }),
+              let job = Self.record(in: root, "printLog", id: jobId),
+              let clientId = Shop.plainString(Self.object(job)["clientId"]), !clientId.isEmpty else { return false }
+        return Self.record(in: root, "clients", id: clientId) != nil
     }
 
     nonisolated static func buttons(in entries: [JSONValue], placement: String, lang: String) -> [ConnectorButton] {
@@ -130,6 +153,14 @@ extension Shop {
         guard (attach == "order" ? order : customer) != nil else {
             return (false, words.callIt("plg.err_refused", ["why": .string("not found")]))
         }
+        // A job with no customer record would send the customer's name, phone
+        // and city empty, and a courier turns that down (Lamha E2E, Nov 10).
+        // Said here, before anything leaves, as the button already shows.
+        if attach == "order", customer == nil,
+           (try? await engine.pluginUsesCustomer(Self.object(entry)["manifest"] ?? .null,
+                                                 trigger: .object(["action": .string(button.actionId)]))) == true {
+            return (false, words.callIt("plg.no_customer"))
+        }
         let names = Self.connectorSecretsDeclared(Self.object(entry)["manifest"] ?? .null).map(\.name)
         var secrets: [String: String] = [:]
         for n in names { if let v = await connectorSecrets.value(pluginId: button.entryId, name: n), !v.isEmpty { secrets[n] = v } }
@@ -147,6 +178,8 @@ extension Shop {
             return (true, "")
         case .failed(let why, _):
             return (false, words.callIt("plg.err_failed", ["why": .string(why)]))
+        case .declined(let said):
+            return (false, Self.declinedText(entry: entry, said: said, words: words))
         case .sent(let values):
             if case .object(let v) = values, !v.isEmpty {
                 let id = attach == "order" ? jobId : clientKey
@@ -155,6 +188,12 @@ extension Shop {
                 }
             }
             return (true, words.callIt("plg.sent"))
+        case .unconfirmed(let keys):
+            // Accepted, but without the order number the button promises: not
+            // something the shop should take as done.
+            return (false, words.callIt("plg.sent_unconfirmed",
+                                        ["name": .string(Self.connectorName(entry, words: words)),
+                                         "field": .string(Self.fieldLabel(entry: entry, key: keys.first ?? "", words: words))]))
         }
     }
 
@@ -214,6 +253,14 @@ extension Shop {
         case sent(JSONValue)
         /// Sent and not accepted, or not answered (`status` nil).
         case failed(String, status: Int?)
+        /// Answered 2xx but TURNED DOWN — `{"success": false, "msg": …}`
+        /// (`lib/plugin-payload.js replyRefusal`). The service's own words,
+        /// maybe empty. Nothing is written, nothing says "Sent", and an event
+        /// that gets this is failed rather than retried.
+        case declined(String)
+        /// Accepted, but a button's reply filled none of the fields it says it
+        /// fills (`fields`, their keys): not "Sent".
+        case unconfirmed([String])
     }
 
     /// What made a connector send: a button, an event on a job, or a
@@ -306,12 +353,53 @@ extension Shop {
         catch let failure as WebhookClient.Failure { return .failed(failure.errorDescription ?? "\(failure)", status: nil) }
         catch { return .failed(error.localizedDescription, status: nil) }
         guard (200..<300).contains(answer.status) else { return .failed("HTTP \(answer.status)", status: answer.status) }
-        guard let body = answer.body, let reply = try? JSONValue.decode(JSONValue.self, from: body),
-              case .object = reply,
-              let values = try? await engine.pluginApplyResponse(manifest, trigger: trigger.json, reply: reply, entry: entry) else {
-            return .sent(.object([:]))
+        // What the reply means is the shared rule's (`replyVerdict`): a 2xx can
+        // still be a refusal (Lamha answers 200 with `success: false`), and a
+        // button's reply that fills none of its declared fields is not "Sent".
+        var reply: JSONValue = .object([:])
+        if let body = answer.body, let parsed = try? JSONValue.decode(JSONValue.self, from: body), case .object = parsed {
+            reply = parsed
         }
-        return .sent(values)
+        let values = (try? await engine.pluginApplyResponse(manifest, trigger: trigger.json, reply: reply, entry: entry))
+            ?? .object([:])
+        guard let verdict = try? await engine.pluginReplyVerdict(manifest, trigger: trigger.json, reply: reply,
+                                                                 entry: entry, mapped: values) else {
+            return .sent(values)
+        }
+        let v = object(verdict)
+        switch Shop.plainString(v["kind"]) {
+        case "refused":
+            return .declined(Shop.plainString(v["message"]) ?? "")
+        case "unconfirmed":
+            guard case .array(let keys)? = v["fields"] else { return .unconfirmed([]) }
+            return .unconfirmed(keys.compactMap(Shop.plainString))
+        default:
+            return .sent(values)
+        }
+    }
+
+    /// The connector's name, in the shop's language.
+    static func connectorName(_ entry: JSONValue, words: Words) -> String {
+        let manifest = object(object(entry)["manifest"])
+        return connectorLabel(manifest["name"], words.language, fallback: Shop.plainString(manifest["id"]) ?? "")
+    }
+
+    /// "Lamha said: …" — or that it turned the request down without saying why.
+    static func declinedText(entry: JSONValue, said: String, words: Words) -> String {
+        let name = connectorName(entry, words: words)
+        return said.isEmpty
+            ? words.callIt("plg.err_declined_nomsg", ["name": .string(name)])
+            : words.callIt("plg.err_declined", ["name": .string(name), "msg": .string(said)])
+    }
+
+    /// An own field's label, in the shop's language.
+    static func fieldLabel(entry: JSONValue, key: String, words: Words) -> String {
+        let manifest = object(object(entry)["manifest"])
+        if case .array(let defs)? = manifest["fields"],
+           let def = defs.first(where: { object($0)["key"] == .string(key) }) {
+            return connectorLabel(object(def)["label"], words.language, fallback: key)
+        }
+        return key
     }
 
     /// Why nothing was sent, in the shop's words: a setting or key not filled
@@ -340,6 +428,8 @@ struct ConnectorButton: Identifiable, Hashable, Sendable {
     let label: String
     /// Opens a page in the browser rather than sending anything.
     let opensPage: Bool
+    /// Why it is greyed out on this record, if it is ("This job has no customer").
+    var blockedWhy: String?
     var id: String { entryId + "|" + actionId }
 }
 
@@ -462,6 +552,13 @@ extension Shop {
         if case .sent(let values) = outcome, case .object(let v) = values, !v.isEmpty {
             _ = await writeConnectorReplies(entry: entry, replies: [ConnectorReply(jobId: item.orderId, values: values)])
         }
+        // Turned down: the same request would be turned down again, so it is
+        // kept as failed with the service's words, for the shop to see and
+        // Retry — never on the backoff ladder.
+        if case .declined(let said) = outcome {
+            await failConnectorEvent(item, message: said)
+            return
+        }
         guard case .failed(_, let status) = outcome,
               let next = try? await engine.webhookNext(status: status ?? 0, attempt: item.attempt), next.retry else {
             // Sent, refused (it will not get better by waiting), or out of tries.
@@ -469,6 +566,84 @@ extension Shop {
             return
         }
         await settleConnectorEvent(item, retryAfterMs: next.afterMs)
+    }
+
+    /// An event the service turned down, kept in the outbox as failed.
+    private func failConnectorEvent(_ item: ConnectorQueued, message: String) async {
+        // lock: system — the record of an event the shop's own action sent, which the service turned down
+        if isDevConnector(item.id) { return }
+        guard let engine, let build = source.build else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                settings["pluginOutbox"] = try await engine.pluginFailed(settings["pluginOutbox"] ?? .array([]),
+                                                                         item: item.json, at: StoreWriter.iso(Date()),
+                                                                         message: message)
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            return
+        }
+    }
+
+    /// The events a connector's service turned down, for its settings.
+    func failedConnectorEvents(pluginId: String) async -> [(delivery: String, event: String, orderId: String, at: String, message: String)] {
+        guard let engine, let list = settingsDict["pluginOutbox"],
+              let rows = try? await engine.pluginFailedQueued(list) else { return [] }
+        return rows.compactMap { row in
+            let o = Self.object(row), f = Self.object(o["failed"])
+            guard o["id"] == .string(pluginId), let d = Shop.plainString(o["delivery"]) else { return nil }
+            return (d, Shop.plainString(o["event"]) ?? "", Shop.plainString(o["orderId"]) ?? "",
+                    Shop.plainString(f["at"]) ?? "", Shop.plainString(f["message"]) ?? "")
+        }
+    }
+
+    /// Retry: the failed event is due again, and the pass sends it now.
+    func retryFailedConnectorEvent(delivery: String) async {
+        // lock: system — the shop asked to send again an event its own action made
+        guard ConnectorsSwitch.isOn(), let engine, let build = source.build else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                settings["pluginOutbox"] = try await engine.pluginRetried(settings["pluginOutbox"] ?? .array([]),
+                                                                          delivery: delivery, nowIso: StoreWriter.iso(Date()))
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            return
+        }
+        await retryDueConnectorEvents()
+    }
+
+    /// Dismiss: the failed event is dropped from the outbox.
+    func dismissFailedConnectorEvent(delivery: String) async {
+        // lock: system — the shop cleared the record of an event its service turned down
+        guard let engine, let build = source.build else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var settings = Self.settings(root)
+                settings["pluginOutbox"] = try await engine.pluginUnqueued(settings["pluginOutbox"] ?? .array([]),
+                                                                           delivery: delivery)
+                root["settings"] = .object(settings)
+            }
+            await load(source)
+        } catch {
+            return
+        }
     }
 
     /// The outbox after one attempt: the item queued for its next try, or
