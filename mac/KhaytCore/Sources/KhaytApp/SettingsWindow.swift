@@ -3,18 +3,60 @@ import KhaytWidgetData
 import AppKit
 import KhaytCore
 
-/// The panes of the Settings window, in the order Khayt's own page has them.
+/// The panes of the Settings window, grouped as the sidebar shows them
+/// (Settings review, Nov 2026, stage 2).
+///
+/// Stage 2 moves sections into fourteen panes one group at a time, without
+/// changing what any of them does. Panes that have not been split yet keep
+/// their old names until their group's turn: `invoice`, `payments` and
+/// `operations` empty into Pricing & Tax, Invoices & Payments and Production,
+/// `slicers` and `preferences` into Printers & Slicers and Library & Files,
+/// `online` and `integrations` into Online Store, Notifications and
+/// Connections.
+///
+/// Not saved between launches (`Shop.settingsPane`), so a raw value is a name
+/// in code and in snapshot file names, never something stored on disk.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case business, invoice, payments, operations, integrations, slicers, online, cloud, assistant, preferences
+    case general
+    case shop, pricing, invoice, payments, operations, team
+    case slicers, preferences
+    case cloud, online, integrations, assistant
     var id: String { rawValue }
 
-    /// The pane's name, as the Electron page's navigation says it.
+    /// The sidebar's groups, in order. `nil` is a pane above or below every
+    /// group (General, as every Mac's settings open on it).
+    enum Group: String, CaseIterable, Identifiable {
+        case top, shop, workshop, online
+        var id: String { rawValue }
+        var wordKey: String? {
+            switch self {
+            case .top:      nil
+            case .shop:     "mac.nav_shop"
+            case .workshop: "mac.set_group_workshop"
+            case .online:   "mac.set_group_online"
+            }
+        }
+    }
+
+    var group: Group {
+        switch self {
+        case .general: .top
+        case .shop, .pricing, .invoice, .payments, .operations, .team: .shop
+        case .slicers, .preferences: .workshop
+        case .cloud, .online, .integrations, .assistant: .online
+        }
+    }
+
+    /// The pane's name.
     var wordKey: String {
         switch self {
-        case .business:     "set.nav_biz"
+        case .general:      "mac.nav_general"
+        case .shop:         "mac.nav_shop"
+        case .pricing:      "mac.nav_pricing"
         case .invoice:      "set.nav_invoice"
         case .payments:     "set.nav_payments"
         case .operations:   "set.nav_ops"
+        case .team:         "mac.nav_team"
         case .integrations: "mac.nav_integrations"
         case .slicers:      "mac.nav_slicers"
         case .online:       "mac.nav_online"
@@ -26,10 +68,13 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .business:     "building.2"
+        case .general:      "gearshape"
+        case .shop:         "building.2"
+        case .pricing:      "percent"
         case .invoice:      "doc.text"
         case .payments:     "creditcard"
         case .operations:   "gearshape.2"
+        case .team:         "person.2"
         case .integrations: "shippingbox"
         case .slicers:      "cube.transparent"
         case .online:       "wifi"
@@ -38,9 +83,11 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .preferences:  "slider.horizontal.3"
         }
     }
+
+    static func panes(in group: Group) -> [SettingsPane] { allCases.filter { $0.group == group } }
 }
 
-/// The shop's own settings — ⌘, — in ten panes.
+/// The shop's own settings — ⌘, — in panes grouped down a sidebar.
 ///
 /// A SIDEBAR, not toolbar tabs. Nine tabs need about 680pt in English and more
 /// in Arabic, and the window is 600pt of pane: AppKit put whatever did not fit
@@ -62,12 +109,17 @@ struct SettingsWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List(SettingsPane.allCases, selection: Binding(
+            List(selection: Binding(
                 get: { Optional(shop.settingsPane) },
                 set: { if let pane = $0 { shop.settingsPane = pane } }
-            )) { pane in
-                Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
-                    .tag(pane)
+            )) {
+                ForEach(SettingsPane.Group.allCases) { group in
+                    if let key = group.wordKey {
+                        Section(shop.words.callIt(key)) { rows(group) }
+                    } else {
+                        rows(group)
+                    }
+                }
             }
             .listStyle(.sidebar)
             .frame(width: 200)
@@ -98,10 +150,20 @@ struct SettingsWindow: View {
         .shopSheet(item: $shop.editingTemplate) { TemplateSheet(shop: shop, template: $0) }
     }
 
+    private func rows(_ group: SettingsPane.Group) -> some View {
+        ForEach(SettingsPane.panes(in: group)) { pane in
+            Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
+                .tag(pane)
+        }
+    }
+
     @ViewBuilder
     private func pane(_ which: SettingsPane) -> some View {
         switch which {
-        case .business:     BusinessPane(shop: shop)
+        case .general:      GeneralPane(shop: shop)
+        case .shop:         ShopPane(shop: shop)
+        case .pricing:      PricingPane(shop: shop)
+        case .team:         TeamPane(shop: shop)
         case .invoice:      InvoicePane(shop: shop)
         case .payments:     PaymentsPane(shop: shop)
         case .operations:   OperationsPane(shop: shop)
@@ -272,9 +334,11 @@ func row<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) 
         // field itself, closer to the leaf still.
 }
 
-// MARK: - Business
+// MARK: - Shop
 
-struct BusinessPane: View {
+/// Who the shop is and where and when it opens: identity, contact, logo,
+/// registration, locations, opening hours, closures and pickup.
+struct ShopPane: View {
     let shop: Shop
 
     /// Which way this WINDOW reads, which is half of where a field's text
@@ -285,18 +349,26 @@ struct BusinessPane: View {
         /// The shop's own text, keyed by store field (`bizEn`, `addr_fr`…).
         var content: [String: String] = [:]
         var phone = "", email = "", vat = "", cr = ""
-        /// The shop's electricity tariff (`settings.elecRate`), per kWh. Nil
-        /// is "not said" — Khayt's default applies, and the key stays absent.
-        var elecRate: Double?
+        /// `settings.workingHours`, hours per weekday. Delivery promises and
+        /// the queue's working week read it (`WorkingWeek`).
+        var hours: [String: Double] = [:]
+        /// `settings.holidays`, the days the shop is closed (`YYYY-MM-DD`).
+        var holidays: [String] = []
+        /// Pickup on the customer's order page (`portal-refresh.js`, Cloud
+        /// #199): shown once either is filled in.
+        var pickupHours = "", pickupMapUrl = ""
+
+        static let days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
-            var d = Draft(phone: r.text("phone"), email: r.text("email"), vat: r.text("vat"), cr: r.text("cr"))
-            // Only a figure the field can show. Junk (`"abc"`, `"inf"`, `"nan"`)
-            // shows empty — and saving the pane untouched still leaves it
-            // byte-identical: the form sends "" both as edited and as opened,
-            // so `RoundTrip` puts the stored value back (`applySettings`).
-            d.elecRate = Shop.plainNumber(settings["elecRate"]).flatMap { $0.isFinite ? $0 : nil }
+            var d = Draft(phone: r.text("phone"), email: r.text("email"), vat: r.text("vat"), cr: r.text("cr"),
+                          pickupHours: r.text("pickupHours"), pickupMapUrl: r.text("pickupMapUrl"))
+            // Eight hours a day is what the working-week rule assumes when a
+            // shop has never set them, so that is what the fields show.
+            let hours = r.object("workingHours")
+            for day in days { d.hours[day] = Shop.plainNumber(hours[day]) ?? (hours.isEmpty ? 8 : 0) }
+            d.holidays = WorkingWeek.holidays(settings: .object(settings))
             for field in shop.contentFields(["biz", "tagline", "addr"]) { d.content[field.key] = r.text(field.key) }
             return d
         }
@@ -305,21 +377,15 @@ struct BusinessPane: View {
         func form() -> [String: JSONValue] {
             ["content": .object(content.mapValues(JSONValue.string)),
              "phone": .string(phone), "email": .string(email), "vat": .string(vat), "cr": .string(cr),
-             "elecRate": elecRate.map { .number($0) } ?? .string("")]
+             "workingHours": .object(hours.mapValues(JSONValue.number)),
+             "holidays": .array(holidays.map(JSONValue.string)),
+             "pickupHours": .string(pickupHours), "pickupMapUrl": .string(pickupMapUrl)]
         }
     }
 
     @State private var draft = Draft()
     @State private var original = Draft()
-    /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
-    /// from the rule, never restated here.
-    @State private var defaultElecRate: Double?
     @State private var askingLogo = false
-    @AppStorage("mac.menuBar") private var menuBar = true
-    /// The same key AND the same default as `ShopWindow` — both from
-    /// `ShellChoice`, because declaring the default twice is how this switch
-    /// came to read OFF in a window that was drawing the new shell.
-    @AppStorage(ShellChoice.key) private var newShell = ShellChoice.byDefault
 
     var body: some View {
         VStack(spacing: 0) {
@@ -394,26 +460,103 @@ struct BusinessPane: View {
                     Text(shop.words.callIt("mac.remove_logo_note") + " "
                          + shop.words.callIt("mac.no_undo"))
                 }
-                // ── THE REDESIGNED WINDOW ─────────────────────────────────
-                //
-                // Off by default while the rest of the app is migrated screen
-                // by screen. Here rather than hidden behind a `defaults write`
-                // because a switch nobody can reach is a feature nobody can
-                // judge — and the whole point of shipping it early is to live
-                // with it before the other fifteen screens follow.
-                Section(shop.words.callIt("set.appearance")) {
-                    Toggle(shop.words.callIt("set.new_shell"), isOn: $newShell)
-                    Text(shop.words.callIt("set.new_shell_why"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
                 Section(shop.words.callIt("set.biz_tax")) {
                     // The registration number is called what the shop's tax
                     // rules call it — GSTIN, USt-IdNr., VAT No. — not always "VAT".
                     latinRow(shop.taxProfile?.registration ?? shop.words.callIt("set.vat")) { LatinField(text: $draft.vat) }
                     latinRow(shop.words.callIt("set.cr")) { LatinField(text: $draft.cr) }
                 }
+                // Where the shop works. Records, saved as they are made — not
+                // part of the draft the bar below saves.
+                Section { LocationsSection(shop: shop) }
+                Section {
+                    HStack(spacing: 8) {
+                        ForEach(Draft.days, id: \.self) { day in
+                            VStack(spacing: 2) {
+                                Text(shop.words.callIt("day." + day)).font(.caption).foregroundStyle(.secondary)
+                                // `.labelsHidden()`, or the empty label still
+                                // claims a Form's label column and shoves the
+                                // field to the right of it — which is why every
+                                // number sat 44 points right of the day it
+                                // belongs to, in a row whose whole job is to
+                                // put a figure under a weekday.
+                                TextField("", value: Binding(get: { draft.hours[day] ?? 0 }, set: { draft.hours[day] = $0 }),
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
+                                    .labelsHidden()
+                                    .multilineTextAlignment(.center).frame(width: 52)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(shop.words.callIt("set.working_hours"))
+                } footer: {
+                    Text(shop.words.callIt("set.wh_hint"))
+                }
+                HolidaysSection(shop: shop, holidays: $draft.holidays)
+
+                // Where and when a customer collects — on their order page,
+                // with the address the invoice already prints.
+                Section {
+                    row(shop.words.callIt("mac.pickup_hours")) { TextField("", text: $draft.pickupHours) }
+                    latinRow(shop.words.callIt("mac.pickup_map")) {
+                        LatinField(text: $draft.pickupMapUrl, placeholder: "https://", monospaced: false)
+                    }
+                    Text(shop.words.callIt("mac.pickup_hint"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } header: { Text(shop.words.callIt("mac.pickup_title")) }
+
+            }
+            .formStyle(.grouped)
+            SaveBar(shop: shop, dirty: draft != original,
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
+                    revert: { draft = original })
+        }
+        .task(id: shop.settingsValue) { reset() }
+    }
+
+    private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
+    private func binding(_ key: String) -> Binding<String> {
+        Binding(get: { draft.content[key] ?? "" }, set: { draft.content[key] = $0 })
+    }
+}
+
+// MARK: - Pricing & tax
+
+/// What the shop's work costs it and what it charges. Stage 2a moves the
+/// running and fixed costs here from the old Business pane; the currency,
+/// tax, exchange rates, quote rules, loyalty and targets follow in 2b.
+struct PricingPane: View {
+    let shop: Shop
+
+    struct Draft: Equatable {
+        /// The shop's electricity tariff (`settings.elecRate`), per kWh. Nil
+        /// is "not said" — Khayt's default applies, and the key stays absent.
+        var elecRate: Double?
+
+        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
+            // Only a figure the field can show. Junk (`"abc"`, `"inf"`, `"nan"`)
+            // shows empty — and saving the pane untouched still leaves it
+            // byte-identical: the form sends "" both as edited and as opened,
+            // so `RoundTrip` puts the stored value back (`applySettings`).
+            Draft(elecRate: Shop.plainNumber(settings["elecRate"]).flatMap { $0.isFinite ? $0 : nil })
+        }
+        /// Blank goes as "" — `settings-edit` deletes the key for it, so a
+        /// cleared field returns the shop to the default rather than to 0.
+        func form() -> [String: JSONValue] {
+            ["elecRate": elecRate.map { .number($0) } ?? .string("")]
+        }
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+    /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
+    /// from the rule, never restated here.
+    @State private var defaultElecRate: Double?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
                 // ── WHAT A kWh COSTS THIS SHOP ────────────────────────────
                 //
                 // `settings.elecRate`, layered by `lib/print-rates.js` between
@@ -446,6 +589,7 @@ struct BusinessPane: View {
                 // It saves itself: it is a LIST, and a list reverted by the
                 // bar below along with the shop's name is a surprise.
                 FixedCostsSettings(shop: shop)
+
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
@@ -457,8 +601,23 @@ struct BusinessPane: View {
     }
 
     private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
-    private func binding(_ key: String) -> Binding<String> {
-        Binding(get: { draft.content[key] ?? "" }, set: { draft.content[key] = $0 })
+}
+
+// MARK: - Team & access
+
+/// Who works at the shop and how they sign in: operators, staff sign-in and
+/// PINs on this Mac, and (for the owner) the Khayt Cloud team and the devices
+/// signed in to it. Every section here saves itself; there is no Save bar.
+struct TeamPane: View {
+    let shop: Shop
+
+    var body: some View {
+        Form {
+            Section { OperatorsSection(shop: shop) }
+            Section { LockSection(shop: shop) }
+            TeamSettings(shop: shop)
+        }
+        .formStyle(.grouped)
     }
 }
 
@@ -522,7 +681,6 @@ struct InvoicePane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
-    @AppStorage("mac.menuBar") private var menuBar = true
     @State private var example = ""
 
     private var countries: [(code: String, name: String)] {
@@ -719,9 +877,6 @@ struct PaymentsPane: View {
         var bankName = "", accountHolder = "", iban = ""
         var accepted: Set<String> = []
         var paymentInstructions = ""
-        /// Pickup on the customer's order page (`portal-refresh.js`, Cloud
-        /// #199): shown once either is filled in.
-        var pickupHours = "", pickupMapUrl = ""
         /// The rewards programme. A shop working only on this Mac could never
         /// turn it on: the switch was in the other app, so its customers'
         /// points were a screen it could not reach.
@@ -746,7 +901,6 @@ struct PaymentsPane: View {
             if case .bool(true)? = settings["loyaltyEnabled"] { on = true }
             return Draft(bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
                          accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
-                         pickupHours: r.text("pickupHours"), pickupMapUrl: r.text("pickupMapUrl"),
                          loyaltyEnabled: on, loyaltyPointsPerUnit: perUnit, loyaltyRedeemRate: rate)
         }
         @MainActor func form() -> [String: JSONValue] {
@@ -754,7 +908,6 @@ struct PaymentsPane: View {
              // In Khayt's own order, not the set's: the invoice lists them.
              "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
              "paymentInstructions": .string(paymentInstructions),
-             "pickupHours": .string(pickupHours), "pickupMapUrl": .string(pickupMapUrl),
              "loyaltyEnabled": .bool(loyaltyEnabled),
              "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
              "loyaltyRedeemRate": .number(loyaltyRedeemRate)]
@@ -763,7 +916,6 @@ struct PaymentsPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
-    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -787,17 +939,6 @@ struct PaymentsPane: View {
                 Section(shop.words.callIt("set.payment_instructions")) {
                     TextEditor(text: $draft.paymentInstructions).frame(height: 70).font(.body)
                 }
-                // Where and when a customer collects — on their order page,
-                // with the address the invoice already prints.
-                Section {
-                    row(shop.words.callIt("mac.pickup_hours")) { TextField("", text: $draft.pickupHours) }
-                    latinRow(shop.words.callIt("mac.pickup_map")) {
-                        LatinField(text: $draft.pickupMapUrl, placeholder: "https://", monospaced: false)
-                    }
-                    Text(shop.words.callIt("mac.pickup_hint"))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } header: { Text(shop.words.callIt("mac.pickup_title")) }
                 Section(shop.words.callIt("set.loyalty")) {
                     Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
                     // The two numbers only mean anything once it is on, and a
@@ -844,7 +985,6 @@ struct OperationsPane: View {
     struct Draft: Equatable {
         var minMarginPct = 0.0, quoteValidityDays = 7.0, minOrderAmount = 0.0
         var rushFeeEnabled = false, rushFeePct = 25.0, defaultPackagingCost = 0.0
-        var hours: [String: Double] = [:]
         var dailyHours = 8.0, workingDaysPerWeek = 5.0, finishingDays = 1.0, dispatchDays = 1.0, safetyDays = 1.0
         var publishToCloud = false
         var wip: [String: Double] = [:]
@@ -869,10 +1009,6 @@ struct OperationsPane: View {
         /// Minutes one spool change takes — an ESTIMATE, used only to say what
         /// grouping the queue by colour saves (`lib/swap-queue.js`).
         var swapMinutes = OperationsPane.swapMinutesDefault
-        /// `settings.holidays`, the days the shop is closed (`YYYY-MM-DD`).
-        var holidays: [String] = []
-
-        static let days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
         static let columns = ["pending", "printing", "post", "qc"]
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
@@ -880,7 +1016,6 @@ struct OperationsPane: View {
             let lead = SettingsReader(settings: r.object("leadTime"))
             let wip = r.object("wipLimits")
             let qc = SettingsReader(settings: r.object("qc"))
-            let hours = r.object("workingHours")
             let budgets = r.object("expBudgets")
             let pay = SettingsReader(settings: r.object("paymentReminder"))
             let follow = SettingsReader(settings: r.object("quoteFollowUp"))
@@ -907,18 +1042,13 @@ struct OperationsPane: View {
                ["whatsapp", "email"].contains(channel) {
                 d.payReminderChannel = channel
             }
-            // Eight hours a day is what the working-week rule assumes when a
-            // shop has never set them, so that is what the fields show.
-            for day in days { d.hours[day] = Shop.plainNumber(hours[day]) ?? (hours.isEmpty ? 8 : 0) }
             for col in columns { d.wip[col] = Shop.plainNumber(wip[col]) ?? 0 }
-            d.holidays = WorkingWeek.holidays(settings: .object(settings))
             return d
         }
         func form() -> [String: JSONValue] {
             ["minMarginPct": .number(minMarginPct), "quoteValidityDays": .number(quoteValidityDays),
              "minOrderAmount": .number(minOrderAmount), "rushFeeEnabled": .bool(rushFeeEnabled),
              "rushFeePct": .number(rushFeePct), "defaultPackagingCost": .number(defaultPackagingCost),
-             "workingHours": .object(hours.mapValues(JSONValue.number)),
              "leadTime": .object(["dailyHours": .number(dailyHours), "workingDaysPerWeek": .number(workingDaysPerWeek),
                                   "finishingDays": .number(finishingDays), "dispatchDays": .number(dispatchDays),
                                   "safetyDays": .number(safetyDays), "publishToCloud": .bool(publishToCloud)]),
@@ -938,8 +1068,7 @@ struct OperationsPane: View {
                                          "channel": .string(payReminderChannel)]),
              "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
                                        "windowDays": .number(quoteFollowUpWindow)]),
-             "swapMinutes": .number(swapMinutes),
-             "holidays": .array(holidays.map(JSONValue.string))]
+             "swapMinutes": .number(swapMinutes)]
         }
     }
 
@@ -949,19 +1078,10 @@ struct OperationsPane: View {
 
     @State private var draft = Draft()
     @State private var original = Draft()
-    @AppStorage("mac.menuBar") private var menuBar = true
 
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                // FIRST: who works here and where. Records, saved as they are
-                // made — not part of the draft the bar below saves. At the foot
-                // of the pane they sat about 5,500 points down, under the QC
-                // switches, where a shop setting up its sites would not find
-                // them. The other app keeps them on its Operations page too.
-                Section { LocationsSection(shop: shop) }
-                Section { OperatorsSection(shop: shop) }
-                Section { LockSection(shop: shop) }
                 Section(shop.words.callIt("set.ops_section")) {
                     numberRow("set.min_margin", $draft.minMarginPct)
                     numberRow("set.quote_validity", $draft.quoteValidityDays)
@@ -970,30 +1090,6 @@ struct OperationsPane: View {
                     numberRow("set.rush_fee_pct", $draft.rushFeePct).disabled(!draft.rushFeeEnabled)
                     numberRow("set.default_packaging_cost", $draft.defaultPackagingCost, unit: Money.mark(shop.currency))
                 }
-                Section {
-                    HStack(spacing: 8) {
-                        ForEach(Draft.days, id: \.self) { day in
-                            VStack(spacing: 2) {
-                                Text(shop.words.callIt("day." + day)).font(.caption).foregroundStyle(.secondary)
-                                // `.labelsHidden()`, or the empty label still
-                                // claims a Form's label column and shoves the
-                                // field to the right of it — which is why every
-                                // number sat 44 points right of the day it
-                                // belongs to, in a row whose whole job is to
-                                // put a figure under a weekday.
-                                TextField("", value: Binding(get: { draft.hours[day] ?? 0 }, set: { draft.hours[day] = $0 }),
-                                          format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
-                                    .labelsHidden()
-                                    .multilineTextAlignment(.center).frame(width: 52)
-                            }
-                        }
-                    }
-                } header: {
-                    Text(shop.words.callIt("set.working_hours"))
-                } footer: {
-                    Text(shop.words.callIt("set.wh_hint"))
-                }
-                HolidaysSection(shop: shop, holidays: $draft.holidays)
                 Section {
                     // ── THE HOURS AND THE DAYS ARE THE GRID ABOVE ────────
                     //
@@ -1127,61 +1223,21 @@ struct OperationsPane: View {
     }
 }
 
-// MARK: - Preferences
+// MARK: - General
 
-struct PreferencesPane: View {
+/// This Mac and how the app reads: language, digits, appearance, the menu
+/// bar, Spotlight, updates, privacy, the browser extension, and how much of
+/// the app the shop wants. Only the language is in the draft the bar saves;
+/// everything else is this Mac's own or saves itself.
+struct GeneralPane: View {
     let shop: Shop
 
     struct Draft: Equatable {
         var lang = "en"
-        var useHijri = true, useArabicNumerals = false
-        var autoDeduct = true, lowStock = 200.0
-        /// The four estimator constants a shop can actually answer for.
-        ///
-        /// THROUGHPUT IS DELIBERATELY NOT HERE. It is the one nobody knows
-        /// about their own printer, and Khayt learns it from jobs whose real
-        /// weight and duration were recorded. Offering a field for it would
-        /// invite guessing the very number the calibration exists to stop
-        /// anyone guessing.
-        var density = 1.24, infillPct = 20.0, wallMm = 1.2, wastePct = 5.0
-        /// `demand` or `import`. Read as text with no default asserted here —
-        /// `lib/print-risk.js` owns the default, and the save path normalises
-        /// whatever this holds through the same reader.
-        var riskWhen = ""
-
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
-            let r = SettingsReader(settings: settings)
-            let risk = SettingsReader(settings: r.object("printRisk"))
-            let est = SettingsReader(settings: r.object("estimator"))
-            return Draft(lang: r.text("lang", "en"), useHijri: r.onUnlessOff("useHijri"),
-                         useArabicNumerals: r.flag("useArabicNumerals"),
-                         autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
-                         // The rule's own defaults, so an unset book shows what
-                         // it is actually estimating with rather than blanks.
-                         density: est.number("densityGPerCm3", 1.24),
-                         infillPct: est.number("infillPct", 0.2) * 100,
-                         wallMm: est.number("wallThicknessMm", 1.2),
-                         wastePct: est.number("wastePct", 0.05) * 100,
-                         // The shop's answer if it has given one, and otherwise
-                         // whatever the shared rule says the default is — asked
-                         // for rather than repeated, so the picker cannot show
-                         // one thing while an import does another.
-                         riskWhen: {
-                             let stored = risk.text("when", "")
-                             return stored.isEmpty ? (shop.riskWhen ?? "demand") : stored
-                         }())
+            Draft(lang: SettingsReader(settings: settings).text("lang", "en"))
         }
-        func form() -> [String: JSONValue] {
-            ["lang": .string(lang), "useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
-             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
-             "printRisk": .object(["when": .string(riskWhen)]),
-             // Per cent on screen, fraction in the book — the rule reads 0..1
-             // and a 20 saved there would be 2,000% infill.
-             "estimator": .object(["densityGPerCm3": .number(density),
-                                   "infillPct": .number(infillPct / 100),
-                                   "wallThicknessMm": .number(wallMm),
-                                   "wastePct": .number(wastePct / 100)])]
-        }
+        func form() -> [String: JSONValue] { ["lang": .string(lang)] }
     }
 
     @State private var draft = Draft()
@@ -1192,6 +1248,10 @@ struct PreferencesPane: View {
     @AppStorage(PrintNoticeKind.finished.defaultsKey) private var notifyFinished = true
     @AppStorage(PrintNoticeKind.failed.defaultsKey) private var notifyFailed = true
     @AppStorage(PrintNoticeKind.paused.defaultsKey) private var notifyPaused = true
+    /// The same key AND the same default as `ShopWindow` — both from
+    /// `ShellChoice`, because declaring the default twice is how this switch
+    /// came to read OFF in a window that was drawing the new shell.
+    @AppStorage(ShellChoice.key) private var newShell = ShellChoice.byDefault
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1204,6 +1264,20 @@ struct PreferencesPane: View {
                             }
                         }.labelsHidden()
                     }
+                }
+                // ── THE REDESIGNED WINDOW ─────────────────────────────────
+                //
+                // Off by default while the rest of the app is migrated screen
+                // by screen. Here rather than hidden behind a `defaults write`
+                // because a switch nobody can reach is a feature nobody can
+                // judge — and the whole point of shipping it early is to live
+                // with it before the other fifteen screens follow.
+                Section(shop.words.callIt("set.appearance")) {
+                    Toggle(shop.words.callIt("set.new_shell"), isOn: $newShell)
+                    Text(shop.words.callIt("set.new_shell_why"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 // MAC-LOCAL, and deliberately not in `Draft`. Everything else
                 // on this pane is written into the shop's settings and reaches
@@ -1314,6 +1388,80 @@ struct PreferencesPane: View {
                 // Save to Khayt: whether this Mac takes pages from the
                 // browser extension, and the door to switching it on.
                 BrowserExtensionSettings(shop: shop)
+            }
+            .formStyle(.grouped)
+            SaveBar(shop: shop, dirty: draft != original,
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
+                    revert: { draft = original })
+        }
+        .task(id: shop.settingsValue) { reset() }
+    }
+
+    private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
+}
+
+// MARK: - Preferences
+
+struct PreferencesPane: View {
+    let shop: Shop
+
+    struct Draft: Equatable {
+        var useHijri = true, useArabicNumerals = false
+        var autoDeduct = true, lowStock = 200.0
+        /// The four estimator constants a shop can actually answer for.
+        ///
+        /// THROUGHPUT IS DELIBERATELY NOT HERE. It is the one nobody knows
+        /// about their own printer, and Khayt learns it from jobs whose real
+        /// weight and duration were recorded. Offering a field for it would
+        /// invite guessing the very number the calibration exists to stop
+        /// anyone guessing.
+        var density = 1.24, infillPct = 20.0, wallMm = 1.2, wastePct = 5.0
+        /// `demand` or `import`. Read as text with no default asserted here —
+        /// `lib/print-risk.js` owns the default, and the save path normalises
+        /// whatever this holds through the same reader.
+        var riskWhen = ""
+
+        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
+            let r = SettingsReader(settings: settings)
+            let risk = SettingsReader(settings: r.object("printRisk"))
+            let est = SettingsReader(settings: r.object("estimator"))
+            return Draft(useHijri: r.onUnlessOff("useHijri"),
+                         useArabicNumerals: r.flag("useArabicNumerals"),
+                         autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
+                         // The rule's own defaults, so an unset book shows what
+                         // it is actually estimating with rather than blanks.
+                         density: est.number("densityGPerCm3", 1.24),
+                         infillPct: est.number("infillPct", 0.2) * 100,
+                         wallMm: est.number("wallThicknessMm", 1.2),
+                         wastePct: est.number("wastePct", 0.05) * 100,
+                         // The shop's answer if it has given one, and otherwise
+                         // whatever the shared rule says the default is — asked
+                         // for rather than repeated, so the picker cannot show
+                         // one thing while an import does another.
+                         riskWhen: {
+                             let stored = risk.text("when", "")
+                             return stored.isEmpty ? (shop.riskWhen ?? "demand") : stored
+                         }())
+        }
+        func form() -> [String: JSONValue] {
+            ["useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
+             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
+             "printRisk": .object(["when": .string(riskWhen)]),
+             // Per cent on screen, fraction in the book — the rule reads 0..1
+             // and a 20 saved there would be 2,000% infill.
+             "estimator": .object(["densityGPerCm3": .number(density),
+                                   "infillPct": .number(infillPct / 100),
+                                   "wallThicknessMm": .number(wallMm),
+                                   "wastePct": .number(wastePct / 100)])]
+        }
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
                     Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)

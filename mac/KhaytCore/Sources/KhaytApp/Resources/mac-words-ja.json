@@ -1028,7 +1028,7 @@
  "mac.late": "遅れ",
  "mac.late_tile": "遅れ",
  "mac.layer_of": "レイヤー {layer} / {total}",
- "mac.lead_from_hours": "1日の稼働時間と週の稼働日数は、上の「稼働時間」から取得されます。",
+ "mac.lead_from_hours": "1日の稼働時間と週の稼働日数は、設定 › ショップの「稼働時間」から取得されます。",
  "mac.lead_time_last": "直近のリードタイム",
  "mac.leave_group": "ライブラリ全体に戻る",
  "mac.ledger": "台帳",
@@ -3899,5 +3899,11 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "アカウント",
  "mac.cloud_not_connected": "このMacはKhayt Cloudにサインインしていません。サインインすると、ショップの帳簿をほかのコンピュータやスマートフォンと同期できます。",
- "mac.cloud_settings": "Khayt Cloud の設定"
+ "mac.cloud_settings": "Khayt Cloud の設定",
+ "mac.nav_general": "一般",
+ "mac.nav_shop": "ショップ",
+ "mac.nav_pricing": "価格と税",
+ "mac.nav_team": "チームとアクセス",
+ "mac.set_group_workshop": "工房",
+ "mac.set_group_online": "オンライン"
 }

@@ -247,7 +247,7 @@ struct IntegrationWiringTests {
         let window = try Self.source("SettingsWindow.swift")
         #expect(window.contains("IntegrationsPane(shop: shop)"),
                 "the directory exists and no settings tab opens it")
-        #expect(window.contains("case business, invoice, payments, operations, integrations"),
+        #expect(window.contains("case cloud, online, integrations, assistant"),
                 "the pane has no tag, so it cannot be restored or deep-linked to")
     }
 
