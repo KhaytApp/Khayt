@@ -1663,17 +1663,7 @@ function openOrderEditor(orderId) {
         <input type="text" data-f="trackingNumber" value="${escapeHtml(draft.trackingNumber)}" placeholder="…">
       </div>
     </div>
-    ${(() => {
-      const cl = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-      if (cl && cl.addresses && cl.addresses.length > 0) {
-        return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
-        <select id="oeAddressSelect" style="margin-bottom:6px;">
-          <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
-          ${cl.addresses.map(a => `<option value="${escapeHtml(a.address || '')}">${escapeHtml(a.label || a.address)}</option>`).join('')}
-        </select>`;
-      }
-      return '';
-    })()}
+    <div id="oeAddressPick">${oeAddressPickHtml(draft.clientId)}</div>
     <label style="margin-top:10px;">${escapeHtml(t('oe.delivery_address'))}</label>
     <textarea data-f="deliveryAddress" rows="2" style="resize:vertical; min-height:48px;" placeholder="…">${escapeHtml(draft.deliveryAddress)}</textarea>
     ${/* The updates this job's customer was sent, with Meta's delivery report
@@ -1910,16 +1900,15 @@ function openOrderEditor(orderId) {
         draft.deliveryAddress = e.target.value;
       });
       // Feature 4: Address book select
-      const addrSel = modal.querySelector('#oeAddressSelect');
-      if (addrSel) {
-        addrSel.addEventListener('change', (e) => {
-          const addrField = modal.querySelector('[data-f="deliveryAddress"]');
-          if (addrField && e.target.value) {
-            addrField.value = e.target.value;
-            draft.deliveryAddress = e.target.value;
-          }
-        });
-      }
+      // Delegated: the select is rebuilt when the Customer picker changes.
+      modal.addEventListener('change', (e) => {
+        if (!e.target || e.target.id !== 'oeAddressSelect') return;
+        const addrField = modal.querySelector('[data-f="deliveryAddress"]');
+        if (addrField && e.target.value) {
+          addrField.value = e.target.value;
+          draft.deliveryAddress = e.target.value;
+        }
+      });
       // Feature 8 (new 8-pack): Apply loyalty tier discount button
       modal.querySelector('#btnApplyTierDiscount')?.addEventListener('click', () => {
         const tier = getClientTier(order.clientId);
@@ -1958,6 +1947,9 @@ function openOrderEditor(orderId) {
         draft.clientId = e.target.value;
         const note = modal.querySelector('#oeCustomerNote');
         if (note) note.innerHTML = oeCustomerNoteHtml(order, draft.clientId);
+        // The address book offered is the customer now picked, not the one the job opened with.
+        const pickWrap = modal.querySelector('#oeAddressPick');
+        if (pickWrap) pickWrap.innerHTML = oeAddressPickHtml(draft.clientId);
       });
 
       // Vault files (Feature 2)
@@ -3069,6 +3061,18 @@ function oeCustomerPickerHtml(order, selected) {
         <small id="oeCustomerNote" style="display:block; margin-top:3px;">${lock ? `<span style="color:var(--text-muted);">${escapeHtml(oeCustomerReasonText(lock))}</span>` : oeCustomerNoteHtml(order, selected)}</small>
       </div>
     </div>`;
+}
+
+/** The customer's address book, to copy one into the delivery address; '' when it has none. */
+function oeAddressPickHtml(clientId) {
+  const cl = clientId ? clients.find(c => c && c.id === clientId) : null;
+  const rows = cl && Array.isArray(cl.addresses) ? cl.addresses.filter(a => a && typeof a === 'object') : [];
+  if (!rows.length) return '';
+  return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
+        <select id="oeAddressSelect" style="margin-bottom:6px;">
+          <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
+          ${rows.map(a => `<option value="${escapeHtml(String(a.address || ''))}">${escapeHtml(String(a.label || a.address || ''))}</option>`).join('')}
+        </select>`;
 }
 
 /** The warning under the picker when the new customer bills in another currency. Nothing is converted. */
