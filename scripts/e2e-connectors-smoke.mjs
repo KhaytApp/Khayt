@@ -163,6 +163,63 @@ try {
   const ev = (await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event === 'order_shipped');
   if (ev.length !== 1 || ev[0].delivery === press.delivery) fail(`event delivery: ${JSON.stringify(ev)}`);
 
+  // ── a 2xx the service turned down (Lamha E2E, Nov 10): not "Sent" ──
+  const setReply = (reply) => electronApp.evaluate(({ ipcMain }, reply) => {
+    ipcMain.removeHandler('hub:plugin-send');
+    ipcMain.handle('hub:plugin-send', (_e, req) => { globalThis.__sends.push(req); return { ok: true, status: 200, reply }; });
+  }, reply);
+  const lastToast = () => window.evaluate(() => [...document.querySelectorAll('#toastContainer .toast')].map((x) => x.textContent).pop() || '');
+  const press2 = async () => {
+    await window.evaluate(() => { document.querySelectorAll('#toastContainer .toast').forEach((x) => x.remove()); openOrderEditor('ORD-c1'); });
+    await window.waitForSelector('.plg-editor [data-plugin-action="sa.lamha.ship|ship"]', { timeout: 10000 });
+    await window.click('.plg-editor [data-plugin-action="sa.lamha.ship|ship"]');
+    await window.waitForFunction(() => document.querySelector('#toastContainer .toast'), null, { timeout: 10000 });
+    const said = await lastToast();
+    await window.click('#modalMount [data-act="save"]');
+    return said;
+  };
+  await setReply({ success: false, msg: 'Customer   phone\nis required' });
+  const declined = await press2();
+  if (declined !== 'Lamha shipping said: Customer phone is required') fail(`refusal toast: ${declined}`);
+  if ((await window.evaluate(() => printLog.find((o) => o.id === 'ORD-c1').plugins['sa.lamha.ship'].awb)) !== 'AWB-77') fail('a refusal wrote to the job');
+  await setReply({ success: true, data: {} });
+  const unconfirmed = await press2();
+  if (!/accepted it but sent back no Air waybill/.test(unconfirmed)) fail(`unconfirmed toast: ${unconfirmed}`);
+  // A numeric status (Lamha's order status 1) is not a refusal.
+  await setReply({ status: 1, shipment: { awb: 'AWB-78' } });
+  if ((await press2()) !== 'Sent') fail('a numeric status was read as a refusal');
+
+  // ── an event turned down: failed, shown, never retried on its own; Retry sends it again ──
+  await setReply({ success: false, msg: 'Duplicate order' });
+  const before = (await electronApp.evaluate(() => globalThis.__sends)).length;
+  await window.evaluate(() => fireStatusWebhook('order_shipped', printLog.find((o) => o.id === 'ORD-c1')));
+  await window.waitForFunction(() => (settings.pluginOutbox || []).some((p) => p.failed), null, { timeout: 10000 });
+  const box = await window.evaluate(() => settings.pluginOutbox.find((p) => p.failed));
+  if (box.failed.message !== 'Duplicate order' || 'nextAttemptAt' in box) fail(`failed item: ${JSON.stringify(box)}`);
+  await window.evaluate(() => resumePluginOutbox());
+  await window.waitForTimeout(800);
+  if ((await electronApp.evaluate(() => globalThis.__sends)).length !== before + 1) fail('a turned-down event was sent again on its own');
+  await switchTab(window, 'settings-tab');
+  await window.evaluate(() => { openSettingsSection('automation'); renderPluginSettings(); });
+  await window.waitForSelector('.plg-failed [data-act="retry"]', { timeout: 10000 });
+  const shown = await window.evaluate(() => document.querySelector('.plg-failed').textContent);
+  if (!/Duplicate order/.test(shown) || !/Lamha shipping/.test(shown)) fail(`failed list: ${shown}`);
+  await setReply({ success: true });
+  await window.click('.plg-failed [data-act="retry"]');
+  await window.waitForFunction(() => !(settings.pluginOutbox || []).length, null, { timeout: 10000 });
+  const retried = (await electronApp.evaluate(() => globalThis.__sends)).slice(-1)[0];
+  if (retried.delivery !== box.delivery) fail('Retry did not keep the delivery id');
+
+  // ── a job with no customer: a button that sends the customer is greyed out ──
+  await window.evaluate(() => { printLog.push({ id: 'ORD-c2', project: 'Cup', status: 'printing', price: 20, date: localDateStr(), parts: [] }); saveAll(); openOrderEditor('ORD-c2'); });
+  await window.waitForSelector('.plg-editor [data-plugin-action="sa.lamha.ship|ship"]', { timeout: 10000 });
+  const blocked = await window.evaluate(() => {
+    const b = document.querySelector('.plg-editor [data-plugin-action="sa.lamha.ship|ship"]');
+    return { disabled: b.disabled, why: b.parentElement.textContent };
+  });
+  if (!blocked.disabled || !/This job has no customer/.test(blocked.why)) fail(`no-customer button: ${JSON.stringify(blocked)}`);
+  await window.click('#modalMount [data-act="save"]').catch(() => {});
+
   // ── a refusal names the setting or key by its label, in the shop's language ──
   const said = await window.evaluate(() => {
     const entry = { manifest: { settings: [{ key: 'senderPhone', label: { en: 'Sender phone', ar: 'جوال المرسل' }, type: 'text' }],
@@ -174,10 +231,11 @@ try {
   if (!said[2].includes('host')) fail(`other refusal: ${said[2]}`);
 
   // ── off means off ──
+  const eventsBeforeOff = (await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event).length;
   await window.evaluate(() => { settings.plugins[0].enabled = false; saveAll(); });
   await window.evaluate(() => fireStatusWebhook('order_shipped', printLog.find((o) => o.id === 'ORD-c1')));
   await window.waitForTimeout(400);
-  if ((await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event).length !== 1) fail('a switched-off connector still sent');
+  if ((await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event).length !== eventsBeforeOff) fail('a switched-off connector still sent');
 
   console.log('connectors smoke: ok');
 } finally {

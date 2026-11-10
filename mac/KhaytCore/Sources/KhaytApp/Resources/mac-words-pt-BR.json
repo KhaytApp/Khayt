@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "Horário de retirada",
  "mac.pickup_map": "Link do mapa",
  "mac.pickup_hint": "Aparece com seu endereço na página do pedido do cliente enquanto o pedido não estiver com uma transportadora. Deixe ambos vazios para não mostrar o cartão de retirada.",
- "mac.paylink_title": "Link de pagamento",
+ "mac.paylink_title": "Botão de pagamento nas páginas dos clientes",
  "mac.paylink_url": "Link",
  "mac.paylink_label": "Rótulo (opcional)",
  "mac.paylink_role": "Somente o proprietário ou um gerente da loja pode alterar o link de pagamento.",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "Preços e impostos",
  "mac.nav_team": "Equipe e acesso",
  "mac.set_group_workshop": "Oficina",
- "mac.set_group_online": "Online"
+ "mac.set_group_online": "Online",
+ "mac.nav_invoices": "Faturas e pagamentos",
+ "mac.nav_production": "Produção"
 }

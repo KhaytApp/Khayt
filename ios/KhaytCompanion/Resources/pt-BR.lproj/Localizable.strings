@@ -1187,9 +1187,10 @@
 "connectors.settings.missing" = "Os botões não enviam nada até que %@ seja definido no seu Mac ou PC.";
 "connectors.error.setting" = "Defina “%@” para este conector no seu Mac ou PC primeiro. Nada foi enviado.";
 "connectors.reply.not_saved" = "Não foi possível salvar a resposta neste iPhone. Copie-a para o campo manualmente.";
-"connectors.reply.refused_said" = "%1$@ não aceitou: “%2$@” Nada foi registrado.";
-"connectors.reply.refused" = "%@ não aceitou. Nada foi registrado.";
-"connectors.reply.unconfirmed" = "%1$@ respondeu, mas a resposta não incluía: %2$@. Nada foi registrado. Confira em %1$@ antes de enviar de novo.";
+"plg.err_declined" = "%1$@ respondeu: %2$@";
+"plg.err_declined_nomsg" = "%1$@ recusou a solicitação sem dizer por quê.";
+"plg.sent_unconfirmed" = "%1$@ aceitou, mas não devolveu %2$@. Verifique no %1$@ antes de enviar de novo.";
+"connectors.reply.unchecked" = "%1$@ respondeu, mas este iPhone não conseguiu verificar a resposta. Verifique no %1$@ antes de enviar de novo.";
 "connectors.error.no_customer" = "Este trabalho não tem cliente, e %@ precisa do nome, telefone e endereço do cliente. Vincule um cliente ao trabalho primeiro. Nada foi enviado.";
 "connectors.field.clear" = "Limpar";
 "connectors.field.footer" = "Salvo neste iPhone e enviado ao seu Mac com suas outras alterações. Seu Mac só o mantém enquanto %@ estiver ativado nele.";
