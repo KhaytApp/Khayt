@@ -106,7 +106,9 @@ function readIndex(site) {
 
 /** A new serial and a fresh expiry, then signed. */
 function stamped(index, nowMs, sign, keys) {
-  const next = Object.assign({}, index, {
+  // Only the index's own keys are carried and signed: a hand-made placeholder's
+  // extras (`_placeholder`) never become part of what Khayt signs.
+  const next = Object.assign({ entries: Array.isArray(index.entries) ? index.entries : [] }, {
     khaytIndex: U.INDEX_FORMAT,
     serial: (Number.isInteger(index.serial) ? index.serial : 0) + 1,
     issuedAt: new Date(nowMs).toISOString(),

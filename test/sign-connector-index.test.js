@@ -118,3 +118,13 @@ test('verify-index runs with no key at all: the CLI exits 0 on a good site and 1
   assert.match(out.stdout, /NOT OK/);
   assert.match(out.stderr, /index: unsigned/);
 });
+
+test("a website placeholder index is replaced outright: its extra keys are never signed", () => {
+  const k = throwaway(); const d = site();
+  fs.mkdirSync(path.join(d, 'connectors'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'connectors', 'index.json'), JSON.stringify({ _placeholder: true, khaytIndex: 1, serial: 0, entries: [] }));
+  const ix = S.publish(d, at('1.1.1'), Object.assign({ nowMs: NOW }, k));
+  assert.deepEqual(Object.keys(ix).sort(), ['entries', 'expires', 'issuedAt', 'khaytIndex', 'serial', 'signature']);
+  assert.equal(ix.serial, 1);
+  assert.equal(S.verifySite(d, { nowMs: NOW, keys: k.keys }).ok, true);
+});
