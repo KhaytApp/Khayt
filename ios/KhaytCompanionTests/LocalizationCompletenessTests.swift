@@ -233,8 +233,8 @@ final class LocalizationCompletenessTests: XCTestCase {
     /// The app is خيط in Arabic letters (Turki, Nov 10 2026), and the cloud
     /// is "سحابة خيط". But خيط is also the Arabic for filament: an Arabic
     /// line once read "open filament". So:
-    /// - no Arabic line writes "Khayt" in Latin letters, except where it names
-    ///   what iOS itself shows (the home-screen name is not localised);
+    /// - no Arabic line writes "Khayt" in Latin letters, the home-screen
+    ///   name included (CFBundleDisplayName in ar InfoPlist.strings);
     /// - a line whose English says "Khayt Cloud" says "سحابة خيط";
     /// - a line that also talks about filament or spools names the app as
     ///   "تطبيق خيط", never a bare خيط that could be read as the filament;
@@ -249,17 +249,21 @@ final class LocalizationCompletenessTests: XCTestCase {
             "calc.add_colour", "calc.filament", "calc.no_spool",
             "shop.hint",  // the shopping list: "every filament at or under its reorder point"
         ]
-        let latinAllowed: Set<String> = ["pair.browse.permission"]  // "Settings → Khayt": the name iOS lists
+        // The home-screen name is localised too (ar InfoPlist.strings), so
+        // "Settings → خيط" matches what iOS lists; nothing keeps the Latin name.
+        let latinAllowed: Set<String> = []
         let ios = Self.appDir.deletingLastPathComponent()
         let tables = ["KhaytCompanion/Resources/%@.lproj/Localizable.strings", "KhaytCompanion/Resources/%@.lproj/InfoPlist.strings",
                       "KhaytWidget/%@.lproj/Localizable.strings", "KhaytAlerts/%@.lproj/Localizable.strings"]
         var problems: [String] = []
         var brandLines = 0
+        let infoPlistEnglish = NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/Info.plist")) as? [String: Any] ?? [:]
         for table in tables {
             let ar = try XCTUnwrap(NSDictionary(contentsOf: ios.appending(path: String(format: table, "ar"))) as? [String: String], table)
             let en = try XCTUnwrap(NSDictionary(contentsOf: ios.appending(path: String(format: table, "en"))) as? [String: String], table)
             for (key, value) in ar {
-                let english = en[key] ?? key
+                // InfoPlist keys with no English line (the home-screen name) fall back to Info.plist.
+                let english = en[key] ?? (infoPlistEnglish[key] as? String) ?? key
                 let mentionsApp = english.replacingOccurrences(of: "Khayt Cloud", with: "").contains("Khayt")
                 let aboutFilament = filament.contains(key) || english.range(of: "filament|spool", options: [.regularExpression, .caseInsensitive]) != nil
                 let unqualified = value.replacingOccurrences(of: "سحابة خيط", with: "").replacingOccurrences(of: "تطبيق خيط", with: "")
@@ -275,6 +279,8 @@ final class LocalizationCompletenessTests: XCTestCase {
             }
         }
         XCTAssertEqual(problems.sorted(), [])
+        let infoPlist = NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/ar.lproj/InfoPlist.strings")) as? [String: String]
+        XCTAssertEqual(infoPlist?["CFBundleDisplayName"], "خيط", "the name under the icon, and in Settings")
         XCTAssertGreaterThan(brandLines, 40, "the rule still sees the app's name")
     }
 
