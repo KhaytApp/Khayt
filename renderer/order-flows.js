@@ -3226,6 +3226,11 @@ async function splitOrderAcrossMachines(orderId) {
       date: order.date || localDateStr(),
       status: 'pending',
       price: subPrice,
+      // The parent's shares are in the parent's currency, so each part is too.
+      // Without this a EUR job split into SAR-read parts (the job's absent
+      // currency falls back to the customer's, then the shop's).
+      ...(order.currency ? { currency: order.currency } : {}),
+      ...(order.fxRate != null ? { fxRate: order.fxRate } : {}),
       paidAmount: subPaid,
       paymentStatus: KhaytSplitOrder.paymentStatusFor(subPrice, subPaid),
       creditNotes: subCredit > 0

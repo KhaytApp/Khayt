@@ -228,6 +228,8 @@ jobs:
         run: xvfb-run -a npm run test:e2e:consent
       - name: E2E job customer (Edit Order picker, option C)
         run: xvfb-run -a npm run test:e2e:jobcustomer
+      - name: E2E split keeps the job's currency
+        run: xvfb-run -a npm run test:e2e:splitcurrency
 
       - name: E2E smoke (already have this model)
         run: xvfb-run -a npm run test:e2e:dedupe
