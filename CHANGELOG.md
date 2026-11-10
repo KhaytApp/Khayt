@@ -9513,6 +9513,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.33] - 2026-11-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release gives a customer an address book and puts the add buttons back on Customers and Inventory. It also reorganises Settings into groups, with General, Shop, Pricing & Tax, Invoices & Payments, Production and Team & Access panes.
+
+### Added
+
+- **A customer has an address book**: label and address per row, **+ Add address**, and the first row is the default, as on Windows and Linux. Addresses the other app or a CSV import wrote are kept as they are.
+- **New Customer** on the Customers screen's toolbar, and **File › New Customer** is **⌥⌘N**. Once a shop had one customer, the only way to add another was the File menu.
+- **New Spool** and **Import from Spoolman…** on the Inventory screen's toolbar. In the standard window a new spool could not be added at all.
+
+### Changed
+
+- **Settings is grouped, and opens on General.** The sidebar has groups (Shop, Workshop, Online), and every section has moved, unchanged, to the pane named for it:
+  - **General**: language, appearance, this Mac's switches, experience mode, crash reports and usage, and the browser extension.
+  - **Shop**: identity, contact, logo, registration, locations, working hours, closure dates and pickup.
+  - **Pricing & Tax**: currency and tax, exchange rates, running and fixed costs, quote rules, loyalty, budgets and the revenue goal.
+  - **Invoices & Payments**: documents, the Hijri and numeral switches, invoice numbering, bank details, accepted methods, the payment link (now headed "Pay button on customer pages"), pay later, reminders and quote follow-up.
+  - **Production**: delivery estimates, work-in-progress limits, stock and purchase orders, spool-change time, quality control, post-processing, custom fields and the environment log.
+  - **Team & Access**: operators, staff sign-in, and the Khayt Cloud team and signed-in devices.
+  No setting changes its value.
+
+### Not switched on yet
+
+- **Connectors** stay hidden until they launch on the Mac, Windows/Linux and iPhone together with the published privacy text. In this build, behind the same switch: a request the service turns down is shown in the service's own words rather than as "Sent"; a button says "Sent" only when the reply fills what it promises; an event the service turns down waits under the connector in Settings with Retry and Dismiss; a job with no customer cannot be sent to a courier; and the Lamha sample (1.1.1) reads its order number from either place Lamha puts it. Connectors can also send the amount still owed and a link expiry.
+
 ## [4.0.0-beta.32] - 2026-11-09
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
