@@ -279,6 +279,8 @@ extension Shop {
         case "shippingCost": "oe.shipping"
         case "priority", "priorityLevel": "oe.priority"
         case "price": "common.total"
+        case "project": "mac.job"
+        case "clientId", "client": "mac.customer"
         default: nil
         }
     }

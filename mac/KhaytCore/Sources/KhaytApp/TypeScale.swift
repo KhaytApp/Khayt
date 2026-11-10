@@ -52,7 +52,8 @@ enum TypeScale {
         case (.label, true):  em = 0.10
         case (.label, false): em = 0.075
         }
-        return em * size
+        // Positive tracking spaces letters out, which Arabic cannot take.
+        return em > 0 ? Words.spaced(em * size) : em * size
     }
 
     /// The label step is heavier in SF, which is lighter than Grotesk at the

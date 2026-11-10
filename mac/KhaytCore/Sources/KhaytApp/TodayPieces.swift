@@ -79,7 +79,7 @@ struct TodayEyebrow: View {
             Rectangle().fill(Khayt.thread).frame(width: 24, height: 2)
             Text(verbatim: text)
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .textCase(.uppercase).tracking(1.0)
+                .textCase(.uppercase).tracking(Words.spaced(1.0))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }

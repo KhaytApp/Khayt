@@ -22,7 +22,7 @@ struct SurveySummaryCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(words.callIt("an.nps_title"))
                 .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase).tracking(0.6)
+                .textCase(.uppercase).tracking(Words.spaced(0.6))
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 22) {
                 figure(summary.average.map(RatingTrendCard.oneDecimal) ?? "—", "mac.sv_avg",

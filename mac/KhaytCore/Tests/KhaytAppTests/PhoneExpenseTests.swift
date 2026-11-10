@@ -125,4 +125,35 @@ struct PhoneExpenseTests {
         #expect(SyncLosses.staleReplacements(before: before, after: after, payload: payload(.number(7)),
                                              already: ["printLog:J1"]).isEmpty, "not kept twice")
     }
+
+    // MARK: - Everyday use (section C)
+
+    @Test("the Stage column sorts by where a job is in the work, not by the stored word")
+    func stageOrder() {
+        #expect(Stage.quote.rank < Stage.pending.rank)
+        #expect(Stage.pending.rank < Stage.printing.rank)
+        #expect(Stage.printing.rank < Stage.qc.rank)
+        #expect(Stage.qc.rank < Stage.completed.rank)
+        #expect(Stage.completed.rank < Stage.cancelled.rank, "alphabetical put cancelled first")
+    }
+
+    @Test("Edit Job renames only when the name was changed to something")
+    @MainActor func renaming() {
+        #expect(EditJobSheet.renamed(from: "Vaze", to: " Vase ") == "Vase")
+        #expect(EditJobSheet.renamed(from: "Vase", to: "Vase") == nil)
+        #expect(EditJobSheet.renamed(from: "Vase", to: "   ") == nil, "emptied is \"leave it\", never a nameless job")
+    }
+
+    @Test("Cancel on New Job asks only when there is work to lose")
+    @MainActor func discardGuard() {
+        #expect(!NewJobSheet.worthAsking(parts: 0, pending: false))
+        #expect(NewJobSheet.worthAsking(parts: 1, pending: false))
+        #expect(NewJobSheet.worthAsking(parts: 0, pending: true))
+    }
+
+    @Test("letter-spacing is nothing in Arabic, whose letters join")
+    func spacing() {
+        #expect(Words.spaced(0.6, joined: false) == 0.6)
+        #expect(Words.spaced(0.6, joined: true) == 0)
+    }
 }

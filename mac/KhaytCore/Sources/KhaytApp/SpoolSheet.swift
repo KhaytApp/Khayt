@@ -102,6 +102,8 @@ struct SpoolSheet: View {
                                 }
                             } label: { Image(systemName: "list.bullet") }
                                 .menuStyle(.borderlessButton).fixedSize()
+                                .help(shop.words.callIt("mac.pick_from_list"))
+                                .accessibilityLabel(shop.words.callIt("mac.pick_from_list"))
                         }
                         // The catalogue: 1,945 filaments somebody else already
                         // wrote down. Separate from the menu above, which is
@@ -155,6 +157,8 @@ struct SpoolSheet: View {
                                 }
                             } label: { Image(systemName: "list.bullet") }
                                 .menuStyle(.borderlessButton).fixedSize()
+                                .help(shop.words.callIt("mac.pick_from_list"))
+                                .accessibilityLabel(shop.words.callIt("mac.pick_from_list"))
                         }
                     }
                 }

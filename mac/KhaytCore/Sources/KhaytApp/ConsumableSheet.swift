@@ -93,6 +93,8 @@ struct ConsumableSheet: View {
                                 }
                             } label: { Image(systemName: "list.bullet") }
                                 .menuStyle(.borderlessButton).fixedSize()
+                                .help(shop.words.callIt("mac.pick_from_list"))
+                                .accessibilityLabel(shop.words.callIt("mac.pick_from_list"))
                         }
                     }
                 }

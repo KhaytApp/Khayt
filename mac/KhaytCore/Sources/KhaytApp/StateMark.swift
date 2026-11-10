@@ -297,7 +297,7 @@ struct StateChip: View {
                     NSFont(name: $0, size: state.markSize(10)).map(Font.init)
                 })
             Text(words.callIt(state.wordKey).uppercased())
-                .tracking(0.9)
+                .tracking(Words.spaced(0.9))
         }
         // A chip is one line. Wrapping one silently changes the height of the
         // row it is in, which is how this was invisible for as long as it was.
