@@ -5873,7 +5873,7 @@ final class Words {
         "mac.deleted_jobs_few": ["en": "{n} jobs deleted.", "ar": "حُذفت {n} أعمال."],
         "mac.delete_jobs_action": ["en": "Delete Jobs", "ar": "حذف الأعمال"],
         "mac.delete_portal_kept": ["en": "The customer link could not be taken down; remove it from Khayt Cloud.",
-                                   "ar": "تعذّر إيقاف رابط العميل؛ احذفه من خيط كلاود."],
+                                   "ar": "تعذّر إيقاف رابط العميل؛ احذفه من سحابة خيط."],
         "mac.customer_has_jobs": ["en": "Has {n} jobs", "ar": "له {n} عملًا"],
         "mac.customer_has_jobs_one": ["en": "Has {n} job", "ar": "له عمل واحد"],
         "mac.customer_has_jobs_two": ["en": "Has {n} jobs", "ar": "له عملان"],
