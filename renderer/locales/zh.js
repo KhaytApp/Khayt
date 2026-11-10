@@ -5368,6 +5368,7 @@
   "plg.err_invalid": "该文件不是 Khayt 连接器。",
   "plg.err_unreviewed": "该连接器未经 Khayt 审核，因此无法在此安装。",
   "plg.reviewed_by_khayt": "已由 Khayt 审核",
+  "plg.consent_updates": "更新版本 {from} — 它发送的内容会再次列出，供你同意。",
   "plg.consent_lead": "运行时，该连接器只会把以下字段发送到以下地址：",
   "plg.consent_link_only": "在那里打开一个页面；不会发送你账本中的任何内容。",
   "plg.consent_scopes": "它还可以",
