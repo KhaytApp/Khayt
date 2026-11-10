@@ -228,6 +228,8 @@ jobs:
         run: xvfb-run -a npm run test:e2e:consent
       - name: E2E job customer (Edit Order picker, option C)
         run: xvfb-run -a npm run test:e2e:jobcustomer
+      - name: E2E split keeps the job's currency
+        run: xvfb-run -a npm run test:e2e:splitcurrency
       - name: E2E customer editor works on a copy (Cancel loses nothing)
         run: xvfb-run -a npm run test:e2e:clientdraft
 
