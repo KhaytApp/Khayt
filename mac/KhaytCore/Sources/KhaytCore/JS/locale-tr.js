@@ -5343,6 +5343,7 @@
   "plg.err_invalid": "Bu dosya bir Khayt bağlayıcısı değil.",
   "plg.err_unreviewed": "Bu bağlayıcı Khayt tarafından incelenmedi, bu yüzden burada kurulamaz.",
   "plg.reviewed_by_khayt": "Khayt tarafından incelendi",
+  "plg.consent_updates": "{from} sürümünü günceller — gönderdikleri onayınız için yeniden listelenir.",
   "plg.consent_lead": "Çalıştığında bu bağlayıcı yalnızca bu alanları şu adreslere gönderir:",
   "plg.consent_link_only": "Orada bir sayfa açar; defterinizden hiçbir şey göndermez.",
   "plg.consent_scopes": "Ayrıca şunları yapabilir",

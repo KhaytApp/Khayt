@@ -5343,6 +5343,7 @@
   "plg.err_invalid": "Diese Datei ist kein Khayt-Konnektor.",
   "plg.err_unreviewed": "Dieser Konnektor wurde nicht von Khayt geprüft und kann hier nicht installiert werden.",
   "plg.reviewed_by_khayt": "Von Khayt geprüft",
+  "plg.consent_updates": "Aktualisiert Version {from} – was gesendet wird, wird zur Zustimmung erneut aufgeführt.",
   "plg.consent_lead": "Wenn er läuft, sendet dieser Konnektor diese Felder, und nur diese, an diese Adressen:",
   "plg.consent_link_only": "Öffnet dort eine Seite; sendet nichts aus deinem Buch.",
   "plg.consent_scopes": "Er darf außerdem",

@@ -5343,6 +5343,7 @@
   "plg.err_invalid": "このファイルは Khayt のコネクタではありません。",
   "plg.err_unreviewed": "このコネクタは Khayt の審査を受けていないため、ここにはインストールできません。",
   "plg.reviewed_by_khayt": "Khayt 審査済み",
+  "plg.consent_updates": "バージョン {from} を更新します — 送信する内容をもう一度確認して同意してください。",
   "plg.consent_lead": "実行されると、このコネクタは次のフィールドだけを次のアドレスに送信します：",
   "plg.consent_link_only": "そこでページを開きます。台帳の内容は何も送信しません。",
   "plg.consent_scopes": "ほかにできること",

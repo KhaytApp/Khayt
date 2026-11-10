@@ -5344,6 +5344,7 @@
   "plg.err_invalid": "Esse arquivo não é um conector do Khayt.",
   "plg.err_unreviewed": "Este conector não foi revisado pelo Khayt, então não pode ser instalado aqui.",
   "plg.reviewed_by_khayt": "Revisado pelo Khayt",
+  "plg.consent_updates": "Atualiza a versão {from} — o que ele envia é listado de novo para você concordar.",
   "plg.consent_lead": "Quando é executado, este conector envia estes campos, e só estes, para estes endereços:",
   "plg.consent_link_only": "Abre uma página lá; não envia nada do seu livro.",
   "plg.consent_scopes": "Ele também pode",

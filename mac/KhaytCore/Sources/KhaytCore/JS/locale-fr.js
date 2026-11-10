@@ -5343,6 +5343,7 @@
   "plg.err_invalid": "Ce fichier n’est pas un connecteur Khayt.",
   "plg.err_unreviewed": "Ce connecteur n’a pas été vérifié par Khayt et ne peut donc pas être installé ici.",
   "plg.reviewed_by_khayt": "Vérifié par Khayt",
+  "plg.consent_updates": "Met à jour la version {from} : ce qu’il envoie vous est de nouveau présenté pour accord.",
   "plg.consent_lead": "Quand il s’exécute, ce connecteur envoie ces champs, et seulement ceux-ci, à ces adresses :",
   "plg.consent_link_only": "Ouvre une page là-bas ; n’envoie rien de votre registre.",
   "plg.consent_scopes": "Il peut aussi",

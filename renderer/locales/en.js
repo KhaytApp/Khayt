@@ -5344,6 +5344,7 @@
   "plg.err_invalid": "That file is not a Khayt connector.",
   "plg.err_unreviewed": "This connector has not been reviewed by Khayt, so it cannot be installed here.",
   "plg.reviewed_by_khayt": "Reviewed by Khayt",
+  "plg.consent_updates": "Updates version {from} — what it sends is listed again for you to agree to.",
   "plg.consent_lead": "When it runs, this connector sends these fields, and only these, to these addresses:",
   "plg.consent_link_only": "Opens a page there; sends nothing from your book.",
   "plg.consent_scopes": "It may also",
