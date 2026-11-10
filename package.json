@@ -124,6 +124,7 @@
     "test:e2e:paritybatch": "node scripts/e2e-parity-batch-smoke.mjs",
     "test:e2e:customerupdates": "node scripts/e2e-customer-updates-smoke.mjs",
     "test:e2e:jobcustomer": "node scripts/e2e-job-customer-smoke.mjs",
+    "test:e2e:clientdraft": "node scripts/e2e-client-draft-smoke.mjs",
     "test:e2e:libraryhealth": "node scripts/e2e-library-health-smoke.mjs",
     "test:e2e:reviewfixes": "node scripts/e2e-review-fixes-smoke.mjs",
     "test:e2e:failedcost": "node scripts/e2e-failed-cost-smoke.mjs",
