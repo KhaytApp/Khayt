@@ -221,10 +221,21 @@ enum ConnectorRules {
     /// secret, whatever its URL says; the lib refuses one too, and this is
     /// the phone's own lock. `secret` reads this phone's Keychain; a missing
     /// one is returned by name.
+    ///
+    /// `settings` is the book's settings: without them the shared code
+    /// refuses `order.amountDue`, which would otherwise read an exclusive
+    /// shop's bill as its pre-tax price. `nowMs` is the clock behind
+    /// `{now.epochMs}` and `{now.plusDays.N.epochMs}`; the caller reads it
+    /// on every attempt, never once for a retry.
     static func context(action: Connector.Action, order: [String: JSONValue]?, customer: [String: JSONValue]?,
                         config: [String: JSONValue] = [:],
+                        settings: [String: JSONValue]? = nil, nowMs: Int64? = nil,
                         secret: (String) -> String?) -> (context: JSONValue, missing: String?) {
         var ctx: [String: JSONValue] = ["config": .object(config)]
+        // The engine's context, never the store: a copy handed to the shared
+        // code for this one payload (MacSettingsReadTests guards store writes).
+        if let settings { ctx.merge(["settings": .object(settings)]) { $1 } }
+        if let nowMs { ctx["nowMs"] = .number(Double(nowMs)) }
         if let order { ctx["order"] = .object(order) }
         if let customer { ctx["customer"] = .object(customer) }
         guard action.kind == "post" else { return (.object(ctx), nil) }
@@ -236,6 +247,9 @@ enum ConnectorRules {
         if !urlSecrets.isEmpty { ctx["secrets"] = .object(urlSecrets) }
         return (.object(ctx), nil)
     }
+
+    /// The clock for `{now…}`, in epoch milliseconds.
+    static func nowMs(_ date: Date = Date()) -> Int64 { Int64((date.timeIntervalSince1970 * 1000).rounded(.down)) }
 
     /// A status in one word or two, for a list row or a badge.
     static func statusName(_ s: Connector.Status) -> String {
@@ -571,6 +585,14 @@ extension KhaytAPIClient {
         }
     }
 
+    /// The book's settings, for the connector context (currency and VAT
+    /// mode behind `order.amountDue`). Nil without a book.
+    func connectorSettings() -> [String: JSONValue]? {
+        guard let book, book.exists, let store = try? book.read(),
+              case .object(let settings)? = store["settings"] else { return nil }
+        return settings
+    }
+
     /// The consent rows for the confirmation and the Settings page.
     func connectorConsentRows(_ c: Connector) async -> [(host: String, fields: [String])] {
         guard let reader, let engine = try? await reader.sharedEngine(),
@@ -611,7 +633,8 @@ extension KhaytAPIClient {
             secrets[name] = v
         }
         let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer,
-                                          config: c.config) { secrets[$0] }
+                                          config: c.config, settings: connectorSettings(),
+                                          nowMs: ConnectorRules.nowMs()) { secrets[$0] }
 
         guard let payload = try? await engine.pluginPayload(
                 c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context) else {
@@ -688,7 +711,8 @@ extension KhaytAPIClient {
                                          engine: KhaytEngine) async -> ConnectorOutcome {
         let records = connectorRecords(place)
         let made = ConnectorRules.context(action: action, order: records.order, customer: records.customer,
-                                          config: c.config) { _ in nil }
+                                          config: c.config, settings: connectorSettings(),
+                                          nowMs: ConnectorRules.nowMs()) { _ in nil }
         guard let payload = try? await engine.pluginPayload(
                 c.manifest, trigger: .object(["action": .string(action.id)]), context: made.context) else {
             return .failed(L10n.tr("connectors.error.build"))

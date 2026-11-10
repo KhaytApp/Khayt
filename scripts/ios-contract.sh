@@ -21,6 +21,9 @@ cd "$ROOT"
 if ! command -v swiftc >/dev/null 2>&1; then
   echo "ios-contract: swiftc not found — this check needs macOS with Xcode." >&2
   echo "ios-contract: SKIPPED (loudly: a silent skip is how a guard stops guarding)." >&2
+  # In CI the job runs on a Mac image on purpose: no swiftc there is a broken
+  # runner, and a skip would pass the required check.
+  if [ -n "${CI:-}" ]; then exit 1; fi
   exit 0
 fi
 

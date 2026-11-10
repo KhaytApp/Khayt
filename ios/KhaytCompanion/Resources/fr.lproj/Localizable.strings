@@ -1203,6 +1203,8 @@
 "connectors.data.order.date" = "Date de commande";
 "connectors.data.order.carrier" = "Transporteur";
 "connectors.data.order.trackingnumber" = "Numéro de suivi";
+"connectors.data.order.amountdue" = "Montant dû";
+"connectors.data.order.amountdueminor" = "Montant dû (unité minimale)";
 "connectors.data.customer.name" = "Nom du client";
 "connectors.data.customer.company" = "Société";
 "connectors.data.customer.phone" = "Numéro de téléphone";
