@@ -12,11 +12,15 @@ import { launchApp, dismissWizard, makeUserDataDir, switchTab } from './e2e/help
 
 const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
 const shots = process.env.SETTINGS_RO_SHOTS || '';
-const PANELS = ['biz', 'prefs', 'stock', 'invoice', 'payments', 'printers', 'online', 'data'];
+const PANELS = ['general', 'shop', 'pricing', 'invoices', 'production', 'team', 'printers', 'library',
+  'cloud', 'store', 'notify', 'connections', 'ai', 'advanced'];
 const ALLOW = '.settings-nav-item, #btnSwitchOperator, #btnLockNow, #btnViewTelemetry';
 
 async function liveControls(window, section) {
-  await window.click(`.settings-nav-item[data-settings-section="${section}"]`);
+  // A pane this mode hides (Team & Access, AI… outside Professional) has nothing to reach.
+  const nav = window.locator(`.settings-nav-item[data-settings-section="${section}"]`);
+  if (!(await nav.isVisible())) return { missing: true, live: [] };
+  await nav.click();
   await window.waitForTimeout(250);
   return window.evaluate(({ section, ALLOW }) => {
     const panel = document.getElementById('settings-panel-' + section);
@@ -33,7 +37,7 @@ let failed = false;
 try {
   await dismissWizard(window);
   await switchTab(window, 'settings-tab');
-  const ownerLive = await liveControls(window, 'biz');
+  const ownerLive = await liveControls(window, 'shop');
   ok(ownerLive.live.length > 0, `with the lock off, Settings are live (${ownerLive.live.length} controls)`);
 
   const before = await window.evaluate(() => settings.bizName || settings.businessName || '');
@@ -54,11 +58,12 @@ try {
   // A panel drawn after the gate is closed too.
   await window.evaluate(() => { renderLanApiSettings(); renderTelemetrySettings(); });
   await window.waitForTimeout(300);
-  ok((await liveControls(window, 'online')).live.length === 0, 'a panel redrawn later is closed as well');
+  ok((await liveControls(window, 'connections')).live.length === 0, 'a panel redrawn later is closed as well');
+  ok((await liveControls(window, 'general')).live.length === 0, 'the privacy and crash-report cards redrawn later are closed too');
 
   // Save refuses even if called directly.
   await window.evaluate(() => {
-    const el = document.querySelector('#settings-panel-biz input[type="text"]');
+    const el = document.querySelector('#settings-panel-shop input[type="text"]');
     if (el) { el.disabled = false; el.value = 'Changed By Manager'; }
     saveSettingsFromPanel();
   });
@@ -84,7 +89,7 @@ try {
     applyOperatorPermissions();
   });
   ok(!(await window.evaluate(() => document.getElementById('settingsReadOnlyNote'))), 'the note goes when the lock is off');
-  ok((await liveControls(window, 'biz')).live.length === ownerLive.live.length, 'and every control is live again');
+  ok((await liveControls(window, 'shop')).live.length === ownerLive.live.length, 'and every control is live again');
 
   console.log('e2e-settings-readonly: ok (manager: every panel closed, redraws closed, Save refused, operator switch open; owner: all live)');
 } catch (err) {

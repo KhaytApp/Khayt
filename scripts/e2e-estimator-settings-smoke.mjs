@@ -22,7 +22,7 @@ const CUBE = { volumeMm3: 8000, bbox: { x: 20, y: 20, z: 20 } };
 
 async function openPanel(window) {
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="prefs"]');
+  await window.click('.settings-nav-item[data-settings-section="printers"]');
   await window.waitForSelector('#est_density');
 }
 

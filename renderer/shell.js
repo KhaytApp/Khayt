@@ -479,12 +479,31 @@ function syncTopbarTitle(tabId) {
 /* ============================================================
    Tabs
    ============================================================ */
-/** Settings sections that are business-only (hidden/redirected in enthusiast mode). */
-const BIZ_SETTINGS_SECTIONS = ['invoice', 'payments', 'online'];
+/** Settings panes that are business-only (hidden/redirected in enthusiast mode). */
+const BIZ_SETTINGS_SECTIONS = ['invoices', 'store', 'connections'];
+
+/** The 11 sections before the 14 panes (Nov 2026), and the pane each one's
+ *  cards mostly moved to, so a deep link, a button or a script that still
+ *  names an old section lands somewhere sensible. Only used when no panel by
+ *  that id exists: Bed Ready keeps the old sections and opens them as-is. */
+const SETTINGS_SECTION_ALIASES = {
+  biz: 'shop', prefs: 'general', stock: 'production', invoice: 'invoices',
+  payments: 'invoices', online: 'cloud', ops: 'pricing', automation: 'notify',
+  access: 'team', data: 'advanced',
+};
+
+function resolveSettingsSection(section) {
+  if (!section || document.getElementById('settings-panel-' + section)) return section;
+  return SETTINGS_SECTION_ALIASES[section] || section;
+}
 
 function openSettingsSection(section) {
-  // Enthusiast (hobbyist) mode has no commerce — bounce business sections to Preferences.
-  if (settings.mode === 'enthusiast' && BIZ_SETTINGS_SECTIONS.includes(section)) section = 'prefs';
+  section = resolveSettingsSection(section);
+  // Enthusiast (hobbyist) mode has no commerce — bounce business panes to the
+  // first pane (General; Preferences in Bed Ready).
+  if (settings.mode === 'enthusiast' && (BIZ_SETTINGS_SECTIONS.includes(section) || ['invoice', 'payments', 'online'].includes(section))) {
+    section = resolveSettingsSection(document.getElementById('settings-panel-general') ? 'general' : 'prefs');
+  }
   switchTab('settings-tab');
   $$('.settings-nav-item').forEach(el => {
     el.classList.remove('active');
@@ -500,7 +519,8 @@ function openSettingsSection(section) {
     panel.classList.add('active');
     panel.scrollTop = 0;
   }
-  if (section === 'online' && typeof renderOnlineSettings === 'function') renderOnlineSettings();
+  // The intake form and LAN cards it fills sit in Online Store and Connections now.
+  if (['online', 'store', 'connections'].includes(section) && typeof renderOnlineSettings === 'function') renderOnlineSettings();
 }
 
 function switchTab(tabId) {
@@ -1069,6 +1089,8 @@ function openFeedbackModal() {
     syncTopbarTitle,
     switchTab,
     openSettingsSection,
+    resolveSettingsSection,
+    SETTINGS_SECTION_ALIASES,
     openGlobalSearch,
     // Read accessor. `globalSearchOpen` is a `let` INSIDE this file's IIFE, so it is not a
     // global — app-boot.js's keydown handler referenced it directly and threw a

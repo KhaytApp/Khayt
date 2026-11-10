@@ -42,11 +42,11 @@ const sliced3mf = () => zipWrite.writeZip([
 /** Configure the shop THROUGH the settings panel, not by writing the store. */
 async function configureViaSettingsPanel(window) {
   await switchTab(window, 'settings-tab');
-  // The LAN panel lives under Settings → Online. Navigating there rather than
+  // The LAN panel lives under Settings → Connections. Navigating there rather than
   // reaching past the sidebar also proves a shop can actually get to these
   // controls — a hidden checkbox is not a feature anyone can switch on.
-  await window.click('.settings-nav-item[data-settings-section="online"]');
-  await window.waitForSelector('#settings-panel-online.active');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
+  await window.waitForSelector('#settings-panel-connections.active');
   await window.evaluate(() => {
     // A preset to price against — the panel offers whatever the shop has.
     if (!Array.isArray(window.printers)) window.printers = [];

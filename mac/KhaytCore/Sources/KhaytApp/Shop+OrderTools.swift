@@ -26,16 +26,58 @@ extension Shop {
 
     /// Save the order editor. `fields` holds only what the shop changed
     /// (`OrderDetailsSheet.fields`); the rule leaves every other field alone.
+    ///
+    /// `customer`, when set, gives the job that customer first (`.some(nil)`
+    /// takes the customer off) by `lib/order-edit.js changeCustomer` —
+    /// Turki's rule of Nov 10: changeable until the invoice is submitted to
+    /// ZATCA, voided, credited or paid; a job with no customer can always be
+    /// given one. A refused change saves nothing, and says why.
     @discardableResult
-    func editOrderDetails(_ id: Order.ID, fields: [String: JSONValue]) async -> Bool {
-        guard !fields.isEmpty else { return true }
+    func editOrderDetails(_ id: Order.ID, fields: [String: JSONValue],
+                          customer: String?? = .none) async -> Bool {
+        guard !fields.isEmpty || customer != nil else { return true }
         guard permitted("orders", "edit") else { return false }
+        let reasons = Self.customerLockWords(words)
         return await writeToOneOrder(id, named: words.callIt("oe.title"), as: .person("orders", "edit")) { order, engine, root in
+            var current = order
+            var moved = false
+            if case .some(let to) = customer {
+                let change = try await engine.changeCustomer(
+                    order: order, clientId: to, clients: Self.rows(root, "clients"),
+                    settings: Self.settings(root), now: Date(), editId: Self.uid("edit"))
+                if !change.ok {
+                    if change.reason == "same" { /* nothing to do */ } else {
+                        throw MoveRefused(sentence: reasons[change.reason ?? ""] ?? reasons["unknown"]!)
+                    }
+                } else {
+                    current = change.order
+                    moved = true
+                }
+            }
+            guard !fields.isEmpty else { return OneOrderEdit(order: current) }
             let out = try await engine.editOrderDetails(
-                order: order, fields: fields, settings: Self.settings(root), now: Date(),
+                order: current, fields: fields, settings: Self.settings(root), now: Date(),
                 editId: Self.uid("edit"), priceId: Self.uid("edit"))
-            return OneOrderEdit(order: out.changed ? out.order : order)
+            return OneOrderEdit(order: out.changed || moved ? out.order : order)
         }
+    }
+
+    /// Why a job's customer cannot be changed, in the shop's words — keyed by
+    /// `lib/order-edit.js`'s reasons.
+    static func customerLockWords(_ words: Words) -> [String: String] {
+        ["zatca": words.callIt("mac.job_customer_locked_zatca"),
+         "voided": words.callIt("mac.job_customer_locked_voided"),
+         "credited": words.callIt("mac.job_customer_locked_credited"),
+         "paid": words.callIt("mac.job_customer_locked_paid"),
+         "unknown": words.callIt("mac.job_customer_unknown"),
+         "missing": words.callIt("mac.move_gone")]
+    }
+
+    /// Why this job's customer is locked, or nil — for the editor to say
+    /// before the shop tries.
+    func customerLock(_ id: Order.ID) async -> String? {
+        guard let engine, let row = orderRow(id) else { return nil }
+        return (try? await engine.customerLocked(row)) ?? nil
     }
 
     /// The raw record, as a dictionary — what the editors open on.

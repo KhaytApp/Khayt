@@ -90,7 +90,7 @@ try {
 
   await window.evaluate(() => { settings.mode = 'professional'; applyMode(); saveAll(); });
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="automation"]');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
   await window.waitForSelector('#btnPluginInstall', { timeout: 10000 });
 
   // ── an unsigned file is refused ──
@@ -201,7 +201,7 @@ try {
   await window.waitForTimeout(800);
   if ((await electronApp.evaluate(() => globalThis.__sends)).length !== before + 1) fail('a turned-down event was sent again on its own');
   await switchTab(window, 'settings-tab');
-  await window.evaluate(() => { openSettingsSection('automation'); renderPluginSettings(); });
+  await window.evaluate(() => { openSettingsSection('connections'); renderPluginSettings(); });
   await window.waitForSelector('.plg-failed [data-act="retry"]', { timeout: 10000 });
   const shown = await window.evaluate(() => document.querySelector('.plg-failed').textContent);
   if (!/Duplicate order/.test(shown) || !/Lamha shipping/.test(shown)) fail(`failed list: ${shown}`);

@@ -4576,6 +4576,61 @@ th[data-sort]:hover {
 }
 .settings-nav-item .nav-icon { display: none; }
 
+/* ── 14 panes: a vertical sidebar with group headers (index.html) ──
+   The Mac's layout (desktop-settings-menus-review.md §3.6): 14 tabs do not
+   fit a horizontal strip at 1280 px. Scoped to .settings-layout--panes so
+   Bed Ready, which keeps its own 10 sections and look, is untouched. */
+.settings-layout--panes { flex-direction: row; }
+.settings-layout--panes .settings-sidebar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  width: 224px;
+  padding: 14px 10px 24px;
+  border-bottom: none;
+  border-inline-end: 1px solid var(--border);
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: normal;
+}
+.settings-layout--panes .settings-nav-group-label,
+.settings-layout--panes .settings-nav-group-label:first-child {
+  display: block;
+  align-self: stretch;
+  width: auto;
+  height: auto;
+  margin: 14px 10px 4px;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.settings-layout--panes .settings-nav-item {
+  padding: 7px 10px;
+  border-bottom: none;
+  border-radius: 7px;
+  white-space: normal;
+  text-align: start;
+}
+.settings-layout--panes .settings-nav-item.active {
+  background: var(--surface-2);
+  color: var(--accent, #5B9CF0);
+}
+@media (max-width: 760px) {
+  .settings-layout--panes { flex-direction: column; }
+  .settings-layout--panes .settings-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: auto;
+    max-height: 160px;
+    border-inline-end: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-layout--panes .settings-nav-group-label { width: 100%; margin: 6px 6px 2px; }
+}
+
 /* ── Panels ────────────────────────────────────────────────── */
 .settings-panels {
   flex: 1;

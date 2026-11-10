@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "Taller",
  "mac.set_group_online": "En línea",
  "mac.nav_invoices": "Facturas y pagos",
- "mac.nav_production": "Producción"
+ "mac.nav_production": "Producción",
+ "mac.job_customer_none": "Sin cliente",
+ "mac.job_customer_locked_zatca": "La factura se envió a ZATCA, así que ya no se puede cambiar el cliente.",
+ "mac.job_customer_locked_voided": "La factura se anuló, así que ya no se puede cambiar el cliente.",
+ "mac.job_customer_locked_credited": "La factura tiene una nota de crédito, así que ya no se puede cambiar el cliente.",
+ "mac.job_customer_locked_paid": "Ya se cobró un pago por este trabajo, así que ya no se puede cambiar el cliente.",
+ "mac.job_customer_unknown": "Ese cliente ya no está en el libro.",
+ "mac.job_customer_currency": "A este cliente se le factura en otra moneda. El trabajo conserva su precio y su moneda."
 }

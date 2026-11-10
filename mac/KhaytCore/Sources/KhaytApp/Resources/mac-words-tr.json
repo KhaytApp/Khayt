@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "Atölye",
  "mac.set_group_online": "Çevrimiçi",
  "mac.nav_invoices": "Faturalar ve Ödemeler",
- "mac.nav_production": "Üretim"
+ "mac.nav_production": "Üretim",
+ "mac.job_customer_none": "Müşteri yok",
+ "mac.job_customer_locked_zatca": "Fatura ZATCA'ya gönderildi, bu yüzden müşteri artık değiştirilemez.",
+ "mac.job_customer_locked_voided": "Fatura iptal edildi, bu yüzden müşteri artık değiştirilemez.",
+ "mac.job_customer_locked_credited": "Faturanın bir alacak dekontu var, bu yüzden müşteri artık değiştirilemez.",
+ "mac.job_customer_locked_paid": "Bu iş için ödeme alındı, bu yüzden müşteri artık değiştirilemez.",
+ "mac.job_customer_unknown": "Bu müşteri artık defterde değil.",
+ "mac.job_customer_currency": "Bu müşteri başka bir para biriminde faturalanıyor. İş fiyatını ve para birimini korur."
 }

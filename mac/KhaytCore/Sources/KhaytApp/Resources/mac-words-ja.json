@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "工房",
  "mac.set_group_online": "オンライン",
  "mac.nav_invoices": "請求書と支払い",
- "mac.nav_production": "生産"
+ "mac.nav_production": "生産",
+ "mac.job_customer_none": "顧客なし",
+ "mac.job_customer_locked_zatca": "請求書はZATCAに送信済みのため、顧客は変更できません。",
+ "mac.job_customer_locked_voided": "請求書は無効化されたため、顧客は変更できません。",
+ "mac.job_customer_locked_credited": "請求書にクレジットノートがあるため、顧客は変更できません。",
+ "mac.job_customer_locked_paid": "この仕事には入金があるため、顧客は変更できません。",
+ "mac.job_customer_unknown": "その顧客は台帳にありません。",
+ "mac.job_customer_currency": "この顧客は別の通貨で請求されます。仕事の価格と通貨はそのままです。"
 }

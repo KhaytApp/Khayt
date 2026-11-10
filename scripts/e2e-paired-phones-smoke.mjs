@@ -40,7 +40,7 @@ async function signedGet(dev, target) {
 
 async function openLanSettings(window) {
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="online"]');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
   await window.evaluate(() => renderLanApiSettings());
   await window.waitForSelector('#lanPairedPhones [data-sign-out], #lanPairedPhones div');
   await window.evaluate(() => document.getElementById('lanPairedPhones')?.scrollIntoView({ block: 'center' }));
