@@ -214,7 +214,7 @@
     });
 
     el.querySelector('#btnOnlineOpenLanSettings')?.addEventListener('click', () => {
-      (typeof openSettingsSection === 'function' ? openSettingsSection : KhaytShell?.openSettingsSection)?.('online');
+      (typeof openSettingsSection === 'function' ? openSettingsSection : KhaytShell?.openSettingsSection)?.('connections');
       setTimeout(() => {
         document.getElementById('lanApiSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 200);
@@ -262,7 +262,7 @@
     i18n.applyToDom(el);
     el.querySelector('#btnWaitingCopyIntake')?.addEventListener('click', (e) => copyOnlineIntakeUrl(e.currentTarget));
     el.querySelector('#btnWaitingOnlineSettings')?.addEventListener('click', () => {
-      (typeof openSettingsSection === 'function' ? openSettingsSection : KhaytShell?.openSettingsSection)?.('online');
+      (typeof openSettingsSection === 'function' ? openSettingsSection : KhaytShell?.openSettingsSection)?.('store');
     });
     refreshOnlineIntakeUrlDisplay(el);
   }

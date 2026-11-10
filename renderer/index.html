@@ -1493,149 +1493,81 @@
 
     <!-- ===================== SETTINGS ===================== -->
     <section id="settings-tab" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-settings-tab" aria-hidden="true" tabindex="-1">
-  <div class="settings-layout">
+  <div class="settings-layout settings-layout--panes">
 
     <!-- ═══ SIDEBAR ═══ -->
     <nav class="settings-sidebar" data-i18n-aria-label="tab.settings" aria-label="Settings">
-      <!-- General group -->
-      <span class="settings-nav-group-label" data-i18n="set.nav_group_general">General</span>
-
-      <button class="settings-nav-item active" data-settings-section="biz">
+      <!-- 14 panes in 4 groups, the same names and order as the Mac
+           (desktop-settings-menus-review.md §4.1). Old section ids still
+           open the pane their cards moved to: SETTINGS_SECTION_ALIASES. -->
+      <button type="button" class="settings-nav-item active" data-settings-section="general">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_biz">Business</span>
+        <span data-i18n="set.pane_general">General</span>
       </button>
-      <button class="settings-nav-item" data-settings-section="prefs">
+      <span class="settings-nav-group-label" data-i18n="set.nav_group_shop">Shop</span>
+      <button type="button" class="settings-nav-item" data-settings-section="shop">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_prefs">Preferences</span>
+        <span data-i18n="set.pane_shop">Shop</span>
       </button>
-      <button class="settings-nav-item" data-settings-section="stock">
+      <button type="button" class="settings-nav-item" data-settings-section="pricing">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_stock">Inventory</span>
+        <span data-i18n="set.pane_pricing">Pricing &amp; Tax</span>
       </button>
-      <button class="settings-nav-item biz-only" data-settings-section="invoice">
+      <button type="button" class="settings-nav-item biz-only" data-settings-section="invoices">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_invoice">Invoice & Tax</span>
+        <span data-i18n="set.pane_invoices">Invoices &amp; Payments</span>
       </button>
-      <button class="settings-nav-item biz-only" data-settings-section="payments">
+      <button type="button" class="settings-nav-item" data-settings-section="production">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_payments">Payments</span>
+        <span data-i18n="set.pane_production">Production</span>
       </button>
-      <button class="settings-nav-item" data-settings-section="printers">
+      <button type="button" class="settings-nav-item pro-only" data-settings-section="team">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_printers">Printers</span>
+        <span data-i18n="set.pane_team">Team &amp; Access</span>
       </button>
-      <button class="settings-nav-item biz-only" data-settings-section="online">
+      <span class="settings-nav-group-label" data-i18n="set.nav_group_workshop">Workshop</span>
+      <button type="button" class="settings-nav-item" data-settings-section="printers">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_online">Online</span>
+        <span data-i18n="set.pane_printers">Printers &amp; Slicers</span>
       </button>
-
-      <!-- Advanced group -->
+      <button type="button" class="settings-nav-item" data-settings-section="library">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_library">Library &amp; Files</span>
+      </button>
+      <span class="settings-nav-group-label" data-i18n="set.nav_group_online">Online</span>
+      <button type="button" class="settings-nav-item" data-settings-section="cloud">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_cloud">Khayt Cloud</span>
+      </button>
+      <button type="button" class="settings-nav-item biz-only" data-settings-section="store">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_store">Online Store</span>
+      </button>
+      <button type="button" class="settings-nav-item pro-only" data-settings-section="notify">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_notify">Notifications &amp; Messages</span>
+      </button>
+      <button type="button" class="settings-nav-item biz-only" data-settings-section="connections">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_connections">Connections</span>
+      </button>
+      <button type="button" class="settings-nav-item pro-only" data-settings-section="ai">
+        <span class="nav-icon" aria-hidden="true"></span>
+        <span data-i18n="set.pane_ai">AI Assistant</span>
+      </button>
       <span class="settings-nav-group-label" data-i18n="set.nav_group_advanced">Advanced</span>
-
-      <button class="settings-nav-item pro-only" data-settings-section="ops">
+      <button type="button" class="settings-nav-item" data-settings-section="advanced">
         <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_ops">Operations</span>
-      </button>
-      <button class="settings-nav-item pro-only" data-settings-section="automation">
-        <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_automation">Automation</span>
-      </button>
-      <button class="settings-nav-item pro-only" data-settings-section="access">
-        <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_access">Access</span>
-      </button>
-      <button class="settings-nav-item" data-settings-section="data">
-        <span class="nav-icon" aria-hidden="true"></span>
-        <span data-i18n="set.nav_data">Data & Locale</span>
+        <span data-i18n="set.pane_advanced">Advanced</span>
       </button>
     </nav>
 
     <!-- ═══ PANELS ═══ -->
     <div class="settings-panels">
 
-      <!-- ─── BUSINESS ─────────────────────────────────────── -->
-      <div class="settings-panel active" id="settings-panel-biz">
-        <h2 class="settings-panel-title" data-i18n="set.biz_section">Business Information</h2>
-
-        <div class="card settings-card">
-          <div class="settings-section-head" data-i18n="set.biz_identity">Identity</div>
-          <!-- Logo + business name -->
-          <div style="display:flex; align-items:flex-start; gap:16px;">
-            <div style="flex-shrink:0;">
-              <label style="font-size:11.5px; color:var(--text-muted); display:block; margin-bottom:6px;" data-i18n="set.logo">Logo</label>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
-                <img id="logoPreview" style="display:none; height:52px; width:auto; border-radius:6px; border:1px solid var(--border); padding:4px; background:var(--surface-2);" alt="logo">
-                <label class="btn small" style="cursor:pointer; margin:0; white-space:nowrap;">
-                  <span data-i18n="set.logo_upload">Upload</span>
-                  <input type="file" id="logoUploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;">
-                </label>
-                <button class="btn small danger" id="btnRemoveLogo" style="display:none; margin:0;" data-i18n="set.logo_remove">Remove</button>
-              </div>
-            </div>
-            <div style="flex:1; min-width:0;">
-              <!-- One field per language the shop writes content in. Built by
-                   renderContentFields() in settings.js — hard-coded English and
-                   Arabic pairs are what stopped a Turkish shop entering its own
-                   business name. -->
-              <div class="inline-pair" style="margin-bottom:10px;" id="bizNameFields"></div>
-              <div class="inline-pair" id="taglineFields"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card settings-card">
-          <div class="settings-section-head" data-i18n="set.biz_contact">Contact</div>
-          <div class="inline-pair" style="margin-bottom:10px;">
-            <div>
-              <label data-i18n="set.phone" for="set_phone">Phone</label>
-              <input type="tel" id="set_phone">
-            </div>
-            <div>
-              <label data-i18n="set.email" for="set_email">Email</label>
-              <input type="email" id="set_email">
-            </div>
-          </div>
-          <div class="inline-pair" id="addressFields"></div>
-        </div>
-
-        <div class="card settings-card pro-only">
-          <div class="settings-section-head" data-i18n="set.biz_tax">Tax &amp; Registration</div>
-          <div class="inline-pair">
-            <div>
-              <label data-i18n="set.vat" for="set_vat">VAT number</label>
-              <input type="text" id="set_vat" placeholder="3xxxxxxxxxxxxx3" maxlength="15">
-            </div>
-            <div>
-              <label data-i18n="set.cr" for="set_cr">CR #</label>
-              <input type="text" id="set_cr">
-            </div>
-          </div>
-        </div>
-
-        <div class="card settings-card">
-          <div class="settings-section-head" data-i18n="set.running_costs">Running costs</div>
-          <label for="set_elecRate" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-            <span><span data-i18n="set.elec_rate">Electricity price</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_kwh">/ kWh</span>)</span>
-            <button type="button" id="btnSetElecAuto" class="btn small ghost" style="font-size:11px;padding:2px 7px;">📍 <span data-i18n="calc.elec_auto">Auto</span></button>
-          </label>
-          <input type="number" id="set_elecRate" min="0" step="0.001" placeholder="0.18">
-          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.elec_rate_hint">What a kWh costs your shop. Quotes, failed prints and power reports use it unless a printer preset sets its own. Leave it empty for Khayt's default.</p>
-        </div>
-
-        <div class="settings-save-row">
-          <button class="btn primary" id="btnSaveSettings" data-i18n="common.save">Save</button>
-        </div>
-      </div>
-
-      <!-- ─── PREFERENCES ───────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-prefs">
-        <h2 class="settings-panel-title" data-i18n="set.prefs_section">Preferences</h2>
-
-        <div class="card settings-card">
-          <div class="settings-section-head" data-i18n="est.head">Estimating from a model</div>
-          <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px;" data-i18n="est.sub">Used when a file has never been sliced, so the weight and time have to be worked out from its shape.</p>
-          <div id="estimatorSettings"></div>
-        </div>
+      <!-- ─── GENERAL ─────────────────────────────────────────── -->
+      <div class="settings-panel active" id="settings-panel-general">
+        <h2 class="settings-panel-title" data-i18n="set.pane_general">General</h2>
 
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.experience">Experience</div>
@@ -1710,33 +1642,98 @@
         </div>
         </div>
 
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="set.locale_section">Saudi Locale</div>
+        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:0;">
+          <input type="checkbox" id="set_useHijri" style="width:auto; margin:3px 0 0;">
+          <span data-i18n="set.use_hijri">Show Hijri date next to Gregorian on invoices</span>
+        </label>
+        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:14px;">
+          <input type="checkbox" id="set_useArabicNumerals" style="width:auto; margin:3px 0 0;">
+          <span data-i18n="set.use_arabic_nums">Use Arabic-Indic numerals (٠١٢٣) in Arabic-mode invoices</span>
+        </label>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="priv.section">Privacy &amp; Customer Data</div>
+        <div id="privacySection"></div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="tel.section">Crash Reports &amp; Usage</div>
+        <div id="telemetrySection"></div>
+        </div>
+
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="set.updates_section">Updates</div>
+        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:0;">
+          <input type="checkbox" id="set_betaUpdates" style="width:auto; margin:3px 0 0;">
+          <span>
+            <span data-i18n="set.beta_updates">Include beta pre-releases when checking for updates</span>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;" data-i18n="set.beta_updates_hint">Off by default. Enable to receive Khayt beta builds (e.g. new themes) via in-app update.</div>
+          </span>
+        </label>
+
+        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <div style="font-size:12px; color:var(--text-muted);">
+            <strong data-i18n="set.about">About</strong> · <span data-i18n="app.title">Khayt</span> · خيط · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
+            <div style="margin-top:4px; font-size:11px;" data-i18n="set.ai_credit">Built with assistance from AI tools.</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="updateStatusMsg" style="font-size:12px; color:var(--text-muted);"></span>
+            <button id="btnCheckForUpdates" class="btn small" data-i18n="set.check_updates">Check for updates</button>
+          </div>
+        </div>
+        </div>
+
         <div class="settings-save-row">
           <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
         </div>
       </div>
 
-      <!-- ─── INVENTORY ─────────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-stock">
-        <h2 class="settings-panel-title" data-i18n="set.stock_section">Stock & Inventory</h2>
+      <!-- ─── SHOP ────────────────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-shop">
+        <h2 class="settings-panel-title" data-i18n="set.pane_shop">Shop</h2>
 
         <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.stock_defaults">Stock Defaults</div>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" id="set_autoDeduct" style="width:auto; margin:0;">
-          <span data-i18n="set.auto_deduct">Auto-deduct filament when an order is completed</span>
-        </label>
-
-        <div class="inline-pair" style="margin-top:14px;">
-          <div>
-            <label data-i18n="set.low_stock" for="set_lowStock">Low-stock threshold (grams)</label>
-            <input type="number" id="set_lowStock" value="200" min="0">
-            <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.low_stock_hint"></p>
-          </div>
-          <div>
-            <label data-i18n="set.supplier_phone" for="set_supplierPhone">Supplier WhatsApp</label>
-            <input type="tel" id="set_supplierPhone" data-i18n-placeholder="set.supplier_ph">
+          <div class="settings-section-head" data-i18n="set.biz_identity">Identity</div>
+          <!-- Logo + business name -->
+          <div style="display:flex; align-items:flex-start; gap:16px;">
+            <div style="flex-shrink:0;">
+              <label style="font-size:11.5px; color:var(--text-muted); display:block; margin-bottom:6px;" data-i18n="set.logo">Logo</label>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+                <img id="logoPreview" style="display:none; height:52px; width:auto; border-radius:6px; border:1px solid var(--border); padding:4px; background:var(--surface-2);" alt="logo">
+                <label class="btn small" style="cursor:pointer; margin:0; white-space:nowrap;">
+                  <span data-i18n="set.logo_upload">Upload</span>
+                  <input type="file" id="logoUploadInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;">
+                </label>
+                <button class="btn small danger" id="btnRemoveLogo" style="display:none; margin:0;" data-i18n="set.logo_remove">Remove</button>
+              </div>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <!-- One field per language the shop writes content in. Built by
+                   renderContentFields() in settings.js — hard-coded English and
+                   Arabic pairs are what stopped a Turkish shop entering its own
+                   business name. -->
+              <div class="inline-pair" style="margin-bottom:10px;" id="bizNameFields"></div>
+              <div class="inline-pair" id="taglineFields"></div>
+            </div>
           </div>
         </div>
+
+        <div class="card settings-card">
+          <div class="settings-section-head" data-i18n="set.biz_contact">Contact</div>
+          <div class="inline-pair" style="margin-bottom:10px;">
+            <div>
+              <label data-i18n="set.phone" for="set_phone">Phone</label>
+              <input type="tel" id="set_phone">
+            </div>
+            <div>
+              <label data-i18n="set.email" for="set_email">Email</label>
+              <input type="email" id="set_email">
+            </div>
+          </div>
+          <div class="inline-pair" id="addressFields"></div>
         </div>
 
         <div class="card settings-card">
@@ -1761,16 +1758,23 @@
         </div>
         </div>
 
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.locations">Locations</div>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Manage your shop locations or branches. Tag orders, machines, inventory and expenses to a location.</p>
+        <div id="locationsSettingsSection"></div>
+        <button class="btn primary" id="btnAddLocation" style="margin-top:10px;" data-i18n="set.location_add">+ Add location</button>
+        </div>
+
         <div class="settings-save-row">
-          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+          <button type="button" class="btn primary" id="btnSaveSettings" data-i18n="common.save">Save</button>
         </div>
       </div>
 
-      <!-- ─── INVOICE & TAX ─────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-invoice">
-        <h2 class="settings-panel-title" data-i18n="set.invoice_section">Invoice & Tax</h2>
+      <!-- ─── PRICING & TAX ───────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-pricing">
+        <h2 class="settings-panel-title" data-i18n="set.pane_pricing">Pricing &amp; Tax</h2>
 
-        <div class="card settings-card">
+        <div class="card settings-card biz-only">
         <div class="settings-section-head" data-i18n="set.worldwide_section">Currency & Region</div>
         <div class="inline-pair">
           <div>
@@ -1786,259 +1790,42 @@
         </div>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.invoice_section">Invoice Defaults</div>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:0;">
-          <input type="checkbox" id="set_enableZatca" style="width:auto; margin:0;">
-          <span data-i18n="set.enable_zatca">ZATCA-compliant invoices (Saudi Arabia)</span>
-        </label>
-        <p style="font-size:11.5px; color:var(--text-muted); margin:3px 0 10px;" data-i18n="set.enable_zatca_hint">Adds ZATCA Phase 1 TLV QR code to invoices. Turn off for international use.</p>
-        <div id="zatcaPhase2Section" class="pro-only" style="margin-bottom:12px;padding:12px;background:var(--bg-elev);border-radius:var(--radius);"></div>
-
-        <div class="inline-pair" style="margin-top:10px;">
-          <div>
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:0; font-weight:normal;">
-              <input type="checkbox" id="set_enableVat" style="width:auto; margin:0;">
-              <span data-i18n="set.enable_vat">Enable VAT on invoices</span>
-            </label>
-            <div style="margin-top:8px;">
-              <label data-i18n="set.vat_rate" for="set_vatRate">VAT rate (%)</label>
-              <input type="number" id="set_vatRate" value="15" min="0" max="100" step="0.1" data-tip="tip.vat_rate">
-              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.vat_rate_hint"></p>
-            </div>
-            <div style="margin-top:12px;">
-              <label data-i18n="set.tax_country" for="set_taxCountry">Tax rules for</label>
-              <select id="set_taxCountry" style="max-width:240px;"></select>
-              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.tax_country_hint">Sets the name, rate and pricing convention. You can still change them.</p>
-            </div>
-            <div style="margin-top:12px;">
-              <label data-i18n="set.tax_mode" for="set_taxMode">Your prices</label>
-              <select id="set_taxMode" style="max-width:240px;">
-                <option value="inclusive" data-i18n="set.tax_mode_inclusive">Include tax</option>
-                <option value="exclusive" data-i18n="set.tax_mode_exclusive">Exclude tax (added at checkout)</option>
-              </select>
-              <p id="taxModeHint" style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;"></p>
-            </div>
-            <!-- How often the VAT return is filed: it decides the period a later
-                 change to a FILED return lands in (lib/vat-periods.js). -->
-            <div style="margin-top:12px;">
-              <label data-i18n="pnl.vat_filing" for="set_vatFilingFrequency">VAT returns are filed</label>
-              <select id="set_vatFilingFrequency" style="max-width:240px;">
-                <option value="quarterly" data-i18n="pnl.vat_filing_quarterly">Quarterly</option>
-                <option value="monthly" data-i18n="pnl.vat_filing_monthly">Monthly</option>
-              </select>
-              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="pnl.vat_filing_hint"></p>
-            </div>
-          </div>
-          <div>
-            <label data-i18n="set.inv_accent">Invoice accent colour</label>
-            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-              <input type="color" id="set_invAccent" value="#5E2E14" style="width:44px; height:34px; padding:2px; border-radius:6px; border:1px solid var(--border); cursor:pointer; background:var(--bg-elev);">
-              <span style="font-size:11.5px; color:var(--text-muted);" data-i18n="set.inv_accent_hint">Brand colour used on invoices</span>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:14px;">
-          <label data-i18n="set.inv_template" for="set_invTemplate">Invoice template</label>
-          <select id="set_invTemplate" style="max-width:240px;">
-            <option value="classic" data-i18n="set.inv_tmpl_classic">Classic</option>
-            <option value="modern" data-i18n="set.inv_tmpl_modern">Modern (accent header)</option>
-            <option value="minimal" data-i18n="set.inv_tmpl_minimal">Minimal</option>
-          </select>
-        </div>
-
-        <div style="margin-top:14px;">
-          <label data-i18n="set.inv_bilingual" for="set_invoiceBilingual">Document language</label>
-          <select id="set_invoiceBilingual" style="max-width:240px;">
-            <option value="auto" data-i18n="set.inv_bilingual_auto">Automatic</option>
-            <option value="single" data-i18n="set.inv_bilingual_single">My language only</option>
-            <option value="both" data-i18n="set.inv_bilingual_both">Bilingual (with Arabic)</option>
-          </select>
-          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.inv_bilingual_hint">Applies to quotes, invoices, credit notes and delivery notes.</p>
-          <p id="invBilingualZatcaNote" style="font-size:11.5px; color:var(--warning); margin:4px 0 0; display:none;" data-i18n="set.inv_bilingual_zatca">ZATCA invoices must carry Arabic, so documents stay bilingual while it is on.</p>
-        </div>
-
-        <div id="invSecondLangRow" style="margin-top:14px;">
-          <label data-i18n="set.inv_second_lang" for="set_invoiceSecondLang">Second language</label>
-          <select id="set_invoiceSecondLang" style="max-width:240px;"></select>
-          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.inv_second_lang_hint">Printed under each label on bilingual documents.</p>
-        </div>
-
-        <div class="inline-pair" style="margin-top:14px;">
-          <div>
-            <label data-i18n="set.invoice_prefix" for="set_invPrefix">Invoice number prefix</label>
-            <input type="text" id="set_invPrefix" value="INV" maxlength="6">
-          </div>
-          <div>
-            <label data-i18n="set.quote_prefix" for="set_quotePrefix">Quote number prefix</label>
-            <input type="text" id="set_quotePrefix" value="QUO" maxlength="6">
-          </div>
-        </div>
-
-        <div id="footerFields" style="margin-top:14px;"></div>
-        <div id="invTermsFields" style="margin-top:12px;"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.inv_num_title">Invoice Numbering</div>
-        <div id="invNumSection"></div>
-        </div>
-
-        <div class="settings-save-row">
-          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
-        </div>
-      </div>
-
-      <!-- ─── PAYMENTS ──────────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-payments">
-        <h2 class="settings-panel-title" data-i18n="set.bank_section">Payments</h2>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.bank_section">Bank Details</div>
-        <div class="inline-pair">
-          <div>
-            <label data-i18n="set.bank_name" for="set_bankName">Bank name</label>
-            <input type="text" id="set_bankName" placeholder="Al Rajhi Bank">
-          </div>
-          <div>
-            <label data-i18n="set.account_holder" for="set_accountHolder">Account holder</label>
-            <input type="text" id="set_accountHolder">
-          </div>
-        </div>
-        <label data-i18n="set.iban" for="set_iban">IBAN</label>
-        <input type="text" id="set_iban" data-i18n-placeholder="set.iban_ph" maxlength="34">
-
-        <label data-i18n="set.accepted">Accepted payment methods</label>
-        <div id="acceptedPaymentsList" class="payment-method-grid">
-          <label><input type="checkbox" data-pm="cash"><span data-i18n="pay.method.cash">Cash</span></label>
-          <label><input type="checkbox" data-pm="mada"><span data-i18n="pay.method.mada">Mada</span></label>
-          <label><input type="checkbox" data-pm="transfer"><span data-i18n="pay.method.transfer">Bank transfer</span></label>
-          <label><input type="checkbox" data-pm="stcpay"><span data-i18n="pay.method.stcpay">STC Pay</span></label>
-          <label><input type="checkbox" data-pm="applepay"><span data-i18n="pay.method.applepay">Apple Pay</span></label>
-          <label><input type="checkbox" data-pm="visa"><span data-i18n="pay.method.visa">Credit card</span></label>
-        </div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="bnpl.section">Payment Services & BNPL</div>
-        <div id="bnplSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="ship.section">Shipping &amp; Fulfillment</div>
-        <div id="shippingSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="priv.section">Privacy &amp; Customer Data</div>
-        <div id="privacySection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="tel.section">Crash Reports &amp; Usage</div>
-        <div id="telemetrySection"></div>
-        </div>
-
         <div class="card settings-card pro-only">
-        <div class="settings-section-head" data-i18n="api.section">API Tokens (automation)</div>
-        <div id="apiTokensSection"></div>
+          <div class="settings-section-head" data-i18n="set.biz_tax">Tax &amp; Registration</div>
+          <div class="inline-pair">
+            <div>
+              <label data-i18n="set.vat" for="set_vat">VAT number</label>
+              <input type="text" id="set_vat" placeholder="3xxxxxxxxxxxxx3" maxlength="15">
+            </div>
+            <div>
+              <label data-i18n="set.cr" for="set_cr">CR #</label>
+              <input type="text" id="set_cr">
+            </div>
+          </div>
         </div>
 
-        <div class="card settings-card">
+        <div class="card settings-card biz-only">
         <div class="settings-section-head" data-i18n="xr.section">Exchange Rates</div>
         <div id="exchangeRatesSection"></div>
         </div>
 
-        <div class="settings-save-row">
-          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
-        </div>
-      </div>
-
-      <!-- ─── PRINTERS ──────────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-printers">
-        <h2 class="settings-panel-title" data-i18n="mach.section">My Printers / Machines</h2>
         <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.printers_devices">Connected Printers</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;" data-i18n="mach.section_hint"></p>
-        <div id="machinesList"></div>
-        <button class="btn primary" id="btnAddMachine" style="margin-top:10px;" data-i18n="mach.add">+ Add Printer</button>
-        <button class="btn" id="btnPartsToBuy" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
-        </div>
-        <div class="card settings-card" id="nozzleWearCard">
-          <div class="settings-section-head" data-i18n="nw.title">Nozzle wear reference</div>
-          <div id="nozzleWearSection"></div>
+          <div class="settings-section-head" data-i18n="set.running_costs">Running costs</div>
+          <label for="set_elecRate" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+            <span><span data-i18n="set.elec_rate">Electricity price</span> (<span data-i18n="common.currency">SAR</span> <span data-i18n="calc.machine.per_kwh">/ kWh</span>)</span>
+            <button type="button" id="btnSetElecAuto" class="btn small ghost" style="font-size:11px;padding:2px 7px;">📍 <span data-i18n="calc.elec_auto">Auto</span></button>
+          </label>
+          <input type="number" id="set_elecRate" min="0" step="0.001" placeholder="0.18">
+          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.elec_rate_hint">What a kWh costs your shop. Quotes, failed prints and power reports use it unless a printer preset sets its own. Leave it empty for Khayt's default.</p>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="slicerProfiles">Slicer Profiles</div>
-        <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
-          <button id="btnAddSlicerProfile" class="btn btn-sm btn-secondary" data-i18n="addSlicerProfile">+ Add Profile</button>
-        </div>
-        <div id="slicerProfilesContainer"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="envLogs">Environment Log</div>
-        <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
-          <button id="btnLogEnv" class="btn btn-sm btn-secondary" data-i18n="logEnvironment">+ Log</button>
-        </div>
-        <div id="envLogsContainer"></div>
-        </div>
-      </div>
-
-      <!-- ─── ONLINE (customer intake & LAN) ───────────────── -->
-      <div class="settings-panel" id="settings-panel-online">
-        <h2 class="settings-panel-title" data-i18n="online.settings_title">Online</h2>
-
-        <!-- MOVED HERE from Advanced → Automation.
-             A section called "Online" that held only LAN features while Khayt
-             Cloud sat under "Automation" was the wrong way round: sync, the
-             storefront and the product feeds are the online surface, and
-             automation is WhatsApp templates and scheduled email.
-
-             The storefront directory keeps `pro-only` on its card, ON PURPOSE:
-             the Automation nav item was pro-only and the Online one is biz-only.
-             Khayt Cloud does NOT, since Nov 2026: with it pro-only a Simple shop
-             had no way to sign in, sign up or sync at all, while the same pane
-             showed it the LAN REST API. Sync is the one connection every shop
-             needs (desktop-settings-menus-review.md, §0). -->
-        <div class="card settings-card" id="cloudSettingsCard">
-        <div class="settings-section-head" data-i18n="set.cloud_title">Khayt Cloud (sync)</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.cloud_hint">Opt-in, end-to-end-encrypted backup/sync of your shop to your own Khayt Cloud server. The server only stores encrypted data; your sync passphrase (never uploaded) is the key.</p>
-        <div id="cloudSettingsSection"></div>
-        </div>
         <div class="card settings-card pro-only">
-        <div class="settings-section-head" data-i18n="integ.title">Storefronts & Payments</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="integ.intro">The top storefronts and payment systems for your market. Enable the payment methods you accept and add your own payment link for each.</p>
-        <div id="integrationsSection"></div>
+        <div class="settings-section-head" data-i18n="set.fixed_costs_title">Fixed Costs &amp; Break-Even</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.fixed_costs_hint">Add monthly fixed costs (rent, salaries, subscriptions) to compute your break-even revenue on the dashboard.</p>
+        <div id="fixedCostsSection"></div>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.online_intake">Customer Intake</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;" data-i18n="online.settings_intro">Let customers submit quote requests via a link on your network. Your data stays on this computer.</p>
-        <div id="onlineSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.lan_title">LAN API &amp; iCal</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="lan.settings_intro">Advanced: REST API, printer webhooks, kiosk queue, and optional internet tunnel.</p>
-        <div id="lanApiSection"></div>
-        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button id="btnExportIcal" class="btn btn-sm btn-secondary" data-i18n="exportIcal">📅 Export iCal Feed</button>
-          <span style="font-size:11px;color:var(--text-muted);" data-i18n="icalDescription">Subscribe to upcoming order due dates in your calendar app</span>
-        </div>
-        </div>
-
-        <div class="settings-save-row">
-          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
-        </div>
-      </div>
-
-      <!-- ─── OPERATIONS (pro-only) ─────────────────────────── -->
-      <div class="settings-panel pro-only" id="settings-panel-ops">
-        <h2 class="settings-panel-title" data-i18n="set.ops_section">Operations</h2>
-
-        <div class="card settings-card">
+        <div class="card settings-card pro-only">
         <div class="settings-section-head" data-i18n="set.ops_pricing">Pricing & Quotes</div>
         <div class="inline-pair" style="align-items:flex-end; margin-top:0;">
           <div>
@@ -2135,7 +1922,243 @@
 
         </div>
 
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.exp_budgets">Monthly Expense Budgets</div>
+        <div class="inline-pair" style="flex-wrap:wrap;">
+          <div><label data-i18n="exp.cat.filament" for="set_budget_filament">Filament</label><input type="number" id="set_budget_filament" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.electricity" for="set_budget_electricity">Electricity</label><input type="number" id="set_budget_electricity" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.maintenance" for="set_budget_maintenance">Maintenance</label><input type="number" id="set_budget_maintenance" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.tools" for="set_budget_tools">Tools</label><input type="number" id="set_budget_tools" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.equipment" for="set_budget_equipment">Equipment</label><input type="number" id="set_budget_equipment" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.shipping" for="set_budget_shipping">Shipping</label><input type="number" id="set_budget_shipping" min="0" step="1" placeholder="0"></div>
+          <div><label data-i18n="exp.cat.other" for="set_budget_other">Other</label><input type="number" id="set_budget_other" min="0" step="1" placeholder="0"></div>
+        </div>
+        </div>
+
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" id="btnSaveOpsSettings" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── INVOICES & PAYMENTS ─────────────────────────────── -->
+      <div class="settings-panel biz-only" id="settings-panel-invoices">
+        <h2 class="settings-panel-title" data-i18n="set.pane_invoices">Invoices &amp; Payments</h2>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="set.invoice_section">Invoice Defaults</div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:0;">
+          <input type="checkbox" id="set_enableZatca" style="width:auto; margin:0;">
+          <span data-i18n="set.enable_zatca">ZATCA-compliant invoices (Saudi Arabia)</span>
+        </label>
+        <p style="font-size:11.5px; color:var(--text-muted); margin:3px 0 10px;" data-i18n="set.enable_zatca_hint">Adds ZATCA Phase 1 TLV QR code to invoices. Turn off for international use.</p>
+        <div id="zatcaPhase2Section" class="pro-only" style="margin-bottom:12px;padding:12px;background:var(--bg-elev);border-radius:var(--radius);"></div>
+
+        <div class="inline-pair" style="margin-top:10px;">
+          <div>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:0; font-weight:normal;">
+              <input type="checkbox" id="set_enableVat" style="width:auto; margin:0;">
+              <span data-i18n="set.enable_vat">Enable VAT on invoices</span>
+            </label>
+            <div style="margin-top:8px;">
+              <label data-i18n="set.vat_rate" for="set_vatRate">VAT rate (%)</label>
+              <input type="number" id="set_vatRate" value="15" min="0" max="100" step="0.1" data-tip="tip.vat_rate">
+              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.vat_rate_hint"></p>
+            </div>
+            <div style="margin-top:12px;">
+              <label data-i18n="set.tax_country" for="set_taxCountry">Tax rules for</label>
+              <select id="set_taxCountry" style="max-width:240px;"></select>
+              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.tax_country_hint">Sets the name, rate and pricing convention. You can still change them.</p>
+            </div>
+            <div style="margin-top:12px;">
+              <label data-i18n="set.tax_mode" for="set_taxMode">Your prices</label>
+              <select id="set_taxMode" style="max-width:240px;">
+                <option value="inclusive" data-i18n="set.tax_mode_inclusive">Include tax</option>
+                <option value="exclusive" data-i18n="set.tax_mode_exclusive">Exclude tax (added at checkout)</option>
+              </select>
+              <p id="taxModeHint" style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;"></p>
+            </div>
+            <!-- How often the VAT return is filed: it decides the period a later
+                 change to a FILED return lands in (lib/vat-periods.js). -->
+            <div style="margin-top:12px;">
+              <label data-i18n="pnl.vat_filing" for="set_vatFilingFrequency">VAT returns are filed</label>
+              <select id="set_vatFilingFrequency" style="max-width:240px;">
+                <option value="quarterly" data-i18n="pnl.vat_filing_quarterly">Quarterly</option>
+                <option value="monthly" data-i18n="pnl.vat_filing_monthly">Monthly</option>
+              </select>
+              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="pnl.vat_filing_hint"></p>
+            </div>
+          </div>
+          <div>
+            <label data-i18n="set.inv_accent">Invoice accent colour</label>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <input type="color" id="set_invAccent" value="#5E2E14" style="width:44px; height:34px; padding:2px; border-radius:6px; border:1px solid var(--border); cursor:pointer; background:var(--bg-elev);">
+              <span style="font-size:11.5px; color:var(--text-muted);" data-i18n="set.inv_accent_hint">Brand colour used on invoices</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <label data-i18n="set.inv_template" for="set_invTemplate">Invoice template</label>
+          <select id="set_invTemplate" style="max-width:240px;">
+            <option value="classic" data-i18n="set.inv_tmpl_classic">Classic</option>
+            <option value="modern" data-i18n="set.inv_tmpl_modern">Modern (accent header)</option>
+            <option value="minimal" data-i18n="set.inv_tmpl_minimal">Minimal</option>
+          </select>
+        </div>
+
+        <div style="margin-top:14px;">
+          <label data-i18n="set.inv_bilingual" for="set_invoiceBilingual">Document language</label>
+          <select id="set_invoiceBilingual" style="max-width:240px;">
+            <option value="auto" data-i18n="set.inv_bilingual_auto">Automatic</option>
+            <option value="single" data-i18n="set.inv_bilingual_single">My language only</option>
+            <option value="both" data-i18n="set.inv_bilingual_both">Bilingual (with Arabic)</option>
+          </select>
+          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.inv_bilingual_hint">Applies to quotes, invoices, credit notes and delivery notes.</p>
+          <p id="invBilingualZatcaNote" style="font-size:11.5px; color:var(--warning); margin:4px 0 0; display:none;" data-i18n="set.inv_bilingual_zatca">ZATCA invoices must carry Arabic, so documents stay bilingual while it is on.</p>
+        </div>
+
+        <div id="invSecondLangRow" style="margin-top:14px;">
+          <label data-i18n="set.inv_second_lang" for="set_invoiceSecondLang">Second language</label>
+          <select id="set_invoiceSecondLang" style="max-width:240px;"></select>
+          <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.inv_second_lang_hint">Printed under each label on bilingual documents.</p>
+        </div>
+
+        <div class="inline-pair" style="margin-top:14px;">
+          <div>
+            <label data-i18n="set.invoice_prefix" for="set_invPrefix">Invoice number prefix</label>
+            <input type="text" id="set_invPrefix" value="INV" maxlength="6">
+          </div>
+          <div>
+            <label data-i18n="set.quote_prefix" for="set_quotePrefix">Quote number prefix</label>
+            <input type="text" id="set_quotePrefix" value="QUO" maxlength="6">
+          </div>
+        </div>
+
+        <div id="footerFields" style="margin-top:14px;"></div>
+        <div id="invTermsFields" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="set.inv_num_title">Invoice Numbering</div>
+        <div id="invNumSection"></div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="set.bank_section">Bank Details</div>
+        <div class="inline-pair">
+          <div>
+            <label data-i18n="set.bank_name" for="set_bankName">Bank name</label>
+            <input type="text" id="set_bankName" placeholder="Al Rajhi Bank">
+          </div>
+          <div>
+            <label data-i18n="set.account_holder" for="set_accountHolder">Account holder</label>
+            <input type="text" id="set_accountHolder">
+          </div>
+        </div>
+        <label data-i18n="set.iban" for="set_iban">IBAN</label>
+        <input type="text" id="set_iban" data-i18n-placeholder="set.iban_ph" maxlength="34">
+
+        <label data-i18n="set.accepted">Accepted payment methods</label>
+        <div id="acceptedPaymentsList" class="payment-method-grid">
+          <label><input type="checkbox" data-pm="cash"><span data-i18n="pay.method.cash">Cash</span></label>
+          <label><input type="checkbox" data-pm="mada"><span data-i18n="pay.method.mada">Mada</span></label>
+          <label><input type="checkbox" data-pm="transfer"><span data-i18n="pay.method.transfer">Bank transfer</span></label>
+          <label><input type="checkbox" data-pm="stcpay"><span data-i18n="pay.method.stcpay">STC Pay</span></label>
+          <label><input type="checkbox" data-pm="applepay"><span data-i18n="pay.method.applepay">Apple Pay</span></label>
+          <label><input type="checkbox" data-pm="visa"><span data-i18n="pay.method.visa">Credit card</span></label>
+        </div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="bnpl.section">Payment Services & BNPL</div>
+        <div id="bnplSection"></div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── PRODUCTION ──────────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-production">
+        <h2 class="settings-panel-title" data-i18n="set.pane_production">Production</h2>
+
         <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="set.stock_defaults">Stock Defaults</div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="set_autoDeduct" style="width:auto; margin:0;">
+          <span data-i18n="set.auto_deduct">Auto-deduct filament when an order is completed</span>
+        </label>
+
+        <div class="inline-pair" style="margin-top:14px;">
+          <div>
+            <label data-i18n="set.low_stock" for="set_lowStock">Low-stock threshold (grams)</label>
+            <input type="number" id="set_lowStock" value="200" min="0">
+            <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="set.low_stock_hint"></p>
+          </div>
+          <div>
+            <label data-i18n="set.supplier_phone" for="set_supplierPhone">Supplier WhatsApp</label>
+            <input type="tel" id="set_supplierPhone" data-i18n-placeholder="set.supplier_ph">
+          </div>
+        </div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.wip_limits">WIP Limits per Column</div>
+        <div class="inline-pair" style="flex-wrap:wrap;">
+          <div><label data-i18n="queue.pending" for="set_wip_pending">Pending</label><input type="number" id="set_wip_pending" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label data-i18n="queue.printing" for="set_wip_printing">Printing</label><input type="number" id="set_wip_printing" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label data-i18n="queue.post" for="set_wip_post">Post</label><input type="number" id="set_wip_post" min="0" step="1" placeholder="0 = unlimited"></div>
+          <div><label for="set_wip_qc">QC</label><input type="number" id="set_wip_qc" min="0" step="1" placeholder="0 = unlimited"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:400;">
+          <input type="checkbox" id="set_wipEnforceHardLimit">
+          <span data-i18n="set.wip_enforce_hard">Block moves when WIP limit is reached (instead of warning only)</span>
+        </label>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.qc_head">Quality control</div>
+        <p class="settings-hint" data-i18n="set.qc_hint">Turn the QC stage into a real inspection gate — record pass/fail with defects, spin off linked reprints, and handle warranty claims. Off keeps today's behaviour.</p>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-weight:400;">
+          <input type="checkbox" id="set_qcEnabled">
+          <span data-i18n="set.qc_enabled">Enable QC inspection (pass/fail, defects, linked reprints, RMA)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;">
+          <input type="checkbox" id="set_qcRequireInspector">
+          <span data-i18n="set.qc_require_inspector">Require an inspector to record a pass or fail</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;">
+          <input type="checkbox" id="set_qcRequirePhotoOnFail">
+          <span data-i18n="set.qc_require_photo">Prompt for a photo on a QC fail</span>
+        </label>
+        <div style="margin-top:10px;max-width:220px;">
+          <label data-i18n="set.qc_warranty_days" for="set_qcWarrantyDays">Warranty window (days)</label>
+          <input type="number" id="set_qcWarrantyDays" min="0" step="1" placeholder="30">
+        </div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.post_process_presets">Post-process presets</div>
+        <div id="postProcessPresetsList" style="margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px; align-items:flex-end;">
+          <div style="flex:1;"><label style="margin:0;" data-i18n="common.name" for="set_ppName">Name</label><input type="text" id="set_ppName" placeholder="e.g. Sanding + Painting"></div>
+          <div style="width:100px;"><label style="margin:0;" data-i18n="common.amount" for="set_ppAmount">Amount</label><input type="number" id="set_ppAmount" min="0" step="0.01" placeholder="0"></div>
+          <button class="btn small primary" id="btnAddPostPreset" style="margin-bottom:1px;" data-i18n="common.add">Add</button>
+        </div>
+        </div>
+
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="post.settings_title">Post-Processing Checklist</div>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="post.settings_hint">Define steps shown on every order card in the Post column of the queue.</p>
+        <div id="postChecklistItems"></div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <input type="text" id="postCheckInput" style="flex:1;" data-i18n-placeholder="post.step_ph" placeholder="e.g. Sand &amp; polish">
+          <button class="btn primary" id="btnAddPostCheck" data-i18n="post.add_step">+ Add step</button>
+        </div>
+        </div>
+
+        <div class="card settings-card pro-only">
         <div class="settings-section-head" data-i18n="set.lead_title">Delivery Estimates</div>
         <p style="font-size:12px; color:var(--text-muted); margin:0 0 10px;" data-i18n="set.lead_hint">Khayt works out when a new order could be printed, finished and posted, from your queue and the hours below. Print time alone is not a delivery date.</p>
         <!-- Hours a day and days a week were typed here, a few rows under a
@@ -2159,176 +2182,31 @@
         </div>
 
         <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.wip_limits">WIP Limits per Column</div>
-        <div class="inline-pair" style="flex-wrap:wrap;">
-          <div><label data-i18n="queue.pending" for="set_wip_pending">Pending</label><input type="number" id="set_wip_pending" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label data-i18n="queue.printing" for="set_wip_printing">Printing</label><input type="number" id="set_wip_printing" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label data-i18n="queue.post" for="set_wip_post">Post</label><input type="number" id="set_wip_post" min="0" step="1" placeholder="0 = unlimited"></div>
-          <div><label for="set_wip_qc">QC</label><input type="number" id="set_wip_qc" min="0" step="1" placeholder="0 = unlimited"></div>
+        <div class="settings-section-head" data-i18n="set.custom_fields_title">Custom Order Fields</div>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="set.custom_fields_hint">Add extra fields that appear in every order form (e.g. "Customer Reference", "Color Choice").</p>
+        <div id="customFieldsList"></div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <input type="text" id="customFieldInput" style="flex:1;" data-i18n-placeholder="set.custom_field_ph" placeholder="e.g. Customer Reference">
+          <button class="btn primary" id="btnAddCustomField" data-i18n="set.add_custom_field">+ Add Field</button>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:400;">
-          <input type="checkbox" id="set_wipEnforceHardLimit">
-          <span data-i18n="set.wip_enforce_hard">Block moves when WIP limit is reached (instead of warning only)</span>
-        </label>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.qc_head">Quality control</div>
-        <p class="settings-hint" data-i18n="set.qc_hint">Turn the QC stage into a real inspection gate — record pass/fail with defects, spin off linked reprints, and handle warranty claims. Off keeps today's behaviour.</p>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-weight:400;">
-          <input type="checkbox" id="set_qcEnabled">
-          <span data-i18n="set.qc_enabled">Enable QC inspection (pass/fail, defects, linked reprints, RMA)</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;">
-          <input type="checkbox" id="set_qcRequireInspector">
-          <span data-i18n="set.qc_require_inspector">Require an inspector to record a pass or fail</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;">
-          <input type="checkbox" id="set_qcRequirePhotoOnFail">
-          <span data-i18n="set.qc_require_photo">Prompt for a photo on a QC fail</span>
-        </label>
-        <div style="margin-top:10px;max-width:220px;">
-          <label data-i18n="set.qc_warranty_days" for="set_qcWarrantyDays">Warranty window (days)</label>
-          <input type="number" id="set_qcWarrantyDays" min="0" step="1" placeholder="30">
-        </div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.post_process_presets">Post-process presets</div>
-        <div id="postProcessPresetsList" style="margin-bottom:8px;"></div>
-        <div style="display:flex; gap:8px; align-items:flex-end;">
-          <div style="flex:1;"><label style="margin:0;" data-i18n="common.name" for="set_ppName">Name</label><input type="text" id="set_ppName" placeholder="e.g. Sanding + Painting"></div>
-          <div style="width:100px;"><label style="margin:0;" data-i18n="common.amount" for="set_ppAmount">Amount</label><input type="number" id="set_ppAmount" min="0" step="0.01" placeholder="0"></div>
-          <button class="btn small primary" id="btnAddPostPreset" style="margin-bottom:1px;" data-i18n="common.add">Add</button>
-        </div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.exp_budgets">Monthly Expense Budgets</div>
-        <div class="inline-pair" style="flex-wrap:wrap;">
-          <div><label data-i18n="exp.cat.filament" for="set_budget_filament">Filament</label><input type="number" id="set_budget_filament" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.electricity" for="set_budget_electricity">Electricity</label><input type="number" id="set_budget_electricity" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.maintenance" for="set_budget_maintenance">Maintenance</label><input type="number" id="set_budget_maintenance" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.tools" for="set_budget_tools">Tools</label><input type="number" id="set_budget_tools" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.equipment" for="set_budget_equipment">Equipment</label><input type="number" id="set_budget_equipment" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.shipping" for="set_budget_shipping">Shipping</label><input type="number" id="set_budget_shipping" min="0" step="1" placeholder="0"></div>
-          <div><label data-i18n="exp.cat.other" for="set_budget_other">Other</label><input type="number" id="set_budget_other" min="0" step="1" placeholder="0"></div>
-        </div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.fixed_costs_title">Fixed Costs &amp; Break-Even</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.fixed_costs_hint">Add monthly fixed costs (rent, salaries, subscriptions) to compute your break-even revenue on the dashboard.</p>
-        <div id="fixedCostsSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.locations">Locations</div>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Manage your shop locations or branches. Tag orders, machines, inventory and expenses to a location.</p>
-        <div id="locationsSettingsSection"></div>
-        <button class="btn primary" id="btnAddLocation" style="margin-top:10px;" data-i18n="set.location_add">+ Add location</button>
         </div>
 
         <div class="settings-save-row">
-          <button class="btn primary" id="btnSaveOpsSettings" data-i18n="common.save">Save</button>
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
         </div>
       </div>
 
-      <!-- ─── AUTOMATION (pro-only) ─────────────────────────── -->
-      <div class="settings-panel pro-only" id="settings-panel-automation">
-        <h2 class="settings-panel-title" data-i18n="set.nav_automation">Automation</h2>
-        <p class="settings-panel-hint" data-i18n="set.automation_save_hint">Each section below has its own Save button — changes are not applied until you save that section.</p>
+      <!-- ─── TEAM & ACCESS ───────────────────────────────────── -->
+      <div class="settings-panel pro-only" id="settings-panel-team">
+        <h2 class="settings-panel-title" data-i18n="set.pane_team">Team &amp; Access</h2>
 
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="wa.settings_section">WhatsApp Quick-Reply Templates</div>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="wa.settings_hint"></p>
-        <div id="waTemplatesList"></div>
-        <button class="btn primary" id="btnAddWaTemplate" style="margin-top:10px;" data-i18n="wa.add_template">+ Add Template</button>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.notifications">Email Notifications</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Send automated status update emails to clients via SendGrid, Mailgun, or your default mail client.</p>
-        <div id="emailNotificationsSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="sms.title">SMS / WhatsApp Notifications</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="sms.intro">Send automated order updates to customers over SMS or WhatsApp via Twilio, the WhatsApp Cloud API, Unifonic, or your own webhook.</p>
-        <div id="smsNotificationsSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="acct.title">Accounting Sync</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="acct.intro">Push paid invoices and expenses to your accounting system via a webhook — bridge to QuickBooks, Zoho or Xero with Zapier/Make or your own endpoint. One-way and idempotent.</p>
-        <div id="accountingSyncSection"></div>
-        </div>
-
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.digest_title">Email Digest</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.digest_hint">Send an automated daily or weekly summary email to yourself with revenue, orders, and stock alerts.</p>
-        <div id="emailDigestSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.ai_title">AI assist</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.ai_hint">Use your own Anthropic API key to estimate quotes from a plain-language description. Off by default; the key is stored encrypted and sent only to Anthropic.</p>
-        <div id="aiSettingsSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="slicer.settings_title">Slicer integration</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="slicer.settings_help">Slice an uploaded model with your own installed slicer to fill the quote with its exact weight &amp; time. Khayt never bundles a slicer.</p>
-        <div id="slicerSettingsSection"></div>
-        </div>
-
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.webhooks_title">Outbound Webhooks</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.webhooks_hint">Fire HTTP POST requests to Zapier, Make.com, n8n, or any URL when order events happen.</p>
-        <div id="webhookSettingsSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="ewh.title">Signed Event Webhooks (developer)</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n-html="ewh.hint">Send one HTTPS endpoint a clean, HMAC-signed <code>order.*</code> event stream (created / status / paid) with an idempotency key — built for your own integrations. Verify the <code>X-Khayt-Signature</code> header to trust each payload.</p>
-        <div id="eventWebhookSection"></div>
-        </div>
-
-        <div class="card settings-card" id="pluginCard" hidden>
-        <div class="settings-section-head" data-i18n="plg.title">Connectors</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="plg.hint">Connect Khayt to other services with a connector reviewed by Khayt. Before it is installed you see exactly which fields it sends and to which address; its keys stay on this computer.</p>
-        <div id="pluginSection"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="telegramNotifications">Telegram Notifications</div>
-        <div id="telegramSettingsContainer"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="ntfy.section">Push to a phone (ntfy)</div>
-        <div id="ntfySettingsContainer"></div>
-        </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.salla_zid_title">Salla / Zid Webhooks</div>
-        <div id="sallaZidContainer"></div>
-        </div>
-      </div>
-
-      <!-- ─── ACCESS (pro-only) ─────────────────────────────── -->
-      <div class="settings-panel pro-only" id="settings-panel-access">
-        <h2 class="settings-panel-title" data-i18n="set.nav_access">Access</h2>
-
-        <div class="card settings-card">
+        <div class="card settings-card pro-only">
         <div class="settings-section-head" data-i18n="op.title">Operators</div>
         <div id="operatorsList"></div>
         <button class="btn primary" id="btnAddOperator" style="margin-top:10px;" data-i18n="op.add">+ Add operator</button>
         </div>
 
-        <div class="card settings-card">
+        <div class="card settings-card pro-only">
         <div class="settings-section-head" data-i18n="op.lock">Operator Lock</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="op.lock_hint">Require a PIN to switch between operator accounts. Restricts access by role.</p>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
@@ -2353,31 +2231,59 @@
         </div>
       </div>
 
-      <!-- ─── DATA & LOCALE ─────────────────────────────────── -->
-      <div class="settings-panel" id="settings-panel-data">
-        <h2 class="settings-panel-title" data-i18n="set.nav_data">Data & Locale</h2>
+      <!-- ─── PRINTERS & SLICERS ──────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-printers">
+        <h2 class="settings-panel-title" data-i18n="set.pane_printers">Printers &amp; Slicers</h2>
 
         <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.locale_section">Saudi Locale</div>
-        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:0;">
-          <input type="checkbox" id="set_useHijri" style="width:auto; margin:3px 0 0;">
-          <span data-i18n="set.use_hijri">Show Hijri date next to Gregorian on invoices</span>
-        </label>
-        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:14px;">
-          <input type="checkbox" id="set_useArabicNumerals" style="width:auto; margin:3px 0 0;">
-          <span data-i18n="set.use_arabic_nums">Use Arabic-Indic numerals (٠١٢٣) in Arabic-mode invoices</span>
-        </label>
+        <div class="settings-section-head" data-i18n="set.printers_devices">Connected Printers</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;" data-i18n="mach.section_hint"></p>
+        <div id="machinesList"></div>
+        <button class="btn primary" id="btnAddMachine" style="margin-top:10px;" data-i18n="mach.add">+ Add Printer</button>
+        <button class="btn" id="btnPartsToBuy" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
         </div>
 
         <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="post.settings_title">Post-Processing Checklist</div>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="post.settings_hint">Define steps shown on every order card in the Post column of the queue.</p>
-        <div id="postChecklistItems"></div>
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <input type="text" id="postCheckInput" style="flex:1;" data-i18n-placeholder="post.step_ph" placeholder="e.g. Sand &amp; polish">
-          <button class="btn primary" id="btnAddPostCheck" data-i18n="post.add_step">+ Add step</button>
+          <div class="settings-section-head" data-i18n="est.head">Estimating from a model</div>
+          <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px;" data-i18n="est.sub">Used when a file has never been sliced, so the weight and time have to be worked out from its shape.</p>
+          <div id="estimatorSettings"></div>
         </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="slicer.settings_title">Slicer integration</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="slicer.settings_help">Slice an uploaded model with your own installed slicer to fill the quote with its exact weight &amp; time. Khayt never bundles a slicer.</p>
+        <div id="slicerSettingsSection"></div>
         </div>
+
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="slicerProfiles">Slicer Profiles</div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
+          <button id="btnAddSlicerProfile" class="btn btn-sm btn-secondary" data-i18n="addSlicerProfile">+ Add Profile</button>
+        </div>
+        <div id="slicerProfilesContainer"></div>
+        </div>
+
+        <div class="card settings-card" id="nozzleWearCard">
+          <div class="settings-section-head" data-i18n="nw.title">Nozzle wear reference</div>
+          <div id="nozzleWearSection"></div>
+        </div>
+
+        <div class="card settings-card">
+        <div class="settings-section-head" data-i18n="envLogs">Environment Log</div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
+          <button id="btnLogEnv" class="btn btn-sm btn-secondary" data-i18n="logEnvironment">+ Log</button>
+        </div>
+        <div id="envLogsContainer"></div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── LIBRARY & FILES ─────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-library">
+        <h2 class="settings-panel-title" data-i18n="set.pane_library">Library &amp; Files</h2>
 
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.plib_loc_section">Print library location</div>
@@ -2488,6 +2394,33 @@
         </div>
         </div>
 
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── KHAYT CLOUD ─────────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-cloud">
+        <h2 class="settings-panel-title" data-i18n="set.pane_cloud">Khayt Cloud</h2>
+
+        <!-- MOVED HERE from Advanced → Automation.
+             A section called "Online" that held only LAN features while Khayt
+             Cloud sat under "Automation" was the wrong way round: sync, the
+             storefront and the product feeds are the online surface, and
+             automation is WhatsApp templates and scheduled email.
+
+             The storefront directory keeps `pro-only` on its card, ON PURPOSE:
+             the Automation nav item was pro-only and the Online one is biz-only.
+             Khayt Cloud does NOT, since Nov 2026: with it pro-only a Simple shop
+             had no way to sign in, sign up or sync at all, while the same pane
+             showed it the LAN REST API. Sync is the one connection every shop
+             needs (desktop-settings-menus-review.md, §0). -->
+        <div class="card settings-card biz-only" id="cloudSettingsCard">
+        <div class="settings-section-head" data-i18n="set.cloud_title">Khayt Cloud (sync)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.cloud_hint">Opt-in, end-to-end-encrypted backup/sync of your shop to your own Khayt Cloud server. The server only stores encrypted data; your sync passphrase (never uploaded) is the key.</p>
+        <div id="cloudSettingsSection"></div>
+        </div>
+
         <div class="card settings-card">
         <div class="settings-section-head" data-i18n="set.backup_section">Backups</div>
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
@@ -2515,14 +2448,152 @@
         </label>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.custom_fields_title">Custom Order Fields</div>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="set.custom_fields_hint">Add extra fields that appear in every order form (e.g. "Customer Reference", "Color Choice").</p>
-        <div id="customFieldsList"></div>
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <input type="text" id="customFieldInput" style="flex:1;" data-i18n-placeholder="set.custom_field_ph" placeholder="e.g. Customer Reference">
-          <button class="btn primary" id="btnAddCustomField" data-i18n="set.add_custom_field">+ Add Field</button>
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
         </div>
+      </div>
+
+      <!-- ─── ONLINE STORE ────────────────────────────────────── -->
+      <div class="settings-panel biz-only" id="settings-panel-store">
+        <h2 class="settings-panel-title" data-i18n="set.pane_store">Online Store</h2>
+
+        <div class="card settings-card pro-only biz-only">
+        <div class="settings-section-head" data-i18n="integ.title">Storefronts & Payments</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="integ.intro">The top storefronts and payment systems for your market. Enable the payment methods you accept and add your own payment link for each.</p>
+        <div id="integrationsSection"></div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="set.online_intake">Customer Intake</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 16px;" data-i18n="online.settings_intro">Let customers submit quote requests via a link on your network. Your data stays on this computer.</p>
+        <div id="onlineSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.salla_zid_title">Salla / Zid Webhooks</div>
+        <div id="sallaZidContainer"></div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── NOTIFICATIONS & MESSAGES ────────────────────────── -->
+      <div class="settings-panel pro-only" id="settings-panel-notify">
+        <h2 class="settings-panel-title" data-i18n="set.pane_notify">Notifications &amp; Messages</h2>
+        <p class="settings-panel-hint" data-i18n="set.automation_save_hint">Each section below has its own Save button — changes are not applied until you save that section.</p>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="telegramNotifications">Telegram Notifications</div>
+        <div id="telegramSettingsContainer"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="ntfy.section">Push to a phone (ntfy)</div>
+        <div id="ntfySettingsContainer"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.digest_title">Email Digest</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.digest_hint">Send an automated daily or weekly summary email to yourself with revenue, orders, and stock alerts.</p>
+        <div id="emailDigestSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.notifications">Email Notifications</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Send automated status update emails to clients via SendGrid, Mailgun, or your default mail client.</p>
+        <div id="emailNotificationsSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="sms.title">SMS / WhatsApp Notifications</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="sms.intro">Send automated order updates to customers over SMS or WhatsApp via Twilio, the WhatsApp Cloud API, Unifonic, or your own webhook.</p>
+        <div id="smsNotificationsSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="wa.settings_section">WhatsApp Quick-Reply Templates</div>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="wa.settings_hint"></p>
+        <div id="waTemplatesList"></div>
+        <button class="btn primary" id="btnAddWaTemplate" style="margin-top:10px;" data-i18n="wa.add_template">+ Add Template</button>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── CONNECTIONS ─────────────────────────────────────── -->
+      <div class="settings-panel biz-only" id="settings-panel-connections">
+        <h2 class="settings-panel-title" data-i18n="set.pane_connections">Connections</h2>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="ship.section">Shipping &amp; Fulfillment</div>
+        <div id="shippingSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="acct.title">Accounting Sync</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="acct.intro">Push paid invoices and expenses to your accounting system via a webhook — bridge to QuickBooks, Zoho or Xero with Zapier/Make or your own endpoint. One-way and idempotent.</p>
+        <div id="accountingSyncSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.webhooks_title">Outbound Webhooks</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.webhooks_hint">Fire HTTP POST requests to Zapier, Make.com, n8n, or any URL when order events happen.</p>
+        <div id="webhookSettingsSection"></div>
+        </div>
+
+        <div class="card settings-card pro-only biz-only">
+        <div class="settings-section-head" data-i18n="api.section">API Tokens (automation)</div>
+        <div id="apiTokensSection"></div>
+        </div>
+
+        <div class="card settings-card biz-only">
+        <div class="settings-section-head" data-i18n="set.lan_title">LAN API &amp; iCal</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="lan.settings_intro">Advanced: REST API, printer webhooks, kiosk queue, and optional internet tunnel.</p>
+        <div id="lanApiSection"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button id="btnExportIcal" class="btn btn-sm btn-secondary" data-i18n="exportIcal">📅 Export iCal Feed</button>
+          <span style="font-size:11px;color:var(--text-muted);" data-i18n="icalDescription">Subscribe to upcoming order due dates in your calendar app</span>
+        </div>
+        </div>
+
+        <div class="card settings-card pro-only" id="pluginCard" hidden>
+        <div class="settings-section-head" data-i18n="plg.title">Connectors</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="plg.hint">Connect Khayt to other services with a connector reviewed by Khayt. Before it is installed you see exactly which fields it sends and to which address; its keys stay on this computer.</p>
+        <div id="pluginSection"></div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── AI ASSISTANT ────────────────────────────────────── -->
+      <div class="settings-panel pro-only" id="settings-panel-ai">
+        <h2 class="settings-panel-title" data-i18n="set.pane_ai">AI Assistant</h2>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.ai_title">AI assist</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.ai_hint">Use your own Anthropic API key to estimate quotes from a plain-language description. Off by default; the key is stored encrypted and sent only to Anthropic.</p>
+        <div id="aiSettingsSection"></div>
+        </div>
+
+        <div class="settings-save-row">
+          <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
+        </div>
+      </div>
+
+      <!-- ─── ADVANCED ────────────────────────────────────────── -->
+      <div class="settings-panel" id="settings-panel-advanced">
+        <h2 class="settings-panel-title" data-i18n="set.pane_advanced">Advanced</h2>
+
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="ewh.title">Signed Event Webhooks (developer)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n-html="ewh.hint">Send one HTTPS endpoint a clean, HMAC-signed <code>order.*</code> event stream (created / status / paid) with an idempotency key — built for your own integrations. Verify the <code>X-Khayt-Signature</code> header to trust each payload.</p>
+        <div id="eventWebhookSection"></div>
         </div>
 
         <div class="card settings-card">
@@ -2563,31 +2634,7 @@
         <div class="settings-save-row">
           <button type="button" class="btn primary" data-act="save-settings-from-panel" data-i18n="common.save">Save</button>
         </div>
-
-        <div class="card settings-card">
-        <div class="settings-section-head" data-i18n="set.updates_section">Updates</div>
-        <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin-top:0;">
-          <input type="checkbox" id="set_betaUpdates" style="width:auto; margin:3px 0 0;">
-          <span>
-            <span data-i18n="set.beta_updates">Include beta pre-releases when checking for updates</span>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;" data-i18n="set.beta_updates_hint">Off by default. Enable to receive Khayt beta builds (e.g. new themes) via in-app update.</div>
-          </span>
-        </label>
-
-        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-          <div style="font-size:12px; color:var(--text-muted);">
-            <strong data-i18n="set.about">About</strong> · <span data-i18n="app.title">Khayt</span> · خيط · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
-            <div style="margin-top:4px; font-size:11px;" data-i18n="set.ai_credit">Built with assistance from AI tools.</div>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span id="updateStatusMsg" style="font-size:12px; color:var(--text-muted);"></span>
-            <button id="btnCheckForUpdates" class="btn small" data-i18n="set.check_updates">Check for updates</button>
-          </div>
-        </div>
-        </div>
-
-      </div><!-- /settings-panel-data -->
-
+      </div>
     </div><!-- /settings-panels -->
   </div><!-- /settings-layout -->
 </section>

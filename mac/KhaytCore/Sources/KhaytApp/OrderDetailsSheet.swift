@@ -147,7 +147,7 @@ struct OrderDetailsSheet: View {
                 } else if Self.currencyDiffers(job: job?.currency ?? "", shop: shop.currency,
                                                client: shop.clients.first { $0.id == form.clientId }?.currency) {
                     Text(shop.words.callIt("mac.job_customer_currency"))
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

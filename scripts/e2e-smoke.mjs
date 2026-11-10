@@ -39,9 +39,9 @@ async function testBootAndDashboard(window) {
 
 async function testSettingsNav(window) {
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="prefs"]');
+  await window.click('.settings-nav-item[data-settings-section="general"]');
   const prefsActive = await window.evaluate(
-    () => document.querySelector('#settings-panel-prefs')?.classList.contains('active') === true
+    () => document.querySelector('#settings-panel-general')?.classList.contains('active') === true
   );
   if (!prefsActive) throw new Error('settings sidebar navigation did not switch panels');
 }
