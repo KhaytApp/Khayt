@@ -425,3 +425,28 @@ test('Lamha: the request is Lamha\'s create-order shape and books no shipment', 
   const cats = M.permissionsOf(lamha).categories;
   for (const c of ['contact.name', 'contact.phone', 'contact.address', 'contact.email']) assert.ok(cats.includes(c), c);
 });
+
+// A shop cannot look its carrier id up (Lamha shows it only through its API),
+// so the sample offers Lamha's carriers by name. The ids are Lamha's own: the
+// snapshot of the studio's Lamha catalogue is the reference, and a refresh of
+// that catalogue that is not carried into the sample fails here.
+test('Lamha: the carrier is picked by name, from exactly the catalogue\'s carriers', () => {
+  const lamha = samples.find(s => s.file === 'lamha-shipping.json').m;
+  const snapshot = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'lamha-carriers.json'), 'utf8'));
+  const carrier = lamha.settings.find(s => s.key === 'carrierId');
+  assert.equal(carrier.type, 'enum');
+  const offered = carrier.options.map(o => o.value).sort();
+  const catalogue = [...new Set(snapshot.carriers.map(c => String(c.carrierId)))].sort();
+  assert.deepEqual(offered, catalogue, 'the picker and the Lamha catalogue disagree');
+  for (const o of carrier.options) assert.ok(o.label.en && o.label.ar, `carrier ${o.value} needs English and Arabic`);
+
+  const job = { id: 'INV-1', invoiceNumber: 'INV-1', project: 'P', price: 10, currency: 'SAR', qty: 1 };
+  const customer = { id: 'c1', nameEn: 'A', phone: '+966500000000', addresses: [{ address: 'X' }],
+    plugins: { 'app.khayt.samples.lamha': { city: 'Riyadh' } } };
+  const config = { senderName: 'S', senderPhone: '+966511111111', senderCity: 'Riyadh', senderAddress: 'Y', carrierId: '24' };
+  const r = P.payloadFor(lamha, { action: 'record' }, { order: job, customer, config });
+  assert.equal(r.ok, true);
+  assert.equal(JSON.parse(r.body).carrier_id, '24', 'the picked id is what Lamha receives');
+  // An id typed before the picker, and not one of Lamha's, is not sent.
+  assert.equal(P.payloadFor(lamha, { action: 'record' }, { order: job, customer, config: Object.assign({}, config, { carrierId: '999' }) }).ok, false);
+});

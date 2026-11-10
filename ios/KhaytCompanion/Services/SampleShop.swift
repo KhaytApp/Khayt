@@ -264,13 +264,13 @@ enum SampleShop {
 
     static var sampleConnectors: JSONValue {
         let lamha = (try? JSONValue.parse(Data(lamhaManifestJSON.utf8))) ?? .null
-        let granted = (try? JSONValue.parse(Data(#"{"version":"1.0.0","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
+        let granted = (try? JSONValue.parse(Data(#"{"version":"1.1.0","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
         let lamhaEntry: JSONValue = .object([
-            "id": .string(lamhaId), "version": .string("1.0.0"), "enabled": .bool(true),
+            "id": .string(lamhaId), "version": .string("1.1.0"), "enabled": .bool(true),
             "manifest": lamha, "granted": granted,
             "config": .object(["senderName": .string("Khayt sample studio"), "senderPhone": .string("+966511234567"),
                                "senderCity": .string("Riyadh"), "senderAddress": .string("King Fahd Rd, Al Olaya"),
-                               "carrierId": .string("1")]),
+                               "carrierId": .string("7")]),
         ])
         let slack = (try? JSONValue.parse(Data(#"{"id":"app.khayt.samples.slack","version":"1.0.0","enabled":true,"manifest":{"khayt":{"manifest":1},"id":"app.khayt.samples.slack","name":{"en":"Slack alerts","ar":"تنبيهات Slack"},"description":{"en":"Posts a message to a Slack channel when a job comes in or is paid."},"publisher":"Khayt","version":"1.0.0","domains":["hooks.slack.com"],"secrets":[{"name":"webhookPath","label":{"en":"Webhook path (the part after /services/)"},"kind":"url"}],"events":[{"event":"order_created","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"New job {order.number}: {order.title} for {customer.name} ({order.total} {order.currency})"}}},{"event":"payment_received","url":"https://hooks.slack.com/services/{secret.webhookPath}","body":{"format":"json-template","template":{"text":"Paid: {order.number} ({order.total} {order.currency})"}}}],"signature":"GKAez8Nc3hke6WN/yOF54cWiv+R8uttlIbxI9LGdOka5mNO5G7XglQivKIw4EDVaJIC2vRdW0k3dZePE5blPCQ=="},"granted":{"version":"1.0.0","fields":[],"domains":["hooks.slack.com"],"scopes":[]},"config":{}}"#.utf8))) ?? .null
         return .array([lamhaEntry, slack])
@@ -294,7 +294,7 @@ enum SampleShop {
     "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
   },
   "publisher": "Khayt",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homepage": "https://khaytapp.com/developers/samples/",
   "domains": [
     "app.lamha.sa"
@@ -352,11 +352,104 @@ enum SampleShop {
     {
       "key": "carrierId",
       "label": {
-        "en": "Lamha carrier ID",
-        "ar": "رقم شركة الشحن في لمحة"
+        "en": "Lamha carrier",
+        "ar": "شركة الشحن في لمحة"
       },
-      "type": "text",
-      "required": true
+      "type": "enum",
+      "required": true,
+      "options": [
+        {
+          "value": "2",
+          "label": {
+            "en": "Aramex (delivery)",
+            "ar": "أرامكس (توصيل)"
+          }
+        },
+        {
+          "value": "24",
+          "label": {
+            "en": "Aramex (pickup from branch)",
+            "ar": "أرامكس (استلام من الفرع)"
+          }
+        },
+        {
+          "value": "26",
+          "label": {
+            "en": "Aramex (international)",
+            "ar": "أرامكس (دولي)"
+          }
+        },
+        {
+          "value": "7",
+          "label": {
+            "en": "SMSA (delivery)",
+            "ar": "سمسا (توصيل)"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "J&T Express V2",
+            "ar": "جي آند تي إكسبرس V2"
+          }
+        },
+        {
+          "value": "3",
+          "label": {
+            "en": "J&T Express (free returns)",
+            "ar": "جي آند تي إكسبرس (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "27",
+          "label": {
+            "en": "iMile",
+            "ar": "آي مايل"
+          }
+        },
+        {
+          "value": "4",
+          "label": {
+            "en": "iMile (free returns)",
+            "ar": "آي مايل (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "29",
+          "label": {
+            "en": "Delex",
+            "ar": "ديلكس"
+          }
+        },
+        {
+          "value": "11",
+          "label": {
+            "en": "AyMakan",
+            "ar": "أي مكان"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "RedBox (lockers)",
+            "ar": "ريدبوكس (خزائن)"
+          }
+        },
+        {
+          "value": "6",
+          "label": {
+            "en": "Delivery Now (free returns)",
+            "ar": "ديليفري ناو (رجيع مجاني)"
+          }
+        },
+        {
+          "value": "18",
+          "label": {
+            "en": "Wepik (free returns)",
+            "ar": "ويبك (رجيع مجاني)"
+          }
+        }
+      ]
     }
   ],
   "fields": [
@@ -441,7 +534,7 @@ enum SampleShop {
   "scopes": [
     "fields.write"
   ],
-  "signature": "uEvUTXLm919sfDumQmBR9GMxOz2eMw2wIgJaUBdQB1hNeaG/IQReW9z8ujqkQLJTS9HE/5+56nEKizC0r39uCQ=="
+  "signature": "xDouxy4XoY73QjkuhcWs8nZIqd9xOIteT9eYaNfb5PLPd3w1mMuHnMuOABWcASfV5jbNYgKfALvCxVa/UwB5DQ=="
 }
 
 """#
