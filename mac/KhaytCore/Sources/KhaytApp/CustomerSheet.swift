@@ -63,7 +63,7 @@ struct CustomerSheet: View {
         var agreement: PriceAgreement {
             var out = PriceAgreement(raw: raw)
             out.product = product
-            out.price = Double(priceText.replacingOccurrences(of: ",", with: "")) ?? 0
+            out.price = TypedNumber.parse(priceText) ?? 0
             out.note = note
             return out
         }

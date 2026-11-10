@@ -111,6 +111,7 @@ struct EditJobSheet: View {
 
             HStack {
                 Spacer()
+                SaveProblem(text: shop.moveProblem)
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
@@ -177,17 +178,19 @@ struct EditJobSheet: View {
 
     private func commit() {
         let id = subject.id
-        let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-        let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
+        let typed = priceText.trimmingCharacters(in: .whitespaces)
+        let price = typed.isEmpty ? nil : TypedNumber.parse(typed)
         let fields = Self.fields(opened: opened, hasDueDate: hasDueDate, dueDate: dueDate,
                                  priority: priority, price: price)
         let wasNonBusiness = job?.nonBusiness == true
         let nowNonBusiness = nonBusiness
-        shop.clearQuestion()
+        // Closes when the edit is in the book, not before: see PaymentSheet.
+        shop.moveProblem = nil
         Task {
             if !fields.isEmpty { await shop.editJob(id, fields: fields) }
             // Only when it changed: an edit that did not touch it writes nothing.
-            if nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+            if shop.moveProblem == nil, nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+            if shop.moveProblem == nil { shop.clearQuestion() }
         }
     }
 }

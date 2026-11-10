@@ -297,6 +297,42 @@ extension Shop {
 
     /// Save a customer — a new one, or changes to one the shop already has.
     ///
+    /// THE CUSTOMER'S OLD JOBS KEEP THEIR CURRENCY WHEN THE CUSTOMER'S CHANGES.
+    ///
+    /// A job in the shop's own currency carries no `currency`, and a job
+    /// without one is read in its customer's (`lib/order-money.js
+    /// orderCurrency`). So giving a customer with ten finished SAR jobs the
+    /// currency EUR made every one of them EUR: a paid 1,000 read as 4,100 of
+    /// revenue. Before the customer's record changes, each of their jobs that
+    /// names no currency is given the one it is read in today — the same rule
+    /// as `pinCurrenciesOf` there. Nothing is converted and no figure moves.
+    nonisolated static func pinJobCurrencies(of clientId: String, was: [String: JSONValue],
+                                             now: [String: JSONValue], in root: inout [String: JSONValue],
+                                             undo: inout [ChangedRecord]) {
+        func code(_ v: JSONValue?) -> String {
+            if case .string(let s)? = v { return s.trimmingCharacters(in: .whitespaces) }; return ""
+        }
+        let before = code(was["currency"]), after = code(now["currency"])
+        guard before != after else { return }
+        var shop = "SAR"
+        if case .object(let settings)? = root["settings"], !code(settings["currency"]).isEmpty {
+            shop = code(settings["currency"])
+        }
+        let reads = before.isEmpty ? shop : before
+        var orders = rows(root, "printLog")
+        var touched = false
+        for at in orders.indices {
+            guard case .object(var job) = orders[at], code(job["clientId"]) == clientId,
+                  code(job["currency"]).isEmpty else { continue }
+            undo.append(ChangedRecord(collection: "printLog", id: recordId(orders[at]) ?? "", was: job))
+            job["currency"] = .string(reads)
+            StoreWriter.stamp(&job)
+            orders[at] = .object(job)
+            touched = true
+        }
+        if touched { root["printLog"] = .array(orders) }
+    }
+
     /// A NAME IS THE ONLY THING REQUIRED, in either language, because that is
     /// Khayt's own rule and because a customer with a phone number and no name
     /// is not a customer anyone can find again.
@@ -333,6 +369,7 @@ extension Shop {
                     record = Self.customerRecord(saving: client, over: was, opened: opened)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
+                    Self.pinJobCurrencies(of: client.id, was: was, now: record, in: &root, undo: &undo)
                 } else {
                     StoreWriter.stamp(&record)
                     rows.append(.object(record))
@@ -2790,6 +2827,21 @@ extension Shop {
     /// `uid()` from renderer/util.js: prefix, base-36 milliseconds, three random
     /// base-36 characters upper-cased. Matched so an entry written here is
     /// indistinguishable from one Khayt wrote.
+    /// `count` ids that are all different. `uid` is the millisecond plus three
+    /// random characters, so ids made in one loop share the millisecond and
+    /// differ only in 46,656 tails: a 100-spool Spoolman import gave two
+    /// spools the same id about one time in ten. Anything that makes more
+    /// than one id at once asks here.
+    nonisolated static func uids(_ prefix: String, count: Int) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        while out.count < count {
+            let id = uid(prefix)
+            if seen.insert(id).inserted { out.append(id) }
+        }
+        return out
+    }
+
     nonisolated static func uid(_ prefix: String) -> String {
         let ms = Int(Date().timeIntervalSince1970 * 1000)
         let stamp = String(ms, radix: 36)
