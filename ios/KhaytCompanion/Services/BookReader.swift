@@ -604,19 +604,25 @@ actor BookReader {
         return out
     }
 
-    /// The outbox as `POST /api/store/deltas` takes it: each delta of a record
-    /// this phone edited carries `baseRev` (on the delta, not in the record).
-    /// A Mac that predates the field ignores it.
-    nonisolated static func wire(_ outbox: KhaytEngine.Outbox, baseRevs: [String: Double]) -> [String: JSONValue] {
-        var wire = outbox.wire
-        wire["deltas"] = .array(outbox.deltas.map { delta in
+    /// The outbox with `baseRev` on each delta of a record this phone edited
+    /// (on the delta, not in the record), for both ways home: `POST
+    /// /api/store/deltas` and the cloud chain. A reader that predates the
+    /// field ignores it.
+    nonisolated static func annotated(_ outbox: KhaytEngine.Outbox, baseRevs: [String: Double]) -> KhaytEngine.Outbox {
+        let deltas: [JSONValue] = outbox.deltas.map { delta in
             guard case .object(var d) = delta, case .string(let collection)? = d["collection"],
                   case .object(let r)? = d["record"], case .string(let id)? = r["id"],
                   let rev = baseRevs[collection + "/" + id] else { return delta }
             d["baseRev"] = .number(rev)
             return .object(d)
-        })
-        return wire
+        }
+        return KhaytEngine.Outbox(deltas: deltas, tombstones: outbox.tombstones,
+                                  cursor: outbox.cursor, settingsDiffer: outbox.settingsDiffer)
+    }
+
+    /// `annotated(…).wire`: what the Mac's delta route is sent.
+    nonisolated static func wire(_ outbox: KhaytEngine.Outbox, baseRevs: [String: Double]) -> [String: JSONValue] {
+        annotated(outbox, baseRevs: baseRevs).wire
     }
 
     /// Collections the phone READS and never sends. The catalogue reaches

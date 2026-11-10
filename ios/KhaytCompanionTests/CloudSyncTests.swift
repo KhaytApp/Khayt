@@ -245,6 +245,21 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertEqual(rec["status"], .string("post"))
     }
 
+    /// The cloud chain carries `baseRev` on each delta too, as the Mac's own
+    /// route does: the rev the edit started from (`DeltaBaseRevTests`).
+    func testTheCloudDeltaSaysTheRevTheEditStartedFrom() async throws {
+        try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
+        var (s, _) = try await sync().pull(session)
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
+        (s, _) = try await sync().push(s)
+        let arrived = try SyncCrypto.store(cloud.chain[0].blob, dek: cloud.dek)
+        guard case .array(let deltas)? = arrived["deltas"], case .object(let d)? = deltas.first,
+              case .object(let rec)? = d["record"] else { return XCTFail("\(arrived)") }
+        XCTAssertEqual(d["baseRev"], .number(1))
+        XCTAssertNil(rec["baseRev"], "on the delta, not in the record")
+        XCTAssertEqual(book.baseRevs(), [:], "taken upstream, so nothing is left noted")
+    }
+
     func testAFullChainLeavesTheEditsHereAndNeverUploadsTheSlice() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)
