@@ -1028,7 +1028,7 @@
  "mac.late": "en retard",
  "mac.late_tile": "En retard",
  "mac.layer_of": "Couche {layer} sur {total}",
- "mac.lead_from_hours": "Les heures par jour et jours par semaine viennent des heures de travail ci-dessus.",
+ "mac.lead_from_hours": "Les heures par jour et jours par semaine viennent des heures de travail, dans Réglages › Boutique.",
  "mac.lead_time_last": "Délai en dernier",
  "mac.leave_group": "Retour à toute la bibliothèque",
  "mac.ledger": "Registre",
@@ -3899,5 +3899,11 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "Compte",
  "mac.cloud_not_connected": "Ce Mac n’est pas connecté à Khayt Cloud. Connectez-vous pour synchroniser le registre de l’atelier avec ses autres ordinateurs et téléphones.",
- "mac.cloud_settings": "Réglages de Khayt Cloud"
+ "mac.cloud_settings": "Réglages de Khayt Cloud",
+ "mac.nav_general": "Général",
+ "mac.nav_shop": "Boutique",
+ "mac.nav_pricing": "Prix et taxes",
+ "mac.nav_team": "Équipe et accès",
+ "mac.set_group_workshop": "Atelier",
+ "mac.set_group_online": "En ligne"
 }

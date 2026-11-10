@@ -81,8 +81,10 @@ enum SyncDiagnostics {
         static let refused = "khayt.diag.refused"
         static let refusedAt = "khayt.diag.refusedAt"
         static let refusedShop = "khayt.diag.refusedShop"
+        /// `ConnectorReplyNote`: the last connector reply's status and keys.
+        static let connectorReply = "khayt.diag.connectorReply"
         static let all = [sources, lastSource, lastSourceAt, macSettings, macSettingsAt, macAnsweredAt, macFailedAt,
-                          counts, cloudShop, refused, refusedAt, refusedShop]
+                          counts, cloudShop, refused, refusedAt, refusedShop, connectorReply]
     }
 
     /// UserDefaults is thread-safe; these are called from the main actor and
@@ -153,6 +155,8 @@ enum SyncDiagnostics {
         var refused: Refusal?
         var refusedAt: Date?
         var refusedShopTail: String?
+        /// The last connector reply: status and top-level keys, no values.
+        var connectorReply: ConnectorReplyNote?
     }
 
     static func recorded() -> Recorded {
@@ -173,6 +177,7 @@ enum SyncDiagnostics {
         r.refused = defaults.string(forKey: Keys.refused).flatMap(Refusal.init(rawValue:))
         r.refusedAt = defaults.object(forKey: Keys.refusedAt) as? Date
         r.refusedShopTail = defaults.string(forKey: Keys.refusedShop)
+        r.connectorReply = ConnectorReplyNote.recorded(defaults: defaults)
         return r
     }
 }

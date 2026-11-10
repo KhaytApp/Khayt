@@ -101,7 +101,9 @@ struct ConnectorActionTests {
         let html = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
                                             secrets: ["apiToken": "t"], engine: engine,
                                             post: { _ in (200, Data("<html>ok</html>".utf8)) }, now: Date())
-        #expect(html == .sent(.object([:])))
+        // Accepted, but without the Lamha order the button promises: not
+        // "Sent" (`replyVerdict`, Lamha E2E Nov 10 2026).
+        #expect(html == .unconfirmed(["lamhaOrderId"]))
     }
 
     @Test("a reply written to a job lands in the connector's own field and raises the job's rev")

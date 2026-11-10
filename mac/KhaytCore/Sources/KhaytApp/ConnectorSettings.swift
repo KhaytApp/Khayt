@@ -92,6 +92,9 @@ struct ConnectorSettings: View {
                 Label(shop.words.callIt("plg.dev_badge"), systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(Khayt.attention)
             }
+            // Events this connector's service turned down: kept, with its words,
+            // until the shop retries or dismisses them (`withFailed`).
+            ConnectorFailedEvents(shop: shop, pluginId: row.id)
             if row.state == "on" || row.state == "off" {
                 if row.keysMissing {
                     Text(shop.words.callIt("plg.keys_missing")).font(.caption).foregroundStyle(Khayt.attention)
@@ -295,4 +298,45 @@ enum ConnectorsSwitch {
                                  defaults: UserDefaults = .standard) -> Bool {
         environment["KHAYT_CONNECTORS"] == "1" || defaults.bool(forKey: "KhaytConnectors")
     }
+}
+
+/// The events a connector's service turned down (`success: false`), each with
+/// what the service said, Retry and Dismiss. Never retried on their own: the
+/// same request would be turned down the same way until the shop fixes why.
+struct ConnectorFailedEvents: View {
+    let shop: Shop
+    let pluginId: String
+    @State private var items: [(delivery: String, event: String, orderId: String, at: String, message: String)] = []
+
+    var body: some View {
+        Group {
+            if !items.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shop.words.callIt("plg.failed_title")).font(.caption.weight(.semibold))
+                        .foregroundStyle(Khayt.attention)
+                    ForEach(items, id: \.delivery) { item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.event + " · " + item.orderId).font(.caption)
+                                Text(item.message.isEmpty ? shop.words.callIt("plg.failed_nomsg") : item.message)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Button(shop.words.callIt("plg.failed_retry")) {
+                                Task { await shop.retryFailedConnectorEvent(delivery: item.delivery); await reload() }
+                            }
+                            Button(shop.words.callIt("plg.failed_dismiss")) {
+                                Task { await shop.dismissFailedConnectorEvent(delivery: item.delivery); await reload() }
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+        .task(id: shop.settingsValue) { await reload() }
+    }
+
+    private func reload() async { items = await shop.failedConnectorEvents(pluginId: pluginId) }
 }

@@ -304,6 +304,9 @@
    * A `response`: which of the connector's own fields on `placement` a reply
    * fills, and from which path in it. Nothing else can be named.
    */
+  /** How many paths one reply field may try, in order. */
+  const RESPONSE_PATHS_MAX = 5;
+
   function checkResponse(errors, where, response, placement, fieldsByKey) {
     if (response === undefined) return;
     if (!isObj(response) || !isObj(response.fields)) { errors.push(`${where}: {"fields": {"<own field>": "path.in.reply"}}`); return; }
@@ -313,7 +316,13 @@
       const f = fieldsByKey.get(k);
       if (!f) errors.push(`${where}.fields: no field named "${k}" — a reply can only fill the plugin's own fields`);
       else if (f.attach !== placement) errors.push(`${where}.fields.${k}: is on a ${f.attach}, the reply is about a ${placement}`);
-      if (typeof p !== 'string' || !/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,5}$/.test(p)) errors.push(`${where}.fields.${k}: a dotted path, like "data.tracking"`);
+      // One path, or a short list tried in order — the first that holds a
+      // value wins (Lamha answers `order_id` on one call and `data.id` on another).
+      const paths = Array.isArray(p) ? p : [p];
+      const okPath = (x) => typeof x === 'string' && /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){0,5}$/.test(x);
+      if (!paths.length || paths.length > RESPONSE_PATHS_MAX || !paths.every(okPath)) {
+        errors.push(`${where}.fields.${k}: a dotted path, like "data.tracking", or a list of up to ${RESPONSE_PATHS_MAX} tried in order`);
+      }
     }
   }
 
@@ -720,7 +729,8 @@
     const auth = { type: 'object', additionalProperties: false, required: ['header', 'secret'],
       properties: { header: { type: 'string' }, scheme: { type: 'string' }, secret: key, encode: { enum: AUTH_ENCODINGS } } };
     const response = { type: 'object', additionalProperties: false, required: ['fields'],
-      properties: { fields: { type: 'object', minProperties: 1, additionalProperties: { type: 'string' } } } };
+      properties: { fields: { type: 'object', minProperties: 1, additionalProperties: {
+        oneOf: [{ type: 'string' }, { type: 'array', minItems: 1, maxItems: RESPONSE_PATHS_MAX, items: { type: 'string' } }] } } } };
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://khaytapp.com/schemas/plugin-manifest-v1.json',
@@ -767,6 +777,7 @@
   }
 
   const api = {
+    RESPONSE_PATHS_MAX,
     MANIFEST_VERSION, SIGNING_KEYS, SENDABLE_FIELDS, OWN_FIELD_CATEGORY, PLACEMENT_SOURCES,
     FIELD_TYPES, FIELD_ATTACH, SETTING_TYPES, SETTING_KINDS, ACTION_KINDS, SECRET_KINDS, SCOPES, RESERVED_SCOPES, EVENTS, BODY_FORMATS, LIMITS, TOP_KEYS,
     REFRESH, REFRESH_METHODS, NOW_MAX_DAYS, AUTH_ENCODINGS, nowDays,

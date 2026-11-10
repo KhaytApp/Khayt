@@ -12,7 +12,7 @@
     "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
   },
   "publisher": "Khayt",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "homepage": "https://khaytapp.com/developers/samples/",
   "domains": [
     "app.lamha.sa"
@@ -244,7 +244,10 @@
       },
       "response": {
         "fields": {
-          "lamhaOrderId": "order_id"
+          "lamhaOrderId": [
+            "order_id",
+            "data.id"
+          ]
         }
       }
     }
@@ -252,5 +255,5 @@
   "scopes": [
     "fields.write"
   ],
-  "signature": "xDouxy4XoY73QjkuhcWs8nZIqd9xOIteT9eYaNfb5PLPd3w1mMuHnMuOABWcASfV5jbNYgKfALvCxVa/UwB5DQ=="
+  "signature": "Yrl+4YztpCg/qMLyn02jTjz2ZjIopnzwq8iYgoCJjo3SR0jdp+mimck45SBVQc7YCX7qScjyzyMnFs6eEn0hAA=="
 }

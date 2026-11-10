@@ -1187,6 +1187,10 @@
 "connectors.settings.missing" = "在 Mac 或 PC 上设置 %@ 之前，它的按钮不会发送任何内容。";
 "connectors.error.setting" = "请先在 Mac 或 PC 上为此连接器设置“%@”。未发送任何内容。";
 "connectors.reply.not_saved" = "无法在此 iPhone 上保存回复。请手动复制到该字段。";
+"connectors.reply.refused_said" = "%1$@ 未接受：“%2$@” 未记录任何内容。";
+"connectors.reply.refused" = "%@ 未接受。未记录任何内容。";
+"connectors.reply.unconfirmed" = "%1$@ 已回复，但回复中没有：%2$@。未记录任何内容。再次发送前请先在 %1$@ 中核对。";
+"connectors.error.no_customer" = "此作业没有客户，而 %@ 需要客户的姓名、电话和地址。请先为作业关联客户。未发送任何内容。";
 "connectors.field.clear" = "清除";
 "connectors.field.footer" = "保存在此 iPhone 上，并随你的其他更改发送到 Mac。只有在 Mac 上启用 %@ 时，Mac 才会保留它。";
 "connectors.field.edit" = "编辑";
@@ -1231,6 +1235,9 @@
 "diag.settings" = "账本中的设置";
 "diag.plugin_entries" = "设置中的连接器条目";
 "diag.connectors_count" = "已读取的连接器";
+"diag.reply.last" = "最近一次连接器回复";
+"diag.reply.no_answer" = "无应答";
+"diag.reply.no_keys" = "无 JSON 内容";
 "diag.section.sources" = "账本来源";
 "diag.last_source" = "最近";
 "diag.source.mac_store" = "Mac，完整账本";
