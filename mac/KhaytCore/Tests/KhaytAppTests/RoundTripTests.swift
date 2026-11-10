@@ -645,7 +645,9 @@ struct RoundTripTests {
         let engine = try #require(shop.engine)
         let s = Self.settings
         let forms: [(String, [String: JSONValue])] = [
-            ("business", BusinessPane.Draft.read(s, shop: shop).form()),
+            ("general", GeneralPane.Draft.read(s, shop: shop).form()),
+            ("shop", ShopPane.Draft.read(s, shop: shop).form()),
+            ("pricing", PricingPane.Draft.read(s, shop: shop).form()),
             ("invoice", InvoicePane.Draft.read(s, shop: shop).form()),
             ("payments", PaymentsPane.Draft.read(s, shop: shop).form()),
             ("operations", OperationsPane.Draft.read(s, shop: shop).form()),

@@ -1028,7 +1028,7 @@
  "mac.late": "überfällig",
  "mac.late_tile": "Überfällig",
  "mac.layer_of": "Schicht {layer} von {total}",
- "mac.lead_from_hours": "Stunden pro Tag und Tage pro Woche stammen aus den Arbeitszeiten oben.",
+ "mac.lead_from_hours": "Stunden pro Tag und Tage pro Woche stammen aus den Arbeitszeiten unter Einstellungen › Geschäft.",
  "mac.lead_time_last": "Zuletzt gedauert",
  "mac.leave_group": "Zurück zur gesamten Bibliothek",
  "mac.ledger": "Journal",
@@ -3899,5 +3899,11 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "Konto",
  "mac.cloud_not_connected": "Dieser Mac ist nicht bei Khayt Cloud angemeldet. Melde dich an, um das Buch des Geschäfts mit seinen anderen Computern und Telefonen zu synchronisieren.",
- "mac.cloud_settings": "Khayt Cloud-Einstellungen"
+ "mac.cloud_settings": "Khayt Cloud-Einstellungen",
+ "mac.nav_general": "Allgemein",
+ "mac.nav_shop": "Geschäft",
+ "mac.nav_pricing": "Preise & Steuern",
+ "mac.nav_team": "Team & Zugriff",
+ "mac.set_group_workshop": "Werkstatt",
+ "mac.set_group_online": "Online"
 }

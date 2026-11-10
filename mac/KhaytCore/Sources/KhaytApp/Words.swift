@@ -3150,8 +3150,8 @@ final class Words {
         "mac.nothing_to_assign_why": ["en": "Every job waiting for a machine already has one.",
                                       "ar": "كل طلب ينتظر آلة لديه واحدة بالفعل."],
         // Where the two numbers that used to be typed here now come from.
-        "mac.lead_from_hours": ["en": "Hours a day and days a week come from Working Hours above.",
-                                "ar": "ساعات اليوم وأيام الأسبوع مأخوذة من ساعات العمل أعلاه."],
+        "mac.lead_from_hours": ["en": "Hours a day and days a week come from Working Hours in Settings › Shop.",
+                                "ar": "ساعات اليوم وأيام الأسبوع مأخوذة من ساعات العمل في الإعدادات › المتجر."],
         "mac.cam_find":      ["en": "Find it",           "ar": "ابحث عنها"],
         "mac.cam_no_frame":  ["en": "No picture yet",     "ar": "لا صورة بعد"],
         "mac.cam_unreachable": ["en": "Camera not answering", "ar": "الكاميرا لا تجيب"],
@@ -4586,6 +4586,13 @@ final class Words {
         // Settings › Khayt Cloud (`CloudPane`, Nov 2026): the account was
         // reachable only from the Book menu and a right-click on the sidebar.
         "mac.nav_cloud":           ["en": "Khayt Cloud", "ar": "سحابة خيط"],
+        // Settings stage 2 (Nov 2026): the panes and the sidebar's groups.
+        "mac.nav_general": ["en": "General", "ar": "عام"],
+        "mac.nav_shop": ["en": "Shop", "ar": "المتجر"],
+        "mac.nav_pricing": ["en": "Pricing & Tax", "ar": "الأسعار والضريبة"],
+        "mac.nav_team": ["en": "Team & Access", "ar": "الفريق والصلاحيات"],
+        "mac.set_group_workshop": ["en": "Workshop", "ar": "الورشة"],
+        "mac.set_group_online": ["en": "Online", "ar": "عبر الإنترنت"],
         "mac.cloud_account":       ["en": "Account", "ar": "الحساب"],
         "mac.cloud_settings":      ["en": "Khayt Cloud Settings", "ar": "إعدادات سحابة خيط"],
         "mac.cloud_not_connected": ["en": "This Mac is not signed in to Khayt Cloud. Sign in to sync the shop's book with its other computers and phones.",

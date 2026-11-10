@@ -1187,6 +1187,10 @@
 "connectors.settings.missing" = "Sus botones no enviarán nada hasta que se defina %@ en tu Mac o PC.";
 "connectors.error.setting" = "Define «%@» para este conector en tu Mac o PC primero. No se envió nada.";
 "connectors.reply.not_saved" = "No se pudo guardar la respuesta en este iPhone. Cópiala en el campo a mano.";
+"connectors.reply.refused_said" = "%1$@ no lo aceptó: «%2$@» No se registró nada.";
+"connectors.reply.refused" = "%@ no lo aceptó. No se registró nada.";
+"connectors.reply.unconfirmed" = "%1$@ respondió, pero la respuesta no incluía: %2$@. No se registró nada. Revisa %1$@ antes de volver a enviar.";
+"connectors.error.no_customer" = "Este trabajo no tiene cliente y %@ necesita su nombre, teléfono y dirección. Vincula primero un cliente al trabajo. No se envió nada.";
 "connectors.field.clear" = "Borrar";
 "connectors.field.footer" = "Se guarda en este iPhone y se envía a tu Mac con tus otros cambios. Tu Mac lo conserva solo mientras %@ esté activado allí.";
 "connectors.field.edit" = "Editar";
@@ -1231,6 +1235,9 @@
 "diag.settings" = "Ajustes en el libro";
 "diag.plugin_entries" = "Entradas de conectores en ajustes";
 "diag.connectors_count" = "Conectores leídos";
+"diag.reply.last" = "Última respuesta de conector";
+"diag.reply.no_answer" = "sin respuesta";
+"diag.reply.no_keys" = "sin cuerpo JSON";
 "diag.section.sources" = "De dónde vino el libro";
 "diag.last_source" = "Último";
 "diag.source.mac_store" = "Mac, libro completo";
