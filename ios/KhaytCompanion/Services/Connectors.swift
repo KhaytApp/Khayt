@@ -103,6 +103,11 @@ struct Connector: Identifiable, Equatable, Sendable {
     var settings: [Setting] = []
     /// The book's `entry.config`: the settings' values, as the Mac saved them.
     var config: [String: JSONValue] = [:]
+    /// The newer version the book holds that this build cannot read (its
+    /// manifest needs a newer app, or the shared check refuses it): the
+    /// phone runs the entry's `previous` instead. Nil when running the
+    /// book's own version.
+    var unreadableVersion: String? = nil
 
     /// Whether its buttons work: active, and nothing else. Every send checks it.
     var isActive: Bool { status == .active }
@@ -204,6 +209,62 @@ enum ConnectorRules {
                          status: status, reviewed: reviewed,
                          secrets: secrets, fields: fields, actions: actions, domains: domains,
                          settings: settings, config: config)
+    }
+
+    /// One book entry as the connector the phone runs. The book's own version
+    /// first, with any update bookkeeping set aside so a build whose shared
+    /// check predates it still reads it. When this build cannot read that
+    /// version (it needs a newer app, or the shared check refuses it), the
+    /// version before it, `previous` (from the entry, or from the update
+    /// record the Mac keeps beside it). Never a manifest that fails the check:
+    /// if neither reads, the book's own version comes back `.invalid`.
+    static func resolve(_ e: [String: JSONValue], previous: JSONValue? = nil, engine: KhaytEngine,
+                        keys: [JSONValue]) async -> Connector? {
+        var candidates: [([String: JSONValue], String?)] = [(runnable(e), nil)]
+        if let older = previousEntry(e, previous: previous) { candidates.append((older, text(e["version"]))) }
+        var made: Connector?
+        for (entry, unreadable) in candidates {
+            guard let m = entry["manifest"] else { continue }
+            let check = try? await engine.pluginCheckEntry(.object(entry))
+            var reviewed = false
+            if let canonical = try? await engine.pluginCanonicalJSON(m) {
+                reviewed = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
+            }
+            guard var c = connector(entry: entry, check: check, reviewed: reviewed) else { continue }
+            c.unreadableVersion = unreadable
+            if c.status != .invalid { return c }
+            if made == nil { made = c }
+        }
+        return made
+    }
+
+    /// A connector update's bookkeeping in a book entry (design
+    /// connector-updates §4). None of it widens what may be sent: `previous`
+    /// and `pending` are other versions, the rest is for the quiet note.
+    static let updateKeys = ["previous", "pending", "updatedAt", "updatedFrom", "skipped", "revoked"]
+
+    /// The entry as the shared check knows it: the book's own version, with
+    /// the update bookkeeping set aside.
+    static func runnable(_ e: [String: JSONValue]) -> [String: JSONValue] {
+        e.filter { !updateKeys.contains($0.key) }
+    }
+
+    /// The entry's `previous` version as an entry of its own, for a build
+    /// that cannot read the current one: its manifest and grant, the shop's
+    /// switch and keys, and only the settings that version has.
+    static func previousEntry(_ e: [String: JSONValue], previous: JSONValue? = nil) -> [String: JSONValue]? {
+        guard case .object(let p)? = previous ?? e["previous"], case .object(let m)? = p["manifest"] else { return nil }
+        var out: [String: JSONValue] = ["id": m["id"] ?? e["id"] ?? .null,
+                                        "version": m["version"] ?? p["version"] ?? .null,
+                                        "manifest": .object(m)]
+        if let on = e["enabled"] { out["enabled"] = on }
+        if case .object? = p["granted"] { out["granted"] = p["granted"] }
+        if let secrets = e["secrets"] { out["secrets"] = secrets }
+        if case .object(let config)? = e["config"] {
+            let known = Set(list(m["settings"]).compactMap { text($0["key"]) })
+            out["config"] = .object(config.filter { known.contains($0.key) })
+        }
+        return out
     }
 
     /// Khayt's connector signing keys: `[{id, key}]`, `key` base64 of the
@@ -555,13 +616,7 @@ extension KhaytAPIClient {
         let keys = await ConnectorRules.signingKeys(engine)
         var out: [Connector] = []
         for e in entries {
-            guard let m = e["manifest"] else { continue }
-            let check = try? await engine.pluginCheckEntry(.object(e))
-            var reviewed = false
-            if let canonical = try? await engine.pluginCanonicalJSON(m) {
-                reviewed = Connectors.reviewedBy(manifest: m, canonical: canonical, keys: keys) != nil
-            }
-            if let c = ConnectorRules.connector(entry: e, check: check, reviewed: reviewed) { out.append(c) }
+            if let c = await ConnectorRules.resolve(e, engine: engine, keys: keys) { out.append(c) }
         }
         return out
     }
