@@ -1205,6 +1205,7 @@
 "connectors.data.order.trackingnumber" = "Número de seguimiento";
 "connectors.data.order.amountdue" = "Importe pendiente";
 "connectors.data.order.amountdueminor" = "Importe pendiente (unidad mínima)";
+"connectors.data.order.amountduecurrency" = "Moneda del importe pendiente";
 "connectors.data.customer.name" = "Nombre del cliente";
 "connectors.data.customer.company" = "Empresa";
 "connectors.data.customer.phone" = "Teléfono";

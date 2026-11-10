@@ -73,6 +73,8 @@
     return { amount: minor / Math.pow(10, exp), minor, currency };
   }
 
+  const AMOUNT_DUE_REFS = ['order.amountDue', 'order.amountDueMinor', 'order.amountDueCurrency'];
+
   /** `{now.epochMs}` / `{now.plusDays.N.epochMs}` from the clock the platform handed in. */
   function nowValue(ref, ctx) {
     const days = M.nowDays(ref);
@@ -110,9 +112,9 @@
       }
     }
     if (ref.startsWith('now.')) return nowValue(ref, c);
-    if (ref === 'order.amountDue' || ref === 'order.amountDueMinor') {
+    if (AMOUNT_DUE_REFS.includes(ref)) {
       const d = amountDue(c);
-      return d ? (ref === 'order.amountDue' ? d.amount : d.minor) : null;
+      return d ? (ref === 'order.amountDue' ? d.amount : ref === 'order.amountDueMinor' ? d.minor : d.currency) : null;
     }
     if (ref.startsWith('field.')) {
       const key = ref.slice(6);
@@ -266,7 +268,7 @@
       if (ref.startsWith('now.') && nowValue(ref, ctx) === null) return { ok: false, error: 'no clock was given' };
       // Without the shop's settings an exclusive shop's bill reads as its
       // pre-tax price: a payment link for the wrong amount. Refuse instead.
-      if ((ref === 'order.amountDue' || ref === 'order.amountDueMinor') && !isObj(ctx && ctx.settings)) {
+      if (AMOUNT_DUE_REFS.includes(ref) && !isObj(ctx && ctx.settings)) {
         return { ok: false, error: 'the shop settings were not given' };
       }
     }

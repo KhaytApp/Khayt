@@ -1205,6 +1205,7 @@
 "connectors.data.order.trackingnumber" = "Takip numarası";
 "connectors.data.order.amountdue" = "Ödenecek tutar";
 "connectors.data.order.amountdueminor" = "Ödenecek tutar (en küçük birim)";
+"connectors.data.order.amountduecurrency" = "Ödenecek tutarın para birimi";
 "connectors.data.customer.name" = "Müşteri adı";
 "connectors.data.customer.company" = "Şirket";
 "connectors.data.customer.phone" = "Telefon numarası";

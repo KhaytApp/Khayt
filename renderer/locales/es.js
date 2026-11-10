@@ -5374,6 +5374,7 @@
   "plg.f.order.trackingNumber": "Número de seguimiento",
   "plg.f.order.amountDue": "Importe pendiente",
   "plg.f.order.amountDueMinor": "Importe pendiente (unidad mínima)",
+  "plg.f.order.amountDueCurrency": "Moneda del importe pendiente",
   "plg.f.customer.name": "Nombre del cliente",
   "plg.f.customer.company": "Empresa del cliente",
   "plg.f.customer.phone": "Teléfono del cliente",

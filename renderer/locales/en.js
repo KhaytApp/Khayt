@@ -5375,6 +5375,7 @@
   "plg.f.order.trackingNumber": "Tracking number",
   "plg.f.order.amountDue": "Amount due",
   "plg.f.order.amountDueMinor": "Amount due (minor units)",
+  "plg.f.order.amountDueCurrency": "Currency of amount due",
   "plg.f.customer.name": "Customer name",
   "plg.f.customer.company": "Customer company",
   "plg.f.customer.phone": "Customer phone",

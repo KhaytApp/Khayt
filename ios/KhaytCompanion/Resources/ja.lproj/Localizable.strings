@@ -1205,6 +1205,7 @@
 "connectors.data.order.trackingnumber" = "追跡番号";
 "connectors.data.order.amountdue" = "未払い金額";
 "connectors.data.order.amountdueminor" = "未払い金額（最小単位）";
+"connectors.data.order.amountduecurrency" = "未払い金額の通貨";
 "connectors.data.customer.name" = "顧客名";
 "connectors.data.customer.company" = "会社名";
 "connectors.data.customer.phone" = "電話番号";

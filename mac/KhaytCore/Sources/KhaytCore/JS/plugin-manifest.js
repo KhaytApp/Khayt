@@ -70,6 +70,10 @@
     // minor units (halalas, cents, fils), the integer a payment API takes.
     'order.amountDue':      { from: 'order', path: null, computed: true, type: 'number', category: 'purchase.history' },
     'order.amountDueMinor': { from: 'order', path: null, computed: true, type: 'number', category: 'purchase.history' },
+    // The currency both are in: the job's own, else its customer's, else the
+    // shop's. `order.currency` is the job's own only, and a job in the shop's
+    // currency has none — a payment link needs one.
+    'order.amountDueCurrency': { from: 'order', path: null, computed: true, type: 'text', category: 'purchase.history' },
     'customer.name':        { from: 'customer', path: 'name',        type: 'text',   category: 'contact.name' },
     'customer.company':     { from: 'customer', path: 'company',     type: 'text',   category: 'contact.other' },
     'customer.phone':       { from: 'customer', path: 'phone',       type: 'text',   category: 'contact.phone' },

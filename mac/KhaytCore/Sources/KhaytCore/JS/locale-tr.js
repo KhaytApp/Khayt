@@ -5374,6 +5374,7 @@
   "plg.f.order.trackingNumber": "Takip numarası",
   "plg.f.order.amountDue": "Ödenecek tutar",
   "plg.f.order.amountDueMinor": "Ödenecek tutar (en küçük birim)",
+  "plg.f.order.amountDueCurrency": "Ödenecek tutarın para birimi",
   "plg.f.customer.name": "Müşteri adı",
   "plg.f.customer.company": "Müşterinin şirketi",
   "plg.f.customer.phone": "Müşteri telefonu",

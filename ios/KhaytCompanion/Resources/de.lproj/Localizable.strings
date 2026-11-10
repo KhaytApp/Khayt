@@ -1205,6 +1205,7 @@
 "connectors.data.order.trackingnumber" = "Sendungsnummer";
 "connectors.data.order.amountdue" = "Offener Betrag";
 "connectors.data.order.amountdueminor" = "Offener Betrag (kleinste Einheit)";
+"connectors.data.order.amountduecurrency" = "Währung des offenen Betrags";
 "connectors.data.customer.name" = "Kundenname";
 "connectors.data.customer.company" = "Firma";
 "connectors.data.customer.phone" = "Telefonnummer";
