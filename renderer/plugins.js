@@ -103,7 +103,26 @@ function renderPluginSettings() {
           <button class="btn danger small" type="button" data-plugin-act="remove" style="margin-inline-start:auto;">${escapeHtml(t('plg.remove'))}</button>
         </div>
       </div>`;
-    }).join('')}`;
+    }).join('')}
+    ${pluginFailedHtml()}`;
+
+  el.querySelectorAll('[data-plugin-failed]').forEach((btn) => btn.addEventListener('click', () => {
+    const delivery = btn.dataset.pluginFailed;
+    const item = (settings.pluginOutbox || []).find((p) => p && p.delivery === delivery);
+    if (!item) return;
+    if (btn.dataset.act === 'retry') {
+      // Due now, with the SAME delivery id, so a receiver that did take it drops the repeat.
+      settings.pluginOutbox = PluginHost().withRetried(settings.pluginOutbox, delivery, new Date().toISOString());
+      saveAll();
+      // A fresh ladder: the shop fixed the cause, so a network blip may be retried again.
+      const again = Object.assign({}, item, { attempt: 1 });
+      delete again.failed;
+      deliverPluginEvent(again);
+    } else {
+      clearPluginOutbox(delivery);
+    }
+    renderPluginSettings();
+  }));
 
   const file = el.querySelector('#pluginFile');
   el.querySelector('#btnPluginInstall').addEventListener('click', () => file.click());
@@ -164,6 +183,38 @@ function renderPluginSettings() {
     await refreshPluginReviewed();
     renderPluginSettings();
   }));
+}
+
+/**
+ * Events a service turned down (a 2xx with success:false): the provider's
+ * words, the job, and Retry / Dismiss. They are never retried on their own.
+ */
+function pluginFailedHtml() {
+  const H = PluginHost();
+  const failed = H && H.failedQueued ? H.failedQueued(settings.pluginOutbox) : [];
+  if (!failed.length) return '';
+  const rows = failed.slice().reverse().map((item) => {
+    const entry = (settings.plugins || []).find((p) => p && p.id === item.id);
+    const name = entry ? pluginLabel(entry.manifest.name) : item.id;
+    const order = (printLog || []).find((o) => o && o.id === item.orderId);
+    const job = order ? jobRef(order) : '';
+    const when = item.failed.at ? new Date(item.failed.at).toLocaleString(settings.lang || undefined) : '';
+    const d = escapeHtml(item.delivery);
+    return `
+      <div class="plg-failed-row" style="border-top:1px solid var(--border-soft);padding:8px 0;">
+        <div style="font-size:12.5px;"><strong>${escapeHtml(name)}</strong>${job ? ` · ${escapeHtml(job)}` : ''} · <span style="color:var(--text-muted);">${escapeHtml(item.event || '')}${when ? ' · ' + escapeHtml(when) : ''}</span></div>
+        <div style="font-size:12px;margin:4px 0 6px;">${escapeHtml(item.failed.message || t('plg.failed_nomsg'))}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn small" type="button" data-plugin-failed="${d}" data-act="retry">${escapeHtml(t('plg.failed_retry'))}</button>
+          <button class="btn ghost small" type="button" data-plugin-failed="${d}" data-act="dismiss">${escapeHtml(t('plg.failed_dismiss'))}</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="plg-failed" style="border:1px solid var(--danger, #c0392b);border-radius:10px;padding:12px;margin-top:6px;">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${escapeHtml(t('plg.failed_title'))} (${failed.length})</div>
+      ${rows}
+    </div>`;
 }
 
 /**
@@ -248,6 +299,16 @@ function pluginEditorHtml(attach, record) {
   const actions = H.actionsFor(settings, attach, pluginIsReviewed);
   if (!fields.length && !actions.length) return '';
   const P = PluginPayload();
+  // A button that sends the customer's details, on a job with no customer
+  // record, would go out with them empty and be turned down (Lamha): grey it
+  // out and say why, before anything is sent (lib/plugin-payload.js usesCustomer).
+  const noCustomer = attach === 'order' && !(typeof customerOfOrder === 'function' && customerOfOrder(record));
+  const actionButton = ({ entry, action }) => {
+    const blocked = noCustomer && P && P.usesCustomer && P.usesCustomer(entry.manifest, { action: action.id });
+    return `<button type="button" class="btn small" data-plugin-action="${escapeHtml(entry.id)}|${escapeHtml(action.id)}"${blocked
+      ? ` disabled data-plugin-blocked="1" title="${escapeHtml(t('plg.no_customer'))}"` : ''}>${escapeHtml(pluginLabel(action.label))}</button>`
+      + (blocked ? `<span style="font-size:11.5px;color:var(--text-muted);align-self:center;">${escapeHtml(t('plg.no_customer'))}</span>` : '');
+  };
   const input = ({ entry, field, editable }) => {
     const v = P ? P.fieldValue(record, entry.id, field.key) : null;
     const id = `${escapeHtml(entry.id)}|${escapeHtml(field.key)}`;
@@ -267,8 +328,7 @@ function pluginEditorHtml(attach, record) {
     <div class="plg-editor" data-plugin-attach="${escapeHtml(attach)}" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <label style="margin-top:0; font-weight:600;">${escapeHtml(t('plg.title'))}</label>
       ${fields.map(input).join('')}
-      ${actions.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">${actions.map(({ entry, action }) =>
-        `<button type="button" class="btn small" data-plugin-action="${escapeHtml(entry.id)}|${escapeHtml(action.id)}">${escapeHtml(pluginLabel(action.label))}</button>`).join('')}</div>` : ''}
+      ${actions.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">${actions.map(actionButton).join('')}</div>` : ''}
     </div>`;
 }
 
@@ -296,6 +356,7 @@ function wirePluginEditor(modal, attach, getRecords) {
   modal.querySelectorAll(`.plg-editor[data-plugin-attach="${attach}"] [data-plugin-action]`).forEach((btn) => {
     btn.addEventListener('click', async () => {
       const [id, actionId] = btn.dataset.pluginAction.split('|');
+      if (btn.dataset.pluginBlocked) return;
       btn.disabled = true;
       try { await runPluginAction(id, actionId, attach, getRecords()); }
       finally { btn.disabled = false; }
@@ -342,11 +403,25 @@ async function runPluginAction(id, actionId, attach, recs) {
   }
   if (r.method === 'OPEN') return r;
   if (!r.ok) { toast(t('plg.err_failed', { why: r.error || ('HTTP ' + (r.status || '?')) }), 'error', 6000); return r; }
-  // applyResponse checks the grant itself (fields.write, still covering this
-  // manifest) and returns nothing without it.
-  if (r.reply && typeof recs.write === 'function') {
-    const values = PluginPayload().applyResponse(entry.manifest, actionId, r.reply, entry);
-    if (Object.keys(values).length) recs.write(PluginHost().withFieldValues(recs[attach], entry, attach, values));
+  // A 2xx is not yet "Sent": the reply may turn it down, or fill none of the
+  // fields it promises (lib/plugin-payload.js replyVerdict, one rule for every
+  // app). applyResponse checks the grant itself and returns nothing without it.
+  const P = PluginPayload();
+  const reply = r.reply || {};
+  const values = P.applyResponse(entry.manifest, actionId, reply, entry);
+  const verdict = P.replyVerdict(entry.manifest, { action: actionId }, reply, entry, values);
+  const name = pluginLabel(entry.manifest.name);
+  if (verdict.kind === 'refused') {
+    toast(verdict.message ? t('plg.err_declined', { name, msg: verdict.message }) : t('plg.err_declined_nomsg', { name }), 'error', 8000);
+    return Object.assign({}, r, { ok: false, verdict });
+  }
+  if (Object.keys(values).length && typeof recs.write === 'function') {
+    recs.write(PluginHost().withFieldValues(recs[attach], entry, attach, values));
+  }
+  if (verdict.kind === 'unconfirmed') {
+    const f = (entry.manifest.fields || []).find((x) => x.key === verdict.fields[0] && x.attach === attach);
+    toast(t('plg.sent_unconfirmed', { name, field: f ? pluginLabel(f.label) : verdict.fields[0] }), 'warning', 8000);
+    return Object.assign({}, r, { verdict });
   }
   toast(t('plg.sent'), 'success');
   return r;
@@ -380,7 +455,23 @@ async function deliverPluginEvent(item) {
     r = await window.hubAPI.pluginSend({ id: item.id, event: item.event, delivery: item.delivery,
       records: { order, customer: customerOfOrder(order) } });
   } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
-  if (r && (r.ok || r.refused)) { clearPluginOutbox(item.delivery); return; }
+  if (r && r.ok) {
+    // A 2xx the service turned down is not transient: the same request would
+    // be turned down again. Kept as failed with its words and a manual Retry
+    // (lib/plugin-host.js withFailed), never put back on the retry ladder.
+    const entry = (settings.plugins || []).find((p) => p && p.id === item.id);
+    const P = PluginPayload();
+    const verdict = entry && P ? P.replyVerdict(entry.manifest, { event: item.event }, r.reply || {}, entry, {}) : { ok: true };
+    if (verdict.kind === 'refused') {
+      settings.pluginOutbox = PluginHost().withFailed(settings.pluginOutbox, item, new Date().toISOString(), verdict.message);
+      saveAll();
+      if (typeof renderPluginSettings === 'function') renderPluginSettings();
+      return;
+    }
+    clearPluginOutbox(item.delivery);
+    return;
+  }
+  if (r && r.refused) { clearPluginOutbox(item.delivery); return; }
   const status = r && r.status;
   const again = Bus ? Bus.shouldRetry(status, item.attempt) : item.attempt < PLUGIN_RETRY_MAX;
   if (!again) { clearPluginOutbox(item.delivery); return; }
@@ -409,7 +500,7 @@ async function resumePluginOutbox() {
   await refreshPluginReviewed();
   const list = Array.isArray(settings.pluginOutbox) ? settings.pluginOutbox.slice() : [];
   for (const item of list) {
-    if (!item || !item.delivery) continue;
+    if (!item || !item.delivery || (item.failed && typeof item.failed === 'object')) continue;
     const wait = Math.max(0, Date.parse(item.nextAttemptAt || '') - Date.now()) || 0;
     setTimeout(() => deliverPluginEvent(item), Math.min(wait, 2_147_000_000));
   }
