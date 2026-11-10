@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "Oder öffnen Sie den Beispiel-Shop – 42 Aufträge, 5 Maschinen, echte Zahlen.",
  "mac.open_total": "offen",
  "mac.open_whatsapp": "WhatsApp öffnen",
- "mac.operator_access_hint": "Wird von der Bediensperre der Desktop-App verwendet. Dieser Mac fragt nicht nach einer PIN.",
+ "mac.operator_access_hint": "Was diese Person darf, wenn die Mitarbeiteranmeldung aktiv ist: auf diesem Mac und in der Windows- und Linux-App.",
  "mac.operator_active": "Aktiv – wird angeboten, wenn ein Auftrag zugewiesen oder Zeit erfasst wird",
  "mac.operator_add": "Bediener hinzufügen",
  "mac.operator_delete_confirm": "„{name}“ löschen?",

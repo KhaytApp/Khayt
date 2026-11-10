@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "或打开示例店铺——42 个订单、5 台机器，真实的数字。",
  "mac.open_total": "未结",
  "mac.open_whatsapp": "打开 WhatsApp",
- "mac.operator_access_hint": "供桌面版 App 的操作员锁使用。这台 Mac 不会询问 PIN。",
+ "mac.operator_access_hint": "启用员工登录后，此人在这台 Mac 以及 Windows 和 Linux 应用中可以做的事。",
  "mac.operator_active": "启用——分配订单或记录工时时可供选择",
  "mac.operator_add": "添加操作员",
  "mac.operator_delete_confirm": "要删除“{name}”吗？",

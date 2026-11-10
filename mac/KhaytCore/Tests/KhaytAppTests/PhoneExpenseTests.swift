@@ -1,0 +1,78 @@
+import Foundation
+import Testing
+import KhaytCore
+@testable import KhaytApp
+
+/// The phone's two routes the Mac did not serve (the Nov 10 2026 review):
+/// an expense with its receipt, and the "ask the Mac" quote.
+struct PhoneExpenseTests {
+
+    @Test("a receipt is what its first bytes say it is")
+    func kinds() {
+        #expect(ExpenseReceipt.kind(of: Data([0xFF, 0xD8, 0xFF, 0xE0])) == "jpg")
+        #expect(ExpenseReceipt.kind(of: Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) == "png")
+        #expect(ExpenseReceipt.kind(of: Data("%PDF-1.7".utf8)) == "pdf")
+        #expect(ExpenseReceipt.kind(of: Data("<html>".utf8)) == nil)
+        #expect(ExpenseReceipt.kind(of: Data()) == nil)
+    }
+
+    @Test("a receipt's name stays in its folder, and its path is only ever read inside receipts/")
+    func paths() throws {
+        let name = ExpenseReceipt.filename("jpg")
+        #expect(name.hasPrefix("receipt-") && name.hasSuffix(".jpg") && !name.contains("/"))
+        #expect(ExpenseReceipt.filename("jpg") != name)
+
+        let dir = FileManager.default.temporaryDirectory.appending(path: "khayt-receipts-\(UUID().uuidString)")
+        let receipts = dir.appending(path: "receipts")
+        try FileManager.default.createDirectory(at: receipts, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appending(path: "khayt-store.json")
+        try Data([0xFF, 0xD8, 0xFF]).write(to: receipts.appending(path: "a.jpg"))
+        try Data("secret".utf8).write(to: dir.appending(path: "other.txt"))
+
+        #expect(ExpenseReceipt.file(for: "receipts/a.jpg", storeURL: store) != nil)
+        #expect(ExpenseReceipt.file(for: "receipts/missing.jpg", storeURL: store) == nil)
+        #expect(ExpenseReceipt.file(for: "receipts/../other.txt", storeURL: store) == nil, "never up out of the folder")
+        #expect(ExpenseReceipt.file(for: "other.txt", storeURL: store) == nil)
+        #expect(ExpenseReceipt.file(for: "", storeURL: store) == nil)
+        // The desktop writes the whole path for a phone's photo; it opens when it is on this computer.
+        #expect(ExpenseReceipt.file(for: receipts.appending(path: "a.jpg").path, storeURL: store) != nil)
+    }
+
+    @Test("the expense route is recognised from the request line, under either name")
+    func route() {
+        #expect(LanServer.isExpenseUpload(method: "POST", target: "/api/expense"))
+        #expect(LanServer.isExpenseUpload(method: "post", target: "/v1/expense/?x=1"))
+        #expect(!LanServer.isExpenseUpload(method: "GET", target: "/api/expense"))
+        #expect(!LanServer.isExpenseUpload(method: "POST", target: "/api/expenses"))
+        #expect(ExpenseReceipt.maxBody > ExpenseReceipt.maxBytes * 4 / 3)
+    }
+
+    @Test("the Mac's engine answers the phone's quote by the shared rule")
+    func quote() async throws {
+        let engine = try KhaytEngine()
+        let store: JSONValue = .object(["settings": .object(["currency": .string("SAR")]), "inventory": .array([])])
+        let part: JSONValue = .object(["spoolCost": .number(80), "spoolWeight": .number(1000),
+                                       "printWeight": .number(100), "qty": .number(2), "margin": .number(50)])
+        let out = try await engine.lanRest("quotePart", store: store,
+                                           args: [part, .object(["today": .string("2026-11-10"), "overheadPerHour": .number(0)])])
+        #expect(out.status == 200)
+        guard case .object(let body) = out.body, case .number(let total)? = body["totalCost"] else {
+            Issue.record("no body"); return
+        }
+        #expect(total > 0)
+        #expect(body["currency"] == .string("SAR"))
+        let bad = try await engine.lanRest("quotePart", store: store, args: [.null, .object([:])])
+        #expect(bad.status == 400)
+    }
+
+    @Test("New Job warns under the shop's minimum order, and only then")
+    @MainActor func minimumOrder() {
+        let settings: [String: JSONValue] = ["minOrderAmount": .number(50)]
+        #expect(NewJobSheet.belowMinimum(total: 30, settings: settings) == 50)
+        #expect(NewJobSheet.belowMinimum(total: 50, settings: settings) == nil)
+        #expect(NewJobSheet.belowMinimum(total: 80, settings: settings) == nil)
+        #expect(NewJobSheet.belowMinimum(total: 30, settings: [:]) == nil, "no minimum set, nothing said")
+        #expect(NewJobSheet.belowMinimum(total: 0, settings: settings) == nil, "no price yet is not a price under the minimum")
+    }
+}

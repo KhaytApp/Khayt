@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "または、サンプルショップを開く — ジョブ42件、マシン5台、実際の数値。",
  "mac.open_total": "未完了",
  "mac.open_whatsapp": "WhatsAppを開く",
- "mac.operator_access_hint": "デスクトップAppのオペレーターロックで使用されます。このMacはPINを要求しません。",
+ "mac.operator_access_hint": "スタッフのサインインがオンのとき、このMacとWindows・Linux版アプリでこの人ができること。",
  "mac.operator_active": "有効 — ジョブの割り当てや作業時間の記録時に表示されます",
  "mac.operator_add": "オペレーターを追加",
  "mac.operator_delete_confirm": "「{name}」を削除しますか？",

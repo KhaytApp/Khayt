@@ -8351,6 +8351,7 @@ public actor KhaytEngine {
     /// can never be anything but one of these functions.
     public static let lanRestReads: Set<String> = [
         "ordersList", "machinesList", "inventoryList", "waitingList", "clientsList", "orderQuoteUrl",
+        "quotePart",
     ]
     public static let lanRestWrites: Set<String> = [
         "orderCreate", "orderPatch", "orderApprove", "inventoryCreate", "inventoryPatch",

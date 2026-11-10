@@ -190,6 +190,8 @@ final class LanServer {
         /// A paired phone's photo of a job (`Shop.phoneAddJobPhoto`): the JPEG
         /// it sent, filed as the Mac's own Add Photo files one.
         var addJobPhoto: (@MainActor (_ jobId: String, _ data: Data) async -> (Int, String))? = nil
+        /// A phone's expense, receipt and all (`Shop.phoneAddExpense`).
+        var addExpense: (@MainActor (_ body: Data) async -> (Int, String))? = nil
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -744,7 +746,20 @@ final class LanServer {
             return try await readSlicerUpload(connection, on: queue, requestLine: requestLine, headers: headers,
                                               start: body, length: length, remote: remote, slot: slot)
         }
-        if length > Self.maxBody, Self.isJobPhotoUpload(method: requestLine[0], target: requestLine[1]) {
+        if length > Self.maxBody, Self.isExpenseUpload(method: requestLine[0], target: requestLine[1]) {
+            // A phone's expense with its receipt: the same terms as its photo
+            // of a job, below — signed, judged from the head, sharing the slots.
+            guard length <= ExpenseReceipt.maxBody else { throw ReadRefusal.tooLarge }
+            guard LanDevices.isSigned(headers) else {
+                throw ReadRefusal.refused(.json(403, #"{"ok":false,"reason":"device-key-required"}"#))
+            }
+            let probe = Request(method: "POST", path: "/api/expense", query: [:],
+                                headers: headers, body: Data(), remote: remote)
+            if let refused = await pinGate(probe, headOnly: true) { throw ReadRefusal.refused(refused) }
+            guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
+            largeBodies += 1
+            slot.held = true
+        } else if length > Self.maxBody, Self.isJobPhotoUpload(method: requestLine[0], target: requestLine[1]) {
             // A phone's photo of a job: past a megabyte, up to the photo cap,
             // for a SIGNED enrolled phone only — judged from the head before a
             // byte of body is read, and sharing the large-body slots.
@@ -954,7 +969,7 @@ final class LanServer {
         // The REST API (`LanServer+Rest`). The ones with an id, and the
         // printer webhook, are not advertised: a 404 is served before any gate.
         "/api/orders", "/api/machines", "/api/inventory", "/api/waiting-list", "/api/clients",
-        "/api/waste",
+        "/api/waste", "/api/quote",
     ]
 
     // MARK: - The routes
@@ -1257,6 +1272,17 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.addJobPhoto!(Self.jobPhotoPath(path)!, request.body)
+            return .json(status, body)
+
+        // ── A PHONE FILES AN EXPENSE WITH ITS RECEIPT (`Shop+PhoneExpense`) ──
+        //
+        // Signed phones only, as above: the body carries a supplier's paper.
+        case ("/api/expense", false) where request.method == "POST" && host.addExpense != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.addExpense!(request.body)
             return .json(status, body)
 
         case (_, true) where host.libraryThumb != nil && Self.libraryPath(path)?.action == "thumb":
@@ -2882,6 +2908,9 @@ extension Shop {
         }
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
+        host.addExpense = { [weak self] body in
+            await self?.phoneAddExpense(body) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
         host.failed = { [weak self] said in
             guard let self else { return }

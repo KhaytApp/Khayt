@@ -521,8 +521,11 @@ route is in the scope model; `/api/waste` is in no scope and takes the PIN only.
 
 Where the two differ: a write the Mac cannot put on disk is **500** (the desktop says
 400), and a body that is not JSON is **400** `{"error":"Invalid JSON"}`. `/api/machines`
-answers GET only on the Mac. `POST /api/expense` and `POST /api/quote` are still
-desktop-only.
+answers GET only on the Mac. `POST /api/quote` is served by both, by one rule
+(`lib/lan-rest.js quotePart`). `POST /api/expense` is served by both too; on the Mac it
+takes a **signed, enrolled phone only** (as a job photo does), files the receipt in
+`receipts/` beside the book and stores that relative path, and answers
+`{"ok":true,"entry":{…}}` or `{"ok":false,"error":"…"}`.
 
 ### `GET /api/orders`
 
