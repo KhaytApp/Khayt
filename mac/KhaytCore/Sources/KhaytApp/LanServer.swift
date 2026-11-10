@@ -3066,6 +3066,8 @@ extension Shop {
             // here: a delete made on the phone is the phone's to make.
             losses = SyncLosses.compute(before: before, after: folded.store, conflicts: folded.conflicts)
                 .filter { $0.kind == .replaced }
+            losses += SyncLosses.staleReplacements(before: before, after: folded.store, payload: guarded,
+                                                   already: Set(losses.map { $0.collection + ":" + $0.recordId }))
             try SyncLosses.keep(losses, at: keepAt)
             root = folded.store
             result = folded

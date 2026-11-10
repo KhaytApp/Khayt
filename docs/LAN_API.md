@@ -450,6 +450,14 @@ what this returns.
 
 A paired client's changes, folded into the shop's book. **Requires owner PIN.**
 
+A delta may carry **`baseRev`**: the `rev` of the copy the client held before its first
+unsent edit to that record (`{"collection":"printLog","record":{…,"rev":9},"baseRev":7}`).
+It is read off the delta and never written to the book. The fold itself is unchanged
+(`KhaytSync.applyDeltas`: higher `rev` wins, a tie goes to the later `updatedAt`). When the
+client's copy replaces one the Mac held at a higher `rev` than `baseRev`, or wins a tie,
+the Mac keeps its own copy beside the book and shows the shop a "changed on another
+device" notice with **Put back**. A delta without `baseRev` is folded as before.
+
 > **Served by the native Mac app only.** `LanServer.Host.fold` is `nil` by
 > default — a build that has not wired it answers `405` and says so, rather than
 > failing as though something broke. The shipping Mac app wires it, so the

@@ -87,4 +87,67 @@ struct LanJobPhotoTests {
         #expect(tooBig.hasPrefix("HTTP/1.1 413"), Comment(rawValue: tooBig))
         #expect(bench.photoCalls.calls == ["J1 1500000"])
     }
+
+    // MARK: - POST /api/expense: the same terms as a photo
+
+    @Test("an expense from the PIN alone, or from nobody, is refused and files nothing")
+    func expensePinIsNotEnough() async throws {
+        let bench = try await LanServerTests.Bench()
+        defer { bench.stop() }
+        let small = Data(#"{"amount":12,"category":"tools"}"#.utf8)
+        let withPin = try await bench.send("POST", "/api/expense", body: small,
+                                           headers: ["x-khayt-pin": LanDeviceKeysTests.pin])
+        #expect(withPin.status == 403 && withPin.text.contains("device-key-required"))
+        let bare = try await bench.send("POST", "/api/expense", body: small)
+        #expect(bare.status == 401)
+        // With a receipt it is over a megabyte: refused from the head, before
+        // a byte of body is read.
+        let port = bench.port, pin = LanDeviceKeysTests.pin
+        let bigPin = await offPool {
+            Alpha58SecurityTests.headOnly(port: port, path: "/api/expense", length: 1_500_000,
+                                          extra: "X-Khayt-Pin: \(pin)\r\n")
+        }
+        #expect(bigPin.hasPrefix("HTTP/1.1 403") && bigPin.contains("device-key-required"), Comment(rawValue: bigPin))
+        let bigBare = await offPool {
+            Alpha58SecurityTests.headOnly(port: port, path: "/api/expense", length: 1_500_000)
+        }
+        #expect(!bigBare.hasPrefix("HTTP/1.1 2"), Comment(rawValue: bigBare))
+        #expect(bench.expenseCalls.calls.isEmpty)
+    }
+
+    @Test("a signed, enrolled phone's expense reaches the book's hook, past a megabyte, and never past the cap")
+    func signedExpense() async throws {
+        let identity = Curve25519.Signing.PrivateKey()
+        let bench = try await LanServerTests.Bench(identity: identity)
+        defer { bench.stop() }
+        let phone = Curve25519.KeyAgreement.PrivateKey()
+        let phonePublic = phone.publicKey.rawRepresentation.base64EncodedString()
+        bench.pairing.open()
+        let reply = try await bench.post("/api/devices", json: #"{"publicKey":"\#(phonePublic)","name":"Bench"}"#,
+                                         headers: ["x-khayt-pin": LanDeviceKeysTests.pin])
+        #expect(reply.status == 200)
+        let body = try #require(try JSONSerialization.jsonObject(with: reply.body) as? [String: String])
+        let id = try #require(body["deviceId"]), serverPublic = try #require(body["publicKey"])
+        let key = try #require(LanDevices.derive(
+            phone, try Curve25519.KeyAgreement.PublicKey(rawRepresentation: LanDeviceKeysTests.d(serverPublic)),
+            deviceId: id))
+        let now = Int(LanServerTests.Bench.start.timeIntervalSince1970)
+        let target = "/api/expense"
+        let payload = Data(count: 1_500_000)
+        let nonce = String(repeating: "ef", count: 16)
+        let c = LanDevices.canonical(method: "POST", target: target, time: String(now), nonce: nonce, body: payload)
+        let headers = LanDeviceKeysTests.signed(id, mac: LanDevices.mac(key: key, canonical: c).base64EncodedString(),
+                                                nonce: nonce, time: now)
+        let ok = try await bench.send("POST", target, body: payload, headers: headers)
+        #expect(ok.status == 201, "\(ok.status) \(ok.text)")
+        #expect(bench.expenseCalls.calls == ["1500000"])
+        let replay = try await bench.send("POST", target, body: payload, headers: headers)
+        #expect(replay.status == 401, "the same signed request again is a replay")
+        let port = bench.port
+        let tooBig = await offPool {
+            Alpha58SecurityTests.headOnly(port: port, path: target, length: ExpenseReceipt.maxBody + 1)
+        }
+        #expect(tooBig.hasPrefix("HTTP/1.1 413"), Comment(rawValue: tooBig))
+        #expect(bench.expenseCalls.calls == ["1500000"])
+    }
 }

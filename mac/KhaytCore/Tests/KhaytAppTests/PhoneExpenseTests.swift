@@ -101,4 +101,28 @@ struct PhoneExpenseTests {
         #expect(o["inspector"] == .string("OP-7"))
         #expect(o["qcStatus"] == .string("pass"))
     }
+
+    @Test("a phone that edited from an older copy says so, and the Mac keeps what it replaced")
+    func staleBase() {
+        let mine: [String: JSONValue] = ["id": .string("J1"), "rev": .number(8), "paidAmount": .number(500)]
+        let theirs: [String: JSONValue] = ["id": .string("J1"), "rev": .number(9), "paidAmount": .number(0)]
+        let before: [String: JSONValue] = ["printLog": .array([.object(mine)])]
+        let after: [String: JSONValue] = ["printLog": .array([.object(theirs)])]
+        func payload(_ base: JSONValue?) -> [String: JSONValue] {
+            var delta: [String: JSONValue] = ["collection": .string("printLog"), "record": .object(theirs)]
+            if let base { delta["baseRev"] = base }
+            return ["deltas": .array([.object(delta)])]
+        }
+        let stale = SyncLosses.staleReplacements(before: before, after: after, payload: payload(.number(7)), already: [])
+        #expect(stale.count == 1)
+        #expect(stale.first?.record == .object(mine), "the copy with the payment on it is the one kept")
+        #expect(SyncLosses.staleReplacements(before: before, after: after, payload: payload(.number(8)), already: []).isEmpty,
+                "based on what is here: an ordinary edit")
+        #expect(SyncLosses.staleReplacements(before: before, after: after, payload: payload(nil), already: []).isEmpty,
+                "an older phone says nothing, and is treated as before")
+        #expect(SyncLosses.staleReplacements(before: before, after: before, payload: payload(.number(7)), already: []).isEmpty,
+                "skipped by the rule: nothing was replaced")
+        #expect(SyncLosses.staleReplacements(before: before, after: after, payload: payload(.number(7)),
+                                             already: ["printLog:J1"]).isEmpty, "not kept twice")
+    }
 }
