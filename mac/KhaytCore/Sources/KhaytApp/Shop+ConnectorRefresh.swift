@@ -78,7 +78,7 @@ extension Shop {
             guard ConnectorsSwitch.isOn(), StoreLock.weOwnIt(build) else { break }
             guard let jobId = Shop.plainString(Self.object(job)["id"]) else { continue }
             let customer = Shop.plainString(Self.object(job)["clientId"]).flatMap { Self.record(in: root, "clients", id: $0) }
-            let outcome = await Self.connectorSend(entry: entry, trigger: .refresh, order: job, customer: customer,
+            let outcome = await Self.connectorSend(entry: entry, trigger: .refresh, order: job, customer: customer, settings: root["settings"],
                                                    secrets: secrets, engine: engine,
                                                    post: connectorPost ?? Self.realConnectorPost(engine),
                                                    now: Date(), delivery: Connectors.newDeliveryId())
