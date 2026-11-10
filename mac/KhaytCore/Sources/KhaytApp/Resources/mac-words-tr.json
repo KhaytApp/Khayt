@@ -1028,7 +1028,7 @@
  "mac.late": "geciken",
  "mac.late_tile": "Geciken",
  "mac.layer_of": "{total} katmandan {layer}.",
- "mac.lead_from_hours": "Günlük saatler ve haftalık günler yukarıdaki Çalışma Saatleri'nden gelir.",
+ "mac.lead_from_hours": "Günlük saatler ve haftalık günler Ayarlar › Mağaza'daki Çalışma Saatleri'nden gelir.",
  "mac.lead_time_last": "Son teslim süresi",
  "mac.leave_group": "Tüm kitaplığa dön",
  "mac.ledger": "Defter",
@@ -3899,5 +3899,11 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "Hesap",
  "mac.cloud_not_connected": "Bu Mac Khayt Cloud’da oturum açmamış. Dükkânın defterini diğer bilgisayar ve telefonlarıyla eşitlemek için oturum açın.",
- "mac.cloud_settings": "Khayt Cloud Ayarları"
+ "mac.cloud_settings": "Khayt Cloud Ayarları",
+ "mac.nav_general": "Genel",
+ "mac.nav_shop": "Mağaza",
+ "mac.nav_pricing": "Fiyatlandırma ve Vergi",
+ "mac.nav_team": "Ekip ve Erişim",
+ "mac.set_group_workshop": "Atölye",
+ "mac.set_group_online": "Çevrimiçi"
 }
