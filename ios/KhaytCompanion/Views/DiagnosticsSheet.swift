@@ -55,6 +55,8 @@ struct DiagnosticsSheet: View {
         }
         Section(header: Text(L10n.tr("connectors.title"))) {
             row("diag.connectors_count", count(d.connectorCount))
+            row("diag.reply.last", d.recorded.connectorReply.map { when($0.at) + " · " + $0.summary }
+                ?? L10n.tr("diag.never"))
             ForEach([Connector.Status.active, .paused, .off, .notReviewed, .invalid], id: \.self) { status in
                 if let n = d.byStatus[status], n > 0 {
                     row(ConnectorRules.statusName(status), count(n), key: false)

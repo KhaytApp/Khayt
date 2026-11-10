@@ -1187,6 +1187,10 @@
 "connectors.settings.missing" = "Mac または PC で %@ を設定するまで、ボタンからは送信されません。";
 "connectors.error.setting" = "先に Mac または PC でこのコネクタの「%@」を設定してください。何も送信されていません。";
 "connectors.reply.not_saved" = "返信をこのiPhoneに保存できませんでした。手動でフィールドにコピーしてください。";
+"connectors.reply.refused_said" = "%1$@ は受け付けませんでした：「%2$@」何も記録されていません。";
+"connectors.reply.refused" = "%@ は受け付けませんでした。何も記録されていません。";
+"connectors.reply.unconfirmed" = "%1$@ から返信がありましたが、次が含まれていませんでした：%2$@。何も記録されていません。再送する前に %1$@ を確認してください。";
+"connectors.error.no_customer" = "このジョブには顧客がいません。%@ には顧客の名前・電話・住所が必要です。先に顧客をジョブに紐付けてください。何も送信されていません。";
 "connectors.field.clear" = "消去";
 "connectors.field.footer" = "このiPhoneに保存され、ほかの変更と一緒にMacに送られます。Macでは%@がオンのあいだだけ保持されます。";
 "connectors.field.edit" = "編集";
@@ -1231,6 +1235,9 @@
 "diag.settings" = "ブック内の設定";
 "diag.plugin_entries" = "設定内のコネクタ項目";
 "diag.connectors_count" = "読み込んだコネクタ";
+"diag.reply.last" = "最後のコネクタ返信";
+"diag.reply.no_answer" = "応答なし";
+"diag.reply.no_keys" = "JSON本文なし";
 "diag.section.sources" = "ブックの取得元";
 "diag.last_source" = "最新";
 "diag.source.mac_store" = "Mac・ブック全体";
