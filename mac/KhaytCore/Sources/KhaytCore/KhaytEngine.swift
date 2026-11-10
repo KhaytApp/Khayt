@@ -9065,6 +9065,30 @@ public actor KhaytEngine {
             as: CsvPlan.self)
     }
 
+    /// Why this job's customer can no longer be changed — `zatca`, `voided`,
+    /// `credited` or `paid` — or nil when it can (`lib/order-edit.js
+    /// customerLocked`, Turki's rule of Nov 10). A job with no customer can
+    /// be given one whatever this says.
+    public func customerLocked(_ order: JSONValue) throws -> String? {
+        try runtime.call2("KhaytOrderEdit.customerLocked(ARG0)", [order], as: String?.self)
+    }
+
+    /// Give a job another customer (nil takes the customer off) —
+    /// `lib/order-edit.js changeCustomer`. `ok` false leaves the order as it
+    /// was, `reason` saying why; `currencyDiffers` is the editor's to warn
+    /// about, since nothing is converted.
+    public func changeCustomer(order: JSONValue, clientId: String?, clients: [JSONValue],
+                               settings: [String: JSONValue] = [:], now: Date,
+                               editId: String) throws -> CustomerChange {
+        try runtime.call2(
+            "(function(){ var o = ARG0;"
+          + " var r = KhaytOrderEdit.changeCustomer(o, ARG1, { now: ARG2, id: ARG3, clients: ARG4, settings: ARG5 });"
+          + " return { order: o, ok: r.ok, reason: r.reason, currencyDiffers: r.currencyDiffers }; })()",
+            [order, clientId.map(JSONValue.string) ?? .null, .number(now.timeIntervalSince1970 * 1000),
+             .string(editId), .array(clients), .object(settings)],
+            as: CustomerChange.self)
+    }
+
     /// A job's edits, newest first — `lib/order-edit.js editLog`.
     public func editLog(_ order: JSONValue) throws -> [OrderEditEntry] {
         try runtime.call2("KhaytOrderEdit.editLog(ARG0)", [order], as: [OrderEditEntry].self)

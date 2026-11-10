@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "Werkstatt",
  "mac.set_group_online": "Online",
  "mac.nav_invoices": "Rechnungen & Zahlungen",
- "mac.nav_production": "Produktion"
+ "mac.nav_production": "Produktion",
+ "mac.job_customer_none": "Kein Kunde",
+ "mac.job_customer_locked_zatca": "Die Rechnung wurde an ZATCA übermittelt, daher kann der Kunde nicht mehr geändert werden.",
+ "mac.job_customer_locked_voided": "Die Rechnung wurde storniert, daher kann der Kunde nicht mehr geändert werden.",
+ "mac.job_customer_locked_credited": "Zur Rechnung gibt es eine Gutschrift, daher kann der Kunde nicht mehr geändert werden.",
+ "mac.job_customer_locked_paid": "Für diesen Auftrag wurde bereits gezahlt, daher kann der Kunde nicht mehr geändert werden.",
+ "mac.job_customer_unknown": "Dieser Kunde ist nicht mehr im Buch.",
+ "mac.job_customer_currency": "Dieser Kunde wird in einer anderen Währung abgerechnet. Der Auftrag behält Preis und Währung."
 }
