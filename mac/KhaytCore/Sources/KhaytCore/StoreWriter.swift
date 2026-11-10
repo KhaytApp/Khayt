@@ -103,12 +103,7 @@ public enum StoreWriter {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
 
-        let data: Data
-        do { data = try Data(contentsOf: url) }
-        catch { throw Refusal.unreadable(error.localizedDescription) }
-        guard var root = try? JSONValue.decode([String: JSONValue].self, from: data) else {
-            throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
-        }
+        var (_, root) = try readBook(url)
 
         let before = root
         try mutate(&root)
@@ -147,6 +142,40 @@ public enum StoreWriter {
     /// either file I/O the synchronous version already does on this thread or a
     /// hop to the engine actor. Leaving it nonisolated only means handing three
     /// closures across an isolation boundary they have no reason to cross.
+    /// The book as a write starts from: the bytes on disk, and what they hold.
+    ///
+    /// A DAMAGED BOOK WITH A GOOD ROLLBACK CAN BE SAVED OVER. The reader opens
+    /// `.prev` when the book itself will not parse, and said "the next save
+    /// replaces the damaged file" — but both writers read only the book, found
+    /// it was not JSON and refused, so the shop was shown a book one save old
+    /// and could not save anything, indefinitely. A write now starts from the
+    /// same rollback the reader showed. The damaged file is kept beside the
+    /// book (`….damaged-<its fingerprint>`) before anything replaces it; the bytes
+    /// returned are still the damaged file's, so the compare before the swap
+    /// is against what is really on disk.
+    public nonisolated static func readBook(_ url: URL) throws -> (Data, [String: JSONValue]) {
+        let data: Data
+        do { data = try Data(contentsOf: url) }
+        catch { throw Refusal.unreadable(error.localizedDescription) }
+        if let root = try? JSONValue.decode([String: JSONValue].self, from: data) { return (data, root) }
+        let prev = url.appendingPathExtension("prev")
+        guard let older = try? Data(contentsOf: prev),
+              let root = try? JSONValue.decode([String: JSONValue].self, from: older) else {
+            throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
+        }
+        // Named by what it holds, not by the time: a write that retries, and
+        // every write after it until one lands, reads the same damaged file,
+        // and each must find the copy already kept rather than make another.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in data { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        let aside = url.deletingLastPathComponent()
+            .appending(path: url.lastPathComponent + ".damaged-" + String(hash, radix: 16))
+        if !FileManager.default.fileExists(atPath: aside.path) {
+            try? FileManager.default.copyItem(at: url, to: aside)
+        }
+        return (data, root)
+    }
+
     /// TESTS ONLY: run between a change being worked out and the swap, so a
     /// test can move the book under it and make the change run again — the
     /// retry every caller's closure has to survive (an undo list that kept
@@ -190,15 +219,7 @@ public enum StoreWriter {
             // The read and decode, and below the bookkeeping and encode, OFF
             // the main thread: on a 15 MB book each is a second or more, and
             // `mutate` is the only part that has to be here.
-            let (data, decoded) = try await offMain { () throws -> (Data, [String: JSONValue]) in
-                let data: Data
-                do { data = try Data(contentsOf: url) }
-                catch { throw Refusal.unreadable(error.localizedDescription) }
-                guard let root = try? JSONValue.decode([String: JSONValue].self, from: data) else {
-                    throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
-                }
-                return (data, root)
-            }
+            let (data, decoded) = try await offMain { try readBook(url) }
 
             var root = decoded
             try await mutate(&root)

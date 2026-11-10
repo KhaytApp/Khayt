@@ -183,7 +183,11 @@ enum StoreLock {
                             host: host,
                             takenAt: now, heartbeat: now)
         guard let data = try? JSONEncoder().encode(record) else { return nil }
-        try? data.write(to: url)
+        // ATOMIC: a plain write truncates the file and then fills it, and a
+        // write on another thread that reads the lock in between sees an empty
+        // or half-written record, takes the book for unowned-or-unreadable and
+        // refuses its own save.
+        try? data.write(to: url, options: .atomic)
         written[url] = record
         return record
     }
@@ -209,7 +213,7 @@ enum StoreLock {
         var next = record
         next.host = host
         next.heartbeat = Date().timeIntervalSince1970 * 1000
-        if let data = try? JSONEncoder().encode(next) { try? data.write(to: url) }
+        if let data = try? JSONEncoder().encode(next) { try? data.write(to: url, options: .atomic) }
         written[url] = next
         return next
     }
