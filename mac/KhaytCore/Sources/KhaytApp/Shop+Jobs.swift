@@ -27,7 +27,7 @@ extension Shop {
     /// desktop does, and what the first-pass and RMA figures count. Nil (QC
     /// off) sends the same job back to Pending, as it always has.
     func recordQcFailure(_ id: Order.ID, failureType: String, reason: String,
-                         weight: Double, next: QcNext? = nil) async {
+                         weight: Double, inspector: String? = nil, next: QcNext? = nil) async {
         moveProblem = nil
         guard permitted("orders", "edit") else { return }
         moveNotices = []
@@ -60,7 +60,7 @@ extension Shop {
                 spentAttempt = spent
                 let out = try await engine.recordQcFailure(
                     order: target, failureType: failureType, severity: "major",
-                    reason: reason, weight: weight, inspector: nil,
+                    reason: reason, weight: weight, inspector: inspector,
                     inventory: shelfBefore, now: Date(),
                     wasteId: Self.uid("WASTE"),
                     defaultReason: self.words.callIt("ord.qc_fail"),
@@ -2180,7 +2180,7 @@ extension Shop {
     }
 
     func moveJob(_ id: Order.ID, to stage: Stage,
-                 holdReason: String? = nil, qcNotes: String? = nil,
+                 holdReason: String? = nil, qcNotes: String? = nil, qcInspector: String? = nil,
                  actuals: Actuals? = nil) async {
         moveProblem = nil
         moveNotices = []
@@ -2217,7 +2217,7 @@ extension Shop {
                 wasOrder = Self.rows(root, "printLog").first(where: { Self.recordId($0) == id })
                 let out = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
-                    holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
+                    holdReason: holdReason, qcNotes: qcNotes, qcInspector: qcInspector, actuals: actuals)
                 undoSnapshot = out.undo; said = out.notices
                 // A quote accepted into a job takes its models off Print
                 // next, in this same write (`clearPrintNext(acceptedFrom:)`).
@@ -2507,6 +2507,7 @@ extension Shop {
                                   id: Order.ID, stage: Stage,
                                   engine: KhaytEngine, words: Words,
                                   holdReason: String? = nil, qcNotes: String? = nil,
+                                  qcInspector: String? = nil,
                                   actuals: Actuals? = nil)
     async throws -> MoveOutcome {
 
@@ -2601,7 +2602,8 @@ extension Shop {
         let move = try await engine.moveJob(
             order: target, to: stage.rawValue, orders: orders, settings: settings,
             inventory: inventory, consumables: consumables, machines: machines,
-            now: Date(), today: localDay(), holdReason: holdReason, qcNotes: qcNotes)
+            now: Date(), today: localDay(), holdReason: holdReason, qcNotes: qcNotes,
+            qcInspector: qcInspector)
 
         guard move.ok else {
             throw MoveRefused(sentence: words.gateRefusal(move.gate), code: move.gate.block?.code ?? "refused",

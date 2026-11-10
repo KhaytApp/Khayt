@@ -75,4 +75,30 @@ struct PhoneExpenseTests {
         #expect(NewJobSheet.belowMinimum(total: 30, settings: [:]) == nil, "no minimum set, nothing said")
         #expect(NewJobSheet.belowMinimum(total: 0, settings: settings) == nil, "no price yet is not a price under the minimum")
     }
+
+    @Test("Require inspector asks on the Mac, when there is somebody to ask about")
+    func inspectorRule() {
+        let on: [String: JSONValue] = ["qc": .object(["enabled": .bool(true), "requireInspector": .bool(true)])]
+        let optional: [String: JSONValue] = ["qc": .object(["enabled": .bool(true)])]
+        #expect(QcInspector.asks(settings: on, operators: 2))
+        #expect(QcInspector.missing(settings: on, operators: 2, chosen: ""))
+        #expect(!QcInspector.missing(settings: on, operators: 2, chosen: "OP-1"))
+        #expect(!QcInspector.missing(settings: optional, operators: 2, chosen: ""), "asked, not required")
+        #expect(!QcInspector.asks(settings: on, operators: 0), "no operators: nobody to name, and nothing blocks")
+        #expect(!QcInspector.missing(settings: on, operators: 0, chosen: ""))
+        #expect(!QcInspector.asks(settings: ["qc": .object(["enabled": .bool(false), "requireInspector": .bool(true)])], operators: 2))
+    }
+
+    @Test("a QC pass carries its inspector onto the job")
+    func inspectorOnThePass() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("J1"), "status": .string("qc"), "project": .string("Vase"),
+                                      "price": .number(10), "rev": .number(1)])
+        let move = try await engine.moveJob(order: job, to: "completed", orders: [job], settings: [:],
+                                            inventory: [], consumables: [], machines: [],
+                                            now: Date(), today: "2026-11-10", qcNotes: "fine", qcInspector: "OP-7")
+        guard move.ok, case .object(let o)? = move.order else { Issue.record("the move was refused"); return }
+        #expect(o["inspector"] == .string("OP-7"))
+        #expect(o["qcStatus"] == .string("pass"))
+    }
 }
