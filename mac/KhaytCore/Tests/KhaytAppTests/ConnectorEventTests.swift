@@ -59,7 +59,7 @@ struct ConnectorEventTests {
         let (engine, entry) = try await Self.discord()
         let sent = Sent()
         let outcome = await Shop.connectorSend(
-            entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil,
+            entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
             secrets: ["webhookPath": "123/made-up"], engine: engine,
             post: { p in sent.posts.append(p); return (204, Data(#"{"id":"x"}"#.utf8)) },
             now: Date(), delivery: "dlv_11111111-2222-4333-8444-555555555555")
@@ -75,7 +75,7 @@ struct ConnectorEventTests {
     @Test("a failed event says its status, so the webhook ladder can decide; a missing key is refused")
     func failures() async throws {
         let (engine, entry) = try await Self.discord()
-        let down = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil,
+        let down = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
                                             secrets: ["webhookPath": "1/x"], engine: engine,
                                             post: { _ in (503, nil) }, now: Date(), delivery: "dlv_a")
         #expect(down == .failed("HTTP 503", status: 503))
@@ -85,7 +85,7 @@ struct ConnectorEventTests {
         #expect(!gone.retry)
 
         let tried = Sent()
-        let noKey = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil,
+        let noKey = await Shop.connectorSend(entry: entry, trigger: .event("order_shipped"), order: Self.order, customer: nil, settings: nil,
                                              secrets: [:], engine: engine,
                                              post: { p in tried.posts.append(p); return (200, nil) }, now: Date(), delivery: "dlv_b")
         guard case .refused = noKey else { Issue.record("sent without its webhook path: \(noKey)"); return }

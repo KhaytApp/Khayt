@@ -50,7 +50,7 @@ struct ConnectorActionTests {
         let (engine, entry, _) = try await Self.lamha()
         let sent = Sent()
         let outcome = await Shop.connectorSend(
-            entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
+            entry: entry, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
             secrets: ["apiToken": "test-token-not-real"], engine: engine,
             post: { post in
                 sent.posts.append(post)
@@ -75,7 +75,7 @@ struct ConnectorActionTests {
         let sent = Sent()
         let post: Shop.ConnectorPost = { p in sent.posts.append(p); return (200, nil) }
 
-        let noSetting = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
+        let noSetting = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
                                                  secrets: ["apiToken": "t"], engine: engine, post: post, now: Date())
         guard case .refused(let why) = noSetting else { Issue.record("sent without a setting: \(noSetting)"); return }
         let text = Shop.refusalText(entry: entry, why: why, words: words)
@@ -83,7 +83,7 @@ struct ConnectorActionTests {
         #expect(!text.contains("senderPhone"), Comment(rawValue: text))
 
         let (engine2, full, _) = try await Self.lamha()
-        let noKey = await Shop.connectorSend(entry: full, actionId: "record", order: Self.order, customer: Self.customer,
+        let noKey = await Shop.connectorSend(entry: full, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
                                              secrets: [:], engine: engine2, post: post, now: Date())
         guard case .refused(let keyWhy) = noKey else { Issue.record("sent without its token: \(noKey)"); return }
         let keyText = Shop.refusalText(entry: full, why: keyWhy, words: words)
@@ -94,11 +94,11 @@ struct ConnectorActionTests {
     @Test("a refused answer, or one that is not JSON, fills nothing")
     func failures() async throws {
         let (engine, entry, _) = try await Self.lamha()
-        let bad = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
+        let bad = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
                                            secrets: ["apiToken": "t"], engine: engine,
                                            post: { _ in (401, Data(#"{"order_id":"X"}"#.utf8)) }, now: Date())
         #expect(bad == .failed("HTTP 401", status: 401))
-        let html = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer,
+        let html = await Shop.connectorSend(entry: entry, actionId: "record", order: Self.order, customer: Self.customer, settings: nil,
                                             secrets: ["apiToken": "t"], engine: engine,
                                             post: { _ in (200, Data("<html>ok</html>".utf8)) }, now: Date())
         #expect(html == .sent(.object([:])))

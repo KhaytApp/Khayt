@@ -134,7 +134,7 @@ extension Shop {
         var secrets: [String: String] = [:]
         for n in names { if let v = await connectorSecrets.value(pluginId: button.entryId, name: n), !v.isEmpty { secrets[n] = v } }
 
-        let outcome = await Self.connectorSend(entry: entry, actionId: button.actionId, order: order, customer: customer,
+        let outcome = await Self.connectorSend(entry: entry, actionId: button.actionId, order: order, customer: customer, settings: root["settings"],
                                                secrets: secrets, engine: engine, post: connectorPost ?? Self.realConnectorPost(engine),
                                                now: Date())
         switch outcome {
@@ -253,9 +253,11 @@ extension Shop {
 
     /// Build, send and read one press. The entry must already be live.
     nonisolated static func connectorSend(entry: JSONValue, actionId: String, order: JSONValue?, customer: JSONValue?,
+                                          settings: JSONValue?,
                                           secrets: [String: String], engine: KhaytEngine, post: ConnectorPost,
                                           now: Date) async -> ConnectorOutcome {
-        await connectorSend(entry: entry, trigger: .action(actionId), order: order, customer: customer, secrets: secrets,
+        await connectorSend(entry: entry, trigger: .action(actionId), order: order, customer: customer, settings: settings,
+                            secrets: secrets,
                             engine: engine, post: post, now: now, delivery: Connectors.newDeliveryId())
     }
 
@@ -264,6 +266,7 @@ extension Shop {
     /// where the manifest gave that trigger a `response` (v1.1: events and
     /// refresh too, onto the job), and only with fields.write granted.
     nonisolated static func connectorSend(entry: JSONValue, trigger: ConnectorTrigger, order: JSONValue?, customer: JSONValue?,
+                                          settings: JSONValue?,
                                           secrets: [String: String], engine: KhaytEngine, post: ConnectorPost,
                                           now: Date, delivery: String) async -> ConnectorOutcome {
         let e = object(entry)
@@ -274,6 +277,12 @@ extension Shop {
         ]
         if let order { ctx["order"] = order }
         if let customer { ctx["customer"] = customer }
+        // The book's settings, so an amount due is worked out in the shop's
+        // tax mode and currency (lib payloadFor refuses order.amountDue* without
+        // them), and this attempt's clock for {now…epochMs}. Both per attempt:
+        // a retry is built again, with the time it is sent.
+        if case .object? = settings { ctx["settings"] = settings }
+        ctx["nowMs"] = .number((now.timeIntervalSince1970 * 1000).rounded())
         guard let payload = try? await engine.pluginPayload(manifest, trigger: trigger.json,
                                                            context: .object(ctx)) else {
             return .refused("payload")
@@ -444,7 +453,7 @@ extension Shop {
         for n in Self.connectorSecretsDeclared(Self.object(entry)["manifest"] ?? .null).map(\.name) {
             if let v = await connectorSecrets.value(pluginId: item.id, name: n), !v.isEmpty { secrets[n] = v }
         }
-        let outcome = await Self.connectorSend(entry: entry, trigger: .event(item.event), order: order, customer: customer,
+        let outcome = await Self.connectorSend(entry: entry, trigger: .event(item.event), order: order, customer: customer, settings: root["settings"],
                                                secrets: secrets, engine: engine,
                                                post: connectorPost ?? Self.realConnectorPost(engine),
                                                now: Date(), delivery: item.delivery)
