@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "受け取り時間",
  "mac.pickup_map": "地図リンク",
  "mac.pickup_hint": "注文が配送業者に渡っていない間、顧客の注文ページに住所と一緒に表示されます。両方を空にすると受け取りカードは表示されません。",
- "mac.paylink_title": "お支払いリンク",
+ "mac.paylink_title": "顧客ページの支払いボタン",
  "mac.paylink_url": "リンク",
  "mac.paylink_label": "ラベル(任意)",
  "mac.paylink_role": "お支払いリンクを変更できるのは、ショップのオーナーまたはマネージャーのみです。",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "価格と税",
  "mac.nav_team": "チームとアクセス",
  "mac.set_group_workshop": "工房",
- "mac.set_group_online": "オンライン"
+ "mac.set_group_online": "オンライン",
+ "mac.nav_invoices": "請求書と支払い",
+ "mac.nav_production": "生産"
 }

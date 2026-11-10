@@ -125,10 +125,10 @@ struct OnlinePane: View {
                 CloudLibrarySettings(shop: shop)
                 // The Khayt Cloud plan is in Settings › Khayt Cloud (`CloudPane`),
                 // beside the sign-in it needs.
-                PayLinkSettings(shop: shop)
+                // The payment link and pay later are in Settings › Invoices &
+                // Payments, with the rest of how the shop is paid.
                 PortalCrossShopSetting(shop: shop)
                 ShopSlugSettings(shop: shop)
-                BnplSettings(shop: shop)
                 // The weekly cloud digest is chosen with the other email
                 // summary now, in Settings › Integrations (EmailSummarySettings).
                 // The cloud team and its devices are in Settings › Team & Access.

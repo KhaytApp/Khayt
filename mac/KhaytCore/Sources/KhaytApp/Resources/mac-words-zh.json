@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "自取时间",
  "mac.pickup_map": "地图链接",
  "mac.pickup_hint": "在订单未交给快递期间，与您的地址一起显示在客户的订单页面上。两项都留空则不显示自取卡片。",
- "mac.paylink_title": "付款链接",
+ "mac.paylink_title": "客户页面上的付款按钮",
  "mac.paylink_url": "链接",
  "mac.paylink_label": "标签(可选)",
  "mac.paylink_role": "只有店铺所有者或经理可以更改付款链接。",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "定价与税务",
  "mac.nav_team": "团队与权限",
  "mac.set_group_workshop": "工坊",
- "mac.set_group_online": "在线"
+ "mac.set_group_online": "在线",
+ "mac.nav_invoices": "发票与付款",
+ "mac.nav_production": "生产"
 }

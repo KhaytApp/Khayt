@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "Horaires de retrait",
  "mac.pickup_map": "Lien de carte",
  "mac.pickup_hint": "Affiché avec votre adresse sur la page de commande du client tant que la commande n’est pas confiée à un transporteur. Laissez les deux vides pour ne pas afficher de carte de retrait.",
- "mac.paylink_title": "Lien de paiement",
+ "mac.paylink_title": "Bouton de paiement sur les pages clients",
  "mac.paylink_url": "Lien",
  "mac.paylink_label": "Libellé (facultatif)",
  "mac.paylink_role": "Seul le propriétaire ou un gérant de l’atelier peut modifier le lien de paiement.",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "Prix et taxes",
  "mac.nav_team": "Équipe et accès",
  "mac.set_group_workshop": "Atelier",
- "mac.set_group_online": "En ligne"
+ "mac.set_group_online": "En ligne",
+ "mac.nav_invoices": "Factures et paiements",
+ "mac.nav_production": "Production"
 }

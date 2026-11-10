@@ -1829,7 +1829,7 @@ final class Words {
         "mac.pickup_map": ["en": "Map link", "ar": "رابط الخريطة"],
         "mac.pickup_hint": ["en": "Shown with your address on the customer's order page while the order is not with a courier. Leave both empty to show no pickup card.",
                             "ar": "تظهر مع عنوانك في صفحة طلب العميل ما دام الطلب ليس مع شركة شحن. اتركهما فارغين لإخفاء بطاقة الاستلام."],
-        "mac.paylink_title": ["en": "Payment link", "ar": "رابط الدفع"],
+        "mac.paylink_title": ["en": "Pay button on customer pages", "ar": "زر الدفع في صفحات العملاء"],
         "mac.paylink_url": ["en": "Link", "ar": "الرابط"],
         "mac.paylink_label": ["en": "Label (optional)", "ar": "التسمية (اختياري)"],
         "mac.paylink_role": ["en": "Only the shop’s owner or a manager can change the payment link.", "ar": "لا يغيّر رابط الدفع إلا مالك المطبعة أو المدير."],
@@ -4587,6 +4587,8 @@ final class Words {
         // reachable only from the Book menu and a right-click on the sidebar.
         "mac.nav_cloud":           ["en": "Khayt Cloud", "ar": "سحابة خيط"],
         // Settings stage 2 (Nov 2026): the panes and the sidebar's groups.
+        "mac.nav_invoices": ["en": "Invoices & Payments", "ar": "الفواتير والمدفوعات"],
+        "mac.nav_production": ["en": "Production", "ar": "الإنتاج"],
         "mac.nav_general": ["en": "General", "ar": "عام"],
         "mac.nav_shop": ["en": "Shop", "ar": "المتجر"],
         "mac.nav_pricing": ["en": "Pricing & Tax", "ar": "الأسعار والضريبة"],
