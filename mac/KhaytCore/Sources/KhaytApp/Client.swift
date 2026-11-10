@@ -93,11 +93,18 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// NOT checked against the catalogue — a code another app stored, that
     /// this one does not list, must come back out exactly as it went in.
     let currency: String
+    /// Where this customer receives things — the desktop's address book,
+    /// `addresses: [{ id, label, address }]`, the first being the default.
+    /// What a courier connector sends as `customer.address`
+    /// (`lib/plugin-payload.js`). Each row is kept whole (`ClientAddress.raw`),
+    /// so a field the other app writes on a row survives a Mac edit. The
+    /// legacy single `address` field is not this and is never touched here.
+    let addresses: [ClientAddress]
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
         case priceList, recurring, commLog, source, marketingOptOut, messageLang, whatsappOptIn
-        case whatsappMarketingOptIn, paymentTermsDays, creditLimit, currency
+        case whatsappMarketingOptIn, paymentTermsDays, creditLimit, currency, addresses
     }
 
     /// A stored credit limit as a usable figure: a finite amount above zero,
@@ -154,6 +161,11 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         priceList = (agreements ?? []).compactMap {
             if case .object(let o) = $0 { return PriceAgreement(raw: o) } else { return nil }
         }
+        // The same leniency: a row that is not an object is not an address.
+        let book = (try? c.decodeIfPresent([JSONValue].self, forKey: .addresses)) ?? nil
+        addresses = (book ?? []).compactMap {
+            if case .object(let o) = $0 { return ClientAddress(raw: o) } else { return nil }
+        }
         if case .object(let o)? = (try? c.decodeIfPresent(JSONValue.self, forKey: .recurring)) ?? nil {
             recurring = Recurring(raw: o)
         } else {
@@ -194,7 +206,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "",
          whatsappOptIn: [String: JSONValue]? = nil,
          whatsappMarketingOptIn: [String: JSONValue]? = nil,
-         paymentTermsDays: Int = 0, creditLimit: Double = 0, currency: String = "") {
+         paymentTermsDays: Int = 0, creditLimit: Double = 0, currency: String = "",
+         addresses: [ClientAddress] = []) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
@@ -207,6 +220,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         self.paymentTermsDays = max(0, min(PaymentTerms.maxDays, paymentTermsDays))
         self.creditLimit = creditLimit.isFinite ? max(0, creditLimit) : 0
         self.currency = currency
+        self.addresses = addresses
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -255,6 +269,10 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             // it writes what it read, and `keepUntouched` then keeps the
             // stored value byte for byte.
             "currency": .string(currency),
+            // Always written, the empty list included, so taking the last
+            // address off can be saved; an untouched book keeps its own
+            // spelling, or no key at all, through `RoundTrip.keepUntouched`.
+            "addresses": .array(addresses.map { .object($0.raw) }),
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -298,7 +316,20 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             messageLang: key == \Client.messageLang ? value : messageLang,
             whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency,
+               addresses: addresses)
+    }
+
+    /// The same customer with a different address book.
+    func replacing(addresses list: [ClientAddress]) -> Client {
+        Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+               cr: cr, vat: vat, notes: notes, source: source,
+               defaultDiscount: defaultDiscount, createdAt: createdAt,
+               priceList: priceList, recurring: recurring, commLog: commLog,
+               marketingOptOut: marketingOptOut, messageLang: messageLang,
+               whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency,
+               addresses: list)
     }
 
     /// The same customer on different payment terms, in whole days.
@@ -309,7 +340,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: days, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: days, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 
     /// The same customer with a different credit limit (0 for none).
@@ -320,7 +351,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: amount, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: amount, currency: currency, addresses: addresses)
     }
 
     /// The same customer invoiced in another currency ("" for the shop's own).
@@ -331,7 +362,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: code)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: code, addresses: addresses)
     }
 
     /// The same customer, marketed to or not.
@@ -342,7 +373,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                priceList: priceList, recurring: recurring, commLog: commLog,
                marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 
     /// The same customer, agreeing to WhatsApp updates or not. `at` and `how`
@@ -355,7 +386,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
                       whatsappOptIn: next, whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 
     /// The same customer, agreeing to offers on WhatsApp or not — kept the
@@ -368,7 +399,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
                       whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: next,
-                      paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+                      paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 
     /// When they agreed to WhatsApp updates, and how — nil when they have not.
@@ -408,7 +439,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 
     /// The same customer with a different standing order.
@@ -420,7 +451,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                marketingOptOut: marketingOptOut, messageLang: messageLang,
                whatsappOptIn: whatsappOptIn,
                whatsappMarketingOptIn: whatsappMarketingOptIn,
-               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency)
+               paymentTermsDays: paymentTermsDays, creditLimit: creditLimit, currency: currency, addresses: addresses)
     }
 }
 
@@ -612,4 +643,39 @@ struct CommEntry: Identifiable, Hashable, Sendable {
     }
     /// Meta's reason, when it gave up on one.
     var deliveryProblem: String? { deliveryKey == "mac.wa_status_failed" ? str(raw["errorTitle"]) : nil }
+}
+
+
+/// One row of a customer's address book, as the desktop writes it:
+/// `{ id, label, address }`. Kept whole, like `PriceAgreement`.
+struct ClientAddress: Identifiable, Hashable, Sendable {
+    /// The row as written, every field of it.
+    var raw: [String: JSONValue]
+    /// For the sheet's list: the row's own id when it has one, else a fresh one.
+    let id: String
+
+    init(raw: [String: JSONValue]) {
+        self.raw = raw
+        if case .string(let s)? = raw["id"], !s.isEmpty { id = s } else { id = UUID().uuidString }
+    }
+    /// A new row, with an id the way the desktop makes one (`uid('ADDR')`).
+    init(label: String = "", address: String = "") {
+        let id = Shop.uid("ADDR")
+        raw = ["id": .string(id), "label": .string(label), "address": .string(address)]
+        self.id = id
+    }
+
+    var label: String {
+        get { if case .string(let s)? = raw["label"] { return s }; return "" }
+        set { raw["label"] = .string(newValue) }
+    }
+    var address: String {
+        get { if case .string(let s)? = raw["address"] { return s }; return "" }
+        set { raw["address"] = .string(newValue) }
+    }
+    /// Nothing typed in either — what the desktop drops on save.
+    var isBlank: Bool {
+        label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
