@@ -1187,9 +1187,10 @@
 "connectors.settings.missing" = "Ses boutons n’enverront rien tant que %@ n’est pas défini sur votre Mac ou PC.";
 "connectors.error.setting" = "Définissez d’abord « %@ » pour ce connecteur sur votre Mac ou PC. Rien n’a été envoyé.";
 "connectors.reply.not_saved" = "La réponse n’a pas pu être enregistrée sur cet iPhone. Recopiez-la dans le champ.";
-"connectors.reply.refused_said" = "%1$@ ne l’a pas accepté : « %2$@ » Rien n’a été enregistré.";
-"connectors.reply.refused" = "%@ ne l’a pas accepté. Rien n’a été enregistré.";
-"connectors.reply.unconfirmed" = "%1$@ a répondu, mais la réponse ne contenait pas : %2$@. Rien n’a été enregistré. Vérifiez %1$@ avant de renvoyer.";
+"plg.err_declined" = "%1$@ a répondu : %2$@";
+"plg.err_declined_nomsg" = "%1$@ a refusé la demande sans en donner la raison.";
+"plg.sent_unconfirmed" = "%1$@ l'a accepté mais n'a renvoyé aucun(e) %2$@. Vérifiez dans %1$@ avant de renvoyer.";
+"connectors.reply.unchecked" = "%1$@ a répondu, mais cet iPhone n’a pas pu vérifier la réponse. Vérifiez dans %1$@ avant de renvoyer.";
 "connectors.error.no_customer" = "Ce travail n’a pas de client, et %@ a besoin du nom, du téléphone et de l’adresse du client. Liez d’abord un client au travail. Rien n’a été envoyé.";
 "connectors.field.clear" = "Effacer";
 "connectors.field.footer" = "Enregistré sur cet iPhone et envoyé à votre Mac avec vos autres modifications. Votre Mac ne le garde que si %@ y est activé.";

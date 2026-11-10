@@ -1187,9 +1187,10 @@
 "connectors.settings.missing" = "在 Mac 或 PC 上设置 %@ 之前，它的按钮不会发送任何内容。";
 "connectors.error.setting" = "请先在 Mac 或 PC 上为此连接器设置“%@”。未发送任何内容。";
 "connectors.reply.not_saved" = "无法在此 iPhone 上保存回复。请手动复制到该字段。";
-"connectors.reply.refused_said" = "%1$@ 未接受：“%2$@” 未记录任何内容。";
-"connectors.reply.refused" = "%@ 未接受。未记录任何内容。";
-"connectors.reply.unconfirmed" = "%1$@ 已回复，但回复中没有：%2$@。未记录任何内容。再次发送前请先在 %1$@ 中核对。";
+"plg.err_declined" = "%1$@ 回复：%2$@";
+"plg.err_declined_nomsg" = "%1$@ 拒绝了请求，但未说明原因。";
+"plg.sent_unconfirmed" = "%1$@ 已接受，但没有返回%2$@。再次发送前请先在 %1$@ 中核对。";
+"connectors.reply.unchecked" = "%1$@ 已回复，但此 iPhone 无法核对回复内容。再次发送前请先在 %1$@ 中核对。";
 "connectors.error.no_customer" = "此作业没有客户，而 %@ 需要客户的姓名、电话和地址。请先为作业关联客户。未发送任何内容。";
 "connectors.field.clear" = "清除";
 "connectors.field.footer" = "保存在此 iPhone 上，并随你的其他更改发送到 Mac。只有在 Mac 上启用 %@ 时，Mac 才会保留它。";

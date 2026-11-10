@@ -625,7 +625,7 @@ extension KhaytAPIClient {
         let records = connectorRecords(place)
         // A job with no customer would send the customer's details empty,
         // and the service can only refuse that (ORD-00005B, Nov 10).
-        if records.customer == nil, ConnectorReply.needsCustomer(action: action, manifest: c.manifest) {
+        if records.customer == nil, await ConnectorReply.needsCustomer(action: action, connector: c, engine: engine) {
             return .failed(L10n.format("connectors.error.no_customer", c.name))
         }
         // Only the secrets this tap needs are read from the Keychain; none
@@ -705,7 +705,8 @@ extension KhaytAPIClient {
         // A 2xx is not a yes on its own: `success: false`, or a reply that
         // fills none of the fields it should carry, is not "Sent." Nothing
         // is written for it.
-        if let why = ConnectorReply.judge(reply: reply, mapped: mapped, action: action, connector: c).failure(connector: c) {
+        if let why = await ConnectorReply.judge(reply: reply, mapped: mapped, action: action, connector: c,
+                                                engine: engine).failure(connector: c) {
             return .failed(why)
         }
         let lines = Self.replyLines(mapped, connector: c)
