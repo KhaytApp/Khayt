@@ -48,7 +48,13 @@ jobs:
           # - lib/lan-server.js and renderer/analytics.js: the fixture reads the
           #   desktop's responses and STATUSES from these (`shipped` once went in
           #   with no case on the phone).
-          pattern='^(ios/|mac/KhaytCore/|lib/lan-server\.js$|renderer/analytics\.js$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
+          # - lib/ and plugins/: the unit tests also read lib/*.js and
+          #   plugins/samples/*.json straight from the checkout (parity checks,
+          #   SENDABLE_FIELDS), not only through the synced copies.
+          # - renderer/invoice.css (the phone's copy must not drift) and
+          #   docs/lan-device-keys.vectors.json (shared signing vectors).
+          #   RepoPathsInTheFilterTests fails if a test reads a path this misses.
+          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|docs/lan-device-keys\.vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
           if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 
@@ -88,7 +94,9 @@ jobs:
       # says the package, and it is the package that changed.
       - name: KhaytCore still builds for the phone
         working-directory: mac/KhaytCore
+        # pipefail: without it the step's status is `tail`'s, always 0.
         run: |
+          set -o pipefail
           xcodebuild build \
             -scheme KhaytCore \
             -destination 'generic/platform=iOS' \
@@ -98,10 +106,26 @@ jobs:
       # The companion's own unit tests. They need a booted simulator, which the
       # contract check above does not, so a failure here is about the app rather
       # than the desktop contract.
+      #
+      # pipefail: from Jul 28 to Nov 10 2026 this ran `xcodebuild test | tail`
+      # with no pipefail, so the step took tail's status. Main printed
+      # `** TEST FAILED **` (12 failures) and stayed green; #2360 merged with
+      # 15 failures.
+      # Ad-hoc signing, not CODE_SIGNING_ALLOWED=NO: an unsigned simulator app
+      # has no entitlements, so every Keychain read comes back nil and the
+      # Keychain tests (connector keys, the device key, the cloud session)
+      # fail. `-` signs ad hoc with the entitlements and needs no certificate.
       - name: Companion unit tests
         run: |
+          set -o pipefail
           xcodebuild test \
             -scheme KhaytCompanion \
             -project ios/KhaytCompanion.xcodeproj \
             -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
-            CODE_SIGNING_ALLOWED=NO | tail -40
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
+            | tee "$RUNNER_TEMP/companion-tests.log" | tail -60
+
+      # The assertion lines are spread through the log, above tail's 60.
+      - name: Which assertions failed
+        if: failure()
+        run: grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test' "$RUNNER_TEMP/companion-tests.log" | head -200 || true
