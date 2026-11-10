@@ -226,6 +226,8 @@ jobs:
 
       - name: E2E smoke (the update gate holds until accepted)
         run: xvfb-run -a npm run test:e2e:consent
+      - name: E2E job customer (Edit Order picker, option C)
+        run: xvfb-run -a npm run test:e2e:jobcustomer
 
       - name: E2E smoke (already have this model)
         run: xvfb-run -a npm run test:e2e:dedupe
