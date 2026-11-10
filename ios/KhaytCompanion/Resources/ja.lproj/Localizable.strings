@@ -1187,9 +1187,10 @@
 "connectors.settings.missing" = "Mac または PC で %@ を設定するまで、ボタンからは送信されません。";
 "connectors.error.setting" = "先に Mac または PC でこのコネクタの「%@」を設定してください。何も送信されていません。";
 "connectors.reply.not_saved" = "返信をこのiPhoneに保存できませんでした。手動でフィールドにコピーしてください。";
-"connectors.reply.refused_said" = "%1$@ は受け付けませんでした：「%2$@」何も記録されていません。";
-"connectors.reply.refused" = "%@ は受け付けませんでした。何も記録されていません。";
-"connectors.reply.unconfirmed" = "%1$@ から返信がありましたが、次が含まれていませんでした：%2$@。何も記録されていません。再送する前に %1$@ を確認してください。";
+"plg.err_declined" = "%1$@の応答: %2$@";
+"plg.err_declined_nomsg" = "%1$@は理由を示さずにリクエストを拒否しました。";
+"plg.sent_unconfirmed" = "%1$@は受け付けましたが、%2$@が返されませんでした。再送信する前に%1$@を確認してください。";
+"connectors.reply.unchecked" = "%1$@から応答がありましたが、このiPhoneでは応答を確認できませんでした。再送信する前に%1$@を確認してください。";
 "connectors.error.no_customer" = "このジョブには顧客がいません。%@ には顧客の名前・電話・住所が必要です。先に顧客をジョブに紐付けてください。何も送信されていません。";
 "connectors.field.clear" = "消去";
 "connectors.field.footer" = "このiPhoneに保存され、ほかの変更と一緒にMacに送られます。Macでは%@がオンのあいだだけ保持されます。";
