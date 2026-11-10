@@ -425,7 +425,7 @@ struct CustomerSheet: View {
     private var addressBook: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("ce.address_book")).font(.subheadline.weight(.semibold))
-            ForEach($addresses) { $row in
+            ForEach($addresses.byID) { $row in
                 HStack(spacing: 8) {
                     TextField(shop.words.callIt("ce.addr_label"), text: $row.label)
                         .textFieldStyle(.roundedBorder).frame(width: 150)
