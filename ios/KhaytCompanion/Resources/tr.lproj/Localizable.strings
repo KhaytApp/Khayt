@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "Bu telefonun fotoğraf ekleyebilmesi için Mac ile yeniden eşleşmesi gerekiyor.";
 "printphotos.why.not_found" = "Bu iş artık Mac’te yok.";
 "printphotos.why.old_mac" = "Telefondan fotoğraf eklemek için Mac’teki Khayt’ı güncelleyin.";
+"expense.needs_mac" = "Bu Mac, telefondan fiş fotoğraflı bir gideri henüz alamıyor. Hiçbir şey kaydedilmedi; gideriniz hâlâ burada.";
+"quote.needs_mac" = "Bu Mac, telefon için henüz teklif hesaplayamıyor. Hiçbir şey gönderilmedi. Bu telefondaki hesap makinesi onsuz da çalışır.";
 "printphotos.why.read_only" = "Atölye şu anda Mac’te salt okunur, bu yüzden fotoğraf alamıyor.";
 "printphotos.why.too_large" = "Bu fotoğraf Mac için çok büyük. Daha küçük bir tane deneyin.";
 "printphotos.why.not_image" = "Mac bu görüntüyü okuyamıyor. JPEG veya PNG deneyin.";
