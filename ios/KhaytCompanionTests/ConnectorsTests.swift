@@ -142,7 +142,7 @@ final class ConnectorsTests: XCTestCase {
         }
         XCTAssertEqual(shipper["name"], .string("Khayt sample studio"))
         XCTAssertEqual(shipper["City"], .string("Riyadh"))
-        XCTAssertEqual(sent["carrier_id"], .string("1"))
+        XCTAssertEqual(sent["carrier_id"], .string("7"))
         XCTAssertEqual(sent["create_shippment"], .bool(false))
         XCTAssertEqual(to["City"], .string("Riyadh"))
     }
