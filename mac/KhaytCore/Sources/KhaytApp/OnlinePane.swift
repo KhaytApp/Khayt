@@ -131,7 +131,7 @@ struct OnlinePane: View {
                 BnplSettings(shop: shop)
                 // The weekly cloud digest is chosen with the other email
                 // summary now, in Settings › Integrations (EmailSummarySettings).
-                TeamSettings(shop: shop)
+                // The cloud team and its devices are in Settings › Team & Access.
                 Section(shop.words.callIt("mac.online_title")) {
                     Text(shop.words.callIt("mac.online_desc"))
                         .font(.callout).foregroundStyle(.secondary)
