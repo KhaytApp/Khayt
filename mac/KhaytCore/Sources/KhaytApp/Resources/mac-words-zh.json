@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "工坊",
  "mac.set_group_online": "在线",
  "mac.nav_invoices": "发票与付款",
- "mac.nav_production": "生产"
+ "mac.nav_production": "生产",
+ "mac.job_customer_none": "无客户",
+ "mac.job_customer_locked_zatca": "发票已提交至 ZATCA，无法再更改客户。",
+ "mac.job_customer_locked_voided": "发票已作废，无法再更改客户。",
+ "mac.job_customer_locked_credited": "发票已开具贷项通知单，无法再更改客户。",
+ "mac.job_customer_locked_paid": "此工作已收款，无法再更改客户。",
+ "mac.job_customer_unknown": "该客户已不在账簿中。",
+ "mac.job_customer_currency": "该客户以其他货币开票。此工作保留原价格和货币。"
 }
