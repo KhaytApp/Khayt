@@ -346,3 +346,39 @@ test("the fixed version brings the switch back only if the shop had it on — it
   // Not revoked: the switch is just the switch.
   assert.equal(U.setSwitch(book(), LAMHA.id, false).settings.plugins[0].enabled, false);
 });
+
+// ── A field re-routed to another host is asking for more (review, Nov 10) ──
+test('same fields and same hosts, but a field now goes to the other host: consent, never automatic', () => {
+  const PM = require('../lib/plugin-manifest.js');
+  const base = (toA, toB, authHost) => ({
+    khayt: { manifest: 1 }, id: 'app.test.route', name: { en: 'Route' }, publisher: 'T', version: '1.0.0',
+    domains: ['a.example.com', 'b.example.com'],
+    secrets: [{ name: 'key', label: { en: 'Key' }, kind: 'token' }],
+    actions: [
+      { id: 'one', label: { en: 'One' }, placement: 'order', kind: 'post', url: 'https://a.example.com/x',
+        ...(authHost === 'a' ? { auth: { header: 'X-K', secret: 'key' } } : {}),
+        body: { format: 'json-template', template: toA } },
+      { id: 'two', label: { en: 'Two' }, placement: 'order', kind: 'post', url: 'https://b.example.com/y',
+        ...(authHost === 'b' ? { auth: { header: 'X-K', secret: 'key' } } : {}),
+        body: { format: 'json-template', template: toB } },
+    ],
+  });
+  const v1 = base({ n: '{customer.name}', p: '{customer.phone}' }, { i: '{order.id}' }, 'a');
+  const v2 = base({ i: '{order.id}' }, { n: '{customer.name}', p: '{customer.phone}' }, 'a');
+  const granted = PM.grantFor(v1);
+  assert.deepEqual(PM.diffPermissions(granted, v1).widened, false, 'the version agreed to asks for nothing more');
+  const moved = PM.diffPermissions(granted, v2);
+  assert.deepEqual([moved.fields, moved.domains], [[], []], 'no new field and no new host');
+  assert.equal(moved.widened, true);
+  assert.ok(moved.routes.includes('b.example.com customer.phone'));
+  // The key sent to the other host is the same kind of move.
+  const keyMoved = PM.diffPermissions(granted, base({ n: '{customer.name}', p: '{customer.phone}' }, { i: '{order.id}' }, 'b'));
+  assert.deepEqual(keyMoved.routes, ['b.example.com secret:key']);
+  assert.equal(keyMoved.widened, true);
+  // Sending LESS is never a reason to ask.
+  assert.equal(PM.diffPermissions(granted, base({ n: '{customer.name}' }, { i: '{order.id}' }, 'a')).widened, false);
+  // A grant from before pairs were kept allowed every field to every host it lists: nothing installed is paused.
+  const old = { version: granted.version, fields: granted.fields, domains: granted.domains, scopes: granted.scopes };
+  assert.equal(PM.diffPermissions(old, v2).widened, false);
+  assert.equal(PM.diffPermissions(old, v1).widened, false);
+});
