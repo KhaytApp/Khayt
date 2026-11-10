@@ -8430,6 +8430,23 @@ public actor KhaytEngine {
         try pluginApplyResponse(manifest, trigger: .object(["action": .string(actionId)]), reply: reply, entry: entry)
     }
 
+    /// What a 2xx reply means, in the rule every app shares
+    /// (`lib/plugin-payload.js replyVerdict`): `{ok: true}`, `{ok: false,
+    /// kind: "refused", message}` (the service turned it down), or `{ok: false,
+    /// kind: "unconfirmed", fields}` (a button whose reply filled none of the
+    /// fields it declares). `mapped` is what `pluginApplyResponse` gave.
+    public func pluginReplyVerdict(_ manifest: JSONValue, trigger: JSONValue, reply: JSONValue,
+                                   entry: JSONValue, mapped: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginPayload.replyVerdict(ARG0, ARG1, ARG2, ARG3, ARG4)",
+                          [manifest, trigger, reply, entry, mapped], as: JSONValue.self)
+    }
+
+    /// Whether a trigger sends anything about the job's customer
+    /// (`usesCustomer`): a job without one greys its button out.
+    public func pluginUsesCustomer(_ manifest: JSONValue, trigger: JSONValue) throws -> Bool {
+        try runtime.call2("globalThis.KhaytPluginPayload.usesCustomer(ARG0, ARG1)", [manifest, trigger], as: Bool.self)
+    }
+
     /// The same for any trigger: `{action}`, `{event}` or `{refresh: true}`.
     /// An event's or a refresh's reply fills the JOB's own fields.
     public func pluginApplyResponse(_ manifest: JSONValue, trigger: JSONValue, reply: JSONValue, entry: JSONValue) throws -> JSONValue {
@@ -8492,6 +8509,24 @@ public actor KhaytEngine {
     }
 
     /// `settings.pluginOutbox` without `delivery`.
+    /// An event the service turned down: kept, marked `failed`, never retried
+    /// on its own (`lib/plugin-host.js withFailed`).
+    public func pluginFailed(_ list: JSONValue, item: JSONValue, at: String, message: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withFailed(ARG0, ARG1, ARG2, ARG3)",
+                          [list, item, .string(at), .string(message)], as: JSONValue.self)
+    }
+
+    /// The shop pressed Retry on a failed event: due now (`withRetried`).
+    public func pluginRetried(_ list: JSONValue, delivery: String, nowIso: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginHost.withRetried(ARG0, ARG1, ARG2)",
+                          [list, .string(delivery), .string(nowIso)], as: JSONValue.self)
+    }
+
+    /// The events a service turned down (`failedQueued`).
+    public func pluginFailedQueued(_ list: JSONValue) throws -> [JSONValue] {
+        try runtime.call2("globalThis.KhaytPluginHost.failedQueued(ARG0)", [list], as: [JSONValue].self)
+    }
+
     public func pluginUnqueued(_ list: JSONValue, delivery: String) throws -> JSONValue {
         try runtime.call2("globalThis.KhaytPluginHost.withoutQueued(ARG0, ARG1)", [list, .string(delivery)], as: JSONValue.self)
     }

@@ -264,9 +264,9 @@ enum SampleShop {
 
     static var sampleConnectors: JSONValue {
         let lamha = (try? JSONValue.parse(Data(lamhaManifestJSON.utf8))) ?? .null
-        let granted = (try? JSONValue.parse(Data(#"{"version":"1.1.0","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
+        let granted = (try? JSONValue.parse(Data(#"{"version":"1.1.1","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
         let lamhaEntry: JSONValue = .object([
-            "id": .string(lamhaId), "version": .string("1.1.0"), "enabled": .bool(true),
+            "id": .string(lamhaId), "version": .string("1.1.1"), "enabled": .bool(true),
             "manifest": lamha, "granted": granted,
             "config": .object(["senderName": .string("Khayt sample studio"), "senderPhone": .string("+966511234567"),
                                "senderCity": .string("Riyadh"), "senderAddress": .string("King Fahd Rd, Al Olaya"),
@@ -294,7 +294,7 @@ enum SampleShop {
     "ar": "يسجّل العمل كطلب في حسابك على لمحة لتختار شركة الشحن هناك. لا يحجز شحنة ولا يدفع عنها بنفسه."
   },
   "publisher": "Khayt",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "homepage": "https://khaytapp.com/developers/samples/",
   "domains": [
     "app.lamha.sa"
@@ -526,7 +526,10 @@ enum SampleShop {
       },
       "response": {
         "fields": {
-          "lamhaOrderId": "order_id"
+          "lamhaOrderId": [
+            "order_id",
+            "data.id"
+          ]
         }
       }
     }
@@ -534,7 +537,7 @@ enum SampleShop {
   "scopes": [
     "fields.write"
   ],
-  "signature": "xDouxy4XoY73QjkuhcWs8nZIqd9xOIteT9eYaNfb5PLPd3w1mMuHnMuOABWcASfV5jbNYgKfALvCxVa/UwB5DQ=="
+  "signature": "Yrl+4YztpCg/qMLyn02jTjz2ZjIopnzwq8iYgoCJjo3SR0jdp+mimck45SBVQc7YCX7qScjyzyMnFs6eEn0hAA=="
 }
 
 """#

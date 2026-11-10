@@ -160,7 +160,7 @@ struct VatFiledPeriodTests {
         guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
         #expect(settings["vatFilingFrequency"] == .string("monthly"))
         #expect(settings["vatFiledPeriods"] == .array([.string("2026-Q3")]))
-        let draft = InvoicePane.Draft.read(settings, shop: Shop())
+        let draft = PricingPane.Draft.read(settings, shop: Shop())
         #expect(draft.vatFilingFrequency == "monthly")
         #expect(draft.form()["vatFilingFrequency"] == .string("monthly"))
     }

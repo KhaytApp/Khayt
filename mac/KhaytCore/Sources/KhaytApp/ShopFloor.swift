@@ -1076,6 +1076,25 @@ struct Inventory: View {
         // supplier, to copy or print — the desktop's, from the same rule
         // (`lib/reorder.js shoppingList`). A read, so not gated on writing.
         .screenToolbar {
+            // ADD A SPOOL. Only the navy strip could (`ScreenActions`): in the
+            // default window nothing set `addingSpool`, so a shop on it could
+            // correct a spool but never put a new one on the shelf (Nov 10).
+            ToolbarItem {
+                Button {
+                    shop.addingSpool = true
+                } label: {
+                    Label(shop.words.callIt("mac.new_spool"), systemImage: "plus")
+                }
+                .disabled(!shop.canMoveJobs)
+                .help(shop.canMoveJobs ? shop.words.callIt("mac.new_spool") : shop.lockedReason)
+            }
+            ToolbarItem {
+                Button(shop.words.callIt("mac.spoolman_import") + "…", systemImage: "square.and.arrow.down") {
+                    shop.importingSpoolman = true
+                }
+                .disabled(!shop.canMoveJobs)
+                .help(shop.words.callIt("mac.spoolman_import"))
+            }
             ToolbarItem {
                 Button(shop.words.callIt("shop.title"), systemImage: "cart") {
                     Task { await shop.askForShoppingList() }

@@ -1028,7 +1028,7 @@
  "mac.late": "逾期",
  "mac.late_tile": "逾期",
  "mac.layer_of": "第 {layer} 层，共 {total} 层",
- "mac.lead_from_hours": "每天小时数和每周天数来自上方的工作时间。",
+ "mac.lead_from_hours": "每天小时数和每周天数来自设置 › 店铺中的工作时间。",
  "mac.lead_time_last": "最近交付周期",
  "mac.leave_group": "返回整个模型库",
  "mac.ledger": "流水账",
@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "自取时间",
  "mac.pickup_map": "地图链接",
  "mac.pickup_hint": "在订单未交给快递期间，与您的地址一起显示在客户的订单页面上。两项都留空则不显示自取卡片。",
- "mac.paylink_title": "付款链接",
+ "mac.paylink_title": "客户页面上的付款按钮",
  "mac.paylink_url": "链接",
  "mac.paylink_label": "标签(可选)",
  "mac.paylink_role": "只有店铺所有者或经理可以更改付款链接。",
@@ -3899,5 +3899,13 @@
  "mac.nav_cloud": "Khayt Cloud",
  "mac.cloud_account": "账户",
  "mac.cloud_not_connected": "这台 Mac 尚未登录 Khayt Cloud。登录后即可将店铺账本与其他电脑和手机同步。",
- "mac.cloud_settings": "Khayt Cloud 设置"
+ "mac.cloud_settings": "Khayt Cloud 设置",
+ "mac.nav_general": "通用",
+ "mac.nav_shop": "店铺",
+ "mac.nav_pricing": "定价与税务",
+ "mac.nav_team": "团队与权限",
+ "mac.set_group_workshop": "工坊",
+ "mac.set_group_online": "在线",
+ "mac.nav_invoices": "发票与付款",
+ "mac.nav_production": "生产"
 }

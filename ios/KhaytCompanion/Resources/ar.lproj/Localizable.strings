@@ -384,21 +384,21 @@
 "inventory.remove.body" = "ستُزال %@ من المخزون.";
 
 /* Khayt Cloud */
-"cloud.title" = "Khayt Cloud";
-"cloud.sign_in" = "تسجيل الدخول إلى Khayt Cloud";
-"cloud.sign_out" = "تسجيل الخروج من Khayt Cloud";
+"cloud.title" = "سحابة خيط";
+"cloud.sign_in" = "تسجيل الدخول إلى سحابة خيط";
+"cloud.sign_out" = "تسجيل الخروج من سحابة خيط";
 "cloud.sync_now" = "مزامنة الآن";
 "cloud.shop" = "الورشة";
 "cloud.role" = "الدور";
 "cloud.last_sync" = "آخر مزامنة";
-"cloud.via_cloud" = "%@ عبر Khayt Cloud";
+"cloud.via_cloud" = "%@ عبر سحابة خيط";
 "cloud.via_mac" = "%@ عبر جهاز Mac";
 "cloud.footer.off" = "يُبقي هذا الهاتف متزامناً حين لا يكون جهاز Mac على نفس الشبكة. وتذهب التغييرات مباشرة إلى جهاز Mac متى أجاب.";
-"cloud.footer.on" = "يقرأ الهاتف الورشة من Khayt Cloud، ويرسل التغييرات إلى جهاز Mac حين يجيب، وعبر السحابة حين لا يجيب.";
-"cloud.needs_mac" = "لا تقبل Khayt Cloud التغييرات منفردة الآن. هي محفوظة على هذا الهاتف؛ افتح Khayt على جهاز Mac ليُكمل المزامنة.";
+"cloud.footer.on" = "يقرأ الهاتف الورشة من سحابة خيط، ويرسل التغييرات إلى جهاز Mac حين يجيب، وعبر السحابة حين لا يجيب.";
+"cloud.needs_mac" = "لا تقبل سحابة خيط التغييرات منفردة الآن. هي محفوظة على هذا الهاتف؛ افتح Khayt على جهاز Mac ليُكمل المزامنة.";
 "cloud.signin.email" = "البريد الإلكتروني";
 "cloud.signin.password" = "كلمة المرور";
-"cloud.signin.account_footer" = "حساب الورشة في Khayt Cloud. يحصل هذا الهاتف على دخول خاص به يمكن إنهاؤه وحده.";
+"cloud.signin.account_footer" = "حساب الورشة في سحابة خيط. يحصل هذا الهاتف على دخول خاص به يمكن إنهاؤه وحده.";
 "cloud.signin.passphrase" = "عبارة مرور الورشة";
 "cloud.signin.passphrase_footer" = "عبارة المرور التي تُشفَّر بها نسخة الورشة في السحابة — التي عُيّنت على جهاز Mac عند ربطه أول مرة. تفتح المفتاح على هذا الهاتف ولا تُحفظ.";
 "cloud.signin.advanced" = "متقدم";
@@ -406,8 +406,8 @@
 "cloud.signin.action" = "تسجيل الدخول";
 "cloud.signin.wrong_passphrase" = "عبارة المرور هذه لا تفتح مفتاح الورشة.";
 
-"pair.use_cloud" = "استخدم Khayt Cloud بدلاً من ذلك";
-"pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع Khayt Cloud، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";
+"pair.use_cloud" = "استخدم سحابة خيط بدلاً من ذلك";
+"pair.use_cloud.footer" = "إن كانت الورشة تتزامن مع سحابة خيط، يبدأ الهاتف منها ويُربط بجهاز Mac لاحقاً.";
 
 
 /* Order detail sheet (khayt-orders.jsx) */
@@ -553,12 +553,12 @@
 "machines.left_until" = "متبقٍ %1$@ · ينتهي %2$@";
 "order.detail.print_progress" = "تقدّم الطباعة";
 "order.detail.no_estimate" = "لا تقدير بعد — الآلة لم تُبلّغ عنه.";
-"machines.not_published" = "لم ينشر الماك حالة طابعاته على Khayt Cloud بعد.";
-"machines.via_cloud" = "عبر Khayt Cloud";
+"machines.not_published" = "لم ينشر الماك حالة طابعاته على سحابة خيط بعد.";
+"machines.via_cloud" = "عبر سحابة خيط";
 "machines.reported" = "آخر تقرير من الماك %@.";
-"cloud.signed_out" = "سُجّل خروج هذا الهاتف من Khayt Cloud — من قائمة أجهزة الورشة على الأرجح. سجّل الدخول مجدداً لتستمر المزامنة بعيداً عن الورشة.";
+"cloud.signed_out" = "سُجّل خروج هذا الهاتف من سحابة خيط — من قائمة أجهزة الورشة على الأرجح. سجّل الدخول مجدداً لتستمر المزامنة بعيداً عن الورشة.";
 "cloud.sign_in_again" = "سجّل الدخول مجدداً";
-"cloud.busy" = "Khayt Cloud مشغول. سيحاول الهاتف مجدداً بعد قليل.";
+"cloud.busy" = "سحابة خيط مشغولة. سيحاول الهاتف مجدداً بعد قليل.";
 
 /* Print alerts */
 "settings.notify.print_done" = "انتهاء الطباعة";
@@ -720,7 +720,7 @@
 "photos.title" = "صور في صفحة العميل";
 "photos.none" = "لا صور بعد. أضف صورة القطعة الجاهزة ليراها العميل في صفحة تتبّع طلبه.";
 "photos.note" = "يرى هذه الصور كل من لديه رابط الطلب. تُحذف بيانات الموقع قبل حفظها.";
-"photos.needs_cloud" = "سجّل الدخول إلى Khayt Cloud من الإعدادات لإضافة صور إلى صفحة تتبّع هذا الطلب.";
+"photos.needs_cloud" = "سجّل الدخول إلى سحابة خيط من الإعدادات لإضافة صور إلى صفحة تتبّع هذا الطلب.";
 "photos.one" = "صورة الطلب";
 "photos.remove" = "إزالة الصورة";
 "photos.remove.title" = "إزالة هذه الصورة؟";
@@ -728,12 +728,12 @@
 "photos.err.full" = "لهذا الطلب %lld صور بالفعل. أزل واحدة لإضافة أخرى.";
 "photos.err.too_large" = "الصورة أكبر من أن تُرسل حتى بعد تصغيرها.";
 "photos.err.not_published" = "ليس لهذا الطلب صفحة تتبّع بعد. انشره من الماك أولاً.";
-"photos.err.viewer" = "تسجيل دخولك إلى Khayt Cloud يسمح بالعرض فقط دون التعديل.";
+"photos.err.viewer" = "تسجيل دخولك إلى سحابة خيط يسمح بالعرض فقط دون التعديل.";
 "photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع Khayt استخدامها. اختر JPEG أو PNG.";
-"photos.err.http" = "لم يقبل Khayt Cloud الصورة (خطأ %lld). حاول مرة أخرى.";
+"photos.err.http" = "لم تقبل سحابة خيط الصورة (خطأ %lld). حاول مرة أخرى.";
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
-"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في Khayt على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";
+"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في Khayt على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى سحابة خيط.";
 
 /* The calculator — priced on the phone from the shop's own book. */
 "tab.calculator" = "الحاسبة";
@@ -832,9 +832,9 @@
 "quote.file.unreliable" = "هذا النموذج خارج النطاق الذي يصلح له التقدير. راجع الرقم قبل إرساله.";
 "library.reason.not-configured" = "اضبط التسعير الفوري على الكمبيوتر أولًا: طابعة وخامة للتقدير.";
 "library.sample" = "الورشة التجريبية بلا ماك يقيس النماذج. افتحه في الحاسبة لتسعيره من وزنه ووقته المسجّلين.";
-"library.from_copy" = "أنت خارج الورشة: هذه مكتبتك كما كانت في آخر مزامنة مع Khayt Cloud، والأسعار تُحسب على هذا الهاتف.";
+"library.from_copy" = "أنت خارج الورشة: هذه مكتبتك كما كانت في آخر مزامنة مع سحابة خيط، والأسعار تُحسب على هذا الهاتف.";
 "library.priced_here" = "حُسب على هذا الهاتف بأسعارك. النموذج متعدد الألوان يُحسب على بكرة واحدة، فقد يختلف رقم الماك قليلًا.";
-"library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى Khayt Cloud من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
+"library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى سحابة خيط من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
 
 /* Catalogue */
 "catalogue.title" = "الكتالوج";
@@ -843,7 +843,7 @@
 "catalogue.empty" = "لا منتجات بعد. أضفها من الكتالوج على جهاز الماك.";
 "catalogue.no_match" = "لا يوجد منتج مطابق.";
 "catalogue.partial" = "تُعرض %1$lld من %2$lld منتج. ابحث عن البقية على الماك.";
-"catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع Khayt Cloud أو مع جهاز الماك أولًا.";
+"catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع سحابة خيط أو مع جهاز الماك أولًا.";
 "catalogue.in_stock" = "%lld في المخزون";
 "catalogue.out_of_stock" = "نفد المخزون";
 "catalogue.description" = "الوصف";
@@ -956,7 +956,7 @@
 "printer.stop.confirm" = "إيقاف الطباعة على %@؟";
 "printer.stop.message" = "لا يمكن استئناف الطباعة بعد إيقافها.";
 "printer.sending" = "جارٍ سؤال الماك…";
-"printer.sending.cloud" = "جارٍ سؤال الماك عبر Khayt Cloud…";
+"printer.sending.cloud" = "جارٍ سؤال الماك عبر سحابة خيط…";
 "printer.done.pause" = "أُوقفت مؤقتًا.";
 "printer.done.resume" = "استُؤنفت.";
 "printer.done.stop" = "أُوقفت.";
@@ -969,7 +969,7 @@
 "printer.why.busy" = "الماك مشغول بهذه الطابعة. حاول بعد لحظة.";
 "printer.why.old_mac" = "حدّث Khayt على الماك للتحكم بالطابعات من الهاتف.";
 "printer.why.no_answer" = "لم يُجب الماك. ربما هو في وضع السكون أو غير متصل.";
-"printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى Khayt Cloud.";
+"printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى سحابة خيط.";
 /* Customer page messages */
 "portal.title" = "صفحة العميل";
 "portal.share" = "مشاركة الرابط";
@@ -1105,8 +1105,8 @@
 "pair.phone_name" = "اسم هذا الهاتف";
 "pair.phone_name.foot" = "هكذا يظهر هذا الهاتف في قائمة الهواتف المربوطة على الماك، لتميّز بينها.";
 "cloud.read_only" = "تسجيل دخول للقراءة فقط";
-"cloud.read_only.line" = "هذا الهاتف مسجّل في Khayt Cloud بصفة مشاهد، ولا ماك مربوطًا به: يعرض الورشة لكنه لا يستطيع تعديلها.";
-"cloud.read_only.refused" = "لم يُحفظ: تسجيل دخول هذا الهاتف إلى Khayt Cloud للقراءة فقط. اربطه بالماك، أو سجّل الدخول بحساب يملك صلاحية التعديل.";
+"cloud.read_only.line" = "هذا الهاتف مسجّل في سحابة خيط بصفة مشاهد، ولا ماك مربوطًا به: يعرض الورشة لكنه لا يستطيع تعديلها.";
+"cloud.read_only.refused" = "لم يُحفظ: تسجيل دخول هذا الهاتف إلى سحابة خيط للقراءة فقط. اربطه بالماك، أو سجّل الدخول بحساب يملك صلاحية التعديل.";
 
 /* Shopping list (lib/reorder.js shoppingList; the desktop's and the Mac's words) */
 "shop.title" = "قائمة التسوق";
@@ -1187,6 +1187,11 @@
 "connectors.settings.missing" = "لن ترسل أزراره شيئًا حتى يُضبط %@ على جهاز Mac أو الكمبيوتر.";
 "connectors.error.setting" = "اضبط «%@» لهذه الأداة على جهاز Mac أو الكمبيوتر أولًا. لم يُرسل شيء.";
 "connectors.reply.not_saved" = "تعذّر حفظ الرد على هذا الآيفون. انسخه إلى الحقل يدويًا.";
+"plg.err_declined" = "ردّ %1$@: %2$@";
+"plg.err_declined_nomsg" = "رفض %1$@ الطلب دون ذكر السبب.";
+"plg.sent_unconfirmed" = "قبل %1$@ الطلب لكنه لم يُرجع %2$@. تحقّق في %1$@ قبل الإرسال مرة أخرى.";
+"connectors.reply.unchecked" = "وصل الرد من %1$@، لكن تعذّر على هذا الآيفون التحقق منه. تحقّق في %1$@ قبل الإرسال مرة أخرى.";
+"connectors.error.no_customer" = "لا عميل لهذا الطلب، والإرسال إلى %@ يحتاج اسم العميل وجواله وعنوانه. اربط عميلًا بالطلب أولًا. لم يُرسل شيء.";
 "connectors.field.clear" = "مسح";
 "connectors.field.footer" = "يُحفظ على هذا الآيفون ويُرسل إلى الماك مع تغييراتك الأخرى. يحتفظ به الماك ما دام %@ مفعّلًا عليه.";
 "connectors.field.edit" = "تعديل";
@@ -1231,11 +1236,14 @@
 "diag.settings" = "الإعدادات في الدفتر";
 "diag.plugin_entries" = "إدخالات الموصِّلات في الإعدادات";
 "diag.connectors_count" = "الموصِّلات المقروءة";
+"diag.reply.last" = "آخر رد من رابط";
+"diag.reply.no_answer" = "لا رد";
+"diag.reply.no_keys" = "لا محتوى JSON";
 "diag.section.sources" = "مصدر الدفتر";
 "diag.last_source" = "الأخير";
 "diag.source.mac_store" = "الماك، الدفتر كاملًا";
-"diag.source.cloud_whole" = "Khayt Cloud، الدفتر كاملًا";
-"diag.source.cloud_delta" = "Khayt Cloud، التغييرات";
+"diag.source.cloud_whole" = "سحابة خيط، الدفتر كاملًا";
+"diag.source.cloud_delta" = "سحابة خيط، التغييرات";
 "diag.source.mac_settings" = "الماك، الإعدادات فقط";
 "diag.section.mac" = "الماك";
 "diag.mac_settings" = "آخر قراءة للإعدادات";
@@ -1253,22 +1261,22 @@
 "diag.section.phone" = "هذا الهاتف";
 "diag.paired" = "مقترن";
 "diag.configured" = "عنوان الماك محدّد";
-"diag.cloud" = "مسجّل الدخول إلى Khayt Cloud";
+"diag.cloud" = "مسجّل الدخول إلى سحابة خيط";
 "diag.sample" = "الورشة التجريبية";
 "diag.app" = "التطبيق";
-"diag.cloud_shop" = "ورشة Khayt Cloud (آخر 6)";
-"diag.mac_shop" = "ورشة الماك على Khayt Cloud (آخر 6)";
+"diag.cloud_shop" = "ورشة سحابة خيط (آخر 6)";
+"diag.mac_shop" = "ورشة الماك على سحابة خيط (آخر 6)";
 "diag.none" = "لا شيء";
 "diag.records" = "السجلات: %ld";
 
 /* A cloud pull refused: wrong shop or empty copy. */
-"cloud.wrong_shop.as" = "حساب Khayt Cloud هذا لورشة غير ورشة الماك. سجّل الدخول باسم %@.";
-"cloud.wrong_shop" = "حساب Khayt Cloud هذا لورشة غير ورشة الماك. سجّل الدخول بالحساب الذي يستخدمه الماك.";
-"cloud.empty_shop" = "نسخة هذه الورشة على Khayt Cloud فارغة. احتفظ هاتفك بنسخته.";
+"cloud.wrong_shop.as" = "حساب سحابة خيط هذا لورشة غير ورشة الماك. سجّل الدخول باسم %@.";
+"cloud.wrong_shop" = "حساب سحابة خيط هذا لورشة غير ورشة الماك. سجّل الدخول بالحساب الذي يستخدمه الماك.";
+"cloud.empty_shop" = "نسخة هذه الورشة على سحابة خيط فارغة. احتفظ هاتفك بنسخته.";
 "cloud.adopt.action" = "استخدم هذه الورشة بدلًا منها";
-"cloud.adopt.title" = "استخدام ورشة Khayt Cloud هذه؟";
-"cloud.adopt.message" = "ستحلّ ورشة هذا الحساب على Khayt Cloud محلّ الورشة الموجودة على هذا الهاتف. لا يمكن التراجع عن ذلك على هذا الهاتف.";
+"cloud.adopt.title" = "استخدام ورشة سحابة خيط هذه؟";
+"cloud.adopt.message" = "ستحلّ ورشة هذا الحساب على سحابة خيط محلّ الورشة الموجودة على هذا الهاتف. لا يمكن التراجع عن ذلك على هذا الهاتف.";
 "cloud.adopt.confirm" = "استبدل الورشة على هذا الهاتف";
-"diag.cloud_refused" = "آخر سحب مرفوض من Khayt Cloud";
+"diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";

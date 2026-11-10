@@ -216,23 +216,24 @@ struct ElecRateParityTests {
         return nil
     }
 
-    /// The Business pane's save, exactly: the draft's form against what it opened.
-    func saveBusinessPane(_ root: inout [String: JSONValue], engine: KhaytEngine,
-                          edit: (inout BusinessPane.Draft) -> Void) async throws {
+    /// The Pricing & Tax pane's save, exactly: the draft's form against what it
+    /// opened. The tariff moved there from the old Business pane (stage 2a).
+    func savePricingPane(_ root: inout [String: JSONValue], engine: KhaytEngine,
+                          edit: (inout PricingPane.Draft) -> Void) async throws {
         let shop = Shop()
-        let original = BusinessPane.Draft.read(Shop.settings(root), shop: shop)
+        let original = PricingPane.Draft.read(Shop.settings(root), shop: shop)
         var draft = original
         edit(&draft)
         try await Shop.applySettings(to: &root, form: draft.form(), opened: original.form(),
                                      country: nil, engine: engine)
     }
 
-    @Test("a new price in Settings › Business goes onto the marked setup preset too, and only its tariff")
+    @Test("a new price in Settings › Pricing & Tax goes onto the marked setup preset too, and only its tariff")
     func businessSaveUpdatesSetupPreset() async throws {
         let engine = try KhaytEngine()
         var root = Self.bookWithSetupPreset()
         let hand = Self.preset(root, "PRNTR-hand")
-        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 0.3 }
+        try await savePricingPane(&root, engine: engine) { $0.elecRate = 0.3 }
 
         guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
         #expect(settings["elecRate"] == .number(0.3))
@@ -247,7 +248,7 @@ struct ElecRateParityTests {
         #expect(rates["elecRate"] == 0.3)
 
         // A KRW-sized price is not cut to 100 on the way.
-        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 250 }
+        try await savePricingPane(&root, engine: engine) { $0.elecRate = 250 }
         #expect(Self.preset(root, "PRNTR-setup")?["elecRate"] == .number(250))
         if case .object(let s)? = root["settings"] { #expect(s["elecRate"] == .number(250)) }
     }
@@ -256,7 +257,7 @@ struct ElecRateParityTests {
     func businessClearRemovesFromSetupPreset() async throws {
         let engine = try KhaytEngine()
         var root = Self.bookWithSetupPreset(settings: ["currency": .string("SAR"), "elecRate": .number(0.3)])
-        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = nil }
+        try await savePricingPane(&root, engine: engine) { $0.elecRate = nil }
 
         guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
         #expect(settings["elecRate"] == nil)
@@ -265,11 +266,11 @@ struct ElecRateParityTests {
         #expect(marked["laborRate"] == .string("40"))
         #expect(try await engine.printRates(preset: .object(marked), settings: settings)["elecRate"] == 0.18)
         // And the next price set reaches it again.
-        try await saveBusinessPane(&root, engine: engine) { $0.elecRate = 0.22 }
+        try await savePricingPane(&root, engine: engine) { $0.elecRate = 0.22 }
         #expect(Self.preset(root, "PRNTR-setup")?["elecRate"] == .number(0.22))
     }
 
-    @Test("saving the Business pane without touching the price leaves it, and the preset, byte-identical")
+    @Test("saving Settings without touching the price leaves it, and the preset, byte-identical")
     func untouchedPriceRoundTrips() async throws {
         let engine = try KhaytEngine()
         for stored: JSONValue in [.string("abc"), .string("inf"), .string("nan"), .string(" "), .string("0.30"),
@@ -277,8 +278,15 @@ struct ElecRateParityTests {
             var root = Self.bookWithSetupPreset(settings: ["currency": .string("SAR"), "elecRate": stored,
                                                            "phone": .string("1")])
             let before = root
-            // Another field changes; the price field is never touched.
-            try await saveBusinessPane(&root, engine: engine) { $0.phone = "2" }
+            // The pane holding the price, saved with the price untouched…
+            try await savePricingPane(&root, engine: engine) { _ in }
+            // …and the Shop pane, which it shared a Save bar with until stage
+            // 2a, saved with another field changed.
+            let shop = Shop()
+            let opened = ShopPane.Draft.read(Shop.settings(root), shop: shop)
+            var edited = opened; edited.phone = "2"
+            try await Shop.applySettings(to: &root, form: edited.form(), opened: opened.form(),
+                                         country: nil, engine: engine)
             guard case .object(let s)? = root["settings"] else { Issue.record("no settings"); continue }
             #expect(s["elecRate"] == stored, Comment(rawValue: "\(stored)"))
             #expect(s["phone"] == .string("2"))
@@ -287,7 +295,7 @@ struct ElecRateParityTests {
         // A junk value shows empty rather than as a number the field invented.
         let shop = Shop()
         for junk: JSONValue in [.string("abc"), .string("inf"), .string("nan")] {
-            #expect(BusinessPane.Draft.read(["elecRate": junk], shop: shop).elecRate == nil)
+            #expect(PricingPane.Draft.read(["elecRate": junk], shop: shop).elecRate == nil)
         }
     }
 }

@@ -1187,6 +1187,11 @@
 "connectors.settings.missing" = "%@ Mac’inizde veya PC’nizde ayarlanana kadar düğmeleri bir şey göndermez.";
 "connectors.error.setting" = "Önce Mac’inizde veya PC’nizde bu bağlayıcı için “%@” ayarını yapın. Hiçbir şey gönderilmedi.";
 "connectors.reply.not_saved" = "Yanıt bu iPhone’a kaydedilemedi. Alana elle kopyalayın.";
+"plg.err_declined" = "%1$@ yanıtı: %2$@";
+"plg.err_declined_nomsg" = "%1$@ isteği nedenini belirtmeden reddetti.";
+"plg.sent_unconfirmed" = "%1$@ kabul etti ancak %2$@ döndürmedi. Yeniden göndermeden önce %1$@ hesabını kontrol edin.";
+"connectors.reply.unchecked" = "%1$@ yanıt verdi, ancak bu iPhone yanıtı denetleyemedi. Yeniden göndermeden önce %1$@ hesabını kontrol edin.";
+"connectors.error.no_customer" = "Bu işin müşterisi yok ve %@ müşterinin adına, telefonuna ve adresine ihtiyaç duyuyor. Önce işe bir müşteri bağlayın. Hiçbir şey gönderilmedi.";
 "connectors.field.clear" = "Temizle";
 "connectors.field.footer" = "Bu iPhone’a kaydedilir ve diğer değişikliklerinizle birlikte Mac’inize gönderilir. Mac’iniz bunu yalnızca %@ orada açıkken tutar.";
 "connectors.field.edit" = "Düzenle";
@@ -1231,6 +1236,9 @@
 "diag.settings" = "Defterdeki ayarlar";
 "diag.plugin_entries" = "Ayarlardaki bağlayıcı girdileri";
 "diag.connectors_count" = "Okunan bağlayıcılar";
+"diag.reply.last" = "Son bağlayıcı yanıtı";
+"diag.reply.no_answer" = "yanıt yok";
+"diag.reply.no_keys" = "JSON gövdesi yok";
 "diag.section.sources" = "Defterin geldiği yer";
 "diag.last_source" = "Son";
 "diag.source.mac_store" = "Mac, tüm defter";

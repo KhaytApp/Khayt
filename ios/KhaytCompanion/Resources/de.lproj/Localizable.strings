@@ -1187,6 +1187,11 @@
 "connectors.settings.missing" = "Die Tasten senden erst, wenn %@ auf deinem Mac oder PC festgelegt ist.";
 "connectors.error.setting" = "Lege zuerst „%@“ für diesen Connector auf deinem Mac oder PC fest. Es wurde nichts gesendet.";
 "connectors.reply.not_saved" = "Die Antwort konnte auf diesem iPhone nicht gespeichert werden. Übertrage sie von Hand ins Feld.";
+"plg.err_declined" = "%1$@ meldet: %2$@";
+"plg.err_declined_nomsg" = "%1$@ hat die Anfrage ohne Begründung abgelehnt.";
+"plg.sent_unconfirmed" = "%1$@ hat es angenommen, aber kein(e) %2$@ zurückgegeben. Prüfen Sie %1$@, bevor Sie erneut senden.";
+"connectors.reply.unchecked" = "%1$@ hat geantwortet, aber dieses iPhone konnte die Antwort nicht prüfen. Prüfen Sie %1$@, bevor Sie erneut senden.";
+"connectors.error.no_customer" = "Dieser Auftrag hat keinen Kunden, und %@ braucht Name, Telefon und Adresse des Kunden. Verknüpfe zuerst einen Kunden. Nichts wurde gesendet.";
 "connectors.field.clear" = "Löschen";
 "connectors.field.footer" = "Auf diesem iPhone gespeichert und mit deinen anderen Änderungen an deinen Mac gesendet. Dein Mac übernimmt es nur, solange %@ dort eingeschaltet ist.";
 "connectors.field.edit" = "Bearbeiten";
@@ -1231,6 +1236,9 @@
 "diag.settings" = "Einstellungen im Buch";
 "diag.plugin_entries" = "Connector-Einträge in den Einstellungen";
 "diag.connectors_count" = "Gelesene Connectoren";
+"diag.reply.last" = "Letzte Connector-Antwort";
+"diag.reply.no_answer" = "keine Antwort";
+"diag.reply.no_keys" = "kein JSON-Inhalt";
 "diag.section.sources" = "Woher das Buch kam";
 "diag.last_source" = "Zuletzt";
 "diag.source.mac_store" = "Mac, ganzes Buch";

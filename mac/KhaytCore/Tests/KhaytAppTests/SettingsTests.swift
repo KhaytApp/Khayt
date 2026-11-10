@@ -34,33 +34,40 @@ struct SettingsTests {
     /// A form key the rule does not know would leave the stored value in place
     /// and this is the test that notices, for every field rather than a sample.
 
-    @Test("the Business pane round-trips every field")
+    @Test("the Shop pane round-trips every field")
     func business() async throws {
         let shop = try await Self.sample()
-        var draft = BusinessPane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = ShopPane.Draft.read(shop.settingsDict, shop: shop)
         draft.phone = "+966 55 000 0001"; draft.email = "shop@example.com"
         draft.vat = "310000000000003"; draft.cr = "1010101010"
         for key in draft.content.keys { draft.content[key] = "edited " + key }
+        // Opening hours, closures and pickup moved here from Operations and
+        // Payments (Settings stage 2a), and still save under their own keys.
+        for day in ShopPane.Draft.days { draft.hours[day] = 6 }
+        draft.holidays = ["2026-12-01"]
+        draft.pickupHours = "Sun–Thu 4–9 pm"; draft.pickupMapUrl = "https://maps.example.com/shop"
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
-        #expect(BusinessPane.Draft.read(out, shop: shop) == draft)
+        #expect(ShopPane.Draft.read(out, shop: shop) == draft)
+        #expect(Self.number(Self.object(out["workingHours"])["mon"]) == 6)
+        #expect(Self.string(out["pickupHours"]) == "Sun–Thu 4–9 pm")
         #expect(Self.string(out["bizEn"]) == "edited bizEn", "the shop's text lands under the store's own key")
     }
 
-    @Test("the Invoice pane round-trips every field")
+    @Test("the Pricing & Tax pane round-trips every field")
     func invoice() async throws {
         let shop = try await Self.sample()
-        var draft = InvoicePane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = PricingPane.Draft.read(shop.settingsDict, shop: shop)
         draft.currency = "EUR"; draft.enableVat = true; draft.vatRate = 19; draft.taxMode = "exclusive"
-        draft.enableZatca = false; draft.quotePrefix = "DEV"
-        draft.invTemplate = "minimal"; draft.invoiceBilingual = "both"; draft.invoiceSecondLang = "fr"
-        draft.invAccent = "#123456"
-        for key in draft.content.keys { draft.content[key] = "edited " + key }
+        draft.enableZatca = false
+        draft.elecRate = 0.3
+        draft.minMarginPct = 12; draft.quoteValidityDays = 14; draft.minOrderAmount = 50
+        draft.rushFeeEnabled = true; draft.rushFeePct = 30; draft.defaultPackagingCost = 4.5
+        draft.loyaltyEnabled = true; draft.loyaltyPointsPerUnit = 2; draft.loyaltyRedeemRate = 0.05
+        draft.monthlyGoal = 9000
+        draft.budgets = ["filament": 1500, "electricity": 500, "maintenance": 300,
+                         "tools": 250, "equipment": 400, "shipping": 200, "other": 300]
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
-        #expect(InvoicePane.Draft.read(out, shop: shop) == draft)
-        // The job-number prefix is Invoice numbering's now (`NumberPrefixes`):
-        // this pane saving must never overwrite it with a stale copy.
-        #expect(draft.form()["invPrefix"] == nil)
-        #expect(out["invPrefix"] == shop.settingsDict["invPrefix"])
+        #expect(PricingPane.Draft.read(out, shop: shop) == draft)
         // And the profile the invoice is computed from agrees with the legacy
         // fields — the rule's whole reason for rebuilding `tax`.
         let tax = Self.object(out["tax"])
@@ -72,15 +79,26 @@ struct SettingsTests {
         }
     }
 
-    @Test("the Payments pane round-trips every field")
+    @Test("the Invoices & Payments pane round-trips every field")
     func payments() async throws {
         let shop = try await Self.sample()
-        var draft = PaymentsPane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = InvoicesPane.Draft.read(shop.settingsDict, shop: shop)
+        draft.quotePrefix = "DEV"
+        draft.invTemplate = "minimal"; draft.invoiceBilingual = "both"; draft.invoiceSecondLang = "fr"
+        draft.invAccent = "#123456"
+        for key in draft.content.keys { draft.content[key] = "edited " + key }
+        draft.useHijri = false; draft.useArabicNumerals = true
         draft.bankName = "Al Rajhi"; draft.accountHolder = "Tuwaiq Additive"
         draft.iban = "SA0380000000608010167519"
         draft.accepted = ["mada", "cash"]; draft.paymentInstructions = "Pay at the counter."
+        draft.payReminderEnabled = true; draft.payReminderGrace = 7; draft.payReminderChannel = "email"
+        draft.quoteFollowUpEnabled = true; draft.quoteFollowUpWindow = 5
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
-        #expect(PaymentsPane.Draft.read(out, shop: shop) == draft)
+        #expect(InvoicesPane.Draft.read(out, shop: shop) == draft)
+        // The job-number prefix is Invoice numbering's now (`NumberPrefixes`):
+        // this pane saving must never overwrite it with a stale copy.
+        #expect(draft.form()["invPrefix"] == nil)
+        #expect(out["invPrefix"] == shop.settingsDict["invPrefix"])
         // Stored in Khayt's own order, not the set's.
         if case .array(let list)? = out["acceptedPayments"] {
             #expect(list.compactMap(Self.string) == ["cash", "mada"])
@@ -90,32 +108,26 @@ struct SettingsTests {
     @Test("an IBAN typed in groups of four is stored without the spaces")
     func iban() async throws {
         let shop = try await Self.sample()
-        var draft = PaymentsPane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = InvoicesPane.Draft.read(shop.settingsDict, shop: shop)
         draft.iban = "SA03 8000 0000 6080 1016 7519"
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
         #expect(Self.string(out["iban"]) == "SA0380000000608010167519")
     }
 
-    @Test("the Operations pane round-trips every field")
+    @Test("the Production pane round-trips every field")
     func operations() async throws {
         let shop = try await Self.sample()
-        var draft = OperationsPane.Draft.read(shop.settingsDict, shop: shop)
-        draft.minMarginPct = 12; draft.quoteValidityDays = 14; draft.minOrderAmount = 50
-        draft.rushFeeEnabled = true; draft.rushFeePct = 30; draft.defaultPackagingCost = 4.5
-        for day in OperationsPane.Draft.days { draft.hours[day] = 6 }
+        var draft = ProductionPane.Draft.read(shop.settingsDict, shop: shop)
         draft.dailyHours = 10; draft.workingDaysPerWeek = 6; draft.finishingDays = 2
         draft.dispatchDays = 3; draft.safetyDays = 4; draft.publishToCloud = true
         draft.wip = ["pending": 5, "printing": 2, "post": 0, "qc": 1]
         draft.wipEnforceHardLimit = true
         draft.qcEnabled = true; draft.qcRequireInspector = true; draft.qcRequirePhotoOnFail = true
         draft.qcWarrantyDays = 45
-        draft.monthlyGoal = 9000
-        draft.budgets = ["filament": 1500, "electricity": 500, "maintenance": 300,
-                         "tools": 250, "equipment": 400, "shipping": 200, "other": 300]
-        draft.payReminderEnabled = true; draft.payReminderGrace = 7
-        draft.quoteFollowUpEnabled = true; draft.quoteFollowUpWindow = 5
+        draft.autoDeduct = false; draft.lowStock = 350; draft.autoDraftPo = true
+        draft.swapMinutes = 5
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
-        #expect(OperationsPane.Draft.read(out, shop: shop) == draft)
+        #expect(ProductionPane.Draft.read(out, shop: shop) == draft)
         // A WIP limit of zero is no limit, and is not stored as a zero.
         #expect(Self.object(out["wipLimits"])["post"] == nil)
     }
@@ -127,10 +139,10 @@ struct SettingsTests {
     /// measured against zero. The two ends are checked together here, because
     /// a settings field that saves to a key the report does not read is the
     /// same amount of nothing.
-    @Test("a budget set in Operations is the budget the Spending screen reads")
+    @Test("a budget set in Pricing & Tax is the budget the Spending screen reads")
     func budgetsReachTheReport() async throws {
         let shop = try await Self.sample()
-        var draft = OperationsPane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = PricingPane.Draft.read(shop.settingsDict, shop: shop)
         draft.budgets["filament"] = 1500
         draft.budgets["electricity"] = 400
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
@@ -156,12 +168,12 @@ struct SettingsTests {
     @Test("saving one budget does not zero the other six")
     func budgetsAreNotPartial() async throws {
         let shop = try await Self.sample()
-        var first = OperationsPane.Draft.read(shop.settingsDict, shop: shop)
+        var first = PricingPane.Draft.read(shop.settingsDict, shop: shop)
         for category in Shop.expenseCategories { first.budgets[category] = 100 }
         let once = try await Self.engine(shop).applySettings(
             shop.settingsDict, form: first.form(), year: 2026)
 
-        var second = OperationsPane.Draft.read(once, shop: shop)
+        var second = PricingPane.Draft.read(once, shop: shop)
         second.budgets["filament"] = 999
         let twice = try await Self.engine(shop).applySettings(once, form: second.form(), year: 2026)
 
@@ -177,15 +189,59 @@ struct SettingsTests {
     func preferences() async throws {
         let shop = try await Self.sample()
         var draft = PreferencesPane.Draft.read(shop.settingsDict, shop: shop)
-        draft.lang = "ar"; draft.useHijri = false; draft.useArabicNumerals = true
-        draft.autoDeduct = false; draft.lowStock = 350
+        draft.density = 1.27; draft.infillPct = 25; draft.wallMm = 1.6; draft.wastePct = 10
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
         #expect(PreferencesPane.Draft.read(out, shop: shop) == draft)
     }
 
+    @Test("the General pane round-trips the language")
+    func general() async throws {
+        let shop = try await Self.sample()
+        var draft = GeneralPane.Draft.read(shop.settingsDict, shop: shop)
+        draft.lang = "ar"
+        let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
+        #expect(GeneralPane.Draft.read(out, shop: shop) == draft)
+        #expect(Self.string(out["lang"]) == "ar")
+    }
+
+    /// Settings review §6.1: moving a section moves its keys between drafts,
+    /// and a key in two drafts is a key two panes overwrite. Every key a pane's
+    /// Save bar sends is sent by that pane alone.
+    @Test("every settings key is saved by exactly one pane")
+    func eachKeyHasOnePane() async throws {
+        let shop = try await Self.sample()
+        let s = shop.settingsDict
+        let forms: [(String, [String: JSONValue])] = [
+            ("general", GeneralPane.Draft.read(s, shop: shop).form()),
+            ("shop", ShopPane.Draft.read(s, shop: shop).form()),
+            ("pricing", PricingPane.Draft.read(s, shop: shop).form()),
+            ("invoices", InvoicesPane.Draft.read(s, shop: shop).form()),
+            ("production", ProductionPane.Draft.read(s, shop: shop).form()),
+            ("preferences", PreferencesPane.Draft.read(s, shop: shop).form()),
+        ]
+        var owner: [String: String] = [:]
+        for (pane, form) in forms {
+            // `content` is a bag of per-language text fields that
+            // `settings-edit.js` spreads in one by one, so two panes may each
+            // send some of it: what must not repeat is a field inside it.
+            var keys = Array(form.keys.filter { $0 != "content" })
+            if case .object(let content)? = form["content"] { keys += content.keys.map { "content." + $0 } }
+            for key in keys {
+                #expect(owner[key] == nil, "\(key) is saved by both \(owner[key] ?? "") and \(pane)")
+                owner[key] = pane
+            }
+        }
+        // The keys stage 2a moved, where they live now.
+        #expect(owner["lang"] == "general")
+        for key in ["workingHours", "holidays", "pickupHours", "pickupMapUrl", "phone", "vat"] {
+            #expect(owner[key] == "shop", "\(key)")
+        }
+        #expect(owner["elecRate"] == "pricing")
+    }
+
     // MARK: - A pane saves only what it shows
 
-    @Test("saving the Business pane leaves the other panes' settings alone")
+    @Test("saving the Shop pane leaves the other panes' settings alone")
     func onlyItsOwn() async throws {
         let shop = try await Self.sample()
         let engine = try Self.engine(shop)
@@ -194,7 +250,7 @@ struct SettingsTests {
         settings["lowStockThreshold"] = .number(50)
         settings["enableVat"] = .bool(true)
         settings["cloud"] = .object(["token": .string("T")])
-        var draft = BusinessPane.Draft.read(settings, shop: shop)
+        var draft = ShopPane.Draft.read(settings, shop: shop)
         draft.phone = "055"
         let out = try await engine.applySettings(settings, form: draft.form(), year: 2026)
         #expect(Self.string(out["phone"]) == "055")
@@ -211,7 +267,7 @@ struct SettingsTests {
         let shop = try await Self.sample()
         let engine = try Self.engine(shop)
         var root: [String: JSONValue] = ["settings": .object(shop.settingsDict)]
-        var draft = InvoicePane.Draft.read(shop.settingsDict, shop: shop)
+        var draft = PricingPane.Draft.read(shop.settingsDict, shop: shop)
         draft.taxCountry = "IN"
         // What the pane fills in when a country is picked, before the save.
         let preset = try #require(shop.taxPresets["IN"])
@@ -235,7 +291,7 @@ struct SettingsTests {
         var settings = shop.settingsDict
         settings = try await engine.chooseTaxCountry(settings, code: "SA")
         var root: [String: JSONValue] = ["settings": .object(settings)]
-        var draft = InvoicePane.Draft.read(settings, shop: shop)
+        var draft = PricingPane.Draft.read(settings, shop: shop)
         draft.vatRate = 5   // a shop on a special rate
         try await Shop.applySettings(to: &root, form: draft.form(), country: draft.taxCountry, engine: engine)
         let tax = Self.object(Self.object(root["settings"])["tax"])
@@ -347,8 +403,8 @@ struct SettingsTests {
         let src = try Self.settingsSource()
         // Sliced per pane, because two PANES may of course share a heading —
         // it is two sections within one that read as a mistake.
-        for pane in ["BusinessPane", "InvoicePane", "PaymentsPane",
-                     "OperationsPane", "SlicersPane", "PreferencesPane"] {
+        for pane in ["GeneralPane", "ShopPane", "PricingPane", "InvoicesPane",
+                     "ProductionPane", "SlicersPane", "PreferencesPane"] {
             guard let at = src.range(of: "struct \(pane): View") else {
                 Issue.record(Comment(rawValue: "\(pane) is gone — this guard is stale"))
                 continue

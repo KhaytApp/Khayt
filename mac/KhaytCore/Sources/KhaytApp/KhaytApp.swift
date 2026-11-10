@@ -967,11 +967,11 @@ final class Activator: NSObject, NSApplicationDelegate {
                         $0.isVisible && $0 !== main && $0.contentView != nil
                             && $0.frame.width >= 300 && $0.frame.height >= 300
                     }) {
-                        subject?.settingsPane = .preferences
+                        subject?.settingsPane = .general
                         await settle()
                         try? await Task.sleep(for: .milliseconds(700))
-                        capture(named: "17-dark-settings-preferences", window: settings, into: dir)
-                        capturePanes(named: "17-dark-settings-preferences", window: settings, into: dir)
+                        capture(named: "17-dark-settings-general", window: settings, into: dir)
+                        capturePanes(named: "17-dark-settings-general", window: settings, into: dir)
                         settings.close()
                         await settle()
                     } else {

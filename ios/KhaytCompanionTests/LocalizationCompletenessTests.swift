@@ -231,10 +231,12 @@ final class LocalizationCompletenessTests: XCTestCase {
     }
 
     /// "خيط" is the Arabic for filament, and the app is called Khayt in
-    /// Latin letters in every language (as "Khayt Cloud" already was). An
-    /// Arabic line that used the word as the app's name read "open filament",
-    /// "filament cloud". The word stays only where it means filament: these
-    /// keys. A new line that needs it names its key here, deliberately.
+    /// Latin letters in every language. An Arabic line that used the word as
+    /// the app's name read "open filament". The word stays only where it
+    /// means filament (these keys) and in the cloud's Arabic name, "سحابة
+    /// خيط" (Turki, Nov 10 2026, as the Mac already says it), which replaces
+    /// "Khayt Cloud" in every Arabic line. A new line that needs the word
+    /// names its key here, deliberately.
     func testArabicCallsTheAppKhaytAndSaysFilamentOnlyForFilament() throws {
         let filament: Set<String> = [
             "settings.notify.low_stock", "notify.low_stock.title", "spool.detail.filament",
@@ -250,10 +252,12 @@ final class LocalizationCompletenessTests: XCTestCase {
         var found: [String] = []
         for url in tables {
             let dict = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], url.path())
-            for (key, value) in dict where value.contains("خيط") && !filament.contains(key) {
+            for (key, value) in dict
+            where value.replacingOccurrences(of: "سحابة خيط", with: "").contains("خيط") && !filament.contains(key) {
                 found.append("\(url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent): \(key)")
             }
-            XCTAssertFalse(dict.values.contains { $0.contains("سحابة خيط") }, "Khayt Cloud is a name: \(url.path())")
+            let latin = dict.filter { $0.value.contains("Khayt Cloud") }.keys.sorted()
+            XCTAssertEqual(latin, [], "the cloud is سحابة خيط in Arabic: \(url.path())")
         }
         XCTAssertEqual(found.sorted(), [], "خيط used as the app's name; write Khayt")
     }

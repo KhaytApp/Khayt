@@ -75,12 +75,12 @@ struct SwapPlanningTests {
     @Test("the settings field starts where the rule does, and the shop's figure wins")
     func minutesSetting() async throws {
         let engine = try KhaytEngine()
-        #expect(try await engine.swapMinutes(settings: [:]) == OperationsPane.swapMinutesDefault)
+        #expect(try await engine.swapMinutes(settings: [:]) == ProductionPane.swapMinutesDefault)
         #expect(try await engine.swapMinutes(settings: ["swapMinutes": .number(5)]) == 5)
         #expect(try await engine.swapMinutes(settings: ["swapMinutes": .number(500)]) == 60)
-        let draft = OperationsPane.Draft.read([:], shop: Shop())
-        #expect(draft.swapMinutes == OperationsPane.swapMinutesDefault)
-        #expect(draft.form()["swapMinutes"] == .number(OperationsPane.swapMinutesDefault))
+        let draft = ProductionPane.Draft.read([:], shop: Shop())
+        #expect(draft.swapMinutes == ProductionPane.swapMinutesDefault)
+        #expect(draft.form()["swapMinutes"] == .number(ProductionPane.swapMinutesDefault))
     }
 
     @Test("a job's colours come from its models, and a hex written on a part")

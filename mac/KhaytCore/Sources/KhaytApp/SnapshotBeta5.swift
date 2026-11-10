@@ -412,7 +412,7 @@ extension Snapshot {
             FileHandle.standardError.write(Data("b5: no settings window\n".utf8))
             return
         }
-        shop.settingsPane = .invoice
+        shop.settingsPane = .invoices
         await settle()
         capture(named: "b5-5-settings-invoice" + tag, window: settings, into: dir)
         capturePanes(named: "b5-5-settings-invoice" + tag, window: settings, into: dir)

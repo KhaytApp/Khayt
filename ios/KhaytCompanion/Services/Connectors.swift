@@ -623,6 +623,11 @@ extension KhaytAPIClient {
         }
 
         let records = connectorRecords(place)
+        // A job with no customer would send the customer's details empty,
+        // and the service can only refuse that (ORD-00005B, Nov 10).
+        if records.customer == nil, await ConnectorReply.needsCustomer(action: action, connector: c, engine: engine) {
+            return .failed(L10n.format("connectors.error.no_customer", c.name))
+        }
         // Only the secrets this tap needs are read from the Keychain; none
         // for a link. The URL's go into the engine, the rest stay in Swift.
         var secrets: [String: String] = [:]
@@ -680,18 +685,29 @@ extension KhaytAPIClient {
             // body and the key to a host the shop never agreed to.
             (data, response) = try await session.data(for: request, delegate: NoRedirects())
         } catch {
+            ConnectorReplyNote.record(ConnectorReplyNote(status: 0, body: nil))
             return .failed(L10n.format("connectors.error.network", post.url.host() ?? ""))
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // Diagnostics keeps the status and the body's top-level keys, never a value.
+        ConnectorReplyNote.record(ConnectorReplyNote(status: status, body: data))
         guard (200..<300).contains(status) else {
             return .failed(L10n.format("connectors.error.server", status))
         }
         // The reply, mapped by the shared rule into the connector's own
         // fields, then written on the record and shown. The shared rule maps
         // nothing unless the stored entry grants fields.write and is not paused.
+        let reply = data.isEmpty ? nil : try? JSONValue.parse(data)
         var mapped: JSONValue?
-        if !data.isEmpty, let reply = try? JSONValue.parse(data) {
+        if let reply {
             mapped = try? await engine.pluginApplyResponse(c.manifest, actionId: action.id, reply: reply, entry: c.entry)
+        }
+        // A 2xx is not a yes on its own: `success: false`, or a reply that
+        // fills none of the fields it should carry, is not "Sent." Nothing
+        // is written for it.
+        if let why = await ConnectorReply.judge(reply: reply, mapped: mapped, action: action, connector: c,
+                                                engine: engine).failure(connector: c) {
+            return .failed(why)
         }
         let lines = Self.replyLines(mapped, connector: c)
         var saved = lines.isEmpty
