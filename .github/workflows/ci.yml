@@ -19,6 +19,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Every `run:` is `bash -eo pipefail` (GitHub's default without `shell:` is
+# `bash -e`, with NO pipefail): a step that pipes a test into tail, tee or grep
+# must fail when the test does. `xcodebuild test | tail` was green with
+# ** TEST FAILED ** from Jul 28 to Nov 10 2026.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # A change a shop can notice should say so in CHANGELOG.md. Nine PRs landed
   # between v3.6.0-beta.8 and this job with [Unreleased] empty for all of them,
@@ -484,7 +492,9 @@ jobs:
           # test/ci-mac-relevant.test.js checks that every repo path the Mac tests
           # name matches this pattern, so a new one can't be missed silently.
           pattern='^(mac/|lib/|main\.js$|renderer/(app-state\.js|index\.html|inventory\.js|invoice\.css|labels\.js|order-flows\.js|locales/)|test/fixtures/|docs/lan-device-keys\.vectors\.json$|ios/KhaytCompanion/Services/BookWriter\.swift$|\.github/workflows/ci\.yml$)'
-          if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
+          # A here-string, not `printf | grep -q`: under pipefail grep's early
+          # exit can SIGPIPE printf on a long list and flip the answer.
+          if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 
   mac:
