@@ -443,6 +443,10 @@ private struct NewJobCommand: View {
         // A write, like New Job beside it: on the sample shop or a book another
         // app holds, the sheet would open and its Save could not land.
         Button(Words.upfront("mac.new_customer")) { shop.editingCustomer = Shop.newCustomer() }
+            // ⌥⌘N: a customer is the other thing a shop writes down most, and
+            // with no shortcut and no button on the Customers screen once one
+            // existed, Turki found no way to add one (Nov 10).
+            .keyboardShortcut("n", modifiers: [.command, .option])
             .disabled(!shop.canMoveJobs)
         // The catalogue could be read on this Mac and not added to.
         Button(Words.upfront("mac.new_product") + "\u{2026}") {
