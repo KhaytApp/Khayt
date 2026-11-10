@@ -159,8 +159,14 @@ struct FeatureModeTests {
     /// and is using. Until Nov 10 the other app DID gate it: the card had no
     /// `pro-only` class of its own, but it sat inside the pro-only Access
     /// panel, and a check of the text just before the switch never saw the
-    /// panel. This one reads the card's own tag AND the pane that holds it.
-    @Test("loyalty is not gated here, and neither its card nor its pane is gated in the other app")
+    /// panel. This one walks every `<div>` still open at the card, from the
+    /// settings pane that holds it down to the card's own tag, so a gate at
+    /// any depth is seen.
+    ///
+    /// Simple, not hobbyist: only `pro-only` is banned. `biz-only` hides a
+    /// thing from the stricter hobbyist mode too, which the ruling did not
+    /// cover — do not add it here without a ruling that does.
+    @Test("loyalty is not gated here, and nothing around its card is pro-only in the other app")
     func loyaltyIsNotGated() throws {
         #expect(!Shop.gatedFeatures.contains("loyalty"))
         let html = try String(
@@ -170,23 +176,23 @@ struct FeatureModeTests {
                 .deletingLastPathComponent().appending(path: "renderer/index.html"),
             encoding: .utf8)
         guard let card = html.range(of: "id=\"settingsLoyaltyCard\""),
-              html[card.upperBound...].range(of: "set_loyaltyEnabled") != nil else {
-            Issue.record("the loyalty card has moved or lost its id — this check has rotted"); return
+              html[card.upperBound...].range(of: "set_loyaltyEnabled") != nil,
+              let cardOpen = html[..<card.lowerBound].range(of: "<div", options: .backwards),
+              let cardClose = html[card.upperBound...].firstIndex(of: ">"),
+              let pane = html[..<card.lowerBound].range(of: "<div class=\"settings-panel", options: .backwards)
+        else {
+            Issue.record("the loyalty card or its pane has moved or lost its id — this check has rotted"); return
         }
-        // The card's own opening tag.
-        guard let open = html[..<card.lowerBound].range(of: "<div", options: .backwards) else {
-            Issue.record("no tag around the loyalty card — this check has rotted"); return
+        // Every <div …> still open at the card: the pane, any wrapper, the card.
+        var open: [Substring] = []
+        for m in html[pane.lowerBound..<cardOpen.lowerBound].matches(of: /<div\b[^>]*>|<\/div>/) {
+            if m.output.hasPrefix("</") { if !open.isEmpty { open.removeLast() } } else { open.append(m.output) }
         }
-        let cardTag = html[open.lowerBound..<card.upperBound]
-        #expect(!cardTag.contains("pro-only"), "the other app hides the loyalty card from Simple shops")
-        // The settings pane that holds it: the last one opened before the card.
-        guard let pane = html[..<card.lowerBound].range(of: "<div class=\"settings-panel", options: .backwards),
-              let paneEnd = html[pane.upperBound...].firstIndex(of: ">") else {
-            Issue.record("the loyalty card is in no settings pane — this check has rotted"); return
+        open.append(html[cardOpen.lowerBound...cardClose])
+        #expect(open.first?.contains("settings-panel") == true, "the walk did not start at the pane")
+        for tag in open {
+            #expect(!tag.contains("pro-only"), "the other app hides loyalty from Simple shops: \(tag)")
         }
-        let paneTag = html[pane.lowerBound...paneEnd]
-        #expect(!paneTag.contains("pro-only"),
-                "the other app hides the pane loyalty is in from Simple shops: \(paneTag)")
     }
 
     @Test("an enthusiast book is read as Simple, and keeps its customers")
