@@ -426,6 +426,8 @@ struct ConnectorsSettingsSection<Heading: View>: View {
     @State private var connectors: [Connector] = []
     @State private var loaded = false
     @State private var tick = 0
+    /// Connectors whose last automatic update this load is the first to show.
+    @State private var freshUpdates: Set<String> = []
     @ViewBuilder var heading: () -> Heading
 
     /// Reloaded when the list changes here, whenever a sync lands, and when
@@ -453,7 +455,12 @@ struct ConnectorsSettingsSection<Heading: View>: View {
             }
         }
         .task(id: Reload(tick: tick, synced: api.syncLanded, holdsBook: api.holdsBook)) {
-            connectors = await api.connectors()
+            let list = await api.connectors()
+            // "Updated to …" once per update: kept on screen for this load,
+            // and remembered so the next one does not show it again.
+            freshUpdates = Set(list.filter { ConnectorUpdateSeen.firstSight($0) }.map(\.id))
+                .union(freshUpdates.filter { id in list.contains { $0.id == id && $0.updatedAt != nil } })
+            connectors = list
             loaded = true
         }
     }
@@ -479,7 +486,8 @@ struct ConnectorsSettingsSection<Heading: View>: View {
                     NavigationLink {
                         ConnectorSettingsPage(connector: c) { tick += 1 }
                     } label: {
-                        ConnectorRow(connector: c, last: i == connectors.count - 1)
+                        ConnectorRow(connector: c, last: i == connectors.count - 1,
+                                     notes: ConnectorRules.updateNotes(c, showUpdated: freshUpdates.contains(c.id)))
                     }
                     .buttonStyle(.plain)
                 }
@@ -498,6 +506,8 @@ struct ConnectorsSettingsSection<Heading: View>: View {
 struct ConnectorRow: View {
     let connector: Connector
     var last = true
+    /// Update notes (`ConnectorRules.updateNotes`), one line each.
+    var notes: [String] = []
 
     private var keysMissing: Bool { connector.secrets.contains { !ConnectorKeys.isSet(connector.id, $0.name) } }
 
@@ -518,6 +528,18 @@ struct ConnectorRow: View {
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(connector.status == .active && !keysMissing ? KhaytDesign.note : KhaytDesign.attention)
                     .lineLimit(2)
+                if connector.status == .revoked, let why = ConnectorRules.disabledReason(connector) {
+                    Text(why)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(notes, id: \.self) { note in
+                    Text(note)
+                        .font(.khayt(12, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.note)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.forward").font(.caption.weight(.semibold)).foregroundStyle(KhaytDesign.note)
@@ -747,5 +769,23 @@ struct ConnectorKeySheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+/// Which automatic connector updates this phone has already announced, by
+/// connector id and `updatedAt`: the note shows once per update.
+enum ConnectorUpdateSeen {
+    static let key = "khayt.connectorUpdatesSeen"
+
+    /// True the first time this update is seen (and remembers it).
+    static func firstSight(_ c: Connector, defaults: UserDefaults = .standard) -> Bool {
+        guard let at = c.updatedAt else { return false }
+        let mark = c.id + "@" + at
+        var seen = defaults.stringArray(forKey: key) ?? []
+        if seen.contains(mark) { return false }
+        seen.removeAll { $0.hasPrefix(c.id + "@") }
+        seen.append(mark)
+        defaults.set(Array(seen.suffix(100)), forKey: key)
+        return true
     }
 }

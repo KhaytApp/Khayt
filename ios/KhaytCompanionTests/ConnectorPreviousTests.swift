@@ -36,10 +36,19 @@ final class ConnectorPreviousTests: XCTestCase {
         .object(["version": e["version"] ?? .null, "manifest": e["manifest"] ?? .null, "granted": e["granted"] ?? .null])
     }
 
-    private func resolve(_ e: [String: JSONValue], previous: JSONValue? = nil) async throws -> Connector? {
+    /// A book's settings holding `entry`, with the Mac's update record for it.
+    private func settings(_ entry: [String: JSONValue], state: [String: JSONValue] = [:]) -> [String: JSONValue] {
+        var s: [String: JSONValue] = ["plugins": .array([.object(entry)])]
+        if !state.isEmpty {
+            s["connectorUpdates"] = .object(["serial": .number(7), "connectors": .object([lamhaId: .object(state)])])
+        }
+        return s
+    }
+
+    private func resolve(_ e: [String: JSONValue], state: [String: JSONValue] = [:]) async throws -> Connector? {
         let engine = try KhaytEngine()
         let keys = await ConnectorRules.signingKeys(engine)
-        return await ConnectorRules.resolve(e, previous: previous, engine: engine, keys: keys)
+        return await ConnectorRules.resolve(e, settings: settings(e, state: state), engine: engine, keys: keys)
     }
 
     func testTheBooksOwnVersionRunsWhenItReads() async throws {
@@ -48,26 +57,19 @@ final class ConnectorPreviousTests: XCTestCase {
         XCTAssertEqual(c?.status, .active)
         XCTAssertNil(c?.unreadableVersion)
         XCTAssertEqual(c?.version, ConnectorRules.text(e["version"]))
+        XCTAssertEqual(ConnectorRules.updateNotes(try XCTUnwrap(c), showUpdated: true), [])
     }
 
-    func testAnUnreadableVersionRunsThePreviousOneFromTheEntry() async throws {
+    func testAnUnreadableVersionRunsThePreviousOneTheMacKept() async throws {
         let old = try lamhaEntry()
-        var newer = try unreadable(old)
-        newer["previous"] = previous(of: old)
-        let c0 = try await resolve(newer)
+        let c0 = try await resolve(try unreadable(old), state: ["previous": previous(of: old)])
         let c = try XCTUnwrap(c0)
         XCTAssertEqual(c.status, .active, "the readable previous version runs")
         XCTAssertEqual(c.version, ConnectorRules.text(old["version"]))
         XCTAssertEqual(c.unreadableVersion, "9.0.0")
         XCTAssertEqual(c.manifest, old["manifest"], "the signed older manifest, not the newer one")
-    }
-
-    func testThePreviousVersionCanComeFromTheUpdateRecordBesideTheEntry() async throws {
-        let old = try lamhaEntry()
-        let c0 = try await resolve(try unreadable(old), previous: previous(of: old))
-        let c = try XCTUnwrap(c0)
-        XCTAssertEqual(c.status, .active)
-        XCTAssertEqual(c.unreadableVersion, "9.0.0")
+        let notes = ConnectorRules.updateNotes(c, showUpdated: true)
+        XCTAssertEqual(notes, [L10n.format("plg.update_needs_app", c.name, "9.0.0")])
     }
 
     func testWithNothingReadableTheConnectorIsInvalidAndSendsNothing() async throws {
@@ -77,25 +79,56 @@ final class ConnectorPreviousTests: XCTestCase {
         XCTAssertFalse(c.isActive)
         XCTAssertNil(c.unreadableVersion)
         // A previous that does not read either is no way out.
-        var newer = try unreadable(try lamhaEntry())
-        newer["previous"] = .object(["version": .string("0.1.0"), "manifest": .object(["id": .string(lamhaId)])])
-        let d0 = try await resolve(newer)
-        let d = try XCTUnwrap(d0)
-        XCTAssertEqual(d.status, .invalid)
+        let d0 = try await resolve(try unreadable(try lamhaEntry()),
+                                   state: ["previous": .object(["version": .string("0.1.0"), "manifest": .object(["id": .string(lamhaId)])])])
+        XCTAssertEqual(try XCTUnwrap(d0).status, .invalid)
     }
 
-    /// An update's bookkeeping in the entry does not make a build whose
-    /// shared check predates it refuse a version it can read.
-    func testUpdateBookkeepingDoesNotHideAReadableVersion() async throws {
-        var e = try lamhaEntry()
-        e["updatedAt"] = .number(1_762_000_000_000)
-        e["updatedFrom"] = .string("1.0.0")
-        e["previous"] = previous(of: try lamhaEntry())
-        let c0 = try await resolve(e)
+    /// Khayt withdrew this version: it never runs, says why, and the
+    /// version before it is not run in its place.
+    func testARevokedVersionIsPausedByKhaytWithTheReason() async throws {
+        let e = try lamhaEntry()
+        let version = try XCTUnwrap(ConnectorRules.text(e["version"]))
+        let c0 = try await resolve(e, state: ["revoked": .object(["version": .string(version), "reason": .string("Reports a refused order as sent."),
+                                                                  "at": .string("2026-11-12T09:00:00.000Z"), "wasEnabled": .bool(true)]),
+                                              "previous": previous(of: e)])
+        let c = try XCTUnwrap(c0)
+        XCTAssertEqual(c.status, .revoked)
+        XCTAssertFalse(c.isActive)
+        XCTAssertEqual(c.revokedReason, "Reports a refused order as sent.")
+        let why = try XCTUnwrap(ConnectorRules.disabledReason(c))
+        XCTAssertTrue(why.contains("Reports a refused order as sent."), why)
+        XCTAssertEqual(why, L10n.format("plg.update_revoked", "Reports a refused order as sent."))
+        // A revocation of another version leaves this one alone.
+        let other0 = try await resolve(e, state: ["revoked": .object(["version": .string("0.0.1"), "reason": .string("x")])])
+        XCTAssertEqual(try XCTUnwrap(other0).status, .active)
+    }
+
+    func testAPendingVersionAndTheQuietNote() async throws {
+        let e = try lamhaEntry()
+        let c0 = try await resolve(e, state: ["pending": .object(["version": .string("1.2.0")]),
+                                              "updatedAt": .string("2026-11-12T09:00:00.000Z"), "updatedFrom": .string("1.0.0")])
         let c = try XCTUnwrap(c0)
         XCTAssertEqual(c.status, .active)
-        XCTAssertNil(c.unreadableVersion)
-        XCTAssertNil(ConnectorRules.runnable(e)["previous"])
+        XCTAssertEqual(c.pendingVersion, "1.2.0")
+        XCTAssertEqual(c.updatedFrom, "1.0.0")
+        XCTAssertEqual(ConnectorRules.updateNotes(c, showUpdated: true),
+                       [L10n.format("plg.update_pending", c.name, "1.2.0"), L10n.format("plg.update_updated", c.name, c.version)])
+        XCTAssertEqual(ConnectorRules.updateNotes(c, showUpdated: false), [L10n.format("plg.update_pending", c.name, "1.2.0")])
+    }
+
+    func testTheUpdatedNoteShowsOncePerUpdate() throws {
+        let suite = "connector-updates-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var c = ConnectorsTests.connector(granted: nil)
+        XCTAssertFalse(ConnectorUpdateSeen.firstSight(c, defaults: defaults), "no update, no note")
+        c.updatedAt = "2026-11-12T09:00:00.000Z"
+        XCTAssertTrue(ConnectorUpdateSeen.firstSight(c, defaults: defaults))
+        XCTAssertFalse(ConnectorUpdateSeen.firstSight(c, defaults: defaults))
+        c.updatedAt = "2026-12-01T09:00:00.000Z"
+        XCTAssertTrue(ConnectorUpdateSeen.firstSight(c, defaults: defaults), "the next update shows again")
+        XCTAssertEqual(defaults.stringArray(forKey: ConnectorUpdateSeen.key)?.count, 1)
     }
 
     /// The older version gets only the settings it has, its own grant, and

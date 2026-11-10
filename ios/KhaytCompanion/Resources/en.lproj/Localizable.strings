@@ -1179,6 +1179,11 @@
 "connectors.status.not_reviewed" = "Not reviewed";
 "connectors.status.off" = "Off";
 "connectors.status.invalid" = "Can’t be read";
+"connectors.status.revoked" = "Paused by Khayt";
+"plg.update_updated" = "%1$@ updated to %2$@";
+"plg.update_revoked" = "Paused by Khayt: %1$@";
+"plg.update_needs_app" = "%1$@ %2$@ needs a newer version of Khayt.";
+"plg.update_pending" = "%1$@ %2$@ is waiting for your agreement on the Mac.";
 "connectors.yes" = "Yes";
 "connectors.no" = "No";
 "connectors.settings.title" = "Shop settings";

@@ -1179,6 +1179,11 @@
 "connectors.status.not_reviewed" = "未審査";
 "connectors.status.off" = "オフ";
 "connectors.status.invalid" = "読み取れません";
+"connectors.status.revoked" = "Khaytにより一時停止";
+"plg.update_updated" = "%1$@を%2$@に更新しました";
+"plg.update_revoked" = "Khaytにより一時停止: %1$@";
+"plg.update_needs_app" = "%1$@ %2$@には新しいバージョンのKhaytが必要です。";
+"plg.update_pending" = "%1$@ %2$@はMacでの同意を待っています。";
 "connectors.yes" = "はい";
 "connectors.no" = "いいえ";
 "connectors.settings.title" = "ショップの設定";

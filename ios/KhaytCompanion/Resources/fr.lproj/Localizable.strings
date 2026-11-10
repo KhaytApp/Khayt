@@ -1179,6 +1179,11 @@
 "connectors.status.not_reviewed" = "Non vérifié";
 "connectors.status.off" = "Désactivé";
 "connectors.status.invalid" = "Illisible";
+"connectors.status.revoked" = "Mis en pause par Khayt";
+"plg.update_updated" = "%1$@ mis à jour vers %2$@";
+"plg.update_revoked" = "Mis en pause par Khayt : %1$@";
+"plg.update_needs_app" = "%1$@ %2$@ nécessite une version plus récente de Khayt.";
+"plg.update_pending" = "%1$@ %2$@ attend votre accord sur le Mac.";
 "connectors.yes" = "Oui";
 "connectors.no" = "Non";
 "connectors.settings.title" = "Réglages de la boutique";

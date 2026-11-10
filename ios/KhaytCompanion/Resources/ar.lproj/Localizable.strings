@@ -1179,6 +1179,11 @@
 "connectors.status.not_reviewed" = "لم تتم مراجعته";
 "connectors.status.off" = "متوقف";
 "connectors.status.invalid" = "تتعذّر قراءته";
+"connectors.status.revoked" = "أوقفه Khayt";
+"plg.update_updated" = "تم تحديث %1$@ إلى %2$@";
+"plg.update_revoked" = "أوقفه Khayt: %1$@";
+"plg.update_needs_app" = "يتطلب %1$@ %2$@ إصدارًا أحدث من Khayt.";
+"plg.update_pending" = "الإصدار %2$@ من %1$@ بانتظار موافقتك على الماك.";
 "connectors.yes" = "نعم";
 "connectors.no" = "لا";
 "connectors.settings.title" = "إعدادات المتجر";
