@@ -112,6 +112,24 @@ test('a forged webhook stops being answered too', async () => {
   assert.ok((codes.get(401) || 0) > 0, 'and the first few are rejected on the signature, not the counter');
 });
 
+test('a correctly signed Salla delivery passes even while forgeries have Salla locked out', async () => {
+  // The salla bucket is locked by the forgeries above. Deliveries come
+  // through one proxy address, so judging the lockout first let anyone
+  // sending unsigned junk lock the real storefront out, and its orders were
+  // lost. The signature is judged first now: a valid HMAC cannot be guessed,
+  // so it passes; a forgery is still refused with 429.
+  const raw = JSON.stringify({ event: 'order.created', data: { id: 5151, reference_id: 5151 } });
+  const sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(Buffer.from(raw)).digest('hex');
+  const forged = await fetch(`${BASE}/api/webhook/salla`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-salla-signature': 'sha256=' + '0'.repeat(64) }, body: raw,
+  });
+  assert.equal(forged.status, 429, 'a forgery is still throttled');
+  const real = await fetch(`${BASE}/api/webhook/salla`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-salla-signature': sig }, body: raw,
+  });
+  assert.ok(real.status !== 429 && real.status !== 401, `the real delivery was refused (${real.status})`);
+});
+
 test('a correctly signed webhook is still accepted once the window passes', async () => {
   // Not a lockout test so much as a guard on the fix: it would be easy to make
   // failures count and accidentally have them count against valid traffic too.

@@ -230,7 +230,7 @@ async function installPluginManifest(manifest) {
     return false;
   }
   const prev = (settings.plugins || []).find((p) => p && p.id === manifest.id) || null;
-  if (!(await pluginConsent(manifest))) return false;
+  if (!(await pluginConsent(manifest, { replacing: prev && (prev.version || (prev.manifest && prev.manifest.version)) }))) return false;
   settings.plugins = PluginHost().withEntry(settings.plugins, PluginHost().consentedEntry(prev, manifest));
   saveAll();
   await refreshPluginReviewed();
@@ -244,7 +244,18 @@ async function installPluginManifest(manifest) {
  * kind of data each is, then the scopes. `readOnly` shows the same thing
  * from the Settings row ("What it sends").
  */
-function pluginConsent(manifest, { readOnly = false } = {}) {
+/**
+ * "Updates version {from} …" when an install goes over a version the shop
+ * already has; '' for a first install, the same version again, or the
+ * read-only view. Same rule as the Mac's ConnectorConsentSheet.updatesLine.
+ */
+function pluginUpdatesLine(manifest, replacing, readOnly) {
+  const from = replacing == null ? '' : String(replacing);
+  if (readOnly || !from || from === String((manifest && manifest.version) || '')) return '';
+  return t('plg.consent_updates', { from });
+}
+
+function pluginConsent(manifest, { readOnly = false, replacing = null } = {}) {
   const M = PluginManifest();
   const rows = M.consentRows(manifest);
   const scopes = M.permissionsOf(manifest).scopes;
@@ -261,11 +272,13 @@ function pluginConsent(manifest, { readOnly = false } = {}) {
     const w = t('plg.f.' + key);
     return w && w !== 'plg.f.' + key ? w : key;
   };
+  const updates = pluginUpdatesLine(manifest, replacing, readOnly);
   return new Promise((resolve) => {
     const overlay = appendStackedModal(`
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plgConsentTitle" style="max-width:520px;">
         <h3 id="plgConsentTitle">${escapeHtml(pluginLabel(manifest.name))}</h3>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">${escapeHtml(manifest.publisher || '')} · ${escapeHtml(manifest.version || '')} · ${escapeHtml(t('plg.reviewed_by_khayt'))}</p>
+        ${updates ? `<p class="plg-consent-updates" style="font-size:12.5px;color:var(--text-muted);margin:0 0 8px;">${escapeHtml(updates)}</p>` : ''}
         <p style="font-size:12.5px;margin:0 0 10px;">${escapeHtml(t('plg.consent_lead'))}</p>
         ${rows.map((r) => `
           <div class="plg-consent-host" data-host="${escapeHtml(r.host)}" style="border:1px solid var(--border-soft);border-radius:8px;padding:8px 10px;margin-bottom:8px;">

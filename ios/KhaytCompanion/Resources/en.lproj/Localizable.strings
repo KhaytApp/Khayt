@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "This phone needs to pair with the Mac again before it can add photos.";
 "printphotos.why.not_found" = "The Mac doesn’t have this job any more.";
 "printphotos.why.old_mac" = "Update Khayt on the Mac to add photos from the phone.";
+"expense.needs_mac" = "This Mac can’t take an expense with a receipt photo from the phone yet. Nothing was saved, and your expense is still here.";
+"quote.needs_mac" = "This Mac can’t price a quote for the phone yet. Nothing was sent. The calculator on this phone works without it.";
 "printphotos.why.read_only" = "The shop is read-only on the Mac right now, so it can’t take a photo.";
 "printphotos.why.too_large" = "That photo is too large for the Mac. Try a smaller one.";
 "printphotos.why.not_image" = "That isn’t a photo the Mac can read. Try a JPEG or PNG.";

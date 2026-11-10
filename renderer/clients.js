@@ -632,10 +632,31 @@ async function runPortalTakedowns() {
   }
 }
 
+/**
+ * A price-list or address row worth keeping: an object with any non-empty
+ * value besides its id (a price above 0 counts). Tolerant of missing keys and
+ * of fields a newer app added, so a row is never dropped or a save thrown
+ * because of its shape.
+ */
+function clientRowHasText(row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
+  return Object.keys(row).some((k) => {
+    if (k === 'id') return false;
+    const v = row[k];
+    if (typeof v === 'string') return v.trim() !== '';
+    if (typeof v === 'number') return v > 0;
+    return false;
+  });
+}
+
 function openClientEditor(clientId = null) {
   const existing = clientId ? clients.find(c => c.id === clientId) : null;
+  // A deep copy: the address book, price list and recurring schedule are
+  // edited in place while the editor is open, and a shallow copy shared them
+  // with the book — Cancel after deleting an address still lost it, and the
+  // next save anywhere wrote that to disk.
   const draft = existing
-    ? { ...existing }
+    ? structuredClone(existing)
     : { id: uid('CLI'), nameEn: '', nameAr: '', phone: '', email: '', cr: '', vat: '', notes: '', defaultDiscount: 0, createdAt: localDateStr() };
   if (!draft.priceList) draft.priceList = [];
   const rec = draft.recurring || { enabled: false, interval: 'monthly', nextDue: '' };
@@ -1080,8 +1101,10 @@ function openClientEditor(clientId = null) {
       draft.paymentTermsDays = KhaytPaymentTerms.termsDays(
         { paymentTermsDays: modal.querySelector('#cePaymentTerms')?.value || 0 });
       draft.source = modal.querySelector('[data-f="source"]')?.value || 'other';
-      draft.priceList = (draft.priceList || []).filter(pl => pl.product.trim() || pl.price > 0);
-      draft.addresses = (draft.addresses || []).filter(a => a.label.trim() || a.address.trim());
+      // Rows with anything in them are kept, and a row another app wrote
+      // without `label` (or with fields this build does not know) never throws.
+      draft.priceList = (Array.isArray(draft.priceList) ? draft.priceList : []).filter(clientRowHasText);
+      draft.addresses = (Array.isArray(draft.addresses) ? draft.addresses : []).filter(clientRowHasText);
       if (typeof readPluginEditor === 'function') {
         const withPlugins = readPluginEditor(modal, 'customer', draft);
         if (withPlugins.plugins) draft.plugins = withPlugins.plugins; else delete draft.plugins;
