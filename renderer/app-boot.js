@@ -469,11 +469,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.hubAPI?.onMenuCommand?.((cmd) => {
     const open = (typeof openSettingsSection === 'function') ? openSettingsSection : window.KhaytShell?.openSettingsSection;
     if (cmd === 'open-settings') {
-      if (open) open(document.querySelector('.settings-nav-item.active')?.dataset.settingsSection || 'biz');
+      if (open) open(document.querySelector('.settings-nav-item.active')?.dataset.settingsSection || 'general');
     } else if (cmd === 'check-updates') {
       const btn = document.getElementById('btnCheckForUpdates');
       if (!btn) return;
-      if (open) open('data');
+      // Updates sits in General since the 14 panes; Bed Ready keeps Data.
+      if (open) open(document.getElementById('settings-panel-general') ? 'general' : 'data');
       btn.scrollIntoView({ block: 'center' });
       if (!btn.disabled) btn.click();
     }

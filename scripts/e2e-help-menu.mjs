@@ -92,9 +92,12 @@ try {
   // A Simple shop can reach Khayt Cloud (it was pro-only, so it could not).
   const cloudInSimple = await page.evaluate(() => {
     settings.mode = 'simple'; applyMode();
-    openSettingsSection('online');
+    openSettingsSection('cloud');
     const visible = !!document.querySelector('#cloudSettingsSection')?.offsetParent;
-    const portHidden = !document.querySelector('#lan_port')?.offsetParent;
+    // The LAN card is in Connections: open it, or "hidden" proves nothing.
+    openSettingsSection('connections');
+    const lanShown = !!document.querySelector('#lanApiSection')?.offsetParent;
+    const portHidden = lanShown && !document.querySelector('#lan_port')?.offsetParent;
     settings.mode = 'professional'; applyMode();
     return { visible, portHidden };
   });

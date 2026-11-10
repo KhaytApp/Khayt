@@ -90,7 +90,7 @@ try {
 
   await window.evaluate(() => { settings.mode = 'professional'; applyMode(); saveAll(); });
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="automation"]');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
   await window.waitForSelector('#btnPluginInstall', { timeout: 10000 });
 
   // ── an unsigned file is refused ──

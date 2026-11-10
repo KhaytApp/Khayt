@@ -5474,6 +5474,8 @@ function renderPrivacySettings() {
     </div>`;
 
   el.querySelector('#btnPrivReviewAi')?.addEventListener('click', () => {
+    // AI has a pane of its own: a scroll alone never reached a hidden panel.
+    (typeof openSettingsSection === 'function' ? openSettingsSection : window.KhaytShell?.openSettingsSection)?.('ai');
     document.querySelector('#aiSettingsSection')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
