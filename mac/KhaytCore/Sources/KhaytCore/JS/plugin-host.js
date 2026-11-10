@@ -194,10 +194,38 @@
   function withoutQueued(list, delivery) {
     return (Array.isArray(list) ? list : []).filter((p) => isObj(p) && p.delivery !== delivery);
   }
-  /** Items whose time has come (an unreadable time counts as due). */
+  /**
+   * An event the service TURNED DOWN (a 2xx with `success: false`,
+   * lib/plugin-payload.js replyRefusal) is not retried on its own — the same
+   * request would be turned down the same way. It stays in the outbox with
+   * `failed: { at, message }` and no next attempt, so the shop sees it and
+   * the provider's words, and can Retry once it has fixed the cause.
+   */
+  function withFailed(list, item, at, message) {
+    const out = (Array.isArray(list) ? list : []).filter((p) => isObj(p) && p.delivery !== item.delivery);
+    const failed = Object.assign({}, item, { failed: { at: String(at || ''), message: String(message || '') } });
+    delete failed.nextAttemptAt;
+    out.push(failed);
+    return out.slice(-OUTBOX_CAP);
+  }
+  /** The shop pressed Retry: no longer failed, and due now. */
+  function withRetried(list, delivery, nowIso) {
+    return (Array.isArray(list) ? list : []).map((p) => {
+      if (!isObj(p) || p.delivery !== delivery || !isObj(p.failed)) return p;
+      const again = Object.assign({}, p, { nextAttemptAt: String(nowIso || '') });
+      delete again.failed;
+      return again;
+    });
+  }
+  /** Items the service turned down, newest last. */
+  function failedQueued(list) {
+    return (Array.isArray(list) ? list : []).filter((p) => isObj(p) && typeof p.delivery === 'string' && isObj(p.failed));
+  }
+  /** Items whose time has come (an unreadable time counts as due). A failed one never is. */
   function dueQueued(list, nowMs) {
     return (Array.isArray(list) ? list : []).filter((p) => {
       if (!isObj(p) || typeof p.delivery !== 'string' || !p.delivery) return false;
+      if (isObj(p.failed)) return false;
       const at = Date.parse(p.nextAttemptAt || '');
       return !Number.isFinite(at) || at <= nowMs;
     });
@@ -333,6 +361,7 @@
     consentedEntry, updatedEntry, withEntry, withoutEntry, stateOf, liveEntries,
     actionsFor, eventTargets, fieldsFor, coerceField, withFieldValues, missingSecrets, labelOf, deliveryId,
     phoneRecord, withConfig, withQueued, withoutQueued, dueQueued, OUTBOX_CAP,
+    withFailed, withRetried, failedQueued,
     refreshTargets, refreshDue, refreshJobs, isOpenJob,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
