@@ -13,6 +13,8 @@ test('the Arabic desktop never calls Khayt Cloud "كلاود"', () => {
   const src = fs.readFileSync(path.join(__dirname, '../renderer/locales/ar.js'), 'utf8');
   const hits = src.split('\n').filter((l) => l.includes('كلاود')).map((l) => l.trim().split('"')[1]);
   assert.deepEqual(hits, []);
+  // Nor "خيط السحابي" ("the cloud Khayt"): one name, سحابة خيط, with feminine verbs.
+  assert.deepEqual(src.split('\n').filter((l) => /خَ?يط السحابي/.test(l)).map((l) => l.trim().split('"')[1]), []);
   assert.match(src, /"set\.pane_cloud": "سحابة خيط"/);
 });
 
