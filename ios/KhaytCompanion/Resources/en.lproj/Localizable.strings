@@ -1187,6 +1187,10 @@
 "connectors.settings.missing" = "Its buttons won’t send until %@ is set on your Mac or PC.";
 "connectors.error.setting" = "Set “%@” for this connector on your Mac or PC first. Nothing was sent.";
 "connectors.reply.not_saved" = "The reply couldn’t be saved on this iPhone. Copy it into the field by hand.";
+"connectors.reply.refused_said" = "%1$@ didn’t accept it: “%2$@” Nothing was recorded.";
+"connectors.reply.refused" = "%@ didn’t accept it. Nothing was recorded.";
+"connectors.reply.unconfirmed" = "%1$@ answered, but the reply didn’t include: %2$@. Nothing was recorded. Check %1$@ before sending again.";
+"connectors.error.no_customer" = "This job has no customer, and %@ needs the customer’s name, phone and address. Link a customer to the job first. Nothing was sent.";
 "connectors.field.clear" = "Clear";
 "connectors.field.footer" = "Saved on this iPhone and sent to your Mac with your other changes. Your Mac keeps it only while %@ is switched on there.";
 "connectors.field.edit" = "Edit";
@@ -1231,6 +1235,9 @@
 "diag.settings" = "Settings in the book";
 "diag.plugin_entries" = "Connector entries in settings";
 "diag.connectors_count" = "Connectors read";
+"diag.reply.last" = "Last connector reply";
+"diag.reply.no_answer" = "no answer";
+"diag.reply.no_keys" = "no JSON body";
 "diag.section.sources" = "Where the book came from";
 "diag.last_source" = "Last";
 "diag.source.mac_store" = "Mac, whole book";
