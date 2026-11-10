@@ -57,7 +57,7 @@ struct ConnectorRefreshTests {
         let (engine, entry, _) = try await Self.courier()
         let sent = Sent()
         let outcome = await Shop.connectorSend(
-            entry: entry, trigger: .refresh, order: Self.job, customer: nil,
+            entry: entry, trigger: .refresh, order: Self.job, customer: nil, settings: nil,
             secrets: ["apiKey": "test-token-not-real"], engine: engine,
             post: { p in sent.posts.append(p); return (200, Data(#"{"data":{"status":"out for delivery","id":"no"}}"#.utf8)) },
             now: Date(), delivery: "dlv_r")
@@ -76,7 +76,7 @@ struct ConnectorRefreshTests {
     func eventReply() async throws {
         let (engine, entry, _) = try await Self.courier()
         let outcome = await Shop.connectorSend(
-            entry: entry, trigger: .event("order_shipped"), order: Self.job, customer: nil,
+            entry: entry, trigger: .event("order_shipped"), order: Self.job, customer: nil, settings: nil,
             secrets: ["apiKey": "t"], engine: engine,
             post: { _ in (200, Data(#"{"id":"CO-1","courierStatus":"sneaky"}"#.utf8)) },
             now: Date(), delivery: "dlv_e")
@@ -87,7 +87,7 @@ struct ConnectorRefreshTests {
     func refusedWithoutKey() async throws {
         let (engine, entry, words) = try await Self.courier()
         let sent = Sent()
-        let outcome = await Shop.connectorSend(entry: entry, trigger: .refresh, order: Self.job, customer: nil,
+        let outcome = await Shop.connectorSend(entry: entry, trigger: .refresh, order: Self.job, customer: nil, settings: nil,
                                                secrets: [:], engine: engine,
                                                post: { p in sent.posts.append(p); return (200, nil) },
                                                now: Date(), delivery: "dlv_k")
