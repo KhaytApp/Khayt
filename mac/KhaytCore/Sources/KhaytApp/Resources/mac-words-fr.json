@@ -3907,5 +3907,12 @@
  "mac.set_group_workshop": "Atelier",
  "mac.set_group_online": "En ligne",
  "mac.nav_invoices": "Factures et paiements",
- "mac.nav_production": "Production"
+ "mac.nav_production": "Production",
+ "mac.job_customer_none": "Aucun client",
+ "mac.job_customer_locked_zatca": "La facture a été transmise à la ZATCA : le client ne peut plus être modifié.",
+ "mac.job_customer_locked_voided": "La facture a été annulée : le client ne peut plus être modifié.",
+ "mac.job_customer_locked_credited": "La facture a un avoir : le client ne peut plus être modifié.",
+ "mac.job_customer_locked_paid": "Un paiement a été reçu pour ce travail : le client ne peut plus être modifié.",
+ "mac.job_customer_unknown": "Ce client n’est plus dans le registre.",
+ "mac.job_customer_currency": "Ce client est facturé dans une autre devise. Le travail garde son prix et sa devise."
 }

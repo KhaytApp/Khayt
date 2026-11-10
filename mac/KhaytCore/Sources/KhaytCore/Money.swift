@@ -392,6 +392,14 @@ public struct JobEdited: Decodable, Sendable {
     public let changed: Bool
 }
 
+/// A job given another customer — `lib/order-edit.js changeCustomer`.
+public struct CustomerChange: Decodable, Sendable {
+    public let order: JSONValue
+    public let ok: Bool
+    public let reason: String?
+    public let currencyDiffers: Bool
+}
+
 /// A job that failed inspection, and the waste row it produced.
 public struct QcFailure: Decodable, Sendable {
     public let order: JSONValue
