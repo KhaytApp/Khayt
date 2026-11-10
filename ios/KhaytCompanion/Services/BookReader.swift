@@ -164,7 +164,11 @@ actor BookReader {
             if !outbox.isEmpty {
                 merged = try await engine().foldDeltas(base: upstream, deltas: [outbox.wire]).store
             }
+            // Noted against the baseline these edits were made from, before
+            // it moves up to upstream's copy below.
+            let revs = Self.baseRevs(of: outbox, baseline: baseline, held: book.baseRevs())
             if try book.swap(from: local, to: merged) {
+                book.writeBaseRevs(revs)
                 book.writeScope(scope)
                 try book.replaceBaseline(with: upstream)
                 return
@@ -567,10 +571,52 @@ actor BookReader {
     /// The outbox AND the book it was measured from. A sender hands `book`
     /// to `CompanionBook.markSynced` once upstream has taken the outbox, so
     /// anything written here while the send was in flight stays pending.
-    func pendingSnapshot() async throws -> (outbox: KhaytEngine.Outbox, book: [String: JSONValue])? {
+    func pendingSnapshot() async throws -> (outbox: KhaytEngine.Outbox, book: [String: JSONValue],
+                                             baseRevs: [String: Double])? {
         guard let baseline = book.baseline() else { return nil }
         let local = try book.read()
-        return (try await Self.outbox(engine(), local: local, server: baseline), local)
+        let outbox = try await Self.outbox(engine(), local: local, server: baseline)
+        let revs = Self.baseRevs(of: outbox, baseline: baseline, held: book.baseRevs())
+        book.writeBaseRevs(revs)
+        return (outbox, local, revs)
+    }
+
+    /// The rev each delta's record started from: the one already noted, else
+    /// the baseline's copy (this is the edit's first measurement, so the
+    /// baseline is still the copy it was made from). None for a record the
+    /// baseline does not hold: this phone created it. Only records still in
+    /// the outbox are kept, so a note for an edit upstream outranked or that
+    /// went another way does not linger.
+    nonisolated static func baseRevs(of outbox: KhaytEngine.Outbox, baseline: [String: JSONValue],
+                                     held: [String: Double]) -> [String: Double] {
+        var out: [String: Double] = [:]
+        for case .object(let d) in outbox.deltas {
+            guard case .string(let collection)? = d["collection"], case .object(let r)? = d["record"],
+                  case .string(let id)? = r["id"] else { continue }
+            let key = collection + "/" + id
+            if let rev = held[key] { out[key] = rev; continue }
+            guard case .array(let rows)? = baseline[collection] else { continue }
+            for case .object(let row) in rows where row["id"] == .string(id) {
+                if case .number(let rev)? = row["rev"], rev.isFinite { out[key] = rev }
+                break
+            }
+        }
+        return out
+    }
+
+    /// The outbox as `POST /api/store/deltas` takes it: each delta of a record
+    /// this phone edited carries `baseRev` (on the delta, not in the record).
+    /// A Mac that predates the field ignores it.
+    nonisolated static func wire(_ outbox: KhaytEngine.Outbox, baseRevs: [String: Double]) -> [String: JSONValue] {
+        var wire = outbox.wire
+        wire["deltas"] = .array(outbox.deltas.map { delta in
+            guard case .object(var d) = delta, case .string(let collection)? = d["collection"],
+                  case .object(let r)? = d["record"], case .string(let id)? = r["id"],
+                  let rev = baseRevs[collection + "/" + id] else { return delta }
+            d["baseRev"] = .number(rev)
+            return .object(d)
+        })
+        return wire
     }
 
     /// Collections the phone READS and never sends. The catalogue reaches

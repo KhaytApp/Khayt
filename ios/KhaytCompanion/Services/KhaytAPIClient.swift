@@ -498,9 +498,9 @@ final class KhaytAPIClient: ObservableObject {
     func sendPendingChanges() async throws -> Int? {
         guard let book, let reader else { return nil }
         guard let pending = try await reader.pendingSnapshot(), !pending.outbox.isEmpty else { return nil }
-        let (outbox, measured) = pending
+        let (outbox, measured, baseRevs) = pending
 
-        let body = try JSONEncoder().encode(JSONValue.object(outbox.wire))
+        let body = try JSONEncoder().encode(JSONValue.object(BookReader.wire(outbox, baseRevs: baseRevs)))
         let (data, response) = try await request(path: "/api/store/deltas", method: "POST",
                                                  body: body, requiresPin: true)
         guard let http = response as? HTTPURLResponse else {
