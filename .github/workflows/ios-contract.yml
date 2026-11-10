@@ -20,6 +20,14 @@ on:
   pull_request:
     branches: [main]
 
+# Every `run:` is `bash -eo pipefail` (GitHub's default without `shell:` is
+# `bash -e`, with NO pipefail): a step that pipes a test into tail, tee or grep
+# must fail when the test does. `xcodebuild test | tail` was green with
+# ** TEST FAILED ** from Jul 28 to Nov 10 2026.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ios-relevant:
     name: Does this touch the iPhone app?
@@ -51,11 +59,15 @@ jobs:
           # - lib/ and plugins/: the unit tests also read lib/*.js and
           #   plugins/samples/*.json straight from the checkout (parity checks,
           #   SENDABLE_FIELDS), not only through the synced copies.
+          # - renderer/locales/: the source mac/sync-js.sh copies into the
+          #   phone's engine as locale-*.js.
           # - renderer/invoice.css (the phone's copy must not drift) and
           #   docs/lan-device-keys.vectors.json (shared signing vectors).
           #   RepoPathsInTheFilterTests fails if a test reads a path this misses.
-          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|docs/lan-device-keys\.vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
-          if printf '%s\n' "$files" | grep -qE "$pattern"; then run=true; else run=false; fi
+          pattern='^(ios/|mac/KhaytCore/|lib/|plugins/|renderer/analytics\.js$|renderer/invoice\.css$|renderer/locales/|docs/lan-device-keys\.vectors\.json$|scripts/ios-contract-|\.github/workflows/ios-contract\.yml$)'
+          # A here-string, not `printf | grep -q`: under pipefail grep's early
+          # exit can SIGPIPE printf on a long list and flip the answer.
+          if grep -qE "$pattern" <<< "$files"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 
   contract:
@@ -128,4 +140,5 @@ jobs:
       # The assertion lines are spread through the log, above tail's 60.
       - name: Which assertions failed
         if: failure()
-        run: grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test' "$RUNNER_TEMP/companion-tests.log" | head -200 || true
+        run: |
+          grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test' "$RUNNER_TEMP/companion-tests.log" | head -200 || true
