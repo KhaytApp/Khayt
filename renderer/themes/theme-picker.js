@@ -66,7 +66,11 @@
       : (selected ? `<span class="theme-picker-badge">${escapeHtml(tr('theme.design.selected_badge', 'Selected'))}</span>` : '');
 
     return `<button type="button" class="theme-picker-card${sel}${soonCls}" data-theme-id="${escapeHtml(id)}"${dis} role="radio" aria-checked="${selected ? 'true' : 'false'}" aria-label="${label}">
-      <img class="theme-picker-shot" src="${src}" alt="" loading="lazy" />
+      ${soon && !theme?.preview
+    // A design that is not built has no screenshot: asking for one only logs a
+    // failed load (pulse.png, stream.png) on every visit to General.
+    ? `<div class="theme-picker-shot-fallback">${label}</div>`
+    : `<img class="theme-picker-shot" src="${src}" alt="" loading="lazy" />`}
       <span class="theme-picker-body">
         <strong>${label}</strong>
         <span>${desc}</span>

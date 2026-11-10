@@ -77,7 +77,7 @@ async function testStorefrontImportLinkReachesTheClipboard(window) {
      * is asserting on. So the shop says where it is, and this stays a test of
      * the copy button. */
     settings.country = 'US';
-    KhaytShell.openSettingsSection('online');
+    KhaytShell.openSettingsSection('store');
     renderIntegrationsSettings();
   }, CLOUD);
 

@@ -144,7 +144,7 @@ const rawTetra = () => zipWrite.writeZip([{ name: '3D/3dmodel.model', data: Buff
 /** Configure the estimator the way a shop does — through the panel. */
 async function setShopEstimator(window, { density, wall, infill }) {
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="prefs"]');
+  await window.click('.settings-nav-item[data-settings-section="printers"]');
   await window.waitForSelector('#est_density');
   await window.evaluate(({ d, w, i }) => {
     const el = document.querySelector('#estimatorSettings');

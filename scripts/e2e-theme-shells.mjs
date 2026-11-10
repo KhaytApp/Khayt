@@ -113,7 +113,7 @@ async function navigateSecondaryTab(window, themeCase) {
   await switchTab(window, 'settings-tab');
   const settingsReady = await window.evaluate(
     () => document.getElementById('settings-tab')?.classList.contains('active') === true
-      && !!document.querySelector('#settings-panel-prefs'),
+      && !!document.querySelector('#settings-panel-general'),
   );
   if (!settingsReady) throw new Error(`${themeCase.id}: settings tab did not activate`);
 }

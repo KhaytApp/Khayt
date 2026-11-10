@@ -53,7 +53,7 @@ try {
   // path a shop does.
   await page.evaluate(() => window.KhaytShell?.switchTab?.('settings-tab'));
   await page.waitForTimeout(600);
-  await page.evaluate(() => document.querySelector('.settings-nav-item[data-settings-section="data"]')?.click());
+  await page.evaluate(() => document.querySelector('.settings-nav-item[data-settings-section="library"]')?.click());
   await page.waitForSelector('#set_plibS3Provider', { state: 'visible', timeout: 30_000 });
   // The panel paints on demand; the section switch does not necessarily reach it.
   await page.evaluate(() => window.KhaytSettings?.renderPrintLibLocation?.());

@@ -24,7 +24,7 @@ try {
   // Khayt Cloud's card is in the Professional view.
   await window.evaluate(() => { settings.mode = 'professional'; applyMode(); saveAll(); });
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="online"]');
+  await window.click('.settings-nav-item[data-settings-section="cloud"]');
   const stand = (open) => electronApp.evaluate(({ ipcMain }, open) => {
     const GB = 1024 ** 3;
     const S = globalThis.__plan || (globalThis.__plan = { plan: 'free', status: 'active', posts: [] });
