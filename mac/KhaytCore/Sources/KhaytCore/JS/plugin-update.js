@@ -355,6 +355,24 @@
   }
 
   /**
+   * The shop flips a connector's switch. While its version is withdrawn the
+   * entry stays OFF — an old build only reads `enabled` — and the shop's
+   * choice is kept as `revoked.wasEnabled`, which is what the fixed version
+   * restores: switched off by the shop while revoked stays off after the fix.
+   */
+  function setSwitch(settings, id, enabled) {
+    const s0 = isObj(settings) ? settings : {};
+    const entry = (Array.isArray(s0.plugins) ? s0.plugins : []).find((p) => isObj(p) && p.id === id);
+    if (!entry) return { ok: false, settings: s0 };
+    const state = clone(stateOf(s0, id));
+    if (isObj(state.revoked) && state.revoked.version === entry.version) {
+      state.revoked.wasEnabled = !!enabled;
+      return { ok: true, settings: withBoth(s0, Object.assign({}, entry, { enabled: false }), state), revoked: true };
+    }
+    return { ok: true, settings: withBoth(s0, Object.assign({}, entry, { enabled: !!enabled }), undefined) };
+  }
+
+  /**
    * Which manifest this device runs for an entry: `{ run, which, manifest,
    * granted, why }`. A withdrawn version never runs. Otherwise the entry when
    * it checks out; else the previous version when THAT checks out here (a
@@ -439,7 +457,7 @@
   const api = {
     INDEX_CONTEXT, INDEX_FORMAT, KINDS, EXPIRY_DAYS, RESIGN_DAYS, CLOCK_SLACK_MS, REASON_MAX,
     compareVersions, indexSigningMessage, checkIndex, rowFor, stateOf, lastSerial,
-    planUpdate, planWithManifest, applyPlan, agree, revert, runnable, fetchesFor, applyIndex,
+    planUpdate, planWithManifest, applyPlan, agree, revert, setSwitch, runnable, fetchesFor, applyIndex,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPluginUpdate = api;

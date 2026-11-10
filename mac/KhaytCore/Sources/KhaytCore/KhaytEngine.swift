@@ -8623,6 +8623,14 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginUpdate.revert(ARG0, ARG1)", [settings, .string(id)], as: JSONValue.self)
     }
 
+    /// The shop flips a connector's switch: `{ ok, settings, revoked? }`. While
+    /// its version is withdrawn the entry stays off and the choice is kept for
+    /// when the fixed version arrives.
+    public func pluginSetSwitch(settings: JSONValue, id: String, enabled: Bool) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.setSwitch(ARG0, ARG1, ARG2)",
+                          [settings, .string(id), .bool(enabled)], as: JSONValue.self)
+    }
+
     /// Which manifest runs for an entry: `{ run, which, manifest, granted, why, reason? }`.
     public func pluginRunnable(entry: JSONValue, settings: JSONValue) throws -> JSONValue {
         try runtime.call2("(function(){ var U = globalThis.KhaytPluginUpdate;"

@@ -323,3 +323,26 @@ test('checkEntry takes an `ext` object from now on, so the next shape change nee
   assert.equal(M.checkEntry(Object.assign({}, e, { ext: 'x' })).ok, false);
   assert.equal(M.checkEntry(Object.assign({}, e, { previous: {} })).ok, false, 'still strict about everything else');
 });
+
+test("the fixed version brings the switch back only if the shop had it on — its own choice while revoked is kept", () => {
+  const rev = { revoked: [{ version: '1.0.0', reason: 'Reports a refused order as sent.' }] };
+  const revoked = U.applyIndex(book(), index([row('1.0.0', rev)]), CTX, {}).settings;
+  // (a) On before the revocation, left alone: back on after the fix.
+  const fixedA = U.applyIndex(revoked, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedA.plugins[0].enabled, true);
+  // (b) On before, but the shop switched it OFF while it was revoked: stays off.
+  const off = U.setSwitch(revoked, LAMHA.id, false);
+  assert.equal(off.revoked, true);
+  assert.equal(off.settings.plugins[0].enabled, false, 'still off for old builds');
+  assert.equal(U.stateOf(off.settings, LAMHA.id).revoked.wasEnabled, false);
+  const fixedB = U.applyIndex(off.settings, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedB.plugins[0].enabled, false);
+  // Switching it on while revoked does not run it, and is what the fix restores.
+  const on = U.setSwitch(off.settings, LAMHA.id, true);
+  assert.equal(on.settings.plugins[0].enabled, false);
+  assert.equal(U.runnable(on.settings.plugins[0], U.stateOf(on.settings, LAMHA.id)).why, 'revoked');
+  const fixedC = U.applyIndex(on.settings, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedC.plugins[0].enabled, true);
+  // Not revoked: the switch is just the switch.
+  assert.equal(U.setSwitch(book(), LAMHA.id, false).settings.plugins[0].enabled, false);
+});
