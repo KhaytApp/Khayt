@@ -1173,10 +1173,12 @@ public actor KhaytEngine {
         // button or event sends. The phone runs these too, so a request is
         // identical on every device. `plugin-payload` reads
         // `KhaytPluginManifest` at load, so it comes second; `plugin-host`
-        // (which connectors are live, and how an entry changes) third.
+        // (which connectors are live, and how an entry changes) third;
+        // `plugin-update` (the signed update index, Nov 10) last.
         "plugin-manifest",
         "plugin-payload",
         "plugin-host",
+        "plugin-update",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -8576,6 +8578,58 @@ public actor KhaytEngine {
 
     /// The ed25519 public keys that make a manifest "reviewed": `[{id, key}]`,
     /// key = base64 of the raw 32 bytes. Any one verifying is enough.
+    // ── Connector updates — lib/plugin-update.js (Nov 10) ──
+    //
+    // The lib does no cryptography: the Mac checks the index signature
+    // (`Connectors.indexSignedBy`) over `pluginIndexMessage`, and every
+    // downloaded manifest (sha256, then `Connectors.reviewedBy`) before
+    // handing it in. An index that fails `checkIndex` changes nothing.
+
+    /// The exact bytes the index signature covers: "khayt-index-v1\n" + its
+    /// canonical JSON, `signature` left out.
+    public func pluginIndexMessage(_ index: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytPluginUpdate.indexSigningMessage(ARG0)", [index], as: String.self)
+    }
+
+    /// `{ ok, reason }` — may this index be acted on.
+    public func pluginCheckIndex(_ index: JSONValue, signedBy: String?, lastSerial: Int?, now: Date) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.checkIndex(ARG0, { signedBy: ARG1, lastSerial: ARG2, nowMs: ARG3 })",
+                          [index, signedBy.map(JSONValue.string) ?? .null, lastSerial.map { .number(Double($0)) } ?? .null,
+                           .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Step 1 of a check: `[{ id, version, url, sha256, size }]` to download;
+    /// empty for an index that cannot be trusted. `ctx`: `{ signedBy, nowMs,
+    /// platform, appVersion, schema }`.
+    public func pluginUpdateFetches(settings: JSONValue, index: JSONValue, ctx: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.fetchesFor(ARG0, ARG1, ARG2)", [settings, index, ctx], as: JSONValue.self)
+    }
+
+    /// Step 2: `{ ok, reason, settings, changed, notes }`. `fetched` maps id →
+    /// a manifest this Mac has VERIFIED.
+    public func pluginApplyIndex(settings: JSONValue, index: JSONValue, ctx: JSONValue, fetched: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.applyIndex(ARG0, ARG1, ARG2, ARG3)",
+                          [settings, index, ctx, fetched], as: JSONValue.self)
+    }
+
+    /// The shop agreed to the pending version: `{ ok, settings }`.
+    public func pluginAgreeUpdate(settings: JSONValue, id: String, now: Date) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.agree(ARG0, ARG1, { nowMs: ARG2 })",
+                          [settings, .string(id), .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Back to the version before the last update: `{ ok, settings }`.
+    public func pluginRevertUpdate(settings: JSONValue, id: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.revert(ARG0, ARG1)", [settings, .string(id)], as: JSONValue.self)
+    }
+
+    /// Which manifest runs for an entry: `{ run, which, manifest, granted, why, reason? }`.
+    public func pluginRunnable(entry: JSONValue, settings: JSONValue) throws -> JSONValue {
+        try runtime.call2("(function(){ var U = globalThis.KhaytPluginUpdate;"
+                        + " return U.runnable(ARG0, U.stateOf(ARG1, ARG0 && ARG0.id)); })()",
+                          [entry, settings], as: JSONValue.self)
+    }
+
     public func pluginSigningKeys() throws -> [JSONValue] {
         try runtime.call2("globalThis.KhaytPluginManifest.SIGNING_KEYS.slice()", [], as: [JSONValue].self)
     }

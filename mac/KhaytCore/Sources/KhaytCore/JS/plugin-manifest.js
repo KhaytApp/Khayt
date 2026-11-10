@@ -659,7 +659,11 @@
   function checkEntry(e) {
     const errors = [];
     if (!isObj(e)) return { ok: false, errors: ['an entry is an object'], paused: true };
-    checkOnly(errors, 'entry', e, ['id', 'version', 'enabled', 'manifest', 'granted', 'config', 'secrets']);
+    // `ext` is room to grow (Nov 10): any later per-entry data goes in it, so a
+    // shape change never again turns every older build's connectors invalid —
+    // the reason update state lives beside the entries (lib/plugin-update.js).
+    checkOnly(errors, 'entry', e, ['id', 'version', 'enabled', 'manifest', 'granted', 'config', 'secrets', 'ext']);
+    if (e.ext !== undefined && !isObj(e.ext)) errors.push('ext: an object');
     const v = validateManifest(e.manifest);
     v.errors.forEach(x => errors.push('manifest: ' + x));
     if (isObj(e.manifest) && (e.id !== e.manifest.id || e.version !== e.manifest.version)) {

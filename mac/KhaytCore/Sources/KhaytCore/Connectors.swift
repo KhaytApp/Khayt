@@ -35,6 +35,24 @@ public enum Connectors {
         return nil
     }
 
+    /// Which published key signed the update index — its `signature` is
+    /// `{ keyId, sig }` over `message` (`KhaytEngine.pluginIndexMessage`: the
+    /// "khayt-index-v1" context, then the canonical JSON). Nil unless the key
+    /// named is the one that verifies.
+    public static func indexSignedBy(index: JSONValue, message: String, keys: [JSONValue]) -> String? {
+        guard case .object(let ix) = index, case .object(let sig)? = ix["signature"],
+              case .string(let keyId)? = sig["keyId"], case .string(let b64)? = sig["sig"],
+              let signature = Data(base64Encoded: b64), signature.count == 64 else { return nil }
+        let data = Data(message.utf8)
+        for k in keys {
+            guard case .object(let o) = k, case .string(let id)? = o["id"], id == keyId,
+                  case .string(let keyB64)? = o["key"], let raw = Data(base64Encoded: keyB64),
+                  let key = try? Curve25519.Signing.PublicKey(rawRepresentation: raw) else { continue }
+            if key.isValidSignature(signature, for: data) { return id }
+        }
+        return nil
+    }
+
     // MARK: - The request
 
     /// A new idempotency id: "dlv_" + a random lower-case UUID. Minted once
