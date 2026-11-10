@@ -2174,16 +2174,24 @@ final class LanServer {
         let now = host.now()
         let key = Self.throttleKey(request.remote) + ":wh:" + source
         let record = webhookFailures[key]
-        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
-            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
-        }
+        // THE SIGNATURE IS JUDGED BEFORE THE LOCKOUT. A storefront or a carrier
+        // reaches this Mac through a proxy or tunnel the shop runs, so every
+        // delivery arrives from one address: ten unsigned requests a minute
+        // from anyone kept that address locked out, and the genuine, correctly
+        // signed deliveries were answered 429 before their signature was
+        // looked at — orders silently never arrived. A valid signature now
+        // passes whatever the lockout says; only a request that FAILS it is
+        // throttled and counted.
+        let lockedOut = (try? await host.engine.lanIsLockedOut(record, now: now)) == true
         guard let secret = host.storefrontSecrets[source], !secret.isEmpty else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             let name = source == "salla" ? "Salla" : "Zid"
             return .json(403, #"{"error":"\#(name) webhook secret not configured in LAN settings"}"#)
         }
         let header = source == "salla" ? "x-salla-signature" : "x-zid-signature"
         let provided = request.headers[header] ?? ""
         guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 webhookFailures[key] = bumped
             }
@@ -2243,14 +2251,22 @@ final class LanServer {
         let now = host.now()
         let key = Self.throttleKey(request.remote) + ":wh:" + carrier
         let record = webhookFailures[key]
-        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
-            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
-        }
+        // THE SIGNATURE IS JUDGED BEFORE THE LOCKOUT. A storefront or a carrier
+        // reaches this Mac through a proxy or tunnel the shop runs, so every
+        // delivery arrives from one address: ten unsigned requests a minute
+        // from anyone kept that address locked out, and the genuine, correctly
+        // signed deliveries were answered 429 before their signature was
+        // looked at — orders silently never arrived. A valid signature now
+        // passes whatever the lockout says; only a request that FAILS it is
+        // throttled and counted.
+        let lockedOut = (try? await host.engine.lanIsLockedOut(record, now: now)) == true
         guard let secret = host.carrierSecrets[carrier], !secret.isEmpty else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             return .json(403, #"{"error":"Carrier webhook secret not configured in Shipping settings"}"#)
         }
         let provided = request.headers["x-khayt-signature"] ?? request.headers["x-signature"] ?? ""
         guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 webhookFailures[key] = bumped
             }

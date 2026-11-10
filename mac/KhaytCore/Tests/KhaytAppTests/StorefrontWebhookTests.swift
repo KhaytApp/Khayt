@@ -227,7 +227,7 @@ struct StorefrontWebhookTests {
         #expect(bench.writes.n == 0)
     }
 
-    @Test("a wrong signature is 401, ten of them lock the channel, and the PIN is not locked with it")
+    @Test("a wrong signature is 401, ten of them lock out the WRONG ones, and a right signature still gets through")
     func wrongSignatureLocks() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
@@ -235,9 +235,18 @@ struct StorefrontWebhookTests {
             let reply = try await bench.deliver("salla", Self.salla("SL-x\(i)"), secret: "wrong")
             #expect(reply.status == 401)
         }
-        let locked = try await bench.deliver("salla", Self.salla("SL-6"))
-        #expect(locked.status == 429, "a right signature after ten wrong ones got through the lockout")
+        // The eleventh wrong one is throttled, and counted no further.
+        let locked = try await bench.deliver("salla", Self.salla("SL-x10"), secret: "wrong")
+        #expect(locked.status == 429)
         #expect(bench.writes.n == 0)
+        // A RIGHT signature is the storefront itself, whatever the lockout
+        // says (the Nov 10 2026 review). Deliveries reach a Mac through one
+        // proxy address, so anyone sending unsigned requests held that address
+        // locked and the shop's real orders were answered 429 and lost. HMAC
+        // cannot be guessed, so letting a valid one through opens nothing.
+        let genuine = try await bench.deliver("salla", Self.salla("SL-6"))
+        #expect(genuine.status == 200, "a genuine delivery was shut out by somebody else's bad requests")
+        #expect(bench.writes.n == 1)
         // Another channel, and the owner's PIN, are their own buckets.
         #expect(try await bench.deliver("zid", #"{"order":{"reference_id":"ZD-1"}}"#).status == 200)
         var request = URLRequest(url: URL(string: "http://127.0.0.1:\(bench.port)/api/queue")!)
