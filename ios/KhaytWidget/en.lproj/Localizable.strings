@@ -42,3 +42,6 @@
 "Pair Khayt with your shop to see its money here." = "Pair Khayt with your shop to see its money here.";
 "Khayt Money" = "Khayt Money";
 "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked.";
+
+/* The app's name in the widget's header. Arabic writes it in Arabic letters. */
+"Khayt" = "Khayt";

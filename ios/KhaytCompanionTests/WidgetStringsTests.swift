@@ -28,7 +28,7 @@ final class WidgetStringsTests: XCTestCase {
         let found = regex.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap {
             Range($0.range(at: 1), in: source).map { String(source[$0]) }
         }
-        let shown = Set(found).subtracting(["Khayt"])   // the product's name, not a word
+        let shown = Set(found)
         XCTAssertFalse(shown.isEmpty, "the pattern still finds the widget's words")
         XCTAssertEqual(shown.filter { ar[$0] == nil }.sorted(), [], "shown by the widget, missing from ar.lproj")
         XCTAssertNotNil(ar["LAN connected"])
@@ -47,11 +47,16 @@ final class WidgetStringsTests: XCTestCase {
         }
     }
 
-    /// In Arabic the app's name is the Latin "Khayt": "خيط" is the word for filament.
+    /// In Arabic the app's name is خيط in Arabic letters, and "تطبيق خيط" in a
+    /// sentence, so it can't be read as the word for filament; the header says خيط.
     /// And the Money widget's figures are net of VAT, so nothing may say VAT is included.
     func testTheAppsNameAndNoVATIncluded() throws {
+        XCTAssertEqual(try table("ar")["Khayt"], "خيط")
         for (key, value) in try table("ar") {
-            XCTAssertFalse(value.contains("خيط"), "\(key): the app is \"Khayt\" in Arabic")
+            XCTAssertFalse(value.contains("Khayt"), "\(key): the app is خيط in Arabic")
+            if key != "Khayt" && key != "Khayt Money" {
+                XCTAssertFalse(value.replacingOccurrences(of: "تطبيق خيط", with: "").contains("خيط"), "\(key): a bare خيط")
+            }
             XCTAssertFalse(value.contains("شامل الضريبة"), key)
         }
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {

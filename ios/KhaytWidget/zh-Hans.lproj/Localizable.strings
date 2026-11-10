@@ -42,3 +42,6 @@
 "Pair Khayt with your shop to see its money here." = "将 Khayt 与你的店铺配对，即可在此查看金额。";
 "Khayt Money" = "Khayt 收支";
 "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "今日收入、客户欠款和库存不足的线材。iPhone 锁定时隐藏金额。";
+
+/* The app's name in the widget's header. Arabic writes it in Arabic letters. */
+"Khayt" = "Khayt";
