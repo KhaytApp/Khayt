@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "Teslim alma saatleri",
  "mac.pickup_map": "Harita bağlantısı",
  "mac.pickup_hint": "Sipariş bir kargo firmasında değilken müşterinin sipariş sayfasında adresinizle birlikte gösterilir. Teslim alma kartı göstermemek için ikisini de boş bırakın.",
- "mac.paylink_title": "Ödeme bağlantısı",
+ "mac.paylink_title": "Müşteri sayfalarındaki ödeme düğmesi",
  "mac.paylink_url": "Bağlantı",
  "mac.paylink_label": "Etiket (isteğe bağlı)",
  "mac.paylink_role": "Ödeme bağlantısını yalnızca dükkânın sahibi veya bir yönetici değiştirebilir.",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "Fiyatlandırma ve Vergi",
  "mac.nav_team": "Ekip ve Erişim",
  "mac.set_group_workshop": "Atölye",
- "mac.set_group_online": "Çevrimiçi"
+ "mac.set_group_online": "Çevrimiçi",
+ "mac.nav_invoices": "Faturalar ve Ödemeler",
+ "mac.nav_production": "Üretim"
 }

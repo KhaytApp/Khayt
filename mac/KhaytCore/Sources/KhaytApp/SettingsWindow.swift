@@ -8,9 +8,7 @@ import KhaytCore
 ///
 /// Stage 2 moves sections into fourteen panes one group at a time, without
 /// changing what any of them does. Panes that have not been split yet keep
-/// their old names until their group's turn: `invoice`, `payments` and
-/// `operations` empty into Pricing & Tax, Invoices & Payments and Production,
-/// `slicers` and `preferences` into Printers & Slicers and Library & Files,
+/// their old names until their group's turn: `slicers` and `preferences` into Printers & Slicers and Library & Files,
 /// `online` and `integrations` into Online Store, Notifications and
 /// Connections.
 ///
@@ -18,7 +16,7 @@ import KhaytCore
 /// in code and in snapshot file names, never something stored on disk.
 enum SettingsPane: String, CaseIterable, Identifiable {
     case general
-    case shop, pricing, invoice, payments, operations, team
+    case shop, pricing, invoices, production, team
     case slicers, preferences
     case cloud, online, integrations, assistant
     var id: String { rawValue }
@@ -41,7 +39,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var group: Group {
         switch self {
         case .general: .top
-        case .shop, .pricing, .invoice, .payments, .operations, .team: .shop
+        case .shop, .pricing, .invoices, .production, .team: .shop
         case .slicers, .preferences: .workshop
         case .cloud, .online, .integrations, .assistant: .online
         }
@@ -53,9 +51,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general:      "mac.nav_general"
         case .shop:         "mac.nav_shop"
         case .pricing:      "mac.nav_pricing"
-        case .invoice:      "set.nav_invoice"
-        case .payments:     "set.nav_payments"
-        case .operations:   "set.nav_ops"
+        case .invoices:     "mac.nav_invoices"
+        case .production:   "mac.nav_production"
         case .team:         "mac.nav_team"
         case .integrations: "mac.nav_integrations"
         case .slicers:      "mac.nav_slicers"
@@ -71,9 +68,8 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general:      "gearshape"
         case .shop:         "building.2"
         case .pricing:      "percent"
-        case .invoice:      "doc.text"
-        case .payments:     "creditcard"
-        case .operations:   "gearshape.2"
+        case .invoices:     "doc.text"
+        case .production:   "gearshape.2"
         case .team:         "person.2"
         case .integrations: "shippingbox"
         case .slicers:      "cube.transparent"
@@ -164,9 +160,8 @@ struct SettingsWindow: View {
         case .shop:         ShopPane(shop: shop)
         case .pricing:      PricingPane(shop: shop)
         case .team:         TeamPane(shop: shop)
-        case .invoice:      InvoicePane(shop: shop)
-        case .payments:     PaymentsPane(shop: shop)
-        case .operations:   OperationsPane(shop: shop)
+        case .invoices:     InvoicesPane(shop: shop)
+        case .production:   ProductionPane(shop: shop)
         case .integrations: IntegrationsPane(shop: shop)
         case .slicers:      SlicersPane(shop: shop)
         case .online:       OnlinePane(shop: shop)
@@ -196,6 +191,22 @@ struct SettingsReader {
     func object(_ key: String) -> [String: JSONValue] {
         if case .object(let o)? = settings[key] { return o }
         return [:]
+    }
+}
+
+/// A number row in a settings form, with the unit it is in where the label
+/// does not already say. Most labels carry theirs — "Finishing & QC (days)",
+/// "Rush fee percentage (%)" — because they were written for a screen with no
+/// room beside the box. The money ones do not, and "Minimum order amount" is a
+/// figure a shop has no way to read as riyals rather than a count.
+@MainActor
+func settingsNumberRow(_ shop: Shop, _ key: String, _ value: Binding<Double>, unit: String = "") -> some View {
+    row(shop.words.callIt(key)) {
+        HStack(spacing: 4) {
+            TextField("", value: value, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                .multilineTextAlignment(.trailing).frame(width: 90)
+            if !unit.isEmpty { Text(unit).foregroundStyle(.secondary) }
+        }
     }
 }
 
@@ -523,112 +534,11 @@ struct ShopPane: View {
 
 // MARK: - Pricing & tax
 
-/// What the shop's work costs it and what it charges. Stage 2a moves the
-/// running and fixed costs here from the old Business pane; the currency,
-/// tax, exchange rates, quote rules, loyalty and targets follow in 2b.
+/// What the shop's work costs it and what it charges: currency and tax,
+/// exchange rates, running and fixed costs, quote rules, loyalty and targets
+/// (Settings stage 2).
 struct PricingPane: View {
     let shop: Shop
-
-    struct Draft: Equatable {
-        /// The shop's electricity tariff (`settings.elecRate`), per kWh. Nil
-        /// is "not said" — Khayt's default applies, and the key stays absent.
-        var elecRate: Double?
-
-        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
-            // Only a figure the field can show. Junk (`"abc"`, `"inf"`, `"nan"`)
-            // shows empty — and saving the pane untouched still leaves it
-            // byte-identical: the form sends "" both as edited and as opened,
-            // so `RoundTrip` puts the stored value back (`applySettings`).
-            Draft(elecRate: Shop.plainNumber(settings["elecRate"]).flatMap { $0.isFinite ? $0 : nil })
-        }
-        /// Blank goes as "" — `settings-edit` deletes the key for it, so a
-        /// cleared field returns the shop to the default rather than to 0.
-        func form() -> [String: JSONValue] {
-            ["elecRate": elecRate.map { .number($0) } ?? .string("")]
-        }
-    }
-
-    @State private var draft = Draft()
-    @State private var original = Draft()
-    /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
-    /// from the rule, never restated here.
-    @State private var defaultElecRate: Double?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                // ── WHAT A kWh COSTS THIS SHOP ────────────────────────────
-                //
-                // `settings.elecRate`, layered by `lib/print-rates.js` between
-                // Khayt's default and a calculator preset — so a failed print
-                // and the power-by-machine report, which have no preset, are
-                // charged what the shop actually pays.
-                Section(shop.words.callIt("mac.set_running_costs")) {
-                    row(shop.words.callIt("mac.set_elec_rate")) {
-                        HStack(spacing: 4) {
-                            TextField("", value: $draft.elecRate,
-                                      format: .number.locale(Money.digits).precision(.fractionLength(0...3)),
-                                      prompt: defaultElecRate.map { Text(Money.fieldValue($0)) })
-                                .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 90)
-                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
-                        }
-                    }
-                    Text(shop.words.callIt("mac.set_elec_rate_hint",
-                                           // With its currency, as every other money hint
-                                           // in Settings is: "Khayt's 0.18" said nothing
-                                           // about what 0.18 was.
-                                           ["rate": .string(defaultElecRate.map { Money.text($0, shop.currency) } ?? "")]))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // What the shop pays every month. Here, beside the tax
-                // registration, because this is the pane about the business
-                // itself rather than about a screen — and because Reports
-                // sends a shop to "Settings" for it without saying which pane.
-                // It saves itself: it is a LIST, and a list reverted by the
-                // bar below along with the shop's name is a surprise.
-                FixedCostsSettings(shop: shop)
-
-            }
-            .formStyle(.grouped)
-            SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form()); reset() } },
-                    revert: { draft = original })
-        }
-        .task(id: shop.settingsValue) { reset() }
-        .task { defaultElecRate = await shop.printRateDefault("elecRate", settings: [:]) }
-    }
-
-    private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
-}
-
-// MARK: - Team & access
-
-/// Who works at the shop and how they sign in: operators, staff sign-in and
-/// PINs on this Mac, and (for the owner) the Khayt Cloud team and the devices
-/// signed in to it. Every section here saves itself; there is no Save bar.
-struct TeamPane: View {
-    let shop: Shop
-
-    var body: some View {
-        Form {
-            Section { OperatorsSection(shop: shop) }
-            Section { LockSection(shop: shop) }
-            TeamSettings(shop: shop)
-        }
-        .formStyle(.grouped)
-    }
-}
-
-// MARK: - Invoice & tax
-
-struct InvoicePane: View {
-    let shop: Shop
-
-    /// Which way this WINDOW reads, which is half of where a field's text
-    /// starts — see `ContentField.textAlignment(appIsRTL:)`.
-    private var appIsRTL: Bool { shop.words.language == "ar" }
 
     struct Draft: Equatable {
         var currency = "SAR"
@@ -640,14 +550,19 @@ struct InvoicePane: View {
         /// "quarterly" unless it is a monthly filer.
         var vatFilingFrequency = "quarterly"
         var enableZatca = false
-        // The job-number prefix is NOT here: Invoice numbering shows it with
-        // the tax-invoice prefix, as one field while they agree
-        // (`NumberPrefixes`). Two fields in two panes each said "invoice prefix".
-        var quotePrefix = "QUO"
-        var invTemplate = "classic"
-        var invoiceBilingual = "auto", invoiceSecondLang = "ar"
-        var invAccent = "#5E2E14"
-        var content: [String: String] = [:]
+        /// The shop's electricity tariff (`settings.elecRate`), per kWh. Nil
+        /// is "not said" — Khayt's default applies, and the key stays absent.
+        var elecRate: Double?
+        var minMarginPct = 0.0, quoteValidityDays = 7.0, minOrderAmount = 0.0
+        var rushFeeEnabled = false, rushFeePct = 25.0, defaultPackagingCost = 0.0
+        /// The rewards programme.
+        var loyaltyEnabled = false
+        var loyaltyPointsPerUnit = 1.0
+        var loyaltyRedeemRate = 0.01
+        /// A monthly ceiling per expense category, which the Spending screen
+        /// draws a bar against.
+        var budgets: [String: Double] = [:]
+        var monthlyGoal = 0.0
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
             let r = SettingsReader(settings: settings)
@@ -659,12 +574,25 @@ struct InvoicePane: View {
                 taxMode: Shop.taxMode(settings),
                 vatFilingFrequency: r.text("vatFilingFrequency", "quarterly") == "monthly" ? "monthly" : "quarterly",
                 enableZatca: r.onUnlessOff("enableZatca"),
-                quotePrefix: r.text("quotePrefix", "QUO"),
-                invTemplate: r.text("invTemplate", "classic"),
-                invoiceBilingual: r.text("invoiceBilingual", "auto"),
-                invoiceSecondLang: r.text("invoiceSecondLang", "ar"),
-                invAccent: r.text("invAccentColor", "#5E2E14"))
-            for field in shop.contentFields(["footer", "invTerms"]) { d.content[field.key] = r.text(field.key) }
+                // Only a figure the field can show. Junk (`"abc"`, `"inf"`,
+                // `"nan"`) shows empty — and saving the pane untouched still
+                // leaves it byte-identical: the form sends "" both as edited and
+                // as opened, so `RoundTrip` puts the stored value back.
+                elecRate: Shop.plainNumber(settings["elecRate"]).flatMap { $0.isFinite ? $0 : nil },
+                minMarginPct: r.number("minMarginPct", 0), quoteValidityDays: r.number("quoteValidityDays", 7),
+                minOrderAmount: r.number("minOrderAmount", 0), rushFeeEnabled: r.flag("rushFeeEnabled"),
+                rushFeePct: r.number("rushFeePct", 25), defaultPackagingCost: r.number("defaultPackagingCost", 0),
+                monthlyGoal: r.number("monthlyGoal", 0))
+            // The rule's own defaults when the shop has set none — a point per
+            // unit, a hundred points to the unit — so the pane opens showing
+            // what a redemption would actually be worth rather than zero.
+            if case .number(let n)? = settings["loyaltyPointsPerUnit"], n > 0 { d.loyaltyPointsPerUnit = n }
+            if case .number(let n)? = settings["loyaltyRedeemRate"], n > 0 { d.loyaltyRedeemRate = n }
+            if case .bool(true)? = settings["loyaltyEnabled"] { d.loyaltyEnabled = true }
+            let budgets = r.object("expBudgets")
+            for category in Shop.expenseCategories {
+                d.budgets[category] = Shop.plainNumber(budgets[category]) ?? 0
+            }
             return d
         }
         func form() -> [String: JSONValue] {
@@ -672,16 +600,29 @@ struct InvoicePane: View {
              "enableVat": .bool(enableVat), "vatRate": .number(vatRate), "taxMode": .string(taxMode),
              "vatFilingFrequency": .string(vatFilingFrequency),
              "enableZatca": .bool(enableZatca),
-             "quotePrefix": .string(quotePrefix),
-             "invTemplate": .string(invTemplate), "invoiceBilingual": .string(invoiceBilingual),
-             "invoiceSecondLang": .string(invoiceSecondLang), "invAccent": .string(invAccent),
-             "content": .object(content.mapValues(JSONValue.string))]
+             // Blank goes as "" — `settings-edit` deletes the key for it, so a
+             // cleared field returns the shop to the default rather than to 0.
+             "elecRate": elecRate.map { .number($0) } ?? .string(""),
+             "minMarginPct": .number(minMarginPct), "quoteValidityDays": .number(quoteValidityDays),
+             "minOrderAmount": .number(minOrderAmount), "rushFeeEnabled": .bool(rushFeeEnabled),
+             "rushFeePct": .number(rushFeePct), "defaultPackagingCost": .number(defaultPackagingCost),
+             "loyaltyEnabled": .bool(loyaltyEnabled),
+             "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
+             "loyaltyRedeemRate": .number(loyaltyRedeemRate),
+             // `settings-edit` rebuilds `expBudgets` from ITS category list
+             // whenever this field is present, so every category has to be in
+             // here — a partial map would silently zero the ones left out.
+             "budgets": .object(budgets.mapValues(JSONValue.number)),
+             "monthlyGoal": .number(monthlyGoal)]
         }
     }
 
     @State private var draft = Draft()
     @State private var original = Draft()
     @State private var example = ""
+    /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
+    /// from the rule, never restated here.
+    @State private var defaultElecRate: Double?
 
     private var countries: [(code: String, name: String)] {
         // The SHOP's language, not this Mac's — `Locale.current` named the
@@ -753,6 +694,248 @@ struct InvoicePane: View {
                         Toggle(shop.words.callIt("set.enable_zatca"), isOn: $draft.enableZatca)
                     }
                 }
+                // Its own Save, like the desktop's: settings-edit keeps the
+                // rates and takes none from the form above.
+                Section { ExchangeRatesSection(shop: shop) }
+                // ── WHAT A kWh COSTS THIS SHOP ────────────────────────────
+                //
+                // `settings.elecRate`, layered by `lib/print-rates.js` between
+                // Khayt's default and a calculator preset — so a failed print
+                // and the power-by-machine report, which have no preset, are
+                // charged what the shop actually pays.
+                Section(shop.words.callIt("mac.set_running_costs")) {
+                    row(shop.words.callIt("mac.set_elec_rate")) {
+                        HStack(spacing: 4) {
+                            TextField("", value: $draft.elecRate,
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...3)),
+                                      prompt: defaultElecRate.map { Text(Money.fieldValue($0)) })
+                                .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 90)
+                            Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(shop.words.callIt("mac.set_elec_rate_hint",
+                                           // With its currency, as every other money hint
+                                           // in Settings is: "Khayt's 0.18" said nothing
+                                           // about what 0.18 was.
+                                           ["rate": .string(defaultElecRate.map { Money.text($0, shop.currency) } ?? "")]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // What the shop pays every month. Here, beside the tax
+                // registration, because this is the pane about the business
+                // itself rather than about a screen — and because Reports
+                // sends a shop to "Settings" for it without saying which pane.
+                // It saves itself: it is a LIST, and a list reverted by the
+                // bar below along with the shop's name is a surprise.
+                FixedCostsSettings(shop: shop)
+                Section(shop.words.callIt("set.ops_section")) {
+                    numberRow("set.min_margin", $draft.minMarginPct)
+                    numberRow("set.quote_validity", $draft.quoteValidityDays)
+                    numberRow("set.min_order_amount", $draft.minOrderAmount, unit: Money.mark(shop.currency))
+                    Toggle(shop.words.callIt("set.rush_fee_enabled"), isOn: $draft.rushFeeEnabled)
+                    numberRow("set.rush_fee_pct", $draft.rushFeePct).disabled(!draft.rushFeeEnabled)
+                    numberRow("set.default_packaging_cost", $draft.defaultPackagingCost, unit: Money.mark(shop.currency))
+                }
+                Section(shop.words.callIt("set.loyalty")) {
+                    Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
+                    // The two numbers only mean anything once it is on, and a
+                    // pane that asks for them anyway is asking about a
+                    // programme the shop has not agreed to run.
+                    if draft.loyaltyEnabled {
+                        row(shop.words.callIt("mac.points_per_unit")) {
+                            TextField("", value: $draft.loyaltyPointsPerUnit,
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                                .monospacedDigit()
+                        }
+                        row(shop.words.callIt("mac.points_worth")) {
+                            TextField("", value: $draft.loyaltyRedeemRate,
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...4)))
+                                .monospacedDigit()
+                        }
+                        Text(shop.words.callIt("mac.points_explains"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                // The tiers the programme climbs, with their own Save — the
+                // desktop's tier editor. Only once the programme is on: a
+                // tier is read by nothing while it is off.
+                if draft.loyaltyEnabled {
+                    Section { LoyaltyTiersSection(shop: shop) }
+                }
+                Section {
+                    ForEach(Shop.expenseCategories, id: \.self) { category in
+                        row(shop.words.callIt("exp.cat." + category)) {
+                            HStack(spacing: 4) {
+                                TextField("", value: Binding(get: { draft.budgets[category] ?? 0 },
+                                                             set: { draft.budgets[category] = $0 }),
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                                    .multilineTextAlignment(.trailing).frame(width: 90)
+                                Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(shop.words.callIt("set.exp_budgets"))
+                }
+                Section {
+                    numberRow("dash.goal_setting", $draft.monthlyGoal, unit: Money.mark(shop.currency))
+                } footer: {
+                    Text(shop.words.callIt("dash.goal_hint"))
+                }
+            }
+            .formStyle(.grouped)
+            SaveBar(shop: shop, dirty: draft != original,
+                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form(), country: draft.taxCountry); reset() } },
+                    revert: { draft = original })
+        }
+        .task(id: shop.settingsValue) { reset() }
+        .task(id: draft) { await explain() }
+        .task { defaultElecRate = await shop.printRateDefault("elecRate", settings: [:]) }
+        .onChange(of: draft.taxCountry) { _, code in chose(code) }
+    }
+
+    private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
+    /// A number, and the unit it is in where the label does not already say.
+    private func numberRow(_ key: String, _ value: Binding<Double>, unit: String = "") -> some View {
+        settingsNumberRow(shop, key, value, unit: unit)
+    }
+
+    /// A country choice fills the rate and the convention in, the way Khayt's
+    /// picker does — the shop can still change them before saving.
+    ///
+    /// Only a choice a PERSON made: `onChange` also fires when `reset` seeds the
+    /// draft from the book, and applying the preset then marked every freshly
+    /// opened pane as edited.
+    private func chose(_ code: String) {
+        guard !code.isEmpty, code != original.taxCountry,
+              let preset = shop.taxPresets[code] else { return }
+        draft.taxMode = preset.mode.rawValue
+        draft.enableVat = !preset.rates.isEmpty
+        if let first = preset.rates.first { draft.vatRate = first.percent }
+    }
+
+    /// "A price of 100 is invoiced as 100.00 — 86.96 plus 13.04 tax."
+    private func explain() async {
+        guard draft.enableVat, draft.vatRate > 0, let engine = shop.engine,
+              let mode = TaxProfile.Mode(rawValue: draft.taxMode) else {
+            example = shop.words.callIt("mac.tax_none"); return
+        }
+        let profile = TaxProfile(name: shop.taxProfile?.name ?? "VAT", mode: mode,
+                                 registration: shop.taxProfile?.registration ?? "VAT No.",
+                                 rates: [.init(id: "vat", label: "VAT", percent: draft.vatRate)])
+        guard let split = try? await engine.computeTax(100, profile: profile) else { example = ""; return }
+        example = shop.words.callIt("set.tax_mode_example", [
+            "total": .string(Money.figure(split.subtotal + split.taxTotal)),
+            "subtotal": .string(Money.figure(split.subtotal)),
+            "tax": .string(Money.figure(split.taxTotal)),
+        ])
+    }
+}
+
+// MARK: - Team & access
+
+/// Who works at the shop and how they sign in: operators, staff sign-in and
+/// PINs on this Mac, and (for the owner) the Khayt Cloud team and the devices
+/// signed in to it. Every section here saves itself; there is no Save bar.
+struct TeamPane: View {
+    let shop: Shop
+
+    var body: some View {
+        Form {
+            Section { OperatorsSection(shop: shop) }
+            Section { LockSection(shop: shop) }
+            TeamSettings(shop: shop)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Invoices & payments
+
+/// What the shop's documents look like and how it is paid: documents and
+/// their numbering, bank details, accepted methods, the payment link, pay
+/// later, payment reminders and quote follow-up (Settings stage 2).
+struct InvoicesPane: View {
+    let shop: Shop
+
+    /// Which way this WINDOW reads, which is half of where a field's text
+    /// starts — see `ContentField.textAlignment(appIsRTL:)`.
+    private var appIsRTL: Bool { shop.words.language == "ar" }
+
+    struct Draft: Equatable {
+        // The job-number prefix is NOT here: Invoice numbering shows it with
+        // the tax-invoice prefix, as one field while they agree
+        // (`NumberPrefixes`). Two fields in two panes each said "invoice prefix".
+        var quotePrefix = "QUO"
+        var invTemplate = "classic"
+        var invoiceBilingual = "auto", invoiceSecondLang = "ar"
+        var invAccent = "#5E2E14"
+        var content: [String: String] = [:]
+        var useHijri = true, useArabicNumerals = false
+        var bankName = "", accountHolder = "", iban = ""
+        var accepted: Set<String> = []
+        var paymentInstructions = ""
+        var payReminderEnabled = false, payReminderGrace = 3.0
+        /// `auto` | `whatsapp` | `email` (`lib/payment-reminder.js reminderChannel`).
+        var payReminderChannel = "auto"
+        var quoteFollowUpEnabled = false, quoteFollowUpWindow = 2.0
+
+        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
+            let r = SettingsReader(settings: settings)
+            let pay = SettingsReader(settings: r.object("paymentReminder"))
+            let follow = SettingsReader(settings: r.object("quoteFollowUp"))
+            var accepted: Set<String> = []
+            if case .array(let list)? = settings["acceptedPayments"] {
+                accepted = Set(list.compactMap(Shop.plainString))
+            }
+            var d = Draft(
+                quotePrefix: r.text("quotePrefix", "QUO"),
+                invTemplate: r.text("invTemplate", "classic"),
+                invoiceBilingual: r.text("invoiceBilingual", "auto"),
+                invoiceSecondLang: r.text("invoiceSecondLang", "ar"),
+                invAccent: r.text("invAccentColor", "#5E2E14"),
+                useHijri: r.onUnlessOff("useHijri"), useArabicNumerals: r.flag("useArabicNumerals"),
+                bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
+                accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
+                payReminderEnabled: pay.flag("enabled"), payReminderGrace: pay.number("graceDays", 3),
+                quoteFollowUpEnabled: follow.flag("enabled"),
+                quoteFollowUpWindow: follow.number("windowDays", 2))
+            for field in shop.contentFields(["footer", "invTerms"]) { d.content[field.key] = r.text(field.key) }
+            if case .string(let channel)? = r.object("paymentReminder")["channel"],
+               ["whatsapp", "email"].contains(channel) {
+                d.payReminderChannel = channel
+            }
+            return d
+        }
+        @MainActor func form() -> [String: JSONValue] {
+            ["quotePrefix": .string(quotePrefix),
+             "invTemplate": .string(invTemplate), "invoiceBilingual": .string(invoiceBilingual),
+             "invoiceSecondLang": .string(invoiceSecondLang), "invAccent": .string(invAccent),
+             "content": .object(content.mapValues(JSONValue.string)),
+             "useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
+             "bankName": .string(bankName), "accountHolder": .string(accountHolder), "iban": .string(iban),
+             // In Khayt's own order, not the set's: the invoice lists them.
+             "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
+             "paymentInstructions": .string(paymentInstructions),
+             "paymentReminder": .object(["enabled": .bool(payReminderEnabled),
+                                         "graceDays": .number(payReminderGrace),
+                                         "channel": .string(payReminderChannel)]),
+             "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
+                                       "windowDays": .number(quoteFollowUpWindow)])]
+        }
+    }
+
+    @State private var draft = Draft()
+    @State private var original = Draft()
+
+    /// ZATCA's switch is in Pricing & Tax now; the documents section only
+    /// needs to know whether it is on, as saved.
+    private var zatcaOn: Bool { SettingsReader(settings: shop.settingsDict).onUnlessOff("enableZatca") }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
                 Section(shop.words.callIt("set.invoice_section")) {
                     latinRow(shop.words.callIt("set.quote_prefix")) { TextField("", text: $draft.quotePrefix).frame(width: 120) }
                     row(shop.words.callIt("set.inv_template")) {
@@ -769,7 +952,7 @@ struct InvoicePane: View {
                             Text(shop.words.callIt("set.inv_bilingual_both")).tag("both")
                         }.labelsHidden()
                     }
-                    if draft.enableZatca {
+                    if zatcaOn {
                         Text(shop.words.callIt("set.inv_bilingual_zatca")).font(.callout).foregroundStyle(.secondary)
                     } else if draft.invoiceBilingual != "single" {
                         row(shop.words.callIt("set.inv_second_lang")) {
@@ -809,117 +992,13 @@ struct InvoicePane: View {
                         }
                     }
                 }
-                // Their own Save, like the desktop's sections: settings-edit
-                // keeps both and takes neither from the form above.
+                Section(shop.words.callIt("set.locale_section")) {
+                    Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
+                    Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)
+                }
+                // Its own Save, like the desktop's section: settings-edit keeps
+                // the numbering and takes none of it from the form above.
                 Section { InvoiceNumberingSection(shop: shop) }
-                Section { ExchangeRatesSection(shop: shop) }
-            }
-            .formStyle(.grouped)
-            SaveBar(shop: shop, dirty: draft != original,
-                    save: { Task { await shop.saveSettings(draft.form(), opened: original.form(), country: draft.taxCountry); reset() } },
-                    revert: { draft = original })
-        }
-        .task(id: shop.settingsValue) { reset() }
-        .task(id: draft) { await explain() }
-        .onChange(of: draft.taxCountry) { _, code in chose(code) }
-    }
-
-    private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
-    private func binding(_ key: String) -> Binding<String> {
-        Binding(get: { draft.content[key] ?? "" }, set: { draft.content[key] = $0 })
-    }
-
-    /// A country choice fills the rate and the convention in, the way Khayt's
-    /// picker does — the shop can still change them before saving.
-    ///
-    /// Only a choice a PERSON made: `onChange` also fires when `reset` seeds the
-    /// draft from the book, and applying the preset then marked every freshly
-    /// opened pane as edited.
-    private func chose(_ code: String) {
-        guard !code.isEmpty, code != original.taxCountry,
-              let preset = shop.taxPresets[code] else { return }
-        draft.taxMode = preset.mode.rawValue
-        draft.enableVat = !preset.rates.isEmpty
-        if let first = preset.rates.first { draft.vatRate = first.percent }
-    }
-
-    /// "A price of 100 is invoiced as 100.00 — 86.96 plus 13.04 tax."
-    private func explain() async {
-        guard draft.enableVat, draft.vatRate > 0, let engine = shop.engine,
-              let mode = TaxProfile.Mode(rawValue: draft.taxMode) else {
-            example = shop.words.callIt("mac.tax_none"); return
-        }
-        let profile = TaxProfile(name: shop.taxProfile?.name ?? "VAT", mode: mode,
-                                 registration: shop.taxProfile?.registration ?? "VAT No.",
-                                 rates: [.init(id: "vat", label: "VAT", percent: draft.vatRate)])
-        guard let split = try? await engine.computeTax(100, profile: profile) else { example = ""; return }
-        example = shop.words.callIt("set.tax_mode_example", [
-            "total": .string(Money.figure(split.subtotal + split.taxTotal)),
-            "subtotal": .string(Money.figure(split.subtotal)),
-            "tax": .string(Money.figure(split.taxTotal)),
-        ])
-    }
-
-    /// The accent as a colour, and back to the hex the document is styled with.
-    private var accent: Binding<Color> {
-        Binding(
-            get: { Color(nsColor: NSColor(hex: draft.invAccent) ?? NSColor(red: 0.37, green: 0.18, blue: 0.08, alpha: 1)) },
-            set: { draft.invAccent = NSColor($0).hexString ?? draft.invAccent })
-    }
-}
-
-// MARK: - Payments
-
-struct PaymentsPane: View {
-    let shop: Shop
-
-    struct Draft: Equatable {
-        var bankName = "", accountHolder = "", iban = ""
-        var accepted: Set<String> = []
-        var paymentInstructions = ""
-        /// The rewards programme. A shop working only on this Mac could never
-        /// turn it on: the switch was in the other app, so its customers'
-        /// points were a screen it could not reach.
-        var loyaltyEnabled = false
-        var loyaltyPointsPerUnit = 1.0
-        var loyaltyRedeemRate = 0.01
-
-        @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
-            let r = SettingsReader(settings: settings)
-            var accepted: Set<String> = []
-            if case .array(let list)? = settings["acceptedPayments"] {
-                accepted = Set(list.compactMap(Shop.plainString))
-            }
-            // The rule's own defaults when the shop has set none — a point per
-            // unit, a hundred points to the unit — so the pane opens showing
-            // what a redemption would actually be worth rather than zero.
-            var perUnit = 1.0
-            if case .number(let n)? = settings["loyaltyPointsPerUnit"], n > 0 { perUnit = n }
-            var rate = 0.01
-            if case .number(let n)? = settings["loyaltyRedeemRate"], n > 0 { rate = n }
-            var on = false
-            if case .bool(true)? = settings["loyaltyEnabled"] { on = true }
-            return Draft(bankName: r.text("bankName"), accountHolder: r.text("accountHolder"), iban: r.text("iban"),
-                         accepted: accepted, paymentInstructions: r.text("paymentInstructions"),
-                         loyaltyEnabled: on, loyaltyPointsPerUnit: perUnit, loyaltyRedeemRate: rate)
-        }
-        @MainActor func form() -> [String: JSONValue] {
-            ["bankName": .string(bankName), "accountHolder": .string(accountHolder), "iban": .string(iban),
-             // In Khayt's own order, not the set's: the invoice lists them.
-             "acceptedPayments": .array(Shop.paymentMethods.filter(accepted.contains).map(JSONValue.string)),
-             "paymentInstructions": .string(paymentInstructions),
-             "loyaltyEnabled": .bool(loyaltyEnabled),
-             "loyaltyPointsPerUnit": .number(loyaltyPointsPerUnit),
-             "loyaltyRedeemRate": .number(loyaltyRedeemRate)]
-        }
-    }
-
-    @State private var draft = Draft()
-    @State private var original = Draft()
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Form {
                 Section(shop.words.callIt("set.bank_section")) {
                     row(shop.words.callIt("set.bank_name")) { TextField("", text: $draft.bankName) }
                     row(shop.words.callIt("set.account_holder")) { TextField("", text: $draft.accountHolder) }
@@ -939,31 +1018,31 @@ struct PaymentsPane: View {
                 Section(shop.words.callIt("set.payment_instructions")) {
                     TextEditor(text: $draft.paymentInstructions).frame(height: 70).font(.body)
                 }
-                Section(shop.words.callIt("set.loyalty")) {
-                    Toggle(shop.words.callIt("set.loyalty_enabled"), isOn: $draft.loyaltyEnabled)
-                    // The two numbers only mean anything once it is on, and a
-                    // pane that asks for them anyway is asking about a
-                    // programme the shop has not agreed to run.
-                    if draft.loyaltyEnabled {
-                        row(shop.words.callIt("mac.points_per_unit")) {
-                            TextField("", value: $draft.loyaltyPointsPerUnit,
-                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
-                                .monospacedDigit()
-                        }
-                        row(shop.words.callIt("mac.points_worth")) {
-                            TextField("", value: $draft.loyaltyRedeemRate,
-                                      format: .number.locale(Money.digits).precision(.fractionLength(0...4)))
-                                .monospacedDigit()
-                        }
-                        Text(shop.words.callIt("mac.points_explains"))
-                            .font(.caption).foregroundStyle(.secondary)
+                // The shop's payment link and pay-later providers, from Online.
+                // Each saves itself, as it did there.
+                PayLinkSettings(shop: shop)
+                BnplSettings(shop: shop)
+                Section {
+                    Toggle(shop.words.callIt("set.pay_reminder_enabled"), isOn: $draft.payReminderEnabled)
+                    numberRow("set.pay_reminder_grace", $draft.payReminderGrace)
+                        .disabled(!draft.payReminderEnabled)
+                    // How "Send reminder" goes out. Not behind the switch: the
+                    // switch is Today's list, and a reminder can be sent from a
+                    // job whether or not the list is shown.
+                    Picker(shop.words.callIt("set.pay_reminder_channel"), selection: $draft.payReminderChannel) {
+                        Text(shop.words.callIt("set.pay_reminder_channel_auto")).tag("auto")
+                        Text(shop.words.callIt("set.pay_reminder_channel_whatsapp")).tag("whatsapp")
+                        Text(shop.words.callIt("set.pay_reminder_channel_email")).tag("email")
                     }
+                } footer: {
+                    Text(shop.words.callIt("set.pay_reminder_hint"))
                 }
-                // The tiers the programme climbs, with their own Save — the
-                // desktop's tier editor. Only once the programme is on: a
-                // tier is read by nothing while it is off.
-                if draft.loyaltyEnabled {
-                    Section { LoyaltyTiersSection(shop: shop) }
+                Section {
+                    Toggle(shop.words.callIt("set.quote_followup_enabled"), isOn: $draft.quoteFollowUpEnabled)
+                    numberRow("set.quote_followup_window", $draft.quoteFollowUpWindow)
+                        .disabled(!draft.quoteFollowUpEnabled)
+                } footer: {
+                    Text(shop.words.callIt("set.quote_followup_hint"))
                 }
             }
             .formStyle(.grouped)
@@ -975,40 +1054,45 @@ struct PaymentsPane: View {
     }
 
     private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
+    private func binding(_ key: String) -> Binding<String> {
+        Binding(get: { draft.content[key] ?? "" }, set: { draft.content[key] = $0 })
+    }
+    /// A number, and the unit it is in where the label does not already say.
+    private func numberRow(_ key: String, _ value: Binding<Double>, unit: String = "") -> some View {
+        settingsNumberRow(shop, key, value, unit: unit)
+    }
+
+    /// The accent as a colour, and back to the hex the document is styled with.
+    private var accent: Binding<Color> {
+        Binding(
+            get: { Color(nsColor: NSColor(hex: draft.invAccent) ?? NSColor(red: 0.37, green: 0.18, blue: 0.08, alpha: 1)) },
+            set: { draft.invAccent = NSColor($0).hexString ?? draft.invAccent })
+    }
 }
 
-// MARK: - Operations
+// MARK: - Production
 
-struct OperationsPane: View {
+/// How work moves through the shop: delivery estimates, work-in-progress
+/// limits, stock and purchase orders, quality control, post-processing and
+/// custom order fields (Settings stage 2).
+struct ProductionPane: View {
     let shop: Shop
 
     struct Draft: Equatable {
-        var minMarginPct = 0.0, quoteValidityDays = 7.0, minOrderAmount = 0.0
-        var rushFeeEnabled = false, rushFeePct = 25.0, defaultPackagingCost = 0.0
         var dailyHours = 8.0, workingDaysPerWeek = 5.0, finishingDays = 1.0, dispatchDays = 1.0, safetyDays = 1.0
         var publishToCloud = false
         var wip: [String: Double] = [:]
         var wipEnforceHardLimit = false
         var qcEnabled = false, qcRequireInspector = false, qcRequirePhotoOnFail = false, qcWarrantyDays = 30.0
-        var monthlyGoal = 0.0
-        /// A monthly ceiling per expense category. The Spending screen has
-        /// drawn a bar against these since it was built and there was nowhere
-        /// to set one, so every shop read a budget of zero.
-        var budgets: [String: Double] = [:]
+        var autoDeduct = true, lowStock = 200.0
         /// Draft purchase orders for what is low, without being asked.
-        ///
-        /// Opt-in and drafts only — the shop still reviews them before any of
-        /// them is sent. The switch was in the other app, so a shop working
-        /// only on this Mac had a setting in its own book that nothing here
-        /// could turn on or off.
+        /// Opt-in and drafts only — the shop still reviews them.
         var autoDraftPo = false
-        var payReminderEnabled = false, payReminderGrace = 3.0
-        /// `auto` | `whatsapp` | `email` (`lib/payment-reminder.js reminderChannel`).
-        var payReminderChannel = "auto"
-        var quoteFollowUpEnabled = false, quoteFollowUpWindow = 2.0
         /// Minutes one spool change takes — an ESTIMATE, used only to say what
-        /// grouping the queue by colour saves (`lib/swap-queue.js`).
-        var swapMinutes = OperationsPane.swapMinutesDefault
+        /// grouping the queue by colour saves (`lib/swap-queue.js`). Moves on
+        /// to Printers & Slicers with the rest of the printing defaults.
+        var swapMinutes = ProductionPane.swapMinutesDefault
+
         static let columns = ["pending", "printing", "post", "qc"]
 
         @MainActor static func read(_ settings: [String: JSONValue], shop: Shop) -> Draft {
@@ -1016,58 +1100,29 @@ struct OperationsPane: View {
             let lead = SettingsReader(settings: r.object("leadTime"))
             let wip = r.object("wipLimits")
             let qc = SettingsReader(settings: r.object("qc"))
-            let budgets = r.object("expBudgets")
-            let pay = SettingsReader(settings: r.object("paymentReminder"))
-            let follow = SettingsReader(settings: r.object("quoteFollowUp"))
             var d = Draft(
-                minMarginPct: r.number("minMarginPct", 0), quoteValidityDays: r.number("quoteValidityDays", 7),
-                minOrderAmount: r.number("minOrderAmount", 0), rushFeeEnabled: r.flag("rushFeeEnabled"),
-                rushFeePct: r.number("rushFeePct", 25), defaultPackagingCost: r.number("defaultPackagingCost", 0),
                 dailyHours: lead.number("dailyHours", 8), workingDaysPerWeek: lead.number("workingDaysPerWeek", 5),
                 finishingDays: lead.number("finishingDays", 1), dispatchDays: lead.number("dispatchDays", 1),
                 safetyDays: lead.number("safetyDays", 1), publishToCloud: lead.flag("publishToCloud"),
                 wipEnforceHardLimit: r.flag("wipEnforceHardLimit"),
                 qcEnabled: qc.flag("enabled"), qcRequireInspector: qc.flag("requireInspector"),
                 qcRequirePhotoOnFail: qc.flag("requirePhotoOnFail"), qcWarrantyDays: qc.number("warrantyDays", 30),
-                monthlyGoal: r.number("monthlyGoal", 0),
+                autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
                 autoDraftPo: r.flag("autoDraftPo"),
-                payReminderEnabled: pay.flag("enabled"), payReminderGrace: pay.number("graceDays", 3),
-                quoteFollowUpEnabled: follow.flag("enabled"),
-                quoteFollowUpWindow: follow.number("windowDays", 2),
-                swapMinutes: r.number("swapMinutes", OperationsPane.swapMinutesDefault))
-            for category in Shop.expenseCategories {
-                d.budgets[category] = Shop.plainNumber(budgets[category]) ?? 0
-            }
-            if case .string(let channel)? = r.object("paymentReminder")["channel"],
-               ["whatsapp", "email"].contains(channel) {
-                d.payReminderChannel = channel
-            }
+                swapMinutes: r.number("swapMinutes", ProductionPane.swapMinutesDefault))
             for col in columns { d.wip[col] = Shop.plainNumber(wip[col]) ?? 0 }
             return d
         }
         func form() -> [String: JSONValue] {
-            ["minMarginPct": .number(minMarginPct), "quoteValidityDays": .number(quoteValidityDays),
-             "minOrderAmount": .number(minOrderAmount), "rushFeeEnabled": .bool(rushFeeEnabled),
-             "rushFeePct": .number(rushFeePct), "defaultPackagingCost": .number(defaultPackagingCost),
-             "leadTime": .object(["dailyHours": .number(dailyHours), "workingDaysPerWeek": .number(workingDaysPerWeek),
+            ["leadTime": .object(["dailyHours": .number(dailyHours), "workingDaysPerWeek": .number(workingDaysPerWeek),
                                   "finishingDays": .number(finishingDays), "dispatchDays": .number(dispatchDays),
                                   "safetyDays": .number(safetyDays), "publishToCloud": .bool(publishToCloud)]),
              "wip": .object(wip.mapValues(JSONValue.number)),
              "wipEnforceHardLimit": .bool(wipEnforceHardLimit),
              "qc": .object(["enabled": .bool(qcEnabled), "requireInspector": .bool(qcRequireInspector),
                             "requirePhotoOnFail": .bool(qcRequirePhotoOnFail), "warrantyDays": .number(qcWarrantyDays)]),
-             "monthlyGoal": .number(monthlyGoal),
+             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
              "autoDraftPo": .bool(autoDraftPo),
-             // `settings-edit` rebuilds `expBudgets` from ITS category list
-             // whenever this field is present, so every category has to be in
-             // here — a partial map would silently zero the ones left out.
-             // `Shop.expenseCategories` is the same seven.
-             "budgets": .object(budgets.mapValues(JSONValue.number)),
-             "paymentReminder": .object(["enabled": .bool(payReminderEnabled),
-                                         "graceDays": .number(payReminderGrace),
-                                         "channel": .string(payReminderChannel)]),
-             "quoteFollowUp": .object(["enabled": .bool(quoteFollowUpEnabled),
-                                       "windowDays": .number(quoteFollowUpWindow)]),
              "swapMinutes": .number(swapMinutes)]
         }
     }
@@ -1082,14 +1137,6 @@ struct OperationsPane: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section(shop.words.callIt("set.ops_section")) {
-                    numberRow("set.min_margin", $draft.minMarginPct)
-                    numberRow("set.quote_validity", $draft.quoteValidityDays)
-                    numberRow("set.min_order_amount", $draft.minOrderAmount, unit: Money.mark(shop.currency))
-                    Toggle(shop.words.callIt("set.rush_fee_enabled"), isOn: $draft.rushFeeEnabled)
-                    numberRow("set.rush_fee_pct", $draft.rushFeePct).disabled(!draft.rushFeeEnabled)
-                    numberRow("set.default_packaging_cost", $draft.defaultPackagingCost, unit: Money.mark(shop.currency))
-                }
                 Section {
                     // ── THE HOURS AND THE DAYS ARE THE GRID ABOVE ────────
                     //
@@ -1126,47 +1173,17 @@ struct OperationsPane: View {
                     }
                     Toggle(shop.words.callIt("set.wip_enforce_hard"), isOn: $draft.wipEnforceHardLimit)
                 }
-                Section {
-                    ForEach(Shop.expenseCategories, id: \.self) { category in
-                        row(shop.words.callIt("exp.cat." + category)) {
-                            HStack(spacing: 4) {
-                                TextField("", value: Binding(get: { draft.budgets[category] ?? 0 },
-                                                             set: { draft.budgets[category] = $0 }),
-                                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
-                                    .multilineTextAlignment(.trailing).frame(width: 90)
-                                Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
-                            }
-                        }
+                Section(shop.words.callIt("set.stock_section")) {
+                    Toggle(shop.words.callIt("set.auto_deduct"), isOn: $draft.autoDeduct)
+                    row(shop.words.callIt("set.low_stock")) {
+                        TextField("", value: $draft.lowStock, format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                            .multilineTextAlignment(.trailing).frame(width: 90)
                     }
-                } header: {
-                    Text(shop.words.callIt("set.exp_budgets"))
                 }
                 Section {
-                    numberRow("dash.goal_setting", $draft.monthlyGoal, unit: Money.mark(shop.currency))
+                    Toggle(shop.words.callIt("reorder.auto_toggle"), isOn: $draft.autoDraftPo)
                 } footer: {
-                    Text(shop.words.callIt("dash.goal_hint"))
-                }
-                Section {
-                    Toggle(shop.words.callIt("set.pay_reminder_enabled"), isOn: $draft.payReminderEnabled)
-                    numberRow("set.pay_reminder_grace", $draft.payReminderGrace)
-                        .disabled(!draft.payReminderEnabled)
-                    // How "Send reminder" goes out. Not behind the switch: the
-                    // switch is Today's list, and a reminder can be sent from a
-                    // job whether or not the list is shown.
-                    Picker(shop.words.callIt("set.pay_reminder_channel"), selection: $draft.payReminderChannel) {
-                        Text(shop.words.callIt("set.pay_reminder_channel_auto")).tag("auto")
-                        Text(shop.words.callIt("set.pay_reminder_channel_whatsapp")).tag("whatsapp")
-                        Text(shop.words.callIt("set.pay_reminder_channel_email")).tag("email")
-                    }
-                } footer: {
-                    Text(shop.words.callIt("set.pay_reminder_hint"))
-                }
-                Section {
-                    Toggle(shop.words.callIt("set.quote_followup_enabled"), isOn: $draft.quoteFollowUpEnabled)
-                    numberRow("set.quote_followup_window", $draft.quoteFollowUpWindow)
-                        .disabled(!draft.quoteFollowUpEnabled)
-                } footer: {
-                    Text(shop.words.callIt("set.quote_followup_hint"))
+                    Text(shop.words.callIt("reorder.auto_hint"))
                 }
                 // Beside the other two opt-in automations, which is what it is.
                 // The words are the other app's — it has had this switch all
@@ -1175,11 +1192,6 @@ struct OperationsPane: View {
                     numberRow("mac.swap_minutes", $draft.swapMinutes)
                 } footer: {
                     Text(shop.words.callIt("mac.swap_minutes_hint"))
-                }
-                Section {
-                    Toggle(shop.words.callIt("reorder.auto_toggle"), isOn: $draft.autoDraftPo)
-                } footer: {
-                    Text(shop.words.callIt("reorder.auto_hint"))
                 }
                 Section(shop.words.callIt("set.qc_head")) {
                     Toggle(shop.words.callIt("set.qc_enabled"), isOn: $draft.qcEnabled)
@@ -1195,6 +1207,7 @@ struct OperationsPane: View {
                 // Saved as each reading is logged, like the sites and staff
                 // at the top — a reading is a record, not a setting.
                 EnvironmentLogSection(shop: shop)
+
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
@@ -1206,20 +1219,8 @@ struct OperationsPane: View {
 
     private func reset() { original = .read(shop.settingsDict, shop: shop); draft = original }
     /// A number, and the unit it is in where the label does not already say.
-    ///
-    /// Most of these labels carry theirs — "Finishing & QC (days)", "Rush fee
-    /// percentage (%)" — because they were written for a screen with no room
-    /// beside the box. The two money ones do not, and "Minimum order amount"
-    /// is a figure a shop has no way to read as riyals rather than a count.
-    private func numberRow(_ key: String, _ value: Binding<Double>,
-                           unit: String = "") -> some View {
-        row(shop.words.callIt(key)) {
-            HStack(spacing: 4) {
-                TextField("", value: value, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
-                    .multilineTextAlignment(.trailing).frame(width: 90)
-                if !unit.isEmpty { Text(unit).foregroundStyle(.secondary) }
-            }
-        }
+    private func numberRow(_ key: String, _ value: Binding<Double>, unit: String = "") -> some View {
+        settingsNumberRow(shop, key, value, unit: unit)
     }
 }
 
@@ -1406,8 +1407,6 @@ struct PreferencesPane: View {
     let shop: Shop
 
     struct Draft: Equatable {
-        var useHijri = true, useArabicNumerals = false
-        var autoDeduct = true, lowStock = 200.0
         /// The four estimator constants a shop can actually answer for.
         ///
         /// THROUGHPUT IS DELIBERATELY NOT HERE. It is the one nobody knows
@@ -1425,10 +1424,7 @@ struct PreferencesPane: View {
             let r = SettingsReader(settings: settings)
             let risk = SettingsReader(settings: r.object("printRisk"))
             let est = SettingsReader(settings: r.object("estimator"))
-            return Draft(useHijri: r.onUnlessOff("useHijri"),
-                         useArabicNumerals: r.flag("useArabicNumerals"),
-                         autoDeduct: r.onUnlessOff("autoDeduct"), lowStock: r.number("lowStockThreshold", 200),
-                         // The rule's own defaults, so an unset book shows what
+            return Draft(// The rule's own defaults, so an unset book shows what
                          // it is actually estimating with rather than blanks.
                          density: est.number("densityGPerCm3", 1.24),
                          infillPct: est.number("infillPct", 0.2) * 100,
@@ -1444,9 +1440,7 @@ struct PreferencesPane: View {
                          }())
         }
         func form() -> [String: JSONValue] {
-            ["useHijri": .bool(useHijri), "useArabicNumerals": .bool(useArabicNumerals),
-             "autoDeduct": .bool(autoDeduct), "lowStock": .number(lowStock),
-             "printRisk": .object(["when": .string(riskWhen)]),
+            ["printRisk": .object(["when": .string(riskWhen)]),
              // Per cent on screen, fraction in the book — the rule reads 0..1
              // and a 20 saved there would be 2,000% infill.
              "estimator": .object(["densityGPerCm3": .number(density),
@@ -1462,17 +1456,6 @@ struct PreferencesPane: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section(shop.words.callIt("set.locale_section")) {
-                    Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
-                    Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)
-                }
-                Section(shop.words.callIt("set.stock_section")) {
-                    Toggle(shop.words.callIt("set.auto_deduct"), isOn: $draft.autoDeduct)
-                    row(shop.words.callIt("set.low_stock")) {
-                        TextField("", value: $draft.lowStock, format: .number.locale(Money.digits).precision(.fractionLength(0)))
-                            .multilineTextAlignment(.trailing).frame(width: 90)
-                    }
-                }
                 Section(shop.words.callIt("mac.est_section")) {
                     row(shop.words.callIt("mac.est_density")) {
                         TextField("", value: $draft.density, format: .number.locale(Money.digits).precision(.fractionLength(2)))

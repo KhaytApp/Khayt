@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "Abholzeiten",
  "mac.pickup_map": "Kartenlink",
  "mac.pickup_hint": "Wird mit Ihrer Adresse auf der Bestellseite des Kunden angezeigt, solange der Auftrag nicht bei einem Kurier ist. Lassen Sie beide leer, um keine Abholkarte zu zeigen.",
- "mac.paylink_title": "Zahlungslink",
+ "mac.paylink_title": "Bezahl-Schaltfläche auf Kundenseiten",
  "mac.paylink_url": "Link",
  "mac.paylink_label": "Bezeichnung (optional)",
  "mac.paylink_role": "Nur der Inhaber oder ein Manager des Shops kann den Zahlungslink ändern.",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "Preise & Steuern",
  "mac.nav_team": "Team & Zugriff",
  "mac.set_group_workshop": "Werkstatt",
- "mac.set_group_online": "Online"
+ "mac.set_group_online": "Online",
+ "mac.nav_invoices": "Rechnungen & Zahlungen",
+ "mac.nav_production": "Produktion"
 }

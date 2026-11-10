@@ -2034,7 +2034,7 @@
  "mac.pickup_hours": "Horario de recogida",
  "mac.pickup_map": "Enlace al mapa",
  "mac.pickup_hint": "Se muestra con tu dirección en la página del pedido del cliente mientras el pedido no esté con un mensajero. Deja ambos vacíos para no mostrar la tarjeta de recogida.",
- "mac.paylink_title": "Enlace de pago",
+ "mac.paylink_title": "Botón de pago en las páginas de clientes",
  "mac.paylink_url": "Enlace",
  "mac.paylink_label": "Etiqueta (opcional)",
  "mac.paylink_role": "Solo el propietario o un gerente del taller puede cambiar el enlace de pago.",
@@ -3905,5 +3905,7 @@
  "mac.nav_pricing": "Precios e impuestos",
  "mac.nav_team": "Equipo y acceso",
  "mac.set_group_workshop": "Taller",
- "mac.set_group_online": "En línea"
+ "mac.set_group_online": "En línea",
+ "mac.nav_invoices": "Facturas y pagos",
+ "mac.nav_production": "Producción"
 }
