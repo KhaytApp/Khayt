@@ -58,7 +58,7 @@ struct DetailSection<Content: View>: View {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 9, weight: .bold))
             }
-            Text(title).textCase(.uppercase).tracking(0.6)
+            Text(title).textCase(.uppercase).tracking(Words.spaced(0.6))
         }
         .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))

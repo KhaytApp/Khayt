@@ -139,7 +139,10 @@ struct OrdersTable: View {
             .width(min: 64, ideal: 76)
             .customizationID("operator")
 
-            TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
+            // By where the job IS in the work, not by the stored word: sorted
+            // on `status` the column read cancelled, completed, in_progress,
+            // pending, quote — alphabetical in English and nothing in Arabic.
+            TableColumn(shop.words.callIt("mac.stage"), value: \.stageRank) { job in
                 StageCell(shop: shop, job: job)
             }
             .width(min: 100, ideal: 100)
@@ -734,7 +737,10 @@ private struct EmptyBook: View {
         } else if shop.stage != nil {
             EmptyHere(title: shop.words.callIt("mac.nothing_at_stage"), message: shop.words.callIt("mac.stage_hint"), mark: .jobs)
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .jobs)
+            // The way in, on the screen that is empty (the Customers rule).
+            EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .jobs) {
+                EmptyAction(shop: shop, title: "mac.new_job") { shop.takingAJob = true }
+            }
         }
     }
 }

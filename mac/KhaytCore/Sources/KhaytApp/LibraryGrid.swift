@@ -864,7 +864,7 @@ struct Cell: View {
                         if let badge = Self.formatBadge(file.sourceFile?.ext, size: size) {
                             Text(badge)
                                 .font(.system(size: 8, weight: .semibold))
-                                .tracking(0.4)
+                                .tracking(Words.spaced(0.4))
                                 .padding(.horizontal, 4).padding(.vertical, 1)
                                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
                                 .foregroundStyle(.secondary)

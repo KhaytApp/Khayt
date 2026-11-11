@@ -455,6 +455,33 @@ private struct NewJobCommand: View {
         .disabled(!shop.canMoveJobs)
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!shop.canMoveJobs)
+        // THE OTHER THINGS A SHOP ADDS, which had only their screen's "+":
+        // no menu item, so no keyboard path and nothing for somebody looking
+        // in File ▸ New. Each goes to its screen first, because that is where
+        // its sheet lives, and is offered only where that screen is.
+        Divider()
+        if shop.canShow(.inventory) {
+            Button(Words.upfront("mac.new_spool") + "\u{2026}") { shop.shelf = .inventory; shop.addingSpool = true }
+                .disabled(!shop.canMoveJobs)
+        }
+        if shop.canShow(.machines) {
+            Button(Words.upfront("mac.add_printer") + "\u{2026}") { shop.shelf = .machines; shop.addingMachine = true }
+                .disabled(!shop.canMoveJobs)
+        }
+        if shop.canShow(.expenses) {
+            Button(Words.upfront("exp.add_title") + "\u{2026}") {
+                shop.shelf = .expenses
+                DispatchQueue.main.async { shop.addingExpense = true }
+            }
+            .disabled(!shop.canMoveJobs)
+        }
+        if shop.canShow(.waste) {
+            Button(Words.upfront("waste.add") + "\u{2026}") {
+                shop.shelf = .waste
+                DispatchQueue.main.async { shop.loggingWaste = true }
+            }
+            .disabled(!shop.canMoveJobs)
+        }
     }
 }
 

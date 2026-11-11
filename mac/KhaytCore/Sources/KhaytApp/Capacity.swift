@@ -28,7 +28,7 @@ struct CapacityCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(words.callIt("dash.capacity_title"))
                     .font(.system(size: 10, weight: .semibold))
-                    .textCase(.uppercase).tracking(0.6)
+                    .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let pct = report?.totals.loadPct {

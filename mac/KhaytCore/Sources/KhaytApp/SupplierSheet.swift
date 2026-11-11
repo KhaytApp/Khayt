@@ -206,7 +206,7 @@ struct SupplierSheet: View {
                 }
                 GridRow {
                     Text(shop.words.callIt("sup.phone")).foregroundStyle(.secondary)
-                    TextField("+966…", text: $draft.phone).textFieldStyle(.roundedBorder)
+                    LatinField(text: $draft.phone, placeholder: "+966…")
                 }
                 GridRow {
                     Text(shop.words.callIt("sup.lead_time")).foregroundStyle(.secondary)
@@ -228,10 +228,8 @@ struct SupplierSheet: View {
                 // either language.
                 GridRow {
                     Text(shop.words.callIt("mac.sup_vat")).foregroundStyle(.secondary)
-                    TextField("300000000000003", text: $draft.vat)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
-                        .environment(\.layoutDirection, .leftToRight)
+                    // `layoutDirection` does nothing to a TextField (LatinField's note).
+                    LatinField(text: $draft.vat, placeholder: "300000000000003", monospaced: true)
                 }
             }
 

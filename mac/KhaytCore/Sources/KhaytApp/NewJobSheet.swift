@@ -63,6 +63,12 @@ struct NewJobSheet: View {
 
     @State private var project = ""
     @State private var clientId: String?
+    /// What was said about the work, and the day it was promised for. Both
+    /// meant saving the job, finding it again and opening an editor.
+    @State private var notes = ""
+    @State private var discarding = false
+    @State private var promised = false
+    @State private var promisedDay = Date()
     @State private var parts: [Draft] = []
     @State private var draft = Draft()
     /// What the shop typed for the assistant to read, and what came back.
@@ -361,6 +367,28 @@ struct NewJobSheet: View {
                 }
                 .labelsHidden()
                 .frame(maxWidth: 260, alignment: .leading)
+            }
+            // "By Thursday." Off, the due date is the estimate from the queue,
+            // as it always was. A quote has no due date, so it is not asked.
+            if !preferQuote {
+                GridRow {
+                    Text(shop.words.callIt("doc.due")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $promised) {
+                        if promised {
+                            DatePicker("", selection: $promisedDay, displayedComponents: .date).labelsHidden()
+                        } else {
+                            Text(shop.words.callIt("mac.due_estimated")).foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
+            }
+            GridRow {
+                Text(shop.words.callIt("common.notes")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                TextField(shop.words.callIt("common.optional"), text: $notes)
+                    .textFieldStyle(.roundedBorder)
             }
         }
     }
@@ -967,8 +995,16 @@ struct NewJobSheet: View {
                 Text(shop.words.callIt(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer()
-            Button(shop.words.callIt("common.cancel")) { shop.takingAJob = false }
-                .keyboardShortcut(.cancelAction)
+            // Escape used to throw a five-part job away in one keypress.
+            Button(shop.words.callIt("common.cancel")) {
+                if Self.worthAsking(parts: parts.count, pending: draft.isComplete) { discarding = true }
+                else { shop.takingAJob = false }
+            }
+            .keyboardShortcut(.cancelAction)
+            .confirmationDialog(shop.words.callIt("mac.discard_q"), isPresented: $discarding) {
+                Button(shop.words.callIt("mac.discard"), role: .destructive) { shop.takingAJob = false }
+                Button(shop.words.callIt("mac.keep_editing"), role: .cancel) {}
+            }
             // Return presses whichever was asked for: Take the job, unless the
             // sheet was opened to make a quote.
             Button(shop.words.callIt("mac.save_quote")) { Task { await save(asQuote: true) } }
@@ -1131,6 +1167,10 @@ struct NewJobSheet: View {
         return min
     }
 
+    /// Whether Cancel asks first: there is a part on the job or in the fields.
+    /// A sheet with only a name typed closes as it always did.
+    static func worthAsking(parts: Int, pending: Bool) -> Bool { parts > 0 || pending }
+
     /// The caption beside the buttons: why they are greyed out, or that the
     /// part in the fields has just been put on the job.
     static func footerNote(parts: Int, pending: Bool, justAdded: Bool) -> String? {
@@ -1168,6 +1208,7 @@ struct NewJobSheet: View {
             // The rate the preview above was priced at, so the job is saved at
             // the price the sheet showed.
             overheadPerHour: shop.overheadPerHour,
+            notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
             carried: carried))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }

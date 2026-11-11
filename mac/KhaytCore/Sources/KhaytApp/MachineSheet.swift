@@ -347,6 +347,8 @@ struct MachineSheet: View {
                                 }
                             } label: { Image(systemName: "list.bullet") }
                                 .menuStyle(.borderlessButton).fixedSize()
+                                .help(shop.words.callIt("mac.pick_from_list"))
+                                .accessibilityLabel(shop.words.callIt("mac.pick_from_list"))
                         }
                         // What the catalogue has checked about the model —
                         // and, by what is missing, what it has not.
@@ -509,7 +511,7 @@ struct MachineSheet: View {
             // The Connection section's own heading style, directly above it.
             Text(shop.words.callIt("plug.title"))
                 .font(.system(size: 11, weight: .semibold))
-                .textCase(.uppercase).tracking(0.5).foregroundStyle(.secondary)
+                .textCase(.uppercase).tracking(Words.spaced(0.5)).foregroundStyle(.secondary)
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                 GridRow {
                     Text(shop.words.callIt("mach.kind")).foregroundStyle(.secondary)
@@ -1505,7 +1507,7 @@ private struct Connection: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(shop.words.callIt("mach.connection"))
                 .font(.system(size: 11, weight: .semibold))
-                .textCase(.uppercase).tracking(0.5).foregroundStyle(.secondary)
+                .textCase(.uppercase).tracking(Words.spaced(0.5)).foregroundStyle(.secondary)
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                 GridRow {

@@ -243,7 +243,9 @@ struct Catalogue: View {
     @ViewBuilder private var emptyState: some View {
         if shop.catalogueRows.isEmpty {
             EmptyHere(title: shop.words.callIt("mac.no_products"),
-                      message: shop.words.callIt("mac.no_products_hint"), mark: .catalogue)
+                      message: shop.words.callIt("mac.no_products_hint"), mark: .catalogue) {
+                EmptyAction(shop: shop, title: "mac.new_product") { shop.editingProduct = shop.newProduct() }
+            }
         } else if shop.shownProducts.isEmpty {
             NothingMatched(shop: shop, mark: .catalogue)
         }

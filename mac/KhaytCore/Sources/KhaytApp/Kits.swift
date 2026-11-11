@@ -47,7 +47,7 @@ struct KitBand: View {
                     // Figure and not a heading (beta.19 review).
                     Text(shop.words.callIt("mac.kits"))
                         .font(.system(size: 10.5, weight: .semibold))
-                        .textCase(.uppercase).tracking(0.6)
+                        .textCase(.uppercase).tracking(Words.spaced(0.6))
                         .foregroundStyle(.secondary)
                     ForEach(shop.kits) { kit in
                         KitChip(shop: shop, kit: kit,
