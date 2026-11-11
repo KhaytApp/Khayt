@@ -365,6 +365,8 @@ jobs:
 
       - name: E2E smoke (primary buttons readable in dark; one field style for date, password and URL)
         run: xvfb-run -a npm run test:e2e:darkcontrast
+      - name: E2E smoke (Simple mode never shows an empty Settings pane)
+        run: xvfb-run -a npm run test:e2e:simplepanes
 
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
