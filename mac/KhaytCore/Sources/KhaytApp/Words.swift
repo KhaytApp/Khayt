@@ -5952,6 +5952,8 @@ final class Words {
                                  + "What has already been paid stays recorded.",
                                  "ar": "تُحذف الدفعات المتفق عليها ({n}) ومجموعها {amount}. "
                                  + "ما دُفع بالفعل يبقى مسجّلًا."],
+        "mac.price_not_read": ["en": "That price is not a number. Type a price, or clear the box.",
+                               "ar": "هذا السعر ليس رقمًا. اكتب سعرًا أو أفرغ الخانة."],
         "mac.save_zero_q":    ["en": "Save at a price of 0?",
                                "ar": "الحفظ بسعر 0؟"],
         "mac.save_zero_note": ["en": "This product would be sold and quoted for nothing. "

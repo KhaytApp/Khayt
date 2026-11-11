@@ -687,10 +687,18 @@ struct NewJobSheet: View {
                         .foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
                         .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
+                        .overlay {
+                            if TypedNumber.unreadable(overrideText) {
+                                RoundedRectangle(cornerRadius: 5).strokeBorder(Khayt.attention, lineWidth: 1.5)
+                            }
+                        }
                         .onChange(of: overrideText) { _, typed in
                             let cleaned = typed.trimmingCharacters(in: .whitespaces)
                             // Half a number, or not one, leaves the price as
-                            // it was rather than making the job free.
+                            // it was rather than making the job free — and the
+                            // box is outlined, the footer says so and the job
+                            // cannot be saved until it reads (`priceNotRead`):
+                            // the box showed one figure and the job took another.
                             if cleaned.isEmpty { rule.override = nil }
                             else if let n = TypedNumber.parse(cleaned) { rule.override = n }
                         }
@@ -985,9 +993,15 @@ struct NewJobSheet: View {
         }
     }
 
+    /// The "Or set the price" box holds something that is not a number, so the
+    /// price in force is NOT what the box shows. Nothing is saved until it is.
+    private var priceNotRead: Bool { TypedNumber.unreadable(overrideText) }
+
     var footer: some View {
         HStack {
-            if let problem {
+            if priceNotRead {
+                SaveProblem(text: shop.words.callIt("mac.price_not_read"))
+            } else if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(Khayt.attention).lineLimit(2)
             } else if let note = Self.footerNote(parts: parts.count, pending: draft.isComplete,
@@ -1009,10 +1023,10 @@ struct NewJobSheet: View {
             // sheet was opened to make a quote.
             Button(shop.words.callIt("mac.save_quote")) { Task { await save(asQuote: true) } }
                 .keyboardShortcut(preferQuote ? .defaultAction : nil)
-                .disabled(parts.isEmpty && !draft.isComplete)
+                .disabled((parts.isEmpty && !draft.isComplete) || priceNotRead)
             Button(shop.words.callIt("mac.take_the_job")) { Task { await save(asQuote: false) } }
                 .keyboardShortcut(preferQuote ? nil : .defaultAction)
-                .disabled(parts.isEmpty && !draft.isComplete)
+                .disabled((parts.isEmpty && !draft.isComplete) || priceNotRead)
         }
         .padding(18)
     }
@@ -1185,6 +1199,7 @@ struct NewJobSheet: View {
     }
 
     private func save(asQuote: Bool, checked: Bool = false) async {
+        guard !priceNotRead else { return }
         // A PART TYPED BUT NEVER "ADDED" IS PART OF THE JOB. It used to be
         // dropped without a word — and with nothing else on the job both
         // buttons were greyed out with no reason given. The same fault the

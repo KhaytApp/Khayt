@@ -2464,6 +2464,7 @@
  "mac.save_zero_do": "以 0 保存",
  "mac.save_zero_new": "此产品将以零价格销售和报价。",
  "mac.save_zero_note": "此产品将以零价格销售和报价。它现在的价格是 {price}。",
+ "mac.price_not_read": "这个价格不是数字。请输入价格，或清空此框。",
  "mac.save_zero_q": "要以 0 的价格保存吗？",
  "mac.saved_at": "{t}保存",
  "mac.saved_to": "已保存为",
