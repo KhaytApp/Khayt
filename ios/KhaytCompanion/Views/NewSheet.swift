@@ -80,14 +80,16 @@ struct NewSheet: View {
             }
             .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("new.title"))
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("common.close")) { dismiss() }
                 }
             }
         }
-        .presentationDetents([.large, .medium])
+        // Full height: at the medium detent two of the six choices sat
+        // below the fold (review W4, Figma 28:83).
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
@@ -105,7 +107,7 @@ struct NewSheet: View {
                 // One tint for every tile: the live/collect/attention tints
                 // borrowed status colours and said nothing.
                 .background(KhaytDesign.accentSoft, in: RoundedRectangle(cornerRadius: 10))
-            Spacer(minLength: 14)
+            Spacer(minLength: 10)
             Text(tile.title)
                 .font(.khayt(16, .semibold, relativeTo: .headline))
                 .foregroundStyle(KhaytDesign.ink)
@@ -118,7 +120,7 @@ struct NewSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
         }
-        .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
         .padding(14)
         .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))
         .contentShape(RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))

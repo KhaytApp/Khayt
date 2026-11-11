@@ -1008,7 +1008,7 @@
 "new.calculator.detail" = "Baskıyı elle fiyatla";
 "new.expense.detail" = "Fişin fotoğrafı";
 "new.waste.detail" = "Başarısız baskı veya tasfiye";
-"new.more" = "Diğer";
+"new.more" = "Ayrıca";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Belgeler";
 "paper.packing_slip" = "Paketleme listesi";

@@ -1008,7 +1008,7 @@
 "new.calculator.detail" = "سعّر طباعة يدويًا";
 "new.expense.detail" = "صورة الإيصال";
 "new.waste.detail" = "طباعة فاشلة أو تنظيف";
-"new.more" = "المزيد";
+"new.more" = "أيضًا";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "المستندات";
 "paper.packing_slip" = "قائمة التعبئة";

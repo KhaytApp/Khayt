@@ -1008,7 +1008,7 @@
 "new.calculator.detail" = "Price a print by hand";
 "new.expense.detail" = "Photo of the receipt";
 "new.waste.detail" = "A failed print or purge";
-"new.more" = "More";
+"new.more" = "Also";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papers";
 "paper.packing_slip" = "Packing slip";

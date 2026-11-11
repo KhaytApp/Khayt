@@ -130,3 +130,12 @@ extension UIReviewWorthDoingTests {
         XCTAssertEqual(found, [], "a job reference is written S-1041, without '#'")
     }
 }
+
+// MARK: W4 — the New sheet opens with every choice in view
+extension UIReviewWorthDoingTests {
+    func testNewSheetOpensLarge() throws {
+        let sheet = try code("Views/NewSheet.swift")
+        XCTAssertTrue(sheet.contains(".presentationDetents([.large])"))
+        XCTAssertFalse(sheet.contains(".medium"), "at medium two of the six tiles sit below the fold")
+    }
+}

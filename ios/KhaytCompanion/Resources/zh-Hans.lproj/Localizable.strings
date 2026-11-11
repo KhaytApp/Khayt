@@ -1008,7 +1008,7 @@
 "new.calculator.detail" = "手动计算价格";
 "new.expense.detail" = "拍下收据";
 "new.waste.detail" = "打印失败或冲料";
-"new.more" = "更多";
+"new.more" = "其他";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "单据";
 "paper.packing_slip" = "装箱单";
