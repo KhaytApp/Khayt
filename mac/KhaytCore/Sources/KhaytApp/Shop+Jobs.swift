@@ -789,8 +789,8 @@ extension Shop {
             // 10.57 and opened the job at 15 where the catalogue said 50.
             if draft.isComplete,
                let costed = await costedPart(spoolId: draft.spoolId,
-                                             grams: Double(draft.grams) ?? 0,
-                                             hours: Double(draft.hours) ?? 0,
+                                             grams: TypedNumber.parse(draft.grams) ?? 0,
+                                             hours: TypedNumber.parse(draft.hours) ?? 0,
                                              qty: draft.qty, extra: draft.raw) {
                 draft.cost = costed.cost
                 draft.parts = costed.parts

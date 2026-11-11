@@ -367,9 +367,11 @@ struct OrderDetailPage: View {
         if let fresh = (try? await api.fetchQueue())?.first(where: { $0.id == order.id }) {
             order = fresh
         } else {
-            order = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
-                               machine: machine, machineId: machineId, dueDate: order.dueDate,
-                               priority: order.priority, jobNumber: order.jobNumber)
+            var kept = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
+                                  machine: machine, machineId: machineId, dueDate: order.dueDate,
+                                  priority: order.priority, jobNumber: order.jobNumber)
+            kept.voided = order.voided
+            order = kept
         }
     }
 }

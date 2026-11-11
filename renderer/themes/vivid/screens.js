@@ -99,7 +99,8 @@
     const client = showBiz ? findClient(order.clientId) : null;
     const parts = [];
     if (client) parts.push(localName(client));
-    if (order.dueDate) {
+    // A cancelled job keeps its due date; it is not overdue.
+    if (order.dueDate && order.status !== 'cancelled') {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const due = new Date(order.dueDate + 'T00:00:00');
       const diff = Math.round((due - today) / 86400000);
