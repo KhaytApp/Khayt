@@ -182,6 +182,26 @@ struct DeletesSurviveSyncTests {
         #expect(a["id"] == .string("A"))
     }
 
+    @Test("a quote whose id IS its number keeps the number it was printed with")
+    func revivedQuoteKeepsItsNumber() {
+        // Jobs taken before Nov 5 2026 have id == jobNumber.
+        let quote: JSONValue = .object(["id": .string("QUO-2026-0007"), "jobNumber": .string("QUO-2026-0007"),
+                                        "quoteNumber": .string("QUO-2026-0007"), "rev": .number(2)])
+        let before: [String: JSONValue] = ["printLog": .array([]), "tombstones": .array([
+            .object(["collection": .string("printLog"), "id": .string("QUO-2026-0007")])])]
+        var after = before
+        after["printLog"] = .array([quote, .object(["id": .string("J2"), "reprintOf": .string("QUO-2026-0007")])])
+        StoreWriter.reviveUnderNewIds(before: before, after: &after)
+        guard case .array(let rows)? = after["printLog"], case .object(let revived) = rows[0],
+              case .object(let other) = rows[1], case .string(let newId)? = revived["id"] else {
+            Issue.record("no rows"); return
+        }
+        #expect(newId != "QUO-2026-0007")
+        #expect(revived["jobNumber"] == .string("QUO-2026-0007"), "what the customer was sent does not change")
+        #expect(revived["quoteNumber"] == .string("QUO-2026-0007"))
+        #expect(other["reprintOf"] == .string(newId), "a link to it follows the new id")
+    }
+
     @Test("a fresh id keeps the old prefix")
     func freshIdPrefix() {
         let id = StoreWriter.freshId(like: "PROD-mth8nqkoVJC")

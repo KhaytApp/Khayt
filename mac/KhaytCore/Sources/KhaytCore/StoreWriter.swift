@@ -153,6 +153,13 @@ public enum StoreWriter {
     /// growing on each run put stock back twice). Nothing in the app sets it.
     @MainActor public static var afterMutateForTests: ((URL) -> Void)?
 
+    /// How many of these writes are between their start and their swap. An
+    /// app about to quit waits for this to reach nothing: quitting used to give
+    /// the book back at once, and a save still being encoded (a second or more
+    /// on a large book) then failed its ownership check or died with the
+    /// process — the last edit lost, with nothing said.
+    @MainActor public private(set) static var writesInFlight = 0
+
     @MainActor
     public static func update(storeURL url: URL,
                        owns: @Sendable () -> Bool,
@@ -162,6 +169,8 @@ public enum StoreWriter {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
+        writesInFlight += 1
+        defer { writesInFlight -= 1 }
 
         // ── A CHANGE IS NEVER WRITTEN OVER ONE IT DID NOT SEE ─────────────
         //
@@ -604,13 +613,25 @@ public enum StoreWriter {
         }
     }
 
+    /// Fields that are what a person READS, never a link to another record.
+    /// A job taken before Nov 5 2026 has an id equal to its own number
+    /// (`QUO-2026-0007`), so reviving one under a new id rewrote the number
+    /// printed on the customer's quotation along with the links to it.
+    static let neverALink: Set<String> = [
+        "jobNumber", "quoteNumber", "invoiceNumber", "proformaNumber", "creditNoteNumber", "number",
+        "project", "name", "nameEn", "nameAr", "title", "label", "notes", "note", "description",
+    ]
+
     private static func relink(_ value: JSONValue, _ renames: [String: String]) -> JSONValue {
         switch value {
         case .string(let s): return renames[s].map { .string($0) } ?? value
         case .array(let a): return .array(a.map { relink($0, renames) })
         case .object(let o):
             var out: [String: JSONValue] = [:]
-            for (k, v) in o { out[renames[k] ?? k] = relink(v, renames) }
+            for (k, v) in o {
+                if neverALink.contains(k), case .string = v { out[k] = v }
+                else { out[renames[k] ?? k] = relink(v, renames) }
+            }
             return .object(out)
         default: return value
         }

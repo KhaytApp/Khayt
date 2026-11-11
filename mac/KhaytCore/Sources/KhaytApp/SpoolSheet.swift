@@ -379,6 +379,7 @@ struct SpoolSheet: View {
                     }
                 }
                 Spacer()
+                SaveProblem(text: shop.spendProblem ?? shop.moveProblem)
                 Button(shop.words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
@@ -650,7 +651,11 @@ struct SpoolSheet: View {
         let input = form.input(isNew: isNew, reclaimsTax: tax)
         let was = opened?.input(isNew: isNew, reclaimsTax: tax)
         let id = existing?.id
-        dismiss()
-        Task { await shop.saveSpool(input, id: id, opened: was) }
+        // Closes when the save is in the book, not before: see PaymentSheet.
+        shop.moveProblem = nil
+        Task {
+            await shop.saveSpool(input, id: id, opened: was)
+            if shop.moveProblem == nil, shop.spendProblem == nil { dismiss() }
+        }
     }
 }

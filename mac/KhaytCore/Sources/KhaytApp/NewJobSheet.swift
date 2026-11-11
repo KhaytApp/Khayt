@@ -83,6 +83,9 @@ struct NewJobSheet: View {
     @State private var rush = false
     @State private var quoted: QuoteTotal?
     @State private var problem: String?
+    /// Save found a part still in the fields and put it on the job; the next
+    /// press saves. Shown as a caption until then.
+    @State private var addedOnSave = false
     /// The spools taking this job would over-commit, one sentence each, held
     /// while the shop decides (`Shop.overcommitWarnings`).
     @State private var overcommitted: [String] = []
@@ -139,7 +142,7 @@ struct NewJobSheet: View {
         /// `Shop.modelPart`'s sentence about it, for the hover.
         var sourceNote: String?
 
-        var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
+        var isComplete: Bool { (TypedNumber.parse(grams) ?? 0) > 0 || (TypedNumber.parse(hours) ?? 0) > 0 }
 
         /// One of a product's parts, as this sheet holds it.
         ///
@@ -394,8 +397,8 @@ struct NewJobSheet: View {
                         // came from: a slice, or the mesh.
                         if let source = part.source {
                             HStack(spacing: 8) {
-                                Text(Money.grams(Double(part.grams) ?? 0) + " " + shop.words.callIt("common.grams")
-                                     + " · " + Money.quantity(Double(part.hours) ?? 0) + " " + shop.words.callIt("common.hours"))
+                                Text(Money.grams(TypedNumber.parse(part.grams) ?? 0) + " " + shop.words.callIt("common.grams")
+                                     + " · " + Money.quantity(TypedNumber.parse(part.hours) ?? 0) + " " + shop.words.callIt("common.hours"))
                                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                                     .lineLimit(1)
                                 FigureSourceLabel(shop: shop, source: source, note: part.sourceNote)
@@ -564,10 +567,14 @@ struct NewJobSheet: View {
                 // them: three numbers on one line is the shape of the question
                 // ("180 grams, four hours, two of them"), and a label each
                 // would take the width the numbers need.
+                // Return in either figure adds the part: the sheet's default
+                // button is greyed out until there is one.
                 TextField(shop.words.callIt("mac.grams"), text: $draft.grams)
                     .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                    .onSubmit { if draft.isComplete { Task { await addPart() } } }
                 TextField(shop.words.callIt("mac.hours"), text: $draft.hours)
                     .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+                    .onSubmit { if draft.isComplete { Task { await addPart() } } }
                 Stepper("× \(draft.qty)", value: $draft.qty, in: 1...999)
                     .monospacedDigit().fixedSize()
                 Spacer(minLength: 8)
@@ -653,8 +660,11 @@ struct NewJobSheet: View {
                     TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
                         .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
                         .onChange(of: overrideText) { _, typed in
-                            let cleaned = typed.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-                            rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
+                            let cleaned = typed.trimmingCharacters(in: .whitespaces)
+                            // Half a number, or not one, leaves the price as
+                            // it was rather than making the job free.
+                            if cleaned.isEmpty { rule.override = nil }
+                            else if let n = TypedNumber.parse(cleaned) { rule.override = n }
                         }
                 }
             }
@@ -944,6 +954,9 @@ struct NewJobSheet: View {
             if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(Khayt.attention).lineLimit(2)
+            } else if let note = Self.footerNote(parts: parts.count, pending: draft.isComplete,
+                                                 justAdded: addedOnSave) {
+                Text(shop.words.callIt(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
             Spacer()
             Button(shop.words.callIt("common.cancel")) { shop.takingAJob = false }
@@ -952,10 +965,10 @@ struct NewJobSheet: View {
             // sheet was opened to make a quote.
             Button(shop.words.callIt("mac.save_quote")) { Task { await save(asQuote: true) } }
                 .keyboardShortcut(preferQuote ? .defaultAction : nil)
-                .disabled(parts.isEmpty)
+                .disabled(parts.isEmpty && !draft.isComplete)
             Button(shop.words.callIt("mac.take_the_job")) { Task { await save(asQuote: false) } }
                 .keyboardShortcut(preferQuote ? nil : .defaultAction)
-                .disabled(parts.isEmpty)
+                .disabled(parts.isEmpty && !draft.isComplete)
         }
         .padding(18)
     }
@@ -1006,8 +1019,8 @@ struct NewJobSheet: View {
         // rather than computed twice from the same inputs.
         defer { Task { await readComparables() } }
         let costed = await shop.costedPart(spoolId: next.spoolId,
-                                           grams: Double(next.grams) ?? 0,
-                                           hours: Double(next.hours) ?? 0,
+                                           grams: TypedNumber.parse(next.grams) ?? 0,
+                                           hours: TypedNumber.parse(next.hours) ?? 0,
                                            qty: next.qty)
         next.cost = costed?.cost ?? 0
         next.parts = costed?.parts
@@ -1072,8 +1085,8 @@ struct NewJobSheet: View {
         // What the job costs, components included: the margin advised is
         // measured against everything the price has to cover.
         let cost = parts.reduce(0.0) { $0 + $1.cost * Double($1.qty) } + componentsCost
-        let grams = parts.reduce(0.0) { $0 + (Double($1.grams) ?? 0) * Double($1.qty) }
-        let hours = parts.reduce(0.0) { $0 + (Double($1.hours) ?? 0) * Double($1.qty) }
+        let grams = parts.reduce(0.0) { $0 + (TypedNumber.parse($1.grams) ?? 0) * Double($1.qty) }
+        let hours = parts.reduce(0.0) { $0 + (TypedNumber.parse($1.hours) ?? 0) * Double($1.qty) }
         switch await shop.recommendMargin(comparables: c, raw: raw, cost: cost,
                                           grams: grams, hours: hours, material: material) {
         case .advised(let said):
@@ -1104,7 +1117,29 @@ struct NewJobSheet: View {
             overheadHours: hours)
     }
 
+    /// The caption beside the buttons: why they are greyed out, or that the
+    /// part in the fields has just been put on the job.
+    static func footerNote(parts: Int, pending: Bool, justAdded: Bool) -> String? {
+        if justAdded { return "mac.part_added_check" }
+        if parts == 0 && !pending { return "mac.add_part_first" }
+        return nil
+    }
+
     private func save(asQuote: Bool, checked: Bool = false) async {
+        // A PART TYPED BUT NEVER "ADDED" IS PART OF THE JOB. It used to be
+        // dropped without a word — and with nothing else on the job both
+        // buttons were greyed out with no reason given. The same fault the
+        // product editor had in Sep 2026 (`ProductSheet.effectiveParts`). The
+        // part goes onto the job and the total is worked out again, and the
+        // sheet stays open once so the price that saves is a price the shop
+        // has seen.
+        if draft.isComplete {
+            await addPart()
+            await reprice()
+            addedOnSave = true
+            return
+        }
+        addedOnSave = false
         // A quote reserves nothing, so only taking the job asks.
         if !asQuote, !checked {
             let warnings = await shop.overcommitWarnings(for: parts)

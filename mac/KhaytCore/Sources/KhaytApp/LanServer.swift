@@ -3017,6 +3017,8 @@ extension Shop {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         guard let engine else { throw CocoaError(.fileWriteUnknown) }
         var result: KhaytEngine.Folded?
+        var losses: [SyncLoss] = []
+        let keepAt = SyncLosses.fileURL(for: build.storeURL)
         // lock: system — a paired phone's changes; the LAN server gates them with the owner LAN PIN and the phone-writable allowlist.
         try await StoreWriter.update(
             storeURL: build.storeURL,
@@ -3025,10 +3027,21 @@ extension Shop {
             recordingDeletes: false
         ) { root in
             let guarded = await Self.phoneConnectorValues(payload, root: root, engine: engine)
+            let before = root
             let folded = try await engine.foldDeltas(base: root, deltas: [guarded])
+            // WHAT THE PHONE'S COPY REPLACED IS KEPT, as a cloud pull keeps it.
+            // The Mac records a payment (rev 8); the phone, still holding rev
+            // 7, marks the job done and sends its own rev 8. The rule takes
+            // the later one, whole, and the payment is gone — correctly by the
+            // rule, and silently until now. Only what was REPLACED is kept
+            // here: a delete made on the phone is the phone's to make.
+            losses = SyncLosses.compute(before: before, after: folded.store, conflicts: folded.conflicts)
+                .filter { $0.kind == .replaced }
+            try SyncLosses.keep(losses, at: keepAt)
             root = folded.store
             result = folded
         }
+        announceSyncLosses(losses, file: keepAt)
         await load(source)
         guard let result else { throw CocoaError(.fileWriteUnknown) }
         return result

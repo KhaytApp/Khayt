@@ -149,7 +149,7 @@ struct ProductSheet: View {
         /// Whether this part is costed at anything beyond its filament.
         var hasRates: Bool { Self.rateKeys.contains { !(rates[$0] ?? "").isEmpty } }
 
-        var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
+        var isComplete: Bool { (TypedNumber.parse(grams) ?? 0) > 0 || (TypedNumber.parse(hours) ?? 0) > 0 }
 
         /// Which plate of a multi-plate file this part is, when it is one.
         var plate: Int? { if case .number(let n)? = raw["plate"] { Int(saturating: n) } else { nil } }
@@ -159,9 +159,9 @@ struct ProductSheet: View {
         func record(spools: [Spool], reclaimsTax: Bool = false) -> JSONValue {
             var o = raw
             o["name"] = .string(name)
-            o["printWeight"] = .number(max(0, Double(grams) ?? 0))
+            o["printWeight"] = .number(max(0, TypedNumber.parse(grams) ?? 0))
             if o["supportWeight"] == nil { o["supportWeight"] = .number(0) }
-            o["printTime"] = .number(max(0, Double(hours) ?? 0))
+            o["printTime"] = .number(max(0, TypedNumber.parse(hours) ?? 0))
             o["qty"] = .number(Double(max(1, qty)))
             if let spoolId, let spool = spools.first(where: { $0.id == spoolId }) {
                 o["filamentId"] = .string(spool.id)
@@ -181,11 +181,10 @@ struct ProductSheet: View {
             if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
             else { o.removeValue(forKey: "printFileId") }
             for key in Self.rateKeys {
-                let typed = (rates[key] ?? "").replacingOccurrences(of: ",", with: "")
-                    .trimmingCharacters(in: .whitespaces)
+                let typed = (rates[key] ?? "").trimmingCharacters(in: .whitespaces)
                 // Cleared means gone, not nought — see `rates`.
                 if typed.isEmpty { o.removeValue(forKey: key) }
-                else { o[key] = .number(max(0, Double(typed) ?? 0)) }
+                else { o[key] = .number(TypedNumber.parse(typed) ?? 0) }
             }
             return .object(o)
         }
@@ -322,9 +321,9 @@ struct ProductSheet: View {
                         TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
                             .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
                             .onChange(of: overrideText) { _, typed in
-                                let cleaned = typed.replacingOccurrences(of: ",", with: "")
-                                    .trimmingCharacters(in: .whitespaces)
-                                rule.override = cleaned.isEmpty ? nil : max(0, Double(cleaned) ?? 0)
+                                let cleaned = typed.trimmingCharacters(in: .whitespaces)
+                                if cleaned.isEmpty { rule.override = nil }
+                                else if let n = TypedNumber.parse(cleaned) { rule.override = n }
                             }
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                         Spacer()
@@ -929,7 +928,7 @@ struct ProductSheet: View {
     }
 
     private func partSummary(_ part: PartRow) -> String {
-        let g = Double(part.grams) ?? 0, h = Double(part.hours) ?? 0
+        let g = TypedNumber.parse(part.grams) ?? 0, h = TypedNumber.parse(part.hours) ?? 0
         var bits: [String] = []
         if g > 0 { bits.append(Money.grams(g) + " " + shop.words.callIt("common.grams")) }
         if h > 0 { bits.append(Money.quantity(h) + " " + shop.words.callIt("common.hours")) }
@@ -1117,7 +1116,7 @@ struct ProductSheet: View {
             get: { draft.margin.map { Self.trim($0) } ?? "" },
             set: { typed in
                 let cleaned = typed.trimmingCharacters(in: .whitespaces)
-                draft.margin = cleaned.isEmpty ? nil : Double(cleaned)
+                draft.margin = cleaned.isEmpty ? nil : TypedNumber.parse(cleaned)
             }
         )
     }

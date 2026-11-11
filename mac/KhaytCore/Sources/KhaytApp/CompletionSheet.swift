@@ -193,9 +193,7 @@ struct CompletionSheet: View {
     /// field is pre-filled WITH them — `1,528` came from this app's own
     /// formatter, and `Double("1,528")` is nil.
     static func number(_ text: String) -> Double? {
-        let cleaned = text.filter { $0.isNumber || $0 == "." }
-        guard let value = Double(cleaned), value >= 0 else { return nil }
-        return value
+        TypedNumber.parse(text)
     }
 
     /// One figure, with what was quoted for it underneath.

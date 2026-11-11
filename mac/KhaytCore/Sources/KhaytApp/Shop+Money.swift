@@ -1407,9 +1407,10 @@ extension Shop {
             guard !plan.isEmpty else {
                 throw MoveRefused(sentence: self.words.callIt("inst.nothing_owed"))
             }
-            record["instalments"] = .array(plan.map { row in
+            let planIds = Self.uids("INS", count: plan.count)
+            record["instalments"] = .array(zip(plan, planIds).map { row, id in
                 .object([
-                    "id": .string(Self.uid("INS")),
+                    "id": .string(id),
                     "amount": .number(row.amount),
                     "dueDate": .string(row.dueDate),
                     "note": .string(""),

@@ -13074,14 +13074,15 @@ public actor KhaytEngine {
                            deltas: [[String: JSONValue]]) throws -> Folded {
         try runtime.call2("""
             (function (base, payloads) {
-              var applied = 0, skipped = 0, removed = 0;
+              var applied = 0, skipped = 0, removed = 0, conflicts = [];
               for (var i = 0; i < payloads.length; i++) {
                 var r = KhaytSync.applyDeltas(base, payloads[i], { appendOnly: [] }) || {};
                 applied += r.applied || 0;
                 skipped += r.skipped || 0;
                 removed += r.removed || 0;
+                if (Array.isArray(r.conflicts)) conflicts = conflicts.concat(r.conflicts);
               }
-              return { store: base, applied: applied, skipped: skipped, removed: removed };
+              return { store: base, applied: applied, skipped: skipped, removed: removed, conflicts: conflicts };
             })(ARG0, ARG1)
             """,
                           [.object(base), .array(deltas.map(JSONValue.object))],
@@ -13128,6 +13129,21 @@ public actor KhaytEngine {
         public let skipped: Int
         /// Records a tombstone in the chain deleted.
         public let removed: Int
+        /// What the rule itself reported: an equal-revision tie that took the
+        /// incoming copy over one edited here, and a delete that beat an edit.
+        /// Dropped until Nov 2026, which is how a phone's "Done" could put a
+        /// job's paid amount back to nothing with no notice anywhere.
+        public let conflicts: [JSONValue]
+
+        private enum CodingKeys: String, CodingKey { case store, applied, skipped, removed, conflicts }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            store = try c.decode([String: JSONValue].self, forKey: .store)
+            applied = try c.decode(Int.self, forKey: .applied)
+            skipped = try c.decode(Int.self, forKey: .skipped)
+            removed = try c.decode(Int.self, forKey: .removed)
+            conflicts = try c.decodeIfPresent([JSONValue].self, forKey: .conflicts) ?? []
+        }
     }
 
     /// Which jobs are late — the attention engine's answer, as a set of ids.
