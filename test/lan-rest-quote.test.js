@@ -47,3 +47,18 @@ test('a body that is not a part is refused, and the quantity is held to a sane r
   assert.equal(R.quotePart(store, Object.assign({}, part, { qty: -4 }), { overheadPerHour: 0 }).body.qty, 1);
   assert.equal(R.quotePart(store, Object.assign({}, part, { qty: 1e9 }), { overheadPerHour: 0 }).body.qty, 100000);
 });
+
+test('with no today in ctx, the overhead rate is asked for a real day, not "NaN-NaN-NaN"', () => {
+  assert.match(R.localDay(), /^\d{4}-\d{2}-\d{2}$/, 'a bare localDay() is today');
+  const seen = [];
+  const saved = globalThis.KhaytPublicQuote;
+  globalThis.KhaytPublicQuote = { overheadPerHourFor: (_book, day) => { seen.push(day); return 0; } };
+  try {
+    R.quotePart(store, part, {});
+    R.quotePart(store, part, { nowMs: Date.parse('2026-03-04T10:00:00') });
+  } finally {
+    if (saved === undefined) delete globalThis.KhaytPublicQuote; else globalThis.KhaytPublicQuote = saved;
+  }
+  assert.match(seen[0], /^\d{4}-\d{2}-\d{2}$/, `no ctx: ${seen[0]}`);
+  assert.equal(seen[1], '2026-03-04', 'ctx.nowMs decides the day when today is not given');
+});
