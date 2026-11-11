@@ -142,7 +142,9 @@ struct Machines: View {
         .background(Khayt.ground)
         .overlay {
             if shop.machines.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"), mark: .machines)
+                EmptyHere(title: shop.words.callIt("mac.no_machines"), message: shop.words.callIt("mac.no_machines_hint"), mark: .machines) {
+                    EmptyAction(shop: shop, title: "mac.add_printer") { shop.addingMachine = true }
+                }
             }
         }
         .screenToolbar {
@@ -673,7 +675,9 @@ struct Upkeep: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .accessibilityLabel(shop.words.callIt("common.more"))
             }
+            .help(shop.words.callIt("common.more"))
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
@@ -798,7 +802,9 @@ struct Inventory: View {
             // it. Gating them on spools alone hid the consumables list entirely
             // from a shop that keeps glue and bags but buys filament as it goes.
             if shop.spools.isEmpty && shop.consumables.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament)
+                EmptyHere(title: shop.words.callIt("mac.no_filament"), mark: .filament) {
+                    EmptyAction(shop: shop, title: "mac.new_spool") { shop.addingSpool = true }
+                }
             } else if shown.isEmpty && shop.consumables.isEmpty {
                 NothingMatched(shop: shop, mark: .filament)
             } else {

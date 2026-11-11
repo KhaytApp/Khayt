@@ -132,7 +132,7 @@ struct NameIt: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
-                .tracking(0.6)
+                .tracking(Words.spaced(0.6))
                 .foregroundStyle(.tertiary)
             TextField(example, text: $typed)
                 .textFieldStyle(.roundedBorder)

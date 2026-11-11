@@ -1358,7 +1358,7 @@ extension Shop {
     static func addFromSpoolman(into root: inout [String: JSONValue], spools: [JSONValue],
                                 engine: KhaytEngine, today: String) async throws -> KhaytEngine.SpoolmanPlan {
         let shelf = rows(root, "inventory")
-        let ids = (0..<spools.count).map { _ in uid("INV") }
+        let ids = uids("INV", count: spools.count)
         let plan = try await engine.spoolmanPlan(spools: spools, inventory: .array(shelf), ids: ids, today: today)
         guard !plan.add.isEmpty else { return plan }
         var next = shelf

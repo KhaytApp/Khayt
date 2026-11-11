@@ -2232,12 +2232,11 @@ ipcMain.handle('hub:save-store', async (event, data) => {
     }
     // Once the quit flush has completed the renderer's state is already on disk.
     // Anything arriving after it is redundant — in practice the `pagehide`
-    // backstop in app-boot.js firing as the window tears down — and it is not
-    // harmless: atomicWriteStore renames the primary to .prev BEFORE moving the
-    // new temp into place, so a write killed by app.quit() between those two
-    // renames leaves no khayt-store.json at all. recoverStoreRaw() heals that on
-    // next launch from .tmp/.prev, but the window should not exist. Refusing
-    // costs nothing (the snapshot is identical) and closes it.
+    // backstop in app-boot.js firing as the window tears down. A write killed
+    // by app.quit() mid-way leaves an orphaned temp behind (the book itself is
+    // never moved away any more; atomicWriteStore links .prev beside it), and
+    // there is no reason to start one. Refusing costs nothing (the snapshot is
+    // identical).
     if (_flushedForQuit) return { ok: true, skipped: 'quit-flush-already-completed' };
 
     const { normalized, errors } = normalizeStoreSnapshot(data);

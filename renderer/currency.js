@@ -167,6 +167,23 @@
     return M().orderOwedBase(o, ctx(), CURRENCIES);
   }
 
+  /**
+   * Write on a new job the currency its figures are in (`code`, else the
+   * shop's). A job with no `currency` is read in its customer's, so a request
+   * priced in riyals for a customer who bills in EUR read as EUR, and changing
+   * a customer's currency later revalued every such job. Left off only where
+   * it changes nothing: shop currency, for a customer who bills in it (so an
+   * ordinary job's shape is unchanged). A job that already says is left alone.
+   */
+  function stampJobCurrency(job, code) {
+    if (!job || typeof job !== 'object' || job.currency) return job;
+    const base = global.settings?.currency || 'SAR';
+    const cur = code || base;
+    if (cur === base && clientCurrency(job.clientId) === base) return job;
+    job.currency = cur;
+    return job;
+  }
+
   function refreshCurrencyLabels() {
     const sym = currencySymbol();
     document.querySelectorAll('[data-i18n="common.currency"]').forEach((el) => {
@@ -193,6 +210,7 @@
     orderEarnedBase,
     orderOwedBase,
     orderOwedRaw,
+    stampJobCurrency,
     refreshCurrencyLabels,
   };
 

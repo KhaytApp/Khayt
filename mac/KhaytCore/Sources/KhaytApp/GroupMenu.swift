@@ -154,7 +154,7 @@ struct NameAGroup: View {
             Text(words.callIt("mac.name_this_group"))
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
-                .tracking(0.6)
+                .tracking(Words.spaced(0.6))
                 .foregroundStyle(.tertiary)
             TextField(words.callIt("mac.group_example"), text: $typed)
                 .textFieldStyle(.roundedBorder)
@@ -427,7 +427,7 @@ struct ManyModels: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
-                .tracking(0.6)
+                .tracking(Words.spaced(0.6))
                 .foregroundStyle(.tertiary)
             FlowLayout(spacing: 6) { content() }
                 .controlSize(.small)

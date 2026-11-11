@@ -503,7 +503,7 @@ private struct OwedSummary: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .textCase(.uppercase)
-                    .tracking(0.6)
+                    .tracking(Words.spaced(0.6))
                 Text(Money.text(shop.owed, shop.currency))
                     .font(.system(size: 13, weight: .medium))
                     .monospacedDigit()

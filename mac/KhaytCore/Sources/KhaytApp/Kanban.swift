@@ -22,6 +22,8 @@ import KhaytCore
 /// is REFUSED rather than half-made only for a channel this app cannot carry,
 /// and says which.
 struct Kanban: View {
+    /// The most cards one column builds — see `Column.shown`.
+    static let columnCap = 120
     @Bindable var shop: Shop
 
     /// ── THE ONE MOMENT THE BOARD EXISTS FOR ──────────────────────────────
@@ -140,7 +142,9 @@ struct Kanban: View {
         .background(Khayt.ground)
         .overlay {
             if shop.orders.isEmpty {
-                EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .board)
+                EmptyHere(title: shop.words.callIt("mac.no_jobs"), mark: .board) {
+                    EmptyAction(shop: shop, title: "mac.new_job") { shop.takingAJob = true }
+                }
             } else if shop.matching(shop.orders).isEmpty {
                 // Seven columns all saying "nothing here" is a board that looks
                 // broken. It is a search that matched nothing, and it should say
@@ -248,6 +252,10 @@ private struct Column: View {
     @State private var isTarget = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
+    /// The most cards one column builds.
+    static let cap = Kanban.columnCap
+    static func shown(_ jobs: [Order]) -> ArraySlice<Order> { jobs.prefix(cap) }
+
     /// Why this column would refuse the card currently in the air, or nil.
     private var refusal: String? { shop.dragRefusal(stage) }
 
@@ -278,7 +286,14 @@ private struct Column: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
             } else {
-                ForEach(jobs) { job in
+                // A COLUMN DRAWS AT MOST `cap` CARDS. Every card is built when
+                // the board opens (they fly between columns, which a lazy
+                // stack cannot do), and Completed only empties when a job is
+                // marked delivered or shipped — so a shop that never marks
+                // them had every job it ever finished built on each visit, on
+                // each search keystroke and after each save. The rest are one
+                // line that says how many, and the Jobs table has them all.
+                ForEach(Self.shown(jobs)) { job in
                     JobCard(job: job, shop: shop, matchedLot: lots[job.id])
                         // The card's path from the column it left to the one
                         // it landed in. Keyed by job id, so the SAME card
@@ -296,6 +311,12 @@ private struct Column: View {
                         // about the card under the pointer. The same menu the
                         // orders table has, on the card itself.
                         .contextMenu { JobActions(shop: shop, job: job) }
+                }
+                if jobs.count > Self.cap {
+                    Text(shop.words.callIt("mac.board_more", ["n": .number(Double(jobs.count - Self.cap))]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
                 }
             }
         }

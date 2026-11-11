@@ -1173,10 +1173,12 @@ public actor KhaytEngine {
         // button or event sends. The phone runs these too, so a request is
         // identical on every device. `plugin-payload` reads
         // `KhaytPluginManifest` at load, so it comes second; `plugin-host`
-        // (which connectors are live, and how an entry changes) third.
+        // (which connectors are live, and how an entry changes) third;
+        // `plugin-update` (the signed update index, Nov 10) last.
         "plugin-manifest",
         "plugin-payload",
         "plugin-host",
+        "plugin-update",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -8351,6 +8353,7 @@ public actor KhaytEngine {
     /// can never be anything but one of these functions.
     public static let lanRestReads: Set<String> = [
         "ordersList", "machinesList", "inventoryList", "waitingList", "clientsList", "orderQuoteUrl",
+        "quotePart",
     ]
     public static let lanRestWrites: Set<String> = [
         "orderCreate", "orderPatch", "orderApprove", "inventoryCreate", "inventoryPatch",
@@ -8575,6 +8578,66 @@ public actor KhaytEngine {
 
     /// The ed25519 public keys that make a manifest "reviewed": `[{id, key}]`,
     /// key = base64 of the raw 32 bytes. Any one verifying is enough.
+    // ── Connector updates — lib/plugin-update.js (Nov 10) ──
+    //
+    // The lib does no cryptography: the Mac checks the index signature
+    // (`Connectors.indexSignedBy`) over `pluginIndexMessage`, and every
+    // downloaded manifest (sha256, then `Connectors.reviewedBy`) before
+    // handing it in. An index that fails `checkIndex` changes nothing.
+
+    /// The exact bytes the index signature covers: "khayt-index-v1\n" + its
+    /// canonical JSON, `signature` left out.
+    public func pluginIndexMessage(_ index: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytPluginUpdate.indexSigningMessage(ARG0)", [index], as: String.self)
+    }
+
+    /// `{ ok, reason }` — may this index be acted on.
+    public func pluginCheckIndex(_ index: JSONValue, signedBy: String?, lastSerial: Int?, now: Date) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.checkIndex(ARG0, { signedBy: ARG1, lastSerial: ARG2, nowMs: ARG3 })",
+                          [index, signedBy.map(JSONValue.string) ?? .null, lastSerial.map { .number(Double($0)) } ?? .null,
+                           .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Step 1 of a check: `[{ id, version, url, sha256, size }]` to download;
+    /// empty for an index that cannot be trusted. `ctx`: `{ signedBy, nowMs,
+    /// platform, appVersion, schema }`.
+    public func pluginUpdateFetches(settings: JSONValue, index: JSONValue, ctx: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.fetchesFor(ARG0, ARG1, ARG2)", [settings, index, ctx], as: JSONValue.self)
+    }
+
+    /// Step 2: `{ ok, reason, settings, changed, notes }`. `fetched` maps id →
+    /// a manifest this Mac has VERIFIED.
+    public func pluginApplyIndex(settings: JSONValue, index: JSONValue, ctx: JSONValue, fetched: JSONValue) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.applyIndex(ARG0, ARG1, ARG2, ARG3)",
+                          [settings, index, ctx, fetched], as: JSONValue.self)
+    }
+
+    /// The shop agreed to the pending version: `{ ok, settings }`.
+    public func pluginAgreeUpdate(settings: JSONValue, id: String, now: Date) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.agree(ARG0, ARG1, { nowMs: ARG2 })",
+                          [settings, .string(id), .number(now.timeIntervalSince1970 * 1000)], as: JSONValue.self)
+    }
+
+    /// Back to the version before the last update: `{ ok, settings }`.
+    public func pluginRevertUpdate(settings: JSONValue, id: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.revert(ARG0, ARG1)", [settings, .string(id)], as: JSONValue.self)
+    }
+
+    /// The shop flips a connector's switch: `{ ok, settings, revoked? }`. While
+    /// its version is withdrawn the entry stays off and the choice is kept for
+    /// when the fixed version arrives.
+    public func pluginSetSwitch(settings: JSONValue, id: String, enabled: Bool) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.setSwitch(ARG0, ARG1, ARG2)",
+                          [settings, .string(id), .bool(enabled)], as: JSONValue.self)
+    }
+
+    /// Which manifest runs for an entry: `{ run, which, manifest, granted, why, reason? }`.
+    public func pluginRunnable(entry: JSONValue, settings: JSONValue) throws -> JSONValue {
+        try runtime.call2("(function(){ var U = globalThis.KhaytPluginUpdate;"
+                        + " return U.runnable(ARG0, U.stateOf(ARG1, ARG0 && ARG0.id)); })()",
+                          [entry, settings], as: JSONValue.self)
+    }
+
     public func pluginSigningKeys() throws -> [JSONValue] {
         try runtime.call2("globalThis.KhaytPluginManifest.SIGNING_KEYS.slice()", [], as: [JSONValue].self)
     }
@@ -8759,9 +8822,14 @@ public actor KhaytEngine {
                         machines: [JSONValue],
                         now: Date, today: String,
                         holdReason: String? = nil,
-                        qcNotes: String? = nil) throws -> JobMove {
+                        qcNotes: String? = nil,
+                        qcInspector: String? = nil) throws -> JobMove {
+        // The inspector goes with the pass (`lib/order-status.js` writes
+        // `order.inspector = qc.inspector || null`): nil is nobody named.
         let qc: JSONValue = qcNotes.map {
-            .object(["outcome": .string("pass"), "notes": .string($0)])
+            var pass: [String: JSONValue] = ["outcome": .string("pass"), "notes": .string($0)]
+            if let who = qcInspector, !who.isEmpty { pass["inspector"] = .string(who) }
+            return .object(pass)
         } ?? .null
         return try runtime.call2(MOVE_SCRIPT,
                           [order, .string(status), .array(orders), .object(settings),
@@ -13074,14 +13142,15 @@ public actor KhaytEngine {
                            deltas: [[String: JSONValue]]) throws -> Folded {
         try runtime.call2("""
             (function (base, payloads) {
-              var applied = 0, skipped = 0, removed = 0;
+              var applied = 0, skipped = 0, removed = 0, conflicts = [];
               for (var i = 0; i < payloads.length; i++) {
                 var r = KhaytSync.applyDeltas(base, payloads[i], { appendOnly: [] }) || {};
                 applied += r.applied || 0;
                 skipped += r.skipped || 0;
                 removed += r.removed || 0;
+                if (Array.isArray(r.conflicts)) conflicts = conflicts.concat(r.conflicts);
               }
-              return { store: base, applied: applied, skipped: skipped, removed: removed };
+              return { store: base, applied: applied, skipped: skipped, removed: removed, conflicts: conflicts };
             })(ARG0, ARG1)
             """,
                           [.object(base), .array(deltas.map(JSONValue.object))],
@@ -13128,6 +13197,21 @@ public actor KhaytEngine {
         public let skipped: Int
         /// Records a tombstone in the chain deleted.
         public let removed: Int
+        /// What the rule itself reported: an equal-revision tie that took the
+        /// incoming copy over one edited here, and a delete that beat an edit.
+        /// Dropped until Nov 2026, which is how a phone's "Done" could put a
+        /// job's paid amount back to nothing with no notice anywhere.
+        public let conflicts: [JSONValue]
+
+        private enum CodingKeys: String, CodingKey { case store, applied, skipped, removed, conflicts }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            store = try c.decode([String: JSONValue].self, forKey: .store)
+            applied = try c.decode(Int.self, forKey: .applied)
+            skipped = try c.decode(Int.self, forKey: .skipped)
+            removed = try c.decode(Int.self, forKey: .removed)
+            conflicts = try c.decodeIfPresent([JSONValue].self, forKey: .conflicts) ?? []
+        }
     }
 
     /// Which jobs are late — the attention engine's answer, as a set of ids.

@@ -45,3 +45,7 @@
 
 /* The app's name in the widget's header. Arabic writes it in Arabic letters. */
 "Khayt" = "Khayt";
+
+/* Queue widget gallery name and description (KhaytQueueWidget.swift) */
+"Khayt Queue" = "Khayt 队列";
+"Queue counts and live print progress from your shop." = "来自你的工坊的队列数量和实时打印进度。";

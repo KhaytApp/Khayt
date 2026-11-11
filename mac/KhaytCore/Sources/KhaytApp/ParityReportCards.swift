@@ -42,7 +42,7 @@ private struct CardHeading: View {
     var body: some View {
         Text(text)
             .font(.system(size: 10, weight: .semibold))
-            .textCase(.uppercase).tracking(0.6)
+            .textCase(.uppercase).tracking(Words.spaced(0.6))
             .foregroundStyle(.secondary)
     }
 }

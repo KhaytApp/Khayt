@@ -54,7 +54,7 @@ final class WidgetStringsTests: XCTestCase {
         XCTAssertEqual(try table("ar")["Khayt"], "خيط")
         for (key, value) in try table("ar") {
             XCTAssertFalse(value.contains("Khayt"), "\(key): the app is خيط in Arabic")
-            if key != "Khayt" && key != "Khayt Money" {
+            if !["Khayt", "Khayt Money", "Khayt Queue"].contains(key) {  // the widgets' names
                 XCTAssertFalse(value.replacingOccurrences(of: "تطبيق خيط", with: "").contains("خيط"), "\(key): a bare خيط")
             }
             XCTAssertFalse(value.contains("شامل الضريبة"), key)

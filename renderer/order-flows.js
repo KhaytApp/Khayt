@@ -1574,6 +1574,7 @@ function openOrderEditor(orderId) {
     // paidAmount rule would silently never apply.
     instalmentBase: order.instalmentBase,
     operatorId: order.operatorId || '',
+    clientId: order.clientId || '',
   };
   const pendingFileDeletes = [];
   // newly-uploaded photos to flush to disk on save (full data URLs)
@@ -1623,6 +1624,7 @@ function openOrderEditor(orderId) {
         })()}
       </select>
     </div>` : ''}
+    ${oeCustomerPickerHtml(order, draft.clientId)}
     ${(() => {
       // Feature 3: Material compatibility check
       if (!order.machineId || !order.material) return '';
@@ -1661,17 +1663,7 @@ function openOrderEditor(orderId) {
         <input type="text" data-f="trackingNumber" value="${escapeHtml(draft.trackingNumber)}" placeholder="…">
       </div>
     </div>
-    ${(() => {
-      const cl = order.clientId ? clients.find(c => c.id === order.clientId) : null;
-      if (cl && cl.addresses && cl.addresses.length > 0) {
-        return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
-        <select id="oeAddressSelect" style="margin-bottom:6px;">
-          <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
-          ${cl.addresses.map(a => `<option value="${escapeHtml(a.address || '')}">${escapeHtml(a.label || a.address)}</option>`).join('')}
-        </select>`;
-      }
-      return '';
-    })()}
+    <div id="oeAddressPick">${oeAddressPickHtml(draft.clientId)}</div>
     <label style="margin-top:10px;">${escapeHtml(t('oe.delivery_address'))}</label>
     <textarea data-f="deliveryAddress" rows="2" style="resize:vertical; min-height:48px;" placeholder="…">${escapeHtml(draft.deliveryAddress)}</textarea>
     ${/* The updates this job's customer was sent, with Meta's delivery report
@@ -1908,16 +1900,15 @@ function openOrderEditor(orderId) {
         draft.deliveryAddress = e.target.value;
       });
       // Feature 4: Address book select
-      const addrSel = modal.querySelector('#oeAddressSelect');
-      if (addrSel) {
-        addrSel.addEventListener('change', (e) => {
-          const addrField = modal.querySelector('[data-f="deliveryAddress"]');
-          if (addrField && e.target.value) {
-            addrField.value = e.target.value;
-            draft.deliveryAddress = e.target.value;
-          }
-        });
-      }
+      // Delegated: the select is rebuilt when the Customer picker changes.
+      modal.addEventListener('change', (e) => {
+        if (!e.target || e.target.id !== 'oeAddressSelect') return;
+        const addrField = modal.querySelector('[data-f="deliveryAddress"]');
+        if (addrField && e.target.value) {
+          addrField.value = e.target.value;
+          draft.deliveryAddress = e.target.value;
+        }
+      });
       // Feature 8 (new 8-pack): Apply loyalty tier discount button
       modal.querySelector('#btnApplyTierDiscount')?.addEventListener('click', () => {
         const tier = getClientTier(order.clientId);
@@ -1951,6 +1942,15 @@ function openOrderEditor(orderId) {
       // Operator select
       const opSel = modal.querySelector('#oeOperator');
       if (opSel) opSel.addEventListener('change', (e) => { draft.operatorId = e.target.value; });
+      const custSel = modal.querySelector('#oeCustomer');
+      if (custSel) custSel.addEventListener('change', (e) => {
+        draft.clientId = e.target.value;
+        const note = modal.querySelector('#oeCustomerNote');
+        if (note) note.innerHTML = oeCustomerNoteHtml(order, draft.clientId);
+        // The address book offered is the customer now picked, not the one the job opened with.
+        const pickWrap = modal.querySelector('#oeAddressPick');
+        if (pickWrap) pickWrap.innerHTML = oeAddressPickHtml(draft.clientId);
+      });
 
       // Vault files (Feature 2)
       const vaultListEl = modal.querySelector('#vaultFilesList');
@@ -2250,6 +2250,17 @@ function openOrderEditor(orderId) {
         }
       }
 
+      // Whose job it is: lib/order-edit.js decides, before anything is written.
+      const customerTo = draft.clientId || null;
+      const customerMoves = (order.clientId || null) !== customerTo;
+      if (customerMoves) {
+        const verdict = EditRules().canChangeCustomer(order, customerTo, { clients });
+        if (!verdict.ok) {
+          toast(oeCustomerReasonText(verdict.reason), 'error', 6000);
+          return false;
+        }
+      }
+
       // Feature 3: Spool over-commit check
       const ocWarnings = checkSpoolOvercommit(order.parts || [], order.id);
       if (ocWarnings.length > 0) {
@@ -2307,6 +2318,9 @@ function openOrderEditor(orderId) {
       Object.assign(order, EditRules().priorityFrom(
         draft.priorityLevel || (draft.priority ? 'high' : 'normal')));
       order.operatorId = draft.operatorId || undefined;
+      if (customerMoves) {
+        EditRules().changeCustomer(order, customerTo, { now: Date.now(), id: uid('edit'), clients, settings, nameOf: localName });
+      }
       const arrived = (order.printPhotos || []).filter(p => p && p.filename && !photosAtOpen.has(p.filename)
         && !draft.printPhotos.some(d => d && d.filename === p.filename));
       order.printPhotos = [...draft.printPhotos, ...arrived];
@@ -3022,6 +3036,60 @@ function openSpoolSwitchModal(orderId) {
   });
 }
 
+/**
+ * The Edit Order customer picker. Turki's rule (Nov 10, option C), which is
+ * lib/order-edit.js's: changeable until the invoice is submitted to ZATCA,
+ * voided, credited or paid; a job with no customer can always get one. Same
+ * shape as the Mac's OrderDetailsSheet customer row.
+ */
+function oeCustomerPickerHtml(order, selected) {
+  const lock = order.clientId ? EditRules().customerLocked(order) : null;
+  const choices = clients.filter(c => c && c.id)
+    .map(c => ({ id: String(c.id), name: localName(c) || String(c.id) }))
+    .sort((a, b) => a.name.localeCompare(b.name, localeTag()));
+  // The job's own customer stays offered even if it is no longer in the
+  // book, so saving for another reason cannot drop it.
+  if (selected && !choices.some(c => c.id === String(selected))) choices.unshift({ id: String(selected), name: String(selected) });
+  return `
+    <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:8px;">
+      <label for="oeCustomer" style="margin:6px 0 0; font-size:13px; white-space:nowrap;">${escapeHtml(t('oe.customer'))}</label>
+      <div style="flex:1; max-width:320px;">
+        <select id="oeCustomer" style="width:100%;"${lock ? ' disabled' : ''}>
+          <option value="">${escapeHtml(t('oe.customer_none'))}</option>
+          ${choices.map(c => `<option value="${escapeHtml(c.id)}"${String(selected) === c.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+        <small id="oeCustomerNote" style="display:block; margin-top:3px;">${lock ? `<span style="color:var(--text-muted);">${escapeHtml(oeCustomerReasonText(lock))}</span>` : oeCustomerNoteHtml(order, selected)}</small>
+      </div>
+    </div>`;
+}
+
+/** The customer's address book, to copy one into the delivery address; '' when it has none. */
+function oeAddressPickHtml(clientId) {
+  const cl = clientId ? clients.find(c => c && c.id === clientId) : null;
+  const rows = cl && Array.isArray(cl.addresses) ? cl.addresses.filter(a => a && typeof a === 'object') : [];
+  if (!rows.length) return '';
+  return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
+        <select id="oeAddressSelect" style="margin-bottom:6px;">
+          <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
+          ${rows.map(a => `<option value="${escapeHtml(String(a.address || ''))}">${escapeHtml(String(a.label || a.address || ''))}</option>`).join('')}
+        </select>`;
+}
+
+/** The warning under the picker when the new customer bills in another currency. Nothing is converted. */
+function oeCustomerNoteHtml(order, clientId) {
+  if (!clientId || String(clientId) === String(order.clientId || '')) return '';
+  const cl = clients.find(c => c && String(c.id) === String(clientId));
+  if (!cl) return '';
+  const shopCur = settings.currency || 'SAR';
+  if ((order.currency || shopCur) === (cl.currency || shopCur)) return '';
+  return `<span style="color:var(--warning);">${escapeHtml(t('oe.customer_currency'))}</span>`;
+}
+
+function oeCustomerReasonText(reason) {
+  if (['zatca', 'voided', 'credited', 'paid'].includes(reason)) return t('oe.customer_locked_' + reason);
+  return t('oe.customer_unknown');
+}
+
 /** Write an edit into the job's history. The rule is lib/order-edit.js's. */
 function recordOrderEdit(order, changedFields) {
   EditRules().recordEdit(order, changedFields, { now: Date.now(), id: uid('edit') });
@@ -3162,6 +3230,11 @@ async function splitOrderAcrossMachines(orderId) {
       date: order.date || localDateStr(),
       status: 'pending',
       price: subPrice,
+      // The parent's shares are in the parent's currency, so each part is too.
+      // Without this a EUR job split into SAR-read parts (the job's absent
+      // currency falls back to the customer's, then the shop's).
+      ...(order.currency ? { currency: order.currency } : {}),
+      ...(order.fxRate != null ? { fxRate: order.fxRate } : {}),
       paidAmount: subPaid,
       paymentStatus: KhaytSplitOrder.paymentStatusFor(subPrice, subPaid),
       creditNotes: subCredit > 0

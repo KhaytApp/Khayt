@@ -768,6 +768,9 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// every caller has to decide what to do about it rather than filtering it
     /// away. `split` reaches here: a parent order replaced by the sub-orders
     /// that carry its price between them.
+    /// Where a stage sits in the work, for sorting: quote first, cancelled last.
+    var rank: Int { Self.allCases.firstIndex(of: self) ?? Self.allCases.count }
+
     static func of(_ order: Order) -> Stage? {
         // Delivered first: it is the later of the two, so a parcel that has
         // arrived is delivered rather than still in the post.
@@ -775,4 +778,10 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
         if order.status == "completed", order.shippedAt != nil { return .shipped }
         return Stage(rawValue: order.status)
     }
+}
+
+extension Order {
+    /// The job's place in the pipeline (`Stage.rank`); a status this app does
+    /// not know sorts after every one it does.
+    var stageRank: Int { Stage.of(self)?.rank ?? Stage.allCases.count }
 }

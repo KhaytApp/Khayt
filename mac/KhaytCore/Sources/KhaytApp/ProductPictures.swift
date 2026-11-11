@@ -33,7 +33,7 @@ struct ProductPictureStrip: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(shop.words.callIt("mac.pictures"))
                     .font(.system(size: 10, weight: .semibold))
-                    .textCase(.uppercase).tracking(0.6)
+                    .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.tertiary)
                 Spacer()
                 Button(shop.words.callIt("mac.add_picture")) { picking = true }

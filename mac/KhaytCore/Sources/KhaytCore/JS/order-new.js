@@ -725,7 +725,11 @@
       invoiceNotes: typeof i.invoiceNotes === 'string' ? i.invoiceNotes : '',
       clientRef: i.clientRef || null,
       tags: [],
-      dueDate: asQuote ? null : estimateDueDate(orders, totalPrintTime, settings, now),
+      // The day the shop PROMISED, when it said one ("by Thursday") — a
+      // plain YYYY-MM-DD. Otherwise the estimate from the queue, as before.
+      dueDate: asQuote ? null
+        : (typeof i.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(i.dueDate) ? i.dueDate
+          : estimateDueDate(orders, totalPrintTime, settings, now)),
       priority: false,
       printPhotos: [],
       parts,
