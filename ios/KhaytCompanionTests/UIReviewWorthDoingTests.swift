@@ -110,7 +110,7 @@ extension UIReviewWorthDoingTests {
 // MARK: W3 — one reference style: S-1041, never #S-1041
 extension UIReviewWorthDoingTests {
     func testNoScreenWritesAHashBeforeAReference() throws {
-        let hashed = try NSRegularExpression(pattern: #"("#\\\(|"#"\s*\+)"#)
+        let hashed = try NSRegularExpression(pattern: ##"("#\\\(|"#"\s*\+)"##)
         var found: [String] = []
         for dir in ["KhaytCompanion", "KhaytWidget", "KhaytAlerts"] {
             let root = Self.iosDir.appending(path: dir)
