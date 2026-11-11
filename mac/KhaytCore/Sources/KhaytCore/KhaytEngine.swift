@@ -8351,6 +8351,7 @@ public actor KhaytEngine {
     /// can never be anything but one of these functions.
     public static let lanRestReads: Set<String> = [
         "ordersList", "machinesList", "inventoryList", "waitingList", "clientsList", "orderQuoteUrl",
+        "quotePart",
     ]
     public static let lanRestWrites: Set<String> = [
         "orderCreate", "orderPatch", "orderApprove", "inventoryCreate", "inventoryPatch",
@@ -8759,9 +8760,14 @@ public actor KhaytEngine {
                         machines: [JSONValue],
                         now: Date, today: String,
                         holdReason: String? = nil,
-                        qcNotes: String? = nil) throws -> JobMove {
+                        qcNotes: String? = nil,
+                        qcInspector: String? = nil) throws -> JobMove {
+        // The inspector goes with the pass (`lib/order-status.js` writes
+        // `order.inspector = qc.inspector || null`): nil is nobody named.
         let qc: JSONValue = qcNotes.map {
-            .object(["outcome": .string("pass"), "notes": .string($0)])
+            var pass: [String: JSONValue] = ["outcome": .string("pass"), "notes": .string($0)]
+            if let who = qcInspector, !who.isEmpty { pass["inspector"] = .string(who) }
+            return .object(pass)
         } ?? .null
         return try runtime.call2(MOVE_SCRIPT,
                           [order, .string(status), .array(orders), .object(settings),

@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "Ou ouvrez l’atelier d’exemple — 42 commandes, 5 machines, de vrais chiffres.",
  "mac.open_total": "ouvertes",
  "mac.open_whatsapp": "Ouvrir WhatsApp",
- "mac.operator_access_hint": "Utilisé par le verrouillage opérateur de l’app de bureau. Ce Mac ne demande pas de code PIN.",
+ "mac.operator_access_hint": "Ce que cette personne peut faire quand la connexion du personnel est activée.",
  "mac.operator_active": "Actif — proposé quand une commande est assignée ou qu’un temps est saisi",
  "mac.operator_add": "Ajouter un opérateur",
  "mac.operator_delete_confirm": "Supprimer « {name} » ?",

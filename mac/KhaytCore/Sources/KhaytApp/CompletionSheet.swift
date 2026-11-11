@@ -25,6 +25,12 @@ struct CompletionSheet: View {
     @State private var hours: String = ""
     @State private var grams: String = ""
     @State private var notes: String = ""
+    @State private var inspector = ""
+    /// Leaving inspection with Require inspector on and nobody chosen.
+    private var inspectorMissing: Bool {
+        subject.leavingQC && QcInspector.missing(settings: shop.settingsDict,
+                                                 operators: shop.activeOperators.count, chosen: inspector)
+    }
     /// Boxes the shop has typed in, so a late answer from the printer does not
     /// overwrite a figure under the cursor.
     @State private var touched: Set<Field> = []
@@ -121,6 +127,7 @@ struct CompletionSheet: View {
                         .textFieldStyle(.roundedBorder)
                         .focused($focused, equals: .notes)
                 }
+                QcInspector.Row(shop: shop, chosen: $inspector)
             }
 
             HStack {
@@ -130,6 +137,7 @@ struct CompletionSheet: View {
                 Button(words.callIt("act.confirm"), action: commit)
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
+                    .disabled(inspectorMissing)
             }
         }
         .padding(20)
@@ -158,6 +166,8 @@ struct CompletionSheet: View {
     private func commit() {
         let id = subject.id
         let leavingQC = subject.leavingQC
+        guard !inspectorMissing else { return }
+        let who = inspector
         let said = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         // The estimate when the box has been emptied or scribbled in: a job
         // completed with a blank weight would deduct nothing from the shelf.
@@ -180,6 +190,7 @@ struct CompletionSheet: View {
         Task {
             await shop.moveJob(id, to: .completed,
                                qcNotes: leavingQC ? said : nil,
+                               qcInspector: leavingQC && !who.isEmpty ? who : nil,
                                actuals: .init(
                                 hours: h, grams: g,
                                 timeSource: (pre?.timeMeasured == true && unchanged(h, pre?.timeH))

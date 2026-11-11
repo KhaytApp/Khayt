@@ -23,7 +23,7 @@ struct LanEndpointsTests {
     /// making this one do so would be the two servers disagreeing, which is the
     /// thing `LanServerTests` exists to prevent.
     static let writes: Set<String> = ["/api/store/deltas", "/api/intake", "/api/devices",
-                                      "/api/intake/estimate", "/api/survey", "/api/waste"]
+                                      "/api/intake/estimate", "/api/survey", "/api/waste", "/api/quote"]
 
     @Test("every endpoint the 404 advertises is one this server routes")
     func advertisedEndpointsAnswer() async throws {

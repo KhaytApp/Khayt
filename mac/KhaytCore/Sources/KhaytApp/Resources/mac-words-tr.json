@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "Veya örnek dükkânı açın — 42 iş, 5 makine, gerçek rakamlar.",
  "mac.open_total": "açık",
  "mac.open_whatsapp": "WhatsApp'ı Aç",
- "mac.operator_access_hint": "Masaüstü uygulamasının operatör kilidi tarafından kullanılır. Bu Mac PIN istemez.",
+ "mac.operator_access_hint": "Personel girişi açıkken bu kişinin yapabilecekleri.",
  "mac.operator_active": "Etkin — bir iş atanırken veya süre kaydedilirken sunulur",
  "mac.operator_add": "Operatör ekle",
  "mac.operator_delete_confirm": "“{name}” silinsin mi?",
