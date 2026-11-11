@@ -217,3 +217,11 @@ extension UIReviewWorthDoingTests {
         }
     }
 }
+
+// MARK: P8 — the unread badge sits on the bell's trailing corner in Arabic too
+extension UIReviewWorthDoingTests {
+    func testUnreadBadgeOffsetMirrors() throws {
+        let home = try code("Views/DashboardView.swift")
+        XCTAssertFalse(home.contains(".offset(x: 2, y: -2)"), "an x offset does not flip in right-to-left")
+    }
+}

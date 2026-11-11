@@ -218,7 +218,7 @@ struct DashboardView: View {
                             .padding(.horizontal, 4)
                             .frame(minWidth: 17, minHeight: 17)
                             .background(KhaytDesign.late, in: Capsule())
-                            .offset(x: 2, y: -2)
+                            .padding(.trailing, -2).offset(y: -2)  // trailing: mirrored in Arabic (an x offset is not)
                     }
                 }
             }
