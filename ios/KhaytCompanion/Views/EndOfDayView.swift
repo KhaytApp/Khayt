@@ -10,11 +10,15 @@ struct EndOfDayView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var day: DayReport?
     @State private var currency: String?
+    /// The read came back empty-handed: a spinner forever said nothing (F3).
+    @State private var unreadable = false
 
     var body: some View {
         ScrollView {
             if let day {
                 content(day)
+            } else if unreadable {
+                LoadFailedView(message: L10n.tr("load.book_unavailable")) { await read() }
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
             }
@@ -27,9 +31,14 @@ struct EndOfDayView: View {
         }
         .task {
             currency = await api.shopCurrency()
-            day = await api.fetchEndOfDay()
+            await read()
         }
-        .refreshable { day = await api.fetchEndOfDay() }
+        .refreshable { await read() }
+    }
+
+    private func read() async {
+        day = await api.fetchEndOfDay()
+        unreadable = day == nil
     }
 
     private func number(_ n: Double, decimals: Int = 0) -> String {

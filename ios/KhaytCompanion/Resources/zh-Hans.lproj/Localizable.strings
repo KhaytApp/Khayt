@@ -1282,3 +1282,8 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "无法加载";
+"load.retry" = "重试";
+"load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
