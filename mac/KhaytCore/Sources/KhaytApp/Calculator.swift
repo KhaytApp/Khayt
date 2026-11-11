@@ -636,6 +636,7 @@ struct Calculator: View {
                             } label: { Image(systemName: "minus.circle") }
                                 .buttonStyle(.borderless)
                                 .help(shop.words.callIt("common.delete"))
+                                .accessibilityLabel(shop.words.callIt("common.delete"))
                             Spacer(minLength: 0)
                         }
                     }

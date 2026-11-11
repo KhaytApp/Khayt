@@ -1831,6 +1831,7 @@ struct DowntimeEditor: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
                         .help(words.callIt("common.delete"))
+                        .accessibilityLabel(words.callIt("common.delete"))
                 }
                 // The pickers read in the SHOP's language, as every date this
                 // app writes does (`Words.say`) — they took this Mac's, so an

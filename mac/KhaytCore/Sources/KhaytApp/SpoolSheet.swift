@@ -144,6 +144,7 @@ struct SpoolSheet: View {
                         } label: { Image(systemName: "magnifyingglass") }
                             .menuStyle(.borderlessButton).fixedSize()
                             .help(shop.words.callIt("mac.filament_catalog"))
+                            .accessibilityLabel(shop.words.callIt("mac.filament_catalog"))
                     }
                 }
                 GridRow {

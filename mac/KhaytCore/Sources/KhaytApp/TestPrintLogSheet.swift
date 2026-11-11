@@ -149,6 +149,7 @@ struct TestPrintLogSheet: View {
             Button(role: .destructive) { deleting = row } label: { Image(systemName: "xmark") }
                 .buttonStyle(.borderless)
                 .help(words.callIt("common.delete"))
+                .accessibilityLabel(words.callIt("common.delete"))
                 .disabled(!shop.canMoveJobs)
         }
     }

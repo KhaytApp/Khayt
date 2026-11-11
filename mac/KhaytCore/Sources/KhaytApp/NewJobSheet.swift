@@ -451,6 +451,7 @@ struct NewJobSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), part.name))
                 }
                 .padding(.vertical, 2)
             }

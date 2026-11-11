@@ -579,6 +579,7 @@ struct CustomerInspector: View {
                         } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.plain)
                             .help(shop.words.callIt("common.delete"))
+                            .accessibilityLabel(shop.words.callIt("common.delete"))
                     }
                 }
                 .padding(.vertical, 2)

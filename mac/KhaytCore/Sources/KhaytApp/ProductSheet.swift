@@ -638,6 +638,7 @@ struct ProductSheet: View {
                     } label: { Image(systemName: "pencil") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.edit"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.edit"), part.name))
                         // Not over a part being typed — it would be overwritten.
                         .disabled(editingAt != nil || newPart.isComplete || !newPart.name.isEmpty
                                   || newPart.spoolId != nil)
@@ -647,6 +648,7 @@ struct ProductSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), part.name))
                 }
             }
 
