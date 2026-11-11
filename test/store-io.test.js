@@ -234,6 +234,102 @@ test('atomicWriteStore writes the store and keeps a one-generation .prev rollbac
   assert.equal(safeJsonParse(fs.readFileSync(fp + '.prev', 'utf8')).v, 1); // previous generation preserved
 });
 
+/**
+ * The book is never missing while it is written. The write used to move the
+ * primary to .prev and then the temp into place, so a read between the two
+ * (the Electron smoke's restore test, on CI, a LAN merge, a sync client)
+ * found no khayt-store.json. Every step of a write is watched here, and after
+ * each one the primary must exist and parse.
+ */
+test('atomicWriteStore never leaves the book missing, at any step', async () => {
+  let fp = null;
+  const seen = [];
+  const watch = (name, fn) => async (...a) => {
+    const r = await fn(...a);
+    if (fp) {
+      let ok = false;
+      try { ok = !!safeJsonParse(fs.readFileSync(fp, 'utf8')); } catch (_) { ok = false; }
+      seen.push([name, ok]);
+    }
+    return r;
+  };
+  const promises = {};
+  for (const k of Object.keys(fs.promises)) promises[k] = typeof fs.promises[k] === 'function' ? watch(k, fs.promises[k].bind(fs.promises)) : fs.promises[k];
+  const io = createStoreIo({ app: { getPath: () => tmpDir }, fs: { ...fs, promises }, safeStorage: { isEncryptionAvailable: () => false }, safeJsonParse, crypto });
+  await io.atomicWriteStore(JSON.stringify({ v: 1 }));
+  fp = io.dataFilePath();
+  const old = fs.statSync(fp).mtimeMs;
+  await io.atomicWriteStore(JSON.stringify({ v: 2 }));
+  assert.ok(seen.length >= 3, `the write was watched (${seen.map((x) => x[0])})`);
+  assert.deepEqual(seen.filter(([, ok]) => !ok), [], 'the book existed after every step');
+  assert.equal(safeJsonParse(fs.readFileSync(fp, 'utf8')).v, 2);
+  assert.equal(safeJsonParse(fs.readFileSync(fp + '.prev', 'utf8')).v, 1);
+  assert.equal(Math.round(fs.statSync(fp + '.prev').mtimeMs), Math.round(old), '.prev keeps the old mtime, which recovery ranks by');
+});
+
+test('without hard links (FAT, some shares) .prev is a copy with the old mtime', async () => {
+  const promises = { ...fs.promises, link: async () => { const e = new Error('EPERM'); e.code = 'EPERM'; throw e; } };
+  for (const k of Object.keys(fs.promises)) if (typeof fs.promises[k] === 'function' && k !== 'link') promises[k] = fs.promises[k].bind(fs.promises);
+  const io = createStoreIo({ app: { getPath: () => tmpDir }, fs: { ...fs, promises }, safeStorage: { isEncryptionAvailable: () => false }, safeJsonParse, crypto });
+  const fp = io.dataFilePath();
+  await io.atomicWriteStore(JSON.stringify({ v: 1 }));
+  const past = new Date(Date.now() - 3600_000);
+  fs.utimesSync(fp, past, past);
+  await io.atomicWriteStore(JSON.stringify({ v: 2 }));
+  assert.equal(safeJsonParse(fs.readFileSync(fp + '.prev', 'utf8')).v, 1);
+  assert.equal(Math.round(fs.statSync(fp + '.prev').mtimeMs / 1000), Math.round(past.getTime() / 1000));
+  assert.equal(safeJsonParse(fs.readFileSync(fp, 'utf8')).v, 2);
+});
+
+test('on Windows a book held open briefly (antivirus, indexer) is swapped on a retry, intact until then', async () => {
+  let fails = 0; const slept = [];
+  const promises = {};
+  for (const k of Object.keys(fs.promises)) if (typeof fs.promises[k] === 'function') promises[k] = fs.promises[k].bind(fs.promises);
+  const realRename = promises.rename;
+  let fp;
+  promises.rename = async (a, b) => {
+    if (b === fp && fails > 0) {
+      fails--;
+      assert.equal(safeJsonParse(fs.readFileSync(fp, 'utf8')).v, 1, 'the book is the old one while the swap is refused');
+      const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM'; throw e;
+    }
+    return realRename(a, b);
+  };
+  const io = createStoreIo({ app: { getPath: () => tmpDir }, fs: { ...fs, promises }, safeStorage: { isEncryptionAvailable: () => false }, safeJsonParse, crypto,
+    platform: 'win32', sleep: async (ms) => { slept.push(ms); } });
+  fp = io.dataFilePath();
+  await io.atomicWriteStore(JSON.stringify({ v: 1 }));
+  fails = 2;
+  await io.atomicWriteStore(JSON.stringify({ v: 2 }));
+  assert.equal(safeJsonParse(fs.readFileSync(fp, 'utf8')).v, 2);
+  assert.deepEqual(slept, [50, 100]);
+  assert.deepEqual(fs.readdirSync(tmpDir).filter((n) => n.includes('.tmp.')), [], 'no temp left behind');
+});
+
+test('a lock that outlasts the retries fails the save, the book intact and no temp left', async () => {
+  const promises = {};
+  for (const k of Object.keys(fs.promises)) if (typeof fs.promises[k] === 'function') promises[k] = fs.promises[k].bind(fs.promises);
+  const realRename = promises.rename;
+  let fp, locked = false; const slept = [];
+  promises.rename = async (a, b) => {
+    if (locked && b === fp) { const e = new Error('EBUSY'); e.code = 'EBUSY'; throw e; }
+    return realRename(a, b);
+  };
+  const io = createStoreIo({ app: { getPath: () => tmpDir }, fs: { ...fs, promises }, safeStorage: { isEncryptionAvailable: () => false }, safeJsonParse, crypto,
+    platform: 'win32', sleep: async (ms) => { slept.push(ms); } });
+  fp = io.dataFilePath();
+  await io.atomicWriteStore(JSON.stringify({ v: 1 }));
+  locked = true;
+  await assert.rejects(io.atomicWriteStore(JSON.stringify({ v: 2 })), /EBUSY/);
+  assert.equal(slept.length, 5);
+  assert.equal(safeJsonParse(fs.readFileSync(fp, 'utf8')).v, 1);
+  assert.deepEqual(fs.readdirSync(tmpDir).filter((n) => n.includes('.tmp.')), []);
+  // Off Windows the same error is thrown at once.
+  const io2 = createStoreIo({ app: { getPath: () => tmpDir }, fs: { ...fs, promises }, safeStorage: { isEncryptionAvailable: () => false }, safeJsonParse, crypto,
+    platform: 'linux', sleep: async () => { throw new Error('slept'); } });
+  await assert.rejects(io2.atomicWriteStore(JSON.stringify({ v: 3 })), /EBUSY/);
+});
+
 test('recoverStoreRaw reads a valid primary', () => {
   const io = makeStoreIo();
   fs.writeFileSync(io.dataFilePath(), JSON.stringify({ printLog: [{ id: 'O' }] }));
