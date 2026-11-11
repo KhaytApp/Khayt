@@ -41,6 +41,9 @@ test('the decisions already made', () => {
   assert.equal(simpleDecision('loyalty'), 'reduced');
   assert.match(SIMPLE_MAP.find((r) => r.key === 'loyalty').simpleShows, /up to 3 tiers by completed orders/);
   assert.equal(simpleDecision('connectors'), 'show');
+  // After S2 it is its own pane under Connected (Mac frame 95:605).
+  assert.equal(SIMPLE_MAP.find((r) => r.key === 'connectors').afterS2.mac, 'Connectors');
+  for (const r of SIMPLE_MAP) if (r.afterS2) for (const v of Object.values(r.afterS2)) assert.ok(!v.includes('?'), `${r.key}: afterS2 is decided`);
   // The simplified-invoice QR always prints; ZATCA Phase 2 is Pro.
   assert.equal(simpleDecision('invoices'), 'show');
   assert.match(SIMPLE_MAP.find((r) => r.key === 'invoices').simpleShows, /simplified-invoice QR always prints/);
