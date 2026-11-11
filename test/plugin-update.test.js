@@ -382,3 +382,34 @@ test('same fields and same hosts, but a field now goes to the other host: consen
   assert.equal(PM.diffPermissions(old, v2).widened, false);
   assert.equal(PM.diffPermissions(old, v1).widened, false);
 });
+
+// ── A grant made before pairs were kept (Lamha 1.1.1 on beta.33) ──────────
+test('a grant with no `routes` is consent to what it lists: nothing asks again, and the next update is automatic', () => {
+  // What beta.33's "Agree and install" wrote: version, fields, domains, scopes.
+  const full = M.grantFor(at('1.1.1'));
+  const legacy = { version: full.version, fields: full.fields, domains: full.domains, scopes: full.scopes };
+  const entry = installed('1.1.1', legacy);
+  // (a) The installed version is not paused, not pending, and still runs.
+  const check = M.checkEntry(entry);
+  assert.deepEqual([check.ok, check.paused], [true, false]);
+  const diff = M.diffPermissions(legacy, entry.manifest);
+  assert.deepEqual([diff.widened, diff.routes], [false, []]);
+  const s0 = book(entry);
+  assert.deepEqual(U.runnable(entry, U.stateOf(s0, LAMHA.id)).which, 'current');
+  // An index that lists the installed version changes nothing at all.
+  const same = U.applyIndex(s0, index([row('1.1.1')]), CTX, {});
+  assert.deepEqual([same.ok, same.changed, same.notes], [true, false, []]);
+  assert.equal(same.settings, s0, 'the very same object: nothing written');
+  // (b) A later version that sends nothing new installs by itself.
+  assert.equal(U.planWithManifest(entry, at('1.1.2'), row('1.1.2')).plan, 'auto');
+  const r = U.applyIndex(s0, index([row('1.1.2')]), CTX, { [LAMHA.id]: at('1.1.2') });
+  assert.deepEqual(r.notes.map((n) => n.kind), ['updated']);
+  assert.equal(r.settings.plugins[0].version, '1.1.2');
+  assert.equal(U.stateOf(r.settings, LAMHA.id).pending, undefined, 'no badge');
+  assert.deepEqual(r.settings.plugins[0].granted, legacy, 'the grant the shop gave, untouched');
+  assert.equal(M.checkEntry(r.settings.plugins[0]).paused, false);
+  // A field the shop never agreed to still asks, as it would with pairs.
+  const narrowGrant = (() => { const g = M.grantFor(narrow('1.1.1')); return { version: g.version, fields: g.fields, domains: g.domains, scopes: g.scopes }; })();
+  const narrowEntry = Object.assign(installed('1.1.1', narrowGrant), { manifest: narrow('1.1.1') });
+  assert.equal(U.planWithManifest(narrowEntry, at('1.1.2'), row('1.1.2')).plan, 'consent');
+});
