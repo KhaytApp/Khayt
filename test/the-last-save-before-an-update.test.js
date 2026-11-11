@@ -93,7 +93,10 @@ test('the shared writer still has the four properties this depends on', () => {
   const at = io.indexOf('async function atomicWriteStoreUnsafe(');
   const body = io.slice(at, io.indexOf('\n  }', at));
   assert.match(body, /await fh\.sync\(\)/, 'the shared writer stopped fsyncing');
-  assert.match(body, /rename\(fp, fp \+ '\.prev'\)/, 'the shared writer stopped keeping a rollback generation');
+  // The rollback generation is linked (or copied) beside the book, never moved
+  // away from it, so the book exists at every step of a write.
+  assert.match(body, /link\(fp, prev\)/, 'the shared writer stopped keeping a rollback generation');
+  assert.doesNotMatch(body, /rename\(fp,/, 'the shared writer moves the book away again (it is missing mid-write)');
   assert.match(body, /\$\{fp\}\.tmp\.\$\{process\.pid\}/, 'the shared writer stopped using a unique temp name');
   assert.match(io, /_writeChain = run\.catch/, 'writes are no longer serialised through the chain');
 });
