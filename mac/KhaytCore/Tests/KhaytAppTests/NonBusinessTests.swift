@@ -26,6 +26,44 @@ struct NonBusinessTests {
         #expect(u["nonBusiness"] == nil, "cleared by removing the field, not by writing false")
     }
 
+    /// Edit job saved its fields and then the Not business box as two writes;
+    /// ⌘Q between them (the quit hold counts writes IN FLIGHT, and between
+    /// two there is none) kept the first and dropped the second.
+    @Test("Edit job's fields and its Not business box are one edit of one record")
+    func oneEdit() async throws {
+        let engine = try KhaytEngine()
+        let job: JSONValue = .object(["id": .string("j1"), "project": .string("Bracket"), "price": .number(40)])
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let both = try await Shop.jobEdited(job, fields: ["project": .string("Bracket v2")], nonBusiness: true,
+                                            settings: [:], engine: engine, now: now, editId: "E1")
+        guard case .object(let b) = both else { Issue.record("not an object"); return }
+        #expect(b["project"] == .string("Bracket v2"))
+        #expect(b["nonBusiness"] == .bool(true))
+        // The box alone, the fields alone, and neither.
+        let boxOnly = try await Shop.jobEdited(job, fields: [:], nonBusiness: true,
+                                               settings: [:], engine: engine, now: now, editId: "E2")
+        #expect(boxOnly == (try await engine.setNonBusiness(job, on: true)))
+        let fieldsOnly = try await Shop.jobEdited(job, fields: ["project": .string("Bracket v2")], nonBusiness: nil,
+                                                  settings: [:], engine: engine, now: now, editId: "E3")
+        guard case .object(let f) = fieldsOnly else { Issue.record("not an object"); return }
+        #expect(f["project"] == .string("Bracket v2"))
+        #expect(f["nonBusiness"] == nil)
+        #expect(try await Shop.jobEdited(job, fields: [:], nonBusiness: nil,
+                                         settings: [:], engine: engine, now: now, editId: "E4") == job)
+    }
+
+    @Test("Edit job saves with one write, never a second one after it")
+    func oneWrite() throws {
+        let sheet = try Self.source("EditJobSheet.swift")
+        let commit = String(sheet[try #require(sheet.range(of: "private func commit() {")).upperBound...])
+        #expect(commit.components(separatedBy: "await shop.").count == 2, "one write to the book per save")
+        #expect(!commit.contains("shop.setNonBusiness("))
+        let shop = try Self.source("Shop+Money.swift")
+        let edit = try #require(shop.range(of: "func editJob(_ id: Order.ID").map { String(shop[$0.lowerBound...].prefix(900)) })
+        #expect(edit.components(separatedBy: "writeToOneOrder(").count == 2)
+        #expect(edit.contains("Self.jobEdited(order, fields: fields, nonBusiness: nonBusiness"))
+    }
+
     // ── THE DASHBOARD ASKS (Sep 2026) ────────────────────────────────────────
     //
     // Triage said "0 things need you" over the same nineteen jobs.
@@ -85,7 +123,8 @@ struct NonBusinessTests {
     @Test("a job can be marked from its right-click menu and from Edit job")
     func reachable() throws {
         #expect(try Self.source("OrdersTable.swift").contains("await shop.setNonBusiness(job.id, on)"))
-        #expect(try Self.source("EditJobSheet.swift").contains("await shop.setNonBusiness(id, nowNonBusiness)"))
+        // Edit job hands the box to the SAME write as its fields (below).
+        #expect(try Self.source("EditJobSheet.swift").contains("await shop.editJob(id, fields: fields, nonBusiness: mark)"))
         #expect(try Self.source("Reports.swift").contains("mac.pnl_unpriced"),
                 "the P&L no longer says why a margin is negative")
         #expect(try Self.source("Reports.swift").contains("callIt(\"pnl.cogs\")"),
