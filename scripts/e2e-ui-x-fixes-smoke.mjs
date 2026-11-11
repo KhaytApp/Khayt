@@ -45,16 +45,20 @@ try {
     await window.waitForTimeout(300);
     const x1 = await window.evaluate(async () => {
       const sc = document.getElementById('mainContent');
-      // Make sure there is something to scroll, whatever the window size.
-      const pad = document.createElement('div'); pad.id = 'x1pad'; pad.style.height = '3000px';
-      document.getElementById('calculator-tab').appendChild(pad);
+      // Make both views tall enough to scroll, whatever the window size, so a
+      // kept position is not simply clamped away by a shorter view.
+      const pads = ['calculator-tab', 'logs-tab'].map((id) => {
+        const pad = document.createElement('div'); pad.className = 'x1pad'; pad.style.height = '3000px';
+        document.getElementById(id).appendChild(pad);
+        return pad;
+      });
       sc.scrollTop = 900;
       const before = sc.scrollTop;
       KhaytShell.switchTab('calculator-tab'); // the same view again: a re-render
       const same = sc.scrollTop;
       KhaytShell.switchTab('logs-tab');
       const other = sc.scrollTop;
-      pad.remove();
+      pads.forEach((p) => p.remove());
       return { before, same, other };
     });
     ok(x1.before > 0 && x1.same === x1.before, `re-showing the same view keeps its place (${x1.same}/${x1.before})`);
