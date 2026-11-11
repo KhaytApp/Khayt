@@ -143,8 +143,9 @@ struct InventoryView: View {
 
     private var chips: some View {
         HStack(spacing: 7) {
-            chip(L10n.tr("inventory.filter.all"), on: !lowOnly) { lowOnly = false }
-            chip(L10n.tr("inventory.filter.low"), on: lowOnly) { lowOnly = true }
+            chip(L10n.tr("inventory.filter.all"), count: spools.count, tone: KhaytDesign.brand, on: !lowOnly) { lowOnly = false }
+            chip(L10n.tr("inventory.filter.low"), count: spools.filter(\.isLowStock).count,
+                 tone: KhaytDesign.attention, on: lowOnly) { lowOnly = true }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
@@ -152,15 +153,24 @@ struct InventoryView: View {
         .padding(.bottom, 14)
     }
 
-    private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+    /// The Orders filter pill (review P4): a dot in the filter's colour, the
+    /// words and the count in ink, the same size.
+    private func chip(_ title: String, count: Int, tone: Color, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.khayt(13, .semibold, relativeTo: .subheadline))
-                .padding(.horizontal, 16)
-                .frame(minHeight: 44)
-                .foregroundStyle(KhaytDesign.ink)
-                .background(on ? KhaytDesign.brand.opacity(0.18) : KhaytDesign.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(on ? KhaytDesign.brand.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
+            HStack(spacing: 6) {
+                Circle().fill(tone).frame(width: 7, height: 7)
+                Text(title)
+                    .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                    .lineLimit(1)
+                Text(count.formatted(.number.locale(L10n.locale)))
+                    .font(.khaytMono(12, .medium, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .foregroundStyle(KhaytDesign.ink)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(on ? tone.opacity(0.18) : KhaytDesign.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(on ? tone.opacity(0.55) : KhaytDesign.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])

@@ -225,3 +225,13 @@ extension UIReviewWorthDoingTests {
         XCTAssertFalse(home.contains(".offset(x: 2, y: -2)"), "an x offset does not flip in right-to-left")
     }
 }
+
+// MARK: P4 — Inventory's filter chips are Orders' chips
+extension UIReviewWorthDoingTests {
+    func testInventoryChipsMatchOrders() throws {
+        let inventory = try code("Views/InventoryView.swift")
+        XCTAssertTrue(inventory.contains("Circle().fill(tone).frame(width: 7, height: 7)"), "the dot")
+        XCTAssertTrue(inventory.contains(".font(.khayt(13.5, .semibold, relativeTo: .subheadline))"), "13.5 as in Orders")
+        XCTAssertTrue(inventory.contains("count.formatted(.number.locale(L10n.locale))"), "the count")
+    }
+}
