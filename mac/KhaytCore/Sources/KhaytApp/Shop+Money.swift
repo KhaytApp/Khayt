@@ -201,6 +201,7 @@ extension Shop {
                      rule: PriceRule = PriceRule(),
                      extraLines: [ExtraLine] = [],
                      overheadPerHour: Double = 0,
+                     notes: String = "", dueDate: String? = nil,
                      carried: [String: JSONValue] = [:]) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools, reclaimsTax: reclaimsTax,
@@ -214,6 +215,11 @@ extension Shop {
             "asQuote": .bool(asQuote),
         ]
         if let clientId { input["clientId"] = .string(clientId) }
+        // What was said about the work when it was taken, and the day it was
+        // promised for. Both were a second trip into the job until Nov 2026.
+        let said = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !said.isEmpty { input["notes"] = .string(said) }
+        if let dueDate, !asQuote { input["dueDate"] = .string(dueDate) }
         // The charges that are not printing. Dropped when half-written, for
         // the reason `previewQuote` gives.
         let charges = extraLines.filter(\.isWorthKeeping)
@@ -1407,9 +1413,10 @@ extension Shop {
             guard !plan.isEmpty else {
                 throw MoveRefused(sentence: self.words.callIt("inst.nothing_owed"))
             }
-            record["instalments"] = .array(plan.map { row in
+            let planIds = Self.uids("INS", count: plan.count)
+            record["instalments"] = .array(zip(plan, planIds).map { row, id in
                 .object([
-                    "id": .string(Self.uid("INS")),
+                    "id": .string(id),
                     "amount": .number(row.amount),
                     "dueDate": .string(row.dueDate),
                     "note": .string(""),

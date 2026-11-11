@@ -21,7 +21,7 @@ struct ShoppingListSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(group.supplier)
                         .font(.system(size: 10, weight: .semibold))
-                        .textCase(.uppercase).tracking(0.6)
+                        .textCase(.uppercase).tracking(Words.spaced(0.6))
                         .foregroundStyle(.secondary)
                     ForEach(group.items) { item in
                         HStack(spacing: 8) {

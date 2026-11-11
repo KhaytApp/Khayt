@@ -25,7 +25,7 @@ struct MachineReliabilityCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(words.callIt("mac.mr_title"))
                     .font(.system(size: 10, weight: .semibold))
-                    .textCase(.uppercase).tracking(0.6)
+                    .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let rate = report?.totals.scrapRate {

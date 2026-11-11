@@ -245,6 +245,45 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertEqual(rec["status"], .string("post"))
     }
 
+    /// The cloud chain carries `baseRev` on each delta too, as the Mac's own
+    /// route does: the rev the edit started from (`DeltaBaseRevTests`).
+    func testTheCloudDeltaSaysTheRevTheEditStartedFrom() async throws {
+        try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
+        var (s, _) = try await sync().pull(session)
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
+        (s, _) = try await sync().push(s)
+        let arrived = try SyncCrypto.store(cloud.chain[0].blob, dek: cloud.dek)
+        guard case .array(let deltas)? = arrived["deltas"], case .object(let d)? = deltas.first,
+              case .object(let rec)? = d["record"] else { return XCTFail("\(arrived)") }
+        XCTAssertEqual(d["baseRev"], .number(1))
+        XCTAssertNil(rec["baseRev"], "on the delta, not in the record")
+        XCTAssertEqual(book.baseRevs(), [:], "taken upstream, so nothing is left noted")
+    }
+
+    /// Two different `baseRev`s, never mixed: the record's rides INSIDE the
+    /// sealed blob, and the HTTP body's is the chain head the cloud checks for
+    /// its 409. A record baseRev leaking into the body would give false 409s,
+    /// or an append onto the wrong head.
+    func testTheRecordBaseRevIsSealedAndTheBodyBaseRevIsTheChainHead() async throws {
+        try cloud.setBase(shop(orders: 2, finished: 0), rev: 9)   // records are at rev 1
+        var (s, _) = try await sync().pull(session)
+        try await BookWriter(book: book).setOrderStatus(orderId: "O-0", to: "post", engine: engine)
+        let pushed: CloudSync.Pushed
+        (s, pushed) = try await sync().push(s)
+        guard case .sent = pushed else { return XCTFail("\(pushed)") }
+
+        let post = try XCTUnwrap(cloud.requests.last { $0.httpMethod == "POST" })
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: post.httpBody ?? Data()) as? [String: Any])
+        XCTAssertEqual(Set(body.keys), ["ciphertext", "baseRev"], "nothing of the outbox outside the seal")
+        XCTAssertEqual(body["baseRev"] as? Int, 9, "the chain head, not the record's 1")
+
+        let arrived = try SyncCrypto.store(cloud.chain[0].blob, dek: cloud.dek)
+        guard case .array(let deltas)? = arrived["deltas"], case .object(let d)? = deltas.first else {
+            return XCTFail("\(arrived)")
+        }
+        XCTAssertEqual(d["baseRev"], .number(1), "the record's own, sealed")
+    }
+
     func testAFullChainLeavesTheEditsHereAndNeverUploadsTheSlice() async throws {
         try cloud.setBase(shop(orders: 2, finished: 0), rev: 1)
         var (s, _) = try await sync().pull(session)

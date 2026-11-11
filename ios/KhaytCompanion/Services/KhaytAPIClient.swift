@@ -498,9 +498,9 @@ final class KhaytAPIClient: ObservableObject {
     func sendPendingChanges() async throws -> Int? {
         guard let book, let reader else { return nil }
         guard let pending = try await reader.pendingSnapshot(), !pending.outbox.isEmpty else { return nil }
-        let (outbox, measured) = pending
+        let (outbox, measured, baseRevs) = pending
 
-        let body = try JSONEncoder().encode(JSONValue.object(outbox.wire))
+        let body = try JSONEncoder().encode(JSONValue.object(BookReader.wire(outbox, baseRevs: baseRevs)))
         let (data, response) = try await request(path: "/api/store/deltas", method: "POST",
                                                  body: body, requiresPin: true)
         guard let http = response as? HTTPURLResponse else {
@@ -971,6 +971,9 @@ final class KhaytAPIClient: ObservableObject {
         guard let http = response as? HTTPURLResponse else {
             throw KhaytAPIError.transport(URLError(.badServerResponse))
         }
+        // The native Mac serves no /api/quote yet (only the Windows/Linux app
+        // does): its 404 is "Not found" in English, which says nothing.
+        if http.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("quote.needs_mac")) }
         guard (200...299).contains(http.statusCode) else {
             throw try decodeAPIError(data, status: http.statusCode)
         }
@@ -1002,6 +1005,9 @@ final class KhaytAPIClient: ObservableObject {
         let (data, response) = try await request(
             path: "/api/expense", method: "POST", body: body, requiresPin: true
         )
+        // The native Mac serves no /api/expense yet: say so, and the sheet
+        // keeps the draft (it closes only on success).
+        if (response as? HTTPURLResponse)?.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("expense.needs_mac")) }
         try ensureOK(data, response)
     }
 

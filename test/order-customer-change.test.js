@@ -107,8 +107,19 @@ test('the price and currency stay; another currency is flagged, never converted'
   const o = booked();
   const r = E.changeCustomer(o, 'C3', ctx);
   assert.equal(r.currencyDiffers, true);
-  assert.equal(o.currency, undefined);
+  // A job with no currency is read in its customer's, so the move itself
+  // would have turned 100 SAR into 100 EUR. The currency it had is written on.
+  assert.equal(o.currency, 'SAR');
   assert.equal(o.price, 100);
   assert.equal(E.changeCustomer(booked({ currency: 'EUR' }), 'C3', ctx).currencyDiffers, false);
   assert.equal(E.changeCustomer(booked(), 'C2', ctx).currencyDiffers, false, 'no currency on the customer = the shop’s');
+});
+
+test('a job read in its old customer\'s currency keeps it when the customer is taken off or changed', () => {
+  const eur = booked({ clientId: 'C3' });           // no currency of its own: read as EUR
+  E.changeCustomer(eur, null, ctx);
+  assert.equal(eur.currency, 'EUR');
+  const same = booked();                             // SAR customer to a customer with no currency
+  E.changeCustomer(same, 'C2', ctx);
+  assert.equal(same.currency, undefined, 'nothing to protect, nothing written');
 });

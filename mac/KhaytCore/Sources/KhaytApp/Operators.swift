@@ -279,8 +279,10 @@ struct OperatorEditor: View {
                         Text(words.callIt("role." + key)).tag(key)
                     }
                 }
-                // Said, because nothing on this Mac changes with it: the level
-                // is what the other app's operator lock lets a person do.
+                // What the level is FOR. It used to say "this Mac does not ask
+                // for a PIN", which stopped being true when the Mac got its own
+                // staff sign-in (`OperatorLock`): an owner told the level did
+                // not matter here picked a wide one, and the Mac enforced it.
                 .help(words.callIt("mac.operator_access_hint"))
                 Text(words.callIt("mac.operator_access_hint"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -497,7 +499,7 @@ struct OperatorPerformanceCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(words.callIt("an.operator_title"))
                 .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase).tracking(0.6)
+                .textCase(.uppercase).tracking(Words.spaced(0.6))
                 .foregroundStyle(.secondary)
             Text(words.callIt("mac.staff_hint"))
                 .font(.caption).foregroundStyle(.secondary)
@@ -564,7 +566,7 @@ struct OperatorTimeCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(words.callIt("time.analytics_title"))
                 .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase).tracking(0.6)
+                .textCase(.uppercase).tracking(Words.spaced(0.6))
                 .foregroundStyle(.secondary)
             Text(words.callIt("mac.labour_hint"))
                 .font(.caption).foregroundStyle(.secondary)

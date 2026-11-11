@@ -1366,7 +1366,7 @@ struct Reports: View {
                         row.isPartial ? MonthLabel.period(row.period, words: shop.words) + " · " + Reports.days(row)
                                       : MonthLabel.period(row.period, words: shop.words))]))
                         .font(.system(size: 11, weight: .semibold))
-                        .textCase(.uppercase).tracking(0.5)
+                        .textCase(.uppercase).tracking(Words.spaced(0.5))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(shop.words.callIt("an.pnl_orders") + " \(row.orders)")
@@ -1440,7 +1440,7 @@ struct Reports: View {
                         // a waterfall of one, and nothing said which.
                         Text(Self.netHeading(shop.words, period: period))
                             .font(.system(size: 10, weight: .semibold))
-                            .textCase(.uppercase).tracking(0.6)
+                            .textCase(.uppercase).tracking(Words.spaced(0.6))
                             .foregroundStyle(.secondary)
                         BigFigure(value: Money.figure(net), unit: Money.mark(shop.currency),
                                   tint: net < 0 ? Khayt.late : nil, size: 28)

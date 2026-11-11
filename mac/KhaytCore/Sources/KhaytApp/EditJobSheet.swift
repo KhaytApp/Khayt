@@ -44,6 +44,8 @@ struct EditJobSheet: View {
     @State private var priority = "normal"
     /// A new total, as typed. Empty is "leave it".
     @State private var priceText = ""
+    /// The job's name, as it will be saved. Opened on what it is now.
+    @State private var name = ""
     @State private var started = false
     /// A test, a gift, something for the shop itself. See `lib/business-scope.js`.
     @State private var nonBusiness = false
@@ -56,6 +58,14 @@ struct EditJobSheet: View {
             Text(subject.project).font(.callout).foregroundStyle(.secondary).lineLimit(1)
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                // The name the invoice is headed with. It could never be
+                // changed here once the job was taken, so a typo stayed on
+                // the customer's paper.
+                GridRow {
+                    Text(shop.words.callIt("mac.job")).foregroundStyle(.secondary).fixedSize()
+                    TextField(shop.words.callIt("mac.what_is_it"), text: $name)
+                        .textFieldStyle(.roundedBorder)
+                }
                 GridRow {
                     Text(shop.words.callIt("doc.due")).foregroundStyle(.secondary)
                         .fixedSize()
@@ -111,6 +121,7 @@ struct EditJobSheet: View {
 
             HStack {
                 Spacer()
+                SaveProblem(text: shop.moveProblem)
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
@@ -128,6 +139,7 @@ struct EditJobSheet: View {
             if let day = was.dueDate { dueDate = day }
             priority = was.priority
             nonBusiness = job?.nonBusiness == true
+            name = job?.project ?? subject.project
         }
     }
 
@@ -175,19 +187,31 @@ struct EditJobSheet: View {
         return out
     }
 
+    /// The new name when it was changed to something; nil for unchanged or
+    /// emptied (an empty name is "leave it", as the rule reads it).
+    static func renamed(from was: String, to typed: String) -> String? {
+        let now = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        return now.isEmpty || now == was ? nil : now
+    }
+
     private func commit() {
         let id = subject.id
-        let typed = priceText.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-        let price = typed.isEmpty ? nil : Double(typed).map { max(0, $0) }
-        let fields = Self.fields(opened: opened, hasDueDate: hasDueDate, dueDate: dueDate,
+        let typed = priceText.trimmingCharacters(in: .whitespaces)
+        let price = typed.isEmpty ? nil : TypedNumber.parse(typed)
+        var fields = Self.fields(opened: opened, hasDueDate: hasDueDate, dueDate: dueDate,
                                  priority: priority, price: price)
+        if let renamed = Self.renamed(from: job?.project ?? subject.project, to: name) {
+            fields["project"] = .string(renamed)
+        }
         let wasNonBusiness = job?.nonBusiness == true
         let nowNonBusiness = nonBusiness
-        shop.clearQuestion()
+        // Closes when the edit is in the book, not before: see PaymentSheet.
+        shop.moveProblem = nil
         Task {
             if !fields.isEmpty { await shop.editJob(id, fields: fields) }
             // Only when it changed: an edit that did not touch it writes nothing.
-            if nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+            if shop.moveProblem == nil, nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+            if shop.moveProblem == nil { shop.clearQuestion() }
         }
     }
 }

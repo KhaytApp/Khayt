@@ -130,8 +130,21 @@
       if (typed === null || typed < 0) delete wanted.price;
       else wanted.price = Math.round(typed * 100) / 100;
     }
+    // THE JOB'S NAME. It is what the invoice is headed with, and on the Mac it
+    // could never be changed after the job was taken: a typo stayed on the
+    // paper. A name is text, never blank (a blank is "leave it"), and a change
+    // is written down like the others — it is exactly the kind of thing a
+    // customer can be shown a different answer about later.
+    let renamed = null;
+    if (Object.prototype.hasOwnProperty.call(wanted, 'project')) {
+      const name = String(wanted.project == null ? '' : wanted.project).trim().slice(0, 200);
+      delete wanted.project;
+      if (name && name !== String(order.project || '')) renamed = { from: order.project || '', to: name };
+    }
     const changes = changesBetween(order, wanted);
+    if (renamed) changes.project = renamed;
     if (Object.keys(changes).length === 0) return { changes: {}, effects: [] };
+    if (renamed) order.project = renamed.to;
 
     for (const key of TRACKED_FIELDS) {
       if (!Object.prototype.hasOwnProperty.call(wanted, key)) continue;
@@ -581,6 +594,17 @@
     const to = present(clientId) ? String(clientId) : null;
     const cl = to !== null && Array.isArray(c.clients) ? c.clients.find((x) => x && String(x.id) === to) : null;
     const changes = { clientId: { from: present(order.clientId) ? order.clientId : null, to } };
+    // What the job's money is in NOW, before it moves. A job in the shop's own
+    // currency carries no `currency`, and one without it is read in its
+    // customer's (`order-money.js orderCurrency`) — so moving such a job to a
+    // customer who bills in EUR would turn 1,000 SAR into 1,000 EUR in every
+    // report. The currency it has is written on it first.
+    const shopCur = (c.settings && c.settings.currency) || 'SAR';
+    const was = present(order.clientId) && Array.isArray(c.clients)
+      ? c.clients.find((x) => x && String(x.id) === String(order.clientId)) : null;
+    const jobCur = order.currency || (was && was.currency) || shopCur;
+    const clientCur = (cl && cl.currency) || shopCur;
+    if (!order.currency && Array.isArray(c.clients) && jobCur !== clientCur) order.currency = jobCur;
     order.clientId = to;
     if (Object.prototype.hasOwnProperty.call(order, 'client')) {
       const name = cl ? nameOfClient(cl, c) : '';
@@ -590,9 +614,6 @@
       }
     }
     recordEdit(order, changes, c);
-    const shopCur = (c.settings && c.settings.currency) || 'SAR';
-    const jobCur = order.currency || shopCur;
-    const clientCur = (cl && cl.currency) || shopCur;
     return { ok: true, reason: null, changes, currencyDiffers: !!cl && jobCur !== clientCur };
   }
 

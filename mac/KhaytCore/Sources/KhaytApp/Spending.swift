@@ -142,6 +142,17 @@ struct Expenses: View {
                     Text(e.note.isEmpty ? "—" : e.note)
                         .foregroundStyle(e.note.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                         .lineLimit(1)
+                    // THE RECEIPT, when there is one. The record has pointed
+                    // at it all along (the desktop attaches them, a phone
+                    // photographs them) and this app decoded the path and did
+                    // nothing with it: the paper behind a VAT claim could not
+                    // be opened from the Mac.
+                    if let receipt = e.receiptPath, !receipt.isEmpty {
+                        Button { shop.openReceipt(receipt) } label: { Image(systemName: "paperclip") }
+                            .buttonStyle(.borderless)
+                            .help(shop.words.callIt("exp.open_receipt"))
+                            .accessibilityLabel(shop.words.callIt("exp.open_receipt"))
+                    }
                     if let recurring = e.recurring {
                         // What it repeats as, and when it is next due: the two
                         // things that tell a standing cost from a one-off.

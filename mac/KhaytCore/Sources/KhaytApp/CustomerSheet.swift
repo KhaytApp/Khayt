@@ -63,7 +63,7 @@ struct CustomerSheet: View {
         var agreement: PriceAgreement {
             var out = PriceAgreement(raw: raw)
             out.product = product
-            out.price = Double(priceText.replacingOccurrences(of: ",", with: "")) ?? 0
+            out.price = TypedNumber.parse(priceText) ?? 0
             out.note = note
             return out
         }
@@ -188,8 +188,10 @@ struct CustomerSheet: View {
                 Text(shop.words.callIt("ce.phone")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                    TextField("+966 5x xxx xxxx", text: binding(\.phone))
-                        .textFieldStyle(.roundedBorder)
+                    // `LatinField`, as Settings uses for the shop's own number:
+                    // in the Arabic window a plain field drew "+966 50 000 0000"
+                    // as "0000 000 50 966+" (see the note there).
+                    LatinField(text: binding(\.phone), placeholder: "+966 5x xxx xxxx")
                     // What WhatsApp will dial, worked out as it is typed — so
                     // `0712345678` from abroad is caught here, not at the
                     // moment a customer is waiting for their update.
@@ -256,7 +258,7 @@ struct CustomerSheet: View {
             GridRow {
                 Text(shop.words.callIt("ce.email")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
-                TextField("", text: binding(\.email)).textFieldStyle(.roundedBorder)
+                LatinField(text: binding(\.email))
             }
             GridRow {
                 Text(shop.words.callIt("ce.cr")).gridColumnAlignment(.trailing)
