@@ -70,6 +70,8 @@
   }
   function tiled() { const t = tilePlan(); return !!t && t.tiles.length > 1; }
   const LAYER_PRESETS = [[0.04, 'ultra'], [0.08, 'recommended'], [0.12, 'faster'], [0.16, 'fast']];
+  const LH_LABEL = { ultra: 'hf.lh_ultra', recommended: 'hf.lh_recommended', faster: 'hf.lh_faster', fast: 'hf.lh_fast', custom: 'hf.lh_custom' };
+  const SPREAD_LABEL = { small: 'hf.spread_small', medium: 'hf.spread_medium', large: 'hf.spread_large' };
 
   function u1Profile() { const P = global.KhaytPrinterProfiles; return P ? P.getProfile(U1_ID) : null; }
   function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
@@ -232,8 +234,8 @@
       '<div class="hf">',
       '<div class="hf-head">',
       '<div><h2 class="hf-title">HueForge <span class="hf-title-sep">·</span> U1 <span class="hf-title-sep">·</span> <span style="font-size:11px;opacity:.6;font-weight:600;letter-spacing:.02em">build 2026-07-15j · selective-sharp</span></h2>',
-      '<p class="hf-sub">Turn a picture into a filament painting, built for the Snapmaker U1’s four SnapSwap heads.</p></div>',
-      S.img ? '<button type="button" class="btn ghost sm" id="hfReset">Start over</button>' : '',
+      '<p class="hf-sub">' + esc(t('hf.subtitle')) + '</p></div>',
+      S.img ? '<button type="button" class="btn ghost sm" id="hfReset">' + esc(t('hf.start_over')) + '</button>' : '',
       '</div>',
       S.img ? bodyHtml() : dropHtml(),
       '<input type="file" id="hfFile" accept="image/*" hidden />',
@@ -243,10 +245,10 @@
 
   function dropHtml() {
     return [
-      '<div class="hf-drop" id="hfDrop" tabindex="0" role="button" aria-label="Add an image">',
+      '<div class="hf-drop" id="hfDrop" tabindex="0" role="button" aria-label="' + esc(t('hf.drop_aria')) + '">',
       '<div class="hf-drop-mark" aria-hidden="true">' + ico('camera', 30) + '</div>',
-      '<div class="hf-drop-t">Drop an image, or click to browse</div>',
-      '<div class="hf-drop-h">JPG or PNG. ' + appName() + ' picks the filaments and builds the relief — everything stays on your machine.</div>',
+      '<div class="hf-drop-t">' + esc(t('hf.drop_title')) + '</div>',
+      '<div class="hf-drop-h">' + esc(t('hf.drop_hint', { app: appName() })) + '</div>',
       '</div>',
     ].join('');
   }
@@ -274,12 +276,12 @@
   function sourceHtml() {
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">SOURCE</div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_source')) + '</div>',
       '<div class="hf-src">',
-      '<img class="hf-src-img" src="' + esc(S.imgUrl) + '" alt="source" />',
+      '<img class="hf-src-img" src="' + esc(S.imgUrl) + '" alt="' + esc(t('hf.src_alt')) + '" />',
       '<div class="hf-src-meta"><div class="hf-src-name">' + esc(S.imgName) + '</div>',
-      '<div class="hf-src-dim">' + (S.img ? S.img.width + '×' + S.img.height + ' px sampled' : '') + '</div>',
-      '<button type="button" class="btn ghost xs" id="hfChange">Change image</button></div>',
+      '<div class="hf-src-dim">' + (S.img ? esc(t('hf.src_sampled', { w: S.img.width, h: S.img.height })) : '') + '</div>',
+      '<button type="button" class="btn ghost xs" id="hfChange">' + esc(t('hf.change_image')) + '</button></div>',
       '</div></div>',
     ].join('');
   }
@@ -289,40 +291,40 @@
     const rows = S.filaments.map((f, i) => filRow(f, i, S.filaments.length)).join('');
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">FILAMENT STACK <span class="hf-card-hx">bottom → top</span></div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_stack')) + ' <span class="hf-card-hx">' + esc(t('hf.stack_order')) + '</span></div>',
       '<div class="hf-auto">',
-      '<button type="button" class="btn sm" id="hfAuto">' + wrapIco('colour') + 'Auto-pick from image</button>',
-      '<button type="button" class="btn ghost sm" id="hfTune" title="Optimise band thicknesses to best match the image">' + wrapIco('target') + 'Auto-tune</button>',
-      '<label class="hf-inline">colours <select class="input xs" id="hfMaxColors">'
+      '<button type="button" class="btn sm" id="hfAuto">' + wrapIco('colour') + esc(t('hf.auto_pick')) + '</button>',
+      '<button type="button" class="btn ghost sm" id="hfTune" title="' + esc(t('hf.auto_tune_title')) + '">' + wrapIco('target') + esc(t('hf.auto_tune')) + '</button>',
+      '<label class="hf-inline">' + esc(t('hf.colours')) + ' <select class="input xs" id="hfMaxColors">'
         + [3, 4, 5, 6].map((n) => '<option value="' + n + '"' + (n === S.maxColors ? ' selected' : '') + '>' + n + '</option>').join('')
         + '</select></label>',
       '</div>',
-      owned ? '' : '<div class="hf-note">No colour filaments in your inventory yet — suggestions use the image’s own colours. Add spools in Inventory to match to what you own.</div>',
-      '<div class="hf-stack" id="hfStack">' + (rows || '<div class="hf-empty">No filaments — auto-pick or add one.</div>') + '</div>',
-      '<button type="button" class="btn ghost xs" id="hfAdd">' + wrapIco('plus') + 'Add filament</button>',
+      owned ? '' : '<div class="hf-note">' + esc(t('hf.no_owned_note')) + '</div>',
+      '<div class="hf-stack" id="hfStack">' + (rows || '<div class="hf-empty">' + esc(t('hf.no_filaments')) + '</div>') + '</div>',
+      '<button type="button" class="btn ghost xs" id="hfAdd">' + wrapIco('plus') + esc(t('hf.add_filament')) + '</button>',
       '</div>',
     ].join('');
   }
 
   function filRow(f, i, total) {
     const near = (f.name && f.deltaE != null)
-      ? '<span class="hf-fil-near" title="closest filament you own">≈ ' + esc(f.name) + ' ΔE ' + f.deltaE.toFixed(1) + '</span>'
+      ? '<span class="hf-fil-near" title="' + esc(t('hf.nearest_title')) + '">≈ ' + esc(f.name) + ' ΔE ' + f.deltaE.toFixed(1) + '</span>'
       : '';
     return [
       '<div class="hf-fil" data-idx="' + i + '">',
       '<div class="hf-fil-ord">',
-      '<button type="button" class="hf-ord-btn" data-act="up" ' + (i === total - 1 ? 'disabled' : '') + ' aria-label="move up" title="move up">⌃</button>',
+      '<button type="button" class="hf-ord-btn" data-act="up" ' + (i === total - 1 ? 'disabled' : '') + ' aria-label="' + esc(t('hf.move_up')) + '" title="' + esc(t('hf.move_up')) + '">⌃</button>',
       '<span class="hf-fil-slot">' + (i + 1) + '</span>',
-      '<button type="button" class="hf-ord-btn" data-act="down" ' + (i === 0 ? 'disabled' : '') + ' aria-label="move down" title="move down">⌄</button>',
+      '<button type="button" class="hf-ord-btn" data-act="down" ' + (i === 0 ? 'disabled' : '') + ' aria-label="' + esc(t('hf.move_down')) + '" title="' + esc(t('hf.move_down')) + '">⌄</button>',
       '</div>',
-      '<label class="hf-sw" style="background:' + css(f.hex) + '"><input type="color" data-fld="hex" value="' + esc(normHex(f.hex)) + '" aria-label="colour" /></label>',
+      '<label class="hf-sw" style="background:' + css(f.hex) + '"><input type="color" data-fld="hex" value="' + esc(normHex(f.hex)) + '" aria-label="' + esc(t('hf.colour_aria')) + '" /></label>',
       '<div class="hf-fil-body">',
       '<div class="hf-fil-hex">' + esc(String(f.hex).toUpperCase()) + '</div>',
-      f.measured ? '<span class="hf-fil-near" title="colour and TD measured from a calibration card">measured</span>' : near,
+      f.measured ? '<span class="hf-fil-near" title="' + esc(t('hf.measured_title')) + '">' + esc(t('hf.measured')) + '</span>' : near,
       '</div>',
-      '<label class="hf-num" title="Transmission distance (mm) — lower = opaque, higher = translucent">TD<input type="number" data-fld="td" min="0.3" max="20" step="0.1" value="' + esc(f.td) + '" /></label>',
-      '<label class="hf-num" title="Band thickness in layers">ly<input type="number" data-fld="layers" min="1" max="80" step="1" value="' + esc(f.layers) + '" /></label>',
-      '<button type="button" class="hf-fil-x" data-act="del" aria-label="remove">' + ico('cross', 14) + '</button>',
+      '<label class="hf-num" title="' + esc(t('hf.td_title')) + '">TD<input type="number" data-fld="td" min="0.3" max="20" step="0.1" value="' + esc(f.td) + '" /></label>',
+      '<label class="hf-num" title="' + esc(t('hf.layers_title')) + '">' + esc(t('hf.layers_abbr')) + '<input type="number" data-fld="layers" min="1" max="80" step="1" value="' + esc(f.layers) + '" /></label>',
+      '<button type="button" class="hf-fil-x" data-act="del" aria-label="' + esc(t('common.remove')) + '">' + ico('cross', 14) + '</button>',
       '</div>',
     ].join('');
   }
@@ -339,13 +341,13 @@
     const measured = S.filaments.filter((f) => f.measured).length;
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">CALIBRATE FILAMENTS</div>',
-      '<div class="hf-note" style="margin-top:0">Print a small card with the filaments in your stack, photograph it flat in even daylight, and ' + appName() + ' measures each filament’s real colour and TD from it. Measured values replace the guesses the painting uses.</div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_calibrate')) + '</div>',
+      '<div class="hf-note" style="margin-top:0">' + esc(t('hf.cal_intro', { app: appName() })) + '</div>',
       '<div class="hf-auto" style="margin-top:10px">',
-      '<button type="button" class="btn sm" id="hfCalCard"' + (can ? '' : ' disabled title="Needs 2 to 4 filaments in the stack"') + '>' + wrapIco('cube') + 'Print calibration card</button>',
-      '<button type="button" class="btn ghost sm" id="hfCalRead"' + (S.calCard ? '' : ' disabled title="Print the card first"') + '>' + wrapIco('camera') + 'Read photo of card</button>',
+      '<button type="button" class="btn sm" id="hfCalCard"' + (can ? '' : ' disabled title="' + esc(t('hf.cal_needs_2_4')) + '"') + '>' + wrapIco('cube') + esc(t('hf.cal_print')) + '</button>',
+      '<button type="button" class="btn ghost sm" id="hfCalRead"' + (S.calCard ? '' : ' disabled title="' + esc(t('hf.cal_print_first')) + '"') + '>' + wrapIco('camera') + esc(t('hf.cal_read')) + '</button>',
       '</div>',
-      measured ? '<div class="hf-note">' + measured + ' of ' + n + ' filament' + (n === 1 ? '' : 's') + ' measured from a card.</div>' : '',
+      measured ? '<div class="hf-note">' + esc(t(n === 1 ? 'hf.cal_measured_of_one' : 'hf.cal_measured_of_many', { m: measured, n })) + '</div>' : '',
       '<input type="file" id="hfCalFile" accept="image/*" hidden />',
       '</div>',
     ].join('');
@@ -393,12 +395,12 @@
     ov.className = 'hf-cal-ov';
     ov.setAttribute('role', 'dialog');
     ov.setAttribute('aria-modal', 'true');
-    ov.setAttribute('aria-label', 'Read the calibration card');
+    ov.setAttribute('aria-label', t('hf.cal_dialog'));
     ov.innerHTML = '<div class="hf-cal-box"><div class="hf-cal-h" id="hfCalHint"></div>'
       + '<div class="hf-cal-stage"></div><div class="hf-cal-res" id="hfCalRes"></div>'
-      + '<div class="hf-auto hf-cal-act"><button type="button" class="btn ghost sm" data-cal="undo">Undo corner</button>'
-      + '<button type="button" class="btn ghost sm" data-cal="close">Cancel</button>'
-      + '<button type="button" class="btn primary sm" data-cal="apply" disabled>Use measured values</button></div></div>';
+      + '<div class="hf-auto hf-cal-act"><button type="button" class="btn ghost sm" data-cal="undo">' + esc(t('hf.cal_undo')) + '</button>'
+      + '<button type="button" class="btn ghost sm" data-cal="close">' + esc(t('common.cancel')) + '</button>'
+      + '<button type="button" class="btn primary sm" data-cal="apply" disabled>' + esc(t('hf.cal_use')) + '</button></div></div>';
     document.body.appendChild(ov);
     const stage = ov.querySelector('.hf-cal-stage');
     const view = document.createElement('canvas');
@@ -406,7 +408,7 @@
     stage.appendChild(view);
     const ctx = view.getContext('2d');
     const imgData = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height);
-    const NAMES = ['the light-square corner (top-left)', 'the top-right corner', 'the bottom-right corner', 'the bottom-left corner'];
+    const NAMES = [t('hf.cal_click_tl'), t('hf.cal_click_tr'), t('hf.cal_click_br'), t('hf.cal_click_bl')];
     const pts = [];
     let result = null;
 
@@ -421,8 +423,8 @@
       ctx.stroke();
       pts.forEach((p) => { ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2); ctx.fill(); });
       ov.querySelector('#hfCalHint').textContent = pts.length < 4
-        ? 'Click ' + NAMES[pts.length] + ' of the card.'
-        : (result ? 'Measured. Check the values, then use them.' : 'Those corners could not be read. Undo and try again.');
+        ? NAMES[pts.length]
+        : (result ? t('hf.cal_done') : t('hf.cal_unread'));
     };
     const measure = () => {
       const out = cal.measureCard(imgData, pts, plan);
@@ -431,16 +433,17 @@
       const apply = ov.querySelector('[data-cal="apply"]');
       if (!out) { box.innerHTML = ''; apply.disabled = true; draw(); return; }
       const WARN = {
-        'too-opaque': 'so opaque the thinnest step hides the backing; TD is an upper bound',
-        'too-translucent': 'so translucent the thickest step still shows the backing; TD is a lower bound',
-        'low-contrast-backings': 'its backings are too alike to read well; add a much lighter or darker filament',
-        'one-backing': 'read over one backing only; add a third filament for a better reading',
-        'few-steps': 'only one step was usable',
-        'poor-fit': 'the card does not fit the model well; check the corners and the lighting',
+        'too-opaque': t('hf.cal_w_too_opaque'),
+        'too-translucent': t('hf.cal_w_too_translucent'),
+        'low-contrast-backings': t('hf.cal_w_low_contrast'),
+        'one-backing': t('hf.cal_w_one_backing'),
+        'few-steps': t('hf.cal_w_few_steps'),
+        'poor-fit': t('hf.cal_w_poor_fit'),
       };
-      box.innerHTML = '<table class="hf-cal-t"><thead><tr><th>Head</th><th>Stated</th><th>Measured</th><th>TD</th><th>Fit ΔE</th></tr></thead><tbody>'
+      box.innerHTML = '<table class="hf-cal-t"><thead><tr><th>' + esc(t('hf.cal_th_head')) + '</th><th>' + esc(t('hf.cal_th_stated')) + '</th><th>'
+        + esc(t('hf.cal_th_measured')) + '</th><th>TD</th><th>' + esc(t('hf.cal_th_fit')) + '</th></tr></thead><tbody>'
         + out.results.map((r) => r.error
-          ? '<tr><td>T' + r.head + '</td><td><span class="hf-cal-sw" style="background:' + css(r.statedHex) + '"></span>' + esc(r.statedHex) + '</td><td colspan="3">Could not read this row</td></tr>'
+          ? '<tr><td>T' + r.head + '</td><td><span class="hf-cal-sw" style="background:' + css(r.statedHex) + '"></span>' + esc(r.statedHex) + '</td><td colspan="3">' + esc(t('hf.cal_row_error')) + '</td></tr>'
           : '<tr><td>T' + r.head + '</td>'
             + '<td><span class="hf-cal-sw" style="background:' + css(r.statedHex) + '"></span>' + esc(r.statedHex) + '</td>'
             + '<td><span class="hf-cal-sw" style="background:' + css(r.hex) + '"></span>' + esc(r.hex) + '</td>'
@@ -493,31 +496,31 @@
     const opts = LAYER_PRESETS.slice();
     if (!opts.some((p) => Math.abs(p[0] - S.layerH) < 1e-6)) opts.push([S.layerH, 'custom']);
     const lopt = opts.map((p) => '<option value="' + p[0] + '"' + (Math.abs(p[0] - S.layerH) < 1e-6 ? ' selected' : '') + '>'
-      + p[0].toFixed(2) + ' mm' + (p[1] ? ' · ' + p[1] : '') + '</option>').join('');
+      + p[0].toFixed(2) + ' mm' + (p[1] ? ' · ' + esc(t(LH_LABEL[p[1]])) : '') + '</option>').join('');
     const flat = isFlat();
-    const modeSel = '<label class="hf-num wide" title="Relief paints by HEIGHT through translucent filament. Flat paints by REGION — solid colour areas, each on its own head. Flat needs no TD calibration and prints faster; relief blends colours the palette does not contain.">mode'
+    const modeSel = '<label class="hf-num wide" title="' + esc(t('hf.mode_title')) + '">' + esc(t('hf.mode'))
       + '<select class="input" id="hfMode">'
-      + '<option value="relief"' + (flat ? '' : ' selected') + '>Relief · light through filament</option>'
-      + '<option value="flat"' + (flat ? ' selected' : '') + '>Flat · solid colour regions</option>'
+      + '<option value="relief"' + (flat ? '' : ' selected') + '>' + esc(t('hf.mode_relief')) + '</option>'
+      + '<option value="flat"' + (flat ? ' selected' : '') + '>' + esc(t('hf.mode_flat')) + '</option>'
       + '</select></label>';
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">PRINT SETTINGS</div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_settings')) + '</div>',
       '<div class="hf-set">',
       modeSel,
-      '<label class="hf-num wide" title="Printed width (mm). A relief wider or deeper than the bed prints as tiles that butt together.">width (mm)<input type="number" id="hfWidth" min="40" max="' + (flat ? 270 : 1000) + '" step="1" value="' + esc(S.widthMm) + '" /></label>',
-      '<label class="hf-num wide" title="Layer height">layer height<select class="input" id="hfLayerH">' + lopt + '</select></label>',
-      flat ? '' : '<label class="hf-num wide" title="Solid base layers before the first colour">base layers<input type="number" id="hfBase" min="1" max="20" step="1" value="' + esc(S.baseLayers) + '" /></label>',
-      '<label class="hf-num wide" title="Total relief height. More height = more colour layers = richer tones (and longer print).">height (mm)<input type="number" id="hfHeight" min="0.8" max="6" step="0.1" value="' + esc(S.heightMm) + '" /></label>',
-      flat ? '' : '<label class="hf-num wide" title="Colour vividness (front-lit correction). Higher = more saturated, punchier colour; lower = softer, more blended. It starts at the recommended value for your filaments (gentler for black and white) and stays where you put it.">vividness<input type="number" id="hfVivid" min="1" max="10" step="1" value="' + esc(S.vivid) + '" /></label>',
-      flat ? '' : '<label class="hf-num wide" title="A hole through the top of the picture to hang it on a nail, or a loop on a tab above it for a keyring.">hanger'
+      '<label class="hf-num wide" title="' + esc(t('hf.width_title')) + '">' + esc(t('hf.width')) + '<input type="number" id="hfWidth" min="40" max="' + (flat ? 270 : 1000) + '" step="1" value="' + esc(S.widthMm) + '" /></label>',
+      '<label class="hf-num wide" title="' + esc(t('hf.lh_title')) + '">' + esc(t('hf.lh')) + '<select class="input" id="hfLayerH">' + lopt + '</select></label>',
+      flat ? '' : '<label class="hf-num wide" title="' + esc(t('hf.base_title')) + '">' + esc(t('hf.base')) + '<input type="number" id="hfBase" min="1" max="20" step="1" value="' + esc(S.baseLayers) + '" /></label>',
+      '<label class="hf-num wide" title="' + esc(t('hf.height_title')) + '">' + esc(t('hf.height')) + '<input type="number" id="hfHeight" min="0.8" max="6" step="0.1" value="' + esc(S.heightMm) + '" /></label>',
+      flat ? '' : '<label class="hf-num wide" title="' + esc(t('hf.vivid_title')) + '">' + esc(t('hf.vivid')) + '<input type="number" id="hfVivid" min="1" max="10" step="1" value="' + esc(S.vivid) + '" /></label>',
+      flat ? '' : '<label class="hf-num wide" title="' + esc(t('hf.hang_title')) + '">' + esc(t('hf.hang'))
         + '<select class="input" id="hfHang">'
-        + '<option value=""' + (S.hang ? '' : ' selected') + '>None</option>'
-        + '<option value="hole"' + (S.hang === 'hole' ? ' selected' : '') + '>Hole · hang on a nail</option>'
-        + '<option value="loop"' + (S.hang === 'loop' ? ' selected' : '') + '>Loop · keychain tab</option>'
+        + '<option value=""' + (S.hang ? '' : ' selected') + '>' + esc(t('hf.hang_none')) + '</option>'
+        + '<option value="hole"' + (S.hang === 'hole' ? ' selected' : '') + '>' + esc(t('hf.hang_hole')) + '</option>'
+        + '<option value="loop"' + (S.hang === 'loop' ? ' selected' : '') + '>' + esc(t('hf.hang_loop')) + '</option>'
         + '</select></label>',
-      flat || !S.hang ? '' : '<label class="hf-num wide" title="Hole diameter. 4 mm takes a keyring; 5–6 mm a nail head.">hole (mm)<input type="number" id="hfHoleMm" min="2" max="12" step="0.5" value="' + esc(S.holeMm) + '" /></label>',
-      flat ? '' : '<label class="hf-num wide" title="The relief is already smoothed to keep flat areas clean. 0 = default; raise it (1–3) only if a busy photo still looks noisy — higher trades fine detail for a smoother surface.">smoothing<input type="number" id="hfSmooth" min="0" max="3" step="1" value="' + esc(S.smooth) + '" /></label>',
+      flat || !S.hang ? '' : '<label class="hf-num wide" title="' + esc(t('hf.hole_title')) + '">' + esc(t('hf.hole')) + '<input type="number" id="hfHoleMm" min="2" max="12" step="0.5" value="' + esc(S.holeMm) + '" /></label>',
+      flat ? '' : '<label class="hf-num wide" title="' + esc(t('hf.smooth_title')) + '">' + esc(t('hf.smooth')) + '<input type="number" id="hfSmooth" min="0" max="3" step="1" value="' + esc(S.smooth) + '" /></label>',
       '</div></div>',
     ].join('');
   }
@@ -525,15 +528,15 @@
   function previewHtml() {
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">HOW IT WILL PRINT <span class="hf-card-hx" id="hfMatch">achievable colour</span></div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_preview')) + ' <span class="hf-card-hx" id="hfMatch">' + esc(t('hf.achievable')) + '</span></div>',
       '<div class="hf-preview"><canvas id="hfCanvas" class="hf-canvas"></canvas>',
-      '<div class="hf-preview-empty" id="hfPreviewEmpty" hidden>Add filaments to preview.</div></div>',
+      '<div class="hf-preview-empty" id="hfPreviewEmpty" hidden>' + esc(t('hf.preview_empty')) + '</div></div>',
       '</div>',
     ].join('');
   }
 
   function elevationHtml() {
-    return '<div class="hf-card"><div class="hf-card-h">SWAP ELEVATION</div><div class="hf-elev" id="hfElev"></div></div>';
+    return '<div class="hf-card"><div class="hf-card-h">' + esc(t('hf.h_elevation')) + '</div><div class="hf-elev" id="hfElev"></div></div>';
   }
 
   function verdictHtml() {
@@ -553,13 +556,12 @@
     const over = f.sizeMm.x > bedX || f.sizeMm.y > bedY;
     const n = f.palette.length;
     host.innerHTML = [
-      '<div class="hf-vd-top"><span class="hf-vd-badge ok">' + wrapIco('check') + 'FULLY AUTOMATIC</span>',
-      '<span class="hf-vd-count">' + n + ' colours · ' + (HF() ? HF().U1_HEADS : 4) + ' heads</span></div>',
-      '<div class="hf-vd-line">A flat plate: each colour is its own region on its own head, so every colour change '
-        + 'is a free tool change. No relief, no light mixing, nothing to calibrate — what the preview shows is what prints.</div>',
+      '<div class="hf-vd-top"><span class="hf-vd-badge ok">' + wrapIco('check') + esc(t('hf.fully_auto')) + '</span>',
+      '<span class="hf-vd-count">' + esc(t('hf.vd_count', { n, heads: HF() ? HF().U1_HEADS : 4 })) + '</span></div>',
+      '<div class="hf-vd-line">' + esc(t('hf.flat_line')) + '</div>',
       '<div class="hf-vd-facts"><span>' + Math.round(f.sizeMm.x) + '×' + Math.round(f.sizeMm.y) + '×' + f.sizeMm.z.toFixed(2) + ' mm</span>',
-      '<span>' + f.parts.length + ' parts</span>',
-      (over ? '<span class="hf-over">exceeds the ' + bedX + '×' + bedY + ' mm bed — reduce width</span>' : ''),
+      '<span>' + esc(t('hf.parts', { n: f.parts.length })) + '</span>',
+      (over ? '<span class="hf-over">' + esc(t('hf.flat_over', { x: bedX, y: bedY })) + '</span>' : ''),
       '</div>',
     ].join('');
   }
@@ -569,13 +571,12 @@
       const can = !!(S.flat && S.flat.parts.length);
       return [
         '<div class="hf-card">',
-        '<div class="hf-card-h">EXPORT</div>',
+        '<div class="hf-card-h">' + esc(t('hf.h_export')) + '</div>',
         '<div class="hf-export">',
-        '<button type="button" class="btn primary sm" id="hf3mf"' + (can ? '' : ' disabled title="Add an image and filaments first"') + '>' + wrapIco('cube') + 'Export U1 3MF</button>',
-        '<button type="button" class="btn ghost sm" id="hfStl">' + wrapIco('doc') + 'Plate STL</button>',
+        '<button type="button" class="btn primary sm" id="hf3mf"' + (can ? '' : ' disabled title="' + esc(t('hf.need_image_title')) + '"') + '>' + wrapIco('cube') + esc(t('hf.export_3mf')) + '</button>',
+        '<button type="button" class="btn ghost sm" id="hfStl">' + wrapIco('doc') + esc(t('hf.plate_stl')) + '</button>',
         '</div>',
-        '<div class="hf-note">The flat 3MF opens in Snapmaker Orca ready to slice — every colour region is its own part, '
-          + 'pre-assigned to a head. A plain STL loses the colour split, so it is only useful as a shape.</div>',
+        '<div class="hf-note">' + esc(t('hf.flat_export_note')) + '</div>',
         '</div>',
       ].join('');
     }
@@ -583,15 +584,13 @@
     const can3mf = auto && S.solve;
     return [
       '<div class="hf-card">',
-      '<div class="hf-card-h">EXPORT</div>',
+      '<div class="hf-card-h">' + esc(t('hf.h_export')) + '</div>',
       '<div class="hf-export">',
-      '<button type="button" class="btn primary sm" id="hf3mf"' + (can3mf ? '' : ' disabled title="Needs ≤4 colours (fits the U1 heads)"') + '>' + wrapIco('cube') + 'Export U1 3MF</button>',
-      '<button type="button" class="btn ghost sm" id="hfStl">' + wrapIco('doc') + 'Relief STL</button>',
-      '<button type="button" class="btn ghost sm" id="hfCopy">' + wrapIco('clipboard') + 'Copy plan</button>',
+      '<button type="button" class="btn primary sm" id="hf3mf"' + (can3mf ? '' : ' disabled title="' + esc(t('hf.needs_4_title')) + '"') + '>' + wrapIco('cube') + esc(t('hf.export_3mf')) + '</button>',
+      '<button type="button" class="btn ghost sm" id="hfStl">' + wrapIco('doc') + esc(t('hf.relief_stl')) + '</button>',
+      '<button type="button" class="btn ghost sm" id="hfCopy">' + wrapIco('clipboard') + esc(t('hf.copy_plan')) + '</button>',
       '</div>',
-      '<div class="hf-note">' + (can3mf
-        ? 'The U1 3MF opens in Snapmaker Orca ready to slice — the four filaments are pre-mapped to the heads and the colour swaps are baked in by height. Just load the shown colours and print.'
-        : 'Reduce to ≤4 colours for the one-click U1 3MF. The relief STL always works — slice it and load the plan’s filaments yourself.') + '</div>',
+      '<div class="hf-note">' + esc(t(can3mf ? 'hf.export_note_ok' : 'hf.export_note_reduce')) + '</div>',
       '</div>',
     ].join('');
   }
@@ -651,7 +650,7 @@
     if (isFlat()) {
       if (match) {
         const n = S.flat.palette.length;
-        match.textContent = n + ' solid colour' + (n === 1 ? '' : 's') + ' — exactly as shown';
+        match.textContent = t(n === 1 ? 'hf.flat_match_one' : 'hf.flat_match_many', { n });
         match.className = 'hf-card-hx hf-match exact';
       }
       return;
@@ -659,7 +658,7 @@
     if (match) {
       const de = S.solve.meanDeltaE || 0;
       const q = de < 2 ? 'exact' : de < 4 ? 'close' : de < 8 ? 'ok' : 'far';
-      match.textContent = 'match ΔE ' + de.toFixed(1) + ' avg';
+      match.textContent = t('hf.match', { de: de.toFixed(1) });
       match.className = 'hf-card-hx hf-match ' + q;
     }
   }
@@ -692,26 +691,26 @@
     const done = (S.solve.fixes || []);
     const rows = S.fixes.map((f, i) => {
       const got = done[i] || {};
-      const prints = got.hex ? ' → prints <span class="hf-fix-sw" style="background:' + css(got.hex) + '"></span>' : '';
+      const prints = got.hex ? ' ' + esc(t('hf.fix_prints')) + ' <span class="hf-fix-sw" style="background:' + css(got.hex) + '"></span>' : '';
       return '<div class="hf-fix-row"><span class="hf-fix-sw" style="background:' + css(f.hex) + '"></span>'
-        + '<span class="hf-fix-t">' + esc(f.spread || 'medium') + ' area · ' + (got.count || 0) + ' px' + prints + '</span>'
-        + '<button type="button" class="btn ghost sm" data-fix-del="' + i + '" title="Remove this fix" aria-label="Remove this fix">×</button></div>';
+        + '<span class="hf-fix-t">' + esc(t('hf.fix_area_row', { spread: t(SPREAD_LABEL[f.spread] || SPREAD_LABEL.medium), px: got.count || 0 })) + prints + '</span>'
+        + '<button type="button" class="btn ghost sm" data-fix-del="' + i + '" title="' + esc(t('hf.fix_remove')) + '" aria-label="' + esc(t('hf.fix_remove')) + '">×</button></div>';
     }).join('');
     let pick = '';
     if (S.fixPick) {
       const sw = fixSwatches().map((p) => '<button type="button" class="hf-fix-pick" data-fix-hex="' + esc(p.hex) + '" title="' + esc(p.hex) + '" aria-label="' + esc(p.hex) + '" style="background:' + css(p.hex) + '"></button>').join('');
-      pick = '<div class="hf-note" style="margin-top:0">Pick the colour this area should print:</div>'
+      pick = '<div class="hf-note" style="margin-top:0">' + esc(t('hf.fix_pick')) + '</div>'
         + '<div class="hf-fix-pal">' + sw + '</div>'
         + '<div class="hf-auto" style="margin-top:8px">'
-        + '<label class="hf-num">area<select class="input" id="hfFixSpread">'
-        + ['small', 'medium', 'large'].map((v) => '<option value="' + v + '"' + ((S.fixSpread || 'medium') === v ? ' selected' : '') + '>' + v + '</option>').join('')
+        + '<label class="hf-num">' + esc(t('hf.fix_area')) + '<select class="input" id="hfFixSpread">'
+        + ['small', 'medium', 'large'].map((v) => '<option value="' + v + '"' + ((S.fixSpread || 'medium') === v ? ' selected' : '') + '>' + esc(t(SPREAD_LABEL[v])) + '</option>').join('')
         + '</select></label>'
-        + '<button type="button" class="btn ghost sm" data-fix-cancel="1">Cancel</button></div>';
+        + '<button type="button" class="btn ghost sm" data-fix-cancel="1">' + esc(t('common.cancel')) + '</button></div>';
     }
-    host.innerHTML = '<div class="hf-card-h">COLOUR FIXES</div>'
-      + (pick || '<div class="hf-note" style="margin-top:0">Click an area in the preview to choose the colour it prints.</div>')
+    host.innerHTML = '<div class="hf-card-h">' + esc(t('hf.h_fixes')) + '</div>'
+      + (pick || '<div class="hf-note" style="margin-top:0">' + esc(t('hf.fix_hint')) + '</div>')
       + rows
-      + (S.fixes.length > 1 ? '<div class="hf-auto" style="margin-top:8px"><button type="button" class="btn ghost sm" data-fix-clear="1">Clear all fixes</button></div>' : '');
+      + (S.fixes.length > 1 ? '<div class="hf-auto" style="margin-top:8px"><button type="button" class="btn ghost sm" data-fix-clear="1">' + esc(t('hf.fix_clear')) + '</button></div>' : '');
   }
 
   function onFixesClick(e) {
@@ -787,7 +786,7 @@
       const reload = plan && plan.reloads.some((r) => r.band === b);
       const dark = KC() && KC().hexToRgb(b.hex) ? HF().luminance(b.hex) < 0.55 : false;
       return '<div class="hf-band" style="flex:' + pct.toFixed(2) + ' 1 0;background:' + css(b.hex) + ';color:' + (dark ? '#fff' : '#111') + '">'
-        + '<span class="hf-band-slot" title="U1 head">T' + (slot - 1) + (reload ? ' ↻' : '') + '</span>'
+        + '<span class="hf-band-slot" title="' + esc(t('hf.u1_head')) + '">T' + (slot - 1) + (reload ? ' ↻' : '') + '</span>'
         + '<span class="hf-band-l">L' + b.startLayer + '–' + b.endLayer + '</span>'
         + '<span class="hf-band-td">TD ' + b.td + '</span>'
         + '</div>';
@@ -801,8 +800,8 @@
     host.innerHTML = S.flat.parts.map((p, i) => {
       const dark = hf ? hf.luminance(p.hex) < 0.55 : false;
       return '<div class="hf-band" style="flex:1 1 0;background:' + css(p.hex) + ';color:' + (dark ? '#fff' : '#111') + '">'
-        + '<span class="hf-band-slot" title="U1 head">T' + (p.head | 0) + '</span>'
-        + '<span class="hf-band-l">' + (i === 0 ? 'base slab' : 'colour region') + '</span>'
+        + '<span class="hf-band-slot" title="' + esc(t('hf.u1_head')) + '">T' + (p.head | 0) + '</span>'
+        + '<span class="hf-band-l">' + esc(t(i === 0 ? 'hf.base_slab' : 'hf.colour_region')) + '</span>'
         + '<span class="hf-band-td">' + esc(String(p.hex).toUpperCase()) + '</span>'
         + '</div>';
     }).join('');
@@ -824,22 +823,22 @@
     const overBed = nTiles <= 1 && S.img && (S.widthMm > bedX || depthMm > (prof && prof.bed ? prof.bed.y : 270));
     const ok = p.automatic;
     const badge = ok
-      ? '<span class="hf-vd-badge ok">' + wrapIco('check') + 'FULLY AUTOMATIC</span>'
-      : '<span class="hf-vd-badge warn">' + wrapIco('alert') + p.reloads.length + ' RELOAD' + (p.reloads.length === 1 ? '' : 'S') + ' NEEDED</span>';
+      ? '<span class="hf-vd-badge ok">' + wrapIco('check') + esc(t('hf.fully_auto')) + '</span>'
+      : '<span class="hf-vd-badge warn">' + wrapIco('alert') + esc(t(p.reloads.length === 1 ? 'hf.reloads_one' : 'hf.reloads_many', { n: p.reloads.length })) + '</span>';
     const line2 = ok
-      ? p.colorCount + ' filaments on the four SnapSwap heads, re-used across ' + ((p.swaps || 0) + 1) + ' colour bands — every swap is an automatic, near-zero-purge tool-change. Nothing to set up in the slicer.'
-      : p.colorCount + ' colours over ' + p.heads + ' heads: after a head finishes, swap its spool for the next colour when the U1 pauses at the marked layer (↻ in the elevation).';
+      ? esc(t('hf.vd_auto_line', { n: p.colorCount, bands: (p.swaps || 0) + 1 }))
+      : esc(t('hf.vd_reload_line', { n: p.colorCount, heads: p.heads }));
     const reloadList = (!ok && p.reloads.length)
       ? '<ul class="hf-vd-reloads">' + p.reloads.map((r) =>
-        '<li><span class="hf-sw sm" style="background:' + css(r.band.hex) + '"></span>swap head T' + r.slot + ' at layer ' + r.atLayer + '</li>').join('') + '</ul>'
+        '<li><span class="hf-sw sm" style="background:' + css(r.band.hex) + '"></span>' + esc(t('hf.vd_swap_at', { slot: r.slot, layer: r.atLayer })) + '</li>').join('') + '</ul>'
       : '';
     host.innerHTML = [
-      '<div class="hf-vd-top">' + badge + '<span class="hf-vd-count">' + p.colorCount + ' colours · ' + p.heads + ' heads</span></div>',
+      '<div class="hf-vd-top">' + badge + '<span class="hf-vd-count">' + esc(t('hf.vd_count', { n: p.colorCount, heads: p.heads })) + '</span></div>',
       '<div class="hf-vd-line">' + line2 + '</div>',
       reloadList,
-      '<div class="hf-vd-facts"><span>' + size + '</span><span>' + (S.stack ? S.stack.totalLayers : 0) + ' layers</span>'
-        + (overBed ? '<span class="hf-over">exceeds ' + bedX + ' mm bed — reduce width</span>' : '')
-        + (nTiles > 1 ? '<span>' + tp.cols + '×' + tp.rows + ' tiles, each fits the bed' + (S.hang ? ' · no hanger on a tiled print' : '') + '</span>' : '') + '</div>',
+      '<div class="hf-vd-facts"><span>' + size + '</span><span>' + esc(t('hf.layers_n', { n: S.stack ? S.stack.totalLayers : 0 })) + '</span>'
+        + (overBed ? '<span class="hf-over">' + esc(t('hf.over_bed', { x: bedX })) + '</span>' : '')
+        + (nTiles > 1 ? '<span>' + esc(t('hf.tiles_fit', { cols: tp.cols, rows: tp.rows })) + (S.hang ? ' · ' + esc(t('hf.tiles_no_hanger')) : '') + '</span>' : '') + '</div>',
     ].join('');
   }
 
@@ -926,7 +925,7 @@
     const hf = HF();
     if (!hf || !S.img || !S.filaments.length) return;
     const btn = document.getElementById('hfTune');
-    if (btn) { btn.disabled = true; btn.textContent = 'Tuning…'; }
+    if (btn) { btn.disabled = true; btn.textContent = t('hf.tuning'); }
     // let the disabled state paint before the (synchronous) optimise runs
     requestAnimationFrame(() => {
       const res = hf.autoTune(S.img, S.filaments, { layerH: S.layerH, baseLayers: S.baseLayers });
@@ -935,7 +934,7 @@
       render();
       // report the value actually shown (full-res solve), not the coarse tuning score
       const de = S.solve ? S.solve.meanDeltaE : res.meanDeltaE;
-      toast('Tuned — match ΔE ' + de.toFixed(1));
+      toast(t('hf.tuned', { de: de.toFixed(1) }));
     });
   }
 
@@ -952,26 +951,23 @@
     const depthMm = S.img ? Math.round(S.widthMm * S.img.height / S.img.width + (hang ? hang.extra * S.widthMm / (S.solve.width - 1) : 0)) : 0;
     const lines = [];
     lines.push('HueForge → Snapmaker U1  ·  ' + (S.imgName || 'painting'));
-    lines.push('Size ' + Math.round(S.widthMm) + '×' + depthMm + '×' + mm(S.stack.totalLayers) + ' mm · '
-      + 'layer ' + lh + ' mm · ' + S.stack.totalLayers + ' layers · 100% infill');
+    lines.push(t('hf.plan_size', { w: Math.round(S.widthMm), d: depthMm, h: mm(S.stack.totalLayers), lh, n: S.stack.totalLayers }));
     lines.push('');
     S.stack.bands.forEach((b, i) => {
       const slot = S.plan.slots[i] ? S.plan.slots[i].slot : i % S.plan.heads;
       const reload = S.plan.reloads.some((r) => r.band === b);
-      lines.push('Head T' + slot + '  ' + String(b.hex).toUpperCase() + '  TD ' + b.td
-        + '  ·  layers ' + b.startLayer + '–' + b.endLayer + ' (' + mm(b.startLayer - 1) + '–' + mm(b.endLayer) + ' mm)'
-        + (reload ? '  ← RELOAD this head at ' + mm(b.startLayer - 1) + ' mm' : ''));
+      lines.push(t('hf.plan_head', { slot, hex: String(b.hex).toUpperCase(), td: b.td, a: b.startLayer, b: b.endLayer, from: mm(b.startLayer - 1), to: mm(b.endLayer) })
+        + (reload ? '  ' + t('hf.plan_reload', { mm: mm(b.startLayer - 1) }) : ''));
     });
     lines.push('');
     // "these 4 colours" was hard-coded next to a head range counted from the real
     // stack, so a three-colour plan read "load these 4 colours into heads T0–T2".
     const n = S.plan.colorCount;
     lines.push(S.plan.automatic
-      ? 'Fully automatic on the U1 — load these ' + n + ' colour' + (n === 1 ? '' : 's')
-        + ' into head' + (n === 1 ? ' T0' : 's T0–T' + (n - 1)) + '; swaps happen mid-print, no manual steps.'
-      : (S.plan.reloads.length + ' mid-print reload(s) needed — swap the marked head when the U1 pauses at the listed height.'));
+      ? t(n === 1 ? 'hf.plan_auto_one' : 'hf.plan_auto_many', { n, last: n - 1 })
+      : t('hf.plan_reloads', { n: S.plan.reloads.length }));
     const text = lines.join('\n');
-    copyText(text).then((ok) => toast(ok ? 'Print plan copied' : 'Copy failed'));
+    copyText(text).then((ok) => toast(ok ? t('hf.plan_copied') : t('common.copy_failed')));
   }
 
   function export3mf() {
@@ -981,7 +977,7 @@
     if (!api || !api.hfExport3mf) { toast(t('common.feature_missing')); return; }
     const p = S.paint;
     const btn = document.getElementById('hf3mf');
-    if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
+    if (btn) { btn.disabled = true; btn.textContent = t('hf.building'); }
     api.hfExport3mf({
       heights: Array.from(p.solve.heights),
       width: p.solve.width, height: p.solve.height,
@@ -996,8 +992,8 @@
       thumbSmallPng: solvePreviewPng(128),
     }).then((r) => {
       render();
-      if (r && r.ok && r.files > 1) toast(r.files + ' tile 3MFs saved (' + r.cols + '×' + r.rows + ') · open each in Snapmaker Orca');
-      else if (r && r.ok) toast('U1 3MF saved · open in Snapmaker Orca');
+      if (r && r.ok && r.files > 1) toast(t('hf.tiles_3mf_saved', { n: r.files, cols: r.cols, rows: r.rows }));
+      else if (r && r.ok) toast(t('hf.u1_3mf_saved'));
       else if (r && r.canceled) { /* silent */ }
       else toast(t('common.export_failed') + (r && r.error ? ': ' + r.error : ''));
     }).catch((e) => { render(); toast(t('common.export_failed')); });
@@ -1014,7 +1010,7 @@
     const api = (typeof window !== 'undefined' && window.hubAPI);
     if (!api || !api.hfExportFlat3mf) { toast(t('common.feature_missing')); return; }
     const btn = document.getElementById('hf3mf');
-    if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
+    if (btn) { btn.disabled = true; btn.textContent = t('hf.building'); }
     api.hfExportFlat3mf({
       labels: Array.from(f.labels),
       palette: f.palette.map((p) => ({ hex: p.hex, r: p.r, g: p.g, b: p.b })),
@@ -1028,7 +1024,7 @@
       thumbSmallPng: solvePreviewPng(128),
     }).then((r) => {
       render();
-      if (r && r.ok) toast('Flat U1 3MF saved · open in Snapmaker Orca');
+      if (r && r.ok) toast(t('hf.flat_3mf_saved'));
       else if (r && r.canceled) { /* silent */ }
       else toast(t('common.export_failed') + (r && r.error ? ': ' + r.error : ''));
     }).catch(() => { render(); toast(t('common.export_failed')); });
@@ -1061,7 +1057,7 @@
     a.download = (S.imgName || 'painting').replace(/\.[^.]+$/, '') + '-U1.stl';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast('STL exported · ' + Math.round(mesh.sizeMm.x) + '×' + Math.round(mesh.sizeMm.y) + '×' + mesh.sizeMm.z.toFixed(1) + ' mm');
+    toast(t('hf.stl_exported', { x: Math.round(mesh.sizeMm.x), y: Math.round(mesh.sizeMm.y), z: mesh.sizeMm.z.toFixed(1) }));
   }
 
   /** One STL per tile, named by row and column (top-left is r1c1). */
@@ -1079,7 +1075,7 @@
         setTimeout(() => URL.revokeObjectURL(url), 4000);
       }, n * 300);
     });
-    toast(tp.tiles.length + ' tile STLs exported (' + tp.cols + '×' + tp.rows + ')');
+    toast(t('hf.tile_stls', { n: tp.tiles.length, cols: tp.cols, rows: tp.rows }));
   }
 
   // ---- utils --------------------------------------------------------------
