@@ -1255,7 +1255,7 @@ struct SetupsSection: View {
         private var tally: String {
             setup.ok == 0 && setup.failed == 0
                 ? shop.words.callIt("setup.untried")
-                : "\(setup.ok) / \(setup.ok + setup.failed)"
+                : Figure.isolated("\(setup.ok) / \(setup.ok + setup.failed)")
         }
 
         static func word(_ status: String) -> String {

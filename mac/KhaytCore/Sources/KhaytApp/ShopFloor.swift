@@ -452,7 +452,9 @@ struct MachineCard: View {
                     HStack(alignment: .center, spacing: 11) {
                         WearGauge(pct: wear.pct)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold)) + " " + shop.words.callIt("common.grams"))
+                            // Isolated: "8,419 / 8,000" is used / limit, and in
+                            // an Arabic line the two swapped places.
+                            Text(verbatim: Figure.isolated(shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold))) + " " + shop.words.callIt("common.grams"))
                                 .font(.callout).monospacedDigit()
                             if wear.over {
                                 Text(shop.words.callIt("mac.nozzle_due"))
