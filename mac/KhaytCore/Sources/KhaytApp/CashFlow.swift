@@ -48,7 +48,7 @@ struct CashFlowChart: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(words.callIt("an.cash_flow"))
                     .font(.system(size: 10, weight: .semibold))
-                    .textCase(.uppercase).tracking(0.6)
+                    .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Key(colour: Khayt.done, label: words.callIt("an.collected"))

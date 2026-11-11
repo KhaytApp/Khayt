@@ -311,7 +311,8 @@ struct CustomerInspector: View {
                     if let record = person.record, record.hasContactDetails {
                         DetailSection(shop.words.callIt("mac.customer")) {
                             if !record.phone.isEmpty {
-                                DetailLine(shop.words.callIt("ce.phone"), record.phone)
+                                // Isolated, so the Arabic window does not reorder its groups.
+                                DetailLine(shop.words.callIt("ce.phone"), "\u{2066}" + record.phone + "\u{2069}")
                                 // Opens a chat with nothing typed — the number
                                 // normalised the way `wa.me` needs it, or the
                                 // reason it cannot be, said under the button.

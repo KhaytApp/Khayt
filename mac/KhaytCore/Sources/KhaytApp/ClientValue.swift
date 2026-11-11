@@ -24,7 +24,7 @@ struct ClientValueTable: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(words.callIt("an.client_ltv"))
                 .font(.system(size: 10, weight: .semibold))
-                .textCase(.uppercase).tracking(0.6)
+                .textCase(.uppercase).tracking(Words.spaced(0.6))
                 .foregroundStyle(.secondary)
 
             if let report, !report.rows.isEmpty {

@@ -55,6 +55,7 @@ final class Words {
     func load(_ wanted: String?, engine: KhaytEngine?) async {
         let lang = Self.supported.contains(wanted ?? "") ? wanted! : "en"
         language = lang
+        Self.lettersJoin = lang == "ar"
         khayt = (try? await engine?.translations(language: lang)) ?? [:]
     }
 
@@ -88,8 +89,21 @@ final class Words {
     /// afterwards. There is nothing to race with.
     nonisolated(unsafe) private(set) static var warm: (language: String, strings: [String: String])?
 
+    /// ARABIC LETTERS JOIN, and letter-spacing pulls a word apart into its
+    /// isolated forms — a different, unreadable word. The sidebar already
+    /// switched its tracking off for Arabic; some forty headings and report
+    /// cards did not. Every positive `.tracking` in the app goes through
+    /// `spaced`, which is nothing in Arabic. Written on the main actor when
+    /// the language is chosen, read by views on it.
+    nonisolated(unsafe) static var lettersJoin = false
+    nonisolated static func spaced(_ tracking: CGFloat) -> CGFloat { spaced(tracking, joined: lettersJoin) }
+    /// The rule itself, apart from the app's language, so a test can ask it
+    /// without changing what every other test's views read.
+    nonisolated static func spaced(_ tracking: CGFloat, joined: Bool) -> CGFloat { joined ? 0 : tracking }
+
     nonisolated static func preload(_ wanted: String) {
         let lang = supported.contains(wanted) ? wanted : "en"
+        lettersJoin = lang == "ar"
         guard let engine = try? KhaytEngine(),
               let strings = try? engineTranslations(engine, lang) else { return }
         warm = (lang, strings)
@@ -947,6 +961,18 @@ final class Words {
         "mac.walk_in":       ["en": "No customer",    "ar": "بلا عميل"],
         "mac.a_part":        ["en": "A part",         "ar": "قطعة"],
         "mac.add_part":      ["en": "Add part",       "ar": "إضافة قطعة"],
+        "mac.pay_total_note": ["en": "This is everything paid so far ({amount} recorded), not only this payment.", "ar": "هذا مجموع ما دُفع حتى الآن (المسجَّل {amount})، وليس هذه الدفعة فقط."],
+        "mac.pay_over_bill": ["en": "More than the bill. {amount} will be recorded.", "ar": "أكثر من قيمة الفاتورة. سيُسجَّل {amount}."],
+        "mac.pick_from_list": ["en": "Choose from the list", "ar": "اختر من القائمة"],
+        "mac.due_estimated": ["en": "Estimated from the queue", "ar": "تقديري بحسب قائمة الانتظار"],
+        "mac.discard_q": ["en": "Discard what you entered?", "ar": "تجاهل ما أدخلته؟"],
+        "mac.discard": ["en": "Discard", "ar": "تجاهل"],
+        "mac.keep_editing": ["en": "Keep Editing", "ar": "متابعة التعديل"],
+        "mac.board_more": ["en": "{n} more in Jobs", "ar": "{n} أخرى في الأعمال"],
+        "mac.opened_rollback": ["en": "The book's file was damaged, so Khayt opened its last good copy, from one save earlier. Check your most recent change. The damaged file is kept beside the book.",
+                                "ar": "ملف الدفتر كان تالفاً، ففتح خيط آخر نسخة سليمة منه، وهي أقدم بحفظ واحد. راجع آخر تغيير أجريته. الملف التالف محفوظ بجانب الدفتر."],
+        "mac.add_part_first": ["en": "Add a part first: a weight or a print time.", "ar": "أضف قطعة أولاً: وزناً أو مدة طباعة."],
+        "mac.part_added_check": ["en": "The part you were typing is on the job now. Check the total, then save.", "ar": "القطعة التي كنت تكتبها أُضيفت إلى العمل. راجع الإجمالي ثم احفظ."],
         "mac.update_part": ["en": "Update part", "ar": "حدّث الجزء"],
         "mac.plate_part": ["en": "{name} — plate {n}", "ar": "{name} — اللوح {n}"],
         "mac.plates": ["en": "Plates", "ar": "الألواح"],
@@ -5671,8 +5697,8 @@ final class Words {
         "mac.operator_add": ["en": "Add operator", "ar": "إضافة مشغّل"],
         "mac.operator_new": ["en": "New operator", "ar": "مشغّل جديد"],
         "mac.operator_edit": ["en": "Edit operator", "ar": "تعديل المشغّل"],
-        "mac.operator_access_hint": ["en": "Used by the desktop app's operator lock. This Mac does not ask for a PIN.",
-                                     "ar": "يستخدمه قفل المشغّلين في تطبيق سطح المكتب. هذا الماك لا يطلب رمزًا."],
+        "mac.operator_access_hint": ["en": "What this person may do when Staff sign-in is on.",
+                                     "ar": "ما يُسمح لهذا الشخص بفعله عند تشغيل تسجيل دخول الموظفين."],
         "mac.op_gone": ["en": "no longer on the list", "ar": "لم يعد في القائمة"],
         "mac.location_delete_hint": ["en": "Machines, spools, expenses and jobs at it become unassigned. You can undo this.",
                                      "ar": "تصبح الأجهزة والبكرات والمصروفات والطلبات التابعة له بلا موقع. يمكنك التراجع عن ذلك."],

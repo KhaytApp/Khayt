@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "Dieses iPhone muss erneut mit dem Mac gekoppelt werden, bevor es Fotos hinzufügen kann.";
 "printphotos.why.not_found" = "Der Mac hat diesen Auftrag nicht mehr.";
 "printphotos.why.old_mac" = "Aktualisiere Khayt auf dem Mac, um Fotos vom iPhone hinzuzufügen.";
+"expense.needs_mac" = "Dieser Mac kann noch keine Ausgabe mit Belegfoto vom iPhone annehmen. Nichts wurde gespeichert, deine Ausgabe ist noch hier.";
+"quote.needs_mac" = "Dieser Mac kann für das iPhone noch kein Angebot berechnen. Nichts wurde gesendet. Der Rechner auf diesem iPhone funktioniert auch ohne ihn.";
 "printphotos.why.read_only" = "Die Werkstatt ist auf dem Mac gerade schreibgeschützt und kann kein Foto annehmen.";
 "printphotos.why.too_large" = "Dieses Foto ist zu groß für den Mac. Versuche ein kleineres.";
 "printphotos.why.not_image" = "Dieses Foto kann der Mac nicht lesen. Versuche JPEG oder PNG.";

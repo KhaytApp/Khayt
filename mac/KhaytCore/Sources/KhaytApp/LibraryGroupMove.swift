@@ -491,7 +491,7 @@ struct GroupMoveSheet: View {
                 Text(shop.words.callIt("mac.move_groups_plan"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase)
-                    .tracking(0.6)
+                    .tracking(Words.spaced(0.6))
                     .foregroundStyle(.tertiary)
                 ForEach(plan.moves) { move in
                     VStack(alignment: .leading, spacing: 2) {

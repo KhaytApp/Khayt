@@ -434,7 +434,7 @@ struct ShellSidebar: View {
     private func group(_ titleKey: String, _ items: [NavItem]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             CapsLabel(shop.words.callIt(titleKey), tint: Role.onNavy3, size: 8.5)
-                .tracking(1.2)
+                .tracking(Words.spaced(1.2))
                 .padding(.horizontal, 14)
                 .frame(height: 20, alignment: .leading)
             // WHAT THE SHOP'S MODE INCLUDES. Asked here rather than at each

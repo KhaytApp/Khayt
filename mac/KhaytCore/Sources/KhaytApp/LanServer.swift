@@ -190,6 +190,8 @@ final class LanServer {
         /// A paired phone's photo of a job (`Shop.phoneAddJobPhoto`): the JPEG
         /// it sent, filed as the Mac's own Add Photo files one.
         var addJobPhoto: (@MainActor (_ jobId: String, _ data: Data) async -> (Int, String))? = nil
+        /// A phone's expense, receipt and all (`Shop.phoneAddExpense`).
+        var addExpense: (@MainActor (_ body: Data) async -> (Int, String))? = nil
         /// Put a carrier's event on the book, INSIDE the write. Returns the job
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
@@ -744,7 +746,20 @@ final class LanServer {
             return try await readSlicerUpload(connection, on: queue, requestLine: requestLine, headers: headers,
                                               start: body, length: length, remote: remote, slot: slot)
         }
-        if length > Self.maxBody, Self.isJobPhotoUpload(method: requestLine[0], target: requestLine[1]) {
+        if length > Self.maxBody, Self.isExpenseUpload(method: requestLine[0], target: requestLine[1]) {
+            // A phone's expense with its receipt: the same terms as its photo
+            // of a job, below — signed, judged from the head, sharing the slots.
+            guard length <= ExpenseReceipt.maxBody else { throw ReadRefusal.tooLarge }
+            guard LanDevices.isSigned(headers) else {
+                throw ReadRefusal.refused(.json(403, #"{"ok":false,"reason":"device-key-required"}"#))
+            }
+            let probe = Request(method: "POST", path: "/api/expense", query: [:],
+                                headers: headers, body: Data(), remote: remote)
+            if let refused = await pinGate(probe, headOnly: true) { throw ReadRefusal.refused(refused) }
+            guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
+            largeBodies += 1
+            slot.held = true
+        } else if length > Self.maxBody, Self.isJobPhotoUpload(method: requestLine[0], target: requestLine[1]) {
             // A phone's photo of a job: past a megabyte, up to the photo cap,
             // for a SIGNED enrolled phone only — judged from the head before a
             // byte of body is read, and sharing the large-body slots.
@@ -954,7 +969,7 @@ final class LanServer {
         // The REST API (`LanServer+Rest`). The ones with an id, and the
         // printer webhook, are not advertised: a 404 is served before any gate.
         "/api/orders", "/api/machines", "/api/inventory", "/api/waiting-list", "/api/clients",
-        "/api/waste",
+        "/api/waste", "/api/quote",
     ]
 
     // MARK: - The routes
@@ -1257,6 +1272,17 @@ final class LanServer {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.addJobPhoto!(Self.jobPhotoPath(path)!, request.body)
+            return .json(status, body)
+
+        // ── A PHONE FILES AN EXPENSE WITH ITS RECEIPT (`Shop+PhoneExpense`) ──
+        //
+        // Signed phones only, as above: the body carries a supplier's paper.
+        case ("/api/expense", false) where request.method == "POST" && host.addExpense != nil:
+            if let refused = await pinGate(request) { return refused }
+            guard LanDevices.isSigned(request.headers) else {
+                return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
+            }
+            let (status, body) = await host.addExpense!(request.body)
             return .json(status, body)
 
         case (_, true) where host.libraryThumb != nil && Self.libraryPath(path)?.action == "thumb":
@@ -2148,16 +2174,24 @@ final class LanServer {
         let now = host.now()
         let key = Self.throttleKey(request.remote) + ":wh:" + source
         let record = webhookFailures[key]
-        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
-            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
-        }
+        // THE SIGNATURE IS JUDGED BEFORE THE LOCKOUT. A storefront or a carrier
+        // reaches this Mac through a proxy or tunnel the shop runs, so every
+        // delivery arrives from one address: ten unsigned requests a minute
+        // from anyone kept that address locked out, and the genuine, correctly
+        // signed deliveries were answered 429 before their signature was
+        // looked at — orders silently never arrived. A valid signature now
+        // passes whatever the lockout says; only a request that FAILS it is
+        // throttled and counted.
+        let lockedOut = (try? await host.engine.lanIsLockedOut(record, now: now)) == true
         guard let secret = host.storefrontSecrets[source], !secret.isEmpty else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             let name = source == "salla" ? "Salla" : "Zid"
             return .json(403, #"{"error":"\#(name) webhook secret not configured in LAN settings"}"#)
         }
         let header = source == "salla" ? "x-salla-signature" : "x-zid-signature"
         let provided = request.headers[header] ?? ""
         guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 webhookFailures[key] = bumped
             }
@@ -2217,14 +2251,22 @@ final class LanServer {
         let now = host.now()
         let key = Self.throttleKey(request.remote) + ":wh:" + carrier
         let record = webhookFailures[key]
-        if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
-            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
-        }
+        // THE SIGNATURE IS JUDGED BEFORE THE LOCKOUT. A storefront or a carrier
+        // reaches this Mac through a proxy or tunnel the shop runs, so every
+        // delivery arrives from one address: ten unsigned requests a minute
+        // from anyone kept that address locked out, and the genuine, correctly
+        // signed deliveries were answered 429 before their signature was
+        // looked at — orders silently never arrived. A valid signature now
+        // passes whatever the lockout says; only a request that FAILS it is
+        // throttled and counted.
+        let lockedOut = (try? await host.engine.lanIsLockedOut(record, now: now)) == true
         guard let secret = host.carrierSecrets[carrier], !secret.isEmpty else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             return .json(403, #"{"error":"Carrier webhook secret not configured in Shipping settings"}"#)
         }
         let provided = request.headers["x-khayt-signature"] ?? request.headers["x-signature"] ?? ""
         guard Self.constantTimeEqual(provided, Self.webhookSignature(request.body, secret: secret)) else {
+            if lockedOut { return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#) }
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 webhookFailures[key] = bumped
             }
@@ -2883,6 +2925,9 @@ extension Shop {
         host.addJobPhoto = { [weak self] id, data in
             await self?.phoneAddJobPhoto(id, data) ?? (503, #"{"ok":false,"reason":"busy"}"#)
         }
+        host.addExpense = { [weak self] body in
+            await self?.phoneAddExpense(body) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
         host.failed = { [weak self] said in
             guard let self else { return }
             self.lanPairing.serverStopped()
@@ -3017,6 +3062,8 @@ extension Shop {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         guard let engine else { throw CocoaError(.fileWriteUnknown) }
         var result: KhaytEngine.Folded?
+        var losses: [SyncLoss] = []
+        let keepAt = SyncLosses.fileURL(for: build.storeURL)
         // lock: system — a paired phone's changes; the LAN server gates them with the owner LAN PIN and the phone-writable allowlist.
         try await StoreWriter.update(
             storeURL: build.storeURL,
@@ -3025,10 +3072,23 @@ extension Shop {
             recordingDeletes: false
         ) { root in
             let guarded = await Self.phoneConnectorValues(payload, root: root, engine: engine)
+            let before = root
             let folded = try await engine.foldDeltas(base: root, deltas: [guarded])
+            // WHAT THE PHONE'S COPY REPLACED IS KEPT, as a cloud pull keeps it.
+            // The Mac records a payment (rev 8); the phone, still holding rev
+            // 7, marks the job done and sends its own rev 8. The rule takes
+            // the later one, whole, and the payment is gone — correctly by the
+            // rule, and silently until now. Only what was REPLACED is kept
+            // here: a delete made on the phone is the phone's to make.
+            losses = SyncLosses.compute(before: before, after: folded.store, conflicts: folded.conflicts)
+                .filter { $0.kind == .replaced }
+            losses += SyncLosses.staleReplacements(before: before, after: folded.store, payload: guarded,
+                                                   already: Set(losses.map { $0.collection + ":" + $0.recordId }))
+            try SyncLosses.keep(losses, at: keepAt)
             root = folded.store
             result = folded
         }
+        announceSyncLosses(losses, file: keepAt)
         await load(source)
         guard let result else { throw CocoaError(.fileWriteUnknown) }
         return result

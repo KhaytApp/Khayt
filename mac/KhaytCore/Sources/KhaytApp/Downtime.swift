@@ -38,7 +38,7 @@ struct DowntimeCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(words.callIt("an.downtime"))
                     .font(.system(size: 10, weight: .semibold))
-                    .textCase(.uppercase).tracking(0.6)
+                    .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 if !rows.isEmpty {
