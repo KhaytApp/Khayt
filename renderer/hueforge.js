@@ -231,7 +231,7 @@
     return [
       '<div class="hf">',
       '<div class="hf-head">',
-      '<div><h2 class="hf-title">HueForge <span class="hf-title-sep">·</span> U1 <span class="hf-title-sep">·</span> <span style="font-size:11px;opacity:.6;font-weight:600;letter-spacing:.02em">build 2026-07-15j · selective-sharp</span></h2>',
+      '<div><h2 class="hf-title">HueForge <span class="hf-title-sep">·</span> U1</h2>',
       '<p class="hf-sub">Turn a picture into a filament painting, built for the Snapmaker U1’s four SnapSwap heads.</p></div>',
       S.img ? '<button type="button" class="btn ghost sm" id="hfReset">Start over</button>' : '',
       '</div>',

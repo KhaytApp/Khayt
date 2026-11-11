@@ -145,6 +145,11 @@ html, body {
 /* -----------------------------------------------------------
    Window chrome — title bar drag area for hiddenInset style
    ----------------------------------------------------------- */
+/* The strip exists for macOS's traffic lights (hiddenInset is macOS-only in
+   Electron); Windows and Linux keep their native frame. The Workbench,
+   Command and Vivid shells hid it there already; Meridian, Flow and Foreman
+   showed an empty 38 px band under the native title bar. One rule for all. */
+html:not(.platform-darwin) .khayt-titlebar { display: none; }
 .titlebar {
   height: 38px;
   -webkit-app-region: drag;
@@ -251,9 +256,16 @@ html, body {
    ----------------------------------------------------------- */
 .grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+/* Inventory's "Add spool | Stock list" pair: a 1fr column will not shrink
+   below its widest row, so the stock table pushed the grid past the page at
+   1280 px ("Lo…", cut headers; past the left edge in Arabic). The columns may
+   shrink now and the table scrolls inside its own .table-wrap. */
+.inv-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.inv-grid > * { min-width: 0; }
 .full    { grid-column: 1 / -1; }
 @media (max-width: 1100px) {
   .grid   { grid-template-columns: 1fr; }
+  .inv-grid { grid-template-columns: minmax(0, 1fr); }
   .kanban { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
 }
 @media (max-width: 700px) {
