@@ -547,6 +547,8 @@ function openSettingsSection(section) {
 }
 
 function switchTab(tabId) {
+  // Icons a tab's own render added after boot (idempotent; see app-boot.js).
+  queueMicrotask?.(() => window.KhaytIcons?.hydrateIcons?.(document.getElementById(tabId)));
   // Enthusiast (hobbyist) mode hides all business tabs — redirect if one is reached
   // via deep-link / global search / keyboard so the user never lands on a hidden tab.
   if (settings.mode === 'enthusiast' && BIZ_TABS.includes(tabId)) tabId = 'dashboard-tab';

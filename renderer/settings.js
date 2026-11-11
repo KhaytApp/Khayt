@@ -5411,7 +5411,6 @@ function renderApiTokensSettings() {
     settings.lanApi = { ...(settings.lanApi || {}), apiTokens: [...(((settings.lanApi || {}).apiTokens) || []), r.record] };
     saveAll();
     renderApiTokensSettings();
-  renderTelemetrySettings();
     // Shown once — the plaintext is never stored and cannot be retrieved again.
     openFormModal({
       title: t('api.created') || 'API token created',
@@ -5483,7 +5482,6 @@ function renderPrivacySettings() {
     settings.privacy = { ...(settings.privacy || {}), retentionMonths: Math.max(0, num($('#set_privacyRetention')?.value, 0)) };
     saveAll();
     renderPrivacySettings();
-  renderApiTokensSettings();
     toast(t('priv.saved') || 'Privacy settings saved', 'success');
   });
 
@@ -5964,6 +5962,12 @@ function loadSettingsIntoForm() {
   renderBnplSettings();
   renderShippingSettings();
   renderPrivacySettings();
+  // The crash-report/usage switches and the API tokens list. Both calls had
+  // landed inside unrelated click handlers (the token mint and the Privacy
+  // Save), so the telemetry card was an empty heading on every visit and
+  // consent could not be changed from Settings.
+  renderTelemetrySettings();
+  renderApiTokensSettings();
   // Feature H: Exchange rates
   renderExchangeRatesSettings();
   // Round 12: Saved filter presets

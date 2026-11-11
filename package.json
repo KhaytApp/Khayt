@@ -43,6 +43,7 @@
     "test:e2e:pricekeep": "node scripts/e2e-product-price-keep-smoke.mjs",
     "test:e2e:darkcontrast": "node scripts/e2e-dark-contrast-smoke.mjs",
     "test:e2e:simplepanes": "node scripts/e2e-simple-panes-smoke.mjs",
+    "test:e2e:plainfixes": "node scripts/e2e-plain-fixes-smoke.mjs",
     "test:e2e:settingsro": "node scripts/e2e-settings-readonly-smoke.mjs",
     "test:e2e:vatfiled": "node scripts/e2e-vat-filed-smoke.mjs",
     "test:e2e:wabcampaign": "node scripts/e2e-whatsapp-business-campaign-smoke.mjs",
