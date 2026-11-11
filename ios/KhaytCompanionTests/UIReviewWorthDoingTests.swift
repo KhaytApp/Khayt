@@ -105,3 +105,28 @@ extension UIReviewWorthDoingTests {
                       "the connection dot is said in a word")
     }
 }
+
+// MARK: W3 — one reference style: S-1041, never #S-1041
+extension UIReviewWorthDoingTests {
+    func testNoScreenWritesAHashBeforeAReference() throws {
+        let hashed = try NSRegularExpression(pattern: #"("#\\\(|"#"\s*\+)"#)
+        var found: [String] = []
+        for dir in ["KhaytCompanion", "KhaytWidget", "KhaytAlerts"] {
+            let root = Self.iosDir.appending(path: dir)
+            let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+            for url in files {
+                let text = try String(contentsOf: url, encoding: .utf8)
+                for (n, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                    let l = String(line)
+                    // A colour written as "#rrggbb" is not a reference.
+                    if l.lowercased().contains("hex") { continue }
+                    if hashed.firstMatch(in: l, range: NSRange(l.startIndex..., in: l)) != nil {
+                        found.append("\(url.lastPathComponent):\(n + 1)")
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(found, [], "a job reference is written S-1041, without '#'")
+    }
+}
