@@ -9164,9 +9164,11 @@ public actor KhaytEngine {
     // MARK: - Customer addresses (`lib/customer-address.js`)
 
     /// A row's fields as an address a person reads, one line per "\n".
-    public func addressText(_ row: JSONValue, shopCountry: String) throws -> String {
-        try runtime.call2("KhaytCustomerAddress.textOf(ARG0, { shopCountry: ARG1 })",
-                          [row, .string(shopCountry)], as: String.self)
+    public func addressText(_ row: JSONValue, shopCountry: String, display: Bool = false) throws -> String {
+        // `display` is for text a screen or a page draws: it keeps
+        // "12345-6789" in order after an Arabic city. Never store the result.
+        try runtime.call2("KhaytCustomerAddress.textOf(ARG0, { shopCountry: ARG1, display: ARG2 })",
+                          [row, .string(shopCountry), .bool(display)], as: String.self)
     }
 
     /// 'empty' | 'unstructured' | 'structured' | 'edited_elsewhere'.

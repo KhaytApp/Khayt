@@ -53,4 +53,17 @@ struct CustomerAddressTests {
         guard case .object(let s)? = snap else { Issue.record("no snapshot"); return }
         #expect(s["country"] == .string("AE"))
     }
+
+    @Test("for display, the postcode after an Arabic city stays one left-to-right number")
+    func displayKeepsThePostcodeInOrder() async throws {
+        let engine = try KhaytEngine()
+        let row = try await engine.applyAddressFields(
+            .object(["id": .string("r"), "label": .string("")]),
+            fields: ["city": "الرياض", "postalCode": "12345", "additionalNumber": "6789", "country": "SA"],
+            shopCountry: "SA")
+        let stored = try await engine.addressText(row, shopCountry: "SA")
+        #expect(stored == "الرياض 12345-6789")
+        let shown = try await engine.addressText(row, shopCountry: "SA", display: true)
+        #expect(shown == "الرياض \u{200E}12345-6789")
+    }
 }

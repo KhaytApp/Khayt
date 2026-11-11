@@ -27,6 +27,25 @@ test('a Saudi address reads as the National Address', () => {
     '8228 Imam Abdullah Ibn Saud Rd\nAl Mursalat\nRiyadh 12345-6789\nRRRD2929');
 });
 
+test('for display, the postcode after an Arabic city stays one left-to-right number', () => {
+  const ar = Object.assign({}, riyadh, { city: 'الرياض', district: 'المرسلات' });
+  const plain = A.formatAddress(ar, { shopCountry: 'SA' });
+  assert.equal(plain.split('\n')[2], 'الرياض 12345-6789');
+  assert.ok(!plain.includes('\u200E'), 'the stored text carries no mark');
+  const shown = A.formatAddress(ar, { shopCountry: 'SA', display: true });
+  assert.equal(shown.split('\n')[2], 'الرياض \u200E12345-6789');
+  // A Latin city needs no mark, nor does a postcode with no separator.
+  assert.ok(!A.formatAddress(riyadh, { shopCountry: 'SA', display: true }).includes('\u200E'));
+  const noExtra = Object.assign({}, ar, { additionalNumber: '' });
+  assert.ok(!A.formatAddress(noExtra, { shopCountry: 'SA', display: true }).includes('\u200E'));
+  // Saving never stores the mark, whatever the caller passes.
+  const saved = A.applyFields({ id: 'ADDR-9', label: '' }, ar, { shopCountry: 'SA' });
+  assert.ok(!saved.address.includes('\u200E') && saved.address === saved.textOf);
+  // Elsewhere too: a ZIP+4 after an Arabic place name.
+  const us = { line1: '1 Main St', city: 'أوستن', postalCode: '78701-1234', country: 'US' };
+  assert.equal(A.formatAddress(us, { shopCountry: 'US', display: true }).split('\n')[1], 'أوستن \u200E78701-1234');
+});
+
 test('elsewhere: lines, then "city, region postcode", and the country when it is not the shop\'s', () => {
   const row = { line1: '1 Main St', line2: 'Suite 4', city: 'Austin', region: 'TX', postalCode: '78701', country: 'US' };
   assert.equal(A.formatAddress(row, { shopCountry: 'SA' }), '1 Main St\nSuite 4\nAustin, TX 78701\nUS');
