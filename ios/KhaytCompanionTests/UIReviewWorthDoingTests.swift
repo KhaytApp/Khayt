@@ -194,3 +194,26 @@ extension UIReviewWorthDoingTests {
         XCTAssertTrue(try code("Views/WhatsAppSheet.swift").contains("fill(lang: api.whatsAppStartLanguage(orderId: orderId))"))
     }
 }
+
+// MARK: P7 — the views nothing drew are gone
+extension UIReviewWorthDoingTests {
+    func testTheUncalledViewsStayRemoved() throws {
+        let gone = ["KhaytSectionHeader", "KhaytCard", "KhaytStatBlock", "KhaytPill", "KhaytMetric",
+                    "KhaytPrimaryButton", "KhaytGhostButton", "KhaytLogoMark", "KhaytListRow",
+                    "CompanionStatusBadge", "QueueView", "KanbanStripView"]
+        let files = FileManager.default.enumerator(at: Self.appDir, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+        XCTAssertFalse(files.isEmpty)
+        var found: [String] = []
+        for url in files {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for name in gone where text.range(of: "struct \(name)\\b", options: .regularExpression) != nil {
+                found.append("\(url.lastPathComponent): \(name)")
+            }
+        }
+        XCTAssertEqual(found, [], "a view with no caller came back; draw with the screens' own pieces")
+        for file in ["Views/QueueView.swift", "Views/KanbanStripView.swift"] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: Self.appDir.appending(path: file).path()), file)
+        }
+    }
+}
