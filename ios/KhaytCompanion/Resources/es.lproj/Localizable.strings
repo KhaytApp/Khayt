@@ -1285,3 +1285,6 @@
 "intake.waiting" = "En espera";
 "spool.low" = "Bajo";
 "stage.a11y.done" = "Hecho";
+"order.new.hint.client" = "Elige o escribe un nombre";
+"order.new.hint.project" = "¿Qué es? p. ej., el nombre de la pieza";
+"order.new.hint.material" = "p. ej., PLA, negro";

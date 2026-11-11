@@ -1285,3 +1285,6 @@
 "intake.waiting" = "等待中";
 "spool.low" = "偏低";
 "stage.a11y.done" = "已完成";
+"order.new.hint.client" = "选择或输入名称";
+"order.new.hint.project" = "做什么？例如零件名称";
+"order.new.hint.material" = "例如 PLA，黑色";

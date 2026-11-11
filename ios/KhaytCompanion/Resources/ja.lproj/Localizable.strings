@@ -1285,3 +1285,6 @@
 "intake.waiting" = "待ち";
 "spool.low" = "残りわずか";
 "stage.a11y.done" = "完了";
+"order.new.hint.client" = "選ぶか名前を入力";
+"order.new.hint.project" = "何を作る？例：部品名";
+"order.new.hint.material" = "例：PLA、黒";

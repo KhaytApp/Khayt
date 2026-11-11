@@ -1285,3 +1285,6 @@
 "intake.waiting" = "بالانتظار";
 "spool.low" = "منخفض";
 "stage.a11y.done" = "تمّت";
+"order.new.hint.client" = "اختر عميلًا أو اكتب اسمًا";
+"order.new.hint.project" = "ما هو؟ مثلًا اسم القطعة";
+"order.new.hint.material" = "مثلًا PLA، أسود";

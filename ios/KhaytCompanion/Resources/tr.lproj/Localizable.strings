@@ -1285,3 +1285,6 @@
 "intake.waiting" = "Bekliyor";
 "spool.low" = "Az";
 "stage.a11y.done" = "Tamamlandı";
+"order.new.hint.client" = "Seçin ya da bir ad yazın";
+"order.new.hint.project" = "Nedir? ör. parça adı";
+"order.new.hint.material" = "ör. PLA, siyah";

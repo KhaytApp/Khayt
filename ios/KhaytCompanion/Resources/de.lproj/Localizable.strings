@@ -1285,3 +1285,6 @@
 "intake.waiting" = "Wartet";
 "spool.low" = "Knapp";
 "stage.a11y.done" = "Erledigt";
+"order.new.hint.client" = "Auswählen oder Namen eingeben";
+"order.new.hint.project" = "Was ist es? z. B. ein Teilename";
+"order.new.hint.material" = "z. B. PLA, schwarz";

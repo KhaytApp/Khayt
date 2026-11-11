@@ -152,3 +152,19 @@ extension UIReviewWorthDoingTests {
         XCTAssertFalse(try code("Views/IntakeView.swift").contains("placement: .confirmationAction"))
     }
 }
+
+// MARK: W6 — hints that don't look like data
+extension UIReviewWorthDoingTests {
+    func testNewOrderHintsAreTranslatedNotSampleData() throws {
+        let sheet = try code("Views/NewOrderSheet.swift")
+        for fake in ["Acme Robotics", "Falcon hood", "PLA · Ink"] {
+            XCTAssertFalse(sheet.contains(fake), "\(fake) reads as a filled value")
+        }
+        let keys = ["order.new.hint.client", "order.new.hint.project", "order.new.hint.material"]
+        for key in keys { XCTAssertTrue(sheet.contains("L10n.tr(\"\(key)\")"), key) }
+        try assertInEveryLanguage(keys)
+        // Arabic hints are Arabic (PLA stays as the material's own name).
+        let ar = try table("ar")
+        XCTAssertNotEqual(ar["order.new.hint.client"], try table("en")["order.new.hint.client"])
+    }
+}
