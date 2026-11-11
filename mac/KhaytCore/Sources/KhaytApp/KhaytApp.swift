@@ -538,8 +538,8 @@ final class Activator: NSObject, NSApplicationDelegate {
                     // that says so is right even about a picture nobody ships.
                     Text("62%").font(.caption).monospacedDigit()
                     ZStack(alignment: .leading) {
-                        LayerLinesShape().fill(Khayt.hot.opacity(0.16))
-                        LayerLinesShape(progress: 0.62).fill(Khayt.hot)
+                        LayerLinesShape().fill(Khayt.thread.opacity(Khayt.threadGhost))
+                        LayerLinesShape(progress: 0.62).fill(Khayt.thread)
                     }
                     .frame(height: 26)
                 }

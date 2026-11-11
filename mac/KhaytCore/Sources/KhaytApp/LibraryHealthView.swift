@@ -302,7 +302,7 @@ struct LibraryHealthView: View {
         case .looksSame:
             Look(symbol: "square.on.square.dashed", title: "mac.lh_looks_same", sentence: "mac.lh_looks_same_says", rail: Khayt.note)
         case .tooBig:
-            Look(symbol: "arrow.up.left.and.arrow.down.right", title: "mac.lh_too_big", sentence: "mac.lh_too_big_says", rail: Khayt.hot)
+            Look(symbol: "arrow.up.left.and.arrow.down.right", title: "mac.lh_too_big", sentence: "mac.lh_too_big_says", rail: Khayt.attention)
         case .unorganised:
             Look(symbol: "tag.slash", title: "mac.lh_unorganised", sentence: "mac.lh_unorganised_says", rail: nil)
         case .orphanProducts:

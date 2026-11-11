@@ -560,7 +560,7 @@ struct MachineCard: View {
         .task(id: upkeepInputs) {
             upkeep = await shop.maintenance(for: machine)
         }
-        .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
+        .card(rail: running ? Khayt.thread : nil, padding: 14, fills: true)
     }
 
     private var upkeepInputs: String { shop.maintenanceSignature(for: machine) }
@@ -2044,9 +2044,9 @@ private struct Live: View {
                     // it sits under its own caption, and it means something.
                     ZStack(alignment: .leading) {
                         LayerLinesShape()
-                            .fill(Khayt.hot.opacity(0.16))
+                            .fill(Khayt.thread.opacity(Khayt.threadGhost))
                         LayerLinesShape(progress: Double(status.progress) / 100)
-                            .fill(Khayt.hot)
+                            .fill(Khayt.thread)
                     }
                     .frame(height: 26)
                     .accessibilityElement()

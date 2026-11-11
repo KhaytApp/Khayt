@@ -223,7 +223,7 @@ struct MachineBandView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            Key(fill: Khayt.hot.opacity(0.16), line: Khayt.hot,
+            Key(fill: Khayt.threadWash, line: Khayt.thread,
                 text: shop.words.callIt("mac.band_printing"))
             Key(fill: Khayt.surface, line: Khayt.hairline, dashed: true,
                 text: shop.words.callIt("mac.band_queued"))
@@ -338,7 +338,8 @@ struct MachineBandView: View {
         private var stateInk: Color {
             if !row.known { return Khayt.attention }
             switch row.state {
-            case "printing": return Khayt.hot
+            // Ink: "printing" is a word here, and amber is never a word.
+            case "printing": return .primary
             case "queued": return .secondary
             case "down": return Khayt.note
             default: return Khayt.note
@@ -390,7 +391,7 @@ struct MachineBandView: View {
                     // Now. Always at zero — the window starts at this moment —
                     // and drawn anyway, because a band with no now-line reads as
                     // a plan rather than as the next two days.
-                    Rectangle().fill(Khayt.hot).frame(width: 2, height: height + 8).offset(y: -4)
+                    Rectangle().fill(Khayt.thread).frame(width: 2, height: height + 8).offset(y: -4)
                 }
                 .frame(height: height)
             }
@@ -456,14 +457,15 @@ struct MachineBandView: View {
 
         private var ink: Color {
             switch block.kind {
-            case "printing": return Khayt.hot
+            // The name of a printing job is ink on the thread's wash; the
+            // amber is the block's edge.
             case "blocked": return Khayt.attention
             default: return .primary
             }
         }
         private var line: Color {
             switch block.kind {
-            case "printing": return Khayt.hot
+            case "printing": return Khayt.thread
             case "blocked": return Khayt.attention
             // A MACHINE THE SHOP TOOK OUT OF SERVICE ON PURPOSE. Not warm —
             // nothing is happening — and not an alarm either: booking a belt
@@ -475,7 +477,7 @@ struct MachineBandView: View {
         }
         private var fill: Color {
             switch block.kind {
-            case "printing": return Khayt.hot.opacity(0.13)
+            case "printing": return Khayt.threadWash
             case "blocked": return Khayt.attention.opacity(0.13)
             case "down": return Khayt.note.opacity(0.10)
             default: return Khayt.recessed

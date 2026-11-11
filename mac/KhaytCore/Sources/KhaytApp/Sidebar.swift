@@ -261,7 +261,7 @@ struct Sidebar: View {
                 }
                 Spacer(minLength: 8)
                 if live {
-                    Circle().fill(Khayt.live).frame(width: 6, height: 6)
+                    Circle().fill(Khayt.thread).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
                 }
                 if let count {
