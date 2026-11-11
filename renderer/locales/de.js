@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "{n} aktive Aufträge",
   "inv.low_stock_count_one": "{n} Spule mit niedrigem Bestand",
   "inv.low_stock_count_many": "{n} Spulen mit niedrigem Bestand",
+  "xr.not_set": "Nicht gesetzt",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

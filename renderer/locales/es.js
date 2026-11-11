@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "{n} trabajos activos",
   "inv.low_stock_count_one": "{n} carrete con poco stock",
   "inv.low_stock_count_many": "{n} carretes con poco stock",
+  "xr.not_set": "Sin definir",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

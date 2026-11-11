@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "{n} tâches actives",
   "inv.low_stock_count_one": "{n} bobine en stock bas",
   "inv.low_stock_count_many": "{n} bobines en stock bas",
+  "xr.not_set": "Non défini",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

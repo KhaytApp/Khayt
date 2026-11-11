@@ -5432,5 +5432,6 @@
   "mach.active_jobs_many": "{n} trabalhos ativos",
   "inv.low_stock_count_one": "{n} carretel baixo",
   "inv.low_stock_count_many": "{n} carretéis baixos",
+  "xr.not_set": "Não definido",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

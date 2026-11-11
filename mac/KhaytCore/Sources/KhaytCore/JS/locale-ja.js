@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "進行中のジョブ {n} 件",
   "inv.low_stock_count_one": "在庫不足スプール {n} 個",
   "inv.low_stock_count_many": "在庫不足スプール {n} 個",
+  "xr.not_set": "未設定",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

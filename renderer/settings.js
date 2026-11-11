@@ -4940,7 +4940,11 @@ function renderExchangeRatesSettings() {
   const otherCurrencies = Object.entries(CURRENCIES).filter(([code]) => code !== base);
 
   const rows = otherCurrencies.map(([code, cur]) => {
-    const rate = rates[code] || '';
+    // An unset rate (none stored, or a 0 from an older build) is drawn empty
+    // with "Not set", never "0.00": with no rate an amount is left as typed,
+    // not converted to zero (lib/order-money.js convertToBase), and a field
+    // reading 0.00 said the opposite (Nov 11 review, W10).
+    const rate = +rates[code] > 0 ? rates[code] : '';
     return `<tr>
       <td style="padding:6px 8px;font-size:12.5px;">
         <strong>${escapeHtml(code)}</strong>
@@ -4949,7 +4953,7 @@ function renderExchangeRatesSettings() {
       <td style="padding:6px 8px;">
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;color:var(--text-muted);">1 ${escapeHtml(code)} =</span>
-          <input type="number" class="xr-input" data-code="${escapeHtml(code)}" aria-label="1 ${escapeHtml(code)} = ? ${escapeHtml(base)}" value="${escapeHtml(String(rate))}" min="0" step="0.0001" placeholder="0.00" style="width:90px;padding:3px 6px;font-size:12px;">
+          <input type="number" class="xr-input" data-code="${escapeHtml(code)}" aria-label="1 ${escapeHtml(code)} = ? ${escapeHtml(base)}" value="${escapeHtml(String(rate))}" min="0" step="0.0001" placeholder="${escapeHtml(t('xr.not_set'))}" style="width:90px;padding:3px 6px;font-size:12px;">
           <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(base)}</span>
         </div>
       </td>

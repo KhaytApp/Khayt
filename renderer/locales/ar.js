@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "{n} طلبات نشطة",
   "inv.low_stock_count_one": "{n} بكرة منخفضة",
   "inv.low_stock_count_many": "{n} بكرات منخفضة",
+  "xr.not_set": "غير محدد",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

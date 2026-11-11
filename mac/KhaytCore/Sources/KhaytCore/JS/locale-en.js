@@ -5432,5 +5432,6 @@
   "mach.active_jobs_many": "{n} active jobs",
   "inv.low_stock_count_one": "{n} spool low",
   "inv.low_stock_count_many": "{n} spools low",
+  "xr.not_set": "Not set",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

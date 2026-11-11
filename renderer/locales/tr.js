@@ -5431,5 +5431,6 @@
   "mach.active_jobs_many": "{n} aktif iş",
   "inv.low_stock_count_one": "{n} makara az",
   "inv.low_stock_count_many": "{n} makara az",
+  "xr.not_set": "Ayarlanmadı",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
