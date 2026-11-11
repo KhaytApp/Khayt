@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI
+import KhaytCore
 import Testing
 @testable import KhaytApp
 
@@ -40,5 +42,37 @@ struct FiguresKeepTheirOrderTests {
         #expect(MenuCoverageTests.source("LibraryInspector.swift")
             .contains(#"Figure.isolated("\(setup.ok) / \(setup.ok + setup.failed)")"#), "tried and passed")
         #expect(MenuCoverageTests.source("TestPrintLogSheet.swift").contains(#"Figure.isolated(print + " / " + bed)"#))
+    }
+}
+
+/// Arabic headings join, and the footer's tax line is Arabic (B17, B22).
+@MainActor
+struct ArabicHeadingsAndTaxLineTests {
+
+    @Test("a small heading is monospaced in Latin script and the interface face in Arabic")
+    func eyebrowFace() {
+        #expect(TypeScale.eyebrow(11, joined: false) == Font.system(size: 11, weight: .medium, design: .monospaced))
+        #expect(TypeScale.eyebrow(11, joined: true) == Font.system(size: 12, weight: .semibold))
+        // The three headings that drew Arabic in a typewriter fallback.
+        #expect(MenuCoverageTests.source("Sidebar.swift").contains(".font(TypeScale.eyebrow(10))"))
+        let today = MenuCoverageTests.source("TodayPieces.swift")
+        #expect(today.contains(".font(TypeScale.eyebrow(11))") && today.contains(".font(TypeScale.eyebrow(10))"))
+        #expect(!today.contains("design: .monospaced"))
+    }
+
+    @Test("the tax line names the tax in the app's language, and Arabic says the price includes the tax")
+    func taxLine() async throws {
+        let engine = try KhaytEngine()
+        let ar = Words(), en = Words()
+        await ar.load("ar", engine: engine)
+        await en.load("en", engine: engine)
+        #expect(Shop.taxLabel("VAT", words: ar) == ar.callIt("an.pnl_vat"))
+        #expect(Shop.taxLabel("GST", words: ar) == "GST")
+        let line = ar.callIt("mac.tax_inclusive", ["name": .string(Shop.taxLabel("VAT", words: ar)), "pct": .string("15.00")])
+        #expect(line.hasPrefix("السعر شامل"), "\(line)")
+        #expect(!line.contains("VAT"))
+        #expect(line.contains("15.00%"))
+        #expect(en.callIt("mac.tax_inclusive", ["name": .string("VAT"), "pct": .string("15.00")]) == "VAT 15.00% included in the price")
+        #expect(MenuCoverageTests.source("Shop+Printers.swift").contains(#""name": .string(Self.taxLabel(profile.name, words: words))"#))
     }
 }

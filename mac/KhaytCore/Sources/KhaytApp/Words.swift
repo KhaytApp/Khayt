@@ -5105,10 +5105,12 @@ final class Words {
         //
         // `name` stays as `lib/tax.js` gives it. That is the tax's own label —
         // what the shop's invoices say — and not interface wording to translate.
+        // The Arabic says the PRICE includes the tax; it used to say the tax
+        // includes the price, and began with the Latin name.
         "mac.tax_inclusive": ["en": "{name} {pct}% included in the price",
-                              "ar": "{name} {pct}% شامل السعر"],
+                              "ar": "السعر شامل {name} بنسبة {pct}%"],
         "mac.tax_exclusive": ["en": "{name} {pct}% added on top",
-                              "ar": "{name} {pct}% يُضاف على السعر"],
+                              "ar": "تُضاف {name} بنسبة {pct}% على السعر"],
         // Six months of takings on the dashboard, and the sentence over them.
         //
         // A SENTENCE, not the word "Revenue" over an axis. The HIG asks a chart
