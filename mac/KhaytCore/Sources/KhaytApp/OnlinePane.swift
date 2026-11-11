@@ -90,8 +90,9 @@ struct OnlinePane: View {
 
         func quoteForm() -> [String: JSONValue] {
             let n = { (t: String, fallback: Double) -> Double in
-                let cleaned = t.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-                return cleaned.isEmpty ? fallback : (Double(cleaned) ?? fallback)
+                // As typed: Arabic digits and a decimal comma read as numbers
+                // (`TypedNumber`), not as the fallback.
+                return TypedNumber.parse(t) ?? fallback
             }
             return [
                 "enabled": .bool(quoteOn),
@@ -445,9 +446,7 @@ struct OnlinePane: View {
                     Task {
                         var rates: [String: Double] = [:]
                         for key in Shop.Preset.rateKeys {
-                            let typed = (presetRates[key] ?? "").replacingOccurrences(of: ",", with: "")
-                                .trimmingCharacters(in: .whitespaces)
-                            rates[key] = max(0, Double(typed) ?? 0)
+                            rates[key] = max(0, TypedNumber.parse(presetRates[key] ?? "") ?? 0)
                         }
                         if let id = await shop.savePreset(name: newPresetName, rates: rates) {
                             // Chosen straight away: a preset made and then not
@@ -473,7 +472,7 @@ struct OnlinePane: View {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     VStack(alignment: .leading, spacing: 2) {
                         FailureHint(shop: shop, machineId: nil, material: nil,
-                                    current: Double(presetRates["failureRate"] ?? "")) { pct in
+                                    current: TypedNumber.parse(presetRates["failureRate"] ?? "")) { pct in
                             presetRates["failureRate"] = Words.plain(.number(pct))
                         }
                     }

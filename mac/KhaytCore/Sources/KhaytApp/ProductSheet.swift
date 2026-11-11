@@ -731,7 +731,7 @@ struct ProductSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             FailureHint(shop: shop, machineId: nil,
                                         material: shop.spools.first { $0.id == newPart.spoolId }?.material,
-                                        current: Double(newPart.rates["failureRate"] ?? "")) { pct in
+                                        current: TypedNumber.parse(newPart.rates["failureRate"] ?? "")) { pct in
                                 newPart.rates["failureRate"] = Words.plain(.number(pct))
                             }
                         }

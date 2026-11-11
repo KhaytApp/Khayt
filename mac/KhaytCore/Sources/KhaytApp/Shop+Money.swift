@@ -1060,8 +1060,8 @@ extension Shop {
     func partEditCost(raw: [String: JSONValue]?, _ now: EditPartSheet.Opened,
                       opened: EditPartSheet.Opened?) async -> (spool: Spool?, costed: KhaytEngine.CostedPart?) {
         let spool = Self.partCostSpool(now, opened: opened, raw: raw, spools: spools)
-        let costed = await costedPart(spoolId: spool?.id, grams: Double(now.grams) ?? 0,
-                                      hours: Double(now.hours) ?? 0, qty: now.qty,
+        let costed = await costedPart(spoolId: spool?.id, grams: TypedNumber.parse(now.grams) ?? 0,
+                                      hours: TypedNumber.parse(now.hours) ?? 0, qty: now.qty,
                                       extra: raw ?? [:])
         return (spool, costed)
     }
@@ -1087,7 +1087,7 @@ extension Shop {
                                     reclaimsTax: Bool = false) -> JSONValue {
         guard let opened else {
             return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
-                                       grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
+                                       grams: TypedNumber.parse(now.grams) ?? 0, hours: TypedNumber.parse(now.hours) ?? 0,
                                        qty: now.qty, costed: costed, reclaimsTax: reclaimsTax)
         }
         guard case .object(var record) = order,
@@ -1096,8 +1096,8 @@ extension Shop {
             guard case .object(var part) = rows[i],
                   case .string(let id)? = part["id"], id == partId else { continue }
             if now.name != opened.name { part["name"] = .string(now.name) }
-            if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
-            if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
+            if now.grams != opened.grams { part["printWeight"] = .number(max(0, TypedNumber.parse(now.grams) ?? 0)) }
+            if now.hours != opened.hours { part["printTime"] = .number(max(0, TypedNumber.parse(now.hours) ?? 0)) }
             if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
             // `spool` is the one the cost was worked out from (`partCostSpool`),
             // so its fields go down whenever it is given — not only when the
