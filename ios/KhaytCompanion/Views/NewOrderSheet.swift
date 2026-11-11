@@ -13,6 +13,15 @@ struct NewOrderSheet: View {
     @State private var draft = NewOrderDraft()
     @State private var hasDueDate = false
     @State private var dueDate = Date()
+
+    /// The book's day, always Gregorian, whatever the phone's own calendar.
+    static let dayFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var currency: String?
@@ -215,6 +224,9 @@ struct NewOrderSheet: View {
             HStack {
                 if hasDueDate {
                     DatePicker("", selection: $dueDate, displayedComponents: .date)
+                        // Picked in the calendar every due date is shown in: a
+                        // Saudi phone's own is Umm al-Qura (UI review F5).
+                        .environment(\.calendar, Calendar(identifier: .gregorian))
                         .labelsHidden()
                     Spacer()
                     Button { hasDueDate = false } label: {
@@ -260,10 +272,7 @@ struct NewOrderSheet: View {
         errorMessage = nil
         defer { isSaving = false }
         if hasDueDate {
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy-MM-dd"
-            fmt.locale = Locale(identifier: "en_US_POSIX")
-            draft.dueDate = fmt.string(from: dueDate)
+            draft.dueDate = Self.dayFormat.string(from: dueDate)
         } else {
             draft.dueDate = ""
         }
