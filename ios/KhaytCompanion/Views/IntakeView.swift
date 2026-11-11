@@ -56,9 +56,10 @@ struct IntakeView: View {
             }
             .scrollIndicators(.hidden)
             .refreshable { await load() }
-            .khaytScreen(title: L10n.tr("intake.title"))
             // One sheet header (review W5): an inline title and Close on the
-            // leading side, as every sheet opened from New has.
+            // leading side, as every sheet opened from New has. Not
+            // `khaytScreen`: its large title wins over a mode set after it.
+            .navigationTitle(L10n.tr("intake.title"))
             .navigationBarTitleDisplayMode(.inline)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .toolbar {

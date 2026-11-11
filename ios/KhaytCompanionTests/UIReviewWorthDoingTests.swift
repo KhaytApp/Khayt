@@ -151,6 +151,10 @@ extension UIReviewWorthDoingTests {
             XCTAssertFalse(text.contains(".navigationBarTitleDisplayMode(.large)"), "\(file): inline title")
         }
         XCTAssertFalse(try code("Views/IntakeView.swift").contains("placement: .confirmationAction"))
+        // `khaytScreen` sets a large title that wins over an inline mode set after it.
+        for file in ["Views/IntakeView.swift", "Views/LibraryView.swift"] {
+            XCTAssertFalse(try code(file).contains(".khaytScreen("), "\(file): inline title")
+        }
     }
 }
 
