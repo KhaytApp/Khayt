@@ -96,6 +96,42 @@
   --shadow-3:     0 12px 32px rgba(28,36,52,0.12);
 }
 
+/* ------------------------------------------------------------
+   Status palette — ONE set, shared with the Mac and iPhone apps
+   (decided Nov 11 2026). Four tones and one payment pair:
+     wait   steel  pending, queued, quote, on hold, cancelled
+     move   amber  printing, post-processing, QC, due today/soon
+     done   green  completed, delivered, shipped, paid
+     late   red    overdue, failed, offline, error — nothing else
+     unpaid        a steel chip with amber ink: money still owed
+                   (unpaid AND partial) is waiting, not late.
+   -bg is the chip fill, -ink its text (every -ink clears 4.5:1 on its
+   own -bg; scripts/e2e-status-palette-smoke.mjs measures it), -dot the
+   marker colour (column dots, the stage dot before a pill).
+
+   Design themes must NOT define or override any --st-* token, or colour a
+   status selector themselves: a job reads the same in every theme, as it does
+   on every device. test/status-palette.test.js fails if one does. Fills are
+   opaque on purpose, so a theme's surface cannot shift the contrast. */
+:root {
+  --st-wait-bg:   #edf0f4; --st-wait-ink:   #5e6c84; --st-wait-dot: #5e6c84;
+  --st-move-bg:   #fdf1de; --st-move-ink:   #9a5b00; --st-move-dot: #f2a541;
+  --st-done-bg:   #dff5e8; --st-done-ink:   #0d7a3c; --st-done-dot: #1bb55c;
+  --st-late-bg:   #fbe9e8; --st-late-ink:   #b5322b; --st-late-dot: #d6453d;
+  --st-unpaid-bg: var(--st-wait-bg);
+  --st-unpaid-ink: var(--st-move-ink);
+  --st-unpaid-dot: var(--st-move-dot);
+}
+html[data-theme="dark"] {
+  --st-wait-bg:   #3a4658; --st-wait-ink:   #a9b8cf; --st-wait-dot: #a9b8cf;
+  --st-move-bg:   #3a2c14; --st-move-ink:   #f5b85c; --st-move-dot: #f2a541;
+  --st-done-bg:   #16382a; --st-done-ink:   #34d27a; --st-done-dot: #34d27a;
+  --st-late-bg:   #3d1a22; --st-late-ink:   #ff7a6f; --st-late-dot: #ff7a6f;
+  --st-unpaid-bg: var(--st-wait-bg);
+  --st-unpaid-ink: var(--st-move-ink);
+  --st-unpaid-dot: var(--st-move-dot);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -682,10 +718,15 @@ tbody tr:hover { background: var(--surface-2); }
   font-size: 11px;
   margin-inline-start: auto;
 }
-.kanban-col[data-status="pending"]   h3 .dot { background: var(--text-muted); }
-.kanban-col[data-status="printing"]  h3 .dot { background: var(--primary); }
-.kanban-col[data-status="post"]      h3 .dot { background: var(--warning); }
-.kanban-col[data-status="completed"] h3 .dot { background: var(--success); }
+/* Column dots read the shared status palette (see --st-* at the top). */
+.kanban-col[data-status="pending"]   h3 .dot,
+.kanban-col[data-status="on_hold"]   h3 .dot { background: var(--st-wait-dot); }
+.kanban-col[data-status="printing"]  h3 .dot,
+.kanban-col[data-status="post"]      h3 .dot,
+.kanban-col[data-status="qc"]        h3 .dot { background: var(--st-move-dot); }
+.kanban-col[data-status="completed"] h3 .dot,
+.kanban-col[data-status="shipped"]   h3 .dot,
+.kanban-col[data-status="delivered"] h3 .dot { background: var(--st-done-dot); }
 .kanban-col h3 .dot {
   width: 8px; height: 8px; border-radius: 50%;
 }
@@ -754,10 +795,9 @@ tbody tr:hover { background: var(--surface-2); }
   margin-inline-start: 6px;
   font-weight: 500;
 }
-.stat.revenue .stat-value { color: var(--success); }
-.stat.orders  .stat-value { color: var(--primary); }
-.stat.hours   .stat-value { color: var(--warning); }
-.stat.pending .stat-value { color: var(--info); }
+/* KPI figures are neutral ink. They are amounts, not conditions: a green
+   revenue, blue order count and amber hours made every tile look like a
+   status, and the one genuinely alarming figure could not stand out. */
 
 .activity-list {
   list-style: none;
@@ -793,13 +833,25 @@ tbody tr:hover { background: var(--surface-2); }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.badge.pending   { background: rgba(107,119,147,0.18); color: var(--text-dim); }
-.badge.on_hold   { background: rgba(245,166,35,0.18); color: var(--warning); }
-.badge.printing  { background: rgba(91,156,240,0.18); color: var(--primary); }
-.badge.post      { background: rgba(245,166,35,0.18); color: var(--warning); }
-.badge.completed { background: rgba(43,182,115,0.18); color: var(--success); }
-.badge.qc        { background: rgba(138,125,240,0.18); color: var(--info); }
-.badge.shipped { background: rgba(6,182,212,0.15); color: #06b6d4; }
+/* Job and payment status chips: the shared palette, never a theme colour.
+   --badge-dot is the marker a theme may draw before the label. */
+.badge.pending,
+.badge.quote,
+.badge.on_hold,
+.badge.cancelled,
+.badge.pay-voided { background: var(--st-wait-bg); color: var(--st-wait-ink); --badge-dot: var(--st-wait-dot); }
+.badge.printing,
+.badge.post,
+.badge.qc         { background: var(--st-move-bg); color: var(--st-move-ink); --badge-dot: var(--st-move-dot); }
+.badge.completed,
+.badge.delivered,
+.badge.shipped,
+.badge.pay-paid   { background: var(--st-done-bg); color: var(--st-done-ink); --badge-dot: var(--st-done-dot); }
+.badge.overdue,
+.badge.late,
+.badge.failed     { background: var(--st-late-bg); color: var(--st-late-ink); --badge-dot: var(--st-late-dot); }
+.badge.pay-unpaid,
+.badge.pay-partial { background: var(--st-unpaid-bg); color: var(--st-unpaid-ink); --badge-dot: var(--st-unpaid-dot); }
 
 /* Highlight-flash for search navigation */
 @keyframes highlight-flash {
@@ -1334,14 +1386,10 @@ tbody tr:hover { background: var(--surface-2); }
    1.3 additions — payment, portfolio, settings extras
    ============================================================ */
 
-/* Payment status badges */
-.badge.pay-unpaid  { background: rgba(239,77,94,0.16); color: var(--danger); }
-.badge.pay-partial { background: rgba(245,166,35,0.18); color: var(--warning); }
-.badge.pay-paid    { background: rgba(43,182,115,0.18); color: var(--success); }
+/* Payment status badges live with the job badges (.badge.pay-*), above. */
 
-/* Receivables stat card */
-.stat.receivables { background: linear-gradient(135deg, rgba(239,77,94,0.10), rgba(239,77,94,0.02)); }
-.stat.receivables .stat-value { color: var(--danger); }
+/* Receivables stat card: money owed is not an error. The tile stays neutral;
+   only the overdue part is ever red (Aged Receivables). */
 .grid-4 .stat.full { grid-column: 1 / -1; }
 
 /* Payment method checkbox grid (settings) */
@@ -1612,13 +1660,13 @@ tbody tr:hover { background: var(--surface-2); }
   margin-top: 5px;
   letter-spacing: 0.01em;
 }
-.due-badge.overdue   { background: rgba(239,77,94,0.15);   color: var(--danger);  }
-.due-badge.due-today { background: rgba(245,166,35,0.18);  color: var(--warning); }
-.due-badge.due-soon  { background: rgba(245,166,35,0.10);  color: var(--warning); }
-.due-badge.due-ok    { background: var(--surface-2);       color: var(--text-muted); }
+.due-badge.overdue   { background: var(--st-late-bg); color: var(--st-late-ink); }
+.due-badge.due-today,
+.due-badge.due-soon  { background: var(--st-move-bg); color: var(--st-move-ink); }
+.due-badge.due-ok    { background: var(--st-wait-bg); color: var(--st-wait-ink); }
 
 /* Overdue log row tint */
-tr.row-overdue td { background: rgba(239,77,94,0.05); }
+tr.row-overdue td { background: color-mix(in srgb, var(--st-late-dot) 6%, transparent); }
 
 .khayt-ico { vertical-align: -2px; flex: 0 0 auto; }
 button .khayt-ico, summary .khayt-ico { opacity: .85; }
@@ -2158,11 +2206,7 @@ button .khayt-ico, summary .khayt-ico { opacity: .85; }
 .quote-meta  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .quote-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
-/* Badge for quote status in logs/kanban */
-.badge.quote {
-  background: rgba(167,139,250,0.18);
-  color: var(--info);
-}
+/* Quote status badge: steel, with the job badges (.badge.quote) above. */
 
 /* -----------------------------------------------------------
    Accuracy section (analytics)
@@ -2753,15 +2797,26 @@ button.tag-chip, .tag-chip[data-act] {
 }
 
 /* ── Min-margin warning ────────────────────────────────────── */
+/* The live margin line. Steel while the margin is healthy, amber when it is
+   thin (under the shop's minimum, or under 20% without one), red ONLY when the
+   job loses money — updateCalc() in build.js sets the class. A red box for an
+   ordinary 23% margin read as an error on every quote. */
 .margin-warning {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: var(--st-wait-bg);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 7px 12px;
   font-size: 12px;
-  color: var(--danger);
+  color: var(--st-wait-ink);
   margin-bottom: 8px;
 }
+.margin-warning.is-thin { background: var(--st-move-bg); color: var(--st-move-ink); }
+.margin-warning.is-loss { background: var(--st-late-bg); color: var(--st-late-ink); }
+/* A margin figure in a table cell (the order log): same three tones. */
+.margin-chip { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 10px;
+  background: var(--st-wait-bg); color: var(--st-wait-ink); }
+.margin-chip.is-thin { background: var(--st-move-bg); color: var(--st-move-ink); }
+.margin-chip.is-loss { background: var(--st-late-bg); color: var(--st-late-ink); }
 
 /* ── Per-part machine badge in build cart ──────────────────── */
 .build-cart .machine-badge {
@@ -3067,10 +3122,10 @@ button.tag-chip, .tag-chip[data-act] {
   transition: transform 0.1s;
 }
 .part-status-dot:hover { transform: scale(1.2); }
-.part-status-dot.pending  { background: var(--text-muted); }
-.part-status-dot.printing { background: var(--primary); }
-.part-status-dot.done     { background: var(--success); }
-.part-status-dot.failed   { background: var(--danger); }
+.part-status-dot.pending  { background: var(--st-wait-dot); }
+.part-status-dot.printing { background: var(--st-move-dot); }
+.part-status-dot.done     { background: var(--st-done-dot); }
+.part-status-dot.failed   { background: var(--st-late-dot); }
 .part-status-name {
   flex: 1;
   color: var(--text-dim);
@@ -3088,10 +3143,10 @@ button.tag-chip, .tag-chip[data-act] {
   letter-spacing: .3px;
   flex-shrink: 0;
 }
-.part-status-badge.pending  { background: rgba(136,136,136,0.18); color: var(--text-muted); }
-.part-status-badge.printing { background: rgba(91,156,240,0.15);  color: var(--primary); }
-.part-status-badge.done     { background: rgba(43,182,115,0.15);  color: var(--success); }
-.part-status-badge.failed   { background: rgba(239,77,94,0.15);   color: var(--danger); }
+.part-status-badge.pending  { background: var(--st-wait-bg); color: var(--st-wait-ink); }
+.part-status-badge.printing { background: var(--st-move-bg); color: var(--st-move-ink); }
+.part-status-badge.done     { background: var(--st-done-bg); color: var(--st-done-ink); }
+.part-status-badge.failed   { background: var(--st-late-bg); color: var(--st-late-ink); }
 
 /* Feature 3: Spool reservation badge */
 .spool-reserved-badge {
@@ -3210,10 +3265,10 @@ button.tag-chip, .tag-chip[data-act] {
   border-radius: 0;
 }
 .schedule-block:hover { opacity: 1; }
-.schedule-block.status-pending { background: var(--primary); }
-.schedule-block.status-printing { background: var(--success); }
-.schedule-block.status-post { background: var(--warning); }
-.schedule-block.status-on_hold { background: var(--warning); }
+.schedule-block.status-pending,
+.schedule-block.status-on_hold  { background: var(--st-wait-bg); color: var(--st-wait-ink); }
+.schedule-block.status-printing,
+.schedule-block.status-post     { background: var(--st-move-bg); color: var(--st-move-ink); }
 
 /* ── Feature 5: Throughput heatmap ─────────────────────────────────── */
 .heatmap-table {
@@ -4028,9 +4083,9 @@ summary.icon .pf-ico, summary.icon .br-ico { margin-inline-end: 0; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.live-state-badge.printing { background: rgba(91,156,240,0.18); color: var(--primary); }
-.live-state-badge.idle     { background: rgba(43,182,115,0.14); color: var(--success); }
-.live-state-badge.error    { background: rgba(239,77,94,0.18);  color: var(--danger); }
+.live-state-badge.printing { background: var(--st-move-bg); color: var(--st-move-ink); }
+.live-state-badge.idle     { background: var(--st-wait-bg); color: var(--st-wait-ink); }
+.live-state-badge.error    { background: var(--st-late-bg); color: var(--st-late-ink); }
 .live-temp {
   font-size: 10.5px;
   color: var(--warning);
@@ -4164,6 +4219,11 @@ summary.icon .pf-ico, summary.icon .br-ico { margin-inline-end: 0; }
 /* Aged receivables table */
 #agedReceivablesSection table { font-size: 12.5px; }
 #agedReceivablesSection table th { font-weight: 600; color: var(--text-dim); }
+/* Days past due: red only when the row IS overdue, steel otherwise. The total
+   owed stays neutral; only its overdue part is red. */
+#agedReceivablesSection .aged-days.is-wait { color: var(--st-wait-ink); }
+#agedReceivablesSection .aged-days.is-late,
+#agedReceivablesSection .aged-overdue.is-late { color: var(--st-late-ink); font-weight: 600; }
 
 /* Survey analytics */
 #surveyAnalyticsSection { padding: 4px 0; }

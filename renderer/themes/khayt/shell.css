@@ -202,45 +202,33 @@ body.khayt-2026 textarea:focus-visible {
   border-color: var(--accent);
 }
 
-/* ---------- 5. Status: one colour per stage, shared with the Mac ---------- */
-/* A 14% tint of the stage colour, a dot in the stage colour, and text in that
-   stage's readable ink. Amber is never a stage colour — only "unpaid"/warning,
-   in its dark warn-ink, uses the amber family. */
+/* ---------- 5. Status: the shared palette, shared with the Mac ---------- */
+/* The pill SHAPE is this theme's (a rounded chip with a stage dot); every
+   status COLOUR comes from the --st-* tokens in styles.css, which no theme may
+   override — so a job reads the same here as in every other theme and on the
+   Mac and iPhone. The dot is the status's own marker colour (--badge-dot). */
 body.khayt-2026 .badge {
-  --kh-stage: var(--kh-quote);
-  --kh-stage-ink: var(--kh-quote-ink);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border-radius: 999px;
   padding: 2px 9px;
   font-weight: 600;
-  background: color-mix(in srgb, var(--kh-stage) 14%, transparent);
-  color: var(--kh-stage-ink);
 }
 body.khayt-2026 .badge::before {
   content: "";
   inline-size: 6px;
   block-size: 6px;
   border-radius: 50%;
-  background: var(--kh-stage);
+  background: var(--badge-dot, currentColor);
   flex: none;
 }
-body.khayt-2026 .badge.pending   { --kh-stage: var(--kh-pending);  --kh-stage-ink: var(--kh-pending-ink); }
-body.khayt-2026 .badge.printing,
-body.khayt-2026 .badge.post      { --kh-stage: var(--kh-printing); --kh-stage-ink: var(--kh-printing-ink); }
-body.khayt-2026 .badge.on_hold,
-body.khayt-2026 .badge.qc        { --kh-stage: var(--kh-hold);     --kh-stage-ink: var(--kh-hold-ink); }
-body.khayt-2026 .badge.completed { --kh-stage: var(--kh-ready);    --kh-stage-ink: var(--kh-ready-ink); }
-body.khayt-2026 .badge.shipped,
-body.khayt-2026 .badge.pay-paid  { --kh-stage: var(--kh-quote);    --kh-stage-ink: var(--kh-quote-ink); }
-body.khayt-2026 .badge.overdue,
-body.khayt-2026 .badge.late      { --kh-stage: var(--kh-late);     --kh-stage-ink: var(--kh-late-ink); }
-body.khayt-2026 .badge.pay-unpaid,
-body.khayt-2026 .badge.pay-partial {
-  --kh-stage: var(--kh-warn-ink);
-  --kh-stage-ink: var(--kh-warn-ink);
-  background: var(--kh-warn-wash);
+/* A bare .badge (a label, not a stage) keeps the quiet grey wash. :where()
+   holds this at lower specificity than styles.css's .badge.<status> rules, so
+   it can never paint over a status. */
+body.khayt-2026 :where(.badge) {
+  background: color-mix(in srgb, var(--kh-quote) 14%, transparent);
+  color: var(--kh-quote-ink);
 }
 
 /* Progress is the thread: every progress fill in the app is amber. Gray (idle)

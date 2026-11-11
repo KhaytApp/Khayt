@@ -363,6 +363,9 @@ jobs:
       - name: E2E smoke (a saved product price never changes silently)
         run: xvfb-run -a npm run test:e2e:pricekeep
 
+      - name: E2E smoke (one status palette in every theme)
+        run: xvfb-run -a npm run test:e2e:statuspalette
+
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 
