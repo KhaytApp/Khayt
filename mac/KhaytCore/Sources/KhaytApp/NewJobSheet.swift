@@ -1057,7 +1057,13 @@ struct NewJobSheet: View {
     }
 
     private func addPart() async {
+        // TAKEN BEFORE THE FIRST AWAIT. Return in the grams field and the
+        // default button can both land here; with the draft still in place
+        // across the awaits below, both appended it and the part was on the
+        // job twice, at twice the price and filament.
+        guard draft.isComplete else { return }
         var next = draft
+        draft = Draft()
         // One crossing for all three: the figure, where it went, and what it was
         // worked out at. They have to agree, so they are asked for together
         // rather than computed twice from the same inputs.
@@ -1077,7 +1083,6 @@ struct NewJobSheet: View {
             agreementNote = shop.words.callIt("ce.pl_autofill")
         }
         parts.append(next)
-        draft = Draft()
     }
 
     /// What choosing a customer brings with it: their discount, and the

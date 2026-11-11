@@ -264,7 +264,7 @@ enum SampleShop {
 
     static var sampleConnectors: JSONValue {
         let lamha = (try? JSONValue.parse(Data(lamhaManifestJSON.utf8))) ?? .null
-        let granted = (try? JSONValue.parse(Data(#"{"version":"1.1.1","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"]}"#.utf8))) ?? .null
+        let granted = (try? JSONValue.parse(Data(#"{"version":"1.1.1","fields":["config.carrierId","config.senderAddress","config.senderCity","config.senderName","config.senderPhone","customer.address","customer.email","customer.name","customer.phone","field.city","order.currency","order.date","order.id","order.number","order.qty","order.title","order.total"],"domains":["app.lamha.sa"],"scopes":["fields.write"],"routes":["app.lamha.sa config.carrierId","app.lamha.sa config.senderAddress","app.lamha.sa config.senderCity","app.lamha.sa config.senderName","app.lamha.sa config.senderPhone","app.lamha.sa customer.address","app.lamha.sa customer.email","app.lamha.sa customer.name","app.lamha.sa customer.phone","app.lamha.sa field.city","app.lamha.sa order.currency","app.lamha.sa order.date","app.lamha.sa order.id","app.lamha.sa order.number","app.lamha.sa order.qty","app.lamha.sa order.title","app.lamha.sa order.total","app.lamha.sa secret:apiToken"]}"#.utf8))) ?? .null
         let lamhaEntry: JSONValue = .object([
             "id": .string(lamhaId), "version": .string("1.1.1"), "enabled": .bool(true),
             "manifest": lamha, "granted": granted,
