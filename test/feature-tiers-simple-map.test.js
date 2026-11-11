@@ -6,7 +6,9 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { SIMPLE_MAP, simpleDecision } = require('../lib/feature-tiers.js');
+const { SIMPLE_MAP, GATE_ROWS, PRO_FEATURES, simpleDecision } = require('../lib/feature-tiers.js');
+
+const APPS = ['desktop', 'mac', 'ios'];
 
 test('every row is well formed and keys are unique', () => {
   const seen = new Set();
@@ -14,20 +16,39 @@ test('every row is well formed and keys are unique', () => {
     assert.ok(r.key && !seen.has(r.key), `duplicate or empty key ${r.key}`); seen.add(r.key);
     assert.ok(['work', 'shop', 'money', 'team', 'tools', 'online', 'shell'].includes(r.area), `${r.key}: area ${r.area}`);
     assert.ok(['show', 'reduced', 'pro'].includes(r.simple), `${r.key}: simple ${r.simple}`);
-    assert.ok(r.where && ['desktop', 'mac', 'ios'].every((a) => typeof r.where[a] === 'string'), `${r.key}: where for every app`);
+    assert.ok(r.today && APPS.every((a) => typeof r.today[a] === 'string'), `${r.key}: today names for every app`);
+    assert.ok(APPS.some((a) => r.today[a]), `${r.key}: lives in at least one app`);
     if (r.simple === 'reduced') assert.ok(r.simpleShows && r.proAdds, `${r.key}: a reduced row says what Simple shows and what Pro adds`);
-    if (r.today) for (const a of Object.keys(r.today)) assert.ok(['desktop', 'mac', 'ios'].includes(a), `${r.key}: today.${a}`);
+    for (const k of ['afterS2', 'simpleNow']) if (r[k]) for (const a of Object.keys(r[k])) assert.ok(APPS.includes(a), `${r.key}: ${k}.${a}`);
   }
 });
 
+test('the five gates the apps read each belong to one row', () => {
+  assert.deepEqual(Object.keys(GATE_ROWS).sort(), ['analytics', 'expenses', 'maintenance', 'purchasing', 'zatca']);
+  for (const [gate, key] of Object.entries(GATE_ROWS)) {
+    const row = SIMPLE_MAP.find((r) => r.key === key);
+    assert.ok(row && row.gate === gate, `${gate} → ${key}`);
+  }
+  // money and expenses become reduced (Dev Hub, Nov 11), not hidden.
+  assert.equal(simpleDecision(GATE_ROWS.analytics), 'reduced');
+  assert.equal(simpleDecision(GATE_ROWS.expenses), 'reduced');
+  assert.equal(simpleDecision(GATE_ROWS.maintenance), 'pro');
+  assert.equal(simpleDecision(GATE_ROWS.zatca), 'pro');
+});
+
 test('the decisions already made', () => {
-  assert.notEqual(simpleDecision('loyalty'), 'pro', 'loyalty is shown in Simple (Turki, Nov 10)');
-  for (const k of ['team', 'sites', 'assignment', 'zatca', 'proforma', 'paymentPlans', 'ai', 'developer']) {
+  // Turki, Nov 11: loyalty in Simple as up to 3 tiers by completed orders; connectors stay visible.
+  assert.equal(simpleDecision('loyalty'), 'reduced');
+  assert.match(SIMPLE_MAP.find((r) => r.key === 'loyalty').simpleShows, /up to 3 tiers by completed orders/);
+  assert.equal(simpleDecision('connectors'), 'show');
+  // The simplified-invoice QR always prints; ZATCA Phase 2 is Pro.
+  assert.equal(simpleDecision('invoices'), 'show');
+  assert.match(SIMPLE_MAP.find((r) => r.key === 'invoices').simpleShows, /simplified-invoice QR always prints/);
+  for (const k of ['team', 'staffPins', 'sites', 'assignment', 'zatca', 'proforma', 'paymentPlans', 'ai', 'developer', 'schedule', 'kiosk', 'campaigns', 'machineUpkeep']) {
     assert.equal(simpleDecision(k), 'pro', k);
   }
-  // Simple gets a short Expenses list and a Money page instead of losing both (Mac A10).
-  assert.equal(simpleDecision('expenses'), 'reduced');
-  assert.equal(simpleDecision('money'), 'reduced');
-  assert.equal(simpleDecision('queue'), 'reduced');
+  for (const k of ['queue', 'quote', 'customers', 'inventory', 'money', 'expenses', 'vatReturns']) assert.equal(simpleDecision(k), 'reduced', k);
   assert.equal(simpleDecision('nope'), undefined);
+  // Every Pro feature in the comparison is covered by some row.
+  assert.ok(PRO_FEATURES.length > 0);
 });
