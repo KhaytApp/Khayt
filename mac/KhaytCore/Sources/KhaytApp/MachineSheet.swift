@@ -455,15 +455,21 @@ struct MachineSheet: View {
                 // without anybody saying the bed is clear (lib/auto-dispatch.js).
                 // Off by default, and said plainly, because a wrong yes drags a
                 // nozzle through yesterday's part.
+                // Only a printer has a plate to clear: a laser cutter's sheet
+                // showed this toggle with the belt-printer explanation (B9).
+                if Self.isPrinter(kind) {
                 GridRow {
                     Toggle(shop.words.callIt("mac.clears_own_bed"), isOn: $clearsOwnBed)
                         .gridCellColumns(2)
                 }
+                }
+                if Self.isPrinter(kind) {
                 GridRow {
                     Text(shop.words.callIt("mac.clears_own_bed_hint"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .gridCellColumns(2)
+                }
                 }
             }
     }

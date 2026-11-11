@@ -660,7 +660,11 @@ private struct Owed: View {
         // telling a shop it had been paid for work it never charged for.
         //
         // Nothing was owed and nothing was paid. That is a dash.
-        if job.price <= 0 {
+        //
+        // The same for a quote, a cancelled job, a voided or a credited one:
+        // nothing was ever charged, so "settled" is not what happened
+        // (Nov 11 2026 UI review, B8).
+        if job.price <= 0 || !job.owesAtAll {
             Text("—")
                 .foregroundStyle(.quaternary)
                 .frame(maxWidth: .infinity, alignment: .trailing)

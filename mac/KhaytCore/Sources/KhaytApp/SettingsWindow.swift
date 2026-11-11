@@ -1648,7 +1648,9 @@ struct AssistantPane: View {
                         }
                     }
                     row(shop.words.callIt("calc.ai_key")) {
-                        SecureField(hasStoredKey ? "••••••••" : "", text: $draft.key)
+                        SecureField("", text: $draft.key,
+                                    prompt: Text(verbatim: hasStoredKey ? "••••••••" : ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                     if hasStoredKey && draft.key.isEmpty {
@@ -1656,7 +1658,9 @@ struct AssistantPane: View {
                             .font(.caption)
                     }
                     row(shop.words.callIt("set.ai_model")) {
-                        TextField(chosen?.defaultModel ?? "", text: $draft.model)
+                        TextField("", text: $draft.model,
+                                  prompt: Text(verbatim: chosen?.defaultModel ?? ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                 }
