@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fix (Mac, Arabic): the Waste table's headings line up with their columns.** With the summary open beside it, the headings were drawn two columns along from the figures under them. Expenses has the same fix.
 - **Fix (Mac, Arabic): the first filter chip on Gift cards and the Catalogue was faded out.** The row's "more this way" fade was drawn on the wrong end, over the first chip, even when every chip fitted.
 - **Fix (Mac): more small text you can read.** The grey captions on a machine's card ("The machine", "Right now", "Nozzle wear") and the dimmed labels and empty values in Reports, Customers, the Catalogue, Expenses and Gift cards were still drawn too pale. They use the same readable grey as the rest.
 - **Fix (Mac): Settings › Preferences › "Where the library lives".** The "Now" row always says where the library is, and the blank row at the foot of the section is gone.

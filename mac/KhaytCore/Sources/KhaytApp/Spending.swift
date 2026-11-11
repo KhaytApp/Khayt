@@ -183,6 +183,9 @@ struct Expenses: View {
         // with six waste entries got six rows and then twenty empty grey bands
         // down the rest of the window, which reads as a list that failed to
         // load rather than as a short list.
+        // Beside a summary in an `HSplitView`: see `TableHeaderFollowsBody`
+        // for what that did to the headings in Arabic.
+        .headerFollowsBody()
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .overlay {
@@ -368,6 +371,9 @@ struct Waste: View {
         }
         // As the expenses table above — including the stripes, which drew
         // twenty empty bands under this shop's six waste entries.
+        // Beside a summary in an `HSplitView`: see `TableHeaderFollowsBody`
+        // for what that did to the headings in Arabic.
+        .headerFollowsBody()
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: WasteEntry.ID.self) { ids in
