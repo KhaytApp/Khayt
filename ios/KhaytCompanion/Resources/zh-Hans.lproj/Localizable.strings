@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
 "intake.waiting" = "等待中";
+"spool.low" = "偏低";
+"stage.a11y.done" = "已完成";

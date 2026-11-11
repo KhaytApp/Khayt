@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
 "intake.waiting" = "En attente";
+"spool.low" = "Faible";
+"stage.a11y.done" = "Terminé";

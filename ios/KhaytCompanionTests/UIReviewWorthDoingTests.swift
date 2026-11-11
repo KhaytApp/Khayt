@@ -71,3 +71,37 @@ final class UIReviewWorthDoingTests: XCTestCase {
         XCTAssertFalse(inventory.contains("KhaytDesign.collect"), "collect means ready to collect, not plenty left")
     }
 }
+
+// MARK: W2 — say it in words, not only colour
+extension UIReviewWorthDoingTests {
+    func testCompactJobCardSaysLate() throws {
+        let card = try code("Views/JobCard.swift")
+        XCTAssertTrue(card.contains("if layout == .compact, order.isOverdue { LateBadge() }"),
+                      "Home's compact card shows the late word, not only a red outline")
+        XCTAssertTrue(card.contains("if layout == .full, order.isOverdue { LateBadge() }"))
+    }
+
+    func testLowSpoolsSayLow() throws {
+        let inventory = try code("Views/InventoryView.swift")
+        XCTAssertTrue(inventory.contains("L10n.tr(\"spool.low\")"))
+        try assertInEveryLanguage(["spool.low", "stage.a11y.done"])
+    }
+
+    func testSelectedChipsCarryTheSelectedTrait() throws {
+        for file in ["Views/OrdersView.swift", "Views/InventoryView.swift", "Views/V2Form.swift"] {
+            XCTAssertTrue(try code(file).contains(".accessibilityAddTraits(on ? .isSelected : [])"), file)
+        }
+    }
+
+    func testPassedStagesSayDone() throws {
+        XCTAssertTrue(try code("Views/OrderDetailPage.swift")
+            .contains(".accessibilityValue(passed ? L10n.tr(\"stage.a11y.done\") : \"\")"))
+    }
+
+    func testWidgetDotHasAWord() throws {
+        let widget = try String(contentsOf: Self.iosDir.appending(path: "KhaytWidget/KhaytQueueWidget.swift"), encoding: .utf8)
+        let header = try XCTUnwrap(widget.range(of: "private func header("))
+        XCTAssertTrue(widget[header.lowerBound...].prefix(700).contains("Text(statusLine(s))"),
+                      "the connection dot is said in a word")
+    }
+}

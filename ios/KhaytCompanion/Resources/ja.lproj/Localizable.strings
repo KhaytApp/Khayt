@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
 "intake.waiting" = "待ち";
+"spool.low" = "残りわずか";
+"stage.a11y.done" = "完了";

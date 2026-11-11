@@ -294,6 +294,13 @@ private struct SpoolRow: View {
                         .font(.khaytMono(13, .medium, relativeTo: .caption))
                         .foregroundStyle(spool.isLowStock ? KhaytDesign.attention : KhaytDesign.ink)
                 }
+                if spool.isLowStock {
+                    // "Low" in words, not only in amber.
+                    Text("· " + L10n.tr("spool.low"))
+                        .font(.khayt(12.5, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.attention)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
                 if let fraction {
                     Text((fraction * 100).rounded().formatted(.number.locale(L10n.locale)) + "%")

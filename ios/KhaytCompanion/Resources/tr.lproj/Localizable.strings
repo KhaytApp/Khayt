@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
 "intake.waiting" = "Bekliyor";
+"spool.low" = "Az";
+"stage.a11y.done" = "Tamamlandı";

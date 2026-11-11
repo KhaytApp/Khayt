@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
 "intake.waiting" = "Aguardando";
+"spool.low" = "Baixo";
+"stage.a11y.done" = "Concluído";

@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
 "intake.waiting" = "Waiting";
+"spool.low" = "Low";
+"stage.a11y.done" = "Done";

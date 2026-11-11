@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
 "intake.waiting" = "Wartet";
+"spool.low" = "Knapp";
+"stage.a11y.done" = "Erledigt";

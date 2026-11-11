@@ -1283,3 +1283,5 @@
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
 "intake.waiting" = "بالانتظار";
+"spool.low" = "منخفض";
+"stage.a11y.done" = "تمّت";

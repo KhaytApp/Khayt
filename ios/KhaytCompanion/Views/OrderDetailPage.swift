@@ -824,6 +824,7 @@ private struct StageStepper: View {
         .disabled(disabled || on)
         .accessibilityLabel(stage.localizedLabel)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityValue(passed ? L10n.tr("stage.a11y.done") : "")
     }
 }
 
