@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} bobine en stock bas",
   "inv.low_stock_count_many": "{n} bobines en stock bas",
   "xr.not_set": "Non défini",
+  "an.new_vs_returning": "Clients nouveaux et fidèles",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

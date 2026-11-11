@@ -5433,5 +5433,6 @@
   "inv.low_stock_count_one": "{n} spool low",
   "inv.low_stock_count_many": "{n} spools low",
   "xr.not_set": "Not set",
+  "an.new_vs_returning": "New vs returning clients",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

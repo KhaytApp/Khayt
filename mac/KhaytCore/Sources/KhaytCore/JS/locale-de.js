@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} Spule mit niedrigem Bestand",
   "inv.low_stock_count_many": "{n} Spulen mit niedrigem Bestand",
   "xr.not_set": "Nicht gesetzt",
+  "an.new_vs_returning": "Neue und wiederkehrende Kunden",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

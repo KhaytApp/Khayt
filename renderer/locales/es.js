@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} carrete con poco stock",
   "inv.low_stock_count_many": "{n} carretes con poco stock",
   "xr.not_set": "Sin definir",
+  "an.new_vs_returning": "Clientes nuevos y recurrentes",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} 个料卷库存偏低",
   "inv.low_stock_count_many": "{n} 个料卷库存偏低",
   "xr.not_set": "未设置",
+  "an.new_vs_returning": "新客户与回头客",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

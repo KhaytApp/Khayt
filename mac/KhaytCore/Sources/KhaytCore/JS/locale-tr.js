@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} makara az",
   "inv.low_stock_count_many": "{n} makara az",
   "xr.not_set": "Ayarlanmadı",
+  "an.new_vs_returning": "Yeni ve geri dönen müşteriler",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

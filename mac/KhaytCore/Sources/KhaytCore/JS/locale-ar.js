@@ -5432,5 +5432,6 @@
   "inv.low_stock_count_one": "{n} بكرة منخفضة",
   "inv.low_stock_count_many": "{n} بكرات منخفضة",
   "xr.not_set": "غير محدد",
+  "an.new_vs_returning": "العملاء الجدد مقابل العائدين",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

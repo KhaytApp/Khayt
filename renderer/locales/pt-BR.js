@@ -5433,5 +5433,6 @@
   "inv.low_stock_count_one": "{n} carretel baixo",
   "inv.low_stock_count_many": "{n} carretéis baixos",
   "xr.not_set": "Não definido",
+  "an.new_vs_returning": "Clientes novos e recorrentes",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

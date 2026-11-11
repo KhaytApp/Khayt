@@ -1757,6 +1757,9 @@ function renderNewVsReturning() {
     // here, which would be a second answer.
     inWindow: (o) => inRange(o.date, analyticsRange, 'analytics'),
   });
+  // No jobs in the window: no card at all, not an empty box (Nov 11 review, X15).
+  const card = document.getElementById('newVsReturningCard');
+  if (card) card.style.display = mix.totals.jobs === 0 ? 'none' : '';
   if (mix.totals.jobs === 0) { el.innerHTML = ''; return; }
 
   const newRev = mix.fresh.revenue, retRev = mix.returning.revenue;
