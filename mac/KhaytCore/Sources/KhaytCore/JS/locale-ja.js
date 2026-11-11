@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "顧客の読み取り",
   "plg.scope.fields.write": "独自フィールドへの入力",
   "plg.scope.jobs.status": "注文ステータスの変更",
+  "kan.orders_one": "{n} 件の注文",
+  "kan.orders_many": "{n} 件の注文",
+  "mach.active_jobs_one": "進行中のジョブ {n} 件",
+  "mach.active_jobs_many": "進行中のジョブ {n} 件",
+  "inv.low_stock_count_one": "在庫不足スプール {n} 個",
+  "inv.low_stock_count_many": "在庫不足スプール {n} 個",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

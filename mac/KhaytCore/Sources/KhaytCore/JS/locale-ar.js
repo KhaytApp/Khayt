@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "قراءة العملاء",
   "plg.scope.fields.write": "تعبئة حقوله الخاصة",
   "plg.scope.jobs.status": "تغيير حالة الطلب",
+  "kan.orders_one": "{n} طلب",
+  "kan.orders_many": "{n} طلبات",
+  "mach.active_jobs_one": "{n} طلب نشط",
+  "mach.active_jobs_many": "{n} طلبات نشطة",
+  "inv.low_stock_count_one": "{n} بكرة منخفضة",
+  "inv.low_stock_count_many": "{n} بكرات منخفضة",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

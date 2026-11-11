@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "leer clientes",
   "plg.scope.fields.write": "rellenar sus propios campos",
   "plg.scope.jobs.status": "cambiar el estado de un trabajo",
+  "kan.orders_one": "{n} pedido",
+  "kan.orders_many": "{n} pedidos",
+  "mach.active_jobs_one": "{n} trabajo activo",
+  "mach.active_jobs_many": "{n} trabajos activos",
+  "inv.low_stock_count_one": "{n} carrete con poco stock",
+  "inv.low_stock_count_many": "{n} carretes con poco stock",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

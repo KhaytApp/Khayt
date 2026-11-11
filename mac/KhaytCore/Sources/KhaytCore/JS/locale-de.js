@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "Kunden lesen",
   "plg.scope.fields.write": "seine eigenen Felder ausfüllen",
   "plg.scope.jobs.status": "den Status eines Auftrags ändern",
+  "kan.orders_one": "{n} Auftrag",
+  "kan.orders_many": "{n} Aufträge",
+  "mach.active_jobs_one": "{n} aktiver Auftrag",
+  "mach.active_jobs_many": "{n} aktive Aufträge",
+  "inv.low_stock_count_one": "{n} Spule mit niedrigem Bestand",
+  "inv.low_stock_count_many": "{n} Spulen mit niedrigem Bestand",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
