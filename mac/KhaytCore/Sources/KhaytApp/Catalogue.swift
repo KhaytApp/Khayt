@@ -310,7 +310,7 @@ struct Catalogue: View {
             TableColumn(shop.words.callIt("mac.pph_column"), value: \.perHourSort) { row in
                 Text(PerHour.text(row.perHour, shop))
                     .moneyStyle()
-                    .foregroundStyle(row.perHour == nil ? AnyShapeStyle(.tertiary)
+                    .foregroundStyle(row.perHour == nil ? AnyShapeStyle(Khayt.faint)
                                      : (row.perHour ?? 0) < 0 ? AnyShapeStyle(Khayt.late)
                                      : AnyShapeStyle(.primary))
                     .help(shop.words.callIt("mac.pph_column_help"))

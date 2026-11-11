@@ -140,7 +140,7 @@ struct Expenses: View {
             TableColumn(shop.words.callIt("exp.note"), value: \.note) { e in
                 HStack(spacing: 6) {
                     Text(e.note.isEmpty ? "—" : e.note)
-                        .foregroundStyle(e.note.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                        .foregroundStyle(e.note.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                         .lineLimit(1)
                     // THE RECEIPT, when there is one. The record has pointed
                     // at it all along (the desktop attaches them, a phone
@@ -169,7 +169,7 @@ struct Expenses: View {
             // "Link to order (" — a column says what is in it, in a word.
             TableColumn(shop.words.callIt("mac.expense_order_col")) { e in
                 Text(e.orderId ?? "—").monospacedDigit()
-                    .foregroundStyle(e.orderId == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(e.orderId == nil ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary))
             }
             .width(min: 90, ideal: 120)
         }
@@ -336,7 +336,7 @@ struct Waste: View {
             .width(min: 110, ideal: 150)
             TableColumn(shop.words.callIt("waste.reason"), value: \.reason) { w in
                 Text(w.reason.isEmpty ? "—" : w.reason)
-                    .foregroundStyle(w.reason.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(w.reason.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
             .width(min: 120, ideal: 220)

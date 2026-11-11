@@ -109,7 +109,7 @@ struct OrdersTable: View {
             // the test is the data rather than a setting somebody has to find.
             TableColumn(shop.words.callIt("mac.customer"), value: \.client) { job in
                 Text(job.client.isEmpty ? "—" : job.client)
-                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
             .width(min: 100, ideal: 110)

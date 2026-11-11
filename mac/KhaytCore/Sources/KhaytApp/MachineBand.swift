@@ -324,7 +324,7 @@ struct MachineBandView: View {
                             // Amber says "go and look". A machine Khayt simply
                             // cannot ask is not a problem, so it is not amber.
                             .foregroundStyle(shop.machineKinds[row.machineId]?.polled == false
-                                             ? AnyShapeStyle(.tertiary)
+                                             ? AnyShapeStyle(Khayt.faint)
                                              : AnyShapeStyle(Khayt.attention))
                             .multilineTextAlignment(.trailing)
                     }
