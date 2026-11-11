@@ -302,6 +302,11 @@ html, body {
 .card.dark     .swatch { background: var(--text); }
 .card.warn     .swatch { background: var(--warning); }
 
+/* Native parts of controls (the date picker, its calendar icon, number
+   spinners, scrollbars) follow the app's appearance, not the OS's. */
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+
 /* -----------------------------------------------------------
    Form controls
    ----------------------------------------------------------- */
@@ -314,7 +319,14 @@ label {
 }
 label:first-child { margin-top: 0; }
 
-input[type="text"], input[type="number"], input[type="tel"], input[type="email"], select, textarea {
+/* Every typed field gets the one field style. Date, time, password and URL
+   were missing, so about 46 fields (cloud sign-in, Telegram, connectors, the
+   store's payment links, every date in a dialog) were 150 px browser boxes,
+   22 px tall next to 40 px fields, clipping their placeholders, and white in
+   dark mode (Nov 11 desktop UI review, F2). */
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"],
+input[type="password"], input[type="url"], input[type="date"], input[type="time"],
+input[type="datetime-local"], input[type="month"], select, textarea {
   width: 100%;
   padding: 9px 11px;
   font: inherit;
@@ -814,7 +826,7 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* Custom date range inputs */
 .custom-range-inputs { display:inline-flex; align-items:center; gap:6px; margin-inline-start:6px; }
-.custom-range-inputs input[type="date"] { font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
+.custom-range-inputs input[type="date"] { width:auto; font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
 
 /* -----------------------------------------------------------
    Empty states
