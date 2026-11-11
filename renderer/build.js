@@ -813,8 +813,7 @@ function updateGrandTotal() {
     const feeTooHigh = _q.feeWarning === 'fees-too-high'
       ? ` — <span style="color:var(--danger);">${escapeHtml(t('calc.fee_pct_too_high', { pct: +(_q.feePct || 0).toFixed(2) }))}</span>` : '';
     const marginDisplay = `<span style="font-weight:600;">${actualMarginPct.toFixed(0)}% margin</span>${feeTooHigh}`;
-    marginWarn.classList.toggle('is-thin', marginTone === 'thin');
-    marginWarn.classList.toggle('is-loss', marginTone === 'loss');
+    marginWarn.className = 'margin-warning' + (marginTone === 'ok' ? '' : ' is-' + marginTone);
     if (minPct > 0 && actualMarginPct < minPct) {
       marginWarn.innerHTML = `${marginDisplay} — ${escapeHtml(t('calc.margin_warn', { min: minPct.toFixed(0), actual: actualMarginPct.toFixed(0) }))}`;
       marginWarn.style.display = 'block';

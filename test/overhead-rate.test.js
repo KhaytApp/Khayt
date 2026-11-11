@@ -310,6 +310,7 @@ function calculatorContext(settings, form, extra = {}) {
   vm.runInContext(fnSource('renderer/build.js', 'clearOverheadCache'), ctx);
   vm.runInContext(fnSource('renderer/build.js', 'shopOverheadPerHour'), ctx);
   vm.runInContext(fnSource('renderer/build.js', 'updateGrandTotal'), ctx);
+  vm.runInContext(fnSource('renderer/app-helpers.js', 'marginToneOf'), ctx);
   return { ctx, els };
 }
 
