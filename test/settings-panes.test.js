@@ -72,3 +72,20 @@ test('every pane and group name is translated in all 9 languages', () => {
     for (const k of keys) assert.match(src, new RegExp(`"${k.replace('.', '\\.')}": "[^"]+"`), `${lang} ${k}`);
   }
 });
+
+test('loyalty is shown in Simple mode: nothing open around its card is pro-only (Turki, Nov 10)', () => {
+  const at = html.indexOf('id="settingsLoyaltyCard"');
+  assert.ok(at > 0 && html.indexOf('set_loyaltyEnabled', at) > at, 'the loyalty card has its id');
+  const cardOpen = html.lastIndexOf('<div', at);
+  const pane = html.lastIndexOf('<div class="settings-panel', at);
+  // Every <div> still open at the card, from its pane down, so a gate at any
+  // depth is seen. Simple, not hobbyist: only pro-only is banned (biz-only
+  // also hides from hobbyist shops, which the ruling did not cover).
+  const open = [];
+  for (const m of html.slice(pane, cardOpen).matchAll(/<div\b[^>]*>|<\/div>/g)) {
+    if (m[0].startsWith('</')) open.pop(); else open.push(m[0]);
+  }
+  open.push(html.slice(cardOpen, html.indexOf('>', at) + 1));
+  assert.match(open[0], /id="settings-panel-pricing"/, 'in Pricing & Tax, as on the Mac');
+  for (const tag of open) assert.doesNotMatch(tag, /\bpro-only\b/, tag);
+});
