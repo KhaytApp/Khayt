@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "lire les clients",
   "plg.scope.fields.write": "remplir ses propres champs",
   "plg.scope.jobs.status": "changer le statut d’un travail",
+  "kan.orders_one": "{n} commande",
+  "kan.orders_many": "{n} commandes",
+  "mach.active_jobs_one": "{n} tâche active",
+  "mach.active_jobs_many": "{n} tâches actives",
+  "inv.low_stock_count_one": "{n} bobine en stock bas",
+  "inv.low_stock_count_many": "{n} bobines en stock bas",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5426,5 +5426,11 @@
   "plg.scope.customers.read": "read customers",
   "plg.scope.fields.write": "fill in its own fields",
   "plg.scope.jobs.status": "change a job's status",
+  "kan.orders_one": "{n} order",
+  "kan.orders_many": "{n} orders",
+  "mach.active_jobs_one": "{n} active job",
+  "mach.active_jobs_many": "{n} active jobs",
+  "inv.low_stock_count_one": "{n} spool low",
+  "inv.low_stock_count_many": "{n} spools low",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

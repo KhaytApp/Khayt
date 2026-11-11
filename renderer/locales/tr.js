@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "müşterileri okumak",
   "plg.scope.fields.write": "kendi alanlarını doldurmak",
   "plg.scope.jobs.status": "bir işin durumunu değiştirmek",
+  "kan.orders_one": "{n} sipariş",
+  "kan.orders_many": "{n} sipariş",
+  "mach.active_jobs_one": "{n} aktif iş",
+  "mach.active_jobs_many": "{n} aktif iş",
+  "inv.low_stock_count_one": "{n} makara az",
+  "inv.low_stock_count_many": "{n} makara az",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

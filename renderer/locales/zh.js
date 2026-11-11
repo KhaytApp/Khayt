@@ -5425,5 +5425,11 @@
   "plg.scope.customers.read": "读取客户",
   "plg.scope.fields.write": "填写它自己的字段",
   "plg.scope.jobs.status": "更改订单状态",
+  "kan.orders_one": "{n} 个订单",
+  "kan.orders_many": "{n} 个订单",
+  "mach.active_jobs_one": "{n} 个进行中的任务",
+  "mach.active_jobs_many": "{n} 个进行中的任务",
+  "inv.low_stock_count_one": "{n} 个料卷库存偏低",
+  "inv.low_stock_count_many": "{n} 个料卷库存偏低",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

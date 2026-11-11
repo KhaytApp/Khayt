@@ -1696,7 +1696,7 @@ function renderInventory() {
       valEl.innerHTML = `
         <span>${escapeHtml(t('inv.total_value'))}: <strong style="color:var(--success);">${fmtMoney(totalValue)}</strong></span>
         <span style="margin-inline-start:16px;">${escapeHtml(t('inv.total_stock'))}: <strong>${fmtCount(Math.round(totalGrams))}g</strong></span>
-        ${lowCount > 0 ? `<span style="margin-inline-start:16px; color:var(--low-stock);">${_iIcoL('alert', '⚠')}${lowCount} ${escapeHtml(t('inv.low_stock_count'))}</span>` : ''}
+        ${lowCount > 0 ? `<span style="margin-inline-start:16px; color:var(--low-stock);">${_iIcoL('alert', '⚠')}${escapeHtml(t(lowCount === 1 ? 'inv.low_stock_count_one' : 'inv.low_stock_count_many', { n: lowCount }))}</span>` : ''}
       `;
       valEl.style.display = 'flex';
     } else {
