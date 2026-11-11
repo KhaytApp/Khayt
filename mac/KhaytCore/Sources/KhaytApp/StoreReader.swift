@@ -114,6 +114,9 @@ public struct StoreReader: Sendable {
     /// collection: a store is 33 collections and this app reads two of them, so
     /// decoding all of it into models would mean writing 31 models to ignore.
     public let raw: [String: JSONValue]
+    /// The book itself would not parse and `.prev` did: `raw` is the book as
+    /// of the save before last.
+    public private(set) var openedFromRollback = false
     /// Nil when the Keychain declined or had nothing. The store still opens;
     /// the secret fields simply stay sealed, which is the right way round.
     public let secretsKey: Data?
@@ -139,6 +142,9 @@ public struct StoreReader: Sendable {
         // save replaces the damaged file, and the damaged one becomes `.prev`.
         if parsed == nil, let older = try? Data(contentsOf: prev) {
             parsed = try? JSONValue.decode([String: JSONValue].self, from: older)
+            // Said to the shop (`Shop.load`): what it is looking at is the
+            // book as of the save before last.
+            openedFromRollback = parsed != nil
         }
         guard let root = parsed else { throw Failure.notJSON(url) }
         self.raw = root
