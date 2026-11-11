@@ -254,7 +254,16 @@ private struct Column: View {
 
     /// The most cards one column builds.
     static let cap = Kanban.columnCap
-    static func shown(_ jobs: [Order]) -> ArraySlice<Order> { jobs.prefix(cap) }
+    ///
+    /// WHICH END IS KEPT DEPENDS ON THE COLUMN. A column is ordered longest
+    /// waiting first, which is the right end to keep while work is waiting.
+    /// In Completed and Shipped it is the wrong one: the 120 oldest were
+    /// drawn, so in a shop with more than that the card just finished flew
+    /// to its column and was not there (beta.34 pre-release review). Those
+    /// two keep the newest.
+    static func shown(_ jobs: [Order], in stage: Stage) -> ArraySlice<Order> {
+        stage == .completed || stage == .shipped ? jobs.suffix(cap) : jobs.prefix(cap)
+    }
 
     /// Why this column would refuse the card currently in the air, or nil.
     private var refusal: String? { shop.dragRefusal(stage) }
@@ -293,7 +302,7 @@ private struct Column: View {
                 // them had every job it ever finished built on each visit, on
                 // each search keystroke and after each save. The rest are one
                 // line that says how many, and the Jobs table has them all.
-                ForEach(Self.shown(jobs)) { job in
+                ForEach(Self.shown(jobs, in: stage)) { job in
                     JobCard(job: job, shop: shop, matchedLot: lots[job.id])
                         // The card's path from the column it left to the one
                         // it landed in. Keyed by job id, so the SAME card
