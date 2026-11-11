@@ -187,7 +187,7 @@
             <div id="notifPanel" style="display:none;position:absolute;inset-inline-end:0;top:calc(100% + 8px);width:340px;max-height:480px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-pop);z-index:8000"></div>
           </div>
           <button type="button" class="btn ghost sm" id="btnFeedback" data-i18n="feedback.title" data-i18n-aria="feedback.title" aria-label="Feedback &amp; bug reports" title="Feedback &amp; bug reports">💬</button>
-          <select class="input" id="locationFilter" aria-label="Location filter" data-i18n-aria="ui.filter_location" data-i18n-title="ui.filter_location" style="width:auto;height:34px;min-width:100px" title="Filter by location">
+          <select class="input" id="locationFilter" hidden aria-label="Location filter" data-i18n-aria="ui.filter_location" data-i18n-title="ui.filter_location" style="width:auto;height:34px;min-width:100px" title="Filter by location">
             <option value="">All locations</option>
           </select>
           <button type="button" class="btn ghost sm" id="btnNavSwitchOp" title="Switch operator" style="display:none">👤 <span id="operatorNavBadge"></span></button>
@@ -690,12 +690,12 @@
             <div class="ovf-menu">
               <button id="btnStartShift"><span data-khayt-icon="play"></span> <span data-i18n="startShift">Start Shift</span></button>
               <button id="btnEndOfDay"><span data-khayt-icon="clipboard"></span> <span data-i18n="endOfDayReport">End of Day</span></button>
-              <button id="btnScheduleView"><span data-khayt-icon="schedule"></span> <span data-i18n="kan.schedule_view">Schedule</span></button>
+              <button id="btnScheduleView" data-simple-pro="schedule"><span data-khayt-icon="schedule"></span> <span data-i18n="kan.schedule_view">Schedule</span></button>
               <button id="btnCalendarView"><span data-khayt-icon="calendar"></span> <span data-i18n="kan.calendar_view">Calendar</span></button>
               <button id="btnBatchPlanner"><span data-khayt-icon="clipboard"></span> <span data-i18n="kan.batch_planner">Batch Planner</span></button>
-              <button id="btnSuggestSchedule"><span data-khayt-icon="wand"></span> <span data-i18n="sched.suggest_btn">Suggest assignments</span></button>
-              <label data-i18n-title="sched.auto_hint" title="Automatically assign queued jobs to free, compatible machines"><input type="checkbox" id="chkAutoSchedule" style="width:auto;margin:0;"> <span data-i18n="sched.auto_toggle">Auto-assign</span></label>
-              <button id="btnKioskView"><span data-khayt-icon="monitor"></span> <span data-i18n="kan.kiosk_view">Kiosk</span></button>
+              <button id="btnSuggestSchedule" data-simple-pro="schedule"><span data-khayt-icon="wand"></span> <span data-i18n="sched.suggest_btn">Suggest assignments</span></button>
+              <label data-simple-pro="schedule" data-i18n-title="sched.auto_hint" title="Automatically assign queued jobs to free, compatible machines"><input type="checkbox" id="chkAutoSchedule" style="width:auto;margin:0;"> <span data-i18n="sched.auto_toggle">Auto-assign</span></label>
+              <button id="btnKioskView" data-simple-pro="kiosk"><span data-khayt-icon="monitor"></span> <span data-i18n="kan.kiosk_view">Kiosk</span></button>
             </div>
           </details>
         </div>
@@ -1135,7 +1135,7 @@
       <div id="invStudioStats" class="khayt-inv-stats" style="display:none" aria-hidden="true"></div>
       <div id="invLocationScopeBanner" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);"></div>
       <div id="reorderAlertsSection" style="display:none;"></div>
-      <div id="supplierReorderList" style="margin-bottom:12px;"></div>
+      <div id="supplierReorderList" data-simple-pro="inventory" style="margin-bottom:12px;"></div>
       <div id="pipelineDemand"></div>
       <!-- What each material costs on the shelf (lib/material-cost.js), as the Mac's MaterialCostCard. -->
       <div id="materialCostCard"></div>
@@ -1293,7 +1293,7 @@
               <button id="btnBlankIntakeForm" data-i18n-title="cl.blank_intake_title" title="Blank intake form"><span data-khayt-icon="doc"></span> <span data-i18n="cl.intake_form">Intake form</span></button>
               <button id="btnExportClientsCsv" title="Export clients to CSV"><span data-khayt-icon="download"></span> <span data-i18n="common.export_csv">CSV</span></button>
               <button id="btnImportClientsCsv"><span data-khayt-icon="upload"></span> <span data-i18n="csv.import_clients_btn">Import CSV</span></button>
-              <button class="pro-only" id="btnCampaign" data-i18n-title="camp.btn_title" title="Send a marketing campaign"><span data-khayt-icon="megaphone"></span> <span data-i18n="camp.btn">Campaign</span></button>
+              <button class="pro-only" id="btnCampaign" data-simple-pro="campaigns" data-i18n-title="camp.btn_title" title="Send a marketing campaign"><span data-khayt-icon="megaphone"></span> <span data-i18n="camp.btn">Campaign</span></button>
               <button class="pro-only" id="btnSubscriptions" data-i18n-title="subs.btn_title" title="Manage subscriptions &amp; retainers"><span data-khayt-icon="repeat"></span> <span data-i18n="subs.btn">Subscriptions</span></button>
               <button class="pro-only" id="btnActivityLog" data-i18n-title="audit.btn_title" title="Team activity log"><span data-khayt-icon="receipt"></span> <span data-i18n="audit.btn">Activity</span></button>
             </div>
@@ -1543,7 +1543,7 @@
         <span class="nav-icon" aria-hidden="true"></span>
         <span data-i18n="set.pane_store">Online Store</span>
       </button>
-      <button type="button" class="settings-nav-item pro-only" data-settings-section="notify">
+      <button type="button" class="settings-nav-item biz-only" data-settings-section="notify">
         <span class="nav-icon" aria-hidden="true"></span>
         <span data-i18n="set.pane_notify">Notifications &amp; Messages</span>
       </button>
@@ -2240,7 +2240,7 @@
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;" data-i18n="mach.section_hint"></p>
         <div id="machinesList"></div>
         <button class="btn primary" id="btnAddMachine" style="margin-top:10px;" data-i18n="mach.add">+ Add Printer</button>
-        <button class="btn" id="btnPartsToBuy" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
+        <button class="btn" id="btnPartsToBuy" data-simple-pro="machineUpkeep" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
         </div>
 
         <div class="card settings-card">
@@ -2480,7 +2480,7 @@
       </div>
 
       <!-- ─── NOTIFICATIONS & MESSAGES ────────────────────────── -->
-      <div class="settings-panel pro-only" id="settings-panel-notify">
+      <div class="settings-panel biz-only" id="settings-panel-notify">
         <h2 class="settings-panel-title" data-i18n="set.pane_notify">Notifications &amp; Messages</h2>
         <p class="settings-panel-hint" data-i18n="set.automation_save_hint">Each section below has its own Save button — changes are not applied until you save that section.</p>
 
@@ -2512,7 +2512,9 @@
         <div id="smsNotificationsSection"></div>
         </div>
 
-        <div class="card settings-card pro-only">
+        <!-- SIMPLE_MAP messages: Simple keeps the WhatsApp templates; the
+             providers, Telegram, push, digest and email relay above stay Pro. -->
+        <div class="card settings-card biz-only" id="waTemplatesCard">
         <div class="settings-section-head" data-i18n="wa.settings_section">WhatsApp Quick-Reply Templates</div>
         <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="wa.settings_hint"></p>
         <div id="waTemplatesList"></div>
@@ -2560,7 +2562,7 @@
         </div>
         </div>
 
-        <div class="card settings-card pro-only" id="pluginCard" hidden>
+        <div class="card settings-card biz-only" id="pluginCard" hidden>
         <div class="settings-section-head" data-i18n="plg.title">Connectors</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="plg.hint">Connect Khayt to other services with a connector reviewed by Khayt. Before it is installed you see exactly which fields it sends and to which address; its keys stay on this computer.</p>
         <div id="pluginSection"></div>
@@ -3104,6 +3106,7 @@
 <script src="themes/foreman/screens.js"></script>
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
+<script src="simple-mode.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>

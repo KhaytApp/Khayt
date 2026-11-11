@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "Kunden lesen",
   "plg.scope.fields.write": "seine eigenen Felder ausfüllen",
   "plg.scope.jobs.status": "den Status eines Auftrags ändern",
+  "sm.gated_title": "{feature} ist Teil von Professionell",
+  "sm.gated_body": "Dieser Shop ist auf Einfach eingestellt.",
+  "sm.gated_open": "{screen} öffnen",
+  "sm.gated_switch": "Zu Professionell wechseln",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

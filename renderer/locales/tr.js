@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "müşterileri okumak",
   "plg.scope.fields.write": "kendi alanlarını doldurmak",
   "plg.scope.jobs.status": "bir işin durumunu değiştirmek",
+  "sm.gated_title": "{feature}, Profesyonel'in parçasıdır",
+  "sm.gated_body": "Bu dükkân Basit moda ayarlı.",
+  "sm.gated_open": "{screen} aç",
+  "sm.gated_switch": "Profesyonel'e geç",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

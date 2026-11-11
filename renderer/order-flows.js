@@ -1773,7 +1773,7 @@ function openOrderEditor(orderId) {
       </div>
     </details>
 
-    <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
+    <div data-simple-pro="paymentPlans" id="oeInstalmentsBlock" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <label style="margin:0; flex:1; font-size:12.5px; font-weight:600;">${escapeHtml(t('inst.title'))}</label>
         <button class="btn ghost small" id="oeGenInstalments" type="button">${escapeHtml(t('inst.generate') || 'Generate plan')}</button>
@@ -1803,7 +1803,7 @@ function openOrderEditor(orderId) {
 
     ${buildProfitabilityHtml(order)}
 
-    <div class="pro-only" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
+    <div class="pro-only" data-simple-pro="proforma" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <label style="margin:0; flex:1; font-size:12.5px; font-weight:600;">${escapeHtml(t('ord.milestone_invoices'))}${(order.milestoneInvoices && order.milestoneInvoices.length > 0) ? ` <span style="font-size:11px;color:var(--primary);">(${order.milestoneInvoices.length})</span>` : ''}</label>
         <button class="btn ghost small" id="oeOpenMilestones" type="button" data-act="milestone-invoices" data-id="${escapeHtml(order.id)}">${escapeHtml(t('ord.milestone_manage'))}</button>

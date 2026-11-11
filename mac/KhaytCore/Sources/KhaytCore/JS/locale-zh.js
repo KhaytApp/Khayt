@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "读取客户",
   "plg.scope.fields.write": "填写它自己的字段",
   "plg.scope.jobs.status": "更改订单状态",
+  "sm.gated_title": "{feature} 属于专业版",
+  "sm.gated_body": "本店当前为简易版。",
+  "sm.gated_open": "打开{screen}",
+  "sm.gated_switch": "切换到专业版",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

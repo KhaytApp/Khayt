@@ -362,6 +362,8 @@ jobs:
 
       - name: E2E smoke (a saved product price never changes silently)
         run: xvfb-run -a npm run test:e2e:pricekeep
+      - name: E2E smoke (Simple mode follows SIMPLE_MAP)
+        run: xvfb-run -a npm run test:e2e:simplemap
 
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro

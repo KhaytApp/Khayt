@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "قراءة العملاء",
   "plg.scope.fields.write": "تعبئة حقوله الخاصة",
   "plg.scope.jobs.status": "تغيير حالة الطلب",
+  "sm.gated_title": "{feature} ضمن الوضع الاحترافي",
+  "sm.gated_body": "هذا المتجر على الوضع البسيط.",
+  "sm.gated_open": "فتح {screen}",
+  "sm.gated_switch": "التبديل إلى الوضع الاحترافي",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

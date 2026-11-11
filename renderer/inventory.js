@@ -1619,7 +1619,7 @@ function renderReorderAlerts() {
       <span style="flex:1;font-size:12.5px;font-weight:600;">${escapeHtml(item.material)}${item.colourVariant ? ` — ${escapeHtml(item.colourVariant)}` : ''}</span>
       <span style="font-size:11.5px;color:var(--danger);white-space:nowrap;">${Math.round(item.weight)}g / ${Math.round(threshold)}g</span>
       ${daysHtml}
-      <button class="btn small primary" data-act="reorder-alert-item" data-id="${escapeHtml(item.id)}" style="font-size:11px;padding:2px 8px;">${escapeHtml(t('inv.draft_po') || 'Draft PO')}</button>
+      <button class="btn small primary" data-act="reorder-alert-item" data-simple-pro="inventory" data-id="${escapeHtml(item.id)}" style="font-size:11px;padding:2px 8px;">${escapeHtml(t('inv.draft_po') || 'Draft PO')}</button>
     </div>`;
   }).join('');
 

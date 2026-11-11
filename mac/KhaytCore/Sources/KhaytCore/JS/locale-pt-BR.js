@@ -5426,5 +5426,9 @@
   "plg.scope.customers.read": "ler clientes",
   "plg.scope.fields.write": "preencher os próprios campos",
   "plg.scope.jobs.status": "mudar o status de um pedido",
+  "sm.gated_title": "{feature} faz parte do Profissional",
+  "sm.gated_body": "Esta loja está no modo Simples.",
+  "sm.gated_open": "Abrir {screen}",
+  "sm.gated_switch": "Mudar para Profissional",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5426,5 +5426,9 @@
   "plg.scope.customers.read": "read customers",
   "plg.scope.fields.write": "fill in its own fields",
   "plg.scope.jobs.status": "change a job's status",
+  "sm.gated_title": "{feature} is part of Professional",
+  "sm.gated_body": "This shop is set to Simple.",
+  "sm.gated_open": "Open {screen}",
+  "sm.gated_switch": "Switch to Professional",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

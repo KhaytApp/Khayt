@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "顧客の読み取り",
   "plg.scope.fields.write": "独自フィールドへの入力",
   "plg.scope.jobs.status": "注文ステータスの変更",
+  "sm.gated_title": "{feature}はプロフェッショナルの機能です",
+  "sm.gated_body": "このショップはシンプルに設定されています。",
+  "sm.gated_open": "{screen}を開く",
+  "sm.gated_switch": "プロフェッショナルに切り替える",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

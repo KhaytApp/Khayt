@@ -5425,5 +5425,9 @@
   "plg.scope.customers.read": "lire les clients",
   "plg.scope.fields.write": "remplir ses propres champs",
   "plg.scope.jobs.status": "changer le statut d’un travail",
+  "sm.gated_title": "{feature} fait partie de Professionnel",
+  "sm.gated_body": "Cet atelier est en mode Simple.",
+  "sm.gated_open": "Ouvrir {screen}",
+  "sm.gated_switch": "Passer à Professionnel",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

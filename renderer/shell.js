@@ -350,10 +350,42 @@ function applyMode() {
   if (settings.mode === 'enthusiast' && BIZ_TABS.includes($('.tab-content.active')?.id)) {
     if (typeof switchTab === 'function') switchTab('dashboard-tab');
   }
+  // A Professional tab or Settings pane on screen when the mode changes: in
+  // Simple it becomes the "Part of Professional" panel, and back in
+  // Professional the panel becomes the screen the shop asked for.
+  const activeTab = $('.tab-content.active');
+  if (activeTab && activeTab.id !== 'settings-tab' && typeof switchTab === 'function') {
+    const gated = activeTab.classList.contains('sm-gated');
+    const gateNow = !!window.KhaytSimpleMode?.tabGate?.(activeTab.id, settings.mode);
+    if (gated !== gateNow) switchTab(activeTab.id);
+  }
+  if (activeTab?.id === 'settings-tab' && _settingsSectionAsked) {
+    const showingGate = !!$('#settings-panel-gated.active');
+    if (showingGate !== settingsPaneGated(_settingsSectionAsked)) openSettingsSection(_settingsSectionAsked);
+  }
+  renderModeBadge();
   renderModeTierCompare();
   applyAnalyticsModeView();
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderOnlineSettings === 'function') renderOnlineSettings();
+}
+
+/** S4 card 1: a steel "Simple" pill beside the name in the sidebar head
+ *  while the shop is in Simple. Nothing in Professional, nor in Bed Ready
+ *  (enthusiast), whose sidebar has no modes to name. */
+function renderModeBadge() {
+  const head = $('.khayt-brand');
+  if (!head) return;
+  let pill = head.querySelector('.sm-mode-badge');
+  if (settings.mode !== 'simple') { pill?.remove(); return; }
+  if (!pill) {
+    pill = document.createElement('span');
+    pill.className = 'sm-mode-badge';
+    pill.id = 'modeBadge';
+    pill.setAttribute('data-i18n', 'set.mode_simple');
+    head.appendChild(pill);
+  }
+  pill.textContent = t('set.mode_simple');
 }
 
 /** Render the Simple-vs-Professional tier comparison from the canonical registry
@@ -497,19 +529,77 @@ function resolveSettingsSection(section) {
   return SETTINGS_SECTION_ALIASES[section] || section;
 }
 
+/** A nav button's own words (its translated label, without the icon or the
+ *  PRO tag beside it). */
+function navLabel(btn, fallback) {
+  const key = btn?.querySelector('[data-i18n]')?.getAttribute('data-i18n');
+  return key ? t(key) : ((btn?.textContent || '').trim() || fallback);
+}
+
+/** The pane last asked for, so a mode switch can re-open it (see applyMode). */
+let _settingsSectionAsked = null;
+
+/** Is this settings pane hidden by the shop's mode? Its nav button says so:
+ *  `.pro-only` is hidden in Simple (and enthusiast), `.biz-only` in enthusiast.
+ *  The same classes are what hide the button, so the two cannot disagree. */
+function settingsSectionGated(section) {
+  const nav = document.querySelector(`.settings-nav-item[data-settings-section="${section}"]`);
+  if (!nav) return false;
+  const mode = settings.mode || 'professional';
+  if (nav.classList.contains('pro-only') && mode !== 'professional') return true;
+  if (nav.classList.contains('biz-only') && mode === 'enthusiast') return true;
+  return false;
+}
+
+/** Does Simple show this pane as "Part of Professional"? SIMPLE_MAP decides
+ *  (KhaytSimpleMode.paneGate); a pane whose nav button is .pro-only is gated
+ *  too, so a pane the map does not name is never left empty. */
+function settingsPaneGated(section) {
+  if (settings.mode !== 'simple') return false;
+  return !!window.KhaytSimpleMode?.paneGate?.(section, settings.mode) || settingsSectionGated(section);
+}
+
+/** The "Part of Professional" pane, made on first use. */
+function settingsGatePanel() {
+  let panel = document.getElementById('settings-panel-gated');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'settings-panel sm-gate';
+    panel.id = 'settings-panel-gated';
+    $('.settings-panels')?.appendChild(panel);
+  }
+  return panel;
+}
+
 function openSettingsSection(section) {
   section = resolveSettingsSection(section);
-  // Enthusiast (hobbyist) mode has no commerce — bounce business panes to the
-  // first pane (General; Preferences in Bed Ready).
-  if (settings.mode === 'enthusiast' && (BIZ_SETTINGS_SECTIONS.includes(section) || ['invoice', 'payments', 'online'].includes(section))) {
-    section = resolveSettingsSection(document.getElementById('settings-panel-general') ? 'general' : 'prefs');
+  _settingsSectionAsked = section;
+  const firstPane = () => resolveSettingsSection(document.getElementById('settings-panel-general') ? 'general' : 'prefs');
+  // Enthusiast (hobbyist) mode has no commerce — bounce business panes, and
+  // the Professional ones it hides, to the first pane (General; Preferences in
+  // Bed Ready).
+  if (settings.mode === 'enthusiast' && (BIZ_SETTINGS_SECTIONS.includes(section) || ['invoice', 'payments', 'online'].includes(section) || settingsSectionGated(section))) {
+    section = firstPane();
   }
+  // A Professional pane reached in Simple (a link, search, a button elsewhere,
+  // or switching to Simple while on it) says so, with a switch — never an
+  // empty page.
+  const gated = settingsPaneGated(section);
   switchTab('settings-tab');
   $$('.settings-nav-item').forEach(el => {
     el.classList.remove('active');
     el.removeAttribute('aria-current');
   });
   $$('.settings-panel').forEach(el => el.classList.remove('active'));
+  if (gated) {
+    const feature = navLabel($(`.settings-nav-item[data-settings-section="${section}"]`), section);
+    const panel = settingsGatePanel();
+    if (window.KhaytSimpleMode) window.KhaytSimpleMode.renderGated(panel, feature, window.KhaytSimpleMode.paneGate(section, settings.mode));
+    else { openSettingsSection(firstPane()); return; }
+    panel.classList.add('active');
+    panel.scrollTop = 0;
+    return;
+  }
   const navItem = $(`.settings-nav-item[data-settings-section="${section}"]`);
   navItem?.classList.add('active');
   navItem?.setAttribute('aria-current', 'page');
@@ -527,9 +617,27 @@ function switchTab(tabId) {
   // Enthusiast (hobbyist) mode hides all business tabs — redirect if one is reached
   // via deep-link / global search / keyboard so the user never lands on a hidden tab.
   if (settings.mode === 'enthusiast' && BIZ_TABS.includes(tabId)) tabId = 'dashboard-tab';
-  // Pro-only tabs must not be reachable in Simple/Enthusiast via search/deep-link either.
+  // A Professional tab reached in Simple (search, a link, a shortcut, a menu)
+  // opens as the "Part of Professional" panel with a switch (SIMPLE_MAP, via
+  // KhaytSimpleMode). Where that is not loaded, and in enthusiast, it bounces
+  // to the dashboard as before.
+  const tabGate = window.KhaytSimpleMode?.tabGate?.(tabId, settings.mode) || null;
   const isPro = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.isProMode(settings.mode) : (settings.mode || 'professional') === 'professional';
-  if (!isPro && PRO_TABS.includes(tabId)) tabId = 'dashboard-tab';
+  if (!tabGate && !isPro && PRO_TABS.includes(tabId)) tabId = 'dashboard-tab';
+  $$('.tab-content.sm-gated').forEach((el) => { if (el.id !== tabId || !tabGate) el.classList.remove('sm-gated'); });
+  if (tabGate) {
+    const host = document.getElementById(tabId);
+    if (host) {
+      let gate = host.querySelector(':scope > .sm-gate');
+      if (!gate) {
+        gate = document.createElement('div');
+        gate.className = 'sm-gate';
+        host.prepend(gate);
+      }
+      window.KhaytSimpleMode.renderGated(gate, navLabel($(`.tab-btn[data-tab="${tabId}"]`), tabId), tabGate);
+      host.classList.add('sm-gated');
+    }
+  }
   $$('.tab-content').forEach(el => {
     const on = el.id === tabId;
     el.classList.toggle('active', on);
@@ -557,6 +665,8 @@ function switchTab(tabId) {
   if (typeof KhaytVividShell?.syncVividPageHead === 'function') {
     KhaytVividShell.syncVividPageHead(tabId);
   }
+  // The panel stands in for the screen: do not draw what it hides.
+  if (tabGate) return;
 
   if (tabId === 'dashboard-tab')  renderDashboard();
   if (tabId === 'expenses-tab')   { renderExpenses(); populateExpOrderDatalist(); }
