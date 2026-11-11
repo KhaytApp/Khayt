@@ -37,14 +37,14 @@ try {
     settings.mode = 'professional'; applyMode();
     settings.tax = Object.assign({}, settings.tax || {}, { country: 'SA' });
     i18n.set('en');
-    const edited = KhaytCustomerAddress.applyFields({ id: 'ADDR-else', label: 'Head office' },
-      { line1: 'Office 14', city: 'Riyadh' }, { shopCountry: 'SA' });
-    edited.address = 'Office 14, Sample Tower, Dubai'; // an older build changed the text since
+    // Saved in fields, then an older build changed the text (address ≠ textOf).
+    const edited = { id: 'ADDR-else', label: 'Head office', line1: 'Office 14', city: 'Riyadh',
+      textOf: 'Office 14\nRiyadh', address: 'Office 14, Sample Tower, Dubai' };
     clients.push({ id: 'CLI-addr', nameEn: 'Sample Customer', phone: '0500000000', createdAt: '2026-01-01',
       addresses: [{ id: 'ADDR-old', label: 'Old shop', address: 'Sample Street near the sample mall, Jeddah' }, edited] });
     printLog.push({ id: 'J-addr-1', project: 'Cup', status: 'pending', price: 10, parts: [], date: '2026-11-01', clientId: 'CLI-addr' });
     saveAll();
-    return KhaytCustomerAddress.shopCountry(settings);
+    return settings.tax.country;
   });
   ok(shop === 'SA', 'the shop is in Saudi Arabia');
 
