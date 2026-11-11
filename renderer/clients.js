@@ -960,34 +960,71 @@ function openClientEditor(clientId = null) {
       const cePlBtn = modal.querySelector('#cePlAdd');
       if (cePlBtn) cePlBtn.addEventListener('click', () => { draft.priceList.push({ product: '', price: 0, note: '' }); renderPriceList(); });
 
-      // Address book (Feature 4)
-      if (!draft.addresses) draft.addresses = [];
+      // Address book: each row in fields (lib/customer-address.js), edited in
+      // its own editor over this one (renderer/address-editor.js). The rows
+      // live on the draft until this editor saves, so Cancel still undoes.
+      if (!Array.isArray(draft.addresses)) draft.addresses = [];
+      const AddrLib = KhaytCustomerAddress;
+      const AddrEd = KhaytAddressEditor;
+      const addrShopCountry = AddrLib.shopCountry(settings);
+      const addrLang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+      const addrFmt = { shopCountry: addrShopCountry, countryName: (c) => AddrEd.countryName(c, addrLang) };
       const addrWrap = modal.querySelector('#ceAddressBookWrap');
       function renderAddressBook() {
         if (!addrWrap) return;
-        if (!draft.addresses || draft.addresses.length === 0) {
-          addrWrap.innerHTML = `<div style="color:var(--text-muted);font-size:12.5px;padding:4px 0;">${escapeHtml(t('ce.price_list_empty'))}</div>`;
+        const rows = draft.addresses;
+        if (!rows.length) {
+          addrWrap.innerHTML = `<div style="color:var(--text-muted);font-size:12.5px;padding:4px 0;">${escapeHtml(t('addr.none'))}</div>`;
           return;
         }
-        addrWrap.innerHTML = `<div class="table-wrap"><table style="width:100%; border-collapse:collapse;">
-          <thead><tr>
-            <th style="font-size:11px; text-align:start; padding:2px 4px;">${escapeHtml(t('ce.addr_label'))}</th>
-            <th style="font-size:11px; text-align:start; padding:2px 4px;">${escapeHtml(t('ce.addr_address'))}</th>
-            <th></th>
-          </tr></thead>
-          <tbody>${draft.addresses.map((a, i) => `<tr>
-            <td style="padding:2px 4px;"><input type="text" class="addr-label" data-ai="${i}" value="${escapeHtml(a.label || '')}" placeholder="${escapeHtml(t('ce.addr_label'))}" style="width:100%;font-size:12px;"></td>
-            <td style="padding:2px 4px;"><input type="text" class="addr-addr" data-ai="${i}" value="${escapeHtml(a.address || '')}" placeholder="${escapeHtml(t('ce.addr_address'))}" style="width:100%;font-size:12px;"></td>
-            <td><button class="btn danger small addr-rm" data-ai="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button></td>
-          </tr>`).join('')}</tbody>
-        </table></div>`;
-        addrWrap.querySelectorAll('.addr-label').forEach(inp => { inp.addEventListener('input', () => { draft.addresses[+inp.dataset.ai].label = inp.value; }); });
-        addrWrap.querySelectorAll('.addr-addr').forEach(inp => { inp.addEventListener('input', () => { draft.addresses[+inp.dataset.ai].address = inp.value; }); });
-        addrWrap.querySelectorAll('.addr-rm').forEach(btn => { btn.addEventListener('click', () => { draft.addresses.splice(+btn.dataset.ai, 1); renderAddressBook(); }); });
+        const def = AddrLib.defaultRow(draft, 'shipping');
+        addrWrap.innerHTML = rows.map((a, i) => {
+          if (!a || typeof a !== 'object') return '';
+          const hint = AddrEd.rowHint(a);
+          const isDef = def && def.id && def.id === a.id;
+          return `<div class="addr-row" data-ai="${i}" data-addr-state="${escapeHtml(AddrLib.stateOf(a))}">
+            <div class="addr-row-head">
+              <span class="addr-row-label">${escapeHtml(a.label || t('addr.title'))}</span>
+              ${isDef ? `<span class="addr-badge default">${escapeHtml(t('addr.default_shipping'))}</span>` : ''}
+              ${hint.badge === 'check' ? `<span class="addr-badge check">${escapeHtml(t('addr.check_fields'))}</span>` : ''}
+              <button type="button" class="btn ghost small addr-edit" data-ai="${i}">${escapeHtml(t('addr.edit'))}</button>
+            </div>
+            <div class="addr-row-text">${escapeHtml(AddrEd.oneLine(a, addrFmt))}</div>
+            ${hint.note ? `<small class="addr-row-note${hint.tone === 'warn' ? ' warn' : ''}">${escapeHtml(t(hint.note))}</small>` : ''}
+          </div>`;
+        }).join('');
+        addrWrap.querySelectorAll('.addr-edit').forEach((btn) => btn.addEventListener('click', () => openAddrRow(+btn.dataset.ai)));
+      }
+      function setShippingDefault(id, on) {
+        if (on && id) draft.defaultShippingId = id;
+        else if (!on && draft.defaultShippingId === id) delete draft.defaultShippingId;
+      }
+      function openAddrRow(i) {
+        const row = i == null ? null : draft.addresses[i];
+        const def = AddrLib.defaultRow(draft, 'shipping');
+        AddrEd.openAddressEditor({
+          row,
+          newId: uid('ADDR'),
+          shopCountry: addrShopCountry,
+          // A new customer's first address is its default.
+          isDefault: row ? !!(def && def.id === row.id) : draft.addresses.length === 0,
+          onSave(saved, { isDefault }) {
+            if (!saved.id) saved.id = uid('ADDR'); // a row an older app wrote without one
+            if (i == null) draft.addresses.push(saved); else draft.addresses[i] = saved;
+            setShippingDefault(saved.id, isDefault);
+            renderAddressBook();
+          },
+          onRemove() {
+            const gone = draft.addresses.splice(i, 1)[0];
+            if (gone && draft.defaultShippingId === gone.id) delete draft.defaultShippingId;
+            if (gone && draft.defaultBillingId === gone.id) delete draft.defaultBillingId;
+            renderAddressBook();
+          },
+        });
       }
       renderAddressBook();
       const ceAddrAddBtn = modal.querySelector('#ceAddrAdd');
-      if (ceAddrAddBtn) ceAddrAddBtn.addEventListener('click', () => { draft.addresses.push({ id: uid('ADDR'), label: '', address: '' }); renderAddressBook(); });
+      if (ceAddrAddBtn) ceAddrAddBtn.addEventListener('click', () => openAddrRow(null));
 
       // Communication log
       if (!draft.commLog) draft.commLog = [];
@@ -1104,7 +1141,9 @@ function openClientEditor(clientId = null) {
       // Rows with anything in them are kept, and a row another app wrote
       // without `label` (or with fields this build does not know) never throws.
       draft.priceList = (Array.isArray(draft.priceList) ? draft.priceList : []).filter(clientRowHasText);
-      draft.addresses = (Array.isArray(draft.addresses) ? draft.addresses : []).filter(clientRowHasText);
+      // Every row as every build can read it (label and address strings; the
+      // old desktop's save threw on anything else), then the empty ones out.
+      draft.addresses = KhaytCustomerAddress.rowsForOldBuilds(draft.addresses).filter(clientRowHasText);
       if (typeof readPluginEditor === 'function') {
         const withPlugins = readPluginEditor(modal, 'customer', draft);
         if (withPlugins.plugins) draft.plugins = withPlugins.plugins; else delete draft.plugins;
