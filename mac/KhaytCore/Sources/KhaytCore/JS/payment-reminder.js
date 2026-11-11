@@ -73,7 +73,8 @@ function daysOverdue(order, now, client) {
 /** Eligible at all: a non-void order that still owes money. `owed` is the
  *  caller-computed outstanding balance (so currency logic stays in the app). */
 function isReminderEligible(order, owed) {
-  if (!order || order.status === 'quote') return false;
+  // A cancelled job owes nothing, whatever `owed` the caller worked out.
+  if (!order || order.status === 'quote' || order.status === 'cancelled') return false;
   if (order.voidedAt) return false;
   return (+owed || 0) > 0.005;
 }
@@ -177,7 +178,7 @@ function milestoneBalances(order) {
  */
 function milestonesDue(order, now = Date.now(), cfg) {
   const grace = cfg && Number.isFinite(+cfg.graceDays) ? +cfg.graceDays : DEFAULTS.graceDays;
-  if (!order || order.status === 'quote' || order.voidedAt) return [];
+  if (!order || order.status === 'quote' || order.status === 'cancelled' || order.voidedAt) return [];
   const today = startOfDay(now);
   return milestoneBalances(order)
     .filter((m) => m.dueDate && m.unpaid > 0.005)
