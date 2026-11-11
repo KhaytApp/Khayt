@@ -28,8 +28,31 @@ struct NewJobSheet: View {
     /// Its own property because `ImageRenderer` draws nothing inside a
     /// `ScrollView` — the snapshot of this sheet was a title, two rules and
     /// three buttons over an empty page, and passed, because a picture has
-    /// nothing to assert. The test photographs this directly.
+    /// nothing to assert. The test photographs this directly: the part that
+    /// scrolls, then the total that does not, as the sheet stacks them.
     var paper: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            scrolled
+            Divider()
+            pinnedTotal
+        }
+    }
+
+    /// What the job comes to, OVER THE BUTTONS and out of the scroll view.
+    ///
+    /// It was the last-but-one line of the scrolling part, so a job from a
+    /// product or a quote from a model — both taller than the sheet's cap —
+    /// opened with the Total cut in half by the footer's rule (Nov 11 2026
+    /// review, B5). The one figure the sheet exists to agree is the one that
+    /// must never need scrolling to.
+    var pinnedTotal: some View {
+        total
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18).padding(.top, 12)
+    }
+
+    /// The part of the sheet that scrolls.
+    var scrolled: some View {
         VStack(alignment: .leading, spacing: 16) {
             who
             if let agreementNote {
@@ -47,7 +70,8 @@ struct NewJobSheet: View {
             }
             cart
             money
-            total
+            // "Where the number came from", under the controls that move it.
+            // The total itself is pinned below: see `pinnedTotal`.
             breakdown
         }
         .padding(18)
@@ -228,8 +252,9 @@ struct NewJobSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            ScrollView { paper }
+            ScrollView { scrolled }
             Divider()
+            pinnedTotal
             footer
         }
         // Sized to what is in it, not to a number. A fixed height left a third
