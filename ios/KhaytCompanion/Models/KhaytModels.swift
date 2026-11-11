@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 struct ShopStatus: Codable, Sendable {
     let queued: Int
@@ -53,6 +54,9 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     /// server sending the word later. A field this app does not draw must never
     /// again be the reason a screen is empty.
     let priority: String?
+    /// A voided job, when this one was rebuilt from History (`init(entry:)`).
+    /// Never on the wire: the queue only ever holds live jobs.
+    var voided = false
 
     private enum CodingKeys: String, CodingKey {
         case id, jobNumber, project, client, status, machine, machineId, dueDate, priority
@@ -137,9 +141,11 @@ struct QueueOrder: Codable, Identifiable, Sendable {
         guard let machineId, !machineId.isEmpty,
               let named = machines.first(where: { $0.id == machineId })?.name,
               !named.isEmpty else { return self }
-        return QueueOrder(id: id, project: project, client: client, status: status,
-                          machine: named, machineId: machineId,
-                          dueDate: dueDate, priority: priority, jobNumber: jobNumber)
+        var renamed = QueueOrder(id: id, project: project, client: client, status: status,
+                                machine: named, machineId: machineId,
+                                dueDate: dueDate, priority: priority, jobNumber: jobNumber)
+        renamed.voided = voided
+        return renamed
     }
 }
 
@@ -568,6 +574,12 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// currency when it is saved (#2148), so it is not always the shop's.
     /// Absent means the shop's.
     var currency: String? = nil
+    /// When the job was voided. Any JSON at all, because no screen prints it
+    /// and a stamp in an unexpected shape must never empty History (the way a
+    /// boolean `priority` once emptied the queue). Only whether it is there
+    /// counts: a voided job is finished and cannot be late. `/api/orders` does
+    /// not send it, so over Wi-Fi alone it is always nil.
+    var voidedAt: JSONValue? = nil
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference
