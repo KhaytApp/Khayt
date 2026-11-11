@@ -63,7 +63,7 @@ struct OnTimeCard: View {
                                 (Text(Self.day(job.dueDate, words)) + Text(" ")
                                     + Text(Image(systemName: "arrow.forward"))
                                     + Text(" " + Self.day(job.finishedDay, words)))
-                                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                                    .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                             }
                             Spacer(minLength: 8)
                             Text(words.counting(Int(job.delayDays.rounded()), "mac.days_late"))

@@ -217,7 +217,7 @@ struct SpoolSheet: View {
                                                       weight: weight, fullWeight: fullWeight) {
                             Text(shop.words.callIt("mac.per_kilo") + " "
                                  + Money.text(perKilo, shop.currency))
-                                .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                .font(.callout).foregroundStyle(Khayt.faint).monospacedDigit()
                                 .fixedSize()
                         }
                     }
@@ -238,7 +238,7 @@ struct SpoolSheet: View {
                             if vatAmount > 0, cost > vatAmount {
                                 Text(shop.words.callIt("inv.costs_a_job") + " "
                                      + Money.text(cost - vatAmount, shop.currency))
-                                    .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                    .font(.callout).foregroundStyle(Khayt.faint).monospacedDigit()
                                     .fixedSize()
                             }
                         }

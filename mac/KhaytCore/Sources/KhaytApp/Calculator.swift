@@ -138,7 +138,7 @@ struct Calculator: View {
                 TextField("", text: Binding(get: { model.rates[field] ?? "" },
                                             set: { model.rates[field] = $0 }))
                     .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
-                Text(unit).font(.caption2).foregroundStyle(.tertiary)
+                Text(unit).font(.caption2).foregroundStyle(Khayt.faint)
                 Spacer()
             }
         }
@@ -335,19 +335,19 @@ struct Calculator: View {
                     Text(shop.words.callIt("mac.calc_cost").lowercased())
                         .foregroundStyle(.secondary)
                     if let q = quoted, q.discountAmount > 0 {
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         Text("−" + Money.short(q.discountAmount, shop.currency))
                             .monospacedDigit().foregroundStyle(Khayt.attention)
                     }
                     if let q = quoted, q.rushFee > 0 {
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         Text("+" + Money.short(q.rushFee, shop.currency))
                             .monospacedDigit().foregroundStyle(Khayt.hot)
                     }
                     // The shop's fixed costs by the print hour, a cost line of
                     // its own beside the cost (only while the shop has it on).
                     if let q = quoted, let overhead = q.overhead, overhead > 0 {
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         Text("+" + Money.short(overhead, shop.currency))
                             .monospacedDigit()
                         Text(shop.words.callIt("calc.bd.overhead").lowercased())
@@ -482,7 +482,7 @@ struct Calculator: View {
                     .labelsHidden()
                     .monospacedDigit()
                     .frame(width: 74)
-                Text(unit).font(.caption).foregroundStyle(.tertiary)
+                Text(unit).font(.caption).foregroundStyle(Khayt.faint)
             }
         }
     }
@@ -526,7 +526,7 @@ struct Calculator: View {
                 }
                 HStack(spacing: 4) {
                     TextField("", text: grams).labelsHidden().monospacedDigit().frame(width: 74)
-                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(Khayt.faint)
                     Text(shop.words.callIt("mac.calc_total_grams",
                                            ["g": .string(Money.grams(model.gramsValue))]))
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
@@ -560,7 +560,7 @@ struct Calculator: View {
                                 model.spoolBinding(line.id))
                     TextField("", text: model.gramsBinding(line.id))
                         .labelsHidden().monospacedDigit().frame(width: 74)
-                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(Khayt.faint)
                     Button(role: .destructive) { model.removeFilament(line.id) } label: {
                         Image(systemName: "minus.circle")
                     }
@@ -579,7 +579,7 @@ struct Calculator: View {
                 Text(shop.words.callIt("mac.calc_purge")).font(.caption).foregroundStyle(.secondary)
                 TextField("", text: $model.purge)
                     .labelsHidden().monospacedDigit().frame(width: 60)
-                Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+                Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(Khayt.faint)
             }
             // Said once, when adding a colour divided the weight already typed
             // rather than adding to it.

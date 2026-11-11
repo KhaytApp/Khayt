@@ -457,7 +457,7 @@ struct GroupCrumb: View {
             // In the shop's digits, as every other count in the app.
             Text(verbatim: shop.words.numeral(shop.shownFiles.count))
                 .monospacedDigit()
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
             Spacer(minLength: 0)
         }
         .font(.callout)

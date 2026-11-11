@@ -125,8 +125,8 @@ struct ScheduleSheet: View {
             // How long until it would come off, which is the figure a shop
             // actually schedules around.
             Text(finish(shop.finishShown(a)))
-                .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
-            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+                .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
+            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(Khayt.faint)
             Text(said.machine).fontWeight(.semibold).lineLimit(1)
         }
         .padding(.horizontal, 12)

@@ -1537,7 +1537,7 @@ private struct Connection: View {
                             TextField("192.168.1.40", text: $host)
                                 .textFieldStyle(.roundedBorder)
                                 .onChange(of: host) { _, _ in said = nil }
-                            Text(":").foregroundStyle(.tertiary)
+                            Text(":").foregroundStyle(Khayt.faint)
                             TextField("", value: $port, format: .number.locale(Money.digits).grouping(.never))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 62)
                                 .onChange(of: port) { _, _ in said = nil }
@@ -1584,7 +1584,7 @@ private struct Connection: View {
                                 // What makes it answer at all, which is the
                                 // question every Bambu owner asks first.
                                 Text(shop.words.callIt("mac.mach_bambu_hint"))
-                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .font(.caption2).foregroundStyle(Khayt.faint)
                                     .fixedSize(horizontal: false, vertical: true)
                                 // Quietly: it works, and is trusted the way it
                                 // was before, but Bambu Lab's CAs did not vouch
@@ -1624,7 +1624,7 @@ private struct Connection: View {
                                 // takes a credential and says nothing about where
                                 // it goes is one a shop is right to distrust.
                                 Text(shop.words.callIt(forgetKey ? "mach.key_will_clear" : "mach.key_where"))
-                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .font(.caption2).foregroundStyle(Khayt.faint)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
@@ -1700,7 +1700,7 @@ private struct CameraSettings: View {
                     // against the printer's host, which is also the only host it
                     // may ever be fetched from.
                     Text(words.callIt("mac.cam_same_host"))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack(spacing: 14) {
@@ -1826,7 +1826,7 @@ struct DowntimeEditor: View {
                     // A symbol, not a typed "→": the symbol turns round in a
                     // right-to-left window and the character does not, so the
                     // Arabic row pointed from the end back to the start.
-                    Image(systemName: "arrow.forward").foregroundStyle(.tertiary)
+                    Image(systemName: "arrow.forward").foregroundStyle(Khayt.faint)
                     DatePicker("", selection: Self.date($block.to), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
                     TextField(words.callIt("mach.downtime_reason"), text: $block.reason)

@@ -133,7 +133,7 @@ struct OrdersTable: View {
                         .lineLimit(1)
                         .help(label)
                 } else {
-                    Text("—").foregroundStyle(.tertiary)
+                    Text("—").foregroundStyle(Khayt.faint)
                 }
             }
             .width(min: 64, ideal: 76)
@@ -296,7 +296,7 @@ struct JobTitleCell: View {
             // still opens the job either way.
             ViewThatFits(in: .horizontal) {
                 Text(job.reference)
-                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                    .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                     .lineLimit(1).fixedSize()
                 Color.clear.frame(width: 0, height: 0)
             }
@@ -417,7 +417,7 @@ private struct StageCell: View {
             // animates nothing.
             .animation(Motion.of(Motion.figure, unless: reduced), value: stage)
         } else {
-            Text(job.status).foregroundStyle(.tertiary)
+            Text(job.status).foregroundStyle(Khayt.faint)
         }
     }
 
@@ -671,7 +671,7 @@ private struct Owed: View {
         } else if job.isSettled {
             Text(words.callIt("mac.settled"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .trailing, spacing: 3) {

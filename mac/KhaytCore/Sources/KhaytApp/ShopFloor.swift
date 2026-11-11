@@ -400,7 +400,7 @@ struct MachineCard: View {
                             // fault rather than as a comparison.
                             Text(shop.words.callIt("mac.bed_against",
                                  ["w": .string("\(Int(saturating: shop.widestBed))"), "d": .string("\(Int(saturating: shop.deepestBed))")]))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(Khayt.faint)
                                 // It wrapped to one truncated line — "dashed:
                                 // the largest bed…" says nothing at all.
                                 .fixedSize(horizontal: false, vertical: true)
@@ -478,7 +478,7 @@ struct MachineCard: View {
                     // whose source is not stated is a number nobody can check.
                     if machine.hasPrinterHistory {
                         Text(shop.words.callIt("mac.wear_from_printer"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
             }
@@ -522,7 +522,7 @@ struct MachineCard: View {
                     VStack(alignment: .leading, spacing: 7) {
                         if upkeep.tasks.isEmpty {
                             Text(shop.words.callIt("maint.no_tasks"))
-                                .font(.caption).foregroundStyle(.tertiary)
+                                .font(.caption).foregroundStyle(Khayt.faint)
                         }
                         ForEach(upkeep.tasks) { task in
                             Upkeep(task: task, machine: machine, shop: shop)
@@ -618,7 +618,7 @@ struct Upkeep: View {
                     .lineLimit(1)
                 if let every {
                     Text(verbatim: "\(shop.words.callIt("maint.every")) \(every)")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Spacer(minLength: 6)
@@ -627,11 +627,11 @@ struct Upkeep: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(colour)
                 if let left {
-                    Text(left).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    Text(left).font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                 }
                 if task.deferred == true {
                     Text(shop.words.callIt("mac.mt_deferred"))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Button(shop.words.callIt("maint.mark_done")) {
@@ -684,7 +684,7 @@ struct Upkeep: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .font(.caption)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Khayt.faint)
             .disabled(!shop.canMoveJobs)
             .accessibilityLabel(shop.words.callIt("common.edit"))
             .shopSheet(isPresented: $editing) {
@@ -1387,7 +1387,7 @@ struct ConsumablesCard: View {
                                 .foregroundStyle(Khayt.attention)
                         }
                     }
-                    Text(stockLine).font(.caption2).foregroundStyle(.tertiary)
+                    Text(stockLine).font(.caption2).foregroundStyle(Khayt.faint)
                 }
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 1) {
@@ -1403,7 +1403,7 @@ struct ConsumablesCard: View {
                     // and an invented number there lands on a purchase order.
                     if let need, need.suggestQty > 0 {
                         Text(verbatim: "\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
-                            .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                            .font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                     }
                 }
             }
@@ -1713,7 +1713,7 @@ struct SpoolCard: View {
                     if colour == nil {
                         Rectangle()
                             .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                             .frame(height: bodyH * level)
                     }
                 }
@@ -1798,7 +1798,7 @@ struct SpoolCard: View {
             // could be mistaken for grey filament.
             if colour == nil {
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(width: wound * 2, height: wound * 2)
             }
         }
@@ -1891,7 +1891,7 @@ private struct Live: View {
             }
         } else {
             Text(shop.words.callIt("mac.asking"))
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.caption).foregroundStyle(Khayt.faint)
         }
     }
 
@@ -2073,7 +2073,7 @@ private struct Live: View {
                 if let caption = PrinterWatch.progressCaption(type: status.type,
                                                               source: status.progressSource) {
                     Text(shop.words.callIt(caption))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
