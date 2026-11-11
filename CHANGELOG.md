@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fix (Mac, Arabic): the first filter chip on Gift cards and the Catalogue was faded out.** The row's "more this way" fade was drawn on the wrong end, over the first chip, even when every chip fitted.
 - **Fix (Mac): more small text you can read.** The grey captions on a machine's card ("The machine", "Right now", "Nozzle wear") and the dimmed labels and empty values in Reports, Customers, the Catalogue, Expenses and Gift cards were still drawn too pale. They use the same readable grey as the rest.
 - **Fix (Mac): Settings › Preferences › "Where the library lives".** The "Now" row always says where the library is, and the blank row at the foot of the section is gone.
 - **Fix (Mac): three cut-off controls.** "From your print library…" in Edit product, a price agreement's note in Edit customer, and the reason for a machine's scheduled downtime are shown whole; the downtime reason has its own line under the two dates.
