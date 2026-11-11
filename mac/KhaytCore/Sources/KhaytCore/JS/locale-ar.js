@@ -5452,6 +5452,6 @@
   "tg.notify_hold": "عند تعليق طلب",
   "tg.notify_low": "عند انخفاض المخزون",
   "set.plib_root_ph": "هذا الكمبيوتر (افتراضي)",
-  "set.about_name": "Khayt · خيط",
+  "set.about_name": "خيط",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
