@@ -1,5 +1,4 @@
 import Foundation
-import KhaytCore
 
 struct ShopStatus: Codable, Sendable {
     let queued: Int
@@ -579,7 +578,7 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// boolean `priority` once emptied the queue). Only whether it is there
     /// counts: a voided job is finished and cannot be late. `/api/orders` does
     /// not send it, so over Wi-Fi alone it is always nil.
-    var voidedAt: JSONValue? = nil
+    var voidedAt: Stamp? = nil
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference
@@ -587,6 +586,20 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
 
     var displayClient: String {
         client?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
+    }
+}
+
+/// A field read only for whether it is there: any JSON value decodes, and
+/// `null` counts as absent. Kept free of KhaytCore so the contract check can
+/// compile this file on its own.
+struct Stamp: Codable, Sendable {
+    let present: Bool
+    init(from decoder: Decoder) throws {
+        present = !((try? decoder.singleValueContainer().decodeNil()) ?? false)
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try present ? c.encode(true) : c.encodeNil()
     }
 }
 

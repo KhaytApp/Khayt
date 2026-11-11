@@ -11,7 +11,7 @@ extension QueueOrder {
 }
 
 extension OrderLogEntry {
-    var isVoided: Bool { voidedAt.map { $0 != .null } ?? false }
+    var isVoided: Bool { voidedAt?.present ?? false }
 
     /// Past its day AND still open — History holds finished and cancelled jobs
     /// too, and those are never late.
