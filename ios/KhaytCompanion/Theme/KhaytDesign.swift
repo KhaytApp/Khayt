@@ -37,6 +37,12 @@ enum KhaytDesign {
     static let collect = Color(light: 0x0E7A70, dark: 0x3FD0C0)
     /// On hold and quality check.
     static let hold = Color(light: 0x6B52B5, dark: 0xB49CFF)
+    /// Waiting for the shop's OK on the Mac (a connector update that asks
+    /// for more). Steel, the Mac's status/pending; Figma signal/pending.
+    static let pending = Color(light: 0x5E6C84, dark: 0xA9B8CF)
+    /// The wash behind `pending`: greyer than every navy surface in Dark,
+    /// so the badge never reads as a neutral one. Figma signal/pending-soft.
+    static let pendingWash = Color(light: 0xEDF0F4, dark: 0x3A4658)
     /// The well a thumbnail sits in: lighter than the card in dark.
     static let well = Color(light: 0xEEF1F3, dark: 0x2A4670)
     /// The icon's navy, for the mark's tile and nothing that is read.
