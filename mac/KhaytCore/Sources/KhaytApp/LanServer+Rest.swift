@@ -113,6 +113,13 @@ extension LanServer {
             return await restRead(request, "waitingList", [])
         case "/api/clients" where isGet:
             return await restRead(request, "clientsList", [])
+        case "/api/quote" where m == "POST":
+            // The phone's "ask the Mac" calculator. A read: nothing is written.
+            guard let part = Self.body(request.body) else {
+                if let refused = await pinGate(request) { return refused }
+                return .json(400, Self.errorBody("Invalid part payload"))
+            }
+            return await restRead(request, "quotePart", [part, self.restContext()])
         case "/api/waste" where m == "POST":
             // Not JSON, or empty, is the rule's own "Invalid waste payload".
             return await restWrite(request, "wasteCreate", empty: .null) { [$0, self.restContext()] }

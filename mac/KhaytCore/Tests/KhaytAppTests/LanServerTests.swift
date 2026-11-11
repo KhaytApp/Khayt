@@ -40,6 +40,8 @@ struct LanServerTests {
         /// What `/api/orders/{id}/photos` handed the stubbed photo hook: the
         /// job and the byte count, in order.
         let photoCalls = PrinterCalls()
+        /// What reached the expense hook: the body's size, once per call.
+        let expenseCalls = PrinterCalls()
         var tokens = 0
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
@@ -143,6 +145,11 @@ struct LanServerTests {
             host.addJobPhoto = { id, data in
                 photoCalls.calls.append("\(id) \(data.count)")
                 return (201, #"{"ok":true,"index":0}"#)
+            }
+            let expenseCalls = self.expenseCalls
+            host.addExpense = { body in
+                expenseCalls.calls.append("\(body.count)")
+                return (201, #"{"ok":true,"entry":{}}"#)
             }
             // The REST writes, as the app runs them (`Shop.applyLanRest`) — on
             // the bench's book rather than a file. Off unless asked, as in the app.

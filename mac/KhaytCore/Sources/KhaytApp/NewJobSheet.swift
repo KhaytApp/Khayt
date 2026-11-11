@@ -940,6 +940,14 @@ struct NewJobSheet: View {
                 Text(shop.words.callIt("calc.bd.overhead") + " " + Money.figure(overhead))
                     .font(.callout).foregroundStyle(.secondary).monospacedDigit()
             }
+            // THE SHOP'S MINIMUM ORDER. Settings has always saved it and only
+            // the other app's calculator read it: here a job was quoted under
+            // the minimum with nothing said. A warning, as there — the shop
+            // may have its reasons — never a refusal.
+            if let quoted, let min = Self.belowMinimum(total: quoted.total, settings: shop.settingsDict) {
+                Text(shop.words.callIt("calc.min_order_warn", ["min": .string(Money.figure(min))]))
+                    .font(.callout).foregroundStyle(Khayt.attention)
+            }
             // Percentage fees too high to build into the price (the rule's
             // cap): the shop keeps less than this total reads as, so say so.
             if let quoted, quoted.feeWarning == "fees-too-high" {
@@ -1115,6 +1123,12 @@ struct NewJobSheet: View {
             shippingCost: shippingCost, rush: rush,
             agreedAmount: agreedAmount, rule: rule, extraLines: extraLines,
             overheadHours: hours)
+    }
+
+    /// The shop's minimum order amount when `total` is under it, else nil.
+    static func belowMinimum(total: Double, settings: [String: JSONValue]) -> Double? {
+        guard case .number(let min)? = settings["minOrderAmount"], min > 0, total > 0, total < min - 0.005 else { return nil }
+        return min
     }
 
     /// The caption beside the buttons: why they are greyed out, or that the

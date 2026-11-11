@@ -86,7 +86,13 @@ extension Shop {
             goTo(GoToIndex.Entry(kind: .machine, id: id, title: id, fields: []))
         case .spool(let id):
             guard canShow(.inventory), spools.contains(where: { $0.id == id }) else { return false }
+            // The spool itself, as ⌘K does it: the shelf with its search
+            // cleared, and that card selected. A tap on a low spool in the
+            // widget used to land on the whole shelf, filtered by whatever was
+            // last typed there.
             shelf = .inventory
+            search = ""
+            spoolSelection = id
         case .screen(let name):
             guard let target = Shelves.shelf(name, in: self), canShow(target) else { return false }
             shelf = target

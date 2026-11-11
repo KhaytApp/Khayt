@@ -1895,7 +1895,7 @@
  "mac.open_the_sample": "O abre el taller de ejemplo: 42 trabajos, 5 máquinas, números reales.",
  "mac.open_total": "abiertos",
  "mac.open_whatsapp": "Abrir WhatsApp",
- "mac.operator_access_hint": "Lo usa el bloqueo de operarios de la app de escritorio. Este Mac no pide un PIN.",
+ "mac.operator_access_hint": "Lo que esta persona puede hacer cuando el inicio de sesión del personal está activado.",
  "mac.operator_active": "Activo: se ofrece al asignar un trabajo o registrar tiempo",
  "mac.operator_add": "Añadir operario",
  "mac.operator_delete_confirm": "¿Eliminar «{name}»?",

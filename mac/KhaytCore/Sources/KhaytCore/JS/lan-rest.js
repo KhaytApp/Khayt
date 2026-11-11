@@ -693,6 +693,81 @@
     return out;
   }
 
+  /**
+   * `POST /api/quote` — cost one part from the phone, with the shop's own
+   * maths (`calculator-cost.js`, `pricing.js`) against the live book, so the
+   * phone can never quote a different number from the computer it is paired
+   * to. Cost, the price tier that applies, and cost → price by the same
+   * function the calculator screen calls. Reads only.
+   *
+   * The desktop's server has carried this inline since the phone could ask;
+   * the Mac did not serve it at all, so the phone's "ask the Mac" calculator
+   * always failed there (the Nov 10 2026 review). This is that route's rule,
+   * for both to call.
+   *
+   * `ctx.overheadPerHour` is the shop's fixed costs per print hour when the
+   * caller has already worked it out; otherwise `public-quote.js` resolves it
+   * from the book for `ctx.today`.
+   */
+  function quotePart(store, raw, ctx) {
+    const part = cleanBody(raw);
+    if (!part) return err(400, 'Invalid part payload');
+    const Cost = req('KhaytCalculatorCost', './calculator-cost.js');
+    const Pricing = req('KhaytPricing', './pricing.js');
+    if (!Cost || !Pricing) return err(500, 'Could not cost this part');
+    try {
+      const book = store || {};
+      const c = ctx || {};
+      const settings = book.settings || {};
+      const costCtx = { inventory: book.inventory || [], settings };
+      const qty = Math.max(1, Math.min(100000, +part.qty || 1));
+      const unitCost = Cost.computePartBaseCost(Object.assign({}, part, { qty }), costCtx);
+      const breakdown = Cost.computePartBreakdown(Object.assign({}, part, { qty }), costCtx);
+      const tier = Pricing.activePriceTier(part.priceTiers, qty);
+      let overheadPerHour = 0;
+      if (!tier) {
+        if (Number.isFinite(+c.overheadPerHour) && c.overheadPerHour != null) overheadPerHour = Math.max(0, +c.overheadPerHour);
+        else {
+          const PQ = req('KhaytPublicQuote', './public-quote.js');
+          if (PQ && PQ.overheadPerHourFor) overheadPerHour = PQ.overheadPerHourFor(book, c.today || localDay());
+        }
+      }
+      const price = Pricing.quoteTotal({
+        baseCost: unitCost * qty,
+        qty,
+        margin: part.margin,
+        overheadPerHour,
+        printHours: tier ? 0 : Math.max(0, +part.printTime || 0) * qty,
+        priceTier: tier,
+        discountPct: part.discountPct,
+        rushEnabled: !!part.rush,
+        rushPct: settings.rushFeePct == null ? 25 : settings.rushFeePct,
+        shippingCost: part.shippingCost,
+        extraLines: part.extraLines,
+      });
+      const round = (n) => Math.round((Number.isFinite(n) ? n : 0) * 10000) / 10000;
+      return { status: 200, body: {
+        ok: true,
+        qty,
+        unitCost: round(unitCost),
+        totalCost: round(unitCost * qty),
+        breakdown: {
+          material: round(breakdown.material), machine: round(breakdown.machine),
+          labor: round(breakdown.labor), buffer: round(breakdown.buffer),
+        },
+        priceTier: tier ? { minQty: +tier.minQty, pricePerUnit: +tier.pricePerUnit } : null,
+        price: {
+          beforeDiscount: round(price.priceBeforeDiscount), discount: round(price.discountAmount),
+          subtotal: round(price.subtotal), rushFee: round(price.rushFee), shipping: round(price.shipping),
+          extras: round(price.extras), overhead: round(price.overhead), total: round(price.total),
+        },
+        currency: settings.currency || null,
+      } };
+    } catch (_) {
+      return err(400, 'Could not cost this part');
+    }
+  }
+
   /** Every collection a rule here reads or writes. */
   const BOOK_KEYS = ['printLog', 'waitingList', 'waitingListHistory', 'settings', 'machines',
     'clients', 'inventory', 'wasteLog'];
@@ -701,7 +776,7 @@
     BOOK_KEYS,
     LAN_SPOOL_FIELDS, LAN_SPOOL_READ_FIELDS, pickLanSpoolFields, pickLanSpoolRead,
     ORDER_STATUSES, WAITING_STATUSES,
-    ordersList, machinesList, inventoryList, waitingList, clientsList, orderQuoteUrl,
+    ordersList, machinesList, inventoryList, waitingList, clientsList, orderQuoteUrl, quotePart,
     orderCreate, orderPatch, orderApprove,
     inventoryCreate, inventoryPatch, inventoryDelete,
     waitingListPatch, wasteCreate,
