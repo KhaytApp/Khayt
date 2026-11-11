@@ -60,7 +60,7 @@ struct NewOrderSheet: View {
                     VStack(spacing: 0) {
                         field(L10n.tr("order.new.client")) {
                             HStack(spacing: 8) {
-                                TextField("", text: $draft.client, prompt: prompt("Acme Robotics"))
+                                TextField(L10n.tr("order.new.client"), text: $draft.client, prompt: prompt("Acme Robotics"))
                                     .onChange(of: draft.client) { _, typed in
                                         // Typing over a picked customer unpicks it.
                                         if let id = draft.clientId,
@@ -97,15 +97,15 @@ struct NewOrderSheet: View {
                             .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
                         }
                         field(L10n.tr("order.new.project")) {
-                            TextField("", text: $draft.project, prompt: prompt("Falcon hood"))
+                            TextField(L10n.tr("order.new.project"), text: $draft.project, prompt: prompt("Falcon hood"))
                         }
                         field(L10n.tr("order.new.material")) {
-                            TextField("", text: $draft.material, prompt: prompt("PLA · Ink"))
+                            TextField(L10n.tr("order.new.material"), text: $draft.material, prompt: prompt("PLA · Ink"))
                         }
                         // The shop's own currency when the book says it.
                         field(currency.map { L10n.format("order.new.price_in", Money.mark($0)) }
                               ?? L10n.tr("order.new.price")) {
-                            TextField("", text: $draft.price, prompt: prompt("0"))
+                            TextField(L10n.tr("order.new.price"), text: $draft.price, prompt: prompt("0"))
                                 .keyboardType(.decimalPad)
                         }
                         dueRow
@@ -214,13 +214,14 @@ struct NewOrderSheet: View {
         field(L10n.tr("order.new.due")) {
             HStack {
                 if hasDueDate {
-                    DatePicker("", selection: $dueDate, displayedComponents: .date)
+                    DatePicker(L10n.tr("order.new.due"), selection: $dueDate, displayedComponents: .date)
                         .labelsHidden()
                     Spacer()
                     Button { hasDueDate = false } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(KhaytDesign.note)
                     }
                     .buttonStyle(.plain)
+                    .tapTarget()
                     .accessibilityLabel(L10n.tr("common.clear"))
                 } else {
                     Button { hasDueDate = true } label: {

@@ -87,7 +87,7 @@ struct MachinesView: View {
                 Label(L10n.tr("camera.open"), systemImage: "video")
                     .font(.khayt(14, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.brand)
-                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
         case .refused(let why)?:

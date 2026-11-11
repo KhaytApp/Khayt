@@ -657,6 +657,7 @@ struct ConnectorSettingsPage: View {
                 } label: {
                     Image(systemName: "trash")
                 }
+                .tapTarget()
                 .accessibilityLabel(L10n.tr("connectors.key.delete"))
                 .foregroundStyle(KhaytDesign.late)
             }
