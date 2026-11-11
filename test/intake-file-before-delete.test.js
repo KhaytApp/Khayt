@@ -73,6 +73,7 @@ function stubApp(takeFile) {
     printLog: [], clients: [], settings: {}, saveAll() {}, toast() {}, switchTab() {},
     t: (k) => k, uid: (p) => `${p}-1`, localDateStr: () => '2026-10-29', nextQuoteSeq: () => '0001',
   });
+  require('../renderer/currency.js'); // stampJobCurrency, as index.html loads it
   return calls;
 }
 const REQ = { id: 'IN1', payload: { title: 'Bracket', name: 'Sara', contact: 'sara@example.com', file: { name: 'bracket.stl', bytes: BYTES.length, sha256: SHA } } };
