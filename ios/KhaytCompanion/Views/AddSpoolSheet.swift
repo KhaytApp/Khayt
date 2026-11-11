@@ -401,8 +401,8 @@ struct SpoolReviewForm: View {
                                 .fill(Color(hex: c.hex) ?? .gray)
                                 .frame(height: 36)
                                 .overlay(RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(picked ? KhaytDesign.brand : KhaytDesign.textFaint,
-                                                  lineWidth: picked ? 3 : 1))
+                                    .strokeBorder(picked ? KhaytDesign.brand : KhaytDesign.swatchRing,
+                                                  lineWidth: picked ? 3 : 1.5))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(L10n.tr("colour.\(c.key)"))
@@ -495,9 +495,7 @@ struct TagPreviewCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 if let hex = tag.hex {
-                    Circle()
-                        .fill(Color(hex: hex) ?? .gray)
-                        .frame(width: 28, height: 28)
+                    SpoolSwatch(hex: hex, size: 28)
                 }
                 VStack(alignment: .leading) {
                     Text(tag.materialLabel.isEmpty ? L10n.tr("spool.detail.filament") : tag.materialLabel)

@@ -168,3 +168,11 @@ extension UIReviewWorthDoingTests {
         XCTAssertNotEqual(ar["order.new.hint.client"], try table("en")["order.new.hint.client"])
     }
 }
+
+// MARK: W7 — swatches carry a ring that shows on navy and on paper
+extension UIReviewWorthDoingTests {
+    func testSwatchRingIsVisibleWeight() {
+        XCTAssertEqual(SpoolSwatch.ring(for: 48), 2)
+        XCTAssertEqual(SpoolSwatch.ring(for: 14), 1.5)
+    }
+}
