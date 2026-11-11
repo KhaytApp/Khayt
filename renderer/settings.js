@@ -3933,16 +3933,16 @@ function renderOperatorLockSettings() {
   el.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
       ${activeOp
-        ? `Active operator: <strong>${escapeHtml(activeOp.name)}</strong> (${escapeHtml(activeOp.role || 'no role')})`
-        : 'No operator active — all features accessible.'}
+        ? `${escapeHtml(t('op.active_label'))}: <strong>${escapeHtml(activeOp.name)}</strong> (${escapeHtml(activeOp.role || t('op.no_role'))})`
+        : escapeHtml(t('op.none_active'))}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button id="btnSwitchOperator" class="btn small primary">${escapeHtml(t('op.switch') || 'Switch operator')}</button>
       ${activeOp ? `<button id="btnLockNow" class="btn small">${escapeHtml(t('op.lock') || 'Lock now')}</button>` : ''}
     </div>
     ${operators.length === 0
-      ? `<p style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Add operators in the Operators section above, then assign PINs.</p>`
-      : `<div style="margin-top:12px;font-size:12.5px;font-weight:600;margin-bottom:6px;">Operator PINs</div>
+      ? `<p style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">${escapeHtml(t('op.add_hint'))}</p>`
+      : `<div style="margin-top:12px;font-size:12.5px;font-weight:600;margin-bottom:6px;">${escapeHtml(t('op.pins'))}</div>
          <div style="display:flex;flex-direction:column;gap:6px;">
            ${operators.map(op => `
              <div style="display:flex;align-items:center;gap:10px;">
@@ -3950,9 +3950,9 @@ function renderOperatorLockSettings() {
                <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(op.role || '')}</span>
                <input type="password" class="op-pin-input" data-op-id="${op.id}" aria-label="${escapeHtml(t('ops.pin_for') || 'PIN for')} ${escapeHtml(op.name || op.id)}"
                  value="${op.pinHash ? '****' : ''}"
-                 placeholder="${op.pinHash ? '(set)' : 'Set PIN'}"
+                 placeholder="${escapeHtml(op.pinHash ? t('op.pin_set_ph') : t('op.pin_new_ph'))}"
                  maxlength="8" style="width:80px;font-size:12px;">
-               <button class="btn small op-save-pin" data-op-id="${op.id}">Save PIN</button>
+               <button class="btn small op-save-pin" data-op-id="${op.id}">${escapeHtml(t('op.save_pin'))}</button>
              </div>`).join('')}
          </div>`}`;
 
@@ -6990,10 +6990,10 @@ function renderTelegramSettings() {
   if (!el) return;
   const tg = settings.telegram || {};
   el.innerHTML = `
-    <label>Bot Token</label>
-    <input type="password" id="tgBotToken" value="${escapeHtml(tg.botToken || '')}" placeholder="123456:ABC-...">
-    <label style="margin-top:8px;">Chat ID</label>
-    <input type="text" id="tgChatId" value="${escapeHtml(tg.chatId || '')}" placeholder="-100123456789 or @yourchannel">
+    <label for="tgBotToken">${escapeHtml(t('tg.bot_token'))}</label>
+    <input type="password" id="tgBotToken" dir="ltr" value="${escapeHtml(tg.botToken || '')}" placeholder="123456:ABC-...">
+    <label for="tgChatId" style="margin-top:8px;">${escapeHtml(t('tg.chat_id'))}</label>
+    <input type="text" id="tgChatId" dir="ltr" value="${escapeHtml(tg.chatId || '')}" placeholder="-100123456789 · @yourchannel">
     <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${escapeHtml(t('tg.chat_id_hint') || 'A numeric id for a group, or the @username of a public channel.')}</div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
       <button class="btn small" id="btnTgTest">${escapeHtml(t('alerts.send_test'))}</button>
@@ -7001,13 +7001,13 @@ function renderTelegramSettings() {
     <div style="margin-top:12px;">
       <div style="font-weight:600;font-size:13px;">${escapeHtml(t('alerts.when'))}</div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyComplete" style="width:auto;" ${tg.notifyOnComplete ? 'checked' : ''}> Notify on order completed
+        <input type="checkbox" id="tgNotifyComplete" style="width:auto;" ${tg.notifyOnComplete ? 'checked' : ''}> ${escapeHtml(t('tg.notify_complete'))}
       </label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyHold" style="width:auto;" ${tg.notifyOnHold ? 'checked' : ''}> Notify on order on_hold
+        <input type="checkbox" id="tgNotifyHold" style="width:auto;" ${tg.notifyOnHold ? 'checked' : ''}> ${escapeHtml(t('tg.notify_hold'))}
       </label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyLowStock" style="width:auto;" ${tg.notifyOnLowStock ? 'checked' : ''}> Notify on low stock
+        <input type="checkbox" id="tgNotifyLowStock" style="width:auto;" ${tg.notifyOnLowStock ? 'checked' : ''}> ${escapeHtml(t('tg.notify_low'))}
       </label>
       ${_alertSwitchesHtml('tgA', {
         error: tg.notifyPrinterError !== false, offline: tg.notifyPrinterOffline !== false,
