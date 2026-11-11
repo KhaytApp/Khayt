@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "Último download da nuvem recusado";
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
+"intake.waiting" = "Aguardando";

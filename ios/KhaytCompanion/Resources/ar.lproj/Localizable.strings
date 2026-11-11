@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+"intake.waiting" = "بالانتظار";

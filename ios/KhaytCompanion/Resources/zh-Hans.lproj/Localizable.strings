@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+"intake.waiting" = "等待中";

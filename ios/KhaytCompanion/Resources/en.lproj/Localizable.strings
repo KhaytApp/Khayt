@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+"intake.waiting" = "Waiting";

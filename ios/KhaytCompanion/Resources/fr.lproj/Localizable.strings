@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "Dernière récupération cloud refusée";
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
+"intake.waiting" = "En attente";

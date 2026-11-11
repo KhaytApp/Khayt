@@ -83,7 +83,7 @@ struct OwedView: View {
                     .labelStyle(.iconOnly)
                     .font(.system(size: 17))
                     .frame(width: 44, height: 44)
-                    .foregroundStyle(KhaytDesign.done)
+                    .foregroundStyle(KhaytDesign.brand)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.format("owed.remind.a11y", line.client.isEmpty ? line.project : line.client))

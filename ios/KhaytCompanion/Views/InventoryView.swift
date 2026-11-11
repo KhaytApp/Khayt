@@ -248,7 +248,9 @@ private struct SpoolRow: View {
         return min(1, max(0, left / full))
     }
 
-    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.collect }
+    /// Amber-brown when it is time to reorder; otherwise a quiet neutral —
+    /// `collect` teal means "ready to collect", not "plenty left".
+    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.note }
 
     /// The colour's own name when it has one ("Galaxy Black"), else the label.
     private var title: String {

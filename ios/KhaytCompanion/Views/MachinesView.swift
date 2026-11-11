@@ -224,11 +224,11 @@ struct LiveStamp: View {
         if printers.isLive, let at = printers.updatedAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 HStack(spacing: 7) {
-                    Circle().fill(KhaytDesign.done).frame(width: 7, height: 7)
+                    Circle().fill(KhaytDesign.live).frame(width: 7, height: 7)
                     Text(L10n.tr("machines.live"))
                         .font(.khayt(11, .bold, relativeTo: .caption2))
                         .khaytTracking(0.9)
-                        .foregroundStyle(KhaytDesign.done)
+                        .foregroundStyle(KhaytDesign.live)
                     Text(L10n.format("machines.live.ago", max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
                         .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)

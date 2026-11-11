@@ -37,6 +37,13 @@ enum KhaytDesign {
     static let collect = Color(light: 0x0E7A70, dark: 0x3FD0C0)
     /// On hold and quality check.
     static let hold = Color(light: 0x6B52B5, dark: 0xB49CFF)
+    /// Waiting on someone else — a request not taken yet, a quote out.
+    /// Steel: quieter than amber progress, never read as trouble.
+    static let pending = Color(light: 0x5E6C84, dark: 0xA9B8CF)
+    static let pendingWash = Color(light: 0xEDF0F4, dark: 0x3A4658)
+    /// The ring round a colour swatch, so a black spool shows on navy and a
+    /// white one on paper (ink/tertiary in the Figma file).
+    static let swatchRing = note.opacity(0.55)
     /// The well a thumbnail sits in: lighter than the card in dark.
     static let well = Color(light: 0xEEF1F3, dark: 0x2A4670)
     /// The icon's navy, for the mark's tile and nothing that is read.

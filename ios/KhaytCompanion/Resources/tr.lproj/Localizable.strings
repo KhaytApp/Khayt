@@ -1282,3 +1282,4 @@
 "diag.cloud_refused" = "Son reddedilen bulut çekimi";
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
+"intake.waiting" = "Bekliyor";
