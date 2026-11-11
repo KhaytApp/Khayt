@@ -5650,6 +5650,8 @@ final class Words {
         "mac.lock_pin_unreadable": ["en": "This PIN was saved in a format Khayt can no longer check. An owner needs to set it again.", "ar": "حُفظ هذا الرمز بصيغة لم يعد خيط قادرًا على التحقق منها. يجب على المالك تعيينه من جديد."],
         "mac.lock_cooling": ["en": "Too many wrong PINs. Try again at {time}.", "ar": "محاولات خاطئة كثيرة. حاول مجددًا الساعة {time}."],
         "mac.lock_screen_not_allowed": ["en": "Your access level does not include this screen.", "ar": "مستوى صلاحيتك لا يشمل هذه الشاشة."],
+        "mac.mode_screen_hidden": ["en": "This screen is part of Professional. This shop is set to Simple.", "ar": "هذه الشاشة جزء من الوضع الاحترافي، وهذا المتجر على الوضع البسيط."],
+        "mac.mode_open_settings": ["en": "Open Settings", "ar": "فتح الإعدادات"],
         "mac.lock_signed_in_as": ["en": "Signed in as {name}", "ar": "مسجّل الدخول باسم {name}"],
         "mac.lock_sign_in_first": ["en": "Sign in first.", "ar": "سجّل الدخول أولًا."],
         "mac.lock_not_allowed": ["en": "Your access level does not allow this.", "ar": "مستوى صلاحيتك لا يسمح بهذا."],

@@ -241,7 +241,9 @@ extension Shop {
     /// Only while there is no figure. A note explaining an absence, printed
     /// under a number that is present, reads as a warning about that number.
     var monthNetNote: String? {
-        monthNetIncome == nil ? words.callIt("mac.net_in_reports") : nil
+        // Not in a Simple shop: Reports is hidden there, so the line would
+        // point at a screen that shop cannot open (Nov 11 UI review, B26).
+        monthNetIncome == nil && has("analytics") ? words.callIt("mac.net_in_reports") : nil
     }
 
     /// Jobs this month with parts and no cost recorded: the masthead's cost
