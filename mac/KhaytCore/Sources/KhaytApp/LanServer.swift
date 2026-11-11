@@ -1268,7 +1268,11 @@ final class LanServer {
         case (_, false) where request.method == "POST" && host.addJobPhoto != nil
                 && Self.jobPhotoPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
-            guard LanDevices.isSigned(request.headers) else {
+            // `pinGate` lets a token-scoped request through, and `isSigned`
+            // only asks whether the device header is THERE, so an API token
+            // with any value in that header reached this "signed phones only"
+            // route (beta.34 pre-release review). A token never does.
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.addJobPhoto!(Self.jobPhotoPath(path)!, request.body)

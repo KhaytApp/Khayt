@@ -344,7 +344,8 @@ function renderDashboard() {
     : []);
 
   // Due-date buckets (non-completed only)
-  const withDue = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o));
+  // Not a cancelled job: it keeps its due date but is nobody's work any more.
+  const withDue = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o) && o.status !== 'cancelled');
   const overdue  = withDue.filter(o => new Date(o.dueDate + 'T00:00:00') < today).sort((a,b) => a.dueDate.localeCompare(b.dueDate));
   const dueSoon  = withDue.filter(o => {
     const d = new Date(o.dueDate + 'T00:00:00');

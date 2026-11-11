@@ -59,12 +59,37 @@ enum ExpenseReceipt {
         let path = receiptPath.trimmingCharacters(in: .whitespaces)
         guard !path.isEmpty else { return nil }
         let fm = FileManager.default
-        if path.hasPrefix("/") { return fm.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil }
+        if path.hasPrefix("/") {
+            // A whole path is only ever one the desktop wrote for a phone's
+            // photo, and it writes those into a folder named `receipts`.
+            let url = URL(fileURLWithPath: path)
+            guard url.deletingLastPathComponent().lastPathComponent == "receipts" else { return nil }
+            return isAReceipt(url) ? url : nil
+        }
         // Relative: only ever inside `receipts/`, and never up out of it.
         let parts = path.split(separator: "/").map(String.init)
         guard parts.count == 2, parts[0] == "receipts", !parts[1].hasPrefix("."), !parts[1].contains("..") else { return nil }
         let url = folder(for: storeURL).appending(path: parts[1])
-        return fm.fileExists(atPath: url.path) ? url : nil
+        return isAReceipt(url) ? url : nil
+    }
+
+    /// What a receipt can be: the three kinds this app and the desktop write.
+    static let kinds: Set<String> = ["jpg", "jpeg", "png", "pdf"]
+
+    /// A picture or a PDF that is really a file.
+    ///
+    /// THE PATH COMES FROM THE BOOK, and an expense is something a phone with
+    /// the LAN PIN, a sync peer or a second computer can write. The paperclip
+    /// hands the file to `NSWorkspace.open`, so a record naming an app, a
+    /// `.command` or `.terminal` file, or a folder would have had the Mac open
+    /// it at one click (beta.34 pre-release review). Only a regular file of a
+    /// receipt's kind is opened, judged after links are followed.
+    static func isAReceipt(_ url: URL) -> Bool {
+        let real = url.resolvingSymlinksInPath()
+        guard kinds.contains(real.pathExtension.lowercased()) else { return false }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: real.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return false }
+        return (try? real.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
     }
 }
 
