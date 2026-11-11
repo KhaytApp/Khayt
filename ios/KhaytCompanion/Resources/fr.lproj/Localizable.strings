@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "Dernière récupération cloud refusée";
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Attend votre accord sur le Mac";
+"connectors.badge.updated" = "Mis à jour en %@";
+"connectors.badge.needs_app" = "Nécessite un Khayt plus récent";
+"connectors.waiting_count" = "En attente du Mac : %d";

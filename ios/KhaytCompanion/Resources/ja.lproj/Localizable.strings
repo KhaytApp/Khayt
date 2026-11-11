@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "最後に拒否したクラウドの取得";
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Macでの承認待ち";
+"connectors.badge.updated" = "%@ に更新";
+"connectors.badge.needs_app" = "新しいKhaytが必要";
+"connectors.waiting_count" = "Mac待ち: %d";

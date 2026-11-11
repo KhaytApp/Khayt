@@ -283,6 +283,25 @@ enum ConnectorRules {
         return out
     }
 
+    /// The one badge a connector's row wears about its updates (frame
+    /// 21:729), most pressing first: paused by Khayt, waiting for the shop's
+    /// OK on the Mac, a version this build cannot read, then the last
+    /// automatic update (only when `showUpdated`: once per update).
+    enum BadgeTone: Equatable, Sendable { case attention, pending, neutral, done }
+    static func updateBadge(_ c: Connector, showUpdated: Bool) -> (label: String, tone: BadgeTone)? {
+        if c.status == .revoked { return (L10n.tr("connectors.status.revoked"), .attention) }
+        if c.pendingVersion != nil { return (L10n.tr("connectors.badge.pending"), .pending) }
+        if c.unreadableVersion != nil { return (L10n.tr("connectors.badge.needs_app"), .neutral) }
+        if showUpdated, c.updatedAt != nil { return (L10n.format("connectors.badge.updated", c.version), .done) }
+        return nil
+    }
+
+    /// How many connectors wait for the shop's OK on the Mac: the read-only
+    /// count above the list. The phone never asks for that OK itself.
+    static func waitingOnMac(_ list: [Connector]) -> Int {
+        list.filter { $0.pendingVersion != nil && $0.status != .revoked }.count
+    }
+
     /// The entry's `previous` version as an entry of its own, for a build
     /// that cannot read the current one: its manifest and grant, the shop's
     /// switch and keys, and only the settings that version has.

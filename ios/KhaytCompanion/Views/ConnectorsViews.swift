@@ -481,13 +481,20 @@ struct ConnectorsSettingsSection<Heading: View>: View {
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
             heading()
+            let waiting = ConnectorRules.waitingOnMac(connectors)
+            if waiting > 0 {
+                // Read-only: the OK is given on the Mac, never here.
+                ConnectorUpdateBadge(label: L10n.format("connectors.waiting_count", waiting), tone: .pending)
+                    .padding(.bottom, 8)
+            }
             VStack(spacing: 0) {
                 ForEach(Array(connectors.enumerated()), id: \.element.id) { i, c in
                     NavigationLink {
                         ConnectorSettingsPage(connector: c) { tick += 1 }
                     } label: {
                         ConnectorRow(connector: c, last: i == connectors.count - 1,
-                                     notes: ConnectorRules.updateNotes(c, showUpdated: freshUpdates.contains(c.id)))
+                                     notes: ConnectorRules.updateNotes(c, showUpdated: freshUpdates.contains(c.id)),
+                                     badge: ConnectorRules.updateBadge(c, showUpdated: freshUpdates.contains(c.id)))
                     }
                     .buttonStyle(.plain)
                 }
@@ -508,6 +515,8 @@ struct ConnectorRow: View {
     var last = true
     /// Update notes (`ConnectorRules.updateNotes`), one line each.
     var notes: [String] = []
+    /// The row's update badge (`ConnectorRules.updateBadge`).
+    var badge: (label: String, tone: ConnectorRules.BadgeTone)? = nil
 
     private var keysMissing: Bool { connector.secrets.contains { !ConnectorKeys.isSet(connector.id, $0.name) } }
 
@@ -521,6 +530,10 @@ struct ConnectorRow: View {
                         .lineLimit(1)
                     if connector.reviewed { ConnectorBadge(text: L10n.tr("connectors.badge.reviewed"), tone: KhaytDesign.done) }
                 }
+                // The update state, on its own line under the name (frame
+                // 21:729 sets it beside the name; with "Reviewed" there too a
+                // phone would cut the name short).
+                if let badge { ConnectorUpdateBadge(label: badge.label, tone: badge.tone) }
                 Text([connector.publisher,
                       ConnectorRules.statusName(connector.status),
                       connector.secrets.isEmpty ? "" : L10n.tr(keysMissing ? "connectors.keys.missing" : "connectors.keys.set")]
@@ -787,5 +800,44 @@ enum ConnectorUpdateSeen {
         seen.append(mark)
         defaults.set(Array(seen.suffix(100)), forKey: key)
         return true
+    }
+}
+
+/// A connector's update state as a chip (frame 21:729): steel for "waiting
+/// on the Mac", amber-brown for paused, quiet for a version this build cannot
+/// read, done for the one-time "Updated to". The words carry the meaning;
+/// the colour only repeats it.
+struct ConnectorUpdateBadge: View {
+    let label: String
+    let tone: ConnectorRules.BadgeTone
+
+    private var ink: Color {
+        switch tone {
+        case .attention: return KhaytDesign.attention
+        case .pending: return KhaytDesign.pending
+        case .neutral: return KhaytDesign.note
+        case .done: return KhaytDesign.done
+        }
+    }
+    private var wash: Color {
+        switch tone {
+        case .attention: return KhaytDesign.warnSoft
+        case .pending: return KhaytDesign.pendingWash
+        case .neutral: return KhaytDesign.sunk
+        case .done: return KhaytDesign.okSoft
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(ink).frame(width: 6, height: 6).accessibilityHidden(true)
+            Text(label)
+                .font(.khayt(11.5, .semibold, relativeTo: .caption))
+                .foregroundStyle(tone == .pending ? KhaytDesign.ink : ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(wash, in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 }

@@ -17,6 +17,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { scroller in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     connectionCard
@@ -48,6 +49,7 @@ struct SettingsView: View {
                         // Draws nothing, not even its heading, until the book
                         // holds a connector (gated off until /privacy says so).
                         ConnectorsSettingsSection { eyebrow(L10n.tr("connectors.title")) }
+                            .id("connectors")
                     }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard
@@ -81,6 +83,15 @@ struct SettingsView: View {
                 // unfolded) is hard to pair with it: the calculator's reading width.
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity)
+            }
+            #if DEBUG
+            // `-KhaytScrollSettingsConnectors YES`: the connectors in view, for screenshots.
+            .task {
+                guard UserDefaults.standard.bool(forKey: "KhaytScrollSettingsConnectors") else { return }
+                try? await Task.sleep(for: .milliseconds(700))
+                scroller.scrollTo("connectors", anchor: .top)
+            }
+            #endif
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)

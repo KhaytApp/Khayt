@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "Son reddedilen bulut çekimi";
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Mac'te onayınızı bekliyor";
+"connectors.badge.updated" = "%@ sürümüne güncellendi";
+"connectors.badge.needs_app" = "Daha yeni bir Khayt gerekiyor";
+"connectors.waiting_count" = "Mac'i bekleyen: %d";

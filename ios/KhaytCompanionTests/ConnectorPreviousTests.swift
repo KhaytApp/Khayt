@@ -131,6 +131,25 @@ final class ConnectorPreviousTests: XCTestCase {
         XCTAssertEqual(defaults.stringArray(forKey: ConnectorUpdateSeen.key)?.count, 1)
     }
 
+    /// One badge per row, most pressing first (frame 21:729), and the
+    /// read-only "waiting on the Mac" count.
+    func testTheBadgeOrderAndTheWaitingCount() throws {
+        var c = ConnectorsTests.connector(granted: nil)
+        XCTAssertNil(ConnectorRules.updateBadge(c, showUpdated: true), "up to date wears no badge")
+        c.updatedAt = "2026-11-12T09:00:00.000Z"
+        XCTAssertEqual(ConnectorRules.updateBadge(c, showUpdated: true)?.tone, .done)
+        XCTAssertNil(ConnectorRules.updateBadge(c, showUpdated: false), "\"Updated to\" shows once")
+        c.unreadableVersion = "1.2.0"
+        XCTAssertEqual(ConnectorRules.updateBadge(c, showUpdated: true)?.tone, .neutral)
+        c.pendingVersion = "1.3.0"
+        XCTAssertEqual(ConnectorRules.updateBadge(c, showUpdated: true)?.tone, .pending)
+        XCTAssertEqual(ConnectorRules.updateBadge(c, showUpdated: true)?.label, L10n.tr("connectors.badge.pending"))
+        XCTAssertEqual(ConnectorRules.waitingOnMac([c, ConnectorsTests.connector(granted: nil)]), 1)
+        c.status = .revoked
+        XCTAssertEqual(ConnectorRules.updateBadge(c, showUpdated: true)?.tone, .attention, "paused beats everything")
+        XCTAssertEqual(ConnectorRules.waitingOnMac([c]), 0, "a paused connector is not waiting for an OK")
+    }
+
     /// The older version gets only the settings it has, its own grant, and
     /// the shop's switch: a shop that switched the connector off keeps it off.
     func testThePreviousEntryKeepsTheSwitchAndDropsSettingsItDoesNotHave() throws {

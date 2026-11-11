@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "بانتظار موافقتك على الماك";
+"connectors.badge.updated" = "حُدِّث إلى %@";
+"connectors.badge.needs_app" = "يتطلب إصدارًا أحدث من Khayt";
+"connectors.waiting_count" = "بانتظار الماك: %d";

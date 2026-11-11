@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Braucht dein OK am Mac";
+"connectors.badge.updated" = "Aktualisiert auf %@";
+"connectors.badge.needs_app" = "Braucht ein neueres Khayt";
+"connectors.waiting_count" = "Wartet auf den Mac: %d";

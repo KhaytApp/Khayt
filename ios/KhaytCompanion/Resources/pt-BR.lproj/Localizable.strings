@@ -1287,3 +1287,9 @@
 "diag.cloud_refused" = "Último download da nuvem recusado";
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Precisa do seu OK no Mac";
+"connectors.badge.updated" = "Atualizado para %@";
+"connectors.badge.needs_app" = "Precisa de um Khayt mais novo";
+"connectors.waiting_count" = "Aguardando o Mac: %d";
