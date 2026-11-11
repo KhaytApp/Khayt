@@ -2453,6 +2453,9 @@ function trackShipment(trackingNumber, carrier) {
         delete order.quoteVersion; delete order.quoteRevisions;
       }
     }
+    // Its price is the shop's (cost plus margin, or the catalogue's), so it
+    // says so: unstamped, a customer who bills in EUR read it as EUR.
+    stampJobCurrency(order);
     printLog.unshift(order);
     await dismissIntake(it.id, c, true); // remove from the cloud inbox (best-effort)
     saveAll();
