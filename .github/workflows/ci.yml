@@ -363,6 +363,9 @@ jobs:
       - name: E2E smoke (a saved product price never changes silently)
         run: xvfb-run -a npm run test:e2e:pricekeep
 
+      - name: E2E smoke (a connector update waits for the shop's yes)
+        run: xvfb-run -a npm run test:e2e:connupdate
+
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 

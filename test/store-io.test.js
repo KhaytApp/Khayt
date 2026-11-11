@@ -876,3 +876,58 @@ test('the book and its .prev are owner-only (0600) after a save', { skip: proces
   assert.equal(mode(fp), 0o600);
   assert.equal(mode(fp + '.prev'), 0o600);
 });
+
+// ── settings.connectorUpdates is main's (lib/plugin-update.js) ───────────
+// A window save can neither overwrite it, drop it, nor invent it — the way
+// the API tokens' server-side stamps are kept from disk. Only a connector the
+// shop removed takes its state with it.
+async function putOnDisk(io, store) {
+  await fs.promises.writeFile(io.dataFilePath(), JSON.stringify(io.encryptForDisk(store)), 'utf8');
+}
+const UPD = { serial: 7, connectors: {
+  'app.sample.one': { pending: { version: '1.1.0', manifest: { id: 'app.sample.one', version: '1.1.0' } } },
+  'app.sample.two': { previous: { version: '2.0.0', manifest: { id: 'app.sample.two' }, granted: {} }, updatedFrom: '2.0.0' },
+} };
+const PLUGINS = [{ id: 'app.sample.one', version: '1.0.0' }, { id: 'app.sample.two', version: '2.1.0' }];
+
+test('connectorUpdates: a window save that sends an older copy keeps the disk\'s', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, connectorUpdates: { serial: 6, connectors: {} } } });
+  assert.deepEqual(merged.settings.connectorUpdates, UPD);
+});
+
+test('connectorUpdates: a window save without it (an older build) does not drop it', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, currency: 'SAR' } });
+  assert.deepEqual(merged.settings.connectorUpdates, UPD);
+  assert.equal(merged.settings.currency, 'SAR');
+});
+
+test('connectorUpdates: a window cannot write one that main never did', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  assert.equal(merged.settings.connectorUpdates, undefined);
+  // Nor on a first save, with nothing on disk yet.
+  const fresh = makeStoreIo();
+  assert.equal(fresh.mergeStoreSecretsFromDisk({ settings: { connectorUpdates: UPD } }).settings.connectorUpdates, undefined);
+});
+
+test('connectorUpdates: a connector removed in the window takes its state with it', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: [PLUGINS[1]], connectorUpdates: UPD } });
+  assert.deepEqual(Object.keys(merged.settings.connectorUpdates.connectors), ['app.sample.two']);
+  assert.equal(merged.settings.connectorUpdates.serial, 7);
+});
+
+test('connectorUpdates: a restore brings back the backup\'s, not today\'s', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const backupUpd = { serial: 2, connectors: { 'app.sample.one': { skipped: ['1.0.5'] } } };
+  const r = await io.restoreSnapshotToDisk({ printLog: [], settings: { plugins: [PLUGINS[0]], connectorUpdates: backupUpd } });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(io.readStoreDecryptedFromDisk().settings.connectorUpdates, backupUpd);
+});

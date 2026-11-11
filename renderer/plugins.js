@@ -18,6 +18,8 @@ let pluginReviewed = {};
 function PluginHost() { return (typeof KhaytPluginHost !== 'undefined') ? KhaytPluginHost : null; }
 function PluginManifest() { return (typeof KhaytPluginManifest !== 'undefined') ? KhaytPluginManifest : null; }
 function PluginPayload() { return (typeof KhaytPluginPayload !== 'undefined') ? KhaytPluginPayload : null; }
+function PluginUpdate() { return (typeof KhaytPluginUpdate !== 'undefined') ? KhaytPluginUpdate : null; }
+function PluginUpdateSheet() { return (typeof KhaytPluginUpdateSheet !== 'undefined') ? KhaytPluginUpdateSheet : null; }
 const pluginIsReviewed = (entry) => !!pluginReviewed[entry && entry.id];
 const pluginLang = () => (typeof i18n !== 'undefined' && i18n.current) || 'en';
 const pluginLabel = (l) => (PluginHost() ? PluginHost().labelOf(l, pluginLang()) : (l && l.en) || '');
@@ -59,6 +61,7 @@ function renderPluginSettings() {
   const el = $('#pluginSection');
   const card = document.getElementById('pluginCard');
   if (card) card.hidden = !pluginsOn;
+  renderPluginNavBadge();
   if (!el || !PluginHost() || !pluginsOn) return;
   const list = Array.isArray(settings.plugins) ? settings.plugins : [];
   const stateWord = (s) => t('plg.state_' + s);
@@ -73,13 +76,22 @@ function renderPluginSettings() {
       const m = entry.manifest;
       const state = PluginHost().stateOf(entry, pluginIsReviewed(entry));
       const missing = PluginHost().missingSecrets(entry);
+      const upd = pluginUpdateState(entry.id);
+      const waiting = pluginUpdateWaiting(entry);
+      // While its version is withdrawn the entry is off whatever the shop
+      // chose; the button says what the shop chose (kept for the fix).
+      const withdrawn = upd.revoked && upd.revoked.version === entry.version;
+      const switchedOn = withdrawn ? upd.revoked.wasEnabled !== false : state === 'on';
       return `
       <div class="plg-row" data-plugin="${escapeHtml(entry.id)}" style="border:1px solid var(--border-soft);border-radius:10px;padding:12px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <strong>${escapeHtml(pluginLabel(m.name))}</strong>
           <span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(m.publisher || '')} · ${escapeHtml(m.version || '')}</span>
+          ${waiting ? `<span class="plg-update-badge" data-plugin-update="${escapeHtml(waiting.version)}">${escapeHtml(t('plg.update_waiting'))}</span>` : ''}
           <span class="plg-state" data-state="${state}" style="margin-inline-start:auto;font-size:11.5px;font-weight:600;">${escapeHtml(stateWord(state))}</span>
         </div>
+        ${withdrawn ? `<p class="plg-revoked" style="font-size:12px;color:var(--danger,#c0392b);margin:6px 0 0;">${escapeHtml(t('plg.upd_revoked', { v: entry.version }))}${upd.revoked.reason ? ' ' + escapeHtml(upd.revoked.reason) : ''}</p>` : ''}
+        ${upd.updatedFrom && upd.previous ? `<p class="plg-updated-note" style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('plg.upd_updated_note', { from: upd.updatedFrom, to: entry.version }))}</p>` : ''}
         ${m.description ? `<p style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(pluginLabel(m.description))}</p>` : ''}
         ${(m.settings || []).map((st) => {
           const v = (entry.config || {})[st.key];
@@ -97,8 +109,10 @@ function renderPluginSettings() {
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
           ${(m.settings || []).length ? `<button class="btn small" type="button" data-plugin-act="save-config">${escapeHtml(t('common.save'))}</button>` : ''}
           ${(m.secrets || []).length ? `<button class="btn small" type="button" data-plugin-act="save-keys">${escapeHtml(t('plg.save_keys'))}</button>` : ''}
+          ${waiting ? `<button class="btn primary small" type="button" data-plugin-act="review-update">${escapeHtml(t('plg.review_update'))}</button>` : ''}
+          ${upd.updatedFrom && upd.previous ? `<button class="btn ghost small" type="button" data-plugin-act="revert">${escapeHtml(t('plg.upd_revert', { v: upd.previous.version }))}</button>` : ''}
           ${state === 'paused' ? `<button class="btn primary small" type="button" data-plugin-act="consent">${escapeHtml(t('plg.review_agree'))}</button>` : ''}
-          ${state === 'on' || state === 'off' ? `<button class="btn ghost small" type="button" data-plugin-act="toggle">${escapeHtml(state === 'on' ? t('plg.turn_off') : t('plg.turn_on'))}</button>` : ''}
+          ${state === 'on' || state === 'off' ? `<button class="btn ghost small" type="button" data-plugin-act="toggle">${escapeHtml(switchedOn ? t('plg.turn_off') : t('plg.turn_on'))}</button>` : ''}
           <button class="btn ghost small" type="button" data-plugin-act="details">${escapeHtml(t('plg.what_it_sends'))}</button>
           <button class="btn danger small" type="button" data-plugin-act="remove" style="margin-inline-start:auto;">${escapeHtml(t('plg.remove'))}</button>
         </div>
@@ -167,8 +181,21 @@ function renderPluginSettings() {
         saveAll();
       }
     } else if (act === 'toggle') {
-      settings.plugins = PluginHost().withEntry(settings.plugins, Object.assign({}, entry, { enabled: entry.enabled === false }));
-      saveAll();
+      const rev = pluginUpdateState(id).revoked;
+      if (rev && rev.version === entry.version) {
+        // Withdrawn: the shop's choice is kept beside the entry, which stays
+        // off until the fix arrives (lib/plugin-update.js setSwitch) — main's.
+        await pluginUpdateOp({ op: 'switch', id, enabled: !(rev.wasEnabled !== false) });
+      } else {
+        settings.plugins = PluginHost().withEntry(settings.plugins, Object.assign({}, entry, { enabled: entry.enabled === false }));
+        saveAll();
+      }
+    } else if (act === 'review-update') {
+      await openConnectorUpdateSheet(id);
+      return;
+    } else if (act === 'revert') {
+      const prev = pluginUpdateState(id).previous;
+      if (await pluginUpdateOp({ op: 'revert', id })) toast(t('plg.upd_reverted', { v: prev ? prev.version : '' }), 'success');
     } else if (act === 'details') {
       await pluginConsent(entry.manifest, { readOnly: true });
       return;
@@ -255,23 +282,26 @@ function pluginUpdatesLine(manifest, replacing, readOnly) {
   return t('plg.consent_updates', { from });
 }
 
+/** A field a manifest sends, in the shop's words. */
+function pluginFieldName(manifest, key) {
+  if (key.startsWith('field.')) {
+    const f = (manifest.fields || []).find((x) => x.key === key.slice(6));
+    return f ? pluginLabel(f.label) : key;
+  }
+  // One of the connector's own settings (manifest settings[]), by its label.
+  if (key.startsWith('config.')) {
+    const st = (manifest.settings || []).find((x) => x.key === key.slice(7));
+    return st ? pluginLabel(st.label) : key;
+  }
+  const w = t('plg.f.' + key);
+  return w && w !== 'plg.f.' + key ? w : key;
+}
+
 function pluginConsent(manifest, { readOnly = false, replacing = null } = {}) {
   const M = PluginManifest();
   const rows = M.consentRows(manifest);
   const scopes = M.permissionsOf(manifest).scopes;
-  const fieldName = (key) => {
-    if (key.startsWith('field.')) {
-      const f = (manifest.fields || []).find((x) => x.key === key.slice(6));
-      return f ? pluginLabel(f.label) : key;
-    }
-    // One of the connector's own settings (manifest settings[]), by its label.
-    if (key.startsWith('config.')) {
-      const st = (manifest.settings || []).find((x) => x.key === key.slice(7));
-      return st ? pluginLabel(st.label) : key;
-    }
-    const w = t('plg.f.' + key);
-    return w && w !== 'plg.f.' + key ? w : key;
-  };
+  const fieldName = (key) => pluginFieldName(manifest, key);
   const updates = pluginUpdatesLine(manifest, replacing, readOnly);
   return new Promise((resolve) => {
     const overlay = appendStackedModal(`
@@ -515,10 +545,158 @@ function clearPluginOutbox(delivery) {
 async function resumePluginOutbox() {
   if (!(await loadPluginsEnabled())) return;
   await refreshPluginReviewed();
+  checkConnectorUpdates();
   const list = Array.isArray(settings.pluginOutbox) ? settings.pluginOutbox.slice() : [];
   for (const item of list) {
     if (!item || !item.delivery || (item.failed && typeof item.failed === 'object')) continue;
     const wait = Math.max(0, Date.parse(item.nextAttemptAt || '') - Date.now()) || 0;
     setTimeout(() => deliverPluginEvent(item), Math.min(wait, 2_147_000_000));
   }
+}
+
+/* ── Updates (lib/plugin-update.js) ─────────────────────────────────── */
+
+// What a check found lives in `settings.connectorUpdates`, written by the
+// main process only (a save from this window keeps the disk's copy). This
+// window draws it — the badge, the sheet, the quiet notes — and hands the
+// shop's answer to main, then takes back what main wrote.
+
+function pluginUpdateState(id) {
+  const U = PluginUpdate();
+  return U ? U.stateOf(settings, id) : {};
+}
+
+/** The pending update this connector is waiting on the shop's yes for, or null. */
+function pluginUpdateWaiting(entry) {
+  const S = PluginUpdateSheet();
+  const U = PluginUpdate();
+  if (!S || !U || !entry) return null;
+  return S.waitingFor(entry, U.stateOf(settings, entry.id), U.compareVersions);
+}
+
+/** Settings › Connections in the nav: a steel badge while an update waits. */
+function renderPluginNavBadge() {
+  const nav = document.querySelector('.settings-nav-item[data-settings-section="connections"]');
+  if (!nav) return;
+  const n = pluginsOn ? (settings.plugins || []).filter((e) => e && pluginUpdateWaiting(e)).length : 0;
+  let badge = nav.querySelector('.plg-nav-badge');
+  if (!n) { if (badge) badge.remove(); return; }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'plg-nav-badge';
+    nav.appendChild(badge);
+  }
+  badge.textContent = String(n);
+  badge.title = t('plg.update_waiting');
+}
+
+/** Take what main wrote: the connectors (keys masked) and their update state. */
+function adoptConnectorUpdates(r) {
+  if (!r || !Array.isArray(r.plugins)) return;
+  settings.plugins = r.plugins;
+  settings.connectorUpdates = r.connectorUpdates || undefined;
+  if (!settings.connectorUpdates) delete settings.connectorUpdates;
+}
+
+/** The shop's Agree / Revert / switch, applied by main. True when it applied. */
+async function pluginUpdateOp(req) {
+  if (!window.hubAPI?.connectorUpdate) return false;
+  // Main reads the store from disk: what this window has not saved yet goes first.
+  if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) {} }
+  let r;
+  try { r = await window.hubAPI.connectorUpdate(req); } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
+  if (!r || !r.ok) { toast(t('plg.err_failed', { why: (r && (r.error || r.refused)) || '?' }), 'error', 6000); return false; }
+  adoptConnectorUpdates(r);
+  return true;
+}
+
+/** At launch: ask main to check the signed index. Main refuses while updates are off. */
+async function checkConnectorUpdates() {
+  if (!pluginsOn || !window.hubAPI?.connectorUpdatesCheck) return;
+  if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) {} }
+  let r;
+  try { r = await window.hubAPI.connectorUpdatesCheck(); } catch (_) { return; }
+  if (!r || !r.ok || !r.changed) return;
+  adoptConnectorUpdates(r);
+  for (const n of r.notes || []) {
+    const e = (settings.plugins || []).find((p) => p && p.id === n.id);
+    const name = e ? pluginLabel(e.manifest.name) : n.id;
+    if (n.kind === 'updated') toast(t('plg.upd_updated', { name, v: n.to }), 'success');
+    else if (n.kind === 'revoked') toast(t('plg.upd_revoked', { v: n.from }) + (n.reason ? ' ' + n.reason : ''), 'warning', 8000);
+  }
+  await refreshPluginReviewed();
+  renderPluginSettings();
+}
+
+/**
+ * The update sheet (Figma 52:2434, the Mac's 70:284). Opened only from
+ * "Review update". What is NEW comes first, each line tagged; what the shop
+ * already agreed to after, quieter. "Not now" changes nothing — the installed
+ * version keeps running and the badge stays. "Agree and update" is the
+ * default button; nothing is accepted for the shop.
+ */
+async function openConnectorUpdateSheet(id) {
+  const entry = (settings.plugins || []).find((p) => p && p.id === id);
+  const pending = entry && pluginUpdateWaiting(entry);
+  const S = PluginUpdateSheet();
+  const sheet = pending && S ? S.sheetFor(entry, pending) : null;
+  if (!sheet) return false;
+  const manifest = pending.manifest;
+  let reviewed = false;
+  try { reviewed = !!(window.hubAPI?.pluginReviewed && (await window.hubAPI.pluginReviewed([manifest]) || {})[manifest.id]); } catch (_) { reviewed = false; }
+  const itemName = (it) => {
+    if (it.kind === 'link') return t('plg.consent_link_only');
+    if (it.kind === 'secret') {
+      const s = (manifest.secrets || []).find((x) => x.name === it.key);
+      return s ? pluginLabel(s.label) : it.key;
+    }
+    return pluginFieldName(manifest, it.key);
+  };
+  const tag = (it) => it.tag ? `<span class="plg-upd-tag" data-tag="${it.tag}">${escapeHtml(t(it.tag === 'new' ? 'plg.upd_tag_new' : 'plg.upd_tag_new_place'))}</span>` : '';
+  const hostRows = (rows, fresh) => rows.map((r) => `
+    <div class="plg-upd-host" data-host="${escapeHtml(r.host)}">
+      <div class="plg-upd-hostname" dir="ltr">${escapeHtml(r.host)}</div>
+      <ul>${r.items.map((it) => `<li data-kind="${it.kind}" data-key="${escapeHtml(it.key)}"${fresh ? ` data-tag="${it.tag}"` : ''}>${escapeHtml(itemName(it))}${tag(it)}</li>`).join('')}</ul>
+    </div>`).join('');
+  const hasNew = sheet.fresh.length || sheet.scopes.length || sheet.refresh;
+  const extras = [
+    sheet.scopes.length ? `<p class="plg-upd-line" data-new="scopes">${escapeHtml(t('plg.consent_scopes'))}: ${sheet.scopes.map((s) => escapeHtml(t('plg.scope.' + s))).join(', ')}<span class="plg-upd-tag" data-tag="new">${escapeHtml(t('plg.upd_tag_new'))}</span></p>` : '',
+    sheet.refresh ? `<p class="plg-upd-line" data-new="refresh">${escapeHtml(t('plg.upd_refresh', { n: sheet.refresh }))}<span class="plg-upd-tag" data-tag="new">${escapeHtml(t('plg.upd_tag_new'))}</span></p>` : '',
+  ].join('');
+  const agreeNow = await new Promise((resolve) => {
+    const overlay = appendStackedModal(`
+      <div class="modal plg-upd-sheet" role="dialog" aria-modal="true" aria-labelledby="plgUpdTitle" data-plugin-update-sheet="${escapeHtml(id)}" style="max-width:560px;">
+        <div class="plg-upd-head">
+          <h3 id="plgUpdTitle">${escapeHtml(pluginLabel(manifest.name))} <span class="plg-upd-ver">${escapeHtml(sheet.to)}</span></h3>
+          ${reviewed ? `<span class="plg-upd-reviewed">✓ ${escapeHtml(t('plg.reviewed_by_khayt'))}</span>` : ''}
+        </div>
+        <p class="plg-upd-sub">${escapeHtml(t('plg.upd_updates', { v: sheet.from }))}</p>
+        ${sheet.asksMore ? `<p class="plg-upd-lead">${escapeHtml(t('plg.upd_asks_more'))}</p>` : ''}
+        ${hasNew ? `<section class="plg-upd-new">
+          <div class="plg-upd-label">${escapeHtml(t('plg.upd_new_head'))}</div>
+          ${hostRows(sheet.fresh, true)}${extras}
+        </section>` : ''}
+        ${sheet.agreed.length ? `<section class="plg-upd-agreed">
+          <div class="plg-upd-label">${escapeHtml(t('plg.upd_agreed_head', { v: sheet.from }))}</div>
+          ${hostRows(sheet.agreed, false)}
+        </section>` : ''}
+        <p class="plg-upd-foot">${escapeHtml(t('plg.upd_footer', { v: sheet.from }))}</p>
+        <div class="btn-row">
+          <button class="btn ghost" type="button" data-act="not-now">${escapeHtml(t('plg.upd_not_now'))}</button>
+          <button class="btn primary" type="button" data-act="agree">${escapeHtml(t('plg.upd_agree'))}</button>
+        </div>
+      </div>`);
+    const done = (v) => { overlay.remove(); resolve(v); };
+    overlay.querySelector('[data-act="not-now"]').addEventListener('click', () => done(false));
+    overlay.querySelector('[data-act="agree"]').addEventListener('click', () => done(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } });
+    try { overlay.querySelector('[data-act="agree"]').focus(); } catch (_) { /* ignore */ }
+  });
+  if (!agreeNow) return false;
+  if (!(await pluginUpdateOp({ op: 'agree', id }))) return false;
+  toast(t('plg.upd_updated', { name: pluginLabel(manifest.name), v: sheet.to }), 'success');
+  await refreshPluginReviewed();
+  renderPluginSettings();
+  return true;
 }
