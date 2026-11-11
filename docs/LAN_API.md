@@ -450,6 +450,14 @@ what this returns.
 
 A paired client's changes, folded into the shop's book. **Requires owner PIN.**
 
+A delta may carry **`baseRev`**: the `rev` of the copy the client held before its first
+unsent edit to that record (`{"collection":"printLog","record":{…,"rev":9},"baseRev":7}`).
+It is read off the delta and never written to the book. The fold itself is unchanged
+(`KhaytSync.applyDeltas`: higher `rev` wins, a tie goes to the later `updatedAt`). When the
+client's copy replaces one the Mac held at a higher `rev` than `baseRev`, or wins a tie,
+the Mac keeps its own copy beside the book and shows the shop a "changed on another
+device" notice with **Put back**. A delta without `baseRev` is folded as before.
+
 > **Served by the native Mac app only.** `LanServer.Host.fold` is `nil` by
 > default — a build that has not wired it answers `405` and says so, rather than
 > failing as though something broke. The shipping Mac app wires it, so the
@@ -521,8 +529,11 @@ route is in the scope model; `/api/waste` is in no scope and takes the PIN only.
 
 Where the two differ: a write the Mac cannot put on disk is **500** (the desktop says
 400), and a body that is not JSON is **400** `{"error":"Invalid JSON"}`. `/api/machines`
-answers GET only on the Mac. `POST /api/expense` and `POST /api/quote` are still
-desktop-only.
+answers GET only on the Mac. `POST /api/quote` is served by both, by one rule
+(`lib/lan-rest.js quotePart`). `POST /api/expense` is served by both too; on the Mac it
+takes a **signed, enrolled phone only** (as a job photo does), files the receipt in
+`receipts/` beside the book and stores that relative path, and answers
+`{"ok":true,"entry":{…}}` or `{"ok":false,"error":"…"}`.
 
 ### `GET /api/orders`
 

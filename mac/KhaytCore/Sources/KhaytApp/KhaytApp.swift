@@ -217,6 +217,27 @@ struct KhaytApp: App {
 /// every launch, is an app people learn to resent. So it is asked for only when
 /// there is no bundle identifier, which is exactly the `swift run` case.
 final class Activator: NSObject, NSApplicationDelegate {
+    /// QUIT WAITS FOR A SAVE THAT HAS STARTED. Save, then ⌘Q: the write was
+    /// still reading or encoding the book when `applicationWillTerminate` gave
+    /// the book back, so it failed its ownership check or died with the
+    /// process. The app now answers "later", and quits when the writes in
+    /// flight have landed — or after ten seconds, so a write that never
+    /// returns cannot hold the app open for good.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            guard StoreWriter.writesInFlight > 0 else { return .terminateNow }
+            Task { @MainActor in
+                let deadline = Date().addingTimeInterval(Self.quitWaitsAtMost)
+                while StoreWriter.writesInFlight > 0, Date() < deadline {
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+    }
+    static let quitWaitsAtMost: TimeInterval = 10
+
     /// Give the book back on the way out, so the next app to open does not have
     /// to reason about a dead pid to know it is free.
     func applicationWillTerminate(_ note: Notification) {

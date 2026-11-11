@@ -50,3 +50,21 @@ test('orderOwedBase subtracts payments and gift card credit', () => {
   assert.equal(orderOwedBase({ price: 100, paidAmount: 0, creditNotes: [{ amount: 100 }] }), 0);
   assert.equal(orderOwedBase({ price: 100, paidAmount: 0, creditNotes: [{ amount: 30 }] }), 70);
 });
+
+test('pinCurrenciesOf: a customer\'s unstamped jobs keep today\'s currency when theirs is about to change', () => {
+  const M = require('../lib/order-money.js');
+  const ctx = { settings: { currency: 'SAR', exchangeRates: { EUR: 4.1 } }, clients: [{ id: 'c1' }, { id: 'c2' }] };
+  const orders = [
+    { id: 'a', clientId: 'c1', price: 1000, paidAmount: 1000 },
+    { id: 'b', clientId: 'c1', price: 500, currency: 'USD' },
+    { id: 'c', clientId: 'c2', price: 70 },
+  ];
+  const changed = M.pinCurrenciesOf(orders, 'c1', ctx);
+  assert.deepEqual(changed.map((o) => o.id), ['a']);
+  assert.equal(orders[0].currency, 'SAR');
+  assert.equal(orders[1].currency, 'USD');
+  assert.equal(orders[2].currency, undefined);
+  // The customer now bills in EUR; the old job is still 1,000 SAR.
+  const after = { settings: ctx.settings, clients: [{ id: 'c1', currency: 'EUR' }, { id: 'c2' }] };
+  assert.equal(M.orderToBase ? M.orderToBase(1000, orders[0], after) : 1000, 1000);
+});
