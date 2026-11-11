@@ -865,6 +865,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Business Mode setup wizard (new first-run experience)
   initWizard();
 
+  // The search shortcut is drawn as Ctrl K, the key on Windows and Linux; a
+  // macOS build shows its own symbol (preload tags <html> platform-darwin).
+  if (document.documentElement.classList.contains('platform-darwin')) {
+    document.querySelectorAll('.kh-shortcut[data-mac]').forEach((el) => { el.textContent = el.dataset.mac; });
+  }
+
   // Global search keyboard shortcut ⌘K / Ctrl+K, plus tab-nav shortcuts
   //
   // This map IS the handler — it used to be a switch statement, which meant the

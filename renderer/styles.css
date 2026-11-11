@@ -131,15 +131,49 @@ html, body {
 [dir="rtl"] input[type="search"],
 [dir="rtl"] input[type="email"],
 [dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="password"],
 [dir="rtl"] input[type="tel"],
 [dir="rtl"] input:not([type]),
 [dir="rtl"] textarea {
   unicode-bidi: plaintext;
   text-align: start;
 }
+/* The placeholder is its own paragraph: "whsec_…" read "…_whsec" without it. */
+[dir="rtl"] input::placeholder,
+[dir="rtl"] textarea::placeholder {
+  unicode-bidi: plaintext;
+}
 
+/* Arabic is set in IBM Plex Sans Arabic, bundled in fonts/fonts.css (Turki,
+   Nov 11: one Arabic face on every app). The old stack named macOS-only fonts
+   first ("SF Arabic", "Geeza Pro"), so Windows and Linux fell through to
+   whatever the system had. */
 [lang="ar"] {
-  font-family: "SF Arabic", "Geeza Pro", "Tajawal", "Cairo", var(--font-sans);
+  font-family: "IBM Plex Sans Arabic", var(--font-sans);
+}
+
+/* In Arabic, the mono face (eyebrows, figures, dates) has no Arabic letters:
+   they fell back to a system monospace, letter by letter. Plex Arabic is the
+   fallback for them now, and tracking and capitals never apply to Arabic —
+   1.5 px between letters breaks their joins ("ا ل أ د و ا ت"). */
+html[dir="rtl"][data-design] {
+  --font-mono: "JetBrains Mono", "IBM Plex Sans Arabic", ui-monospace, monospace;
+  --font-num: var(--font-mono);
+}
+html[dir="rtl"] body .khayt-navhead,
+html[dir="rtl"] body .main .eyebrow,
+html[dir="rtl"] body .khayt-main .eyebrow,
+html[dir="rtl"] body .sidebar-subtitle,
+html[dir="rtl"] body .settings-nav-group-label {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* Latin values inside Arabic text keep their own order: a phone's leading +,
+   a colour's #, a URL's slashes, a key's prefix, a shortcut. */
+code, kbd, samp, bdi[dir="ltr"], .ltr-value, .cs-hex, .cs-step-hex, .cp-hex {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* -----------------------------------------------------------
@@ -4570,6 +4604,7 @@ th[data-sort]:hover {
   border-radius: 8px 8px 0 0;
   background: transparent;
   color: var(--text-muted);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
