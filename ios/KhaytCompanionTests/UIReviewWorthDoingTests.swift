@@ -1,4 +1,5 @@
 import XCTest
+import KhaytCore
 @testable import KhaytCompanion
 
 /// The "worth doing" items of the Nov 11 iPhone UI review
@@ -174,5 +175,22 @@ extension UIReviewWorthDoingTests {
     func testSwatchRingIsVisibleWeight() {
         XCTAssertEqual(SpoolSwatch.ring(for: 48), 2)
         XCTAssertEqual(SpoolSwatch.ring(for: 14), 1.5)
+    }
+}
+
+// MARK: W10 — WhatsApp opens in the customer's language, else the app's
+extension UIReviewWorthDoingTests {
+    func testWhatsAppStartsInTheCustomersLanguageElseTheApps() {
+        let pick = KhaytAPIClient.whatsAppStartLanguage
+        XCTAssertEqual(pick(["messageLang": .string("en")], "ar"), "en", "the customer's own language wins")
+        XCTAssertEqual(pick(["messageLang": .string("ar")], "en"), "ar")
+        // Written down only in English, no language set: the app's language.
+        XCTAssertEqual(pick(["nameEn": .string("Jordan Lee")], "ar"), "ar")
+        XCTAssertEqual(pick(nil, "en"), "en")
+        XCTAssertEqual(pick(["messageLang": .string("fr")], "en"), "en", "only ar/en messages exist")
+    }
+
+    func testTheSheetAsksForTheStartLanguage() throws {
+        XCTAssertTrue(try code("Views/WhatsAppSheet.swift").contains("fill(lang: api.whatsAppStartLanguage(orderId: orderId))"))
     }
 }
