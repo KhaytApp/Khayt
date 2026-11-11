@@ -5434,5 +5434,15 @@
   "inv.low_stock_count_many": "{n} carretéis baixos",
   "xr.not_set": "Não definido",
   "an.new_vs_returning": "Clientes novos e recorrentes",
+  "a11y.search_board": "Pesquisar no quadro",
+  "a11y.search_orders": "Pesquisar pedidos",
+  "a11y.search_clients": "Pesquisar clientes",
+  "a11y.search_inventory": "Pesquisar estoque",
+  "a11y.search_suppliers": "Pesquisar fornecedores",
+  "a11y.search_pos": "Pesquisar ordens de compra",
+  "a11y.search_products": "Pesquisar produtos",
+  "a11y.search_portfolio": "Pesquisar portfólio",
+  "a11y.search_waste": "Pesquisar desperdício",
+  "a11y.language": "Idioma",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

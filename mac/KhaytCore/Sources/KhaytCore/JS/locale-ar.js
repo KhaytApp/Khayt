@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} بكرات منخفضة",
   "xr.not_set": "غير محدد",
   "an.new_vs_returning": "العملاء الجدد مقابل العائدين",
+  "a11y.search_board": "ابحث في اللوحة",
+  "a11y.search_orders": "ابحث في الطلبات",
+  "a11y.search_clients": "ابحث في العملاء",
+  "a11y.search_inventory": "ابحث في المخزون",
+  "a11y.search_suppliers": "ابحث في الموردين",
+  "a11y.search_pos": "ابحث في أوامر الشراء",
+  "a11y.search_products": "ابحث في المنتجات",
+  "a11y.search_portfolio": "ابحث في معرض الأعمال",
+  "a11y.search_waste": "ابحث في الهدر",
+  "a11y.language": "اللغة",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

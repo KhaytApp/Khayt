@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} bobines en stock bas",
   "xr.not_set": "Non défini",
   "an.new_vs_returning": "Clients nouveaux et fidèles",
+  "a11y.search_board": "Rechercher dans le tableau",
+  "a11y.search_orders": "Rechercher des commandes",
+  "a11y.search_clients": "Rechercher des clients",
+  "a11y.search_inventory": "Rechercher dans le stock",
+  "a11y.search_suppliers": "Rechercher des fournisseurs",
+  "a11y.search_pos": "Rechercher des bons de commande",
+  "a11y.search_products": "Rechercher des produits",
+  "a11y.search_portfolio": "Rechercher dans le portfolio",
+  "a11y.search_waste": "Rechercher les pertes",
+  "a11y.language": "Langue",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

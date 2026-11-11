@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} makara az",
   "xr.not_set": "Ayarlanmadı",
   "an.new_vs_returning": "Yeni ve geri dönen müşteriler",
+  "a11y.search_board": "Panoda ara",
+  "a11y.search_orders": "Siparişlerde ara",
+  "a11y.search_clients": "Müşterilerde ara",
+  "a11y.search_inventory": "Envanterde ara",
+  "a11y.search_suppliers": "Tedarikçilerde ara",
+  "a11y.search_pos": "Satın alma siparişlerinde ara",
+  "a11y.search_products": "Ürünlerde ara",
+  "a11y.search_portfolio": "Portfolyoda ara",
+  "a11y.search_waste": "Fireleri ara",
+  "a11y.language": "Dil",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

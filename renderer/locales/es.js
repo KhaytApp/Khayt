@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} carretes con poco stock",
   "xr.not_set": "Sin definir",
   "an.new_vs_returning": "Clientes nuevos y recurrentes",
+  "a11y.search_board": "Buscar en el tablero",
+  "a11y.search_orders": "Buscar pedidos",
+  "a11y.search_clients": "Buscar clientes",
+  "a11y.search_inventory": "Buscar en el inventario",
+  "a11y.search_suppliers": "Buscar proveedores",
+  "a11y.search_pos": "Buscar órdenes de compra",
+  "a11y.search_products": "Buscar productos",
+  "a11y.search_portfolio": "Buscar en el portafolio",
+  "a11y.search_waste": "Buscar desperdicio",
+  "a11y.language": "Idioma",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

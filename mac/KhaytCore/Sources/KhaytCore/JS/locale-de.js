@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} Spulen mit niedrigem Bestand",
   "xr.not_set": "Nicht gesetzt",
   "an.new_vs_returning": "Neue und wiederkehrende Kunden",
+  "a11y.search_board": "Board durchsuchen",
+  "a11y.search_orders": "Aufträge durchsuchen",
+  "a11y.search_clients": "Kunden durchsuchen",
+  "a11y.search_inventory": "Lager durchsuchen",
+  "a11y.search_suppliers": "Lieferanten durchsuchen",
+  "a11y.search_pos": "Bestellungen durchsuchen",
+  "a11y.search_products": "Produkte durchsuchen",
+  "a11y.search_portfolio": "Portfolio durchsuchen",
+  "a11y.search_waste": "Ausschuss durchsuchen",
+  "a11y.language": "Sprache",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

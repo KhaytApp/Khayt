@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "在庫不足スプール {n} 個",
   "xr.not_set": "未設定",
   "an.new_vs_returning": "新規顧客とリピーター",
+  "a11y.search_board": "ボードを検索",
+  "a11y.search_orders": "注文を検索",
+  "a11y.search_clients": "顧客を検索",
+  "a11y.search_inventory": "在庫を検索",
+  "a11y.search_suppliers": "仕入先を検索",
+  "a11y.search_pos": "発注を検索",
+  "a11y.search_products": "商品を検索",
+  "a11y.search_portfolio": "ポートフォリオを検索",
+  "a11y.search_waste": "廃棄を検索",
+  "a11y.language": "言語",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5434,5 +5434,15 @@
   "inv.low_stock_count_many": "{n} spools low",
   "xr.not_set": "Not set",
   "an.new_vs_returning": "New vs returning clients",
+  "a11y.search_board": "Search the board",
+  "a11y.search_orders": "Search orders",
+  "a11y.search_clients": "Search clients",
+  "a11y.search_inventory": "Search inventory",
+  "a11y.search_suppliers": "Search suppliers",
+  "a11y.search_pos": "Search purchase orders",
+  "a11y.search_products": "Search products",
+  "a11y.search_portfolio": "Search portfolio",
+  "a11y.search_waste": "Search waste",
+  "a11y.language": "Language",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

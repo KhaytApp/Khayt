@@ -5433,5 +5433,15 @@
   "inv.low_stock_count_many": "{n} 个料卷库存偏低",
   "xr.not_set": "未设置",
   "an.new_vs_returning": "新客户与回头客",
+  "a11y.search_board": "搜索看板",
+  "a11y.search_orders": "搜索订单",
+  "a11y.search_clients": "搜索客户",
+  "a11y.search_inventory": "搜索库存",
+  "a11y.search_suppliers": "搜索供应商",
+  "a11y.search_pos": "搜索采购单",
+  "a11y.search_products": "搜索产品",
+  "a11y.search_portfolio": "搜索作品集",
+  "a11y.search_waste": "搜索损耗",
+  "a11y.language": "语言",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
