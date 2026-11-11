@@ -323,3 +323,93 @@ test('checkEntry takes an `ext` object from now on, so the next shape change nee
   assert.equal(M.checkEntry(Object.assign({}, e, { ext: 'x' })).ok, false);
   assert.equal(M.checkEntry(Object.assign({}, e, { previous: {} })).ok, false, 'still strict about everything else');
 });
+
+test("the fixed version brings the switch back only if the shop had it on — its own choice while revoked is kept", () => {
+  const rev = { revoked: [{ version: '1.0.0', reason: 'Reports a refused order as sent.' }] };
+  const revoked = U.applyIndex(book(), index([row('1.0.0', rev)]), CTX, {}).settings;
+  // (a) On before the revocation, left alone: back on after the fix.
+  const fixedA = U.applyIndex(revoked, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedA.plugins[0].enabled, true);
+  // (b) On before, but the shop switched it OFF while it was revoked: stays off.
+  const off = U.setSwitch(revoked, LAMHA.id, false);
+  assert.equal(off.revoked, true);
+  assert.equal(off.settings.plugins[0].enabled, false, 'still off for old builds');
+  assert.equal(U.stateOf(off.settings, LAMHA.id).revoked.wasEnabled, false);
+  const fixedB = U.applyIndex(off.settings, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedB.plugins[0].enabled, false);
+  // Switching it on while revoked does not run it, and is what the fix restores.
+  const on = U.setSwitch(off.settings, LAMHA.id, true);
+  assert.equal(on.settings.plugins[0].enabled, false);
+  assert.equal(U.runnable(on.settings.plugins[0], U.stateOf(on.settings, LAMHA.id)).why, 'revoked');
+  const fixedC = U.applyIndex(on.settings, index([row('1.1.1', rev)], { serial: 8 }), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+  assert.equal(fixedC.plugins[0].enabled, true);
+  // Not revoked: the switch is just the switch.
+  assert.equal(U.setSwitch(book(), LAMHA.id, false).settings.plugins[0].enabled, false);
+});
+
+// ── A field re-routed to another host is asking for more (review, Nov 10) ──
+test('same fields and same hosts, but a field now goes to the other host: consent, never automatic', () => {
+  const PM = require('../lib/plugin-manifest.js');
+  const base = (toA, toB, authHost) => ({
+    khayt: { manifest: 1 }, id: 'app.test.route', name: { en: 'Route' }, publisher: 'T', version: '1.0.0',
+    domains: ['a.example.com', 'b.example.com'],
+    secrets: [{ name: 'key', label: { en: 'Key' }, kind: 'token' }],
+    actions: [
+      { id: 'one', label: { en: 'One' }, placement: 'order', kind: 'post', url: 'https://a.example.com/x',
+        ...(authHost === 'a' ? { auth: { header: 'X-K', secret: 'key' } } : {}),
+        body: { format: 'json-template', template: toA } },
+      { id: 'two', label: { en: 'Two' }, placement: 'order', kind: 'post', url: 'https://b.example.com/y',
+        ...(authHost === 'b' ? { auth: { header: 'X-K', secret: 'key' } } : {}),
+        body: { format: 'json-template', template: toB } },
+    ],
+  });
+  const v1 = base({ n: '{customer.name}', p: '{customer.phone}' }, { i: '{order.id}' }, 'a');
+  const v2 = base({ i: '{order.id}' }, { n: '{customer.name}', p: '{customer.phone}' }, 'a');
+  const granted = PM.grantFor(v1);
+  assert.deepEqual(PM.diffPermissions(granted, v1).widened, false, 'the version agreed to asks for nothing more');
+  const moved = PM.diffPermissions(granted, v2);
+  assert.deepEqual([moved.fields, moved.domains], [[], []], 'no new field and no new host');
+  assert.equal(moved.widened, true);
+  assert.ok(moved.routes.includes('b.example.com customer.phone'));
+  // The key sent to the other host is the same kind of move.
+  const keyMoved = PM.diffPermissions(granted, base({ n: '{customer.name}', p: '{customer.phone}' }, { i: '{order.id}' }, 'b'));
+  assert.deepEqual(keyMoved.routes, ['b.example.com secret:key']);
+  assert.equal(keyMoved.widened, true);
+  // Sending LESS is never a reason to ask.
+  assert.equal(PM.diffPermissions(granted, base({ n: '{customer.name}' }, { i: '{order.id}' }, 'a')).widened, false);
+  // A grant from before pairs were kept allowed every field to every host it lists: nothing installed is paused.
+  const old = { version: granted.version, fields: granted.fields, domains: granted.domains, scopes: granted.scopes };
+  assert.equal(PM.diffPermissions(old, v2).widened, false);
+  assert.equal(PM.diffPermissions(old, v1).widened, false);
+});
+
+// ── A grant made before pairs were kept (Lamha 1.1.1 on beta.33) ──────────
+test('a grant with no `routes` is consent to what it lists: nothing asks again, and the next update is automatic', () => {
+  // What beta.33's "Agree and install" wrote: version, fields, domains, scopes.
+  const full = M.grantFor(at('1.1.1'));
+  const legacy = { version: full.version, fields: full.fields, domains: full.domains, scopes: full.scopes };
+  const entry = installed('1.1.1', legacy);
+  // (a) The installed version is not paused, not pending, and still runs.
+  const check = M.checkEntry(entry);
+  assert.deepEqual([check.ok, check.paused], [true, false]);
+  const diff = M.diffPermissions(legacy, entry.manifest);
+  assert.deepEqual([diff.widened, diff.routes], [false, []]);
+  const s0 = book(entry);
+  assert.deepEqual(U.runnable(entry, U.stateOf(s0, LAMHA.id)).which, 'current');
+  // An index that lists the installed version changes nothing at all.
+  const same = U.applyIndex(s0, index([row('1.1.1')]), CTX, {});
+  assert.deepEqual([same.ok, same.changed, same.notes], [true, false, []]);
+  assert.equal(same.settings, s0, 'the very same object: nothing written');
+  // (b) A later version that sends nothing new installs by itself.
+  assert.equal(U.planWithManifest(entry, at('1.1.2'), row('1.1.2')).plan, 'auto');
+  const r = U.applyIndex(s0, index([row('1.1.2')]), CTX, { [LAMHA.id]: at('1.1.2') });
+  assert.deepEqual(r.notes.map((n) => n.kind), ['updated']);
+  assert.equal(r.settings.plugins[0].version, '1.1.2');
+  assert.equal(U.stateOf(r.settings, LAMHA.id).pending, undefined, 'no badge');
+  assert.deepEqual(r.settings.plugins[0].granted, legacy, 'the grant the shop gave, untouched');
+  assert.equal(M.checkEntry(r.settings.plugins[0]).paused, false);
+  // A field the shop never agreed to still asks, as it would with pairs.
+  const narrowGrant = (() => { const g = M.grantFor(narrow('1.1.1')); return { version: g.version, fields: g.fields, domains: g.domains, scopes: g.scopes }; })();
+  const narrowEntry = Object.assign(installed('1.1.1', narrowGrant), { manifest: narrow('1.1.1') });
+  assert.equal(U.planWithManifest(narrowEntry, at('1.1.2'), row('1.1.2')).plan, 'consent');
+});

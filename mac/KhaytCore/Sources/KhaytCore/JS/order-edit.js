@@ -130,8 +130,21 @@
       if (typed === null || typed < 0) delete wanted.price;
       else wanted.price = Math.round(typed * 100) / 100;
     }
+    // THE JOB'S NAME. It is what the invoice is headed with, and on the Mac it
+    // could never be changed after the job was taken: a typo stayed on the
+    // paper. A name is text, never blank (a blank is "leave it"), and a change
+    // is written down like the others — it is exactly the kind of thing a
+    // customer can be shown a different answer about later.
+    let renamed = null;
+    if (Object.prototype.hasOwnProperty.call(wanted, 'project')) {
+      const name = String(wanted.project == null ? '' : wanted.project).trim().slice(0, 200);
+      delete wanted.project;
+      if (name && name !== String(order.project || '')) renamed = { from: order.project || '', to: name };
+    }
     const changes = changesBetween(order, wanted);
+    if (renamed) changes.project = renamed;
     if (Object.keys(changes).length === 0) return { changes: {}, effects: [] };
+    if (renamed) order.project = renamed.to;
 
     for (const key of TRACKED_FIELDS) {
       if (!Object.prototype.hasOwnProperty.call(wanted, key)) continue;
@@ -483,10 +496,132 @@
     return { steps, totalMs };
   }
 
+  /* ── WHOSE JOB IT IS ───────────────────────────────────────────────────── */
+
+  /*
+   * Turki's rule (Nov 10, option C): a job's customer can be changed until
+   * its invoice is submitted to ZATCA, voided, credited or paid; then it is
+   * locked. A job with NO customer can always be given one, locked or not —
+   * a walk-in paid at the counter is still somebody's job.
+   *
+   * Being numbered is not a lock. Every booked job gets its invoice number at
+   * booking (lib/order-new.js), so "locked once invoiced" would lock every job
+   * but a quote. What locks it is what has left the shop: a submission to
+   * ZATCA, a void or a credit note, or money taken against that customer.
+   */
+
+  const present = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+  /** lib/record-delete.js — what "paid" means is the delete rule's. */
+  function recordDelete() {
+    const G = typeof globalThis !== 'undefined' ? globalThis : {};
+    if (G.KhaytRecordDelete) return G.KhaytRecordDelete;
+    if (typeof require === 'function') { try { return require('./record-delete.js'); } catch (_) { /* fall through */ } }
+    return null;
+  }
+
+  /**
+   * Why this job's customer can no longer be changed, or null if it can.
+   * `zatca`, `voided`, `credited` or `paid`, in that order: the first is the
+   * one the shop cannot undo, so it is the one worth saying.
+   */
+  function customerLocked(order) {
+    if (!isObj(order)) return null;
+    if (present(order.zatcaUuid) || isObj(order.zatcaSubmission)) return 'zatca';
+    if (present(order.voidedAt)) return 'voided';
+    if (present(order.creditedAt) || (Array.isArray(order.creditNotes) && order.creditNotes.length > 0)) return 'credited';
+    const RD = recordDelete();
+    if (RD && typeof RD.paid === 'function' ? RD.paid(order) : (+order.paidAmount > 0 || +order.depositAmount > 0)) return 'paid';
+    return null;
+  }
+
+  /**
+   * A customer's name as a record would show it, if the caller gives no way:
+   * in the shop's own content languages (lib/content-languages.js), never a
+   * two-language pick that is blank for a shop writing anything else.
+   */
+  function nameOfClient(cl, ctx) {
+    if (!cl) return '';
+    if (ctx && typeof ctx.nameOf === 'function') return String(ctx.nameOf(cl) || '');
+    const G = typeof globalThis !== 'undefined' ? globalThis : {};
+    let CL = G.KhaytContentLanguages;
+    if (!CL && typeof require === 'function') { try { CL = require('./content-languages.js'); } catch (_) { CL = null; } }
+    const settings = ctx && ctx.settings ? ctx.settings : null;
+    const read = CL && typeof CL.read === 'function' ? CL.read(cl, 'name', null, settings) : '';
+    return String(read || cl.name || '');
+  }
+
+  /**
+   * May this job be given this customer (an id, or null to take the customer
+   * off)? `{ ok: true, reason: null }` or `{ ok: false, reason }`, where reason
+   * is `missing` (no job), `same`, `unknown` (no such customer in
+   * `ctx.clients`, when given), or the lock: `zatca` | `voided` | `credited` |
+   * `paid`.
+   */
+  function canChangeCustomer(order, clientId, ctx) {
+    if (!isObj(order)) return { ok: false, reason: 'missing' };
+    const from = present(order.clientId) ? String(order.clientId) : null;
+    const to = present(clientId) ? String(clientId) : null;
+    if (from === to) return { ok: false, reason: 'same' };
+    const c = ctxOf(ctx);
+    if (to !== null && Array.isArray(c.clients) && !c.clients.some((x) => x && String(x.id) === to)) {
+      return { ok: false, reason: 'unknown' };
+    }
+    if (from === null) return { ok: true, reason: null };   // always: a job with no customer
+    const locked = customerLocked(order);
+    return locked ? { ok: false, reason: locked } : { ok: true, reason: null };
+  }
+
+  /**
+   * Give a job another customer, in place, and write it in the edit history.
+   *
+   * `ctx`: `{ now, id, clients, settings, nameOf }`. Only `clientId` always
+   * moves. The customer's NAME is written only on a record that carries one
+   * (`order.client` — LAN and older jobs; a desktop or Mac job carries the id
+   * alone and reads the name from the customer). The price and the currency
+   * stay as they were agreed: a change of customer is not a new quote. When
+   * the new customer bills in another currency than the job,
+   * `currencyDiffers` says so, for the editor to warn; nothing is converted.
+   *
+   * Returns `{ ok, reason, changes, currencyDiffers }`; `ok: false` leaves the
+   * job untouched.
+   */
+  function changeCustomer(order, clientId, ctx) {
+    const verdict = canChangeCustomer(order, clientId, ctx);
+    if (!verdict.ok) return { ok: false, reason: verdict.reason, changes: {}, currencyDiffers: false };
+    const c = ctxOf(ctx);
+    const to = present(clientId) ? String(clientId) : null;
+    const cl = to !== null && Array.isArray(c.clients) ? c.clients.find((x) => x && String(x.id) === to) : null;
+    const changes = { clientId: { from: present(order.clientId) ? order.clientId : null, to } };
+    // What the job's money is in NOW, before it moves. A job in the shop's own
+    // currency carries no `currency`, and one without it is read in its
+    // customer's (`order-money.js orderCurrency`) — so moving such a job to a
+    // customer who bills in EUR would turn 1,000 SAR into 1,000 EUR in every
+    // report. The currency it has is written on it first.
+    const shopCur = (c.settings && c.settings.currency) || 'SAR';
+    const was = present(order.clientId) && Array.isArray(c.clients)
+      ? c.clients.find((x) => x && String(x.id) === String(order.clientId)) : null;
+    const jobCur = order.currency || (was && was.currency) || shopCur;
+    const clientCur = (cl && cl.currency) || shopCur;
+    if (!order.currency && Array.isArray(c.clients) && jobCur !== clientCur) order.currency = jobCur;
+    order.clientId = to;
+    if (Object.prototype.hasOwnProperty.call(order, 'client')) {
+      const name = cl ? nameOfClient(cl, c) : '';
+      if (String(order.client || '') !== name) {
+        changes.client = { from: order.client == null ? '' : order.client, to: name };
+        order.client = name;
+      }
+    }
+    recordEdit(order, changes, c);
+    return { ok: true, reason: null, changes, currencyDiffers: !!cl && jobCur !== clientCur };
+  }
+
   const api = {
     EDIT_HISTORY_CAP, TRACKED_FIELDS, PRIORITY_LEVELS,
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
+    customerLocked, canChangeCustomer, changeCustomer,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;

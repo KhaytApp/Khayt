@@ -115,6 +115,16 @@ struct PaymentSheet: View {
                     .help(job.id)
             }
 
+            // THE BOX IS THE TOTAL PAID, and said so only in a code comment. A
+            // customer who had paid 300 pays the other 200; typing 200 put the
+            // job back to 200 paid. And a figure over the bill was cut down to
+            // it at Save with nothing said.
+            if let note = Self.note(recorded: job?.paidAmount ?? 0, typed: amount, bill: price) {
+                Text(shop.words.callIt(note.key, ["amount": .string(Money.text(note.amount, currency))]))
+                    .font(.caption).foregroundStyle(note.warns ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
                 if (job?.paidAmount ?? 0) > 0 {
                     Button(shop.words.callIt("mac.clear_payment") + "\u{2026}", role: .destructive) {
@@ -122,6 +132,7 @@ struct PaymentSheet: View {
                     }
                 }
                 Spacer()
+                SaveProblem(text: shop.moveProblem)
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
@@ -182,12 +193,26 @@ struct PaymentSheet: View {
         return full
     }
 
+    /// The caption under the figure: over the bill wins, then "this is the
+    /// total" on a job that already has money recorded.
+    static func note(recorded: Double, typed: Double, bill: Double) -> (key: String, amount: Double, warns: Bool)? {
+        if bill > 0, typed > bill + 0.005 { return ("mac.pay_over_bill", bill, true) }
+        if recorded > 0.005 { return ("mac.pay_total_note", recorded, false) }
+        return nil
+    }
+
     private func commit() {
         let id = subject.id
         let paid = min(max(0, amount), price)
         let when = paidAt
         let how = method
-        shop.clearQuestion()
-        Task { await shop.recordPayment(id, amount: paid, method: how, paidAt: when) }
+        // The sheet closes when the payment is IN the book. It used to close
+        // first, so a refusal (another computer holds the book, the staff
+        // lock) lost what was typed and said so only behind it.
+        shop.moveProblem = nil
+        Task {
+            await shop.recordPayment(id, amount: paid, method: how, paidAt: when)
+            if shop.moveProblem == nil { shop.clearQuestion() }
+        }
     }
 }

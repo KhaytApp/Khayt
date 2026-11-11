@@ -16,6 +16,8 @@ test('processRecurringOrders clones due recurring jobs', () => {
     project: 'Monthly part',
     price: 100,
   }];
+  global.settings = {}; global.clients = [];
+  require('../renderer/currency.js'); // stampJobCurrency, orderCurrency, as index.html loads them
   const { processRecurringOrders } = require('../renderer/operations-extras.js');
   processRecurringOrders();
   assert.equal(printLog.length, 2);

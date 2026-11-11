@@ -8353,6 +8353,7 @@ public actor KhaytEngine {
     /// can never be anything but one of these functions.
     public static let lanRestReads: Set<String> = [
         "ordersList", "machinesList", "inventoryList", "waitingList", "clientsList", "orderQuoteUrl",
+        "quotePart",
     ]
     public static let lanRestWrites: Set<String> = [
         "orderCreate", "orderPatch", "orderApprove", "inventoryCreate", "inventoryPatch",
@@ -8622,6 +8623,14 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPluginUpdate.revert(ARG0, ARG1)", [settings, .string(id)], as: JSONValue.self)
     }
 
+    /// The shop flips a connector's switch: `{ ok, settings, revoked? }`. While
+    /// its version is withdrawn the entry stays off and the choice is kept for
+    /// when the fixed version arrives.
+    public func pluginSetSwitch(settings: JSONValue, id: String, enabled: Bool) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.setSwitch(ARG0, ARG1, ARG2)",
+                          [settings, .string(id), .bool(enabled)], as: JSONValue.self)
+    }
+
     /// Which manifest runs for an entry: `{ run, which, manifest, granted, why, reason? }`.
     public func pluginRunnable(entry: JSONValue, settings: JSONValue) throws -> JSONValue {
         try runtime.call2("(function(){ var U = globalThis.KhaytPluginUpdate;"
@@ -8813,9 +8822,14 @@ public actor KhaytEngine {
                         machines: [JSONValue],
                         now: Date, today: String,
                         holdReason: String? = nil,
-                        qcNotes: String? = nil) throws -> JobMove {
+                        qcNotes: String? = nil,
+                        qcInspector: String? = nil) throws -> JobMove {
+        // The inspector goes with the pass (`lib/order-status.js` writes
+        // `order.inspector = qc.inspector || null`): nil is nobody named.
         let qc: JSONValue = qcNotes.map {
-            .object(["outcome": .string("pass"), "notes": .string($0)])
+            var pass: [String: JSONValue] = ["outcome": .string("pass"), "notes": .string($0)]
+            if let who = qcInspector, !who.isEmpty { pass["inspector"] = .string(who) }
+            return .object(pass)
         } ?? .null
         return try runtime.call2(MOVE_SCRIPT,
                           [order, .string(status), .array(orders), .object(settings),
@@ -9117,6 +9131,30 @@ public actor KhaytEngine {
              .object(mapping.mapValues { .number(Double($0)) }), .array(existing), .string(today),
              .object(settings), .array(ids.map(JSONValue.string))],
             as: CsvPlan.self)
+    }
+
+    /// Why this job's customer can no longer be changed — `zatca`, `voided`,
+    /// `credited` or `paid` — or nil when it can (`lib/order-edit.js
+    /// customerLocked`, Turki's rule of Nov 10). A job with no customer can
+    /// be given one whatever this says.
+    public func customerLocked(_ order: JSONValue) throws -> String? {
+        try runtime.call2("KhaytOrderEdit.customerLocked(ARG0)", [order], as: String?.self)
+    }
+
+    /// Give a job another customer (nil takes the customer off) —
+    /// `lib/order-edit.js changeCustomer`. `ok` false leaves the order as it
+    /// was, `reason` saying why; `currencyDiffers` is the editor's to warn
+    /// about, since nothing is converted.
+    public func changeCustomer(order: JSONValue, clientId: String?, clients: [JSONValue],
+                               settings: [String: JSONValue] = [:], now: Date,
+                               editId: String) throws -> CustomerChange {
+        try runtime.call2(
+            "(function(){ var o = ARG0;"
+          + " var r = KhaytOrderEdit.changeCustomer(o, ARG1, { now: ARG2, id: ARG3, clients: ARG4, settings: ARG5 });"
+          + " return { order: o, ok: r.ok, reason: r.reason, currencyDiffers: r.currencyDiffers }; })()",
+            [order, clientId.map(JSONValue.string) ?? .null, .number(now.timeIntervalSince1970 * 1000),
+             .string(editId), .array(clients), .object(settings)],
+            as: CustomerChange.self)
     }
 
     /// A job's edits, newest first — `lib/order-edit.js editLog`.
@@ -13104,14 +13142,15 @@ public actor KhaytEngine {
                            deltas: [[String: JSONValue]]) throws -> Folded {
         try runtime.call2("""
             (function (base, payloads) {
-              var applied = 0, skipped = 0, removed = 0;
+              var applied = 0, skipped = 0, removed = 0, conflicts = [];
               for (var i = 0; i < payloads.length; i++) {
                 var r = KhaytSync.applyDeltas(base, payloads[i], { appendOnly: [] }) || {};
                 applied += r.applied || 0;
                 skipped += r.skipped || 0;
                 removed += r.removed || 0;
+                if (Array.isArray(r.conflicts)) conflicts = conflicts.concat(r.conflicts);
               }
-              return { store: base, applied: applied, skipped: skipped, removed: removed };
+              return { store: base, applied: applied, skipped: skipped, removed: removed, conflicts: conflicts };
             })(ARG0, ARG1)
             """,
                           [.object(base), .array(deltas.map(JSONValue.object))],
@@ -13158,6 +13197,21 @@ public actor KhaytEngine {
         public let skipped: Int
         /// Records a tombstone in the chain deleted.
         public let removed: Int
+        /// What the rule itself reported: an equal-revision tie that took the
+        /// incoming copy over one edited here, and a delete that beat an edit.
+        /// Dropped until Nov 2026, which is how a phone's "Done" could put a
+        /// job's paid amount back to nothing with no notice anywhere.
+        public let conflicts: [JSONValue]
+
+        private enum CodingKeys: String, CodingKey { case store, applied, skipped, removed, conflicts }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            store = try c.decode([String: JSONValue].self, forKey: .store)
+            applied = try c.decode(Int.self, forKey: .applied)
+            skipped = try c.decode(Int.self, forKey: .skipped)
+            removed = try c.decode(Int.self, forKey: .removed)
+            conflicts = try c.decodeIfPresent([JSONValue].self, forKey: .conflicts) ?? []
+        }
     }
 
     /// Which jobs are late — the attention engine's answer, as a set of ids.

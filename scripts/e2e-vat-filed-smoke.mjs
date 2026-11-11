@@ -84,7 +84,7 @@ try {
 
   // Settings → VAT: the frequency, saved through the shared settings edit.
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="invoice"]');
+  await window.click('.settings-nav-item[data-settings-section="invoices"]');
   await window.waitForSelector('#set_vatFilingFrequency');
   await window.evaluate(() => loadSettingsIntoForm());
   const disabled = await window.evaluate(() => document.getElementById('set_vatFilingFrequency').disabled);

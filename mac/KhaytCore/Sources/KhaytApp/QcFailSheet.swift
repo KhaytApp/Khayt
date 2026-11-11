@@ -28,6 +28,10 @@ struct QcFailSheet: View {
     /// Who pays for a reprint, when QC is on: the shop (our defect — no
     /// charge) by default, as on the desktop.
     @State private var reprintCost = "shop"
+    @State private var inspector = ""
+    private var inspectorMissing: Bool {
+        QcInspector.missing(settings: shop.settingsDict, operators: shop.activeOperators.count, chosen: inspector)
+    }
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -50,7 +54,7 @@ struct QcFailSheet: View {
                     TextField("", text: $reason)
                         .textFieldStyle(.roundedBorder)
                         .focused($focused)
-                        .onSubmit { commit(shop.qcReprintFlow ? .reprint(cost: reprintCost) : nil) }
+                        .onSubmit { commit(shop.qcReprintFlow ? .reprint(cost: reprintCost) : nil) }  // refuses with no inspector
                 }
                 GridRow {
                     Text(shop.words.callIt("mac.wasted")).foregroundStyle(.secondary)
@@ -91,17 +95,22 @@ struct QcFailSheet: View {
                 }
             }
 
+            QcInspector.Row(shop: shop, chosen: $inspector)
+
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
                 if shop.qcReprintFlow {
                     Button(shop.words.callIt("mac.qc_scrap"), role: .destructive) { commit(.scrap) }
+                        .disabled(inspectorMissing)
                     Button(shop.words.callIt("qc.reprint")) { commit(.reprint(cost: reprintCost)) }
                         .keyboardShortcut(.defaultAction)
+                        .disabled(inspectorMissing)
                 } else {
                     Button(shop.words.callIt("ord.qc_fail"), role: .destructive) { commit(nil) }
                         .keyboardShortcut(.defaultAction)
+                        .disabled(inspectorMissing)
                 }
             }
         }
@@ -114,8 +123,10 @@ struct QcFailSheet: View {
         let id = subject.id
         let type = failureType
         let note = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        let grams = Double(wasted.trimmingCharacters(in: .whitespaces)) ?? 0
+        guard !inspectorMissing else { return }
+        let grams = TypedNumber.parse(wasted) ?? 0
+        let who = inspector.isEmpty ? nil : inspector
         shop.clearQuestion()
-        Task { await shop.recordQcFailure(id, failureType: type, reason: note, weight: grams, next: next) }
+        Task { await shop.recordQcFailure(id, failureType: type, reason: note, weight: grams, inspector: who, next: next) }
     }
 }

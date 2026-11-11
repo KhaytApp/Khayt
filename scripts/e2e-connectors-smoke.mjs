@@ -90,7 +90,7 @@ try {
 
   await window.evaluate(() => { settings.mode = 'professional'; applyMode(); saveAll(); });
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="automation"]');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
   await window.waitForSelector('#btnPluginInstall', { timeout: 10000 });
 
   // ── an unsigned file is refused ──
@@ -111,6 +111,7 @@ try {
   if (consent.hosts.join() !== 'api.lamha.sa') fail(`consent hosts: ${consent.hosts}`);
   if (consent.fields.sort().join() !== 'customer.phone,order.id') fail(`consent fields: ${consent.fields}`);
   if (!/phone number/.test(consent.text)) fail(`consent does not name the kind of data: ${consent.text}`);
+  if (await window.$('.plg-consent-updates')) fail('a first install said it updates a version');
   await window.click('.modal [data-act="ok"]');
   await window.waitForSelector('.plg-row[data-plugin="sa.lamha.ship"]', { timeout: 10000 });
   const stored = await window.evaluate(() => settings.plugins[0]);
@@ -200,7 +201,7 @@ try {
   await window.waitForTimeout(800);
   if ((await electronApp.evaluate(() => globalThis.__sends)).length !== before + 1) fail('a turned-down event was sent again on its own');
   await switchTab(window, 'settings-tab');
-  await window.evaluate(() => { openSettingsSection('automation'); renderPluginSettings(); });
+  await window.evaluate(() => { openSettingsSection('connections'); renderPluginSettings(); });
   await window.waitForSelector('.plg-failed [data-act="retry"]', { timeout: 10000 });
   const shown = await window.evaluate(() => document.querySelector('.plg-failed').textContent);
   if (!/Duplicate order/.test(shown) || !/Lamha shipping/.test(shown)) fail(`failed list: ${shown}`);
@@ -229,6 +230,23 @@ try {
   if (!said[0].includes('Sender phone') || said[0].includes('senderPhone')) fail(`setting refusal: ${said[0]}`);
   if (!said[1].includes('API key')) fail(`secret refusal: ${said[1]}`);
   if (!said[2].includes('host')) fail(`other refusal: ${said[2]}`);
+
+  // ── installing over another version says so; the same version, or the read-only view, does not ──
+  const updates = await window.evaluate(async () => {
+    const m = Object.assign({}, settings.plugins[0].manifest, { version: '1.1.1' });
+    const seen = [];
+    for (const opts of [{ replacing: '1.0.0' }, { replacing: '1.1.1' }, { replacing: '1.0.0', readOnly: true }]) {
+      const p = pluginConsent(m, opts);
+      await new Promise((r) => setTimeout(r, 50));
+      const el = document.querySelector('.plg-consent-updates');
+      seen.push(el ? el.textContent : '');
+      document.querySelector('.modal [data-act="cancel"], .modal [data-act="ok"]').click();
+      await p;
+    }
+    return seen;
+  });
+  if (!/Updates version 1\.0\.0/.test(updates[0])) fail(`updates line: ${updates[0]}`);
+  if (updates[1] || updates[2]) fail(`updates line where none belongs: ${JSON.stringify(updates)}`);
 
   // ── off means off ──
   const eventsBeforeOff = (await electronApp.evaluate(() => globalThis.__sends)).filter((s) => s.event).length;

@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "此手机需要重新与 Mac 配对后才能添加照片。";
 "printphotos.why.not_found" = "Mac 上已没有这个订单。";
 "printphotos.why.old_mac" = "请在 Mac 上更新 Khayt，以便从手机添加照片。";
+"expense.needs_mac" = "这台 Mac 还不能接收来自手机的带收据照片的支出。没有保存任何内容，你的支出仍在这里。";
+"quote.needs_mac" = "这台 Mac 还不能为手机计算报价。没有发送任何内容。这部手机上的计算器无需它也能使用。";
 "printphotos.why.read_only" = "Mac 上的店铺目前为只读，无法接收照片。";
 "printphotos.why.too_large" = "这张照片对 Mac 来说太大了。请换一张小一点的。";
 "printphotos.why.not_image" = "Mac 无法读取这张图片。请使用 JPEG 或 PNG。";

@@ -30,6 +30,9 @@ struct OrderDetailsSheet: View {
         var trackingNumber = ""
         var deliveryAddress = ""
         var operatorId = ""
+        /// Who the job is for — "" is nobody. Saved by its own rule
+        /// (`lib/order-edit.js changeCustomer`), not by `applyDetails`.
+        var clientId = ""
         var discountPct = 0.0
         var shippingCost = 0.0
         var lines: [Line] = []
@@ -50,6 +53,9 @@ struct OrderDetailsSheet: View {
     @State private var form = Form()
     @State private var opened = Form()
     @State private var started = false
+    /// Why the customer cannot be changed (`zatca` | `voided` | `credited` |
+    /// `paid`), or nil. Read once when the sheet opens.
+    @State private var customerLock: String?
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
 
@@ -90,12 +96,15 @@ struct OrderDetailsSheet: View {
             let was = Self.opening(shop.orderFields(subject.id))
             opened = was
             form = was
+            let id = subject.id
+            Task { customerLock = await shop.customerLock(id) }
         }
     }
 
     // MARK: - Sections
 
     @ViewBuilder private var people: some View {
+        customer
         let ops = Self.operatorChoices(shop.operatorRows, current: form.operatorId)
         if !ops.isEmpty {
             LabeledContent(shop.words.callIt("op.assigned")) {
@@ -111,6 +120,36 @@ struct OrderDetailsSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 TextField(shop.words.callIt("tag.ph"), text: $form.tags).textFieldStyle(.roundedBorder)
                 Text(shop.words.callIt("tag.hint")).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// The job's customer. A job with no customer can always be given one;
+    /// otherwise the picker is shut once the invoice has left the shop
+    /// (Turki's rule, Nov 10), and says which way it left.
+    @ViewBuilder private var customer: some View {
+        let locked = Self.customerShut(lock: customerLock, openedWith: opened.clientId)
+        LabeledContent(shop.words.callIt("mac.customer")) {
+            VStack(alignment: .leading, spacing: 2) {
+                Picker("", selection: $form.clientId) {
+                    Text(shop.words.callIt("mac.job_customer_none")).tag("")
+                    ForEach(Self.customerChoices(shop.clients, current: form.clientId), id: \.id) { c in
+                        Text(c.name).tag(c.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 260)
+                .disabled(locked)
+                if locked, let lock = customerLock {
+                    Text(Shop.customerLockWords(shop.words)[lock] ?? "")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if Self.currencyDiffers(job: job?.currency ?? "", shop: shop.currency,
+                                               client: shop.clients.first { $0.id == form.clientId }?.currency) {
+                    Text(shop.words.callIt("mac.job_customer_currency"))
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -181,7 +220,7 @@ struct OrderDetailsSheet: View {
         }
         VStack(alignment: .leading, spacing: 4) {
             Text(shop.words.callIt("oe.delivery_address")).foregroundStyle(.secondary)
-            let saved = Self.savedAddresses(clientRow(job?.clientId))
+            let saved = Self.savedAddresses(clientRow(form.clientId.isEmpty ? nil : form.clientId))
             if !saved.isEmpty {
                 Menu(shop.words.callIt("oe.select_address")) {
                     ForEach(saved, id: \.address) { a in
@@ -261,6 +300,7 @@ struct OrderDetailsSheet: View {
                     invoiceNotes: text("invoiceNotes"), tags: tags.joined(separator: ", "),
                     courierName: text("courierName"), trackingNumber: text("trackingNumber"),
                     deliveryAddress: text("deliveryAddress"), operatorId: text("operatorId"),
+                    clientId: text("clientId"),
                     discountPct: Shop.plainNumber(o["discountPct"]) ?? 0,
                     shippingCost: Shop.plainNumber(o["shippingCost"]) ?? 0, lines: lines,
                     custom: custom)
@@ -316,6 +356,37 @@ struct OrderDetailsSheet: View {
         return out
     }
 
+    /// Whether the customer picker is shut: locked, and the job HAS a
+    /// customer — one with none can always be given one.
+    static func customerShut(lock: String?, openedWith clientId: String) -> Bool {
+        lock != nil && !clientId.isEmpty
+    }
+
+    /// The customers offered, by name, with the job's own kept even if it is
+    /// no longer in the book (so saving for another reason cannot drop it).
+    static func customerChoices(_ clients: [Client], current: String) -> [(id: String, name: String)] {
+        var out = clients.map { (id: $0.id, name: $0.anyName) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if !current.isEmpty, !out.contains(where: { $0.id == current }) { out.insert((current, current), at: 0) }
+        return out
+    }
+
+    /// The new customer bills in another currency than the job is priced in.
+    /// Nothing is converted — a change of customer is not a new quote — so
+    /// the shop is told before it saves.
+    static func currencyDiffers(job: String, shop: String, client: String?) -> Bool {
+        guard let client else { return false }
+        let j = job.isEmpty ? shop : job
+        let c = client.isEmpty ? shop : client
+        return j != c
+    }
+
+    /// The customer to hand the save: `.none` when unchanged.
+    static func customerChange(opened: Form, now form: Form) -> String?? {
+        guard form.clientId != opened.clientId else { return .none }
+        return .some(form.clientId.isEmpty ? nil : form.clientId)
+    }
+
     /// The customer's saved addresses (`addresses[]` of `{ label, address }`).
     static func savedAddresses(_ client: [String: JSONValue]?) -> [(label: String, address: String)] {
         guard case .array(let list)? = client?["addresses"] else { return [] }
@@ -329,7 +400,8 @@ struct OrderDetailsSheet: View {
     private func commit() {
         let id = subject.id
         let fields = Self.fields(opened: opened, now: form)
+        let customer = Self.customerChange(opened: opened, now: form)
         shop.clearQuestion()
-        Task { await shop.editOrderDetails(id, fields: fields) }
+        Task { await shop.editOrderDetails(id, fields: fields, customer: customer) }
     }
 }

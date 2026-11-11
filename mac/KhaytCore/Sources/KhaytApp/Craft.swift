@@ -167,6 +167,24 @@ struct CraftArt: View {
 ///
 /// The argument order matches the component it replaces, so a call site changes
 /// by its name and nothing else.
+/// The one thing to do on a screen with nothing on it: the Customers screen's
+/// rule ("the way in, on the screen that is empty"), for every screen that has
+/// one. Greyed out, with the reason said, where the shop may not write.
+struct EmptyAction: View {
+    let shop: Shop
+    /// A Words key.
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(shop.words.callIt(title), action: action)
+            .buttonStyle(.borderedProminent)
+            .disabled(!shop.canMoveJobs)
+            .help(shop.canMoveJobs ? "" : shop.lockedReason)
+        WhyLockedNote(shop: shop)
+    }
+}
+
 struct EmptyHere<Actions: View>: View {
     let title: String
     var message: String?

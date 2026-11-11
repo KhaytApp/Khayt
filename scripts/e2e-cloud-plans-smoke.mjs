@@ -41,7 +41,7 @@ async function openCloudPanel(window) {
     renderCloudSettings();
     // Khayt Cloud lives under `online` — it moved out of `automation`, which is
     // for WhatsApp templates and scheduled email rather than the online surface.
-    openSettingsSection('online');
+    openSettingsSection('cloud');
   });
   await window.waitForSelector('#cloudSettingsSection');
   await window.waitForFunction(() =>

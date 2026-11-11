@@ -73,7 +73,7 @@ try {
   // ---- The switch ----
   await dismissWizard(window);
   await switchTab(window, 'settings-tab');
-  await window.click('.settings-nav-item[data-settings-section="payments"]');
+  await window.click('.settings-nav-item[data-settings-section="general"]');
   await window.evaluate(() => renderTelemetrySettings());
   await window.waitForSelector('#tel_active');
   ok(await window.evaluate(() => document.getElementById('tel_active').checked), 'Settings shows the count on by default');

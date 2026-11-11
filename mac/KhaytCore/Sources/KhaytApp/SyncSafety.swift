@@ -450,6 +450,44 @@ enum SyncLosses {
         return out
     }
 
+    /// A PHONE THAT EDITED FROM AN OLD COPY, said by the phone itself.
+    ///
+    /// `rev` counts a record's saves; it is not a history. The Mac saves a job
+    /// (rev 8); a phone still holding rev 7 edits it twice and sends rev 9.
+    /// Nine beats eight, there is no tie, and the Mac's save is gone with no
+    /// conflict for anyone to see. The one fact that tells the two cases apart
+    /// is which revision the phone STARTED from, so a delta may say it:
+    ///
+    ///     { "collection": "printLog", "record": { …, "rev": 9 }, "baseRev": 7 }
+    ///
+    /// `baseRev` is the `rev` of the copy the phone held before its first
+    /// unsent edit to that record — on the delta, not in the record, so it
+    /// never reaches the book. When the copy here was at a HIGHER rev than
+    /// that and the phone's copy replaced it, what was here is kept and
+    /// announced, exactly like a tie. The rule that decides who wins does not
+    /// change (one rule on every device, or they stop converging); this only
+    /// makes sure the losing copy is not thrown away unseen. A delta without
+    /// `baseRev` (an older phone) is treated as before.
+    static func staleReplacements(before: [String: JSONValue], after: [String: JSONValue],
+                                  payload: [String: JSONValue], already: Set<String>) -> [SyncLoss] {
+        guard case .array(let deltas)? = payload["deltas"] else { return [] }
+        let was = BookRecords.index(before)
+        let now = BookRecords.index(after)
+        var out: [SyncLoss] = []
+        var seen = already
+        for case .object(let delta) in deltas {
+            guard case .string(let c)? = delta["collection"], case .number(let base)? = delta["baseRev"],
+                  case .object(let record)? = delta["record"], case .string(let id)? = record["id"] else { continue }
+            let key = c + ":" + id
+            guard !seen.contains(key), let mine = was[key], let theirs = now[key], mine != theirs else { continue }
+            guard case .number(let myRev)? = mine["rev"], myRev > base else { continue }
+            out.append(SyncLoss(kind: .replaced, collection: c, recordId: id,
+                                record: .object(mine), replacedBy: .object(theirs)))
+            seen.insert(key)
+        }
+        return out
+    }
+
     /// The file for one merge. Named once, before the merge, so a merge the
     /// write chain has to work out again rewrites the same file.
     static func fileURL(for storeURL: URL, at date: Date = Date()) -> URL {

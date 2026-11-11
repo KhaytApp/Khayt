@@ -879,7 +879,7 @@ private struct MoneyTiles: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(shop.words.callIt("mac.revenue"))
                         .font(.system(size: 10, weight: .semibold))
-                        .textCase(.uppercase).tracking(0.6)
+                        .textCase(.uppercase).tracking(Words.spaced(0.6))
                         .foregroundStyle(.secondary)
                     BigFigure(value: Money.figure(k.revenue), unit: Money.mark(shop.currency))
                     HStack(spacing: 5) {

@@ -98,7 +98,14 @@ final class CalculatorModel {
     /// ALWAYS the decimal point — nobody writes thousands after a nought, and
     /// "0,125" g or "0,180" per kWh read as 125 and 180 otherwise.
     static func number(_ text: String) -> Double {
-        var said = text.trimmingCharacters(in: .whitespaces)
+        // Arabic-Indic and Persian digits and the Arabic decimal mark first:
+        // `Double("١٥٠")` is nil, so a weight typed on an Arabic keyboard was 0.
+        var said = String(text.trimmingCharacters(in: .whitespaces).compactMap { ch -> Character? in
+            if ch.isNumber, let d = ch.wholeNumberValue, !ch.isASCII { return Character(String(d)) }
+            if ch == "٫" { return "." }
+            if ch == "٬" { return nil }
+            return ch
+        })
         let whole = said.prefix { $0 != "," }
         let zeroWhole = said.contains(",") && whole.allSatisfy { $0 == "0" || $0 == "-" || $0 == "+" }
         if !zeroWhole { said = said.replacing(/,(?=\d{3}(?!\d))/, with: "") }

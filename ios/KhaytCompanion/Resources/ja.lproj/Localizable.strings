@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "写真を追加するには、このiPhoneをMacともう一度ペアリングする必要があります。";
 "printphotos.why.not_found" = "この注文はMacにもうありません。";
 "printphotos.why.old_mac" = "iPhoneから写真を追加するには、MacのKhaytをアップデートしてください。";
+"expense.needs_mac" = "この Mac は、まだ iPhone からのレシート写真付きの経費を受け取れません。何も保存されておらず、経費はこのまま残っています。";
+"quote.needs_mac" = "この Mac は、まだ iPhone 向けに見積もりを計算できません。何も送信されていません。この iPhone の計算機は Mac なしで使えます。";
 "printphotos.why.read_only" = "Macのショップは現在読み取り専用のため、写真を受け取れません。";
 "printphotos.why.too_large" = "この写真はMacには大きすぎます。小さい写真をお試しください。";
 "printphotos.why.not_image" = "Macが読み取れない画像です。JPEGまたはPNGをお試しください。";

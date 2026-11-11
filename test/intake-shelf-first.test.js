@@ -23,6 +23,7 @@ function stub(stockQty) {
     saveAll() {}, toast() {}, switchTab() {},
     t: (k, v) => k + (v ? JSON.stringify(v) : ''), uid: (p) => `${p}-1`, localDateStr: () => '2026-11-05', nextQuoteSeq: () => '0001',
   });
+  require('../renderer/currency.js'); // stampJobCurrency, as index.html loads it
 }
 const order = (n) => ({ id: 'IN9', payload: { title: 'Web order', name: 'Sara', contact: 'sara@example.com', description: `- Flexi dragon × ${n}` } });
 

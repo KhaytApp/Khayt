@@ -213,6 +213,13 @@ struct ConnectorSettings: View {
 /// What a connector will send, and where, before it is installed: one row per
 /// address with the fields that go there and the kind of data each is.
 struct ConnectorConsentSheet: View {
+    /// "Updates version 1.0.0 …" when this installs over a version the shop
+    /// already has, nil for a first install or the same version again.
+    static func updatesLine(_ offer: ConnectorOffer, words: Words) -> String? {
+        guard let from = offer.replacing, !from.isEmpty, from != offer.version else { return nil }
+        return words.callIt("plg.consent_updates", ["from": .string(from)])
+    }
+
     let shop: Shop
     let offer: ConnectorOffer
     let done: (String?) -> Void
@@ -236,6 +243,11 @@ struct ConnectorConsentSheet: View {
             }
             if offer.dev {
                 Text(shop.words.callIt("plg.dev_warning")).font(.callout).foregroundStyle(Khayt.attention)
+            }
+            // Installing over a version the shop has: say so, or the sheet
+            // reads like a first install (Lamha 1.0.0 → 1.1.1, Nov 10).
+            if let line = Self.updatesLine(offer, words: shop.words) {
+                Text(line).font(.callout).foregroundStyle(.secondary)
             }
             Text(shop.words.callIt("plg.consent_lead")).font(.callout)
             ScrollView {

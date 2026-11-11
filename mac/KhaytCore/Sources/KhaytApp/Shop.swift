@@ -949,7 +949,9 @@ final class Shop {
                 repeat {
                     read = try await BookWork.run { () throws -> BookRead in
                         let holds = StoreWriter.serialised { LibraryWritten.current }
-                        let raw = try StoreReader(build: build).raw
+                        let reader = try StoreReader(build: build)
+                        let raw = reader.raw
+                        let fromRollback = reader.openedFromRollback
                         let files = Self.decodeFiles(raw)
                         // The jobs too, and what each model's jobs say: on a
                         // 5,000-job book these held the main thread on every
@@ -958,7 +960,8 @@ final class Shop {
                         // is reported as before, so nil only on a thrown read.
                         return BookRead(root: raw, files: files.items, skipped: files.skipped, holds: holds,
                                         orders: try? Self.decodeOrders(raw),
-                                        history: PrintHistory.byFile(Self.rows(raw, "printLog")))
+                                        history: PrintHistory.byFile(Self.rows(raw, "printLog")),
+                                        fromRollback: fromRollback)
                     }
                     if let hook = Self.afterBookReadForTests { await hook() }
                     // A later load started while this one was reading: it has
@@ -967,6 +970,13 @@ final class Shop {
                     tries += 1
                 } while read.holds < libraryShownSequence && tries < 10
                 root = read.root
+                // Said once: what is on screen is one save old, and the next
+                // save here replaces the damaged file (which is kept beside
+                // the book). It used to open the rollback with nothing said.
+                if read.fromRollback, !saidRollback {
+                    saidRollback = true
+                    moveNotices.append(words.callIt("mac.opened_rollback"))
+                }
                 library = (items: read.files, skipped: read.skipped)
                 if let orders = read.orders { preDecoded = (orders, read.history) }
                 // This book is now the library on screen: a write it already
@@ -1802,7 +1812,26 @@ final class Shop {
     /// takes ownership whatever it finds, because refusing to open a shop's own
     /// app is worse than the collision. This app defers — it is the newcomer,
     /// and it has somewhere to fall back to, which is reading.
+    /// Whether this window has already said it opened the book's rollback.
+    private var saidRollback = false
+
     private func takeOwnership(of build: StoreReader.Build?) {
+        // THE SAME BOOK, STILL OURS: keep the claim, do not drop and retake it.
+        //
+        // Every write reloads, and every reload came through here and DELETED
+        // the lock file before writing it again. A write on the chain (a
+        // library scan, a phone's changes, a printer finishing) whose
+        // ownership check landed in that gap found no lock, was refused as
+        // "another app owns this book", and — where its caller swallowed the
+        // error — was lost without a word. The other app, reading in the same
+        // gap, saw a free book.
+        if let build, let held = ownership, heartbeat != nil,
+           previousBuild?.storeURL == build.storeURL,
+           let kept = StoreLock.beat(held, for: build) {
+            ownership = kept
+            previousBuild = build
+            return
+        }
         heartbeat?.cancel()
         heartbeat = nil
         StoreLock.release(ownership, for: previousBuild)
@@ -3525,4 +3554,6 @@ struct BookRead: Sendable {
     var holds: Int
     var orders: (items: [Order], skipped: [String])?
     var history: [String: PrintHistory.Entry]
+    /// The book would not parse and its rollback was opened in its place.
+    var fromRollback = false
 }

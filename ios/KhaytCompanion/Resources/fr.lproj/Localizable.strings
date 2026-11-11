@@ -1054,6 +1054,8 @@
 "printphotos.why.device" = "Ce téléphone doit être de nouveau jumelé au Mac avant de pouvoir ajouter des photos.";
 "printphotos.why.not_found" = "Le Mac n’a plus cette commande.";
 "printphotos.why.old_mac" = "Mettez Khayt à jour sur le Mac pour ajouter des photos depuis le téléphone.";
+"expense.needs_mac" = "Ce Mac ne peut pas encore recevoir une dépense avec photo du reçu depuis le téléphone. Rien n’a été enregistré, et votre dépense est toujours là.";
+"quote.needs_mac" = "Ce Mac ne peut pas encore calculer un devis pour le téléphone. Rien n’a été envoyé. La calculatrice de ce téléphone fonctionne sans lui.";
 "printphotos.why.read_only" = "L’atelier est en lecture seule sur le Mac pour le moment : il ne peut pas recevoir de photo.";
 "printphotos.why.too_large" = "Cette photo est trop grande pour le Mac. Essayez-en une plus petite.";
 "printphotos.why.not_image" = "Le Mac ne peut pas lire cette image. Essayez un JPEG ou un PNG.";

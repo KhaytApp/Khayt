@@ -29,7 +29,7 @@ export const SHOTS = [
   { tab: 'gift-cards-tab', file: 'screenshot-8-gift-cards.png', wait: '#giftCardsContainer table tbody tr, #gift-cards-tab' },
   { tab: 'catalog-tab', file: 'screenshot-9-catalog.png', wait: '#catalogGrid .product-card, #catalogGrid' },
   { tab: 'waste-tab', file: 'screenshot-10-waste.png', wait: '#wasteTable tbody tr, #waste-tab' },
-  { tab: 'settings-tab', file: 'screenshot-11-settings-invoice.png', wait: '#zatcaPhase2Section, #settings-panel-invoice', setup: 'settings-invoice' },
+  { tab: 'settings-tab', file: 'screenshot-11-settings-invoice.png', wait: '#zatcaPhase2Section, #settings-panel-invoices', setup: 'settings-invoice' },
   { tab: 'portfolio-tab', file: 'screenshot-12-portfolio.png', wait: '#portfolioGrid .portfolio-cell, #portfolioGrid' },
 ];
 
@@ -74,7 +74,7 @@ async function prepareShot(page, shot) {
   if (shot.setup === 'settings-invoice') {
     await page.evaluate(() => window.KhaytShell.switchTab('settings-tab'));
     await page.evaluate(() => {
-      document.querySelector('.settings-nav-item[data-settings-section="invoice"]')?.click();
+      document.querySelector('.settings-nav-item[data-settings-section="invoices"]')?.click();
     });
     return;
   }
