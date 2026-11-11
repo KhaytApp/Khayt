@@ -39,12 +39,18 @@ final class DesignV2FoundationTests: XCTestCase {
         XCTAssertEqual(hex(KhaytDesign.thread, .light), "F2A541")
     }
 
-    func testStagesTakeTheMacsTodayColours() {
-        // Printing live green, QC and hold violet, done done, pending and post quiet.
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "34D27A")
+    func testStagesTakeTheSharedColours() {
+        // Turki, Nov 11, every app: printing AMBER (warn amber as ink, on the
+        // amber wash), QC and hold violet, done and paid GREEN, pending and
+        // post quiet.
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "E0A73C")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .light), "8A5A0B")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "printing"), .light), "FDF1DE")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "printing"), .dark), "3A2C14")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "qc"), .dark), "B49CFF")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "on_hold"), .dark), "B49CFF")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "4FBFA0")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "34D27A")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .light), "13803F")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "8AA4C2")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "post"), .dark), "8AA4C2")
         // Rails stay rare: only printing and QC.
@@ -96,5 +102,15 @@ final class DesignV2FoundationTests: XCTestCase {
         L10n.setLanguage(.ar)
         XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.postScriptName(.medium), size: 12, relativeTo: .caption))
         XCTAssertNotEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
+    }
+
+    /// The Live Activity draws the same amber bar as the app and the widget,
+    /// and says "printing" in the warn amber, never the old live green.
+    func testTheLiveActivityPrintsInAmber() throws {
+        let src = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("KhaytWidget/PrintActivityViews.swift"), encoding: .utf8)
+        XCTAssertTrue(src.contains("case .printing: attention"))
+        XCTAssertTrue(src.contains("phase == .printing ? thread : tone(phase)"))
+        XCTAssertEqual(src.components(separatedBy: "PrintActivityLook.bar(state.phase)").count - 1, 2, "both bars use bar(_:)")
     }
 }
