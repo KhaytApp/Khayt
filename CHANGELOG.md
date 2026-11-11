@@ -9542,6 +9542,43 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.34] - 2026-11-11
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release fixes two faults found in daily use, a job moving when you pressed ⌘→ while typing and a cancelled job shown as late, and carries the fixes from the 10 November review of the whole app.
+
+If you run Khayt on more than one Mac, update them all. Until then, change a customer's currency or a job's customer only on an updated Mac: an older build does not protect the jobs' figures when it does that.
+
+### Fixed
+
+- **⌘→, ⌘← and ⌘⌫ no longer act on the selected job while you are typing.** They are Move Along, Move Back and Delete… in the menus, and also "end of line", "start of line" and "delete to the start of the line" in a text field. With a job selected, pressing ⌘→ in the search field moved the job a stage. While a field is being edited those keys now go to the text.
+- **A cancelled or finished job is never counted as late.** A cancelled job with a past due date was shown overdue on Today, in reminders and to the assistant.
+- **A customer's currency no longer revalues their jobs.** Giving a customer with finished SAR jobs the currency EUR turned a paid 1,000 SAR into 1,000 EUR. Each job now keeps the currency it was priced in.
+- **An iPhone's change no longer silently replaces work done on the Mac since.** When a phone's copy replaces the Mac's, the Mac keeps what it replaced, says so, and offers **Put back**.
+- **Numbers are read as typed.** A weight, time or price typed in Arabic digits or with a decimal comma was read as 0 or as the wrong figure. New Job, the product editor, Edit Job, agreed prices, the calculator and the completion sheet now read them, and a part entered that way is saved with its weight and print time.
+- **Sheets close when the save is in the book, not before**, so a save that is refused no longer loses what was typed. Record payment closes once the payment is written even if the email or a webhook after it fails, and a second press of Save no longer makes a second spool or consumable.
+- **A part cannot be added to a new job twice** when Return and the Add button land together.
+- **The book's lock is kept across a reload**, so a background save (a library scan, a phone's changes, a printer finishing) is no longer refused as "another app owns this book". A damaged book with a good rollback copy can be saved over.
+- **The board draws at most 120 cards a column**, and in Completed and Shipped it keeps the newest.
+- **A storefront's or carrier's genuine delivery is no longer shut out by somebody else's bad requests.** The signature is judged before the lockout.
+- **The receipt paperclip on an expense opens only a picture or a PDF from the receipts folder**, and an API token can no longer reach the route that takes a phone's job photos.
+- **Arabic:** Khayt Cloud is "سحابة خيط" everywhere; a customer's or supplier's phone number, email and tax number are typed and shown left to right; letter-spacing is off on headings and report cards, where it pulled joined letters apart.
+
+### Added
+
+- **New Job takes a promised date and a note**, and Cancel asks before throwing away a job that has parts on it.
+- **Edit Job can change the job's name.**
+- **A job's customer can be changed** until its invoice is submitted to ZATCA, voided, credited or paid. A job with no customer can always be given one.
+- **An iPhone can file an expense with a photographed receipt, and ask for a price, when its host is a Mac.** Receipts open from the Expenses screen.
+- **File ▸ New** has New Spool, Add Printer, Add Expense and Log Waste; empty screens offer their first action; the Stage column sorts in the order work moves.
+- **Minimum order amount** (Settings › Pricing & Tax) is now read: New Job warns when the total is under it.
+
+### Not switched on yet
+
+- **Connectors** stay hidden until they launch on the Mac, Windows/Linux and iPhone together with the published privacy text. This build carries the rules for updating a connector from a signed list; nothing checks for updates yet.
+
 ## [4.0.0-beta.33] - 2026-11-10
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
