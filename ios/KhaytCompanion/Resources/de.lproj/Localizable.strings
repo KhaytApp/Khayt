@@ -1282,3 +1282,30 @@
 "diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
+
+/* Home — Needs you */
+"home.greeting.morning" = "Guten Morgen.";
+"home.greeting.afternoon" = "Guten Tag.";
+"home.greeting.evening" = "Guten Abend.";
+"needs.title" = "Braucht dich";
+"needs.none" = "Gerade braucht dich nichts.";
+"needs.calm" = "Keine verspäteten Aufträge, das Regal ist voll und niemand wartet.";
+"needs.late.one" = "%1$@ war am %2$@ fällig";
+"needs.late.action" = "Verspätete öffnen";
+"needs.low.title" = "Das Regal wird leer";
+"needs.low.left" = "%1$@ noch %2$@";
+"needs.low.action" = "Lager ansehen";
+"needs.waiting.action" = "Anfragen öffnen";
+"needs.quotes.action" = "Angebote öffnen";
+"tile.owed" = "Dir geschuldet";
+"tile.machines" = "Auf den Maschinen";
+"tile.machines.value" = "%1$d von %2$d";
+"tile.machines.sub" = "drucken gerade";
+"needs.due_week" = "Diese Woche fällig";
+"needs.this_year" = "%@ dieses Jahr";
+"needs.owed" = "%@ offen";
+"needs.count" = "%d Dinge brauchen dich.";
+"needs.late" = "%d Aufträge sind verspätet";
+"needs.low.count" = "%d Spulen fast leer";
+"needs.quotes" = "%d Angebote warten auf Antwort";
+"needs.more" = "und %d weitere";

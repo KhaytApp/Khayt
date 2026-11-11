@@ -181,7 +181,11 @@ struct OrdersView: View {
         }
         #endif
         if let pending = ordersNav.pendingStatusFilter {
-            if pending == .completed {
+            if pending == .quote {
+                // Home's "quotes waiting" row: the Quotes list, not a chip.
+                segment = .quotes
+                chip = .all
+            } else if pending == .completed {
                 segment = .history
                 chip = .stage(.completed)
             } else {

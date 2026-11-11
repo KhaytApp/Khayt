@@ -82,5 +82,85 @@
 			<string>%d separate spools, each tracked on its own.</string>
 		</dict>
 	</dict>
+	<key>needs.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d thing needs you.</string>
+			<key>other</key>
+			<string>%d things need you.</string>
+		</dict>
+	</dict>
+	<key>needs.late</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d job is late</string>
+			<key>other</key>
+			<string>%d jobs are late</string>
+		</dict>
+	</dict>
+	<key>needs.low.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d spool low</string>
+			<key>other</key>
+			<string>%d spools low</string>
+		</dict>
+	</dict>
+	<key>needs.quotes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d quote is waiting for an answer</string>
+			<key>other</key>
+			<string>%d quotes are waiting for an answer</string>
+		</dict>
+	</dict>
+	<key>needs.more</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>and %d more</string>
+			<key>other</key>
+			<string>and %d more</string>
+		</dict>
+	</dict>
 </dict>
 </plist>
