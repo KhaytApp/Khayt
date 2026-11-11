@@ -176,6 +176,8 @@ function processRecurringOrders() {
       changeLog: [],
       failurePhotoPath: null,
     };
+    // The parent's figures, in the currency the parent is read in today.
+    stampJobCurrency(newOrder, orderCurrency(order));
     printLog.push(newOrder);
     created++;
 

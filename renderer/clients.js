@@ -1110,6 +1110,13 @@ function openClientEditor(clientId = null) {
         if (withPlugins.plugins) draft.plugins = withPlugins.plugins; else delete draft.plugins;
       }
       const idx = clients.findIndex(c => c.id === draft.id);
+      // A job in the shop's currency carries none and is read in its
+      // customer's, so a new currency here would revalue every old job (a paid
+      // 1,000 SAR becoming 1,000 EUR). Each is given the currency it is in
+      // now, read with the clients AS THEY ARE, before the change.
+      if (idx >= 0 && clientCurrency(draft.id) !== (draft.currency || settings.currency || 'SAR')) {
+        KhaytOrderMoney.pinCurrenciesOf(printLog, draft.id, { clients, settings });
+      }
       if (idx >= 0) clients[idx] = draft;
       else clients.push(draft);
       saveAll();
@@ -1180,7 +1187,7 @@ function checkSubscriptionBilling() {
         const invoiceNum = invoice.number;
         const jobNumber = `${settings.invPrefix || 'INV'}-${nowD.getFullYear()}-${invoice.seq4}`;
         const client = clients.find(c => c.id === sub.clientId);
-        printLog.unshift({
+        printLog.unshift(stampJobCurrency({
           id: ON.mintOrderId(jobNumber, crypto.getRandomValues(new Uint8Array(4))),
           jobNumber,
           invoiceNum, invoiceNumber: invoiceNum,
@@ -1193,8 +1200,9 @@ function checkSubscriptionBilling() {
           parts: [], tags: ['subscription'], notes: '',
           internalNotes: `↳ ${sub.planName || (t('subs.plan') || 'Subscription')}`,
           subscriptionId: sub.id, recurringCycle: cycle,
-          currency: sub.currency || undefined,
-        });
+          // The amount was typed in the shop's currency (the plan's own, if
+          // it has one), not the customer's.
+        }, sub.currency));
         created++;
       }
       // Advance one cycle (calendar-safe).
