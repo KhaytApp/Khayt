@@ -139,3 +139,16 @@ extension UIReviewWorthDoingTests {
         XCTAssertFalse(sheet.contains(".medium"), "at medium two of the six tiles sit below the fold")
     }
 }
+
+// MARK: W5 — one sheet header: Close on the leading side, an inline title
+extension UIReviewWorthDoingTests {
+    func testSheetsCloseOnTheLeadingSide() throws {
+        for file in ["Views/AddSpoolSheet.swift", "Views/NewOrderSheet.swift", "Views/IntakeView.swift", "Views/NewSheet.swift"] {
+            let text = try code(file)
+            let close = try XCTUnwrap(text.range(of: "placement: .cancellationAction"), file)
+            XCTAssertTrue(text[close.upperBound...].prefix(120).contains("common.close"), "\(file): Close, not Cancel/Done")
+            XCTAssertFalse(text.contains(".navigationBarTitleDisplayMode(.large)"), "\(file): inline title")
+        }
+        XCTAssertFalse(try code("Views/IntakeView.swift").contains("placement: .confirmationAction"))
+    }
+}

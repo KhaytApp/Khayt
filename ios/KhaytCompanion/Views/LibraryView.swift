@@ -92,7 +92,7 @@ struct LibraryFolderPage: View {
         }
         .listStyle(.insetGrouped)
         .khaytScreen(title: title)
-        .navigationBarTitleDisplayMode(folder.isEmpty ? .large : .inline)
+        .navigationBarTitleDisplayMode(.inline)
         // A short pause while typing, so each letter is not its own question.
         .task(id: query) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(300)) }

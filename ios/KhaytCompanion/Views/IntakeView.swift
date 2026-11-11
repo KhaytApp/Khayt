@@ -57,10 +57,13 @@ struct IntakeView: View {
             .scrollIndicators(.hidden)
             .refreshable { await load() }
             .khaytScreen(title: L10n.tr("intake.title"))
+            // One sheet header (review W5): an inline title and Close on the
+            // leading side, as every sheet opened from New has.
+            .navigationBarTitleDisplayMode(.inline)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("common.done")) { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("common.close")) { dismiss() }
                 }
             }
             .confirmationDialog(L10n.tr("intake.remind.when"),

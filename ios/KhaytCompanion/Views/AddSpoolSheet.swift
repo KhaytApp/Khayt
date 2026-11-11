@@ -66,7 +66,7 @@ struct AddSpoolSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("common.cancel")) { dismiss() }
+                    Button(L10n.tr("common.close")) { dismiss() }
                 }
                 if step != .chooseMethod && step != .review {
                     ToolbarItem(placement: .topBarLeading) {
