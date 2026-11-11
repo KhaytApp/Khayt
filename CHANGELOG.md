@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fix (Mac): Settings › Preferences › "Where the library lives".** The "Now" row always says where the library is, and the blank row at the foot of the section is gone.
 - **Fix (Mac): three cut-off controls.** "From your print library…" in Edit product, a price agreement's note in Edit customer, and the reason for a machine's scheduled downtime are shown whole; the downtime reason has its own line under the two dates.
 - **Fix (Mac): sheets no longer cut their fields or their last line.** In New and Edit customer, Edit product and Edit machine the wide text fields ran under the sheet's right edge and lost their border. A long sheet stopped mid-line just above Cancel and Save; it now ends with a little room, and a thin line shows when there is more to scroll to. In New Job and New Quote the Total stays above the buttons instead of scrolling out of sight.
 - **Mac: printing is amber (Turki, Nov 11).** A job being printed was drawn in a rust red that read as late, and in other places in green. It is amber everywhere now: the dot, layer stack and stage pill in Jobs, the Board column, a running machine's card and progress, the Machines timeline and its key, the Kiosk, the sidebar's running dot. The figure beside it ("93%") and the word "Printing" are ordinary text, because amber is too pale to read. On hold is purple. Green stays for done and paid.
