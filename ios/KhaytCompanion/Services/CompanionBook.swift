@@ -220,6 +220,40 @@ struct CompanionBook {
     /// exactly the bug `readBaseline` describes.
     private static let baselineProtection: Data.WritingOptions = .completeFileProtectionUntilFirstUserAuthentication
 
+    // MARK: - The rev each unsent edit started from
+
+    /// For each record with an unsent edit, the `rev` of the copy this phone
+    /// held BEFORE that edit: what `POST /api/store/deltas` sends as `baseRev`,
+    /// so a Mac whose copy moved on meanwhile (a payment taken at the desk)
+    /// keeps its own and tells the shop, instead of being replaced by an edit
+    /// made from a stale copy.
+    ///
+    /// ── WHY NOT THE BASELINE'S REV AT SEND TIME ──────────────────────────
+    ///
+    /// A pull with edits still pending (`BookReader.adopt`) folds them onto
+    /// the newer copy and moves the baseline up to it. Read at send time, the
+    /// baseline then names the Mac's NEW rev, and the stale edit would look
+    /// as if it had been made from it. So the rev is noted the first time an
+    /// edit is measured, against the baseline of that moment, and kept until
+    /// upstream takes the change (`markSynced`).
+    ///
+    /// Keyed "collection/id". Beside the book, never in it (see `scopeURL`).
+    var baseRevsURL: URL { directory.appending(path: "book-base-revs.json") }
+
+    func baseRevs() -> [String: Double] {
+        guard let data = try? Data(contentsOf: baseRevsURL),
+              let held = try? JSONDecoder().decode([String: Double].self, from: data) else { return [:] }
+        return held
+    }
+
+    func writeBaseRevs(_ revs: [String: Double]) {
+        guard revs != baseRevs() else { return }
+        if revs.isEmpty { try? FileManager.default.removeItem(at: baseRevsURL); return }
+        if let data = try? JSONEncoder().encode(revs) {
+            try? data.write(to: baseRevsURL, options: [.atomic, Self.baselineProtection])
+        }
+    }
+
     /// Where the description of what this phone holds lives.
     ///
     /// Beside the book, not inside it. Anything added to the store itself is a
@@ -299,6 +333,8 @@ struct CompanionBook {
         // next outbox would either send nothing or send everything. Failing the
         // pull is the safe direction: a phone with no book asks for one again.
         try next.write(to: baselineURL, options: [.atomic, Self.baselineProtection])
+        // A book taken whole has no edits of this phone's in it.
+        writeBaseRevs([:])
     }
 
     /// Change the book in place, atomically.
@@ -514,6 +550,10 @@ struct CompanionBook {
     /// edit still differs from the baseline, and stays pending.
     func markSynced(_ sent: [String: JSONValue]) throws {
         try replaceBaseline(with: sent)
+        // Upstream has every edit measured so far. One still pending (made
+        // during the send) is noted again from this baseline, which is the
+        // copy upstream now holds.
+        writeBaseRevs([:])
     }
 
     /// Forget the shop entirely. Unpairing must not leave a client list behind.
@@ -524,6 +564,7 @@ struct CompanionBook {
         try? FileManager.default.removeItem(at: libraryURL)
         try? FileManager.default.removeItem(at: oldLibraryURL)
         try? FileManager.default.removeItem(at: scopeURL)
+        try? FileManager.default.removeItem(at: baseRevsURL)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))
     }

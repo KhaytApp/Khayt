@@ -361,8 +361,13 @@ struct CloudSync {
             let outbox = try await BookReader.outbox(engine, local: measured, server: baseline)
             guard !outbox.isEmpty else { return (s, .nothingToSend) }
             guard let base = s.seenRev else { return (s, .needsTheMac) }
+            // The rev each edit started from, on each delta, as the Mac's own
+            // route gets it (see `CompanionBook.baseRevsURL`).
+            let revs = BookReader.baseRevs(of: outbox, baseline: baseline, held: book.baseRevs())
+            book.writeBaseRevs(revs)
             do {
-                let sent = try await CloudWriter.send(connection(s), token: s.token, payload: outbox,
+                let sent = try await CloudWriter.send(connection(s), token: s.token,
+                                                      payload: BookReader.annotated(outbox, baseRevs: revs),
                                                       dek: s.dek, baseRev: base, fetch: fetch)
                 try book.markSynced(measured)
                 s.seenRev = sent.rev
