@@ -569,7 +569,12 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// the one surface in the app that ships unlooked at.
     @MainActor
     static func captureView(named name: String, _ view: some View, into dir: URL) {
-        let renderer = ImageRenderer(content: view)
+        // In the shop's writing direction. A view outside a window inherits
+        // none, so the Arabic run photographed the menu-bar panel laid out
+        // left to right, which the real popover is not (Nov 11 UI review, B18:
+        // the camera, not the app).
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        let renderer = ImageRenderer(content: view.environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight))
         renderer.scale = 2
         guard let image = renderer.nsImage,
               let tiff = image.tiffRepresentation,
