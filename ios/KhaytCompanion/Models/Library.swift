@@ -11,19 +11,26 @@ struct LibraryPage: Decodable, Equatable, Sendable {
     /// (`LibraryFilter`). Nil from a Mac that cannot filter yet: the phone
     /// then hides both menus rather than guess from its version.
     var facets: LibraryFacets?
-    /// How many models the search or folder held before the two menus
-    /// narrowed them ("N of M"). Sent with `facets`; equal to `total` when
-    /// nothing is picked.
+    /// The REACH of the two menus: without `q`, this folder and everything
+    /// under it; with `q`, the search results. `unfilteredTotal` is every
+    /// model in the reach (M of "N of M"), `matchedTotal` those that pass both
+    /// menus (N). `total` only pages `items` — in a folder, the models filed
+    /// directly in it — so it can be 0 while `matchedTotal` is not, and the
+    /// page is then sub-folders only. Both come with `facets`.
     var unfilteredTotal: Int?
+    var matchedTotal: Int?
+    /// N of "N of M": `matchedTotal`, or `total` from a Mac that sent facets
+    /// without it.
+    var shownTotal: Int { matchedTotal ?? total }
     /// Read from the phone's copy because the Mac could not be reached.
     var fromCopy = false
 
-    private enum CodingKeys: String, CodingKey { case total, offset, folders, items, facets, unfilteredTotal }
+    private enum CodingKeys: String, CodingKey { case total, offset, folders, items, facets, unfilteredTotal, matchedTotal }
 
     init(total: Int, offset: Int, folders: [LibraryFolder], items: [LibraryItem],
-         facets: LibraryFacets? = nil, unfilteredTotal: Int? = nil) {
+         facets: LibraryFacets? = nil, unfilteredTotal: Int? = nil, matchedTotal: Int? = nil) {
         self.total = total; self.offset = offset; self.folders = folders; self.items = items
-        self.facets = facets; self.unfilteredTotal = unfilteredTotal
+        self.facets = facets; self.unfilteredTotal = unfilteredTotal; self.matchedTotal = matchedTotal
     }
 
     /// Lenient per record: one model the phone cannot read is left out, not
@@ -37,6 +44,7 @@ struct LibraryPage: Decodable, Equatable, Sendable {
         offset = (try? c.decode(Int.self, forKey: .offset)) ?? 0
         facets = try? c.decodeIfPresent(LibraryFacets.self, forKey: .facets)
         unfilteredTotal = (try? c.decodeIfPresent(Int.self, forKey: .unfilteredTotal)).flatMap { $0 }
+        matchedTotal = (try? c.decodeIfPresent(Int.self, forKey: .matchedTotal)).flatMap { $0 }
     }
 }
 

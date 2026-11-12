@@ -122,7 +122,8 @@ final class LibraryFilterTests: XCTestCase {
         let page = SampleLibrary.page(query: "", folder: "", filter: f)
         XCTAssertEqual(Set(page.items.map(\.id)), ["PF-sample-drone-arm", "PF-sample-cable-clips", "PF-sample-desk-organiser"])
         XCTAssertEqual(page.total, 3)
-        XCTAssertEqual(page.unfilteredTotal, 7, "the top's own models before the menus")
+        XCTAssertEqual(page.unfilteredTotal, 14, "at the top the menus reach the whole library")
+        XCTAssertEqual(page.matchedTotal, 5, "the three listed here, the dallah and the king relief further down")
         XCTAssertNotNil(page.facets, "a library the phone holds always has the menus")
         XCTAssertEqual(page.facets?.type["nofile"], 0, "counted over colour=blue,black: the web keychain has no colour")
         XCTAssertEqual(SampleLibrary.page(query: "", folder: "", filter: LibraryFilter()).facets?.type["nofile"], 1)
@@ -148,12 +149,56 @@ final class LibraryFilterTests: XCTestCase {
         XCTAssertEqual(top.folders, [LibraryFolder(path: "Home", name: "Home", count: 1)],
                        "only Home holds a green model (the lantern, under Home/Lighting); the rest are left out")
         XCTAssertEqual(top.items.map(\.id), ["PF-sample-planter"])
-        XCTAssertEqual(top.unfilteredTotal, 7)
+        XCTAssertEqual(top.unfilteredTotal, 14)
+        XCTAssertEqual(top.matchedTotal, 2, "the planter here and the lantern under Home/Lighting")
         let plain = SampleLibrary.page(query: "", folder: "", filter: LibraryFilter())
         XCTAssertEqual(plain.folders.map(\.name), ["Gifts", "Home", "Parts", "Saudi Kings"], "nothing picked: the normal shape")
-        XCTAssertEqual(plain.unfilteredTotal, plain.total, "nothing picked: M equals N")
+        XCTAssertEqual(plain.unfilteredTotal, 14, "nothing picked at the top: the whole library")
+        XCTAssertEqual(plain.matchedTotal, 14, "nothing picked: N equals M")
+        XCTAssertEqual(plain.total, 7, "total still pages only the models filed at the top")
         let both = SampleLibrary.page(query: "", folder: "", filter: LibraryFilter(colours: ["black"], types: ["stl"]))
         XCTAssertEqual(both.folders, [LibraryFolder(path: "Parts", name: "Parts", count: 1)], "a folder counts what passes BOTH menus")
+    }
+
+    func testTheMenusReachTheWholeSubtreeWithoutASearch() throws {
+        let all = [try item("red-a", colours: ["#D92D20"], folder: "Home"),
+                   try item("red-b", colours: ["#C0392B"], folder: "Home/Kitchen"),
+                   try item("blue-top", colours: ["#2F6FDE"]),
+                   try item("bare-top")]
+        let red = SampleLibrary.page(all, query: "", folder: "", filter: LibraryFilter(colours: ["red"]))
+        XCTAssertEqual(red.total, 0, "no red model is filed at the top itself")
+        XCTAssertEqual(red.items, [])
+        XCTAssertEqual(red.matchedTotal, 2)
+        XCTAssertEqual(red.unfilteredTotal, 4)
+        XCTAssertEqual(red.facets?.colour["red"], 2, "Red counts every red model under the top")
+        XCTAssertEqual(red.folders, [LibraryFolder(path: "Home", name: "Home", count: 2)])
+
+        let nothing = SampleLibrary.page(all, query: "", folder: "", filter: LibraryFilter())
+        XCTAssertEqual(nothing.facets?.colour["red"], 2, "nothing chosen: the whole library is counted")
+        XCTAssertEqual(nothing.facets?.colour["blue"], 1)
+        XCTAssertEqual(nothing.facets?.colour["none"], 1)
+        XCTAssertEqual(nothing.facets?.type["3mf"], 4)
+        XCTAssertEqual(nothing.unfilteredTotal, 4)
+        XCTAssertEqual(nothing.total, 2, "only the two filed at the top are listed")
+
+        let home = SampleLibrary.page(all, query: "", folder: "Home", filter: LibraryFilter(colours: ["red"]))
+        XCTAssertEqual(home.total, 1)
+        XCTAssertEqual(home.matchedTotal, 2, "Home and Home/Kitchen")
+        XCTAssertEqual(home.unfilteredTotal, 2)
+
+        let search = SampleLibrary.page(all, query: "red", folder: "", filter: LibraryFilter(colours: ["red"]))
+        XCTAssertEqual(search.total, 2, "a search reaches the whole library and lists what it finds")
+        XCTAssertEqual(search.matchedTotal, search.total, "for a search the totals agree")
+        XCTAssertEqual(search.unfilteredTotal, 2)
+    }
+
+    func testMatchedTotalIsReadAndFallsBackToTotal() throws {
+        let with = #"{"total":0,"matchedTotal":2,"unfilteredTotal":9,"items":[],"facets":{"colour":{},"type":{}}}"#
+        let page = try JSONDecoder().decode(LibraryPage.self, from: Data(with.utf8))
+        XCTAssertEqual(page.shownTotal, 2, "N is matchedTotal, not the page's own total")
+        let without = #"{"total":3,"unfilteredTotal":9,"items":[],"facets":{"colour":{},"type":{}}}"#
+        XCTAssertEqual(try JSONDecoder().decode(LibraryPage.self, from: Data(without.utf8)).shownTotal, 3,
+                       "facets without matchedTotal: fall back to total")
     }
 
     func testAFolderCanHoldItsMatchesOnlyDeeperDown() {
@@ -161,7 +206,8 @@ final class LibraryFilterTests: XCTestCase {
         let home = SampleLibrary.page(query: "", folder: "Home", filter: green)
         XCTAssertTrue(home.items.isEmpty, "the spiral vase filed in Home has no colour, so Home shows none of its own")
         XCTAssertEqual(home.total, 0)
-        XCTAssertEqual(home.unfilteredTotal, 1)
+        XCTAssertEqual(home.unfilteredTotal, 2, "the vase here and the lantern under Lighting")
+        XCTAssertEqual(home.matchedTotal, 1, "N counts the subtree, so it is 1 while total is 0")
         XCTAssertEqual(home.folders, [LibraryFolder(path: "Home/Lighting", name: "Lighting", count: 1)],
                        "but its sub-folder holds the match, so the page is folders, not an empty library")
         let lighting = SampleLibrary.page(query: "", folder: "Home/Lighting", filter: green)

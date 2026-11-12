@@ -69,7 +69,7 @@ struct LibraryFolderPage: View {
                     .listRowSeparator(.hidden)
                 // A Mac that cannot filter sends no counts: no menus then.
                 if let page, let facets = page.facets {
-                    LibraryFilterBar(filter: $filter, facets: facets, shown: page.total,
+                    LibraryFilterBar(filter: $filter, facets: facets, shown: page.shownTotal,
                                      of: page.unfilteredTotal,
                                      open: folder.isEmpty ? $openMenu : $ownMenu)
                         .listRowBackground(Color.clear)

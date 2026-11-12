@@ -39,8 +39,17 @@ enum SampleLibrary {
         let (folders, found) = search(items, query: query, folder: folder, filter: filter)
         let kept = found.filter(filter.matches)
         let slice = Array(kept.dropFirst(offset).prefix(limit))
+        // The menus' reach: the search, or this folder and all under it.
+        let reach = query.split(whereSeparator: \.isWhitespace).isEmpty ? subtree(items, folder) : found
         return LibraryPage(total: kept.count, offset: offset, folders: folders, items: slice,
-                           facets: filter.facets(found), unfilteredTotal: found.count)
+                           facets: filter.facets(reach), unfilteredTotal: reach.count,
+                           matchedTotal: reach.filter(filter.matches).count)
+    }
+
+    /// The models filed in `folder` or any folder under it (`""` is all).
+    static func subtree(_ all: [LibraryItem], _ folder: String) -> [LibraryItem] {
+        guard !folder.isEmpty else { return all }
+        return all.filter { ($0.folder ?? "") == folder || ($0.folder ?? "").hasPrefix(folder + "/") }
     }
 
     /// Every word must appear in the name, folder, tags or category, ignoring
