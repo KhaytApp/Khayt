@@ -16,6 +16,8 @@ import Foundation
 /// never on Swift's 512 KB pool threads, and never on the main thread.
 public actor KhaytEngine {
     let runtime: JSRuntime
+    /// A test's switch; see `ruleSettings` (KhaytEngine+RuleSettings.swift).
+    var probesRuleSettings = false
     private let thread: EngineThread
 
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -1341,7 +1343,7 @@ public actor KhaytEngine {
 
     /// The shop's tax profile, resolved the way every invoice resolves it.
     public func taxProfile(settings: [String: JSONValue]) throws -> TaxProfile {
-        try runtime.call("KhaytTax", "profileFromSettings", [settings], as: TaxProfile.self)
+        try runtime.call("KhaytTax", "profileFromSettings", [ruleSettings(settings)], as: TaxProfile.self)
     }
 
     /// Split a price into net and tax, honouring the profile's mode.
@@ -1832,7 +1834,7 @@ public actor KhaytEngine {
             [.object([
                 "spools": .array(spools), "consumables": .array(consumables),
                 "orders": .array(orders), "purchaseOrders": .array(purchaseOrders),
-                "settings": .object(settings),
+                "settings": .object(ruleSettings(settings)),
                 "now": .number(now.timeIntervalSince1970 * 1000),
             ])],
             as: [ToOrder].self)
@@ -2012,7 +2014,7 @@ public actor KhaytEngine {
                          today: String) throws -> Overhead {
         try runtime.call2(
             "KhaytOverheadRate.resolve({ settings: ARG0, machines: ARG1, orders: ARG2, today: ARG3 })",
-            [settings, .array(machines), .array(orders), .string(today)], as: Overhead.self)
+            [ruleSettings(settings), .array(machines), .array(orders), .string(today)], as: Overhead.self)
     }
 
     /// The print hours a cart's overhead is charged on — `lib/order-new.js`
@@ -2070,7 +2072,7 @@ public actor KhaytEngine {
                         // The clock, when the caller has one to agree with:
                         // nothing (`null`) is the module's own `Date.now()`.
                         + " now: ARG5})",
-                          [.array(orders), .array(machines), .object(settings),
+                          [.array(orders), .array(machines), .object(ruleSettings(settings)),
                            .object(statusCache), .array(inventory),
                            now.map { .number($0.timeIntervalSince1970 * 1000) } ?? .null],
                           as: DashboardFacts.self)
@@ -2904,7 +2906,7 @@ public actor KhaytEngine {
               });
             })(ARG0)
             """,
-            [.object(settings)], as: [AiFeature].self)
+            [.object(ruleSettings(settings))], as: [AiFeature].self)
     }
 
     /// True when something switched on right now sends another person's data.
@@ -2947,7 +2949,7 @@ public actor KhaytEngine {
               return KhaytLowStockAlert.wouldWarn({ settings, low });
             })(ARG0, ARG1)
             """,
-            [.array(spools), .object(settings)], as: LowStockWarning.self)
+            [.array(spools), .object(ruleSettings(settings))], as: LowStockWarning.self)
         return warning.send ? warning : nil
     }
 
@@ -3092,7 +3094,7 @@ public actor KhaytEngine {
     /// build that spells it differently cannot silently add an hour to an
     /// import.
     public func riskWhen(settings: [String: JSONValue]) throws -> String {
-        try runtime.call2("KhaytPrintRisk.riskWhen(ARG0)", [.object(settings)], as: String.self)
+        try runtime.call2("KhaytPrintRisk.riskWhen(ARG0)", [.object(ruleSettings(settings))], as: String.self)
     }
 
     /// Judge a model from the summary `Mesh.Overhangs` produced.
@@ -3911,7 +3913,7 @@ public actor KhaytEngine {
               }
               return out;
             })(ARG0, ARG1)
-            """, [.array(spools), .object(settings)], as: [String: Bool].self)
+            """, [.array(spools), .object(ruleSettings(settings))], as: [String: Bool].self)
     }
 
     // MARK: - Will it fit
@@ -4031,7 +4033,7 @@ public actor KhaytEngine {
         try runtime.call2(
             "({ invoices: KhaytPaymentReminder.reminderConfig(ARG0).enabled,"
           + " quotes: KhaytQuoteFollowUp.followUpConfig(ARG0).enabled })",
-            [.object(settings)], as: ChaseSwitches.self)
+            [.object(ruleSettings(settings))], as: ChaseSwitches.self)
     }
 
     public struct ChaseSwitches: Decodable, Sendable, Equatable {
@@ -4131,7 +4133,7 @@ public actor KhaytEngine {
         // yet, and the money function it takes cannot cross the bridge. Adding
         // the rows up is `KhaytCore.Kpi` now.
         let rows: [JSONValue] = try runtime.call2(
-            KPI_SCRIPT, [.array(orders), .array(clients), .object(settings),
+            KPI_SCRIPT, [.array(orders), .array(clients), .object(ruleSettings(settings)),
                          .string(range), .string("\u{2014}"), .string(language), .array(inventory),
                          .array(consumables), .object(currencies)],
             as: [JSONValue].self)
@@ -4249,7 +4251,7 @@ public actor KhaytEngine {
             return (v === 0 || v !== v) ? 0 : v;
           });
         })()
-        """, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+        """, [.array(orders), .object(ruleSettings(settings)), .array(clients)], as: [Double].self)
 
         let outlook = Forecast.forecast(orders: orders, revenues: revenues,
                                         now: now, months: months, periods: periods)
@@ -4428,14 +4430,14 @@ public actor KhaytEngine {
     /// settings — including the legacy single `settings.slicer`, which shops
     /// that predate the list still carry.
     public func slicers(settings: [String: JSONValue]) throws -> [Slicer] {
-        try runtime.call2("KhaytSlicers.listSlicers(ARG0)", [.object(settings)], as: [Slicer].self)
+        try runtime.call2("KhaytSlicers.listSlicers(ARG0)", [.object(ruleSettings(settings))], as: [Slicer].self)
     }
 
     /// The one to reach for when nobody has said which: `defaultSlicerId`, or
     /// the first configured.
     public func defaultSlicer(settings: [String: JSONValue]) throws -> Slicer? {
         try runtime.call2("(KhaytSlicers.defaultSlicer(ARG0) || null)",
-                          [.object(settings)], as: Slicer?.self)
+                          [.object(ruleSettings(settings))], as: Slicer?.self)
     }
 
     /// A friendly name for a slicer, guessed from its path.
@@ -4683,7 +4685,7 @@ public actor KhaytEngine {
     public func nozzleWear(orders: [JSONValue], machine: JSONValue,
                            settings: [String: JSONValue]) throws -> NozzleWear {
         try runtime.call2("KhaytNozzleWear.nozzleWear(ARG0, ARG1, ARG2)",
-                          [.array(orders), machine, .object(settings)], as: NozzleWear.self)
+                          [.array(orders), machine, .object(ruleSettings(settings))], as: NozzleWear.self)
     }
 
     // MARK: - Groups
@@ -6016,7 +6018,7 @@ public actor KhaytEngine {
             [.object(["volumeMm3": .number(volumeMm3), "areaMm2": .number(areaMm2),
                       "bbox": .object(["x": .number(bbox.x), "y": .number(bbox.y),
                                        "z": .number(bbox.z)]),
-                      "settings": .object(settings), "orders": .array(orders)])],
+                      "settings": .object(ruleSettings(settings)), "orders": .array(orders)])],
             as: MeshEstimate.self)
     }
 
@@ -6097,7 +6099,7 @@ public actor KhaytEngine {
               });
             })(ARG0)
             """,
-            [.object(["meshes": .array(sent), "settings": .object(settings),
+            [.object(["meshes": .array(sent), "settings": .object(ruleSettings(settings)),
                       "orders": .array(orders)])],
             as: [String?].self)
         for (k, text) in texts.enumerated() where k < at.count {
@@ -7550,7 +7552,7 @@ public actor KhaytEngine {
             return [isFinite(n) ? n : 0, isFinite(g) ? g : 0];
           });
         })()
-        """#, [.array(orders), .object(settings), .array(clients)], as: [[Double]].self)
+        """#, [.array(orders), .object(ruleSettings(settings)), .array(clients)], as: [[Double]].self)
 
         let report = KhaytCore.CashFlow.report(orders: orders, revenues: money.map { $0[0] },
                                                billed: money.map { $0[1] },
@@ -8275,7 +8277,7 @@ public actor KhaytEngine {
 
     public func duplicateNumbers(orders: [JSONValue], settings: [String: JSONValue]) throws -> [DuplicateNumber] {
         try runtime.call2("KhaytInvoiceDocument.duplicateNumbers(ARG0, ARG1)",
-                          [.array(orders), .object(settings)], as: [DuplicateNumber].self)
+                          [.array(orders), .object(ruleSettings(settings))], as: [DuplicateNumber].self)
     }
 
     /// `lib/order-new.js`'s `renumber`: the job with the next free number,
@@ -9679,7 +9681,7 @@ public actor KhaytEngine {
     }
 
     public func contentLanguages(settings: [String: JSONValue]) throws -> [String] {
-        try runtime.call2("KhaytContentLanguages.contentLangs(ARG0)", [.object(settings)], as: [String].self)
+        try runtime.call2("KhaytContentLanguages.contentLangs(ARG0)", [.object(ruleSettings(settings))], as: [String].self)
     }
 
     /// EVERY language the catalogue format knows, not only the ones this shop
@@ -9706,8 +9708,13 @@ public actor KhaytEngine {
     /// that language only if the shop writes in it, then the shop's own
     /// languages, then anything filled in at all.
     public func shopText(_ base: String, settings: [String: JSONValue], language: String) throws -> String {
-        try runtime.call2("(KhaytContentLanguages.read(ARG0, ARG1, ARG2, ARG0) || '')",
-                          [.object(settings), .string(base), .string(language)], as: String.self)
+        // The rule reads the keys built from `base` ("bizEn", "biz_de") and
+        // `base` itself, and the content languages. So it is handed settings
+        // without the logo and the library blocks, unless one of those is
+        // the very field asked for.
+        let read = Self.heavySettings.contains(base) ? settings : ruleSettings(settings)
+        return try runtime.call2("(KhaytContentLanguages.read(ARG0, ARG1, ARG2, ARG0) || '')",
+                                 [.object(read), .string(base), .string(language)], as: String.self)
     }
 
     /// A language's own name — "Deutsch", not "German".
@@ -10042,7 +10049,7 @@ public actor KhaytEngine {
                              clients: [JSONValue], currencies: [String: JSONValue],
                              from: String, to: String) throws -> Double {
         try runtime.call2("KhaytKpiRows.tradeRevenue({orders: ARG0, settings: ARG1, clients: ARG2, known: ARG3, from: ARG4, to: ARG5})",
-                          [.array(orders), .object(settings), .array(clients), .object(currencies),
+                          [.array(orders), .object(ruleSettings(settings)), .array(clients), .object(currencies),
                            .string(from), .string(to)], as: Double.self)
     }
 
@@ -12616,7 +12623,7 @@ public actor KhaytEngine {
               });
               return out;
             })(ARG0, ARG1)
-            """, [.array(items), .object(settings)], as: [String: InventoryUnit].self)
+            """, [.array(items), .object(ruleSettings(settings))], as: [String: InventoryUnit].self)
     }
 
     /// The units a shop can choose from, for the picker.
@@ -12956,7 +12963,7 @@ public actor KhaytEngine {
               });
             })(ARG0, ARG1, ARG2, ARG3)
             """,
-                          [.array(products), .string(language), .object(settings),
+                          [.array(products), .string(language), .object(ruleSettings(settings)),
                            .array(specs)],
                           as: [CatalogueRow].self)
     }
@@ -13235,7 +13242,7 @@ public actor KhaytEngine {
         let ids: [String] = try runtime.call2(
             "Array.from(KhaytDashboardFacts.dashboardFacts({orders: ARG0, machines: ARG1,"
           + " settings: ARG2, now: ARG3, attention: globalThis.KhaytAttention}).lateIds)",
-            [.array(orders), .array(machines), .object(settings),
+            [.array(orders), .array(machines), .object(ruleSettings(settings)),
              .number(now.timeIntervalSince1970 * 1000)],
             as: [String].self)
         return Set(ids)
@@ -13303,7 +13310,7 @@ public actor KhaytEngine {
               return out;
             })(ARG0, {settings: ARG1, clients: ARG2})
             """,
-                          [.array(orders), .object(settings), .array(clients)],
+                          [.array(orders), .object(ruleSettings(settings)), .array(clients)],
                           as: [String: OrderFigures].self)
     }
 
@@ -13344,7 +13351,7 @@ public actor KhaytEngine {
               return out;
             })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
             """,
-                          [.array(orders), .object(settings), .array(clients), .object(currencies)],
+                          [.array(orders), .object(ruleSettings(settings)), .array(clients), .object(currencies)],
                           as: [String: Double].self)
     }
 
@@ -13384,7 +13391,7 @@ public actor KhaytEngine {
               return out;
             })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
             """,
-                          [.array(orders), .object(settings), .array(clients), .object(currencies)],
+                          [.array(orders), .object(ruleSettings(settings)), .array(clients), .object(currencies)],
                           as: [String: BilledAndPaid].self)
     }
 
@@ -13419,7 +13426,7 @@ public actor KhaytEngine {
               return out;
             })(ARG0, ARG1, ARG2)
             """,
-                          [.array(clients), .string(language), .object(settings)],
+                          [.array(clients), .string(language), .object(ruleSettings(settings))],
                           as: [String: Named].self)
     }
 
