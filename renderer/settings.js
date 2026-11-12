@@ -6583,7 +6583,7 @@ function renderPostChecklistSettings() {
     <div class="post-check-setting-row">
       <span style="flex:1; font-size:13px;">${escapeHtml(ch.label)}</span>
       <button class="btn danger small sm-pro-form" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
-      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}">${escapeHtml(t('common.remove'))}</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}" title="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}">${escapeHtml(t('common.remove'))}</button>
     </div>`).join('');
 }
 
@@ -6623,7 +6623,7 @@ function renderCustomFieldsSettings() {
       <span style="flex:1; font-size:13px;">${escapeHtml(f.label)}<span class="sm-simple-only sm-row-sub">${escapeHtml(t('sm.cf_text_sub'))}</span></span>
       <span class="sm-pro-form" style="font-size:11px; color:var(--text-muted); margin-inline-end:8px;">${escapeHtml(f.type || 'text')}</span>
       <button class="btn danger small sm-pro-form" data-act="del-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
-      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="edit-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}">${escapeHtml(t('common.edit'))}</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="edit-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}" title="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}">${escapeHtml(t('common.edit'))}</button>
     </div>`).join('');
 }
 
