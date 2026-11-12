@@ -59,7 +59,6 @@
 "settings.notify.connection" = "连接中断";
 "settings.notify.overdue" = "逾期订单";
 "settings.notify.low_stock" = "耗材不足";
-"settings.docs" = "LAN API 参考";
 
 /* Status */
 "status.quote" = "报价";
@@ -1287,3 +1286,26 @@
 "load.failed.title" = "无法加载";
 "load.retry" = "重试";
 "load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
+
+/* Settings in groups (S2) */
+"settings.search" = "搜索设置";
+"settings.search.none" = "没有与“%@”匹配的设置。";
+"settings.group.this_phone" = "此手机";
+"settings.group.shop" = "店铺";
+"settings.group.connected" = "已连接";
+"settings.group.about" = "关于";
+"settings.appearance" = "外观与语言";
+"settings.shop_details" = "店铺信息";
+"settings.shop.readonly" = "在 Mac 上设置 · 此处只读";
+"settings.phones_wifi" = "手机与 Wi-Fi";
+"settings.cloud.sub" = "同步与客户页面";
+"settings.help" = "帮助";
+"settings.diag.sub" = "此手机保存的内容、最近同步";
+"settings.diag.syncs" = "最近同步";
+"state.paired" = "已配对";
+"state.away" = "不在附近";
+"state.not_paired" = "未配对";
+"state.signed_in" = "已登录";
+"state.needs_sign_in" = "需要登录";
+"state.on" = "开";
+"state.off" = "关";

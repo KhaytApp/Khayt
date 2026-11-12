@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Connexion perdue";
 "settings.notify.overdue" = "Commandes en retard";
 "settings.notify.low_stock" = "Filament bas";
-"settings.docs" = "Référence de l’API LAN";
 
 /* Status */
 "status.quote" = "Devis";
@@ -1287,3 +1286,26 @@
 "load.failed.title" = "Chargement impossible";
 "load.retry" = "Réessayer";
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
+
+/* Settings in groups (S2) */
+"settings.search" = "Rechercher dans les réglages";
+"settings.search.none" = "Aucun réglage ne correspond à « %@ ».";
+"settings.group.this_phone" = "Ce téléphone";
+"settings.group.shop" = "Atelier";
+"settings.group.connected" = "Connexions";
+"settings.group.about" = "À propos";
+"settings.appearance" = "Apparence et langue";
+"settings.shop_details" = "Coordonnées de l’atelier";
+"settings.shop.readonly" = "Réglé sur le Mac · lecture seule ici";
+"settings.phones_wifi" = "Téléphones et Wi-Fi";
+"settings.cloud.sub" = "Synchronisation et pages clients";
+"settings.help" = "Aide";
+"settings.diag.sub" = "Ce que ce téléphone contient, dernières synchros";
+"settings.diag.syncs" = "Dernières synchros";
+"state.paired" = "Associé";
+"state.away" = "Hors de portée";
+"state.not_paired" = "Non associé";
+"state.signed_in" = "Connecté";
+"state.needs_sign_in" = "Connexion requise";
+"state.on" = "Activé";
+"state.off" = "Désactivé";
