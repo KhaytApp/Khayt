@@ -1287,3 +1287,27 @@
 "load.failed.title" = "読み込めませんでした";
 "load.retry" = "再試行";
 "load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "次";
+"job.next.start_printing" = "印刷を開始";
+"job.next.mark_printed" = "印刷済みにする";
+"job.next.send_to_qc" = "検品へ";
+"job.next.mark_ready" = "準備完了にする";
+"job.next.hand_over" = "引き渡す";
+"job.next.resume" = "再開";
+"job.next.done" = "完了・支払済み";
+"job.next.none" = "することはありません";
+"job.more" = "その他";
+"job.more.label" = "このジョブのその他の操作";
+"job.header.due" = "期限 %@";
+"job.day_late" = "1日遅れ";
+"job.days_late" = "%d日遅れ";
+"job.section.parts" = "パーツ";
+"job.section.money" = "金額";
+"job.section.activity" = "アクティビティ";
+"job.money.price" = "価格";
+"job.money.paid" = "支払済み";
+"job.money.owing" = "未払い";
+"job.money.owing_overdue" = "未払い · 期限超過";
+"job.parts.on_machine" = "%@で印刷中";

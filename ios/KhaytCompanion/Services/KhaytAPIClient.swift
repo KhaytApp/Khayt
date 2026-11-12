@@ -1190,6 +1190,22 @@ final class KhaytAPIClient: ObservableObject {
         return ShopShoppingList(store: store, shopName: shopName)
     }
 
+    /// The stage a held job was in before it went on hold, from its
+    /// `statusHistory` in the book (`JobNextStep.stageBeforeHold`). Nil with
+    /// no book, or when the history does not say.
+    func stageBeforeHold(orderId: String) -> OrderStatus? {
+        guard let book, book.exists, let store = try? book.read() else { return nil }
+        for case .object(let o) in JSRead.rows(store, "printLog") where o["id"] == .string(orderId) {
+            guard case .array(let rows)? = o["statusHistory"] else { return nil }
+            let statuses: [String] = rows.compactMap {
+                if case .object(let r) = $0, case .string(let st)? = r["status"] { return st }
+                return nil
+            }
+            return JobNextStep.stageBeforeHold(history: statuses)
+        }
+        return nil
+    }
+
     /// What a job's print drew from a metering plug, when one measured enough
     /// of it (`JobEnergy`). Nil otherwise, and with no book.
     func jobEnergy(orderId: String) -> JobEnergy? {

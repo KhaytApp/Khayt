@@ -1287,3 +1287,27 @@
 "load.failed.title" = "无法加载";
 "load.retry" = "重试";
 "load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "下一步";
+"job.next.start_printing" = "开始打印";
+"job.next.mark_printed" = "标记为已打印";
+"job.next.send_to_qc" = "送去质检";
+"job.next.mark_ready" = "标记为就绪";
+"job.next.hand_over" = "交付";
+"job.next.resume" = "恢复";
+"job.next.done" = "已完成并付款";
+"job.next.none" = "无需操作";
+"job.more" = "更多";
+"job.more.label" = "此任务的更多操作";
+"job.header.due" = "截止 %@";
+"job.day_late" = "晚了 1 天";
+"job.days_late" = "晚了 %d 天";
+"job.section.parts" = "零件";
+"job.section.money" = "金额";
+"job.section.activity" = "动态";
+"job.money.price" = "价格";
+"job.money.paid" = "已付";
+"job.money.owing" = "待付";
+"job.money.owing_overdue" = "待付 · 已逾期";
+"job.parts.on_machine" = "在 %@ 上";

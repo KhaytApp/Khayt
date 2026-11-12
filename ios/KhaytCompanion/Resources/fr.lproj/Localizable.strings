@@ -1287,3 +1287,27 @@
 "load.failed.title" = "Chargement impossible";
 "load.retry" = "Réessayer";
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Suivant";
+"job.next.start_printing" = "Lancer l’impression";
+"job.next.mark_printed" = "Marquer imprimé";
+"job.next.send_to_qc" = "Envoyer au contrôle";
+"job.next.mark_ready" = "Marquer prêt";
+"job.next.hand_over" = "Remettre";
+"job.next.resume" = "Reprendre";
+"job.next.done" = "Terminé et payé";
+"job.next.none" = "Rien à faire";
+"job.more" = "Plus";
+"job.more.label" = "Autres actions pour ce travail";
+"job.header.due" = "échéance %@";
+"job.day_late" = "1 jour de retard";
+"job.days_late" = "%d jours de retard";
+"job.section.parts" = "Pièces";
+"job.section.money" = "Argent";
+"job.section.activity" = "Activité";
+"job.money.price" = "Prix";
+"job.money.paid" = "Payé";
+"job.money.owing" = "Restant dû";
+"job.money.owing_overdue" = "Restant dû · en retard";
+"job.parts.on_machine" = "Sur %@";

@@ -1287,3 +1287,27 @@
 "load.failed.title" = "Yüklenemedi";
 "load.retry" = "Tekrar dene";
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Sıradaki";
+"job.next.start_printing" = "Baskıyı başlat";
+"job.next.mark_printed" = "Basıldı olarak işaretle";
+"job.next.send_to_qc" = "Kalite kontrole gönder";
+"job.next.mark_ready" = "Hazır olarak işaretle";
+"job.next.hand_over" = "Teslim et";
+"job.next.resume" = "Devam ettir";
+"job.next.done" = "Bitti ve ödendi";
+"job.next.none" = "Yapılacak bir şey yok";
+"job.more" = "Diğer";
+"job.more.label" = "Bu iş için diğer işlemler";
+"job.header.due" = "teslim %@";
+"job.day_late" = "1 gün gecikmeli";
+"job.days_late" = "%d gün gecikmeli";
+"job.section.parts" = "Parçalar";
+"job.section.money" = "Para";
+"job.section.activity" = "Etkinlik";
+"job.money.price" = "Fiyat";
+"job.money.paid" = "Ödenen";
+"job.money.owing" = "Kalan";
+"job.money.owing_overdue" = "Kalan · gecikmiş";
+"job.parts.on_machine" = "%@ üzerinde";

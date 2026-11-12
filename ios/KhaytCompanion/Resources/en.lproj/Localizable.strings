@@ -1287,3 +1287,27 @@
 "load.failed.title" = "Couldn't load";
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Next";
+"job.next.start_printing" = "Start printing";
+"job.next.mark_printed" = "Mark printed";
+"job.next.send_to_qc" = "Send to QC";
+"job.next.mark_ready" = "Mark ready";
+"job.next.hand_over" = "Hand over";
+"job.next.resume" = "Resume";
+"job.next.done" = "Done and paid";
+"job.next.none" = "Nothing to do";
+"job.more" = "More";
+"job.more.label" = "More actions for this job";
+"job.header.due" = "due %@";
+"job.day_late" = "1 day late";
+"job.days_late" = "%d days late";
+"job.section.parts" = "Parts";
+"job.section.money" = "Money";
+"job.section.activity" = "Activity";
+"job.money.price" = "Price";
+"job.money.paid" = "Paid";
+"job.money.owing" = "Owing";
+"job.money.owing_overdue" = "Owing · overdue";
+"job.parts.on_machine" = "On %@";

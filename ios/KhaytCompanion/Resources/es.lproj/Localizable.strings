@@ -1287,3 +1287,27 @@
 "load.failed.title" = "No se pudo cargar";
 "load.retry" = "Reintentar";
 "load.book_unavailable" = "No se pudo leer el libro en este teléfono. Vuelve a intentarlo o comprueba que el Mac esté al alcance.";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Siguiente";
+"job.next.start_printing" = "Empezar a imprimir";
+"job.next.mark_printed" = "Marcar impreso";
+"job.next.send_to_qc" = "Enviar a control";
+"job.next.mark_ready" = "Marcar listo";
+"job.next.hand_over" = "Entregar";
+"job.next.resume" = "Reanudar";
+"job.next.done" = "Terminado y pagado";
+"job.next.none" = "Nada que hacer";
+"job.more" = "Más";
+"job.more.label" = "Más acciones para este trabajo";
+"job.header.due" = "entrega %@";
+"job.day_late" = "1 día de retraso";
+"job.days_late" = "%d días de retraso";
+"job.section.parts" = "Piezas";
+"job.section.money" = "Dinero";
+"job.section.activity" = "Actividad";
+"job.money.price" = "Precio";
+"job.money.paid" = "Pagado";
+"job.money.owing" = "Pendiente";
+"job.money.owing_overdue" = "Pendiente · vencido";
+"job.parts.on_machine" = "En %@";

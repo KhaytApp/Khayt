@@ -1287,3 +1287,27 @@
 "load.failed.title" = "تعذّر التحميل";
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
+
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "التالي";
+"job.next.start_printing" = "ابدأ الطباعة";
+"job.next.mark_printed" = "تمت الطباعة";
+"job.next.send_to_qc" = "أرسل للفحص";
+"job.next.mark_ready" = "جاهز";
+"job.next.hand_over" = "سلِّم";
+"job.next.resume" = "استئناف";
+"job.next.done" = "منتهٍ ومدفوع";
+"job.next.none" = "لا شيء للقيام به";
+"job.more" = "المزيد";
+"job.more.label" = "إجراءات أخرى لهذا العمل";
+"job.header.due" = "التسليم %@";
+"job.day_late" = "متأخر يومًا واحدًا";
+"job.days_late" = "متأخر %d أيام";
+"job.section.parts" = "القطع";
+"job.section.money" = "المال";
+"job.section.activity" = "النشاط";
+"job.money.price" = "السعر";
+"job.money.paid" = "المدفوع";
+"job.money.owing" = "المتبقي";
+"job.money.owing_overdue" = "المتبقي · متأخر";
+"job.parts.on_machine" = "على %@";
