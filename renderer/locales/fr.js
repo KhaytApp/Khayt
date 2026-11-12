@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "Secret du lien enregistré sur cet ordinateur.",
   "qpl.secret_failed": "Le secret du lien n’a pas pu être modifié.",
   "qpl.remove_confirm": "Supprimer le secret du lien de cet ordinateur ? « Envoyer le lien de paiement » ne sera plus proposé tant qu’il n’est pas redéfini.",
+  "qpl.line_outdated": "Le devis a changé depuis : ce lien demande {sent}, le devis s’élève maintenant à {now}. Renvoyez-le.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

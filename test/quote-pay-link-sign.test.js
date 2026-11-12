@@ -35,12 +35,15 @@ const sign = (o) => signQuotePayLink(Object.assign({
   store: book(), orderId: 'QUO-2026-0142-ab3k', secret: SECRET, locale: 'ar', words: {}, nowSeconds: NOW, crypto,
 }, o || {}));
 
-/** An independent check of a token: recompute the HMAC over header.payload with the secret. */
+/**
+ * Check a token the way the shared rule says a device does: `open` it, HMAC
+ * ITS input with the secret, and ask `signatureMatches`.
+ */
 function verify(token, secret) {
-  const [h, p, s] = token.split('.');
-  const want = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(`${h}.${p}`).digest('base64url');
-  return { ok: h === L.HEADER && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(want)),
-    claims: JSON.parse(Buffer.from(p, 'base64url').toString('utf8')) };
+  const t = L.open(token);
+  if (!t) return { ok: false, claims: null };
+  const mac = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(t.input).digest();
+  return { ok: L.signatureMatches(token, Array.from(mac)), claims: t.claims };
 }
 
 test('no secret: refused, and the reason is "not set up"', () => {
@@ -77,7 +80,9 @@ test('the link it signs verifies, and says what the shared rule says', () => {
     config: { storeUrl: 'https://shop.example', hasSecret: true }, nowSeconds: NOW, words: { rush: '', extra: '' }, customerName: 'سارة مثال' });
   assert.deepEqual(v.claims, expected);
   assert.deepEqual(v.claims.customer, { name: 'سارة مثال' }, 'the name in the customer\'s language, and nothing else');
-  assert.deepEqual(r.record, { issuedAt: NOW, expiresAt: NOW + L.LIFETIME_S, amount: 340 });
+  assert.deepEqual(r.record, { issuedAt: NOW, expiresAt: NOW + L.LIFETIME_S, amount: 340,
+    locale: 'ar', sentAt: new Date(NOW * 1000).toISOString() }, 'recordOf(claims, { locale, sentAt })');
+  assert.deepEqual(L.stateOf({ ...b.printLog[0], payLink: r.record }, NOW), { state: 'sent', outdated: false });
 });
 
 test('English when asked, with the English name', () => {

@@ -5506,5 +5506,6 @@
   "qpl.secret_set": "Link secret saved on this computer.",
   "qpl.secret_failed": "The link secret could not be changed.",
   "qpl.remove_confirm": "Remove the link secret from this computer? “Send pay link” is not offered until it is set again.",
+  "qpl.line_outdated": "The quote has changed since: this link charges {sent}, the quote now comes to {now}. Send it again.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

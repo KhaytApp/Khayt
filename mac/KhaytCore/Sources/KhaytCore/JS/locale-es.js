@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "Secreto del enlace guardado en este ordenador.",
   "qpl.secret_failed": "No se pudo cambiar el secreto del enlace.",
   "qpl.remove_confirm": "¿Quitar el secreto del enlace de este ordenador? «Enviar enlace de pago» no se ofrecerá hasta que se vuelva a fijar.",
+  "qpl.line_outdated": "El presupuesto ha cambiado desde entonces: este enlace cobra {sent} y el presupuesto ahora suma {now}. Envíalo de nuevo.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

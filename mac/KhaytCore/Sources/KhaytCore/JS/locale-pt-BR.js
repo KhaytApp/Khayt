@@ -5506,5 +5506,6 @@
   "qpl.secret_set": "Segredo do link salvo neste computador.",
   "qpl.secret_failed": "Não foi possível alterar o segredo do link.",
   "qpl.remove_confirm": "Remover o segredo do link deste computador? “Enviar link de pagamento” só volta a aparecer quando ele for definido de novo.",
+  "qpl.line_outdated": "O orçamento mudou desde então: este link cobra {sent} e o orçamento agora soma {now}. Envie de novo.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -9,11 +9,10 @@
  * (`hubAPI.quotePayLinkSign`) — main reads the job from the book on disk, so
  * the window flushes its save first.
  *
- * What the job remembers is `order.payLink`: `recordOf(claims)` —
- * `{ issuedAt, expiresAt, amount }` — plus the language it was sent in. A
- * payment on the store arrives as `order.payLink.paid`
- * (`{ storeOrder, amount, delivery, paidAt, url? }`, riyals, written by the
- * store import that settles the job); this file only reads it.
+ * What the job remembers is `order.payLink`, the shared `recordOf(claims,
+ * { locale, sentAt })` main hands back. A payment on the store arrives as
+ * `order.payLink.paid` (`paidRecord`, written by the store import); where the
+ * line stands is the shared `stateOf`, and this file only draws it.
  *
  * Figma: file 7Iqw0GcrLLRW7CLDEhTa1P, page "Pay link (desktop)".
  */
@@ -50,35 +49,24 @@
   const riyals = (amount) => (Math.round((+amount || 0) * 100) / 100).toFixed(2);
   const shortDate = (ms) => new Date(ms).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short' });
   const approvedAt = (o) => o.quoteAcceptedAt || o.clientApprovedAt || '';
-  const beganAsAcceptedQuote = (o) => o.status !== 'quote' && !!approvedAt(o);
-  const paidElsewhere = (o) => (+o.paidAmount || 0) > 0 || o.paymentStatus === 'paid';
 
   /**
-   * Which of the five states the job's line is in, or null for no line.
-   *
-   *   ready     an approved quote, nothing sent, nothing paid
-   *   sent      a link is out and has not run out
-   *   expired   the link ran out, still not paid
-   *   paid      the store was paid what the quote says
-   *   mismatch  the store was paid, but not what the quote now says
+   * Where the job's link stands: the shared rule's `stateOf` (ready, sent,
+   * expired, paid, mismatch or null, and `outdated` when a link is out but
+   * the quote has changed since). One thing is the desktop's own: "Ready" is
+   * not offered on a computer where pay links are not set up, so a shop that
+   * never uses them sees no line on its approved quotes.
    */
   function lineState(order, nowMs) {
-    if (!order || !PL()) return null;
-    const rec = order.payLink && typeof order.payLink === 'object' ? order.payLink : null;
-    if (rec && rec.paid && typeof rec.paid === 'object') {
-      const quoted = PL().sums(order).total;
-      return Math.round((+rec.paid.amount || 0) * 100) === quoted ? 'paid' : 'mismatch';
-    }
-    if (order.status === 'cancelled' || order.voidedAt || order.creditedAt) return null;
-    if (paidElsewhere(order)) return null;
-    if (rec && rec.expiresAt) return (nowMs / 1000) >= rec.expiresAt ? 'expired' : 'sent';
-    if (!PL().configured(config()) || !beganAsAcceptedQuote(order)) return null;
-    return 'ready';
+    if (!order || !PL()) return { state: null, outdated: false };
+    const s = PL().stateOf(order, Math.floor(nowMs / 1000));
+    if (s.state === 'ready' && !PL().configured(config())) return { state: null, outdated: false };
+    return s;
   }
 
   function lineHtml(order) {
     const now = Date.now();
-    const state = lineState(order, now);
+    const { state, outdated } = lineState(order, now);
     if (!state) return '';
     const rec = order.payLink || {};
     const id = escapeHtml(String(order.id));  // an attribute, never shown
@@ -92,10 +80,10 @@
     } else if (state === 'sent') {
       const days = Math.max(1, Math.ceil((rec.expiresAt - now / 1000) / DAY));
       text = t(days === 1 ? 'qpl.line_sent_one' : 'qpl.line_sent', { date: shortDate(rec.issuedAt * 1000), days });
-      btn = secondary('qpl-send', t('qpl.send_again'));
+      btn = (outdated ? primary : secondary)('qpl-send', t('qpl.send_again'));
     } else if (state === 'expired') {
       text = t('qpl.line_expired', { date: shortDate(rec.expiresAt * 1000) });
-      btn = secondary('qpl-send', t('qpl.send_new'));
+      btn = outdated ? primary('qpl-send', t('qpl.send_again')) : secondary('qpl-send', t('qpl.send_new'));
     } else if (state === 'paid') {
       const p = rec.paid;
       text = t('qpl.line_paid', { order: String(p.storeOrder || ''), amount: riyals(p.amount) + ' ' + t('qpl.sar'), delivery: riyals(p.delivery) });
@@ -104,10 +92,13 @@
       text = t('qpl.line_mismatch', { paid: riyals(rec.paid.amount), quoted: money(PL().sums(order).total) });
       btn = primary('qpl-settle', t('qpl.settle'));
     }
-    return `<div class="qpl-line" data-state="${state}" data-id="${id}">
+    const note = outdated
+      ? `<div class="qpl-line-outdated">${escapeHtml(t('qpl.line_outdated', { sent: riyals(rec.amount), now: money(PL().sums(order).total) }))}</div>`
+      : '';
+    return `<div class="qpl-line" data-state="${state}"${outdated ? ' data-outdated="true"' : ''} data-id="${id}">
       <div class="qpl-line-words">
         <div class="qpl-line-label"><span class="qpl-dot" aria-hidden="true"></span>${escapeHtml(t('qpl.state_' + state))}</div>
-        <div class="qpl-line-text">${escapeHtml(text)}</div>
+        <div class="qpl-line-text">${escapeHtml(text)}</div>${note}
       </div>
       ${btn}
     </div>`;
@@ -247,7 +238,7 @@
         else toast(t('qpl.sign_failed'), 'error');
         return '';
       }
-      order.payLink = { ...res.record, locale: lang, sentAt: new Date().toISOString() };
+      order.payLink = res.record;
       saveAll();
       signed[lang] = res.url;
       refreshLines(order.id);
@@ -382,11 +373,11 @@
   document.addEventListener('click', onSettingsClick);
 
   const payLinkLineHtml = (order) => `<div class="qpl-line-host" data-id="${escapeHtml(String(order.id))}">${lineHtml(order)}</div>`;
-  const payLinkCanSend = (order) => ['ready', 'sent', 'expired'].includes(lineState(order, Date.now()));
+  const payLinkCanSend = (order) => !!PL() && PL().canSendFrom(lineState(order, Date.now()).state);
   const renderPayLinkSettingsNow = () => renderPayLinkSettings(false);
 
   Object.assign(global, {
-    payLinkLineHtml, payLinkLineState: lineState, payLinkCanSend, openPayLinkSheet: openSendSheet,
+    payLinkLineHtml, payLinkLineState: (order) => lineState(order, Date.now()), payLinkCanSend, openPayLinkSheet: openSendSheet,
     renderPayLinkSettings: renderPayLinkSettingsNow, savePayLinkSettingsFromForm,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

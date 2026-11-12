@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "حُفظ سر الرابط على هذا الجهاز.",
   "qpl.secret_failed": "تعذّر تغيير سر الرابط.",
   "qpl.remove_confirm": "إزالة سر الرابط من هذا الجهاز؟ لن يظهر «إرسال رابط الدفع» حتى يُضبط من جديد.",
+  "qpl.line_outdated": "تغيّر عرض السعر منذ إرسال الرابط: الرابط يطلب {sent}، والعرض الآن {now}. أرسله مرة أخرى.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -7,7 +7,8 @@
  *      sheet; Copy link puts a link on the clipboard that verifies against
  *      the fake secret, and the line turns to Sent.
  *   3. A part with no weight: the sheet says why it cannot be sent.
- *   4. The job line in its other states: Expired, Paid, Mismatch.
+ *   4. The job line in its other states: Expired, Paid, Mismatch, a Sent
+ *      link the quote has changed under, and no line on a cancelled job.
  *   5. The secret is nowhere in the window: not the DOM, not an input, not
  *      localStorage, not the window's copy of the book, not the file on disk
  *      when the system can encrypt.
@@ -16,9 +17,11 @@
  */
 import { launchApp, dismissWizard, makeUserDataDir, switchTab } from './e2e/helpers.mjs';
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const L = createRequire(import.meta.url)('../lib/quote-pay-link.js');
 const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
 const SECRET = 'test-secret-not-real-e2e-0123456789abcdef';
 const STORE = 'https://shop.example';
@@ -48,6 +51,8 @@ try {
       job('QPL-EXPIRED', { payLink: { issuedAt: now - 9 * 86400, expiresAt: now - 2 * 86400, amount: 340, locale: 'ar' } }),
       job('QPL-PAID', { payLink: { issuedAt: now - 86400, expiresAt: now + 6 * 86400, amount: 340,
         paid: { storeOrder: '1043', amount: 340, delivery: 22, paidAt: '2026-11-12T10:00:00Z', url: 'https://shop.example/orders/1043' } } }),
+      job('QPL-OUTDATED', { payLink: { issuedAt: now - 86400, expiresAt: now + 6 * 86400, amount: 290, locale: 'ar' } }),
+      job('QPL-CANCELLED', { status: 'cancelled', payLink: { issuedAt: now - 86400, expiresAt: now + 6 * 86400, amount: 340 } }),
       job('QPL-MISMATCH', { payLink: { issuedAt: now - 86400, expiresAt: now + 6 * 86400, amount: 290,
         paid: { storeOrder: '1044', amount: 290, delivery: 22, paidAt: '2026-11-12T10:00:00Z' } } }),
     );
@@ -93,18 +98,24 @@ try {
   await window.click('.qpl-sheet [data-qpl="copy"]');
   await window.waitForFunction(() => /\S/.test(document.querySelector('.qpl-sheet .qpl-status')?.textContent || ''), null, { timeout: 10_000 });
   const link = await electronApp.evaluate(({ clipboard }) => clipboard.readText());
-  const m = /^https:\/\/shop\.example\/sa\/(ar|en)\/pay\/([\w-]+)\.([\w-]+)\.([\w-]+)$/.exec(link);
+  const m = /^https:\/\/shop\.example\/sa\/(ar|en)\/pay\/([\w-]+\.[\w-]+\.[\w-]+)$/.exec(link);
   ok(!!m, `the copied link is the store's pay link (${link.slice(0, 48)}…)`);
-  const want = crypto.createHmac('sha256', Buffer.from(SECRET, 'utf8')).update(`${m[2]}.${m[3]}`).digest('base64url');
-  ok(want === m[4], 'and its signature verifies against the secret');
-  const claims = JSON.parse(Buffer.from(m[3], 'base64url').toString('utf8'));
+  const opened = L.open(m[2]);
+  ok(!!opened, 'the shared rule can open its token');
+  const mac = crypto.createHmac('sha256', Buffer.from(SECRET, 'utf8')).update(opened.input).digest();
+  ok(L.signatureMatches(m[2], Array.from(mac)), 'and its signature matches the secret (signatureMatches)');
+  const other = crypto.createHmac('sha256', Buffer.from('test-secret-not-real-some-other-key-000000', 'utf8')).update(opened.input).digest();
+  ok(!L.signatureMatches(m[2], Array.from(other)), 'and no other key');
+  const claims = opened.claims;
   ok(claims.quote_id === 'QPL-READY' && claims.items.reduce((s, i) => s + i.unit_amount * i.quantity, 0) === 34000,
     'it charges the quote: 340.00 in halalas, for this job');
   ok(JSON.stringify(claims.customer) === JSON.stringify({ name: m[1] === 'ar' ? 'سارة مثال' : 'Sara Example' }), 'only the name goes with it');
   await window.click('.qpl-sheet [data-qpl="close"]');
   await window.waitForSelector('.qpl-line[data-state="sent"]', { timeout: 10_000 });
   ok((await window.textContent('.qpl-line[data-state="sent"]')).includes('expires in 7 days'), 'the line turns to Sent, expiring in 7 days');
-  ok(await window.evaluate(() => printLog.find((o) => o.id === 'QPL-READY').payLink.issuedAt > 0), 'the job remembers the link it sent');
+  const rec = await window.evaluate(() => printLog.find((o) => o.id === 'QPL-READY').payLink);
+  ok(rec.issuedAt > 0 && rec.amount === 340 && (rec.locale === 'ar' || rec.locale === 'en') && typeof rec.sentAt === 'string',
+    `the job remembers the link it sent, as recordOf(claims, { locale, sentAt }) (${JSON.stringify(rec)})`);
   await window.click('.modal-form [data-act="cancel"]');
 
   // ── 3. Can't send: a part with no weight ─────────────────────────────────
@@ -123,6 +134,7 @@ try {
     ['QPL-EXPIRED', 'expired', 'Not paid.'],
     ['QPL-PAID', 'paid', 'order #1043'],
     ['QPL-MISMATCH', 'mismatch', '290.00 paid, 340.00 quoted'],
+    ['QPL-OUTDATED', 'sent', 'The quote has changed since: this link charges 290.00, the quote now comes to 340.00'],
   ]) {
     await window.click(`[data-act="edit-log"][data-id="${id}"]`);
     await window.waitForSelector(`.qpl-line[data-state="${state}"]`, { timeout: 10_000 });
@@ -130,6 +142,14 @@ try {
     ok(text.includes(words), `${state}: "${text.replace(/\s+/g, ' ').trim()}"`);
     await window.click('.modal-form [data-act="cancel"]');
   }
+  await window.click('[data-act="edit-log"][data-id="QPL-OUTDATED"]');
+  await window.waitForSelector('.qpl-line[data-outdated="true"] .btn.primary[data-act="qpl-send"]', { timeout: 10_000 });
+  ok((await window.textContent('.qpl-line[data-outdated="true"] [data-act="qpl-send"]')).trim() === 'Send again', 'an outdated link offers Send again');
+  await window.click('.modal-form [data-act="cancel"]');
+  await window.click('[data-act="edit-log"][data-id="QPL-CANCELLED"]');
+  await window.waitForSelector('.modal-form', { timeout: 10_000 });
+  ok(!(await window.$('.modal-form .qpl-line')), 'a cancelled job shows no pay link line');
+  await window.click('.modal-form [data-act="cancel"]');
   const dots = await window.evaluate(() => Object.fromEntries(['expired', 'paid', 'mismatch'].map((s) => {
     const host = document.createElement('div');
     host.innerHTML = payLinkLineHtml(printLog.find((o) => o.id === 'QPL-' + s.toUpperCase()));

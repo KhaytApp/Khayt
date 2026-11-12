@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "Link-Geheimnis auf diesem Computer gespeichert.",
   "qpl.secret_failed": "Das Link-Geheimnis konnte nicht geändert werden.",
   "qpl.remove_confirm": "Link-Geheimnis von diesem Computer entfernen? „Zahlungslink senden“ wird erst wieder angeboten, wenn es neu gesetzt ist.",
+  "qpl.line_outdated": "Das Angebot hat sich seitdem geändert: Dieser Link verlangt {sent}, das Angebot beträgt jetzt {now}. Sende ihn erneut.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

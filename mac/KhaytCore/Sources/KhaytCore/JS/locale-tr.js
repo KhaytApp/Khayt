@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "Bağlantı sırrı bu bilgisayara kaydedildi.",
   "qpl.secret_failed": "Bağlantı sırrı değiştirilemedi.",
   "qpl.remove_confirm": "Bağlantı sırrı bu bilgisayardan kaldırılsın mı? Yeniden ayarlanana kadar “Ödeme bağlantısı gönder” sunulmaz.",
+  "qpl.line_outdated": "Teklif o zamandan beri değişti: bu bağlantı {sent} istiyor, teklif şimdi {now}. Yeniden gönderin.",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "リンクシークレットをこのコンピューターに保存しました。",
   "qpl.secret_failed": "リンクシークレットを変更できませんでした。",
   "qpl.remove_confirm": "このコンピューターからリンクシークレットを削除しますか？再設定するまで「支払いリンクを送信」は表示されません。",
+  "qpl.line_outdated": "送信後に見積もりが変わりました。このリンクの請求額は {sent}、現在の見積もりは {now} です。もう一度送信してください。",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

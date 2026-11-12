@@ -5505,5 +5505,6 @@
   "qpl.secret_set": "链接密钥已保存在此电脑。",
   "qpl.secret_failed": "无法更改链接密钥。",
   "qpl.remove_confirm": "从此电脑移除链接密钥？在重新设置之前不会提供“发送付款链接”。",
+  "qpl.line_outdated": "报价在发送后已更改：此链接收取 {sent}，报价现在为 {now}。请重新发送。",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

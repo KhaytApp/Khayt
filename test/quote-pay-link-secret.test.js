@@ -23,9 +23,36 @@ const book = () => ({
   printLog: [], clients: [],
 });
 
-test('the path is on the secret list and the per-device list', () => {
+test('the path is on the secret list and the per-device list; when it was set is per device only', () => {
   assert.ok(P.SECRET_PATHS.includes('settings.quotePayLink.secret'));
   assert.ok(P.PER_DEVICE_PATHS.includes('settings.quotePayLink.secret'));
+  assert.ok(P.PER_DEVICE_PATHS.includes('settings.quotePayLink.secretSetAt'));
+  assert.ok(!P.SECRET_PATHS.includes('settings.quotePayLink.secretSetAt'), 'shown on this computer, so not masked');
+});
+
+const SET_AT = '2026-11-12T08:00:00.000Z';
+
+test('"set {date}" goes nowhere the secret does not: not /api/store, the cloud or an export', () => {
+  const { buildExportPayload } = require('../lib/store.js');
+  for (const [name, out] of [['forPhone', forPhone(book()).settings], ['forCloud', forCloud(book()).settings],
+    ['export', buildExportPayload(book(), { redactSecrets: true }).settings]]) {
+    assert.equal('secretSetAt' in out.quotePayLink, false, `${name} carries secretSetAt`);
+    assert.equal('secret' in out.quotePayLink, false, `${name} carries the secret`);
+    assert.equal(JSON.stringify(out).includes(SET_AT), false, name);
+    assert.equal(out.quotePayLink.storeUrl, 'https://shop.example', `${name} keeps the address`);
+  }
+});
+
+test('"set {date}" is this computer\'s on restore, and absent when this computer has none', () => {
+  const incoming = book();
+  incoming.settings.quotePayLink.secretSetAt = '2025-01-01T00:00:00.000Z';
+  P.keepMachineLocal(book(), incoming);
+  assert.equal(incoming.settings.quotePayLink.secretSetAt, SET_AT);
+  const bare = book();
+  delete bare.settings.quotePayLink.secret; delete bare.settings.quotePayLink.secretSetAt;
+  const again = book();
+  P.keepMachineLocal(bare, again);
+  assert.equal('secretSetAt' in again.settings.quotePayLink, false);
 });
 
 test('/api/store (forPhone) carries neither the secret nor a mask of it', () => {
