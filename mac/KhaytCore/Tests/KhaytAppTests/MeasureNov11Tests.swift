@@ -199,9 +199,10 @@ struct MeasureNov11Tests {
                 t = mine()
                 _ = shop.memoEntries()
                 let b = mine() - t
-                let c = await timed { await shop.readLibraryFacets() }.cpu
+                let took = await timed { await shop.readLibraryFacets() }
+                let c = took.cpu
                 typing.append(["chars": n, "found": found.count, "shownMs": a, "entriesMs": b,
-                               "facetsMs": c, "keystrokeMs": a + b + c])
+                               "facetsMs": c, "facetsWallMs": took.wall, "keystrokeMs": a + b + c])
             }
         }
         out["typing"] = typing
@@ -259,7 +260,11 @@ struct MeasureNov11Tests {
         report["sampleLibrary"] = await Self.library(sample)
 
         // ── The scrubbed book ────────────────────────────────────────────
-        if let bookPath = env["KHAYT_MEASURE_BOOK"] {
+        // One or more books, "label=path" separated by commas.
+        for entry in (env["KHAYT_MEASURE_BOOK"] ?? "").split(separator: ",") {
+            let parts = entry.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            let label = parts[0], bookPath = parts[1]
             let support = FileManager.default.temporaryDirectory
                 .appending(path: "khayt-measure-\(UUID().uuidString)/Application Support")
             let folder = support.appending(path: StoreReader.Build.shipped.rawValue)
@@ -269,11 +274,6 @@ struct MeasureNov11Tests {
             StoreReader.Build.supportFolderForTests = support
             let spotlight = UserDefaults.standard.object(forKey: Spotlight.defaultsKey)
             UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
-            defer {
-                StoreReader.Build.supportFolderForTests = nil
-                UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
-                try? FileManager.default.removeItem(at: support.deletingLastPathComponent())
-            }
 
             // The parts of a read that are not the engine, each on its own.
             var readMs: [Double] = [], filesMs: [Double] = [], ordersMs: [Double] = []
@@ -283,26 +283,32 @@ struct MeasureNov11Tests {
                 filesMs.append(await Self.timed { _ = Shop.decodeFiles(raw) }.cpu)
                 ordersMs.append(await Self.timed { _ = try? Shop.decodeOrders(raw) }.cpu)
             }
-            report["bookRead"] = ["readAndParse": Self.stats(readMs), "decodeFiles": Self.stats(filesMs),
+            report["\(label)Read"] = ["readAndParse": Self.stats(readMs), "decodeFiles": Self.stats(filesMs),
                                   "decodeOrders": Self.stats(ordersMs)]
 
             let shop = Shop()
             MeasureProbe.on = true
             let before = Self.memory()
-            report["bookLoads"] = await Self.loads(shop, .store(.shipped), runs: 7)
+            report["\(label)Loads"] = await Self.loads(shop, .store(.shipped), runs: 7)
             let after = Self.memory()
             MeasureProbe.on = false
-            report["bookLoadFootprintDeltaMB"] = Double(after.footprint - before.footprint) / 1_048_576
-            report["bookProblem"] = shop.problem == nil ? "none" : "load reported a problem"
-            report["bookCounts"] = ["jobs": shop.orders.count, "models": shop.files.count,
+            report["\(label)LoadFootprintDeltaMB"] = Double(after.footprint - before.footprint) / 1_048_576
+            report["\(label)Problem"] = shop.problem == nil ? "none" : "load reported a problem"
+            report["\(label)Counts"] = ["jobs": shop.orders.count, "models": shop.files.count,
                                     "customers": shop.clients.count, "spools": shop.spools.count,
                                     "machines": shop.machines.count, "products": shop.productRows.count]
-            report["bookBoard"] = Self.board(shop)
+            // What the first load of a book starts in the background has
+            // finished before the screens are timed.
+            try? await Task.sleep(for: .seconds(20))
+            report["\(label)Board"] = Self.board(shop)
             MeasureProbe.on = true
-            report["bookLibrary"] = await Self.library(shop)
+            report["\(label)Library"] = await Self.library(shop)
             MeasureProbe.on = false
             await shop.settleLibraryWrites()
             await shop.load(.sample)
+            StoreReader.Build.supportFolderForTests = nil
+            UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
+            try? FileManager.default.removeItem(at: support.deletingLastPathComponent())
         }
 
         var loads = [Double](repeating: 0, count: 3)
