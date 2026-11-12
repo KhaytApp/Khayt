@@ -8,12 +8,12 @@ import XCTest
 @MainActor
 final class LibraryFilterTests: XCTestCase {
     private func item(_ id: String, colours: [String] = [], ext: String? = "3mf", fileType: String? = nil,
-                      folder: String? = nil) throws -> LibraryItem {
+                      folder: String? = nil) throws -> KhaytCompanion.LibraryItem {
         var o: [String: Any] = ["id": id, "name": id, "colors": colours.map { ["hex": $0] }]
         if let ext { o["ext"] = ext }
         if let fileType { o["fileType"] = fileType }
         if let folder { o["folder"] = folder }
-        return try JSONDecoder().decode(LibraryItem.self, from: JSONSerialization.data(withJSONObject: o))
+        return try JSONDecoder().decode(KhaytCompanion.LibraryItem.self, from: JSONSerialization.data(withJSONObject: o))
     }
 
     // MARK: keys and query
@@ -65,7 +65,7 @@ final class LibraryFilterTests: XCTestCase {
 
     func testAModelReadsItsColoursAndType() throws {
         let json = ##"{"id":"PF-1","name":"Arm","ext":"STL","colors":[{"hex":"#1A1A1A","grams":30},"#2F6FDE",{"grams":4},{"hex":""}]}"##
-        let it = try JSONDecoder().decode(LibraryItem.self, from: Data(json.utf8))
+        let it = try JSONDecoder().decode(KhaytCompanion.LibraryItem.self, from: Data(json.utf8))
         XCTAssertEqual(it.colors, ["#1A1A1A", "#2F6FDE"])
         XCTAssertEqual(it.colourKeys, ["blue", "black", "multi"])
         XCTAssertEqual(it.fileType, "stl")
@@ -134,7 +134,7 @@ final class LibraryFilterTests: XCTestCase {
     }
 
     func testTheCloudCopyWorksOutTheTypeFromTheWholeRecord() throws {
-        func row(_ o: [String: JSONValue]) -> LibraryItem? { LibraryCopy.item(.object(o)) }
+        func row(_ o: [String: JSONValue]) -> KhaytCompanion.LibraryItem? { LibraryCopy.item(.object(o)) }
         let web = try XCTUnwrap(row(["id": .string("PF-web"), "name": .string("From the web")]))
         XCTAssertEqual(web.fileType, "nofile")
         let member = try XCTUnwrap(row(["id": .string("PF-zip"), "name": .string("In a zip"),
