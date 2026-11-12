@@ -236,7 +236,7 @@ struct LibraryFilterBar: View {
     static func colourKey(_ token: String) -> String {
         switch token {
         case ColourFamily.multi: "plan.material_label"
-        case ColourFamily.none: "mac.lf_no_colour"
+        case ColourFamily.noInfo: "mac.lf_no_colour"
         default: "mac.lf_" + token
         }
     }

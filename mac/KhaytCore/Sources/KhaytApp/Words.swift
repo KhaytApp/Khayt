@@ -4076,7 +4076,7 @@ final class Words {
         "mac.lf_white": ["en": "White", "ar": "أبيض"],
         "mac.lf_no_colour": ["en": "No colour info", "ar": "بلا معلومات لون"],
         "mac.lf_no_file": ["en": "No file", "ar": "بلا ملف"],
-        "mac.lf_gcode": ["en": "G-code", "ar": "G-code"],
+        "mac.lf_gcode": ["en": "G-code", "ar": "جي كود"],
         // Where a model's bytes are (`LibrarySyncIndex`): the tile badge, the
         // Show menu pair, and the inspector's Storage section.
         "mac.lib_online_only": ["en": "Online only", "ar": "على الإنترنت فقط"],

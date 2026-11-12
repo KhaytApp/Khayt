@@ -23,10 +23,10 @@ public enum ColourFamily: String, CaseIterable, Sendable, Hashable {
     /// A model with two or more different families.
     public static let multi = "multi"
     /// A model with no readable colour on its record.
-    public static let none = "none"
+    public static let noInfo = "none"
 
     /// Every id the Colour filter can hold, in menu order.
-    public static let tokens: [String] = allCases.map(\.rawValue) + [multi, none]
+    public static let tokens: [String] = allCases.map(\.rawValue) + [multi, noInfo]
 
     /// One typical colour for the swatch beside the name (`SWATCH` in the
     /// lib). Drawn, never matched against.
@@ -124,10 +124,10 @@ public enum ColourFamily: String, CaseIterable, Sendable, Hashable {
 
     /// The Colour filter ids a model is found under (`tokensOf`): each family
     /// it has, then `multi` when it has two or more DIFFERENT ones — or
-    /// `[none]` when no colour on it can be read.
+    /// `[noInfo]` when no colour on it can be read.
     public static func tokens(ofHexes hexes: [String?]) -> [String] {
         let found = families(ofHexes: hexes).map(\.rawValue)
-        if found.isEmpty { return [none] }
+        if found.isEmpty { return [noInfo] }
         return found.count >= 2 ? found + [multi] : found
     }
 }
