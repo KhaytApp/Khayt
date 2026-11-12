@@ -417,3 +417,30 @@ test('each menu is counted over everything but its own choice, with every key pr
   // An empty library still names every row.
   assert.equal(Object.keys(LanLibrary.list([], {}).facets.colour).length, ColourFamily.TOKENS.length);
 });
+
+// ── The fixtures the phone reads too ────────────────────────────────────────
+
+test('the library-wire fixtures are current, and say what the phone was promised', () => {
+  const Gen = require(path.join(ROOT, 'test/fixtures/library-wire/gen.js'));
+  const dir = path.join(ROOT, 'test/fixtures/library-wire');
+  const stored = JSON.parse(fs.readFileSync(path.join(dir, 'answers.json'), 'utf8'));
+  // Stale answers would have the phone's tests agreeing with an old rule.
+  assert.deepEqual(stored, JSON.parse(JSON.stringify(Gen.answers())), 'run: node test/fixtures/library-wire/gen.js');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'printFiles.json'), 'utf8')), Gen.files);
+
+  // Top of the library, nothing chosen: the menus cover the whole library.
+  const top = stored['top-none'].answer;
+  assert.deepEqual([top.total, top.matchedTotal, top.unfilteredTotal], [2, 12, 12]);
+  assert.equal(Object.values(top.facets.type).reduce((a, b) => a + b, 0), 12, 'every model has one type');
+  assert.equal(top.facets.colour.red, 2);
+  // Top, Red: nothing loose is red, two reds sit in Home, and the menu says so.
+  const red = stored['top-red'].answer;
+  assert.deepEqual([red.total, red.matchedTotal, red.unfilteredTotal, red.items.length], [0, 2, 12, 0]);
+  assert.equal(red.facets.colour.red, 2);
+  assert.deepEqual(red.folders.map((f) => [f.path, f.count]), [['Home', 2]]);
+  // A search: all three counts are over the search.
+  const search = stored['search-red'].answer;
+  assert.equal(search.matchedTotal, search.total);
+  // Unknown keys change nothing.
+  assert.deepEqual(stored['unknown-keys'].answer, Object.assign({}, top));
+});
