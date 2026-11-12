@@ -16,7 +16,7 @@ enum TodayStage {
 
     var color: Color {
         switch self {
-        case .printing: Khayt.live
+        case .printing: Khayt.thread
         case .pending, .quote: Khayt.note
         case .hold: Khayt.hold
         case .collect: Khayt.collect
@@ -48,7 +48,10 @@ struct StatusPill: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(color.opacity(0.14), in: Capsule())
+        // The thread has a wash of its own (the design's #FDF1DE / #3A2C14):
+        // amber at 14% on a white card is not a pill at all.
+        .background(color == Khayt.thread ? AnyShapeStyle(Khayt.threadWash)
+                                          : AnyShapeStyle(color.opacity(0.14)), in: Capsule())
         .fixedSize()
     }
 }
@@ -60,7 +63,7 @@ extension Stage {
         switch self {
         case .quote, .pending: Khayt.note
         case .on_hold, .post, .qc: Khayt.hold
-        case .printing: Khayt.live
+        case .printing: Khayt.thread
         case .completed: Khayt.collect
         case .shipped, .delivered: Khayt.done
         case .cancelled: Khayt.late

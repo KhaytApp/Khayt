@@ -199,7 +199,13 @@ struct PrinterRow: View {
     let now: Date
     @Environment(\.colorScheme) private var scheme
 
-    private var ink: Color { printer.paused ? Ink.attention.on(scheme) : Ink.hot.on(scheme) }
+    /// The bar: amber while it prints (`Khayt.thread`, printing on every
+    /// Khayt screen since Nov 2026), the attention colour while paused.
+    private var ink: Color { printer.paused ? Ink.attention.on(scheme) : Ink.thread.on(scheme) }
+    /// The figure beside it. Amber is a mark, never text: on a light widget
+    /// it is under 3:1, so the percentage is ordinary ink and the bar says
+    /// printing.
+    private var figureInk: Color { printer.paused ? Ink.attention.on(scheme) : .primary }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -208,7 +214,7 @@ struct PrinterRow: View {
                 Spacer(minLength: 2)
                 Text(verbatim: "\(printer.progress)%")
                     .font(.caption2.weight(.semibold)).monospacedDigit()
-                    .foregroundStyle(ink)
+                    .foregroundStyle(figureInk)
                     .widgetAccentable()
             }
             Bar(fraction: Double(printer.progress) / 100, ink: ink)
@@ -452,7 +458,10 @@ struct JobRow: View {
             Text(job.title).font(.caption.weight(.semibold)).lineLimit(1)
             if job.urgent {
                 Text(snapshot.word(.urgent)).font(.caption2.weight(.bold))
-                    .foregroundStyle(Ink.hot.on(scheme)).lineLimit(1).fixedSize()
+                    // "Wants a person", which is what urgent means. It was
+                    // the printing colour, and printing is amber now: amber
+                    // is a mark, and this is a word.
+                    .foregroundStyle(Ink.attention.on(scheme)).lineLimit(1).fixedSize()
             }
             Spacer(minLength: 2)
             if let due = job.due {
@@ -594,7 +603,9 @@ struct Header: View {
     let title: String
     let shop: String
     let count: Int?
-    var countInk = Ink.hot
+    /// The count's colour; nil is ordinary ink (the Printing header: its
+    /// count is a figure, and amber is not a text colour).
+    var countInk: Ink? = nil
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -603,7 +614,7 @@ struct Header: View {
                 .foregroundStyle(Ink.brand.on(scheme)).widgetAccentable()
             if let count {
                 Text(verbatim: String(count)).font(.caption.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(countInk.on(scheme)).widgetAccentable()
+                    .foregroundStyle(countInk?.on(scheme) ?? .primary).widgetAccentable()
             }
             Spacer(minLength: 0)
         }
@@ -632,7 +643,7 @@ struct Updated: View {
     }
 }
 
-/// Khayt's colours, by role. The SAME values as `Khayt.brand`, `.hot`,
+/// Khayt's colours, by role. The SAME values as `Khayt.brand`, `.thread`,
 /// `.attention` and `.late` in the app's `Palette.swift` — this code cannot
 /// import that file, so `WidgetExtensionTests` reads both and fails when they
 /// part. Chosen by the widget's own colour scheme rather than a dynamic NSColor,
@@ -642,7 +653,7 @@ struct Ink {
     let dark: UInt32
 
     static let brand = Ink(light: 0x216DCA, dark: 0x4C97F0)
-    static let hot = Ink(light: 0xAF3E18, dark: 0xF0763D)
+    static let thread = Ink(light: 0xF2A541, dark: 0xF2A541)
     static let attention = Ink(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = Ink(light: 0xBB2D44, dark: 0xF2564A)
 

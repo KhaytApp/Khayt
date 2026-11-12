@@ -20,12 +20,19 @@ struct EngineThreadTests {
     @Test("concurrent callers are served one at a time, every answer intact")
     func concurrentCallersAreSerial() async throws {
         let engine = try KhaytEngine()
-        let rows: [JSONValue] = (0..<2_000).map { i in
-            .object(["id": .string("r\(i)"), "category": .string("Category \(i % 37)")])
-        }
+        // A rule that still runs in JavaScript. This asked for the category
+        // counts until those were ported to Swift, and a call that never
+        // enters the engine's context would prove nothing about it.
+        let ask = """
+            (function () {
+              var rows = [];
+              for (var i = 0; i < 2000; i++) rows.push({ id: 'r' + i, category: 'Category ' + (i % 37) });
+              return KhaytOrganise.counts(rows, 'category').length;
+            })()
+            """
         let answers = await withTaskGroup(of: Int.self) { group in
             for _ in 0..<16 {
-                group.addTask { ((try? await engine.categoryCounts(rows)) ?? []).count }
+                group.addTask { (try? await engine.raw(ask, as: Int.self)) ?? -1 }
             }
             var all: [Int] = []
             for await n in group { all.append(n) }

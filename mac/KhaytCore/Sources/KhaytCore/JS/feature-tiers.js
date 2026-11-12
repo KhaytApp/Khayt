@@ -56,6 +56,9 @@ const BUSINESS_FEATURES = [
   // the shop actually gets.
   { key: 'catalog',    label: { en: 'Product catalogue', ar: 'كتالوج المنتجات' } },
   { key: 'portfolio',  label: { en: 'Portfolio', ar: 'معرض الأعمال' } },
+  // Loyalty is shown in Simple (Turki, Nov 10): the settings card carries no
+  // .pro-only and the Mac does not gate it. The comparison listed it as Pro.
+  { key: 'loyalty',    label: { en: 'Loyalty tiers', ar: 'مستويات الولاء' } },
 ];
 
 /** Professional-only — unlocked in Professional mode (each maps to .pro-only UI). */
@@ -67,7 +70,7 @@ const PRO_FEATURES = [
   { key: 'multiLocation', label: { en: 'Multiple locations & print-farm view', ar: 'فروع متعددة وعرض مزرعة الطباعة' } },
   { key: 'team',          label: { en: 'Team accounts & roles', ar: 'حسابات الفريق والأدوار' } },
   { key: 'maintenance',   label: { en: 'Machine maintenance & downtime', ar: 'صيانة الأجهزة والتوقّف' } },
-  { key: 'loyalty',       label: { en: 'Loyalty tiers & break-even', ar: 'مستويات الولاء ونقطة التعادل' } },
+  { key: 'breakEven',     label: { en: 'Break-even & overhead', ar: 'نقطة التعادل والتكاليف الثابتة' } },
   { key: 'expenses',      label: { en: 'Expense tracking', ar: 'تتبّع المصروفات' } },
 ];
 

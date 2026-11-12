@@ -2466,6 +2466,7 @@
  "mac.save_zero_do": "Guardar a 0",
  "mac.save_zero_new": "Este producto se vendería y presupuestaría por nada.",
  "mac.save_zero_note": "Este producto se vendería y presupuestaría por nada. Su precio ahora es {price}.",
+ "mac.price_not_read": "Ese precio no es un número. Escribe un precio o vacía la casilla.",
  "mac.save_zero_q": "¿Guardar a un precio de 0?",
  "mac.saved_at": "guardado {t}",
  "mac.saved_to": "Guardado como",
