@@ -137,7 +137,7 @@ extension UIReviewWorthDoingTests {
     func testNewSheetOpensLarge() throws {
         let sheet = try code("Views/NewSheet.swift")
         XCTAssertTrue(sheet.contains(".presentationDetents([.large])"))
-        XCTAssertFalse(sheet.contains(".medium"), "at medium two of the six tiles sit below the fold")
+        XCTAssertEqual(sheet.components(separatedBy: ".presentationDetents(").count, 2, "one detent list: large only; at medium two of the six tiles sit below the fold")
     }
 }
 
