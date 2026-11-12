@@ -420,10 +420,16 @@ private struct HeroCard: View {
                     Button(shop.words.callIt("mac.attn_go_job")) { FloorStatus.shared.open(job: job.id) }
                         .buttonStyle(.borderedProminent)
                 }
-            } else if !stopped || resolves {
+            } else if resolves {
                 // The book cannot say which job without guessing: the machine.
                 Button(shop.words.callIt("mac.mbh_open_machine")) { FloorStatus.shared.open(machine: line.id) }
                     .buttonStyle(.bordered)
+            } else if !stopped {
+                // A running print with no job named still has ONE primary: the
+                // card drew Pause and Open machine as two grey buttons, with
+                // nothing saying which is the way in (Nov 12 2026 capture).
+                Button(shop.words.callIt("mac.mbh_open_machine")) { FloorStatus.shared.open(machine: line.id) }
+                    .buttonStyle(.borderedProminent)
             }
         }
         .buttonBorderShape(.capsule)
