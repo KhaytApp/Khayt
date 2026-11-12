@@ -92,8 +92,13 @@ test('a check fails safe: unsigned index, tampered manifest, or no network chang
   const signed = signIndex(ix);
   const tampered = Buffer.from(b.toString('utf8').replace('Lamha', 'Lamhaa'), 'utf8');
   const t = await C.check(settings, { ctx: CTX, keys: KEYS, fetchBytes: fetcher({ [C.INDEX_URL]: bytesOf(signed), [ix.entries[0].url]: tampered }) });
-  assert.equal(t.settings, settings);
-  assert.equal(t.changed, false);
+  // A tampered manifest is not handed over, so the connector is untouched;
+  // the index itself verified, so its serial is remembered (#2426) and the
+  // check reports a change, for main to save.
+  assert.equal(t.settings.plugins, settings.plugins);
+  assert.equal(t.settings.connectorUpdates.serial, 3);
+  assert.equal(t.changed, true);
+  assert.equal(U.stateOf(t.settings, LAMHA.id).pending, undefined);
   const off = await C.check(settings, { ctx: CTX, keys: KEYS, fetchBytes: fetcher({}) });
   assert.equal(off.settings, settings);
 });
@@ -129,13 +134,37 @@ test('keys: a grant with no routes whose hosts changed drops every key', () => {
   const before = KEYED(null, ['one.example.com']);
   const after = KEYED(['one.example.com secret:a', 'one.example.com secret:b'], ['one.example.com', 'two.example.com']);
   assert.equal(C.keysWhereEntered(before, after).secrets, undefined);
-  // Same hosts, no routes: kept.
-  assert.deepEqual(C.keysWhereEntered(KEYED(null), KEYED(['one.example.com secret:a'])).secrets, { a: 'sample-a', b: 'sample-b' });
+  // Same hosts, no routes: the older grant is read as what its OWN manifest
+  // sends (lib grantWithPairs). This fixture's manifest sends no key at all,
+  // so key a now going to one.example.com is a move and only a is dropped.
+  // (Before #2426 the desktop kept both here: hosts alone said nothing moved.)
+  assert.deepEqual(C.keysWhereEntered(KEYED(null), KEYED(['one.example.com secret:a'])).secrets, { b: 'sample-b' });
+  // With a real manifest (Lamha) that sends its key to the same host, an
+  // older grant gaining its pairs keeps the key.
+  const g = M.grantFor(LAMHA); const old = Object.assign({}, g); delete old.routes;
+  const e = (granted) => ({ id: LAMHA.id, manifest: LAMHA, granted, secrets: { apiToken: 'sample-token' } });
+  assert.deepEqual(C.keysWhereEntered(e(old), e(g)).secrets, { apiToken: 'sample-token' });
 });
 
 test('keys: nothing moved, every key kept', () => {
   const g = ['one.example.com secret:a', 'two.example.com secret:b'];
   assert.deepEqual(C.keysWhereEntered(KEYED(g), KEYED(g.slice().concat(['one.example.com order.id']))).secrets, { a: 'sample-a', b: 'sample-b' });
+});
+
+test('keys: the desktop drops exactly what the shared keysToForget names (cross-check)', () => {
+  const cases = [
+    [KEYED(['one.example.com secret:a', 'one.example.com secret:b', 'one.example.com order.id']),
+     KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']), ['b']],
+    [KEYED(null, ['one.example.com']),
+     KEYED(['one.example.com secret:a', 'one.example.com secret:b'], ['one.example.com', 'two.example.com']), ['a', 'b']],
+    [KEYED(['one.example.com secret:a', 'two.example.com secret:b']),
+     KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']), []],
+  ];
+  for (const [before, after, dropped] of cases) {
+    assert.deepEqual(U.keysToForget(before, after), dropped);
+    const kept = C.keysWhereEntered(before, after).secrets || {};
+    assert.deepEqual(Object.keys(after.secrets).filter((n) => !(n in kept)), dropped);
+  }
 });
 
 test('forWindow masks every key', () => {
