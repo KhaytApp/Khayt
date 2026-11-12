@@ -22,6 +22,9 @@ struct SimpleModeDeadEndsTests {
         #expect(simple.engineProblem == nil, "no engine means this proves nothing")
         #expect(!simple.has("analytics"))
         #expect(simple.monthNetNote == nil)
+        // A shop whose book has not been read yet is not a Simple shop: its
+        // dash keeps its explanation.
+        #expect(Shop().monthNetNote != nil)
         // A Professional shop with no figure yet still gets the line.
         let pro = await Self.shop(mode: nil)
         if pro.monthNet == nil {
