@@ -5440,6 +5440,7 @@
   "plg.upd_updated_note": "تم التحديث إلى {to} من {from}.",
   "plg.upd_revert": "ارجع إلى {v}",
   "plg.upd_reverted": "عدت إلى الإصدار {v}",
+  "plg.upd_revert_withdrawn": "سحبت خيط الإصدار {v}، لذا لا يمكن الرجوع إليه.",
   "plg.upd_revoked": "سحبت خيط الإصدار {v}، لذا أوقف مؤقتًا.",
   "plg.upd_refresh": "يتحقق من تلقاء نفسه كل {n} دقيقة",
 };

@@ -5440,6 +5440,7 @@
   "plg.upd_updated_note": "{from} sürümünden {to} sürümüne güncellendi.",
   "plg.upd_revert": "{v} sürümüne dön",
   "plg.upd_reverted": "{v} sürümüne dönüldü",
+  "plg.upd_revert_withdrawn": "Khayt {v} sürümünü geri çekti, bu yüzden o sürüme dönülemez.",
   "plg.upd_revoked": "Khayt {v} sürümünü geri çekti, bu yüzden duraklatıldı.",
   "plg.upd_refresh": "Her {n} dakikada bir kendisi kontrol eder",
 };

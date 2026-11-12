@@ -5440,6 +5440,7 @@
   "plg.upd_updated_note": "Actualizado de {from} a {to}.",
   "plg.upd_revert": "Volver a {v}",
   "plg.upd_reverted": "De vuelta a la versión {v}",
+  "plg.upd_revert_withdrawn": "Khayt retiró la versión {v}, así que no se puede volver a ella.",
   "plg.upd_revoked": "Khayt retiró la versión {v}, así que está en pausa.",
   "plg.upd_refresh": "Comprueba por sí solo cada {n} minutos",
 };

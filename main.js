@@ -7236,11 +7236,16 @@ ipcMain.handle('hub:connector-update', async (_e, req) => {
   if (!['agree', 'revert', 'switch'].includes(r.op) || typeof r.id !== 'string') return { ok: false, error: 'invalid' };
   try {
     let applied = false;
+    let reason = null;
     const next = await updateStoreOnDisk((cur) => {
       const got = connectorUpdates.applyOp(cur, { op: r.op, id: r.id, enabled: !!r.enabled });
       applied = got.ok;
+      reason = got.reason || null;
       return got.store;
     });
+    // A Revert to a withdrawn version is refused by the lib ('revoked'): the
+    // window is handed the state so it can say why, and drop the button.
+    if (!applied && reason === 'revoked') return { ok: false, reason, ...connectorUpdates.forWindow(next.settings, STORE_SECRET_MASK) };
     if (!applied) return { ok: false, error: 'nothing to apply' };
     return { ok: true, ...connectorUpdates.forWindow(next.settings, STORE_SECRET_MASK) };
   } catch (e) {

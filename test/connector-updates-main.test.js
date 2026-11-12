@@ -118,53 +118,161 @@ test('Agree, applied to the store: the new version, granted what was shown, the 
   assert.equal(C.applyOp(r.store, { op: 'agree', id: LAMHA.id }).ok, false, 'nothing left to agree to');
 });
 
-// Keys and hosts, the rule the Mac keeps too: per key, the set of hosts the
-// grant's routes send it to, before and after.
-const KEYED = (routes, domains) => ({ id: 'app.test.keys', secrets: { a: 'sample-a', b: 'sample-b' },
-  manifest: { domains: domains || ['one.example.com', 'two.example.com'] },
-  granted: Object.assign({ domains: domains || ['one.example.com', 'two.example.com'] }, routes ? { routes } : {}) });
+// Keys and hosts: the shared rule, lib/plugin-update.js keysToForget (the Mac
+// keeps the same). Per key, the hosts the grant's routes send it to, before and
+// after; a grant from before pairs were kept is read as what its own manifest
+// sends. Every fixture here is a valid manifest with a grant checkEntry passes
+// (#2426 refuses a grant listing a route its manifest does not send).
+const ONE = 'one.example.com';
+const TWO = 'two.example.com';
+/** A connector sending key `name` to host `to[name]`, and order.number to each `extra` host. */
+function keyedManifest(version, to, extra) {
+  const actions = Object.entries(to).map(([name, host]) => ({ id: 'send_' + name, label: { en: name }, placement: 'order', kind: 'post',
+    url: `https://${host}/${name}`, auth: { header: 'X-Key', secret: name }, body: { format: 'json-template', template: { i: '{order.id}' } } }));
+  for (const host of extra || []) actions.push({ id: 'ping_' + host.split('.')[0], label: { en: 'Ping' }, placement: 'order', kind: 'post',
+    url: `https://${host}/ping`, body: { format: 'json-template', template: { n: '{order.number}' } } });
+  return { khayt: { manifest: 1 }, id: 'app.test.keys', name: { en: 'Keys' }, publisher: 'Test', version,
+    domains: Array.from(new Set(Object.values(to).concat(extra || []))).sort(),
+    secrets: Object.keys(to).map((n) => ({ name: n, label: { en: n }, kind: 'token' })), actions };
+}
+function KEYED(version, to, extra, { legacy } = {}) {
+  const manifest = keyedManifest(version, to, extra);
+  const granted = M.grantFor(manifest);
+  if (legacy) delete granted.routes;
+  const e = { id: manifest.id, version, enabled: true, manifest, granted, config: {}, secrets: { a: 'sample-a', b: 'sample-b' } };
+  assert.equal(M.checkEntry(e).ok, true, `fixture ${version} is a valid entry`);
+  return e;
+}
+const KEY_CASES = {
+  // 1. One key moves: only it drops.
+  oneMoves: [KEYED('1.0.0', { a: ONE, b: ONE }), KEYED('1.1.0', { a: ONE, b: TWO }), ['b']],
+  // 2. A grant with no routes, the hosts changed. Before #2426 the desktop
+  //    dropped EVERY key here (hosts alone said nothing of which key went
+  //    where). The shared rule reads the old grant as what its installed
+  //    manifest sends, so only a key whose hosts really moved drops.
+  legacyHostsChangedKeysStay: [KEYED('1.0.0', { a: ONE, b: ONE }, [], { legacy: true }), KEYED('1.1.0', { a: ONE, b: ONE }, [TWO]), []],
+  legacyHostsChangedOneMoves: [KEYED('1.0.0', { a: ONE, b: ONE }, [], { legacy: true }), KEYED('1.1.0', { a: ONE, b: TWO }), ['b']],
+  legacySameHosts: [KEYED('1.0.0', { a: ONE, b: TWO }, [], { legacy: true }), KEYED('1.1.0', { a: ONE, b: TWO }), []],
+  // 3. Nothing moved (a new field only): every key kept.
+  nothingMoved: [KEYED('1.0.0', { a: ONE, b: TWO }), KEYED('1.1.0', { a: ONE, b: TWO }, [ONE]), []],
+};
+const droppedBy = (before, after) => Object.keys(after.secrets).filter((n) => !(n in (C.keysWhereEntered(before, after).secrets || {})));
 
 test('keys: one key sent to a new host is dropped, the other kept', () => {
-  const before = KEYED(['one.example.com secret:a', 'one.example.com secret:b', 'one.example.com order.id']);
-  const after = KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']);
+  const [before, after] = KEY_CASES.oneMoves;
   assert.deepEqual(C.keysWhereEntered(before, after).secrets, { a: 'sample-a' });
 });
 
-test('keys: a grant with no routes whose hosts changed drops every key', () => {
-  const before = KEYED(null, ['one.example.com']);
-  const after = KEYED(['one.example.com secret:a', 'one.example.com secret:b'], ['one.example.com', 'two.example.com']);
-  assert.equal(C.keysWhereEntered(before, after).secrets, undefined);
-  // Same hosts, no routes: the older grant is read as what its OWN manifest
-  // sends (lib grantWithPairs). This fixture's manifest sends no key at all,
-  // so key a now going to one.example.com is a move and only a is dropped.
-  // (Before #2426 the desktop kept both here: hosts alone said nothing moved.)
-  assert.deepEqual(C.keysWhereEntered(KEYED(null), KEYED(['one.example.com secret:a'])).secrets, { b: 'sample-b' });
-  // With a real manifest (Lamha) that sends its key to the same host, an
-  // older grant gaining its pairs keeps the key.
-  const g = M.grantFor(LAMHA); const old = Object.assign({}, g); delete old.routes;
-  const e = (granted) => ({ id: LAMHA.id, manifest: LAMHA, granted, secrets: { apiToken: 'sample-token' } });
-  assert.deepEqual(C.keysWhereEntered(e(old), e(g)).secrets, { apiToken: 'sample-token' });
+test('keys: a grant with no routes whose hosts changed drops only the keys that moved', () => {
+  assert.deepEqual(C.keysWhereEntered(...KEY_CASES.legacyHostsChangedKeysStay.slice(0, 2)).secrets, { a: 'sample-a', b: 'sample-b' });
+  assert.deepEqual(C.keysWhereEntered(...KEY_CASES.legacyHostsChangedOneMoves.slice(0, 2)).secrets, { a: 'sample-a' });
+  assert.deepEqual(C.keysWhereEntered(...KEY_CASES.legacySameHosts.slice(0, 2)).secrets, { a: 'sample-a', b: 'sample-b' });
+  // Every key dropped leaves no `secrets` at all.
+  const [before] = KEY_CASES.oneMoves;
+  const both = KEYED('1.2.0', { a: TWO, b: TWO });
+  assert.equal(C.keysWhereEntered(before, both).secrets, undefined);
 });
 
 test('keys: nothing moved, every key kept', () => {
-  const g = ['one.example.com secret:a', 'two.example.com secret:b'];
-  assert.deepEqual(C.keysWhereEntered(KEYED(g), KEYED(g.slice().concat(['one.example.com order.id']))).secrets, { a: 'sample-a', b: 'sample-b' });
+  assert.deepEqual(C.keysWhereEntered(...KEY_CASES.nothingMoved.slice(0, 2)).secrets, { a: 'sample-a', b: 'sample-b' });
 });
 
 test('keys: the desktop drops exactly what the shared keysToForget names (cross-check)', () => {
-  const cases = [
-    [KEYED(['one.example.com secret:a', 'one.example.com secret:b', 'one.example.com order.id']),
-     KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']), ['b']],
-    [KEYED(null, ['one.example.com']),
-     KEYED(['one.example.com secret:a', 'one.example.com secret:b'], ['one.example.com', 'two.example.com']), ['a', 'b']],
-    [KEYED(['one.example.com secret:a', 'two.example.com secret:b']),
-     KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']), []],
-  ];
-  for (const [before, after, dropped] of cases) {
-    assert.deepEqual(U.keysToForget(before, after), dropped);
-    const kept = C.keysWhereEntered(before, after).secrets || {};
-    assert.deepEqual(Object.keys(after.secrets).filter((n) => !(n in kept)), dropped);
+  for (const [name, [before, after, dropped]] of Object.entries(KEY_CASES)) {
+    assert.deepEqual(U.keysToForget(before, after), dropped, `lib, ${name}`);
+    assert.deepEqual(droppedBy(before, after), dropped, `desktop, ${name}`);
   }
+});
+
+test('keys: a Revert through applyOp drops a key whose hosts move back', () => {
+  const [v1, v2] = KEY_CASES.oneMoves;
+  const settings = { plugins: [v2], connectorUpdates: { serial: 1, connectors: { [v2.id]: {
+    previous: { version: v1.version, manifest: v1.manifest, granted: v1.granted }, updatedAt: '2026-11-12T09:00:00.000Z', updatedFrom: v1.version } } } };
+  const r = C.applyOp({ settings }, { op: 'revert', id: v2.id });
+  assert.equal(r.ok, true);
+  const e = r.store.settings.plugins[0];
+  assert.equal(e.version, '1.0.0');
+  assert.deepEqual(e.granted, v1.granted, 'the grant is the kept one, from the lib');
+  assert.deepEqual(e.secrets, { a: 'sample-a' });
+});
+
+// ── #2426's behaviour the desktop must carry ──
+const IXCTX = Object.assign({ signedBy: K1.id }, CTX);
+function installedFull(v = '1.0.0') {
+  const m = signManifest(at(v));
+  return { id: m.id, version: v, enabled: true, manifest: m, granted: M.grantFor(m), config: {}, secrets: { apiToken: 'sample-token' } };
+}
+
+test('a check that only raises the serial reports a change, so main saves it; the same serial again does not', () => {
+  const settings = { plugins: [installedFull('1.1.1')], connectorUpdates: { serial: 3, connectors: {} } };
+  const ix = signIndex(indexFor('1.1.1', 'a'.repeat(64), { serial: 4 }));
+  const r = C.applyPrepared(settings, { index: ix, ctx: IXCTX, fetched: {} });
+  assert.equal(r.ok, true);
+  assert.equal(r.changed, true, 'main saves when changed is true (main.js hub:connector-updates-check)');
+  assert.equal(r.settings.connectorUpdates.serial, 4);
+  assert.equal(r.settings.plugins, settings.plugins, 'nothing else moved');
+  const again = C.applyPrepared(r.settings, { index: ix, ctx: IXCTX, fetched: {} });
+  assert.equal(again.changed, false);
+  assert.equal(again.settings, r.settings);
+});
+
+test('a check whose index withdraws the waiting version drops it: no badge after the check', () => {
+  const settings = { plugins: [installedNarrow()] };
+  const waiting = U.applyIndex(settings, signIndex(indexFor('1.1.1', 'a'.repeat(64))), IXCTX, { [LAMHA.id]: signManifest(at('1.1.1')) }).settings;
+  const S = require('../lib/plugin-update-sheet.js');
+  assert.ok(S.waitingFor(waiting.plugins[0], U.stateOf(waiting, LAMHA.id), U.compareVersions), 'waiting first');
+  const ix = signIndex(indexFor('1.1.1', 'a'.repeat(64), { serial: 4 }));
+  ix.entries[0].revoked = [{ version: '1.1.1', reason: 'Sample withdrawal' }];
+  const r = C.applyPrepared(waiting, { index: signIndex(ix), ctx: IXCTX, fetched: {} });
+  assert.equal(r.changed, true);
+  assert.equal(U.stateOf(r.settings, LAMHA.id).pending, undefined);
+  assert.equal(S.waitingFor(r.settings.plugins[0], U.stateOf(r.settings, LAMHA.id), U.compareVersions), null);
+  const w = C.forWindow(r.settings, 'MASK');
+  assert.equal(U.stateOf({ connectorUpdates: w.connectorUpdates }, LAMHA.id).pending, undefined, 'the window is handed the state without it');
+});
+
+test('a withdrawn previous version: dropped by a check, and a Revert to one is refused with its reason', () => {
+  // Automatic update 1.0.0 → 1.0.1 (sends less), so 1.0.0 is kept for Revert.
+  const settings = { plugins: [installedFull('1.0.0')] };
+  const auto = U.applyIndex(settings, signIndex(indexFor('1.0.1', 'a'.repeat(64))), IXCTX, { [LAMHA.id]: signManifest(narrow('1.0.1')) }).settings;
+  assert.equal(auto.plugins[0].version, '1.0.1');
+  assert.equal(U.stateOf(auto, LAMHA.id).previous.version, '1.0.0');
+  // The index withdraws 1.0.0: the kept copy goes, so there is nothing to revert to.
+  const ix = indexFor('1.0.1', 'a'.repeat(64), { serial: 4 });
+  ix.entries[0].revoked = [{ version: '1.0.0', reason: 'Sample withdrawal' }];
+  const r = C.applyPrepared(auto, { index: signIndex(ix), ctx: IXCTX, fetched: {} });
+  const st = U.stateOf(r.settings, LAMHA.id);
+  assert.equal(st.previous, undefined);
+  assert.equal(st.updatedFrom, '1.0.0', 'updatedFrom without previous: the window explains why there is no Revert');
+  assert.equal(C.applyOp({ settings: r.settings }, { op: 'revert', id: LAMHA.id }).ok, false);
+  // A kept previous recorded as withdrawn (state from elsewhere): refused with 'revoked'.
+  const forced = JSON.parse(JSON.stringify(auto));
+  forced.connectorUpdates.connectors[LAMHA.id].revoked = { version: '1.0.0', reason: 'x', wasEnabled: true };
+  const refused = C.applyOp({ settings: forced }, { op: 'revert', id: LAMHA.id });
+  assert.deepEqual([refused.ok, refused.reason], [false, 'revoked']);
+});
+
+test('an automatic update that sends less narrows the stored grant; Revert puts the old one back', () => {
+  const settings = { plugins: [installedFull('1.0.0')] };
+  const before = settings.plugins[0].granted;
+  assert.ok(before.fields.includes('customer.email'));
+  const auto = U.applyIndex(settings, signIndex(indexFor('1.0.1', 'a'.repeat(64))), IXCTX, { [LAMHA.id]: signManifest(narrow('1.0.1')) }).settings;
+  const e = auto.plugins[0];
+  assert.equal(e.version, '1.0.1');
+  assert.ok(!e.granted.fields.includes('customer.email'), 'narrowed to what 1.0.1 sends');
+  assert.equal(M.checkEntry(e).ok, true, 'and still a valid entry');
+  assert.deepEqual(C.forWindow(auto, 'MASK').plugins[0].granted, e.granted, 'the window is shown the entry\'s grant');
+  const back = C.applyOp({ settings: auto }, { op: 'revert', id: LAMHA.id });
+  assert.equal(back.ok, true);
+  assert.deepEqual(back.store.settings.plugins[0].granted, before);
+  assert.deepEqual(back.store.settings.plugins[0].secrets, { apiToken: 'sample-token' }, 'the key\'s host did not move');
+});
+
+test('an automatic update gives a grant without routes its pairs', () => {
+  const old = installedFull('1.0.0'); delete old.granted.routes;
+  const auto = U.applyIndex({ plugins: [old] }, signIndex(indexFor('1.0.1', 'a'.repeat(64))), IXCTX, { [LAMHA.id]: signManifest(at('1.0.1')) }).settings;
+  assert.equal(auto.plugins[0].version, '1.0.1');
+  assert.ok(Array.isArray(auto.plugins[0].granted.routes) && auto.plugins[0].granted.routes.length);
 });
 
 test('forWindow masks every key', () => {

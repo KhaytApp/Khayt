@@ -5440,6 +5440,7 @@
   "plg.upd_updated_note": "已从 {from} 更新到 {to}。",
   "plg.upd_revert": "恢复到 {v}",
   "plg.upd_reverted": "已恢复到版本 {v}",
+  "plg.upd_revert_withdrawn": "Khayt 已撤回版本 {v}，因此无法恢复到该版本。",
   "plg.upd_revoked": "Khayt 已撤回版本 {v}，因此已暂停。",
   "plg.upd_refresh": "每 {n} 分钟自动检查一次",
 };

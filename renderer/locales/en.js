@@ -5441,6 +5441,7 @@
   "plg.upd_updated_note": "Updated to {to} from {from}.",
   "plg.upd_revert": "Revert to {v}",
   "plg.upd_reverted": "Back to version {v}",
+  "plg.upd_revert_withdrawn": "Khayt withdrew version {v}, so you can’t go back to it.",
   "plg.upd_revoked": "Khayt withdrew version {v}, so it is paused.",
   "plg.upd_refresh": "Checks on its own every {n} minutes",
 };

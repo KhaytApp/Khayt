@@ -5440,6 +5440,7 @@
   "plg.upd_updated_note": "{from} から {to} に更新しました。",
   "plg.upd_revert": "{v} に戻す",
   "plg.upd_reverted": "バージョン {v} に戻しました",
+  "plg.upd_revert_withdrawn": "Khayt がバージョン {v} を取り下げたため、そこへは戻せません。",
   "plg.upd_revoked": "Khayt がバージョン {v} を取り下げたため、一時停止しています。",
   "plg.upd_refresh": "{n} 分ごとに自動で確認します",
 };

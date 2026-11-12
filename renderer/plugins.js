@@ -81,6 +81,12 @@ function renderPluginSettings() {
       // While its version is withdrawn the entry is off whatever the shop
       // chose; the button says what the shop chose (kept for the fix).
       const withdrawn = upd.revoked && upd.revoked.version === entry.version;
+      // Revert goes back to the kept version; one Khayt withdrew is never
+      // kept (lib/plugin-update.js drops it), so then the row says why there
+      // is no Revert instead. `updatedFrom` without `previous` means exactly that.
+      const prevWithdrawn = !!upd.updatedFrom && (!upd.previous
+        || (upd.revoked && upd.revoked.version === upd.previous.version));
+      const canRevert = !!upd.updatedFrom && !!upd.previous && !prevWithdrawn;
       const switchedOn = withdrawn ? upd.revoked.wasEnabled !== false : state === 'on';
       return `
       <div class="plg-row" data-plugin="${escapeHtml(entry.id)}" style="border:1px solid var(--border-soft);border-radius:10px;padding:12px;margin-bottom:10px;">
@@ -91,7 +97,8 @@ function renderPluginSettings() {
           <span class="plg-state" data-state="${state}" style="margin-inline-start:auto;font-size:11.5px;font-weight:600;">${escapeHtml(stateWord(state))}</span>
         </div>
         ${withdrawn ? `<p class="plg-revoked" style="font-size:12px;color:var(--danger,#c0392b);margin:6px 0 0;">${escapeHtml(t('plg.upd_revoked', { v: entry.version }))}${upd.revoked.reason ? ' ' + escapeHtml(upd.revoked.reason) : ''}</p>` : ''}
-        ${upd.updatedFrom && upd.previous ? `<p class="plg-updated-note" style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('plg.upd_updated_note', { from: upd.updatedFrom, to: entry.version }))}</p>` : ''}
+        ${canRevert ? `<p class="plg-updated-note" style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('plg.upd_updated_note', { from: upd.updatedFrom, to: entry.version }))}</p>` : ''}
+        ${prevWithdrawn ? `<p class="plg-revert-withdrawn" data-plugin-revert-withdrawn="${escapeHtml(upd.updatedFrom)}" style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('plg.upd_revert_withdrawn', { v: upd.updatedFrom }))}</p>` : ''}
         ${m.description ? `<p style="font-size:12px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(pluginLabel(m.description))}</p>` : ''}
         ${(m.settings || []).map((st) => {
           const v = (entry.config || {})[st.key];
@@ -110,7 +117,7 @@ function renderPluginSettings() {
           ${(m.settings || []).length ? `<button class="btn small" type="button" data-plugin-act="save-config">${escapeHtml(t('common.save'))}</button>` : ''}
           ${(m.secrets || []).length ? `<button class="btn small" type="button" data-plugin-act="save-keys">${escapeHtml(t('plg.save_keys'))}</button>` : ''}
           ${waiting ? `<button class="btn primary small" type="button" data-plugin-act="review-update">${escapeHtml(t('plg.review_update'))}</button>` : ''}
-          ${upd.updatedFrom && upd.previous ? `<button class="btn ghost small" type="button" data-plugin-act="revert">${escapeHtml(t('plg.upd_revert', { v: upd.previous.version }))}</button>` : ''}
+          ${canRevert ? `<button class="btn ghost small" type="button" data-plugin-act="revert">${escapeHtml(t('plg.upd_revert', { v: upd.previous.version }))}</button>` : ''}
           ${state === 'paused' ? `<button class="btn primary small" type="button" data-plugin-act="consent">${escapeHtml(t('plg.review_agree'))}</button>` : ''}
           ${state === 'on' || state === 'off' ? `<button class="btn ghost small" type="button" data-plugin-act="toggle">${escapeHtml(switchedOn ? t('plg.turn_off') : t('plg.turn_on'))}</button>` : ''}
           <button class="btn ghost small" type="button" data-plugin-act="details">${escapeHtml(t('plg.what_it_sends'))}</button>
@@ -605,6 +612,13 @@ async function pluginUpdateOp(req) {
   if (typeof flushSave === 'function') { try { await flushSave(); } catch (_) {} }
   let r;
   try { r = await window.hubAPI.connectorUpdate(req); } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
+  if (r && !r.ok && r.reason === 'revoked') {
+    // Revert to a version Khayt withdrew: refused by the lib; say why.
+    adoptConnectorUpdates(r);
+    const prev = pluginUpdateState(req.id).previous;
+    toast(t('plg.upd_revert_withdrawn', { v: (prev && prev.version) || pluginUpdateState(req.id).updatedFrom || '' }), 'warning', 8000);
+    return false;
+  }
   if (!r || !r.ok) { toast(t('plg.err_failed', { why: (r && (r.error || r.refused)) || '?' }), 'error', 6000); return false; }
   adoptConnectorUpdates(r);
   return true;
