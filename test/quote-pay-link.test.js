@@ -309,6 +309,16 @@ test('the one line a job shows: ready, sent, expired, paid, or paid but not what
   assert.equal(at({ payLink: sent, paymentStatus: 'paid' }, NOW + 3600).state, null);
   assert.equal(L.stateOf(null, NOW).state, null);
 
+  // A device that is not set up offers nothing, but still tells what is so.
+  const off = { configured: false };
+  assert.equal(L.stateOf(job(), NOW, off).state, null, 'no line on every approved quote');
+  assert.equal(L.stateOf(job({ payLink: sent }), NOW + 3600, off).state, 'sent');
+  assert.equal(L.stateOf(job({ payLink: sent }), NOW + 604800, off).state, 'expired');
+  assert.equal(L.stateOf(job({ payLink: paid(340) }), NOW, off).state, 'paid');
+  assert.equal(L.stateOf(job({ payLink: paid(290) }), NOW, off).state, 'mismatch');
+  assert.equal(L.stateOf(job(), NOW, { configured: true }).state, 'ready');
+  assert.equal(L.stateOf(job(), NOW, {}).state, 'ready', 'left out, a device is taken to be set up');
+
   assert.deepEqual(['ready', 'sent', 'expired', 'paid', 'mismatch', null].map(L.canSendFrom), [true, true, true, false, false, false]);
 });
 
