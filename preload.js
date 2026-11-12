@@ -411,6 +411,11 @@ contextBridge.exposeInMainWorld('hubAPI', {
   bnplCheck:  (opts) => ipcRenderer.invoke('hub:bnpl-check', opts),
   bnplCapture: (opts) => ipcRenderer.invoke('hub:bnpl-capture', opts),
   bnplStripe: (opts) => ipcRenderer.invoke('hub:bnpl-stripe', opts),
+  // Quote pay link (lib/main/quote-pay-link-sign.js). The secret goes in once
+  // and never comes back: main signs, the window gets the link.
+  quotePayLinkSetSecret: (secret) => ipcRenderer.invoke('hub:quote-pay-link-set-secret', secret),
+  quotePayLinkRemoveSecret: () => ipcRenderer.invoke('hub:quote-pay-link-remove-secret'),
+  quotePayLinkSign: (opts) => ipcRenderer.invoke('hub:quote-pay-link-sign', opts),
 
   // Telegram notifications
   sendTelegram: (opts) => ipcRenderer.invoke('hub:send-telegram', opts),

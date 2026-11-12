@@ -300,6 +300,7 @@ const receiptsDir    = () => ensureDir('receipts');
 const { registerPrinterDiscovery } = require('./lib/main/printer-discovery.js');
 const { registerWebcamProxy } = require('./lib/main/webcam-proxy.js');
 const { registerPaymentLinks } = require('./lib/main/payment-links.js');
+const { registerQuotePayLink } = require('./lib/main/quote-pay-link-sign.js');
 const { registerUpdater } = require('./lib/updater');
 const { setupAutoUpdater } = registerUpdater({
   app,
@@ -1944,6 +1945,10 @@ ipcMain.handle('hub:relocate-printers', async (_e, { machines, statusCache, requ
 
 // BNPL checkout links (Tabby, Tamara, Stripe) — lib/main/payment-links.js.
 registerPaymentLinks({ ipcMain, resolveStoreSecret });
+// The quote pay link: its secret, kept here, and the HMAC the shared rule
+// leaves to the device — lib/main/quote-pay-link-sign.js. Signed from the book
+// on disk, which the window flushes before it asks.
+registerQuotePayLink({ ipcMain, crypto, readBook: () => readStoreDecryptedFromDisk(), updateStoreOnDisk });
 // The nightly off-site backup (lib/main/offsite-backup.js): the Mac's, to the
 // same files. Sealed with the Khayt Cloud key, so only while that is unlocked.
 require('./lib/main/offsite-backup.js').registerOffsiteBackup({

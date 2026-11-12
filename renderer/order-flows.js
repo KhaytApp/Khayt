@@ -1598,6 +1598,9 @@ function openOrderEditor(orderId) {
   };
 
   const bodyHtml = `
+    ${/* The quote pay link's line: ready, sent, expired, paid or mismatch
+         (renderer/quote-pay-link.js). Nothing when the job has none. */
+      typeof payLinkLineHtml === 'function' ? payLinkLineHtml(order) : ''}
     <div style="display:flex; align-items:center; gap:12px; margin-top:0; margin-bottom:8px;">
       <label style="margin:0; font-size:13px; white-space:nowrap;">${escapeHtml(t('oe.priority'))}</label>
       <select data-f="priorityLevel" style="flex:1; max-width:160px;">
