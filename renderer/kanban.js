@@ -382,6 +382,57 @@ function runAutoSchedule() {
   toast((t('sched.applied') || 'Assigned') + ' (' + n + ')' + (skipped ? ' · ' + skipped + ' ' + (t('sched.skipped') || 'skipped') : ''), n ? 'success' : 'info');
 }
 
+/** Simple's four columns (lib/order-status.js SIMPLE_COLUMNS) and the column
+ *  of the board each is drawn in. Quote is the "Awaiting approval" section,
+ *  moved onto the board as its first column. */
+const SIMPLE_BOARD_COLUMN = { queued: 'pending', printing: 'printing', ready: 'completed' };
+/** The words a card's note uses for the stage Simple does not draw. */
+const SIMPLE_NOTE_KEY = { on_hold: 'queue.on_hold', post: 'queue.post', qc: 'kan.col_qc', shipped: 'queue.shipped_col', delivered: 'queue.delivered_col' };
+/** Column heading words in Simple, and in Professional (as index.html has them). */
+const SIMPLE_BOARD_HEADS = { pending: ['sm.col_queued', 'queue.pending'], completed: ['sm.col_ready', 'queue.completed'] };
+let _quotesHome = null;
+
+/** Is the board drawn as Simple's four columns? Simple, the columns view (not
+ *  the grouped list) and not Bed Ready's studio board. Sets the board up for
+ *  it, or puts it back. */
+function syncSimpleBoard(quoteCount) {
+  const board = document.querySelector('.kanban');
+  const quotesSec = document.getElementById('quotesSection');
+  const on = !!board && settings.mode === 'simple'
+    && typeof KhaytOrderStatus !== 'undefined' && typeof KhaytOrderStatus.simpleStageOf === 'function'
+    && !document.body.classList.contains('bedready-ui')
+    && !(window.KhaytQueueList?.isListView?.());
+  if (!board) return false;
+  board.classList.toggle('sm-board', on);
+  for (const [status, [simpleKey, proKey]] of Object.entries(SIMPLE_BOARD_HEADS)) {
+    const label = board.querySelector(`.kanban-col[data-status="${status}"] h3 [data-i18n]`);
+    if (!label) continue;
+    const key = on ? simpleKey : proKey;
+    if (label.getAttribute('data-i18n') !== key) { label.setAttribute('data-i18n', key); label.textContent = t(key); }
+  }
+  const heading = quotesSec?.querySelector('.quotes-section-header [data-i18n]');
+  if (on && quotesSec && quotesSec.parentElement !== board) {
+    _quotesHome = { parent: quotesSec.parentElement, next: quotesSec.nextSibling };
+    board.insertBefore(quotesSec, board.querySelector('.kanban-col'));
+  } else if (!on && quotesSec && quotesSec.parentElement === board && _quotesHome) {
+    _quotesHome.parent.insertBefore(quotesSec, _quotesHome.next);
+    _quotesHome = null;
+  }
+  if (quotesSec) {
+    quotesSec.classList.toggle('sm-quote-col', on);
+    quotesSec.classList.toggle('kanban-col', on);
+  }
+  if (heading) {
+    const key = on ? 'sm.col_quote' : 'queue.quotes_awaiting';
+    if (heading.getAttribute('data-i18n') !== key) { heading.setAttribute('data-i18n', key); heading.textContent = t(key); }
+  }
+  const empty = quotesSec?.querySelector('.sm-quote-empty');
+  if (on && quotesSec && !quoteCount && !empty) {
+    quotesSec.insertAdjacentHTML('beforeend', `<div class="empty-state sm-quote-empty" style="padding:20px 8px;">${escapeHtml(t('queue.empty'))}</div>`);
+  } else if (empty && (!on || quoteCount)) empty.remove();
+  return on;
+}
+
 function renderKanban() {
   // Auto-assign mode: silently place queued jobs before drawing the board.
   // The guard prevents re-entrancy (applyAutoSchedule → saveAll never re-renders).
@@ -455,6 +506,12 @@ function renderKanban() {
 
   window.KhaytBedReadyUI?.syncQueueFolds?.();
 
+  // S4 card 6: a Simple shop's board is four columns. Which column a job is
+  // in is lib/order-status.js simpleStageOf; its finer stage is a note on the
+  // card. Professional (and Bed Ready) keep all eight.
+  const simpleBoard = syncSimpleBoard(quotes.length);
+  const simpleInfo = new Map();
+
   // --- Production columns (exclude quotes) ---
   const kanTerm = (kanSearchTerm || '').toLowerCase().trim();
   const cols = { pending: [], on_hold: [], printing: [], post: [], qc: [], completed: [], shipped: [], delivered: [] };
@@ -476,6 +533,14 @@ function renderKanban() {
     const stage = (typeof KhaytOrderStatus !== 'undefined')
       ? KhaytOrderStatus.stageOf(o)
       : (o.status === 'completed' && o.deliveredAt ? 'delivered' : o.status);
+    if (simpleBoard) {
+      const sm = KhaytOrderStatus.simpleStageOf(o);
+      if (sm && SIMPLE_BOARD_COLUMN[sm.column]) {
+        simpleInfo.set(o.id, sm);
+        cols[SIMPLE_BOARD_COLUMN[sm.column]].push(sm.stage === 'split' ? { ...o, _isSplitParent: true } : o);
+        return;
+      }
+    }
     if (cols[stage]) {
       cols[stage].push(o);
     } else if (o.status === 'split') {
@@ -576,7 +641,15 @@ function renderKanban() {
       container.innerHTML = `<div class="empty-state" style="padding:20px 8px;">${escapeHtml(t('queue.empty'))}</div>`;
       return;
     }
+    const colStatus = status;
     container.innerHTML = sorted.map(log => {
+      // In Simple a card keeps its own stage's actions (Resume for a job on
+      // hold, QC pass in QC) though it sits in one of the four columns.
+      const simpleCard = simpleInfo.get(log.id);
+      const status = (simpleCard && simpleCard.stage !== 'split' ? simpleCard.stage : null) || colStatus;
+      const simpleNote = simpleCard && simpleCard.note
+        ? `<span class="sm-stage-note" data-note="${escapeHtml(simpleCard.note)}">${escapeHtml(t(SIMPLE_NOTE_KEY[simpleCard.note]))}</span>`
+        : '';
       let actions = '';
       // Enthusiast (hobbyist) mode = no commerce: hide customer-notify, invoice, payment and BNPL actions.
       const biz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
@@ -829,7 +902,7 @@ function renderKanban() {
       return renderStudioKanbanCard({
         log, status, _pl, pausedClass, cardClientAccent, partColourHtml, partsLabel,
         machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge: kanbanSubBadge + reprintedBadge,
-        qcBadge: qcBadge + storeLinesBadge,
+        qcBadge: simpleNote + qcBadge + storeLinesBadge,
         postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions,
       });
     }).join('');

@@ -2268,7 +2268,7 @@
           <div id="nozzleWearSection"></div>
         </div>
 
-        <div class="card settings-card">
+        <div class="card settings-card" data-simple-pro="productionSettings">
         <div class="settings-section-head" data-i18n="envLogs">Environment Log</div>
         <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
           <button id="btnLogEnv" class="btn btn-sm btn-secondary" data-i18n="logEnvironment">+ Log</button>
@@ -2285,7 +2285,17 @@
       <div class="settings-panel" id="settings-panel-library">
         <h2 class="settings-panel-title" data-i18n="set.pane_library">Library &amp; Files</h2>
 
+        <!-- Simple (S4 card 8, Figma 80:382): three places, drawn by
+             renderer/simple-screens.js. S3 / R2, tiering and the backup copy
+             below are Professional; a library already in a bucket keeps
+             working and is listed as "Set up in Professional". -->
+        <div class="card settings-card sm-simple-only" id="plibPlacesCard">
+        <p class="settings-panel-hint" style="margin:0 0 12px;" data-i18n="sm.lib_hint">Where your models are kept.</p>
+        <div id="plibPlaces"></div>
+        </div>
+
         <div class="card settings-card">
+        <div data-simple-pro="libraryStorage">
         <div class="settings-section-head" data-i18n="set.plib_loc_section">Print library location</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.plib_loc_hint">Where your model files are kept. A folder on a network drive, an external disk, or a synced folder (iCloud Drive, Dropbox, Google Drive, OneDrive) all work — Khayt just needs to be able to reach it.</p>
         <label data-i18n="set.plib_loc_primary">Library folder</label>
@@ -2301,6 +2311,7 @@
           <button class="btn ghost" id="btnPlibMirrorClear" data-i18n="common.clear">Clear</button>
         </div>
         <p style="font-size:11.5px;color:var(--text-muted);margin:8px 0 0;" data-i18n="set.plib_mirror_hint">Every file added to the library is copied here too. Khayt never reads from it — it is a backup, not a second library.</p>
+        </div>
         <p id="plibLocStatus" style="font-size:12px;margin:10px 0 0;"></p>
 
         <div id="plibMoveBox" style="display:none; border:1px solid var(--border,#2a2e38); border-radius:8px; padding:12px; margin-top:12px;">
@@ -2314,7 +2325,7 @@
         </div>
 
         <p id="plibVaultNote" style="display:none; font-size:12px; margin:16px 0 0; padding:10px 12px; border:1px solid var(--border,#2a2e38); border-radius:8px;" data-i18n="set.plib_vault_lock">This library lives in the Khayt Vault. To change where it is kept, use the Khayt Mac app.</p>
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibS3On" style="width:auto; margin:0;">
             <span data-i18n="set.plib_s3_on">Also back up to object storage (S3, Cloudflare R2, Backblaze B2, and more)</span>
@@ -2351,7 +2362,7 @@
         <!-- Google Drive. The one non-S3 backend, because a lot of makers
              already pay for the storage. Dropbox and OneDrive are reachable as a
              synced folder via the library folder setting above, at no code cost. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div class="sm-drive-setup" id="plibDriveBlock" tabindex="-1" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibGDriveOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_gd_on">Use Google Drive instead of a bucket</span>
@@ -2373,7 +2384,7 @@
         <!-- Tiering. Separate from the backup block above because it is a
              different job with a different risk: the mirror only ever writes,
              this one deletes local files once the bucket has them. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibTierOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_tier_on">Move old models to the cloud to free up disk space</span>
@@ -3107,6 +3118,7 @@
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
 <script src="simple-mode.js"></script>
+<script src="simple-screens.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>
