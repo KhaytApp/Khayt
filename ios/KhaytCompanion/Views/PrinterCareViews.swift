@@ -277,6 +277,7 @@ struct CareCard: View {
                 .background(prominent ? KhaytDesign.brand : KhaytDesign.brand.opacity(0.10), in: Capsule())
         }
         .buttonStyle(.plain)
+        .tapTarget()
         .disabled(working != nil || task.hoursUnknown)
         .opacity(working != nil || task.hoursUnknown ? 0.5 : 1)
     }

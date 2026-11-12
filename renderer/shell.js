@@ -350,6 +350,12 @@ function applyMode() {
   if (settings.mode === 'enthusiast' && BIZ_TABS.includes($('.tab-content.active')?.id)) {
     if (typeof switchTab === 'function') switchTab('dashboard-tab');
   }
+  // The same for a settings pane: switching to Simple while on Team,
+  // Notifications or AI must not leave an empty page behind.
+  const openPane = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection;
+  if (openPane && settingsSectionGated(openPane) && $('#settings-tab')?.classList.contains('active')) {
+    openSettingsSection(openPane);
+  }
   renderModeTierCompare();
   applyAnalyticsModeView();
   if (typeof renderDashboard === 'function') renderDashboard();
@@ -497,12 +503,29 @@ function resolveSettingsSection(section) {
   return SETTINGS_SECTION_ALIASES[section] || section;
 }
 
+/** Is this settings pane hidden by the shop's mode? Its nav button says so:
+ *  `.pro-only` is hidden in Simple (and enthusiast), `.biz-only` in enthusiast.
+ *  The same classes are what hide the button, so the two cannot disagree. */
+function settingsSectionGated(section) {
+  const nav = document.querySelector(`.settings-nav-item[data-settings-section="${section}"]`);
+  if (!nav) return false;
+  const mode = settings.mode || 'professional';
+  if (nav.classList.contains('pro-only') && mode !== 'professional') return true;
+  if (nav.classList.contains('biz-only') && mode === 'enthusiast') return true;
+  return false;
+}
+
 function openSettingsSection(section) {
   section = resolveSettingsSection(section);
-  // Enthusiast (hobbyist) mode has no commerce — bounce business panes to the
-  // first pane (General; Preferences in Bed Ready).
+  // A pane the mode hides lands on the first pane instead (General;
+  // Preferences in Bed Ready). Enthusiast has no commerce panes; Simple has no
+  // Team, Notifications or AI — opening one used to show an empty page with no
+  // pane selected, from a deep link, search, or a mode switch while on it.
+  const first = () => resolveSettingsSection(document.getElementById('settings-panel-general') ? 'general' : 'prefs');
   if (settings.mode === 'enthusiast' && (BIZ_SETTINGS_SECTIONS.includes(section) || ['invoice', 'payments', 'online'].includes(section))) {
-    section = resolveSettingsSection(document.getElementById('settings-panel-general') ? 'general' : 'prefs');
+    section = first();
+  } else if (settingsSectionGated(section)) {
+    section = first();
   }
   switchTab('settings-tab');
   $$('.settings-nav-item').forEach(el => {
@@ -524,12 +547,23 @@ function openSettingsSection(section) {
 }
 
 function switchTab(tabId) {
+  // Icons a tab's own render added after boot (idempotent; see app-boot.js).
+  queueMicrotask?.(() => window.KhaytIcons?.hydrateIcons?.(document.getElementById(tabId)));
   // Enthusiast (hobbyist) mode hides all business tabs — redirect if one is reached
   // via deep-link / global search / keyboard so the user never lands on a hidden tab.
   if (settings.mode === 'enthusiast' && BIZ_TABS.includes(tabId)) tabId = 'dashboard-tab';
   // Pro-only tabs must not be reachable in Simple/Enthusiast via search/deep-link either.
   const isPro = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.isProMode(settings.mode) : (settings.mode || 'professional') === 'professional';
   if (!isPro && PRO_TABS.includes(tabId)) tabId = 'dashboard-tab';
+  // A real change of view opens the new view at its top: the views share one
+  // scroller (#mainContent), so without this the Calculator, Logs or Expenses
+  // opened wherever the previous view had been scrolled to. Re-showing the
+  // same tab (a re-render) keeps the place.
+  const prevTab = document.querySelector('.tab-content.active')?.id;
+  if (prevTab !== tabId) {
+    const scroller = document.getElementById('mainContent');
+    if (scroller) scroller.scrollTop = 0;
+  }
   $$('.tab-content').forEach(el => {
     const on = el.id === tabId;
     el.classList.toggle('active', on);

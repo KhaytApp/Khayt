@@ -230,14 +230,18 @@ final class LocalizationCompletenessTests: XCTestCase {
                        "KhaytModels.swift uses L10n; put the words in an extension elsewhere")
     }
 
-    /// "خيط" is the Arabic for filament, and the app is called Khayt in
-    /// Latin letters in every language. An Arabic line that used the word as
-    /// the app's name read "open filament". The word stays only where it
-    /// means filament (these keys) and in the cloud's Arabic name, "سحابة
-    /// خيط" (Turki, Nov 10 2026, as the Mac already says it), which replaces
-    /// "Khayt Cloud" in every Arabic line. A new line that needs the word
-    /// names its key here, deliberately.
-    func testArabicCallsTheAppKhaytAndSaysFilamentOnlyForFilament() throws {
+    /// The app is خيط in Arabic letters (Turki, Nov 10 2026), and the cloud
+    /// is "سحابة خيط". But خيط is also the Arabic for filament: an Arabic
+    /// line once read "open filament". So:
+    /// - no Arabic line writes "Khayt" in Latin letters, the home-screen
+    ///   name included (CFBundleDisplayName in ar InfoPlist.strings);
+    /// - a line whose English says "Khayt Cloud" says "سحابة خيط";
+    /// - a line that also talks about filament or spools names the app as
+    ///   "تطبيق خيط", never a bare خيط that could be read as the filament;
+    /// - a bare خيط in a line that is not about filament is the app's name,
+    ///   so its English must name Khayt too: filament words stay where the
+    ///   English means filament (these keys).
+    func testArabicWritesTheAppInArabicLettersAndNeverAsFilament() throws {
         let filament: Set<String> = [
             "settings.notify.low_stock", "notify.low_stock.title", "spool.detail.filament",
             "spool.detail.adjust.body", "spool.lookup.body", "spool.quantity.one", "order.field.filament",
@@ -245,21 +249,39 @@ final class LocalizationCompletenessTests: XCTestCase {
             "calc.add_colour", "calc.filament", "calc.no_spool",
             "shop.hint",  // the shopping list: "every filament at or under its reorder point"
         ]
+        // The home-screen name is localised too (ar InfoPlist.strings), so
+        // "Settings → خيط" matches what iOS lists; nothing keeps the Latin name.
+        let latinAllowed: Set<String> = []
         let ios = Self.appDir.deletingLastPathComponent()
-        let tables = ["KhaytCompanion/Resources", "KhaytWidget", "KhaytAlerts"].map {
-            ios.appending(path: "\($0)/ar.lproj/Localizable.strings")
-        }
-        var found: [String] = []
-        for url in tables {
-            let dict = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], url.path())
-            for (key, value) in dict
-            where value.replacingOccurrences(of: "سحابة خيط", with: "").contains("خيط") && !filament.contains(key) {
-                found.append("\(url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent): \(key)")
+        let tables = ["KhaytCompanion/Resources/%@.lproj/Localizable.strings", "KhaytCompanion/Resources/%@.lproj/InfoPlist.strings",
+                      "KhaytWidget/%@.lproj/Localizable.strings", "KhaytAlerts/%@.lproj/Localizable.strings"]
+        var problems: [String] = []
+        var brandLines = 0
+        let infoPlistEnglish = NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/Info.plist")) as? [String: Any] ?? [:]
+        for table in tables {
+            let ar = try XCTUnwrap(NSDictionary(contentsOf: ios.appending(path: String(format: table, "ar"))) as? [String: String], table)
+            let en = try XCTUnwrap(NSDictionary(contentsOf: ios.appending(path: String(format: table, "en"))) as? [String: String], table)
+            for (key, value) in ar {
+                // InfoPlist keys with no English line (the home-screen name) fall back to Info.plist.
+                let english = en[key] ?? (infoPlistEnglish[key] as? String) ?? key
+                let mentionsApp = english.replacingOccurrences(of: "Khayt Cloud", with: "").contains("Khayt")
+                let aboutFilament = filament.contains(key) || english.range(of: "filament|spool", options: [.regularExpression, .caseInsensitive]) != nil
+                let unqualified = value.replacingOccurrences(of: "سحابة خيط", with: "").replacingOccurrences(of: "تطبيق خيط", with: "")
+                if value.contains("Khayt") && !latinAllowed.contains(key) { problems.append("\(key): Latin Khayt") }
+                if english.contains("Khayt Cloud") && !value.contains("سحابة خيط") { problems.append("\(key): the cloud is سحابة خيط") }
+                if mentionsApp && aboutFilament && !value.contains("تطبيق خيط") && !latinAllowed.contains(key) {
+                    problems.append("\(key): next to filament, the app is تطبيق خيط")
+                }
+                if unqualified.contains("خيط") && !aboutFilament && !mentionsApp {
+                    problems.append("\(key): خيط where the English names neither the app nor filament")
+                }
+                if value.contains("خيط") && (mentionsApp || english.contains("Khayt Cloud")) { brandLines += 1 }
             }
-            let latin = dict.filter { $0.value.contains("Khayt Cloud") }.keys.sorted()
-            XCTAssertEqual(latin, [], "the cloud is سحابة خيط in Arabic: \(url.path())")
         }
-        XCTAssertEqual(found.sorted(), [], "خيط used as the app's name; write Khayt")
+        XCTAssertEqual(problems.sorted(), [])
+        let infoPlist = NSDictionary(contentsOf: Self.appDir.appending(path: "Resources/ar.lproj/InfoPlist.strings")) as? [String: String]
+        XCTAssertEqual(infoPlist?["CFBundleDisplayName"], "خيط", "the name under the icon, and in Settings")
+        XCTAssertGreaterThan(brandLines, 40, "the rule still sees the app's name")
     }
 
     /// Every permission prompt the app can raise is in all nine languages,

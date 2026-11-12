@@ -283,7 +283,7 @@ struct Catalogue: View {
                     // calculated one says "calculated", because saying
                     // "rounded" of a figure that did not move is noise.
                     Text(Self.reasonLine(row, shop.words, currency: shop.currency))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -310,7 +310,7 @@ struct Catalogue: View {
             TableColumn(shop.words.callIt("mac.pph_column"), value: \.perHourSort) { row in
                 Text(PerHour.text(row.perHour, shop))
                     .moneyStyle()
-                    .foregroundStyle(row.perHour == nil ? AnyShapeStyle(.tertiary)
+                    .foregroundStyle(row.perHour == nil ? AnyShapeStyle(Khayt.faint)
                                      : (row.perHour ?? 0) < 0 ? AnyShapeStyle(Khayt.late)
                                      : AnyShapeStyle(.primary))
                     .help(shop.words.callIt("mac.pph_column_help"))
@@ -490,7 +490,7 @@ private struct ProductCell: View {
                         // to it, and drawing it as a fault makes the whole
                         // grid look wrong.
                         Image(systemName: "shippingbox")
-                            .font(.system(size: 28)).foregroundStyle(.tertiary)
+                            .font(.system(size: 28)).foregroundStyle(Khayt.faint)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -573,7 +573,7 @@ struct CountTheShelf: View {
                     "date": .string(shop.words.say(
                         at, Date.FormatStyle(date: .abbreviated, time: .omitted))),
                 ]))
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.caption).foregroundStyle(Khayt.faint)
             }
 
             // ── WHAT THIS SHOP HAS SOLD OFF ITS OWN SHELF ────────────────
@@ -593,7 +593,7 @@ struct CountTheShelf: View {
                 Text(shop.words.callIt("mac.sold_here_n", ["n": .number(Double(sold))]))
                     .font(.caption).foregroundStyle(.secondary)
                 Text(shop.words.callIt("mac.sold_here_hint"))
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } footer: {

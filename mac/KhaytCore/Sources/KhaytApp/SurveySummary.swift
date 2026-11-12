@@ -50,7 +50,7 @@ struct SurveySummaryCard: View {
                             .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                             .frame(width: 40, alignment: .trailing)
                         Text(verbatim: "(" + words.numeral(bar.count) + ")")
-                            .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                            .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
                             .frame(width: 36, alignment: .leading)
                     }
                 }

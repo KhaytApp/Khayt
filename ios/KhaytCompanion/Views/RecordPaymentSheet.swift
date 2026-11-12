@@ -33,7 +33,7 @@ struct RecordPaymentSheet: View {
                                 .foregroundStyle(KhaytDesign.ink)
                         }
                         V2Field(label: L10n.tr("pay.amount_paid")) {
-                            TextField("", text: $amount, prompt: Text(verbatim: "0.00"))
+                            TextField(L10n.tr("pay.amount_paid"), text: $amount, prompt: Text(verbatim: "0.00"))
                                 .keyboardType(.decimalPad)
                                 .font(.khayt(26, .semibold, relativeTo: .title).monospacedDigit())
                         }

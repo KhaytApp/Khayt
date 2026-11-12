@@ -513,6 +513,11 @@ final class PrinterCareBookTests: XCTestCase {
             for k in keys { XCTAssertNotNil(table[k], "\(lang): \(k)") }
         }
         let ar = try XCTUnwrap(NSDictionary(contentsOf: root.appending(path: "KhaytCompanion/Resources/ar.lproj/Localizable.strings")) as? [String: String])
-        for k in keys { XCTAssertFalse(ar[k]!.contains("خيط"), "the app is Khayt in Latin letters: \(k)") }
+        // The app is "تطبيق خيط" here, never a bare خيط read as filament,
+        // and never the Latin name (the whole rule is in LocalizationCompletenessTests).
+        for k in keys {
+            XCTAssertFalse(ar[k]!.contains("Khayt"), "the app is خيط in Arabic: \(k)")
+            XCTAssertFalse(ar[k]!.replacingOccurrences(of: "تطبيق خيط", with: "").contains("خيط"), "a bare خيط: \(k)")
+        }
     }
 }

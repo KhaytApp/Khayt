@@ -167,20 +167,59 @@ html, body {
 [dir="rtl"] input[type="search"],
 [dir="rtl"] input[type="email"],
 [dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="password"],
 [dir="rtl"] input[type="tel"],
 [dir="rtl"] input:not([type]),
 [dir="rtl"] textarea {
   unicode-bidi: plaintext;
   text-align: start;
 }
+/* The placeholder is its own paragraph: "whsec_…" read "…_whsec" without it. */
+[dir="rtl"] input::placeholder,
+[dir="rtl"] textarea::placeholder {
+  unicode-bidi: plaintext;
+}
 
+/* Arabic is set in IBM Plex Sans Arabic, bundled in fonts/fonts.css (Turki,
+   Nov 11: one Arabic face on every app). The old stack named macOS-only fonts
+   first ("SF Arabic", "Geeza Pro"), so Windows and Linux fell through to
+   whatever the system had. */
 [lang="ar"] {
-  font-family: "SF Arabic", "Geeza Pro", "Tajawal", "Cairo", var(--font-sans);
+  font-family: "IBM Plex Sans Arabic", var(--font-sans);
+}
+
+/* In Arabic, the mono face (eyebrows, figures, dates) has no Arabic letters:
+   they fell back to a system monospace, letter by letter. Plex Arabic is the
+   fallback for them now, and tracking and capitals never apply to Arabic —
+   1.5 px between letters breaks their joins ("ا ل أ د و ا ت"). */
+html[dir="rtl"][data-design] {
+  --font-mono: "JetBrains Mono", "IBM Plex Sans Arabic", ui-monospace, monospace;
+  --font-num: var(--font-mono);
+}
+html[dir="rtl"] body .khayt-navhead,
+html[dir="rtl"] body .main .eyebrow,
+html[dir="rtl"] body .khayt-main .eyebrow,
+html[dir="rtl"] body .sidebar-subtitle,
+html[dir="rtl"] body .settings-nav-group-label {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* Latin values inside Arabic text keep their own order: a phone's leading +,
+   a colour's #, a URL's slashes, a key's prefix, a shortcut. */
+code, kbd, samp, bdi[dir="ltr"], .ltr-value, .cs-hex, .cs-step-hex, .cp-hex {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* -----------------------------------------------------------
    Window chrome — title bar drag area for hiddenInset style
    ----------------------------------------------------------- */
+/* The strip exists for macOS's traffic lights (hiddenInset is macOS-only in
+   Electron); Windows and Linux keep their native frame. The Workbench,
+   Command and Vivid shells hid it there already; Meridian, Flow and Foreman
+   showed an empty 38 px band under the native title bar. One rule for all. */
+html:not(.platform-darwin) .khayt-titlebar { display: none; }
 .titlebar {
   height: 38px;
   -webkit-app-region: drag;
@@ -287,9 +326,16 @@ html, body {
    ----------------------------------------------------------- */
 .grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+/* Inventory's "Add spool | Stock list" pair: a 1fr column will not shrink
+   below its widest row, so the stock table pushed the grid past the page at
+   1280 px ("Lo…", cut headers; past the left edge in Arabic). The columns may
+   shrink now and the table scrolls inside its own .table-wrap. */
+.inv-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.inv-grid > * { min-width: 0; }
 .full    { grid-column: 1 / -1; }
 @media (max-width: 1100px) {
   .grid   { grid-template-columns: 1fr; }
+  .inv-grid { grid-template-columns: minmax(0, 1fr); }
   .kanban { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
 }
 @media (max-width: 700px) {
@@ -338,6 +384,11 @@ html, body {
 .card.dark     .swatch { background: var(--text); }
 .card.warn     .swatch { background: var(--warning); }
 
+/* Native parts of controls (the date picker, its calendar icon, number
+   spinners, scrollbars) follow the app's appearance, not the OS's. */
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+
 /* -----------------------------------------------------------
    Form controls
    ----------------------------------------------------------- */
@@ -350,7 +401,14 @@ label {
 }
 label:first-child { margin-top: 0; }
 
-input[type="text"], input[type="number"], input[type="tel"], input[type="email"], select, textarea {
+/* Every typed field gets the one field style. Date, time, password and URL
+   were missing, so about 46 fields (cloud sign-in, Telegram, connectors, the
+   store's payment links, every date in a dialog) were 150 px browser boxes,
+   22 px tall next to 40 px fields, clipping their placeholders, and white in
+   dark mode (Nov 11 desktop UI review, F2). */
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"],
+input[type="password"], input[type="url"], input[type="date"], input[type="time"],
+input[type="datetime-local"], input[type="month"], select, textarea {
   width: 100%;
   padding: 9px 11px;
   font: inherit;
@@ -866,7 +924,7 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* Custom date range inputs */
 .custom-range-inputs { display:inline-flex; align-items:center; gap:6px; margin-inline-start:6px; }
-.custom-range-inputs input[type="date"] { font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
+.custom-range-inputs input[type="date"] { width:auto; font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
 
 /* -----------------------------------------------------------
    Empty states
@@ -2724,6 +2782,8 @@ button .khayt-ico, summary .khayt-ico { opacity: .85; }
 }
 button.tag-chip, .tag-chip[data-act] {
   cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
   transition: background 0.15s;
 }
 .tag-chip[data-act]:hover {
@@ -4618,6 +4678,7 @@ th[data-sort]:hover {
   border-radius: 8px 8px 0 0;
   background: transparent;
   color: var(--text-muted);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
