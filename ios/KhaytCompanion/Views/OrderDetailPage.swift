@@ -93,7 +93,7 @@ struct OrderDetailPage: View {
     private var hasActivity: Bool {
         whatsApp != nil || canShip
             || (customer.map { $0.dialNumber != nil || !($0.email ?? "").isEmpty } ?? false)
-            || api.holdsBook
+            || api.holdsBook || !printPhotos.isEmpty || canAddPhoto
             || photoAccess.map { $0 != .notPublished } ?? false
     }
 
@@ -218,7 +218,7 @@ struct OrderDetailPage: View {
         }
     }
 
-    // MARK: - 4 · Parts, the cards beside the parts card
+    // MARK: - 4 · Parts, the card beside the parts card
 
     @ViewBuilder
     private var partsExtras: some View {
@@ -226,20 +226,6 @@ struct OrderDetailPage: View {
         // enough of it. Nothing at all otherwise.
         if let energy {
             EnergyCard(energy: energy).id("energy")
-        }
-        // The finished print, as the Mac and the desktop keep it — the
-        // printer's own snapshot at the end of a print among them.
-        if !printPhotos.isEmpty || canAddPhoto {
-            PrintPhotosCard(photos: printPhotos, add: canAddPhoto ? { jpeg in
-                let reply = await api.addJobPhoto(orderId: order.id, jpeg: jpeg)
-                printPhotos = api.printPhotos(orderId: order.id)
-                return reply
-            } : nil)
-        }
-        // The papers besides the invoice, from the book. A quote is not
-        // work yet; a cancelled job is nothing to pack or make.
-        if api.holdsBook, !isQuote, !isCancelled {
-            JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
         }
     }
 
@@ -296,6 +282,20 @@ struct OrderDetailPage: View {
             }
             if let customer, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
                 ContactCard(client: customer)
+            }
+            // The finished print, as the Mac and the desktop keep it — the
+            // printer's own snapshot at the end of a print among them.
+            if !printPhotos.isEmpty || canAddPhoto {
+                PrintPhotosCard(photos: printPhotos, add: canAddPhoto ? { jpeg in
+                    let reply = await api.addJobPhoto(orderId: order.id, jpeg: jpeg)
+                    printPhotos = api.printPhotos(orderId: order.id)
+                    return reply
+                } : nil)
+            }
+            // The papers besides the invoice, from the book. A quote is not
+            // work yet; a cancelled job is nothing to pack or make.
+            if api.holdsBook, !isQuote, !isCancelled {
+                JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
             }
             // Only an order the Mac has published has a page to put a photo on.
             if let photoAccess, photoAccess != .notPublished {
