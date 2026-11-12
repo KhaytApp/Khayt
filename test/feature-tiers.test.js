@@ -118,7 +118,9 @@ test('every gated nav tab maps to a feature the registry names', () => {
     } else if (isPro) {
       const body = html.slice(html.indexOf(`id="${tab}"`));
       const section = body.slice(0, body.indexOf('</section>'));
-      assert.ok(section.includes('pro-only'),
+      // Since S4 the depth may instead be marked `data-simple-pro` (SIMPLE_MAP
+      // 'reduced': Simple draws its smaller form beside it — Expenses).
+      assert.ok(section.includes('pro-only') || section.includes('data-simple-pro'),
         `${tab} is only biz-only, yet "${key}" is a Pro feature and nothing inside the tab is gated — `
         + 'a simple shop would get the whole of it');
     }
