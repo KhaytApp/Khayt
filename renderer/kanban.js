@@ -550,7 +550,7 @@ function renderKanban() {
         const totalValFoot = fmtJobsTotal(sorted);
         // Enthusiast/maker mode has no commerce — omit the per-column money total.
         const showColMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${sorted.length} ${escapeHtml(t('kan.orders') || 'orders')}</span>${showColMoney ? `<span class="metric" style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(totalValFoot)}</span>` : ''}`;
+        foot.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">${escapeHtml(t(sorted.length === 1 ? 'kan.orders_one' : 'kan.orders_many', { n: sorted.length }))}</span>${showColMoney ? ` <span class="metric" style="font-size:11.5px;color:var(--text-dim)">${escapeHtml(totalValFoot)}</span>` : ''}`;
       }
     }
 

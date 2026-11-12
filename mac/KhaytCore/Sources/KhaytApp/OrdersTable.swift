@@ -109,7 +109,7 @@ struct OrdersTable: View {
             // the test is the data rather than a setting somebody has to find.
             TableColumn(shop.words.callIt("mac.customer"), value: \.client) { job in
                 Text(job.client.isEmpty ? "—" : job.client)
-                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
             .width(min: 100, ideal: 110)
@@ -388,7 +388,7 @@ private struct StageCell: View {
             HStack(spacing: 6) {
                 // The one movement reserved for work in progress, on the one
                 // row that is work in progress.
-                Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
+                Circle().fill(Khayt.thread).frame(width: 6, height: 6).alive()
                 LayerProgress(progress: Double(live.progress) / 100, height: 14)
                     .frame(width: 32)
                 Text(verbatim: shop.words.numeral(live.progress) + "%")
@@ -396,7 +396,9 @@ private struct StageCell: View {
                     // A print gains a percent every few minutes and the figure
                     // used to be a different number with no moment in between.
                     .contentTransition(.numericText())
-                    .foregroundStyle(Khayt.hot)
+                    // Ink beside the amber dot and bar: amber is about 2:1
+                    // on a white row, and a figure has to be read.
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
             }
             .help(tooltip(stage: stage, live: live))

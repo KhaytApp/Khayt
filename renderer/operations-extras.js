@@ -556,21 +556,31 @@ function renderVatFiling() {
   const today = _vatToday();
   const freq = V.frequencyOf(settings);
 
+  // A shop that charges no VAT and has never filed a return has nothing for
+  // this card to say: it was a "VAT RETURN" heading over an empty box.
+  const profile = KhaytTax.profileFromSettings(settings);
+  const charges = profile.rates.reduce((sum, r) => sum + r.percent, 0) > 0;
+  const container = document.getElementById('vatReturnContainer');
+  if (container) container.style.display = (charges || V.filedMarks(settings).length) ? '' : 'none';
+
   const sel = document.getElementById('vatReturnPeriod');
   if (sel) {
     const was = sel.value;
-    const keys = V.periodsBetween(`${today.slice(0, 4)}-01-01`, today, freq).reverse();
+    // The return being worked on (lib/vat-periods.js returnPeriodFor): the
+    // last ended period until its deadline, then the running one — not the
+    // last ended one for ever (Q3 in November). Listed even across New Year.
+    const working = V.returnPeriodFor(today, freq);
+    const yearStart = `${today.slice(0, 4)}-01-01`;
+    const workingFrom = working ? V.periodBounds(working).from : yearStart;
+    const keys = V.periodsBetween(workingFrom < yearStart ? workingFrom : yearStart, today, freq).reverse();
     sel.innerHTML = `<option value="year">${escapeHtml(t('analytics.this_year'))}</option>`
       + keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(vatPeriodLabel(k))}</option>`).join('');
-    // The last ENDED period first: that is the return about to be filed.
-    const ended = keys.find((k) => V.periodBounds(k).to < today);
-    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (ended || keys[0] || 'year');
+    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (keys.includes(working) ? working : (keys[0] || 'year'));
   }
 
   const box = document.getElementById('vatFilingSection');
   if (!box) return;
-  const profile = KhaytTax.profileFromSettings(settings);
-  if (!profile.rates.reduce((sum, r) => sum + r.percent, 0)) { box.innerHTML = ''; return; }
+  if (!charges) { box.innerHTML = ''; return; }
   const ro = _vatReadOnly();
   const rows = V.filingPeriods(settings, { today, count: 8 });
   const rowHtml = (r) => {

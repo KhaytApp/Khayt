@@ -261,7 +261,7 @@ struct Sidebar: View {
                 }
                 Spacer(minLength: 8)
                 if live {
-                    Circle().fill(Khayt.live).frame(width: 6, height: 6)
+                    Circle().fill(Khayt.thread).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
                 }
                 if let count {
@@ -370,7 +370,7 @@ private struct Provenance: View {
     // this window's own styling stays here.
     static func tint(_ tone: Shop.SyncTone) -> AnyShapeStyle {
         switch tone {
-        case .quiet: AnyShapeStyle(.tertiary)
+        case .quiet: AnyShapeStyle(Khayt.faint)
         case .normal: AnyShapeStyle(.secondary)
         case .attention: AnyShapeStyle(Khayt.attention)
         }

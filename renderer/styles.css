@@ -2738,6 +2738,8 @@ button .khayt-ico, summary .khayt-ico { opacity: .85; }
 }
 button.tag-chip, .tag-chip[data-act] {
   cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
   transition: background 0.15s;
 }
 .tag-chip[data-act]:hover {

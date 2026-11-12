@@ -423,7 +423,7 @@ struct Reports: View {
             TableColumn(shop.words.callIt("mac.pnl_col_cogs"), value: \.cogsValue) { r in
                 Text(r.cogsValue > 0 ? Money.figure(-r.cogsValue) : "—")
                     .monospacedDigit()
-                    .foregroundStyle(r.cogsValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(r.cogsValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(Khayt.faint))
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 84, ideal: 84, max: 220)
@@ -435,7 +435,7 @@ struct Reports: View {
                 TableColumn(shop.words.callIt("mac.pnl_col_waste"), value: \.wasteValue) { r in
                     Text(r.wasteValue > 0 ? Money.figure(-r.wasteValue) : "—")
                         .monospacedDigit()
-                        .foregroundStyle(r.wasteValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                        .foregroundStyle(r.wasteValue > 0 ? AnyShapeStyle(.secondary) : AnyShapeStyle(Khayt.faint))
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .width(min: 56, ideal: 56, max: 200)
@@ -461,7 +461,7 @@ struct Reports: View {
                     // two different minus signs in one table is a typo.
                     Text(spent > 0 ? Money.figure(-spent) : "—")
                         .monospacedDigit()
-                        .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
+                        .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(Khayt.faint))
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 // ITS PARTS IN A TOOLTIP, NOT UNDER IT. Three captions here
@@ -1132,7 +1132,7 @@ struct Reports: View {
             /// The ranked column is the emphasised one; a figure that is not
             /// there is fainter than one that is merely secondary.
             private var revenueTint: AnyShapeStyle {
-                if row.revenue <= 0 { return AnyShapeStyle(.tertiary) }
+                if row.revenue <= 0 { return AnyShapeStyle(Khayt.faint) }
                 return showing == .revenue ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
             }
 
@@ -1162,7 +1162,7 @@ struct Reports: View {
                     Text("\(row.count)×")
                         .monospacedDigit()
                         .font(showing == .count ? .body.weight(.semibold) : .callout)
-                        .foregroundStyle(showing == .count ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        .foregroundStyle(showing == .count ? AnyShapeStyle(.primary) : AnyShapeStyle(Khayt.faint))
                         .frame(width: 46, alignment: .trailing)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 7)
@@ -1220,7 +1220,7 @@ struct Reports: View {
                         .width(min: 120, ideal: 200)
                         TableColumn(shop.words.callIt("mac.customer"), value: \.client) { row in
                             Text(row.client.isEmpty ? "—" : row.client)
-                                .foregroundStyle(row.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                                .foregroundStyle(row.client.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                                 .lineLimit(1)
                         }
                         .width(min: 110, ideal: 170)
@@ -1245,7 +1245,7 @@ struct Reports: View {
                         .width(min: 90, ideal: 110)
                         TableColumn(shop.words.callIt("an.aged_col_days"), value: \.days) { row in
                             Text("\(row.days)").monospacedDigit()
-                                .foregroundStyle(row.notYetDue ? AnyShapeStyle(.tertiary)
+                                .foregroundStyle(row.notYetDue ? AnyShapeStyle(Khayt.faint)
                                                                : AnyShapeStyle(Self.tint(row.bucket)))
                         }
                         .width(min: 60, ideal: 80)

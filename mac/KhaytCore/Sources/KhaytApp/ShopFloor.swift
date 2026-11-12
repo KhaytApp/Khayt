@@ -560,7 +560,7 @@ struct MachineCard: View {
         .task(id: upkeepInputs) {
             upkeep = await shop.maintenance(for: machine)
         }
-        .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
+        .card(rail: running ? Khayt.thread : nil, padding: 14, fills: true)
     }
 
     private var upkeepInputs: String { shop.maintenanceSignature(for: machine) }
@@ -1593,7 +1593,7 @@ struct SpoolCard: View {
                        + shop.words.counting(shown, "mac.days_word"))
                     .font(.caption2).monospacedDigit()
                     .foregroundStyle(shown <= 14 ? AnyShapeStyle(Khayt.attention)
-                                                 : AnyShapeStyle(.tertiary))
+                                                 : AnyShapeStyle(Khayt.faint))
             }
             // Damp filament prints badly, and the shelf is where somebody is
             // standing when they could do something about it. Only the two
@@ -1604,7 +1604,7 @@ struct SpoolCard: View {
                 Text(shop.words.callIt(state == "overdue" ? "mac.dry_overdue" : "mac.dry_due"))
                     .font(.caption2)
                     .foregroundStyle(state == "overdue" ? AnyShapeStyle(Khayt.attention)
-                                                        : AnyShapeStyle(.tertiary))
+                                                        : AnyShapeStyle(Khayt.faint))
             }
         }
         .frame(maxWidth: .infinity)
@@ -2044,9 +2044,9 @@ private struct Live: View {
                     // it sits under its own caption, and it means something.
                     ZStack(alignment: .leading) {
                         LayerLinesShape()
-                            .fill(Khayt.hot.opacity(0.16))
+                            .fill(Khayt.thread.opacity(Khayt.threadGhost))
                         LayerLinesShape(progress: Double(status.progress) / 100)
-                            .fill(Khayt.hot)
+                            .fill(Khayt.thread)
                     }
                     .frame(height: 26)
                     .accessibilityElement()

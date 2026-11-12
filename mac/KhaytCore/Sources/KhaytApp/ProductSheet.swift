@@ -682,11 +682,23 @@ struct ProductSheet: View {
                     .textFieldStyle(.roundedBorder).frame(width: 80).monospacedDigit()
                 Stepper("× \(newPart.qty)", value: $newPart.qty, in: 1...999)
                     .monospacedDigit().fixedSize()
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
+            }
+            // ── THE BUTTONS ON A LINE OF THEIR OWN ────────────────────────
+            //
+            // They shared the line above with the three fields, and there was
+            // not room: the button read "From your print li…" in English
+            // (Nov 11 2026 review, B10), and while a part is being edited a
+            // Cancel joins them. A button says its whole name or it is not a
+            // label, in any of nine languages — so the row wraps instead of
+            // the words being cut, and each button keeps its own width.
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
                 // Fill the part from a model the shop already has, instead of
                 // typing what the library already knows. See `PickModelSheet`.
                 Button(shop.words.callIt("link.from_library") + "\u{2026}") { pickingModel = true }
                     .disabled(shop.files.isEmpty)
+                    .fixedSize()
                 if editingAt != nil {
                     Button(shop.words.callIt("common.cancel")) {
                         if let original = editingOriginal {
@@ -710,6 +722,7 @@ struct ProductSheet: View {
                     Task { await reprice() }
                 }
                 .disabled(!newPart.isComplete && editingAt == nil)
+                .fixedSize()
             }
             // ── WHAT THE PART COSTS BESIDES ITS FILAMENT ──────────────────
             //

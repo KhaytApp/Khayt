@@ -365,6 +365,8 @@ jobs:
       - name: E2E smoke (Simple mode follows SIMPLE_MAP)
         run: xvfb-run -a npm run test:e2e:simplemap
 
+      - name: E2E smoke (Nov 11 UI review fixes — scroll, counts, dates, a11y, analytics)
+        run: xvfb-run -a npm run test:e2e:uixfixes
       - name: E2E smoke (primary buttons readable in dark; one field style for date, password and URL)
         run: xvfb-run -a npm run test:e2e:darkcontrast
       - name: E2E smoke (Simple mode never shows an empty Settings pane)

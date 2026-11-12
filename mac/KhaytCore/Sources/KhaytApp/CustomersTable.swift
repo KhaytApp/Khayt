@@ -452,7 +452,7 @@ struct CustomerInspector: View {
                                     .monospacedDigit()
                                     .foregroundStyle(job.price <= 0
                                                      ? AnyShapeStyle(.quaternary)
-                                                     : (job.isSettled ? AnyShapeStyle(.tertiary)
+                                                     : (job.isSettled ? AnyShapeStyle(Khayt.faint)
                                                                       : AnyShapeStyle(.primary)))
                             }
                             .padding(.vertical, 2)
