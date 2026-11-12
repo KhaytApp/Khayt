@@ -5,7 +5,8 @@
  *   - each wired 'pro' surface is hidden: schedule, kiosk, campaigns, parts to
  *     buy, the supplier reorder list, the order editor's payment plan and
  *     milestones, the machine editor's upkeep and value, a job's change order;
- *   - a Professional tab (Expenses) or pane (Team, AI) reached anyway shows
+ *   - Expenses opens as its short list (S4 card 4), not as the panel;
+ *   - a Professional pane (Team, AI) reached anyway shows
  *     "Part of Professional" with a switch that works and lands on it; a
  *     view opened in place (kiosk) offers the switch instead of opening;
  *   - Notifications & Messages opens with the WhatsApp templates only;
@@ -80,28 +81,15 @@ try {
   const dyn = await dynamicChecks();
   for (const [k, v] of Object.entries(dyn)) ok(v === false, `Simple: ${k} is hidden`);
 
-  // A Professional tab reached anyway.
-  const tabGate = await window.evaluate(() => {
+  // Expenses is 'reduced' since S4 card 4: Simple opens its short list, not
+  // the panel (scripts/e2e-simple-screens-smoke.mjs checks the list itself).
+  const expSimple = await window.evaluate(() => {
     switchTab('expenses-tab');
     const tab = document.getElementById('expenses-tab');
-    const gate = tab.querySelector(':scope > .sm-gate');
-    return {
-      active: tab.classList.contains('active'),
-      gated: tab.classList.contains('sm-gated'),
-      gateShown: !!gate && getComputedStyle(gate).display !== 'none',
-      text: gate?.innerText || '',
-      contentHidden: [...tab.children].filter((c) => c !== gate).every((c) => getComputedStyle(c).display === 'none'),
-    };
+    return { active: tab.classList.contains('active'), gated: tab.classList.contains('sm-gated') };
   });
-  ok(tabGate.active && tabGate.gated && tabGate.gateShown && tabGate.contentHidden, `Simple: Expenses opens as the "Part of Professional" panel (${JSON.stringify(tabGate)})`);
-  ok(/^Expenses is part of Professional\n/.test(tabGate.text) && /This shop is set to Simple\./.test(tabGate.text) && /Switch to Professional/.test(tabGate.text) && !/PRO\b/.test(tabGate.text),
-    `the panel names the screen, says the shop is Simple and offers the switch (${JSON.stringify(tabGate.text)})`);
-  await window.click('#expenses-tab .sm-gate [data-act="sm-switch-pro"]');
-  await window.waitForTimeout(300);
-  const afterTabSwitch = await window.evaluate(() => ({ mode: settings.mode, active: document.getElementById('expenses-tab').classList.contains('active'), gated: document.getElementById('expenses-tab').classList.contains('sm-gated') }));
-  ok(afterTabSwitch.mode === 'professional' && afterTabSwitch.active && !afterTabSwitch.gated, `the switch moves to Professional and opens Expenses (${JSON.stringify(afterTabSwitch)})`);
-  await setMode('simple');
-  ok(await window.evaluate(() => document.getElementById('expenses-tab').classList.contains('sm-gated')), 'switching back to Simple while on Expenses shows the panel again');
+  ok(expSimple.active && !expSimple.gated, `Simple: Expenses opens, not as the panel (${JSON.stringify(expSimple)})`);
+  ok(await shown('#expSimple') === true, 'Simple: Expenses is the short list');
 
   // Professional panes reached anyway.
   const paneState = () => window.evaluate(() => ({

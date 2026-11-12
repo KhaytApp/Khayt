@@ -129,10 +129,10 @@
             <span class="nav-icon" aria-hidden="true">◐</span>
             <span class="nav-label grow" data-i18n="tab.analytics">Analytics</span>
           </button>
-          <button type="button" class="tab-btn khayt-navitem pro-only" data-tab="expenses-tab" role="tab" id="tabbtn-expenses-tab" aria-selected="false" aria-controls="expenses-tab" tabindex="-1">
+          <button type="button" class="tab-btn khayt-navitem biz-only" data-tab="expenses-tab" role="tab" id="tabbtn-expenses-tab" aria-selected="false" aria-controls="expenses-tab" tabindex="-1">
             <span class="nav-icon" aria-hidden="true">◧</span>
             <span class="nav-label grow" data-i18n="tab.expenses">Expenses</span>
-            <span class="khayt-pro">PRO</span>
+            <span class="khayt-pro" data-simple-pro="expenses">PRO</span>
           </button>
         </div>
       </nav>
@@ -888,7 +888,10 @@
 
     <!-- ===================== ANALYTICS ===================== -->
     <section id="analytics-tab" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-analytics-tab" aria-hidden="true" tabindex="-1">
-      <div class="toolbar" style="margin-bottom: 16px;">
+      <!-- SIMPLE_MAP money (S4 card 5): in Simple this tab is the one-page
+           Money summary, drawn into #analyticsSimpleWrap; the toolbar's
+           exports and range are Professional's. -->
+      <div class="toolbar" data-simple-pro="money" style="margin-bottom: 16px;">
         <h3 class="card-head" style="margin: 0; flex: 1;"><span class="swatch"></span><span data-i18n="an.title">Business Overview</span></h3>
         <button class="btn small" id="btnTaxExport" data-i18n="an.tax_export">Monthly Tax Summary</button>
         <button class="btn small" id="btnAccountingExport" data-i18n="an.accounting_export">Accounting CSV</button>
@@ -1332,9 +1335,13 @@
 
     <!-- ===================== EXPENSES ===================== -->
     <section id="expenses-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-expenses-tab" aria-hidden="true" tabindex="-1">
+      <!-- SIMPLE_MAP expenses (S4 card 4): Simple draws the short list in
+           #expSimple (renderer/simple-screens-ui.js); everything marked
+           data-simple-pro="expenses" is Professional's tracker. -->
+      <div id="expSimple" class="sm-simple-only"></div>
       <!-- Recurring expenses that have come round (renderer/expenses.js renderRecurringStrip). -->
-      <div id="recurringStrip"></div>
-      <div class="toolbar" style="margin-bottom:16px;">
+      <div id="recurringStrip" data-simple-pro="expenses"></div>
+      <div class="toolbar" data-simple-pro="expenses" style="margin-bottom:16px;">
         <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="exp.title">Expense Tracker</span></h3>
         <button class="btn small" id="btnExportExpCsv" data-i18n="exp.export_csv">Export CSV</button>
         <select id="expRangeFilter" class="toolbar-select">
@@ -1352,7 +1359,7 @@
         </span>
       </div>
 
-      <div class="grid">
+      <div class="grid" data-simple-pro="expenses">
         <!-- Add expense form -->
         <div class="card">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="exp.add_title">Add Expense</span></h3>
@@ -1409,13 +1416,13 @@
       </div>
 
       <!-- Budget vs Actual -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" data-simple-pro="expenses" style="margin-top:16px;">
         <h3 class="card-head"><span class="swatch"></span><span data-i18n="exp.budget_title">Budget vs. Actual</span></h3>
         <div id="expenseBudgetSection"></div>
       </div>
 
       <!-- Expenses table -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" data-simple-pro="expenses" style="margin-top:16px;">
         <div class="table-wrap">
           <table id="expenseTable">
             <thead>
@@ -1937,13 +1944,17 @@
 
 
         <div class="card settings-card" id="settingsLoyaltyCard">
-        <div class="settings-section-head" data-i18n="set.loyalty">Customer Loyalty Tiers</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Auto-assign tier badges and discounts based on completed orders or spend.</p>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
+        <!-- SIMPLE_MAP loyalty (S4 card 3): Simple draws #loyaltySimple — on/off
+             and up to three tiers by completed orders (renderer/simple-screens-ui.js);
+             the full editor below is Professional's. Both edit settings.loyaltyTiers. -->
+        <div id="loyaltySimple" class="sm-simple-only sm-loyalty"></div>
+        <div class="settings-section-head" data-simple-pro="loyalty" data-i18n="set.loyalty">Customer Loyalty Tiers</div>
+        <p data-simple-pro="loyalty" style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Auto-assign tier badges and discounts based on completed orders or spend.</p>
+        <label data-simple-pro="loyalty" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
           <input type="checkbox" id="set_loyaltyEnabled" style="width:auto;margin:0;">
           <span data-i18n="set.loyalty_enabled">Enable loyalty tiers</span>
         </label>
-        <div id="loyaltyTiersSection"></div>
+        <div id="loyaltyTiersSection" data-simple-pro="loyalty"></div>
         </div>
 
         <div class="settings-save-row">
@@ -3033,6 +3044,7 @@
 <script src="../lib/qc-failure.js"></script>
 <script src="../lib/date-range.js"></script>
 <script src="../lib/expense-book.js"></script>
+<script src="../lib/simple-screens.js"></script>
 <script src="../lib/waste-entry.js"></script>
 <script src="../lib/spool-edit.js"></script>
 <!-- The filament catalogue (assets/filament-catalog.json), matched the way the Mac matches it. -->
@@ -3184,6 +3196,7 @@
 <script src="portal-watch.js"></script>
 <script src="dashboard.js"></script>
 <script src="analytics.js"></script>
+<script src="simple-screens-ui.js"></script>
 <script src="operations-extras.js"></script>
 <script src="plugins.js"></script>
 <script src="tour.js"></script>

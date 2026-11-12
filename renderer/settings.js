@@ -3989,6 +3989,8 @@ function renderOperatorLockSettings() {
 /** Show PIN pad modal to switch operator */
 
 function renderLoyaltyTiersSettings() {
+  // Simple's smaller card (SIMPLE_MAP loyalty) reads the same tiers.
+  if (typeof renderSimpleLoyalty === 'function') renderSimpleLoyalty();
   const el = $('#loyaltyTiersSection');
   if (!el) return;
   const tiers = settings.loyaltyTiers || [];

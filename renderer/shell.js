@@ -302,6 +302,7 @@ function applyAnalyticsModeView() {
   const proWrap = $('#analyticsProWrap');
   if (simpleWrap) simpleWrap.style.display = simple ? 'block' : 'none';
   if (proWrap) proWrap.style.display = simple ? 'none' : 'block';
+  if (typeof syncMoneyNavLabel === 'function') syncMoneyNavLabel();
   if ($('#analytics-tab')?.classList.contains('active')) {
     if (simple) renderSimpleReports();
     else renderAnalytics();
@@ -312,8 +313,10 @@ function applyAnalyticsModeView() {
  *  bounce the active tab and to block keyboard/programmatic navigation to them. Keep
  *  in sync with the .biz-only / .pro-only nav buttons in index.html. */
 const BIZ_TABS = ['logs-tab', 'clients-tab', 'gift-cards-tab', 'portfolio-tab', 'expenses-tab', 'catalog-tab', 'analytics-tab'];
-/** Professional-only tabs — never reachable in Simple/Enthusiast (nav buttons are .pro-only). */
-const PRO_TABS = ['expenses-tab'];
+/** Professional-only tabs — never reachable in Simple/Enthusiast (nav buttons are .pro-only).
+ *  Empty since S4: Expenses is 'reduced' in SIMPLE_MAP — Simple opens its short
+ *  list — and enthusiast is kept out of it by BIZ_TABS. */
+const PRO_TABS = [];
 
 function applyMode() {
   // Bed Ready (the standalone maker app) is always the commerce-free "enthusiast"

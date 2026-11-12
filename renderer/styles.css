@@ -3425,6 +3425,86 @@ body.mode-simple [data-simple-pro] { display: none !important; }
 [data-theme="dark"] .sm-mode-badge { background: #3A4658; color: #A9B8CF; }
 .khayt-sidebar.collapsed .sm-mode-badge { display: none; }
 
+/* ── S4 cards 3–5: Simple's reduced Loyalty, Expenses and Money ──────────
+   (renderer/simple-screens-ui.js). A `.sm-simple-only` host is Simple's; the
+   markup beside it carries data-simple-pro, so each mode sees one of them. */
+body:not(.mode-simple) .sm-simple-only { display: none !important; }
+.sm-vh { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sm-card { max-width: 640px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.sm-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.sm-head-text { flex: 1; min-width: 0; }
+.sm-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.sm-title-lg { font-size: 18px; font-weight: 700; }
+.sm-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.sm-empty { margin: 8px 0; font-size: 13px; color: var(--text-muted); }
+.sm-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-box { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.sm-pill-btn { border-radius: 999px; padding-inline: 16px; }
+.sm-link { color: var(--primary); font-weight: 600; }
+.sm-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.sm-foot .sm-sub { flex: 1; margin: 0; }
+
+/* Card 3 · Loyalty */
+.sm-loyalty { margin-bottom: 4px; }
+.sm-pill-switch {
+  min-height: 24px; padding: 4px 10px; border: 0; border-radius: 999px; cursor: pointer;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  background: var(--surface-2); color: var(--text-muted);
+}
+.sm-pill-switch[aria-checked="true"] { background: rgba(43, 182, 115, 0.16); color: var(--success); }
+.sm-pill-switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sm-loy-table { inline-size: 100%; border-collapse: collapse; font-size: 13px; }
+.sm-loy-table thead th { padding: 8px 14px; text-align: start; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 500; color: var(--text-muted); background: var(--surface-2); }
+.sm-loy-table tbody th, .sm-loy-table tbody td { padding: 8px 14px; text-align: start; font-weight: 500; border-top: 1px solid var(--border); }
+.sm-loy-table .sm-loy-act { text-align: end; }
+.sm-loy-after { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sm-loy-in { inline-size: 100%; min-width: 0; margin: 0; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); font: inherit; }
+.sm-loy-in:hover { border-color: var(--border); }
+.sm-loy-in:focus-visible { border-color: var(--primary); outline: none; background: var(--surface); }
+.sm-loy-orders, .sm-loy-disc { inline-size: 5ch; }
+.sm-loy-row.is-readonly { color: var(--text-dim); }
+.sm-loy-ro { font-size: 12px; color: var(--text-muted); }
+
+/* Card 4 · Expenses */
+#expSimple .sm-head { align-items: center; }
+.sm-list { list-style: none; margin: 0; padding: 0; }
+.sm-list-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.sm-list-row + .sm-list-row { border-top: 1px solid var(--border); }
+.sm-list-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sm-list-name { font-size: 14px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-list-meta { font-size: 12px; color: var(--text-muted); }
+.sm-row-del { opacity: 0; }
+.sm-list-row:hover .sm-row-del, .sm-row-del:focus-visible { opacity: 1; }
+
+/* Card 5 · Money */
+.sm-money { max-width: 720px; }
+.sm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.sm-tile {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 0; border-radius: 10px;
+  background: var(--surface-2); color: var(--text); text-align: start; font: inherit;
+}
+button.sm-tile { cursor: pointer; }
+button.sm-tile:hover { box-shadow: inset 0 0 0 1px var(--border); }
+button.sm-tile:focus-visible, .sm-line:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sm-tile-label { font-size: 12px; color: var(--text-muted); }
+.sm-tile-value { font-family: var(--font-num); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sm-tile-sub { font-size: 12px; color: var(--text-muted); }
+.sm-tile-sub.is-warn { color: var(--danger); }
+.sm-money-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 24px; }
+.sm-money-list { margin-bottom: 12px; }
+.sm-money-list ul { list-style: none; margin: 0; padding: 0; }
+.sm-eyebrow {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+  font-family: var(--font-num); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted);
+}
+.sm-eyebrow::before { content: ""; inline-size: 24px; block-size: 2px; background: var(--accent); }
+.sm-line {
+  display: flex; justify-content: space-between; gap: 12px; inline-size: 100%; padding: 4px 0;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: start;
+}
+button.sm-line { cursor: pointer; }
+button.sm-line:hover > span:first-child { text-decoration: underline; }
+
 /* ── Enthusiast (hobbyist) mode: no commerce at all ───────────
    Stricter than simple — hides both the Pro depth (.pro-only) and every
    business/commerce surface (.biz-only: orders, clients, invoicing, ZATCA,
