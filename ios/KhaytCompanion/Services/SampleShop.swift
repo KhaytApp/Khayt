@@ -159,7 +159,7 @@ enum SampleShop {
                 order("S-1049", "quote", "Trophy bases", "Omar Haddad", "C-5", placed: 0, due: nil, price: 85, paid: 0, material: "PLA", qty: 3,
                       extra: ["quoteExpiresAt": day(7)]),
                 order("S-1048", "quote", "Prototype housing", "Acme Robotics", "C-1", placed: -2, due: nil, price: 340, paid: 0, material: "ABS", qty: 2,
-                      extra: ["quoteExpiresAt": day(5)]),
+                      extra: ["quoteExpiresAt": day(5), "quoteSentAt": day(-2)]),
                 // Placed and finished today, so Home's This month and This
                 // year have takings on the first day of a month or a year, and
                 // Done today counts it.

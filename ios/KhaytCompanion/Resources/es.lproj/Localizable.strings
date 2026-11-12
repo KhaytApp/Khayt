@@ -1311,3 +1311,4 @@
 "job.money.owing" = "Pendiente";
 "job.money.owing_overdue" = "Pendiente · vencido";
 "job.parts.on_machine" = "En %@";
+"job.money.quote_sent" = "Enviado";

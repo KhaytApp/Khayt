@@ -1311,3 +1311,4 @@
 "job.money.owing" = "Owing";
 "job.money.owing_overdue" = "Owing · overdue";
 "job.parts.on_machine" = "On %@";
+"job.money.quote_sent" = "Sent";

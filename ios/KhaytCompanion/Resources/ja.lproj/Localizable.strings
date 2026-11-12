@@ -1311,3 +1311,4 @@
 "job.money.owing" = "未払い";
 "job.money.owing_overdue" = "未払い · 期限超過";
 "job.parts.on_machine" = "%@で印刷中";
+"job.money.quote_sent" = "送付日";

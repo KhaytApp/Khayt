@@ -1311,3 +1311,4 @@
 "job.money.owing" = "Kalan";
 "job.money.owing_overdue" = "Kalan · gecikmiş";
 "job.parts.on_machine" = "%@ üzerinde";
+"job.money.quote_sent" = "Gönderildi";

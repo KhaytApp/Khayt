@@ -1311,3 +1311,4 @@
 "job.money.owing" = "Em aberto";
 "job.money.owing_overdue" = "Em aberto · vencido";
 "job.parts.on_machine" = "Em %@";
+"job.money.quote_sent" = "Enviado";

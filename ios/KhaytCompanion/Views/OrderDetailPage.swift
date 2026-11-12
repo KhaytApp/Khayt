@@ -830,6 +830,9 @@ struct JobMoneyCard: View {
                 if let made = DueDateParser.display(quote.date) {
                     line(L10n.tr("quote.field.made")) { Text(made).foregroundStyle(KhaytDesign.ink) }
                 }
+                if let sent = DueDateParser.display(quote.quoteSentAt) {
+                    line(L10n.tr("job.money.quote_sent")) { Text(sent).foregroundStyle(KhaytDesign.ink) }
+                }
                 if let last = DueDateParser.display(quote.quoteExpiresAt) {
                     let expired = quote.isQuoteExpired()
                     line(L10n.tr("quote.field.valid_until")) {

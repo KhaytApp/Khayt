@@ -1311,3 +1311,4 @@
 "job.money.owing" = "المتبقي";
 "job.money.owing_overdue" = "المتبقي · متأخر";
 "job.parts.on_machine" = "على %@";
+"job.money.quote_sent" = "أُرسل";

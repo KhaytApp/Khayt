@@ -1311,3 +1311,4 @@
 "job.money.owing" = "待付";
 "job.money.owing_overdue" = "待付 · 已逾期";
 "job.parts.on_machine" = "在 %@ 上";
+"job.money.quote_sent" = "已发送";
