@@ -14,8 +14,20 @@
  *     entry is 2.1.0 granted what was shown, the old one kept for Revert, the
  *     badge gone — and a later window save does not wind it back.
  *
+ * Then, relaunched with the check on (KHAYT_CONNECTOR_UPDATES=1), through
+ * main's real check (hub:connector-updates-check: signature, sha256, write
+ * chain) with its network and signing key stubbed — a throwaway key, never
+ * Khayt's — and no reload between checks (lib/plugin-update.js, #2426):
+ *   - an index that withdraws the kept 2.0.0: Revert goes, and the row says
+ *     why ("Khayt withdrew version 2.0.0, so you can’t go back to it.");
+ *   - an index offering 2.2.0 (asks more): the badge comes; the next index
+ *     withdraws 2.2.0: the badge and "Review update" go, on the row and in
+ *     the nav;
+ *   - each index's serial is saved, even by a check that changes nothing else.
+ *
  *   node scripts/e2e-connector-update-smoke.mjs
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -182,6 +194,90 @@ try {
   await window.evaluate(() => { settings.currency = settings.currency || 'SAR'; saveAll(); return flushSave(); });
   await window.waitForTimeout(500);
   check();
+
+  // ── 7. relaunch with the check on; main's network and key stubbed ──
+  await electronApp.close();
+  electronApp = null;
+  process.env.KHAYT_CONNECTOR_UPDATES = '1';
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
+  const KEY = { id: 'e2e-throwaway', key: publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64') };
+  const signText = (msg) => crypto.sign(null, Buffer.from(msg, 'utf8'), privateKey).toString('base64');
+  const INDEX_URL = 'https://khaytapp.com/connectors/index.json';
+  const NOW3 = Date.now();
+  function signedIndex(serial, row) {
+    const ix = { khaytIndex: 1, serial, issuedAt: new Date(NOW3 - 3600e3).toISOString(), expires: new Date(NOW3 + 30 * 86400e3).toISOString(), entries: [row] };
+    return Object.assign(ix, { signature: { keyId: KEY.id, sig: signText(U.indexSigningMessage(ix)) } });
+  }
+  const rowAt = (version, extra) => Object.assign({ kind: 'connector', id: ID, version, url: `https://khaytapp.com/connectors/${ID}/${version}.json`, sha256: 'a'.repeat(64) }, extra || {});
+  const l3 = await launchApp(userData);
+  electronApp = l3.electronApp;
+  const w3 = l3.window;
+  // The throwaway key joins main's list for this run only; every https fetch
+  // in main is served from __e2eFiles (absent → a failed download).
+  await electronApp.evaluate((_electron, key) => {
+    const M3 = process.mainModule.require('./lib/plugin-manifest.js');
+    if (!M3.SIGNING_KEYS.some((k) => k.id === key.id)) M3.SIGNING_KEYS.push(key);
+    globalThis.__e2eFiles = {};
+    globalThis.fetch = async (url) => {
+      const body = globalThis.__e2eFiles[String(url)];
+      if (body === undefined) return new Response('', { status: 404 });
+      return new Response(Buffer.from(body, 'base64'), { status: 200 });
+    };
+  }, KEY);
+  const serve = (files) => electronApp.evaluate((_electron, f) => { globalThis.__e2eFiles = f; }, files);
+  const b64 = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64');
+  await dismissWizard(w3);
+  await stubReviewed(electronApp);
+  await openConnections(w3);
+  // The launch check may be in flight (served nothing, or the real index if
+  // it ran before the stub); either way it changes nothing here. Wait it out.
+  await w3.waitForTimeout(1500);
+  if (!(await w3.$('.plg-row [data-plugin-act="revert"]'))) fail('no Revert after the update, before any withdrawal');
+  const runCheck = () => w3.evaluate(() => checkConnectorUpdates());
+
+  // 7a. The index withdraws 2.0.0, the version kept for Revert.
+  await serve({ [INDEX_URL]: b64(signedIndex(6, rowAt('2.1.0', { revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForFunction(() => !document.querySelector('.plg-row [data-plugin-act="revert"]'), null, { timeout: 10000 });
+  const why = await w3.evaluate(() => document.querySelector('.plg-row .plg-revert-withdrawn')?.textContent);
+  if (why !== 'Khayt withdrew version 2.0.0, so you can’t go back to it.') fail(`no reason given for the missing Revert: ${why}`);
+  {
+    const s = readDisk().settings; const st = U.stateOf(s, ID);
+    if (st.previous || st.updatedFrom !== '2.0.0' || s.connectorUpdates.serial !== 6) fail(`after the withdrawal: ${JSON.stringify(st)} serial ${s.connectorUpdates.serial}`);
+  }
+  // 7b. A serial-only check: saved, nothing else changes.
+  const before7b = readDisk().settings.plugins;
+  await serve({ [INDEX_URL]: b64(signedIndex(7, rowAt('2.1.0', { revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForTimeout(800);
+  if (readDisk().settings.connectorUpdates.serial !== 7) fail('a check that changed nothing else did not save its serial');
+  if (JSON.stringify(readDisk().settings.plugins) !== JSON.stringify(before7b)) fail('a serial-only check changed the connector');
+
+  // 7c. 2.2.0 is offered (asks more): the badge comes, after a check, no reload.
+  const V3 = sample('2.2.0', { n: '{customer.name}', p: '{customer.phone}', a: '{customer.address}', e: '{customer.email}', j: '{order.number}' },
+    { t: '{order.id}', j: '{order.number}' });
+  delete V3.signature;
+  const V3s = Object.assign({}, V3, { signature: signText(M.canonicalJSON(V3)) });
+  const v3bytes = Buffer.from(JSON.stringify(V3s), 'utf8');
+  const v3sha = crypto.createHash('sha256').update(v3bytes).digest('hex');
+  const row3 = rowAt('2.2.0', { sha256: v3sha, revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] });
+  await serve({ [INDEX_URL]: b64(signedIndex(8, row3)), [row3.url]: v3bytes.toString('base64') });
+  await runCheck();
+  await w3.waitForSelector('.plg-row .plg-update-badge', { timeout: 10000 });
+  if (!(await w3.$('.settings-nav-item .plg-nav-badge'))) fail('no nav badge for the waiting 2.2.0');
+  if (U.stateOf(readDisk().settings, ID).pending?.version !== '2.2.0') fail('2.2.0 is not waiting on disk');
+
+  // 7d. The next index withdraws 2.2.0: the badge goes, after a check, no reload.
+  await serve({ [INDEX_URL]: b64(signedIndex(9, rowAt('2.2.0', { sha256: v3sha,
+    revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }, { version: '2.2.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForFunction(() => !document.querySelector('.plg-row .plg-update-badge')
+    && !document.querySelector('.settings-nav-item .plg-nav-badge')
+    && !document.querySelector('.plg-row [data-plugin-act="review-update"]'), null, { timeout: 10000 });
+  {
+    const s = readDisk().settings; const st = U.stateOf(s, ID);
+    if (st.pending || s.connectorUpdates.serial !== 9 || s.plugins.find((p) => p.id === ID).version !== '2.1.0') fail(`after withdrawing 2.2.0: ${JSON.stringify(st)}`);
+  }
 
   console.log('connector update smoke: ok');
 } finally {
