@@ -106,7 +106,8 @@ struct FloorPanel: View {
             // What a person would go to the app FOR, rather than a list of
             // everything the app can do.
             VStack(spacing: 1) {
-                MenuLine(text: shop.words.callIt("mac.mb_open_khayt"), key: "⌘0") {
+                // The shortcut keeps its order in an Arabic panel: it drew "0⌘".
+                MenuLine(text: shop.words.callIt("mac.mb_open_khayt"), key: "\u{2066}⌘0\u{2069}") {
                     openWindow(id: "shop")
                     NSApp.activate(ignoringOtherApps: true)
                 }
@@ -395,8 +396,16 @@ private struct HeroCard: View {
             if camera {
                 // The picture is on the machine's card in the main window; the
                 // panel does not start a second stream of stills.
-                Button(shop.words.callIt("mac.camera")) { FloorStatus.shared.open(machine: line.id) }
-                    .buttonStyle(.borderless)
+                // A plain button in the accent, not `.borderless`: that style is
+                // an AppKit control, which the snapshot's `ImageRenderer`
+                // cannot draw (it photographed as a yellow "no entry" sign).
+                Button { FloorStatus.shared.open(machine: line.id) } label: {
+                    Text(shop.words.callIt("mac.camera")).fontWeight(.medium)
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             if !stopped, let step, let machine {
                 Button(shop.words.callIt(step.wordKey)) { Task { await shop.tell(machine, step.verb) } }
@@ -423,7 +432,7 @@ private struct HeroCard: View {
 
     static func colour(_ hex: String) -> Color {
         guard let (r, g, b) = CalculatorModel.rgb(hex) else { return Color(nsColor: .tertiaryLabelColor) }
-        return Color(red: r, green: g, blue: b)
+        return Color(red: r / 255, green: g / 255, blue: b / 255)
     }
 }
 

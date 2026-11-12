@@ -349,9 +349,11 @@ struct DigitsLeftoversTests {
         let grid = try QuoteSheetStatusTests.source("LibraryGrid.swift")
         #expect(!grid.contains("Text(verbatim: \"\\(shop.shownFiles.count)\")"))
         #expect(grid.contains("Text(verbatim: shop.words.numeral(shop.shownFiles.count))"))
-        let menu = try QuoteSheetStatusTests.source("MenuBar.swift")
+        // The panel moved to its own file with the hero card (`MenuBarPanel.swift`).
+        let menu = try QuoteSheetStatusTests.source("MenuBarPanel.swift")
         #expect(!menu.contains("Text(verbatim: \"\\(status.progress)%\")"))
-        // The fleet rows (Menu bar progress) say it through `mac.mbp_pct`.
+        #expect(!menu.contains("\\(line.progress)"), "a bare Int in the panel skips the digits setting")
+        // The hero card and the rows say it through `mac.mbp_pct`.
         #expect(menu.contains("shop.words.numeral(line.progress)"))
         // The live print's figure on Today's machine cards, counted bare.
         let dash = try QuoteSheetStatusTests.source("TodayPieces.swift")

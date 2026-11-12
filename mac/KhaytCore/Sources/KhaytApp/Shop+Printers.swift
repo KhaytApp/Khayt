@@ -238,7 +238,7 @@ extension Shop {
     /// protocol cannot take it, or has not been asked yet: draw nothing. The
     /// press is `tell`, below, for both.
     struct PrintStep: Equatable {
-        let verb: PrinterControl.Verb
+        let verb: PrinterVerb
         let wordKey: String
         let enabled: Bool
     }

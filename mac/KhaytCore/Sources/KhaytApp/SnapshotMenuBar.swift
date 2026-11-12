@@ -172,6 +172,7 @@ extension Snapshot {
             if scene == .runout { held.filamentOut = true }
             shop.printers.setReadingForTesting("MACH-u1", reading(held))
             shop.printers.setReadingForTesting("MACH-x1c", reading(standby))
+            shop.printers.setReadingForTesting("MACH-core-one", reading(standby))
         case .free:
             for machine in shop.machinesInUse {
                 shop.printers.setReadingForTesting(machine.id, reading(standby))

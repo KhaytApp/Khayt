@@ -417,7 +417,12 @@ enum FloorRead {
     @MainActor
     static func headline(_ lines: [FloorLine], now: Date, words: Words) -> String {
         let running = lines.filter(\.printing)
-        guard !running.isEmpty else { return words.callIt("mac.nothing_printing") }
+        guard !running.isEmpty else {
+            // A print held part-way is not "nothing on the beds": say what
+            // holds it, in the words its card uses.
+            if let held = hero(lines)?.attention { return words.callIt(held.wordKey) }
+            return words.callIt("mac.nothing_printing")
+        }
         let count = words.counting(running.count, "mac.printing_count")
         let soonest = running.compactMap { line in
             line.left.map { leftNow(left: $0, readAt: line.readAt, now: now).seconds }
@@ -646,12 +651,16 @@ enum StatusGlyph {
 ///
 /// ── MOTION, AND ONLY WHILE SOMEBODY IS LOOKING ───────────────────────────
 ///
-/// The ring eases to each new reading over about a second, and a printing
-/// ring has a slow, faint pulse behind it. Both live in a view that exists
-/// only while the panel is open (`FloorStatus.toggle` builds it on opening and
-/// drops it on closing), so nothing animates behind a closed menu bar item.
-/// With Reduce Motion there is no pulse and a value changes at once; with
-/// Increase Contrast the track is solid rather than a tint of the ring.
+/// The ring eases to each new reading (`Motion.progress`, about a second),
+/// and a printing ring has a slow, faint pulse: a thin halo outside it that
+/// breathes with `Alive`, the one repeating movement this app has and the one
+/// it keeps for a print running right now. The ring itself never fades; a
+/// figure that dims every second is a figure that is harder to read. Both
+/// live in a view that exists only while the panel is open
+/// (`FloorStatus.toggle` builds it on opening and drops it on closing), so
+/// nothing animates behind a closed menu bar item. With Reduce Motion there
+/// is no halo and a value changes at once; with Increase Contrast the track
+/// is solid rather than a tint of the ring.
 struct ProgressRing: View {
     let value: Double
     let tint: Color
@@ -661,16 +670,13 @@ struct ProgressRing: View {
     var pulses = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     @Environment(\.colorSchemeContrast) private var contrast
-    @State private var breathed = false
 
     var body: some View {
         ZStack {
             if pulses && !reduced {
-                Circle().stroke(tint, lineWidth: line)
-                    .scaleEffect(breathed ? 1.07 : 1)
-                    .opacity(breathed ? 0 : 0.28)
-                    .animation(.easeOut(duration: 2.6).repeatForever(autoreverses: false), value: breathed)
-                    .onAppear { breathed = true }
+                Circle().stroke(tint.opacity(0.4), lineWidth: max(1, line / 4))
+                    .padding(-(line / 2 + max(2, line / 3)))
+                    .alive()
             }
             Circle().stroke(contrast == .increased ? AnyShapeStyle(Color.primary.opacity(0.55))
                                                    : AnyShapeStyle(tint.opacity(0.22)),
@@ -678,7 +684,7 @@ struct ProgressRing: View {
             Circle().trim(from: 0, to: min(1, max(0, value)))
                 .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(reduced ? nil : .easeInOut(duration: 1), value: value)
+                .animation(Motion.of(Motion.progress, unless: reduced), value: value)
         }
         .frame(width: size, height: size)
         // Progress runs clockwise in every language.

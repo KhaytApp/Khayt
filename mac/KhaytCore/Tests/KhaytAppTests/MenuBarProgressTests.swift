@@ -489,6 +489,8 @@ struct MenuBarProgressTests {
         #expect(FloorRead.headline(lines, now: now, words: words) == "2 printing · next free \(free)")
         #expect(FloorRead.headline([Self.line("i", Self.state("standby"))], now: now, words: words)
                 == words.callIt("mac.nothing_printing"))
+        // A print held part-way is not an empty floor.
+        #expect(FloorRead.headline([Self.line("r", Self.runout(48))], now: now, words: words) == "Out of filament")
     }
 
     @Test("next up: the dispatcher's proposal, else the waiting job due soonest")
