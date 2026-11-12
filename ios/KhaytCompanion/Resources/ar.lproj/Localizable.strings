@@ -1293,8 +1293,8 @@
 "mode.professional" = "احترافي";
 "mode.badge.a11y" = "الوضع: %@، يُضبط على جهاز Mac";
 "simple.stage.ready" = "جاهز";
-"simple.note.on_hold" = "معلّق";
-"simple.note.post" = "تشطيب";
+"simple.note.on_hold" = "متوقف مؤقتاً";
+"simple.note.post" = "قيد المعالجة";
 "simple.note.qc" = "قيد الفحص";
 "simple.note.shipped" = "تم الشحن";
 "simple.note.delivered" = "تم التسليم";
