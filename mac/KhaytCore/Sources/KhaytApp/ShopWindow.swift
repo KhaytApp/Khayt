@@ -501,7 +501,7 @@ private struct OwedSummary: View {
             VStack(alignment: .trailing, spacing: 0) {
                 Text(shop.words.callIt("mac.owed_caps"))
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .textCase(.uppercase)
                     .tracking(Words.spaced(0.6))
                 Text(Money.text(shop.owed, shop.currency))

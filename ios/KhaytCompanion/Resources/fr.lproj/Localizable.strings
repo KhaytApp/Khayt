@@ -1282,3 +1282,8 @@
 "diag.cloud_refused" = "Dernière récupération cloud refusée";
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Chargement impossible";
+"load.retry" = "Réessayer";
+"load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";

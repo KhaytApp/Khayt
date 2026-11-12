@@ -291,7 +291,7 @@ private struct Column: View {
                 // columns collapse as work moves is a board you cannot learn.
                 Text(shop.words.callIt("mac.nothing_here"))
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
             } else {
@@ -443,7 +443,7 @@ private struct JobCard: View {
                     if let thumb = shop.modelThumbnail(for: job) {
                         Thumbnail(source: thumb).padding(3)
                     } else {
-                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(.tertiary)
+                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(Khayt.faint)
                     }
                 }
                 .frame(width: 40, height: 40)

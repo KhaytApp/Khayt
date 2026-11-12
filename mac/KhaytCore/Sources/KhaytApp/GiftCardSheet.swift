@@ -124,7 +124,7 @@ struct OptionalDate: View {
                 DatePicker("", selection: bound, displayedComponents: .date)
                     .labelsHidden()
             } else {
-                Text(shop.words.callIt("common.none")).foregroundStyle(.tertiary)
+                Text(shop.words.callIt("common.none")).foregroundStyle(Khayt.faint)
             }
         }
     }

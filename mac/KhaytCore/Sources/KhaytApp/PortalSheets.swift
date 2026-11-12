@@ -166,7 +166,9 @@ struct CustomerLinkSection: View {
             // "…moved to Pending" only when it was; a refused move says why.
             line = words.callIt(checked.moved ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
             if r.advance, !checked.moved, let why = shop.moveProblem { line += " · " + why }
-        case "declined": line = words.callIt("cloud.portal_declined")
+        // Still a decline, said differently when it answered an older version
+        // of a quote the shop has since changed and sent again.
+        case "declined": line = words.callIt(r.stale == true ? "cloud.portal_declined_earlier" : "cloud.portal_declined")
         default: line = words.callIt(r.paid ? "cloud.portal_deposit_paid" : "cloud.portal_no_response")
         }
         if r.paid, r.response != "none" { line += " · " + words.callIt("cloud.portal_deposit_paid") }

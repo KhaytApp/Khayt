@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "Henüz yanıt yok",
   "cloud.portal_approved": "Müşteri teklifi onayladı",
   "cloud.portal_declined": "Müşteri teklifi reddetti",
+  "cloud.portal_declined_earlier": "Müşteri önceki sürümü reddetti; yenisine yanıt bekleniyor",
   "cloud.portal_approved_advanced": "Müşteri onayladı — sipariş Beklemede durumuna taşındı",
   "cloud.deposit_amount": "İstenecek kapora (isteğe bağlı)",
   "cloud.deposit_payurl": "Ödeme bağlantısı (isteğe bağlı)",

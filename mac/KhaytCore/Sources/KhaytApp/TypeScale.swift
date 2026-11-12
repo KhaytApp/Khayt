@@ -82,6 +82,19 @@ enum TypeScale {
         brand(size, weight ?? labelWeight())
     }
 
+    /// A small heading over a section: monospaced capitals in Latin script.
+    ///
+    /// NOT in Arabic. The system's monospaced face has no Arabic, so the text
+    /// fell back to a typewriter-style face whose letters stand apart — the
+    /// same damage as letter-spacing, by another route (Nov 11 2026 UI review,
+    /// B17). Arabic headings use the ordinary interface face, a step heavier,
+    /// and carry the heading by weight and colour.
+    static func eyebrow(_ size: CGFloat = 11) -> Font { eyebrow(size, joined: Words.lettersJoin) }
+    static func eyebrow(_ size: CGFloat, joined: Bool) -> Font {
+        joined ? .system(size: size + 1, weight: .semibold)
+               : .system(size: size, weight: .medium, design: .monospaced)
+    }
+
     /// EVERY number. Monospaced digits so a column of figures lines up on its
     /// decimal without a single alignment guide — the spec asks for tabular
     /// and this is what tabular means on this platform.
