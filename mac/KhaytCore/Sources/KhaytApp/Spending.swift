@@ -685,6 +685,8 @@ struct SpendBanner: View {
                 Spacer()
                 Button(action: dismiss) { Image(systemName: "xmark") }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .help(Words.upfront("common.close"))
+                    .accessibilityLabel(Words.upfront("common.close"))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)

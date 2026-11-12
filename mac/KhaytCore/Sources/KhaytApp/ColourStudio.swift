@@ -93,7 +93,7 @@ struct ColourStudio: View {
                 // What ΔE means, in Khayt's own words rather than in a comment
                 // only the source can see.
                 Text(shop.words.callIt("cmix.matcher.hint"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                 if matches.isEmpty {
                     Text(shop.words.callIt("cmix.no_filaments"))
                         .font(.callout).foregroundStyle(.secondary)
@@ -124,7 +124,7 @@ struct ColourStudio: View {
                     // dashboard's, in the second place that writes a shelf
                     // quantity without asking what it is counted in.
                     Text(Quantity.say(weight, shop.inventoryUnits[m.id], shop.words))
-                        .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                        .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                 }
             }
             Spacer(minLength: 8)
@@ -156,7 +156,7 @@ struct ColourStudio: View {
                     // then says the gradient runs from the TO colour to the
                     // FROM one — the opposite of the swatches underneath it.
                     // `arrow.forward` turns with the writing direction.
-                    Image(systemName: "arrow.forward").foregroundStyle(.tertiary)
+                    Image(systemName: "arrow.forward").foregroundStyle(Khayt.faint)
                     spoolPicker($toSpool)
                     Spacer(minLength: 12)
                     Text(shop.words.callIt("cmix.steps")).foregroundStyle(.secondary)
@@ -164,7 +164,7 @@ struct ColourStudio: View {
                         .monospacedDigit().fixedSize()
                 }
                 Text(shop.words.callIt("cmix.blend.hint"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                 if !ramp.isEmpty {
                     HStack(spacing: 0) {
                         ForEach(Array(ramp.enumerated()), id: \.offset) { _, hex in

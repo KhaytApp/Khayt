@@ -163,7 +163,7 @@ struct MachineBandView: View {
                         let x = geo.size.width * (minute / band.minutes)
                         Text(Self.clock(band, minute, shop.words))
                             .font(.caption2).monospacedDigit()
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                             .fixedSize()
                             // First and last hug their edges; the rest centre on
                             // the tick, or the row's ends lose their labels.
@@ -215,7 +215,7 @@ struct MachineBandView: View {
                     Text(shop.words.callIt("mac.band_no_protocol"))
                 }
             }
-            .font(.caption2).foregroundStyle(.tertiary)
+            .font(.caption2).foregroundStyle(Khayt.faint)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14).padding(.top, 6)
         }
@@ -311,12 +311,12 @@ struct MachineBandView: View {
                             .foregroundStyle(row.freeMinutes <= 0 ? Khayt.attention : Khayt.note)
                         if !compact {
                             Text(shop.words.callIt("mac.band_free_in", ["hours": .number(band.hours)]))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(Khayt.faint)
                         }
                     } else {
                         // The honest answer, and the reason the totals below are
                         // over fewer machines than the shop owns.
-                        Text("—").font(.title3.weight(.semibold)).foregroundStyle(.tertiary)
+                        Text("—").font(.title3.weight(.semibold)).foregroundStyle(Khayt.faint)
                         Text(shop.words.callIt(
                             shop.machineKinds[row.machineId]?.polled == false
                                 ? "mac.band_not_asked" : "mac.band_unknown"))

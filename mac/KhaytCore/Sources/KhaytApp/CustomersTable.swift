@@ -77,7 +77,7 @@ struct CustomersTable: View {
                 } else if person.isSettled {
                     Text(shop.words.callIt("mac.settled"))
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Khayt.faint)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 } else {
                     Text(Money.figure(person.owed))
@@ -441,7 +441,7 @@ struct CustomerInspector: View {
                                         Text(job.reference)
                                     }
                                     .font(.caption2)
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(Khayt.faint)
                                 }
                                 Spacer(minLength: 8)
                                 Text(job.price > 0
@@ -560,7 +560,7 @@ struct CustomerInspector: View {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 6) {
                             Text(shop.words.callIt(line.wordKey)).font(.callout.weight(.medium))
-                            Text(line.day).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                            Text(line.day).font(.caption).foregroundStyle(Khayt.faint).monospacedDigit()
                             if let delivery = line.deliveryKey {
                                 Text(shop.words.callIt(delivery)
                                      + (line.deliveryProblem.map { ": " + $0 } ?? ""))
@@ -579,6 +579,7 @@ struct CustomerInspector: View {
                         } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.plain)
                             .help(shop.words.callIt("common.delete"))
+                            .accessibilityLabel(shop.words.callIt("common.delete"))
                     }
                 }
                 .padding(.vertical, 2)
