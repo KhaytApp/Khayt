@@ -91,7 +91,7 @@ struct Calculator: View {
                     VStack(alignment: .leading, spacing: 2) {
                         FailureHint(shop: shop, machineId: machineId,
                                     material: shop.spools.first { $0.id == model.lines.first?.spoolId }?.material,
-                                    current: Double(model.rates["failureRate"] ?? "")) { pct in
+                                    current: TypedNumber.parse(model.rates["failureRate"] ?? "")) { pct in
                             model.rates["failureRate"] = Words.plain(.number(pct))
                         }
                     }

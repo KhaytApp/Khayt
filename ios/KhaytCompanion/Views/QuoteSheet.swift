@@ -52,14 +52,14 @@ struct QuoteSheet: View {
                     eyebrow(L10n.tr("quote.rates"))
                     V2FieldCard {
                         V2Field(label: L10n.tr("quote.spool_cost")) {
-                            TextField("", text: $spoolCost, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                            TextField(L10n.tr("quote.spool_cost"), text: $spoolCost, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
                         }
                         V2Field(label: L10n.tr("quote.labor_rate")) {
-                            TextField("", text: $laborRate, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                            TextField(L10n.tr("quote.labor_rate"), text: $laborRate, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
                         }
                         V2Field(label: L10n.tr("quote.margin")) {
                             HStack(spacing: 6) {
-                                TextField("", text: $margin, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
+                                TextField(L10n.tr("quote.margin"), text: $margin, prompt: Text(verbatim: "0")).keyboardType(.decimalPad)
                                 Text(verbatim: "%").foregroundStyle(KhaytDesign.note)
                             }
                         }
@@ -117,7 +117,7 @@ struct QuoteSheet: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             HStack(spacing: 4) {
-                TextField("", text: text, prompt: Text(verbatim: "0"))
+                TextField(label, text: text, prompt: Text(verbatim: "0"))
                     .keyboardType(decimal ? .decimalPad : .numberPad)
                     .font(.khayt(18, .semibold, relativeTo: .body).monospacedDigit())
                     .foregroundStyle(KhaytDesign.ink)

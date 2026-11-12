@@ -47,3 +47,21 @@ test('a body that is not a part is refused, and the quantity is held to a sane r
   assert.equal(R.quotePart(store, Object.assign({}, part, { qty: -4 }), { overheadPerHour: 0 }).body.qty, 1);
   assert.equal(R.quotePart(store, Object.assign({}, part, { qty: 1e9 }), { overheadPerHour: 0 }).body.qty, 100000);
 });
+
+test('with no day handed in, the overhead is asked for TODAY, never for "NaN-NaN-NaN"', () => {
+  // Both callers pass `today`, so the fallback was never reached: it called
+  // `localDay()` with no argument, which is `new Date(undefined)`.
+  const PQ = require('../lib/public-quote.js');
+  const real = PQ.overheadPerHourFor;
+  const asked = [];
+  PQ.overheadPerHourFor = (book, today) => { asked.push(today); return 0; };
+  try {
+    R.quotePart(store, part, {});
+    R.quotePart(store, part, { nowMs: new Date(2026, 10, 11, 9, 0, 0).getTime() });
+    R.quotePart(store, part, { today: '2026-01-02' });
+  } finally { PQ.overheadPerHourFor = real; }
+  assert.match(asked[0], /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(asked[0], R.localDay(Date.now()));
+  assert.equal(asked[1], '2026-11-11');
+  assert.equal(asked[2], '2026-01-02');
+});
