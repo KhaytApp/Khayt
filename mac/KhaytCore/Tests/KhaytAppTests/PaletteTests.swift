@@ -62,8 +62,10 @@ struct PaletteTests {
             ("a recessed strip", Khayt.recessed),
         ]
         let text: [(String, Color)] = [
-            ("cyan", Khayt.brand), ("hot", Khayt.hot), ("done", Khayt.done),
+            ("cyan", Khayt.brand), ("done", Khayt.done),
             ("attention", Khayt.attention), ("late", Khayt.late), ("note", Khayt.note),
+            // Held is purple and its word is set in it (the Kiosk's chip).
+            ("hold", Khayt.hold),
         ]
 
         for dark in [false, true] {
@@ -104,20 +106,103 @@ struct PaletteTests {
 
     /// Two colours that mean opposite things have to be tellable apart.
     ///
-    /// `hot` is printing — the thing going well — and `late` is an invoice
-    /// nobody has paid. They appear on the same dashboard. Warming `hot` to a
-    /// burnt orange moved it toward the red, and "distinguishable" is not a
-    /// thing to decide by looking once.
-    @Test("the heat colour and the alarm colour are not the same colour")
+    /// Printing — the thing going well — and `late`, an invoice nobody has
+    /// paid, appear on the same dashboard. Printing WAS a rust (`hot`) that had
+    /// drifted toward the red until a job at 93% read as a job in trouble
+    /// (Nov 11 2026 review, B12); it is the amber `thread` now. The rule this
+    /// test always held is kept and its cast changed: the printing colour is
+    /// far from the alarm, and also from the green of done and the purple of
+    /// held, which are the other dots on the same board.
+    @Test("the printing colour is not the alarm colour, nor done, nor held")
     func heatIsNotAlarm() {
         for dark in [false, true] {
-            let hot = Self.resolved(Khayt.hot, dark: dark)
-            let late = Self.resolved(Khayt.late, dark: dark)
-            let apart = Self.distance(hot, late)
+            let printing = Self.resolved(Khayt.thread, dark: dark)
             let where_ = dark ? "dark" : "light"
-            #expect(apart >= 25,
-                    "hot and late are \(String(format: "%.0f", apart)) apart in \(where_) — a shop cannot tell a printing job from an overdue invoice")
+            for (name, other) in [("late", Khayt.late), ("done", Khayt.done),
+                                  ("live", Khayt.live), ("hold", Khayt.hold)] {
+                let apart = Self.distance(printing, Self.resolved(other, dark: dark))
+                // The old pair, hot and late, measured 68 apart at their
+                // closest and were still confused; amber is 159 from late at
+                // its closest. `attention` is deliberately NOT in this list:
+                // in dark it is an amber too (27 apart), which is exactly why
+                // the thread is never text and attention is never a fill
+                // that means printing.
+                #expect(apart >= 100,
+                        "printing and \(name) are \(String(format: "%.0f", apart)) apart in \(where_) — a shop cannot tell a printing job from a \(name) one")
+            }
         }
+    }
+
+    /// Printing is amber, and amber is a fill.
+    ///
+    /// `Khayt.thread` is about 2:1 on a white card: a dot or a bar at that
+    /// contrast is a colour, a word at it is not readable. So the stage and
+    /// machine states that mean "printing" resolve to the thread for their
+    /// graphics, and the word beside them is ink that clears AA on the
+    /// thread's own wash.
+    @Test("printing is the amber thread; held is purple; their words are ink")
+    func printingIsAmber() {
+        #expect(Stage.printing.tint == Khayt.thread)
+        #expect(Stage.printing.dot == Khayt.thread)
+        #expect(TodayStage.printing.color == Khayt.thread)
+        #expect(ShopState.running.tint == Khayt.thread)
+        #expect(ShopState.running.ground == Khayt.threadWash)
+        #expect(ShopState.running.ink == Role.text, "PRINTING is a word, so it is ink")
+        #expect(Stage.on_hold.tint == Khayt.hold)
+        #expect(Stage.on_hold.dot == Khayt.hold)
+        // Green stays for done and paid.
+        #expect(Stage.delivered.tint == Khayt.done)
+
+        for dark in [false, true] {
+            let wash = Self.resolved(Khayt.threadWash, dark: dark)
+            let where_ = dark ? "dark" : "light"
+            for (name, ink) in [("primary ink", Role.text)] {
+                let ratio = Self.contrast(Self.resolved(ink, dark: dark), wash)
+                #expect(ratio >= 4.5,
+                        "\(name) is \(String(format: "%.2f", ratio)):1 on the thread's wash, \(where_)")
+            }
+            // And the reason for all of it, pinned so nobody "fixes" the
+            // guard below by deciding amber is readable after all.
+            if !dark {
+                let onCard = Self.contrast(Self.resolved(Khayt.thread, dark: false),
+                                           Self.resolved(Khayt.surface, dark: false))
+                #expect(onCard < 3, "the thread became dark enough to read (\(onCard)); is it still amber?")
+            }
+        }
+    }
+
+    /// THE GUARD for "graphic only — never text".
+    ///
+    /// A source guard, because nothing at runtime can tell a word from a dot.
+    /// A fill, a stroke, a rail and a background are how the thread reaches
+    /// the screen; a `foregroundStyle` or a `tint:` handed to a text view is
+    /// how it would become a word.
+    @Test("no text is set in the amber thread")
+    func amberIsNeverText() throws {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp")
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            .filter { $0.hasSuffix(".swift") && $0 != "Palette.swift" }
+        let banned = ["foregroundStyle(Khayt.thread", "foregroundColor(Khayt.thread",
+                      "AnyShapeStyle(Khayt.thread)", "tint: Khayt.thread", "tint(Khayt.thread",
+                      // The rust that used to mean printing. Gone, on purpose.
+                      "Khayt.hot"]
+        var seen = 0
+        for file in files.sorted() {
+            let source = try String(contentsOf: dir.appending(path: file), encoding: .utf8)
+            if source.contains("Khayt.thread") { seen += 1 }
+            for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+                let text = String(line)
+                let code = text.components(separatedBy: "//").first ?? text
+                for token in banned where code.contains(token) {
+                    Issue.record(Comment(rawValue:
+                        "\(file): \(token) — amber is a fill; the word beside it is ink\n  \(code.trimmingCharacters(in: .whitespaces))"))
+                }
+            }
+        }
+        #expect(seen >= 8, "the guard read \(seen) files that use the thread; it is looking in the wrong place")
     }
 
     /// Rough perceptual distance, enough to catch two colours that have drifted
@@ -139,7 +224,9 @@ struct PaletteTests {
     /// somebody switches appearance.
     @Test("each colour is lighter in dark appearance than in light")
     func theyActuallyAdapt() {
-        for (name, color) in [("brand", Khayt.brand), ("hot", Khayt.hot), ("done", Khayt.done),
+        // `thread` is absent on purpose: it is one amber in both appearances,
+        // a fill on a wash that does the adapting (`threadWash`).
+        for (name, color) in [("brand", Khayt.brand), ("hold", Khayt.hold), ("done", Khayt.done),
                               ("attention", Khayt.attention), ("late", Khayt.late),
                               ("note", Khayt.note), ("marked", Khayt.marked)] {
             let light = Self.luminance(Self.resolved(color, dark: false))
@@ -169,7 +256,7 @@ struct PaletteTests {
         return min(d, 360 - d)
     }
 
-    /// The accent is the icon's NAVY, and `hot` is the icon's FILAMENT.
+    /// The accent is the icon's NAVY, and `thread` is the icon's FILAMENT.
     ///
     /// ── WHY THIS PINS A HUE AND NOT A VALUE ───────────────────────────────
     ///

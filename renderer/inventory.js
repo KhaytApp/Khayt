@@ -1696,7 +1696,7 @@ function renderInventory() {
       valEl.innerHTML = `
         <span>${escapeHtml(t('inv.total_value'))}: <strong style="color:var(--success);">${fmtMoney(totalValue)}</strong></span>
         <span style="margin-inline-start:16px;">${escapeHtml(t('inv.total_stock'))}: <strong>${fmtCount(Math.round(totalGrams))}g</strong></span>
-        ${lowCount > 0 ? `<span style="margin-inline-start:16px; color:var(--low-stock);">${_iIcoL('alert', '⚠')}${lowCount} ${escapeHtml(t('inv.low_stock_count'))}</span>` : ''}
+        ${lowCount > 0 ? `<span style="margin-inline-start:16px; color:var(--low-stock);">${_iIcoL('alert', '⚠')}${escapeHtml(t(lowCount === 1 ? 'inv.low_stock_count_one' : 'inv.low_stock_count_many', { n: lowCount }))}</span>` : ''}
       `;
       valEl.style.display = 'flex';
     } else {
@@ -4526,7 +4526,7 @@ function renderPurchaseOrders() {
     ${poSuspectBannerHtml()}
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
       <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span>${escapeHtml(t('po.title'))}</span></h3>
-      <input type="search" id="poSearch" class="search-input" placeholder="${escapeHtml(t('po.search_ph'))}" value="${escapeHtml(poSearchTerm)}" style="max-width:200px;">
+      <input type="search" id="poSearch" class="search-input" aria-label="${escapeHtml(t('a11y.search_pos'))}" placeholder="${escapeHtml(t('po.search_ph'))}" value="${escapeHtml(poSearchTerm)}" style="max-width:200px;">
       <select id="poStatusSel" style="background:var(--bg-elev);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
         <option value=""${poStatusFilter===''?' selected':''}>${escapeHtml(t('common.all'))}</option>
         <option value="draft"${poStatusFilter==='draft'?' selected':''}>${escapeHtml(t('po.status.draft'))}</option>

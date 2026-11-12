@@ -264,8 +264,8 @@ struct TriageCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             HStack(spacing: Space.sm) {
-                Text(card.state.glyph)
-                CapsLabel(card.title, tint: card.state.tint, size: 10)
+                Text(card.state.glyph).foregroundStyle(card.state.tint)
+                CapsLabel(card.title, tint: card.state.ink, size: 10)
             }
             VStack(alignment: .leading, spacing: Space.sm) {
                 ForEach(Array(card.lines.enumerated()), id: \.offset) { index, line in

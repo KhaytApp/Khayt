@@ -402,6 +402,18 @@ final class Shop {
         productRows = rows
     }
 
+    /// Empty the book's jobs, customers, shelf and catalogue, for the capture
+    /// run's pictures of each screen with nothing on it. The book on disk is
+    /// not touched, and loading any book puts everything back.
+    func pretendEmptyBook() {
+        orders = []
+        clients = []
+        spools = []
+        consumables = []
+        productRows = []
+        catalogueRows = []
+    }
+
     /// Give the shop a library, for a test. The book on disk is not touched.
     func pretendLibrary(_ rows: [JSONValue]) {
         files = withPrintHistory(Self.decodeFiles(["printFiles": .array(rows)]).items)
@@ -3302,6 +3314,12 @@ final class Shop {
     var libraryFitsOn: String? { didSet { if libraryFitsOn != oldValue { libraryViewChanged() } } }
     /// One creator's models. See `LibraryFile.creator`.
     var libraryCreator: String? { didSet { libraryViewChanged() } }
+    /// The Colour menu's chosen rows — colour families, `multi`, `none`
+    /// (`LibraryFile.colourTokens`). Several are OR: a model under any of
+    /// them is in.
+    var libraryColours: Set<String> = [] { didSet { if libraryColours != oldValue { libraryViewChanged() } } }
+    /// The File type menu's chosen rows (`ModelFileType` raw values), OR.
+    var libraryFileTypes: Set<String> = [] { didSet { if libraryFileTypes != oldValue { libraryViewChanged() } } }
     /// The library as models (true, the default — "All models") or as
     /// folders ("Groups"). In All models a group that is one print in parts is
     /// still one tile; see `libraryEntries`.
