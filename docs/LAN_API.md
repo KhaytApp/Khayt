@@ -252,7 +252,7 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
 
 ```json
 {
-  "total": 7, "offset": 0, "unfilteredTotal": 7,
+  "total": 7, "offset": 0, "matchedTotal": 31, "unfilteredTotal": 31,
   "folders": [ { "path": "Saudi Kings/Large", "name": "Large", "count": 12 } ],
   "facets": { "colour": { "red": 3, "orange": 0, "…": 0, "multi": 2, "none": 41 },
               "type": { "3mf": 30, "stl": 14, "step": 0, "obj": 0, "gcode": 2, "other": 0, "nofile": 3 } },
@@ -270,14 +270,21 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
 ```
 
 `facets` counts each menu's rows over everything EXCEPT that menu's own choice
-(the search or folder, and the other menu), so choosing Blue does not zero the
-other colours. Every key is always present, zeros included; take the menu's
-order from the key lists above, not from the object. `total` and `items` are
-the fully narrowed list, and `unfilteredTotal` is what the search or the folder
-held before the two menus (for "26 of 312"; equal to `total` when nothing is
-chosen). `folders` follows the menus too: a sub-folder is listed for the models
-under it that pass, at that count, so a tap never opens a folder the filter has
-emptied. **A computer from before
+(and with the other menu applied), so choosing Blue does not zero the other
+colours. Every key is always present, zeros included; take the menu's order
+from the key lists above, not from the object.
+
+**What is counted.** With `q`, the search's results. Without it, the folder
+AND everything under it, the same reach as a sub-folder's `count`: at the top
+of a library whose red models are all in folders, Red reads their number, not
+0. `matchedTotal` and `unfilteredTotal` are counted the same way: the models in
+that reach that pass both menus, and all of them (for "26 of 312").
+
+`total` and `items` are the models LISTED here, fully narrowed: in a folder
+that is only the ones filed directly in it, so `total` can be 0 while
+`matchedTotal` is not (the matches are in sub-folders). `folders` follows the
+menus too: a sub-folder is listed for the models under it that pass, at that
+count, so a tap never opens a folder the filter has emptied. **A computer from before
 this sends no `facets` and ignores the two parameters: a phone hides both
 menus when `facets` is absent.**
 

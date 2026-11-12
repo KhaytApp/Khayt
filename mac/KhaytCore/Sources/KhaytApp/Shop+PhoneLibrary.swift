@@ -102,7 +102,8 @@ extension Shop {
     nonisolated static func libraryPage(_ files: [LibraryFile], q: String, folder: String,
                                         offset: Int, limit: Int,
                                         passes: ((LibraryFile) -> Bool)? = nil,
-                                        narrow: (([LibraryFile]) -> [LibraryFile])? = nil)
+                                        narrow: (([LibraryFile]) -> [LibraryFile])? = nil,
+                                        scope: (([LibraryFile]) -> Void)? = nil)
         -> (total: Int, files: [LibraryFile], folders: [(path: String, name: String, count: Int)]) {
         let live = files.filter { !$0.isArchived }
         let words = SearchText.fold(q).split(whereSeparator: \.isWhitespace).map(String.init)
@@ -114,8 +115,16 @@ extension Shop {
                 let fields = file.searchFields + [file.groupName ?? "", file.category ?? ""]
                 return words.allSatisfy { w in fields.contains { !$0.isEmpty && SearchText.containsFolded($0, w) } }
             }
+            scope?(chosen)
         } else {
             chosen = live.filter { folderPath($0.groupName) == here }
+            // What the menus and "N of M" are counted over: the folder AND
+            // everything under it, the same reach as its sub-folders' counts
+            // (`lib/lan-library.js list` says why they must agree).
+            if let scope {
+                let under = here.isEmpty ? "" : here + "/"
+                scope(live.filter { let p = folderPath($0.groupName); return p == here || p.hasPrefix(under) })
+            }
             var counts: [String: Int] = [:]
             let prefix = here.isEmpty ? "" : here + "/"
             for file in live {
@@ -173,15 +182,16 @@ extension Shop {
     /// `GET /api/library`'s answer.
     func phoneLibrary(q: String, folder: String, offset: Int, limit: Int,
                       filter: PhoneLibraryFilter = .init()) -> JSONValue {
-        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:], unfiltered = 0
+        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:], unfiltered = 0, inScope = 0
         let tokens: (LibraryFile) -> [String] = { self.libraryColourTokens($0) }
         let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit,
-                                    passes: { filter.passes($0, tokens: tokens) }) { matched in
-            unfiltered = matched.count
-            let narrowed = Self.libraryNarrow(matched, filter, tokens: tokens)
-            colourCounts = narrowed.colour; typeCounts = narrowed.type
-            return narrowed.files
-        }
+                                    passes: { filter.passes($0, tokens: tokens) },
+                                    narrow: { Self.libraryNarrow($0, filter, tokens: tokens).files },
+                                    scope: { scope in
+            unfiltered = scope.count
+            let narrowed = Self.libraryNarrow(scope, filter, tokens: tokens)
+            colourCounts = narrowed.colour; typeCounts = narrowed.type; inScope = narrowed.files.count
+        })
         let items: [JSONValue] = page.files.map { file in
             var o: [String: JSONValue] = [
                 "id": .string(file.id), "name": .string(file.title),
@@ -234,8 +244,10 @@ extension Shop {
             "folders": .array(page.folders.map {
                 .object(["path": .string($0.path), "name": .string($0.name), "count": .number(Double($0.count))])
             }),
-            // What the search or the folder held before the two menus, for
-            // "26 of 312".
+            // "26 of 312": the models in scope that pass both menus, of all
+            // in scope. `total` pages `items`, which in a folder is only the
+            // models filed directly in it.
+            "matchedTotal": .number(Double(inScope)),
             "unfilteredTotal": .number(Double(unfiltered)),
             // An older Mac sends no `facets`; that is how a phone knows not
             // to draw the two menus (docs/LAN_API.md).

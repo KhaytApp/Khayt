@@ -366,10 +366,14 @@ test('colour and type narrow the list: OR within a menu, AND between them and wi
   assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'red' }).folders.map((f) => [f.path, f.count]), [['Deep', 1]]);
   assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'blue' }).folders, [], 'nothing blue under Deep: not offered');
   assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'red', type: '3mf' }).folders, [], 'the red one under Deep is an STL');
-  // "N of M": what the folder or the search held before the menus.
-  assert.equal(LanLibrary.list(FILTERED, {}).unfilteredTotal, 5);
-  assert.deepEqual([LanLibrary.list(FILTERED, { colour: 'blue' }).total, LanLibrary.list(FILTERED, { colour: 'blue' }).unfilteredTotal], [2, 5]);
-  assert.equal(LanLibrary.list(FILTERED, { q: 'f', colour: 'blue' }).unfilteredTotal, 1, 'counted over the search, not the library');
+  // "N of M" is counted over the folder AND everything under it, like the
+  // sub-folders' counts; `total` pages the models listed here.
+  const nOfM = (o) => { const p = LanLibrary.list(FILTERED, o); return [p.total, p.matchedTotal, p.unfilteredTotal]; };
+  assert.deepEqual(nOfM({}), [5, 6, 6]);
+  assert.deepEqual(nOfM({ colour: 'blue' }), [2, 2, 6]);
+  assert.deepEqual(nOfM({ colour: 'red' }), [1, 2, 6], 'one red here, another under Deep');
+  assert.deepEqual(nOfM({ folder: 'Deep', colour: 'red' }), [1, 1, 1]);
+  assert.deepEqual(nOfM({ q: 'f', colour: 'blue' }), [0, 0, 1], 'for a search all three are over the search');
 });
 
 test('each menu is counted over everything but its own choice, with every key present', () => {
@@ -378,9 +382,24 @@ test('each menu is counted over everything but its own choice, with every key pr
   const none = LanLibrary.list(FILTERED, {}).facets;
   assert.deepEqual(Object.keys(none.colour), ColourFamily.TOKENS, 'every colour key, in the menu\'s order');
   assert.deepEqual(Object.keys(none.type), ModelFileType.TYPES);
-  assert.deepEqual(none.colour, { red: 1, orange: 0, yellow: 0, green: 0, blue: 2, purple: 0, pink: 0, brown: 0,
+  // Counted over the top folder and everything under it: the red STL in Deep is in.
+  assert.deepEqual(none.colour, { red: 2, orange: 0, yellow: 0, green: 0, blue: 2, purple: 0, pink: 0, brown: 0,
     black: 0, grey: 0, white: 1, multi: 1, none: 2 });
-  assert.deepEqual(none.type, { '3mf': 2, stl: 1, step: 0, obj: 0, gcode: 1, other: 0, nofile: 1 });
+  assert.deepEqual(none.type, { '3mf': 2, stl: 2, step: 0, obj: 0, gcode: 1, other: 0, nofile: 1 });
+  // THE CASE THIS SCOPE EXISTS FOR: two loose models, the reds all in folders.
+  // The menu must not say Red 0 beside a folder that says it holds two.
+  const nested = [
+    { id: 'x', name: 'X', colors: [{ hex: '#00ff00' }] }, { id: 'y', name: 'Y' },
+    { id: 'h1', name: 'H1', folder: 'Home', colors: [{ hex: '#ff0000' }] },
+    { id: 'h2', name: 'H2', folder: 'Home/Deep', colors: [{ hex: '#ff0000' }] },
+  ];
+  const top = LanLibrary.list(nested, { colour: 'red' });
+  assert.equal(top.facets.colour.red, 2);
+  assert.deepEqual(top.folders.map((f) => [f.path, f.count]), [['Home', 2]]);
+  assert.deepEqual([top.total, top.matchedTotal, top.unfilteredTotal, ids(top)], [0, 2, 4, []]);
+  assert.equal(LanLibrary.list(nested, {}).facets.colour.red, 2, 'and with nothing chosen the row is not greyed');
+  const home = LanLibrary.list(nested, { folder: 'Home', colour: 'red' });
+  assert.deepEqual([ids(home), home.matchedTotal, home.folders.map((f) => f.count)], [['h1'], 2, [1]]);
 
   // Choosing Blue does not zero the other colours; it narrows the TYPE counts.
   const blue = LanLibrary.list(FILTERED, { colour: 'blue' }).facets;
