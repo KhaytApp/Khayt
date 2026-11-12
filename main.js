@@ -7213,9 +7213,8 @@ ipcMain.handle('hub:connector-updates-check', async () => {
   try {
     const disk = readStoreDecryptedFromDisk();
     if (!disk || !disk.settings) return { ok: false, error: 'no store' };
-    // TODO: use KhaytPluginUpdate.SCHEMA once the Mac's lib PR exports it; 1 until then.
     const U = require('./lib/plugin-update.js');
-    const ctx = { platform: 'desktop', appVersion: app.getVersion(), schema: U.SCHEMA ?? 1, nowMs: Date.now() };
+    const ctx = { platform: 'desktop', appVersion: app.getVersion(), schema: U.SCHEMA, nowMs: Date.now() };
     const prepared = await connectorUpdates.prepare(disk.settings, { fetchBytes: connectorFetchBytes, ctx });
     const dry = connectorUpdates.applyPrepared(disk.settings, prepared);
     if (!dry.ok || !dry.changed) return { ok: dry.ok, reason: dry.reason, changed: false, notes: dry.notes };
