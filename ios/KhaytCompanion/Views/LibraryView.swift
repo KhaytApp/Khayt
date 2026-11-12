@@ -54,9 +54,6 @@ struct LibraryFolderPage: View {
     @State private var problem: String?
     @State private var loading = false
     @State private var ownMenu: LibraryFilterMenu?
-    /// How many the search and folder find before the filters, from the
-    /// last load without any — the Mac does not say it on a filtered page.
-    @State private var unfiltered: (key: String, total: Int)?
 
     private var title: String {
         folder.isEmpty ? L10n.tr("library.title") : (folder.split(separator: "/").last.map(String.init) ?? folder)
@@ -73,7 +70,7 @@ struct LibraryFolderPage: View {
                 // A Mac that cannot filter sends no counts: no menus then.
                 if let page, let facets = page.facets {
                     LibraryFilterBar(filter: $filter, facets: facets, shown: page.total,
-                                     of: page.unfilteredTotal ?? (unfiltered?.key == baseKey ? unfiltered?.total : nil),
+                                     of: page.unfilteredTotal,
                                      open: folder.isEmpty ? $openMenu : $ownMenu)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
@@ -153,7 +150,6 @@ struct LibraryFolderPage: View {
         defer { loading = false }
         do {
             page = try await api.fetchLibrary(query: query, folder: query.isEmpty ? folder : "", filter: filter)
-            if filter.isEmpty, let page { unfiltered = (baseKey, page.total) }
             more = []
             problem = nil
         } catch is CancellationError {

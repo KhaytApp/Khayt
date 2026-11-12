@@ -11,14 +11,14 @@ struct LibraryPage: Decodable, Equatable, Sendable {
     /// (`LibraryFilter`). Nil from a Mac that cannot filter yet: the phone
     /// then hides both menus rather than guess from its version.
     var facets: LibraryFacets?
-    /// How many models the search and folder find before the two menus
-    /// narrow them, where the phone counted it itself (its copy, the sample
-    /// shop). The Mac does not send it.
+    /// How many models the search or folder held before the two menus
+    /// narrowed them ("N of M"). Sent with `facets`; equal to `total` when
+    /// nothing is picked.
     var unfilteredTotal: Int?
     /// Read from the phone's copy because the Mac could not be reached.
     var fromCopy = false
 
-    private enum CodingKeys: String, CodingKey { case total, offset, folders, items, facets }
+    private enum CodingKeys: String, CodingKey { case total, offset, folders, items, facets, unfilteredTotal }
 
     init(total: Int, offset: Int, folders: [LibraryFolder], items: [LibraryItem],
          facets: LibraryFacets? = nil, unfilteredTotal: Int? = nil) {
@@ -36,6 +36,7 @@ struct LibraryPage: Decodable, Equatable, Sendable {
         total = (try? c.decode(Int.self, forKey: .total)) ?? items.count
         offset = (try? c.decode(Int.self, forKey: .offset)) ?? 0
         facets = try? c.decodeIfPresent(LibraryFacets.self, forKey: .facets)
+        unfilteredTotal = (try? c.decodeIfPresent(Int.self, forKey: .unfilteredTotal)).flatMap { $0 }
     }
 }
 

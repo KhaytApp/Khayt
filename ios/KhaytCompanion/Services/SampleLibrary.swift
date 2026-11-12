@@ -36,7 +36,7 @@ enum SampleLibrary {
     /// phone-held library always has them.
     static func page(_ items: [LibraryItem], query: String, folder: String, offset: Int = 0, limit: Int = 50,
                      filter: LibraryFilter = LibraryFilter()) -> LibraryPage {
-        let (folders, found) = search(items, query: query, folder: folder)
+        let (folders, found) = search(items, query: query, folder: folder, filter: filter)
         let kept = found.filter(filter.matches)
         let slice = Array(kept.dropFirst(offset).prefix(limit))
         return LibraryPage(total: kept.count, offset: offset, folders: folders, items: slice,
@@ -46,7 +46,11 @@ enum SampleLibrary {
     /// Every word must appear in the name, folder, tags or category, ignoring
     /// case and diacritics. Without words: the models directly in `folder`,
     /// and its immediate sub-folders with how many models sit under each.
-    static func search(_ all: [LibraryItem], query: String, folder: String) -> ([LibraryFolder], [LibraryItem]) {
+    /// The folders follow the two menus: each counts the models at or under
+    /// it that pass them, and one with none is left out. `found` is NOT
+    /// narrowed by the menus — the caller counts facets over it.
+    static func search(_ all: [LibraryItem], query: String, folder: String,
+                       filter: LibraryFilter = LibraryFilter()) -> ([LibraryFolder], [LibraryItem]) {
         func fold(_ s: String) -> String { s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
         let words = query.split(whereSeparator: \.isWhitespace).map { fold(String($0)) }
         let order: (LibraryItem, LibraryItem) -> Bool = { a, b in
@@ -62,7 +66,7 @@ enum SampleLibrary {
         let here = all.filter { ($0.folder ?? "") == folder }.sorted(by: order)
         let prefix = folder.isEmpty ? "" : folder + "/"
         var counts: [String: Int] = [:]
-        for item in all {
+        for item in all where filter.matches(item) {
             guard let f = item.folder, f.hasPrefix(prefix), f != folder else { continue }
             let child = f.dropFirst(prefix.count).split(separator: "/").first.map(String.init) ?? ""
             if !child.isEmpty { counts[prefix + child, default: 0] += 1 }

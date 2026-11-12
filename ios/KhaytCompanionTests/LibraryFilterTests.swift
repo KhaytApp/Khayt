@@ -133,6 +133,41 @@ final class LibraryFilterTests: XCTestCase {
                        "the red phone stand is tagged desk too, and the colour pick leaves it out")
     }
 
+    func testUnfilteredTotalIsReadFromTheMac() throws {
+        let json = #"{"total":26,"offset":0,"folders":[],"items":[],"unfilteredTotal":312,"facets":{"colour":{},"type":{}}}"#
+        let page = try JSONDecoder().decode(LibraryPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.total, 26)
+        XCTAssertEqual(page.unfilteredTotal, 312, "N of M: M is the Mac's, never a cached guess")
+        let older = #"{"total":5,"items":[]}"#
+        XCTAssertNil(try JSONDecoder().decode(LibraryPage.self, from: Data(older.utf8)).unfilteredTotal)
+    }
+
+    func testFoldersFollowTheMenusAndAnEmptyOneIsLeftOut() {
+        let green = LibraryFilter(colours: ["green"])
+        let top = SampleLibrary.page(query: "", folder: "", filter: green)
+        XCTAssertEqual(top.folders, [LibraryFolder(path: "Home", name: "Home", count: 1)],
+                       "only Home holds a green model (the lantern, under Home/Lighting); the rest are left out")
+        XCTAssertEqual(top.items.map(\.id), ["PF-sample-planter"])
+        XCTAssertEqual(top.unfilteredTotal, 7)
+        let plain = SampleLibrary.page(query: "", folder: "", filter: LibraryFilter())
+        XCTAssertEqual(plain.folders.map(\.name), ["Gifts", "Home", "Parts", "Saudi Kings"], "nothing picked: the normal shape")
+        XCTAssertEqual(plain.unfilteredTotal, plain.total, "nothing picked: M equals N")
+        let both = SampleLibrary.page(query: "", folder: "", filter: LibraryFilter(colours: ["black"], types: ["stl"]))
+        XCTAssertEqual(both.folders, [LibraryFolder(path: "Parts", name: "Parts", count: 1)], "a folder counts what passes BOTH menus")
+    }
+
+    func testAFolderCanHoldItsMatchesOnlyDeeperDown() {
+        let green = LibraryFilter(colours: ["green"])
+        let home = SampleLibrary.page(query: "", folder: "Home", filter: green)
+        XCTAssertTrue(home.items.isEmpty, "the spiral vase filed in Home has no colour, so Home shows none of its own")
+        XCTAssertEqual(home.total, 0)
+        XCTAssertEqual(home.unfilteredTotal, 1)
+        XCTAssertEqual(home.folders, [LibraryFolder(path: "Home/Lighting", name: "Lighting", count: 1)],
+                       "but its sub-folder holds the match, so the page is folders, not an empty library")
+        let lighting = SampleLibrary.page(query: "", folder: "Home/Lighting", filter: green)
+        XCTAssertEqual(lighting.items.map(\.id), ["PF-sample-lantern"])
+    }
+
     func testTheCloudCopyWorksOutTheTypeFromTheWholeRecord() throws {
         func row(_ o: [String: JSONValue]) -> KhaytCompanion.LibraryItem? { LibraryCopy.item(.object(o)) }
         let web = try XCTUnwrap(row(["id": .string("PF-web"), "name": .string("From the web")]))
