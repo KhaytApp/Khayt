@@ -392,7 +392,7 @@ function updateTabBadges() {
   }
   // Overdue orders badge on logs tab
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const overdueCount = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o) && new Date(o.dueDate + 'T00:00:00') < today).length;
+  const overdueCount = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o) && o.status !== 'cancelled' && new Date(o.dueDate + 'T00:00:00') < today).length;
   const logsTabBtn = document.querySelector('.tab-btn[data-tab="logs-tab"]');
   if (logsTabBtn) {
     let badge = logsTabBtn.querySelector('.tab-badge');
@@ -420,7 +420,7 @@ async function checkDueDateNotifications() {
   if (Notification.permission !== 'granted') return;
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const active = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o));
+  const active = printLog.filter(o => o.dueDate && !KhaytOrderStatus.isFinished(o) && o.status !== 'cancelled');
 
   const overdue = active.filter(o => new Date(o.dueDate + 'T00:00:00') < today);
   const dueToday = active.filter(o => {

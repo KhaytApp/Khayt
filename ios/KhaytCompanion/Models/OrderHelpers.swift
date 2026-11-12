@@ -1,16 +1,22 @@
 import Foundation
 
 extension QueueOrder {
+    /// Past its day AND still open. A cancelled or finished job is not late,
+    /// however long ago its day was.
     var isOverdue: Bool {
-        DueDateParser.isOverdue(dueDate)
+        OrderOpenness.isOpen(status: status, voided: voided) && DueDateParser.isOverdue(dueDate)
     }
 
     var formattedDueDate: String? { DueDateParser.display(dueDate) }
 }
 
 extension OrderLogEntry {
+    var isVoided: Bool { voidedAt?.present ?? false }
+
+    /// Past its day AND still open — History holds finished and cancelled jobs
+    /// too, and those are never late.
     var isOverdue: Bool {
-        DueDateParser.isOverdue(dueDate)
+        OrderOpenness.isOpen(status: status, voided: isVoided) && DueDateParser.isOverdue(dueDate)
     }
 
     /// Whether a quote's last day has gone by, on the shop's calendar day —
@@ -39,6 +45,18 @@ enum QuoteList {
                 let da = a.date ?? "", db = b.date ?? ""
                 return da != db ? da > db : a.id > b.id
             }
+    }
+}
+
+/// Whether a job can still be late: `lib/attention.js` `isOpenOrder`, which
+/// the desktop and the Mac both use. A finished, legacy-delivered, quoted,
+/// cancelled or voided job is not open. Anything else — on hold, shipped, a
+/// status this phone does not know — is.
+enum OrderOpenness {
+    static let closedStatuses: Set<String> = ["completed", "delivered", "quote", "cancelled"]
+
+    static func isOpen(status: String, voided: Bool) -> Bool {
+        !voided && !closedStatuses.contains(status)
     }
 }
 
@@ -131,6 +149,7 @@ extension QueueOrder {
         self.init(id: entry.id, project: entry.project, client: entry.client, status: entry.status,
                   machine: nil, machineId: nil, dueDate: entry.dueDate, priority: nil,
                   jobNumber: entry.jobNumber)
+        self.voided = entry.isVoided
     }
 }
 
