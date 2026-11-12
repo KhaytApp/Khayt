@@ -14158,13 +14158,19 @@ public actor KhaytEngine {
 
     /// `canDelete` for one printer, against the WHOLE book — every collection
     /// that names a machine counts, including ones added after this was written.
+    ///
+    /// The rule is asked about the whole book and HANDED only what it reads
+    /// (`MachineDeleteBook.trimmed`): which machine each record names. It used
+    /// to be handed every field of every record, 26 MB on a shop with a large
+    /// library, to count a few ids.
     public func machineCanDelete(book: [String: JSONValue], id: String) throws -> MachineDeleteVerdict {
         try runtime.call2("KhaytMachineStatus.canDelete(ARG0, ARG1)",
-                          [.object(book), .string(id)], as: MachineDeleteVerdict.self)
+                          [.object(MachineDeleteBook.trimmed(book)), .string(id)],
+                          as: MachineDeleteVerdict.self)
     }
 
     /// `canDelete` for several printers in one crossing — the machines screen
-    /// asks once a load, not once a card.
+    /// asks once a load, not once a card. Trimmed the same way.
     public func machineDeleteVerdicts(book: [String: JSONValue], ids: [String]) throws -> [String: MachineDeleteVerdict] {
         try runtime.call2("""
             (function (b, ids) {
@@ -14172,7 +14178,8 @@ public actor KhaytEngine {
               for (const id of ids) out[id] = KhaytMachineStatus.canDelete(b, id);
               return out;
             })(ARG0, ARG1)
-            """, [.object(book), .array(ids.map { .string($0) })], as: [String: MachineDeleteVerdict].self)
+            """, [.object(MachineDeleteBook.trimmed(book)), .array(ids.map { .string($0) })],
+            as: [String: MachineDeleteVerdict].self)
     }
 
     /// What `remove` did: the machine list as it now stands (unchanged when it
