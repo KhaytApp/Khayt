@@ -185,7 +185,7 @@ function studioKanbanProgress(log) {
 }
 
 function studioKanbanDuePill(log, status) {
-  if (!log.dueDate || status === 'completed' || status === 'delivered') return '';
+  if (!log.dueDate || status === 'completed' || status === 'delivered' || status === 'cancelled') return '';
   const today0 = new Date();
   today0.setHours(0, 0, 0, 0);
   const due = new Date(log.dueDate + 'T00:00:00');
@@ -284,7 +284,7 @@ function renderStudioKanbanCard(b) {
         <span>${log.printTime} ${escapeHtml(t('common.hours'))}</span><span>·</span>
         <span>${escapeHtml(partsLabel)}</span>
       </div>
-      <div class="order-meta-row">${biz ? paymentBadge(log) : ''}${log.dueDate && !KhaytOrderStatus.isFinished(log) ? ' ' + formatDueDateBadge(log.dueDate) : ''}${timerBadge}${etaBadge}</div>`;
+      <div class="order-meta-row">${biz ? paymentBadge(log) : ''}${log.dueDate && !KhaytOrderStatus.isFinished(log) && log.status !== 'cancelled' ? ' ' + formatDueDateBadge(log.dueDate) : ''}${timerBadge}${etaBadge}</div>`;
 
   return `
     <div class="kanban-card khayt-kcard${_pl === 'urgent' ? ' kanban-priority-urgent' : _pl === 'high' ? ' kanban-priority-high' : ''}${pausedClass}${cardClientAccent ? ' has-client-accent' : ''}" draggable="true" data-order-id="${log.id}" style="${cardClientAccent}">

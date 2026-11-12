@@ -219,7 +219,7 @@ function renderLogs() {
     const isPaid = ps === 'paid';
     const photoCount = (log.printPhotos || []).length;
     const fileCount  = (log.attachedFiles || []).length;
-    const isOverdue = log.dueDate && !KhaytOrderStatus.isFinished(log) && new Date(log.dueDate + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
+    const isOverdue = log.dueDate && !KhaytOrderStatus.isFinished(log) && log.status !== 'cancelled' && new Date(log.dueDate + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
     const isSel = selectedOrders.has(log.id);
     const logOperator = log.operatorId ? operators.find(o => o.id === log.operatorId) : null;
     const logSplitBadge = log.splitInto && log.splitInto.length > 0 ? `<span class="split-badge">🔀 ${escapeHtml(t('ord.split_badge', { n: log.splitInto.length }))}</span>` : '';
@@ -243,7 +243,7 @@ function renderLogs() {
       <td style="width:32px;padding:8px 6px;"><input type="checkbox" class="log-sel" data-id="${log.id}" style="width:auto;" ${isSel ? 'checked' : ''}></td>
       <td style="font-family: var(--font-num); font-size: 12px; color: var(--text-dim); white-space:nowrap;">${escapeHtml(log.date)}</td>
       <td>
-        ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && !KhaytOrderStatus.isFinished(log) ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
+        ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && !KhaytOrderStatus.isFinished(log) && log.status !== 'cancelled' ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
         ${logOperator ? `<span class="operator-badge">👤 ${escapeHtml(logOperator.name)}</span>` : ''}
         ${(log.tags && log.tags.length > 0) ? `<div style="margin-top:3px;">${renderTagChips(log.tags, true)}</div>` : ''}
         <div style="font-family: var(--font-num); font-size: 11.5px; color: var(--text-muted);">${escapeHtml(jobRef(log))}${photoCount ? ` · ${photoCount}📷` : ''}${fileCount ? ` · ${fileCount}📎` : ''}${log.notes ? ' · 📝' : ''}</div>

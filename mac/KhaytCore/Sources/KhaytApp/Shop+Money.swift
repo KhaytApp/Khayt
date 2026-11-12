@@ -113,8 +113,13 @@ extension Shop {
         for p in parts {
             var row: [String: JSONValue] = [
                 "name": .string(p.name.isEmpty ? unnamed : p.name),
-                "printWeight": .number(Double(p.grams) ?? 0),
-                "printTime": .number(Double(p.hours) ?? 0),
+                // `TypedNumber.parse`, as the sheet's own costing and totals
+                // use: `Double("١٥٠")` and `Double("1,5")` are nil, so a part
+                // typed in Arabic digits or with a decimal comma was priced
+                // right on screen and SAVED with 0 g and 0 h (beta.34
+                // pre-release review).
+                "printWeight": .number(TypedNumber.parse(p.grams) ?? 0),
+                "printTime": .number(TypedNumber.parse(p.hours) ?? 0),
                 "qty": .number(Double(max(1, p.qty))),
                 // What the shared cost model said, frozen: a job priced today
                 // must not re-cost itself at next year's filament prices.
@@ -764,8 +769,13 @@ extension Shop {
     /// One record changes, not three — but through the same door as a move, so
     /// the ownership check, the atomic swap and the undo are the ones already
     /// proven rather than a second set written for money.
-    func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async {
-        guard permitted("invoicing", "edit") else { return }
+    /// True when the payment is in the book. What follows the write — the
+    /// email, the webhooks, the accounting push, the customer's page — can
+    /// each fail and say so in `moveProblem` without the payment being any
+    /// less recorded, so the sheet closes on this and not on a clean banner.
+    @discardableResult
+    func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async -> Bool {
+        guard permitted("invoicing", "edit") else { return false }
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
         let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title"), as: .person("invoicing", "edit")) { order, engine, root in
@@ -826,7 +836,7 @@ extension Shop {
         }
         // After the write, like a move's: a delivery that went out for a
         // payment the book then refused to keep would be a lie told outward.
-        guard wrote else { return }
+        guard wrote else { return false }
         Telemetry.feature(.paymentRecorded, in: self)
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
@@ -839,6 +849,7 @@ extension Shop {
         // waves it through), and then nothing carried it: the page went on
         // asking for money already paid.
         await republishPortalIfPublished(id)
+        return true
     }
 
     /// The email a recorded payment owes the customer, or nil when it owes

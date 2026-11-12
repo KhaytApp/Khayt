@@ -1282,3 +1282,8 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "تعذّر التحميل";
+"load.retry" = "أعد المحاولة";
+"load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";

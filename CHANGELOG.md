@@ -6,6 +6,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Simple mode on Windows/Linux follows SIMPLE_MAP (S4).** What the map marks Professional is out of Simple: the schedule view and suggested assignments, the kiosk view, campaigns, parts to buy and a machine's service interval and value, the supplier reorder list and the "Draft PO" button, a job's change order, payment plan and pay-later button. A Professional screen reached anyway (search, a link, switching to Simple while on it) shows "{Screen} is part of Professional" with a Switch to Professional button that lands on it, instead of the dashboard or an empty page: Expenses, Settings › Team & Access and AI; kiosk, schedule and campaigns offer the same switch. Simple now has Settings › Notifications & Messages with the WhatsApp templates only, and connectors a shop installs. The top-bar location picker shows only with two or more locations, in either mode. A "Simple" badge sits beside the name in the sidebar head. Expenses and Analytics keep today's Simple behaviour until their short forms are drawn.
 - Spec (no behaviour change): `lib/feature-tiers.js` gains `SIMPLE_MAP`, one table of what Simple shows on each screen for the desktop, the Mac and the iPhone (Nov 11 shared change S4), for the Mac and iPhone sessions to review before any app reads it.
+- **Fix (iPhone): a failed read is never shown as "all clear", and a failed move says why (UI review Nov 11, F3/F4).** These screens used to keep their empty-state title ("Queue clear", "Nothing is owed") and put the error underneath: Orders (and Quotes), Inventory, Machines, Clients, Intake, Home, Owed and End of day. End of day could also spin forever. Each now shows "Couldn't load", the reason and Try again (`LoadFailedView`). Home now keeps what it last showed when the queue read fails. A failed swipe-advance on Home or Orders shows the Mac's reason in the foot note, where it was only a haptic or never drawn. `LoadFailedStateTests` guards all of it. New strings in all 9 languages.
+- **Fix (Windows/Linux): a product with no parts list opens in the editor.** The catalogue's sample products, and products from older builds or imports, carry no `parts`, and the editor threw before it opened (`renderer/inventory.js` read `draft.parts.length`). It now opens with an empty parts list; Save still asks for a part before it stores the product. Found in the Nov 11 desktop UI review (F4).
+- **Fix (iPhone): a cancelled or finished job is never shown as late (Turki, Nov 11).** History's cards, the order page's due date and the Overdue chip and its count asked only whether the due day had passed. Now a job is late only while it is open, by the shared rule in `lib/attention.js` `isOpenOrder`: completed, legacy delivered, quote, cancelled and voided jobs never are. The phone reads `voidedAt` from the book and, since #2397, from `/api/orders`. `OverdueOpenJobsTests` pins the rule and checks it against the lib.
+- **Fix: a cancelled job is never shown as overdue (Turki, Nov 11).** A cancelled job keeps its due date, and the overdue rules left it in, so a job cancelled before its due date sat on the dashboard as overdue. Fixed in the shared attention list (`lib/attention.js`, which also feeds the dashboard's late count on every theme, and the Mac where it reads that list), what the AI assistant is told is overdue and owed, payment reminders, and the desktop's own dashboard overdue/due-soon lists, Logs badge and tab count, board due chips, calendar and desktop notifications. `test/cancelled-is-never-late.test.js` covers each, with a ratchet on the renderer. The LAN `/api/orders` list (desktop and Mac) now sends `voidedAt` on a voided job, so a phone on Wi-Fi alone can tell it is not live work.
+- **Fix (Mac): ⌘→, ⌘← and ⌘⌫ no longer act on the selected job while you are typing.** Job ▸ Move Along (⌘→), Move Back (⌘←) and File ▸ Delete… (⌘⌫) are also "end of line", "start of line" and "delete to the start of the line" in a text field, and the menu bar took them first: with a job selected, pressing ⌘→ in the search field moved the job a stage instead of the caret. While a field is being edited those keys now go to the text. With nothing being typed they work as before (Nov 11 UI review).
 - **Loyalty tiers are shown to Simple shops on Windows/Linux, as on the Mac (Turki, Nov 10).** The loyalty card moves out of the pro-only Team & Access pane into Pricing & Tax, where the Mac has it. The Mac's FeatureModeTests check now reads the card's own tag and the pane that holds it, not the 600 characters before the switch. The old check never saw that the Access panel hid loyalty. `test/settings-panes.test.js` guards the same rule on the desktop.
 - **Arabic: the app is خيط in Arabic letters on Windows/Linux (Turki, Nov 10).** 19 strings that said "Khayt" now say "تطبيق خيط" (where خيط alone could read as "filament"), "سحابة خيط" for Khayt Cloud, or "مشروع خيط". Latin stays only in the "Khayt · خيط" window title, the `X-Khayt-Signature` header names, the iCloud backup folder path and the app's name as Google lists it. `test/locale-ar-cloud-name.test.js` pins that list.
 - **Fix (Windows/Linux): the data file is never missing while it is saved.** Each save moved `khayt-store.json` to `.prev` and then the new copy into place, so for a moment there was no book at all. A read in that gap failed: the Electron smoke test's restore check on CI, a LAN merge, or a sync client watching the folder, which could see a deletion. A read could also wander into crash recovery. `.prev` is now a hard link beside the book (or, on disks without links, a copy carrying the old date), and the new copy replaces the book in one rename, as the Mac's StoreWriter does. On Windows, where that rename is refused while another program (antivirus, the indexer, a sync client) has the book open, it is tried again for about 1.5 s before the save is reported failed. The book is untouched until it succeeds.
@@ -9540,6 +9545,43 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.34] - 2026-11-11
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release fixes two faults found in daily use, a job moving when you pressed ⌘→ while typing and a cancelled job shown as late, and carries the fixes from the 10 November review of the whole app.
+
+If you run Khayt on more than one Mac, update them all. Until then, change a customer's currency or a job's customer only on an updated Mac: an older build does not protect the jobs' figures when it does that.
+
+### Fixed
+
+- **⌘→, ⌘← and ⌘⌫ no longer act on the selected job while you are typing.** They are Move Along, Move Back and Delete… in the menus, and also "end of line", "start of line" and "delete to the start of the line" in a text field. With a job selected, pressing ⌘→ in the search field moved the job a stage. While a field is being edited those keys now go to the text.
+- **A cancelled or finished job is never counted as late.** A cancelled job with a past due date was shown overdue on Today, in reminders and to the assistant.
+- **A customer's currency no longer revalues their jobs.** Giving a customer with finished SAR jobs the currency EUR turned a paid 1,000 SAR into 1,000 EUR. Each job now keeps the currency it was priced in.
+- **An iPhone's change no longer silently replaces work done on the Mac since.** When a phone's copy replaces the Mac's, the Mac keeps what it replaced, says so, and offers **Put back**.
+- **Numbers are read as typed.** A weight, time or price typed in Arabic digits or with a decimal comma was read as 0 or as the wrong figure. New Job, the product editor, Edit Job, agreed prices, the calculator and the completion sheet now read them, and a part entered that way is saved with its weight and print time.
+- **Sheets close when the save is in the book, not before**, so a save that is refused no longer loses what was typed. Record payment closes once the payment is written even if the email or a webhook after it fails, and a second press of Save no longer makes a second spool or consumable.
+- **A part cannot be added to a new job twice** when Return and the Add button land together.
+- **The book's lock is kept across a reload**, so a background save (a library scan, a phone's changes, a printer finishing) is no longer refused as "another app owns this book". A damaged book with a good rollback copy can be saved over.
+- **The board draws at most 120 cards a column**, and in Completed and Shipped it keeps the newest.
+- **A storefront's or carrier's genuine delivery is no longer shut out by somebody else's bad requests.** The signature is judged before the lockout.
+- **The receipt paperclip on an expense opens only a picture or a PDF from the receipts folder**, and an API token can no longer reach the route that takes a phone's job photos.
+- **Arabic:** Khayt Cloud is "سحابة خيط" everywhere; a customer's or supplier's phone number, email and tax number are typed and shown left to right; letter-spacing is off on headings and report cards, where it pulled joined letters apart.
+
+### Added
+
+- **New Job takes a promised date and a note**, and Cancel asks before throwing away a job that has parts on it.
+- **Edit Job can change the job's name.**
+- **A job's customer can be changed** until its invoice is submitted to ZATCA, voided, credited or paid. A job with no customer can always be given one.
+- **An iPhone can file an expense with a photographed receipt, and ask for a price, when its host is a Mac.** Receipts open from the Expenses screen.
+- **File ▸ New** has New Spool, Add Printer, Add Expense and Log Waste; empty screens offer their first action; the Stage column sorts in the order work moves.
+- **Minimum order amount** (Settings › Pricing & Tax) is now read: New Job warns when the total is under it.
+
+### Not switched on yet
+
+- **Connectors** stay hidden until they launch on the Mac, Windows/Linux and iPhone together with the published privacy text. This build carries the rules for updating a connector from a signed list; nothing checks for updates yet.
 
 ## [4.0.0-beta.33] - 2026-11-10
 

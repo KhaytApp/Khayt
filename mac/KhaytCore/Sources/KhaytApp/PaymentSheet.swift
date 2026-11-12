@@ -18,6 +18,8 @@ struct PaymentSheet: View {
     let subject: Shop.PendingHold
 
     @State private var amount: Double = 0
+    /// A save is on its way to the book; a second press waits for it.
+    @State private var saving = false
     @State private var method = "cash"
     @State private var paidAt = Date()
     @State private var started = false
@@ -209,10 +211,18 @@ struct PaymentSheet: View {
         // The sheet closes when the payment is IN the book. It used to close
         // first, so a refusal (another computer holds the book, the staff
         // lock) lost what was typed and said so only behind it.
+        //
+        // It closes when the payment is WRITTEN, whatever happened to the
+        // email or the webhook after it: a failed send left the sheet open
+        // with an error over a payment that was already in the book. And one
+        // press is one payment's worth of sending.
+        guard !saving else { return }
+        saving = true
         shop.moveProblem = nil
         Task {
-            await shop.recordPayment(id, amount: paid, method: how, paidAt: when)
-            if shop.moveProblem == nil { shop.clearQuestion() }
+            let wrote = await shop.recordPayment(id, amount: paid, method: how, paidAt: when)
+            saving = false
+            if wrote { shop.clearQuestion() }
         }
     }
 }

@@ -19,6 +19,8 @@ struct ConsumableSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    /// A save is on its way to the book; a second press waits for it.
+    @State private var saving = false
     /// Delete was pressed and not yet answered: it sat beside Save, one click.
     @State private var deleting: Consumable?
     @State private var stock: Double = 0
@@ -205,9 +207,13 @@ struct ConsumableSheet: View {
         let was = opened?.input
         let id = existing?.id
         // Closes when the save is in the book, not before: see PaymentSheet.
+        // One press, one record: see SpoolSheet.
+        guard !saving else { return }
+        saving = true
         shop.moveProblem = nil
         Task {
             await shop.saveConsumable(input, id: id, opened: was)
+            saving = false
             if shop.moveProblem == nil, shop.spendProblem == nil { dismiss() }
         }
     }

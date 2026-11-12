@@ -1282,3 +1282,8 @@
 "diag.cloud_refused" = "Último download da nuvem recusado";
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Não foi possível carregar";
+"load.retry" = "Tentar de novo";
+"load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";
