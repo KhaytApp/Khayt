@@ -224,15 +224,37 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// What the last save did, in the shop's language. Shown under the paper.
     @Published var note: String?
 
+    /// The page as it was handed to WebKit, kept to hand it over again.
+    private let page: String
+    /// How many times the page has been handed to WebKit. A digit pass that
+    /// was started for an earlier one must not mark a later one drawn.
+    private var loads = 0
+    /// How many times WebKit's process for this page went away under it.
+    private(set) var processLosses = 0
+    /// The last thing WebKit said went wrong with the load, if anything did.
+    private var loadProblem: String?
+    /// The print that is waiting on WebKit, if one is.
+    private var printing: Printed?
+
+    /// How many times a page whose process went away is handed over again.
+    /// Not for ever: a page that kills its process every time would loop.
+    static let reloads = 3
+
     /// `wholePage`: the document is a page of its own, styles and all — the
     /// packing slip (`lib/shop-documents.js`) — and is drawn as it is rather
     /// than inside the invoice's stylesheet.
     init(document: InvoiceDocument, wholePage: Bool = false) {
         self.document = document
         self.webView = DocumentWeb.view()
+        self.page = wholePage ? document.html : Self.page(document)
         super.init()
         webView.navigationDelegate = self
-        webView.loadHTMLString(wholePage ? document.html : Self.page(document), baseURL: nil)
+        load()
+    }
+
+    private func load() {
+        loads += 1
+        webView.loadHTMLString(page, baseURL: nil)
     }
 
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
@@ -242,10 +264,60 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         // rewrite has run would let a fast hand save a PDF with the digits
         // still in 0–9. The pass is awaited first.
         guard document.arabicNumerals else { drawn = true; return }
+        let load = loads
         Task { @MainActor in
             _ = try? await view.evaluateJavaScript(Self.digitPass(document.selector))
-            drawn = true
+            // The page this pass ran on may have gone since it was asked for
+            // (see `webViewWebContentProcessDidTerminate`).
+            if load == loads { drawn = true }
         }
+    }
+
+    /// WebKit draws the page in a process of its own, and that process can go
+    /// away: the system ends it when memory is short, or it crashes.
+    ///
+    /// ── WHAT HAPPENED WITHOUT THIS ────────────────────────────────────────
+    ///
+    /// Nothing, for ever, which was the fault. WebKit says so here and
+    /// nowhere else: `didFinish` never arrives for a page whose process went
+    /// before the load ended. Measured by ending the process on purpose: gone
+    /// before the load finished, `drawn` stayed false and the sheet's Save,
+    /// Share and Print stayed grey until it was closed; gone after it,
+    /// `drawn` stayed TRUE over an empty view, and a PDF asked for then never
+    /// came back at all (the print waits on a process that is not there).
+    ///
+    /// The tests met this as a paper that was still not drawn after its
+    /// ten-minute hang guard on a loaded runner. Whether that runner lost
+    /// the process is not known; this is the one way found to make a page
+    /// never finish. A main thread busy with other work did not do it, and
+    /// neither did a process stopped for seventy seconds.
+    ///
+    /// So the page is handed to WebKit again, which starts a new process, a
+    /// few times at most. A print that was waiting is told it failed.
+    func webViewWebContentProcessDidTerminate(_ view: WKWebView) {
+        drawn = false
+        processLosses += 1
+        printing?.finish(false)
+        printing = nil
+        guard processLosses <= Self.reloads else { return }
+        load()
+    }
+
+    func webView(_ view: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        loadProblem = "\(error)"
+    }
+
+    func webView(_ view: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        loadProblem = "\(error)"
+    }
+
+    /// Where the page has got to, for a test or a log that has to say why a
+    /// paper is not drawn. Not shown to a shop.
+    var condition: String {
+        "drawn=\(drawn) loads=\(loads) processLosses=\(processLosses) "
+            + "loading=\(webView.isLoading) progress=\(webView.estimatedProgress) "
+            + "problem=\(loadProblem ?? "none")"
     }
 
     /// Rewrite the document's digits to Arabic-Indic, AS THE APP rather than
@@ -315,7 +387,15 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// print media instead, which is the half of `renderer/invoice.css` written
     /// for paper: `@page { size: A4 }`, the margins, and the black-on-white the
     /// shop's colours give way to.
+    ///
+    /// Refused until the page is drawn. WebKit prints a page it has not laid
+    /// out as one blank sheet and calls that a success: an 856-byte PDF,
+    /// measured, where this invoice is 75 KB. Every caller waits for `drawn`
+    /// first, but two of them (Share…, and the profit-and-loss export) wait
+    /// only so long and then asked anyway, so on a Mac slow enough the shop
+    /// was handed the blank sheet as its invoice. Now they are told it failed.
     func pdf() async throws -> Data {
+        guard drawn else { throw Failure.printFailed }
         let info = Self.a4Info()
         info.jobDisposition = .save
 
@@ -384,9 +464,14 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         // `run()` waits for them on the very run loop they need, forever. The
         // documentation for `printOperation(with:)` says so in as many words;
         // it was read after the first attempt hung a test for ten minutes.
-        let printed = Printed()
+        let saving = operation.printInfo.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] as? URL
+        let printed = Printed(saving: saving)
+        // Kept so that losing WebKit's process can end the wait: until the
+        // page is drawn again, the print operation does not report back.
+        printing = printed
+        defer { if printing === printed { printing = nil } }
         return await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
-            printed.done = done
+            printed.wait(done)
             operation.runModal(for: host, delegate: printed,
                                didRun: #selector(Printed.printOperationDidRun(_:success:contextInfo:)),
                                contextInfo: nil)
@@ -395,12 +480,57 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
 
     /// The print operation's way of saying it finished: an Objective-C
     /// selector, on an object that holds the continuation waiting for it.
-    private final class Printed: NSObject {
-        var done: CheckedContinuation<Bool, Never>?
+    ///
+    /// ── IT KEEPS ITSELF UNTIL APPKIT HAS SPOKEN ───────────────────────────
+    ///
+    /// AppKit does not keep this object, and it calls it from the thread the
+    /// print ran on, whenever the print ends. While `run` waited for exactly
+    /// that, `run` kept it. Now a wait can be ended early (WebKit's process
+    /// went), and the print operation still ends later, once the page has
+    /// been drawn again, and still calls: the first run of the test for this
+    /// died in `-[NSConcretePrintOperation _finishModalOperation]`, sending
+    /// that message to an object that had been let go. So it holds itself
+    /// from `wait` until the operation reports, and a lock decides which of
+    /// the two threads answers the wait.
+    private final class Printed: NSObject, @unchecked Sendable {
+        private let lock = NSLock()
+        private var done: CheckedContinuation<Bool, Never>?
+        private var untilAppKitReports: Printed?
+        /// Where a print to a file is writing, if it is.
+        private let saving: URL?
+
+        init(saving: URL?) { self.saving = saving }
+
+        func wait(_ done: CheckedContinuation<Bool, Never>) {
+            lock.lock()
+            self.done = done
+            untilAppKitReports = self
+            lock.unlock()
+        }
+
         @objc func printOperationDidRun(_ op: NSPrintOperation, success: Bool,
                                         contextInfo: UnsafeMutableRawPointer?) {
-            done?.resume(returning: success)
+            // Nobody is waiting any more when the wait was ended early, and
+            // nobody will read the file a late print wrote: `pdf()` has gone.
+            // lock: system — the app's own temporary PDF, not a shop's file
+            if !finish(success), let saving { try? FileManager.default.removeItem(at: saving) }
+            lock.lock()
+            let me = untilAppKitReports
+            untilAppKitReports = nil
+            lock.unlock()
+            _ = me
+        }
+
+        /// Answer the wait, once. Whichever of the print and the lost process
+        /// speaks second is not heard. True when this call was the answer.
+        @discardableResult
+        func finish(_ success: Bool) -> Bool {
+            lock.lock()
+            let waiting = done
             done = nil
+            lock.unlock()
+            waiting?.resume(returning: success)
+            return waiting != nil
         }
     }
 
