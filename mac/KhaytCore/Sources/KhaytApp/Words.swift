@@ -6211,7 +6211,7 @@ final class Words {
         "mac.mbp_m": ["en": "{m}m", "ar": "\u{2068}{m} د\u{2069}"],
         "mac.mbp_more": ["en": "+{n}", "ar": "\u{2068}+{n}\u{2069}"],
         "mac.mbp_left": ["en": "{left} left", "ar": "المتبقي \u{2068}{left}\u{2069}"],
-        "mac.mbp_done_at": ["en": "done {time}", "ar": "ينتهي \u{2068}{time}\u{2069}"],
+        "mac.mbp_done_at": ["en": "done at {time}", "ar": "ينتهي \u{2068}{time}\u{2069}"],
         "mac.mbp_attn_fault": ["en": "Fault", "ar": "عطل"],
         "mac.mbp_attn_paused": ["en": "Paused", "ar": "متوقفة مؤقتًا"],
         "mac.mbp_attn_runout": ["en": "Out of filament", "ar": "نفد الخيط"],
@@ -6229,6 +6229,27 @@ final class Words {
         "mac.mbp_notice_finished": ["en": "{machine} finished printing", "ar": "انتهت \u{2068}{machine}\u{2069} من الطباعة"],
         "mac.mbp_notice_failed": ["en": "The print on {machine} failed", "ar": "فشلت الطباعة على \u{2068}{machine}\u{2069}"],
         "mac.mbp_notice_paused": ["en": "{machine} is paused", "ar": "\u{2068}{machine}\u{2069} متوقفة مؤقتًا"],
+        // ── The menu bar's hero card (`MenuBarPanel.swift`) ───────────────
+        // One print large, the others as rows, the empty floor, the finish
+        // moment and the chime's switch. Figures, times and names inside an
+        // Arabic sentence are isolated, as above.
+        "mac.mbh_title": ["en": "On the machines", "ar": "على الطابعات"],
+        "mac.mbh_next_free_at": ["en": "next free {time}", "ar": "أول جهاز يفرغ \u{2068}{time}\u{2069}"],
+        "mac.mbh_left_est": ["en": "about {left} left", "ar": "المتبقي نحو \u{2068}{left}\u{2069}"],
+        "mac.mbh_finished": ["en": "Finished", "ar": "انتهت"],
+        "mac.mbh_free_since": ["en": "Free since {time}", "ar": "فارغة منذ \u{2068}{time}\u{2069}"],
+        "mac.mbh_plates_free": ["en": "All {n} plates are free", "ar": "الأسرّة الـ\u{2068}{n}\u{2069} كلها فارغة"],
+        "mac.mbh_plate_free": ["en": "The plate is free", "ar": "السرير فارغ"],
+        "mac.mbh_next_up": ["en": "Next up: {job}.", "ar": "التالي: \u{2068}{job}\u{2069}."],
+        "mac.mbh_next_up_today": ["en": "Next up: {job}, due today.", "ar": "التالي: \u{2068}{job}\u{2069}، مستحق اليوم."],
+        "mac.mbh_next_up_due": ["en": "Next up: {job}, due {date}.", "ar": "التالي: \u{2068}{job}\u{2069}، مستحق \u{2068}{date}\u{2069}."],
+        "mac.mbh_start_next": ["en": "Start the next job", "ar": "ابدأ العمل التالي"],
+        "mac.mbh_nothing_queued": ["en": "Nothing queued. Enjoy the quiet.", "ar": "لا شيء في الانتظار. استمتع بالهدوء."],
+        "mac.mbh_done_title": ["en": "{job} is done", "ar": "اكتمل \u{2068}{job}\u{2069}"],
+        "mac.mbh_vo_printing": ["en": "printing {job}", "ar": "تطبع \u{2068}{job}\u{2069}"],
+        "mac.mbh_vo_percent": ["en": "{pct} percent", "ar": "\u{2068}{pct}\u{2069} بالمئة"],
+        "mac.mbh_open_machine": ["en": "Open machine", "ar": "افتح الطابعة"],
+        "mac.mbh_chime": ["en": "Play a soft chime when a print finishes", "ar": "تشغيل نغمة هادئة عند انتهاء طباعة"],
 
         // ── A printer's working life: under service, retired, deleted ─────
         // (`Shop+MachineLife.swift`, `lib/machine-status.js`).

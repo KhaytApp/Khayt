@@ -3927,5 +3927,22 @@
  "mac.job_customer_locked_credited": "La facture a un avoir : le client ne peut plus être modifié.",
  "mac.job_customer_locked_paid": "Un paiement a été reçu pour ce travail : le client ne peut plus être modifié.",
  "mac.job_customer_unknown": "Ce client n’est plus dans le registre.",
- "mac.job_customer_currency": "Ce client est facturé dans une autre devise. Le travail garde son prix et sa devise."
+ "mac.job_customer_currency": "Ce client est facturé dans une autre devise. Le travail garde son prix et sa devise.",
+ "mac.mbh_title": "Sur les machines",
+ "mac.mbh_next_free_at": "prochaine libre à {time}",
+ "mac.mbh_left_est": "environ {left} restantes",
+ "mac.mbh_finished": "Terminée",
+ "mac.mbh_free_since": "Libre depuis {time}",
+ "mac.mbh_plates_free": "Les {n} plateaux sont libres",
+ "mac.mbh_plate_free": "Le plateau est libre",
+ "mac.mbh_next_up": "À suivre : {job}.",
+ "mac.mbh_next_up_today": "À suivre : {job}, à rendre aujourd’hui.",
+ "mac.mbh_next_up_due": "À suivre : {job}, à rendre le {date}.",
+ "mac.mbh_start_next": "Lancer le travail suivant",
+ "mac.mbh_nothing_queued": "Rien en attente. Profitez du calme.",
+ "mac.mbh_done_title": "{job} est terminé",
+ "mac.mbh_vo_printing": "impression de {job}",
+ "mac.mbh_vo_percent": "{pct} pour cent",
+ "mac.mbh_open_machine": "Ouvrir la machine",
+ "mac.mbh_chime": "Jouer un son discret quand une impression se termine"
 }

@@ -3927,5 +3927,22 @@
  "mac.job_customer_locked_credited": "La factura tiene una nota de crédito, así que ya no se puede cambiar el cliente.",
  "mac.job_customer_locked_paid": "Ya se cobró un pago por este trabajo, así que ya no se puede cambiar el cliente.",
  "mac.job_customer_unknown": "Ese cliente ya no está en el libro.",
- "mac.job_customer_currency": "A este cliente se le factura en otra moneda. El trabajo conserva su precio y su moneda."
+ "mac.job_customer_currency": "A este cliente se le factura en otra moneda. El trabajo conserva su precio y su moneda.",
+ "mac.mbh_title": "En las máquinas",
+ "mac.mbh_next_free_at": "próxima libre {time}",
+ "mac.mbh_left_est": "quedan unos {left}",
+ "mac.mbh_finished": "Terminada",
+ "mac.mbh_free_since": "Libre desde {time}",
+ "mac.mbh_plates_free": "Las {n} bandejas están libres",
+ "mac.mbh_plate_free": "La bandeja está libre",
+ "mac.mbh_next_up": "Siguiente: {job}.",
+ "mac.mbh_next_up_today": "Siguiente: {job}, vence hoy.",
+ "mac.mbh_next_up_due": "Siguiente: {job}, vence el {date}.",
+ "mac.mbh_start_next": "Empezar el siguiente trabajo",
+ "mac.mbh_nothing_queued": "Nada en cola. Disfruta de la calma.",
+ "mac.mbh_done_title": "{job} está listo",
+ "mac.mbh_vo_printing": "imprimiendo {job}",
+ "mac.mbh_vo_percent": "{pct} por ciento",
+ "mac.mbh_open_machine": "Abrir máquina",
+ "mac.mbh_chime": "Reproducir un tono suave cuando termine una impresión"
 }

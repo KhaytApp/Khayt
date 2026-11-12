@@ -3061,6 +3061,9 @@ final class Shop {
 
     /// The last print that ended on each machine, as `printFinished` saw it.
     var lastPrintEnded: [String: FinishCamera.Ended] = [:]
+    /// And when: `Ended` carries no time, and the menu bar panel says "Free
+    /// since 9:10 am" and holds a finished print's green for a few seconds.
+    var lastPrintEndedAt: [String: Date] = [:]
 
     // Stored for "A job's photo, on its product" (Shop+Jobs.swift).
     /// The job whose invoice is on screen.

@@ -180,6 +180,11 @@ extension Shop {
     /// that disagrees with this one about what "finished" means.
     func printFinished(_ ended: FinishCamera.Ended) async {
         lastPrintEnded[ended.machineId] = ended
+        lastPrintEndedAt[ended.machineId] = Date()
+        // One soft chime, only when this Mac's owner switched it on
+        // (`FinishChime`). Here and not in the panel: this seam is the one
+        // place that knows a print finished, once per print.
+        if ended.outcome == "finished" { FinishChime.ring() }
         // The notification on this Mac: finished or failed, once per print.
         noticePrintEnded(ended)
         await settleEnergy(ended)

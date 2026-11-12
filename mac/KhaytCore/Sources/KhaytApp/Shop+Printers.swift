@@ -226,6 +226,41 @@ extension Shop {
         printerVerbs[type] = await PrinterControl.verbs(for: type, engine: engine)
     }
 
+    /// Pause or Resume, as ONE offer for every place that draws the button.
+    ///
+    /// The machine card decided this inline: which of the two the print can
+    /// take now, whether the protocol has it (`PrinterControl.offers`, the
+    /// table the press itself is built from), and when it is greyed (a command
+    /// already on its way, a book this Mac may not move jobs in, an operator
+    /// who may not edit orders). The menu bar's hero card offers the same
+    /// button, and a second copy of those four conditions is how the two
+    /// would come to disagree about who may stop a printer. Nil means the
+    /// protocol cannot take it, or has not been asked yet: draw nothing. The
+    /// press is `tell`, below, for both.
+    struct PrintStep: Equatable {
+        let verb: PrinterControl.Verb
+        let wordKey: String
+        let enabled: Bool
+    }
+
+    func printStep(_ machine: Machine, paused: Bool) -> PrintStep? {
+        let verb: PrinterControl.Verb = paused ? .resume : .pause
+        guard PrinterControl.offers(verb, printerVerbs[machine.printerApi?.type ?? ""]) else { return nil }
+        return PrintStep(verb: verb, wordKey: paused ? "mac.printer_resume" : "mac.printer_pause",
+                         enabled: !printerBusy.contains(machine.id) && canMoveJobs && lockAllows("orders", "edit"))
+    }
+
+    /// When somebody last said this machine's plate is clear (`markBedClear`
+    /// stamps `bedClearedAt` on the machine's row), from this Mac or another.
+    func bedClearedAt(_ machineId: String) -> Date? {
+        for row in machineRows {
+            guard case .object(let o) = row, case .string(let id)? = o["id"], id == machineId,
+                  case .string(let at)? = o["bedClearedAt"] else { continue }
+            return Calendar.instant(at)
+        }
+        return nil
+    }
+
     func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
         // A printer is told what to do by somebody running the floor —
         // `orders`/`edit` in lib/rbac.js, which an operator has and a viewer

@@ -3927,5 +3927,22 @@
  "mac.job_customer_locked_credited": "Faturanın bir alacak dekontu var, bu yüzden müşteri artık değiştirilemez.",
  "mac.job_customer_locked_paid": "Bu iş için ödeme alındı, bu yüzden müşteri artık değiştirilemez.",
  "mac.job_customer_unknown": "Bu müşteri artık defterde değil.",
- "mac.job_customer_currency": "Bu müşteri başka bir para biriminde faturalanıyor. İş fiyatını ve para birimini korur."
+ "mac.job_customer_currency": "Bu müşteri başka bir para biriminde faturalanıyor. İş fiyatını ve para birimini korur.",
+ "mac.mbh_title": "Makinelerde",
+ "mac.mbh_next_free_at": "ilk boşalan {time}",
+ "mac.mbh_left_est": "yaklaşık {left} kaldı",
+ "mac.mbh_finished": "Bitti",
+ "mac.mbh_free_since": "{time} itibarıyla boş",
+ "mac.mbh_plates_free": "{n} tablanın hepsi boş",
+ "mac.mbh_plate_free": "Tabla boş",
+ "mac.mbh_next_up": "Sıradaki: {job}.",
+ "mac.mbh_next_up_today": "Sıradaki: {job}, bugün teslim.",
+ "mac.mbh_next_up_due": "Sıradaki: {job}, teslim {date}.",
+ "mac.mbh_start_next": "Sıradaki işi başlat",
+ "mac.mbh_nothing_queued": "Sırada iş yok. Sessizliğin tadını çıkarın.",
+ "mac.mbh_done_title": "{job} tamamlandı",
+ "mac.mbh_vo_printing": "{job} yazdırılıyor",
+ "mac.mbh_vo_percent": "yüzde {pct}",
+ "mac.mbh_open_machine": "Makineyi aç",
+ "mac.mbh_chime": "Bir baskı bittiğinde hafif bir ses çal"
 }
