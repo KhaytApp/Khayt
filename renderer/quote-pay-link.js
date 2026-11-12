@@ -53,15 +53,13 @@
   /**
    * Where the job's link stands: the shared rule's `stateOf` (ready, sent,
    * expired, paid, mismatch or null, and `outdated` when a link is out but
-   * the quote has changed since). One thing is the desktop's own: "Ready" is
-   * not offered on a computer where pay links are not set up, so a shop that
-   * never uses them sees no line on its approved quotes.
+   * the quote has changed since). `configured: false` takes away READY only,
+   * so a shop that never uses pay links sees no line on its approved quotes,
+   * while a link sent from another computer is still told.
    */
   function lineState(order, nowMs) {
     if (!order || !PL()) return { state: null, outdated: false };
-    const s = PL().stateOf(order, Math.floor(nowMs / 1000));
-    if (s.state === 'ready' && !PL().configured(config())) return { state: null, outdated: false };
-    return s;
+    return PL().stateOf(order, Math.floor(nowMs / 1000), { configured: PL().configured(config()) });
   }
 
   function lineHtml(order) {
