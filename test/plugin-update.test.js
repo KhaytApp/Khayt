@@ -462,6 +462,7 @@ test('a withdrawn version is not kept when its fix installs: no Revert, no fallb
     assert.equal(st.previous, undefined, `${name}: the withdrawn 1.0.0 is not kept`);
     assert.equal(st.revoked, undefined, name);
     assert.equal(st.updatedFrom, '1.0.0', `${name}: the note still says what happened`);
+    assert.equal(st.previousWithdrawn, '1.0.0', `${name}: and WHY there is no Revert is written down`);
     assert.equal(JSON.stringify(s).includes('"version":"1.0.0","manifest"'), false, `${name}: its manifest is nowhere in the book`);
     const back = U.revert(s, LAMHA.id);
     assert.equal(back.ok, false, `${name}: Revert is unavailable`);
@@ -480,6 +481,8 @@ test('a kept or a waiting version the index later withdraws is dropped', () => {
   const r = U.applyIndex(s1, index([row('1.1.1', REV)], { serial: 8 }), CTX, {});
   assert.equal(r.changed, true);
   assert.equal(U.stateOf(r.settings, LAMHA.id).previous, undefined);
+  assert.equal(U.stateOf(r.settings, LAMHA.id).previousWithdrawn, '1.0.0', 'the device can say which version was withdrawn');
+  assert.equal(U.stateOf(s1, LAMHA.id).previousWithdrawn, undefined, 'an ordinary update, Revert on offer: no such note');
   assert.equal(U.revert(r.settings, LAMHA.id).ok, false);
   assert.deepEqual([r.settings.plugins[0].version, r.settings.plugins[0].enabled], ['1.1.1', true], 'the version in use is not the withdrawn one: it keeps running');
   // A consent waiting for 1.1.1, then 1.1.1 is withdrawn before the shop answers.
@@ -514,6 +517,7 @@ test('reverting away from a withdrawn version brings the switch back as the shop
   assert.equal(r.ok, true);
   assert.deepEqual([r.settings.plugins[0].version, r.settings.plugins[0].enabled], ['1.0.0', true]);
   assert.equal(U.stateOf(r.settings, LAMHA.id).revoked, undefined);
+  assert.equal(U.stateOf(r.settings, LAMHA.id).previousWithdrawn, undefined, 'a Revert clears the note with the rest');
   assert.equal(U.runnable(r.settings.plugins[0], U.stateOf(r.settings, LAMHA.id)).which, 'current');
 });
 

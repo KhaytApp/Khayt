@@ -33,6 +33,7 @@
  *       revoked?:   { version, reason, at, wasEnabled },
  *       skipped?:   [version, …],               // reverted: never auto again
  *       updatedAt?, updatedFrom?,               // the quiet note (ISO, version)
+ *       previousWithdrawn?,                     // version: why there is no Revert
  *     } } }
  *
  * Old builds leave an unknown settings key alone (the Mac writes settings by
@@ -374,8 +375,8 @@
       case 'needs_setup': {
         const H = hostLib();
         // A withdrawn version is never kept: not for Revert, not as a fallback.
-        if (knownRevoked(state, entry.version)) delete state.previous;
-        else state.previous = { version: entry.version, manifest: entry.manifest, granted: entry.granted };
+        if (knownRevoked(state, entry.version)) { delete state.previous; state.previousWithdrawn = entry.version; }
+        else { state.previous = { version: entry.version, manifest: entry.manifest, granted: entry.granted }; delete state.previousWithdrawn; }
         state.updatedAt = iso(now);
         state.updatedFrom = entry.version;
         if (isObj(state.pending) && compareVersions(state.pending.version, manifest.version) <= 0) delete state.pending;
@@ -409,8 +410,8 @@
     const state = clone(stateOf(s0, id));
     if (!entry || !isObj(state.pending) || !isObj(state.pending.manifest)) return { ok: false, settings: s0 };
     const manifest = state.pending.manifest;
-    if (knownRevoked(state, entry.version)) delete state.previous;
-    else state.previous = { version: entry.version, manifest: entry.manifest, granted: entry.granted };
+    if (knownRevoked(state, entry.version)) { delete state.previous; state.previousWithdrawn = entry.version; }
+    else { state.previous = { version: entry.version, manifest: entry.manifest, granted: entry.granted }; delete state.previousWithdrawn; }
     state.updatedAt = iso(now);
     state.updatedFrom = entry.version;
     delete state.pending;
@@ -424,6 +425,20 @@
    * skipped, so tomorrow's check does not install it again; a newer one will.
    * `{ ok: false }` when there is nothing to go back to — which includes a
    * previous version that was withdrawn.
+   *
+   * WHY THERE IS NOTHING TO GO BACK TO is `previousWithdrawn` on the
+   * connector's state: the version Khayt withdrew, set wherever a `previous`
+   * is dropped or not kept for that reason (an update away from a withdrawn
+   * version, or `withoutWithdrawn` at a later check) and cleared by the next
+   * update that does keep one and by a Revert. A device says "Khayt withdrew
+   * version {v}, so you can't go back to it" from THAT field. `updatedFrom`
+   * with no `previous` is not the test: it is also what a book written
+   * before this field looks like, and it stays after the note is read.
+   *
+   * `reason: 'revoked'` is a guard, close to unreachable: a withdrawn
+   * `previous` is never kept and is dropped at the next check. It answers the
+   * one window in between — a revocation learnt (`state.revoked` names the
+   * previous version) before `withoutWithdrawn` has run on this book.
    */
   function revert(settings, id) {
     const s0 = isObj(settings) ? settings : {};
@@ -440,7 +455,7 @@
     // version it was about.
     if (knownRevoked(state, entry.version)) { back = unrevoked(back, state); delete state.revoked; }
     state.skipped = Array.from(new Set([].concat(Array.isArray(state.skipped) ? state.skipped : [], [entry.version])));
-    delete state.previous; delete state.updatedAt; delete state.updatedFrom;
+    delete state.previous; delete state.updatedAt; delete state.updatedFrom; delete state.previousWithdrawn;
     return { ok: true, settings: withBoth(s0, back, state) };
   }
 
@@ -503,6 +518,13 @@
    * "host secret:name". A grant from before pairs were kept has none: there,
    * ANY change in `domains` is a change for every secret (`all: true`), since
    * nothing says which key went where.
+   *
+   * Devices do not call this with a bare old grant: they call `keysToForget`,
+   * which first gives an old grant the pairs its own manifest sends. So the
+   * `all` answer is reached only for an entry with no grant at all, and "any
+   * new host drops every key" is NOT the rule a shop gets. The rule is: a key
+   * is dropped when the hosts THAT key is sent to change, and only then.
+   * Adding a host that receives no secret drops nothing.
    */
   function secretsToForget(before, after) {
     const b = isObj(before) ? before : {};
@@ -535,6 +557,15 @@
    * (`grantWithPairs`), so a key moving between two hosts it already listed
    * is seen; when even that cannot say (`all`), every secret either manifest
    * declares is named.
+   *
+   * THE RULE EVERY APP DESCRIBES (desktop, Mac, and the words under the
+   * consent sheet): "a key you entered is asked for again when the place it
+   * is sent to changes". Worked through, for a grant with domains [one] whose
+   * manifest sends a and b to one:
+   *   - the new version also sends order.number to two → nothing dropped;
+   *   - the new version sends b to two instead        → b dropped, a kept.
+   * A secret that only appears in the new version counts as moved (it had no
+   * hosts and now has some), which is right: no key was shown for it before.
    */
   function keysToForget(beforeEntry, afterEntry) {
     const r = secretsToForget(grantWithPairs(beforeEntry), grantWithPairs(afterEntry));
@@ -561,7 +592,7 @@
     if (!dropPrevious && !dropPending) return settings;
     const entry = (Array.isArray(settings.plugins) ? settings.plugins : []).find((p) => isObj(p) && p.id === id);
     const state = clone(st);
-    if (dropPrevious) delete state.previous;
+    if (dropPrevious) { state.previousWithdrawn = st.previous.version; delete state.previous; }
     if (dropPending) delete state.pending;
     return withBoth(settings, entry, state);
   }
