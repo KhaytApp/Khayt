@@ -227,7 +227,7 @@ struct MachineBandView: View {
                 text: shop.words.callIt("mac.band_printing"))
             Key(fill: Khayt.surface, line: Khayt.hairline, dashed: true,
                 text: shop.words.callIt("mac.band_queued"))
-            Key(fill: Khayt.attention.opacity(0.16), line: Khayt.attention,
+            Key(fill: Khayt.surface, line: Khayt.attention, hatched: true,
                 text: shop.words.callIt("mac.band_blocked"))
             // ONLY WHEN THERE IS ONE. A key for a block this shop never draws
             // is a line of legend explaining something that is not on screen,
@@ -252,16 +252,54 @@ struct MachineBandView: View {
     private struct Key: View {
         let fill: Color, line: Color
         var dashed = false
+        var hatched = false
         let text: String
         var body: some View {
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(fill)
                     .frame(width: 13, height: 9)
+                    .overlay {
+                        if hatched {
+                            Hatch(step: 4).stroke(line.opacity(Hatch.strength), lineWidth: 1)
+                                .clipShape(RoundedRectangle(cornerRadius: 2))
+                        }
+                    }
                     .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(
                         line, style: StrokeStyle(lineWidth: 1, dash: dashed ? [2, 2] : [])))
                 Text(text).font(.caption2)
             }
+        }
+    }
+
+    /// Diagonal lines across a block that cannot start: BLOCKED ON STOCK.
+    ///
+    /// ── WHY A PATTERN AND NOT A COLOUR ───────────────────────────────────
+    ///
+    /// Printing became amber (Nov 11 2026, B12) and a blocked block was
+    /// already a warm wash with a warm edge. In dark the two were 27 apart
+    /// (`#E0A73C` against `#F2A541`): the key said "Printing now" and
+    /// "Blocked on stock" beside two swatches nobody could tell apart, and a
+    /// machine waiting for filament read as a machine at work, which is the
+    /// one mistake this band exists to prevent. A second hue was not the
+    /// answer: every warm one is near the thread and red is for late. So a
+    /// blocked block has NO fill and is hatched: it reads as "not solid, not
+    /// happening" in either appearance and without colour vision at all.
+    struct Hatch: Shape {
+        /// The gap between lines, in points.
+        var step: CGFloat = 6
+        /// How strongly the lines are drawn over the pane.
+        static let strength = 0.45
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            guard step > 0, rect.width > 0, rect.height > 0 else { return path }
+            var x = rect.minX - rect.height
+            while x < rect.maxX {
+                path.move(to: CGPoint(x: x, y: rect.maxY))
+                path.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+                x += step
+            }
+            return path
         }
     }
 
@@ -422,6 +460,12 @@ struct MachineBandView: View {
             .padding(.horizontal, width >= Self.labelledFrom ? 7 : 0)
             .padding(.vertical, compact ? 3 : 5)
             .background(fill, in: RoundedRectangle(cornerRadius: 3))
+            .background {
+                if block.kind == "blocked" {
+                    Hatch(step: 6).stroke(Khayt.attention.opacity(Hatch.strength), lineWidth: 1)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+            }
             .overlay(shape)
             .help(block.title + " · " + sub)
         }
@@ -478,7 +522,8 @@ struct MachineBandView: View {
         private var fill: Color {
             switch block.kind {
             case "printing": return Khayt.threadWash
-            case "blocked": return Khayt.attention.opacity(0.13)
+            // NO WASH. See `Hatch`: a warm wash here was the printing block.
+            case "blocked": return .clear
             case "down": return Khayt.note.opacity(0.10)
             default: return Khayt.recessed
             }

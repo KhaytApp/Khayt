@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fix (Mac): a machine blocked on stock no longer looks like one that is printing.** With printing drawn in amber, the Machines timeline showed "Printing now" and "Blocked on stock" as two warm blocks that could not be told apart in dark. A blocked block is now unfilled and hatched, in the timeline and in its key, so it reads as not happening in either appearance and without colour vision.
 - Mac capture run (tooling): it now photographs the job and customer inspectors and the empty Jobs, Customers, Inventory and Catalogue screens, and a dark run covers every screen and sheet the light run does.
 - **Fix (Mac, Arabic): the Waste table's headings line up with their columns.** With the summary open beside it, the headings were drawn two columns along from the figures under them. Expenses has the same fix.
 - **Fix (Mac, Arabic): the first filter chip on Gift cards was cut off.** A row of filter chips that fits its screen is now drawn in place and starts at its first chip ("نشطة 3", not "ـطة 3"). Not fixed yet: a row too long to fit, such as the Catalogue's, is still cut at its first chip in Arabic.
