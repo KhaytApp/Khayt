@@ -81,8 +81,12 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
     /// SECONDS — `StudioEngine`'s HueForge plan. On a pooled thread one plan
     /// would hold up every shop engine sharing it; on its own it holds up
     /// nothing but itself.
+    ///
+    /// Its owner stops it (`retire`) when it goes away. A pooled thread is
+    /// never stopped; a dedicated one that was not would outlive its engine
+    /// for the life of the process.
     static func dedicated(name: String) -> EngineThread {
-        EngineThread(name: name)
+        EngineThread(name: name, pooled: false)
     }
 
     static var current: EngineThread? {
@@ -107,7 +111,7 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
             lock.lock()
             // A new thread only while every one made so far has work waiting.
             if threads.count < EngineThread.poolSize, threads.allSatisfy({ $0.waiting > 0 }) {
-                let made = EngineThread(name: "khayt.engine.\(threads.count)")
+                let made = EngineThread(name: "khayt.engine.\(threads.count)", pooled: true)
                 threads.append(made)
                 lock.unlock()
                 return made
@@ -121,17 +125,27 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
     /// What the thread reads: its loop, set once before `init` returns.
     private final class Loop: @unchecked Sendable {
         var loop: CFRunLoop?
+        /// Set by `retire`, read by the thread each time its loop returns.
+        private let lock = NSLock()
+        private var stopped = false
+        var retired: Bool {
+            get { lock.lock(); defer { lock.unlock() }; return stopped }
+            set { lock.lock(); stopped = newValue; lock.unlock() }
+        }
     }
 
     private let state = Loop()
     private let thread: Thread
+    /// One of the shared few, which live as long as the process.
+    private let pooled: Bool
     private let counter = NSLock()
     private var queued = 0
 
     /// Blocks handed to the thread and not yet finished.
     var waiting: Int { counter.lock(); defer { counter.unlock() }; return queued }
 
-    private init(name: String) {
+    private init(name: String, pooled: Bool) {
+        self.pooled = pooled
         let started = DispatchSemaphore(value: 0)
         let state = state
         // Not `self`: the thread outlives nothing, but it should hold nothing
@@ -144,7 +158,7 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
             // while no JavaScriptCore timer is scheduled.
             RunLoop.current.add(NSMachPort(), forMode: .default)
             started.signal()
-            while true {
+            while !state.retired {
                 autoreleasepool { _ = CFRunLoopRunInMode(.defaultMode, 60, false) }
             }
         }
@@ -157,6 +171,32 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
     }
 
     private final class WeakBox: @unchecked Sendable { weak var thread: EngineThread? }
+
+    /// End a `dedicated` thread: its loop returns once the block that is
+    /// running has finished, and the thread with it.
+    ///
+    /// ── WHY A THREAD HAS TO BE TOLD ───────────────────────────────────────
+    ///
+    /// The thread's loop ran `while true`, which is right for the pooled
+    /// threads and was wrong for this one: a `StudioEngine` let go of its
+    /// context and its thread stayed, parked, for the life of the process.
+    /// Measured: ten studio engines made and dropped left the process with
+    /// eleven more threads than it started with. In the app that is one
+    /// thread for every time the Studio window is opened.
+    ///
+    /// Called by the owner as its last act, from the thread itself (an
+    /// `isolated deinit` runs there): whatever that block still has to do, it
+    /// does, the context is let go on this thread as before, and then the
+    /// loop returns. Nothing may be handed to the thread afterwards.
+    func retire() {
+        precondition(!pooled, "a shared engine thread is never stopped")
+        guard let loop = state.loop else { return }
+        state.retired = true
+        CFRunLoopStop(loop)
+    }
+
+    /// True once a retired thread has ended. For the test that holds it to that.
+    var hasEnded: Bool { thread.isFinished }
 
     /// Run `block` on the thread, in order after everything already queued.
     func perform(_ block: @escaping @Sendable () -> Void) {
