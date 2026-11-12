@@ -93,7 +93,7 @@ final class SettingsIndexTests: XCTestCase {
         let keys = SettingsRoute.allCases.flatMap { [$0.titleKey] + $0.searchKeys }
             + SettingsRoute.Group.allCases.map(\.titleKey)
             + ["settings.search", "settings.search.none", "settings.diag.syncs"]
-        let states: [SettingsState] = [.paired, .away, .notPaired, .signedIn, .needsSignIn, .on, .off]
+        let states: [SettingsState] = [.paired, .away, .notPaired, .sampleShop, .signedIn, .needsSignIn, .on, .off]
         for lang in languages {
             L10n.setLanguage(lang)
             for key in keys {
@@ -115,6 +115,26 @@ final class SettingsIndexTests: XCTestCase {
         XCTAssertEqual(L10n.tr(SettingsRoute.notifications.titleKey), "Notifications", "the phone's own pushes, not Messages & alerts")
     }
 
+    /// The sample shop has no Mac: never a green "Paired", whatever else is set.
+    func testTheSampleShopIsNeverPaired() {
+        for paired in [true, false] {
+            for inReach in [true, false] {
+                XCTAssertEqual(SettingsState.mac(paired: paired, inReach: inReach, sampleShop: true), .sampleShop)
+            }
+        }
+        XCTAssertEqual(SettingsState.sampleShop.tone, .neutral)
+        for lang in languages {
+            L10n.setLanguage(lang)
+            XCTAssertNotEqual(SettingsState.sampleShop.label, "sample.banner", lang.rawValue)
+        }
+    }
+
+    /// The phone pairs with Khayt on a Mac or a PC: the address field says so.
+    func testTheAddressSaysMacOrPC() {
+        L10n.setLanguage(.en)
+        XCTAssertEqual(L10n.tr("settings.host"), "Mac or PC address")
+    }
+
     func testTheLANReferenceIsGone() {
         XCTAssertFalse(SettingsRoute.allCases.flatMap(\.searchKeys).contains("settings.docs"))
         L10n.setLanguage(.en)
@@ -127,6 +147,7 @@ final class SettingsIndexTests: XCTestCase {
         XCTAssertEqual(SettingsState.mac(paired: true, inReach: true), .paired)
         XCTAssertEqual(SettingsState.mac(paired: true, inReach: false), .away)
         XCTAssertEqual(SettingsState.mac(paired: false, inReach: true), .notPaired)
+        XCTAssertEqual(SettingsState.away.tone, .neutral)
         XCTAssertEqual(SettingsState.cloud(signedIn: true, needsSignIn: false), .signedIn)
         XCTAssertEqual(SettingsState.cloud(signedIn: true, needsSignIn: true), .needsSignIn)
         XCTAssertEqual(SettingsState.cloud(signedIn: false, needsSignIn: false), .off)

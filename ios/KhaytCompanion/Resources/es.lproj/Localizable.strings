@@ -47,7 +47,7 @@
 "settings.connection" = "Conexión";
 "settings.connection.footer" = "Mismo PIN que en Khayt, Ajustes → API de red local. Requiere la versión 2.2.1 o posterior del ordenador.";
 "settings.shop_name" = "Nombre del taller";
-"settings.host" = "IP o nombre de host del ordenador";
+"settings.host" = "Dirección del Mac o PC";
 "settings.port" = "Puerto: %d";
 "settings.pin" = "PIN de red local del propietario";
 "settings.retest" = "Volver a probar el emparejamiento";

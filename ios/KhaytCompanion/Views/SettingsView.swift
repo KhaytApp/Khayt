@@ -159,8 +159,8 @@ struct SettingsView: View {
         case .privacy:
             return ActiveCountSender.ready ? (settings.countInstall ? .on : .off) : nil
         case .mac:
-            return SettingsState.mac(paired: settings.isPaired && (settings.isConfigured || settings.isSampleShop),
-                                     inReach: health.macInReach || settings.isSampleShop)
+            return SettingsState.mac(paired: settings.isPaired && settings.isConfigured,
+                                     inReach: health.macInReach, sampleShop: settings.isSampleShop)
         case .cloud:
             return SettingsState.cloud(signedIn: api.cloud != nil, needsSignIn: api.cloudNeedsSignIn)
         case .connectors:
@@ -217,15 +217,17 @@ extension ConnectionSettings {
 /// Paired green, Needs sign-in steel, Off and Away neutral. Amber is never a
 /// setting's state.
 enum SettingsState: Equatable {
-    case paired, away, notPaired
+    case paired, away, notPaired, sampleShop
     case signedIn, needsSignIn
     case on, off
     case count(Int)
 
     enum Tone { case good, waiting, neutral }
 
-    static func mac(paired: Bool, inReach: Bool) -> SettingsState {
-        !paired ? .notPaired : (inReach ? .paired : .away)
+    /// The sample shop has no Mac, so it is never "Paired".
+    static func mac(paired: Bool, inReach: Bool, sampleShop: Bool = false) -> SettingsState {
+        if sampleShop { return .sampleShop }
+        return !paired ? .notPaired : (inReach ? .paired : .away)
     }
 
     static func cloud(signedIn: Bool, needsSignIn: Bool) -> SettingsState {
@@ -237,6 +239,7 @@ enum SettingsState: Equatable {
         case .paired: return L10n.tr("state.paired")
         case .away: return L10n.tr("state.away")
         case .notPaired: return L10n.tr("state.not_paired")
+        case .sampleShop: return L10n.tr("sample.banner")
         case .signedIn: return L10n.tr("state.signed_in")
         case .needsSignIn: return L10n.tr("state.needs_sign_in")
         case .on: return L10n.tr("state.on")
@@ -249,7 +252,7 @@ enum SettingsState: Equatable {
         switch self {
         case .paired, .signedIn, .on: return .good
         case .needsSignIn: return .waiting
-        case .away, .notPaired, .off, .count: return .neutral
+        case .away, .notPaired, .sampleShop, .off, .count: return .neutral
         }
     }
 }
@@ -593,8 +596,8 @@ struct SettingsMacPage: View {
             Button { withAnimation { showConnection.toggle() } } label: {
                 SettingsPieces.row(settings.macAddress ?? L10n.tr("settings.host"),
                                    last: !showConnection) {
-                    SettingsStateChip(state: SettingsState.mac(paired: settings.isPaired && (settings.isConfigured || settings.isSampleShop),
-                                                               inReach: health.macInReach || settings.isSampleShop))
+                    SettingsStateChip(state: SettingsState.mac(paired: settings.isPaired && settings.isConfigured,
+                                                               inReach: health.macInReach, sampleShop: settings.isSampleShop))
                     Image(systemName: showConnection ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold)).foregroundStyle(KhaytDesign.note)
                 }

@@ -47,7 +47,7 @@
 "settings.connection" = "الاتصال";
 "settings.connection.footer" = "نفس PIN من إعدادات Khayt → LAN API. يتطلب سطح المكتب 2.2.1+";
 "settings.shop_name" = "اسم الورشة";
-"settings.host" = "IP أو اسم المضيف";
+"settings.host" = "عنوان الماك أو الكمبيوتر";
 "settings.port" = "المنفذ: %d";
 "settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";

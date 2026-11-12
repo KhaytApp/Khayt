@@ -47,7 +47,7 @@
 "settings.connection" = "Conexão";
 "settings.connection.footer" = "Mesmo PIN do Khayt, Ajustes → API de rede local. Requer a versão 2.2.1 ou posterior do computador.";
 "settings.shop_name" = "Nome da oficina";
-"settings.host" = "IP ou nome do host do computador";
+"settings.host" = "Endereço do Mac ou PC";
 "settings.port" = "Porta: %d";
 "settings.pin" = "PIN da rede local do proprietário";
 "settings.retest" = "Testar o pareamento novamente";

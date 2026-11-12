@@ -47,7 +47,7 @@
 "settings.connection" = "接続";
 "settings.connection.footer" = "Khaytの「設定」→「LAN API」と同じPINです。デスクトップ版v2.2.1以降が必要です。";
 "settings.shop_name" = "店名";
-"settings.host" = "デスクトップのIPまたはホスト名";
+"settings.host" = "Mac または PC のアドレス";
 "settings.port" = "ポート: %d";
 "settings.pin" = "オーナー用LAN PIN";
 "settings.retest" = "ペアリングを再テスト";

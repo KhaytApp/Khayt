@@ -47,7 +47,7 @@
 "settings.connection" = "Bağlantı";
 "settings.connection.footer" = "Khayt Ayarlar → LAN API’deki PIN ile aynı. Masaüstü v2.2.1 veya üzeri gerekir.";
 "settings.shop_name" = "Dükkân adı";
-"settings.host" = "Masaüstü IP’si veya ana makine adı";
+"settings.host" = "Mac veya PC adresi";
 "settings.port" = "Bağlantı noktası: %d";
 "settings.pin" = "Sahip LAN PIN’i";
 "settings.retest" = "Eşlemeyi yeniden sına";

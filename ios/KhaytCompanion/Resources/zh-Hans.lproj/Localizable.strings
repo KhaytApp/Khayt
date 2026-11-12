@@ -47,7 +47,7 @@
 "settings.connection" = "连接";
 "settings.connection.footer" = "与 Khayt“设置”→“LAN API”中的 PIN 相同。需要桌面端 v2.2.1 或更高版本。";
 "settings.shop_name" = "店铺名称";
-"settings.host" = "桌面端 IP 或主机名";
+"settings.host" = "Mac 或 PC 的地址";
 "settings.port" = "端口：%d";
 "settings.pin" = "店主 LAN PIN";
 "settings.retest" = "重新测试配对";

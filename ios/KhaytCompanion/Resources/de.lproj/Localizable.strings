@@ -47,7 +47,7 @@
 "settings.connection" = "Verbindung";
 "settings.connection.footer" = "Dieselbe PIN wie in Khayt, Einstellungen → LAN-API. Desktop ab Version 2.2.1 erforderlich.";
 "settings.shop_name" = "Name des Shops";
-"settings.host" = "Desktop-IP oder Hostname";
+"settings.host" = "Adresse des Mac oder PC";
 "settings.port" = "Port: %d";
 "settings.pin" = "LAN-PIN des Inhabers";
 "settings.retest" = "Kopplung erneut testen";

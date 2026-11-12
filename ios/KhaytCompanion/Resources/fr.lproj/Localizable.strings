@@ -47,7 +47,7 @@
 "settings.connection" = "Connexion";
 "settings.connection.footer" = "Même code PIN que dans Khayt, Réglages → API LAN. Ordinateur v2.2.1 ou ultérieure requis.";
 "settings.shop_name" = "Nom de l’atelier";
-"settings.host" = "IP ou nom d’hôte de l’ordinateur";
+"settings.host" = "Adresse du Mac ou du PC";
 "settings.port" = "Port : %d";
 "settings.pin" = "Code PIN LAN du propriétaire";
 "settings.retest" = "Retester l’association";
