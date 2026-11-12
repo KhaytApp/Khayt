@@ -165,6 +165,42 @@ struct PortalOwnerTests {
         #expect(!moved.advance, "a job already past the quote is not moved again")
     }
 
+    /// The sheet chose its own words until Nov 2026 and had parted from the
+    /// desktop once already. Every answer now comes from the one rule.
+    @Test("the Check response line is the shared rule's, for every answer")
+    func responseLineIsTheSharedRules() async throws {
+        let engine = try KhaytEngine()
+        func line(_ response: String, paid: Bool = false, stale: Bool? = nil, advanced: Bool = false) async throws -> KhaytEngine.PortalLine {
+            try await engine.portalResponseLine(
+                .init(found: true, response: response, paid: paid, advance: false, note: nil, stale: stale),
+                advanced: advanced)
+        }
+        #expect(try await line("approved").key == "cloud.portal_approved")
+        #expect(try await line("approved", advanced: true).key == "cloud.portal_approved_advanced")
+        #expect(try await line("approved", paid: true).paidNote)
+        #expect(try await line("declined") == .init(key: "cloud.portal_declined", tone: "late", mark: "✗", paidNote: false))
+        // A decline of an earlier version is waiting, not a refusal.
+        #expect(try await line("declined", stale: true) == .init(key: "cloud.portal_declined_earlier", tone: "wait", mark: "", paidNote: false))
+        #expect(try await line("none").key == "cloud.portal_no_response")
+        // Paid with no answer: the line IS "deposit paid", so it is not said twice.
+        #expect(try await line("none", paid: true) == .init(key: "cloud.portal_deposit_paid", tone: "live", mark: "✓", paidNote: false))
+        // Every key it can return is a word this app has, in Arabic too.
+        for lang in ["en", "ar"] {
+            let words = Words()
+            await words.load(lang, engine: engine)
+            for key in ["cloud.portal_approved", "cloud.portal_approved_advanced", "cloud.portal_declined",
+                        "cloud.portal_declined_earlier", "cloud.portal_deposit_paid", "cloud.portal_no_response"] {
+                #expect(words.callIt(key) != key, "\(lang): \(key)")
+            }
+        }
+        // And the sheet asks the rule, it does not choose.
+        let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/KhaytApp/PortalSheets.swift"), encoding: .utf8)
+        #expect(sheet.contains("words.callIt(checked.line.key)"))
+        #expect(!sheet.contains("\"cloud.portal_declined\""), "the sheet no longer names an answer's key itself")
+    }
+
     @Test("an address that is not https is refused before anything is sent")
     func httpsOnly() async throws {
         let engine = try KhaytEngine()

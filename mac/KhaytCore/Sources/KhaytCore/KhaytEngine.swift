@@ -10956,12 +10956,43 @@ public actor KhaytEngine {
         /// and the customer has not answered the new one (the cloud's
         /// `actionStale`). Optional so a rule from before it decodes.
         public let stale: Bool?
+
+        public init(found: Bool, response: String, paid: Bool, advance: Bool, note: String?, stale: Bool?) {
+            self.found = found; self.response = response; self.paid = paid
+            self.advance = advance; self.note = note; self.stale = stale
+        }
     }
 
     /// What the customer did with this link, from `GET /published`'s items.
     public func portalResponse(items: JSONValue, pubToken: String, order: JSONValue) throws -> PortalResponse {
         try runtime.call2("KhaytPortalOwner.responseFor(ARG0, ARG1, ARG2)",
                           [items, .string(pubToken), order], as: PortalResponse.self)
+    }
+
+    /// The "Check response" line as the shared rule words it
+    /// (`lib/portal-owner.js responseLine`): a locale key, a tone, and whether
+    /// "deposit paid" follows. The desktop draws the same answer from the
+    /// same function, so the two apps cannot word one reply two ways.
+    public struct PortalLine: Decodable, Sendable, Equatable {
+        public let key: String
+        /// `live` | `late` | `wait` | `muted`
+        public let tone: String
+        /// `✓` | `✗` | ``
+        public let mark: String
+        public let paidNote: Bool
+
+        public init(key: String, tone: String, mark: String, paidNote: Bool) {
+            self.key = key; self.tone = tone; self.mark = mark; self.paidNote = paidNote
+        }
+    }
+
+    /// `advanced` is whether the job was moved on just now.
+    public func portalResponseLine(_ said: PortalResponse, advanced: Bool) throws -> PortalLine {
+        try runtime.call2("KhaytPortalOwner.responseLine(Object.assign({}, ARG0, { advanced: ARG1 }))",
+                          [.object([
+                              "response": .string(said.response), "paid": .bool(said.paid),
+                              "stale": .bool(said.stale == true),
+                          ]), .bool(advanced)], as: PortalLine.self)
     }
 
     /// A payment the customer made through the portal, and what recording it
