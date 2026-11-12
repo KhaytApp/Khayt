@@ -11,7 +11,8 @@ final class DesignV2FoundationTests: XCTestCase {
         for name in KhaytType.allNames {
             XCTAssertNotNil(UIFont(name: name, size: 17), name)
         }
-        XCTAssertEqual(KhaytType.allNames.count, 8)
+        // 8 website faces + 4 IBM Plex Sans Arabic (every face in Arabic).
+        XCTAssertEqual(KhaytType.allNames.count, 12)
     }
 
     func testBigSizesDrawInTheDisplayFace() {
@@ -86,15 +87,17 @@ final class DesignV2FoundationTests: XCTestCase {
     }
 
     /// JetBrains Mono has no Arabic: in Arabic, the mono labels take the
-    /// text face (spaced letter by letter otherwise), and positive
-    /// letter-spacing is dropped, which pulled joined letters apart.
+    /// Arabic face, IBM Plex Sans Arabic (spaced letter by letter otherwise),
+    /// and positive letter-spacing is dropped, which pulled joined letters apart.
     func testArabicNeverSetsWordsInTheMonoFace() {
         let before = L10n.currentLanguage
         defer { L10n.setLanguage(before) }
         L10n.setLanguage(.en)
         XCTAssertEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
         L10n.setLanguage(.ar)
-        XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.postScriptName(.medium), size: 12, relativeTo: .caption))
+        XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.arabicName(.medium), size: 12, relativeTo: .caption))
+        XCTAssertEqual(Font.khayt(14), .custom("IBMPlexSansArabic-Regular", size: 14, relativeTo: .body))
+        XCTAssertEqual(Font.khaytDisplay(30), .custom("IBMPlexSansArabic-Bold", size: 30, relativeTo: .title))
         XCTAssertNotEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
     }
 
