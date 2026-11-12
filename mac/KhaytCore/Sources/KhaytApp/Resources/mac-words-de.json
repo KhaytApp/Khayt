@@ -2466,6 +2466,7 @@
  "mac.save_zero_do": "Mit 0 speichern",
  "mac.save_zero_new": "Dieses Produkt würde umsonst verkauft und angeboten.",
  "mac.save_zero_note": "Dieses Produkt würde umsonst verkauft und angeboten. Sein Preis ist jetzt {price}.",
+ "mac.price_not_read": "Dieser Preis ist keine Zahl. Gib einen Preis ein oder leere das Feld.",
  "mac.save_zero_q": "Mit einem Preis von 0 speichern?",
  "mac.saved_at": "gespeichert {t}",
  "mac.saved_to": "Gespeichert als",

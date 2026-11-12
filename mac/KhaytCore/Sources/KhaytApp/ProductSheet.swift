@@ -72,6 +72,9 @@ struct ProductSheet: View {
     /// draft's record as they change, so the preview and the save agree.
     @State private var rule = Shop.PriceRule()
     @State private var overrideText = ""
+    /// The price box holds something that is not a number, so the price in
+    /// force is NOT what the box shows. Nothing is saved until it is.
+    private var priceNotRead: Bool { TypedNumber.unreadable(overrideText) }
     @State private var pictures: [StagedPicture] = []
     /// Files to unlink, acted on only if this sheet is saved.
     @State private var removedPictures: [String] = []
@@ -320,12 +323,20 @@ struct ProductSheet: View {
                     HStack(spacing: 6) {
                         TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
                             .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                            .overlay {
+                                if TypedNumber.unreadable(overrideText) {
+                                    RoundedRectangle(cornerRadius: 5).strokeBorder(Khayt.attention, lineWidth: 1.5)
+                                }
+                            }
                             .onChange(of: overrideText) { _, typed in
                                 let cleaned = typed.trimmingCharacters(in: .whitespaces)
                                 if cleaned.isEmpty { rule.override = nil }
                                 else if let n = TypedNumber.parse(cleaned) { rule.override = n }
                             }
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
+                        // Not a number: the price in force is still the one
+                        // before it, so the box is marked and Save waits.
+                        if priceNotRead { SaveProblem(text: shop.words.callIt("mac.price_not_read")) }
                         Spacer()
                     }
                 }
@@ -383,7 +394,7 @@ struct ProductSheet: View {
                     if Self.savesAtZero(pricing) { askingZero = true } else { save() }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!draft.hasAName)
+                .disabled(!draft.hasAName || priceNotRead)
                 .confirmationDialog(shop.words.callIt("mac.save_zero_q"),
                                     isPresented: $askingZero, titleVisibility: .visible) {
                     Button(shop.words.callIt("mac.save_zero_do"), role: .destructive) { save() }
@@ -722,7 +733,7 @@ struct ProductSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             FailureHint(shop: shop, machineId: nil,
                                         material: shop.spools.first { $0.id == newPart.spoolId }?.material,
-                                        current: Double(newPart.rates["failureRate"] ?? "")) { pct in
+                                        current: TypedNumber.parse(newPart.rates["failureRate"] ?? "")) { pct in
                                 newPart.rates["failureRate"] = Words.plain(.number(pct))
                             }
                         }
@@ -1020,6 +1031,7 @@ struct ProductSheet: View {
 
     /// What Save writes — the pictures, the parts, the tiers and the docs.
     private func save() {
+        guard !priceNotRead else { return }
         let saving = draft
         let staged = pictures
         let unlink = removedPictures
