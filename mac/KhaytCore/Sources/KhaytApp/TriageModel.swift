@@ -243,7 +243,13 @@ extension Shop {
     var monthNetNote: String? {
         // Not in a Simple shop: Reports is hidden there, so the line would
         // point at a screen that shop cannot open (Nov 11 UI review, B26).
-        monthNetIncome == nil && has("analytics") ? words.callIt("mac.net_in_reports") : nil
+        //
+        // Asked of the MODE, not of `has("analytics")`: the feature set is
+        // empty until a book has been read, so `has` said no for a shop that
+        // had not loaded yet and the dash lost its explanation
+        // (`MastheadNetTests.unreadBookIsStillADash`). An absent mode is
+        // Professional.
+        monthNetIncome == nil && mode != "simple" ? words.callIt("mac.net_in_reports") : nil
     }
 
     /// Jobs this month with parts and no cost recorded: the masthead's cost

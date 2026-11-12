@@ -170,13 +170,15 @@ struct InventoryView: View {
     private var list: some View {
         if !loaded && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if displayed.isEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
         } else if displayed.isEmpty {
             let searching = !searchText.isEmpty || lowOnly
             VStack(spacing: 5) {
                 Text(L10n.tr(searching ? "inventory.no_results" : "inventory.none"))
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? L10n.tr(searching ? "inventory.no_results.sub" : "inventory.none.sub"))
+                Text(L10n.tr(searching ? "inventory.no_results.sub" : "inventory.none.sub"))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
