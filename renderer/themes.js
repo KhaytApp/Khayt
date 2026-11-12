@@ -18,15 +18,36 @@
     return tr(theme.labelKey, id);
   }
 
+  /** A percentage from a preset, or null. A custom theme file supplies these,
+   *  so anything else is left out rather than written into a stylesheet. */
+  function cssPct(v) {
+    const m = /^\s*(\d{1,3}(?:\.\d+)?)%\s*$/.exec(String(v == null ? '' : v));
+    return m ? `${Math.min(100, +m[1])}%` : null;
+  }
+
   function applyAccent(accentId, accentSet) {
     const root = document.documentElement;
     const design = reg()?.normalizeDesignId(root.dataset.design || 'khayt') || 'khayt';
     const set = accentSet || reg()?.accentsForTheme(design) || {};
     const preset = set[accentId] || set[reg()?.defaultAccentForTheme(design)];
     if (!preset) return;
-    root.style.setProperty('--accent-h', String(preset.h));
-    root.style.setProperty('--accent-s', preset.s);
-    root.style.setProperty('--accent-l', preset.l);
+    /* The preset's HUE applies in both appearances; its saturation and
+     * lightness only outside dark mode. Each design's dark tokens lift the
+     * accent (khayt: 100% / 72%) and pair it with dark ink (--on-accent).
+     * Written inline on <html>, the light preset beat that lift, so dark mode
+     * drew navy text on a mid blue (about 2.5:1) on every primary button, and
+     * Blueprint dark lost its PRINTING pill and tags altogether. A rule in a
+     * stylesheet of our own outranks the design's light defaults
+     * (html[data-design] is 0,1,1; both rules here are 0,2,1), and the
+     * saturation/lightness rule does not apply in dark at all. No design's
+     * dark block sets the hue, so the hue holds in both. */
+    for (const k of ['--accent-h', '--accent-s', '--accent-l']) root.style.removeProperty(k);
+    let el = document.getElementById('khAccentPreset');
+    if (!el) { el = document.createElement('style'); el.id = 'khAccentPreset'; document.head.appendChild(el); }
+    const h = Number(preset.h);
+    const sl = [['--accent-s', cssPct(preset.s)], ['--accent-l', cssPct(preset.l)]].filter(([, v]) => v).map(([k, v]) => `${k}: ${v};`).join(' ');
+    el.textContent = (Number.isFinite(h) ? `html[data-accent][data-design] { --accent-h: ${h}; }\n` : '')
+      + (sl ? `html[data-accent]:not([data-theme="dark"]) { ${sl} }` : '');
     root.dataset.accent = accentId;
   }
 
