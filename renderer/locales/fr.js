@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "Pas encore de réponse",
   "cloud.portal_approved": "Le client a approuvé le devis",
   "cloud.portal_declined": "Le client a refusé le devis",
+  "cloud.portal_declined_earlier": "Le client a refusé la version précédente ; en attente de sa réponse à la nouvelle",
   "cloud.portal_approved_advanced": "Client a approuvé — commande passée en attente",
   "cloud.deposit_amount": "Acompte à demander (facultatif)",
   "cloud.deposit_payurl": "Lien de paiement (facultatif)",

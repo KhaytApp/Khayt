@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "まだ返答がありません",
   "cloud.portal_approved": "お客様が見積もりを承認しました",
   "cloud.portal_declined": "お客様が見積もりを辞退しました",
+  "cloud.portal_declined_earlier": "お客様は以前の版を辞退しました。新しい版への回答を待っています",
   "cloud.portal_approved_advanced": "お客様が承認しました — 注文を「保留中」に移動しました",
   "cloud.deposit_amount": "請求する手付金（任意）",
   "cloud.deposit_payurl": "支払いリンク（任意）",

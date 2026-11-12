@@ -4112,6 +4112,7 @@
   "cloud.portal_no_response": "لا يوجد رد بعد",
   "cloud.portal_approved": "وافق العميل على عرض السعر",
   "cloud.portal_declined": "رفض العميل عرض السعر",
+  "cloud.portal_declined_earlier": "رفض العميل النسخة السابقة من عرض السعر، وبانتظار ردّه على النسخة الجديدة",
   "cloud.portal_approved_advanced": "وافق العميل — نُقل الطلب إلى قيد الانتظار",
   "cloud.deposit_amount": "العربون المطلوب (اختياري)",
   "cloud.deposit_payurl": "رابط الدفع (اختياري)",
