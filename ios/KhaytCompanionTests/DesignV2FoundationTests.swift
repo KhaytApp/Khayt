@@ -97,4 +97,25 @@ final class DesignV2FoundationTests: XCTestCase {
         XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.postScriptName(.medium), size: 12, relativeTo: .caption))
         XCTAssertNotEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
     }
+
+    /// In Arabic every face is IBM Plex Sans Arabic (Turki, Nov 11: one Arabic
+    /// font on every app); English keeps the website's three. The Arabic face
+    /// is registered, really has Arabic letters, and has Latin for names and
+    /// references set inside Arabic text.
+    func testArabicUsesIBMPlexSansArabicEverywhere() throws {
+        for w: Font.Weight in [.regular, .medium, .semibold, .bold] {
+            XCTAssertTrue(KhaytType.textName(w, arabic: true).hasPrefix("IBMPlexSansArabic-"))
+            XCTAssertEqual(KhaytType.textName(w, arabic: false), KhaytType.postScriptName(w))
+            XCTAssertEqual(KhaytType.titleName(w, arabic: true), "IBMPlexSansArabic-Bold")
+            XCTAssertEqual(KhaytType.titleName(w, arabic: false), KhaytType.displayName(w))
+        }
+        for name in ["IBMPlexSansArabic-Regular", "IBMPlexSansArabic-Medium", "IBMPlexSansArabic-SemiBold", "IBMPlexSansArabic-Bold"] {
+            XCTAssertTrue(KhaytType.allNames.contains(name), name)
+            let font = try XCTUnwrap(UIFont(name: name, size: 14), "\(name) is not registered")
+            let set = CTFontCopyCharacterSet(font as CTFont) as CharacterSet
+            XCTAssertTrue(set.contains(Unicode.Scalar(0x0628)!), "\(name) has no Arabic")
+            XCTAssertTrue(set.contains(Unicode.Scalar(0x0053)!), "\(name) has no Latin")
+        }
+        XCTAssertEqual(PrintActivityLook.arabicName(.semibold), "IBMPlexSansArabic-SemiBold")
+    }
 }
