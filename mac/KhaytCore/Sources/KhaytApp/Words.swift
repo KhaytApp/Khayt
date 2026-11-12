@@ -4057,6 +4057,26 @@ final class Words {
         "mac.lib_token_creator": ["en": "Creator", "ar": "المصمم"],
         "mac.lib_token_printer": ["en": "Ready on", "ar": "جاهز على"],
         "mac.lib_token_remove": ["en": "Remove {name}", "ar": "إزالة {name}"],
+        // The Library's Colour and File type menus (`LibraryFilterBar`): the
+        // eleven colour families (`ColourFamily`, lib/colour-family.js), a
+        // model with no colour on its record, and the file types that are
+        // words. The menu titles, Multicolour and Other are the shared
+        // catalogue's (`inv.color`, `brl.sort_type`, `plan.material_label`,
+        // `inv.type_other`).
+        "mac.lf_red": ["en": "Red", "ar": "أحمر"],
+        "mac.lf_orange": ["en": "Orange", "ar": "برتقالي"],
+        "mac.lf_yellow": ["en": "Yellow", "ar": "أصفر"],
+        "mac.lf_green": ["en": "Green", "ar": "أخضر"],
+        "mac.lf_blue": ["en": "Blue", "ar": "أزرق"],
+        "mac.lf_purple": ["en": "Purple", "ar": "بنفسجي"],
+        "mac.lf_pink": ["en": "Pink", "ar": "وردي"],
+        "mac.lf_brown": ["en": "Brown", "ar": "بني"],
+        "mac.lf_black": ["en": "Black", "ar": "أسود"],
+        "mac.lf_grey": ["en": "Grey", "ar": "رمادي"],
+        "mac.lf_white": ["en": "White", "ar": "أبيض"],
+        "mac.lf_no_colour": ["en": "No colour info", "ar": "بلا معلومات لون"],
+        "mac.lf_no_file": ["en": "No file", "ar": "بلا ملف"],
+        "mac.lf_gcode": ["en": "G-code", "ar": "جي كود"],
         // Where a model's bytes are (`LibrarySyncIndex`): the tile badge, the
         // Show menu pair, and the inspector's Storage section.
         "mac.lib_online_only": ["en": "Online only", "ar": "على الإنترنت فقط"],
@@ -6486,6 +6506,9 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The Library's Colour and File type menus (`LibraryFilterBar`):
+        // their titles, Multicolour and Other. (`inv.color` is further down.)
+        "brl.sort_type", "plan.material_label", "inv.type_other",
         // Partial delivery and the spool switch (`PartTrackingSheets.swift`).
         "ord.partial_delivery", "ord.parts_delivered", "ord.spool_switch", "ord.add_spool",
         // The desktop-parity reports (`ParityReportCards.swift`), the box-form
