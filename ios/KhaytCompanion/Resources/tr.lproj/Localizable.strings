@@ -1283,6 +1283,10 @@
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
 
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Yüklenemedi";
+"load.retry" = "Tekrar dene";
+"load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
 /* Home — Needs you */
 "home.greeting.morning" = "Günaydın.";
 "home.greeting.afternoon" = "Tünaydın.";

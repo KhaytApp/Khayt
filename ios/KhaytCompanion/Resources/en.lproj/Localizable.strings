@@ -1283,6 +1283,10 @@
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
 
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Couldn't load";
+"load.retry" = "Try again";
+"load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
 /* Home — Needs you */
 "home.greeting.morning" = "Good morning.";
 "home.greeting.afternoon" = "Good afternoon.";

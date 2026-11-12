@@ -32,6 +32,9 @@ struct DashboardView: View {
     @State private var loaded = false
     @State private var updatingId: String?
     @State private var moveNotes: [String] = []
+    /// Why the queue could not be read, when it could not: Home said "Queue
+    /// clear" for a failed read (F3). Nil once a read succeeds.
+    @State private var queueError: String?
     @State private var showAddSpool = false
     @State private var showQuote = false
     @State private var showLibrary = false
@@ -154,7 +157,11 @@ struct DashboardView: View {
 
     /// What needs the owner: the list under the greeting, or one calm line.
     @ViewBuilder private var attention: some View {
-        if needs.isCalm {
+        if queue.isEmpty, let queueError {
+            // The queue could not be read: that is not "nothing needs you".
+            LoadFailedView(message: queueError) { await load() }
+                .padding(.horizontal, 16)
+        } else if needs.isCalm {
             if loaded {
                 Text(L10n.tr("needs.calm"))
                     .font(.khayt(14, relativeTo: .subheadline))
@@ -205,7 +212,7 @@ struct DashboardView: View {
 
     private var greeting: String {
         let hello = L10n.tr(NeedsYou.greetingKey(hour: Calendar(identifier: .gregorian).component(.hour, from: Date())))
-        guard loaded else { return hello }
+        guard loaded, !(queue.isEmpty && queueError != nil) else { return hello }
         return hello + "\n" + (needs.isCalm ? L10n.tr("needs.none") : L10n.count("needs.count", needs.total))
     }
 
@@ -521,7 +528,9 @@ struct DashboardView: View {
     // MARK: - Loading and advancing
 
     private func load() async {
-        async let queueTask = try? api.fetchQueue()
+        async let queueTask: Result<[QueueOrder], Error> = {
+            do { return .success(try await api.fetchQueue()) } catch { return .failure(error) }
+        }()
         async let inventoryTask = try? api.fetchInventory()
         async let waitingTask = try? api.fetchWaitingList()
         async let pulseTask = api.fetchPulse()
@@ -530,7 +539,14 @@ struct DashboardView: View {
         // Quotes only where the phone can see them: the native Mac serves no
         // `/api/orders`, and an unknown is not "no quotes".
         async let quotesTask = openQuotes()
-        queue = await queueTask ?? []
+        switch await queueTask {
+        case .success(let jobs):
+            queue = jobs
+            queueError = nil
+        case .failure(let error):
+            // Keep what was last shown; say why it is not fresh.
+            queueError = error.localizedDescription
+        }
         spools = await inventoryTask ?? []
         waiting = await waitingTask ?? []
         pulse = await pulseTask
@@ -588,6 +604,8 @@ struct DashboardView: View {
             CompanionHaptics.success()
             await load()
         } catch {
+            // A failed move used to be a haptic and nothing else (F4).
+            moveNotes = [error.localizedDescription]
             CompanionHaptics.warning()
         }
     }

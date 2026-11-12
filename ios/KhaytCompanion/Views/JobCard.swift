@@ -96,18 +96,15 @@ struct JobCard: View {
                 ProgressView().controlSize(.mini)
             } else {
                 // The redesign's pill: a dot in the stage colour, the words in ink.
-                // Printing is progress, and progress is amber: an amber wash
-                // with the words in the warn colour, never amber on white.
-                let printing = order.status == "printing"
                 HStack(spacing: 5) {
-                    Circle().fill(printing ? KhaytDesign.thread : tone).frame(width: 6, height: 6)
+                    Circle().fill(tone).frame(width: 6, height: 6)
                     Text(chipLabel)
                         .font(.khayt(11.5, .semibold, relativeTo: .caption2))
-                        .foregroundStyle(printing ? KhaytDesign.attention : KhaytDesign.ink)
+                        .foregroundStyle(KhaytDesign.ink)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(printing ? KhaytDesign.threadWash : tone.opacity(0.16), in: Capsule())
+                .background(tone.opacity(0.16), in: Capsule())
             }
         }
     }

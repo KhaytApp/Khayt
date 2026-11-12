@@ -1283,6 +1283,10 @@
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
 
+/* A read that failed (UI review F3) */
+"load.failed.title" = "読み込めませんでした";
+"load.retry" = "再試行";
+"load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
 /* Home — Needs you */
 "home.greeting.morning" = "おはようございます。";
 "home.greeting.afternoon" = "こんにちは。";

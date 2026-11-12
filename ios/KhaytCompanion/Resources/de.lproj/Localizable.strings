@@ -1283,6 +1283,10 @@
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
 
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Laden fehlgeschlagen";
+"load.retry" = "Erneut versuchen";
+"load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
 /* Home — Needs you */
 "home.greeting.morning" = "Guten Morgen.";
 "home.greeting.afternoon" = "Guten Tag.";
