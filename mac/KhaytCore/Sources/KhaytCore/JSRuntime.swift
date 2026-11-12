@@ -293,6 +293,14 @@ public final class JSRuntime {
     /// that inherited whatever the record said. `JSON.parse` makes it an
     /// ordinary own property, which is what the record holds.
     public func call<T: Decodable>(_ object: String, _ method: String, _ args: [Encodable] = [], as type: T.Type) throws -> T {
+        if MeasureProbe.on {
+            return try probed("\(object).\(method)", jsons: {
+                let encoder = JSONEncoder()
+                return try args.map { arg -> String in
+                    String(data: try encoder.encode(AnyEncodable(arg)), encoding: .utf8) ?? "null"
+                }
+            }, script: { names in "\(object).\(method)(\(names.joined(separator: ", ")))" }, as: type)
+        }
         let encoder = JSONEncoder()
         let encoded = try args.map { arg -> String in
             let data = try encoder.encode(AnyEncodable(arg))
@@ -397,6 +405,12 @@ public final class JSRuntime {
         // as a VALUE and bound to its own global, and only the expression the
         // developer wrote is rewritten — `ARG3` becomes `__karg3`, in one pass,
         // over text no argument can reach.
+        if MeasureProbe.on {
+            return try probed(expression, jsons: {
+                try args.map { String(data: try JSONValue.encode($0), encoding: .utf8) ?? "null" }
+            }, script: { _ in expression.replacing(/\bARG(\d+)\b/) { match in "__karg" + match.output.1 } },
+            as: type)
+        }
         let bound = try bind(args.map { String(data: try JSONValue.encode($0), encoding: .utf8) ?? "null" })
         defer { unbind(bound) }
         let script = expression.replacing(/\bARG(\d+)\b/) { match in "__karg" + match.output.1 }
@@ -405,6 +419,36 @@ public final class JSRuntime {
             throw KhaytJSError.unexpectedResult(expression)
         }
         return try JSONValue.decode(T.self, from: data)
+    }
+
+    /// MEASUREMENT ONLY: the same crossing as `call`/`call2`/`value`, with the
+    /// rule evaluated apart from `JSON.stringify` so each part can be timed.
+    private func probed<T: Decodable>(_ name: String, jsons: () throws -> [String],
+                                      script: ([String]) -> String, as type: T.Type) throws -> T {
+        let t0 = MeasureProbe.now()
+        let encoded = try jsons()
+        let t1 = MeasureProbe.now()
+        let names = try bind(encoded)
+        defer { unbind(names) }
+        let t2 = MeasureProbe.now()
+        let value = try evaluate("(\(script(names)))")
+        let t3 = MeasureProbe.now()
+        let stringify = context.objectForKeyedSubscript("JSON").objectForKeyedSubscript("stringify")
+        lastException = nil
+        let out = stringify?.call(withArguments: [value])
+        if let problem = lastException { throw KhaytJSError.evaluationFailed(problem) }
+        guard let json = out?.toString(), json != "undefined", let data = json.data(using: .utf8) else {
+            throw KhaytJSError.unexpectedResult(name)
+        }
+        let t4 = MeasureProbe.now()
+        let decoded = try JSONValue.decode(T.self, from: data)
+        let t5 = MeasureProbe.now()
+        MeasureProbe.record(.init(name: String(name.prefix(90)), args: encoded.count,
+                                  argBytes: encoded.reduce(0) { $0 + $1.utf8.count },
+                                  resultBytes: data.count,
+                                  encodeNs: t1 - t0, parseNs: t2 - t1, ruleNs: t3 - t2,
+                                  stringifyNs: t4 - t3, decodeNs: t5 - t4))
+        return decoded
     }
 
     /// Parse each JSON text with `JSON.parse` — handed over as a VALUE, never
@@ -433,6 +477,10 @@ public final class JSRuntime {
     /// Read `object.property` and decode it as `T`. Same JSON crossing as
     /// `call`, for the modules that export data rather than functions.
     public func value<T: Decodable>(_ object: String, _ property: String, as type: T.Type) throws -> T {
+        if MeasureProbe.on {
+            return try probed("\(object).\(property)", jsons: { [] },
+                              script: { _ in "\(object).\(property)" }, as: type)
+        }
         let js = try evaluate("JSON.stringify(\(object).\(property))")
         guard let json = js.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult("\(object).\(property) is undefined")

@@ -1209,9 +1209,11 @@ public actor KhaytEngine {
         // Made ON the engine's thread, so the VM's timers are scheduled on
         // that thread's run loop and not on the caller's (the main one).
         nonisolated(unsafe) let bundle = bundle
+        let measureStart = DispatchTime.now().uptimeNanoseconds
         runtime = try thread.sync {
             try JSRuntime(modules: Self.modules, locales: Self.eagerLocales, bundle: bundle)
         }
+        MeasureProbe.engineMade(ns: DispatchTime.now().uptimeNanoseconds - measureStart)
     }
 
     /// Isolated, so it runs on the engine's thread like every call: the
