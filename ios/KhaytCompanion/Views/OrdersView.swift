@@ -292,12 +292,14 @@ struct OrdersView: View {
     private var list: some View {
         if !loaded && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if rows.isEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
         } else if rows.isEmpty {
             VStack(spacing: 5) {
                 Text(emptyTitle)
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? emptyBody)
+                Text(emptyBody)
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
@@ -328,12 +330,14 @@ struct OrdersView: View {
     private var quoteList: some View {
         if !loaded && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if quotes.isEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
         } else if quotes.isEmpty {
             VStack(spacing: 5) {
                 Text(L10n.tr(quotesHeld ? "orders.no_quotes" : "orders.quotes_on_mac"))
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? L10n.tr(quotesHeld ? "orders.no_quotes.sub" : "orders.quotes_on_mac.sub"))
+                Text(L10n.tr(quotesHeld ? "orders.no_quotes.sub" : "orders.quotes_on_mac.sub"))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
@@ -447,7 +451,9 @@ struct OrdersView: View {
             CompanionHaptics.success()
             await load()
         } catch {
-            errorMessage = error.localizedDescription
+            // Said where the move was made, not in the empty state (which a
+            // list with rows never draws): F4.
+            moveNotes = [error.localizedDescription]
             CompanionHaptics.warning()
         }
     }

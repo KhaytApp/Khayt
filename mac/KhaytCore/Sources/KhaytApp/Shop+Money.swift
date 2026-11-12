@@ -607,6 +607,15 @@ extension Shop {
     }
 
     /// Can this shop reach that screen at all?
+    /// The screen is there for this person, and the shop's MODE is what hides
+    /// it: the lock allows it and its feature is not in Simple. `NotAllowed`
+    /// asks, so a mode gate is not explained in the staff lock's words.
+    func hiddenByMode(_ shelf: Shelf) -> Bool {
+        if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        guard let gate = Self.gate(of: shelf) else { return false }
+        return !has(gate)
+    }
+
     func canShow(_ shelf: Shelf) -> Bool {
         // The operator lock first: a screen the person signed in may not see
         // is not reachable by ANY path that asks here — the sidebars, the menu

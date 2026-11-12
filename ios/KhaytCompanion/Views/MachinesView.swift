@@ -87,7 +87,7 @@ struct MachinesView: View {
                 Label(L10n.tr("camera.open"), systemImage: "video")
                     .font(.khayt(14, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.brand)
-                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
         case .refused(let why)?:
@@ -112,12 +112,14 @@ struct MachinesView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if machines.isEmpty && !didLoad && errorMessage == nil {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+                    } else if machines.isEmpty, let errorMessage {
+                        LoadFailedView(message: errorMessage) { await load() }
                     } else if machines.isEmpty {
                         VStack(spacing: 5) {
                             Text(L10n.tr("machines.none"))
                                 .font(.khayt(15, .semibold, relativeTo: .headline))
                                 .foregroundStyle(KhaytDesign.ink)
-                            Text(errorMessage ?? L10n.tr("machines.none.sub"))
+                            Text(L10n.tr("machines.none.sub"))
                                 .font(.khayt(13, relativeTo: .footnote))
                                 .foregroundStyle(KhaytDesign.note)
                         }

@@ -189,7 +189,7 @@ struct LibraryHealthView: View {
                     HStack(spacing: 8) {
                         Text(file.title).font(.callout).lineLimit(1).truncationMode(.middle)
                         if let folder = file.groupName {
-                            Text(folder).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                            Text(folder).font(.caption).foregroundStyle(Khayt.faint).lineLimit(1)
                         }
                         Spacer(minLength: 8)
                         if group.kind == .missing {

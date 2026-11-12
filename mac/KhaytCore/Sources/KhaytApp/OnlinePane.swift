@@ -259,7 +259,7 @@ struct OnlinePane: View {
                                 Spacer(minLength: 0)
                                 if let at = shop.quoteSheetAt {
                                     Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
-                                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                                        .font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                                 }
                             }
                         }
@@ -404,7 +404,7 @@ struct OnlinePane: View {
                             Spacer(minLength: 0)
                             if let at = shop.leadTimeAt {
                                 Text(shop.words.say(at, Date.FormatStyle(date: .omitted, time: .shortened)))
-                                    .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                                    .font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                             }
                         }
                     }
@@ -489,7 +489,7 @@ struct OnlinePane: View {
             HStack(spacing: 4) {
                 TextField("", text: text)
                     .textFieldStyle(.roundedBorder).frame(width: 80).monospacedDigit()
-                if !unit.isEmpty { Text(unit).font(.caption2).foregroundStyle(.tertiary) }
+                if !unit.isEmpty { Text(unit).font(.caption2).foregroundStyle(Khayt.faint) }
                 Spacer()
             }
         }

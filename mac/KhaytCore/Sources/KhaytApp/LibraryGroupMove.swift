@@ -492,7 +492,7 @@ struct GroupMoveSheet: View {
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(Words.spaced(0.6))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                 ForEach(plan.moves) { move in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {

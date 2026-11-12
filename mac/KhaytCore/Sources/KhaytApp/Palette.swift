@@ -219,6 +219,16 @@ enum Khayt {
     static let collect = adaptive(light: 0x0E7A70, dark: 0x3FD0C0, name: "khaytCollect")
     /// On hold and quality check.
     static let hold = adaptive(light: 0x6B52B5, dark: 0xB49CFF, name: "khaytHold")
+    /// THE FAINTEST TEXT THAT IS STILL TEXT: order numbers, dates, column and
+    /// section captions, "settled", the dash for "not recorded".
+    ///
+    /// These were SwiftUI's `.tertiary`, which is the label colour at reduced
+    /// opacity: about 1.9:1 on a white card and 2.2:1 on a navy one, measured
+    /// from the running app (Nov 11 2026 UI review, B25). That is a texture,
+    /// and it was carrying data. This clears 4.5:1 on every card and ground in
+    /// both appearances (`FaintTextIsReadableTests`) and is still a step
+    /// quieter than `.secondary`. `.tertiary` stays for strokes and symbols.
+    static let faint = adaptive(light: 0x636B78, dark: 0x8593AB, name: "khaytFaint")
     /// The well a model thumbnail sits in: lighter than the card in dark, so
     /// a black print does not vanish into navy.
     static let well = adaptive(light: 0xEEF1F3, dark: 0x2A4670, name: "khaytWell")
