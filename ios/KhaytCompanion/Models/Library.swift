@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// One page of the shop's library, as `GET /api/library` answers it.
 struct LibraryPage: Decodable, Equatable, Sendable {
@@ -6,13 +7,23 @@ struct LibraryPage: Decodable, Equatable, Sendable {
     let offset: Int
     let folders: [LibraryFolder]
     var items: [LibraryItem]
+    /// How many models each Colour and File type row would find
+    /// (`LibraryFilter`). Nil from a Mac that cannot filter yet: the phone
+    /// then hides both menus rather than guess from its version.
+    var facets: LibraryFacets?
+    /// How many models the search and folder find before the two menus
+    /// narrow them, where the phone counted it itself (its copy, the sample
+    /// shop). The Mac does not send it.
+    var unfilteredTotal: Int?
     /// Read from the phone's copy because the Mac could not be reached.
     var fromCopy = false
 
-    private enum CodingKeys: String, CodingKey { case total, offset, folders, items }
+    private enum CodingKeys: String, CodingKey { case total, offset, folders, items, facets }
 
-    init(total: Int, offset: Int, folders: [LibraryFolder], items: [LibraryItem]) {
+    init(total: Int, offset: Int, folders: [LibraryFolder], items: [LibraryItem],
+         facets: LibraryFacets? = nil, unfilteredTotal: Int? = nil) {
         self.total = total; self.offset = offset; self.folders = folders; self.items = items
+        self.facets = facets; self.unfilteredTotal = unfilteredTotal
     }
 
     /// Lenient per record: one model the phone cannot read is left out, not
@@ -24,6 +35,7 @@ struct LibraryPage: Decodable, Equatable, Sendable {
         folders = (try? c.decode([Lenient<LibraryFolder>].self, forKey: .folders))?.compactMap(\.value) ?? []
         total = (try? c.decode(Int.self, forKey: .total)) ?? items.count
         offset = (try? c.decode(Int.self, forKey: .offset)) ?? 0
+        facets = try? c.decodeIfPresent(LibraryFacets.self, forKey: .facets)
     }
 }
 
@@ -78,10 +90,29 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
     /// A new version the Mac has not measured yet (`figuresStaleFor`), as
     /// the phone's copy reads it.
     let figuresStale: Bool
+    /// The colours it was sliced with, as hex (`colors: [{hex, grams}]`).
+    let colors: [String]
+    /// Its File type row (`ModelFileType`). The Mac's answer says only `ext`,
+    /// so a model there without one reads as `nofile`; the phone's copy
+    /// works it out from the whole record and sends `fileType`.
+    let fileType: String
+
+    /// Its Colour rows (`ColourFamily.tokens`): each family, `multi` for two
+    /// or more, `none` for no colour on the record.
+    var colourKeys: [String] { ColourFamily.tokens(ofHexes: colors) }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, folder, category, tags, material, ext, favorite, timesPrinted, lastPrinted, thumb,
-             estimable, printTimeMins, grams, plates, testedNotes, figuresStale
+             estimable, printTimeMins, grams, plates, testedNotes, figuresStale, colors, fileType
+    }
+
+    private struct Swatch: Decodable {
+        let hex: String?
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { hex = s; return }
+            enum K: String, CodingKey { case hex }
+            hex = try? decoder.container(keyedBy: K.self).decode(String.self, forKey: .hex)
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -106,5 +137,36 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
         printTimeMins = positive(.printTimeMins)
         grams = positive(.grams)
         plates = ((try? c.decode([Lenient<Plate>].self, forKey: .plates)) ?? []).compactMap(\.value)
+        colors = ((try? c.decode([Lenient<Swatch>].self, forKey: .colors)) ?? []).compactMap { $0.value?.hex }
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        if let said = text(.fileType)?.lowercased(), ModelFileType(rawValue: said) != nil {
+            fileType = said
+        } else {
+            fileType = ModelFileType.type(hasSourceFile: ext != nil, ext: ext, kind: nil, names: []).rawValue
+        }
+    }
+}
+
+/// `facets` in `GET /api/library`: for each Colour and each File type key, how
+/// many models that row would find. Every key is meant to be there; one left
+/// out reads as 0, an unknown one is dropped.
+struct LibraryFacets: Decodable, Equatable, Sendable {
+    var colour: [String: Int]
+    var type: [String: Int]
+
+    init(colour: [String: Int], type: [String: Int]) { self.colour = colour; self.type = type }
+
+    private enum CodingKeys: String, CodingKey { case colour, type }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func counts(_ k: CodingKeys, _ keys: [String]) throws -> [String: Int] {
+            let raw = try c.decode([String: Lenient<Double>].self, forKey: k)
+            var out: [String: Int] = [:]
+            for key in keys { out[key] = raw[key]?.value.map { max(0, Int($0)) } ?? 0 }
+            return out
+        }
+        colour = try counts(.colour, LibraryFilter.colourKeys)
+        type = try counts(.type, LibraryFilter.typeKeys)
     }
 }

@@ -1485,17 +1485,21 @@ final class KhaytAPIClient: ObservableObject {
     /// One page of the library (`GET /api/library`). The library stays on the
     /// Mac — ten thousand models in a real shop — so searching and paging
     /// happen there.
-    func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50) async throws -> LibraryPage {
-        if settings.isSampleShop { return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit) }
+    func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50,
+                      filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
+        if settings.isSampleShop {
+            return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
+        }
         do {
-            return try await libraryFromMac(query: query, folder: folder, offset: offset, limit: limit)
+            return try await libraryFromMac(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
         } catch {
             // Away from the shop: the copy that came with the cloud sync.
             guard Self.isUnreachable(error) || isMissingRoute(error) else { throw error }
             guard let rows = book?.library() else {
                 throw Self.isUnreachable(error) ? KhaytAPIError.server(L10n.tr("library.no_copy")) : error
             }
-            var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset, limit: limit)
+            var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset,
+                                          limit: limit, filter: filter)
             page.fromCopy = true
             // The pictures the Mac already sent, kept on the phone.
             let kept = await thumbShelf.kept(page.items.map(\.id))
@@ -1513,12 +1517,13 @@ final class KhaytAPIClient: ObservableObject {
         return false
     }
 
-    private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
+    private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int,
+                                filter: LibraryFilter) async throws -> LibraryPage {
         if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60, book?.hasLibrary == true {
             throw KhaytAPIError.transport(URLError(.cannotConnectToHost))
         }
         do {
-            let page = try await libraryPage(query: query, folder: folder, offset: offset, limit: limit)
+            let page = try await libraryPage(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
             libraryMacDownSince = nil
             return page
         } catch {
@@ -1527,10 +1532,10 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
-    private func libraryPage(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
+    private func libraryPage(query: String, folder: String, offset: Int, limit: Int,
+                             filter: LibraryFilter) async throws -> LibraryPage {
         var q = URLComponents()
-        q.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "folder", value: folder),
-                        URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "limit", value: String(limit))]
+        q.queryItems = LibraryFilter.queryItems(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
         let (data, response) = try await request(path: "/api/library?" + (q.percentEncodedQuery ?? ""),
                                                  method: "GET", body: nil, requiresPin: true)
         guard let http = response as? HTTPURLResponse else { throw KhaytAPIError.transport(URLError(.badServerResponse)) }
