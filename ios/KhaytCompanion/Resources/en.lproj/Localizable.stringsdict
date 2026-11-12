@@ -82,5 +82,21 @@
 			<string>%d separate spools, each tracked on its own.</string>
 		</dict>
 	</dict>
+	<key>simple.expenses.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d expense</string>
+			<key>other</key>
+			<string>%d expenses</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

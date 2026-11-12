@@ -1287,3 +1287,22 @@
 "load.failed.title" = "无法加载";
 "load.retry" = "重试";
 "load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
+
+/* S4: Simple mode */
+"mode.simple" = "简洁";
+"mode.professional" = "专业";
+"mode.badge.a11y" = "模式：%@，在 Mac 上设置";
+"simple.stage.ready" = "已完成";
+"simple.note.on_hold" = "暂停";
+"simple.note.post" = "后处理";
+"simple.note.qc" = "质检中";
+"simple.note.shipped" = "已发货";
+"simple.note.delivered" = "已交付";
+"simple.expenses.month" = "本月：%@ · %@";
+"simple.gate.care.title" = "保养计划属于专业模式";
+"simple.gate.care.body" = "此店铺在 Mac 上设为简洁模式。要使用保养计划，请在 Mac 上的 Khayt 中切换到专业模式。手机跟随 Mac 的选择。";
+"simple.gate.parts.title" = "待购零件属于专业模式";
+"simple.gate.parts.body" = "此店铺在 Mac 上设为简洁模式。零件清单来自属于专业模式的保养计划：请在 Mac 上的 Khayt 中切换。手机跟随 Mac 的选择。";
+"simple.gate.back_machine" = "返回机器";
+"simple.gate.back_machines" = "返回机器列表";
+"simple.expenses.count" = "%d 笔支出";

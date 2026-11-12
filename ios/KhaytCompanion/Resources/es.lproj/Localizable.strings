@@ -1287,3 +1287,22 @@
 "load.failed.title" = "No se pudo cargar";
 "load.retry" = "Reintentar";
 "load.book_unavailable" = "No se pudo leer el libro en este teléfono. Vuelve a intentarlo o comprueba que el Mac esté al alcance.";
+
+/* S4: Simple mode */
+"mode.simple" = "Sencillo";
+"mode.professional" = "Profesional";
+"mode.badge.a11y" = "Modo: %@, se elige en el Mac";
+"simple.stage.ready" = "Listo";
+"simple.note.on_hold" = "En espera";
+"simple.note.post" = "Posprocesado";
+"simple.note.qc" = "En control";
+"simple.note.shipped" = "Enviado";
+"simple.note.delivered" = "Entregado";
+"simple.expenses.month" = "Este mes: %@ · %@";
+"simple.gate.care.title" = "Los planes de mantenimiento son parte de Profesional";
+"simple.gate.care.body" = "Este taller está en Sencillo en el Mac. Para usar los planes de mantenimiento, cambia a Profesional en Khayt en tu Mac. El teléfono sigue lo que elija el Mac.";
+"simple.gate.parts.title" = "Piezas por comprar es parte de Profesional";
+"simple.gate.parts.body" = "Este taller está en Sencillo en el Mac. La lista de piezas sale de los planes de mantenimiento, que son de Profesional: cambia en Khayt en tu Mac. El teléfono sigue lo que elija el Mac.";
+"simple.gate.back_machine" = "Volver a la máquina";
+"simple.gate.back_machines" = "Volver a Máquinas";
+"simple.expenses.count" = "%d gastos";

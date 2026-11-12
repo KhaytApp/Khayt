@@ -146,6 +146,28 @@ final class KhaytAPIClient: ObservableObject {
     func refreshHoldsBook() {
         let now = holdsBookOnDisk
         if holdsBook != now { holdsBook = now }
+        refreshShopMode()
+    }
+
+    /// Simple or Professional, as the book on this phone says (`ShopMode`).
+    /// Published, so a screen redraws when the Mac's settings change the mode.
+    /// Professional with no book.
+    @Published private(set) var shopMode: ShopMode = .professional
+    private var shopModeTask: Task<Void, Never>?
+
+    /// Read the mode again. Called with `refreshHoldsBook()`, which every path
+    /// that makes, replaces or deletes the book (and every refresh round) calls.
+    func refreshShopMode() {
+        shopModeTask?.cancel()
+        guard let reader else {
+            if shopMode != .professional { shopMode = .professional }
+            return
+        }
+        shopModeTask = Task { [weak self] in
+            let next = await reader.shopMode()
+            guard !Task.isCancelled, let self else { return }
+            if self.shopMode != next { self.shopMode = next }
+        }
     }
 
     /// Whether the book on this phone holds ALL of a collection, so a total
@@ -190,6 +212,7 @@ final class KhaytAPIClient: ObservableObject {
         self.reader = opened.map(BookReader.init(book:))
         _holdsBook = Published(initialValue: opened?.exists ?? false)
         gateEdits()
+        refreshShopMode()
         // Pairing a Mac (or letting it go) changes whether edits have
         // somewhere to go. `objectWillChange` fires before the change lands.
         settingsWatch = settings.objectWillChange.sink { [weak self] _ in
@@ -336,7 +359,7 @@ final class KhaytAPIClient: ObservableObject {
     /// pulled one, with nothing to pull it from and nowhere to send to.
     func openSampleShop(now: Date = Date()) throws {
         guard let book else { throw KhaytAPIError.notConfigured }
-        let store = SampleShop.book(now: now)
+        let store = SampleShop.withDebugMode(SampleShop.book(now: now))
         try book.replace(with: store, scope: SampleShop.scope(now: now))
         try book.replaceBaseline(with: store)
         try book.replaceLibrary(SampleShop.library())

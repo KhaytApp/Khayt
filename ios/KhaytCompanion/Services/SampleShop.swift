@@ -22,6 +22,24 @@ import KhaytCore
 enum SampleShop {
     static let label = "Sample Print Shop"
 
+    /// The sample shop is Professional: its settings carry no `mode`. A debug
+    /// build launched with `-KhaytShopMode simple` writes that mode into the
+    /// sample book, as the Mac would, so Simple can be photographed and tested
+    /// on the same shop. Release builds always return the book unchanged.
+    static func withDebugMode(_ store: [String: JSONValue],
+                              defaults: UserDefaults = .standard) -> [String: JSONValue] {
+        #if DEBUG
+        guard let mode = defaults.string(forKey: "KhaytShopMode"), !mode.isEmpty,
+              case .object(var settings)? = store["settings"] else { return store }
+        settings["mode"] = .string(mode)
+        var out = store
+        out["settings"] = .object(settings)
+        return out
+        #else
+        return store
+        #endif
+    }
+
     static func book(now: Date = Date()) -> [String: JSONValue] {
         let cal = Calendar(identifier: .gregorian)
         let f = DateFormatter()
@@ -197,6 +215,18 @@ enum SampleShop {
                 spool("SP-205", "Elegoo", "Resin", "#9AA3AD", left: 150, of: 1000, cost: 35.00,
                       extra: ["supplierId": .string("SUP-3"), "reorderQty": .number(2000)]),
                 spool("SP-206", "Polymaker", "Nylon", "#C9B79C", left: 750, of: 750, cost: 42.00),
+            ]),
+            // Two expenses filed today, so this month's spending has something
+            // to add up (Simple's line under the Expense sheet).
+            "expenses": .array([
+                .object(["id": .string("EXP-S1"), "date": day(0), "category": .string("filament"),
+                         "amount": .number(85), "note": .string("PETG, 3 rolls"), "orderId": .null,
+                         "receiptPath": .null, "recurring": .null, "nextDue": .null,
+                         "locationId": .string(""), "rev": .number(1)]),
+                .object(["id": .string("EXP-S2"), "date": day(0), "category": .string("electricity"),
+                         "amount": .number(35), "note": .string(""), "orderId": .null,
+                         "receiptPath": .null, "recurring": .null, "nextDue": .null,
+                         "locationId": .string(""), "rev": .number(1)]),
             ]),
             "suppliers": .array([
                 supplier("SUP-1", "Bambu Lab Store", prices: [("PLA", 19.99), ("PETG", 21.99)], leadDays: 6),

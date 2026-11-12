@@ -1287,3 +1287,22 @@
 "load.failed.title" = "Couldn't load";
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
+
+/* S4: Simple mode */
+"mode.simple" = "Simple";
+"mode.professional" = "Professional";
+"mode.badge.a11y" = "Mode: %@, set on the Mac";
+"simple.stage.ready" = "Ready";
+"simple.note.on_hold" = "On hold";
+"simple.note.post" = "Post-processing";
+"simple.note.qc" = "In QC";
+"simple.note.shipped" = "Shipped";
+"simple.note.delivered" = "Delivered";
+"simple.expenses.month" = "This month: %@ · %@";
+"simple.gate.care.title" = "Care plans are part of Professional";
+"simple.gate.care.body" = "This shop is set to Simple on the Mac. To use care plans, switch to Professional in Khayt on your Mac. The phone follows the Mac's choice.";
+"simple.gate.parts.title" = "Parts to buy is part of Professional";
+"simple.gate.parts.body" = "This shop is set to Simple on the Mac. The parts list comes from care plans, which are Professional: switch in Khayt on your Mac. The phone follows the Mac's choice.";
+"simple.gate.back_machine" = "Back to the machine";
+"simple.gate.back_machines" = "Back to Machines";
+"simple.expenses.count" = "%d expenses";

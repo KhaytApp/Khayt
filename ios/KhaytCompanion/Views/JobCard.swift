@@ -21,6 +21,9 @@ struct JobCard: View {
     /// bar with nothing behind it would be a figure the phone does not have.
     var live: MachineLiveStatus? = nil
     var layout: Layout = .compact
+    /// Simple's board: the stage the card is filed under, and the finer one
+    /// it is really at as a note. Nil draws the job's own stage (Professional).
+    var filing: SimpleBoard.Filing? = nil
     let isUpdating: Bool
     let onAdvance: () -> Void
     let onOpen: () -> Void
@@ -88,7 +91,11 @@ struct JobCard: View {
         }
     }
 
-    private var tone: Color { KhaytDesign.statusColor(for: order.status) }
+    /// The status the pill, tile and icon are drawn in: the job's own, or in
+    /// Simple the column's (a job in QC is Printing).
+    private var shownStatus: String { filing.map { SimpleBoard.toneStatus($0.column) } ?? order.status }
+
+    private var tone: Color { KhaytDesign.statusColor(for: shownStatus) }
 
     private var stageChip: some View {
         Group {
@@ -111,7 +118,7 @@ struct JobCard: View {
 
     /// "Printing 64%" while the machine reports it, else the stage's word.
     private var chipLabel: String {
-        let word = L10n.tr("stage.short.\(order.status)")
+        let word = filing.map { SimpleBoard.title($0.column) } ?? L10n.tr("stage.short.\(order.status)")
         if order.status == "printing", let live, live.isPrinting, let p = live.progress {
             return word + " " + p.formatted(.number.locale(L10n.locale)) + "%"
         }
@@ -124,7 +131,7 @@ struct JobCard: View {
     private var card: some View {
         let edge = order.isOverdue ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline
         return HStack(alignment: .top, spacing: 12) {
-            Image(systemName: CompanionTheme.statusIcon(for: order.status))
+            Image(systemName: CompanionTheme.statusIcon(for: shownStatus))
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(order.isOverdue ? KhaytDesign.late : tone)
                 .frame(width: 46, height: 46)
@@ -139,6 +146,7 @@ struct JobCard: View {
                         .lineLimit(1)
                         .environment(\.layoutDirection, .leftToRight)
                     stageChip
+                    if let note = filing?.note { SimpleNoteTag(text: SimpleBoard.noteText(note)) }
                     if order.isRush { RushBadge() }
                     Spacer(minLength: 0)
                 }
@@ -179,5 +187,21 @@ struct JobCard: View {
         .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(edge, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+/// Simple's note on a card: the finer stage a job is at ("In QC", "On hold",
+/// "Shipped"), small and neutral, beside the stage it is filed under. Words,
+/// not a colour, so it reads without one.
+struct SimpleNoteTag: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.khayt(10.5, .semibold, relativeTo: .caption2))
+            .lineLimit(1)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .foregroundStyle(KhaytDesign.note)
+            .overlay(Capsule().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
     }
 }

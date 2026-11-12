@@ -72,5 +72,19 @@
 			<string>%d 个独立线轴，各自单独追踪。</string>
 		</dict>
 	</dict>
+	<key>simple.expenses.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>other</key>
+			<string>%d 笔支出</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

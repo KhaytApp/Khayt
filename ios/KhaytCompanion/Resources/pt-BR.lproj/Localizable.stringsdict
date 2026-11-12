@@ -82,5 +82,21 @@
 			<string>%d carretéis separados, cada um controlado individualmente.</string>
 		</dict>
 	</dict>
+	<key>simple.expenses.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d despesa</string>
+			<key>other</key>
+			<string>%d despesas</string>
+		</dict>
+	</dict>
 </dict>
 </plist>
