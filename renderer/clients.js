@@ -661,7 +661,7 @@ function openClientEditor(clientId = null) {
   if (!draft.priceList) draft.priceList = [];
   // Simple (SIMPLE_MAP customers, S4 card 6): the five fields a small shop
   // fills. Everything else on the record is kept as it is.
-  if (settings.mode === 'simple' && window.KhaytSimpleScreens) {
+  if (settings.mode === 'simple' && window.KhaytSimpleForms) {
     openClientEditorSimple(existing, draft);
     return;
   }
@@ -1143,11 +1143,11 @@ function openClientEditor(clientId = null) {
  * further address ride through the save untouched (S4 rule 3).
  *
  * The one Address field is the address book's first row
- * (KhaytSimpleScreens.addressOf). A structured row from the address editor
+ * (KhaytSimpleForms.addressOf). A structured row from the address editor
  * (#2416) is shown read-only, never flattened into one line.
  */
 function openClientEditorSimple(existing, draft) {
-  const S = window.KhaytSimpleScreens;
+  const S = window.KhaytSimpleForms;
   const nameKey = S.nameKey(draft, settings.lang);
   const addr = S.addressOf(draft);
   const bodyHtml = `

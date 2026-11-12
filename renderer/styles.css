@@ -3425,7 +3425,7 @@ body.mode-simple [data-simple-pro] { display: none !important; }
 [data-theme="dark"] .sm-mode-badge { background: #3A4658; color: #A9B8CF; }
 .khayt-sidebar.collapsed .sm-mode-badge { display: none; }
 
-/* ── S4 reduced screens (renderer/simple-screens.js) ───────────────────────
+/* ── S4 reduced screens (renderer/simple-forms.js) ───────────────────────
    .sm-simple-only is drawn in Simple only; .sm-pro-form is the Professional
    form of the same control, hidden in Simple. Professional is unchanged. */
 body:not(.mode-simple) .sm-simple-only { display: none !important; }

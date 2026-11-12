@@ -2,13 +2,13 @@
 /**
  * S4 cards 6–8: the rules behind Simple's reduced screens.
  *   lib/order-status.js simpleStageOf — the four-column board
- *   renderer/simple-screens.js        — the five-field customer, the library places
+ *   renderer/simple-forms.js        — the five-field customer, the library places
  */
 const test = require('node:test');
 const assert = require('node:assert');
 
 const OS = require('../lib/order-status.js');
-const SS = require('../renderer/simple-screens.js');
+const SS = require('../renderer/simple-forms.js');
 
 test('the Simple board files every stage into Quote · Queued · Printing · Ready', () => {
   assert.deepStrictEqual(OS.SIMPLE_COLUMNS, ['quote', 'queued', 'printing', 'ready']);

@@ -2450,7 +2450,7 @@ async function renderPrintLibLocation() {
   rootEl.value = cfg.root || '';
   mirrorEl.value = cfg.mirror || '';
   // Simple's three places (S4 card 8) read the same settings.
-  window.KhaytSimpleScreens?.renderLibraryPlaces?.();
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   const s3 = cfg.s3 || {};
   const setV = (id, v) => { const el = $(id); if (el) el.value = v || ''; };
   if ($('#set_plibS3On')) $('#set_plibS3On').checked = !!s3.enabled;
@@ -2790,7 +2790,7 @@ function plibVaultLock() {
 async function renderPrintLibGDrive() {
   const cfg = ((settings && settings.printLibrary) || {}).gdrive || {};
   const status = $('#plibGDStatus');
-  window.KhaytSimpleScreens?.renderLibraryPlaces?.();
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   if ($('#set_plibGDriveOn')) $('#set_plibGDriveOn').checked = !!cfg.enabled;
   plibVaultLock();
   if ($('#set_plibGDClientId')) $('#set_plibGDClientId').value = cfg.clientId || '';

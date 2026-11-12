@@ -365,7 +365,7 @@ jobs:
       - name: E2E smoke (Simple mode follows SIMPLE_MAP)
         run: xvfb-run -a npm run test:e2e:simplemap
       - name: E2E smoke (Simple mode reduced screens, S4 cards 6-8)
-        run: xvfb-run -a npm run test:e2e:simplescreens
+        run: xvfb-run -a npm run test:e2e:simpleforms
 
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro

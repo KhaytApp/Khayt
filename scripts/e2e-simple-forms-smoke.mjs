@@ -16,7 +16,7 @@
  *     "Set up in Professional"; "Connect…" opens the Drive set-up.
  * In Professional each screen is as it was.
  *
- * Run: npm run test:e2e:simplescreens
+ * Run: npm run test:e2e:simpleforms
  */
 import { launchApp, dismissWizard, makeUserDataDir } from './e2e/helpers.mjs';
 
@@ -235,10 +235,10 @@ try {
   const proLib2 = await library();
   ok(!proLib2.places && proLib2.root && proLib2.mirror && proLib2.s3 && proLib2.tier && proLib2.drive, 'Professional again: Library & Files as before');
 
-  console.log('e2e-simple-screens: ok');
+  console.log('e2e-simple-forms: ok');
 } catch (err) {
   failed = true;
-  console.error('e2e-simple-screens FAILED:', err && err.message);
+  console.error('e2e-simple-forms FAILED:', err && err.message);
 } finally {
   await electronApp.close();
   process.exit(failed ? 1 : 0);

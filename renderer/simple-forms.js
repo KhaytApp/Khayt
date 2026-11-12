@@ -144,5 +144,5 @@
 
   const api = { nameKey, isPlainAddress, addressOf, applyAddress, libraryPlace, renderLibraryPlaces, openDriveSetup };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (typeof globalThis !== 'undefined') globalThis.KhaytSimpleScreens = api;
+  if (typeof globalThis !== 'undefined') globalThis.KhaytSimpleForms = api;
 })();
