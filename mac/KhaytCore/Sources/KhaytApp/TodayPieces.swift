@@ -78,7 +78,7 @@ struct TodayEyebrow: View {
         HStack(spacing: 8) {
             Rectangle().fill(Khayt.thread).frame(width: 24, height: 2)
             Text(verbatim: text)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(TypeScale.eyebrow(11))
                 .textCase(.uppercase).tracking(Words.spaced(1.0))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -306,7 +306,7 @@ struct DueThisWeek: View {
                     Text(words.say(date, .dateTime.day()))
                 }
             }
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(TypeScale.eyebrow(10))
             .textCase(.uppercase).foregroundStyle(.primary)
             .frame(width: 46, height: 36)
             .background(isToday ? Khayt.threadWash : Khayt.recessed,

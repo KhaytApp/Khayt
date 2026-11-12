@@ -438,6 +438,7 @@ struct CustomerSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(shop.words.callIt("common.delete"))
                 }
             }
             Button(shop.words.callIt("ce.addr_add")) { addresses.append(ClientAddress()) }
@@ -464,6 +465,7 @@ struct CustomerSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), row.product))
                 }
             }
             Button(shop.words.callIt("common.add")) { agreements.append(AgreementRow()) }

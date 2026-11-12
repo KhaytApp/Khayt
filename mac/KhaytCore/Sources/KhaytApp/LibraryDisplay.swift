@@ -340,7 +340,11 @@ enum LibraryTile {
     /// placeholder and a rendered preview (its white keyed out, see
     /// `ThumbnailStore.matte`) are laid on. A step off the window's warm
     /// ground in each appearance, so a tile reads as a tile without a border.
-    static let well = Khayt.adaptive(light: 0xE4DFD5, dark: 0x24211C, name: "khaytLibraryWell")
+    ///
+    /// In DARK it is `Khayt.well`'s value: lighter than the navy card, so a
+    /// black print does not vanish. It was a warm brown-black (#24211C) from
+    /// the older palette, against which a black model measured about 2.2:1.
+    static let well = Khayt.adaptive(light: 0xE4DFD5, dark: 0x2A4670, name: "khaytLibraryWell")
 }
 
 /// A model with no picture yet: a build plate, seen at the angle the slicers
