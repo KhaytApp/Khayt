@@ -528,6 +528,25 @@
     return { all: false, names };
   }
 
+  /**
+   * The same for two whole entries — the connector before and after an Agree
+   * or a Revert — as a plain list of secret names for the device to drop.
+   * An older grant is first given the pairs its own manifest sends
+   * (`grantWithPairs`), so a key moving between two hosts it already listed
+   * is seen; when even that cannot say (`all`), every secret either manifest
+   * declares is named.
+   */
+  function keysToForget(beforeEntry, afterEntry) {
+    const r = secretsToForget(grantWithPairs(beforeEntry), grantWithPairs(afterEntry));
+    if (!r.all) return r.names;
+    const names = new Set();
+    for (const e of [beforeEntry, afterEntry]) {
+      const list = isObj(e) && isObj(e.manifest) && Array.isArray(e.manifest.secrets) ? e.manifest.secrets : [];
+      list.forEach((x) => { if (isObj(x) && str(x.name)) names.add(x.name); });
+    }
+    return Array.from(names).sort();
+  }
+
   /* ── ONE PASS OVER THE BOOK ───────────────────────────────────────────── */
 
   /**
@@ -612,7 +631,7 @@
   const api = {
     INDEX_CONTEXT, INDEX_FORMAT, SCHEMA, KINDS, EXPIRY_DAYS, RESIGN_DAYS, CLOCK_SLACK_MS, REASON_MAX,
     compareVersions, indexSigningMessage, checkIndex, rowFor, stateOf, lastSerial,
-    planUpdate, planWithManifest, grantWithPairs, applyPlan, agree, revert, setSwitch, runnable, secretsToForget, fetchesFor, applyIndex,
+    planUpdate, planWithManifest, grantWithPairs, applyPlan, agree, revert, setSwitch, runnable, secretsToForget, keysToForget, fetchesFor, applyIndex,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPluginUpdate = api;
