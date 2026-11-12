@@ -60,7 +60,7 @@ struct DowntimeCard: View {
                     Spacer().frame(width: 130)
                     ForEach(months, id: \.self) { month in
                         Text(MonthLabel.short(month))
-                            .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                            .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                             .frame(maxWidth: .infinity)
                     }
                     Spacer().frame(width: 62)

@@ -570,3 +570,39 @@ test('a repeat order carries the standing order, not the last run’s money, lin
   const without = R.run(deep(b.clients), deep(b.orders), { settings: deep(b.settings), now: new Date() });
   assert.equal('trackingToken' in without.created[0], false);
 });
+
+test('a repeat order says the currency it is in, so a later change to the customer cannot revalue it', () => {
+  require('../lib/record-duplicate.js');
+  const M = require('../lib/order-money.js');
+  const job = (id, clientId, extra) => Object.assign({ id, clientId, status: 'completed', date: '2026-08-01',
+    project: 'Brackets', price: 100, parts: [] }, extra);
+  const sched = { enabled: true, interval: 'monthly', nextDue: TODAY };
+  const b = {
+    clients: [
+      { id: 'EUR', currency: 'EUR', recurring: { ...sched } },
+      { id: 'SAR', recurring: { ...sched } },
+      { id: 'OWN', currency: 'EUR', recurring: { ...sched } },
+      { id: 'BASE', currency: 'SAR', recurring: { ...sched } },
+    ],
+    orders: [job('T-eur', 'EUR'), job('T-sar', 'SAR'), job('T-own', 'OWN', { currency: 'USD' }), job('T-base', 'BASE')],
+    settings: { invNumNext: 1, invNumYear: 2026, currency: 'SAR', exchangeRates: { EUR: 4.1, USD: 3.75 } },
+  };
+  const cl = deep(b.clients), orders = deep(b.orders), st = deep(b.settings);
+  const { created } = R.run(cl, orders, { settings: st, now: new Date() });
+  const of = (id) => created.find(o => o.clientId === id);
+  assert.equal(created.length, 4);
+  assert.equal(of('EUR').currency, 'EUR', 'a EUR customer’s repeat says EUR');
+  assert.equal('currency' in of('SAR'), false, 'one in the shop’s currency carries none, as before');
+  assert.equal(of('OWN').currency, 'USD', 'a template that said its own currency is carried, not overwritten');
+  assert.equal('currency' in of('BASE'), false, 'a customer set to the shop’s currency is the shop’s currency');
+
+  // The customer moves to USD later, on a computer that does not pin jobs first:
+  // the repeat is still 100 EUR = 410 of revenue, not 375.
+  cl[0].currency = 'USD';
+  assert.equal(M.orderCurrency(of('EUR'), { clients: cl, settings: st }), 'EUR');
+  assert.ok(Math.abs(M.orderRevenueBase(of('EUR'), { clients: cl, settings: st }) - 410) < 0.005);
+
+  // clone() with no clients (an older host) stamps nothing rather than guessing.
+  const bare = R.clone(job('T-x', 'EUR'), { settings: deep(b.settings), now: new Date(), cycle: TODAY });
+  assert.equal('currency' in bare, false);
+});

@@ -122,9 +122,14 @@ struct PostPresetsSettingsSection: View {
             }
             HStack {
                 TextField("", text: $name, prompt: Text(words.callIt("common.name")))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
-                TextField(words.callIt("common.amount"), value: $amount,
-                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
+                // The word as a PROMPT, with the label hidden: as a title it
+                // was drawn beside the 90-point field and wrapped "Amou / nt".
+                TextField("", value: $amount,
+                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)),
+                          prompt: Text(words.callIt("common.amount")))
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
                 Button(words.callIt("common.add")) {
                     guard let record = Shop.newPostPreset(name, amount: amount) else { return }

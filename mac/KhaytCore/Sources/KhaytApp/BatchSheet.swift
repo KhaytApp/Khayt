@@ -107,7 +107,7 @@ struct BatchSheet: View {
                                 Text(takes.material).font(.caption).foregroundStyle(.secondary)
                             }
                             Text(hoursAndGrams(takes))
-                                .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                                .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
                         }
                     }
                     .toggleStyle(.checkbox)

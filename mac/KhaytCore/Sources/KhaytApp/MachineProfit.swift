@@ -249,7 +249,7 @@ struct MachineProfitPage: View {
                         if row.measured < row.jobs {
                             Text(words.callIt("mac.mpl_estimated",
                                               ["n": .number(Double(row.jobs - row.measured))]))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(Khayt.faint)
                         }
                     }
                     VStack(alignment: .trailing, spacing: 2) {

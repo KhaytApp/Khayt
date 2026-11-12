@@ -133,7 +133,7 @@ struct OrdersTable: View {
                         .lineLimit(1)
                         .help(label)
                 } else {
-                    Text("—").foregroundStyle(.tertiary)
+                    Text("—").foregroundStyle(Khayt.faint)
                 }
             }
             .width(min: 64, ideal: 76)
@@ -296,7 +296,7 @@ struct JobTitleCell: View {
             // still opens the job either way.
             ViewThatFits(in: .horizontal) {
                 Text(job.reference)
-                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                    .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                     .lineLimit(1).fixedSize()
                 Color.clear.frame(width: 0, height: 0)
             }
@@ -417,7 +417,7 @@ private struct StageCell: View {
             // animates nothing.
             .animation(Motion.of(Motion.figure, unless: reduced), value: stage)
         } else {
-            Text(job.status).foregroundStyle(.tertiary)
+            Text(job.status).foregroundStyle(Khayt.faint)
         }
     }
 
@@ -660,14 +660,18 @@ private struct Owed: View {
         // telling a shop it had been paid for work it never charged for.
         //
         // Nothing was owed and nothing was paid. That is a dash.
-        if job.price <= 0 {
+        //
+        // The same for a quote, a cancelled job, a voided or a credited one:
+        // nothing was ever charged, so "settled" is not what happened
+        // (Nov 11 2026 UI review, B8).
+        if job.price <= 0 || !job.owesAtAll {
             Text("—")
                 .foregroundStyle(.quaternary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else if job.isSettled {
             Text(words.callIt("mac.settled"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .trailing, spacing: 3) {

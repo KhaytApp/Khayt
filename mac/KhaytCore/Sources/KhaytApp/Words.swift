@@ -5105,10 +5105,12 @@ final class Words {
         //
         // `name` stays as `lib/tax.js` gives it. That is the tax's own label —
         // what the shop's invoices say — and not interface wording to translate.
+        // The Arabic says the PRICE includes the tax; it used to say the tax
+        // includes the price, and began with the Latin name.
         "mac.tax_inclusive": ["en": "{name} {pct}% included in the price",
-                              "ar": "{name} {pct}% شامل السعر"],
+                              "ar": "السعر شامل {name} بنسبة {pct}%"],
         "mac.tax_exclusive": ["en": "{name} {pct}% added on top",
-                              "ar": "{name} {pct}% يُضاف على السعر"],
+                              "ar": "تُضاف {name} بنسبة {pct}% على السعر"],
         // Six months of takings on the dashboard, and the sentence over them.
         //
         // A SENTENCE, not the word "Revenue" over an axis. The HIG asks a chart
@@ -5650,6 +5652,8 @@ final class Words {
         "mac.lock_pin_unreadable": ["en": "This PIN was saved in a format Khayt can no longer check. An owner needs to set it again.", "ar": "حُفظ هذا الرمز بصيغة لم يعد خيط قادرًا على التحقق منها. يجب على المالك تعيينه من جديد."],
         "mac.lock_cooling": ["en": "Too many wrong PINs. Try again at {time}.", "ar": "محاولات خاطئة كثيرة. حاول مجددًا الساعة {time}."],
         "mac.lock_screen_not_allowed": ["en": "Your access level does not include this screen.", "ar": "مستوى صلاحيتك لا يشمل هذه الشاشة."],
+        "mac.mode_screen_hidden": ["en": "This screen is part of Professional. This shop is set to Simple.", "ar": "هذه الشاشة جزء من الوضع الاحترافي، وهذا المتجر على الوضع البسيط."],
+        "mac.mode_open_settings": ["en": "Open Settings", "ar": "فتح الإعدادات"],
         "mac.lock_signed_in_as": ["en": "Signed in as {name}", "ar": "مسجّل الدخول باسم {name}"],
         "mac.lock_sign_in_first": ["en": "Sign in first.", "ar": "سجّل الدخول أولًا."],
         "mac.lock_not_allowed": ["en": "Your access level does not allow this.", "ar": "مستوى صلاحيتك لا يسمح بهذا."],
@@ -5952,6 +5956,8 @@ final class Words {
                                  + "What has already been paid stays recorded.",
                                  "ar": "تُحذف الدفعات المتفق عليها ({n}) ومجموعها {amount}. "
                                  + "ما دُفع بالفعل يبقى مسجّلًا."],
+        "mac.price_not_read": ["en": "That price is not a number. Type a price, or clear the box.",
+                               "ar": "هذا السعر ليس رقمًا. اكتب سعرًا أو أفرغ الخانة."],
         "mac.save_zero_q":    ["en": "Save at a price of 0?",
                                "ar": "الحفظ بسعر 0؟"],
         "mac.save_zero_note": ["en": "This product would be sold and quoted for nothing. "
