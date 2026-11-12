@@ -69,6 +69,7 @@ struct LibraryFolderPage: View {
                 KhaytSearchField(text: $query, prompt: L10n.tr("library.search"))
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
                 // A Mac that cannot filter sends no counts: no menus then.
                 if let page, let facets = page.facets {
                     LibraryFilterBar(filter: $filter, facets: facets, shown: page.total,
@@ -76,6 +77,7 @@ struct LibraryFolderPage: View {
                                      open: folder.isEmpty ? $openMenu : $ownMenu)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
                 }
             }
             if let problem {

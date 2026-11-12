@@ -123,11 +123,11 @@ struct LibraryFilterMenuView: View {
     let counts: [String: Int]
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            content
-            ScrollView { content }
-        }
-        .frame(width: 340)
+        // Its ideal height is the rows', so the popover is as tall as they
+        // are and scrolls only where the screen is shorter (large type).
+        ScrollView { content }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: 340)
         .background(KhaytDesign.surface)
     }
 
