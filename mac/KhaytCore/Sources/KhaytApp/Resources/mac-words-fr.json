@@ -2480,6 +2480,7 @@
  "mac.save_zero_do": "Enregistrer à 0",
  "mac.save_zero_new": "Ce produit serait vendu et devisé pour rien.",
  "mac.save_zero_note": "Ce produit serait vendu et devisé pour rien. Son prix actuel est {price}.",
+ "mac.price_not_read": "Ce prix n’est pas un nombre. Saisissez un prix ou videz le champ.",
  "mac.save_zero_q": "Enregistrer à un prix de 0 ?",
  "mac.saved_at": "enregistré {t}",
  "mac.saved_to": "Enregistré sous",

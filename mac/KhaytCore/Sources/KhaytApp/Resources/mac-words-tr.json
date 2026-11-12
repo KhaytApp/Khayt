@@ -2480,6 +2480,7 @@
  "mac.save_zero_do": "0 Olarak Kaydet",
  "mac.save_zero_new": "Bu ürün bedavaya satılır ve bedavaya teklif edilir.",
  "mac.save_zero_note": "Bu ürün bedavaya satılır ve bedavaya teklif edilir. Şimdiki fiyatı {price}.",
+ "mac.price_not_read": "Bu fiyat bir sayı değil. Bir fiyat yazın veya kutuyu boşaltın.",
  "mac.save_zero_q": "0 fiyatla kaydedilsin mi?",
  "mac.saved_at": "kaydedildi {t}",
  "mac.saved_to": "Şu adla kaydedildi",

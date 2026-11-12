@@ -2480,6 +2480,7 @@
  "mac.save_zero_do": "Salvar com 0",
  "mac.save_zero_new": "Este produto seria vendido e orçado por nada.",
  "mac.save_zero_note": "Este produto seria vendido e orçado por nada. O preço dele agora é {price}.",
+ "mac.price_not_read": "Esse preço não é um número. Digite um preço ou limpe o campo.",
  "mac.save_zero_q": "Salvar com preço 0?",
  "mac.saved_at": "salvo {t}",
  "mac.saved_to": "Salvo como",

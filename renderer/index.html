@@ -174,13 +174,13 @@
         <div class="khayt-search" role="search">
           <span class="dim" aria-hidden="true">⌕</span>
           <input type="text" id="topbarSearchMirror" readonly tabindex="-1" placeholder="Search…" data-i18n-placeholder="search.placeholder" style="cursor:pointer" />
-          <kbd>⌘K</kbd>
+          <kbd class="kh-shortcut" data-mac="⌘K" dir="ltr">Ctrl K</kbd>
         </div>
         <span class="grow topbar-spacer"></span>
         <div class="row gap8 topbar-actions wrap">
           <button type="button" class="btn ghost icon sm" id="themeToggle" title="Toggle theme" aria-label="Toggle theme" data-i18n-title="ui.toggle_theme" data-i18n-aria="ui.toggle_theme">◐</button>
           <button type="button" class="btn ghost sm" id="btnHelp" data-i18n="help.btn" data-i18n-title="help.btn_label" title="Help" aria-label="Help">?</button>
-          <button type="button" class="btn ghost sm" id="btnGlobalSearch" aria-label="Global search" data-i18n-aria="ui.global_search" title="Global search">🔍 <span class="muted" style="font-size:10px">⌘K</span></button>
+          <button type="button" class="btn ghost sm" id="btnGlobalSearch" aria-label="Global search" data-i18n-aria="ui.global_search" title="Global search">🔍 <span class="muted kh-shortcut" data-mac="⌘K" dir="ltr" style="font-size:10px">Ctrl K</span></button>
           <div class="khayt-bell tb-notif-wrap" style="position:relative">
             <button type="button" class="btn ghost icon sm" id="btnNotifBell" title="Notifications" data-i18n-title="notif.title" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">🔔</button>
             <span class="khayt-bdot" id="notifBadge" style="display:none"></span>
@@ -1146,7 +1146,7 @@
         <button id="btnImportSpoolsCsv" class="btn small ghost" data-i18n="csv.import_spools_btn">Import CSV</button>
         <button id="btnImportSpoolman" type="button" class="btn small ghost" data-i18n="inv.spoolman_import">Import from Spoolman</button>
       </div>
-      <div class="grid">
+      <div class="grid inv-grid">
         <div class="card warn">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="inv.add_title">Add Filament Spool</span></h3>
 
@@ -1676,7 +1676,7 @@
 
         <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="font-size:12px; color:var(--text-muted);">
-            <strong data-i18n="set.about">About</strong> · <span data-i18n="app.title">Khayt</span> · خيط · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
+            <strong data-i18n="set.about">About</strong> · <span data-i18n="set.about_name">Khayt · خيط</span> · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
             <div style="margin-top:4px; font-size:11px;" data-i18n="set.ai_credit">Built with assistance from AI tools.</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
@@ -1736,8 +1736,8 @@
           <div class="inline-pair" id="addressFields"></div>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head pro-only" data-i18n="set.working_hours">Working Hours</div>
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.working_hours">Working Hours</div>
         <div class="pro-only">
           <p style="font-size:11.5px; color:var(--text-muted); margin:0 0 10px;" data-i18n="set.wh_hint">Available print hours per day of week (0 = closed)</p>
           <div id="workingHoursGrid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-bottom:12px;">
@@ -2290,7 +2290,7 @@
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.plib_loc_hint">Where your model files are kept. A folder on a network drive, an external disk, or a synced folder (iCloud Drive, Dropbox, Google Drive, OneDrive) all work — Khayt just needs to be able to reach it.</p>
         <label data-i18n="set.plib_loc_primary">Library folder</label>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input type="text" id="set_plibRoot" readonly placeholder="This Mac (default)" style="flex:1; min-width:220px;">
+          <input type="text" id="set_plibRoot" readonly placeholder="This computer (default)" data-i18n-placeholder="set.plib_root_ph" style="flex:1; min-width:220px;">
           <button class="btn" id="btnPlibRoot" data-i18n="set.plib_choose">Choose…</button>
           <button class="btn ghost" id="btnPlibRootClear" data-i18n="set.plib_use_default">Use this computer</button>
         </div>

@@ -2480,6 +2480,7 @@
  "mac.save_zero_do": "0で保存",
  "mac.save_zero_new": "この商品は、無料で販売および見積されます。",
  "mac.save_zero_note": "この商品は、無料で販売および見積されます。現在の価格は {price} です。",
+ "mac.price_not_read": "この価格は数値ではありません。価格を入力するか、欄を空にしてください。",
  "mac.save_zero_q": "価格0で保存しますか？",
  "mac.saved_at": "{t} に保存",
  "mac.saved_to": "保存先：",
