@@ -225,7 +225,8 @@ struct LibraryGridRedesignTests {
         #expect(!bar.contains("if !rows.isEmpty {"), "an empty axis is hidden again")
         #expect(bar.contains(".disabled(true)"))
         #expect(bar.contains("LibraryViewControls(shop: shop)"), "sort, view and size left the row")
-        #expect(LibraryFilterBar.axes.count == 5)
+        // Five, and since Nov 2026 Colour and File type after them.
+        #expect(LibraryFilterBar.axes.count == 7)
         #expect(bar.contains("ViewThatFits(in: .horizontal)") && bar.contains("more(all,"),
                 "axes that do not fit are cut instead of folded into More")
         #expect(!bar.contains("ScrollView(.horizontal"), "the row scrolls a chip half out of sight again")

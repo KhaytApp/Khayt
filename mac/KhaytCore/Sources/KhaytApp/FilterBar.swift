@@ -68,6 +68,11 @@ struct FilterChipModel: Identifiable {
     let count: Int
     let on: Bool
     let press: () -> Void
+    /// A colour drawn before the name, as hex — the Library's Colour rows.
+    var swatch: String? = nil
+    /// False for a row that is always listed but holds nothing just now: it
+    /// is drawn greyed rather than taken away.
+    var enabled = true
 }
 
 /// A chip that PRESSES, which is the only reason it is not `Chip`.

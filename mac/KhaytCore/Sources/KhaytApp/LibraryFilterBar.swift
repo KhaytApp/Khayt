@@ -38,7 +38,7 @@ struct LibraryFilterBar: View {
     /// other.
     private var facets: Shop.LibraryFacets { shop.libraryFacets }
 
-    private var chips: [FilterChipModel] {
+    var chips: [FilterChipModel] {
         var out: [FilterChipModel] = []
         // A LIBRARY HEALTH GROUP, put on the grid by its Show button: on the
         // Show menu while it is on, and off from there (`libraryHealthFocus`).
@@ -203,7 +203,56 @@ struct LibraryFilterBar: View {
                     shop.libraryTag?.lowercased() == row.name.lowercased() ? nil : row.name
             })
         }
+        // ── COLOUR AND FILE TYPE: FIXED ROWS, SEVERAL AT ONCE ──────────────
+        //
+        // What colour family a model was sliced in, and what kind of file it
+        // is. Unlike a creator or a tag these are short lists everybody
+        // knows, so every row is ALWAYS listed, in one order, and a row with
+        // nothing under it just now is greyed, not removed: a shop learns
+        // where Purple is once. Several rows of one menu can be on, and they
+        // are OR — "red or orange"; the two menus narrow together like any
+        // other pair. A multicolour model is under each of its families and
+        // under Multicolour, and a model whose record holds no colour is
+        // under "No colour info", said plainly, never guessed from spools.
+        for token in ColourFamily.tokens {
+            let n = facets.colours[token] ?? 0, on = shop.libraryColours.contains(token)
+            out.append(FilterChipModel(id: "colour:" + token, label: shop.words.callIt(Self.colourKey(token)),
+                                       count: n, on: on, press: {
+                if on { shop.libraryColours.remove(token) } else { shop.libraryColours.insert(token) }
+            }, swatch: ColourFamily(rawValue: token)?.swatchHex, enabled: n > 0 || on))
+        }
+        for type in ModelFileType.allCases {
+            let id = type.rawValue
+            let n = facets.fileTypes[id] ?? 0, on = shop.libraryFileTypes.contains(id)
+            out.append(FilterChipModel(id: "type:" + id, label: Self.typeLabel(type, shop.words),
+                                       count: n, on: on, press: {
+                if on { shop.libraryFileTypes.remove(id) } else { shop.libraryFileTypes.insert(id) }
+            }, enabled: n > 0 || on))
+        }
         return out
+    }
+
+    /// The word for one Colour row (`ColourFamily.tokens`).
+    static func colourKey(_ token: String) -> String {
+        switch token {
+        case ColourFamily.multi: "plan.material_label"
+        case ColourFamily.none: "mac.lf_no_colour"
+        default: "mac.lf_" + token
+        }
+    }
+
+    /// What one File type row is called. 3MF, STL, STEP and OBJ are the
+    /// formats' own names, the same in every language.
+    static func typeLabel(_ type: ModelFileType, _ words: Words) -> String {
+        switch type {
+        case .threeMF: "3MF"
+        case .stl: "STL"
+        case .step: "STEP"
+        case .obj: "OBJ"
+        case .gcode: words.callIt("mac.lf_gcode")
+        case .other: words.callIt("inv.type_other")
+        case .noFile: words.callIt("mac.lf_no_file")
+        }
     }
 
     /// Keep the chosen value on the row even when the other axes have narrowed
@@ -367,6 +416,8 @@ struct LibraryFilterBar: View {
         Axis(key: "mac.lib_creator", prefix: "creator:"),
         Axis(key: "mac.category", prefix: "category:"),
         Axis(key: "mac.lib_tag", prefix: "tag:"),
+        Axis(key: "inv.color", prefix: "colour:"),
+        Axis(key: "brl.sort_type", prefix: "type:"),
     ]
 
     /// ── A MENU WITH NOTHING IN IT IS GREYED, NOT GONE ─────────────────────
@@ -378,6 +429,10 @@ struct LibraryFilterBar: View {
     /// to fill them. Now every axis is always drawn, disabled when it has
     /// nothing to offer, with the reason on hover.
     static func menuEnabled(rows: Int) -> Bool { rows > 0 }
+
+    /// The rows of an axis that have something to offer: every row but the
+    /// always-listed ones that are empty just now (`FilterChipModel.enabled`).
+    static func offered(_ rows: [FilterChipModel]) -> Int { rows.count(where: \.enabled) }
 
     /// The title an axis wears: its name, and what it is set to.
     private func title(_ axis: Axis, on: [FilterChipModel]) -> String {
@@ -396,18 +451,46 @@ struct LibraryFilterBar: View {
 
     private func item(_ chip: FilterChipModel) -> some View {
         Group {
-            Button { chip.press() } label: {
-                if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
-                else { Text(chip.label + "  (\(chip.count))") }
+            if let hex = chip.swatch {
+                // A colour row: the family's swatch where the others have no
+                // picture, so "on" is the menu's own tick (a Toggle) rather
+                // than a checkmark that would take the swatch's place.
+                Toggle(isOn: Binding(get: { chip.on }, set: { _ in chip.press() })) {
+                    Label { Text(chip.label + "  (\(chip.count))") } icon: { Image(nsImage: Self.swatch(hex)) }
+                }
+            } else {
+                Button { chip.press() } label: {
+                    if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
+                    else { Text(chip.label + "  (\(chip.count))") }
+                }
             }
         }
+        .disabled(!chip.enabled)
+    }
+
+    /// A family's colour as a small ringed disc. The ring is what keeps White
+    /// visible on a light menu and Black on a dark one. Drawn when shown, so
+    /// the ring follows the appearance; not a template, so the menu keeps the
+    /// colour instead of tinting it.
+    static func swatch(_ hex: String) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            let disc = NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1))
+            (NSColor(hex: hex) ?? .clear).setFill()
+            disc.fill()
+            NSColor.secondaryLabelColor.setStroke()
+            disc.lineWidth = 1
+            disc.stroke()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 
     /// One axis as a menu. Disabled — never hidden — when it has nothing to offer.
     @ViewBuilder
     private func menu(_ all: [FilterChipModel], _ axis: Axis, labelsOnly: Bool = false) -> some View {
         let rows = all.filter(axis.holds)
-        if !Self.menuEnabled(rows: rows.count) {
+        if !Self.menuEnabled(rows: Self.offered(rows)) {
             Menu {
                 EmptyView()
             } label: {
@@ -450,7 +533,7 @@ struct LibraryFilterBar: View {
             if !labelsOnly { ForEach(Array(hidden.enumerated()), id: \.offset) { _, axis in
                 let rows = all.filter(axis.holds)
                 Menu(title(axis, on: rows.filter(\.on))) { items(rows) }
-                    .disabled(!Self.menuEnabled(rows: rows.count))
+                    .disabled(!Self.menuEnabled(rows: Self.offered(rows)))
             } }
         } label: {
             Text(active == 0 ? shop.words.callIt("mac.lg_more_filters")
