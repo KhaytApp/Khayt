@@ -65,7 +65,8 @@ struct TypedNumberRatchetTests {
         #"Double\("# + argument + #"\)\s*(?:\?\?|\.flatMap|\.map)"#,
         #"\blet \w+ = Double\("# + argument + #"\)\s*(?:,|else)"#,
         #"Double\.init"#,
-        #"Double\(.*?(?:trimmingCharacters|replacingOccurrences|\?\? "")"#,
+        // Inside the call's own brackets only: `Double(count)) ?? ""` is a count.
+        #"Double\("# + argument + #"?(?:trimmingCharacters|replacingOccurrences|\?\? "")"#,
         #"(?:\? nil : |return |(?<![<>!=])= )Double\((?:s|t|\w*[Tt]ext|\w*[Tt]yped|cleaned|raw|said|plain|out|token|rest|cell)[.)]"#,
     ]
 
@@ -85,6 +86,7 @@ struct TypedNumberRatchetTests {
             "guard let n = Double(typed), n.isFinite, n > 0 else { return nil }",
             #"let n = max(0, Double(s.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)) ?? 0)"#,
             #"current: Double(presetRates["failureRate"] ?? "")) { pct in"#,
+            #"let retry = Double(http.value(forHTTPHeaderField: "Retry-After") ?? "")"#,
             "grams: Double(now.grams) ?? 0, hours: 1,",
             "let rates = texts.compactMap(Double.init)",
             "price = Double(priceText)",
@@ -94,6 +96,8 @@ struct TypedNumberRatchetTests {
             "let k = Double(side) * margin / span",
             "guard abs(a - b) <= Double(out.count), c else { return [] }",
             "// rates[key] = Double(typed) ?? 0",
+            #"["n": .number(Double(freeUp?.count ?? 0)), "size": .string(freeUp?.size ?? "")]),"#,
+            #"let human = (try? await engine.formatBytes(Double(freed))) ?? """#,
             "let n = TypedNumber.parse(typed) ?? 0",
         ] { #expect(!Self.flagged(line), "false alarm: \(line)") }
     }
