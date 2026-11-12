@@ -953,6 +953,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 subject?.shelf = .library(nil)
                 try? await Task.sleep(for: .milliseconds(700))
                 capture(named: "03-dark-library", into: dir)
+                if let subject {
+                    captureView(named: "03k-dark-library-colour-type-rows",
+                                LibraryFilterBar.RowsSpecimen(chips: LibraryFilterBar(shop: subject).chips,
+                                                              words: subject.words)
+                                    .environment(\.colorScheme, .dark),
+                                into: dir)
+                }
                 capturePanes(named: "03-dark-library", into: dir)
                 // A model selected, its inspector and the storage badges, dark.
                 if let subject { await captureLibrary1a(subject, into: dir, dark: true) }
@@ -1177,6 +1184,15 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.shelf = .library(nil)
             await settle()
             capture(named: "03-library", into: dir)
+            // The Colour and File type rows. Their menus cannot be opened
+            // by a run that must not click, and at this width both are folded
+            // into More, so without this neither the swatches nor the words
+            // are in any picture (`LibraryFilterBar.RowsSpecimen`).
+            captureView(named: "03k-library-colour-type-rows",
+                        LibraryFilterBar.RowsSpecimen(chips: LibraryFilterBar(shop: shop).chips, words: shop.words)
+                            .environment(\.colorScheme,
+                                         ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DARK"] == "1" ? .dark : .light),
+                        into: dir)
             // A model SELECTED, so the inspector is in the picture — the size,
             // the triangle count and whether it goes on a bed the shop owns all
             // live there, and a grid shot cannot show any of them. Picked as

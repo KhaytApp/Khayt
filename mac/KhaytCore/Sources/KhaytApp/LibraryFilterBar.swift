@@ -468,6 +468,44 @@ struct LibraryFilterBar: View {
         .disabled(!chip.enabled)
     }
 
+    /// The Colour and File type rows as their menus draw them, laid out as a
+    /// plain list: THE CAPTURE RUN'S STAND-IN FOR AN OPEN MENU.
+    ///
+    /// An open menu is not a view and cannot be photographed without clicking
+    /// on somebody's screen, so until this the swatches had never been seen:
+    /// eleven discs drawn by hand, one of them white on a light menu. This
+    /// draws the same label, the same count and the same `swatch` image the
+    /// menu item is given, greyed where the item would be disabled. It is not
+    /// the menu's own drawing (AppKit sets the row height and the tick), and
+    /// nothing in the app shows it.
+    struct RowsSpecimen: View {
+        let chips: [FilterChipModel]
+        let words: Words
+
+        var body: some View {
+            HStack(alignment: .top, spacing: 28) {
+                column("inv.color", chips.filter { $0.id.hasPrefix("colour:") })
+                column("brl.sort_type", chips.filter { $0.id.hasPrefix("type:") })
+            }
+            .padding(16)
+            .background(Khayt.surface)
+        }
+
+        private func column(_ key: String, _ rows: [FilterChipModel]) -> some View {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(words.callIt(key)).font(.headline)
+                ForEach(rows) { chip in
+                    HStack(spacing: 6) {
+                        if let hex = chip.swatch { Image(nsImage: LibraryFilterBar.swatch(hex)) }
+                        Text(chip.label + "  (\(chip.count))")
+                    }
+                    .foregroundStyle(chip.enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(Khayt.faint))
+                }
+            }
+            .fixedSize()
+        }
+    }
+
     /// A family's colour as a small ringed disc. The ring is what keeps White
     /// visible on a light menu and Black on a dark one. Drawn when shown, so
     /// the ring follows the appearance; not a template, so the menu keeps the
@@ -477,7 +515,10 @@ struct LibraryFilterBar: View {
             let disc = NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1))
             (NSColor(hex: hex) ?? .clear).setFill()
             disc.fill()
-            NSColor.secondaryLabelColor.setStroke()
+            // Ink at half strength, not the secondary label colour: in a dark
+            // capture the Black disc had a ring too faint to find it by
+            // (Nov 12 2026), and Black is a row a shop looks for.
+            NSColor.labelColor.withAlphaComponent(0.5).setStroke()
             disc.lineWidth = 1
             disc.stroke()
             return true
