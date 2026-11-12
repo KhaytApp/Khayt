@@ -5433,7 +5433,7 @@
   "plg.upd_agreed_head": "已同意（版本 {v}）",
   "plg.upd_tag_new": "新增",
   "plg.upd_tag_new_place": "新去向",
-  "plg.upd_footer": "在你同意之前，版本 {v} 会继续运行。你输入的密钥保留在此设备上。",
+  "plg.upd_footer": "在你同意之前，版本 {v} 会继续运行。你输入的密钥保留在此设备上；如果更新会把密钥发送到新的主机，你需要重新输入。",
   "plg.upd_not_now": "暂不",
   "plg.upd_agree": "同意并更新",
   "plg.upd_updated": "{name} 已更新到 {v}",

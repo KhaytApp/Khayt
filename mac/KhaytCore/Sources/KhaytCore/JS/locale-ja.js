@@ -5433,7 +5433,7 @@
   "plg.upd_agreed_head": "同意済み（バージョン {v}）",
   "plg.upd_tag_new": "新規",
   "plg.upd_tag_new_place": "新しい送信先",
-  "plg.upd_footer": "同意するまでバージョン {v} が動作し続けます。入力したキーはこのデバイスに残ります。",
+  "plg.upd_footer": "同意するまでバージョン {v} が動作し続けます。入力したキーはこのデバイスに残ります。ただし、アップデートでキーが新しいホストに送られる場合は、もう一度入力してください。",
   "plg.upd_not_now": "今はしない",
   "plg.upd_agree": "同意して更新",
   "plg.upd_updated": "{name} を {v} に更新しました",

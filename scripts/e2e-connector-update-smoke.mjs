@@ -144,7 +144,7 @@ try {
   if (sheet.title !== 'Sample Courier 2.1.0' || sheet.reviewed !== '✓ Reviewed by Khayt') fail(`header: ${JSON.stringify(sheet)}`);
   if (sheet.sub !== 'Updates version 2.0.0') fail(`sub: ${sheet.sub}`);
   if (sheet.lead !== 'This version asks for more than you agreed to. Nothing new is sent until you agree.') fail(`lead: ${sheet.lead}`);
-  if (sheet.foot !== 'Version 2.0.0 keeps running until you agree. Keys you entered stay on this device.') fail(`footer: ${sheet.foot}`);
+  if (sheet.foot !== 'Version 2.0.0 keeps running until you agree. Keys you entered stay on this device, unless the update sends them to a new host; then you enter them again.') fail(`footer: ${sheet.foot}`);
   if (sheet.buttons.join('|') !== 'Not now|Agree and update' || sheet.focused !== 'agree') fail(`buttons: ${JSON.stringify(sheet)}`);
 
   // ── 5. Not now changes nothing ──

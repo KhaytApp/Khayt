@@ -5434,7 +5434,7 @@
   "plg.upd_agreed_head": "Já aceito (versão {v})",
   "plg.upd_tag_new": "Novo",
   "plg.upd_tag_new_place": "Novo destino",
-  "plg.upd_footer": "A versão {v} continua funcionando até você aceitar. As chaves que você digitou ficam neste dispositivo.",
+  "plg.upd_footer": "A versão {v} continua funcionando até você aceitar. As chaves que você digitou ficam neste dispositivo, a menos que a atualização as envie para um novo host; nesse caso, você as digita de novo.",
   "plg.upd_not_now": "Agora não",
   "plg.upd_agree": "Aceitar e atualizar",
   "plg.upd_updated": "{name} atualizado para {v}",

@@ -113,12 +113,29 @@ test('Agree, applied to the store: the new version, granted what was shown, the 
   assert.equal(C.applyOp(r.store, { op: 'agree', id: LAMHA.id }).ok, false, 'nothing left to agree to');
 });
 
-test('keys go only where they were entered for: a grant whose hosts move drops them', () => {
-  const before = installedNarrow();
-  const after = Object.assign({}, before, { granted: Object.assign({}, before.granted, { domains: ['other.example.com'] }),
-    manifest: Object.assign({}, before.manifest, { domains: ['other.example.com'] }) });
+// Keys and hosts, the rule the Mac keeps too: per key, the set of hosts the
+// grant's routes send it to, before and after.
+const KEYED = (routes, domains) => ({ id: 'app.test.keys', secrets: { a: 'sample-a', b: 'sample-b' },
+  manifest: { domains: domains || ['one.example.com', 'two.example.com'] },
+  granted: Object.assign({ domains: domains || ['one.example.com', 'two.example.com'] }, routes ? { routes } : {}) });
+
+test('keys: one key sent to a new host is dropped, the other kept', () => {
+  const before = KEYED(['one.example.com secret:a', 'one.example.com secret:b', 'one.example.com order.id']);
+  const after = KEYED(['one.example.com secret:a', 'two.example.com secret:b', 'one.example.com order.id']);
+  assert.deepEqual(C.keysWhereEntered(before, after).secrets, { a: 'sample-a' });
+});
+
+test('keys: a grant with no routes whose hosts changed drops every key', () => {
+  const before = KEYED(null, ['one.example.com']);
+  const after = KEYED(['one.example.com secret:a', 'one.example.com secret:b'], ['one.example.com', 'two.example.com']);
   assert.equal(C.keysWhereEntered(before, after).secrets, undefined);
-  assert.deepEqual(C.keysWhereEntered(before, before).secrets, { apiToken: 'sample-token' });
+  // Same hosts, no routes: kept.
+  assert.deepEqual(C.keysWhereEntered(KEYED(null), KEYED(['one.example.com secret:a'])).secrets, { a: 'sample-a', b: 'sample-b' });
+});
+
+test('keys: nothing moved, every key kept', () => {
+  const g = ['one.example.com secret:a', 'two.example.com secret:b'];
+  assert.deepEqual(C.keysWhereEntered(KEYED(g), KEYED(g.slice().concat(['one.example.com order.id']))).secrets, { a: 'sample-a', b: 'sample-b' });
 });
 
 test('forWindow masks every key', () => {

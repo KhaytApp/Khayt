@@ -99,3 +99,16 @@ test('waitingFor: only a pending version newer than the one installed', () => {
   assert.equal(S.waitingFor(e, {}, U.compareVersions), null);
   assert.equal(S.sheetFor(e, null), null);
 });
+
+test('JavaScriptCore-safe: runs with no require, module, global or window', () => {
+  const vm = require('vm');
+  const fs = require('fs');
+  const path = require('path');
+  const ctx = vm.createContext({});
+  for (const f of ['plugin-manifest.js', 'plugin-update-sheet.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lib', f), 'utf8'), ctx, { filename: f });
+  }
+  const e = entryAt(V1);
+  const out = vm.runInContext('KhaytPluginUpdateSheet', ctx).sheetFor(e, pendingOf(V2, e));
+  assert.deepEqual(JSON.parse(JSON.stringify(out)), S.sheetFor(e, pendingOf(V2, e)));
+});

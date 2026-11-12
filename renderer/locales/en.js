@@ -5434,7 +5434,7 @@
   "plg.upd_agreed_head": "Already agreed (version {v})",
   "plg.upd_tag_new": "New",
   "plg.upd_tag_new_place": "New place",
-  "plg.upd_footer": "Version {v} keeps running until you agree. Keys you entered stay on this device.",
+  "plg.upd_footer": "Version {v} keeps running until you agree. Keys you entered stay on this device, unless the update sends them to a new host; then you enter them again.",
   "plg.upd_not_now": "Not now",
   "plg.upd_agree": "Agree and update",
   "plg.upd_updated": "{name} updated to {v}",

@@ -5433,7 +5433,7 @@
   "plg.upd_agreed_head": "Déjà accepté (version {v})",
   "plg.upd_tag_new": "Nouveau",
   "plg.upd_tag_new_place": "Nouvelle destination",
-  "plg.upd_footer": "La version {v} continue de fonctionner jusqu'à votre accord. Les clés saisies restent sur cet appareil.",
+  "plg.upd_footer": "La version {v} continue de fonctionner jusqu'à votre accord. Les clés saisies restent sur cet appareil, sauf si la mise à jour les envoie à un nouvel hôte ; vous les saisissez alors à nouveau.",
   "plg.upd_not_now": "Pas maintenant",
   "plg.upd_agree": "Accepter et mettre à jour",
   "plg.upd_updated": "{name} mis à jour en {v}",

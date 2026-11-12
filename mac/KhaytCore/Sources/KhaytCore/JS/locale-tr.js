@@ -5433,7 +5433,7 @@
   "plg.upd_agreed_head": "Zaten onaylandı (sürüm {v})",
   "plg.upd_tag_new": "Yeni",
   "plg.upd_tag_new_place": "Yeni hedef",
-  "plg.upd_footer": "Onaylayana kadar {v} sürümü çalışmaya devam eder. Girdiğiniz anahtarlar bu cihazda kalır.",
+  "plg.upd_footer": "Onaylayana kadar {v} sürümü çalışmaya devam eder. Girdiğiniz anahtarlar bu cihazda kalır; güncelleme onları yeni bir sunucuya gönderirse yeniden girersiniz.",
   "plg.upd_not_now": "Şimdi değil",
   "plg.upd_agree": "Onayla ve güncelle",
   "plg.upd_updated": "{name} {v} sürümüne güncellendi",

@@ -5433,7 +5433,7 @@
   "plg.upd_agreed_head": "Bereits zugestimmt (Version {v})",
   "plg.upd_tag_new": "Neu",
   "plg.upd_tag_new_place": "Neues Ziel",
-  "plg.upd_footer": "Version {v} läuft weiter, bis Sie zustimmen. Eingegebene Schlüssel bleiben auf diesem Gerät.",
+  "plg.upd_footer": "Version {v} läuft weiter, bis Sie zustimmen. Eingegebene Schlüssel bleiben auf diesem Gerät, außer das Update sendet sie an einen neuen Host; dann geben Sie sie erneut ein.",
   "plg.upd_not_now": "Nicht jetzt",
   "plg.upd_agree": "Zustimmen und aktualisieren",
   "plg.upd_updated": "{name} auf {v} aktualisiert",
