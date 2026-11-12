@@ -92,7 +92,7 @@ extension KhaytAPIClient {
     /// rule's guess from which name is filled in is NOT used for the first
     /// pick — in the Arabic app a customer written down only in English
     /// opened in English, though nobody had said they want English.
-    static func whatsAppStartLanguage(client: [String: JSONValue]?, appLanguage: String) -> String {
+    nonisolated static func whatsAppStartLanguage(client: [String: JSONValue]?, appLanguage: String) -> String {
         if case .string(let set)? = client?["messageLang"], ["ar", "en"].contains(set) { return set }
         return appLanguage == "en" ? "en" : "ar"
     }
