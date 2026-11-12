@@ -31,7 +31,7 @@ struct ShopMode: Equatable, Sendable {
     static let professional = ShopMode(mode: nil, surfaces: [:])
 
     /// The rows of the map the phone has a screen for.
-    static let askedKeys = ["queue", "expenses", "machineUpkeep", "modeBadge",
+    static let askedKeys = ["queue", "jobsLog", "quote", "expenses", "machineUpkeep", "modeBadge",
                             "money", "inventory", "customers", "gatedLink"]
 
     /// Is the shop Simple? The engine's reading of the mode, not the phone's.

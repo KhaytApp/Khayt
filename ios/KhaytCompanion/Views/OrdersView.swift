@@ -63,18 +63,24 @@ struct OrdersView: View {
     @State private var showNewOrder = false
     @State private var machines: [MachineInfo] = []
     @State private var loadGeneration = 0
-    /// Simple's board: every job on one of the four stages, each with where
-    /// it is filed. Empty in Professional.
+    /// Simple's Active list: every job filed under Pending, Printing or
+    /// Ready, each with where it is filed. Empty in Professional.
     @State private var board: [SimpleBoard.Row] = []
 
-    /// The shop is Simple, so Orders is one board of four stages
-    /// (SIMPLE_MAP `queue` reduced) instead of Active, Quotes and History.
+    /// The shop is Simple (SIMPLE_MAP `queue` reduced), so Active's chips are
+    /// the four stages. Quotes and History stay as segments in both modes:
+    /// the map keeps the jobs log (`jobsLog` show) and quoting (`quote`
+    /// reduced), and the Quotes segment is the phone's only list of open
+    /// quotes — so Simple's Quote stage IS that segment, not a second chip.
     private var simpleBoard: Bool { api.shopMode.isReduced("queue") }
+
+    /// Active's stages in Simple: the four, less Quote (its own segment).
+    static let simpleActiveColumns: [SimpleBoard.Column] = SimpleBoard.Column.allCases.filter { $0 != .quote }
 
     private var chips: [Chip] {
         switch segment {
         case .active where simpleBoard:
-            var ids: [Chip] = [.all] + SimpleBoard.Column.allCases.map(Chip.column)
+            var ids: [Chip] = [.all] + Self.simpleActiveColumns.map(Chip.column)
             if chip == .overdue { ids.append(.overdue) }
             if chip == .rush || board.contains(where: { $0.order.isRush }) { ids.append(.rush) }
             return ids
@@ -163,7 +169,7 @@ struct OrdersView: View {
     private var listPage: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if !simpleBoard { segmentPicker } else { Color.clear.frame(height: 14) }
+                segmentPicker
                 if !chips.isEmpty { chipRow }
                 if segment == .quotes { quoteList } else { list }
                 if segment == .history, let window = api.historyWindow {
@@ -192,12 +198,9 @@ struct OrdersView: View {
         .moveNotes($moveNotes)
         .refreshable { await load() }
         .task(id: "\(segment.rawValue)|\(simpleBoard)") { await load() }
-        // The mode is the Mac's: when it changes, Simple's one board replaces
-        // the three segments (or gives them back) without a relaunch.
-        .onChange(of: simpleBoard) { _, simple in
-            if simple { segment = .active }
-            chip = .all
-        }
+        // The mode is the Mac's: when it changes, Active's chips change with
+        // it without a relaunch.
+        .onChange(of: simpleBoard) { _, _ in chip = .all }
         .watchesPrinters(when: segment == .active
                          && queue.contains { $0.status == "printing" && $0.machineId != nil })
         .onAppear { applyExternalFilters() }
@@ -215,9 +218,16 @@ struct OrdersView: View {
         }
         #endif
         if let pending = ordersNav.pendingStatusFilter, simpleBoard {
-            // Home's "printing" or "QC" lands on the stage it is filed under.
-            segment = .active
-            chip = SimpleBoard.filing(status: pending.rawValue).map { .column($0.column) } ?? .all
+            // Home's "printing" or "QC" lands on the stage it is filed under;
+            // a finished job is History's, as in Professional.
+            if pending == .completed {
+                segment = .history
+                chip = .stage(.completed)
+            } else {
+                segment = .active
+                chip = SimpleBoard.filing(status: pending.rawValue)
+                    .flatMap { Self.simpleActiveColumns.contains($0.column) ? .column($0.column) : nil } ?? .all
+            }
             ordersNav.pendingStatusFilter = nil
             Task { await load() }
         } else if let pending = ordersNav.pendingStatusFilter {
@@ -460,15 +470,15 @@ struct OrdersView: View {
         do {
             switch segment {
             case .active where simpleBoard:
-                // The board: the queue's live work, and from the book the
-                // quotes, the jobs on hold and the finished ones.
+                // Active in Simple: the queue's live work, and from the book the
+                // jobs on hold and the finished ones. Quotes are their segment's.
                 let data = try await api.fetchQueue()
                 let held = try await api.fetchRecentOrders(limit: 100_000)
                 currency = await api.shopCurrency()
                 guard generation == loadGeneration else { return }
                 queue = data
                 quotes = QuoteList.select(held)
-                board = SimpleBoard.rows(queue: data, book: held)
+                board = SimpleBoard.rows(queue: data, book: held).filter { $0.filing.column != .quote }
                 #if DEBUG
                 if KhaytCompanionApp.ScreenshotOpen.take("neworder") != nil { showNewOrder = true }
                 if let id = KhaytCompanionApp.ScreenshotOpen.take("pick:") { openOrder = board.first { $0.id == id }?.order }

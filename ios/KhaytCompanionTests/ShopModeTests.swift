@@ -48,6 +48,10 @@ final class ShopModeTests: XCTestCase {
         let m = await ShopMode.decide(mode: "simple", engine: try await engine())
         XCTAssertTrue(m.isSimple)
         XCTAssertEqual(m.surface("queue"), .reduced)
+        // History and Quotes stay reachable in Simple: the jobs log is shown
+        // and quoting is reduced, never Professional's alone.
+        XCTAssertEqual(m.surface("jobsLog"), .full)
+        XCTAssertEqual(m.surface("quote"), .reduced)
         XCTAssertEqual(m.surface("expenses"), .reduced)
         XCTAssertEqual(m.surface("machineUpkeep"), .professionalOnly)
         XCTAssertEqual(m.surface("modeBadge"), .full)
@@ -156,6 +160,8 @@ final class ShopModeTests: XCTestCase {
         XCTAssertNil(f("failed"))
         XCTAssertNil(f("something-new"))
         XCTAssertEqual(SimpleBoard.Column.allCases, [.quote, .queued, .printing, .ready])
+        // Active's chips in Simple: Quote is its own segment, so not a chip too.
+        XCTAssertEqual(OrdersView.simpleActiveColumns, [.queued, .printing, .ready])
     }
 
     private func entries(_ rows: [[String: Any]]) throws -> [OrderLogEntry] {
