@@ -60,6 +60,13 @@ extension Shop {
             colours = keys(colour, ColourFamily.tokens)
             types = keys(type, ModelFileType.allCases.map(\.rawValue))
         }
+
+        /// Does this model pass both menus as chosen? True for every model
+        /// when nothing is.
+        func passes(_ file: LibraryFile, tokens: (LibraryFile) -> [String]) -> Bool {
+            if !colours.isEmpty, !tokens(file).contains(where: colours.contains) { return false }
+            return types.isEmpty || types.contains(file.fileType.rawValue)
+        }
     }
 
     /// The menus counted and applied: `lib/lan-library.js narrow`, natively.
@@ -88,8 +95,13 @@ extension Shop {
         return (kept, colour, type)
     }
 
+    /// `passes` and `narrow` are the two filter menus, for `phoneLibrary`:
+    /// `passes` says whether one model passes both as chosen (it decides which
+    /// sub-folders are listed, and at what count), and `narrow` is handed what
+    /// the search or the folder matched and returns what is left of it.
     nonisolated static func libraryPage(_ files: [LibraryFile], q: String, folder: String,
                                         offset: Int, limit: Int,
+                                        passes: ((LibraryFile) -> Bool)? = nil,
                                         narrow: (([LibraryFile]) -> [LibraryFile])? = nil)
         -> (total: Int, files: [LibraryFile], folders: [(path: String, name: String, count: Int)]) {
         let live = files.filter { !$0.isArchived }
@@ -109,14 +121,16 @@ extension Shop {
             for file in live {
                 let path = folderPath(file.groupName)
                 guard !path.isEmpty, path.hasPrefix(prefix), path != here else { continue }
+                // The sub-folders follow the two menus, so a tap never opens
+                // a folder the filter has emptied (`lib/lan-library.js list`).
+                if let passes, !passes(file) { continue }
                 let child = path.dropFirst(prefix.count).split(separator: "/").first.map(String.init) ?? ""
                 if !child.isEmpty { counts[child, default: 0] += 1 }
             }
             folders = counts.map { (path: prefix + $0.key, name: $0.key, count: $0.value) }
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
-        // After the search or the folder, before the page is cut. The
-        // sub-folders above are the library's own shape and are not narrowed.
+        // After the search or the folder, before the page is cut.
         if let narrow { chosen = narrow(chosen) }
         chosen.sort { a, b in
             if a.isFavourite != b.isFavourite { return a.isFavourite }
@@ -159,9 +173,12 @@ extension Shop {
     /// `GET /api/library`'s answer.
     func phoneLibrary(q: String, folder: String, offset: Int, limit: Int,
                       filter: PhoneLibraryFilter = .init()) -> JSONValue {
-        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:]
-        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit) { matched in
-            let narrowed = Self.libraryNarrow(matched, filter) { self.libraryColourTokens($0) }
+        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:], unfiltered = 0
+        let tokens: (LibraryFile) -> [String] = { self.libraryColourTokens($0) }
+        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit,
+                                    passes: { filter.passes($0, tokens: tokens) }) { matched in
+            unfiltered = matched.count
+            let narrowed = Self.libraryNarrow(matched, filter, tokens: tokens)
             colourCounts = narrowed.colour; typeCounts = narrowed.type
             return narrowed.files
         }
@@ -217,6 +234,9 @@ extension Shop {
             "folders": .array(page.folders.map {
                 .object(["path": .string($0.path), "name": .string($0.name), "count": .number(Double($0.count))])
             }),
+            // What the search or the folder held before the two menus, for
+            // "26 of 312".
+            "unfilteredTotal": .number(Double(unfiltered)),
             // An older Mac sends no `facets`; that is how a phone knows not
             // to draw the two menus (docs/LAN_API.md).
             "facets": .object([

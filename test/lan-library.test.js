@@ -361,8 +361,15 @@ test('colour and type narrow the list: OR within a menu, AND between them and wi
   // A key nobody knows is ignored, not an error; case and spaces do not matter.
   assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'teal' })), ['a', 'b', 'c', 'd', 'e']);
   assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: ' Blue , teal ', type: '3MF' })), ['c']);
-  // The sub-folders are the library's shape and are not narrowed away.
-  assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'blue' }).folders.map((f) => [f.path, f.count]), [['Deep', 1]]);
+  // The sub-folders follow the menus: listed for what passes under them, at that count.
+  assert.deepEqual(LanLibrary.list(FILTERED, {}).folders.map((f) => [f.path, f.count]), [['Deep', 1]]);
+  assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'red' }).folders.map((f) => [f.path, f.count]), [['Deep', 1]]);
+  assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'blue' }).folders, [], 'nothing blue under Deep: not offered');
+  assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'red', type: '3mf' }).folders, [], 'the red one under Deep is an STL');
+  // "N of M": what the folder or the search held before the menus.
+  assert.equal(LanLibrary.list(FILTERED, {}).unfilteredTotal, 5);
+  assert.deepEqual([LanLibrary.list(FILTERED, { colour: 'blue' }).total, LanLibrary.list(FILTERED, { colour: 'blue' }).unfilteredTotal], [2, 5]);
+  assert.equal(LanLibrary.list(FILTERED, { q: 'f', colour: 'blue' }).unfilteredTotal, 1, 'counted over the search, not the library');
 });
 
 test('each menu is counted over everything but its own choice, with every key present', () => {

@@ -49,12 +49,14 @@ struct LanLibraryTests {
     func filters() async throws {
         let bench = try await LanServerTests.Bench()
         defer { bench.stop() }
-        func page(_ query: String) async throws -> (total: Int, ids: [String], colour: [String: Int], type: [String: Int]) {
+        func page(_ query: String) async throws
+            -> (total: Int, ids: [String], colour: [String: Int], type: [String: Int], unfiltered: Int) {
             let body = try Self.json(try await bench.get("/api/library" + query, headers: Self.pin))
             let facets = try #require(body["facets"] as? [String: Any], "a Mac that filters says so with facets")
             let items = try #require(body["items"] as? [[String: Any]])
             return (try #require(body["total"] as? Int), items.compactMap { $0["id"] as? String },
-                    try #require(facets["colour"] as? [String: Int]), try #require(facets["type"] as? [String: Int]))
+                    try #require(facets["colour"] as? [String: Int]), try #require(facets["type"] as? [String: Int]),
+                    try #require(body["unfilteredTotal"] as? Int))
         }
         // A search, so the whole sample library is in play rather than one folder.
         let all = try await page("?q=e&limit=200")
@@ -62,12 +64,14 @@ struct LanLibraryTests {
         #expect(Set(all.type.keys) == Set(ModelFileType.allCases.map(\.rawValue)))
         #expect(all.type.values.reduce(0, +) == all.total, "every model has exactly one type")
         #expect(all.total > 3)
+        #expect(all.unfiltered == all.total, "nothing chosen: N of N")
 
         // Each colour row: asking for it gives exactly the count it showed,
         // leaves the colour counts alone, and narrows the type counts.
         for (key, count) in all.colour where count > 0 {
             let one = try await page("?q=e&limit=200&colour=" + key)
             #expect(one.total == count, "\(key)")
+            #expect(one.unfiltered == all.total, "\(key): N of M, M is the search before the menus")
             #expect(one.colour == all.colour, "\(key): a menu is not narrowed by its own choice")
             #expect(one.type.values.reduce(0, +) == count, "\(key): the other menu is")
             #expect(Set(one.ids).isSubset(of: Set(all.ids)))
@@ -120,6 +124,18 @@ struct LanLibraryTests {
         #expect(blue.colour == none.colour)
         #expect(blue.type == ["3mf": 1, "stl": 0, "step": 0, "obj": 0, "gcode": 1, "other": 0, "nofile": 0])
         #expect(run(nil, "3mf").type == none.type && run(nil, "3mf").colour["none"] == 0)
+
+        // The sub-folders follow the menus, at the count of what passes.
+        let deep = files + [Self.file("f", name: "f", folder: "Deep", filename: "f.stl", colours: ["#ff0000"])]
+        func folders(_ colour: String?, _ type: String?) -> [String] {
+            let filter = Shop.PhoneLibraryFilter(colour: colour, type: type)
+            return Shop.libraryPage(deep, q: "", folder: "", offset: 0, limit: 50,
+                                    passes: { filter.passes($0) { $0.colourTokens } })
+                .folders.map { "\($0.path) \($0.count)" }
+        }
+        #expect(folders(nil, nil) == ["Deep 1"] && folders("red", nil) == ["Deep 1"])
+        #expect(folders("blue", nil).isEmpty, "nothing blue under Deep: not offered")
+        #expect(folders("red", "3mf").isEmpty, "the red one under Deep is an STL")
     }
 
     @Test("a search covers the whole library, every word, any case or accent, and the folder name")
