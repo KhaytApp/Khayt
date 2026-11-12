@@ -89,4 +89,27 @@ final class LibraryLiveMacTests: XCTestCase {
         try log.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
         print("library-live: \(log.count) answers checked, log at \(out)")
     }
+
+    /// A server from before the filters (the Mac's simulated one on its
+    /// `KHAYT_LIVE_OLD_MAC` port): it ignores the picks and sends no facets,
+    /// so the phone must hide both menus rather than show stale counts.
+    func testAnOlderServerHidesTheMenus() async throws {
+        guard let spec = ProcessInfo.processInfo.environment["KHAYT_LIVE_OLD_MAC"], !spec.isEmpty else {
+            throw XCTSkip("set TEST_RUNNER_KHAYT_LIVE_OLD_MAC=host:port:pin")
+        }
+        let parts = spec.split(separator: ":").map(String.init)
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.pin, s.isPaired, s.isSampleShop)
+        defer { (s.host, s.port, s.pin, s.isPaired, s.isSampleShop) = saved }
+        s.host = parts[0]; s.port = Int(parts[1]) ?? 0; s.pin = parts[2]; s.isPaired = true; s.isSampleShop = false
+        let api = KhaytAPIClient(settings: s, withBook: false)
+        var f = LibraryFilter(); f.colours = ["brown"]
+        let p = try await api.fetchLibrary(query: "", folder: "", limit: 200, filter: f)
+        XCTAssertNil(p.facets, "an older server sends no facets")
+        XCTAssertNil(p.matchedTotal)
+        XCTAssertNil(p.unfilteredTotal)
+        // That IS the screen's rule: LibraryView draws the bar only
+        // `if let facets = page.facets`, so no facets means no menus.
+        print("library-live-old: total \(p.total), folders \(p.folders.map { "\($0.path):\($0.count)" }), facets nil")
+    }
 }
