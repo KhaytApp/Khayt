@@ -44,7 +44,8 @@ struct RuleSettingsProbeTests {
             });
           }
           function isMarked(v) { return !!v && typeof v === 'object' && !Array.isArray(v) && v[mark] === true; }
-          JSON.parse = function (text, reviver) {
+          // In this engine's own context only; no other test's engine sees it.
+          globalThis.JSON.parse = function (text, reviver) {
             var v = parse.call(JSON, text, reviver);
             if (isMarked(v)) return watched(v);
             if (v && typeof v === 'object' && !Array.isArray(v)) {
