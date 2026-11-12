@@ -243,7 +243,8 @@ test('a withdrawn previous version: dropped by a check, and a Revert to one is r
   const r = C.applyPrepared(auto, { index: signIndex(ix), ctx: IXCTX, fetched: {} });
   const st = U.stateOf(r.settings, LAMHA.id);
   assert.equal(st.previous, undefined);
-  assert.equal(st.updatedFrom, '1.0.0', 'updatedFrom without previous: the window explains why there is no Revert');
+  assert.equal(st.previousWithdrawn, '1.0.0', 'the window says why there is no Revert from this field');
+  assert.equal(C.forWindow(r.settings, 'MASK').connectorUpdates.connectors[LAMHA.id].previousWithdrawn, '1.0.0', 'and is handed it');
   assert.equal(C.applyOp({ settings: r.settings }, { op: 'revert', id: LAMHA.id }).ok, false);
   // A kept previous recorded as withdrawn (state from elsewhere): refused with 'revoked'.
   const forced = JSON.parse(JSON.stringify(auto));

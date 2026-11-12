@@ -23,7 +23,11 @@
  *   - an index offering 2.2.0 (asks more): the badge comes; the next index
  *     withdraws 2.2.0: the badge and "Review update" go, on the row and in
  *     the nav;
- *   - each index's serial is saved, even by a check that changes nothing else.
+ *   - each index's serial is saved, even by a check that changes nothing else;
+ *   - a save the window sent before it took main's copy back does not undo
+ *     an Agree (main is the only writer of an update);
+ *   - a book from before `previousWithdrawn` (updatedFrom, no previous) shows
+ *     no "withdrew" line.
  *
  *   node scripts/e2e-connector-update-smoke.mjs
  */
@@ -170,6 +174,9 @@ try {
   if (!(await window.$('.plg-row .plg-update-badge')) || !(await window.$('.settings-nav-item .plg-nav-badge'))) fail('the badge went away after Not now');
 
   // ── 6. Agree and update ──
+  // The window's book as it is before Agree: sent again after main's write
+  // below, as a save already in flight would be.
+  const staleSnapshot = await window.evaluate(() => JSON.parse(JSON.stringify(buildStoreSnapshot())));
   await window.click('.plg-row [data-plugin-act="review-update"]');
   await window.waitForSelector('.plg-upd-sheet', { timeout: 10000 });
   await window.click('.plg-upd-sheet [data-act="agree"]');
@@ -193,6 +200,11 @@ try {
   // A later window save keeps it.
   await window.evaluate(() => { settings.currency = settings.currency || 'SAR'; saveAll(); return flushSave(); });
   await window.waitForTimeout(500);
+  check();
+  // A save the window sent BEFORE it took main's copy back arrives after the
+  // update: main is the only writer of an update, so it does not undo it.
+  const staleSave = await window.evaluate((snap) => window.hubAPI.saveStore(snap), staleSnapshot);
+  if (!staleSave || staleSave.ok === false) fail(`the stale save was refused outright: ${JSON.stringify(staleSave)}`);
   check();
 
   // ── 7. relaunch with the check on; main's network and key stubbed ──
@@ -239,11 +251,14 @@ try {
   await serve({ [INDEX_URL]: b64(signedIndex(6, rowAt('2.1.0', { revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] }))) });
   await runCheck();
   await w3.waitForFunction(() => !document.querySelector('.plg-row [data-plugin-act="revert"]'), null, { timeout: 10000 });
-  const why = await w3.evaluate(() => document.querySelector('.plg-row .plg-revert-withdrawn')?.textContent);
-  if (why !== 'Khayt withdrew version 2.0.0, so you can’t go back to it.') fail(`no reason given for the missing Revert: ${why}`);
+  const why = await w3.evaluate(() => {
+    const el = document.querySelector('.plg-row .plg-revert-withdrawn');
+    return el && [el.textContent, el.dataset.pluginRevertWithdrawn];
+  });
+  if (!why || why[0] !== 'Khayt withdrew version 2.0.0, so you can’t go back to it.' || why[1] !== '2.0.0') fail(`no reason given for the missing Revert: ${why}`);
   {
     const s = readDisk().settings; const st = U.stateOf(s, ID);
-    if (st.previous || st.updatedFrom !== '2.0.0' || s.connectorUpdates.serial !== 6) fail(`after the withdrawal: ${JSON.stringify(st)} serial ${s.connectorUpdates.serial}`);
+    if (st.previous || st.previousWithdrawn !== '2.0.0' || s.connectorUpdates.serial !== 6) fail(`after the withdrawal: ${JSON.stringify(st)} serial ${s.connectorUpdates.serial}`);
   }
   // 7b. A serial-only check: saved, nothing else changes.
   const before7b = readDisk().settings.plugins;
@@ -278,6 +293,28 @@ try {
     const s = readDisk().settings; const st = U.stateOf(s, ID);
     if (st.pending || s.connectorUpdates.serial !== 9 || s.plugins.find((p) => p.id === ID).version !== '2.1.0') fail(`after withdrawing 2.2.0: ${JSON.stringify(st)}`);
   }
+
+  // ── 8. a book written before previousWithdrawn: updated, nothing kept ──
+  // updatedFrom with no previous and no previousWithdrawn says nothing about
+  // a withdrawal: no Revert, and no "withdrew" line.
+  await electronApp.close();
+  electronApp = null;
+  delete process.env.KHAYT_CONNECTOR_UPDATES;
+  {
+    const store = readDisk();
+    store.settings.connectorUpdates.connectors[ID] = { updatedAt: new Date().toISOString(), updatedFrom: '2.0.0' };
+    fs.writeFileSync(storeFile, JSON.stringify(store));
+  }
+  const l4 = await launchApp(userData);
+  electronApp = l4.electronApp;
+  await dismissWizard(l4.window);
+  await stubReviewed(electronApp);
+  await openConnections(l4.window);
+  const oldShape = await l4.window.evaluate(() => ({
+    line: !!document.querySelector('.plg-row .plg-revert-withdrawn'),
+    revert: !!document.querySelector('.plg-row [data-plugin-act="revert"]'),
+  }));
+  if (oldShape.line || oldShape.revert) fail(`an older book shows a withdrawal it never recorded: ${JSON.stringify(oldShape)}`);
 
   console.log('connector update smoke: ok');
 } finally {
