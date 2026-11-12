@@ -3944,5 +3944,8 @@
  "mac.mbh_vo_printing": "{job} yazdırılıyor",
  "mac.mbh_vo_percent": "yüzde {pct}",
  "mac.mbh_open_machine": "Makineyi aç",
- "mac.mbh_chime": "Bir baskı bittiğinde hafif bir ses çal"
+ "mac.mbh_chime": "Bir baskı bittiğinde hafif bir ses çal",
+ "mac.mbh_mark_printed": "Basıldı olarak işaretle",
+ "mac.mbh_took": "{time} sürdü",
+ "mac.mbh_overdue": "Gecikti · teslim tarihi {date} idi"
 }

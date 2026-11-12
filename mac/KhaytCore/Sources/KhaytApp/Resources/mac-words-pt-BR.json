@@ -3944,5 +3944,8 @@
  "mac.mbh_vo_printing": "imprimindo {job}",
  "mac.mbh_vo_percent": "{pct} por cento",
  "mac.mbh_open_machine": "Abrir máquina",
- "mac.mbh_chime": "Tocar um som suave quando uma impressão terminar"
+ "mac.mbh_chime": "Tocar um som suave quando uma impressão terminar",
+ "mac.mbh_mark_printed": "Marcar como impresso",
+ "mac.mbh_took": "levou {time}",
+ "mac.mbh_overdue": "Atrasado · era para {date}"
 }

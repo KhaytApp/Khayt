@@ -3944,5 +3944,8 @@
  "mac.mbh_vo_printing": "正在打印 {job}",
  "mac.mbh_vo_percent": "百分之 {pct}",
  "mac.mbh_open_machine": "打开机器",
- "mac.mbh_chime": "打印完成时播放轻柔提示音"
+ "mac.mbh_chime": "打印完成时播放轻柔提示音",
+ "mac.mbh_mark_printed": "标记为已打印",
+ "mac.mbh_took": "耗时 {time}",
+ "mac.mbh_overdue": "已逾期 · 原定 {date} 到期"
 }

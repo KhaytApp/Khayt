@@ -3944,5 +3944,8 @@
  "mac.mbh_vo_printing": "druckt {job}",
  "mac.mbh_vo_percent": "{pct} Prozent",
  "mac.mbh_open_machine": "Maschine öffnen",
- "mac.mbh_chime": "Leisen Ton abspielen, wenn ein Druck fertig ist"
+ "mac.mbh_chime": "Leisen Ton abspielen, wenn ein Druck fertig ist",
+ "mac.mbh_mark_printed": "Als gedruckt markieren",
+ "mac.mbh_took": "Dauer {time}",
+ "mac.mbh_overdue": "Überfällig · war fällig am {date}"
 }

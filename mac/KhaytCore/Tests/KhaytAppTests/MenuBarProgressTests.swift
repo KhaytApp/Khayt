@@ -128,7 +128,8 @@ struct MenuBarProgressTests {
                     "mac.mbp_notice_finished", "mac.mbp_notice_failed", "mac.mbp_notice_paused",
                     "mac.mbh_next_free_at", "mac.mbh_left_est", "mac.mbh_free_since", "mac.mbh_plates_free",
                     "mac.mbh_next_up", "mac.mbh_next_up_today", "mac.mbh_next_up_due", "mac.mbh_done_title",
-                    "mac.mbh_vo_printing", "mac.mbh_vo_percent"] {
+                    "mac.mbh_vo_printing", "mac.mbh_vo_percent",
+                    "mac.mbh_took", "mac.mbh_overdue"] {
             let ar = try #require(Words.own[key]?["ar"], "\(key) has no Arabic")
             let en = try #require(Words.own[key]?["en"], "\(key) has no English")
             // Same placeholders both sides.
@@ -537,6 +538,115 @@ struct MenuBarProgressTests {
         #expect(FinishChime.ring(play: { played.append($0) }))
         #expect(played == [FinishChime.sound])
         #expect(Words.own["mac.mbh_chime"]?["ar"] != nil)
+    }
+
+    @Test("the chime never sounds on top of a notification that will be heard: every combination")
+    func chimeDoesNotDoubleUp() {
+        for wanted in [false, true] {
+            for posted in [false, true] {
+                for audible in [false, true] {
+                    let rings = FinishChime.shouldRing(wanted: wanted, noticePosted: posted, noticeAudible: audible)
+                    // Off is off. On, it rings unless a notification is posted AND heard.
+                    #expect(rings == (wanted && !(posted && audible)),
+                            "wanted \(wanted), posted \(posted), audible \(audible)")
+                }
+            }
+        }
+        // Spelled out, the four that matter.
+        #expect(!FinishChime.shouldRing(wanted: true, noticePosted: true, noticeAudible: true), "the notification is the sound")
+        #expect(FinishChime.shouldRing(wanted: true, noticePosted: true, noticeAudible: false), "posted, but silent")
+        #expect(FinishChime.shouldRing(wanted: true, noticePosted: false, noticeAudible: false), "finish notices are off")
+        #expect(FinishChime.shouldRing(wanted: true, noticePosted: false, noticeAudible: true),
+                "sound is allowed but nothing is posted for this finish")
+        // And the decision reaches the player: silent when it says no.
+        var played = 0
+        FinishChime.ring(wanted: FinishChime.shouldRing(wanted: true, noticePosted: true, noticeAudible: true),
+                         play: { _ in played += 1 })
+        #expect(played == 0)
+        FinishChime.ring(wanted: FinishChime.shouldRing(wanted: true, noticePosted: true, noticeAudible: false),
+                         play: { _ in played += 1 })
+        #expect(played == 1)
+    }
+
+    @Test("a notification is heard only when allowed, with sound on, and shown somewhere: every combination")
+    func noticeAudible() async {
+        for authorized in [false, true] {
+            for sound in [false, true] {
+                for shown in [false, true] {
+                    #expect(PrinterNotice.audible(authorized: authorized, soundOn: sound, shown: shown)
+                            == (authorized && sound && shown))
+                }
+            }
+        }
+        // A test run has no notification centre: nothing is posted, nothing
+        // is heard, and nobody is asked for permission.
+        // (Asked only where there is none, as `deliver` is: the centre traps
+        // in a process with no bundle identifier.)
+        if !PrinterNotice.canDeliver {
+            #expect(await PrinterNotice().carriesSound() == false)
+        }
+    }
+
+    @Test("a finish in a run that posts no notification reports that none was posted")
+    func finishReportsNoNotice() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        let ended = FinishCamera.Ended(machineId: "MACH-u1", machineName: "Snapmaker U1", orderId: nil,
+                                       outcome: "finished", durationS: 600, photoTaken: false, filename: "a.gcode")
+        guard !PrinterNotice.canDeliver else { return }
+        #expect(shop.noticePrintEnded(ended) == false, "no bundle, so no notification: the chime may sound")
+    }
+
+    // MARK: - Overdue
+
+    @Test("the next job is overdue from yesterday back, by the book's calendar")
+    func overdueBoundary() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let job = try #require(shop.orders.first { ($0.status == "pending" || $0.status == "queued") && Order.day($0.dueDate) != nil })
+        let due = try #require(Order.day(job.dueDate))
+        let book = Calendar.book
+        func state(_ today: Date) -> FloorRead.NextJob.Due? { FloorRead.nextUp([job], proposed: [], today: today)?.due }
+        // The day it is due: today, at the first and the last second of it.
+        #expect(state(due) == .today)
+        #expect(state(try #require(book.date(byAdding: .second, value: 86399, to: book.startOfDay(for: due)))) == .today)
+        // The day before it is due: still to come.
+        #expect(state(try #require(book.date(byAdding: .day, value: -1, to: due))) == .on(due))
+        // The day after: overdue, from its first second.
+        let after = try #require(book.date(byAdding: .day, value: 1, to: book.startOfDay(for: due)))
+        #expect(state(after) == .overdue(due))
+        #expect(state(try #require(book.date(byAdding: .day, value: 40, to: due))) == .overdue(due))
+
+        let words = Words()
+        let late = FloorRead.NextJob(id: "x", name: "Bracket", due: .overdue(due))
+        let day = words.say(due, .dateTime.day().month(.abbreviated))
+        #expect(FloorRead.overdueLine(late, words: words) == "Overdue · was due \(day)")
+        #expect(FloorRead.nextUpLine(late, words: words) == words.callIt("mac.mbh_next_up", ["job": .string(Figure.isolated("Bracket"))]))
+        #expect(!FloorRead.nextUpLine(late, words: words).contains(day), "the date is said once, as late")
+        for due in [FloorRead.NextJob.Due.none, .today, .on(due)] {
+            #expect(FloorRead.overdueLine(.init(id: "x", name: "Bracket", due: due), words: words) == nil)
+        }
+    }
+
+    // MARK: - Mark printed
+
+    @Test("Mark printed is the job's own next step, offered only for a job in Printing that may be moved")
+    func markPrinted() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        defer { shop.pretendsControl = false }
+        let printing = try #require(shop.orders.first { Stage.of($0) == .printing })
+        let done = try #require(shop.orders.first { $0.status == "completed" })
+        let waiting = try #require(shop.orders.first { $0.status == "pending" })
+        // The sample book is not one this Mac may move jobs in: no button.
+        #expect(!shop.canMarkPrinted(printing))
+        shop.pretendsControl = true
+        #expect(shop.canMarkPrinted(printing))
+        // It is exactly what the inspector's button would do: one step along.
+        #expect(shop.nextStep(for: printing.id) == .move(.post))
+        // A job not in Printing has nothing to mark, whatever its own next step is.
+        #expect(!shop.canMarkPrinted(done))
+        #expect(!shop.canMarkPrinted(waiting))
     }
 
     @Test("Pause and Resume are one offer, with the machine card's own gates")

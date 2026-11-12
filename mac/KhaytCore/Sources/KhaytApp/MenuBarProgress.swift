@@ -480,7 +480,9 @@ enum FloorRead {
 
     /// The job the empty panel offers: "Next up: Turbine bracket, due today."
     struct NextJob: Equatable, Sendable {
-        enum Due: Equatable, Sendable { case none, today, on(Date) }
+        /// `overdue` is a due day before today: it is said as late, in the late
+        /// tone, not as an appointment still to come.
+        enum Due: Equatable, Sendable { case none, today, on(Date), overdue(Date) }
         let id: String
         let name: String
         let due: Due
@@ -493,7 +495,13 @@ enum FloorRead {
     static func nextUp(_ orders: [Order], proposed: [String], today: Date) -> NextJob? {
         func job(_ order: Order) -> NextJob {
             let day = Order.day(order.dueDate)
-            let due: NextJob.Due = day.map { Calendar.book.isDate($0, inSameDayAs: today) ? .today : .on($0) } ?? .none
+            // By the book's calendar (`Calendar.book`), day against day: a job
+            // due today is not overdue at four in the afternoon.
+            let start = Calendar.book.startOfDay(for: today)
+            let due: NextJob.Due = day.map { day in
+                if Calendar.book.isDate(day, inSameDayAs: today) { return .today }
+                return day < start ? .overdue(day) : .on(day)
+            } ?? .none
             return NextJob(id: order.id, name: order.project.isEmpty ? order.id : order.project, due: due)
         }
         let waiting = orders.filter { $0.status == "pending" || $0.status == "queued" }
@@ -514,12 +522,21 @@ enum FloorRead {
     static func nextUpLine(_ next: NextJob, words: Words) -> String {
         let name = JSONValue.string(Figure.isolated(next.name))
         switch next.due {
-        case .none: return words.callIt("mac.mbh_next_up", ["job": name])
+        // The late part is its own line, in the late tone (`overdueLine`).
+        case .none, .overdue: return words.callIt("mac.mbh_next_up", ["job": name])
         case .today: return words.callIt("mac.mbh_next_up_today", ["job": name])
         case .on(let day):
             return words.callIt("mac.mbh_next_up_due",
                                 ["job": name, "date": .string(words.say(day, .dateTime.day().month(.abbreviated)))])
         }
+    }
+
+    /// "Overdue · was due Oct 24" for a next job whose day has passed; nil for
+    /// one due today, later, or with no date.
+    @MainActor
+    static func overdueLine(_ next: NextJob, words: Words) -> String? {
+        guard case .overdue(let day) = next.due else { return nil }
+        return words.callIt("mac.mbh_overdue", ["date": .string(words.say(day, .dateTime.day().month(.abbreviated)))])
     }
 
     // MARK: - Which job
@@ -706,6 +723,21 @@ enum FinishChime {
     static let sound = "Glass"
 
     static var wanted: Bool { UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? false }
+
+    /// Should the chime sound for this finish?
+    ///
+    /// NOT ON TOP OF THE NOTIFICATION'S OWN SOUND. The finish notification
+    /// (`Shop.noticePrintEnded`) is posted with the system's default sound, and
+    /// a chime a second later is two noises for one print. So the chime is for
+    /// the finishes that would otherwise be silent: the setting is on, and
+    /// either no notification is posted for this finish (the shop switched
+    /// "Notify me when a print finishes" off, or this run cannot post one) or
+    /// the one posted will not be heard (`PrinterNotice.audible`: Khayt's
+    /// notifications are not allowed, their sound is off, or they are shown
+    /// nowhere).
+    static func shouldRing(wanted: Bool, noticePosted: Bool, noticeAudible: Bool) -> Bool {
+        wanted && !(noticePosted && noticeAudible)
+    }
 
     /// Play it if the setting is on. Returns whether it was played. `play` is
     /// the seam the tests count through; the app passes nothing.

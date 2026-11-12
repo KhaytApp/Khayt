@@ -6250,6 +6250,9 @@ final class Words {
         "mac.mbh_vo_percent": ["en": "{pct} percent", "ar": "\u{2068}{pct}\u{2069} بالمئة"],
         "mac.mbh_open_machine": ["en": "Open machine", "ar": "افتح الطابعة"],
         "mac.mbh_chime": ["en": "Play a soft chime when a print finishes", "ar": "تشغيل نغمة هادئة عند انتهاء طباعة"],
+        "mac.mbh_mark_printed": ["en": "Mark printed", "ar": "علّمها مطبوعة"],
+        "mac.mbh_took": ["en": "took {time}", "ar": "استغرقت \u{2068}{time}\u{2069}"],
+        "mac.mbh_overdue": ["en": "Overdue · was due {date}", "ar": "متأخر · كان مستحقًا \u{2068}{date}\u{2069}"],
 
         // ── A printer's working life: under service, retired, deleted ─────
         // (`Shop+MachineLife.swift`, `lib/machine-status.js`).

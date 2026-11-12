@@ -180,6 +180,21 @@ final class FloorStatus {
         Shop.openedLinks += [.job(id)]
     }
 
+    /// "Mark printed" on a finished print: the job's own next step
+    /// (`Shop.takeNextStep`, the inspector's button), not a second way to
+    /// move a job. When that step has a question to ask first (finishing a
+    /// job asks what it took), the question is a sheet in the main window, so
+    /// the window is brought up for it; a plain step leaves the person where
+    /// they are.
+    func markPrinted(job id: String) {
+        guard let shop, let there = shop.moveAlongTarget(id, by: 1) else { return }
+        if shop.questionFor(id, moving: there) != nil {
+            popover?.performClose(nil); popover = nil
+            ShopWindowOpener.raise()
+        }
+        shop.takeNextStep(id)
+    }
+
     @objc private func toggle() {
         guard let shop, let button = item?.button else { return }
         if let popover, popover.isShown { popover.performClose(nil); self.popover = nil; return }

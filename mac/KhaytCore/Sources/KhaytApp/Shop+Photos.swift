@@ -181,12 +181,18 @@ extension Shop {
     func printFinished(_ ended: FinishCamera.Ended) async {
         lastPrintEnded[ended.machineId] = ended
         lastPrintEndedAt[ended.machineId] = Date()
-        // One soft chime, only when this Mac's owner switched it on
-        // (`FinishChime`). Here and not in the panel: this seam is the one
-        // place that knows a print finished, once per print.
-        if ended.outcome == "finished" { FinishChime.ring() }
         // The notification on this Mac: finished or failed, once per print.
-        noticePrintEnded(ended)
+        let posted = noticePrintEnded(ended)
+        // One soft chime, only when this Mac's owner switched it on AND the
+        // notification above will not already make a sound: two sounds for
+        // one print is one too many (`FinishChime.shouldRing`). Here and not
+        // in the panel: this seam is the one place that knows a print
+        // finished, once per print.
+        if ended.outcome == "finished", FinishChime.wanted {
+            let audible = posted ? await printers.notices.carriesSound() : false
+            FinishChime.ring(wanted: FinishChime.shouldRing(wanted: true, noticePosted: posted,
+                                                           noticeAudible: audible))
+        }
         await settleEnergy(ended)
         await sendPrintFinishedEvent(ended)
     }

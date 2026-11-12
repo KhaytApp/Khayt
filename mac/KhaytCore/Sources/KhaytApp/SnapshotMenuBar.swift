@@ -9,7 +9,8 @@ import KhaytCore
 /// finished — in each of the three styles, and the panel in every state it
 /// has: the hero with one print and with several, a runout and a pause as the
 /// hero, an old reading (the estimate), the finish moment and the row it
-/// settles to, and the empty floor with a job waiting and with none. Run it
+/// settles to (each with "Mark printed", and the row without it), and the
+/// empty floor with a job waiting, one overdue, one due later, and none. Run it
 /// three times for light, dark (`KHAYT_SNAPSHOT_DARK=1`) and Arabic
 /// (`KHAYT_LANG=ar`).
 ///
@@ -80,6 +81,14 @@ extension Snapshot {
             if scene == .free {
                 // The same floor with nothing waiting.
                 panel("free-nothing-queued", jobs: jobs, queue: [])
+                // And with the next job late, and not late: the sample's dates
+                // move with the calendar, so each is picked by what it is.
+                let waiting = shop.orders.filter { $0.status == "pending" || $0.status == "queued" }
+                let start = Calendar.book.startOfDay(for: now)
+                let late = waiting.filter { Order.day($0.dueDate).map { $0 < start } ?? false }
+                let ahead = waiting.filter { Order.day($0.dueDate).map { $0 >= start } ?? false }
+                if !late.isEmpty { panel("free-overdue", jobs: jobs, queue: late) }
+                if !ahead.isEmpty { panel("free-due-later", jobs: jobs, queue: ahead) }
             }
         }
 
@@ -102,6 +111,10 @@ extension Snapshot {
         let jobs = await FloorRead.jobs(shop, lines: lines)
         panel("finish-moment", jobs: jobs, holds: ["MACH-core-one": now.addingTimeInterval(FloorRead.cardHold)])
         panel("finish-settled", jobs: jobs)
+        // The same row for somebody who may not move jobs: no "Mark printed".
+        shop.pretendsControl = false
+        panel("finish-settled-no-button", jobs: jobs)
+        shop.pretendsControl = true
         // And the item for that short while: the closed ring with its tick.
         let ticked = MenuBarStyle.allCases.map { style in
             (style, FloorRead.label(lines, style: style, words: shop.words,

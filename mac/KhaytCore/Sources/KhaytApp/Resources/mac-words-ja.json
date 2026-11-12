@@ -3944,5 +3944,8 @@
  "mac.mbh_vo_printing": "{job} を印刷中",
  "mac.mbh_vo_percent": "{pct} パーセント",
  "mac.mbh_open_machine": "マシンを開く",
- "mac.mbh_chime": "印刷が完了したら控えめな音を鳴らす"
+ "mac.mbh_chime": "印刷が完了したら控えめな音を鳴らす",
+ "mac.mbh_mark_printed": "印刷済みにする",
+ "mac.mbh_took": "所要 {time}",
+ "mac.mbh_overdue": "期限切れ · 納期は {date} でした"
 }

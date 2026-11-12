@@ -451,19 +451,62 @@ private struct FinishCard: View {
     var body: some View {
         let name = FloorLook.jobName(job, line)
         HStack(spacing: 12) {
-            ProgressRing(value: 1, tint: Khayt.done, size: 40, line: 5)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: name.isEmpty ? shop.words.callIt("mac.mbh_finished")
-                                            : shop.words.callIt("mac.mbh_done_title", ["job": .string(Figure.isolated(name))]))
-                    .font(.callout.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
-                Text(verbatim: line.name + " · " + shop.words.callIt("mac.mbh_finished"))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            HStack(spacing: 12) {
+                ProgressRing(value: 1, tint: Khayt.done, size: 40, line: 5)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: name.isEmpty ? shop.words.callIt("mac.mbh_finished")
+                                                : shop.words.callIt("mac.mbh_done_title", ["job": .string(Figure.isolated(name))]))
+                        .font(.callout.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
+                    // Two lines when it must: beside the button, "Prusa CORE One
+                    // · took 3h 02m" was cut to "took 3h…", the one figure on it.
+                    Text(verbatim: line.name + " · " + detail)
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .accessibilityElement(children: .combine)
+            MarkPrinted(shop: shop, job: job, prominent: true)
         }
         .padding(14)
         .modifier(Wash(fill: Khayt.done.opacity(0.14), edge: Khayt.done))
-        .accessibilityElement(children: .combine)
+    }
+
+    /// "took 3h 02m" when the printer's own counter said how long, at the
+    /// finish seam (`FinishCamera.Ended.durationS`); the word alone when it
+    /// never said. Nothing is asked for it.
+    private var detail: String {
+        guard let took = shop.lastPrintEnded[line.id]?.durationS, took >= 60 else {
+            return shop.words.callIt("mac.mbh_finished")
+        }
+        return shop.words.callIt("mac.mbh_took", ["time": .string(FloorRead.duration(took, shop.words))])
+    }
+}
+
+/// "Mark printed" on a finished print, on its green card and on the row it
+/// settles to.
+///
+/// THE JOB'S OWN NEXT STEP, NOT A SECOND WAY TO MOVE A JOB. Whether it is
+/// offered is `Shop.canMarkPrinted` and the press is `Shop.takeNextStep`
+/// (through `FloorStatus.markPrinted`): the inspector's button, with its
+/// gates and its permission check. Drawn only when the book names the job
+/// without guessing (the finish seam's own lookup) and this person may move
+/// it; otherwise there is no button. It is on the row as well as the card
+/// because the card lasts six seconds, which is a target nobody hits.
+private struct MarkPrinted: View {
+    let shop: Shop
+    let job: Order?
+    var prominent = false
+
+    var body: some View {
+        if let job, shop.canMarkPrinted(job) {
+            let button = Button(shop.words.callIt("mac.mbh_mark_printed")) {
+                FloorStatus.shared.markPrinted(job: job.id)
+            }
+            .buttonBorderShape(.capsule)
+            if prominent { button.buttonStyle(.borderedProminent).controlSize(.regular) }
+            else { button.buttonStyle(.bordered).controlSize(.small) }
+        }
     }
 }
 
@@ -489,6 +532,12 @@ private struct EmptyFloor: View {
                 Text(verbatim: FloorRead.nextUpLine(next, words: shop.words))
                     .font(.caption).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                // A day that has passed is late, and is said as late: "due
+                // Oct 24" in November read as an appointment still to come.
+                if let late = FloorRead.overdueLine(next, words: shop.words) {
+                    Text(verbatim: late).font(.caption.weight(.medium)).monospacedDigit()
+                        .foregroundStyle(Khayt.late)
+                }
                 Button(shop.words.callIt("mac.mbh_start_next")) { FloorStatus.shared.open(job: next.id) }
                     .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
                     .padding(.top, 6)
@@ -534,30 +583,43 @@ private struct FleetRow: View {
     @State private var hovered = false
 
     var body: some View {
-        Button(action: open) {
-            HStack(alignment: .center, spacing: 10) {
-                ProgressRing(value: ringValue, tint: FloorLook.tint(line), size: 26, line: 3.5,
-                             pulses: line.printing && line.attention == nil)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: line.name).font(.callout.weight(.medium)).foregroundStyle(.primary).lineLimit(1)
-                    if !second.isEmpty {
-                        Text(verbatim: second).font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
+        // The row opens its machine; "Mark printed" sits BESIDE that button,
+        // not inside it: a button in a button is one click with two meanings.
+        HStack(spacing: 8) {
+            Button(action: open) {
+                HStack(alignment: .center, spacing: 10) {
+                    ProgressRing(value: ringValue, tint: FloorLook.tint(line), size: 26, line: 3.5,
+                                 pulses: line.printing && line.attention == nil)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(verbatim: line.name).font(.callout.weight(.medium)).foregroundStyle(.primary).lineLimit(1)
+                        if !second.isEmpty {
+                            Text(verbatim: second).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
                     }
+                    Spacer(minLength: 6)
+                    if !marks { trailing }
                 }
-                Spacer(minLength: 6)
-                trailing
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(hovered ? Color.accentColor.opacity(0.10) : .clear)
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(FloorRead.spoken(line, job: FloorLook.jobName(job, line), now: now, words: shop.words))
+            .accessibilityHint(shop.words.callIt("mac.mbp_open_machine", ["machine": .string(line.name)]))
+            .accessibilityAddTraits(.isButton)
+            if marks { MarkPrinted(shop: shop, job: job) }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(hovered ? Color.accentColor.opacity(0.10) : .clear)
         .onHover { hovered = $0 }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(FloorRead.spoken(line, job: FloorLook.jobName(job, line), now: now, words: shop.words))
-        .accessibilityHint(shop.words.callIt("mac.mbp_open_machine", ["machine": .string(line.name)]))
-        .accessibilityAddTraits(.isButton)
+    }
+
+    /// A finished print whose job is still in Printing: the row offers "Mark
+    /// printed" where its pill was, and says "Finished" in its second line
+    /// instead, so the state still has its word.
+    private var marks: Bool {
+        guard line.isFinished, let job else { return false }
+        return shop.canMarkPrinted(job)
     }
 
     /// A finished plate is a closed ring; an idle one is the track alone.
@@ -588,6 +650,7 @@ private struct FleetRow: View {
         }
         if line.midPrint || line.isFinished {
             if line.attention == .bedNotClear, name.isEmpty { return shop.words.callIt("mac.mbp_attn_bed") }
+            if marks { return shop.words.callIt("mac.mbh_finished") + " · " + Figure.isolated(name) }
             return name
         }
         if line.attention == .fault { return name }
