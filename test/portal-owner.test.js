@@ -58,6 +58,23 @@ test('the customer\'s response matches the original for approve, decline, nothin
   }
 });
 
+test('the cloud calls a decline "reject", and a decline of an earlier version is marked stale', () => {
+  const quote = { status: 'quote' };
+  // The live cloud's word. It used to be read as "no response yet".
+  const rejected = P.responseFor([{ token: 't1', action: { type: 'reject', note: 'too dear' } }], 't1', quote);
+  assert.deepEqual([rejected.response, rejected.advance, rejected.stale, rejected.note], ['declined', false, false, 'too dear']);
+  // The retired backend's word is still a decline.
+  assert.equal(P.responseFor([{ token: 't1', action: { type: 'decline' } }], 't1', quote).response, 'declined');
+  // Re-published with a different amount: the old decline stands, marked stale.
+  const stale = P.responseFor([{ token: 't1', action: { type: 'reject' }, actionStale: true }], 't1', quote);
+  assert.deepEqual([stale.response, stale.stale, stale.advance], ['declined', true, false]);
+  // Only a decline can be stale: an approval always stands, and "true" as text is not true.
+  assert.equal(P.responseFor([{ token: 't1', action: { type: 'approve' }, actionStale: true }], 't1', quote).stale, false);
+  assert.equal(P.responseFor([{ token: 't1', action: { type: 'reject' }, actionStale: 'true' }], 't1', quote).stale, false);
+  assert.equal(P.responseFor([{ token: 't1', action: null, actionStale: true }], 't1', quote).stale, false);
+  assert.equal(P.responseFor([], 't1', quote).stale, false);
+});
+
 test('a well-formed deposit and pay link store what the original stored', () => {
   for (const [dep, url] of [['250', 'https://pay.example/x'], ['', ''], ['99.5', '']]) {
     const mine = P.depositForm(dep, url);

@@ -457,7 +457,7 @@ struct GroupCrumb: View {
             // In the shop's digits, as every other count in the app.
             Text(verbatim: shop.words.numeral(shop.shownFiles.count))
                 .monospacedDigit()
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
             Spacer(minLength: 0)
         }
         .font(.callout)
@@ -718,11 +718,18 @@ struct Cell: View {
     /// selection, so a chosen King read its group as a smudge. On a chosen
     /// tile the link is white and the facts a slightly dimmer white, in both
     /// appearances — the selection fill is the accent colour either way.
-    static func groupInk(selected: Bool) -> Color { selected ? .white : Khayt.brand }
+    ///
+    /// ── AND NOTHING IN WHITE EITHER (Nov 11 2026 UI review, B6) ──────────
+    ///
+    /// White was right only while the selection fill was the accent blue.
+    /// `.selection` is that blue in the key window and a PALE GREY in any
+    /// other — Khayt beside another app, or behind its own Settings — and
+    /// there the white link and facts were unreadable. The chosen tile is now
+    /// a light wash of the accent with a border (`tileSelection`), the same
+    /// in both states, and the text keeps its ordinary colours on it.
+    static func groupInk(selected: Bool) -> Color { Khayt.brand }
 
-    static func secondaryInk(selected: Bool) -> AnyShapeStyle {
-        selected ? AnyShapeStyle(Color.white.opacity(0.85)) : AnyShapeStyle(.secondary)
-    }
+    static func secondaryInk(selected: Bool) -> AnyShapeStyle { AnyShapeStyle(.secondary) }
 
     /// The extensions a shop prints from every day. Their badge said
     /// nothing a shop did not already assume, on every tile, so only the
@@ -900,8 +907,7 @@ struct Cell: View {
                     let line = facts.isEmpty ? subtitle : shown
                     if group == nil || size.isCompact || !line.isEmpty {
                         Text(((group == nil || size.isCompact || !facts.isEmpty) ? "" : "\u{00B7} ") + line)
-                            .foregroundStyle(selected ? Self.secondaryInk(selected: true)
-                                             : facts.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary.opacity(0.78)))
+                            .foregroundStyle(facts.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary.opacity(0.78)))
                             .layoutPriority(facts.isEmpty ? 0 : 1)
                             .help(facts.isEmpty ? line : facts)
                     }
@@ -911,7 +917,9 @@ struct Cell: View {
                 .lineLimit(1)
                 // WHERE IT PRINTS, per printer — Medium and Large only.
                 if let fits, !size.isCompact {
-                    FitChipRow(row: fits, words: words, selected: selected)
+                    // Never the white-on-accent look: the chosen tile is a
+                    // light wash now, so the chips keep their own colours.
+                    FitChipRow(row: fits, words: words, selected: false)
                         .padding(.top, 1)
                 }
             }
@@ -1155,7 +1163,10 @@ extension View {
     /// group read as chosen; a model wears the same, so the two cannot be
     /// told apart by how they are selected.
     func tileSelection(_ selected: Bool) -> some View {
-        background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
+        // A light wash of the accent, not `.selection`: that fill changes
+        // from blue to pale grey when the window is not key, and the text on
+        // it cannot follow. This reads the same either way.
+        background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(.clear),
                    in: RoundedRectangle(cornerRadius: 8))
             .overlay {
                 if selected {

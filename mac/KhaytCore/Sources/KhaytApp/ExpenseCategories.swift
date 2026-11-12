@@ -96,7 +96,7 @@ struct ExpenseCategoriesCard: View {
                 // amounts comparable between two periods of different size.
                 Text(verbatim: shop.words.numeral(Int((row.share * 100).rounded())) + "%")
                     .font(.caption).monospacedDigit()
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(width: 34, alignment: .trailing)
             }
         }
