@@ -126,12 +126,12 @@ final class ShopModeTests: XCTestCase {
     // MARK: - The sample shop
 
     func testTheSampleShopIsProfessionalUnlessTheDebugFlagSaysSimple() throws {
-        let sample = SampleShop.book()
-        XCTAssertNil(ShopMode.mode(in: sample), "the sample shop carries no mode")
+        XCTAssertNil(ShopMode.mode(in: SampleShop.book()), "the sample shop carries no mode")
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "shopmode-\(UUID().uuidString)"))
-        XCTAssertNil(ShopMode.mode(in: SampleShop.withDebugMode(sample, defaults: defaults)))
+        XCTAssertNil(SampleShop.debugMode(defaults))
         defaults.set("simple", forKey: "KhaytShopMode")
-        XCTAssertEqual(ShopMode.mode(in: SampleShop.withDebugMode(sample, defaults: defaults)), "simple")
+        XCTAssertEqual(SampleShop.debugMode(defaults), "simple")
+        XCTAssertEqual(ShopMode.mode(in: SampleShop.book(mode: SampleShop.debugMode(defaults))), "simple")
     }
 
     // MARK: - Simple's four stages

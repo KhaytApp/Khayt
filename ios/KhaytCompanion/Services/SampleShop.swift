@@ -23,24 +23,25 @@ enum SampleShop {
     static let label = "Sample Print Shop"
 
     /// The sample shop is Professional: its settings carry no `mode`. A debug
-    /// build launched with `-KhaytShopMode simple` writes that mode into the
-    /// sample book, as the Mac would, so Simple can be photographed and tested
-    /// on the same shop. Release builds always return the book unchanged.
-    static func withDebugMode(_ store: [String: JSONValue],
-                              defaults: UserDefaults = .standard) -> [String: JSONValue] {
+    /// build launched with `-KhaytShopMode simple` asks for the sample book
+    /// with that mode in its settings, as the Mac would write it, so Simple
+    /// can be photographed and tested on the same shop. Nil in release builds.
+    static func debugMode(_ defaults: UserDefaults = .standard) -> String? {
         #if DEBUG
-        guard let mode = defaults.string(forKey: "KhaytShopMode"), !mode.isEmpty,
-              case .object(var settings)? = store["settings"] else { return store }
-        settings["mode"] = .string(mode)
-        var out = store
-        out["settings"] = .object(settings)
-        return out
+        guard let mode = defaults.string(forKey: "KhaytShopMode"), !mode.isEmpty else { return nil }
+        return mode
         #else
-        return store
+        return nil
         #endif
     }
 
-    static func book(now: Date = Date()) -> [String: JSONValue] {
+    /// The settings with `mode` added when one is asked for.
+    private static func moded(_ settings: [String: JSONValue], _ mode: String?) -> [String: JSONValue] {
+        guard let mode else { return settings }
+        return settings.merging(["mode": .string(mode)]) { _, new in new }
+    }
+
+    static func book(now: Date = Date(), mode: String? = nil) -> [String: JSONValue] {
         let cal = Calendar(identifier: .gregorian)
         let f = DateFormatter()
         f.calendar = cal; f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
@@ -82,7 +83,7 @@ enum SampleShop {
         }
 
         return [
-            "settings": .object([
+            "settings": .object(moded([
                 // `bizEn` / `bizAr` are the shop's name as the desk stores it —
                 // what a customer message signs with. Without them the WhatsApp
                 // update read "thank you for your order with ."
@@ -100,7 +101,7 @@ enum SampleShop {
                 // Store build's sample shop shows no connector until
                 // khaytapp.com/privacy describes them.
                 "plugins": shippedSampleConnectors,
-            ]),
+            ], mode)),
             // The catalogue: one with a picture, a rounded price, an override,
             // one never stocked — so every line of the screen is drawn.
             "products": .array([

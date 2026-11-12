@@ -359,7 +359,7 @@ final class KhaytAPIClient: ObservableObject {
     /// pulled one, with nothing to pull it from and nowhere to send to.
     func openSampleShop(now: Date = Date()) throws {
         guard let book else { throw KhaytAPIError.notConfigured }
-        let store = SampleShop.withDebugMode(SampleShop.book(now: now))
+        let store = SampleShop.book(now: now, mode: SampleShop.debugMode())
         try book.replace(with: store, scope: SampleShop.scope(now: now))
         try book.replaceBaseline(with: store)
         try book.replaceLibrary(SampleShop.library())
