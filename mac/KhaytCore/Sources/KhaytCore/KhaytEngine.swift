@@ -4714,12 +4714,12 @@ public actor KhaytEngine {
 
     /// The names a shop has actually used, most-used first, with counts.
     ///
-    /// One call for the whole library rather than one per row: building a
-    /// JSContext call is cheap and doing it four hundred times to draw a sidebar
-    /// is not.
+    /// Counted in Swift (`KhaytCore.Organise`), like tags below. This used to
+    /// hand the records to `KhaytOrganise.counts`, and the records are the
+    /// whole library: 24 MB of JSON written and parsed for an answer of a few
+    /// names. `OrganiseCountsParityTests` holds the port to the JavaScript.
     public func groupCounts(_ records: [JSONValue]) throws -> [GroupCount] {
-        try runtime.call("KhaytOrganise", "counts", [JSONValue.array(records), "group"],
-                         as: [GroupCount].self)
+        try Organise.counts(records, field: .group).map { GroupCount(name: $0.label, count: $0.count) }
     }
 
     /// The same, for what a thing IS rather than the set it belongs to.
@@ -4727,9 +4727,12 @@ public actor KhaytEngine {
     /// `lib/organise.js` carries both axes because a library of hundreds is
     /// asked two different questions: you look for the GROUP when you want the
     /// set, and the CATEGORY when you do not yet know what you want.
+    ///
+    /// Native for the reason above, and this is the one that cost: it is
+    /// asked for the whole library twice on every reload and again while a
+    /// Library search is typed.
     public func categoryCounts(_ records: [JSONValue]) throws -> [GroupCount] {
-        try runtime.call("KhaytOrganise", "counts", [JSONValue.array(records), "category"],
-                         as: [GroupCount].self)
+        try Organise.counts(records, field: .category).map { GroupCount(name: $0.label, count: $0.count) }
     }
 
     /// Tags, which are the third axis: free-form and many per record.
