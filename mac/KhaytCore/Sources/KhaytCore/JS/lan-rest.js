@@ -52,9 +52,7 @@
   const QuotePage = () => req('KhaytLanQuotePage', './lan-quote-page.js');
 
   /** The shop's calendar day for a moment — never UTC's. */
-  /** `YYYY-MM-DD` in local time; now when no instant is given (a bare call
-   *  was `new Date(undefined)`, "NaN-NaN-NaN"). */
-  function localDay(ms = Date.now()) {
+  function localDay(ms) {
     const d = new Date(ms);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
@@ -734,7 +732,11 @@
         if (Number.isFinite(+c.overheadPerHour) && c.overheadPerHour != null) overheadPerHour = Math.max(0, +c.overheadPerHour);
         else {
           const PQ = req('KhaytPublicQuote', './public-quote.js');
-          if (PQ && PQ.overheadPerHourFor) overheadPerHour = PQ.overheadPerHourFor(book, todayOf(c));
+          if (PQ && PQ.overheadPerHourFor) {
+            // `todayOf`, not `localDay()`: with no argument that is
+            // `new Date(undefined)` and the day came out "NaN-NaN-NaN".
+            overheadPerHour = PQ.overheadPerHourFor(book, todayOf(c));
+          }
         }
       }
       const price = Pricing.quoteTotal({

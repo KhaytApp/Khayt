@@ -418,23 +418,50 @@ final class PrinterWatch {
         }
     }
 
-    /// Ask every machine once, one after another.
+    /// Ask every machine once, different hosts at the same time.
     ///
-    /// Serially rather than all at once: a shop has a handful of printers, and
-    /// a burst of simultaneous requests to a Klipper host is a way to find out
-    /// what its request queue does under load, on somebody's live print.
-    private func sweep(shop: Shop) async {
+    /// ── ONE SWITCHED-OFF PRINTER USED TO HOLD UP ALL THE OTHERS ───────────
+    ///
+    /// This asked the machines one after another, so a printer that was off
+    /// cost every other printer its whole timeout (5 s for most, 8 s for a
+    /// Bambu, 15 s for a Duet) before they were asked at all: the time
+    /// between two readings of any printer was ten seconds plus the sum of
+    /// every dead one's wait. With five off, a healthy printer's progress
+    /// moved every 35 s.
+    ///
+    /// Now each HOST is its own lane (`lanes`) and the lanes run together, so
+    /// a sweep takes as long as its slowest host and no longer. What has not
+    /// changed is the reason the old note gave for going one at a time: a
+    /// burst of simultaneous requests to a Klipper host is a way to find out
+    /// what its request queue does under load, on somebody's live print. One
+    /// machine's own requests are still made in order, and so are those of
+    /// two machines at one address (several Klipper instances on one board).
+    ///
+    /// Nothing here leaves the main actor except to wait: every lane is a
+    /// main-actor task, and the waiting is `URLSession`'s and the sockets'
+    /// own. No blocking work is put on the shared pool.
+    ///
+    /// Internal, not private: a test sweeps fake printers.
+    func sweep(shop: Shop) async {
         let forgot = forgetUnwatched(shop: shop)
         // A Bambu deleted, retired or put under service keeps no connection
         // open: its held session hangs up here, on the sweep after.
         await BambuWatch.shared.retain(Set(shop.machines
             .filter { Self.notWatched($0) == nil && $0.printerApi?.type == "bambu" }.map(\.id)))
-        var asked = false
-        for machine in shop.machines where Self.notWatched(machine) == nil {
-            if Task.isCancelled { return }
-            await poll(machine, shop: shop)
-            asked = true
+        let lanes = Self.lanes(shop.machines.filter { Self.notWatched($0) == nil })
+        if Task.isCancelled { return }
+        // False from a lane the watch's own cancellation cut short: the book
+        // closed, and what the others heard is not told to anybody.
+        let finished = await withTaskGroup(of: Bool.self, returning: Bool.self) { group in
+            for lane in lanes {
+                group.addTask { [weak self] in await self?.ask(lane: lane, shop: shop) ?? true }
+            }
+            var all = true
+            for await whole in group where !whole { all = false }
+            return all
         }
+        if !finished { return }
+        let asked = !lanes.isEmpty
         // The fleet tile is `dashboard-facts`'s answer and it reads this cache,
         // so a dashboard computed before the first poll says every machine is
         // neither live nor offline — it read 0/1 with the machine beside it
@@ -449,6 +476,19 @@ final class PrinterWatch {
             // dashboard and the widget still count it until they are told.
             await shop.printersAnswered()
         }
+    }
+
+    /// One lane of the sweep: the machines at one address, asked in order.
+    /// False when the watch was cancelled before the lane was done.
+    private func ask(lane: [Machine], shop: Shop) async -> Bool {
+        for machine in lane {
+            if Task.isCancelled { return false }
+            guard let engine = shop.engine else { continue }
+            let answer = await hear(machine, engine: engine, shop: shop)
+            // One at a time, whichever lane it came from (`inTurn`).
+            await inTurn { [weak self] in await self?.record(machine, answer, shop: shop) }
+        }
+        return true
     }
 
     /// Drop everything remembered about a machine this app no longer asks.
@@ -575,26 +615,93 @@ final class PrinterWatch {
     }
 
     private func poll(_ machine: Machine, shop: Shop) async {
-        let engine = shop.engine
-        guard let engine else { return }
+        guard let engine = shop.engine else { return }
+        await record(machine, await hear(machine, engine: engine, shop: shop), shop: shop)
+    }
+
+    /// The machines to ask, grouped by the address they are at.
+    ///
+    /// Each lane is asked in order and the lanes are asked together. Machines
+    /// that name the same host share a lane whatever their ports, because two
+    /// Klipper instances on one board are one small computer answering both.
+    /// Compared as written (trimmed, case ignored): a host entered once by
+    /// name and once by address is two lanes, which is the old burst worry
+    /// only for a shop that typed one printer in twice.
+    /// Lanes in the order their first machine has in the book.
+    static func lanes(_ machines: [Machine]) -> [[Machine]] {
+        var order: [String] = []
+        var byHost: [String: [Machine]] = [:]
+        for machine in machines {
+            let host = (machine.printerApi?.host ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if byHost[host] == nil { order.append(host) }
+            byHost[host, default: []].append(machine)
+        }
+        return order.compactMap { byHost[$0] }
+    }
+
+    /// How one machine is asked. A seam: a test stands fake printers here, so
+    /// a sweep can be watched without a network.
+    var asking: (Machine, KhaytEngine, _ key: String, _ accessCode: String) async throws
+        -> KhaytEngine.PrinterStatus = { machine, engine, key, accessCode in
+        try await PrinterWatch.ask(machine, engine: engine, key: key, accessCode: accessCode, held: true)
+    }
+
+    /// The last recording a sweep started, so the next waits for it.
+    private var recordingTail: Task<Void, Never>?
+
+    /// Run `work` after every recording asked for before it.
+    ///
+    /// The sweep hears several printers at once, but what a reading sets off
+    /// (the finished-print cache, the write of it to the book, the photo) was
+    /// written for one printer at a time and reads what the one before left.
+    /// So the asking overlaps and the recording does not.
+    private func inTurn(_ work: @escaping @MainActor () async -> Void) async {
+        let before = recordingTail
+        let mine = Task { @MainActor in
+            await before?.value
+            await work()
+        }
+        recordingTail = mine
+        await mine.value
+    }
+
+    /// What one ask came back with: the status, or the sentence that says
+    /// why there is none.
+    private enum Heard: Sendable {
+        case status(KhaytEngine.PrinterStatus)
+        case problem(String)
+    }
+
+    /// Ask one machine and hand back what it said, or why it did not.
+    /// Records nothing.
+    private func hear(_ machine: Machine, engine: KhaytEngine, shop: Shop) async -> Heard {
+        // The API key, opened at the moment it is sent and never held.
+        // Moonraker in trusted-client mode needs none; the other two always
+        // do, and an unset one must be sent as NOTHING rather than as the
+        // string "undefined" — which is the mistake main.js records having
+        // made.
+        var key = ""
+        if let sealed = machine.printerApi?.apiKey, !sealed.isEmpty, let build = source {
+            key = (try? await Secrets.open(sealed, for: build)) ?? ""
+        }
+        // A Bambu's access code, the same way — and only for a Bambu.
+        var accessCode = ""
+        if machine.printerApi?.type == "bambu",
+           let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
+            accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
+        }
         do {
-            // The API key, opened at the moment it is sent and never held.
-            // Moonraker in trusted-client mode needs none; the other two always
-            // do, and an unset one must be sent as NOTHING rather than as the
-            // string "undefined" — which is the mistake main.js records having
-            // made.
-            var key = ""
-            if let sealed = machine.printerApi?.apiKey, !sealed.isEmpty, let build = source {
-                key = (try? await Secrets.open(sealed, for: build)) ?? ""
-            }
-            // A Bambu's access code, the same way — and only for a Bambu.
-            var accessCode = ""
-            if machine.printerApi?.type == "bambu",
-               let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
-                accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
-            }
-            let status = try await Self.ask(machine, engine: engine, key: key, accessCode: accessCode,
-                                            held: true)
+            return .status(try await asking(machine, engine, key, accessCode))
+        } catch {
+            return .problem(Self.say(error, shop.words))
+        }
+    }
+
+    /// Write down what one machine said, and act on it.
+    private func record(_ machine: Machine, _ answer: Heard, shop: Shop) async {
+        switch answer {
+        case .status(let status):
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0, lastGood: status)
@@ -610,10 +717,10 @@ final class PrinterWatch {
             // screen should not wait on a store write to see its printer's
             // progress move. This is the only thing that notices a job ending.
             await capture(machine.id, status: status, shop: shop)
-        } catch {
+        case .problem(let why):
             let before = readings[machine.id]?.consecutiveFailures ?? 0
             let last = readings[machine.id]?.status ?? readings[machine.id]?.lastGood
-            readings[machine.id] = Reading(status: nil, problem: Self.say(error, shop.words), at: Date(),
+            readings[machine.id] = Reading(status: nil, problem: why, at: Date(),
                                            consecutiveFailures: before + 1, lastGood: last)
         }
     }

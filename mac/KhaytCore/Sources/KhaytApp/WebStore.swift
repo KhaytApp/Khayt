@@ -625,7 +625,7 @@ struct StorefrontDraft: Equatable {
     }
 
     private static func number(_ s: String, max upper: Double? = nil) -> Double {
-        let n = max(0, Double(s.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)) ?? 0)
+        let n = max(0, TypedNumber.parse(s) ?? 0)
         return upper.map { min($0, n) } ?? n
     }
 

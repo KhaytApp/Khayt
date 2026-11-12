@@ -9,7 +9,7 @@
 "LAN connected" = "متصل";
 "%lld queued · %lld printing" = "%lld في الطابور · %lld قيد الطباعة";
 "ETA %@" = "ينتهي بعد %@";
-"Open app on shop Wi‑Fi" = "افتح Khayt على شبكة الورشة";
+"Open app on shop Wi‑Fi" = "افتح تطبيق خيط على شبكة الورشة";
 "%lld%%" = "%lld٪";
 "Paused" = "متوقفة مؤقتًا";
 "Failed" = "فشلت";
@@ -21,11 +21,11 @@
 "Ends %@" = "تنتهي %@";
 "Log a failed print" = "تسجيل طباعة فاشلة";
 "Scan a spool" = "مسح بكرة";
-"Opens Khayt on the failed-print form." = "يفتح Khayt على نموذج الطباعة الفاشلة.";
-"Opens Khayt on booking in a spool." = "يفتح Khayt على إضافة بكرة.";
+"Opens Khayt on the failed-print form." = "يفتح تطبيق خيط على نموذج الطباعة الفاشلة.";
+"Opens Khayt on booking in a spool." = "يفتح تطبيق خيط على إضافة بكرة.";
 
 "Price a part" = "تسعير قطعة";
-"Opens Khayt on the calculator." = "يفتح Khayt على الحاسبة.";
+"Opens Khayt on the calculator." = "يفتح تطبيق خيط على الحاسبة.";
 
 /* Live Activity buttons */
 "Move to post-processing" = "انقل إلى المعالجة اللاحقة";
@@ -37,6 +37,13 @@
 "Low stock" = "مخزون منخفض";
 "%lld unpaid" = "%lld غير مدفوع";
 "to reorder" = "لإعادة الطلب";
-"Pair Khayt with your shop to see its money here." = "اربط Khayt بورشتك لترى أموالها هنا.";
-"Khayt Money" = "أموال Khayt";
+"Pair Khayt with your shop to see its money here." = "اربط تطبيق خيط بورشتك لترى أموالها هنا.";
+"Khayt Money" = "أموال خيط";
 "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "إيراد اليوم وما على العملاء والمخزون المنخفض. تُخفى المبالغ حين يكون الـiPhone مقفلًا.";
+
+/* The app's name in the widget's header. Arabic writes it in Arabic letters. */
+"Khayt" = "خيط";
+
+/* Queue widget gallery name and description (KhaytQueueWidget.swift) */
+"Khayt Queue" = "طابور خيط";
+"Queue counts and live print progress from your shop." = "أعداد الطابور وتقدّم الطباعة المباشر من ورشتك.";

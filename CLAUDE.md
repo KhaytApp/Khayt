@@ -183,9 +183,11 @@ with different rules; nothing in this file applies to them.
   the Salla/Zid order webhooks, the SMSA/Aramex/SPL carrier webhooks, and (since
   Nov 2026) the REST routes (`/api/orders`, `/api/inventory`, `/api/clients`,
   `/api/waiting-list`, `/api/waste`, `/api/machines`) and the printer webhook,
-  whose rules are `lib/lan-rest.js` for both — but not `/api/expense`,
-  `/api/quote` or the tunnel. Do not
-  assume a route exists on both. [`docs/LAN_API.md`](docs/LAN_API.md) marks which is which.
+  whose rules are `lib/lan-rest.js` for both. Since #2385 it also serves
+  `POST /api/quote` (the same `lib/lan-rest.js quotePart`) and `POST /api/expense`
+  (a signed, enrolled phone only, where the desktop takes the owner PIN). It
+  still does not run the public tunnel: that is the desktop's alone. Do not
+  assume a route exists on both, or behaves the same on both. [`docs/LAN_API.md`](docs/LAN_API.md) marks which is which.
 - **`scripts/ios-contract-capture.mjs` must be fixed against what the desktop
   actually writes, not what seems reasonable.** It built its fixture with
   `priority: 'high'` while `lib/order-new.js` writes `priority: false` on every

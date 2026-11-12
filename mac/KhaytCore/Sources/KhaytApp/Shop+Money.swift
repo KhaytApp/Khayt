@@ -896,18 +896,38 @@ extension Shop {
     /// shared rule guarantees rather than this app promising it.
     ///
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
-    func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
-        guard permitted("orders", "edit") else { return }
-        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+    ///
+    /// `nonBusiness` is the sheet's Not business box, when the shop moved it.
+    /// It is part of the SAME write: as a second write after this one, a quit
+    /// between the two (⌘Q holds for a write in flight, and none was) saved
+    /// the fields and dropped the box. One write is also one undo.
+    @discardableResult
+    func editJob(_ id: Order.ID, fields: [String: JSONValue], nonBusiness: Bool? = nil) async -> Bool {
+        guard permitted("orders", "edit") else { return false }
+        return await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+            OneOrderEdit(order: try await Self.jobEdited(order, fields: fields, nonBusiness: nonBusiness,
+                                                         settings: Self.settings(root), engine: engine,
+                                                         now: Date(), editId: Self.uid("edit")))
+        }
+    }
+
+    /// The job as Edit Job leaves it: the changed fields through
+    /// `lib/order-edit.js applyEdit`, then the Not business mark through
+    /// `lib/business-scope.js setNonBusiness` — both on one record, for one
+    /// write. With nothing to change the order comes back untouched, so the
+    /// write path finds no change, stamps nothing and syncs nothing.
+    static func jobEdited(_ order: JSONValue, fields: [String: JSONValue], nonBusiness: Bool?,
+                          settings: [String: JSONValue], engine: KhaytEngine,
+                          now: Date, editId: String) async throws -> JSONValue {
+        var out = order
+        if !fields.isEmpty {
             // The shop's settings, so a typed price caps the payment at the
             // new price plus its tax and paid/partial is read from that gross.
-            let out = try await engine.editJob(
-                order: order, fields: fields, settings: Self.settings(root),
-                now: Date(), editId: Self.uid("edit"))
-            // Nothing moved: return the order untouched so the write path finds
-            // no change, stamps nothing and syncs nothing.
-            return OneOrderEdit(order: out.order)
+            out = try await engine.editJob(order: out, fields: fields, settings: settings,
+                                           now: now, editId: editId).order
         }
+        if let nonBusiness { out = try await engine.setNonBusiness(out, on: nonBusiness) }
+        return out
     }
 
     /// Mark a job as not business — a test, a gift, something for the shop
@@ -1049,8 +1069,8 @@ extension Shop {
     func partEditCost(raw: [String: JSONValue]?, _ now: EditPartSheet.Opened,
                       opened: EditPartSheet.Opened?) async -> (spool: Spool?, costed: KhaytEngine.CostedPart?) {
         let spool = Self.partCostSpool(now, opened: opened, raw: raw, spools: spools)
-        let costed = await costedPart(spoolId: spool?.id, grams: Double(now.grams) ?? 0,
-                                      hours: Double(now.hours) ?? 0, qty: now.qty,
+        let costed = await costedPart(spoolId: spool?.id, grams: TypedNumber.parse(now.grams) ?? 0,
+                                      hours: TypedNumber.parse(now.hours) ?? 0, qty: now.qty,
                                       extra: raw ?? [:])
         return (spool, costed)
     }
@@ -1076,7 +1096,7 @@ extension Shop {
                                     reclaimsTax: Bool = false) -> JSONValue {
         guard let opened else {
             return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
-                                       grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
+                                       grams: TypedNumber.parse(now.grams) ?? 0, hours: TypedNumber.parse(now.hours) ?? 0,
                                        qty: now.qty, costed: costed, reclaimsTax: reclaimsTax)
         }
         guard case .object(var record) = order,
@@ -1085,8 +1105,8 @@ extension Shop {
             guard case .object(var part) = rows[i],
                   case .string(let id)? = part["id"], id == partId else { continue }
             if now.name != opened.name { part["name"] = .string(now.name) }
-            if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
-            if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
+            if now.grams != opened.grams { part["printWeight"] = .number(max(0, TypedNumber.parse(now.grams) ?? 0)) }
+            if now.hours != opened.hours { part["printTime"] = .number(max(0, TypedNumber.parse(now.hours) ?? 0)) }
             if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
             // `spool` is the one the cost was worked out from (`partCostSpool`),
             // so its fields go down whenever it is given — not only when the
