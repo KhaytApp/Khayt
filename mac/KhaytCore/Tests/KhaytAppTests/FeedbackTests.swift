@@ -138,7 +138,10 @@ import KhaytCore
         // A plugin's secrets are PER DEVICE (store-secret-paths
         // PER_DEVICE_PATHS): removed on the way out, not masked, so they are
         // checked below rather than expected back as the mask.
-        let masked = paths.filter { !$0.hasPrefix("settings.plugins[]") }
+        // The quote pay link's secret is PER DEVICE as well (Keychain on the
+        // Mac; sealed and per-device on the desktop): planted, and checked
+        // below to be gone.
+        let masked = paths.filter { !$0.hasPrefix("settings.plugins[]") && $0 != "settings.quotePayLink.secret" }
         for (index, path) in masked.enumerated() {
             let value = "planted-secret-\(index)-x7"
             planted.append(value)
@@ -149,6 +152,8 @@ import KhaytCore
             "secrets": .object(["apiKey": .string("planted-plugin-secret-2f")]),
         ])]))
         planted.append("planted-plugin-secret-2f")
+        Self.plant(&root, path: "settings.quotePayLink.secret", value: .string("planted-pay-link-secret-4a"))
+        planted.append("planted-pay-link-secret-4a")
         Self.plant(&root, path: "settings.someoneForgot.key", value: .string("__enc__c2VhbGVk"))
         planted.append("__enc__c2VhbGVk")
 
