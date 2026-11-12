@@ -96,7 +96,7 @@ struct DowntimeCard: View {
                     Text(value > 0 ? DowntimeCard.hours(value, shop.words) : "—")
                         .font(.caption).monospacedDigit()
                         .foregroundStyle(value > 0 ? AnyShapeStyle(.primary)
-                                                   : AnyShapeStyle(.tertiary))
+                                                   : AnyShapeStyle(Khayt.faint))
                         .frame(maxWidth: .infinity)
                 }
                 // The bar is the machine's TOTAL against the worst machine, so

@@ -341,8 +341,10 @@ struct Calculator: View {
                     }
                     if let q = quoted, q.rushFee > 0 {
                         Text("·").foregroundStyle(Khayt.faint)
+                        // Ink: a rush fee is a figure, not a print in progress,
+                        // and the plus sign already says which way it goes.
                         Text("+" + Money.short(q.rushFee, shop.currency))
-                            .monospacedDigit().foregroundStyle(Khayt.hot)
+                            .monospacedDigit().foregroundStyle(.primary)
                     }
                     // The shop's fixed costs by the print hour, a cost line of
                     // its own beside the cost (only while the shop has it on).
