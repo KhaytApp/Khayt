@@ -64,7 +64,7 @@ final class LibraryFilterTests: XCTestCase {
     }
 
     func testAModelReadsItsColoursAndType() throws {
-        let json = #"{"id":"PF-1","name":"Arm","ext":"STL","colors":[{"hex":"#1A1A1A","grams":30},"#2F6FDE",{"grams":4},{"hex":""}]}"#
+        let json = ##"{"id":"PF-1","name":"Arm","ext":"STL","colors":[{"hex":"#1A1A1A","grams":30},"#2F6FDE",{"grams":4},{"hex":""}]}"##
         let it = try JSONDecoder().decode(LibraryItem.self, from: Data(json.utf8))
         XCTAssertEqual(it.colors, ["#1A1A1A", "#2F6FDE"])
         XCTAssertEqual(it.colourKeys, ["blue", "black", "multi"])
