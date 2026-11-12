@@ -1518,7 +1518,7 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int,
-                                filter: LibraryFilter) async throws -> LibraryPage {
+                                filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
         if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60, book?.hasLibrary == true {
             throw KhaytAPIError.transport(URLError(.cannotConnectToHost))
         }
@@ -1533,7 +1533,7 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     private func libraryPage(query: String, folder: String, offset: Int, limit: Int,
-                             filter: LibraryFilter) async throws -> LibraryPage {
+                             filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
         var q = URLComponents()
         q.queryItems = LibraryFilter.queryItems(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
         let (data, response) = try await request(path: "/api/library?" + (q.percentEncodedQuery ?? ""),
