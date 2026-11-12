@@ -92,7 +92,8 @@
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--khayt-chip-tone);
+  /* The words; the wash below is the tone itself (see `toneInk`). */
+  color: var(--khayt-chip-ink, var(--khayt-chip-tone));
   /* A wash of the same hue rather than a second colour, so a chip never
      introduces a colour the palette has not accounted for. */
   background: color-mix(in srgb, var(--khayt-chip-tone) 13%, transparent);
@@ -111,7 +112,7 @@
   letter-spacing: 0.02em;
   /* No tone is the common case and is meant to be: the pill says where the job
      is, and colour is kept for the few stages that are actually news. */
-  color: var(--khayt-stage-tone, var(--khayt-note));
+  color: var(--khayt-stage-ink, var(--khayt-stage-tone, var(--khayt-note)));
   background: color-mix(in srgb, var(--khayt-stage-tone, var(--khayt-note)) 12%, transparent);
 }
 

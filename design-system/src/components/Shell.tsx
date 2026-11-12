@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { TONE_VAR, type Tone } from '../tone';
+import { toneInk, type Tone } from '../tone';
 
 export interface ThemeProps {
   /**
@@ -55,7 +55,7 @@ export function Stat({ label, value, unit, tone, note }: StatProps) {
       <span className="khayt-caps khayt-stat__label">{label}</span>
       <span
         className="khayt-figure khayt-stat__figure"
-        style={tone ? { ['--khayt-figure-tone' as string]: `var(${TONE_VAR[tone]})` } : undefined}
+        style={tone ? { ['--khayt-figure-tone' as string]: toneInk(tone) } : undefined}
       >
         <span className="khayt-figure__value">{value}</span>
         {unit ? <span className="khayt-figure__unit">{unit}</span> : null}

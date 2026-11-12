@@ -31,7 +31,7 @@ Never pick one because it looks right. Pick the one whose sentence is true:
 
 | Tone | Means |
 |---|---|
-| `hot` | something is being made right now |
+| `hot` | something is being made right now. Amber: it colours the rail, wash or dot, and the words stay ordinary ink |
 | `done` | finished, paid, sent, agreed |
 | `attention` | wants a person, and will keep working if it does not get one |
 | `late` | late, failed, refused |

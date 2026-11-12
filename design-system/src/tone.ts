@@ -30,8 +30,8 @@ export type Tone = 'brand' | 'hot' | 'done' | 'attention' | 'late' | 'note' | 'm
 export const TONE_VAR: Record<Tone, string> = {
   brand: '--khayt-brand',
   // Printing is the thread amber since Nov 2026 (Palette.swift has no `hot`).
-  // The tone keeps its name; use it for marks, not for words: amber on a
-  // light surface is under 3:1.
+  // The tone keeps its name. This is the FILL: a rail, a wash, a dot. Words
+  // in this tone go through `toneInk`, because amber is not a text colour.
   hot: '--khayt-thread',
   done: '--khayt-done',
   attention: '--khayt-attention',
@@ -39,5 +39,19 @@ export const TONE_VAR: Record<Tone, string> = {
   note: '--khayt-note',
   marked: '--khayt-marked',
 };
+
+/**
+ * The colour a tone's WORDS and figures are set in, as a CSS value.
+ *
+ * Every tone is its own text colour except `hot`. The thread amber measures
+ * under 3:1 on the light surface, so the Mac app never sets a word in it
+ * (`PaletteTests.amberIsNeverText`): the mark beside the word is amber and
+ * the word is the ordinary ink around it. `currentColor` is exactly that.
+ * It is NOT the attention colour: that one means "wants a person", and a
+ * print that is running does not.
+ */
+export function toneInk(tone: Tone): string {
+  return tone === 'hot' ? 'currentColor' : `var(${TONE_VAR[tone]})`;
+}
 
 export const TONES: Tone[] = ['brand', 'hot', 'done', 'attention', 'late', 'note', 'marked'];
