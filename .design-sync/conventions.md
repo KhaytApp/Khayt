@@ -62,7 +62,7 @@ border-radius: var(--khayt-radius);
 color: var(--khayt-note);            /* quiet text */
 ```
 
-Colours: `--khayt-brand`, `--khayt-on-brand`, `--khayt-hot`, `--khayt-done`,
+Colours: `--khayt-brand`, `--khayt-on-brand`, `--khayt-thread`, `--khayt-done`,
 `--khayt-attention`, `--khayt-late`, `--khayt-note`, `--khayt-marked`,
 `--khayt-surface`, `--khayt-ground`, `--khayt-hairline`.
 

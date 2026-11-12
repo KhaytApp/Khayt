@@ -29,7 +29,10 @@ export type Tone = 'brand' | 'hot' | 'done' | 'attention' | 'late' | 'note' | 'm
 /** The custom property each tone resolves to. */
 export const TONE_VAR: Record<Tone, string> = {
   brand: '--khayt-brand',
-  hot: '--khayt-hot',
+  // Printing is the thread amber since Nov 2026 (Palette.swift has no `hot`).
+  // The tone keeps its name; use it for marks, not for words: amber on a
+  // light surface is under 3:1.
+  hot: '--khayt-thread',
   done: '--khayt-done',
   attention: '--khayt-attention',
   late: '--khayt-late',

@@ -283,7 +283,7 @@
   margin-inline-end: 5px;
   border-radius: 50%;
   vertical-align: middle;
-  background: var(--khayt-hot);
+  background: var(--khayt-thread);
   animation: khayt-breath var(--khayt-motion-alive) ease-in-out infinite alternate;
 }
 @keyframes khayt-breath {

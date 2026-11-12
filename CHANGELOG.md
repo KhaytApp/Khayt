@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Fix (Mac widget): printing is amber in the widget too.** The widget kept its own copy of the old printing colour, so a printer's progress bar was still orange-red after the app moved to amber. The bar is amber now, with the percentage and the count in ordinary ink (amber is a mark, not a text colour), and "urgent" is said in the attention colour. The design tokens are regenerated: `--khayt-hot` is now `--khayt-thread`.
 - **Fix (Mac): a machine blocked on stock no longer looks like one that is printing.** With printing drawn in amber, the Machines timeline showed "Printing now" and "Blocked on stock" as two warm blocks that could not be told apart in dark. A blocked block is now unfilled and hatched, in the timeline and in its key, so it reads as not happening in either appearance and without colour vision.
 - Mac capture run (tooling): it now photographs the job and customer inspectors and the empty Jobs, Customers, Inventory and Catalogue screens, and a dark run covers every screen and sheet the light run does.
 - **Fix (Mac, Arabic): the Waste table's headings line up with their columns.** With the summary open beside it, the headings were drawn two columns along from the figures under them. Expenses has the same fix.
