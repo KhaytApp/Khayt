@@ -501,7 +501,7 @@ function renderMachines() {
         <span data-machine-live="${escapeHtml(m.id)}">${machineLiveBadge(m)}</span>
         <span data-machine-ctl="${escapeHtml(m.id)}" style="display:inline-flex;gap:6px;">${retired ? '' : machineControlsHtml(m)}</span>
         ${retired ? '' : smartPlugCardHtml(m)}
-        ${active > 0 ? `<span class="machine-jobs-badge">${active} ${escapeHtml(t('mach.active_jobs'))}</span>` : ''}
+        ${active > 0 ? `<span class="machine-jobs-badge">${escapeHtml(t(active === 1 ? 'mach.active_jobs_one' : 'mach.active_jobs_many', { n: active }))}</span>` : ''}
         ${svcBadge ? `<span class="pro-only">${svcBadge}</span>` : ''}
         ${downtimeBadge ? `<span class="pro-only">${downtimeBadge}</span>` : ''}
         ${hrsLine}

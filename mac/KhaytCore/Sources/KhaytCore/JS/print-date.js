@@ -52,7 +52,11 @@
   function printDate(iso, tag) {
     if (!iso) return '';
     try {
-      const d = new Date(iso);
+      // A bare day ("2026-11-05", how a job's date is stored) is that day where
+      // the shop is. `new Date('2026-11-05')` is midnight UTC, which west of
+      // Greenwich is the evening before, and the date printed a day early.
+      const day = typeof iso === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+      const d = day ? new Date(+day[1], +day[2] - 1, +day[3]) : new Date(iso);
       if (isNaN(d.getTime())) return String(iso);
       return d.toLocaleDateString(tag || 'en-US',
         { day: '2-digit', month: 'short', year: 'numeric' });
