@@ -79,20 +79,24 @@ struct LibraryFilterBar: View {
     }
 
     private var applied: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Text(of.map { L10n.format("library.filter.n_of_m", shown, $0) } ?? L10n.format("library.found", shown))
-                    .font(.khaytMono(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
-                    .fixedSize()
-                ForEach([LibraryFilterMenu.colour, .type]) { menu in
-                    let keys = menu.ordered(filter)
-                    if !keys.isEmpty { pill(menu, keys) }
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Text(of.map { L10n.format("library.filter.n_of_m", shown, $0) } ?? L10n.format("library.found", shown))
+                        .font(.khayt(12.5, relativeTo: .footnote).monospacedDigit()).foregroundStyle(KhaytDesign.note)
+                        .fixedSize()
+                    ForEach([LibraryFilterMenu.colour, .type]) { menu in
+                        let keys = menu.ordered(filter)
+                        if !keys.isEmpty { pill(menu, keys) }
+                    }
                 }
-                Button(L10n.tr("common.clear")) { filter = LibraryFilter() }
-                    .font(.khayt(13.5, .semibold, relativeTo: .footnote)).foregroundStyle(KhaytDesign.brand)
-                    .buttonStyle(.plain)
-                    .tapTarget()
             }
+            // Always in reach, however many pills there are.
+            Button(L10n.tr("common.clear")) { filter = LibraryFilter() }
+                .font(.khayt(13.5, .semibold, relativeTo: .footnote)).foregroundStyle(KhaytDesign.brand)
+                .buttonStyle(.plain)
+                .fixedSize()
+                .tapTarget()
         }
     }
 
@@ -101,7 +105,7 @@ struct LibraryFilterBar: View {
                                keys.map(menu.name).formatted(.list(type: .and, width: .narrow).locale(L10n.locale)))
         return Button { menu.set([], in: &filter) } label: {
             HStack(spacing: 6) {
-                Text(text).font(.khayt(12.5, .semibold, relativeTo: .footnote)).foregroundStyle(KhaytDesign.ink)
+                Text(text).font(.khayt(12, .semibold, relativeTo: .footnote)).foregroundStyle(KhaytDesign.ink)
                     .lineLimit(1)
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(KhaytDesign.note)
             }
@@ -134,15 +138,15 @@ struct LibraryFilterMenuView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(menu.keys, id: \.self) { key in
-                if key == menu.dividerBefore { Divider().padding(.vertical, 4) }
+                if key == menu.dividerBefore { Divider().padding(.vertical, 2) }
                 row(key)
             }
             Text(L10n.tr(menu == .colour ? "library.filter.colour_hint" : "library.filter.counts_hint"))
                 .font(.khayt(11.5, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 12)
+                .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 10)
         }
-        .padding(.top, 6)
+        .padding(.top, 2)
     }
 
     private func row(_ key: String) -> some View {
