@@ -50,7 +50,7 @@ struct CycleTimeCard: View {
                         Text(words.callIt("an.lead_time_slowest"))
                         Text("#")
                     }
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(Khayt.faint)
                     ForEach(lead.rows) { row in
                         GridRow {
                             // The catalogue's name for the product when the
@@ -61,7 +61,7 @@ struct CycleTimeCard: View {
                             Text(Self.days(row.fastest)).foregroundStyle(.secondary)
                             Text(Self.days(row.slowest))
                                 .foregroundStyle(row.slowest > row.avgDays * 2 ? Khayt.attention : .secondary)
-                            Text("\(row.jobs)").foregroundStyle(.tertiary)
+                            Text("\(row.jobs)").foregroundStyle(Khayt.faint)
                         }
                         .font(.callout).monospacedDigit()
                     }

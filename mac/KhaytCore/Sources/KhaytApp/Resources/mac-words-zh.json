@@ -1372,6 +1372,8 @@
  "mac.lock_recovery_once": "请记下并妥善保管。它只显示这一次；当所有者忘记 PIN 时，可凭它重新进入。",
  "mac.lock_recovery_title": "恢复代码",
  "mac.lock_screen_not_allowed": "你的访问级别不包含此屏幕。",
+ "mac.mode_screen_hidden": "此屏幕属于专业模式。本店当前设为简易模式。",
+ "mac.mode_open_settings": "打开设置",
  "mac.lock_section": "员工登录",
  "mac.lock_section_hint": "开启后，这台 Mac 会询问谁在使用，每个人的访问级别决定其可以打开和更改的内容。它让员工只使用 App 中属于自己的部分；这不是加密。",
  "mac.lock_set_pin": "设置 PIN",

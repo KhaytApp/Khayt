@@ -248,7 +248,7 @@ struct CompletionSheet: View {
                     }
                     Text(verbatim: "\(quoted): \(Money.quantity(estimate, decimals: decimals))")
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Khayt.faint)
                 }
             }
         }

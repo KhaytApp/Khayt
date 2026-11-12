@@ -99,7 +99,7 @@ struct CloudCheckSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($focused)
             Text(shop.words.callIt("mac.cloud_passphrase_why"))
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.caption).foregroundStyle(Khayt.faint)
                 .fixedSize(horizontal: false, vertical: true)
             if shop.cloudBusy {
                 // Unwrapping the key is scrypt at N=32768 — deliberately slow,
@@ -125,7 +125,7 @@ struct CloudCheckSheet: View {
                  + " · " + shop.words.callIt("mac.cloud_folded",
                                              ["chain": .number(Double(result.chain)),
                                               "applied": .number(Double(result.applied))]))
-                .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                .font(.caption).foregroundStyle(Khayt.faint).monospacedDigit()
 
             if !result.differing.isEmpty {
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
@@ -146,7 +146,7 @@ struct CloudCheckSheet: View {
                     }
                 }
                 Text(shop.words.callIt("mac.cloud_apart_why"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
             // Said whether or not there is anything else to send: a setting
@@ -161,7 +161,7 @@ struct CloudCheckSheet: View {
             // action in the app that rewrites records the shop did not touch.
             if shop.canPullFromCloud {
                 Text(shop.words.callIt("mac.cloud_pull_why"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let pulled = shop.cloudPulled {
@@ -208,7 +208,7 @@ struct CloudCheckSheet: View {
                 // said why or how it ends.
                 if sent.wholeStore {
                     Text(shop.words.callIt("mac.cloud_sent_whole_why"))
-                        .font(.caption).foregroundStyle(.tertiary)
+                        .font(.caption).foregroundStyle(Khayt.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
