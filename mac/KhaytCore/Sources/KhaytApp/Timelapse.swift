@@ -152,7 +152,7 @@ struct TimelapseLine: View {
             Text(shop.words.callIt("mac.timelapse_on_printer",
                                    ["size": .string(Self.size(link.bytes, shop.words)),
                                     "machine": .string(shop.machineName(forId: link.machineId))]))
-                .font(.caption2).foregroundStyle(.tertiary)
+                .font(.caption2).foregroundStyle(Khayt.faint)
                 .fixedSize(horizontal: false, vertical: true)
             if let problem {
                 Text(problem).font(.caption).foregroundStyle(.secondary)

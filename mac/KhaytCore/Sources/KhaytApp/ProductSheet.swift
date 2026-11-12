@@ -649,6 +649,7 @@ struct ProductSheet: View {
                     } label: { Image(systemName: "pencil") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.edit"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.edit"), part.name))
                         // Not over a part being typed — it would be overwritten.
                         .disabled(editingAt != nil || newPart.isComplete || !newPart.name.isEmpty
                                   || newPart.spoolId != nil)
@@ -658,6 +659,7 @@ struct ProductSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), part.name))
                 }
             }
 
@@ -790,7 +792,7 @@ struct ProductSheet: View {
                     HStack(spacing: 10) {
                         Text(shop.words.callIt("mac.cost") + " "
                              + Money.text(pricing.cost, shop.currency))
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         Text(shop.words.callIt("mac.price") + " "
                              + Money.text(Self.shownPrice(stored: Self.storedPrice(existing),
                                                           opened: openedPricing, live: pricing),
@@ -932,7 +934,7 @@ struct ProductSheet: View {
                     get: { newPart.rates[field] ?? "" },
                     set: { newPart.rates[field] = $0 }))
                     .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
-                Text(unit).font(.caption2).foregroundStyle(.tertiary)
+                Text(unit).font(.caption2).foregroundStyle(Khayt.faint)
                 Spacer()
             }
         }

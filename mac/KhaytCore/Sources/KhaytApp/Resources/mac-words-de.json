@@ -1372,6 +1372,8 @@
  "mac.lock_recovery_once": "Notieren Sie ihn und bewahren Sie ihn sicher auf. Er wird nur jetzt angezeigt; mit ihm kommt ein Inhaber, der seine PIN vergessen hat, wieder hinein.",
  "mac.lock_recovery_title": "Wiederherstellungscode",
  "mac.lock_screen_not_allowed": "Ihre Zugriffsstufe umfasst diesen Bildschirm nicht.",
+ "mac.mode_screen_hidden": "Dieser Bildschirm gehört zum Modus „Professionell“. Dieser Shop ist auf „Einfach“ eingestellt.",
+ "mac.mode_open_settings": "Einstellungen öffnen",
  "mac.lock_section": "Mitarbeiter-Anmeldung",
  "mac.lock_section_hint": "Wenn aktiv, fragt dieser Mac, wer ihn benutzt, und die Zugriffsstufe jeder Person bestimmt, was sie öffnen und ändern kann. Sie hält Mitarbeiter in ihrem Teil der App; es ist keine Verschlüsselung.",
  "mac.lock_set_pin": "PIN festlegen",

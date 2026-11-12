@@ -441,7 +441,7 @@ struct NewJobSheet: View {
                         Text(Money.figure(agreed * Double(part.qty)))
                             .monospacedDigit()
                         Text(shop.words.callIt("ce.pl_autofill") + " · " + Money.figure(part.cost * Double(part.qty)))
-                            .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                            .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
                     } else {
                         Text(Money.figure(part.cost * Double(part.qty)))
                             .monospacedDigit().foregroundStyle(.secondary)
@@ -451,6 +451,7 @@ struct NewJobSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), part.name))
                 }
                 .padding(.vertical, 2)
             }
@@ -482,7 +483,7 @@ struct NewJobSheet: View {
                 Text(Money.figure(componentsCost)).monospacedDigit().foregroundStyle(.secondary)
             }
             Text(shop.words.callIt("mac.job_components_hint"))
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.caption).foregroundStyle(Khayt.faint)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 2)
