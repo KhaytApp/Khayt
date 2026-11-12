@@ -130,7 +130,7 @@ function renderCalendarView() {
   // Build a map: "YYYY-MM-DD" -> orders[]
   const dayMap = {};
   printLog.forEach(o => {
-    if (!o.dueDate || KhaytOrderStatus.isFinished(o) || o.status === 'quote') return;
+    if (!o.dueDate || !KhaytOrderStatus.isOpen(o)) return;
     const d = (o.dueDate || '').slice(0, 10);
     if (!dayMap[d]) dayMap[d] = [];
     dayMap[d].push(o);

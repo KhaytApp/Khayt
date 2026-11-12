@@ -3454,6 +3454,12 @@ function openProductEditor(productId = null) {
         parts: [],
         createdAt: localDateStr()
       };
+  /* A product with no parts list opens like one with an empty list. The
+   * sample products (lib/sample-data.js) and records from older builds or
+   * imports carry none, and every read below (`draft.parts.length`, `.map`,
+   * `.push`) threw, so the editor never opened at all. Save still asks for a
+   * part before it will store one (pe.need_part). */
+  if (!Array.isArray(draft.parts)) draft.parts = [];
   /* A SAVED PRICE NEVER CHANGES SILENTLY (Turki's rule; the Mac's
    * Shop+Messages.swift keeps the stored price on an untouched save).
    *

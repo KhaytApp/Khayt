@@ -282,6 +282,9 @@ final class Activator: NSObject, NSApplicationDelegate {
         // Yesterday's feedback reports — a masked book and a picture of the
         // window each — out of the temporary directory. See `Feedback`.
         DispatchQueue.global(qos: .utility).async { Feedback.sweepOldDrafts() }
+        // ⌘→, ⌘← and ⌘⌫ go to the text being typed before the menu bar can
+        // take them (`TypingKeys`).
+        TypingKeys.install()
         if Bundle.main.bundleIdentifier == nil {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
