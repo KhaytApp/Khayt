@@ -101,9 +101,19 @@ enum SettingsSearch {
         return rows.filter { row in row.labels.contains { fold($0).contains(q) } }.map(\.id)
     }
 
+    /// Foundation's diacritic folding leaves Arabic alone (an alef with a
+    /// hamza stays a different letter), so the Arabic is folded by hand:
+    /// harakat, superscript alef and tatweel go, and every alef seat is one alef.
     static func fold(_ s: String) -> String {
-        s.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
-            .replacingOccurrences(of: "\u{0640}", with: "")   // Arabic tatweel
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let folded = s.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+        var out = String.UnicodeScalarView()
+        for scalar in folded.unicodeScalars {
+            switch scalar.value {
+            case 0x064B...0x065F, 0x0670, 0x0640: continue           // harakat, dagger alef, tatweel
+            case 0x0622, 0x0623, 0x0625, 0x0671: out.append("\u{0627}") // آ أ إ ٱ → ا
+            default: out.append(scalar)
+            }
+        }
+        return String(out).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
