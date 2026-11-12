@@ -79,8 +79,8 @@ struct LanServerTests {
             let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
             self.pairing = pairing
             host.pairing = pairing
-            host.library = { [shop] q, folder, offset, limit in
-                shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
+            host.library = { [shop] q, folder, offset, limit, filter in
+                shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter)
             }
             host.libraryThumb = { [shop] id in await shop.phoneLibraryThumb(id) }
             host.libraryEstimate = { [shop] id, plate, qty in await shop.phoneLibraryEstimate(id, plate: plate, qty: qty) }

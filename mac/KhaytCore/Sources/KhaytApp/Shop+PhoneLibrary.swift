@@ -41,8 +41,56 @@ extension Shop {
 
     /// Which models a page shows, and the folders beside them. Pure, so the
     /// search and the folder counts are tested without a server.
+    /// The two filter menus the phone draws: which keys are chosen.
+    ///
+    /// `colour=blue,black&type=3mf,stl`. A key nobody knows is ignored, not an
+    /// error, so a newer phone asking for a row this Mac has not heard of
+    /// still gets its list.
+    struct PhoneLibraryFilter: Sendable, Equatable {
+        var colours: [String] = []
+        var types: [String] = []
+
+        init() {}
+        init(colour: String?, type: String?) {
+            func keys(_ text: String?, _ known: [String]) -> [String] {
+                let want = Set((text ?? "").lowercased().split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+                return known.filter(want.contains)
+            }
+            colours = keys(colour, ColourFamily.tokens)
+            types = keys(type, ModelFileType.allCases.map(\.rawValue))
+        }
+    }
+
+    /// The menus counted and applied: `lib/lan-library.js narrow`, natively.
+    ///
+    /// Several rows of one menu are OR, the two menus narrow together and
+    /// with the search or the folder, and each menu is counted over
+    /// everything EXCEPT its own choice, so choosing Blue does not zero the
+    /// other colours. Every key is always counted, zeros included. `tokens`
+    /// is handed in because the shop keeps each model's colour rows
+    /// (`Shop.libraryColourTokens`); working them out again per request is
+    /// the whole cost of this on a large library.
+    nonisolated static func libraryNarrow(_ files: [LibraryFile], _ filter: PhoneLibraryFilter,
+                                          tokens: (LibraryFile) -> [String])
+        -> (files: [LibraryFile], colour: [String: Int], type: [String: Int]) {
+        var colour = Dictionary(uniqueKeysWithValues: ColourFamily.tokens.map { ($0, 0) })
+        var type = Dictionary(uniqueKeysWithValues: ModelFileType.allCases.map { ($0.rawValue, 0) })
+        var kept: [LibraryFile] = []
+        for file in files {
+            let rows = tokens(file), kind = file.fileType.rawValue
+            let colourOk = filter.colours.isEmpty || rows.contains(where: filter.colours.contains)
+            let typeOk = filter.types.isEmpty || filter.types.contains(kind)
+            if typeOk { for row in rows { colour[row, default: 0] += 1 } }
+            if colourOk { type[kind, default: 0] += 1 }
+            if colourOk && typeOk { kept.append(file) }
+        }
+        return (kept, colour, type)
+    }
+
     nonisolated static func libraryPage(_ files: [LibraryFile], q: String, folder: String,
-                                        offset: Int, limit: Int)
+                                        offset: Int, limit: Int,
+                                        narrow: (([LibraryFile]) -> [LibraryFile])? = nil)
         -> (total: Int, files: [LibraryFile], folders: [(path: String, name: String, count: Int)]) {
         let live = files.filter { !$0.isArchived }
         let words = SearchText.fold(q).split(whereSeparator: \.isWhitespace).map(String.init)
@@ -67,6 +115,9 @@ extension Shop {
             folders = counts.map { (path: prefix + $0.key, name: $0.key, count: $0.value) }
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
+        // After the search or the folder, before the page is cut. The
+        // sub-folders above are the library's own shape and are not narrowed.
+        if let narrow { chosen = narrow(chosen) }
         chosen.sort { a, b in
             if a.isFavourite != b.isFavourite { return a.isFavourite }
             let order = a.title.localizedStandardCompare(b.title)
@@ -106,8 +157,14 @@ extension Shop {
     }
 
     /// `GET /api/library`'s answer.
-    func phoneLibrary(q: String, folder: String, offset: Int, limit: Int) -> JSONValue {
-        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit)
+    func phoneLibrary(q: String, folder: String, offset: Int, limit: Int,
+                      filter: PhoneLibraryFilter = .init()) -> JSONValue {
+        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:]
+        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit) { matched in
+            let narrowed = Self.libraryNarrow(matched, filter) { self.libraryColourTokens($0) }
+            colourCounts = narrowed.colour; typeCounts = narrowed.type
+            return narrowed.files
+        }
         let items: [JSONValue] = page.files.map { file in
             var o: [String: JSONValue] = [
                 "id": .string(file.id), "name": .string(file.title),
@@ -160,6 +217,12 @@ extension Shop {
             "folders": .array(page.folders.map {
                 .object(["path": .string($0.path), "name": .string($0.name), "count": .number(Double($0.count))])
             }),
+            // An older Mac sends no `facets`; that is how a phone knows not
+            // to draw the two menus (docs/LAN_API.md).
+            "facets": .object([
+                "colour": .object(colourCounts.mapValues { .number(Double($0)) }),
+                "type": .object(typeCounts.mapValues { .number(Double($0)) }),
+            ]),
             "items": .array(items),
         ])
     }

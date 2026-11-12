@@ -330,3 +330,64 @@ test('figures measured from older bytes (figuresStaleFor) are never priced as th
   assert.equal(PartFromPrintFile.partPatch(fresh).fields.printWeight, 40);
   assert.equal(LanLibrary.recordedFigures(fresh, null).exact, true);
 });
+
+// ── The two filter menus: colour and file type ──────────────────────────────
+
+const FILTERED = [
+  { id: 'a', name: 'A', sourceFile: { filename: 'a.3mf' }, colors: [{ hex: '#ff0000' }, { hex: '#ffffff' }] },
+  { id: 'b', name: 'B', sourceFile: { filename: 'b.stl' } },
+  { id: 'c', name: 'C', sourceFile: { filename: 'c.3mf' }, colors: [{ hex: '#0000ff' }] },
+  { id: 'd', name: 'D', sourceFile: { filename: 'd.gcode' }, colors: [{ hex: '#0000cc' }] },
+  { id: 'e', name: 'E' },
+  { id: 'f', name: 'F', folder: 'Deep', sourceFile: { filename: 'f.stl' }, colors: [{ hex: '#ff0000' }] },
+];
+const ids = (page) => page.items.map((i) => i.id);
+
+test('colour and type narrow the list: OR within a menu, AND between them and with the search', () => {
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, {})), ['a', 'b', 'c', 'd', 'e'], 'nothing chosen: the folder as it was');
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'blue' })), ['c', 'd']);
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'blue,red' })), ['a', 'c', 'd'], 'red OR blue');
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'blue', type: '3mf' })), ['c'], 'blue AND 3MF');
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { type: 'stl,gcode' })), ['b', 'd']);
+  // A multicolour model is under each of its families and under multi.
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'white' })), ['a']);
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'multi' })), ['a']);
+  // No colour stored, and no file at all, are rows of their own.
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'none' })), ['b', 'e']);
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { type: 'nofile' })), ['e']);
+  // With a search the whole library is covered, and still narrowed.
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { q: 'f', colour: 'red' })), ['f']);
+  assert.equal(LanLibrary.list(FILTERED, { colour: 'red' }).total, 1);
+  // A key nobody knows is ignored, not an error; case and spaces do not matter.
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: 'teal' })), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(ids(LanLibrary.list(FILTERED, { colour: ' Blue , teal ', type: '3MF' })), ['c']);
+  // The sub-folders are the library's shape and are not narrowed away.
+  assert.deepEqual(LanLibrary.list(FILTERED, { colour: 'blue' }).folders.map((f) => [f.path, f.count]), [['Deep', 1]]);
+});
+
+test('each menu is counted over everything but its own choice, with every key present', () => {
+  const ColourFamily = require(path.join(ROOT, 'lib/colour-family.js'));
+  const ModelFileType = require(path.join(ROOT, 'lib/model-file-type.js'));
+  const none = LanLibrary.list(FILTERED, {}).facets;
+  assert.deepEqual(Object.keys(none.colour), ColourFamily.TOKENS, 'every colour key, in the menu\'s order');
+  assert.deepEqual(Object.keys(none.type), ModelFileType.TYPES);
+  assert.deepEqual(none.colour, { red: 1, orange: 0, yellow: 0, green: 0, blue: 2, purple: 0, pink: 0, brown: 0,
+    black: 0, grey: 0, white: 1, multi: 1, none: 2 });
+  assert.deepEqual(none.type, { '3mf': 2, stl: 1, step: 0, obj: 0, gcode: 1, other: 0, nofile: 1 });
+
+  // Choosing Blue does not zero the other colours; it narrows the TYPE counts.
+  const blue = LanLibrary.list(FILTERED, { colour: 'blue' }).facets;
+  assert.deepEqual(blue.colour, none.colour);
+  assert.deepEqual(blue.type, { '3mf': 1, stl: 0, step: 0, obj: 0, gcode: 1, other: 0, nofile: 0 });
+  // And 3MF narrows the COLOUR counts, not its own.
+  const threeMF = LanLibrary.list(FILTERED, { type: '3mf' }).facets;
+  assert.deepEqual(threeMF.type, none.type);
+  assert.equal(threeMF.colour.blue, 1);
+  assert.equal(threeMF.colour.none, 0);
+  // Both chosen: each still counted without itself.
+  const both = LanLibrary.list(FILTERED, { colour: 'blue', type: '3mf' }).facets;
+  assert.deepEqual(both.colour, threeMF.colour);
+  assert.deepEqual(both.type, blue.type);
+  // An empty library still names every row.
+  assert.equal(Object.keys(LanLibrary.list([], {}).facets.colour).length, ColourFamily.TOKENS.length);
+});

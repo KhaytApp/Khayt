@@ -41,6 +41,87 @@ struct LanLibraryTests {
         #expect((kings["folders"] as? [Any])?.isEmpty == true)
     }
 
+    /// The phone's two filter menus (Turki, Nov 2026: "filter by color group,
+    /// filter by file type"). The rule is `lib/lan-library.js narrow`, whose
+    /// own tests pin the cases; this holds the Mac's native answer to the same
+    /// shape and the same arithmetic on the sample book.
+    @Test("colour and type narrow the phone's list, and each menu is counted without its own choice")
+    func filters() async throws {
+        let bench = try await LanServerTests.Bench()
+        defer { bench.stop() }
+        func page(_ query: String) async throws -> (total: Int, ids: [String], colour: [String: Int], type: [String: Int]) {
+            let body = try Self.json(try await bench.get("/api/library" + query, headers: Self.pin))
+            let facets = try #require(body["facets"] as? [String: Any], "a Mac that filters says so with facets")
+            let items = try #require(body["items"] as? [[String: Any]])
+            return (try #require(body["total"] as? Int), items.compactMap { $0["id"] as? String },
+                    try #require(facets["colour"] as? [String: Int]), try #require(facets["type"] as? [String: Int]))
+        }
+        // A search, so the whole sample library is in play rather than one folder.
+        let all = try await page("?q=e&limit=200")
+        #expect(Set(all.colour.keys) == Set(ColourFamily.tokens), "every colour row, zeros included")
+        #expect(Set(all.type.keys) == Set(ModelFileType.allCases.map(\.rawValue)))
+        #expect(all.type.values.reduce(0, +) == all.total, "every model has exactly one type")
+        #expect(all.total > 3)
+
+        // Each colour row: asking for it gives exactly the count it showed,
+        // leaves the colour counts alone, and narrows the type counts.
+        for (key, count) in all.colour where count > 0 {
+            let one = try await page("?q=e&limit=200&colour=" + key)
+            #expect(one.total == count, "\(key)")
+            #expect(one.colour == all.colour, "\(key): a menu is not narrowed by its own choice")
+            #expect(one.type.values.reduce(0, +) == count, "\(key): the other menu is")
+            #expect(Set(one.ids).isSubset(of: Set(all.ids)))
+        }
+        // And each type row the same way round.
+        for (key, count) in all.type where count > 0 {
+            let one = try await page("?q=e&limit=200&type=" + key)
+            #expect(one.total == count, "\(key)")
+            #expect(one.type == all.type, "\(key)")
+        }
+        // OR within a menu: two rows give at least the larger and at most the sum.
+        let rows = all.colour.filter { $0.value > 0 && $0.key != ColourFamily.multi }.keys.sorted()
+        if rows.count >= 2 {
+            let two = try await page("?q=e&limit=200&colour=\(rows[0]),\(rows[1])")
+            #expect(two.total >= max(all.colour[rows[0]]!, all.colour[rows[1]]!))
+            #expect(two.total <= all.colour[rows[0]]! + all.colour[rows[1]]!)
+        }
+        // A key nobody knows is ignored; so are case and spaces.
+        #expect(try await page("?q=e&limit=200&colour=teal").total == all.total)
+        if let first = rows.first {
+            #expect(try await page("?q=e&limit=200&colour=%20" + first.uppercased() + "%20,teal").total == all.colour[first])
+        }
+    }
+
+    @Test("the menus' arithmetic, on models made for it")
+    func narrowRule() {
+        func model(_ id: String, _ file: String?, _ hexes: [String]) -> LibraryFile {
+            Self.file(id, name: id, folder: "", filename: file, colours: hexes)
+        }
+        let files = [
+            model("a", "a.3mf", ["#ff0000", "#ffffff"]), model("b", "b.stl", []),
+            model("c", "c.3mf", ["#0000ff"]), model("d", "d.gcode", ["#0000cc"]), model("e", nil, []),
+        ]
+        func run(_ colour: String?, _ type: String?) -> (ids: [String], colour: [String: Int], type: [String: Int]) {
+            let r = Shop.libraryNarrow(files, .init(colour: colour, type: type)) { $0.colourTokens }
+            return (r.files.map(\.id), r.colour, r.type)
+        }
+        #expect(run(nil, nil).ids == ["a", "b", "c", "d", "e"])
+        #expect(run("blue", nil).ids == ["c", "d"])
+        #expect(run("blue,red", nil).ids == ["a", "c", "d"])
+        #expect(run("blue", "3mf").ids == ["c"])
+        #expect(run("multi", nil).ids == ["a"] && run("white", nil).ids == ["a"])
+        #expect(run("none", nil).ids == ["b", "e"] && run(nil, "nofile").ids == ["e"])
+        // The same figures `test/lan-library.test.js` holds the JavaScript to.
+        let none = run(nil, nil)
+        #expect(none.colour["red"] == 1 && none.colour["blue"] == 2 && none.colour["white"] == 1
+                && none.colour["multi"] == 1 && none.colour["none"] == 2 && none.colour["green"] == 0)
+        #expect(none.type == ["3mf": 2, "stl": 1, "step": 0, "obj": 0, "gcode": 1, "other": 0, "nofile": 1])
+        let blue = run("blue", nil)
+        #expect(blue.colour == none.colour)
+        #expect(blue.type == ["3mf": 1, "stl": 0, "step": 0, "obj": 0, "gcode": 1, "other": 0, "nofile": 0])
+        #expect(run(nil, "3mf").type == none.type && run(nil, "3mf").colour["none"] == 0)
+    }
+
     @Test("a search covers the whole library, every word, any case or accent, and the folder name")
     func search() throws {
         let shop = Shop()
@@ -66,8 +147,10 @@ struct LanLibraryTests {
     }
 
     static func file(_ id: String, name: String, folder: String, tags: [String] = [], category: String? = nil,
-                     archived: Bool = false) -> LibraryFile {
+                     archived: Bool = false, filename: String? = nil, colours: [String] = []) -> LibraryFile {
         var o: [String: Any] = ["id": id, "name": name, "folder": folder, "tags": tags]
+        if let filename { o["sourceFile"] = ["filename": filename] }
+        if !colours.isEmpty { o["colors"] = colours.map { ["hex": $0] } }
         if let category { o["category"] = category }
         if archived { o["archivedAt"] = "2026-10-01T00:00:00Z" }
         let data = try! JSONSerialization.data(withJSONObject: o)
