@@ -538,7 +538,7 @@ struct StatStrip: View {
                         Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
                         Text(working).font(.caption2).monospacedDigit()
                             .contentTransition(.numericText())
-                            .foregroundStyle(.tertiary).lineLimit(1)
+                            .foregroundStyle(Khayt.faint).lineLimit(1)
                     }
                 }
             }

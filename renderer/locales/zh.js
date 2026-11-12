@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "暂无回复",
   "cloud.portal_approved": "客户已批准报价",
   "cloud.portal_declined": "客户已拒绝报价",
+  "cloud.portal_declined_earlier": "客户已拒绝之前的版本，正在等待对新版本的答复",
   "cloud.portal_approved_advanced": "客户已批准 — 订单已转为待处理",
   "cloud.deposit_amount": "需收取的定金（可选）",
   "cloud.deposit_payurl": "支付链接（可选）",

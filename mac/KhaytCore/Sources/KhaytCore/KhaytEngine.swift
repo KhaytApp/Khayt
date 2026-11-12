@@ -10952,6 +10952,10 @@ public actor KhaytEngine {
         /// Move the job on: approved, and still a quote.
         public let advance: Bool
         public let note: String?
+        /// A decline of an EARLIER version: the quote was re-published changed
+        /// and the customer has not answered the new one (the cloud's
+        /// `actionStale`). Optional so a rule from before it decodes.
+        public let stale: Bool?
     }
 
     /// What the customer did with this link, from `GET /published`'s items.

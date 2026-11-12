@@ -35,15 +35,21 @@ import SwiftUI
 enum Role {
 
     // MARK: Grounds
+    //
+    // IN DARK THESE ARE THE NAVY FAMILY, the same values as `Khayt.ground`,
+    // `Khayt.surface`, `Khayt.recessed` and `Khayt.hairline` (Surface.swift).
+    // They were a neutral charcoal (#1B1E24 and friends) from before the
+    // navy redesign, so a screen that mixed the two card styles showed navy
+    // cards beside charcoal ones (Nov 11 2026 UI review, B23).
 
     /// The window ground behind content.
-    static let bg = adaptive(light: 0xFBF9F5, dark: 0x14161A, name: "roleBg")
+    static let bg = adaptive(light: 0xFBF9F5, dark: 0x06182F, name: "roleBg")
     /// Cards, tables, sheets — the paper things sit on.
-    static let surf = adaptive(light: 0xFFFFFF, dark: 0x1B1E24, name: "roleSurf")
+    static let surf = adaptive(light: 0xFFFFFF, dark: 0x0D2444, name: "roleSurf")
     /// Toolbars, footers, the inspector: a surface that is NOT the content.
-    static let surf2 = adaptive(light: 0xFAF6EE, dark: 0x171A1F, name: "roleSurf2")
+    static let surf2 = adaptive(light: 0xFAF6EE, dark: 0x0A2140, name: "roleSurf2")
     /// Chips, wells, inert fills — a surface nothing is written on.
-    static let surf3 = adaptive(light: 0xF3EDE1, dark: 0x232830, name: "roleSurf3")
+    static let surf3 = adaptive(light: 0xF3EDE1, dark: 0x0F2847, name: "roleSurf3")
 
     // MARK: Lines
     //
@@ -53,9 +59,9 @@ enum Role {
     // rule where its last row meets its frame.
 
     /// The hairline between rows.
-    static let line = adaptive(light: 0xEEE7DA, dark: 0x262B33, name: "roleLine")
+    static let line = adaptive(light: 0xEEE7DA, dark: 0x1F3A5E, name: "roleLine")
     /// Container borders and dividers.
-    static let line2 = adaptive(light: 0xE2DBCD, dark: 0x323945, name: "roleLine2")
+    static let line2 = adaptive(light: 0xE2DBCD, dark: 0x2A4670, name: "roleLine2")
 
     // MARK: Text
 

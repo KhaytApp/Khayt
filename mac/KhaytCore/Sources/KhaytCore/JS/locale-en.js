@@ -4107,6 +4107,7 @@
   "cloud.portal_no_response": "No response yet",
   "cloud.portal_approved": "Customer approved the quote",
   "cloud.portal_declined": "Customer declined the quote",
+  "cloud.portal_declined_earlier": "Customer declined the earlier version; waiting for an answer to the new one",
   "cloud.portal_approved_advanced": "Customer approved — order moved to Pending",
   "cloud.deposit_amount": "Deposit to request (optional)",
   "cloud.deposit_payurl": "Payment link (optional)",

@@ -316,11 +316,11 @@ private struct FleetRow: View {
                     }
                     if let job {
                         Text(verbatim: FloorRead.jobLine(job, shop: shop))
-                            .font(.caption).foregroundStyle(.tertiary)
+                            .font(.caption).foregroundStyle(Khayt.faint)
                             .lineLimit(1).truncationMode(.tail)
                     }
                     if line.rank == .idle || line.rank == .offline {
-                        Text(verbatim: quiet).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                        Text(verbatim: quiet).font(.caption).foregroundStyle(Khayt.faint).lineLimit(1)
                     }
                 }
             }

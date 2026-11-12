@@ -4107,6 +4107,7 @@
   "cloud.portal_no_response": "Nenhuma resposta ainda",
   "cloud.portal_approved": "O cliente aprovou o orçamento",
   "cloud.portal_declined": "O cliente recusou o orçamento",
+  "cloud.portal_declined_earlier": "O cliente recusou a versão anterior; aguardando a resposta à nova",
   "cloud.portal_approved_advanced": "Cliente aprovou — pedido movido para Pendente",
   "cloud.deposit_amount": "Entrada a solicitar (opcional)",
   "cloud.deposit_payurl": "Link de pagamento (opcional)",

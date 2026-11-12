@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "Noch keine Antwort",
   "cloud.portal_approved": "Kunde hat das Angebot angenommen",
   "cloud.portal_declined": "Kunde hat das Angebot abgelehnt",
+  "cloud.portal_declined_earlier": "Kunde hat die frühere Version abgelehnt; Antwort auf die neue steht noch aus",
   "cloud.portal_approved_advanced": "Kunde hat angenommen — Auftrag auf Ausstehend verschoben",
   "cloud.deposit_amount": "Anzufordernde Anzahlung (optional)",
   "cloud.deposit_payurl": "Zahlungslink (optional)",
