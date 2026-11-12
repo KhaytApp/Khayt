@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "Choose or type a name";
 "order.new.hint.project" = "What is it? e.g. a part name";
 "order.new.hint.material" = "e.g. PLA, black";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Couldn't load";
+"load.retry" = "Try again";
+"load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";

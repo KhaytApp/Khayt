@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "Seçin ya da bir ad yazın";
 "order.new.hint.project" = "Nedir? ör. parça adı";
 "order.new.hint.material" = "ör. PLA, siyah";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Yüklenemedi";
+"load.retry" = "Tekrar dene";
+"load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";

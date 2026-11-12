@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "Choisissez ou saisissez un nom";
 "order.new.hint.project" = "Qu’est-ce que c’est ? ex. le nom de la pièce";
 "order.new.hint.material" = "ex. PLA, noir";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Chargement impossible";
+"load.retry" = "Réessayer";
+"load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";

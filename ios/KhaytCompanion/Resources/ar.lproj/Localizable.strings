@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "اختر عميلًا أو اكتب اسمًا";
 "order.new.hint.project" = "ما هو؟ مثلًا اسم القطعة";
 "order.new.hint.material" = "مثلًا PLA، أسود";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "تعذّر التحميل";
+"load.retry" = "أعد المحاولة";
+"load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";

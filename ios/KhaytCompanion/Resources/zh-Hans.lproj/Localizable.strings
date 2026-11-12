@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "选择或输入名称";
 "order.new.hint.project" = "做什么？例如零件名称";
 "order.new.hint.material" = "例如 PLA，黑色";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "无法加载";
+"load.retry" = "重试";
+"load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";

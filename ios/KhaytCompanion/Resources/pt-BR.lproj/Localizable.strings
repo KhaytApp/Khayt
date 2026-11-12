@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "Escolha ou digite um nome";
 "order.new.hint.project" = "O que é? ex.: o nome da peça";
 "order.new.hint.material" = "ex.: PLA, preto";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Não foi possível carregar";
+"load.retry" = "Tentar de novo";
+"load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";

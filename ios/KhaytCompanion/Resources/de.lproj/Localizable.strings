@@ -1288,3 +1288,8 @@
 "order.new.hint.client" = "Auswählen oder Namen eingeben";
 "order.new.hint.project" = "Was ist es? z. B. ein Teilename";
 "order.new.hint.material" = "z. B. PLA, schwarz";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Laden fehlgeschlagen";
+"load.retry" = "Erneut versuchen";
+"load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
