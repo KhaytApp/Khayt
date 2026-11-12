@@ -15,7 +15,7 @@
 "connection.moved.use" = "انتقل";
 "connection.moved.not_now" = "ليس الآن";
 "connection.unauthorized" = "رمز PIN خاطئ";
-"connection.banner.unreachable" = "لا يمكن الوصول إلى Khayt على الشبكة. تحقق من الواي فاي وتفعيل LAN API.";
+"connection.banner.unreachable" = "لا يمكن الوصول إلى تطبيق خيط على الشبكة. تحقق من الواي فاي وتفعيل LAN API.";
 "connection.banner.pin" = "رمز LAN مرفوض. حدّث PIN في الإعدادات ليطابق سطح المكتب.";
 "sync.pending" = "%d تغيير على هذا الهاتف، بانتظار الماك.";
 "sync.mac_refused" = "لم يقبل الماك %d منها. تبقى على هذا الهاتف وتُرسل مرة أخرى.";
@@ -45,7 +45,7 @@
 
 /* Settings */
 "settings.connection" = "الاتصال";
-"settings.connection.footer" = "نفس PIN من إعدادات Khayt → LAN API. يتطلب سطح المكتب 2.2.1+";
+"settings.connection.footer" = "نفس PIN من إعدادات تطبيق خيط → LAN API. يتطلب سطح المكتب 2.2.1+";
 "settings.shop_name" = "اسم الورشة";
 "settings.host" = "IP أو اسم المضيف";
 "settings.port" = "المنفذ: %d";
@@ -204,9 +204,9 @@
 "pair.back" = "رجوع";
 "pair.continue" = "متابعة";
 "pair.manual" = "سأُدخل العنوان بنفسي";
-"pair.browse.failed" = "لا يستطيع Khayt البحث عن الورش على هذه الشبكة.";
-"pair.browse.permission" = "إن رفضت طلب الشبكة المحلية، فاسمح به من الإعدادات ← Khayt ← الشبكة المحلية.";
-"pair.browse.looking" = "جاري البحث… تأكد أن Khayt مفتوح على جهاز Mac وأن LAN API مفعّل.";
+"pair.browse.failed" = "لا يستطيع تطبيق خيط البحث عن الورش على هذه الشبكة.";
+"pair.browse.permission" = "إن رفضت طلب الشبكة المحلية، فاسمح به من الإعدادات ← خيط ← الشبكة المحلية.";
+"pair.browse.looking" = "جاري البحث… تأكد أن تطبيق خيط مفتوح على جهاز Mac وأن LAN API مفعّل.";
 "pair.browse.none" = "لم يُعثر على شيء بعد.";
 "pair.shop.offline" = "يعمل دون اتصال مع هذه الورشة";
 "pair.manual.host" = "عنوان السطح";
@@ -278,11 +278,11 @@
 "intake.email" = "بريد";
 "clients.search" = "الاسم، الهاتف، البريد";
 "clients.none" = "لا عملاء";
-"clients.none.sub" = "أضف العملاء من Khayt على سطح المكتب.";
+"clients.none.sub" = "أضف العملاء من تطبيق خيط على سطح المكتب.";
 "clients.no_match" = "لا نتائج";
 "clients.no_match.sub" = "لا عميل يطابق “%@”.";
 "machines.none" = "لا طابعات";
-"machines.none.sub" = "أضف الطابعات من Khayt على سطح المكتب.";
+"machines.none.sub" = "أضف الطابعات من تطبيق خيط على سطح المكتب.";
 "machines.no_live" = "لا اتصال مباشر";
 
 "spool.detail.remove" = "إزالة البكرة";
@@ -322,7 +322,7 @@
 "spool.add.confirm" = "تأكيد البكرة";
 "spool.add.how" = "كيف تريد إضافة هذه البكرة؟";
 "spool.add.no_camera" = "الكاميرا غير متاحة على هذا الجهاز.";
-"spool.add.one" = "إضافة إلى مخزون Khayt";
+"spool.add.one" = "إضافة إلى المخزون في تطبيق خيط";
 "spool.add.n" = "إضافة %d بكرات";
 "spool.method.barcode" = "مسح باركود المنتج";
 "spool.method.barcode.sub" = "رمز UPC/EAN على العلبة، ونبحث عنه لك";
@@ -364,7 +364,7 @@
 "spool.tag.bed" = "المنصّة";
 
 /* Errors */
-"error.not_configured" = "اربط التطبيق بـ Khayt على سطح المكتب من الإعدادات.";
+"error.not_configured" = "اربط هذا الهاتف بتطبيق خيط على سطح المكتب من الإعدادات.";
 "error.invalid_url" = "عنوان الخادم غير صالح.";
 "error.unauthorized" = "رمز PIN خاطئ. راجع الإعدادات ← LAN API على سطح المكتب.";
 "error.no_such_machine" = "هذه الطابعة ليست في قائمة الورشة.";
@@ -395,7 +395,7 @@
 "cloud.via_mac" = "%@ عبر جهاز Mac";
 "cloud.footer.off" = "يُبقي هذا الهاتف متزامناً حين لا يكون جهاز Mac على نفس الشبكة. وتذهب التغييرات مباشرة إلى جهاز Mac متى أجاب.";
 "cloud.footer.on" = "يقرأ الهاتف الورشة من سحابة خيط، ويرسل التغييرات إلى جهاز Mac حين يجيب، وعبر السحابة حين لا يجيب.";
-"cloud.needs_mac" = "لا تقبل سحابة خيط التغييرات منفردة الآن. هي محفوظة على هذا الهاتف؛ افتح Khayt على جهاز Mac ليُكمل المزامنة.";
+"cloud.needs_mac" = "لا تقبل سحابة خيط التغييرات منفردة الآن. هي محفوظة على هذا الهاتف؛ افتح تطبيق خيط على جهاز Mac ليُكمل المزامنة.";
 "cloud.signin.email" = "البريد الإلكتروني";
 "cloud.signin.password" = "كلمة المرور";
 "cloud.signin.account_footer" = "حساب الورشة في سحابة خيط. يحصل هذا الهاتف على دخول خاص به يمكن إنهاؤه وحده.";
@@ -452,12 +452,12 @@
 
 /* Pairing, as design/ios-v2 draws it */
 "pair.find.title" = "أي ورشة؟";
-"pair.find.body" = "أجهزة الماك التي تشغّل Khayt تعلن عن نفسها على هذه الشبكة.";
+"pair.find.body" = "أجهزة الماك التي تشغّل تطبيق خيط تعلن عن نفسها على هذه الشبكة.";
 "pair.searching" = "جاري البحث";
 "pair.shop.needs_mac" = "يحتاج الماك قريباً";
 "pair.manual.why" = "لماك لا يعلن عن نفسه، أو شبكة تحجب ذلك.";
 "pair.manual.title" = "عنوان الماك";
-"pair.manual.body" = "يعرضهما Khayt على السطح، في الإعدادات ← واجهة الشبكة.";
+"pair.manual.body" = "يعرضهما تطبيق خيط على السطح، في الإعدادات ← واجهة الشبكة.";
 "pair.manual.port" = "المنفذ";
 "pair.signed_out" = "سجّل الماك خروج هذا الهاتف. أقرنه من جديد برمز المالك.";
 "pair.pin.title" = "رمز المالك";
@@ -594,7 +594,7 @@
 
 /* Push alerts relayed by Khayt Cloud: the server sends these KEYS
    (loc-key), never text, so the alert is in the phone's language. */
-"PUSH_TITLE" = "Khayt";
+"PUSH_TITLE" = "خيط";
 "PUSH_PRINT_FINISHED" = "انتهت طباعة";
 "PUSH_INTAKE" = "طلب جديد";
 
@@ -647,7 +647,7 @@
 /* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
 "intent.advance.done" = "نُقل %1$@ إلى %2$@.";
 "intent.advance.gone" = "هذا الطلب لم يعد في الطابور.";
-"intent.no_book" = "لا توجد ورشة في Khayt على هذا الهاتف بعد.";
+"intent.no_book" = "لا توجد ورشة في تطبيق خيط على هذا الهاتف بعد.";
 "intent.filament.one" = "متبقٍّ %1$@ من %2$@، على %3$d بكرة.";
 "intent.filament.none" = "لا يوجد %@ على الرف.";
 "intent.filament.empty" = "الرف فارغ.";
@@ -667,7 +667,7 @@
 "wa.m.delivered" = "تم التسليم";
 "wa.to" = "إلى %@";
 "wa.logged_note" = "فتح واتساب يسجّل هذه الرسالة في سجل تواصل العميل. لا يُرسل واتساب شيئًا حتى تضغط إرسال فيه.";
-"wa.default_words" = "كلمات Khayt الافتراضية. قوالب واتساب الخاصة بورشتك على الماك، في الإعدادات › التكاملات.";
+"wa.default_words" = "الكلمات الافتراضية في تطبيق خيط. قوالب واتساب الخاصة بورشتك على الماك، في الإعدادات › التكاملات.";
 "wa.open" = "افتح واتساب";
 "wa.language" = "اللغة";
 "wa.lang.ar" = "العربية";
@@ -685,7 +685,7 @@
 "wa.share_photo" = "مشاركة مع الصورة…";
 "wa.share_photo.note" = "اختر واتساب من قائمة المشاركة، ثم محادثة العميل. تُسجَّل في سجل تواصل العميل حين تُرسل إلى واتساب.";
 /* Focus filter (ShopFocusFilter) */
-"Khayt notifications" = "إشعارات Khayt";
+"Khayt notifications" = "إشعارات خيط";
 "Print finished or failed" = "انتهاء الطباعة أو فشلها";
 "New order requests" = "طلبات جديدة";
 "Queue, late jobs, low filament" = "الطابور والطلبات المتأخرة ونقص الخيط";
@@ -695,8 +695,8 @@
 "focus.kind.shop" = "الورشة";
 /* Scanning a Khayt label (lib/scan.js) */
 "scan.label.title" = "مسح ملصق";
-"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من Khayt.";
-"scan.label.unknown" = "هذا الرمز ليس ملصقًا من Khayt.";
+"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من تطبيق خيط.";
+"scan.label.unknown" = "هذا الرمز ليس ملصقًا من تطبيق خيط.";
 "scan.label.missing" = "الطلب أو البكرة في هذا الملصق غير موجودة على هذا الهاتف.";
 
 /* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
@@ -709,9 +709,9 @@
 "quote.file.exact" = "قاسه مُقطِّع الطباعة على الماك.";
 "quote.file.estimated" = "تقدير من شكل المجسّم.";
 "quote.file.make_quote" = "حوّله إلى عرض سعر";
-"quote.file.needs_mac" = "تسعير الملفات يحتاج تطبيق Khayt للماك (alpha.63 أو أحدث) على شبكة الورشة.";
+"quote.file.needs_mac" = "تسعير الملفات يحتاج تطبيق خيط للماك (alpha.63 أو أحدث) على شبكة الورشة.";
 "quote.file.reason.off" = "التسعير الفوري متوقف على الماك. فعّله لنموذج الطلبات في الإعدادات.";
-"quote.file.reason.unsupported" = "يسعّر Khayt ملفات STL وOBJ و3MF وG-code.";
+"quote.file.reason.unsupported" = "يسعّر تطبيق خيط ملفات STL وOBJ و3MF وG-code.";
 "quote.file.reason.too-large" = "حجم الملف أكبر من 32 ميغابايت.";
 "quote.file.reason.no-numbers" = "أسعار الورشة غير مُعدّة على الماك بعد.";
 "quote.file.reason.no-price" = "لم يستطع الماك تسعير هذا الملف.";
@@ -729,11 +729,11 @@
 "photos.err.too_large" = "الصورة أكبر من أن تُرسل حتى بعد تصغيرها.";
 "photos.err.not_published" = "ليس لهذا الطلب صفحة تتبّع بعد. انشره من الماك أولاً.";
 "photos.err.viewer" = "تسجيل دخولك إلى سحابة خيط يسمح بالعرض فقط دون التعديل.";
-"photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع Khayt استخدامها. اختر JPEG أو PNG.";
+"photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع تطبيق خيط استخدامها. اختر JPEG أو PNG.";
 "photos.err.http" = "لم تقبل سحابة خيط الصورة (خطأ %lld). حاول مرة أخرى.";
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
-"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في Khayt على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى سحابة خيط.";
+"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في تطبيق خيط على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى سحابة خيط.";
 
 /* The calculator — priced on the phone from the shop's own book. */
 "tab.calculator" = "الحاسبة";
@@ -826,7 +826,7 @@
 "library.notes" = "ملاحظات من طباعته";
 "library.stale" = "لهذا النموذج إصدار جديد لم يقِسه الماك بعد. سعّره على شبكة الورشة، أو استخدم الحاسبة.";
 "library.not_estimable" = "يسعّر الماك نماذج STL وOBJ و3MF وG-code. استخدم الحاسبة لهذا النموذج.";
-"library.needs_mac" = "التسعير من المكتبة يحتاج الماك على شبكة الورشة بإصدار من Khayt يدعمه. الحاسبة تعمل على أي حال.";
+"library.needs_mac" = "التسعير من المكتبة يحتاج الماك على شبكة الورشة بإصدار من تطبيق خيط يدعمه. الحاسبة تعمل على أي حال.";
 "library.reason.no-file" = "النموذج مسجّل على الماك لكن ملفه غير موجود.";
 "library.reason.not-found" = "هذا النموذج لم يعد في المكتبة.";
 "quote.file.unreliable" = "هذا النموذج خارج النطاق الذي يصلح له التقدير. راجع الرقم قبل إرساله.";
@@ -964,10 +964,10 @@
 "printer.why.device" = "يحتاج هذا الهاتف إلى الاقتران بالماك من جديد قبل التحكم بالطابعات.";
 "printer.why.not_found" = "هذه الآلة غير موجودة على الماك.";
 "printer.why.not_connected" = "الماك غير متصل بهذه الطابعة الآن.";
-"printer.why.unsupported" = "لا يمكن التحكم بهذه الطابعة من Khayt.";
+"printer.why.unsupported" = "لا يمكن التحكم بهذه الطابعة من تطبيق خيط.";
 "printer.why.no_job" = "لا شيء قيد الطباعة عليها.";
 "printer.why.busy" = "الماك مشغول بهذه الطابعة. حاول بعد لحظة.";
-"printer.why.old_mac" = "حدّث Khayt على الماك للتحكم بالطابعات من الهاتف.";
+"printer.why.old_mac" = "حدّث تطبيق خيط على الماك للتحكم بالطابعات من الهاتف.";
 "printer.why.no_answer" = "لم يُجب الماك. ربما هو في وضع السكون أو غير متصل.";
 "printer.why.unreachable" = "تعذّر الوصول إلى الماك وإلى سحابة خيط.";
 /* Customer page messages */
@@ -1053,7 +1053,7 @@
 "printphotos.sending" = "جارٍ الإرسال إلى الماك…";
 "printphotos.why.device" = "يحتاج هذا الهاتف إلى الاقتران بالماك من جديد قبل أن يضيف الصور.";
 "printphotos.why.not_found" = "لم يعد هذا الطلب موجودًا على الماك.";
-"printphotos.why.old_mac" = "حدّث Khayt على الماك لتتمكن من إضافة الصور من الهاتف.";
+"printphotos.why.old_mac" = "حدّث تطبيق خيط على الماك لتتمكن من إضافة الصور من الهاتف.";
 "expense.needs_mac" = "لا يستطيع هذا الماك استلام مصروف مع صورة إيصال من الهاتف بعد. لم يُحفظ شيء، والمصروف ما زال هنا.";
 "quote.needs_mac" = "لا يستطيع هذا الماك تسعير عرض للهاتف بعد. لم يُرسل شيء. الحاسبة على هذا الهاتف تعمل من دونه.";
 "printphotos.why.read_only" = "الورشة في وضع القراءة فقط على الماك الآن، فلا يمكنه استقبال صورة.";
@@ -1063,7 +1063,7 @@
 
 /* Printer care (lib/maintenance.js, lib/care-plans.js) */
 "care.title" = "العناية";
-"care.none" = "لا مهام عناية لهذه الطابعة بعد. تُعدّ خطط العناية في Khayt على الماك أو الكمبيوتر.";
+"care.none" = "لا مهام عناية لهذه الطابعة بعد. تُعدّ خطط العناية في تطبيق خيط على الماك أو الكمبيوتر.";
 "care.status.ok" = "جيد";
 "care.status.warning" = "قريباً";
 "care.status.due" = "مستحقة";
@@ -1079,7 +1079,7 @@
 "care.hours_over" = "متأخرة %@ س";
 "care.days_left" = "باقٍ %@ يوم";
 "care.days_over" = "متأخرة %@ يوم";
-"care.hours_unknown" = "يحمل هذا الهاتف أحدث الأعمال فقط، فلا يستطيع عدّ ساعات هذه الطابعة. حدّث Khayt على الماك لتظهر هنا؛ أما المهام المحسوبة بالأيام فتظهر كما هي.";
+"care.hours_unknown" = "يحمل هذا الهاتف أحدث الأعمال فقط، فلا يستطيع عدّ ساعات هذه الطابعة. حدّث تطبيق خيط على الماك لتظهر هنا؛ أما المهام المحسوبة بالأيام فتظهر كما هي.";
 "care.needs" = "تحتاج عناية · %d";
 "care.unnamed" = "مهمة بلا اسم";
 "care.error.no_task" = "لم تعد هذه المهمة في الدفتر. اسحب للتحديث.";
@@ -1115,7 +1115,7 @@
 "shop.none" = "لا شيء للشراء — كل الخيوط فوق نقطة إعادة الطلب.";
 "shop.no_supplier" = "لا يوجد مورّد";
 "shop.share" = "مشاركة القائمة";
-"shop.hint" = "كل خيط عند نقطة إعادة الطلب أو دونها، مجمّعة حسب المورّد الذي يبيعه. تُضبط نقاط إعادة الطلب والكميات والمورّدون في Khayt على الماك أو الكمبيوتر.";
+"shop.hint" = "كل خيط عند نقطة إعادة الطلب أو دونها، مجمّعة حسب المورّد الذي يبيعه. تُضبط نقاط إعادة الطلب والكميات والمورّدون في تطبيق خيط على الماك أو الكمبيوتر.";
 "shop.buy" = "اشترِ %@";
 "shop.have" = "المتبقي %@";
 
@@ -1146,14 +1146,14 @@
 "connectors.sent.reply" = "تم الإرسال. جاء في الرد:\n%@";
 "connectors.confirm.title" = "الإرسال من هذا الآيفون؟";
 "connectors.confirm.body" = "يرسل %@ هذه البيانات من دفترك إلى هذه المواقع عند الضغط على أحد أزراره:";
-"connectors.confirm.footer" = "وافقت على هذا الموصِّل من جهاز Mac. يسأل Khayt مرة واحدة على كل آيفون، ومرة أخرى إذا تغيّر ما يرسله.";
+"connectors.confirm.footer" = "وافقت على هذا الموصِّل من جهاز Mac. يسأل تطبيق خيط مرة واحدة على كل آيفون، ومرة أخرى إذا تغيّر ما يرسله.";
 "connectors.confirm.allow" = "سماح ومتابعة";
 "connectors.consent.title" = "ما يرسله وإلى أين";
 "connectors.consent.nothing" = "يفتح هذا الموقع فقط، ولا يرسل شيئًا من دفترك.";
 "connectors.consent.confirmed" = "مسموح من هذا الآيفون.";
-"connectors.consent.not_confirmed" = "لم يُستخدم من هذا الآيفون بعد. يسألك Khayt قبل أول إرسال.";
+"connectors.consent.not_confirmed" = "لم يُستخدم من هذا الآيفون بعد. يسألك تطبيق خيط قبل أول إرسال.";
 "connectors.list.footer" = "تُضاف الموصِّلات ويُوافَق عليها من جهاز Mac. مفاتيحها تبقى على هذا الآيفون ولا تُزامَن أبدًا.";
-"connectors.settings.hint_mac" = "تظهر هنا الموصِّلات التي تُعدّها على الماك بعد أن يُفتح Khayt قرب الماك مرة واحدة.";
+"connectors.settings.hint_mac" = "تظهر هنا الموصِّلات التي تُعدّها على الماك بعد أن يُفتح تطبيق خيط قرب الماك مرة واحدة.";
 "connectors.badge.reviewed" = "تمت مراجعته";
 "connectors.status.active" = "نشط";
 "connectors.status.paused" = "متوقف";
@@ -1170,7 +1170,7 @@
 "connectors.key.footer" = "يُحفظ في سلسلة مفاتيح هذا الآيفون فقط. لكل آيفون وMac مفتاحه، وإلغاء الاقتران يحذفه.";
 "connectors.error.key_missing" = "أدخل المفتاح «%@» أولًا من الإعدادات ▸ الموصِّلات. لم يُرسل شيء.";
 "connectors.error.build" = "لا يمكن استخدام هذا الزر الآن. لم يُرسل شيء.";
-"connectors.error.scheme" = "يفتح Khayt الروابط الآمنة (https) فقط. لم يُفتح أو يُرسل شيء.";
+"connectors.error.scheme" = "يفتح تطبيق خيط الروابط الآمنة (https) فقط. لم يُفتح أو يُرسل شيء.";
 "connectors.error.host" = "هذا يذهب إلى %@، ولم يُصرّح به الموصِّل. لم يُرسل شيء.";
 "connectors.error.network" = "تعذّر الوصول إلى %@. لم يُرسل شيء.";
 "connectors.error.server" = "ردّت الخدمة بالرمز %d. لم يتغيّر شيء على هذا الآيفون.";
