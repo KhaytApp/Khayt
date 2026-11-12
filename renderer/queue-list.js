@@ -231,6 +231,10 @@
     }
 
     board.classList.toggle('queue-list-mode', isListView());
+    // An empty host is still a grid item: left in the board it took the first
+    // column, so Pending started one column in and the stages wrapped to two
+    // rows even at 1920 px. Hidden, it takes nothing.
+    host.hidden = !isListView();
     if (!isListView()) { host.innerHTML = ''; return false; }
 
     const locMatch = (typeof orderMatchesActiveLocation === 'function') ? orderMatchesActiveLocation : () => true;

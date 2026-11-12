@@ -236,7 +236,7 @@ struct CalculatorView: View {
             VStack(alignment: .leading, spacing: 7) {
                 fieldLabel(model.lines.count > 1 ? L10n.format("calc.colour_n", index + 1) : L10n.tr("quote.weight"))
                 HStack(spacing: 4) {
-                    TextField("", text: gramsBinding(line.id), prompt: Text(verbatim: "0"))
+                    TextField((model.lines.count > 1 ? L10n.format("calc.colour_n", index + 1) : L10n.tr("quote.weight")), text: gramsBinding(line.id), prompt: Text(verbatim: "0"))
                         .keyboardType(.decimalPad)
                         .font(.khayt(18, .semibold, relativeTo: .body).monospacedDigit())
                         .foregroundStyle(KhaytDesign.ink)
@@ -268,6 +268,7 @@ struct CalculatorView: View {
                     Image(systemName: "minus.circle").foregroundStyle(KhaytDesign.late)
                 }
                 .buttonStyle(.plain)
+                .tapTarget()
                 .accessibilityLabel(L10n.tr("calc.remove_colour"))
             }
         }
@@ -339,7 +340,7 @@ struct CalculatorView: View {
                 .font(.khayt(14, relativeTo: .subheadline))
                 .foregroundStyle(KhaytDesign.note)
             Spacer()
-            TextField("", text: Binding(get: { model.rates[key] ?? "" },
+            TextField(L10n.tr("calc.rate.\(key)"), text: Binding(get: { model.rates[key] ?? "" },
                                         set: { model.rates[key] = $0 }),
                       prompt: Text(verbatim: seeded))
                 .keyboardType(.decimalPad)
@@ -379,6 +380,7 @@ struct CalculatorView: View {
                         Image(systemName: "minus.circle").foregroundStyle(KhaytDesign.late)
                     }
                     .buttonStyle(.plain)
+                    .tapTarget()
                     .accessibilityLabel(L10n.tr("calc.remove_piece"))
                 }
                 .padding(.horizontal, 14).frame(minHeight: 52)
@@ -488,7 +490,7 @@ struct CalculatorView: View {
         VStack(alignment: .leading, spacing: 7) {
             fieldLabel(label)
             HStack(spacing: 4) {
-                TextField("", text: text, prompt: Text(verbatim: "0"))
+                TextField(label, text: text, prompt: Text(verbatim: "0"))
                     .keyboardType(.decimalPad)
                     .font(.khayt(18, .semibold, relativeTo: .body).monospacedDigit())
                     .foregroundStyle(KhaytDesign.ink)

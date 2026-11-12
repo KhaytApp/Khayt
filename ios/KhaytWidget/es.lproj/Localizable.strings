@@ -42,3 +42,10 @@
 "Pair Khayt with your shop to see its money here." = "Vincula Khayt con tu taller para ver aquí su dinero.";
 "Khayt Money" = "Khayt Dinero";
 "Today's takings, what customers owe and low stock. Hidden while your iPhone is locked." = "Lo ganado hoy, lo que deben los clientes y el stock bajo. Oculto mientras el iPhone está bloqueado.";
+
+/* The app's name in the widget's header. Arabic writes it in Arabic letters. */
+"Khayt" = "Khayt";
+
+/* Queue widget gallery name and description (KhaytQueueWidget.swift) */
+"Khayt Queue" = "Khayt Cola";
+"Queue counts and live print progress from your shop." = "Recuentos de la cola y progreso de impresión en directo de tu taller.";

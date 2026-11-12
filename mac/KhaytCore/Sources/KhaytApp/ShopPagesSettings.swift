@@ -72,7 +72,7 @@ struct EnvironmentLogSection: View {
                         .frame(maxWidth: 260)
                         .frame(height: 44)
                     Text(verbatim: degrees(trend.min) + " – " + degrees(trend.max))
-                        .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                        .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                 }
             }
 

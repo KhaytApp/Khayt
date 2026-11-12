@@ -611,6 +611,11 @@ on purpose (`LAN_SPOOL_READ_FIELDS` in `lib/lan-server.js`).
 
 Record an expense, with an optional photographed receipt. **Requires owner PIN.**
 
+> **Served by both apps** (the native Mac since Nov 2026). On the Mac the owner PIN
+> alone is not enough: it takes a **signed, enrolled phone** (the `x-khayt-device`
+> headers, as a job photo does) and answers **403** `{"ok":false,"reason":"device-key-required"}`
+> to anything else. An API token never opens it there (the route is in no token scope).
+
 The only endpoint that accepts binary, so most of its behaviour is what it
 refuses.
 
@@ -672,6 +677,10 @@ the two do not diverge until a reload.
 ### `POST /api/quote`
 
 Cost a part using the desktop's own maths. **Requires owner PIN.**
+
+> **Served by both apps** (the native Mac since Nov 2026), by one rule:
+> `lib/lan-rest.js quotePart`. The public tunnel is the desktop's alone; the Mac
+> answers this on the shop's network only.
 
 For quoting a walk-in customer without going back to the desk. The endpoint runs
 `lib/calculator-cost.js` against the live store, so a phone can never

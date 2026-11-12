@@ -668,7 +668,7 @@ struct InspectorSection<Content: View>: View {
                     // down when open, in both.
                     Image(systemName: open ? "chevron.down" : "chevron.forward")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Khayt.faint)
                 }
                 .padding(.vertical, 2)
                 .contentShape(Rectangle())
@@ -792,7 +792,7 @@ struct ModelSummaryCard: View {
                     } label: {
                         Image(systemName: file.isFavourite ? "star.fill" : "star")
                             .foregroundStyle(file.isFavourite ? AnyShapeStyle(Khayt.marked)
-                                                             : AnyShapeStyle(.tertiary))
+                                                             : AnyShapeStyle(Khayt.faint))
                     }
                     .buttonStyle(.plain)
                     .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
@@ -1020,7 +1020,7 @@ struct ModelSummaryCard: View {
                         Text(Money.text(product.price, shop.currency))
                             .font(.callout.weight(.semibold)).monospacedDigit()
                         if let margin = product.margin {
-                            Text(verbatim: "·").foregroundStyle(.tertiary)
+                            Text(verbatim: "·").foregroundStyle(Khayt.faint)
                             Text(w.callIt("mac.li_margin_pct", ["pct": .string(Money.quantity(margin * 100, decimals: 0))]))
                                 .font(.callout).monospacedDigit()
                                 .foregroundStyle(product.belowFloor || margin < 0 ? AnyShapeStyle(Khayt.late)
@@ -1217,14 +1217,14 @@ struct SetupsSection: View {
                                 .font(.caption2).foregroundStyle(Khayt.done)
                         }
                     }
-                    if let line { Text(line).font(.caption2).foregroundStyle(.tertiary) }
+                    if let line { Text(line).font(.caption2).foregroundStyle(Khayt.faint) }
                 }
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(shop.words.callIt(Self.word(setup.status)))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Self.colour(setup.status))
-                    Text(tally).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    Text(tally).font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                 }
             }
         }
@@ -1255,7 +1255,7 @@ struct SetupsSection: View {
         private var tally: String {
             setup.ok == 0 && setup.failed == 0
                 ? shop.words.callIt("setup.untried")
-                : "\(setup.ok) / \(setup.ok + setup.failed)"
+                : Figure.isolated("\(setup.ok) / \(setup.ok + setup.failed)")
         }
 
         static func word(_ status: String) -> String {
@@ -1355,7 +1355,7 @@ struct PartsSection: View {
                         // to be able to work out from this list.
                         Text(part.size.map(Self.bytes) ?? "—")
                             .font(.caption)
-                            .foregroundStyle(part.size == nil ? AnyShapeStyle(.tertiary)
+                            .foregroundStyle(part.size == nil ? AnyShapeStyle(Khayt.faint)
                                                               : AnyShapeStyle(.secondary))
                             .monospacedDigit()
                     }
@@ -1593,7 +1593,7 @@ struct ArchiveMemberNote: View {
             }
             if !file.isLocked {
                 Text(w.callIt("mac.arc_untouched"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

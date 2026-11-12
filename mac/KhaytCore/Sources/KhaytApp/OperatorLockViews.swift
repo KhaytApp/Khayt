@@ -121,6 +121,31 @@ struct LockScreen: View {
 struct NotAllowed: View {
     let shop: Shop
     var body: some View {
+        // A SCREEN THE SHOP'S MODE HIDES IS NOT A SCREEN A PERSON MAY NOT SEE.
+        // A Simple shop that reached Reports was told "Your access level does
+        // not include this screen" and offered "Switch person" — the staff
+        // lock's words, to an owner with nobody to switch to (Nov 11 UI
+        // review, B27). It is told which mode has the screen, and where the
+        // switch is.
+        if shop.hiddenByMode(shop.shelf) {
+            VStack(spacing: 12) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 28)).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(shop.words.callIt("mac.mode_screen_hidden"))
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                SettingsLink { Text(shop.words.callIt("mac.mode_open_settings") + "\u{2026}") }
+            }
+            .frame(maxWidth: 360)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Khayt.ground)
+        } else {
+            lockMessage
+        }
+    }
+
+    @ViewBuilder private var lockMessage: some View {
         VStack(spacing: 12) {
             Image(systemName: "hand.raised")
                 .font(.system(size: 28)).foregroundStyle(.secondary)

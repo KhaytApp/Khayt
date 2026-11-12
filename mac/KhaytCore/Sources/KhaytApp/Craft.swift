@@ -143,7 +143,7 @@ struct CraftArt: View {
             // leaves the nozzle. Small — it is a bead, and one the size of the
             // tip reads as a blob somebody dropped there.
             BeadShape()
-                .fill(Khayt.hot)
+                .fill(Khayt.thread)
                 .frame(width: size * 0.085, height: size * 0.10)
                 .padding(.top, size * 0.015)
             // Narrower than the nozzle is wide is wrong, and much wider is
@@ -289,7 +289,7 @@ struct KhaytWatermark: View {
 struct LayerProgress: View {
     /// 0…1.
     let progress: Double
-    var tint: Color = Khayt.hot
+    var tint: Color = Khayt.thread
     var height: CGFloat = 18
 
     @Environment(\.accessibilityReduceMotion) private var reduced
@@ -299,7 +299,7 @@ struct LayerProgress: View {
             // The layers still to come, ghosted — so the bar has a length
             // before it has a value, and a print at 4% is not a screen with
             // almost nothing on it.
-            LayerLinesShape().fill(tint.opacity(0.15))
+            LayerLinesShape().fill(tint.opacity(Khayt.threadGhost))
             LayerLinesShape(progress: max(0, min(1, progress))).fill(tint)
         }
         .frame(height: height)

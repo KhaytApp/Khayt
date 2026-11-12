@@ -126,3 +126,23 @@ html:root .hf-fix-pick:hover, html:root .hf-fix-pick:focus-visible { outline: 2p
 html:root .hf-fix-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
 html:root .hf-fix-t { flex: 1; color: var(--text-muted); }
 html:root .hf-fix-sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+
+/* Arabic: headings and small labels set in the mono face with tracking pulled
+   Arabic letters apart, and Latin values (colour codes, the file name, band
+   ranges) were reordered by the bidi algorithm ("EEF3F6#"). The Arabic face
+   (IBM Plex Sans Arabic, bundled) and no tracking; Latin values isolate LTR. */
+html[dir="rtl"]:root .hf-card-h,
+html[dir="rtl"]:root .hf-card-hx,
+html[dir="rtl"]:root .hf-num,
+html[dir="rtl"]:root .hf-vd-badge,
+html[dir="rtl"]:root .hf-src-dim {
+  font-family: "IBM Plex Sans Arabic", var(--font-sans, system-ui);
+  letter-spacing: 0;
+  text-transform: none;
+}
+html:root .hf-fil-hex,
+html:root .hf-src-name {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+html[dir="rtl"]:root .hf-fil-hex { text-align: right; }

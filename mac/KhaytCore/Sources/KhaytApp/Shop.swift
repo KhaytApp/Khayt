@@ -402,6 +402,18 @@ final class Shop {
         productRows = rows
     }
 
+    /// Empty the book's jobs, customers, shelf and catalogue, for the capture
+    /// run's pictures of each screen with nothing on it. The book on disk is
+    /// not touched, and loading any book puts everything back.
+    func pretendEmptyBook() {
+        orders = []
+        clients = []
+        spools = []
+        consumables = []
+        productRows = []
+        catalogueRows = []
+    }
+
     /// Give the shop a library, for a test. The book on disk is not touched.
     func pretendLibrary(_ rows: [JSONValue]) {
         files = withPrintHistory(Self.decodeFiles(["printFiles": .array(rows)]).items)
