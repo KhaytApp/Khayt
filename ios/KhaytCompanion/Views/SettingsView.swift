@@ -144,8 +144,7 @@ struct SettingsView: View {
         case .shop:
             return [settings.shopLabel, L10n.tr("settings.shop.readonly")].filter { !$0.isEmpty }.joined(separator: " · ")
         case .mac:
-            let host = settings.displayURL
-            return host.isEmpty ? nil : host
+            return settings.macAddress
         case .cloud: return L10n.tr("settings.cloud.sub")
         case .connectors:
             let names = connectors.map(\.name)
@@ -200,6 +199,15 @@ struct SettingsView: View {
         case .help: EmptyView()   // a link, never pushed
         case .diagnostics: SettingsDiagnosticsPage()
         }
+    }
+}
+
+extension ConnectionSettings {
+    /// The Mac's address as a row says it, or nothing: `displayURL` draws
+    /// "—" for a phone with no address (the sample shop, a cloud-only phone).
+    var macAddress: String? {
+        let a = displayURL
+        return a.isEmpty || a == "—" ? nil : a
     }
 }
 
@@ -583,7 +591,7 @@ struct SettingsMacPage: View {
     private var macCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button { withAnimation { showConnection.toggle() } } label: {
-                SettingsPieces.row(settings.displayURL.isEmpty ? L10n.tr("settings.host") : settings.displayURL,
+                SettingsPieces.row(settings.macAddress ?? L10n.tr("settings.host"),
                                    last: !showConnection) {
                     SettingsStateChip(state: SettingsState.mac(paired: settings.isPaired && (settings.isConfigured || settings.isSampleShop),
                                                                inReach: health.macInReach || settings.isSampleShop))
