@@ -33,6 +33,53 @@ test('every column simpleStageOf names is one of the four', () => {
   }
 });
 
+test('a job on hold says when it was paused mid-print', () => {
+  assert.strictEqual(OS.simpleStageOf({ status: 'on_hold' }).midPrint, false);
+  for (const extra of [{ printingStartedAt: '2026-11-01T10:00:00Z' }, { timerStart: '2026-11-01T10:00:00Z' }, { startedAt: 'x' },
+    { statusHistory: [{ status: 'pending', at: 'a' }, { status: 'printing', at: 'b' }, { status: 'on_hold', at: 'c' }] }]) {
+    assert.strictEqual(OS.simpleStageOf({ status: 'on_hold', ...extra }).midPrint, true, JSON.stringify(extra));
+  }
+  assert.strictEqual(OS.simpleStageOf({ status: 'on_hold', statusHistory: [{ status: 'pending' }] }).midPrint, false);
+  assert.strictEqual('midPrint' in OS.simpleStageOf({ status: 'pending', printingStartedAt: 'x' }), false, 'only on hold carries it');
+});
+
+test('Ready is capped and keeps the NEWEST (the Mac\'s beta.34 rule)', () => {
+  assert.strictEqual(OS.SIMPLE_COLUMN_CAP, 120);
+  const day = (n) => new Date(Date.UTC(2026, 0, 1) + n * 86400000).toISOString();
+  // 130 finished jobs, oldest first, as a book lists them; some shipped or delivered later.
+  const orders = Array.from({ length: 130 }, (_, i) => ({ id: 'J' + i, status: 'completed', completedAt: day(i) }));
+  orders[3].deliveredAt = day(500);    // an old job delivered last of all is the newest
+  orders[5].shippedAt = day(499);
+  orders.push({ id: 'P', status: 'pending', date: day(600) }, { id: 'H', status: 'on_hold' });
+  const before = orders.map((o) => o.id).join();
+  const r = OS.simpleColumnJobs(orders, 'ready');
+  assert.strictEqual(r.jobs.length, 120);
+  assert.strictEqual(r.more, 10);
+  assert.deepStrictEqual(r.jobs.slice(0, 4).map((o) => o.id), ['J3', 'J5', 'J129', 'J128'], 'newest first');
+  assert.ok(r.jobs.some((o) => o.id === 'J129') && !r.jobs.some((o) => o.id === 'J0'), 'the newest survive, the oldest are cut');
+  assert.strictEqual(orders.map((o) => o.id).join(), before, 'the input is not reordered');
+  const small = OS.simpleColumnJobs(orders, 'ready', { cap: 2 });
+  assert.deepStrictEqual([small.jobs.map((o) => o.id), small.more], [['J3', 'J5'], 128]);
+  // A job with no readable time sorts last, and ties keep the book's order.
+  const tie = OS.simpleColumnJobs([{ id: 'a', status: 'completed' }, { id: 'b', status: 'completed', completedAt: day(1) }, { id: 'c', status: 'completed' }], 'ready');
+  assert.deepStrictEqual(tie.jobs.map((o) => o.id), ['b', 'a', 'c']);
+  // The intake date never outranks a finish stamp: a job taken in today but
+  // finished in January is older than one finished yesterday.
+  const intake = OS.simpleColumnJobs([
+    { id: 'jan', status: 'completed', date: day(400), completedAt: day(10) },
+    { id: 'yday', status: 'completed', date: day(300), completedAt: day(399) },
+    { id: 'nostamp', status: 'completed', date: day(200) },
+  ], 'ready');
+  assert.deepStrictEqual(intake.jobs.map((o) => o.id), ['yday', 'nostamp', 'jan']);
+});
+
+test('Quote, Queued and Printing are never cut', () => {
+  const many = Array.from({ length: 200 }, (_, i) => ({ id: 'Q' + i, status: i % 2 ? 'pending' : 'on_hold' }));
+  const r = OS.simpleColumnJobs(many, 'queued');
+  assert.deepStrictEqual([r.jobs.length, r.more, r.jobs[0].id], [200, 0, 'Q0']);
+  assert.deepStrictEqual(OS.simpleColumnJobs(null, 'ready'), { jobs: [], more: 0 });
+});
+
 test('the one Name field edits the name the customer has; the other is never touched', () => {
   assert.strictEqual(SS.nameKey({ nameEn: 'Layla', nameAr: '' }, 'ar'), 'nameEn');
   assert.strictEqual(SS.nameKey({ nameEn: '', nameAr: 'ليلى' }, 'en'), 'nameAr');
@@ -88,7 +135,7 @@ test('library places: this computer, a folder, Google Drive; a bucket is "Set up
 test('every new sm.* string is in all nine languages', () => {
   const keys = ['sm.col_quote', 'sm.col_queued', 'sm.col_ready', 'sm.cust_business', 'sm.cust_addr_structured', 'sm.cf_text_sub',
     'sm.cf_edit_title', 'sm.lib_hint', 'sm.lib_computer', 'sm.lib_computer_sub', 'sm.lib_folder', 'sm.lib_folder_sub', 'sm.lib_drive',
-    'sm.lib_drive_sub', 'sm.lib_in_use', 'sm.lib_connect', 'sm.lib_manage', 'sm.lib_bucket', 'sm.lib_bucket_sub'];
+    'sm.lib_drive_sub', 'sm.lib_in_use', 'sm.lib_connect', 'sm.lib_manage', 'sm.lib_bucket', 'sm.lib_bucket_sub', 'sm.note_mid_print', 'sm.col_more'];
   for (const lang of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'pt-BR', 'tr', 'zh']) {
     const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'renderer', 'locales', lang + '.js'), 'utf8');
     for (const k of keys) assert.ok(src.includes(`"${k}":`), `${lang} ${k}`);

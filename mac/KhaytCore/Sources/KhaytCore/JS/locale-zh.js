@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "管理…",
   "sm.lib_bucket": "对象存储（S3 / R2）",
   "sm.lib_bucket_sub": "仍在使用。请在专业版中设置。",
+  "sm.note_mid_print": "已暂停，打印中途暂停",
+  "sm.col_more": "订单记录中还有 {n} 个",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

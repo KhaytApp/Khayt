@@ -602,6 +602,20 @@
    *
    * `stage` is stageOf's answer, so a caller can still draw the card's own
    * actions (Resume for a job on hold, QC pass for one in QC).
+   *
+   * `midPrint` (on hold only) is true when the job had started printing before
+   * it was held — a first-start stamp (`printingStartedAt`, `timerStart`,
+   * `startedAt`) or a `printing` entry in its history. Such a job sits under
+   * Queued, where a shop looking under Printing would not find it, so the card
+   * says "On hold, paused mid-print" at its top.
+   *
+   * READY IS CAPPED, NEWEST FIRST (`simpleColumnJobs`). Delivered and shipped
+   * jobs are filed under Ready and never leave it, so the column would grow
+   * with every job the shop ever finished. It shows the SIMPLE_COLUMN_CAP
+   * newest — by when each was last finished, shipped or delivered — and says
+   * how many more there are. This is the Mac's rule for its Completed and
+   * Shipped columns (Kanban.columnCap, 120; beta.34 fixed it keeping the
+   * oldest). Quote, Queued and Printing hold live work and are never cut.
    */
   const SIMPLE_COLUMNS = ['quote', 'queued', 'printing', 'ready'];
   const SIMPLE_FILING = {
@@ -620,7 +634,61 @@
     const stage = stageOf(order);
     const f = stage ? SIMPLE_FILING[stage] : null;
     if (!f) return null;
-    return { column: f[0], note: f[1], stage };
+    const out = { column: f[0], note: f[1], stage };
+    if (stage === 'on_hold') out.midPrint = hadStartedPrinting(order);
+    return out;
+  }
+
+  /** Had this job started printing at some point? See simpleStageOf. */
+  function hadStartedPrinting(order) {
+    if (!order) return false;
+    if (order.printingStartedAt || order.timerStart || order.startedAt) return true;
+    const h = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+    return h.some((e) => e && e.status === 'printing');
+  }
+
+  /** The most cards Simple's Ready column draws (the Mac's Kanban.columnCap). */
+  const SIMPLE_COLUMN_CAP = 120;
+
+  /** When a Ready job last moved: the latest of delivered, shipped and
+   *  completed. The job's `date` (the day it was taken in) counts only when
+   *  it carries none of those — it is older than any of them, and letting it
+   *  win would file a job finished last year as finished the day it came in.
+   *  0 when nothing can be read. */
+  function readyAt(order) {
+    const read = (keys) => {
+      let best = 0;
+      for (const k of keys) {
+        const ms = order && order[k] ? Date.parse(order[k]) : NaN;
+        if (ms === ms && ms > best) best = ms;   // ms === ms: not NaN
+      }
+      return best;
+    };
+    return read(['deliveredAt', 'shippedAt', 'completedAt']) || read(['date']);
+  }
+
+  /**
+   * The jobs one of Simple's four columns shows, and how many it leaves out.
+   *
+   *   simpleColumnJobs(orders, 'ready')         → { jobs, more }
+   *   simpleColumnJobs(orders, 'ready', { cap }) — a different cap (tests)
+   *
+   * Ready is sorted newest first and cut to the cap; `more` is how many were
+   * left out. The other columns keep the order they were given, uncut
+   * (more: 0). Pure, and the input array is not reordered.
+   */
+  function simpleColumnJobs(orders, column, opts) {
+    const list = (Array.isArray(orders) ? orders : []).filter((o) => {
+      const s = simpleStageOf(o);
+      return s && s.column === column;
+    });
+    if (column !== 'ready') return { jobs: list, more: 0 };
+    const cap = opts && Number.isInteger(opts.cap) && opts.cap >= 0 ? opts.cap : SIMPLE_COLUMN_CAP;
+    const sorted = list
+      .map((o, i) => ({ o, i, at: readyAt(o) }))
+      .sort((a, b) => (b.at - a.at) || (a.i - b.i))
+      .map((x) => x.o);
+    return { jobs: sorted.slice(0, cap), more: Math.max(0, sorted.length - cap) };
   }
 
   /**
@@ -854,7 +922,7 @@
 
   const api = {
     HISTORY_CAP, SURVEY_TOKEN_BYTES, FINISHED_STATUSES, DERIVED_STAGES, REFUSED_AS_A_DESTINATION, isFinished, isOpen,
-    wouldExceedWipLimit, gate, apply, outboundFor, stageOf, SIMPLE_COLUMNS, simpleStageOf, markDelivered, markShipped, stampFromShipping, IN_THE_POST,
+    wouldExceedWipLimit, gate, apply, outboundFor, stageOf, SIMPLE_COLUMNS, SIMPLE_COLUMN_CAP, simpleStageOf, simpleColumnJobs, markDelivered, markShipped, stampFromShipping, IN_THE_POST,
     resumeFromHold, makeSurveyToken,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

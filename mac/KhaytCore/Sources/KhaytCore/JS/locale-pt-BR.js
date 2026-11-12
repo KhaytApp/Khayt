@@ -5449,5 +5449,7 @@
   "sm.lib_manage": "Gerenciar…",
   "sm.lib_bucket": "Armazenamento de objetos (S3 / R2)",
   "sm.lib_bucket_sub": "Continua funcionando. Configurado no modo Profissional.",
+  "sm.note_mid_print": "Em espera, pausado no meio da impressão",
+  "sm.col_more": "Mais {n} no registro de pedidos",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -5449,5 +5449,7 @@
   "sm.lib_manage": "Manage…",
   "sm.lib_bucket": "Object storage (S3 / R2)",
   "sm.lib_bucket_sub": "Keeps working. Set up in Professional.",
+  "sm.note_mid_print": "On hold, paused mid-print",
+  "sm.col_more": "{n} more in the Orders log",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

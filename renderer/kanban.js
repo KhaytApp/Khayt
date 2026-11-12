@@ -210,7 +210,7 @@ function renderStudioKanbanCard(b) {
   const {
     log, status, _pl, pausedClass, cardClientAccent, partColourHtml, partsLabel,
     machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge, qcBadge,
-    postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions,
+    postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions, topChip,
   } = b;
 
   const useStudio = document.body.classList.contains('bedready-ui');
@@ -288,6 +288,7 @@ function renderStudioKanbanCard(b) {
 
   return `
     <div class="kanban-card khayt-kcard${_pl === 'urgent' ? ' kanban-priority-urgent' : _pl === 'high' ? ' kanban-priority-high' : ''}${pausedClass}${cardClientAccent ? ' has-client-accent' : ''}" draggable="true" data-order-id="${log.id}" style="${cardClientAccent}">
+      ${topChip || ''}
       ${headBlock}
       ${!useStudio && partColourHtml ? `<div style="margin-top:2px;">${partColourHtml}</div>` : ''}
       ${useStudio && partColourHtml ? `<div style="margin-top:4px">${partColourHtml}</div>` : ''}
@@ -583,8 +584,18 @@ function renderKanban() {
   Object.entries(cols).forEach(([status, items]) => {
     let sorted = sortColumnOrders(items, status);
     if (kanbanSortByPriority) sorted = sorted.slice().sort((a, b) => kanbanUrgencyScore(a) - kanbanUrgencyScore(b));
+    // Simple's Ready column keeps every finished, shipped and delivered job,
+    // so it is drawn newest first and capped (lib/order-status.js
+    // simpleColumnJobs). The count and totals are the whole column's.
+    let readyMore = 0;
+    const colAll = sorted;
+    if (simpleBoard && status === 'completed') {
+      const r = KhaytOrderStatus.simpleColumnJobs(items, 'ready');
+      sorted = r.jobs;
+      readyMore = r.more;
+    }
     const countEl = $('#count-' + status);
-    if (countEl) countEl.textContent = sorted.length;
+    if (countEl) countEl.textContent = colAll.length;
 
     // WIP limit warning
     const wipLimit = (settings.wipLimits || {})[status] || 0;
@@ -620,12 +631,12 @@ function renderKanban() {
     }
 
     // Column totals meta line
-    const totalHrs = sorted.reduce((s, o) => s + (+o.printTime || 0), 0);
-    const totalVal = fmtJobsTotal(sorted);   // saved rates; partial when a job has none
+    const totalHrs = colAll.reduce((s, o) => s + (+o.printTime || 0), 0);
+    const totalVal = fmtJobsTotal(colAll);   // saved rates; partial when a job has none
     const metaEl = $('#meta-' + status);
     if (metaEl) {
       const showMetaMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-      metaEl.textContent = sorted.length > 0
+      metaEl.textContent = colAll.length > 0
         ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${totalVal}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
         : '';
     }
@@ -647,8 +658,15 @@ function renderKanban() {
       // hold, QC pass in QC) though it sits in one of the four columns.
       const simpleCard = simpleInfo.get(log.id);
       const status = (simpleCard && simpleCard.stage !== 'split' ? simpleCard.stage : null) || colStatus;
-      const simpleNote = simpleCard && simpleCard.note
+      // On hold is a chip at the top of the card, not a small note: the job
+      // sits under Queued, and one paused mid-print is looked for under
+      // Printing. The other stages are a note beside the name.
+      const onHold = simpleCard && simpleCard.note === 'on_hold';
+      const simpleNote = simpleCard && simpleCard.note && !onHold
         ? `<span class="sm-stage-note" data-note="${escapeHtml(simpleCard.note)}">${escapeHtml(t(SIMPLE_NOTE_KEY[simpleCard.note]))}</span>`
+        : '';
+      const simpleTopChip = onHold
+        ? `<div class="sm-hold-chip" data-mid-print="${simpleCard.midPrint ? 'true' : 'false'}">${_kIcoL('pause', '⏸', 12)}${escapeHtml(t(simpleCard.midPrint ? 'sm.note_mid_print' : 'queue.on_hold'))}</div>`
         : '';
       let actions = '';
       // Enthusiast (hobbyist) mode = no commerce: hide customer-notify, invoice, payment and BNPL actions.
@@ -903,9 +921,12 @@ function renderKanban() {
         log, status, _pl, pausedClass, cardClientAccent, partColourHtml, partsLabel,
         machineBadge, operatorBadge, kanbanSplitBadge, kanbanSubBadge: kanbanSubBadge + reprintedBadge,
         qcBadge: simpleNote + qcBadge + storeLinesBadge,
-        postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions,
+        postCheckHtml, resinCheckHtml, timerBadge, etaBadge, actions, topChip: simpleTopChip,
       });
     }).join('');
+    if (readyMore > 0) {
+      container.insertAdjacentHTML('beforeend', `<p class="sm-col-more">${escapeHtml(t('sm.col_more', { n: readyMore }))}</p>`);
+    }
   });
 
   // Feature 2 (new batch): Populate live status on rendered cards

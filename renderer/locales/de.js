@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "Verwalten…",
   "sm.lib_bucket": "Objektspeicher (S3 / R2)",
   "sm.lib_bucket_sub": "Läuft weiter. Eingerichtet in Professional.",
+  "sm.note_mid_print": "Angehalten, mitten im Druck pausiert",
+  "sm.col_more": "{n} weitere im Auftragsprotokoll",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

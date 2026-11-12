@@ -3471,7 +3471,9 @@ body.mode-simple #settings-panel-production .post-check-setting-row { min-block-
 .kanban.sm-board > #quotesSection .quote-card { flex-direction: column; align-items: stretch; gap: 8px; }
 .sm-stage-note { display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
   vertical-align: middle; background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
-.sm-stage-note[data-note="on_hold"] { background: var(--warn-soft); color: var(--warning); border-color: transparent; }
+.sm-hold-chip { display: inline-flex; align-items: center; gap: 6px; margin-block-end: 8px; padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--warn-soft); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); }
+.sm-col-more { margin: 4px 0 0; padding: 8px; text-align: center; font-size: 12px; color: var(--text-muted); }
 
 /* Card 6: the customer in Simple — five fields, then where the rest lives. */
 .sm-cust-form .inline-pair { margin-block-start: 0; }

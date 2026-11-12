@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "Yönet…",
   "sm.lib_bucket": "Nesne depolama (S3 / R2)",
   "sm.lib_bucket_sub": "Çalışmaya devam eder. Profesyonel modda ayarlanır.",
+  "sm.note_mid_print": "Beklemede, baskı ortasında duraklatıldı",
+  "sm.col_more": "Sipariş kaydında {n} tane daha",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

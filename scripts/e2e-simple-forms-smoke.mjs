@@ -36,7 +36,10 @@ try {
       job('ORD-q', 'quote'), job('ORD-p', 'pending'), job('ORD-h', 'on_hold', { holdReason: 'Waiting on filament' }),
       job('ORD-r', 'printing'), job('ORD-pp', 'post'), job('ORD-qc', 'qc'), job('ORD-c', 'completed'),
       job('ORD-s', 'completed', { shippedAt: new Date().toISOString() }),
+      job('ORD-hp', 'on_hold', { printingStartedAt: new Date(Date.now() - 3600000).toISOString() }),
     );
+    // 125 jobs finished last year: Simple's Ready column draws the newest 120.
+    for (let i = 0; i < 125; i++) printLog.push(job('ORD-old' + i, 'completed', { completedAt: new Date(Date.UTC(2025, 0, 1 + i)).toISOString() }));
     clients.push({
       id: 'CLI-s4', nameEn: 'Layla Design Studio', nameAr: 'استوديو ليلى', phone: '+966500000000', email: 'layla@example.com',
       cr: '1010101010', vat: '300000000000003', paymentTermsDays: 30, creditLimit: 5000, notes: 'Prefers pickup on Thursdays',
@@ -90,7 +93,15 @@ try {
         post: inCol('printing', 'ORD-pp'), postNote: note('ORD-pp'),
         qc: inCol('printing', 'ORD-qc'), qcNote: note('ORD-qc'),
         shipped: inCol('completed', 'ORD-s'), shippedNote: note('ORD-s'),
-        anyNote: !!document.querySelector('.kanban .sm-stage-note'),
+        anyNote: !!document.querySelector('.kanban .sm-stage-note, .kanban .sm-hold-chip'),
+        heldChip: (() => { const c = document.querySelector('[data-order-id="ORD-h"] > .sm-hold-chip'); return c && c === c.parentElement.firstElementChild && getComputedStyle(c).display !== 'none' ? c.textContent.trim() : null; })(),
+        midChip: (() => { const c = document.querySelector('[data-order-id="ORD-hp"] > .sm-hold-chip'); return c && c === c.parentElement.firstElementChild ? c.textContent.trim() : null; })(),
+        midInQueued: inCol('pending', 'ORD-hp'),
+        readyCards: document.querySelectorAll('#list-completed .kanban-card').length,
+        readyCount: document.getElementById('count-completed').textContent.trim(),
+        readyMore: document.querySelector('#list-completed .sm-col-more')?.textContent.trim() || null,
+        newestKept: inCol('completed', 'ORD-old124') && inCol('completed', 'ORD-c'),
+        oldestCut: !inCol('completed', 'ORD-old0') && !inCol('completed', 'ORD-old6') && inCol('completed', 'ORD-old7'),
       };
     });
   };
@@ -140,6 +151,7 @@ try {
   // ── Professional: the baseline ──
   const proBoard = await board();
   ok(proBoard.heads.length === 8 && !proBoard.quotesOnBoard && !proBoard.anyNote, `Professional: eight columns, quotes above the board (${proBoard.heads.join(' · ')})`);
+  ok(proBoard.readyCards === 126 && proBoard.readyMore === null && proBoard.heldChip === null, `Professional: Completed is not capped and no card has the Simple chip (${proBoard.readyCards})`);
   const proCust = await fullEditor();
   ok(!proCust.simple && proCust.terms, 'Professional: the customer editor is the full one');
   const proProd = await production();
@@ -157,7 +169,10 @@ try {
   const b = await board();
   ok(JSON.stringify(b.heads) === JSON.stringify(['Quote', 'Queued', 'Printing', 'Ready']), `Simple: four columns, Quote · Queued · Printing · Ready (${b.heads.join(' · ')})`);
   ok(b.quotesOnBoard && b.quoteCard, 'Simple: the quote is a card in the Quote column');
-  ok(b.held && /on hold/i.test(b.heldNote || '') && b.heldResume, `Simple: the job on hold is in Queued, says so, and can be resumed (${b.heldNote})`);
+  ok(b.held && /^On Hold$/i.test(b.heldChip || '') && b.heldResume, `Simple: the job on hold is in Queued with a chip at the top of the card, and can be resumed (${b.heldChip})`);
+  ok(b.midInQueued && b.midChip === 'On hold, paused mid-print', `Simple: a job held after it started printing says "On hold, paused mid-print" (${b.midChip})`);
+  ok(b.readyCards === 120 && b.readyCount === '127' && /^7 more/.test(b.readyMore || ''), `Simple: Ready draws the newest 120 of 127 and says how many more (${b.readyCards}, ${b.readyCount}, ${b.readyMore})`);
+  ok(b.newestKept && b.oldestCut, 'Simple: the newest finished jobs are kept, the seven oldest are the ones left out');
   ok(b.post && /post/i.test(b.postNote || ''), `Simple: the post-processing job is in Printing with a note (${b.postNote})`);
   ok(b.qc && /QC/.test(b.qcNote || ''), `Simple: the QC job is in Printing with a note (${b.qcNote})`);
   ok(b.shipped && /shipped/i.test(b.shippedNote || ''), `Simple: the shipped job is in Ready with a note (${b.shippedNote})`);

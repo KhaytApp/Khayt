@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "管理…",
   "sm.lib_bucket": "オブジェクトストレージ（S3 / R2）",
   "sm.lib_bucket_sub": "引き続き動作します。設定はプロフェッショナルで行います。",
+  "sm.note_mid_print": "保留中・印刷途中で一時停止",
+  "sm.col_more": "他 {n} 件は注文履歴にあります",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

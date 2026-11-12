@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "إدارة…",
   "sm.lib_bucket": "تخزين الكائنات (S3 / R2)",
   "sm.lib_bucket_sub": "يستمر في العمل. يُضبط في الوضع الاحترافي.",
+  "sm.note_mid_print": "معلّق، أُوقف أثناء الطباعة",
+  "sm.col_more": "{n} أخرى في سجل الطلبات",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

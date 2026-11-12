@@ -5448,5 +5448,7 @@
   "sm.lib_manage": "Gérer…",
   "sm.lib_bucket": "Stockage objet (S3 / R2)",
   "sm.lib_bucket_sub": "Continue de fonctionner. Se règle en mode Professionnel.",
+  "sm.note_mid_print": "En attente, mis en pause en cours d’impression",
+  "sm.col_more": "{n} de plus dans le journal des commandes",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
