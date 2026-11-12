@@ -199,6 +199,40 @@ struct LanLibraryTests {
         return try! JSONDecoder().decode(LibraryFile.self, from: data)
     }
 
+    /// NOT A TEST: a server for the phone's simulator to be tried against.
+    ///
+    /// The Mac app never starts its LAN server on the sample book, and pairing
+    /// is a window a person clicks, so there was no way to put the iPhone's
+    /// screen in front of the NATIVE server without a real book or a real
+    /// phone. This starts the same bench every test here uses (the native
+    /// `LanServer`, the sample book, loopback only) on a port that is asked
+    /// for, and keeps it up.
+    ///
+    ///     KHAYT_SERVE_LIBRARY=3929 KHAYT_SERVE_LIBRARY_OLD=3930 \
+    ///     KHAYT_SERVE_MINUTES=20 swift test --filter LanLibraryTests/serve
+    ///
+    /// `…_OLD` is a second server that answers as a Mac from before the
+    /// filters did, for the "menus hide" case. Without the first variable
+    /// this does nothing at all, which is every ordinary run.
+    @Test("a server for the simulator, only when asked for")
+    func serve() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let port = env["KHAYT_SERVE_LIBRARY"].flatMap(UInt16.init) else { return }
+        let minutes = min(60, max(1, env["KHAYT_SERVE_MINUTES"].flatMap(Int.init) ?? 15))
+        let bench = try await LanServerTests.Bench(port: port)
+        defer { bench.stop() }
+        var old: LanServerTests.Bench?
+        if let oldPort = env["KHAYT_SERVE_LIBRARY_OLD"].flatMap(UInt16.init) {
+            old = try await LanServerTests.Bench(port: oldPort, libraryAsBeforeFilters: true)
+        }
+        defer { old?.stop() }
+        func say(_ line: String) { FileHandle.standardError.write(Data((line + "\n").utf8)) }
+        say("SERVING the sample book at http://127.0.0.1:\(bench.port)/ for \(minutes) min (owner PIN header: the bench's test PIN)")
+        if let old { say("SERVING as a Mac before the filters at http://127.0.0.1:\(old.port)/") }
+        try await Task.sleep(for: .seconds(minutes * 60))
+        say("SERVE ended")
+    }
+
     @Test("a thumbnail where there is one, a 404 where there is none")
     func thumbs() async throws {
         let bench = try await LanServerTests.Bench()
