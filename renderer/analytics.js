@@ -114,13 +114,9 @@ function renderSimpleReports() {
     .filter(o => payStatus(o) !== 'paid')
     .reduce((s, o) => s + orderOwedBase(o), 0);
 
-  const tagRev = {};
-  for (const o of monthOrders) {
-    for (const tag of (o.tags || [])) {
-      tagRev[tag] = (tagRev[tag] || 0) + orderNetRevenueBase(o);
-    }
-  }
-  const topTags = Object.entries(tagRev).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  // By product, or the job's name when it has none — not by tag, which listed
+  // a shop's own labels ("1. sample") as its products (Nov 11 review, X14).
+  const topSellers = _topLists()?.topSellers(monthOrders, _topCtx(), { limit: 3 }) || [];
 
   wrap.innerHTML = `
     <div class="card" id="simpleReportsCard" style="margin-top:0;">
@@ -140,14 +136,14 @@ function renderSimpleReports() {
       </div>
     </div>
     ${monthGoalHtml()}
-    ${topTags.length > 0 ? `
+    ${topSellers.length > 0 ? `
     <h4 style="font-size:13px;font-weight:600;margin:0 0 10px;">${escapeHtml(t('an.simple_top_products') || 'Top products this month')}</h4>
     <ul class="leaderboard" style="margin-bottom:16px;">
-      ${topTags.map(([ tag, rev ], i) => `
+      ${topSellers.map((row, i) => `
         <li>
           <span class="rank">${i + 1}.</span>
-          <span class="name">${escapeHtml(tag)}</span>
-          <span class="value">${fmtPrice(rev)}</span>
+          <span class="name">${escapeHtml(row.name)}</span>
+          <span class="value">${fmtPrice(row.revenue)}</span>
         </li>`).join('')}
     </ul>` : ''}
     <button class="btn small" id="btnSimpleReportsCsv">${escapeHtml(t('an.simple_csv') || 'Download CSV')}</button>
@@ -1761,6 +1757,9 @@ function renderNewVsReturning() {
     // here, which would be a second answer.
     inWindow: (o) => inRange(o.date, analyticsRange, 'analytics'),
   });
+  // No jobs in the window: no card at all, not an empty box (Nov 11 review, X15).
+  const card = document.getElementById('newVsReturningCard');
+  if (card) card.style.display = mix.totals.jobs === 0 ? 'none' : '';
   if (mix.totals.jobs === 0) { el.innerHTML = ''; return; }
 
   const newRev = mix.fresh.revenue, retRev = mix.returning.revenue;
