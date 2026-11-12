@@ -143,11 +143,11 @@ struct CarePlanSheet: View {
                 if !task.parts.isEmpty {
                     Text(shop.words.callIt("mac.cp_parts_used", ["parts": .string(
                         task.parts.map { shop.carePartName($0.id) }.joined(separator: ", "))]))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
                 if task.source == "starter" {
                     Text(shop.words.callIt("mac.cp_task_starter"))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Spacer(minLength: 6)

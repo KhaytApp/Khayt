@@ -37,7 +37,7 @@ struct NextUp: View {
                         HStack(spacing: 8) {
                             Text(machine.name).foregroundStyle(.secondary)
                             Text(shop.words.callIt(blocked.blocked))
-                                .font(.caption).foregroundStyle(.tertiary)
+                                .font(.caption).foregroundStyle(Khayt.faint)
                             Spacer()
                             // The one thing a printer cannot tell us, so a
                             // person says it — and only where it is the answer.
@@ -70,7 +70,7 @@ struct NextUp: View {
                     // the queue runs the other way and a pinned arrow points
                     // back at where the job came from. Held by
                     // `ColourStudioTests`, which caught this one.
-                    Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+                    Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(Khayt.faint)
                     Text(machine?.name ?? proposal.machineId)
                 }
                 Text(shop.words.callIt(proposal.reason))

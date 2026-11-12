@@ -1372,6 +1372,8 @@
  "mac.lock_recovery_once": "Anote e guarde em um lugar seguro. Ele é mostrado só agora; ele permite que um proprietário que esqueceu o PIN volte a entrar.",
  "mac.lock_recovery_title": "Código de recuperação",
  "mac.lock_screen_not_allowed": "Seu nível de acesso não inclui esta tela.",
+ "mac.mode_screen_hidden": "Esta tela faz parte do modo Profissional. Esta loja está no modo Simples.",
+ "mac.mode_open_settings": "Abrir Ajustes",
  "mac.lock_section": "Login da equipe",
  "mac.lock_section_hint": "Quando ativado, este Mac pergunta quem o está usando, e o nível de acesso de cada pessoa decide o que ela pode abrir e alterar. Ele mantém a equipe na sua parte do app; não é criptografia.",
  "mac.lock_set_pin": "Definir PIN",

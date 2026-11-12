@@ -481,7 +481,7 @@ struct Reports: View {
                         .monospacedDigit()
                         .foregroundStyle(pct < 10 ? Khayt.late : pct < 25 ? Khayt.attention : .primary)
                 } else {
-                    Text("—").foregroundStyle(.tertiary)
+                    Text("—").foregroundStyle(Khayt.faint)
                 }
             }
             // The table's last 10pt of slack, so the header is never cut.
@@ -506,7 +506,7 @@ struct Reports: View {
                             .monospacedDigit()
                         if r.vatReclaimable > 0 {
                             Text(Money.figure(-r.vatReclaimable))
-                                .font(.caption).foregroundStyle(.tertiary)
+                                .font(.caption).foregroundStyle(Khayt.faint)
                                 .help(shop.words.callIt("exp.vat_reclaimed"))
                         }
                     }
@@ -1140,7 +1140,7 @@ struct Reports: View {
                 HStack(spacing: 10) {
                     Text("\(place)")
                         .font(.callout.monospacedDigit())
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Khayt.faint)
                         .frame(width: 18, alignment: .trailing)
                     // A record with no name filled in reads as blank in Khayt's
                     // own lists. Here it says so, because a blank line in a
@@ -1192,7 +1192,7 @@ struct Reports: View {
                                     .font(.title3.weight(.semibold)).monospacedDigit()
                                     .foregroundStyle(Self.tint(bucket.label))
                                 Text(shop.words.callIt("an.aged_orders_n", ["n": .number(Double(bucket.count))]))
-                                    .font(.caption2).foregroundStyle(.tertiary)
+                                    .font(.caption2).foregroundStyle(Khayt.faint)
                             }
                             .card(rail: bucket.count == 0 ? nil : Self.rail(bucket.label), padding: 10)
                         }
@@ -1213,7 +1213,7 @@ struct Reports: View {
                                 // due date and shows only its own amount.
                                 if row.instalment {
                                     Image(systemName: "calendar.badge.clock")
-                                        .font(.caption).foregroundStyle(.tertiary)
+                                        .font(.caption).foregroundStyle(Khayt.faint)
                                 }
                             }
                         }
@@ -1238,7 +1238,7 @@ struct Reports: View {
                                     .foregroundStyle(.secondary)
                                 if row.notYetDue {
                                     Text(shop.words.callIt("mac.not_yet_due"))
-                                        .font(.caption2).foregroundStyle(.tertiary)
+                                        .font(.caption2).foregroundStyle(Khayt.faint)
                                 }
                             }
                         }
@@ -1358,7 +1358,7 @@ struct Reports: View {
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Drawn(mark: .reports, size: 13).foregroundStyle(.tertiary)
+                    Drawn(mark: .reports, size: 13).foregroundStyle(Khayt.faint)
                     // The days it holds as well, when the chosen period cuts
                     // the row short: "2026-Q4" over this month's figures
                     // would name a quarter they do not cover.
@@ -1370,7 +1370,7 @@ struct Reports: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(shop.words.callIt("an.pnl_orders") + " \(row.orders)")
-                        .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        .font(.caption).foregroundStyle(Khayt.faint).monospacedDigit()
                 }
                 Waterfall(steps: steps, currency: shop.currency, height: 220)
             }
