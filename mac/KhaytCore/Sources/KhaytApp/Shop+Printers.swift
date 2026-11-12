@@ -1192,7 +1192,10 @@ extension Shop {
         // footer on every screen, and an Arabic shop read its tax name in
         // Arabic followed by "included in the price" in English.
         let key = profile.mode == .inclusive ? "mac.tax_inclusive" : "mac.tax_exclusive"
-        return words.callIt(key, ["name": .string(profile.name),
+        // The name in the app's language where it has one (`taxLabel`): the
+        // Arabic line began with the Latin "VAT", so the whole line was laid
+        // out left to right in a right-to-left sidebar (Nov 11 UI review, B22).
+        return words.callIt(key, ["name": .string(Self.taxLabel(profile.name, words: words)),
                                   "pct": .string(Money.figure(profile.totalPercent))])
     }
 

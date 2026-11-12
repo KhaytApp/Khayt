@@ -769,7 +769,7 @@ struct WebStoreSheet: View {
                             }
                             if let at = shop.webStoreAt {
                                 Text(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened)))
-                                    .foregroundStyle(.tertiary).monospacedDigit()
+                                    .foregroundStyle(Khayt.faint).monospacedDigit()
                             }
                         }
                     }

@@ -203,8 +203,35 @@ struct Figure: View {
     /// the formatter. One, for now, and it is the shop's own.
     static func hasOwnMark(_ code: String) -> Bool { code == "SAR" }
 
-    /// First-strong isolate … pop. The `<bdi>` of the reference implementation.
-    static func isolated(_ text: String) -> String { "\u{2068}" + text + "\u{2069}" }
+    /// An isolate … pop, so a figure or a name keeps its own order inside a
+    /// sentence in the other direction. The `<bdi>` of the reference
+    /// implementation, with one difference that matters in Arabic:
+    ///
+    /// A FIRST-STRONG isolate (U+2068) takes its direction from the first
+    /// letter inside it. "250 × 220 × 270" and "8,419 / 8,000" have no letter
+    /// at all, and an isolate with no strong character falls back to the
+    /// direction of the paragraph around it (UAX #9, P2 and P3 applied by X5c)
+    /// — right to left in an Arabic line. So the bed read 270 × 220 × 250 and
+    /// a nozzle at 8,419 of 8,000 g read "8,000 / 8,419": used and limit
+    /// swapped (Nov 11 2026 UI review, B16). Text with no letter in it is
+    /// isolated LEFT TO RIGHT (U+2066) instead; text with letters keeps the
+    /// first-strong isolate, so an Arabic name inside an English line is still
+    /// right to left.
+    static func isolated(_ text: String) -> String {
+        (isBareFigure(text) ? "\u{2066}" : "\u{2068}") + text + "\u{2069}"
+    }
+
+    /// Numbers with no letter beside them: "250 × 220 × 270", "8,419 / 8,000",
+    /// "+966 50 123 4567", "210° / 60°", in either digit set. A currency mark
+    /// alone is not one; it has no order to lose.
+    static func isBareFigure(_ text: String) -> Bool {
+        var digit = false
+        for scalar in text.unicodeScalars {
+            if scalar.properties.isAlphabetic { return false }
+            if scalar.properties.numericType != nil { digit = true }
+        }
+        return digit
+    }
 
     /// What the mark leaf actually says.
     ///

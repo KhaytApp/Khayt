@@ -71,7 +71,7 @@ struct ConsumableSheet: View {
                         // item whatever this says, and a shop that leaves this
                         // at nought should know that is not "never warn me".
                         Text(shop.words.callIt("cons.min_stock_note"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
                 GridRow {
@@ -105,7 +105,7 @@ struct ConsumableSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         amount($usagePerHour, step: 0.01)
                         Text(shop.words.callIt("cons.auto_deducted"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
                 GridRow {

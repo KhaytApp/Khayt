@@ -4106,6 +4106,7 @@
   "cloud.portal_no_response": "Aún no hay respuesta",
   "cloud.portal_approved": "El cliente aprobó la cotización",
   "cloud.portal_declined": "El cliente rechazó la cotización",
+  "cloud.portal_declined_earlier": "El cliente rechazó la versión anterior; se espera su respuesta a la nueva",
   "cloud.portal_approved_advanced": "El cliente aprobó — pedido movido a Pendiente",
   "cloud.deposit_amount": "Depósito a solicitar (opcional)",
   "cloud.deposit_payurl": "Enlace de pago (opcional)",

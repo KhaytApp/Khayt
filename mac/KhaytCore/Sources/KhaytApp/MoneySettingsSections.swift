@@ -310,6 +310,7 @@ struct LoyaltyTiersSection: View {
                             } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless)
                             .help(words.callIt("common.delete"))
+                            .accessibilityLabel(IconLabel.naming(words.callIt("common.delete"), tier.name))
                         }
                     }
                 }

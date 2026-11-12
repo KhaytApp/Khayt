@@ -108,11 +108,11 @@ struct GiftCards: View {
                         HStack(spacing: 4) {
                             if closed(card) {
                                 Text(shop.words.callIt("mac.gc_closed"))
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(Khayt.faint)
                             } else {
                                 Text(Money.figure(card.balance ?? 0)).monospacedDigit()
                             }
-                            Text("/").foregroundStyle(.tertiary)
+                            Text("/").foregroundStyle(Khayt.faint)
                             Text(Money.text(card.initialBalance ?? 0, shop.currency))
                                 .monospacedDigit().foregroundStyle(.secondary)
                         }

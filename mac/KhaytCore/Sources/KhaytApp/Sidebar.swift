@@ -30,7 +30,7 @@ struct Sidebar: View {
     /// into its isolated forms, which is a different (and unreadable) word.
     private func eyebrow(_ key: String) -> some View {
         Text(shop.words.callIt(key))
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(TypeScale.eyebrow(10))
             .tracking(shop.words.isRTL ? 0 : 1.2)
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
