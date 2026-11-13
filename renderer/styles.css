@@ -3442,6 +3442,48 @@ button.tag-chip, .tag-chip[data-act] {
 
 /* ── Simple mode: hide professional-only features ─────────── */
 body.mode-simple .pro-only { display: none !important; }
+/* The Pro part of a SIMPLE_MAP row (renderer/simple-mode.js). Simple only:
+   enthusiast (Bed Ready) keeps what it shows today. */
+body.mode-simple [data-simple-pro] { display: none !important; }
+
+/* "Part of Professional": a gated tab shows the panel instead of its content. */
+.tab-content.sm-gated > :not(.sm-gate) { display: none !important; }
+.tab-content:not(.sm-gated) > .sm-gate { display: none; }
+/* Figma 7Iqw0GcrLLRW7CLDEhTa1P, S4 card 2 (79:175). */
+.sm-gate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  margin: 48px auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, var(--bg-elev));
+  text-align: center;
+}
+.sm-gate-mark { inline-size: 40px; block-size: 40px; border-radius: 50%; background: var(--bg-elev, #eef0f1); }
+.sm-gate-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.sm-gate-body { margin: 0; max-width: 360px; font-size: 13px; color: var(--text-muted); }
+.sm-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.sm-gate-actions .btn { min-height: 36px; border-radius: 999px; padding-inline: 16px; }
+
+/* S4 card 1 (79:160): the mode beside the name in the sidebar head — steel,
+   the "waiting / neutral" status colour. */
+.sm-mode-badge {
+  margin-inline-start: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  background: #EDF0F4;
+  color: #5E6C84;
+}
+[data-theme="dark"] .sm-mode-badge { background: #3A4658; color: #A9B8CF; }
+.khayt-sidebar.collapsed .sm-mode-badge { display: none; }
 
 /* ── Enthusiast (hobbyist) mode: no commerce at all ───────────
    Stricter than simple — hides both the Pro depth (.pro-only) and every

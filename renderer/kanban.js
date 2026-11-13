@@ -651,7 +651,7 @@ function renderKanban() {
           <button class="btn small danger" data-act="qc-fail" data-id="${log.id}" style="margin-inline-start:4px;">${_kIcoL('cross', '❌')}${escapeHtml(t('ord.qc_fail'))}</button>${woBtn}${notifyBtn}${trackBtn}${labelBtn}`;
       }
       const bnplBtn = (biz && (settings.bnpl?.tabby?.enabled || settings.bnpl?.tamara?.enabled || settings.bnpl?.stripe?.enabled))
-        ? `<button class="btn small ghost" data-act="bnpl-pay" data-id="${log.id}" title="${escapeHtml(t('bnpl.payment_modal'))}" aria-label="${escapeHtml(t('bnpl.payment_modal'))}"><span aria-hidden="true">💳</span></button>`
+        ? `<button class="btn small ghost" data-act="bnpl-pay" data-simple-pro="paymentPlans" data-id="${log.id}" title="${escapeHtml(t('bnpl.payment_modal'))}" aria-label="${escapeHtml(t('bnpl.payment_modal'))}"><span aria-hidden="true">💳</span></button>`
         : '';
       // Shipping is orthogonal to print status — a "Ship" action off the completed/delivered
       // state (label reflects current shipping status once shipped).
