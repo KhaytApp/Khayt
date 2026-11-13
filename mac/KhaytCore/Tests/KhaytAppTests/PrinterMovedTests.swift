@@ -104,6 +104,25 @@ struct PrinterMovedTests {
         #expect(!Shop.needsIdentity(try machine(["type": "moonraker", "host": " "]), answering: true, asked: []))
     }
 
+    @Test("why an offer is made is said in the shop's language, and a guess gives no reason")
+    func whyIsTranslated() async throws {
+        #expect(MachineCard.relocationWhyKey("serial") == "mac.moved_why_serial")
+        #expect(MachineCard.relocationWhyKey("mac") == "mac.moved_why_mac")
+        #expect(MachineCard.relocationWhyKey("model") == nil && MachineCard.relocationWhyKey("protocol") == nil)
+        let engine = try KhaytEngine()
+        for lang in ["en", "ar"] {
+            let words = Words()
+            await words.load(lang, engine: engine)
+            for key in ["mac.moved_why_serial", "mac.moved_why_mac", "mac.moved_not_now", "mac.moved_dhcp_hint"] {
+                #expect(words.callIt(key) != key, "\(lang): \(key)")
+            }
+        }
+        // The card no longer shows the rule's English sentence.
+        let card = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/KhaytApp/ShopFloor.swift"), encoding: .utf8)
+        #expect(!card.contains("Text(move.why)"))
+    }
+
     @Test("the sample book never asks the network anything")
     func sampleNeverSearches() async throws {
         let shop = Shop()

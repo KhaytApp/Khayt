@@ -264,15 +264,31 @@ struct MachineCard: View {
     /// MAC or a serial is identity — neither moves with a DHCP lease — and may
     /// be applied on one confirmation. A model match is "strong, and still a
     /// guess", so it is proposed and says so.
+    /// The words for why a move is offered: the recorded serial or network
+    /// card answered at the new address. Nil for a resemblance.
+    static func relocationWhyKey(_ confidence: String) -> String? {
+        switch confidence {
+        case "serial": "mac.moved_why_serial"
+        case "mac": "mac.moved_why_mac"
+        default: nil
+        }
+    }
+
     @ViewBuilder private var relocateRow: some View {
         let move = shop.relocations.first { $0.machineId == machine.id }
         VStack(alignment: .leading, spacing: 6) {
             if let move {
                 Text(shop.words.callIt("mac.moved_here", ["host": .string(move.to)]))
                     .font(.callout).foregroundStyle(.primary)
-                Text(move.why)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Why Khayt is sure, in the shop's language. The rule's own
+                // `why` is English, and an Arabic shop saw it on this card
+                // (#2448 review). A guess says nothing here: `mac.moved_maybe`
+                // below already says check before you apply.
+                if let why = Self.relocationWhyKey(move.confidence) {
+                    Text(shop.words.callIt(why))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !move.isIdentity {
                     Text(shop.words.callIt("mac.moved_maybe"))
                         .font(.caption).foregroundStyle(Khayt.attention)

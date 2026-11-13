@@ -3944,5 +3944,7 @@
  "mac.job_customer_unknown": "Ce client n’est plus dans le registre.",
  "mac.job_customer_currency": "Ce client est facturé dans une autre devise. Le travail garde son prix et sa devise.",
  "mac.moved_not_now": "Pas maintenant",
- "mac.moved_dhcp_hint": "Khayt a cherché sur le réseau et n'a pas trouvé cette imprimante à une autre adresse. Si son adresse change souvent, donnez-lui une adresse fixe (une réservation DHCP) dans votre routeur."
+ "mac.moved_dhcp_hint": "Khayt a cherché sur le réseau et n'a pas trouvé cette imprimante à une autre adresse. Si son adresse change souvent, donnez-lui une adresse fixe (une réservation DHCP) dans votre routeur.",
+ "mac.moved_why_serial": "L'imprimante à cette adresse a donné le numéro de série de cette machine.",
+ "mac.moved_why_mac": "L'imprimante à cette adresse a la carte réseau de cette machine."
 }

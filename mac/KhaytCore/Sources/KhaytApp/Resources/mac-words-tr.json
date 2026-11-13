@@ -3944,5 +3944,7 @@
  "mac.job_customer_unknown": "Bu müşteri artık defterde değil.",
  "mac.job_customer_currency": "Bu müşteri başka bir para biriminde faturalanıyor. İş fiyatını ve para birimini korur.",
  "mac.moved_not_now": "Şimdi değil",
- "mac.moved_dhcp_hint": "Khayt ağda aradı ve bu yazıcıyı başka bir adreste bulamadı. Adresi sürekli değişiyorsa, yönlendiricide ona sabit bir adres (DHCP rezervasyonu) verin."
+ "mac.moved_dhcp_hint": "Khayt ağda aradı ve bu yazıcıyı başka bir adreste bulamadı. Adresi sürekli değişiyorsa, yönlendiricide ona sabit bir adres (DHCP rezervasyonu) verin.",
+ "mac.moved_why_serial": "Oradaki yazıcı bu makinenin seri numarasını bildirdi.",
+ "mac.moved_why_mac": "Oradaki yazıcı bu makinenin ağ kartına sahip."
 }
