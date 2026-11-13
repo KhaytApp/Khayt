@@ -364,6 +364,8 @@ jobs:
         run: xvfb-run -a npm run test:e2e:pricekeep
       - name: E2E smoke (Simple mode follows SIMPLE_MAP)
         run: xvfb-run -a npm run test:e2e:simplemap
+      - name: E2E smoke (Simple mode reduced screens, S4 cards 6-8)
+        run: xvfb-run -a npm run test:e2e:simpleforms
 
       - name: E2E smoke (Nov 11 UI review fixes — scroll, counts, dates, a11y, analytics)
         run: xvfb-run -a npm run test:e2e:uixfixes

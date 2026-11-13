@@ -2449,6 +2449,8 @@ async function renderPrintLibLocation() {
   const cfg = (settings && settings.printLibrary) || {};
   rootEl.value = cfg.root || '';
   mirrorEl.value = cfg.mirror || '';
+  // Simple's three places (S4 card 8) read the same settings.
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   const s3 = cfg.s3 || {};
   const setV = (id, v) => { const el = $(id); if (el) el.value = v || ''; };
   if ($('#set_plibS3On')) $('#set_plibS3On').checked = !!s3.enabled;
@@ -2788,6 +2790,7 @@ function plibVaultLock() {
 async function renderPrintLibGDrive() {
   const cfg = ((settings && settings.printLibrary) || {}).gdrive || {};
   const status = $('#plibGDStatus');
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   if ($('#set_plibGDriveOn')) $('#set_plibGDriveOn').checked = !!cfg.enabled;
   plibVaultLock();
   if ($('#set_plibGDClientId')) $('#set_plibGDClientId').value = cfg.clientId || '';
@@ -6587,7 +6590,8 @@ function renderPostChecklistSettings() {
   el.innerHTML = list.map((ch, i) => `
     <div class="post-check-setting-row">
       <span style="flex:1; font-size:13px;">${escapeHtml(ch.label)}</span>
-      <button class="btn danger small" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button class="btn danger small sm-pro-form" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}" title="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}">${escapeHtml(t('common.remove'))}</button>
     </div>`).join('');
 }
 
@@ -6624,9 +6628,10 @@ function renderCustomFieldsSettings() {
   }
   el.innerHTML = fields.map((f, i) => `
     <div class="post-check-setting-row">
-      <span style="flex:1; font-size:13px;">${escapeHtml(f.label)}</span>
-      <span style="font-size:11px; color:var(--text-muted); margin-inline-end:8px;">${escapeHtml(f.type || 'text')}</span>
-      <button class="btn danger small" data-act="del-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <span style="flex:1; font-size:13px;">${escapeHtml(f.label)}<span class="sm-simple-only sm-row-sub">${escapeHtml(t('sm.cf_text_sub'))}</span></span>
+      <span class="sm-pro-form" style="font-size:11px; color:var(--text-muted); margin-inline-end:8px;">${escapeHtml(f.type || 'text')}</span>
+      <button class="btn danger small sm-pro-form" data-act="del-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="edit-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}" title="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}">${escapeHtml(t('common.edit'))}</button>
     </div>`).join('');
 }
 
@@ -6641,6 +6646,36 @@ function addCustomField() {
   saveAll();
   renderCustomFieldsSettings();
   toast(t('set.custom_field_added'), 'success');
+}
+
+/** Simple (S4 card 7): "Edit" on a custom order field renames it, or removes
+ *  it. The field keeps its id and type, so what orders already hold under it
+ *  stays theirs. */
+function editCustomField(idx) {
+  const f = (settings.customFields || [])[idx];
+  if (!f) return;
+  openFormModal({
+    title: t('sm.cf_edit_title'),
+    sizeLg: false,
+    bodyHtml: `<label for="smCfLabel">${escapeHtml(t('common.name'))}</label>
+      <input type="text" id="smCfLabel" value="${escapeHtml(f.label || '')}" required>
+      <p class="settings-hint" style="margin:6px 0 0;">${escapeHtml(t('sm.cf_text_sub'))}</p>
+      <button type="button" class="btn ghost small" id="smCfRemove" style="margin-top:14px;color:var(--danger);">${escapeHtml(t('common.remove'))}</button>`,
+    onMount(modal) {
+      modal.querySelector('#smCfRemove')?.addEventListener('click', () => {
+        modal.querySelector('[data-act="cancel"]')?.click();
+        deleteCustomField(idx);
+      });
+    },
+    onSave(modal) {
+      const label = (modal.querySelector('#smCfLabel')?.value || '').trim();
+      if (!label) return false;
+      f.label = label;
+      saveAll();
+      renderCustomFieldsSettings();
+      return true;
+    },
+  });
 }
 
 function deleteCustomField(idx) {
@@ -7200,6 +7235,7 @@ function renderNtfySettings() {
     addPostCheckItem,
     deletePostCheckItem,
     renderCustomFieldsSettings,
+    editCustomField,
     addCustomField,
     deleteCustomField,
     exportData,
