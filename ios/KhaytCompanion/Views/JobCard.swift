@@ -148,6 +148,9 @@ struct JobCard: View {
                     stageChip
                     if let note = filing?.note { SimpleNoteTag(text: SimpleBoard.noteText(note)) }
                     if order.isRush { RushBadge() }
+                    // Home's compact card says "Late" in words as well as with
+                    // the red outline (the full layout says it on its due line).
+                    if layout == .compact, order.isOverdue { LateBadge() }
                     Spacer(minLength: 0)
                 }
                 Text(order.displayTitle)

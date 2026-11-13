@@ -272,14 +272,16 @@ struct SpoolSwatch: View {
     let hex: String?
     var size: CGFloat = 34
 
+    static func ring(for size: CGFloat) -> CGFloat { size < 24 ? 1.5 : 2 }
+
     var body: some View {
         Circle()
             .fill(hex.flatMap { Color(hex: $0) } ?? KhaytDesign.sunk)
             .frame(width: size, height: size)
-            // Ink, not the hairline: a black spool on the dark surface had
-            // only #3a342c around it and vanished; a white one did the same
-            // in light. A faint ring of the text colour shows both.
-            .overlay(Circle().strokeBorder(KhaytDesign.ink.opacity(0.22), lineWidth: 1))
+            // A quiet ink ring, 2 pt (1.5 on the small dots): a black spool
+            // on navy and a white one on paper both vanished behind a 1 pt
+            // faint line (review W7, Figma 28:107).
+            .overlay(Circle().strokeBorder(KhaytDesign.swatchRing, lineWidth: Self.ring(for: size)))
             .accessibilityHidden(true)
     }
 }

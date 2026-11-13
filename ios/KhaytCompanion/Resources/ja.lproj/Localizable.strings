@@ -836,6 +836,28 @@
 "library.priced_here" = "お店の価格を使用してこのiPhoneで計算しました。複数色のモデルは1つのスプールで原価計算されるため、Macの金額と少し異なる場合があります。";
 "library.no_copy" = "Macに接続できません。「設定」でKhayt Cloudにサインインして一度同期すると、ライブラリを持ち出せます。";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "ピンク";
+"colour.brown" = "茶";
+"library.filter.colour" = "色";
+"library.filter.type" = "ファイル形式";
+"library.filter.multi" = "多色";
+"library.filter.none" = "色情報なし";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "その他";
+"library.type.nofile" = "ファイルなし（ウェブから）";
+"library.filter.colour_hint" = "複数選ぶと、そのいずれかを含むモデルが表示されます。";
+"library.filter.counts_hint" = "件数は他のフィルターを適用したライブラリのものです。0件の行は消さずに薄く表示します。";
+"library.filter.n_of_m" = "%2$d件中%1$d件";
+"library.filter.pill" = "%1$@：%2$@";
+"library.filter.remove" = "%@を外す";
+"library.filter.row" = "%1$@：%2$d";
+"library.filter.chosen" = "%1$@、選択：%2$d";
+
 /* Catalogue */
 "catalogue.title" = "製品カタログ";
 "catalogue.search" = "製品を検索";
@@ -1282,6 +1304,12 @@
 "diag.cloud_refused" = "最後に拒否したクラウドの取得";
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
+"intake.waiting" = "待ち";
+"spool.low" = "残りわずか";
+"stage.a11y.done" = "完了";
+"order.new.hint.client" = "選ぶか名前を入力";
+"order.new.hint.project" = "何を作る？例：部品名";
+"order.new.hint.material" = "例：PLA、黒";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "読み込めませんでした";
@@ -1306,3 +1334,31 @@
 "simple.gate.back_machine" = "マシンに戻る";
 "simple.gate.back_machines" = "マシンに戻る";
 "simple.expenses.count" = "経費%d件";
+"PUSH_GENERIC" = "ショップに確認が必要な項目があります";
+"push.not_connected" = "通知はまだこのiPhoneに届いていません。次に開いたときに再試行します。";
+/* Home — Needs you */
+"home.greeting.morning" = "おはようございます。";
+"home.greeting.afternoon" = "こんにちは。";
+"home.greeting.evening" = "こんばんは。";
+"needs.title" = "対応が必要";
+"needs.none" = "今は対応が必要なものはありません。";
+"needs.calm" = "遅れている注文はなく、在庫も十分で、待っている人もいません。";
+"needs.late.one" = "%1$@ の期日は %2$@ でした";
+"needs.late.action" = "遅れている注文を開く";
+"needs.low.title" = "在庫が少なくなっています";
+"needs.low.left" = "%1$@ 残り %2$@";
+"needs.low.action" = "在庫を見る";
+"needs.waiting.action" = "受付を開く";
+"needs.quotes.action" = "見積もりを開く";
+"tile.owed" = "未回収";
+"tile.machines" = "稼働中のマシン";
+"tile.machines.value" = "%2$d台中%1$d台";
+"tile.machines.sub" = "印刷中";
+"needs.due_week" = "今週が期日";
+"needs.this_year" = "今年 %@";
+"needs.owed" = "未回収 %@";
+"needs.count" = "対応が必要なことが%d件あります。";
+"needs.late" = "%d件の注文が遅れています";
+"needs.low.count" = "残り少ないスプール %d個";
+"needs.quotes" = "返答待ちの見積もり %d件";
+"needs.more" = "ほか%d件";

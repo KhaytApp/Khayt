@@ -69,7 +69,7 @@ struct NewOrderSheet: View {
                     VStack(spacing: 0) {
                         field(L10n.tr("order.new.client")) {
                             HStack(spacing: 8) {
-                                TextField(L10n.tr("order.new.client"), text: $draft.client, prompt: prompt("Acme Robotics"))
+                                TextField(L10n.tr("order.new.client"), text: $draft.client, prompt: prompt(L10n.tr("order.new.hint.client")))
                                     .onChange(of: draft.client) { _, typed in
                                         // Typing over a picked customer unpicks it.
                                         if let id = draft.clientId,
@@ -106,15 +106,15 @@ struct NewOrderSheet: View {
                             .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
                         }
                         field(L10n.tr("order.new.project")) {
-                            TextField(L10n.tr("order.new.project"), text: $draft.project, prompt: prompt("Falcon hood"))
+                            TextField(L10n.tr("order.new.project"), text: $draft.project, prompt: prompt(L10n.tr("order.new.hint.project")))
                         }
                         field(L10n.tr("order.new.material")) {
-                            TextField(L10n.tr("order.new.material"), text: $draft.material, prompt: prompt("PLA · Ink"))
+                            TextField(L10n.tr("order.new.material"), text: $draft.material, prompt: prompt(L10n.tr("order.new.hint.material")))
                         }
                         // The shop's own currency when the book says it.
                         field(currency.map { L10n.format("order.new.price_in", Money.mark($0)) }
                               ?? L10n.tr("order.new.price")) {
-                            TextField(L10n.tr("order.new.price"), text: $draft.price, prompt: prompt("0"))
+                            TextField(L10n.tr("order.new.price"), text: $draft.price, prompt: prompt((0.0).formatted(.number.precision(.fractionLength(2)).locale(L10n.locale))))
                                 .keyboardType(.decimalPad)
                         }
                         dueRow
@@ -158,7 +158,7 @@ struct NewOrderSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("common.cancel")) { dismiss() }
+                    Button(L10n.tr("common.close")) { dismiss() }
                 }
             }
             .task {
@@ -213,8 +213,9 @@ struct NewOrderSheet: View {
         .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
 
-    /// A placeholder, in the design's dimmer ink. An example, not an
-    /// instruction — the label above already says what goes here.
+    /// A placeholder, in the design's dimmer ink: a hint that says what to
+    /// type, in the app's language. A made-up customer ("Acme Robotics") read
+    /// as a filled value and stayed English on an Arabic phone (review W6).
     private func prompt(_ example: String) -> Text {
         Text(verbatim: example).foregroundStyle(KhaytDesign.note.opacity(0.6))
     }

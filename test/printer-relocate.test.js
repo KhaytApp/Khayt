@@ -346,3 +346,35 @@ test('coming back online clears the explanation rather than leaving it stale', (
   const kept = cache.mergePollFailure(stale, 'still down', Date.now());
   assert.deepEqual(kept.relocated, { from: '.77', to: '.56' });
 });
+
+// ── Two printers that both call themselves "lava" ──────────────────────────────
+
+test('two U1s both named "lava": only the one whose serial was recorded is offered', () => {
+  const S = require('../lib/printer-sweep.js');
+  const found = (host, prod, cpu, mac) => Object.assign(
+    S.identifyResponse('moonraker', host, 200, { result: { state: 'ready', hostname: 'lava', software_version: '1.5.2' } }),
+    S.readIdentity('moonraker', { result: { system_info: { product_info: { serial_number: prod }, cpu_info: { serial_number: cpu },
+      network: { wlan0: { mac_address: mac } } } } }));
+  const baby = found('192.168.68.74', '811002610171', 'CPU-B', '40:fd:f3:00:00:74');
+  const other = found('192.168.68.56', '811002606081', 'CPU-O', '40:fd:f3:00:00:56');
+  assert.equal(baby.name, 'lava'); assert.equal(other.name, 'lava');
+  const machine = (api) => ({ id: 'm1', name: 'Baby U1', printerApi: Object.assign({ type: 'moonraker', host: '192.168.68.77', port: 7125 }, api) });
+  const offline = { m1: { error: 'timeout', consecutiveFailures: 5 } };
+  const plan = (m, discovered) => R.planRelocations({ machines: [m], discovered, statusCache: offline });
+
+  // By product serial.
+  let p = plan(machine({ serial: '811002610171' }), [other, baby]);
+  assert.deepEqual(p.moves.map((x) => [x.to, x.confidence]), [['192.168.68.74', 'serial']]);
+  // By the board serial recorded before product serials were read.
+  p = plan(machine({ serial: 'CPU-B' }), [other, baby]);
+  assert.deepEqual(p.moves.map((x) => [x.to, x.confidence]), [['192.168.68.74', 'serial']]);
+  // By the network card.
+  p = plan(machine({ mac: '40:FD:F3:00:00:74' }), [other, baby]);
+  assert.deepEqual(p.moves.map((x) => [x.to, x.confidence]), [['192.168.68.74', 'mac']]);
+  // Only the OTHER printer on the network: no identity move.
+  p = plan(machine({ serial: '811002610171' }), [other]);
+  assert.equal(p.moves.filter((x) => x.confidence === 'serial' || x.confidence === 'mac').length, 0);
+  // Nothing recorded at all: whatever is offered is a guess, never identity.
+  p = plan(machine({}), [other, baby]);
+  assert.equal(p.moves.filter((x) => x.confidence === 'serial' || x.confidence === 'mac').length, 0);
+});

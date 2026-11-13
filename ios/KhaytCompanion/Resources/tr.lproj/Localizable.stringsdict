@@ -82,6 +82,86 @@
 			<string>%d ayrı makara, her biri ayrı takip edilir.</string>
 		</dict>
 	</dict>
+	<key>needs.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d şey sizi bekliyor.</string>
+			<key>other</key>
+			<string>%d şey sizi bekliyor.</string>
+		</dict>
+	</dict>
+	<key>needs.late</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d iş gecikti</string>
+			<key>other</key>
+			<string>%d iş gecikti</string>
+		</dict>
+	</dict>
+	<key>needs.low.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d makara azaldı</string>
+			<key>other</key>
+			<string>%d makara azaldı</string>
+		</dict>
+	</dict>
+	<key>needs.quotes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d teklif yanıt bekliyor</string>
+			<key>other</key>
+			<string>%d teklif yanıt bekliyor</string>
+		</dict>
+	</dict>
+	<key>needs.more</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>ve %d tane daha</string>
+			<key>other</key>
+			<string>ve %d tane daha</string>
+		</dict>
+	</dict>
 	<key>simple.expenses.count</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

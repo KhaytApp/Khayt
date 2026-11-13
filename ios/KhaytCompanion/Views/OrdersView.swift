@@ -217,7 +217,14 @@ struct OrdersView: View {
             chip = .all
         }
         #endif
-        if let pending = ordersNav.pendingStatusFilter, simpleBoard {
+        if let pending = ordersNav.pendingStatusFilter, pending == .quote {
+            // Home's "quotes waiting" row: the Quotes list, not a chip, in
+            // either mode (Quotes is a segment in both).
+            segment = .quotes
+            chip = .all
+            ordersNav.pendingStatusFilter = nil
+            Task { await load() }
+        } else if let pending = ordersNav.pendingStatusFilter, simpleBoard {
             // Home's "printing" or "QC" lands on the stage it is filed under;
             // a finished job is History's, as in Professional.
             if pending == .completed {

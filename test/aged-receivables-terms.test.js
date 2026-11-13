@@ -40,9 +40,13 @@ test('a net-30 invoice from last week says "Not yet due", with its due date, and
   ], clients, now);
   assert.match(html, /an\.aged_col_due/);
   assert.match(html, /2026-11-22/, 'net 30 from Oct 23 is due Nov 22');
-  assert.match(html, /an\.aged_overdue 50\.00 · an\.aged_not_yet_due 100\.00/);
+  // Only the overdue part of the total is red (the shared status palette).
+  assert.match(html, /an\.aged_overdue <span class="aged-overdue is-late">50\.00<\/span> · an\.aged_not_yet_due 100\.00/);
   // The walk-in, due on receipt, is 20 days overdue and shown as a number.
   assert.match(html, />20<\/td>/);
+  // Red only on the overdue row; the not-yet-due row's cell is steel.
+  assert.match(html, /class="aged-days is-late"[^>]*>20<\/td>/);
+  assert.match(html, /class="aged-days is-wait"[^>]*>an\.aged_not_yet_due<\/td>/);
   // The bucket header is translated, not a hard-coded "DAYS — n order(s)".
   assert.doesNotMatch(html, / DAYS — /);
   assert.match(html, /an\.aged_bucket_days\{"label":"0–30"\}/);

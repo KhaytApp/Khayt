@@ -836,6 +836,28 @@
 "library.priced_here" = "已在此 iPhone 上按你的价格计算。多色模型按一卷线轴计算成本，因此可能与 Mac 上的数字略有差异。";
 "library.no_copy" = "无法连接 Mac。请在“设置”中登录 Khayt Cloud 并同步一次，你的模型库就会随身携带。";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "粉色";
+"colour.brown" = "棕色";
+"library.filter.colour" = "颜色";
+"library.filter.type" = "文件类型";
+"library.filter.multi" = "多色";
+"library.filter.none" = "无颜色信息";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "其他";
+"library.type.nofile" = "无文件（来自网页）";
+"library.filter.colour_hint" = "选择多个，可查看包含其中任意一种的模型。";
+"library.filter.counts_hint" = "数量按其他筛选条件之后的模型库计算。没有模型的行会变灰，不会被移除。";
+"library.filter.n_of_m" = "%1$d / %2$d";
+"library.filter.pill" = "%1$@：%2$@";
+"library.filter.remove" = "移除%@";
+"library.filter.row" = "%1$@：%2$d";
+"library.filter.chosen" = "%1$@，已选：%2$d";
+
 /* Catalogue */
 "catalogue.title" = "产品目录";
 "catalogue.search" = "搜索产品";
@@ -1008,7 +1030,7 @@
 "new.calculator.detail" = "手动计算价格";
 "new.expense.detail" = "拍下收据";
 "new.waste.detail" = "打印失败或冲料";
-"new.more" = "更多";
+"new.more" = "其他";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "单据";
 "paper.packing_slip" = "装箱单";
@@ -1282,6 +1304,12 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+"intake.waiting" = "等待中";
+"spool.low" = "偏低";
+"stage.a11y.done" = "已完成";
+"order.new.hint.client" = "选择或输入名称";
+"order.new.hint.project" = "做什么？例如零件名称";
+"order.new.hint.material" = "例如 PLA，黑色";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "无法加载";
@@ -1306,3 +1334,31 @@
 "simple.gate.back_machine" = "返回机器";
 "simple.gate.back_machines" = "返回机器列表";
 "simple.expenses.count" = "%d 笔支出";
+"PUSH_GENERIC" = "店里有事需要你看一下";
+"push.not_connected" = "提醒尚未送达这部手机。下次打开时 Khayt 会再试一次。";
+/* Home — Needs you */
+"home.greeting.morning" = "早上好。";
+"home.greeting.afternoon" = "下午好。";
+"home.greeting.evening" = "晚上好。";
+"needs.title" = "需要你处理";
+"needs.none" = "目前没有需要你处理的事。";
+"needs.calm" = "没有逾期订单，库存充足，也没有人在等待。";
+"needs.late.one" = "%1$@ 应于 %2$@ 交付";
+"needs.late.action" = "打开逾期订单";
+"needs.low.title" = "库存不足";
+"needs.low.left" = "%1$@ 剩余 %2$@";
+"needs.low.action" = "查看库存";
+"needs.waiting.action" = "打开请求";
+"needs.quotes.action" = "打开报价";
+"tile.owed" = "应收款";
+"tile.machines" = "机器上";
+"tile.machines.value" = "%1$d / %2$d";
+"tile.machines.sub" = "正在打印";
+"needs.due_week" = "本周到期";
+"needs.this_year" = "今年 %@";
+"needs.owed" = "应收 %@";
+"needs.count" = "有 %d 件事需要你处理。";
+"needs.late" = "%d 个订单已逾期";
+"needs.low.count" = "%d 卷线材不足";
+"needs.quotes" = "%d 份报价等待答复";
+"needs.more" = "还有 %d 项";

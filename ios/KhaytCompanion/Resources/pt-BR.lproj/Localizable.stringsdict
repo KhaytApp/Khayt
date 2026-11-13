@@ -82,6 +82,86 @@
 			<string>%d carretéis separados, cada um controlado individualmente.</string>
 		</dict>
 	</dict>
+	<key>needs.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d coisa precisa de você.</string>
+			<key>other</key>
+			<string>%d coisas precisam de você.</string>
+		</dict>
+	</dict>
+	<key>needs.late</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d pedido está atrasado</string>
+			<key>other</key>
+			<string>%d pedidos estão atrasados</string>
+		</dict>
+	</dict>
+	<key>needs.low.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d carretel baixo</string>
+			<key>other</key>
+			<string>%d carretéis baixos</string>
+		</dict>
+	</dict>
+	<key>needs.quotes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d orçamento aguarda resposta</string>
+			<key>other</key>
+			<string>%d orçamentos aguardam resposta</string>
+		</dict>
+	</dict>
+	<key>needs.more</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>e mais %d</string>
+			<key>other</key>
+			<string>e mais %d</string>
+		</dict>
+	</dict>
 	<key>simple.expenses.count</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

@@ -2044,6 +2044,14 @@ final class Shop {
     /// True while the subnets are being asked, which is the slow half and
     /// worth saying: mDNS answers instantly and a sweep takes seconds.
     var sweeping = false
+    /// The background search for a printer that changed address
+    /// (Shop+PrinterMoved.swift): when it last ran, whether it is running,
+    /// the quiet machines it looked for and could not find, and the machines
+    /// whose identity was already asked for this launch.
+    var movedSearchedAt: Date?
+    var movedSearching = false
+    var movedNotFound: Set<String> = []
+    var identityAsked: Set<String> = []
 
     // Stored for "Telling a printer what to do" (Shop+Printers.swift).
     /// What went wrong the last time a machine was told something, by machine.
@@ -3073,6 +3081,11 @@ final class Shop {
 
     /// The last print that ended on each machine, as `printFinished` saw it.
     var lastPrintEnded: [String: FinishCamera.Ended] = [:]
+    /// Shop events that could not be sent when they happened: the cloud was
+    /// locked on this Mac, or the post failed. Sent at the next chance
+    /// (`flushPendingEvents`). This run's only, and bounded.
+    @ObservationIgnored var pendingEvents: [Shop.PendingEvent] = []
+    @ObservationIgnored var pendingEventsTriedAt: Date?
 
     // Stored for "A job's photo, on its product" (Shop+Jobs.swift).
     /// The job whose invoice is on screen.

@@ -1,4 +1,5 @@
 import ActivityKit
+import Combine
 import SwiftUI
 
 /// For the one thing SwiftUI has no hook for: the APNs device token.
@@ -17,9 +18,10 @@ final class PushTokenDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         // No push on this build — the simulator, or a build signed without
-        // the `aps-environment` entitlement, which waits on Push being turned
-        // on for com.khaytapp.companion in the developer portal. Alerts still
-        // come from the live readings and the stream while the app is open.
+        // the `aps-environment` entitlement. Alerts still come from the live
+        // readings and the stream while the app is open. Logged, and a
+        // signed-in phone says so quietly in Settings.
+        Task { @MainActor in Self.api?.pushTokenFailed(error) }
     }
 }
 
@@ -174,10 +176,20 @@ struct KhaytCompanionApp: App {
                         api.refreshHoldsBook()
                         Task { await activities.push.sendAll() }
                         Task { await activeCount.tick() }
+                        // The APNs token too, unless the cloud took it in the
+                        // last few minutes; and whether alerts are still allowed.
+                        Task {
+                            await api.refreshPushRegistration()
+                            await CompanionNotifications.shared.refreshAuthorization()
+                        }
                     }
                 }
                 // Signing in or out of the cloud opens or closes the stream.
                 .onChange(of: api.cloud) { _, _ in channel.setActive(scenePhase == .active) }
+                // Alerts turned on or off in iOS Settings: tell the cloud at once.
+                .onReceive(CompanionNotifications.shared.$isAuthorized.removeDuplicates().dropFirst()) { _ in
+                    Task { await api.refreshPushRegistration(force: true) }
+                }
                 .task { channel.setActive(true) }
                 .task { await activeCount.tick() }
         }

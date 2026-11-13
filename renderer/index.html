@@ -129,10 +129,10 @@
             <span class="nav-icon" aria-hidden="true">◐</span>
             <span class="nav-label grow" data-i18n="tab.analytics">Analytics</span>
           </button>
-          <button type="button" class="tab-btn khayt-navitem pro-only" data-tab="expenses-tab" role="tab" id="tabbtn-expenses-tab" aria-selected="false" aria-controls="expenses-tab" tabindex="-1">
+          <button type="button" class="tab-btn khayt-navitem biz-only" data-tab="expenses-tab" role="tab" id="tabbtn-expenses-tab" aria-selected="false" aria-controls="expenses-tab" tabindex="-1">
             <span class="nav-icon" aria-hidden="true">◧</span>
             <span class="nav-label grow" data-i18n="tab.expenses">Expenses</span>
-            <span class="khayt-pro">PRO</span>
+            <span class="khayt-pro" data-simple-pro="expenses">PRO</span>
           </button>
         </div>
       </nav>
@@ -187,7 +187,7 @@
             <div id="notifPanel" style="display:none;position:absolute;inset-inline-end:0;top:calc(100% + 8px);width:340px;max-height:480px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-pop);z-index:8000"></div>
           </div>
           <button type="button" class="btn ghost sm" id="btnFeedback" data-i18n="feedback.title" data-i18n-aria="feedback.title" aria-label="Feedback &amp; bug reports" title="Feedback &amp; bug reports">💬</button>
-          <select class="input" id="locationFilter" aria-label="Location filter" data-i18n-aria="ui.filter_location" data-i18n-title="ui.filter_location" style="width:auto;height:34px;min-width:100px" title="Filter by location">
+          <select class="input" id="locationFilter" hidden aria-label="Location filter" data-i18n-aria="ui.filter_location" data-i18n-title="ui.filter_location" style="width:auto;height:34px;min-width:100px" title="Filter by location">
             <option value="">All locations</option>
           </select>
           <button type="button" class="btn ghost sm" id="btnNavSwitchOp" title="Switch operator" style="display:none">👤 <span id="operatorNavBadge"></span></button>
@@ -690,12 +690,12 @@
             <div class="ovf-menu">
               <button id="btnStartShift"><span data-khayt-icon="play"></span> <span data-i18n="startShift">Start Shift</span></button>
               <button id="btnEndOfDay"><span data-khayt-icon="clipboard"></span> <span data-i18n="endOfDayReport">End of Day</span></button>
-              <button id="btnScheduleView"><span data-khayt-icon="schedule"></span> <span data-i18n="kan.schedule_view">Schedule</span></button>
+              <button id="btnScheduleView" data-simple-pro="schedule"><span data-khayt-icon="schedule"></span> <span data-i18n="kan.schedule_view">Schedule</span></button>
               <button id="btnCalendarView"><span data-khayt-icon="calendar"></span> <span data-i18n="kan.calendar_view">Calendar</span></button>
               <button id="btnBatchPlanner"><span data-khayt-icon="clipboard"></span> <span data-i18n="kan.batch_planner">Batch Planner</span></button>
-              <button id="btnSuggestSchedule"><span data-khayt-icon="wand"></span> <span data-i18n="sched.suggest_btn">Suggest assignments</span></button>
-              <label data-i18n-title="sched.auto_hint" title="Automatically assign queued jobs to free, compatible machines"><input type="checkbox" id="chkAutoSchedule" style="width:auto;margin:0;"> <span data-i18n="sched.auto_toggle">Auto-assign</span></label>
-              <button id="btnKioskView"><span data-khayt-icon="monitor"></span> <span data-i18n="kan.kiosk_view">Kiosk</span></button>
+              <button id="btnSuggestSchedule" data-simple-pro="schedule"><span data-khayt-icon="wand"></span> <span data-i18n="sched.suggest_btn">Suggest assignments</span></button>
+              <label data-simple-pro="schedule" data-i18n-title="sched.auto_hint" title="Automatically assign queued jobs to free, compatible machines"><input type="checkbox" id="chkAutoSchedule" style="width:auto;margin:0;"> <span data-i18n="sched.auto_toggle">Auto-assign</span></label>
+              <button id="btnKioskView" data-simple-pro="kiosk"><span data-khayt-icon="monitor"></span> <span data-i18n="kan.kiosk_view">Kiosk</span></button>
             </div>
           </details>
         </div>
@@ -745,8 +745,8 @@
           <div class="kanban-col-meta" id="meta-pending"></div>
           <div id="list-pending"></div>
         </div>
-        <div class="kanban-col" data-status="on_hold" style="border-top: 3px solid var(--warning);">
-          <h3><span class="dot" style="background:var(--warning);"></span><span data-i18n="queue.on_hold">On Hold</span><span class="count" id="count-on_hold">0</span></h3>
+        <div class="kanban-col" data-status="on_hold">
+          <h3><span class="dot"></span><span data-i18n="queue.on_hold">On Hold</span><span class="count" id="count-on_hold">0</span></h3>
           <div class="kanban-col-meta" id="meta-on_hold"></div>
           <div id="list-on_hold"></div>
         </div>
@@ -760,8 +760,8 @@
           <div class="kanban-col-meta" id="meta-post"></div>
           <div id="list-post"></div>
         </div>
-        <div class="kanban-col" data-status="qc" style="border-top: 3px solid #a78bfa;">
-          <h3><span class="dot" style="background:#a78bfa;"></span><span data-i18n="kan.col_qc">QC</span><span class="count" id="count-qc">0</span></h3>
+        <div class="kanban-col" data-status="qc">
+          <h3><span class="dot"></span><span data-i18n="kan.col_qc">QC</span><span class="count" id="count-qc">0</span></h3>
           <div class="kanban-col-meta" id="meta-qc"></div>
           <div id="list-qc"></div>
         </div>
@@ -770,13 +770,13 @@
           <div class="kanban-col-meta" id="meta-completed"></div>
           <div id="list-completed"></div>
         </div>
-        <div class="kanban-col" data-status="shipped" style="border-top: 3px solid #06b6d4;">
-          <h3><span class="dot" style="background:#06b6d4;"></span><span data-i18n="queue.shipped_col">Shipped</span><span class="count" id="count-shipped">0</span></h3>
+        <div class="kanban-col" data-status="shipped">
+          <h3><span class="dot"></span><span data-i18n="queue.shipped_col">Shipped</span><span class="count" id="count-shipped">0</span></h3>
           <div class="kanban-col-meta" id="meta-shipped"></div>
           <div id="list-shipped"></div>
         </div>
-        <div class="kanban-col" data-status="delivered" style="border-top: 3px solid var(--success);">
-          <h3><span class="dot" style="background:var(--success);"></span><span data-i18n="queue.delivered_col">Delivered</span><span class="count" id="count-delivered">0</span></h3>
+        <div class="kanban-col" data-status="delivered">
+          <h3><span class="dot"></span><span data-i18n="queue.delivered_col">Delivered</span><span class="count" id="count-delivered">0</span></h3>
           <div class="kanban-col-meta" id="meta-delivered"></div>
           <div id="list-delivered"></div>
         </div>
@@ -888,7 +888,10 @@
 
     <!-- ===================== ANALYTICS ===================== -->
     <section id="analytics-tab" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-analytics-tab" aria-hidden="true" tabindex="-1">
-      <div class="toolbar" style="margin-bottom: 16px;">
+      <!-- SIMPLE_MAP money (S4 card 5): in Simple this tab is the one-page
+           Money summary, drawn into #analyticsSimpleWrap; the toolbar's
+           exports and range are Professional's. -->
+      <div class="toolbar" data-simple-pro="money" style="margin-bottom: 16px;">
         <h3 class="card-head" style="margin: 0; flex: 1;"><span class="swatch"></span><span data-i18n="an.title">Business Overview</span></h3>
         <button class="btn small" id="btnTaxExport" data-i18n="an.tax_export">Monthly Tax Summary</button>
         <button class="btn small" id="btnAccountingExport" data-i18n="an.accounting_export">Accounting CSV</button>
@@ -1136,7 +1139,7 @@
       <div id="invStudioStats" class="khayt-inv-stats" style="display:none" aria-hidden="true"></div>
       <div id="invLocationScopeBanner" style="display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);"></div>
       <div id="reorderAlertsSection" style="display:none;"></div>
-      <div id="supplierReorderList" style="margin-bottom:12px;"></div>
+      <div id="supplierReorderList" data-simple-pro="inventory" style="margin-bottom:12px;"></div>
       <div id="pipelineDemand"></div>
       <!-- What each material costs on the shelf (lib/material-cost.js), as the Mac's MaterialCostCard. -->
       <div id="materialCostCard"></div>
@@ -1294,7 +1297,7 @@
               <button id="btnBlankIntakeForm" data-i18n-title="cl.blank_intake_title" title="Blank intake form"><span data-khayt-icon="doc"></span> <span data-i18n="cl.intake_form">Intake form</span></button>
               <button id="btnExportClientsCsv" title="Export clients to CSV"><span data-khayt-icon="download"></span> <span data-i18n="common.export_csv">CSV</span></button>
               <button id="btnImportClientsCsv"><span data-khayt-icon="upload"></span> <span data-i18n="csv.import_clients_btn">Import CSV</span></button>
-              <button class="pro-only" id="btnCampaign" data-i18n-title="camp.btn_title" title="Send a marketing campaign"><span data-khayt-icon="megaphone"></span> <span data-i18n="camp.btn">Campaign</span></button>
+              <button class="pro-only" id="btnCampaign" data-simple-pro="campaigns" data-i18n-title="camp.btn_title" title="Send a marketing campaign"><span data-khayt-icon="megaphone"></span> <span data-i18n="camp.btn">Campaign</span></button>
               <button class="pro-only" id="btnSubscriptions" data-i18n-title="subs.btn_title" title="Manage subscriptions &amp; retainers"><span data-khayt-icon="repeat"></span> <span data-i18n="subs.btn">Subscriptions</span></button>
               <button class="pro-only" id="btnActivityLog" data-i18n-title="audit.btn_title" title="Team activity log"><span data-khayt-icon="receipt"></span> <span data-i18n="audit.btn">Activity</span></button>
             </div>
@@ -1333,9 +1336,13 @@
 
     <!-- ===================== EXPENSES ===================== -->
     <section id="expenses-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-expenses-tab" aria-hidden="true" tabindex="-1">
+      <!-- SIMPLE_MAP expenses (S4 card 4): Simple draws the short list in
+           #expSimple (renderer/simple-screens-ui.js); everything marked
+           data-simple-pro="expenses" is Professional's tracker. -->
+      <div id="expSimple" class="sm-simple-only"></div>
       <!-- Recurring expenses that have come round (renderer/expenses.js renderRecurringStrip). -->
-      <div id="recurringStrip"></div>
-      <div class="toolbar" style="margin-bottom:16px;">
+      <div id="recurringStrip" data-simple-pro="expenses"></div>
+      <div class="toolbar" data-simple-pro="expenses" style="margin-bottom:16px;">
         <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="exp.title">Expense Tracker</span></h3>
         <button class="btn small" id="btnExportExpCsv" data-i18n="exp.export_csv">Export CSV</button>
         <select id="expRangeFilter" class="toolbar-select">
@@ -1353,7 +1360,7 @@
         </span>
       </div>
 
-      <div class="grid">
+      <div class="grid" data-simple-pro="expenses">
         <!-- Add expense form -->
         <div class="card">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="exp.add_title">Add Expense</span></h3>
@@ -1410,13 +1417,13 @@
       </div>
 
       <!-- Budget vs Actual -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" data-simple-pro="expenses" style="margin-top:16px;">
         <h3 class="card-head"><span class="swatch"></span><span data-i18n="exp.budget_title">Budget vs. Actual</span></h3>
         <div id="expenseBudgetSection"></div>
       </div>
 
       <!-- Expenses table -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" data-simple-pro="expenses" style="margin-top:16px;">
         <div class="table-wrap">
           <table id="expenseTable">
             <thead>
@@ -1544,7 +1551,7 @@
         <span class="nav-icon" aria-hidden="true"></span>
         <span data-i18n="set.pane_store">Online Store</span>
       </button>
-      <button type="button" class="settings-nav-item pro-only" data-settings-section="notify">
+      <button type="button" class="settings-nav-item biz-only" data-settings-section="notify">
         <span class="nav-icon" aria-hidden="true"></span>
         <span data-i18n="set.pane_notify">Notifications &amp; Messages</span>
       </button>
@@ -1938,13 +1945,17 @@
 
 
         <div class="card settings-card" id="settingsLoyaltyCard">
-        <div class="settings-section-head" data-i18n="set.loyalty">Customer Loyalty Tiers</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Auto-assign tier badges and discounts based on completed orders or spend.</p>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
+        <!-- SIMPLE_MAP loyalty (S4 card 3): Simple draws #loyaltySimple — on/off
+             and up to three tiers by completed orders (renderer/simple-screens-ui.js);
+             the full editor below is Professional's. Both edit settings.loyaltyTiers. -->
+        <div id="loyaltySimple" class="sm-simple-only sm-loyalty"></div>
+        <div class="settings-section-head" data-simple-pro="loyalty" data-i18n="set.loyalty">Customer Loyalty Tiers</div>
+        <p data-simple-pro="loyalty" style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Auto-assign tier badges and discounts based on completed orders or spend.</p>
+        <label data-simple-pro="loyalty" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
           <input type="checkbox" id="set_loyaltyEnabled" style="width:auto;margin:0;">
           <span data-i18n="set.loyalty_enabled">Enable loyalty tiers</span>
         </label>
-        <div id="loyaltyTiersSection"></div>
+        <div id="loyaltyTiersSection" data-simple-pro="loyalty"></div>
         </div>
 
         <div class="settings-save-row">
@@ -2241,7 +2252,7 @@
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;" data-i18n="mach.section_hint"></p>
         <div id="machinesList"></div>
         <button class="btn primary" id="btnAddMachine" style="margin-top:10px;" data-i18n="mach.add">+ Add Printer</button>
-        <button class="btn" id="btnPartsToBuy" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
+        <button class="btn" id="btnPartsToBuy" data-simple-pro="machineUpkeep" style="margin-top:10px;" data-i18n="maint.pb_title">Parts to buy</button>
         </div>
 
         <div class="card settings-card">
@@ -2269,7 +2280,7 @@
           <div id="nozzleWearSection"></div>
         </div>
 
-        <div class="card settings-card">
+        <div class="card settings-card" data-simple-pro="productionSettings">
         <div class="settings-section-head" data-i18n="envLogs">Environment Log</div>
         <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
           <button id="btnLogEnv" class="btn btn-sm btn-secondary" data-i18n="logEnvironment">+ Log</button>
@@ -2286,7 +2297,17 @@
       <div class="settings-panel" id="settings-panel-library">
         <h2 class="settings-panel-title" data-i18n="set.pane_library">Library &amp; Files</h2>
 
+        <!-- Simple (S4 card 8, Figma 80:382): three places, drawn by
+             renderer/simple-forms.js. S3 / R2, tiering and the backup copy
+             below are Professional; a library already in a bucket keeps
+             working and is listed as "Set up in Professional". -->
+        <div class="card settings-card sm-simple-only" id="plibPlacesCard">
+        <p class="settings-panel-hint" style="margin:0 0 12px;" data-i18n="sm.lib_hint">Where your models are kept.</p>
+        <div id="plibPlaces"></div>
+        </div>
+
         <div class="card settings-card">
+        <div data-simple-pro="libraryStorage">
         <div class="settings-section-head" data-i18n="set.plib_loc_section">Print library location</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.plib_loc_hint">Where your model files are kept. A folder on a network drive, an external disk, or a synced folder (iCloud Drive, Dropbox, Google Drive, OneDrive) all work — Khayt just needs to be able to reach it.</p>
         <label data-i18n="set.plib_loc_primary">Library folder</label>
@@ -2302,6 +2323,7 @@
           <button class="btn ghost" id="btnPlibMirrorClear" data-i18n="common.clear">Clear</button>
         </div>
         <p style="font-size:11.5px;color:var(--text-muted);margin:8px 0 0;" data-i18n="set.plib_mirror_hint">Every file added to the library is copied here too. Khayt never reads from it — it is a backup, not a second library.</p>
+        </div>
         <p id="plibLocStatus" style="font-size:12px;margin:10px 0 0;"></p>
 
         <div id="plibMoveBox" style="display:none; border:1px solid var(--border,#2a2e38); border-radius:8px; padding:12px; margin-top:12px;">
@@ -2315,7 +2337,7 @@
         </div>
 
         <p id="plibVaultNote" style="display:none; font-size:12px; margin:16px 0 0; padding:10px 12px; border:1px solid var(--border,#2a2e38); border-radius:8px;" data-i18n="set.plib_vault_lock">This library lives in the Khayt Vault. To change where it is kept, use the Khayt Mac app.</p>
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibS3On" style="width:auto; margin:0;">
             <span data-i18n="set.plib_s3_on">Also back up to object storage (S3, Cloudflare R2, Backblaze B2, and more)</span>
@@ -2352,7 +2374,7 @@
         <!-- Google Drive. The one non-S3 backend, because a lot of makers
              already pay for the storage. Dropbox and OneDrive are reachable as a
              synced folder via the library folder setting above, at no code cost. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div class="sm-drive-setup" id="plibDriveBlock" tabindex="-1" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibGDriveOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_gd_on">Use Google Drive instead of a bucket</span>
@@ -2374,7 +2396,7 @@
         <!-- Tiering. Separate from the backup block above because it is a
              different job with a different risk: the mirror only ever writes,
              this one deletes local files once the bucket has them. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibTierOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_tier_on">Move old models to the cloud to free up disk space</span>
@@ -2481,7 +2503,7 @@
       </div>
 
       <!-- ─── NOTIFICATIONS & MESSAGES ────────────────────────── -->
-      <div class="settings-panel pro-only" id="settings-panel-notify">
+      <div class="settings-panel biz-only" id="settings-panel-notify">
         <h2 class="settings-panel-title" data-i18n="set.pane_notify">Notifications &amp; Messages</h2>
         <p class="settings-panel-hint" data-i18n="set.automation_save_hint">Each section below has its own Save button — changes are not applied until you save that section.</p>
 
@@ -2513,7 +2535,9 @@
         <div id="smsNotificationsSection"></div>
         </div>
 
-        <div class="card settings-card pro-only">
+        <!-- SIMPLE_MAP messages: Simple keeps the WhatsApp templates; the
+             providers, Telegram, push, digest and email relay above stay Pro. -->
+        <div class="card settings-card biz-only" id="waTemplatesCard">
         <div class="settings-section-head" data-i18n="wa.settings_section">WhatsApp Quick-Reply Templates</div>
         <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;" data-i18n="wa.settings_hint"></p>
         <div id="waTemplatesList"></div>
@@ -2561,7 +2585,7 @@
         </div>
         </div>
 
-        <div class="card settings-card pro-only" id="pluginCard" hidden>
+        <div class="card settings-card biz-only" id="pluginCard" hidden>
         <div class="settings-section-head" data-i18n="plg.title">Connectors</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="plg.hint">Connect Khayt to other services with a connector reviewed by Khayt. Before it is installed you see exactly which fields it sends and to which address; its keys stay on this computer.</p>
         <div id="pluginSection"></div>
@@ -2981,6 +3005,8 @@
 <script src="../lib/plugin-manifest.js"></script>
 <script src="../lib/plugin-payload.js"></script>
 <script src="../lib/plugin-host.js"></script>
+<script src="../lib/plugin-update.js"></script>
+<script src="../lib/plugin-update-sheet.js"></script>
 <script src="../lib/telemetry-scrub.js"></script>
 <script src="../lib/webcam.js"></script>
 <script src="../lib/csv-bundle.js"></script>
@@ -2999,6 +3025,7 @@
 <script src="../lib/overhead-rate.js"></script>
 <script src="../lib/machine-pl.js"></script>
 <script src="../lib/payment-terms.js"></script>
+<script src="../lib/customer-address.js"></script>
 <script src="../lib/receivables.js"></script>
 <script src="../lib/ai-price.js"></script>
 <script src="../lib/schedule.js"></script>
@@ -3032,6 +3059,7 @@
 <script src="../lib/qc-failure.js"></script>
 <script src="../lib/date-range.js"></script>
 <script src="../lib/expense-book.js"></script>
+<script src="../lib/simple-screens.js"></script>
 <script src="../lib/waste-entry.js"></script>
 <script src="../lib/spool-edit.js"></script>
 <!-- The filament catalogue (assets/filament-catalog.json), matched the way the Mac matches it. -->
@@ -3105,6 +3133,8 @@
 <script src="themes/foreman/screens.js"></script>
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
+<script src="simple-mode.js"></script>
+<script src="simple-forms.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>
@@ -3126,6 +3156,7 @@
 <script src="build.js"></script>
 <script src="inventory.js"></script>
 <script src="machines.js"></script>
+<script src="address-editor.js"></script>
 <script src="clients.js"></script>
 <script src="expenses.js"></script>
 <script src="labels.js"></script>
@@ -3182,6 +3213,7 @@
 <script src="portal-watch.js"></script>
 <script src="dashboard.js"></script>
 <script src="analytics.js"></script>
+<script src="simple-screens-ui.js"></script>
 <script src="operations-extras.js"></script>
 <script src="plugins.js"></script>
 <script src="tour.js"></script>

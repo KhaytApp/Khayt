@@ -122,6 +122,126 @@
 			<string>%d بكرة.</string>
 		</dict>
 	</dict>
+	<key>needs.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>لا شيء يحتاجك.</string>
+			<key>one</key>
+			<string>أمر واحد يحتاجك.</string>
+			<key>two</key>
+			<string>أمران يحتاجانك.</string>
+			<key>few</key>
+			<string>%d أمور تحتاجك.</string>
+			<key>many</key>
+			<string>%d أمراً يحتاجك.</string>
+			<key>other</key>
+			<string>%d أمر يحتاجك.</string>
+		</dict>
+	</dict>
+	<key>needs.late</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>لا طلبات متأخرة</string>
+			<key>one</key>
+			<string>طلب واحد متأخر</string>
+			<key>two</key>
+			<string>طلبان متأخران</string>
+			<key>few</key>
+			<string>%d طلبات متأخرة</string>
+			<key>many</key>
+			<string>%d طلباً متأخراً</string>
+			<key>other</key>
+			<string>%d طلب متأخر</string>
+		</dict>
+	</dict>
+	<key>needs.low.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>لا بكرات منخفضة</string>
+			<key>one</key>
+			<string>بكرة واحدة منخفضة</string>
+			<key>two</key>
+			<string>بكرتان منخفضتان</string>
+			<key>few</key>
+			<string>%d بكرات منخفضة</string>
+			<key>many</key>
+			<string>%d بكرة منخفضة</string>
+			<key>other</key>
+			<string>%d بكرة منخفضة</string>
+		</dict>
+	</dict>
+	<key>needs.quotes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>لا عروض أسعار تنتظر رداً</string>
+			<key>one</key>
+			<string>عرض سعر واحد ينتظر رداً</string>
+			<key>two</key>
+			<string>عرضا سعر ينتظران رداً</string>
+			<key>few</key>
+			<string>%d عروض أسعار تنتظر رداً</string>
+			<key>many</key>
+			<string>%d عرض سعر ينتظر رداً</string>
+			<key>other</key>
+			<string>%d عرض سعر ينتظر رداً</string>
+		</dict>
+	</dict>
+	<key>needs.more</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>zero</key>
+			<string>ولا شيء آخر</string>
+			<key>one</key>
+			<string>وأمر آخر</string>
+			<key>two</key>
+			<string>وأمران آخران</string>
+			<key>few</key>
+			<string>و%d أمور أخرى</string>
+			<key>many</key>
+			<string>و%d أمراً آخر</string>
+			<key>other</key>
+			<string>و%d أمر آخر</string>
+		</dict>
+	</dict>
 	<key>simple.expenses.count</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
