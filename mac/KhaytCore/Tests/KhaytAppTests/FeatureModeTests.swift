@@ -20,6 +20,43 @@ import KhaytCore
 @MainActor
 struct FeatureModeTests {
 
+    /// The Simple map, asked through the bridge (`KhaytEngine+SimpleMode`).
+    /// The phone and the Mac both build their Simple mode on these answers.
+    @Test("what Simple gets of a surface is the shared map's answer, with the mode read as the gates read it")
+    func simpleSurfaces() async throws {
+        let engine = try KhaytEngine()
+        let keys = try await engine.simpleSurfaceKeys()
+        #expect(keys.count >= 20, "the map has a row per surface (\(keys.count))")
+        #expect(Set(keys).count == keys.count, "no row twice")
+        // The rows the phone builds on first, and the five the gates own.
+        for key in ["queue", "money", "expenses", "machineUpkeep", "gatedLink", "inventory", "zatca", "today", "jobPage"] {
+            #expect(keys.contains(key), "\(key) is a row")
+        }
+        for key in keys {
+            let decision = try #require(try await engine.simpleDecision(key), "\(key)")
+            #expect(["show", "reduced", "pro"].contains(decision), "\(key): \(decision)")
+            // Professional, and a book with no mode at all, get everything.
+            #expect(try await engine.simpleSurface(key, mode: "professional") == .full)
+            #expect(try await engine.simpleSurface(key, mode: nil) == .full, "no book yet is Professional")
+            #expect(try await engine.simpleSurface(key, mode: "something-new") == .full)
+            // Simple gets the row's answer, and Bed Ready's old value is Simple.
+            let expected: KhaytEngine.SimpleSurface =
+                decision == "reduced" ? .reduced : decision == "pro" ? .professionalOnly : .full
+            #expect(try await engine.simpleSurface(key, mode: "simple") == expected, "\(key)")
+            #expect(try await engine.simpleSurface(key, mode: "enthusiast") == expected, "\(key)")
+        }
+        // Known answers, so a change to the map is a change somebody chose.
+        #expect(try await engine.simpleSurface("queue", mode: "simple") == .reduced)
+        #expect(try await engine.simpleSurface("schedule", mode: "simple") == .professionalOnly)
+        #expect(try await engine.simpleSurface("jobsLog", mode: "simple") == .full)
+        // A key nobody recognises is not "show everything".
+        #expect(try await engine.simpleDecision("no-such-surface") == nil)
+        #expect(try await engine.simpleSurface("no-such-surface", mode: "simple") == nil)
+        #expect(try await engine.simpleSurface("no-such-surface", mode: "professional") == nil)
+        #expect(KhaytEngine.isSimple("simple") && KhaytEngine.isSimple("enthusiast"))
+        #expect(!KhaytEngine.isSimple(nil) && !KhaytEngine.isSimple("professional") && !KhaytEngine.isSimple(""))
+    }
+
     @Test("every feature this app gates is one the rule actually calls Professional")
     func gatesOnlyRealProFeatures() async throws {
         let engine = try KhaytEngine()
