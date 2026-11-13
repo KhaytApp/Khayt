@@ -288,6 +288,35 @@ function licenceCreditText(printFileIds, written) {
 
 /* Invoicing — renderer/invoicing.js */
 
+/**
+ * A job status's tone in the shared status palette (the --st-* tokens in
+ * styles.css): 'wait' steel, 'move' amber, 'done' green, 'late' red. The CSS
+ * .badge.<status> rules say the same thing; this is for screens that colour a
+ * chip from script (the theme dashboards).
+ */
+function statusToneOf(status) {
+  switch (status) {
+    case 'printing': case 'post': case 'qc': return 'move';
+    case 'completed': case 'delivered': case 'shipped': return 'done';
+    case 'overdue': case 'late': case 'failed': return 'late';
+    default: return 'wait';   // pending, quote, on_hold, cancelled
+  }
+}
+
+/**
+ * The tone of a margin figure in the shared status palette: 'loss' (red) only
+ * when the job loses money, 'thin' (amber) when it is under the shop's minimum
+ * margin — or under 20% when the shop set none — and 'ok' (steel) otherwise.
+ * A healthy margin is not a status, so it is never green or red.
+ */
+function marginToneOf(pct, minPct) {
+  const p = Number(pct);
+  if (!Number.isFinite(p)) return 'ok';
+  if (p < 0) return 'loss';
+  const floor = Number(minPct) > 0 ? Number(minPct) : 20;
+  return p < floor ? 'thin' : 'ok';
+}
+
 function formatDueDateBadge(dueDate) {
   if (!dueDate) return '';
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -651,6 +680,8 @@ function openActivityLog() {
     prioritySortValue,
     priorityBadgeHtml,
     formatDueDateBadge,
+    statusToneOf,
+    marginToneOf,
     licenceAtSaleHtml,
     openLicenceHave,
     licenceCreditText,

@@ -1,12 +1,14 @@
 /**
  * E2E smoke — Simple mode never shows an empty Settings pane (Windows/Linux).
  *
- * Team, Notifications and AI are Professional panes: their nav buttons carry
+ * Team and AI are Professional panes (Notifications was, until the S4 map): their nav buttons carry
  * .pro-only. Opening one in Simple (a deep link, search, a button elsewhere,
  * or switching to Simple while on it) used to show an empty page with no pane
  * selected. Here:
- *   - each Pro pane opened in Simple lands on General, with General selected;
- *   - switching Pro → Simple while on Notifications lands on General;
+ *   - each Pro pane opened in Simple shows the "Part of Professional" panel
+ *     (S4 card 2), never an empty page;
+ *   - Notifications is 'reduced' in the S4 map, so Simple opens it as itself;
+ *   - switching Pro → Simple while on AI shows that panel too;
  *   - in Professional the same panes open as themselves;
  *   - the Working Hours card is hidden whole in Simple, not left empty;
  *   - the mode comparison lists Loyalty tiers under Simple.
@@ -24,14 +26,20 @@ try {
   const state = () => window.evaluate(() => ({
     nav: document.querySelector('.settings-nav-item.active')?.dataset.settingsSection || null,
     panel: document.querySelector('.settings-panel.active')?.id || null,
+    gateText: (document.getElementById('settings-panel-gated')?.innerText || '').trim(),
   }));
 
   await window.evaluate(() => { settings.mode = 'simple'; applyMode(); });
-  for (const pane of ['team', 'notify', 'ai']) {
+  for (const pane of ['team', 'ai']) {
     await window.evaluate((p) => openSettingsSection(p), pane);
     const s = await state();
-    ok(s.nav === 'general' && s.panel === 'settings-panel-general', `Simple: opening "${pane}" lands on General (${JSON.stringify(s)})`);
+    ok(s.panel === 'settings-panel-gated' && /Professional/.test(s.gateText), `Simple: opening "${pane}" shows the "Part of Professional" panel (${JSON.stringify({ nav: s.nav, panel: s.panel })})`);
   }
+
+  // Messages is 'reduced' in the S4 map: Simple opens the pane itself.
+  await window.evaluate(() => openSettingsSection('notify'));
+  const msg = await state();
+  ok(msg.nav === 'notify' && msg.panel === 'settings-panel-notify', `Simple: Notifications opens as itself (S4: reduced) (${JSON.stringify({ nav: msg.nav, panel: msg.panel })})`);
 
   const hours = await window.evaluate(() => {
     openSettingsSection('shop');
@@ -51,10 +59,10 @@ try {
     ok(s.nav === pane && s.panel === 'settings-panel-' + pane, `Professional: "${pane}" opens as itself`);
   }
 
-  await window.evaluate(() => openSettingsSection('notify'));
+  await window.evaluate(() => openSettingsSection('ai'));
   await window.evaluate(() => { settings.mode = 'simple'; applyMode(); });
   const after = await state();
-  ok(after.nav === 'general' && after.panel === 'settings-panel-general', `switching to Simple while on Notifications lands on General (${JSON.stringify(after)})`);
+  ok(after.panel === 'settings-panel-gated' && /Professional/.test(after.gateText), `switching to Simple while on AI shows the "Part of Professional" panel (${JSON.stringify({ nav: after.nav, panel: after.panel })})`);
 
   console.log('e2e-simple-panes: ok');
 } catch (err) {

@@ -632,8 +632,8 @@
           <div class="kanban-col-meta" id="meta-pending"></div>
           <div id="list-pending"></div>
         </div>
-        <div class="kanban-col" data-status="on_hold" style="border-top: 3px solid var(--warning);">
-          <h3><span class="dot" style="background:var(--warning);"></span><span data-i18n="queue.on_hold">On Hold</span><span class="count" id="count-on_hold">0</span></h3>
+        <div class="kanban-col" data-status="on_hold">
+          <h3><span class="dot"></span><span data-i18n="queue.on_hold">On Hold</span><span class="count" id="count-on_hold">0</span></h3>
           <div class="kanban-col-meta" id="meta-on_hold"></div>
           <div id="list-on_hold"></div>
         </div>
@@ -647,8 +647,8 @@
           <div class="kanban-col-meta" id="meta-post"></div>
           <div id="list-post"></div>
         </div>
-        <div class="kanban-col" data-status="qc" style="border-top: 3px solid #a78bfa;">
-          <h3><span class="dot" style="background:#a78bfa;"></span><span data-i18n="kan.col_qc">QC</span><span class="count" id="count-qc">0</span></h3>
+        <div class="kanban-col" data-status="qc">
+          <h3><span class="dot"></span><span data-i18n="kan.col_qc">QC</span><span class="count" id="count-qc">0</span></h3>
           <div class="kanban-col-meta" id="meta-qc"></div>
           <div id="list-qc"></div>
         </div>
@@ -657,13 +657,13 @@
           <div class="kanban-col-meta" id="meta-completed"></div>
           <div id="list-completed"></div>
         </div>
-        <div class="kanban-col" data-status="shipped" style="border-top: 3px solid #06b6d4;">
-          <h3><span class="dot" style="background:#06b6d4;"></span><span data-i18n="queue.shipped_col">Shipped</span><span class="count" id="count-shipped">0</span></h3>
+        <div class="kanban-col" data-status="shipped">
+          <h3><span class="dot"></span><span data-i18n="queue.shipped_col">Shipped</span><span class="count" id="count-shipped">0</span></h3>
           <div class="kanban-col-meta" id="meta-shipped"></div>
           <div id="list-shipped"></div>
         </div>
-        <div class="kanban-col" data-status="delivered" style="border-top: 3px solid var(--success);">
-          <h3><span class="dot" style="background:var(--success);"></span><span data-i18n="queue.delivered_col">Delivered</span><span class="count" id="count-delivered">0</span></h3>
+        <div class="kanban-col" data-status="delivered">
+          <h3><span class="dot"></span><span data-i18n="queue.delivered_col">Delivered</span><span class="count" id="count-delivered">0</span></h3>
           <div class="kanban-col-meta" id="meta-delivered"></div>
           <div id="list-delivered"></div>
         </div>
@@ -2077,6 +2077,8 @@
 <script src="themes/command/screens.js"></script>
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
+<script src="simple-mode.js"></script>
+<script src="simple-forms.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>

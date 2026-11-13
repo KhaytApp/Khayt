@@ -836,6 +836,28 @@
 "library.priced_here" = "Calculado neste iPhone com os seus preços. Um modelo com várias cores é calculado em um só carretel, então o valor do Mac pode diferir um pouco.";
 "library.no_copy" = "Não foi possível acessar o Mac. Entre no Khayt Cloud nos Ajustes e sincronize uma vez, e sua biblioteca vai com você.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Rosa";
+"colour.brown" = "Marrom";
+"library.filter.colour" = "Cor";
+"library.filter.type" = "Tipo de arquivo";
+"library.filter.multi" = "Multicolorido";
+"library.filter.none" = "Sem informação de cor";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "Outro";
+"library.type.nofile" = "Sem arquivo (da web)";
+"library.filter.colour_hint" = "Escolha mais de um para ver os modelos que tenham qualquer um deles.";
+"library.filter.counts_hint" = "As contagens são da biblioteca como os outros filtros a deixam. Uma linha vazia fica esmaecida, não é removida.";
+"library.filter.n_of_m" = "%1$d de %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "Remover %@";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@, escolhidos: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Catálogo";
 "catalogue.search" = "Buscar produtos";

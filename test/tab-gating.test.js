@@ -66,7 +66,10 @@ test('the check can still see the nav, the lists and the tabs', () => {
   // nothing, every assertion below would pass against empty sets.
   const { biz, pro } = gatedNavTabs();
   assert.ok(biz.size >= 5, `expected several biz-only nav tabs, found ${biz.size}`);
-  assert.ok(pro.size >= 1, `expected at least one pro-only nav tab, found ${pro.size}`);
+  // No nav tab is Professional whole since S4 (Expenses is 'reduced' in
+  // SIMPLE_MAP), so `pro` may be empty; PRO_TABS must then be empty too
+  // (checked below).
+  assert.ok(pro.size >= 0);
   assert.ok(shellList('BIZ_TABS').size >= 5);
   assert.ok(realTabs().size >= 10, 'expected the app to define many tab panels');
 });

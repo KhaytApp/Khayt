@@ -652,7 +652,7 @@ function openMachineEditor(machineId = null) {
         </div>
         <div style="padding-top:20px; font-size:11.5px; color:var(--text-muted);">${escapeHtml(t('mach.target_hours_hint'))}</div>
       </div>
-      <div class="inline-pair" style="margin-top:14px;">
+      <div class="inline-pair" data-simple-pro="machineUpkeep" style="margin-top:14px;">
         <div>
           <label style="margin-top:0;">${escapeHtml(t('mach.service_interval'))}</label>
           <input type="number" id="machServiceInterval" value="${draft.serviceInterval || ''}" min="0" step="1" placeholder="500">
@@ -670,7 +670,7 @@ function openMachineEditor(machineId = null) {
         const dep = draft.depreciation || {};
         const v = (x) => (x == null || x === '' ? '' : escapeHtml(String(x)));
         const sel = (a, b) => (a === b ? ' selected' : '');
-        return `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
+        return `<div data-simple-pro="machineUpkeep" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
         <label style="margin-top:0; font-weight:600;">${escapeHtml(t('mach.dep_title'))}</label>
         <div style="font-size:11.5px; color:var(--text-muted); margin:2px 0 8px;">${escapeHtml(t(document.documentElement.dataset.app === 'bedready' ? 'mach.dep_hint_maker' : 'mach.dep_hint'))}</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 12px;">

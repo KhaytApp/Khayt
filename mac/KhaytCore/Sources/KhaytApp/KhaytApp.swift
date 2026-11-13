@@ -1134,6 +1134,13 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.shelf = .library(nil)
             await settle()
             capture(named: "03-library", into: dir)
+            // The Colour and File type rows. Their menus cannot be opened
+            // by a run that must not click, and at this width both are folded
+            // into More, so without this neither the swatches nor the words
+            // are in any picture (`LibraryFilterBar.RowsSpecimen`).
+            captureView(named: "03k-library-colour-type-rows",
+                        LibraryFilterBar.RowsSpecimen(chips: LibraryFilterBar(shop: shop).chips, words: shop.words),
+                        into: dir)
             // A model SELECTED, so the inspector is in the picture — the size,
             // the triangle count and whether it goes on a bed the shop owns all
             // live there, and a grid shot cannot show any of them. Picked as

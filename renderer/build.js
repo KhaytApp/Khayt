@@ -805,12 +805,15 @@ function updateGrandTotal() {
   const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + (_q.overhead || 0) + shippingCost + pctFeesKept)) / finalPrice) * 100 : margin;
   if (marginWarn) {
     const minPct = num(settings.minMarginPct, 0);
-    const marginColor = actualMarginPct >= 40 ? 'var(--success)' : actualMarginPct >= 20 ? 'var(--warning)' : 'var(--danger)';
+    // One tone for the whole line (styles.css .margin-warning): steel when the
+    // margin is healthy, amber when thin, red only when the job loses money.
+    const marginTone = marginToneOf(actualMarginPct, minPct);
     // Fees too high to build into the price: said beside the margin, because
     // the shop keeps less than the quote reads as.
     const feeTooHigh = _q.feeWarning === 'fees-too-high'
       ? ` — <span style="color:var(--danger);">${escapeHtml(t('calc.fee_pct_too_high', { pct: +(_q.feePct || 0).toFixed(2) }))}</span>` : '';
-    const marginDisplay = `<span style="color:${marginColor}; font-weight:600;">${actualMarginPct.toFixed(0)}% margin</span>${feeTooHigh}`;
+    const marginDisplay = `<span style="font-weight:600;">${actualMarginPct.toFixed(0)}% margin</span>${feeTooHigh}`;
+    marginWarn.className = 'margin-warning' + (marginTone === 'ok' ? '' : ' is-' + marginTone);
     if (minPct > 0 && actualMarginPct < minPct) {
       marginWarn.innerHTML = `${marginDisplay} — ${escapeHtml(t('calc.margin_warn', { min: minPct.toFixed(0), actual: actualMarginPct.toFixed(0) }))}`;
       marginWarn.style.display = 'block';
