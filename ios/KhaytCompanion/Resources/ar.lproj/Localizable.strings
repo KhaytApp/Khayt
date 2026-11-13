@@ -503,7 +503,7 @@
 "spool.method.label" = "امسح الملصق";
 
 /* Machines, as design/ios-v2 draws them */
-"machines.idle" = "خامل";
+"machines.idle" = "متاحة";
 "machines.error" = "خطأ";
 "machines.offline" = "متوقفة";
 "machines.offline.sub" = "أُوقفت من الماك";
