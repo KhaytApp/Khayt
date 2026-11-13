@@ -24,8 +24,55 @@ final class FinishCamera {
     /// rule's own bookkeeping, never read here.
     private var memo: JSONValue = .object([:])
 
-    /// A book closed and reopened has not just finished a print.
-    func reset() { memo = .object([:]) }
+    /// When each machine's print was last predicted to finish: the reading's
+    /// time plus the seconds the printer said were left.
+    private(set) var predictedEnd: [String: Date] = [:]
+
+    /// A book closed and reopened has not just finished a print. Only this
+    /// run's memory: what `keep` wrote is read back by `restore`.
+    func reset() { memo = .object([:]); predictedEnd = [:] }
+
+    // ── WHAT WAS PRINTING SURVIVES A RELAUNCH ─────────────────────────────
+    //
+    // The memory used to start empty on every launch, so a print that ended
+    // while the app was closed (or being updated) had no edge: no photo, no
+    // energy, and no print-finished alert to the phones, ever. Two of the
+    // shop's four prints on 13 Nov went that way (push review M1). The memory
+    // is kept in this Mac's UserDefaults for the book it belongs to, and read
+    // back when that book is watched again within a day.
+
+    static let keptKey = "mac.finishMemo"
+    private struct Kept: Codable {
+        var book: String; var savedAt: Date; var memo: JSONValue; var predictedEnd: [String: Date]
+    }
+
+    /// Where to keep it; nil (tests, the sample book) keeps nothing.
+    var keepFor: (book: String, defaults: UserDefaults)?
+
+    private func keep(now: Date) {
+        guard let keepFor else { return }
+        let kept = Kept(book: keepFor.book, savedAt: now, memo: memo, predictedEnd: predictedEnd)
+        if let data = try? JSONEncoder().encode(kept) { keepFor.defaults.set(data, forKey: Self.keptKey) }
+    }
+
+    /// Read back what was kept for `book`, when it is under a day old.
+    func restore(book: String, defaults: UserDefaults, now: Date = Date()) {
+        keepFor = (book, defaults)
+        guard let data = defaults.data(forKey: Self.keptKey),
+              let kept = try? JSONDecoder().decode(Kept.self, from: data),
+              kept.book == book, now.timeIntervalSince(kept.savedAt) < 24 * 3600 else { return }
+        memo = kept.memo
+        predictedEnd = kept.predictedEnd
+    }
+
+    /// When the print that just ended really ended: the finish predicted at
+    /// the last reading when that is in the past (the Mac was asleep or closed
+    /// when it happened), and `now` otherwise. Push review M1: the alert used
+    /// to carry the moment the Mac noticed.
+    func finishedAt(_ machineId: String, now: Date = Date()) -> Date {
+        guard let predicted = predictedEnd[machineId], predicted < now else { return now }
+        return predicted
+    }
 
     /// One machine taken out of the watch: its next answer is not an edge.
     func forget(_ machineId: String) {
@@ -51,7 +98,25 @@ final class FinishCamera {
     func observe(_ machineId: String, status: JSONValue, engine: KhaytEngine) async -> KhaytEngine.FinishTrack? {
         guard let t = try? await engine.printFinishTrack(memo: memo, machineId: machineId,
                                                          status: status) else { return nil }
+        let was = memo
         memo = t.memo
+        // The predicted finish, while it prints. Kept when the machine's state
+        // changes or the prediction moves by more than a minute, not on every
+        // poll.
+        let now = Date()
+        var moved = false
+        if case .object(let s) = status, case .string(let state)? = s["state"],
+           state.lowercased().contains("print"),
+           case .number(let left)? = s["timeRemaining"], left.isFinite, left > 0 {
+            let ends = now.addingTimeInterval(left)
+            if let old = predictedEnd[machineId] { moved = abs(old.timeIntervalSince(ends)) > 60 } else { moved = true }
+            predictedEnd[machineId] = ends
+        }
+        func stateOf(_ m: JSONValue) -> JSONValue? {
+            if case .object(let o) = m, case .object(let e)? = o[machineId] { return e["state"] }
+            return nil
+        }
+        if moved || stateOf(was) != stateOf(memo) || t.outcome != nil { keep(now: now) }
         return t.outcome == nil ? nil : t
     }
 
@@ -84,6 +149,9 @@ final class FinishCamera {
         let photoTaken: Bool
         /// The file the printer was running.
         let filename: String
+        /// When it ended, as best known (`FinishCamera.finishedAt`). Nil
+        /// means now.
+        var finishedAt: Date? = nil
     }
 
     /// The last photo outcome per machine.

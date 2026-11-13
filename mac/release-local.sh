@@ -38,10 +38,14 @@ command -v node >/dev/null || fail "needs node"
 # run while the screen is locked reports "No Keychain password item found"
 # for a profile that is there. Seen on the first overnight release attempt:
 # the same profile had worked hours earlier with somebody at the machine.
-xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 \
-  || fail "cannot read the notarytool profile '$PROFILE'.
-  If this Mac's screen is locked, unlock it and run this again.
-  If the profile was never saved, run once:  xcrun notarytool store-credentials $PROFILE"
+# Say what Apple said: a 403 for an unsigned or expired developer agreement
+# came out here as "unlock the screen" while somebody sat at the Mac (Nov 13).
+notary_err=$(xcrun notarytool history --keychain-profile "$PROFILE" 2>&1 >/dev/null) \
+  || fail "cannot use the notarytool profile '$PROFILE'. Apple said:
+  $(printf '%s' "$notary_err" | head -3)
+  403 'required agreement': sign it at developer.apple.com/account (Agreements), then run this again.
+  'No Keychain password item found': unlock the screen, or save it once with
+    xcrun notarytool store-credentials $PROFILE"
 
 # Two releases racing would let the older feed land last and walk every
 # install backwards, so a CI release in flight is a hard stop.

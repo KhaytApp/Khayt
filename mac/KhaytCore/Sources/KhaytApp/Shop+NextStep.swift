@@ -81,6 +81,18 @@ extension Shop {
         }
     }
 
+    /// May "Mark printed" be offered for this job? The menu bar's finished
+    /// card and row ask this, and the press is `takeNextStep` below: the
+    /// inspector's own button, one step along from Printing, behind the same
+    /// gates (`moveAlongTarget`: a book this Mac may write, the operator lock,
+    /// the stage rules) and the same permission check in `moveJob`. Only for a
+    /// job still IN Printing: once it has been moved on, by this button or in
+    /// the main window, there is nothing left to mark.
+    func canMarkPrinted(_ job: Order) -> Bool {
+        guard Stage.of(job) == .printing, case .move? = nextStep(for: job.id) else { return false }
+        return true
+    }
+
     /// Do it — through the same calls the menus make.
     func takeNextStep(_ id: Order.ID) {
         switch nextStep(for: id) {

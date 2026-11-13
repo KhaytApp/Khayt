@@ -18,3 +18,4 @@
 "PUSH_QUOTE_DECLINED" = "Bir müşteri teklifi reddetti";
 "PUSH_MESSAGE" = "Bir müşteri mesaj gönderdi";
 "PUSH_PAYMENT" = "Bir ödeme geldi";
+"PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";

@@ -224,7 +224,7 @@ private struct DuplicateNumbers: View {
                     ForEach(group.jobs) { job in
                         HStack(spacing: 8) {
                             Text(job.project.isEmpty ? job.ref : job.project).lineLimit(1)
-                            Text(job.date).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                            Text(job.date).font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                             Spacer(minLength: 8)
                             Button(shop.words.callIt("dupnum.renumber")) { asking = (job, group) }
                                 .controlSize(.small)
@@ -380,7 +380,7 @@ struct RunningOut: View {
             // about to be late — and without the number this section and the
             // chase list below it read as the same job written twice.
             Text(job.reference)
-                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
             Spacer(minLength: 12)
             // Both dates, because the gap is the point: "due the 12th, expected
             // the 15th" says how much trouble it is in, and one date alone does
@@ -470,7 +470,7 @@ struct ToChase: View {
                         // of the same shape reading differently is the reader
                         // wondering what the difference means.
                         Text(row.name?.isEmpty == false ? row.name! : shop.reference(ofJob: row.id)).lineLimit(1)
-                        Text(shop.reference(ofJob: row.id)).font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                        Text(shop.reference(ofJob: row.id)).font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                         Spacer(minLength: 8)
                         Text(age(row, overdue: overdue))
                             .font(.callout).monospacedDigit()
@@ -556,7 +556,7 @@ private struct Goal: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(Money.text(done, shop.currency)).monospacedDigit()
-                        Text("/").foregroundStyle(.tertiary)
+                        Text("/").foregroundStyle(Khayt.faint)
                         Text(Money.text(goal, shop.currency))
                             .monospacedDigit().foregroundStyle(.secondary)
                         Spacer()
@@ -799,7 +799,7 @@ private struct WentWrong: View {
                                 .controlSize(.small)
                             }
                             Text(shop.words.say(notice.at, Date.FormatStyle(date: .omitted, time: .shortened)))
-                                .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                                .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
                         }
                         .padding(.vertical, 5)
                         if notice.id != notices.prefix(5).last?.id { Divider() }
@@ -887,7 +887,7 @@ private struct MoneyTiles: View {
                             .monospacedDigit()
                         Text(shop.words.callIt("mac.gross").lowercased())
                             .foregroundStyle(.secondary)
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         // No revenue, no margin: the rule answers 0 there, and
                         // "0% margin" beside a loss reads as breaking even.
                         Text(k.revenue > 0 ? "\(Money.figure(k.grossMargin))%" : "—")
@@ -904,7 +904,7 @@ private struct MoneyTiles: View {
                         // 310.77. Both figures were right and together they
                         // were not: `avgOrderValue` divides by the count that
                         // is now printed here.
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         Text(shop.words.counting(k.completedCount, "mac.jobs_word"))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)

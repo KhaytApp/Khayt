@@ -354,6 +354,10 @@ jobs:
       - name: E2E smoke (scoped API tokens)
         run: xvfb-run -a npm run test:e2e:apitokens
 
+      - name: E2E smoke (quote pay link, settings, send sheet, job line, the secret stays in main)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:paylink
+
       - name: E2E smoke (sign out one paired phone)
         run: xvfb-run -a npm run test:e2e:phones
 
@@ -362,6 +366,29 @@ jobs:
 
       - name: E2E smoke (a saved product price never changes silently)
         run: xvfb-run -a npm run test:e2e:pricekeep
+      - name: E2E smoke (Simple mode follows SIMPLE_MAP)
+        run: xvfb-run -a npm run test:e2e:simplemap
+      - name: E2E smoke (Simple's Loyalty, Expenses and Money)
+        run: xvfb-run -a npm run test:e2e:simplescreens
+      - name: E2E smoke (Simple mode reduced screens, S4 cards 6-8)
+        run: xvfb-run -a npm run test:e2e:simpleforms
+
+      - name: E2E smoke (one status palette in every theme)
+        run: xvfb-run -a npm run test:e2e:statuspalette
+      - name: E2E smoke (Nov 11 UI review fixes — scroll, counts, dates, a11y, analytics)
+        run: xvfb-run -a npm run test:e2e:uixfixes
+      - name: E2E smoke (primary buttons readable in dark; one field style for date, password and URL)
+        run: xvfb-run -a npm run test:e2e:darkcontrast
+      - name: E2E smoke (Simple mode never shows an empty Settings pane)
+        run: xvfb-run -a npm run test:e2e:simplepanes
+      - name: E2E smoke (board, telemetry card, icons, title strip, HueForge title, inventory width)
+        run: xvfb-run -a npm run test:e2e:plainfixes
+
+      - name: E2E smoke (a customer's address in fields)
+        run: xvfb-run -a npm run test:e2e:addresseditor
+
+      - name: E2E smoke (a connector update waits for the shop's yes)
+        run: xvfb-run -a npm run test:e2e:connupdate
 
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro

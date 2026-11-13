@@ -287,7 +287,8 @@ extension Shop {
     /// A deposit the customer paid is RECORDED on the job, once
     /// (`recordPortalDeposit`); `deposit` is the sentence saying what happened
     /// to it, nil when nothing did (nothing paid, or recorded before).
-    func checkPortalResponse(_ id: Order.ID) async -> (said: KhaytEngine.PortalResponse, moved: Bool, deposit: String?)? {
+    func checkPortalResponse(_ id: Order.ID) async
+        -> (said: KhaytEngine.PortalResponse, moved: Bool, deposit: String?, line: KhaytEngine.PortalLine)? {
         moveProblem = nil
         guard let engine, let tok = portalToken(id), let raw = portalRecord(id) else { return nil }
         do {
@@ -303,7 +304,9 @@ extension Shop {
                 await moveJob(id, to: .pending)
                 moved = orders.first(where: { $0.id == id })?.status == "pending"
             }
-            return (said, moved, deposit)
+            // The words for it come from the shared rule, after the move, so
+            // "…moved to Pending" is said only when it was.
+            return (said, moved, deposit, try await engine.portalResponseLine(said, advanced: moved))
         } catch {
             moveProblem = portalSentence(error); return nil
         }

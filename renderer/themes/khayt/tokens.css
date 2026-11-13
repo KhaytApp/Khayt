@@ -6,14 +6,15 @@
 
      1. Navy is the chrome, white is the work. The sidebar is navy; panels are
         white with a 1px line and a soft shadow.
-     2. Amber is the thread — the active screen, progress, "today" — and never
-        a fill or a status colour.
+     2. Amber is the thread — the active screen, progress, "today" — and so
+        it is also the colour of work in motion: a printing job.
      3. Dark mode is the site's deep-navy set, not a grey.
 
-   Status colours are the stage palette agreed with the Mac app so a job reads
-   the same on every device: quote grey, pending steel, printing green, hold /
-   quality-check purple, ready teal, late red. Foregrounds are darkened where
-   the stage hue itself is too light to read as text (green, teal, purple).
+   Status colours are NOT defined here. Every theme reads the one shared
+   status palette in styles.css (--st-*: steel waiting, amber printing, green
+   done and paid, red late only), agreed with the Mac and iPhone apps so a job
+   reads the same on every device. The --kh-* hues below colour this theme's
+   own chrome (--success, --danger, the --wb-* tile pairs), not job status.
 
    NOTE: --ink-3 (aliased to --text-muted) clears WCAG AA 4.5:1 against BOTH
    --bg and --surface in both appearances (test/theme-contrast.test.js). */
@@ -61,7 +62,7 @@ html[data-design="khayt"] {
   --kh-thread:       #f2a541;
   --kh-live:         #1bb55c;
 
-  /* ---- Stage palette (shared with the Mac). -ink is the readable text form. ---- */
+  /* ---- Theme hues (not job status — see --st-* in styles.css). -ink is the readable text form. ---- */
   --kh-quote:    #697079; --kh-quote-ink:    #4b5259;
   --kh-pending:  #5e6c84; --kh-pending-ink:  #4a566b;
   --kh-printing: #1bb55c; --kh-printing-ink: #0d7a3c;

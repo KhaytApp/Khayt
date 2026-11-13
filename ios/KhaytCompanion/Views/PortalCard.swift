@@ -46,6 +46,7 @@ struct PortalCard: View {
                         Button { Task { await send() } } label: {
                             if sending { ProgressView() } else { Image(systemName: "paperplane.fill") }
                         }
+                        .tapTarget()
                         .disabled(sending || reply.trimmingCharacters(in: .whitespaces).isEmpty)
                         .accessibilityLabel(L10n.tr("portal.send"))
                     }

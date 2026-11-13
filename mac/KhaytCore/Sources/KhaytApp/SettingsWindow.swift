@@ -1246,6 +1246,7 @@ struct GeneralPane: View {
     @AppStorage("mac.menuBar") private var menuBar = true
     @AppStorage(Spotlight.defaultsKey) private var spotlight = true
     @AppStorage(MenuBarStyle.defaultsKey) private var menuBarStyle = MenuBarStyle.ringAndFigures.rawValue
+    @AppStorage(FinishChime.defaultsKey) private var finishChime = false
     @AppStorage(PrintNoticeKind.finished.defaultsKey) private var notifyFinished = true
     @AppStorage(PrintNoticeKind.failed.defaultsKey) private var notifyFailed = true
     @AppStorage(PrintNoticeKind.paused.defaultsKey) private var notifyPaused = true
@@ -1314,7 +1315,7 @@ struct GeneralPane: View {
                             if on { FloorStatus.shared.install(shop: shop) }
                             else { FloorStatus.shared.remove() }
                         }
-                    // What the item draws: the ring and "64% · 1h 02m", the ring
+                    // What the item draws: the ring and "64%" (or how many print), the ring
                     // alone, or the nozzle as it always was. Mac-local, beside
                     // the switch above (`MenuBarStyle`).
                     Picker(shop.words.callIt("mac.mbp_style"), selection: $menuBarStyle) {
@@ -1324,6 +1325,10 @@ struct GeneralPane: View {
                     }
                     .disabled(!menuBar)
                     .onChange(of: menuBarStyle) { _, _ in FloorStatus.shared.restyle() }
+                    // One soft sound when a print finishes. Off unless
+                    // somebody wants it (`FinishChime`), and not tied to the
+                    // menu bar switch: the print finishes either way.
+                    Toggle(shop.words.callIt("mac.mbh_chime"), isOn: $finishChime)
                     // The print notices this Mac did not send before
                     // (`PrintNotices.swift`). Faults, runouts and silent
                     // printers were already notified and have no switch here.
@@ -1648,7 +1653,9 @@ struct AssistantPane: View {
                         }
                     }
                     row(shop.words.callIt("calc.ai_key")) {
-                        SecureField(hasStoredKey ? "••••••••" : "", text: $draft.key)
+                        SecureField("", text: $draft.key,
+                                    prompt: Text(verbatim: hasStoredKey ? "••••••••" : ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                     if hasStoredKey && draft.key.isEmpty {
@@ -1656,7 +1663,9 @@ struct AssistantPane: View {
                             .font(.caption)
                     }
                     row(shop.words.callIt("set.ai_model")) {
-                        TextField(chosen?.defaultModel ?? "", text: $draft.model)
+                        TextField("", text: $draft.model,
+                                  prompt: Text(verbatim: chosen?.defaultModel ?? ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                 }
@@ -2013,7 +2022,7 @@ struct SlicersPane: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(slicer.name)
                                 Text(slicer.path)
-                                    .font(.caption).foregroundStyle(.tertiary)
+                                    .font(.caption).foregroundStyle(Khayt.faint)
                                     .lineLimit(1).truncationMode(.head)
                                     .help(slicer.path)
                             }
@@ -2044,7 +2053,7 @@ struct SlicersPane: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Text(shop.words.callIt("mac.slicer_why"))
-                        .font(.caption).foregroundStyle(.tertiary)
+                        .font(.caption).foregroundStyle(Khayt.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
