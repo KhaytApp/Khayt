@@ -351,6 +351,8 @@ struct CompanionBook {
             }
         }
         AlertIndex.write(AlertIndex.build(from: rows), to: directory)
+        // The badge follows the book: worked out again on the main actor.
+        NotificationCenter.default.post(name: .khaytBookChanged, object: directory)
     }
 
     /// Change the book in place, atomically.
@@ -587,4 +589,9 @@ struct CompanionBook {
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))
     }
+}
+
+extension Notification.Name {
+    /// Posted after every change to the book on disk (replace, edit, swap).
+    static let khaytBookChanged = Notification.Name("khayt.bookChanged")
 }
