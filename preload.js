@@ -367,6 +367,9 @@ contextBridge.exposeInMainWorld('hubAPI', {
   pluginCheck: (manifest) => ipcRenderer.invoke('hub:plugin-check', manifest),
   pluginReviewed: (manifests) => ipcRenderer.invoke('hub:plugin-reviewed', manifests),
   pluginSend: (req) => ipcRenderer.invoke('hub:plugin-send', req),
+  // Connector updates: the check (off unless KHAYT_CONNECTOR_UPDATES=1) and the shop's answers.
+  connectorUpdatesCheck: () => ipcRenderer.invoke('hub:connector-updates-check'),
+  connectorUpdate: (req) => ipcRenderer.invoke('hub:connector-update', req),
 
   // Round 12: Embedded LAN REST API
   startLanServer: (config) => ipcRenderer.invoke('hub:start-lan-server', config),

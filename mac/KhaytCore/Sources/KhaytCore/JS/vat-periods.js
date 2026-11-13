@@ -156,6 +156,26 @@
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   }
 
+  /**
+   * The return a shop is working on today: the period that last ENDED while
+   * its return is still due — to the end of the month after it closes, the
+   * ZATCA deadline — and after that the one running now. In October the Q3
+   * return is the one to file; in November it is past due and the screen
+   * opened on it anyway (Nov 11 desktop UI review, X15). `''` for a bad day.
+   */
+  function returnPeriodFor(today, frequency) {
+    const d = String(today || '').slice(0, 10);
+    const current = periodKeyOf(d, frequency);
+    if (!current) return '';
+    const b = periodBounds(current);
+    const before = new Date(Date.UTC(+b.from.slice(0, 4), +b.from.slice(5, 7) - 1, 0));
+    const prev = periodKeyOf(`${before.getUTCFullYear()}-${pad(before.getUTCMonth() + 1)}-${pad(before.getUTCDate())}`, frequency);
+    const end = periodBounds(prev).to;
+    const due = new Date(Date.UTC(+end.slice(0, 4), +end.slice(5, 7) + 1, 0));
+    const dueDay = `${due.getUTCFullYear()}-${pad(due.getUTCMonth() + 1)}-${pad(due.getUTCDate())}`;
+    return d <= dueDay ? prev : current;
+  }
+
   /** The period after `key`, in the same shape. */
   function nextPeriodKey(key) {
     const b = periodBounds(key);
@@ -415,7 +435,7 @@
 
   const api = {
     FREQUENCIES, DEFAULT_FREQUENCY,
-    frequencyOf, localDay, periodKeyOf, periodBounds, nextPeriodKey, periodsBetween, dayAfter,
+    frequencyOf, localDay, periodKeyOf, periodBounds, nextPeriodKey, periodsBetween, dayAfter, returnPeriodFor,
     filedMarks, markFor, isFiled, coveringMark, landingDay, landingPeriod,
     isReversed, reversalDayOf,
     markFiled, unmarkFiled, overlapOf, laterFiledOf, filingPeriods,

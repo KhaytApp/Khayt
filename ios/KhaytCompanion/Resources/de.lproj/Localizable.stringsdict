@@ -82,5 +82,101 @@
 			<string>%d einzelne Spulen, jede für sich erfasst.</string>
 		</dict>
 	</dict>
+	<key>needs.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d Sache braucht dich.</string>
+			<key>other</key>
+			<string>%d Dinge brauchen dich.</string>
+		</dict>
+	</dict>
+	<key>needs.late</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d Auftrag ist verspätet</string>
+			<key>other</key>
+			<string>%d Aufträge sind verspätet</string>
+		</dict>
+	</dict>
+	<key>needs.low.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d Spule fast leer</string>
+			<key>other</key>
+			<string>%d Spulen fast leer</string>
+		</dict>
+	</dict>
+	<key>needs.quotes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d Angebot wartet auf Antwort</string>
+			<key>other</key>
+			<string>%d Angebote warten auf Antwort</string>
+		</dict>
+	</dict>
+	<key>needs.more</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>und %d weitere</string>
+			<key>other</key>
+			<string>und %d weitere</string>
+		</dict>
+	</dict>
+	<key>simple.expenses.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d Ausgabe</string>
+			<key>other</key>
+			<string>%d Ausgaben</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -24,9 +24,18 @@ struct LibrarySearch: Equatable, Sendable {
 
     enum Field: String, CaseIterable, Sendable {
         case tag, group, category, material, creator, printer
+        /// The Colour and File type menus, typed: `colour:red`, `type:stl`.
+        case colour, type
 
-        /// What the chip calls it.
-        var wordKey: String { "mac.lib_token_" + rawValue }
+        /// What the chip calls it. Colour and File type are called what
+        /// their menus are.
+        var wordKey: String {
+            switch self {
+            case .colour: "inv.color"
+            case .type: "brl.sort_type"
+            default: "mac.lib_token_" + rawValue
+            }
+        }
 
         /// The names a field is typed as, folded. English first; each Arabic
         /// one is the word the app's own menus use for that axis.
@@ -38,6 +47,8 @@ struct LibrarySearch: Equatable, Sendable {
                 ("material", .material), ("خامة", .material), ("مادة", .material), ("الخامة", .material),
                 ("creator", .creator), ("by", .creator), ("مصمم", .creator), ("المصمم", .creator),
                 ("printer", .printer), ("طابعة", .printer), ("الطابعة", .printer),
+                ("colour", .colour), ("color", .colour), ("لون", .colour), ("اللون", .colour),
+                ("type", .type), ("filetype", .type), ("نوع", .type), ("النوع", .type),
             ]
             return Dictionary(names.map { (SearchText.fold($0.0), $0.1) }, uniquingKeysWith: { a, _ in a })
         }()
@@ -126,6 +137,10 @@ struct LibrarySearch: Equatable, Sendable {
         guard older.tokens.count <= tokens.count else { return false }
         for (was, now) in zip(older.tokens, tokens) {
             guard was.field == now.field, now.folded.contains(was.folded) else { return false }
+            // Colour and File type are matched from the START of a row's name
+            // (`Shop.searchMatcher`), so only a value that begins with the
+            // older one is narrower: "ed" finds nothing and "red" finds Red.
+            if was.field == .colour || was.field == .type, !now.folded.hasPrefix(was.folded) { return false }
         }
         return true
     }

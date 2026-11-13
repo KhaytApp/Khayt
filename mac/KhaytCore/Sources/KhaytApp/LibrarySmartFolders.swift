@@ -578,7 +578,7 @@ struct ClassicSmartFolderRows: View {
             let count = shop.libraryCount(row.query)
             HStack {
                 Label(row.title, systemImage: row.symbol)
-                    .foregroundStyle(count == 0 && row.saved == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(count == 0 && row.saved == nil ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                 Spacer(minLength: 8)
                 Text(shop.words.numeral(count)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }

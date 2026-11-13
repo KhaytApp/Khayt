@@ -60,9 +60,9 @@ struct MachineTile: View {
                 HStack(spacing: 5) {
                     // The one movement reserved for work in progress, on the
                     // one tile that is work in progress.
-                    Circle().fill(Khayt.hot).frame(width: 5, height: 5).alive()
+                    Circle().fill(Khayt.thread).frame(width: 5, height: 5).alive()
                     Figure(value: percent, style: .percent, size: 15, weight: .bold,
-                           tint: Khayt.hot)
+                           tint: Role.text)
                 }
             } else {
                 Text(now.state.glyph)

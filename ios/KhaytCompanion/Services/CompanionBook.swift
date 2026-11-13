@@ -335,6 +335,24 @@ struct CompanionBook {
         try next.write(to: baselineURL, options: [.atomic, Self.baselineProtection])
         // A book taken whole has no edits of this phone's in it.
         writeBaseRevs([:])
+        writeAlertIndex(store)
+    }
+
+    /// The few KB the notification extension reads instead of the book (job
+    /// id → stage), rewritten whenever the book changes. See `AlertIndex`.
+    func writeAlertIndex(_ store: [String: JSONValue]) {
+        var rows: [[String: Any]] = []
+        if case .array(let log)? = store["printLog"] {
+            for case .object(let o) in log {
+                guard case .string(let id)? = o["id"], case .string(let status)? = o["status"] else { continue }
+                var row: [String: Any] = ["id": id, "status": status]
+                if let v = o["voidedAt"], v != .null { row["voidedAt"] = true }
+                rows.append(row)
+            }
+        }
+        AlertIndex.write(AlertIndex.build(from: rows), to: directory)
+        // The badge follows the book: worked out again on the main actor.
+        NotificationCenter.default.post(name: .khaytBookChanged, object: directory)
     }
 
     /// Change the book in place, atomically.
@@ -343,10 +361,12 @@ struct CompanionBook {
     /// top about why that is honest on a phone rather than a stub.
     func update(_ mutate: (inout [String: JSONValue]) throws -> Void) throws {
         try refuseIfReadOnly()
+        var after: [String: JSONValue]?
         try StoreWriter.update(storeURL: url,
                                owns: { true },
                                whoHasIt: { nil },
-                               mutate: mutate)
+                               mutate: { root in try mutate(&root); after = root })
+        if let after { writeAlertIndex(after) }
     }
 
     /// Put a FOLDED book in place — but only if the book is still the one the
@@ -373,6 +393,7 @@ struct CompanionBook {
             guard root == expected else { current = false; return }
             root = next
         }
+        if current { writeAlertIndex(next) }
         return current
     }
 
@@ -568,4 +589,9 @@ struct CompanionBook {
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))
     }
+}
+
+extension Notification.Name {
+    /// Posted after every change to the book on disk (replace, edit, swap).
+    static let khaytBookChanged = Notification.Name("khayt.bookChanged")
 }

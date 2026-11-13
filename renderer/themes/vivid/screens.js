@@ -47,6 +47,11 @@
     teal: { fg: 'var(--vv-teal)', bg: 'var(--vv-teal-bg)' },
     cyan: { fg: 'var(--vv-cyan)', bg: 'var(--vv-cyan-bg)' },
     gray: { fg: 'var(--ink-2)', bg: 'rgba(120,130,150,.14)' },
+    // Job status chips: the shared status palette (styles.css --st-*).
+    'st-wait': { fg: 'var(--st-wait-ink)', bg: 'var(--st-wait-bg)' },
+    'st-move': { fg: 'var(--st-move-ink)', bg: 'var(--st-move-bg)' },
+    'st-done': { fg: 'var(--st-done-ink)', bg: 'var(--st-done-bg)' },
+    'st-late': { fg: 'var(--st-late-ink)', bg: 'var(--st-late-bg)' },
   };
 
   // Top-level `let clients` lives in the shared global lexical scope, not on
@@ -63,18 +68,10 @@
     return (typeof currencySymbol === 'function') ? currencySymbol() : 'SAR';
   }
 
-  // Bucket a queue status into one of the prototype's chip colors.
+  // A queue status's chip: the shared status palette, the same in every theme.
   function statusChipClass(status) {
-    switch (status) {
-      case 'printing': return 'blue';
-      case 'completed': return 'green';
-      case 'qc': return 'amber';
-      case 'post': return 'violet';
-      case 'on_hold': return 'gray';
-      case 'pending': return 'cyan';
-      case 'quote': return 'teal';
-      default: return 'gray';
-    }
+    const tone = (typeof statusToneOf === 'function') ? statusToneOf(status) : 'wait';
+    return 'st-' + tone;
   }
 
   /* ---------- Gradient KPI tile ---------- */
@@ -164,8 +161,9 @@
       state = 'printing';
     }
     const jobName = order ? (order.project || jobRef(order)) : machine.materialType || tr('mach.status_idle', 'idle');
-    let color = 'var(--vv-blue)';
-    if (state === 'error') color = 'var(--vv-red)';
+    // Printing is amber in the shared status palette (ink, so the label reads).
+    let color = 'var(--st-move-ink)';
+    if (state === 'error') color = 'var(--st-late-ink)';
     else if (state === 'idle' || state === 'reconnecting') color = 'var(--ink-3)';
     const tail = state === 'idle'
       ? tr('mach.status_idle', 'idle')
@@ -327,13 +325,14 @@
       barData.push({ cap, v });
     }
 
-    /* ---- Orders-by-status donut (real) ---- */
+    /* ---- Orders-by-status donut (real) ----
+       Printing, queued and done take the shared status palette's markers. */
     const statusCounts = [
-      { key: 'printing', label: tr('queue.printing', 'Printing'), color: 'var(--vv-blue)' },
-      { key: 'pending', label: tr('queue.pending', 'Queue'), color: 'var(--vv-cyan)' },
+      { key: 'printing', label: tr('queue.printing', 'Printing'), color: 'var(--st-move-dot)' },
+      { key: 'pending', label: tr('queue.pending', 'Queue'), color: 'var(--st-wait-dot)' },
       { key: 'post', label: tr('queue.post', 'Post'), color: 'var(--vv-violet)' },
-      { key: 'qc', label: tr('queue.qc', 'QC'), color: 'var(--vv-amber)' },
-      { key: 'completed', label: tr('queue.completed', 'Done'), color: 'var(--vv-green)' },
+      { key: 'qc', label: tr('queue.qc', 'QC'), color: 'var(--vv-teal)' },
+      { key: 'completed', label: tr('queue.completed', 'Done'), color: 'var(--st-done-dot)' },
     ].map((s) => ({
       ...s,
       // The "Done" segment counts both spellings of finished: the donut has no

@@ -31,7 +31,7 @@ struct QuoteCard: View {
                         .foregroundStyle(KhaytDesign.ink)
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    Text("#\(quote.reference)")
+                    Text(quote.reference)
                         .font(.khayt(12, .medium, relativeTo: .caption).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)

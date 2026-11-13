@@ -282,13 +282,17 @@ let package = Package(
         // library out — see `Library` for what that deliberately cannot see.
         .executableTarget(name: "KhaytMcp", dependencies: ["KhaytCore"]),
         .testTarget(name: "KhaytMcpTests", dependencies: ["KhaytMcp", "KhaytCore"]),
-        .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore", "KhaytWebSave"]),
+        // How many tests may be in flight at once, set as a test bundle
+        // loads. C, because nothing in Swift runs at load; in `Tests/`,
+        // because no product links it. The why is in `width.c`.
+        .target(name: "KhaytTestWidth", path: "Tests/KhaytTestWidth"),
+        .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore", "KhaytWebSave", "KhaytTestWidth"]),
         // `Resources/fake-smtp.py` is run as a program by `SmtpWireTests`, which
         // finds it by `#filePath`, not as a bundled resource. Excluded rather
         // than declared, so SwiftPM stops calling it an unhandled file and the
         // shipping app does not carry a copy of a test server.
         .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore", "KhaytWidgetData", "KhaytWidgetViews",
-                                                          "KhaytWebSave"],
+                                                          "KhaytWebSave", "KhaytTestWidth"],
                     exclude: ["Resources/fake-smtp.py"]),
     ]
 )

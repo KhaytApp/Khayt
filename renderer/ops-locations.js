@@ -118,6 +118,13 @@ function renderLocationFilter() {
   const sel = $('#locationFilter');
   if (!sel) return;
   if (activeLocation && !locations.some(l => l.id === activeLocation)) activeLocation = null;
+  // SIMPLE_MAP sites: the picker is there only when there is something to
+  // pick — two or more locations — in either mode. With one, a filter left on
+  // it would hide nothing but still say "filtering", so it is cleared.
+  const many = locations.length >= 2;
+  sel.hidden = !many;
+  sel.style.display = many ? '' : 'none';
+  if (!many && activeLocation) { activeLocation = null; persistActiveLocation(); }
   sel.innerHTML = `<option value="">${escapeHtml(t('loc.all'))}</option>` +
     locations.map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
   sel.value = activeLocation || '';

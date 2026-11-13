@@ -177,7 +177,10 @@
       // is the same printer on a different lease — not a resemblance.
       const storedMac = normalizeMac(machine.printerApi.mac);
       if (storedMac) {
-        const hit = sameType.find((d) => normalizeMac(d.mac) === storedMac);
+        // Against every network card the printer reported, not only the first:
+        // a printer has a wired port and Wi-Fi, and either may be the one recorded.
+        const hit = sameType.find((d) => normalizeMac(d.mac) === storedMac
+          || (Array.isArray(d.macs) && d.macs.some((m) => normalizeMac(m) === storedMac)));
         if (hit) {
           if (bareHost(hit.host) === here) { note(NO_MOVE.SAME_HOST, { host: hit.host }); continue; }
           moves.push(describeMove(machine, hit, CONFIDENCE.MAC,
@@ -193,7 +196,10 @@
       // five identical printers on the bench.
       const stored = machine.printerApi.serial;
       if (stored) {
-        const hit = sameType.find((d) => sameSerial(d.serial, stored));
+        // Any serial the printer gave: a U1 has a product serial and a board
+        // serial, and a machine may have had either written down.
+        const hit = sameType.find((d) => sameSerial(d.serial, stored)
+          || (Array.isArray(d.serials) && d.serials.some((s) => sameSerial(s, stored))));
         if (hit) {
           if (bareHost(hit.host) === here) { note(NO_MOVE.SAME_HOST, { host: hit.host }); continue; }
           moves.push(describeMove(machine, hit, CONFIDENCE.SERIAL,
