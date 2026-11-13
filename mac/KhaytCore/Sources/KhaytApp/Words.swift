@@ -759,7 +759,7 @@ final class Words {
         // not drawn: one line saying what is missing beats three empty lanes and
         // a legend for marks that do not appear.
         "mac.band_free_across": ["en": "{hours} free across {machines}",
-                                 "ar": "{hours} متفرغة على {machines}"],
+                                 "ar": "{hours} متاحة على {machines}"],
         "mac.band_machines": ["en": "{n} machines", "ar": "{n} طابعة"],
         "mac.band_machines_one": ["en": "{n} machine", "ar": "طابعة واحدة"],
         "mac.band_machines_two": ["en": "2 machines", "ar": "طابعتين"],
@@ -775,7 +775,7 @@ final class Words {
         "mac.band_unknown":  ["en": "no estimate",   "ar": "لا تقدير"],
         "mac.band_cannot_ask": ["en": "printing something Khayt cannot time — nothing here is a guess",
                                 "ar": "تطبع شيئاً لا يستطيع خيط تقديره — ولا شيء هنا تخمين"],
-        "mac.band_free_in":  ["en": "free in {hours} h",  "ar": "متفرغة خلال {hours} ساعة"],
+        "mac.band_free_in":  ["en": "free in {hours} h",  "ar": "متاحة خلال {hours} ساعة"],
         // A machine Khayt has no protocol for is not a machine that has stopped
         // answering, and the two must not read the same.
         "mac.band_no_protocol": ["en": "Khayt has no way to ask this kind of machine what it is doing — it is not a fault",
@@ -820,10 +820,10 @@ final class Words {
         "mac.band_printing": ["en": "Printing now",   "ar": "تطبع الآن"],
         "mac.band_queued":   ["en": "Queued — projected", "ar": "في الانتظار — متوقع"],
         "mac.band_blocked":  ["en": "Blocked on stock",  "ar": "متوقف على المخزون"],
-        "mac.band_free":     ["en": "free",           "ar": "متفرغة"],
+        "mac.band_free":     ["en": "free",           "ar": "متاحة"],
         "mac.band_state_printing": ["en": "Printing", "ar": "تطبع"],
         "mac.band_state_queued":   ["en": "Queued",   "ar": "في الانتظار"],
-        "mac.band_state_free":     ["en": "Free",     "ar": "متفرغة"],
+        "mac.band_state_free":     ["en": "Free",     "ar": "متاحة"],
         "mac.band_state_offline": ["en": "Not answering", "ar": "لا تجيب"],
         "mac.band_state_down":    ["en": "Maintenance", "ar": "صيانة"],
         "mac.band_offline_note": ["en": "not answering — its hours are left out of the free total until it does", "ar": "لا تجيب — ساعاتها خارج إجمالي الوقت المتاح حتى تجيب"],
@@ -2742,7 +2742,10 @@ final class Words {
         "mac.state_done":      ["en": "Done",      "ar": "تم"],
         "mac.state_blocked":   ["en": "Blocked",   "ar": "متوقف"],
         "mac.state_quoted":    ["en": "Quoted",    "ar": "عرض سعر"],
-        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصل"],
+        // A printer, so feminine: «غير متصلة», the word every app uses for a
+        // printer that is not connected (Nov 2026). Never «متوقفة», which is
+        // kept for a real stop.
+        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصلة"],
         "mac.state_stopped": ["en": "Stopped", "ar": "متوقفة"],
         "mac.state_check_it": ["en": "Check it", "ar": "افحصها"],
         "mac.state_worn": ["en": "Worn", "ar": "مهترئة"],
@@ -3422,7 +3425,11 @@ final class Words {
         "mac.quarter_2": ["en": "Q2\u{00A0}{year}", "ar": "الربع الثاني {year}"],
         "mac.quarter_3": ["en": "Q3\u{00A0}{year}", "ar": "الربع الثالث {year}"],
         "mac.quarter_4": ["en": "Q4\u{00A0}{year}", "ar": "الربع الرابع {year}"],
-        "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
+        // «متاحة» (free), not «متوقفة»: with On hold now «متوقف مؤقتاً» on every
+        // app, an idle printer, a paused one and a held job all read as some
+        // form of "stopped" (Turki, 13 Nov 2026). A paused printer keeps
+        // «متوقفة مؤقتًا» and a real stop keeps «متوقفة».
+        "mac.idle":          ["en": "Idle",            "ar": "متاحة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
         "mach.connection":   ["en": "Connection",      "ar": "الاتصال"],
@@ -3695,7 +3702,7 @@ final class Words {
                             "ar": "تعذّر تشفير الرمز، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، والرمز غير المشفّر سينتقل معه."],
         "mac.tg_when": ["en": "Send a message when", "ar": "أرسل رسالة عند"],
         "mac.tg_on_complete": ["en": "A job is finished", "ar": "اكتمال عمل"],
-        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "تعليق عمل"],
+        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "إيقاف عمل مؤقتاً"],
         "mac.tg_on_low_stock": ["en": "Filament is running low", "ar": "انخفاض مخزون الخيط"],
         // THE LAST THREE ARE NOT THE SHARED `fleet.notify_*`, and the picture
         // is why. Those read "Notify on printer error", which is right on the
