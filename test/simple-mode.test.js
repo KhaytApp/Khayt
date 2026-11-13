@@ -27,10 +27,11 @@ test("Simple hides exactly the 'pro' rows, plus what waits for its design", () =
   assert.strictEqual(SM.shows('not-a-row', 'simple'), true, 'an unknown key is shown');
 });
 
-test('Expenses stays hidden in Simple until its reduced screen is drawn (S4, Mac page 09)', () => {
+test('Expenses is the short list in Simple, not the "Part of Professional" panel (S4 card 4)', () => {
   assert.strictEqual(SIMPLE_MAP.find((r) => r.key === 'expenses').simple, 'reduced');
-  assert.strictEqual(SM.decision('expenses'), 'pro');
-  assert.strictEqual(SM.tabGate('expenses-tab', 'simple'), 'expenses');
+  assert.strictEqual(SM.decision('expenses'), 'reduced');
+  assert.strictEqual(SM.shows('expenses', 'simple'), true);
+  assert.strictEqual(SM.tabGate('expenses-tab', 'simple'), null);
 });
 
 test('only Simple gates tabs and panes; enthusiast keeps its redirects', () => {

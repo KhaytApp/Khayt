@@ -95,6 +95,9 @@ function monthGoalHtml(now = new Date()) {
 function renderSimpleReports() {
   const wrap = $('#analyticsSimpleWrap');
   if (!wrap) return;
+  // A Simple shop's Analytics tab is the one-page Money summary (SIMPLE_MAP
+  // money, S4 card 5). The reports below stay for anything else that lands here.
+  if (settings.mode === 'simple' && typeof renderMoneyPage === 'function') { renderMoneyPage(wrap); return; }
 
   const thisMonthStr = localMonthStr();
   /* The trade set. `!o.voidedAt` has always meant "this did not count";

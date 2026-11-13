@@ -30,17 +30,13 @@
     : (typeof require === 'function' ? require('../lib/feature-tiers.js') : null));
 
   /** 'reduced' rows whose reduced screen is not designed yet, and what Simple
-   *  does with them meanwhile.
-   *  TODO(S4, Mac page 09): Expenses becomes a short list in Simple (add an
-   *  expense, this month's total) once the Mac draws it; until then it stays
-   *  hidden in Simple, as before S4. Money (`money`, the Analytics tab) keeps
-   *  today's Simple reports view (shell.js applyAnalyticsModeView) until the
-   *  one-page Money summary is drawn — it is not listed here because it is
-   *  already shown in Simple. */
-  const UNTIL_DESIGNED = { expenses: 'pro' };
+   *  does with them meanwhile. Empty since S4 cards 3–5: Expenses is a short
+   *  list in Simple and Analytics is the Money page (renderer/simple-screens-ui.js). */
+  const UNTIL_DESIGNED = {};
 
-  /** Tabs gated by a SIMPLE_MAP row. */
-  const TAB_KEYS = { 'expenses-tab': 'expenses' };
+  /** Tabs gated by a SIMPLE_MAP row. None today: Expenses was the one, and
+   *  Simple now opens its short list. */
+  const TAB_KEYS = {};
   /** Settings panes gated by a SIMPLE_MAP row (pane id → row). */
   const PANE_KEYS = { team: 'team', ai: 'ai' };
 

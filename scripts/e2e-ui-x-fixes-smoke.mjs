@@ -193,7 +193,9 @@ try {
         price: 500, currency: settings.currency || 'SAR', tags: ['sample'], parts: [] });
       settings.mode = 'simple'; applyMode();
       renderSimpleReports();
-      const names = [...document.querySelectorAll('#simpleReportsCard .leaderboard .name')].map((n) => n.textContent.trim());
+      // Simple's Analytics is the Money page since S4 card 5: its "Top
+      // products this month" list (#moneyTop) keeps the X14 rule.
+      const names = [...document.querySelectorAll('#moneyTop .sm-line > span:first-child')].map((n) => n.textContent.trim());
       settings.mode = 'professional'; applyMode();
       return names;
     });
