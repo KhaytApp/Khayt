@@ -471,6 +471,11 @@ final class PrinterWatch {
             await raiseAlerts(shop: shop)
             // A print just paused, told once (`PrintNoticeLedger`).
             raisePrintNotices(shop: shop)
+            // Who each answering printer is, learnt while it answers, and a
+            // search for any that went quiet because its address changed
+            // (Shop+PrinterMoved.swift). Started, not waited for: a search can
+            // take twenty-five seconds and the next poll must not.
+            shop.watchForMovedPrinters()
         } else if forgot {
             // Nothing was asked, but a machine's last reading went: the
             // dashboard and the widget still count it until they are told.

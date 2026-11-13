@@ -2044,6 +2044,14 @@ final class Shop {
     /// True while the subnets are being asked, which is the slow half and
     /// worth saying: mDNS answers instantly and a sweep takes seconds.
     var sweeping = false
+    /// The background search for a printer that changed address
+    /// (Shop+PrinterMoved.swift): when it last ran, whether it is running,
+    /// the quiet machines it looked for and could not find, and the machines
+    /// whose identity was already asked for this launch.
+    var movedSearchedAt: Date?
+    var movedSearching = false
+    var movedNotFound: Set<String> = []
+    var identityAsked: Set<String> = []
 
     // Stored for "Telling a printer what to do" (Shop+Printers.swift).
     /// What went wrong the last time a machine was told something, by machine.

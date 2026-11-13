@@ -6185,6 +6185,45 @@ public actor KhaytEngine {
                           [.string(lastKnownHost), .number(Double(limit))], as: [String].self)
     }
 
+    /// Which printer this is, from the answer to a protocol's identity
+    /// request (`lib/printer-sweep.js readIdentity`): the serials and network
+    /// card addresses the printer reports about itself. Never the hostname:
+    /// two Snapmaker U1s on one LAN both call themselves "lava".
+    public struct SweepIdentity: Decodable, Sendable, Equatable {
+        public let serial: String
+        public let serials: [String]
+        public let mac: String
+        public let macs: [String]
+        public var isEmpty: Bool { serials.isEmpty && macs.isEmpty }
+    }
+
+    /// The protocol's identity request path, or nil when it has none. Asked
+    /// WITHOUT credentials, always: it is how a printer at a new address is
+    /// recognised before anything secret is sent to it.
+    public func identityPath(type: String) throws -> String? {
+        let p = try runtime.call2("globalThis.KhaytPrinterSweep.identityProbeFor(ARG0)", [.string(type)], as: JSONValue.self)
+        if case .string(let path) = p, !path.isEmpty { return path }
+        return nil
+    }
+
+    public func readSweepIdentity(type: String, body: JSONValue) throws -> SweepIdentity {
+        try runtime.call2("globalThis.KhaytPrinterSweep.readIdentity(ARG0, ARG1)",
+                          [.string(type), body], as: SweepIdentity.self)
+    }
+
+    /// Is a search for moved printers worth running now
+    /// (`lib/printer-relocate.js shouldScan`): a machine is offline and not
+    /// already explained, and the last search was long enough ago.
+    public func shouldSearchForMoved(machines: [JSONValue], statusCache: [String: JSONValue],
+                                     lastScanAt: Date?, now: Date) throws -> Bool {
+        try runtime.call2(
+            "KhaytPrinterRelocate.shouldScan({ machines: ARG0.machines, statusCache: ARG0.statusCache, lastScanAt: ARG0.lastScanAt, now: ARG0.now, offlineThreshold: 3 })",
+            [.object(["machines": .array(machines), "statusCache": .object(statusCache),
+                      "lastScanAt": .number((lastScanAt?.timeIntervalSince1970 ?? 0) * 1000),
+                      "now": .number(now.timeIntervalSince1970 * 1000)])],
+            as: Bool.self)
+    }
+
     /// What answered, as a discovery record — or nil when it was not a printer.
     ///
     /// The shape matches `lib/printer-discovery.js` on purpose, so
