@@ -34,6 +34,10 @@ struct ExpenseSheet: View {
     /// The code that filled the form, read again once its seller is a supplier.
     @State private var readCode: String?
     @State private var addingSupplier = false
+    /// Simple's line under the sheet: this month's spending. Nil in
+    /// Professional, and when the book holds no expenses.
+    @State private var monthSpend: MonthSpend.Total?
+    @State private var monthCurrency: String?
 
     // The book's own categories (`ExpenseCategory.known`, KhaytCore, held to
     // `lib/expense-book.js` by its parity tests), so the phone cannot file
@@ -86,6 +90,7 @@ struct ExpenseSheet: View {
                         Task { await save() }
                     }
                     .padding(.top, 4)
+                    if let monthSpend { monthLine(monthSpend) }
                 }
                 .padding(16)
             }
@@ -115,12 +120,35 @@ struct ExpenseSheet: View {
             }
             .task {
                 if let reader = api.reader, canReadReceipts { reclaimsTax = await reader.reclaimsTax() }
+                await loadMonthSpend()
                 #if DEBUG
                 // `-KhaytReceipt <QR text>` on the launch line, for screenshots.
                 if let code = UserDefaults.standard.string(forKey: "KhaytReceipt") { await read([code]) }
                 #endif
             }
         }
+    }
+
+    // MARK: - This month (Simple)
+
+    /// SIMPLE_MAP `expenses` is reduced: "a short list: add an expense, this
+    /// month's total". The phone only adds, so Simple gets the total under the
+    /// sheet; Professional's budgets and vendors live on the Mac.
+    private func loadMonthSpend() async {
+        guard api.shopMode.isReduced("expenses"), api.holdsBook, let reader = api.reader,
+              let store = try? await reader.wholeBook() else { monthSpend = nil; return }
+        let reclaims = await reader.reclaimsTax()
+        monthCurrency = await api.shopCurrency()
+        monthSpend = MonthSpend.total(in: store, reclaimsTax: reclaims)
+    }
+
+    private func monthLine(_ t: MonthSpend.Total) -> some View {
+        Text(L10n.format("simple.expenses.month", Money.text(t.amount, monthCurrency),
+                         L10n.count("simple.expenses.count", t.count)))
+            .font(.khayt(14, .semibold, relativeTo: .subheadline).monospacedDigit())
+            .foregroundStyle(KhaytDesign.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
     }
 
     // MARK: - The receipt's QR

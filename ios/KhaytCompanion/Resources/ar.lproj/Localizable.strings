@@ -63,14 +63,14 @@
 
 /* Status */
 "status.quote" = "عرض سعر";
-"status.pending" = "قيد الانتظار";
+"status.pending" = "بانتظار";
 "status.printing" = "طباعة";
 "status.post" = "ما بعد الطباعة";
 "status.qc" = "فحص الجودة";
 "status.completed" = "مكتمل";
 "status.delivered" = "تم التسليم";
 "status.shipped" = "تم الشحن";
-"status.on_hold" = "معلق";
+"status.on_hold" = "متوقف مؤقتاً";
 
 /* Lang */
 "lang.system" = "النظام";
@@ -416,7 +416,7 @@
 "order.detail.due_date" = "تاريخ التسليم";
 "order.detail.printer" = "الطابعة";
 
-"stage.short.pending" = "معلّق";
+"stage.short.pending" = "بانتظار";
 "stage.short.printing" = "طباعة";
 "stage.short.post" = "معالجة";
 "stage.short.qc" = "فحص";
@@ -503,10 +503,10 @@
 "spool.method.label" = "امسح الملصق";
 
 /* Machines, as design/ios-v2 draws them */
-"machines.idle" = "خامل";
+"machines.idle" = "متاحة";
 "machines.error" = "خطأ";
-"machines.offline" = "متوقفة";
-"machines.offline.sub" = "أُوقفت من الماك";
+"machines.offline" = "غير متصلة";
+"machines.offline.sub" = "عُلّمت غير متصلة على الماك";
 "machines.ready" = "جاهز للمهمة التالية";
 "machines.nozzle" = "الفوهة";
 "machines.bed" = "المنصّة";
@@ -535,7 +535,7 @@
 "book.collection.giftCards" = "بطاقات الهدايا";
 
 /* Intake, as design/ios-v2 draws it */
-"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور كمعلّق.";
+"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور بحالة «بانتظار».";
 "intake.foot.no_book" = "الزبائن المباشرون وقائمة الانتظار. أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف؛ أما التجاهل فيعمل دائماً.";
 "intake.take" = "خذه";
 "intake.dismiss" = "تجاهل";
@@ -1315,6 +1315,25 @@
 "load.failed.title" = "تعذّر التحميل";
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
+
+/* S4: Simple mode */
+"mode.simple" = "بسيط";
+"mode.professional" = "احترافي";
+"mode.badge.a11y" = "الوضع: %@، يُضبط على جهاز Mac";
+"simple.stage.ready" = "جاهز";
+"simple.note.on_hold" = "متوقف مؤقتاً";
+"simple.note.post" = "قيد المعالجة";
+"simple.note.qc" = "قيد الفحص";
+"simple.note.shipped" = "تم الشحن";
+"simple.note.delivered" = "تم التسليم";
+"simple.expenses.month" = "هذا الشهر: %@ · %@";
+"simple.gate.care.title" = "خطط الصيانة جزء من الوضع الاحترافي";
+"simple.gate.care.body" = "هذا المتجر مضبوط على الوضع البسيط في جهاز Mac. لاستخدام خطط الصيانة، بدّل إلى الوضع الاحترافي في تطبيق خيط على جهاز Mac. يتبع الهاتف اختيار جهاز Mac.";
+"simple.gate.parts.title" = "قائمة القطع المطلوبة جزء من الوضع الاحترافي";
+"simple.gate.parts.body" = "هذا المتجر مضبوط على الوضع البسيط في جهاز Mac. قائمة القطع تأتي من خطط الصيانة، وهي من الوضع الاحترافي: بدّل في تطبيق خيط على جهاز Mac. يتبع الهاتف اختيار جهاز Mac.";
+"simple.gate.back_machine" = "العودة إلى الآلة";
+"simple.gate.back_machines" = "العودة إلى الآلات";
+"simple.expenses.count" = "%d مصروف";
 "PUSH_GENERIC" = "في متجرك ما يحتاج نظرة";
 "push.not_connected" = "التنبيهات لا تصل إلى هذا الهاتف بعد. سيحاول خيط مجدداً عند فتحه.";
 /* Home — Needs you */

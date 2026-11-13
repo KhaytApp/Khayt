@@ -154,10 +154,11 @@ extension Shop {
     /// shop's to fix at the moment a print ends. The photo can always be added
     /// by hand.
     func printEnded(_ machine: Machine, edge: KhaytEngine.FinishTrack) async {
-        let (ended, photo) = await FinishCamera.finish(machine, edge: edge, printLog: orderRows,
+        var (ended, photo) = await FinishCamera.finish(machine, edge: edge, printLog: orderRows,
                                                        shop: self) { jobId, data in
             await self.attachFinishPhoto(jobId: jobId, data: data)
         }
+        ended.finishedAt = printers.finishCamera.finishedAt(machine.id)
         FinishCamera.lastOutcome[machine.id] = photo
         await printFinished(ended)
         // The printer's timelapse, written a little after the end — looked
@@ -190,28 +191,104 @@ extension Shop {
     /// ended, sealed with the shop's key. Only a signed-in owner or member Mac
     /// with the key open sends it; everything else is a quiet no.
     @discardableResult
-    func sendPrintFinishedEvent(_ ended: FinishCamera.Ended, now: Date = Date()) async -> ShopEventPublisher.Outcome? {
-        guard let build = source.build, let dek = cloudDek,
-              Self.cloudConnected(settingsDict), cloudRoleCanWrite, !eventsNotOffered else { return nil }
+    func sendPrintFinishedEvent(_ ended: FinishCamera.Ended, now: Date = Date(),
+                                queueOnFailure: Bool = true) async -> ShopEventPublisher.Outcome? {
+        guard source.build != nil, Self.cloudConnected(settingsDict), cloudRoleCanWrite, !eventsNotOffered
+        else { return nil }
         let order = ended.orderId.flatMap { id in orders.first { $0.id == id } }
-        let at = ShopEventPublisher.stamp(now)
+        // When the print ENDED, not when this Mac noticed: a print that
+        // finished while the Mac slept used to be announced at wake time
+        // (push review M1).
+        let at = ShopEventPublisher.stamp(ended.finishedAt ?? now)
         let payload = ShopEventPublisher.printFinishedPayload(
             ended, at: at, project: order?.project, client: order?.client)
+        let id = ShopEventPublisher.printFinishedId(ended, at: at)
+        let outcome = await postShopEvent(kind: "print-finished", at: at, payload: payload, id: id)
+        if queueOnFailure, Self.worthKeeping(outcome) {
+            queueEvent(.init(kind: "print-finished", at: at, payload: payload, since: now, id: id))
+        } else if outcome == .sent {
+            flushPendingEvents(force: true)
+        }
+        return outcome
+    }
+
+    /// One event, sealed and posted. Nil when the cloud is locked here.
+    func postShopEvent(kind: String, at: String, payload: [String: JSONValue],
+                       id: String? = nil) async -> ShopEventPublisher.Outcome? {
+        guard let build = source.build, let dek = cloudDek else { return nil }
         do {
             let connection = try CloudReader.connection(settingsDict)
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { return nil }
             let session = CloudReader.session
             let outcome = try await ShopEventPublisher.send(
-                connection, token: token, dek: dek, kind: "print-finished", at: at, payload: payload) {
+                connection, token: token, dek: dek, kind: kind, at: at, payload: payload, id: id) {
                 try await session.data(for: $0)
             }
             if outcome == .notOffered { eventsNotOffered = true }
-            FileHandle.standardError.write(Data("khayt: print-finished event — \(outcome)\n".utf8))
+            FileHandle.standardError.write(Data("khayt: \(kind) event — \(outcome)\n".utf8))
             return outcome
         } catch {
-            FileHandle.standardError.write(Data("khayt: print-finished event — \(error)\n".utf8))
+            FileHandle.standardError.write(Data("khayt: \(kind) event — \(error)\n".utf8))
             return .failed(0)
+        }
+    }
+
+    // ── AN ALERT THAT COULD NOT GO IS NOT DROPPED ─────────────────────────
+    //
+    // It was "logged and dropped": a print that finished during a Wi-Fi
+    // blip, or while the cloud was locked on this Mac, never reached the
+    // phones (push review M2, M3). It now waits, with the time it HAPPENED
+    // (`at`), and goes at the next chance: the next printer sweep, the next
+    // event that does go, or the cloud being unlocked. Six hours at most, and
+    // twenty at most: an alert about this morning is not news in the evening.
+
+    struct PendingEvent: Equatable {
+        let kind: String
+        let at: String
+        let payload: [String: JSONValue]
+        /// When it was first held, for the six-hour limit.
+        let since: Date
+        /// Sent with every attempt, so the cloud can drop a repeat.
+        var id: String? = nil
+    }
+    static let pendingLimit = 20
+    static let pendingFor: TimeInterval = 6 * 3600
+    /// The least time between two attempts at the held alerts.
+    static let pendingRetry: TimeInterval = 60
+
+    /// Locked here (nil), or a failure that a later try may get through.
+    /// Refusals that will not change (read-only, not offered, too large,
+    /// over the hourly allowance) are not kept.
+    static func worthKeeping(_ outcome: ShopEventPublisher.Outcome?) -> Bool {
+        switch outcome {
+        case nil, .failed?: return true
+        default: return false
+        }
+    }
+
+    func queueEvent(_ event: PendingEvent) {
+        guard !pendingEvents.contains(where: { ($0.id != nil && $0.id == event.id)
+            || ($0.kind == event.kind && $0.at == event.at && $0.payload == event.payload) })
+        else { return }
+        pendingEvents.append(event)
+        if pendingEvents.count > Self.pendingLimit { pendingEvents.removeFirst(pendingEvents.count - Self.pendingLimit) }
+    }
+
+    /// Send what is waiting, oldest first, if the cloud is open here. Stops at
+    /// the first that does not go, so order is kept.
+    func flushPendingEvents(force: Bool = false, now: Date = Date()) {
+        pendingEvents.removeAll { now.timeIntervalSince($0.since) > Self.pendingFor }
+        guard !pendingEvents.isEmpty, cloudDek != nil else { return }
+        if !force, let last = pendingEventsTriedAt, now.timeIntervalSince(last) < Self.pendingRetry { return }
+        pendingEventsTriedAt = now
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            while let next = self.pendingEvents.first {
+                let outcome = await self.postShopEvent(kind: next.kind, at: next.at, payload: next.payload, id: next.id)
+                if Self.worthKeeping(outcome) { return }
+                self.pendingEvents.removeAll { $0 == next }
+            }
         }
     }
 
@@ -224,7 +301,8 @@ extension Shop {
         let ended = FinishCamera.Ended(machineId: machine?.id ?? "test", machineName: machine?.name ?? "Khayt",
                                        orderId: nil, outcome: "finished", durationS: 3720,
                                        photoTaken: false, filename: "test.gcode")
-        let outcome = await sendPrintFinishedEvent(ended)
+        // A test alert that did not go is not kept for later.
+        let outcome = await sendPrintFinishedEvent(ended, queueOnFailure: false)
         switch outcome {
         case .sent?: testAlertSaid = words.callIt("mac.alert_test_sent")
         case .rateLimited?: testAlertSaid = words.callIt("mac.alert_test_limit")
