@@ -63,14 +63,14 @@
 
 /* Status */
 "status.quote" = "عرض سعر";
-"status.pending" = "قيد الانتظار";
+"status.pending" = "بانتظار";
 "status.printing" = "طباعة";
 "status.post" = "ما بعد الطباعة";
 "status.qc" = "فحص الجودة";
 "status.completed" = "مكتمل";
 "status.delivered" = "تم التسليم";
 "status.shipped" = "تم الشحن";
-"status.on_hold" = "معلق";
+"status.on_hold" = "متوقف مؤقتاً";
 
 /* Lang */
 "lang.system" = "النظام";
@@ -416,7 +416,7 @@
 "order.detail.due_date" = "تاريخ التسليم";
 "order.detail.printer" = "الطابعة";
 
-"stage.short.pending" = "معلّق";
+"stage.short.pending" = "بانتظار";
 "stage.short.printing" = "طباعة";
 "stage.short.post" = "معالجة";
 "stage.short.qc" = "فحص";
@@ -535,7 +535,7 @@
 "book.collection.giftCards" = "بطاقات الهدايا";
 
 /* Intake, as design/ios-v2 draws it */
-"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور كمعلّق.";
+"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور بحالة «بانتظار».";
 "intake.foot.no_book" = "الزبائن المباشرون وقائمة الانتظار. أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف؛ أما التجاهل فيعمل دائماً.";
 "intake.take" = "خذه";
 "intake.dismiss" = "تجاهل";
