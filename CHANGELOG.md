@@ -9609,6 +9609,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.35] - 2026-11-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release makes the iPhone's print alerts arrive, finds a printer whose address changed, and adds the Library's colour and file type filters.
+
+### Fixed
+
+- **Print alerts on your iPhone arrive, even for a print that finished while Khayt was closed.** Khayt used to forget what was printing each time it started, so a print that ended while the app was closed (or being updated) never sent its alert or ended its Lock Screen activity. It now remembers, for a day, and sends them when it starts, stamped with when the print finished. An alert that could not be sent (no network, or the cloud locked on this Mac) is kept for up to six hours and sent in order, and never twice. One printer's failed update no longer holds back the others.
+- **The Lock Screen shows the job's name**, not the printer's file name, and goes stale within five minutes if this Mac stops sending, instead of showing the last percent for hours.
+- **Unlocking the cloud sends the changes made while it was locked** at once, rather than with the next edit.
+- **A customer's decline on their quote page is shown as a decline**, not "no response yet". One that answered an earlier version of the quote says so.
+- **Reloading is much faster on a large library** (about 3 s instead of 8 s on a 14,700-model library, measured on a test build), and printers that are switched off no longer slow down the readings of the others.
+- **Printing is amber everywhere**, on screens, the board, the Machines timeline and the widget; a job on hold is purple, and "Blocked on stock" is drawn hatched so it no longer looks like printing.
+- **Sheets no longer cut off their fields**, and a few labels that were cut short are whole.
+- **Small fixes from the last release's review:** the backup copy of the book is kept when the book itself could not be read; Edit Job saves its fields and the Not business box in one step and cannot be saved twice; a price that cannot be read is pointed out instead of saved as 0; Arabic digits are read everywhere a number is typed.
+- **Arabic:** an idle printer is «متاحة», a printer that is not connected «غير متصلة», and the stage names are «بانتظار» (Pending) and «متوقف مؤقتاً» (On hold).
+- **An invoice whose page failed to draw** is drawn again rather than shared or exported as a blank page; an export that still cannot draw says so.
+
+### Added
+
+- **A printer that gets a new address from your router is found by itself.** While a printer answers, Khayt notes its serial number and network card. If it stops answering, Khayt looks for it on your network (at most every ten minutes) and asks on the machine's card: "It answers at 192.168.68.74 now · Point Khayt at it · Not now". It never switches by itself, never sends the printer's key to an address it has not recognised, and never goes by the printer's name, since two Snapmaker U1s both call themselves "lava". If it is not found, the card suggests giving the printer a fixed address in your router.
+- **The Library filters by colour and by file type**, beside Show, Printer, Creator, Category and Tag. A multicolour model is under each of its colours.
+- **The iPhone can filter the Library by colour and file type** when its host is this Mac (needs the matching iPhone build).
+
 ## [4.0.0-beta.34] - 2026-11-11
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
