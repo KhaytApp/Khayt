@@ -1,4 +1,4 @@
-import { TONE_VAR, type Tone } from '../tone';
+import { toneInk, type Tone } from '../tone';
 
 export interface BigFigureProps {
   /** The figure itself, already formatted — this draws it, it does not round it. */
@@ -29,7 +29,7 @@ export function BigFigure({ value, unit, tone, size = 34 }: BigFigureProps) {
       className="khayt-figure"
       style={{
         ['--khayt-figure-size' as string]: `${size}px`,
-        ...(tone ? { ['--khayt-figure-tone' as string]: `var(${TONE_VAR[tone]})` } : null),
+        ...(tone ? { ['--khayt-figure-tone' as string]: toneInk(tone) } : null),
       }}
     >
       <span className="khayt-figure__value">{value}</span>

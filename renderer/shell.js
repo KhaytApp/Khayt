@@ -624,6 +624,15 @@ function switchTab(tabId) {
   const tabGate = window.KhaytSimpleMode?.tabGate?.(tabId, settings.mode) || null;
   const isPro = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.isProMode(settings.mode) : (settings.mode || 'professional') === 'professional';
   if (!tabGate && !isPro && PRO_TABS.includes(tabId)) tabId = 'dashboard-tab';
+  // A real change of view opens the new view at its top: the views share one
+  // scroller (#mainContent), so without this the Calculator, Logs or Expenses
+  // opened wherever the previous view had been scrolled to. Re-showing the
+  // same tab (a re-render) keeps the place.
+  const prevTab = document.querySelector('.tab-content.active')?.id;
+  if (prevTab !== tabId) {
+    const scroller = document.getElementById('mainContent');
+    if (scroller) scroller.scrollTop = 0;
+  }
   $$('.tab-content.sm-gated').forEach((el) => { if (el.id !== tabId || !tabGate) el.classList.remove('sm-gated'); });
   if (tabGate) {
     const host = document.getElementById(tabId);

@@ -140,7 +140,7 @@ private struct KitChip: View {
                     }
                     if let off = kit.accuracy?.time {
                         Text(verbatim: "\(off > 0 ? "+" : "")\(Money.quantity(off))% \(shop.words.callIt("mac.kit_vs_estimate"))")
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                     }
                 }
                 .font(.caption)

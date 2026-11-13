@@ -22,6 +22,9 @@ import Foundation
 /// - The Show axis (print next, duplicates, unfiled, never printed, archived,
 ///   storage, no print figures, sells in the catalogue), Ready on (one
 ///   machine, or any), Fits (one machine), Creator, Category and Tag.
+/// - Colour and File type: SEVERAL values each (`colours`, `fileTypes`). A
+///   model passes Colour when it is under ANY of the chosen rows, and the
+///   two menus narrow together like every other pair.
 /// - The ranges (`Ranges`): print time, filament, price, times printed and
 ///   the day a model was added. A model whose figure is NOT KNOWN never
 ///   matches a range — "under two hours" is not a claim about a model nobody
@@ -76,6 +79,24 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     public var uncategorised = false
     public var tag: String?
 
+    /// The Colour menu's chosen rows: colour-family ids, `multi` and `none`
+    /// (`ColourFamily.tokens`). Several are OR — a model is in when it is
+    /// under any of them. Kept in menu order with no repeats, so two
+    /// queries that ask the same thing are equal and hash alike.
+    public var colours: [String] = [] { didSet { Self.tidy(&colours, ColourFamily.tokens) } }
+    /// The File type menu's chosen rows (`ModelFileType` raw values), OR.
+    public var fileTypes: [String] = [] { didSet { Self.tidy(&fileTypes, Self.typeIds) } }
+
+    static let typeIds = ModelFileType.allCases.map(\.rawValue)
+
+    /// Only ids this build knows, each once, in menu order. An id from a
+    /// newer build is dropped rather than kept as a filter with no row to
+    /// show it or take it off.
+    private static func tidy(_ list: inout [String], _ known: [String]) {
+        let tidy = known.filter(list.contains)
+        if tidy != list { list = tidy }
+    }
+
     public var ranges = Ranges()
 
     /// A `LibrarySort` raw value; nil keeps the order the screen has.
@@ -91,7 +112,8 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     public var filtersOn: Bool {
         printNext || duplicates || unfiled || neverPrinted || archived || storage != nil
             || noFigures || inCatalogue || fromWeb || readyOn != nil || readyAnywhere || fitsOn != nil
-            || creator != nil || category != nil || uncategorised || tag != nil || ranges.isActive
+            || creator != nil || category != nil || uncategorised || tag != nil
+            || !colours.isEmpty || !fileTypes.isEmpty || ranges.isActive
     }
 
     /// The same question with no order — what a count depends on.
@@ -243,6 +265,8 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
                              ("tag", tag), ("sort", sort)] {
             if let value, !value.isEmpty { o[key] = .string(value) }
         }
+        if !colours.isEmpty { o["colours"] = .array(colours.map(JSONValue.string)) }
+        if !fileTypes.isEmpty { o["fileTypes"] = .array(fileTypes.map(JSONValue.string)) }
         var r: [String: JSONValue] = [:]
         for (key, bound) in [("minutes", ranges.minutes), ("grams", ranges.grams), ("price", ranges.price),
                              ("timesPrinted", ranges.timesPrinted)] where bound.isActive {
@@ -279,6 +303,17 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
         storage = text("storage").flatMap(Storage.init(rawValue:))
         readyOn = text("readyOn"); fitsOn = text("fitsOn"); creator = text("creator"); category = text("category")
         tag = text("tag"); sort = text("sort")
+        func list(_ k: String) -> [String] {
+            guard case .array(let rows)? = o[k] else { return [] }
+            return rows.compactMap { if case .string(let s) = $0 { s.lowercased() } else { nil } }
+        }
+        // Through the setters' tidy: `didSet` does not run inside an init.
+        var chosen = list("colours")
+        Self.tidy(&chosen, ColourFamily.tokens)
+        colours = chosen
+        chosen = list("fileTypes")
+        Self.tidy(&chosen, Self.typeIds)
+        fileTypes = chosen
         if case .object(let r)? = o["ranges"] {
             func bound(_ k: String) -> Bound {
                 guard case .object(let b)? = r[k] else { return Bound() }

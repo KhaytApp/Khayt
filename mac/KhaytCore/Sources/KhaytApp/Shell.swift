@@ -329,7 +329,7 @@ struct ShellSidebar: View {
                 // The site's, when one is chosen, as the screens they open are:
                 // a "▼2" for another site's spools above an Inventory showing
                 // none of them read as a fault (alpha.61 review).
-                .init(.machines, "mac.machines", dot: shop.anySiteMachineRunning ? Role.ok : nil),
+                .init(.machines, "mac.machines", dot: shop.anySiteMachineRunning ? Khayt.thread : nil),
                 .init(.inventory, "mac.inventory", alarm: shop.lowSpools.filter { shop.inSite(spool: $0) }.count),
                 .init(.expenses, "mac.nav_expenses"),
             ])

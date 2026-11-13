@@ -206,7 +206,7 @@ function renderClients() {
             </div>
           </div>
         </td>
-        <td style="font-variant-numeric: tabular-nums;">${escapeHtml(c.phone || '—')}</td>
+        <td style="font-variant-numeric: tabular-nums;"><bdi dir="ltr">${escapeHtml(c.phone || '—')}</bdi></td>
         <td style="font-variant-numeric: tabular-nums;">${stats.count}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--success);">${fmtPrice(stats.revenue)}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--text-dim);">${escapeHtml(stats.lastDate || t('cl.never_ordered'))}</td>

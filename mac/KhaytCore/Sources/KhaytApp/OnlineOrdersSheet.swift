@@ -113,7 +113,7 @@ private struct WebStoreJobRow: View {
             // back to front.
             Text(Figure.isolated(job.reference)).font(TypeScale.figure(11))
                 .foregroundStyle(.secondary)
-            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(Khayt.faint)
                 .flipsForRightToLeftLayoutDirection(true)
             Text(Figure.isolated(job.jobId)).font(TypeScale.figure(11))
             if !job.customer.isEmpty {
@@ -153,7 +153,7 @@ private struct OnlineOrderCard: View {
                 // hand-typed customer request has no platform in its title and
                 // still needs one.
                 if let chip = platformChip {
-                    Text(chip).font(.caption).foregroundStyle(.tertiary)
+                    Text(chip).font(.caption).foregroundStyle(Khayt.faint)
                 }
             }
             if !order.customer.isEmpty {
@@ -184,7 +184,7 @@ private struct OnlineOrderCard: View {
                     // reorders and the quantity reads back to front. The same
                     // bidi rule that drew `+966 50…` as `…05 669+`.
                     Text(Figure.isolated("\(line.qty)×")).font(TypeScale.figure(11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Khayt.faint)
                         .frame(width: 28, alignment: .trailing)
                     Text(line.name).font(.callout).lineLimit(1)
                     Spacer(minLength: 8)

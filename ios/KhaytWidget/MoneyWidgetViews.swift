@@ -140,7 +140,7 @@ struct KhaytMoneyView: View {
                 .font(.system(size: compact ? 11 : 12, weight: .semibold))
                 .foregroundStyle(fullColor ? Look.brand : .primary)
                 .widgetAccentable()
-            Text(verbatim: s.shopName.isEmpty ? "Khayt" : s.shopName)
+            (s.shopName.isEmpty ? Text("Khayt") : Text(verbatim: s.shopName))
                 .font(Look.text(compact ? 11 : 12, .semibold))
                 .foregroundStyle(ink)
                 .lineLimit(1)
@@ -204,7 +204,7 @@ struct KhaytMoneyView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(fullColor ? Look.brand : .primary)
                     .widgetAccentable()
-                Text(verbatim: "Khayt").font(Look.display(15)).foregroundStyle(ink)
+                Text("Khayt").font(Look.display(15)).foregroundStyle(ink)
             }
             Spacer(minLength: 0)
             Text("Pair Khayt with your shop to see its money here.", bundle: bundle)

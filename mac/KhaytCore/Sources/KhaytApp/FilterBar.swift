@@ -30,30 +30,57 @@ struct FilterBar: View {
     var body: some View {
         if !chips.isEmpty {
             VStack(spacing: 0) {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 6) {
-                        ForEach(chips) { chip in
-                            FilterChip(label: chip.label, count: chip.count,
-                                       on: chip.on, press: chip.press)
-                        }
-                        if showingClear {
-                            Button(clearLabel, action: clear)
-                                .buttonStyle(.link)
-                                .padding(.leading, 4)
-                        }
-                    }
-                    .padding(.horizontal, Metric.screen)
-                    .padding(.vertical, 6)
+                // ── A ROW THAT FITS IS NOT A SCROLL VIEW ──────────────────
+                //
+                // In Arabic the first chip of Gift cards and of the Catalogue
+                // was cut at the leading edge — "ـطة 3" for "نشطة 3" — on a
+                // row of three chips (Nov 11 2026 review, B19). The fade was
+                // suspected first and was not it: with the fade ruled out
+                // (`ScrollEdges`), the same picture came back. WHY a
+                // right-to-left horizontal scroll view cuts content narrower
+                // than itself was not established; that it does, here, was
+                // photographed twice.
+                //
+                // So the scroll view is used only when the chips do not fit.
+                // When they do — nearly always — the row is a plain stack
+                // against the leading edge, which cannot be scrolled out of
+                // place because it does not scroll.
+                ViewThatFits(in: .horizontal) {
+                    row.frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView(.horizontal) { row }
+                        // STILL OPEN: a row too long to fit (the Catalogue
+                        // with seventeen chips) is still cut at its first
+                        // chip in Arabic. `.defaultScrollAnchor(.leading)`
+                        // was tried and photographed, and changed nothing.
+                        .scrollIndicators(.never)
+                        // The scroller is hidden, so the row said nothing about the
+                        // chips past the window edge — the library's ran off mid-chip
+                        // after the eighth creator. The far edge fades while there is
+                        // more to see. See `HorizontalScrollCue`.
+                        .horizontalScrollCue()
                 }
-                .scrollIndicators(.never)
-                // The scroller is hidden, so the row said nothing about the
-                // chips past the window edge — the library's ran off mid-chip
-                // after the eighth creator. The far edge fades while there is
-                // more to see. See `HorizontalScrollCue`.
-                .horizontalScrollCue()
                 Divider()
             }
         }
+    }
+}
+
+extension FilterBar {
+    /// The chips and the clear link, with the row's own margins.
+    fileprivate var row: some View {
+        HStack(spacing: 6) {
+            ForEach(chips) { chip in
+                FilterChip(label: chip.label, count: chip.count,
+                           on: chip.on, press: chip.press)
+            }
+            if showingClear {
+                Button(clearLabel, action: clear)
+                    .buttonStyle(.link)
+                    .padding(.leading, 4)
+            }
+        }
+        .padding(.horizontal, Metric.screen)
+        .padding(.vertical, 6)
     }
 }
 
@@ -68,6 +95,11 @@ struct FilterChipModel: Identifiable {
     let count: Int
     let on: Bool
     let press: () -> Void
+    /// A colour drawn before the name, as hex — the Library's Colour rows.
+    var swatch: String? = nil
+    /// False for a row that is always listed but holds nothing just now: it
+    /// is drawn greyed rather than taken away.
+    var enabled = true
 }
 
 /// A chip that PRESSES, which is the only reason it is not `Chip`.
