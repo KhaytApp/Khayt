@@ -27,10 +27,12 @@ final class NotificationService: UNNotificationServiceExtension {
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
         deliver = contentHandler
         let original = request.content.mutableCopy() as? UNMutableNotificationContent
+        if let original { Self.prepare(original) }
         original?.filterCriteria = NotificationKind.of(request.content.userInfo)
         fallback = original
         Task {
             let rewritten = await Self.rewrite(request.content.userInfo)
+            if let rewritten, let original { Self.carry(from: original, to: rewritten) }
             // Labelled for Focus filters whichever version is shown.
             let shown = rewritten ?? original
             shown?.filterCriteria = NotificationKind.of(request.content.userInfo)
@@ -48,6 +50,27 @@ final class NotificationService: UNNotificationServiceExtension {
     /// delivered it — `intake`, the cloud's own "New order request", carries
     /// no sealed details at all (the cloud holds no shop key), so there is
     /// nothing to open and nothing to fetch.
+    /// The pushed alert as it will be shown if it is not rewritten: words for a
+    /// kind this build does not know (never a raw `PUSH_…` key), and payments
+    /// through Focus (push review C8, Nov 13).
+    static func prepare(_ c: UNMutableNotificationContent) {
+        if KnownPush.isRawKey(c.body) || c.body.isEmpty {
+            c.body = NSLocalizedString("PUSH_GENERIC", comment: "")
+        }
+        if KnownPush.isRawKey(c.title) { c.title = NSLocalizedString("PUSH_TITLE", comment: "") }
+        let kind = ((c.userInfo["k"] as? [String: Any])?["kind"] as? String) ?? ""
+        if KnownPush.isTimeSensitive(kind: kind) { c.interruptionLevel = .timeSensitive }
+    }
+
+    /// What the server's version carried that the rewritten one must keep:
+    /// the badge, and the `k` block (shop, kind, time) a tap is checked by.
+    static func carry(from original: UNMutableNotificationContent, to rewritten: UNMutableNotificationContent) {
+        if let badge = original.badge { rewritten.badge = badge }
+        var info = rewritten.userInfo
+        if let k = original.userInfo["k"] { info["k"] = k }
+        rewritten.userInfo = info
+    }
+
     static func rewrite(_ info: [AnyHashable: Any]) async -> UNMutableNotificationContent? {
         guard let k = info["k"] as? [String: Any],
               let kind = k["kind"] as? String, kind == "print-finished",
@@ -64,7 +87,7 @@ final class NotificationService: UNNotificationServiceExtension {
               let plain = try? SyncCrypto.openStore(blob, dek: shared.dek),
               let event = try? JSONDecoder().decode(PrintFinished.self, from: plain) else { return nil }
         let status = event.orderId.flatMap(BookPeek.status(of:))
-        return PrintAlertText.content(for: event, orderStatus: status) {
+        return PrintAlertText.content(for: event, orderStatus: status, shopId: shopId) {
             NSLocalizedString($0, comment: "")
         }
     }
@@ -137,14 +160,11 @@ struct SharedCloud {
 /// The stage of one job, read from the phone's book in the App Group — so the
 /// alert offers the button that fits the job as it is now.
 enum BookPeek {
+    /// One job's stage from the app's small alert index, never the book: the
+    /// book is tens of MB on a real shop and this process may use about 24 MB.
     static func status(of orderId: String) -> String? {
-        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedCloud.group),
-              let data = try? Data(contentsOf: dir.appending(path: "Book/khayt-store.json")),
-              case .object(let root)? = try? JSONDecoder().decode(JSONValue.self, from: data),
-              case .array(let rows)? = root["printLog"] else { return nil }
-        for case .object(let o) in rows where o["id"] == .string(orderId) {
-            if case .string(let status)? = o["status"] { return status }
-        }
-        return nil
+        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedCloud.group)
+        else { return nil }
+        return AlertIndex.status(of: orderId, in: dir.appending(path: "Book"))
     }
 }

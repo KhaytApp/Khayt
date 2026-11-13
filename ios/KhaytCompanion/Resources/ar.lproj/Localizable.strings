@@ -1315,6 +1315,8 @@
 "load.failed.title" = "تعذّر التحميل";
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
+"PUSH_GENERIC" = "في متجرك ما يحتاج نظرة";
+"push.not_connected" = "التنبيهات لا تصل إلى هذا الهاتف بعد. سيحاول خيط مجدداً عند فتحه.";
 /* Home — Needs you */
 "home.greeting.morning" = "صباح الخير.";
 "home.greeting.afternoon" = "طاب يومك.";

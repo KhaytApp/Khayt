@@ -1315,6 +1315,8 @@
 "load.failed.title" = "Couldn't load";
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
+"PUSH_GENERIC" = "Something in your shop needs a look";
+"push.not_connected" = "Alerts aren’t reaching this phone yet. Khayt will try again when you next open it.";
 /* Home — Needs you */
 "home.greeting.morning" = "Good morning.";
 "home.greeting.afternoon" = "Good afternoon.";

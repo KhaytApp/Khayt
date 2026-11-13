@@ -223,6 +223,16 @@ struct SettingsView: View {
                 }
             }
             .buttonStyle(.plain)
+            // Quiet, never a pop-up: the cloud refused this phone's token or
+            // iOS gave none. Gone once a registration is accepted.
+            if let problem = api.pushProblem {
+                Label(problem, systemImage: "bell.slash")
+                    .font(.khayt(13, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .accessibilityIdentifier("settings.push_problem")
+            }
         }
         .card()
     }

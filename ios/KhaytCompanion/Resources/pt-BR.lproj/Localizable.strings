@@ -1315,6 +1315,8 @@
 "load.failed.title" = "Não foi possível carregar";
 "load.retry" = "Tentar de novo";
 "load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";
+"PUSH_GENERIC" = "Algo na sua loja precisa de atenção";
+"push.not_connected" = "Os alertas ainda não chegam a este telefone. O Khayt tentará de novo quando você abrir o app.";
 /* Home — Needs you */
 "home.greeting.morning" = "Bom dia.";
 "home.greeting.afternoon" = "Boa tarde.";
