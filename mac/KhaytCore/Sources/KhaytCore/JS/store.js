@@ -77,6 +77,10 @@
         const c = { ...p }; delete c.secrets; return c;
       });
     }
+    // The quote pay link's key is PER DEVICE too: removed, not masked.
+    if (s.quotePayLink && typeof s.quotePayLink === 'object') {
+      s.quotePayLink = { ...s.quotePayLink }; delete s.quotePayLink.secret; delete s.quotePayLink.secretSetAt;
+    }
     // Per-subscription webhook signing secrets.
     if (Array.isArray(s.webhooks?.subscriptions)) {
       s.webhooks.subscriptions = s.webhooks.subscriptions.map(sub => (

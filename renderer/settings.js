@@ -5963,6 +5963,7 @@ function loadSettingsIntoForm() {
   renderFixedCostSettings();
   // Online (customer intake)
   renderOnlineSettings?.();
+  if (typeof renderPayLinkSettings === 'function') renderPayLinkSettings();
   // Round 12: LAN API
   renderLanApiSettings();
   renderEstimatorSettings();
@@ -6157,6 +6158,8 @@ function saveSettingsFromPanel() {
   if (settingsReadOnly()) { toast(t('set.readonly_note'), 'error'); return; }
   const onlineCb = document.getElementById('online_enabled');
   if (onlineCb) settings.onlineEnabled = onlineCb.checked;
+  // The store address for quote pay links; a bad one stops the save.
+  if (typeof savePayLinkSettingsFromForm === 'function' && savePayLinkSettingsFromForm() === false) return;
   saveLanApiSettingsFromForm({ restartServer: false });
   saveSettingsFromForm();
 }

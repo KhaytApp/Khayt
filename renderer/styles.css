@@ -5759,6 +5759,79 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 /* The queue runs the other way in Arabic, so the arrow turns with it. */
 [dir="rtl"] .next-up-arrow { display: inline-block; transform: scaleX(-1); }
 
+/* ============================================================
+   Quote pay link (renderer/quote-pay-link.js)
+   Figma 7Iqw0GcrLLRW7CLDEhTa1P, page "Pay link (desktop)".
+   The status colours are the shared --st-* palette: steel waits, amber
+   ink ran out, green paid, red does not match.
+   ============================================================ */
+:root {
+  --qpl-steel: var(--st-wait-ink);
+  --qpl-amber: var(--st-move-ink);
+  --qpl-green: var(--st-done-ink);
+  --qpl-red:   var(--st-late-ink);
+}
+.qpl-line {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 20px; margin: 0 0 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.qpl-line-words { flex: 1; min-width: 0; }
+.qpl-line-label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-num); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.qpl-dot { inline-size: 6px; block-size: 6px; border-radius: 50%; background: var(--qpl-dot, var(--qpl-steel)); flex: none; }
+.qpl-line-text { margin-top: 3px; font-size: 13.5px; color: var(--qpl-ink, var(--text)); overflow-wrap: anywhere; }
+.qpl-line[data-state="expired"]  { --qpl-dot: var(--qpl-amber); --qpl-ink: var(--qpl-amber); }
+.qpl-line[data-state="paid"]     { --qpl-dot: var(--qpl-green); --qpl-ink: var(--qpl-green); }
+.qpl-line[data-state="mismatch"] { --qpl-dot: var(--qpl-red);   --qpl-ink: var(--qpl-red); }
+.qpl-btn { flex: none; border-radius: 999px; }
+.qpl-line-outdated { margin-top: 2px; font-size: 12.5px; color: var(--qpl-amber); }
+
+.modal.qpl-sheet { max-width: 560px; width: calc(100% - 32px); padding: 24px 28px; border-radius: 16px; }
+.qpl-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.qpl-sheet-head h3 { margin: 0; font-size: 20px; }
+.qpl-sub { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+.qpl-x { font-size: 18px; line-height: 1; }
+.qpl-items { list-style: none; margin: 0 0 16px; padding: 2px 14px; background: var(--bg-soft, var(--bg)); border-radius: 10px; }
+.qpl-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.qpl-item + .qpl-item { border-top: 1px solid var(--border); }
+.qpl-item-what { flex: 1; min-width: 0; }
+.qpl-item-title { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.qpl-item-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.qpl-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qpl-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 14px; margin-bottom: 16px; font-size: 14px; font-weight: 600; }
+.qpl-total strong { font-size: 20px; }
+.qpl-note { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--primary) 10%, var(--surface)); margin-bottom: 16px; }
+.qpl-note-title { font-weight: 600; font-size: 13px; }
+.qpl-why .qpl-note-title { color: var(--qpl-amber); }
+.qpl-note-body { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.45; }
+.qpl-reads { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; padding: 0; margin: 0 0 14px; }
+.qpl-reads legend { float: inline-start; padding: 0; font-size: 13px; }
+.qpl-seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--bg-soft, var(--bg)); margin-inline-start: auto; }
+.qpl-seg-opt { position: relative; margin: 0; cursor: pointer; }
+.qpl-seg-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.qpl-seg-opt span { display: block; padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--text-dim); }
+.qpl-seg-opt input:checked + span { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.qpl-seg-opt input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
+.modal .qpl-valid { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+.modal .qpl-status { font-size: 12px; color: var(--success); min-block-size: 1em; margin: 0 0 8px; }
+.qpl-rule { border: 0; border-top: 1px solid var(--border); margin: 0 0 16px; }
+.qpl-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.qpl-actions .btn { border-radius: 999px; min-block-size: 36px; }
+
+#quotePayLinkSection .qpl-label { font-size: 12px; color: var(--text-dim); margin: 12px 0 6px; }
+.qpl-secret-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qpl-secret-dots { flex: 1; min-width: 200px; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--bg-soft, var(--bg)); font-size: 13px; color: var(--text-dim); }
+.qpl-secret-dots.is-empty { font-style: italic; }
+.qpl-remove.btn { color: var(--primary); background: none; border-color: transparent; box-shadow: none; }
+#quotePayLinkSection #qpl_storeUrl { inline-size: 100%; box-sizing: border-box; }
+.qpl-secret-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.qpl-secret-edit[hidden] { display: none; }
+.qpl-secret-edit input { flex: 1; min-width: 220px; }
+.qpl-secret-edit .settings-field-hint { flex-basis: 100%; margin: 0; }
 /* ── Connector updates (renderer/plugins.js, Figma 52:2434) ──
    Waiting is STEEL, never amber (amber is "moving / today"). Dark is the
    default theme here; [data-theme="light"] below. */
