@@ -61,10 +61,52 @@ struct FaintTextIsReadableTests {
     @Test("text is never set in the system's tertiary style, which measures about 2:1")
     func noTertiaryText() {
         var hits: [String] = []
-        for file in IconSources.all where file.text.contains(".foregroundStyle(.tertiary)") {
-            hits.append(file.name)
+        for file in IconSources.all {
+            for (index, line) in file.text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
+            where Self.setsTextInTertiary(String(line)) {
+                hits.append("\(file.name):\(index + 1)")
+            }
         }
         #expect(hits.isEmpty, Comment(rawValue: "use Khayt.faint: " + hits.joined(separator: ", ")))
+    }
+
+    /// Does this line of source set text in the system's tertiary style?
+    ///
+    /// THREE spellings, because the first sweep knew one. It looked for
+    /// `.foregroundStyle(.tertiary)` and so walked past every place the style
+    /// is one arm of a choice: `dim ? AnyShapeStyle(.tertiary) : …` (the
+    /// machine cards' section captions and dim labels, `Detail.swift`) and
+    /// `x == nil ? .tertiary : .primary` (the gift cards table). A stroke or a
+    /// fill in tertiary is a line, not text, and is left alone; so is prose in
+    /// a comment.
+    static func setsTextInTertiary(_ line: String) -> Bool {
+        let code = line.components(separatedBy: "//").first ?? line
+        if code.contains(".foregroundStyle(.tertiary)") { return true }
+        let lower = code.lowercased()
+        let drawsALine = lower.contains("stroke") || lower.contains(".fill(")
+        if code.contains("AnyShapeStyle(.tertiary)") { return !drawsALine }
+        if code.contains("foregroundStyle("), code.contains("? .tertiary :") || code.contains(": .tertiary)") {
+            return true
+        }
+        return false
+    }
+
+    @Test("the guard knows a caption from a stroke")
+    func theGuardReads() {
+        #expect(Self.setsTextInTertiary("Text(a).foregroundStyle(.tertiary)"))
+        #expect(Self.setsTextInTertiary(".foregroundStyle(dim ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))"))
+        #expect(Self.setsTextInTertiary("    : AnyShapeStyle(.tertiary))"))
+        #expect(Self.setsTextInTertiary(".foregroundStyle(holder == nil ? .tertiary : .primary)"))
+        #expect(!Self.setsTextInTertiary(".strokeBorder(colour == nil ? AnyShapeStyle(.tertiary)"))
+        #expect(!Self.setsTextInTertiary("// was AnyShapeStyle(.tertiary) until the review"))
+        #expect(!Self.setsTextInTertiary(".foregroundStyle(dim ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary))"))
+    }
+
+    @Test("a machine card's captions and dim labels are drawn in the faint ink")
+    func machineCaptions() throws {
+        let detail = try #require(IconSources.all.first { $0.name == "Detail.swift" }).text
+        #expect(detail.contains("accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(Khayt.faint)"))
+        #expect(detail.contains("dim ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary)"))
     }
 }
 

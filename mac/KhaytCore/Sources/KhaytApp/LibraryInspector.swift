@@ -792,7 +792,7 @@ struct ModelSummaryCard: View {
                     } label: {
                         Image(systemName: file.isFavourite ? "star.fill" : "star")
                             .foregroundStyle(file.isFavourite ? AnyShapeStyle(Khayt.marked)
-                                                             : AnyShapeStyle(.tertiary))
+                                                             : AnyShapeStyle(Khayt.faint))
                     }
                     .buttonStyle(.plain)
                     .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
@@ -1355,7 +1355,7 @@ struct PartsSection: View {
                         // to be able to work out from this list.
                         Text(part.size.map(Self.bytes) ?? "—")
                             .font(.caption)
-                            .foregroundStyle(part.size == nil ? AnyShapeStyle(.tertiary)
+                            .foregroundStyle(part.size == nil ? AnyShapeStyle(Khayt.faint)
                                                               : AnyShapeStyle(.secondary))
                             .monospacedDigit()
                     }

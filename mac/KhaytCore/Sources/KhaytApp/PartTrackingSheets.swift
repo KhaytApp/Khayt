@@ -95,8 +95,7 @@ struct SpoolSwitchSheet: View {
     @State private var problem: String?
 
     private var amount: Double? {
-        let typed = grams.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
-        guard let n = Double(typed), n.isFinite, n > 0 else { return nil }
+        guard let n = TypedNumber.parse(grams), n > 0 else { return nil }
         return n
     }
 

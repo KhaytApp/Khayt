@@ -14,6 +14,11 @@ struct CustomerPage: View {
     @State private var machines: [MachineInfo] = []
     @State private var showingStatement = false
 
+    /// Simple's customer (SIMPLE_MAP `customers` reduced): name, phone,
+    /// email, notes and what they owe. Payment terms, the credit limit and
+    /// price agreements are Professional — hidden here, never deleted.
+    private var simple: Bool { api.shopMode.isReduced("customers") }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -33,7 +38,7 @@ struct CustomerPage: View {
                     }
                     .buttonStyle(.plain)
                     jobs(L10n.tr("customer.open"), s.openJobs, empty: L10n.tr("customer.open.none"))
-                    if !s.agreements.isEmpty { agreements(s) }
+                    if !s.agreements.isEmpty && !simple { agreements(s) }
                     jobs(L10n.tr("customer.history"), s.finishedJobs, empty: L10n.tr("customer.history.none"))
                     if s.historyWindowed {
                         Text(L10n.tr("customer.history.window"))
@@ -119,12 +124,13 @@ struct CustomerPage: View {
     }
 
     private func money(_ s: CustomerSummary) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let overLimit = s.isOverLimit && !simple
+        return VStack(alignment: .leading, spacing: 6) {
             header(L10n.tr("customer.owes"))
             Text(Money.text(s.owed, s.currency))
                 .font(.khaytDisplay(34, .bold, relativeTo: .title).monospacedDigit())
                 .tracking(-0.8)
-                .foregroundStyle(s.isOverLimit ? KhaytDesign.late : (s.owed > 0.005 ? KhaytDesign.attention : KhaytDesign.done))
+                .foregroundStyle(overLimit ? KhaytDesign.late : (s.owed > 0.005 ? KhaytDesign.attention : KhaytDesign.done))
             // Summed over the jobs this phone holds. A cut book keeps every
             // job that may still owe (`BookScope.mayOwe`), so this is rarely
             // short — but a book from an older Mac does not, and the figure
@@ -133,15 +139,17 @@ struct CustomerPage: View {
                 Text(L10n.tr("customer.owes.window"))
                     .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
             }
-            if s.creditLimit > 0 {
+            if s.creditLimit > 0 && !simple {
                 Text(L10n.format(s.isOverLimit ? "customer.over_limit" : "customer.limit",
                                  Money.text(s.creditLimit, s.currency)))
                     .font(.khayt(12.5, relativeTo: .footnote))
                     .foregroundStyle(s.isOverLimit ? KhaytDesign.late : KhaytDesign.note)
             }
-            Text(s.paymentTermsDays > 0 ? L10n.format("customer.terms", s.paymentTermsDays)
-                                        : L10n.tr("customer.terms.receipt"))
-                .font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+            if !simple {
+                Text(s.paymentTermsDays > 0 ? L10n.format("customer.terms", s.paymentTermsDays)
+                                            : L10n.tr("customer.terms.receipt"))
+                    .font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -149,7 +157,7 @@ struct CustomerPage: View {
         // redesign draws a debt that needs chasing.
         .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(s.isOverLimit ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline, lineWidth: 1))
+            .strokeBorder(overLimit ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline, lineWidth: 1))
     }
 
     private func jobs(_ title: String, _ list: [CustomerSummary.Job], empty: String) -> some View {

@@ -1993,6 +1993,13 @@ extension Shop {
         /// the tile chip's count (`LibraryFitChips`), over what the other
         /// axes leave.
         var fits: [Ready] = []
+        /// Per Colour row (`ColourFamily.tokens`: the families, `multi`,
+        /// `none`): how many models are under it. A multicolour model is
+        /// counted under EACH of its families and under `multi`, so the rows
+        /// add up to more than the library — on purpose.
+        var colours: [String: Int] = [:]
+        /// Per File type row (`ModelFileType` raw values).
+        var fileTypes: [String: Int] = [:]
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -2003,13 +2010,14 @@ extension Shop {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
                 && creators.isEmpty && printNext == 0 && duplicates == 0 && archived == 0
                 && onlineOnly == 0 && thisMacOnly == 0 && readyAnywhere == 0 && noFigures == 0
-                && inCatalogue == 0 && fromWeb == 0
+                && inCatalogue == 0 && fromWeb == 0 && colours.isEmpty && fileTypes.isEmpty
         }
     }
 
     enum LibraryAxis {
         case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage
         case noFigures, inCatalogue, fromWeb, fits
+        case colour, fileType
     }
 
     /// The group a record is in, by the rule the grid files it under —
@@ -2116,6 +2124,7 @@ extension Shop {
         var creatorIds = Set<String>(), printNextIds = Set<String>(), dupeIds = Set<String>()
         var noFigureIds = Set<String>(), catalogueIds = Set<String>(), webIds = Set<String>()
         var fitIds = Set<String>()
+        var colourIds = Set<String>(), typeIds = Set<String>()
         // Off the models, not the rows: a record's own `timesPrinted` is only
         // the desktop's manual log, and the jobs' answer is on `LibraryFile`.
         let printedIds = Set(files.lazy.filter { $0.printCount > 0 }.map(\.id))
@@ -2146,6 +2155,8 @@ extension Shop {
             if on(.inCatalogue) { catalogueIds.insert(id) }
             if on(.fromWeb) { webIds.insert(id) }
             if on(.fits) { fitIds.insert(id) }
+            if on(.colour) { colourIds.insert(id) }
+            if on(.fileType) { typeIds.insert(id) }
         }
         // "On this Mac only" says something only beside somewhere else.
         if index != nil, !libraryHasRemote && onlineOnly == 0 { thisMacOnly = 0 }
@@ -2196,6 +2207,16 @@ extension Shop {
             guard !set.isEmpty || libraryFitsOn == machine.id else { return nil }
             return .init(machineId: machine.id, machineName: machine.name,
                          count: fitIds.count { set.contains($0) })
+        }
+        // Colour and File type, off the models: one rule for the row a model
+        // is counted under and the row that finds it (`libraryAxisMisses`).
+        for id in colourIds {
+            guard let file = libraryFile(id: id) else { continue }
+            for token in libraryColourTokens(file) { facets.colours[token, default: 0] += 1 }
+        }
+        for id in typeIds {
+            guard let file = libraryFile(id: id) else { continue }
+            facets.fileTypes[file.fileType.rawValue, default: 0] += 1
         }
         if facets != libraryFacets { libraryFacets = facets }
         // Taken AFTER the run: writing `readyByMachine` and `duplicateOf`
@@ -2353,6 +2374,7 @@ extension Shop {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
             || libraryNeverPrintedOnly || libraryReadyOn != nil || libraryFitsOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
+            || !libraryColours.isEmpty || !libraryFileTypes.isEmpty
             || libraryShowArchived || libraryStorage != nil
             || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryFromWebOnly || libraryRanges.isActive || libraryHealthFocus != nil
     }
@@ -2365,6 +2387,8 @@ extension Shop {
         libraryReadyOn = nil
         libraryFitsOn = nil
         libraryCreator = nil
+        libraryColours = []
+        libraryFileTypes = []
         libraryPrintNextOnly = false
         libraryDuplicatesOnly = false
         libraryShowArchived = false

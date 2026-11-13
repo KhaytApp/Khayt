@@ -47,7 +47,7 @@
 "settings.connection" = "الاتصال";
 "settings.connection.footer" = "نفس PIN من إعدادات تطبيق خيط → LAN API. يتطلب سطح المكتب 2.2.1+";
 "settings.shop_name" = "اسم الورشة";
-"settings.host" = "IP أو اسم المضيف";
+"settings.host" = "عنوان الماك أو الكمبيوتر";
 "settings.port" = "المنفذ: %d";
 "settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";
@@ -59,18 +59,17 @@
 "settings.notify.connection" = "انقطاع الاتصال";
 "settings.notify.overdue" = "طلبات متأخرة";
 "settings.notify.low_stock" = "نقص الخيط";
-"settings.docs" = "مرجع LAN API";
 
 /* Status */
 "status.quote" = "عرض سعر";
-"status.pending" = "قيد الانتظار";
+"status.pending" = "بانتظار";
 "status.printing" = "طباعة";
 "status.post" = "ما بعد الطباعة";
 "status.qc" = "فحص الجودة";
 "status.completed" = "مكتمل";
 "status.delivered" = "تم التسليم";
 "status.shipped" = "تم الشحن";
-"status.on_hold" = "معلق";
+"status.on_hold" = "متوقف مؤقتاً";
 
 /* Lang */
 "lang.system" = "النظام";
@@ -416,7 +415,7 @@
 "order.detail.due_date" = "تاريخ التسليم";
 "order.detail.printer" = "الطابعة";
 
-"stage.short.pending" = "معلّق";
+"stage.short.pending" = "بانتظار";
 "stage.short.printing" = "طباعة";
 "stage.short.post" = "معالجة";
 "stage.short.qc" = "فحص";
@@ -503,10 +502,10 @@
 "spool.method.label" = "امسح الملصق";
 
 /* Machines, as design/ios-v2 draws them */
-"machines.idle" = "خامل";
+"machines.idle" = "متاحة";
 "machines.error" = "خطأ";
-"machines.offline" = "متوقفة";
-"machines.offline.sub" = "أُوقفت من الماك";
+"machines.offline" = "غير متصلة";
+"machines.offline.sub" = "عُلّمت غير متصلة على الماك";
 "machines.ready" = "جاهز للمهمة التالية";
 "machines.nozzle" = "الفوهة";
 "machines.bed" = "المنصّة";
@@ -535,7 +534,7 @@
 "book.collection.giftCards" = "بطاقات الهدايا";
 
 /* Intake, as design/ios-v2 draws it */
-"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور كمعلّق.";
+"intake.foot" = "الزبائن المباشرون وقائمة الانتظار. أخذ أحدهم يضعه في الطابور بحالة «بانتظار».";
 "intake.foot.no_book" = "الزبائن المباشرون وقائمة الانتظار. أخذ طلب إلى الطابور يحتاج دفتر الورشة على هذا الهاتف؛ أما التجاهل فيعمل دائماً.";
 "intake.take" = "خذه";
 "intake.dismiss" = "تجاهل";
@@ -836,6 +835,28 @@
 "library.priced_here" = "حُسب على هذا الهاتف بأسعارك. النموذج متعدد الألوان يُحسب على بكرة واحدة، فقد يختلف رقم الماك قليلًا.";
 "library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى سحابة خيط من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "وردي";
+"colour.brown" = "بني";
+"library.filter.colour" = "اللون";
+"library.filter.type" = "نوع الملف";
+"library.filter.multi" = "متعدد الألوان";
+"library.filter.none" = "بلا معلومات لون";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "أخرى";
+"library.type.nofile" = "بلا ملف (من الويب)";
+"library.filter.colour_hint" = "اختر أكثر من واحد لترى النماذج التي فيها أيٌّ منها.";
+"library.filter.counts_hint" = "الأعداد للمكتبة كما تتركها المرشحات الأخرى. الصف الفارغ يظهر باهتًا ولا يُحذف.";
+"library.filter.n_of_m" = "%1$d من %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "إزالة %@";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@، المختار: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "الكتالوج";
 "catalogue.search" = "ابحث في المنتجات";
@@ -1008,7 +1029,7 @@
 "new.calculator.detail" = "سعّر طباعة يدويًا";
 "new.expense.detail" = "صورة الإيصال";
 "new.waste.detail" = "طباعة فاشلة أو تنظيف";
-"new.more" = "المزيد";
+"new.more" = "أيضًا";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "المستندات";
 "paper.packing_slip" = "قائمة التعبئة";
@@ -1181,6 +1202,11 @@
 "connectors.status.not_reviewed" = "لم تتم مراجعته";
 "connectors.status.off" = "متوقف";
 "connectors.status.invalid" = "تتعذّر قراءته";
+"connectors.status.revoked" = "أوقفته خيط";
+"plg.update_updated" = "تم تحديث %1$@ إلى %2$@";
+"plg.update_revoked" = "سحبت خيط الإصدار %@، لذا أوقف مؤقتًا.";
+"plg.update_needs_app" = "يتطلب %1$@ %2$@ إصدارًا أحدث من تطبيق خيط.";
+"plg.update_pending" = "الإصدار %2$@ من %1$@ بانتظار موافقتك على الماك.";
 "connectors.yes" = "نعم";
 "connectors.no" = "لا";
 "connectors.settings.title" = "إعدادات المتجر";
@@ -1283,7 +1309,88 @@
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
 
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "بانتظار موافقتك على الماك";
+"connectors.badge.updated" = "حُدِّث إلى %@";
+"connectors.badge.needs_app" = "يتطلب إصدارًا أحدث من تطبيق خيط";
+"connectors.waiting_count" = "بانتظار الماك: %d";
+"intake.waiting" = "بالانتظار";
+"spool.low" = "منخفض";
+"stage.a11y.done" = "تمّت";
+"order.new.hint.client" = "اختر عميلًا أو اكتب اسمًا";
+"order.new.hint.project" = "ما هو؟ مثلًا اسم القطعة";
+"order.new.hint.material" = "مثلًا PLA، أسود";
+
 /* A read that failed (UI review F3) */
 "load.failed.title" = "تعذّر التحميل";
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
+
+/* Settings in groups (S2) */
+"settings.search" = "ابحث في الإعدادات";
+"settings.search.none" = "لا يوجد إعداد يطابق «%@».";
+"settings.group.this_phone" = "هذا الهاتف";
+"settings.group.shop" = "المتجر";
+"settings.group.connected" = "الاتصالات";
+"settings.group.about" = "حول";
+"settings.appearance" = "المظهر واللغة";
+"settings.shop_details" = "بيانات المتجر";
+"settings.shop.readonly" = "يُضبط على الماك · للقراءة فقط هنا";
+"settings.phones_wifi" = "الهواتف وWi-Fi";
+"settings.cloud.sub" = "المزامنة وصفحات العملاء";
+"settings.help" = "المساعدة";
+"settings.diag.sub" = "ما يحمله هذا الهاتف، وآخر المزامنات";
+"settings.diag.syncs" = "آخر المزامنات";
+"state.paired" = "مقترن";
+"state.away" = "بعيد";
+"state.not_paired" = "غير مقترن";
+"state.signed_in" = "مسجّل الدخول";
+"state.needs_sign_in" = "يلزم تسجيل الدخول";
+"state.on" = "مفعّل";
+"state.off" = "متوقف";
+/* S4: Simple mode */
+"mode.simple" = "بسيط";
+"mode.professional" = "احترافي";
+"mode.badge.a11y" = "الوضع: %@، يُضبط على جهاز Mac";
+"simple.stage.ready" = "جاهز";
+"simple.note.on_hold" = "متوقف مؤقتاً";
+"simple.note.post" = "قيد المعالجة";
+"simple.note.qc" = "قيد الفحص";
+"simple.note.shipped" = "تم الشحن";
+"simple.note.delivered" = "تم التسليم";
+"simple.expenses.month" = "هذا الشهر: %@ · %@";
+"simple.gate.care.title" = "خطط الصيانة جزء من الوضع الاحترافي";
+"simple.gate.care.body" = "هذا المتجر مضبوط على الوضع البسيط في جهاز Mac. لاستخدام خطط الصيانة، بدّل إلى الوضع الاحترافي في تطبيق خيط على جهاز Mac. يتبع الهاتف اختيار جهاز Mac.";
+"simple.gate.parts.title" = "قائمة القطع المطلوبة جزء من الوضع الاحترافي";
+"simple.gate.parts.body" = "هذا المتجر مضبوط على الوضع البسيط في جهاز Mac. قائمة القطع تأتي من خطط الصيانة، وهي من الوضع الاحترافي: بدّل في تطبيق خيط على جهاز Mac. يتبع الهاتف اختيار جهاز Mac.";
+"simple.gate.back_machine" = "العودة إلى الآلة";
+"simple.gate.back_machines" = "العودة إلى الآلات";
+"simple.expenses.count" = "%d مصروف";
+"PUSH_GENERIC" = "في متجرك ما يحتاج نظرة";
+"push.not_connected" = "التنبيهات لا تصل إلى هذا الهاتف بعد. سيحاول خيط مجدداً عند فتحه.";
+/* Home — Needs you */
+"home.greeting.morning" = "صباح الخير.";
+"home.greeting.afternoon" = "طاب يومك.";
+"home.greeting.evening" = "مساء الخير.";
+"needs.title" = "يحتاجك";
+"needs.none" = "لا شيء يحتاجك الآن.";
+"needs.calm" = "لا طلبات متأخرة، والرف ممتلئ، ولا أحد ينتظر.";
+"needs.late.one" = "%1$@ كان موعده %2$@";
+"needs.late.action" = "فتح الطلبات المتأخرة";
+"needs.low.title" = "الرف شبه فارغ";
+"needs.low.left" = "%1$@ متبقٍّ %2$@";
+"needs.low.action" = "عرض المخزون";
+"needs.waiting.action" = "فتح الطلبات الواردة";
+"needs.quotes.action" = "فتح عروض الأسعار";
+"tile.owed" = "مستحق لك";
+"tile.machines" = "على الآلات";
+"tile.machines.value" = "%1$d من %2$d";
+"tile.machines.sub" = "تطبع الآن";
+"needs.due_week" = "مستحق هذا الأسبوع";
+"needs.this_year" = "%@ هذه السنة";
+"needs.owed" = "%@ مستحق";
+"needs.count" = "%d أمر يحتاجك.";
+"needs.late" = "%d طلب متأخر";
+"needs.low.count" = "%d بكرة منخفضة";
+"needs.quotes" = "%d عرض سعر ينتظر رداً";
+"needs.more" = "و%d أمر آخر";

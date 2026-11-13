@@ -73,53 +73,53 @@ function openEndOfDayReport() {
 
   const overdueHtml = overdueOrders.length > 0 ? `
     <div style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.35);border-radius:6px;padding:10px;margin-top:12px;">
-      <strong style="font-size:12px;color:var(--warning);">Due Today — Not Completed</strong>
+      <strong style="font-size:12px;color:var(--warning);">${escapeHtml(t('eod.due_open'))}</strong>
       ${overdueOrders.map(o => `<div style="font-size:12px;margin-top:4px;">• ${escapeHtml(o.project || jobRef(o))}</div>`).join('')}
     </div>` : '';
 
   const bodyHtml = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       <div class="card" style="padding:12px;">
-        <div style="font-size:11px;color:var(--text-muted);">Orders Completed</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('eod.completed'))}</div>
         <div style="font-size:24px;font-weight:700;">${completedToday.length}</div>
       </div>
       <div class="card" style="padding:12px;">
-        <div style="font-size:11px;color:var(--text-muted);">Revenue Today</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('eod.revenue_today'))}</div>
         <div style="font-size:20px;font-weight:700;">${fmtPrice(revenueToday)}</div>
       </div>
       <div class="card" style="padding:12px;">
-        <div style="font-size:11px;color:var(--text-muted);">In Progress</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('eod.in_progress'))}</div>
         <div style="font-size:24px;font-weight:700;">${inProgress.length}</div>
       </div>
       <div class="card" style="padding:12px;">
-        <div style="font-size:11px;color:var(--text-muted);">Filament Wasted Today</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('eod.waste_today'))}</div>
         <div style="font-size:20px;font-weight:700;">${wasteTotalG.toFixed(0)}g</div>
       </div>
       <div class="card" style="padding:12px;grid-column:1/-1;">
-        <div style="font-size:11px;color:var(--text-muted);">Time Logged Today</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('eod.time_today'))}</div>
         <div style="font-size:20px;font-weight:700;">${(timeTotal / 60).toFixed(1)}h (${timeTotal} min)</div>
       </div>
     </div>
     ${overdueHtml}`;
 
-  const eodHtmlForExport = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>End of Day Report — ${today}</title>
+  const eodHtmlForExport = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(t('eod.title', { date: today }))}</title>
     <style>body{font-family:sans-serif;max-width:600px;margin:auto;padding:24px;}h1{font-size:20px;}table{width:100%;border-collapse:collapse;}td,th{border:1px solid #ddd;padding:8px;}</style></head>
-    <body><h1>End of Day Report — ${escapeHtml(today)}</h1>
-    <table><tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Orders Completed</td><td>${completedToday.length}</td></tr>
-    <tr><td>Revenue</td><td>${fmtPrice(revenueToday)}</td></tr>
-    <tr><td>In Progress</td><td>${inProgress.length}</td></tr>
-    <tr><td>Filament Wasted</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
-    <tr><td>Time Logged</td><td>${timeTotal} min</td></tr>
-    </table>${overdueOrders.length > 0 ? '<h2>Due Today — Not Completed</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || jobRef(o))}</li>`).join('') + '</ul>' : ''}
+    <body dir="${document.documentElement.dir || 'ltr'}"><h1>${escapeHtml(t('eod.title', { date: today }))}</h1>
+    <table><tr><th>${escapeHtml(t('eod.metric'))}</th><th>${escapeHtml(t('eod.value'))}</th></tr>
+    <tr><td>${escapeHtml(t('eod.completed'))}</td><td>${completedToday.length}</td></tr>
+    <tr><td>${escapeHtml(t('eod.revenue'))}</td><td>${fmtPrice(revenueToday)}</td></tr>
+    <tr><td>${escapeHtml(t('eod.in_progress'))}</td><td>${inProgress.length}</td></tr>
+    <tr><td>${escapeHtml(t('eod.waste'))}</td><td>${wasteTotalG.toFixed(0)}g</td></tr>
+    <tr><td>${escapeHtml(t('eod.time'))}</td><td>${timeTotal} min</td></tr>
+    </table>${overdueOrders.length > 0 ? '<h2>' + escapeHtml(t('eod.due_open')) + '</h2><ul>' + overdueOrders.map(o => `<li>${escapeHtml(o.project || jobRef(o))}</li>`).join('') + '</ul>' : ''}
     </body></html>`;
 
   openFormModal({
-    title: 'End of Day Report — ' + today,
+    title: t('eod.title', { date: today }),
     bodyHtml,
     sizeLg: false,
     noSave: false,
-    saveLabel: 'Export as PDF',
+    saveLabel: t('eod.export_pdf'),
     onSave() {
       if (window.hubAPI?.exportPDF) {
         window.hubAPI.exportPDF({ html: eodHtmlForExport, filename: `eod-report-${today}.pdf` })
@@ -556,21 +556,31 @@ function renderVatFiling() {
   const today = _vatToday();
   const freq = V.frequencyOf(settings);
 
+  // A shop that charges no VAT and has never filed a return has nothing for
+  // this card to say: it was a "VAT RETURN" heading over an empty box.
+  const profile = KhaytTax.profileFromSettings(settings);
+  const charges = profile.rates.reduce((sum, r) => sum + r.percent, 0) > 0;
+  const container = document.getElementById('vatReturnContainer');
+  if (container) container.style.display = (charges || V.filedMarks(settings).length) ? '' : 'none';
+
   const sel = document.getElementById('vatReturnPeriod');
   if (sel) {
     const was = sel.value;
-    const keys = V.periodsBetween(`${today.slice(0, 4)}-01-01`, today, freq).reverse();
+    // The return being worked on (lib/vat-periods.js returnPeriodFor): the
+    // last ended period until its deadline, then the running one — not the
+    // last ended one for ever (Q3 in November). Listed even across New Year.
+    const working = V.returnPeriodFor(today, freq);
+    const yearStart = `${today.slice(0, 4)}-01-01`;
+    const workingFrom = working ? V.periodBounds(working).from : yearStart;
+    const keys = V.periodsBetween(workingFrom < yearStart ? workingFrom : yearStart, today, freq).reverse();
     sel.innerHTML = `<option value="year">${escapeHtml(t('analytics.this_year'))}</option>`
       + keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(vatPeriodLabel(k))}</option>`).join('');
-    // The last ENDED period first: that is the return about to be filed.
-    const ended = keys.find((k) => V.periodBounds(k).to < today);
-    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (ended || keys[0] || 'year');
+    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (keys.includes(working) ? working : (keys[0] || 'year'));
   }
 
   const box = document.getElementById('vatFilingSection');
   if (!box) return;
-  const profile = KhaytTax.profileFromSettings(settings);
-  if (!profile.rates.reduce((sum, r) => sum + r.percent, 0)) { box.innerHTML = ''; return; }
+  if (!charges) { box.innerHTML = ''; return; }
   const ro = _vatReadOnly();
   const rows = V.filingPeriods(settings, { today, count: 8 });
   const rowHtml = (r) => {

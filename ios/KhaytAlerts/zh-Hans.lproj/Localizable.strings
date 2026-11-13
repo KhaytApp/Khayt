@@ -18,3 +18,4 @@
 "PUSH_QUOTE_DECLINED" = "客户已拒绝报价";
 "PUSH_MESSAGE" = "客户发来一条消息";
 "PUSH_PAYMENT" = "收到一笔付款";
+"PUSH_GENERIC" = "店里有事需要你看一下";

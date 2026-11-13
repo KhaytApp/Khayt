@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SwiftUI
 import KhaytCore
 @testable import KhaytApp
 
@@ -397,5 +398,23 @@ struct MachineBandFarmTests {
         let twenty = MachineBandView.tickMinutes(try await Self.farm(20, answering: 20))
         #expect(three == twenty)
         #expect(three.allSatisfy { $0 >= 0 && $0 < 2880 })
+    }
+
+    /// A blocked block and a printing block were two warm rectangles, 27 apart
+    /// in dark, under a key that named them differently (Nov 12 2026).
+    @Test("blocked on stock is hatched and unfilled, so it is never mistaken for printing")
+    func blockedIsHatchedNotWarm() throws {
+        let source = try #require(IconSources.all.first { $0.name == "MachineBand.swift" }).text
+        #expect(source.contains(#"case "blocked": return .clear"#), "a blocked block has no wash")
+        #expect(!source.contains("Khayt.attention.opacity(0.1"), "no warm wash for blocked, in the block or its key")
+        #expect(source.contains("Key(fill: Khayt.surface, line: Khayt.attention, hatched: true"))
+        // The pattern draws something at the sizes it is used at, and nothing
+        // at a size where it could loop for ever.
+        let key = MachineBandView.Hatch(step: 4).path(in: CGRect(x: 0, y: 0, width: 13, height: 9))
+        #expect(!key.isEmpty)
+        let block = MachineBandView.Hatch(step: 6).path(in: CGRect(x: 0, y: 0, width: 120, height: 30))
+        #expect(!block.isEmpty)
+        #expect(MachineBandView.Hatch(step: 0).path(in: CGRect(x: 0, y: 0, width: 120, height: 30)).isEmpty)
+        #expect(MachineBandView.Hatch(step: 6).path(in: .zero).isEmpty)
     }
 }

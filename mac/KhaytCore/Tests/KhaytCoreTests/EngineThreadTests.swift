@@ -20,12 +20,19 @@ struct EngineThreadTests {
     @Test("concurrent callers are served one at a time, every answer intact")
     func concurrentCallersAreSerial() async throws {
         let engine = try KhaytEngine()
-        let rows: [JSONValue] = (0..<2_000).map { i in
-            .object(["id": .string("r\(i)"), "category": .string("Category \(i % 37)")])
-        }
+        // A rule that still runs in JavaScript. This asked for the category
+        // counts until those were ported to Swift, and a call that never
+        // enters the engine's context would prove nothing about it.
+        let ask = """
+            (function () {
+              var rows = [];
+              for (var i = 0; i < 2000; i++) rows.push({ id: 'r' + i, category: 'Category ' + (i % 37) });
+              return KhaytOrganise.counts(rows, 'category').length;
+            })()
+            """
         let answers = await withTaskGroup(of: Int.self) { group in
             for _ in 0..<16 {
-                group.addTask { ((try? await engine.categoryCounts(rows)) ?? []).count }
+                group.addTask { (try? await engine.raw(ask, as: Int.self)) ?? -1 }
             }
             var all: [Int] = []
             for await n in group { all.append(n) }
@@ -69,6 +76,26 @@ struct EngineThreadTests {
         #expect(made <= EngineThread.poolSize, "\(made) engine threads for \(count) engines")
     }
 
+    /// A `StudioEngine` has a thread to itself, because one of its calls can
+    /// take seconds. That thread used to outlive the engine: ten engines made
+    /// and dropped left eleven more threads in the process than before.
+    @Test("a studio engine that goes away takes its thread with it")
+    func studioThreadEnds() async throws {
+        let thread: EngineThread
+        do {
+            let engine = try StudioEngine()
+            thread = engine.thread
+            // A call, so the thread has done an engine's work before it ends.
+            let onIt = await engine.isOnItsThread()
+            #expect(onIt)
+            #expect(!thread.hasEnded)
+        }
+        // Ended once the engine's last call has returned and its context has
+        // been let go there; give that a moment. A hang guard.
+        for _ in 0..<60_000 where !thread.hasEnded { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(thread.hasEnded)
+    }
+
     @Test("an engine made from an engine thread is built there, in place, without waiting")
     func madeOnAnEngineThread() throws {
         let outer = EngineThread.forNewEngine()
@@ -80,4 +107,9 @@ struct EngineThreadTests {
         #expect(answer.same)
         #expect(answer.inner == 7)
     }
+}
+
+extension StudioEngine {
+    /// Whether a call is running on the engine's own thread.
+    func isOnItsThread() -> Bool { thread.isCurrent }
 }

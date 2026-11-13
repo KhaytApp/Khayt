@@ -36,13 +36,15 @@ html[data-design="flow"] {
   --radius:      12px;
   --radius-sm:   8px;
 
-  /* Column accent stripes. Deliberately desaturated: they label a lane, they
-     are not status signals. Real signals get --danger / --warn below. */
-  --flow-lane-1: hsl(220 14% 62%);
-  --flow-lane-2: hsl(199 60% 52%);
-  --flow-lane-3: hsl(258 46% 60%);
-  --flow-lane-4: hsl(38  72% 54%);
-  --flow-lane-5: hsl(158 44% 44%);
+  /* Column accent stripes: each lane IS a job status, so it takes the shared
+     status palette's marker (styles.css --st-*) — steel waiting, amber for
+     the three working lanes, green done — and follows the appearance itself,
+     which is why the dark block does not repeat them. */
+  --flow-lane-1: var(--st-wait-dot);
+  --flow-lane-2: var(--st-move-dot);
+  --flow-lane-3: var(--st-move-dot);
+  --flow-lane-4: var(--st-move-dot);
+  --flow-lane-5: var(--st-done-dot);
 
   --success:     hsl(158 52% 32%);
   --success-soft:hsl(158 46% 92%);
@@ -76,12 +78,6 @@ html[data-design="flow"][data-theme="dark"] {
   --line:        hsl(222 16% 26%);
   --border:      hsl(222 16% 26%);
   --border-soft: hsl(222 16% 22%);
-
-  --flow-lane-1: hsl(220 12% 52%);
-  --flow-lane-2: hsl(199 58% 56%);
-  --flow-lane-3: hsl(258 48% 66%);
-  --flow-lane-4: hsl(38  70% 58%);
-  --flow-lane-5: hsl(158 40% 50%);
 
   --success:     hsl(158 44% 52%);
   --success-soft:hsl(158 40% 18%);

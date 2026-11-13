@@ -87,6 +87,20 @@ extension KhaytAPIClient {
         return WhatsAppOffer(milestone: milestone, sentAt: sent)
     }
 
+    /// The language the WhatsApp sheet opens in: the customer's own when the
+    /// shop set one (`messageLang`), else the app's (review W10). The shared
+    /// rule's guess from which name is filled in is NOT used for the first
+    /// pick — in the Arabic app a customer written down only in English
+    /// opened in English, though nobody had said they want English.
+    nonisolated static func whatsAppStartLanguage(client: [String: JSONValue]?, appLanguage: String) -> String {
+        if case .string(let set)? = client?["messageLang"], ["ar", "en"].contains(set) { return set }
+        return appLanguage == "en" ? "en" : "ar"
+    }
+
+    func whatsAppStartLanguage(orderId: String) -> String {
+        Self.whatsAppStartLanguage(client: rows(for: orderId)?.client, appLanguage: L10n.contentLanguage)
+    }
+
     /// The update's text and recipient, by the shared rule. `lang` nil is the
     /// customer's own language.
     func whatsAppUpdate(orderId: String, lang: String? = nil) async -> WhatsAppUpdate? {

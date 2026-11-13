@@ -58,11 +58,15 @@ struct IntakeView: View {
             }
             .scrollIndicators(.hidden)
             .refreshable { await load() }
-            .khaytScreen(title: L10n.tr("intake.title"))
+            // One sheet header (review W5): an inline title and Close on the
+            // leading side, as every sheet opened from New has. Not
+            // `khaytScreen`: its large title wins over a mode set after it.
+            .navigationTitle(L10n.tr("intake.title"))
+            .navigationBarTitleDisplayMode(.inline)
             .background(KhaytDesign.ground.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("common.done")) { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("common.close")) { dismiss() }
                 }
             }
             .confirmationDialog(L10n.tr("intake.remind.when"),
@@ -136,8 +140,8 @@ struct IntakeView: View {
     }
 }
 
-/// A walk-in, as `design/ios-v2/` draws one: an amber rail (somebody is
-/// waiting), who and when, what they want, and the two answers — take it into
+/// A walk-in, as `design/ios-v2/` draws one: a steel rail and a "Waiting"
+/// chip (somebody is waiting on the shop), who and when, what they want, and the two answers — take it into
 /// the queue, or dismiss it. Reminding and getting in touch are a long-press
 /// away: useful, but not what the card is for.
 private struct IntakeCard: View {
@@ -175,11 +179,17 @@ private struct IntakeCard: View {
                         .background(KhaytDesign.attention.opacity(0.14), in: Capsule())
                 }
                 Spacer(minLength: 0)
-                if let when {
-                    Text(when)
-                        .font(.khayt(12, relativeTo: .caption))
-                        .foregroundStyle(KhaytDesign.note)
+                // Steel: this one waits on the shop, not on a printer — amber
+                // is progress and today. Said in words, not only by the edge.
+                HStack(spacing: 5) {
+                    Circle().fill(KhaytDesign.pending).frame(width: 6, height: 6)
+                    Text(when.map { L10n.tr("intake.waiting") + " · " + $0 } ?? L10n.tr("intake.waiting"))
+                        .font(.khayt(11.5, .medium, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.pending)
+                        .lineLimit(1)
                 }
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(KhaytDesign.pendingWash, in: Capsule())
             }
             Text(want)
                 .font(.khayt(13.5, relativeTo: .subheadline))
@@ -216,7 +226,7 @@ private struct IntakeCard: View {
         .padding(.vertical, 14).padding(.leading, 18).padding(.trailing, 15)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(KhaytDesign.surface)
-        .overlay(alignment: .leading) { Rectangle().fill(KhaytDesign.attention).frame(width: 3) }
+        .overlay(alignment: .leading) { Rectangle().fill(KhaytDesign.pending).frame(width: 3) }
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
         .contextMenu {

@@ -53,6 +53,7 @@ struct OrderDetailsSheet: View {
     @State private var form = Form()
     @State private var opened = Form()
     @State private var started = false
+    @State private var saving = false
     /// Why the customer cannot be changed (`zatca` | `voided` | `credited` |
     /// `paid`), or nil. Read once when the sheet opens.
     @State private var customerLock: String?
@@ -82,10 +83,12 @@ struct OrderDetailsSheet: View {
             .frame(maxHeight: 560)
             HStack {
                 Spacer()
+                SaveProblem(text: shop.moveProblem)
                 Button(shop.words.callIt("common.cancel")) { shop.clearQuestion() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(saving)
             }
         }
         .padding(18)
@@ -144,7 +147,10 @@ struct OrderDetailsSheet: View {
                     Text(Shop.customerLockWords(shop.words)[lock] ?? "")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if Self.currencyDiffers(job: job?.currency ?? "", shop: shop.currency,
+                } else if form.clientId != opened.clientId,
+                          Self.currencyDiffers(job: job?.currency ?? "",
+                                               was: shop.clients.first { $0.id == opened.clientId }?.currency,
+                                               shop: shop.currency,
                                                client: shop.clients.first { $0.id == form.clientId }?.currency) {
                     Text(shop.words.callIt("mac.job_customer_currency"))
                         .font(.caption).foregroundStyle(Khayt.attention)
@@ -374,9 +380,16 @@ struct OrderDetailsSheet: View {
     /// The new customer bills in another currency than the job is priced in.
     /// Nothing is converted — a change of customer is not a new quote — so
     /// the shop is told before it saves.
-    static func currencyDiffers(job: String, shop: String, client: String?) -> Bool {
+    ///
+    /// The SAME expression as the write's (`lib/order-edit.js changeCustomer`):
+    /// a job that carries no currency is read in the currency of the customer
+    /// it has NOW (`was`), and only with neither in the shop's. Reading it
+    /// straight in the shop's warned on EUR customer → EUR customer and said
+    /// nothing on EUR → SAR. `JobCustomerPickerTests` holds it to the lib.
+    static func currencyDiffers(job: String, was: String?, shop: String, client: String?) -> Bool {
         guard let client else { return false }
-        let j = job.isEmpty ? shop : job
+        let shop = shop.isEmpty ? "SAR" : shop
+        let j = !job.isEmpty ? job : (was.map { $0.isEmpty ? shop : $0 } ?? shop)
         let c = client.isEmpty ? shop : client
         return j != c
     }
@@ -401,7 +414,17 @@ struct OrderDetailsSheet: View {
         let id = subject.id
         let fields = Self.fields(opened: opened, now: form)
         let customer = Self.customerChange(opened: opened, now: form)
-        shop.clearQuestion()
-        Task { await shop.editOrderDetails(id, fields: fields, customer: customer) }
+        // The sheet closes when the change is IN the book. It closed first, so
+        // a refusal (another computer holds the book, the staff lock, a
+        // customer locked since the sheet opened) lost everything typed and
+        // said so only behind it.
+        guard !saving else { return }
+        saving = true
+        shop.moveProblem = nil
+        Task {
+            let wrote = await shop.editOrderDetails(id, fields: fields, customer: customer)
+            saving = false
+            if wrote { shop.clearQuestion() }
+        }
     }
 }

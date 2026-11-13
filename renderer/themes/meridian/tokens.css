@@ -59,13 +59,15 @@ html[data-design="meridian"] {
   --accent-2:    #0e7c86;
 
   /* ---- Job-state colours. These ARE the data on a schedule, so they get the
-         saturation and the chrome does not. Foregrounds clear AA on their
-         own -bg fill. ---- */
-  --mrd-run:#0b6ea8;    --mrd-run-bg:#dcecf7;    /* printing        */
-  --mrd-queue:#5b6675;  --mrd-queue-bg:#e8ebef;  /* waiting         */
-  --mrd-late:#b3261e;   --mrd-late-bg:#fbe3e1;   /* overdue         */
-  --mrd-done:#1c6b45;   --mrd-done-bg:#dff0e6;   /* finished        */
-  --mrd-hold:#8a5a00;   --mrd-hold-bg:#f8ecd4;   /* blocked / hold  */
+         saturation and the chrome does not. They are the shared status
+         palette (styles.css --st-*), which follows the appearance on its own
+         — so the dark block below does not repeat them. Hold is waiting
+         (steel), as it is on every other screen. ---- */
+  --mrd-run:var(--st-move-ink);    --mrd-run-bg:var(--st-move-bg);    /* printing        */
+  --mrd-queue:var(--st-wait-ink);  --mrd-queue-bg:var(--st-wait-bg);  /* waiting         */
+  --mrd-late:var(--st-late-ink);   --mrd-late-bg:var(--st-late-bg);   /* overdue         */
+  --mrd-done:var(--st-done-ink);   --mrd-done-bg:var(--st-done-bg);   /* finished        */
+  --mrd-hold:var(--st-wait-ink);   --mrd-hold-bg:var(--st-wait-bg);   /* blocked / hold  */
   --mrd-idle:#98a1ad;                            /* empty lane time */
 
   /* ---- Shadows: a schedule is flat; blocks lift only on hover ---- */
@@ -105,10 +107,11 @@ html[data-design="meridian"] {
   --border-soft: var(--line-2);
   --primary: var(--accent);
   --primary-soft: var(--accent-soft);
-  --success: var(--mrd-done);
-  --warning: var(--mrd-hold);
-  --danger: var(--mrd-late);
-  --ok: var(--mrd-done);
+  /* The theme's own alert colours (not job status, which is --st-*). */
+  --success: #1c6b45;
+  --warning: #8a5a00;
+  --danger: #b3261e;
+  --ok: var(--success);
   --bg-elev: var(--surface-2);
   --bg-card: var(--surface);
 
@@ -140,12 +143,10 @@ html[data-design="meridian"][data-theme="dark"] {
 
   --accent-l: 52%;
 
-  --mrd-run:#66b8e8;    --mrd-run-bg:#11304a;
-  --mrd-queue:#9aa5b4;  --mrd-queue-bg:#232a35;
-  --mrd-late:#f4796c;   --mrd-late-bg:#3d1b19;
-  --mrd-done:#4fc389;   --mrd-done-bg:#12331f;
-  --mrd-hold:#e0a83f;   --mrd-hold-bg:#382c11;
   --mrd-idle:#4a5462;
+  --success: #4fc389;
+  --warning: #e0a83f;
+  --danger: #f4796c;
 
   --shadow-1: 0 1px 2px rgba(0,0,0,.45);
   --shadow-2: 0 10px 28px rgba(0,0,0,.55);

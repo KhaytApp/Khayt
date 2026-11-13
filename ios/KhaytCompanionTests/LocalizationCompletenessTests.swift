@@ -173,6 +173,7 @@ final class LocalizationCompletenessTests: XCTestCase {
         "ProductBarcodeScanner.swift",
         "BarcodeScannerView.swift",
         "SettingsView.swift",
+        "SettingsIndex.swift",
         "LogWasteSheet.swift",
         "ContentView.swift",
         "InventoryView.swift",
