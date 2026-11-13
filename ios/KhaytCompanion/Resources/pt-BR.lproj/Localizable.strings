@@ -1183,7 +1183,7 @@
 "connectors.status.invalid" = "Ilegível";
 "connectors.status.revoked" = "Pausado pelo Khayt";
 "plg.update_updated" = "%1$@ atualizado para %2$@";
-"plg.update_revoked" = "Pausado pelo Khayt: %1$@";
+"plg.update_revoked" = "A Khayt retirou a versão %@, por isso está pausada.";
 "plg.update_needs_app" = "%1$@ %2$@ precisa de uma versão mais recente do Khayt.";
 "plg.update_pending" = "%1$@ %2$@ aguarda sua aprovação no Mac.";
 "connectors.yes" = "Sim";

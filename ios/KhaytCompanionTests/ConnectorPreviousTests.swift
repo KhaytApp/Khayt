@@ -98,7 +98,7 @@ final class ConnectorPreviousTests: XCTestCase {
         XCTAssertEqual(c.revokedReason, "Reports a refused order as sent.")
         let why = try XCTUnwrap(ConnectorRules.disabledReason(c))
         XCTAssertTrue(why.contains("Reports a refused order as sent."), why)
-        XCTAssertEqual(why, L10n.format("plg.update_revoked", "Reports a refused order as sent."))
+        XCTAssertEqual(why, L10n.format("plg.update_revoked", version) + " Reports a refused order as sent.")
         // A revocation of another version leaves this one alone.
         let other0 = try await resolve(e, state: ["revoked": .object(["version": .string("0.0.1"), "reason": .string("x")])])
         XCTAssertEqual(try XCTUnwrap(other0).status, .active)

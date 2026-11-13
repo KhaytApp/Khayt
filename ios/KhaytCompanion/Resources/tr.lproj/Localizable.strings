@@ -1183,7 +1183,7 @@
 "connectors.status.invalid" = "Okunamıyor";
 "connectors.status.revoked" = "Khayt tarafından duraklatıldı";
 "plg.update_updated" = "%1$@, %2$@ sürümüne güncellendi";
-"plg.update_revoked" = "Khayt tarafından duraklatıldı: %1$@";
+"plg.update_revoked" = "Khayt %@ sürümünü geri çekti, bu yüzden duraklatıldı.";
 "plg.update_needs_app" = "%1$@ %2$@ için Khayt'ın daha yeni bir sürümü gerekiyor.";
 "plg.update_pending" = "%1$@ %2$@, Mac'te onayınızı bekliyor.";
 "connectors.yes" = "Evet";

@@ -1181,10 +1181,10 @@
 "connectors.status.not_reviewed" = "لم تتم مراجعته";
 "connectors.status.off" = "متوقف";
 "connectors.status.invalid" = "تتعذّر قراءته";
-"connectors.status.revoked" = "أوقفه Khayt";
+"connectors.status.revoked" = "أوقفته خيط";
 "plg.update_updated" = "تم تحديث %1$@ إلى %2$@";
-"plg.update_revoked" = "أوقفه Khayt: %1$@";
-"plg.update_needs_app" = "يتطلب %1$@ %2$@ إصدارًا أحدث من Khayt.";
+"plg.update_revoked" = "سحبت خيط الإصدار %@، لذا أوقف مؤقتًا.";
+"plg.update_needs_app" = "يتطلب %1$@ %2$@ إصدارًا أحدث من تطبيق خيط.";
 "plg.update_pending" = "الإصدار %2$@ من %1$@ بانتظار موافقتك على الماك.";
 "connectors.yes" = "نعم";
 "connectors.no" = "لا";
@@ -1291,5 +1291,5 @@
 /* Connector update badges (frame 21:729) */
 "connectors.badge.pending" = "بانتظار موافقتك على الماك";
 "connectors.badge.updated" = "حُدِّث إلى %@";
-"connectors.badge.needs_app" = "يتطلب إصدارًا أحدث من Khayt";
+"connectors.badge.needs_app" = "يتطلب إصدارًا أحدث من تطبيق خيط";
 "connectors.waiting_count" = "بانتظار الماك: %d";

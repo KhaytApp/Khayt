@@ -1183,7 +1183,7 @@
 "connectors.status.invalid" = "无法读取";
 "connectors.status.revoked" = "已被 Khayt 暂停";
 "plg.update_updated" = "%1$@ 已更新到 %2$@";
-"plg.update_revoked" = "已被 Khayt 暂停：%1$@";
+"plg.update_revoked" = "Khayt 已撤回版本 %@，因此已暂停。";
 "plg.update_needs_app" = "%1$@ %2$@ 需要更新版本的 Khayt。";
 "plg.update_pending" = "%1$@ %2$@ 正在等待你在 Mac 上同意。";
 "connectors.yes" = "是";

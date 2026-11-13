@@ -1183,7 +1183,7 @@
 "connectors.status.invalid" = "Nicht lesbar";
 "connectors.status.revoked" = "Von Khayt pausiert";
 "plg.update_updated" = "%1$@ auf %2$@ aktualisiert";
-"plg.update_revoked" = "Von Khayt pausiert: %1$@";
+"plg.update_revoked" = "Khayt hat Version %@ zurückgezogen, daher ist sie pausiert.";
 "plg.update_needs_app" = "%1$@ %2$@ benötigt eine neuere Version von Khayt.";
 "plg.update_pending" = "%1$@ %2$@ wartet auf dem Mac auf Ihre Zustimmung.";
 "connectors.yes" = "Ja";

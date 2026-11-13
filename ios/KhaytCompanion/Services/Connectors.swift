@@ -392,7 +392,10 @@ enum ConnectorRules {
         case .notReviewed: return L10n.tr("connectors.not_reviewed")
         case .off: return L10n.tr("connectors.off")
         case .invalid: return L10n.tr("connectors.error.build")
-        case .revoked: return L10n.format("plg.update_revoked", c.revokedReason ?? "")
+        // The desktop's sentence (`plg.upd_revoked`), then Khayt's reason.
+        case .revoked:
+            return [L10n.format("plg.update_revoked", c.version), c.revokedReason ?? ""]
+                .filter { !$0.isEmpty }.joined(separator: " ")
         }
     }
 
