@@ -232,6 +232,96 @@ test('the link is the store\'s address, the language and the token as it is', ()
   assert.equal(L.secretIsUsable('x'.repeat(32)), true);
 });
 
+test('a token is read back, and only the right key says it is genuine', () => {
+  const input = L.signingInput(JSON.parse(VECTOR_PAYLOAD));
+  const token = L.tokenFrom(input, hmac(input, VECTOR_SECRET));
+  const read = L.open(token);
+  assert.equal(read.input, input);
+  assert.deepEqual(read.claims, JSON.parse(VECTOR_PAYLOAD));
+  assert.equal(Buffer.from(read.signature).toString('hex'), VECTOR_HMAC_HEX);
+  assert.equal(L.signatureMatches(token, hmac(read.input, VECTOR_SECRET)), true);
+  assert.equal(L.signatureMatches(token, hmac(read.input, VECTOR_SECRET + 'x')), false, 'another key');
+  // One character of the payload changed: the old signature no longer fits.
+  const [h, b, sig] = token.split('.');
+  const edited = `${h}.${b.slice(0, 40)}${b[40] === 'A' ? 'B' : 'A'}${b.slice(41)}.${sig}`;
+  const again = L.open(edited);
+  if (again) {
+    // The device signs what the token NOW says; the old signature does not fit it.
+    assert.notEqual(again.input, input);
+    assert.equal(L.signatureMatches(edited, hmac(again.input, VECTOR_SECRET)), false, 'edited after signing');
+  }
+  // Not tokens at all.
+  for (const bad of ['', 'a.b', 'a.b.c', `x${token}`, `${h}.${b}`, `${h}.${b}.short`, `${h}.!!!.${sig}`, null, 42]) {
+    assert.equal(L.open(bad), null, String(bad).slice(0, 20));
+    assert.equal(L.signatureMatches(bad, hmac(input, VECTOR_SECRET)), false);
+  }
+  assert.equal(L.signatureMatches(token, [1, 2, 3]), false, 'not 32 bytes');
+  // Arabic and emoji come back as they went in.
+  const claims = L.claimsFor(job({ parts: [{ name: 'فانوس 🐉', material: 'PLA', qty: 1, printWeight: 300, baseCost: 1 }] }), ctx({ customerName: 'سارة' }));
+  const t2 = L.tokenFrom(L.signingInput(claims), hmac(L.signingInput(claims), VECTOR_SECRET));
+  assert.deepEqual(L.open(t2).claims, claims);
+});
+
+test('what the job remembers about a link, and about being paid on the store', () => {
+  const claims = L.claimsFor(job(), ctx());
+  assert.deepEqual(L.recordOf(claims), { issuedAt: NOW, expiresAt: NOW + 604800, amount: 340 });
+  assert.deepEqual(L.recordOf(claims, { locale: 'en-GB', sentAt: '2026-11-12T08:00:00.000Z' }),
+    { issuedAt: NOW, expiresAt: NOW + 604800, amount: 340, locale: 'en', sentAt: '2026-11-12T08:00:00.000Z' });
+  assert.equal(L.recordOf(claims, { locale: 'tr' }).locale, 'ar', 'the store reads Arabic or English');
+
+  assert.deepEqual(L.paidRecord({ storeOrder: '#1043', amount: 340, delivery: 22, paidAt: '2026-11-13T09:00:00Z', url: 'https://admin.example/app/orders/order_1' }),
+    { storeOrder: '1043', amount: 340, delivery: 22, paidAt: '2026-11-13T09:00:00Z', url: 'https://admin.example/app/orders/order_1' });
+  assert.equal('url' in L.paidRecord({ storeOrder: 1043, amount: 340, url: 'http://admin.example/x' }), false, 'https only');
+  assert.equal(L.paidRecord({ storeOrder: 1043, amount: 0.1 + 0.2 }).amount, 0.3, 'to the halala');
+  // Half a record would read as paid.
+  assert.equal(L.paidRecord({ amount: 340 }), null);
+  assert.equal(L.paidRecord({ storeOrder: '1043', amount: 'lots' }), null);
+  assert.equal(L.paidRecord({ storeOrder: '1043', amount: -1 }), null);
+  assert.equal(L.paidRecord(null), null);
+});
+
+test('the one line a job shows: ready, sent, expired, paid, or paid but not what the quote says', () => {
+  const at = (over, now) => L.stateOf(job(over), now === undefined ? NOW : now);
+  const sent = { issuedAt: NOW, expiresAt: NOW + 604800, amount: 340 };
+  assert.deepEqual(at(), { state: 'ready', outdated: false });
+  assert.deepEqual(at({ payLink: sent }, NOW + 3600), { state: 'sent', outdated: false });
+  assert.deepEqual(at({ payLink: sent }, NOW + 604799), { state: 'sent', outdated: false });
+  assert.deepEqual(at({ payLink: sent }, NOW + 604800), { state: 'expired', outdated: false }, 'at the moment it says, not five minutes later');
+  // The job was edited after the link went out: the link charges the old figure.
+  assert.deepEqual(at({ payLink: sent, price: 400 }, NOW + 3600), { state: 'sent', outdated: true });
+  assert.deepEqual(at({ payLink: sent, shippingCost: 25, price: 365 }, NOW + 3600), { state: 'sent', outdated: false }, 'delivery is not part of what a link charges');
+
+  const paid = (amount) => ({ ...sent, paid: L.paidRecord({ storeOrder: '1043', amount, delivery: 22, paidAt: '2026-11-13T09:00:00Z' }) });
+  assert.deepEqual(at({ payLink: paid(340) }), { state: 'paid', outdated: false });
+  assert.deepEqual(at({ payLink: paid(290) }), { state: 'mismatch', outdated: false });
+  // The store's payment is read first, whatever happened to the job since.
+  assert.equal(at({ payLink: paid(340), paidAmount: 340, paymentStatus: 'paid' }).state, 'paid');
+  assert.equal(at({ payLink: paid(340), status: 'cancelled' }).state, 'paid');
+  assert.equal(at({ payLink: paid(340), price: 400 }).state, 'mismatch', 'the quote was changed after it was paid');
+  assert.equal(L.paidMatches(job({ payLink: paid(340) })), true);
+  assert.equal(L.paidMatches(job()), false);
+
+  // Nothing to say.
+  assert.equal(at({ status: 'quote', quoteAcceptedAt: undefined }).state, null, 'still waiting for its answer');
+  assert.equal(at({ quoteAcceptedAt: undefined }).state, null, 'never a quote');
+  assert.equal(at({ status: 'cancelled' }).state, null);
+  assert.equal(at({ paidAmount: 100 }).state, null, 'paid some other way');
+  assert.equal(at({ payLink: sent, paymentStatus: 'paid' }, NOW + 3600).state, null);
+  assert.equal(L.stateOf(null, NOW).state, null);
+
+  // A device that is not set up offers nothing, but still tells what is so.
+  const off = { configured: false };
+  assert.equal(L.stateOf(job(), NOW, off).state, null, 'no line on every approved quote');
+  assert.equal(L.stateOf(job({ payLink: sent }), NOW + 3600, off).state, 'sent');
+  assert.equal(L.stateOf(job({ payLink: sent }), NOW + 604800, off).state, 'expired');
+  assert.equal(L.stateOf(job({ payLink: paid(340) }), NOW, off).state, 'paid');
+  assert.equal(L.stateOf(job({ payLink: paid(290) }), NOW, off).state, 'mismatch');
+  assert.equal(L.stateOf(job(), NOW, { configured: true }).state, 'ready');
+  assert.equal(L.stateOf(job(), NOW, {}).state, 'ready', 'left out, a device is taken to be set up');
+
+  assert.deepEqual(['ready', 'sent', 'expired', 'paid', 'mismatch', null].map(L.canSendFrom), [true, true, true, false, false, false]);
+});
+
 test('the secret is never an input to anything this module exports', () => {
   const source = require('node:fs').readFileSync(require.resolve('../lib/quote-pay-link.js'), 'utf8');
   // The one place the word may appear as a parameter is the length check.
