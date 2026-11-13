@@ -5698,3 +5698,65 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .next-up-caveat { font-size: 12px; color: var(--warning, #b7791f); }
 /* The queue runs the other way in Arabic, so the arrow turns with it. */
 [dir="rtl"] .next-up-arrow { display: inline-block; transform: scaleX(-1); }
+
+/* ── Connector updates (renderer/plugins.js, Figma 52:2434) ──
+   Waiting is STEEL, never amber (amber is "moving / today"). Dark is the
+   default theme here; [data-theme="light"] below. */
+:root {
+  --plg-steel-bg: #3A4658;
+  --plg-steel-ink: #A9B8CF;
+}
+[data-theme="light"] {
+  --plg-steel-bg: #EDF0F4;
+  --plg-steel-ink: #5E6C84;
+}
+.plg-update-badge,
+.plg-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--plg-steel-bg);
+  color: var(--plg-steel-ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.plg-update-badge { padding: 4px 9px; }
+.plg-nav-badge {
+  margin-inline-start: auto;
+  min-width: 18px;
+  justify-content: center;
+  padding: 3px 6px;
+}
+.plg-upd-head { display: flex; align-items: baseline; gap: 10px; }
+.plg-upd-head h3 { margin: 0; }
+.plg-upd-ver { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.plg-upd-reviewed { margin-inline-start: auto; font-size: 12px; font-weight: 600; color: var(--success, #1BB55C); white-space: nowrap; }
+.plg-upd-sub { font-size: 12px; color: var(--text-muted); margin: 6px 0 12px; }
+.plg-upd-lead { font-size: 13.5px; margin: 0 0 14px; }
+.plg-upd-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.plg-upd-new { background: var(--surface-2); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+.plg-upd-agreed { color: var(--text-muted); margin-bottom: 12px; }
+.plg-upd-hostname { font-weight: 600; font-size: 13px; margin-top: 4px; }
+.plg-upd-agreed .plg-upd-hostname { font-weight: 500; }
+.plg-upd-host ul { margin: 4px 0 6px; padding-inline-start: 16px; font-size: 13px; }
+.plg-upd-host li { margin: 3px 0; }
+.plg-upd-line { font-size: 13px; margin: 6px 0 0; }
+.plg-upd-tag {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg-elev, transparent);
+  border: 1px solid var(--border-soft);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.plg-upd-foot { font-size: 11.5px; color: var(--text-muted); margin: 0 0 4px; }
