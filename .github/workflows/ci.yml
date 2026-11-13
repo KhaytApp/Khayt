@@ -378,6 +378,9 @@ jobs:
       - name: E2E smoke (board, telemetry card, icons, title strip, HueForge title, inventory width)
         run: xvfb-run -a npm run test:e2e:plainfixes
 
+      - name: E2E smoke (a customer's address in fields)
+        run: xvfb-run -a npm run test:e2e:addresseditor
+
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 

@@ -1233,7 +1233,7 @@ function openShipModal(orderId) {
         <label>${escapeHtml(t('ship.address') || 'Delivery address')}</label>
         <select id="shipAddress" style="margin-bottom:8px;">
           <option value="">${escapeHtml(order.deliveryAddress || t('ship.address_none') || '—')}</option>
-          ${addresses.map(a => `<option value="${escapeHtml(a.address)}">${escapeHtml(a.label || a.address)}</option>`).join('')}
+          ${addressPickOptionsHtml(addresses.filter(a => a && typeof a === 'object'))}
         </select>` : ''}
       <label>${escapeHtml(t('ship.tracking') || 'Tracking number')}</label>
       <input type="text" id="shipTracking" value="${escapeHtml(order.trackingNumber || '')}" placeholder="${escapeHtml(t('ship.tracking_ph') || 'AWB / waybill')}" autocomplete="off">
@@ -3071,8 +3071,25 @@ function oeAddressPickHtml(clientId) {
   return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
         <select id="oeAddressSelect" style="margin-bottom:6px;">
           <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
-          ${rows.map(a => `<option value="${escapeHtml(String(a.address || ''))}">${escapeHtml(String(a.label || a.address || ''))}</option>`).join('')}
+          ${addressPickOptionsHtml(rows)}
         </select>`;
+}
+
+/**
+ * One <option> per address book row: the label and the address on one line
+ * as the screen shows it, the value the plain text that is copied onto the
+ * job (lib/customer-address.js textOf — never the display marks).
+ */
+function addressPickOptionsHtml(rows) {
+  const A = KhaytCustomerAddress;
+  const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+  const fmt = { shopCountry: A.shopCountry(settings), countryName: (c) => KhaytAddressEditor.countryName(c, lang) };
+  return rows.map((a) => {
+    const line = KhaytAddressEditor.oneLine(a, fmt);
+    const label = String(a.label || '').trim();
+    const shown = label && line ? label + ' — ' + line : (label || line);
+    return `<option value="${escapeHtml(A.textOf(a, fmt))}">${escapeHtml(shown)}</option>`;
+  }).join('');
 }
 
 /** The warning under the picker when the new customer bills in another currency. Nothing is converted. */
