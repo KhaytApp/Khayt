@@ -587,15 +587,17 @@ function renderKanban() {
     // Simple's Ready column keeps every finished, shipped and delivered job,
     // so it is drawn newest first and capped (lib/order-status.js
     // simpleColumnJobs). The count and totals are the whole column's.
+    // `sorted` stays the whole column (count, WIP, totals); `shown` is what is drawn.
     let readyMore = 0;
-    const colAll = sorted;
-    if (simpleBoard && status === 'completed') {
+    let shown = sorted;
+    const columnKey = status; // a column, not a job's status: Ready holds finished, shipped and delivered
+    if (simpleBoard && columnKey === 'completed') {
       const r = KhaytOrderStatus.simpleColumnJobs(items, 'ready');
-      sorted = r.jobs;
+      shown = r.jobs;
       readyMore = r.more;
     }
     const countEl = $('#count-' + status);
-    if (countEl) countEl.textContent = colAll.length;
+    if (countEl) countEl.textContent = sorted.length;
 
     // WIP limit warning
     const wipLimit = (settings.wipLimits || {})[status] || 0;
@@ -631,12 +633,12 @@ function renderKanban() {
     }
 
     // Column totals meta line
-    const totalHrs = colAll.reduce((s, o) => s + (+o.printTime || 0), 0);
-    const totalVal = fmtJobsTotal(colAll);   // saved rates; partial when a job has none
+    const totalHrs = sorted.reduce((s, o) => s + (+o.printTime || 0), 0);
+    const totalVal = fmtJobsTotal(sorted);   // saved rates; partial when a job has none
     const metaEl = $('#meta-' + status);
     if (metaEl) {
       const showMetaMoney = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-      metaEl.textContent = colAll.length > 0
+      metaEl.textContent = sorted.length > 0
         ? (showMetaMoney ? `${totalHrs.toFixed(1)} ${t('common.hours')} · ${totalVal}` : `${totalHrs.toFixed(1)} ${t('common.hours')}`)
         : '';
     }
@@ -648,12 +650,12 @@ function renderKanban() {
       return;
     }
     container.style.display = '';
-    if (sorted.length === 0) {
+    if (shown.length === 0) {
       container.innerHTML = `<div class="empty-state" style="padding:20px 8px;">${escapeHtml(t('queue.empty'))}</div>`;
       return;
     }
     const colStatus = status;
-    container.innerHTML = sorted.map(log => {
+    container.innerHTML = shown.map(log => {
       // In Simple a card keeps its own stage's actions (Resume for a job on
       // hold, QC pass in QC) though it sits in one of the four columns.
       const simpleCard = simpleInfo.get(log.id);
@@ -691,10 +693,10 @@ function renderKanban() {
       // Manual ordering is available in EVERY column, not just pending: dragging works
       // everywhere, so the keyboard-accessible equivalent must too. Without this, the
       // other five columns could only be reordered with a mouse.
-      const qIdx = sorted.indexOf(log);
+      const qIdx = shown.indexOf(log);
       const queueControls = `<span class="queue-pos-ctrl">
         ${qIdx > 0 ? `<button data-act="q-up" data-id="${log.id}" title="${escapeHtml(t('queue.move_up'))}" aria-label="${escapeHtml(t('queue.move_up'))}"><span aria-hidden="true">▲</span></button>` : ''}
-        ${qIdx < sorted.length - 1 ? `<button data-act="q-down" data-id="${log.id}" title="${escapeHtml(t('queue.move_down'))}" aria-label="${escapeHtml(t('queue.move_down'))}"><span aria-hidden="true">▼</span></button>` : ''}
+        ${qIdx < shown.length - 1 ? `<button data-act="q-down" data-id="${log.id}" title="${escapeHtml(t('queue.move_down'))}" aria-label="${escapeHtml(t('queue.move_down'))}"><span aria-hidden="true">▼</span></button>` : ''}
       </span>`;
       if (status === 'pending') {
         // Feature 1: Per-machine ETA — for multi-machine orders use MAX across all machines
