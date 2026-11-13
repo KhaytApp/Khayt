@@ -66,11 +66,15 @@ extension Shop {
         guard let engine, let build = source.build else { return }
         for machine in machinesInUse {
             let answering = printers.heard(machine.id) != nil
-            guard Self.needsIdentity(machine, answering: answering, asked: identityAsked),
-                  let api = machine.printerApi, let type = api.type,
+            guard Self.needsIdentity(machine, answering: answering, asked: identityAsked) else { continue }
+            // Asked once per launch whatever the answer, including "this
+            // protocol has no identity question" (Bambu, OctoPrint…): that was
+            // a call into the engine for every such printer after every poll
+            // (beta.35 pre-release review).
+            identityAsked.insert(machine.id)
+            guard let api = machine.printerApi, let type = api.type,
                   let path = try? await engine.identityPath(type: type),
                   let rawHost = api.host else { continue }
-            identityAsked.insert(machine.id)
             let host = rawHost.split(separator: ":").first.map(String.init) ?? rawHost
             guard (try? await engine.printerHostAllowed(host)) == true,
                   let probe = try? await engine.sweepProbes().first(where: { $0.type == type }),
