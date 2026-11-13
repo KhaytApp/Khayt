@@ -70,3 +70,59 @@ extension KhaytEngine {
         mode == "simple" || mode == "enthusiast"
     }
 }
+
+/// Simple's board: four columns instead of eight, asked of the shared rule.
+///
+/// `lib/order-status.js` `simpleStageOf` and `simpleColumnJobs` (desktop
+/// #2428) say which of Quote, Queued, Printing and Ready a job is filed under,
+/// the finer stage it is really at (shown as a note on the card), whether a
+/// job on hold had already started printing, and the newest 120 of Ready.
+/// The iPhone carried a Swift copy of the table until this; the Mac and the
+/// phone ask the engine instead, so the three apps file a job the same way.
+extension KhaytEngine {
+
+    /// Where Simple files one job.
+    public struct SimpleStage: Decodable, Sendable, Equatable {
+        /// `quote` | `queued` | `printing` | `ready`.
+        public let column: String
+        /// The finer stage shown on the card (`on_hold`, `post`, `qc`,
+        /// `shipped`, `delivered`), or nil.
+        public let note: String?
+        /// The job's own stage, so a card can still offer its own actions.
+        public let stage: String
+        /// On hold only: the job had started printing before it was held.
+        public let midPrint: Bool?
+
+        public init(column: String, note: String?, stage: String, midPrint: Bool?) {
+            self.column = column; self.note = note; self.stage = stage; self.midPrint = midPrint
+        }
+    }
+
+    /// The four columns, in order.
+    public func simpleColumns() throws -> [String] {
+        try runtime.call2("globalThis.KhaytOrderStatus.SIMPLE_COLUMNS", [], as: [String].self)
+    }
+
+    /// Where Simple files this job, or nil when it is not on the board
+    /// (cancelled, failed, an unknown status), as in Professional.
+    public func simpleStage(of order: JSONValue) throws -> SimpleStage? {
+        try runtime.call2("globalThis.KhaytOrderStatus.simpleStageOf(ARG0)", [order], as: SimpleStage?.self)
+    }
+
+    /// The jobs one column shows, in the rule's order, as indexes into
+    /// `orders`, and how many Ready leaves out (only Ready is cut, newest
+    /// first). Indexes rather than records, so a caller keeps its own models.
+    public func simpleColumn(_ column: String, orders: [JSONValue], cap: Int? = nil) throws -> (indexes: [Int], more: Int) {
+        struct Answer: Decodable { let indexes: [Int]; let more: Int }
+        let a = try runtime.call2("""
+            (function (orders, column, cap) {
+              var tagged = orders.map(function (o, i) {
+                var c = Object.assign({}, o); Object.defineProperty(c, '__i', { value: i, enumerable: false }); return c;
+              });
+              var r = globalThis.KhaytOrderStatus.simpleColumnJobs(tagged, column, cap === null ? undefined : { cap: cap });
+              return { indexes: r.jobs.map(function (o) { return o.__i; }), more: r.more };
+            })(ARG0, ARG1, ARG2)
+            """, [.array(orders), .string(column), cap.map { .number(Double($0)) } ?? .null], as: Answer.self)
+        return (a.indexes, a.more)
+    }
+}
