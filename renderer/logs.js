@@ -236,7 +236,7 @@ function renderLogs() {
     const hasMarginData = partsCost > 0 && netRevenue > 0;
     const marginPct = hasMarginData ? ((netRevenue - partsCost) / netRevenue * 100) : null;
     const marginHtml = marginPct !== null
-      ? `<span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:10px;background:${marginPct >= 40 ? 'rgba(34,197,94,0.15)' : marginPct >= 20 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'};color:${marginPct >= 40 ? 'var(--success)' : marginPct >= 20 ? 'var(--warning)' : 'var(--danger)'};">${marginPct.toFixed(0)}%</span>`
+      ? `<span class="margin-chip is-${marginToneOf(marginPct, settings.minMarginPct)}">${marginPct.toFixed(0)}%</span>`
       : `<span style="color:var(--text-muted);font-size:11px;">—</span>`;
     return `
     <tr${isOverdue ? ' class="row-overdue"' : ''}${isSel ? ' style="background:rgba(91,156,240,0.07);"' : ''}>
@@ -249,7 +249,7 @@ function renderLogs() {
         <div style="font-family: var(--font-num); font-size: 11.5px; color: var(--text-muted);">${escapeHtml(jobRef(log))}${photoCount ? ` · ${photoCount}📷` : ''}${fileCount ? ` · ${fileCount}📎` : ''}${log.notes ? ' · 📝' : ''}</div>
       </td>
       <td>
-        <span class="badge ${escapeHtml(log.status)}">${escapeHtml(t('queue.' + log.status))}</span>${log.deliveredAt ? ` <span style="font-size:10px; color:var(--success);">✓ ${escapeHtml(t('queue.delivered'))}</span>` : ''}
+        <span class="badge ${escapeHtml(log.status)}">${escapeHtml(t('queue.' + log.status))}</span>${log.deliveredAt ? ` <span style="font-size:10px; color:var(--st-done-ink);">✓ ${escapeHtml(t('queue.delivered'))}</span>` : ''}
         ${KhaytOrderStatus.isFinished(log) && log.completedAt ? `<div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">✓ ${escapeHtml(t('ord.completed_at'))}: ${escapeHtml(formatPrintDate(log.completedAt))}</div>` : ''}
         ${log.qcPassedAt ? `<div style="margin-top:2px;"><span class="qc-badge">✅ ${escapeHtml(t('ord.qc_passed'))}</span>${log.qcNotes ? `<span style="font-size:11px;color:var(--text-muted);margin-inline-start:5px;">${escapeHtml(log.qcNotes)}</span>` : ''}</div>` : ''}
         ${(log.milestoneInvoices && log.milestoneInvoices.length > 0) ? `<div style="margin-top:2px;font-size:10.5px;color:var(--primary);">📄 ${log.milestoneInvoices.length} ${escapeHtml(t('ord.milestone_invoices'))}</div>` : ''}

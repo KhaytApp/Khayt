@@ -210,7 +210,7 @@ function renderClients() {
         <td style="font-variant-numeric: tabular-nums;">${stats.count}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--success);">${fmtPrice(stats.revenue)}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--text-dim);">${escapeHtml(stats.lastDate || t('cl.never_ordered'))}</td>
-        <td style="font-variant-numeric:tabular-nums;text-align:end;color:${balance > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${balance > 0 ? fmtPrice(balance) : '—'}</td>
+        <td style="font-variant-numeric:tabular-nums;text-align:end;color:${balance > 0 ? 'var(--st-unpaid-ink)' : 'var(--text-muted)'};">${balance > 0 ? fmtPrice(balance) : '—'}</td>
         <td>
           <button class="btn small" data-act="cl-history" data-id="${c.id}">${escapeHtml(t('cl.history'))}</button>
           <button class="btn small success" data-act="cl-quote" data-id="${c.id}">${escapeHtml(t('cl.quote'))}</button>
