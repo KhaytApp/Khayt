@@ -37,6 +37,33 @@ struct PhoneExpenseTests {
         #expect(ExpenseReceipt.file(for: "", storeURL: store) == nil)
         // The desktop writes the whole path for a phone's photo; it opens when it is on this computer.
         #expect(ExpenseReceipt.file(for: receipts.appending(path: "a.jpg").path, storeURL: store) != nil)
+
+        // THE PATH COMES FROM THE BOOK, WHICH A PHONE CAN WRITE. The paperclip
+        // opens the file, so only a picture or a PDF, really a file, inside a
+        // folder named `receipts` (beta.34 pre-release review).
+        let fm = FileManager.default
+        #expect(ExpenseReceipt.file(for: dir.appending(path: "other.txt").path, storeURL: store) == nil, "a whole path outside receipts/")
+        #expect(ExpenseReceipt.file(for: "/Applications/Calculator.app", storeURL: store) == nil)
+        #expect(ExpenseReceipt.file(for: "/System/Applications/Utilities/Terminal.app", storeURL: store) == nil)
+        try Data("#!/bin/sh\n".utf8).write(to: receipts.appending(path: "run.command"))
+        #expect(ExpenseReceipt.file(for: "receipts/run.command", storeURL: store) == nil, "not a receipt's kind")
+        #expect(ExpenseReceipt.file(for: receipts.appending(path: "run.command").path, storeURL: store) == nil)
+        try fm.createDirectory(at: receipts.appending(path: "folder.pdf"), withIntermediateDirectories: true)
+        #expect(ExpenseReceipt.file(for: "receipts/folder.pdf", storeURL: store) == nil, "a folder named like a PDF")
+        // A link is judged by what it points at.
+        try fm.createSymbolicLink(at: receipts.appending(path: "link.jpg"), withDestinationURL: dir.appending(path: "other.txt"))
+        #expect(ExpenseReceipt.file(for: "receipts/link.jpg", storeURL: store) == nil)
+        try Data("%PDF-1.4".utf8).write(to: receipts.appending(path: "bill.PDF"))
+        #expect(ExpenseReceipt.file(for: "receipts/bill.PDF", storeURL: store) != nil, "the extension's case does not matter")
+    }
+
+    @Test("an API token never reaches the phone-only photo route, whatever header it carries")
+    func tokenIsNotAPhone() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/LanServer.swift")
+        let server = try String(contentsOf: url, encoding: .utf8)
+        #expect(server.contains("guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {"))
     }
 
     @Test("the expense route is recognised from the request line, under either name")

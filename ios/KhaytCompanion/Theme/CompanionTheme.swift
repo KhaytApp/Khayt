@@ -24,30 +24,6 @@ enum CompanionTheme {
     }
 }
 
-struct CompanionStatusBadge: View {
-    let status: String
-    var compact = false
-
-    var body: some View {
-        let color = KhaytDesign.statusColor(for: status)
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: compact ? 6 : 7, height: compact ? 6 : 7)
-            Text(OrderStatus(rawValue: status)?.localizedLabel ?? status.capitalized)
-        }
-        // As the Mac's StatusPill: a dot in the stage colour, the label in
-        // ink on the stage's tint, so the words never sit in a colour that
-        // reads at 2:1.
-        .font(.khayt(compact ? 11 : 12, .semibold, relativeTo: .caption))
-        .padding(.horizontal, compact ? 8 : 10)
-        .padding(.vertical, compact ? 4 : 5)
-        .foregroundStyle(KhaytDesign.ink)
-        .background(KhaytDesign.statusSoft(for: status), in: Capsule())
-        .environment(\.layoutDirection, .leftToRight)
-    }
-}
-
 enum CompanionHaptics {
     static func success() {
         #if os(iOS)

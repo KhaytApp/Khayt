@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Home — **Shop Pulse**, as `design/ios-v2/` draws it.
+/// Home — **Needs you** first (Figma R9W19Jakt19nKs1yM5GEde 38:3, the shared
+/// rules on the Mac's 91:1156).
 ///
-/// Three counts, the money, the pipeline, the rails that need a person, and the
-/// first five jobs of the chosen lane, each swiped forward to advance. Money
-/// the book cannot answer is an em-dash captioned "On the Mac" (see
-/// `BookReader.pulse`), never a zero.
+/// The greeting says how many kinds of thing need the owner, and the list under
+/// it has one row per kind with the action that deals with it (`NeedsYou`).
+/// Then the figures — Owed, On the machines, the month's money — and the open
+/// jobs due this week, each swiped forward to advance. A figure the phone
+/// cannot work out is not drawn; the counts and the pipeline live in Orders.
 ///
 /// The header's **+** opens the redesign's New sheet (`NewSheet`): a new job,
 /// a file to quote, a spool, the calculator, an expense, waste, and below them
@@ -17,17 +19,22 @@ struct DashboardView: View {
     @EnvironmentObject private var health: ConnectionHealth
     @EnvironmentObject private var ordersNav: OrdersNavigationState
 
-    @State private var status: ShopStatus?
     @State private var pulse: ShopPulse?
     @State private var queue: [QueueOrder] = []
     @State private var facts: [String: OrderFacts] = [:]
     @State private var openOrder: QueueOrder?
     @ObservedObject private var feed = ShopFeed.shared
-    @State private var lowSpools: [InventorySpool] = []
+    @State private var spools: [InventorySpool] = []
     @State private var waiting: [WaitingListItem] = []
-    @State private var lane: String = "all"
+    @State private var quotes: [OrderLogEntry]?
+    /// Whether the first load has come back: until it has, the greeting says
+    /// only hello, rather than "nothing needs you" about a book not yet read.
+    @State private var loaded = false
     @State private var updatingId: String?
     @State private var moveNotes: [String] = []
+    /// Why the queue could not be read, when it could not: Home said "Queue
+    /// clear" for a failed read (F3). Nil once a read succeeds.
+    @State private var queueError: String?
     @State private var showAddSpool = false
     @State private var showQuote = false
     @State private var showLibrary = false
@@ -53,7 +60,9 @@ struct DashboardView: View {
     @Environment(\.horizontalSizeClass) private var widthClass
     @State private var fold: FoldGap?
 
-    private static let stages = ["pending", "printing", "post", "qc", "completed"]
+    private var needs: NeedsYou.Summary {
+        NeedsYou.summary(queue: queue, spools: spools, waiting: waiting, quotes: quotes)
+    }
 
     var body: some View {
         NavigationStack {
@@ -69,15 +78,15 @@ struct DashboardView: View {
                     // than straddling it (see `FoldGap`).
                     if widthClass == .regular {
                         FoldColumns(fold: fold) {
-                            VStack(alignment: .leading, spacing: 0) { figures }
+                            VStack(alignment: .leading, spacing: 0) { attention }
                                 .frame(maxWidth: .infinity, alignment: .top)
-                            VStack(alignment: .leading, spacing: 0) { work.padding(.top, 14) }
+                            VStack(alignment: .leading, spacing: 0) { figures }
                                 .frame(maxWidth: .infinity, alignment: .top)
                         }
                         .readsFold($fold)
                     } else {
+                        attention
                         figures
-                        work
                     }
                 }
                 .padding(.bottom, 18)
@@ -89,7 +98,7 @@ struct DashboardView: View {
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showSettings) { SettingsView(showsClose: true) }
             .sheet(isPresented: $showNew, onDismiss: openNewChoice) {
                 NewSheet(holdsBook: api.holdsBook) { newChoice = $0 }
             }
@@ -146,97 +155,111 @@ struct DashboardView: View {
 
     // MARK: - The two halves of Home
 
-    /// The shop's numbers: counts, money and the pipeline.
-    @ViewBuilder private var figures: some View {
-        money.padding(.top, 14)
-        counts.padding(.top, 10)
-        section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
-        lanes
+    /// What needs the owner: the list under the greeting, or one calm line.
+    @ViewBuilder private var attention: some View {
+        if queue.isEmpty, let queueError {
+            // The queue could not be read: that is not "nothing needs you".
+            LoadFailedView(message: queueError) { await load() }
+                .padding(.horizontal, 16)
+        } else if needs.isCalm {
+            if loaded {
+                Text(L10n.tr("needs.calm"))
+                    .font(.khayt(14, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+            }
+        } else {
+            section(L10n.tr("needs.title"))
+            needsList
+        }
     }
 
-    /// What needs doing: the alerts and the jobs in the chosen lane.
-    @ViewBuilder private var work: some View {
-        alerts.padding(.top, 16)
-        section(laneTitle, trailing: L10n.format("pulse.jobs", laneJobs.count))
-        jobs
-        Text(L10n.tr("pulse.swipe_hint"))
-            .font(.khayt(11.5, relativeTo: .caption2))
-            .foregroundStyle(KhaytDesign.note)
-            .frame(maxWidth: .infinity)
-            .multilineTextAlignment(.center)
-            .padding(.top, 14)
+    /// The shop's figures, then the work due this week.
+    @ViewBuilder private var figures: some View {
+        tiles
+        money
+        dueWeek
     }
 
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                // The redesign's header: today's date as a mono eyebrow over
-                // the title, with the shop's name after it when it has one.
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 12) {
+                // Today's date as a mono eyebrow, Gregorian.
                 Text(dateLine)
                     .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
                     .khaytTracking(0.8)
                     .foregroundStyle(KhaytDesign.note)
-                    // At the largest text sizes it shrank to "WEDNESDAY, 4 NOV…".
                     .lineLimit(1).minimumScaleFactor(0.7)
-                Text(L10n.tr("pulse.title"))
-                    .font(.khaytDisplay(30, .bold, relativeTo: .largeTitle))
-                    .tracking(-0.6)
-                    .foregroundStyle(KhaytDesign.ink)
-                    // One line beside the buttons: it shrinks a little
-                    // before it would wrap.
-                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 8)
+                headerButtons
             }
-            Spacer(minLength: 8)
-            if widthClass == .compact {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(KhaytDesign.ink)
-                        .frame(width: 44, height: 44)
-                        .background(KhaytDesign.surface, in: Circle())
-                        .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-                }
-                .accessibilityLabel(L10n.tr("tab.settings"))
-            }
-            // The design's bell, with how many are unread.
-            NavigationLink {
-                NotificationsView()
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(KhaytDesign.ink)
-                        .frame(width: 44, height: 44)
-                        .background(KhaytDesign.surface, in: Circle())
-                        .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-                    if feed.unreadCount > 0 {
-                        Text("\(min(feed.unreadCount, 99))")
-                            .font(.khayt(10, .bold, relativeTo: .caption2).monospacedDigit())
-                            .foregroundStyle(KhaytDesign.ground)
-                            .padding(.horizontal, 4)
-                            .frame(minWidth: 17, minHeight: 17)
-                            .background(KhaytDesign.late, in: Capsule())
-                            .offset(x: 2, y: -2)
-                    }
-                }
-            }
-            .accessibilityLabel(L10n.tr("feed.title"))
-            .accessibilityValue(feed.unreadCount > 0 ? L10n.format("feed.unread_count", feed.unreadCount) : "")
-            Button { showNew = true } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(KhaytDesign.onBrand)
-                    .frame(width: 44, height: 44)
-                    .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .accessibilityLabel(L10n.tr("new.title"))
+            // The greeting carries the count: "Good morning. 3 things need you."
+            Text(greeting)
+                .font(.khaytDisplay(30, .bold, relativeTo: .largeTitle))
+                .tracking(-0.6)
+                .foregroundStyle(KhaytDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+        .padding(.bottom, 4)
+    }
+
+    private var greeting: String {
+        let hello = L10n.tr(NeedsYou.greetingKey(hour: Calendar(identifier: .gregorian).component(.hour, from: Date())))
+        guard loaded, !(queue.isEmpty && queueError != nil) else { return hello }
+        return hello + "\n" + (needs.isCalm ? L10n.tr("needs.none") : L10n.count("needs.count", needs.total))
+    }
+
+    @ViewBuilder private var headerButtons: some View {
+        if widthClass == .compact {
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .frame(width: 44, height: 44)
+                    .background(KhaytDesign.surface, in: Circle())
+                    .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            }
+            .accessibilityLabel(L10n.tr("tab.settings"))
+        }
+        // The bell, with how many are unread.
+        NavigationLink {
+            NotificationsView()
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .frame(width: 44, height: 44)
+                    .background(KhaytDesign.surface, in: Circle())
+                    .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+                if feed.unreadCount > 0 {
+                    Text("\(min(feed.unreadCount, 99))")
+                        .font(.khayt(10, .bold, relativeTo: .caption2).monospacedDigit())
+                        .foregroundStyle(KhaytDesign.ground)
+                        .padding(.horizontal, 4)
+                        .frame(minWidth: 17, minHeight: 17)
+                        .background(KhaytDesign.late, in: Capsule())
+                        .padding(.trailing, -2).offset(y: -2)  // trailing: mirrored in Arabic (an x offset is not)
+                }
+            }
+        }
+        .accessibilityLabel(L10n.tr("feed.title"))
+        .accessibilityValue(feed.unreadCount > 0 ? L10n.format("feed.unread_count", feed.unreadCount) : "")
+        Button { showNew = true } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(KhaytDesign.onBrand)
+                .frame(width: 44, height: 44)
+                .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .accessibilityLabel(L10n.tr("new.title"))
     }
 
     /// "TUESDAY 3 NOVEMBER" — Gregorian whatever the phone's calendar, as the
@@ -251,241 +274,234 @@ struct DashboardView: View {
         return L10n.usesArabicLayout ? date : date.uppercased()
     }
 
-    // MARK: - Counts and money
+    // MARK: - Needs you
 
-    private var counts: some View {
-        HStack(spacing: 8) {
-            countTile(pulse?.inQueue ?? status?.pending, L10n.tr("stat.in_queue"), tint: KhaytDesign.ink, label: KhaytDesign.note, rail: nil)
-            countTile(pulse?.printing ?? status?.printing, L10n.tr("pulse.printing"), tint: KhaytDesign.live, label: KhaytDesign.live, rail: KhaytDesign.live)
-            countTile(pulse?.doneToday ?? status?.completedToday, L10n.tr("pulse.done_today"), tint: KhaytDesign.done, label: KhaytDesign.note, rail: nil)
+    /// Steel: waiting on someone else.
+    private static let steel = Color(light: 0x5E6C84, dark: 0xA9B8CF)
+
+    private func color(_ tone: NeedsYou.Tone) -> Color {
+        switch tone {
+        case .late: return KhaytDesign.late
+        case .today: return KhaytDesign.thread
+        case .waitingOnOthers: return Self.steel
         }
+    }
+
+    /// One row per kind, each with the action that deals with it.
+    private var needsList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(needs.shown.enumerated()), id: \.element.id) { index, row in
+                if index > 0 { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+                needsRow(row)
+            }
+            if needs.more > 0 {
+                Rectangle().fill(KhaytDesign.hairline).frame(height: 1)
+                Text(L10n.count("needs.more", needs.more))
+                    .font(.khayt(13, .medium, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+        }
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
         .padding(.horizontal, 16)
     }
 
-    private func countTile(_ value: Int?, _ label: String, tint: Color, label labelTint: Color, rail: Color?) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(value.map { $0.formatted(.number.locale(L10n.locale)) } ?? "—")
-                .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())
-                .foregroundStyle(value == nil ? KhaytDesign.note : tint)
-                .environment(\.layoutDirection, .leftToRight)
-            Text(L10n.usesArabicLayout ? label : label.uppercased())
-                .font(L10n.usesArabicLayout ? .khayt(11, .bold, relativeTo: .caption2) : .khaytMono(10.5, .medium, relativeTo: .caption2))
-                .khaytTracking(0.6)
-                .foregroundStyle(labelTint)
+    private func title(_ row: NeedsYou.Row) -> String {
+        switch row.kind {
+        case .late: return L10n.count("needs.late", row.count)
+        case .lowStock: return L10n.tr("needs.low.title")
+        case .waiting: return L10n.count("pulse.waiting", row.count)
+        case .quotes: return L10n.count("needs.quotes", row.count)
+        }
+    }
+
+    private func actionTitle(_ kind: NeedsYou.Kind) -> String {
+        switch kind {
+        case .late: return L10n.tr("needs.late.action")
+        case .lowStock: return L10n.tr("needs.low.action")
+        case .waiting: return L10n.tr("needs.waiting.action")
+        case .quotes: return L10n.tr("needs.quotes.action")
+        }
+    }
+
+    /// Where a row goes: the filtered list it names.
+    private func open(_ kind: NeedsYou.Kind) {
+        switch kind {
+        case .late: ordersNav.openOverdue()
+        case .lowStock: ordersNav.openLowStock()
+        case .waiting: showIntake = true
+        case .quotes: ordersNav.openOrders(filter: .quote)
+        }
+    }
+
+    private func needsRow(_ row: NeedsYou.Row) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // The row itself opens the list; the button says what it does.
+            Button { open(row.kind) } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Circle().fill(color(row.tone)).frame(width: 8, height: 8)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title(row))
+                            .font(.khayt(16, .semibold, relativeTo: .body))
+                            .foregroundStyle(KhaytDesign.ink)
+                        Text(row.detail)
+                            .font(.khayt(13, relativeTo: .footnote))
+                            .foregroundStyle(KhaytDesign.note)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(actionTitle(row.kind))
+            Button { open(row.kind) } label: {
+                Text(actionTitle(row.kind))
+                    .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 16)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Figures
+
+    /// Owed and On the machines. A figure this phone cannot work out is not
+    /// drawn — no dashes.
+    @ViewBuilder private var tiles: some View {
+        let machinesFigure = NeedsYou.onTheMachines(machines, queue: queue)
+        if pulse != nil || machinesFigure != nil {
+            HStack(alignment: .top, spacing: 10) {
+                if let pulse {
+                    NavigationLink { OwedView() } label: {
+                        tile(L10n.tr("tile.owed"), value: amount(pulse.owed),
+                             sub: L10n.format("pulse.unpaid", pulse.unpaid))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(L10n.tr("owed.open.hint"))
+                }
+                if let m = machinesFigure {
+                    Button { ordersNav.openMachines() } label: {
+                        tile(L10n.tr("tile.machines"),
+                             value: L10n.format("tile.machines.value", m.busy, m.of),
+                             sub: L10n.tr("tile.machines.sub"))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+        }
+    }
+
+    private func tile(_ label: String, value: String, sub: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.khayt(13, relativeTo: .footnote))
+                .foregroundStyle(KhaytDesign.note)
                 .lineLimit(1).minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13).padding(.top, 12).padding(.bottom, 11)
-        // The redesign's tile: a plain card, the live count marked by a
-        // stroke in its colour rather than a rail.
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(rail.map { $0.opacity(0.45) } ?? KhaytDesign.hairline, lineWidth: 1))
-        .accessibilityElement(children: .combine)
-    }
-
-    /// The redesign's hero: this month's takings large on the brand blue,
-    /// this year and what is owed beneath it. Owed still opens who owes it.
-    private var money: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.usesArabicLayout ? L10n.tr("pulse.this_month") : L10n.tr("pulse.this_month").uppercased())
-                .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
-                .khaytTracking(0.8)
-                .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(pulse?.thisMonth.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
-                    .font(.khaytDisplay(44, .bold, relativeTo: .largeTitle).monospacedDigit())
-                    .tracking(-1.2)
-                    .lineLimit(1).minimumScaleFactor(0.5)
-                Text(pulse?.thisMonth == nil ? L10n.tr("pulse.on_the_mac") : currencyNote)
-                    .font(.khaytMono(13, .medium))
-            }
-            .foregroundStyle(KhaytDesign.onBrand)
-            .environment(\.layoutDirection, .leftToRight)
-            .frame(maxWidth: .infinity, alignment: L10n.usesArabicLayout ? .trailing : .leading)
-            .padding(.top, 4)
-            Rectangle().fill(KhaytDesign.onBrand.opacity(0.18)).frame(height: 1).padding(.vertical, 12)
-            HStack(spacing: 0) {
-                heroFigure(pulse?.thisYear, L10n.tr("pulse.this_year"), note: currencyNote)
-                NavigationLink { OwedView() } label: {
-                    heroFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
-                               note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "", chevron: true)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(pulse == nil)
-                .accessibilityHint(L10n.tr("owed.open.hint"))
-            }
-        }
-        .padding(18)
-        .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.horizontal, 16)
-    }
-
-    private func heroFigure(_ value: Double?, _ label: String, note: String, chevron: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(L10n.usesArabicLayout ? label : label.uppercased())
-                    .font(L10n.usesArabicLayout ? .khayt(11, .semibold, relativeTo: .caption2) : .khaytMono(10, .medium, relativeTo: .caption2))
-                    .khaytTracking(0.6)
-                if chevron {
-                    Image(systemName: "chevron.forward").font(.system(size: 9, weight: .bold))
-                }
-            }
-            .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
-            Text(value.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
-                .font(.khaytDisplay(20, .semibold, relativeTo: .title3).monospacedDigit())
-                .foregroundStyle(KhaytDesign.onBrand)
+            Text(value)
+                .font(.khaytDisplay(26, .bold, relativeTo: .title).monospacedDigit())
+                .foregroundStyle(KhaytDesign.ink)
                 .lineLimit(1).minimumScaleFactor(0.6)
-                .environment(\.layoutDirection, .leftToRight)
-            Text(value == nil ? L10n.tr("pulse.on_the_mac") : note)
-                .font(.khayt(11.5, relativeTo: .caption2))
-                .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
-                .lineLimit(1)
+            Text(sub)
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
+                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+
+    private func amount(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale))
     }
 
     private var currencyNote: String { pulse?.currency.map(Money.mark) ?? "" }
 
-    // MARK: - Pipeline
-
-    private func count(_ stage: String) -> Int {
-        switch stage {
-        case "all": return queue.count
-        case "completed": return pulse?.doneToday ?? status?.completedToday ?? 0
-        default: return queue.filter { $0.status == stage }.count
-        }
-    }
-
-    private var lanes: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(["all"] + Self.stages, id: \.self) { id in
-                    let tone = id == "all" ? KhaytDesign.brand : KhaytDesign.statusColor(for: id)
-                    let on = lane == id
-                    let n = count(id)
-                    Button {
-                        if id == "completed" {
-                            ordersNav.openOrders(filter: .completed)
-                        } else {
-                            lane = id
+    /// The money, compact: this month large, then the year and what is owed on
+    /// one line that opens who owes it. Not drawn when the phone has no pulse.
+    @ViewBuilder private var money: some View {
+        if let pulse {
+            NavigationLink { OwedView() } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.usesArabicLayout ? L10n.tr("pulse.this_month") : L10n.tr("pulse.this_month").uppercased())
+                        .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11, .medium))
+                        .khaytTracking(0.8)
+                        .foregroundStyle(KhaytDesign.onBrand.opacity(0.75))
+                    if let month = pulse.thisMonth {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(amount(month))
+                                .font(.khaytDisplay(36, .bold, relativeTo: .largeTitle).monospacedDigit())
+                                .tracking(-1)
+                                .lineLimit(1).minimumScaleFactor(0.5)
+                            Text(currencyNote).font(.khaytMono(13, .medium))
                         }
-                    } label: {
-                        VStack(spacing: 5) {
-                            Text("\(n)")
-                                .font(.khayt(21, .semibold, relativeTo: .title3).monospacedDigit())
-                            Text(id == "all" ? L10n.tr("orders.filter.all") : L10n.tr("stage.short.\(id)"))
-                                .font(.khayt(9.5, .bold, relativeTo: .caption2))
-                                .khaytTracking(0.8)
-                        }
-                        .foregroundStyle(on ? tone : (n > 0 || id == "all" ? KhaytDesign.ink : KhaytDesign.note))
-                        .frame(minWidth: 60, minHeight: 64)
-                        .padding(.horizontal, 8)
-                        .background(on ? tone.opacity(0.16) : KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(on ? tone.opacity(0.55) : KhaytDesign.hairline, lineWidth: 1))
+                        .environment(\.layoutDirection, .leftToRight)
+                        .frame(maxWidth: .infinity, alignment: L10n.usesArabicLayout ? .trailing : .leading)
+                    } else {
+                        // Older than this phone's window: the Mac has it.
+                        Text(L10n.tr("pulse.on_the_mac"))
+                            .font(.khayt(17, .semibold, relativeTo: .headline))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(on ? .isSelected : [])
+                    HStack(spacing: 4) {
+                        Text(moneyLine(pulse))
+                            .font(.khayt(13, relativeTo: .footnote))
+                            .lineLimit(2)
+                        Image(systemName: "chevron.forward").font(.system(size: 10, weight: .bold))
+                            .accessibilityHidden(true)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(KhaytDesign.onBrand.opacity(0.85))
                 }
+                .foregroundStyle(KhaytDesign.onBrand)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(L10n.tr("owed.open.hint"))
             .padding(.horizontal, 16)
-        }
-        .clipShape(Rectangle())
-    }
-
-    // MARK: - Rails that need a person
-
-    @ViewBuilder
-    private var alerts: some View {
-        let late = queue.filter(\.isOverdue)
-        if !late.isEmpty || !lowSpools.isEmpty || !waiting.isEmpty {
-            VStack(spacing: 0) {
-                if !late.isEmpty {
-                    alertRail(tone: KhaytDesign.late, icon: "clock.badge.exclamationmark",
-                              title: L10n.count("pulse.late", late.count),
-                              sub: late.map(\.displayTitle).joined(separator: " · ")) {
-                        ordersNav.openOrders()
-                    }
-                }
-                if !lowSpools.isEmpty {
-                    if !late.isEmpty { KhaytThreadDivider().padding(.leading, 64) }
-                    alertRail(tone: KhaytDesign.attention, icon: "cylinder.split.1x2",
-                              title: L10n.count("pulse.low_stock", lowSpools.count),
-                              sub: lowSpools.map { spool in
-                                  let grams = Int((spool.remainingGrams ?? 0).rounded())
-                                  return "\(spool.displayLabel) · \(L10n.grams(grams))"
-                              }.joined(separator: " · ")) {
-                        ordersNav.openLowStock()
-                    }
-                }
-                if !waiting.isEmpty {
-                    if !late.isEmpty || !lowSpools.isEmpty { KhaytThreadDivider().padding(.leading, 64) }
-                    alertRail(tone: KhaytDesign.brand, icon: "tray.and.arrow.down",
-                              title: L10n.count("pulse.waiting", waiting.count),
-                              sub: waiting.map(\.displayClient).joined(separator: " · ")) {
-                        showIntake = true
-                    }
-                }
-            }
-            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-            .padding(.horizontal, 16)
+            .padding(.top, 12)
         }
     }
 
-    /// A "needs you" row: the tone in a soft tile, the words in ink.
-    private func alertRail(tone: Color, icon: String, title: String, sub: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(tone)
-                    .frame(width: 38, height: 38)
-                    .background(tone.opacity(0.16), in: Circle())
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.khayt(15, .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(KhaytDesign.ink)
-                    Text(sub)
-                        .font(.khayt(12.5, relativeTo: .footnote))
-                        .foregroundStyle(KhaytDesign.note)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(KhaytDesign.note)
-            }
-            .padding(.vertical, 12).padding(.horizontal, 14)
-            .frame(minHeight: 62)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    /// "550 this year · 515 owed · 5 unpaid" — the year only when the phone
+    /// holds all of it.
+    private func moneyLine(_ pulse: ShopPulse) -> String {
+        var parts: [String] = []
+        if let year = pulse.thisYear { parts.append(L10n.format("needs.this_year", amount(year))) }
+        parts.append(L10n.format("needs.owed", amount(pulse.owed)))
+        parts.append(L10n.format("pulse.unpaid", pulse.unpaid))
+        return parts.joined(separator: " · ")
     }
 
-    // MARK: - Jobs
+    // MARK: - Due this week
 
-    private var laneJobs: [QueueOrder] {
-        lane == "all" ? queue : queue.filter { $0.status == lane }
-    }
-
-    private var laneTitle: String {
-        lane == "all" ? L10n.tr("tab.orders") : L10n.tr("stage.short.\(lane)")
-    }
-
-    @ViewBuilder
-    private var jobs: some View {
-        if laneJobs.isEmpty {
-            VStack(spacing: 5) {
-                Text(L10n.tr("orders.queue_clear")).font(.khayt(15, .semibold, relativeTo: .headline)).foregroundStyle(KhaytDesign.ink)
-                Text(L10n.tr("orders.queue_clear.sub")).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 34)
-        } else {
+    @ViewBuilder private var dueWeek: some View {
+        let due = NeedsYou.dueThisWeek(queue)
+        if !due.isEmpty {
+            section(L10n.tr("needs.due_week"))
             VStack(spacing: 8) {
-                ForEach(laneJobs.prefix(5)) { order in
+                ForEach(due.prefix(8)) { order in
                     JobCard(order: order, facts: facts[order.id], live: printers.reading(for: order.machineId), isUpdating: updatingId == order.id) {
                         Task { await advance(order) }
                     } onOpen: {
@@ -497,39 +513,50 @@ struct DashboardView: View {
         }
     }
 
-    private func section(_ title: String, trailing: String? = nil) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(L10n.usesArabicLayout ? title : title.uppercased())
-                .font(L10n.usesArabicLayout ? .khayt(12, .bold, relativeTo: .caption2) : .khaytMono(11, .medium, relativeTo: .caption2))
-                .khaytTracking(0.9)
-                .foregroundStyle(KhaytDesign.note)
-            Spacer()
-            if let trailing {
-                Text(trailing)
-                    .font(.khayt(12, relativeTo: .caption))
-                    .foregroundStyle(KhaytDesign.note)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .padding(.bottom, 8)
+    private func section(_ title: String) -> some View {
+        Text(L10n.usesArabicLayout ? title : title.uppercased())
+            .font(L10n.usesArabicLayout ? .khayt(12, .bold, relativeTo: .caption2) : .khaytMono(11, .medium, relativeTo: .caption2))
+            .khaytTracking(0.9)
+            .foregroundStyle(KhaytDesign.note)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 8)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Loading and advancing
 
     private func load() async {
-        async let statusTask = try? api.fetchStatus()
-        async let queueTask = try? api.fetchQueue()
+        async let queueTask: Result<[QueueOrder], Error> = {
+            do { return .success(try await api.fetchQueue()) } catch { return .failure(error) }
+        }()
         async let inventoryTask = try? api.fetchInventory()
         async let waitingTask = try? api.fetchWaitingList()
         async let pulseTask = api.fetchPulse()
         async let factsTask = api.fetchOrderFacts()
-        status = await statusTask
-        queue = await queueTask ?? []
-        lowSpools = (await inventoryTask ?? []).filter(\.isLowStock)
+        async let machinesTask = try? api.fetchMachines()
+        // Quotes only where the phone can see them: the native Mac serves no
+        // `/api/orders`, and an unknown is not "no quotes".
+        async let quotesTask = openQuotes()
+        switch await queueTask {
+        case .success(let jobs):
+            queue = jobs
+            queueError = nil
+        case .failure(let error):
+            // Keep what was last shown; say why it is not fresh.
+            queueError = error.localizedDescription
+        }
+        spools = await inventoryTask ?? []
         waiting = await waitingTask ?? []
         pulse = await pulseTask
         facts = await factsTask
+        machines = await machinesTask ?? []
+        quotes = await quotesTask
+        loaded = true
+        // The icon says what the greeting says. Only on a read that worked:
+        // a failed one would put a stale or empty count up.
+        if queueError == nil, !settings.isSampleShop { Task { await ShopBadge.shared.set(needs.total) } }
         // Spotlight and Siri find the jobs this phone holds.
         Task { await JobSearch.index() }
         // A sheet an App Intent asked for (Siri, Shortcuts, a Control).
@@ -556,6 +583,12 @@ struct DashboardView: View {
         #endif
     }
 
+    /// The open quotes, or nil where this phone cannot see them.
+    private func openQuotes() async -> [OrderLogEntry]? {
+        guard api.holdsBook else { return nil }
+        return try? await api.fetchRecentOrders(limit: 200, status: OrderStatus.quote.rawValue)
+    }
+
     /// A scanned label: open the job or the spool it names, or say why not.
     private func follow(_ code: String) async {
         switch await api.followLabel(code) {
@@ -574,6 +607,8 @@ struct DashboardView: View {
             CompanionHaptics.success()
             await load()
         } catch {
+            // A failed move used to be a haptic and nothing else (F4).
+            moveNotes = [error.localizedDescription]
             CompanionHaptics.warning()
         }
     }

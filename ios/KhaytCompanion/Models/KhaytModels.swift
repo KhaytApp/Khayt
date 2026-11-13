@@ -53,6 +53,9 @@ struct QueueOrder: Codable, Identifiable, Sendable {
     /// server sending the word later. A field this app does not draw must never
     /// again be the reason a screen is empty.
     let priority: String?
+    /// A voided job, when this one was rebuilt from History (`init(entry:)`).
+    /// Never on the wire: the queue only ever holds live jobs.
+    var voided = false
 
     private enum CodingKeys: String, CodingKey {
         case id, jobNumber, project, client, status, machine, machineId, dueDate, priority
@@ -137,9 +140,11 @@ struct QueueOrder: Codable, Identifiable, Sendable {
         guard let machineId, !machineId.isEmpty,
               let named = machines.first(where: { $0.id == machineId })?.name,
               !named.isEmpty else { return self }
-        return QueueOrder(id: id, project: project, client: client, status: status,
-                          machine: named, machineId: machineId,
-                          dueDate: dueDate, priority: priority, jobNumber: jobNumber)
+        var renamed = QueueOrder(id: id, project: project, client: client, status: status,
+                                machine: named, machineId: machineId,
+                                dueDate: dueDate, priority: priority, jobNumber: jobNumber)
+        renamed.voided = voided
+        return renamed
     }
 }
 
@@ -568,6 +573,17 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// currency when it is saved (#2148), so it is not always the shop's.
     /// Absent means the shop's.
     var currency: String? = nil
+    /// When the job was voided. Any JSON at all, because no screen prints it
+    /// and a stamp in an unexpected shape must never empty History (the way a
+    /// boolean `priority` once emptied the queue). Only whether it is there
+    /// counts: a voided job is finished and cannot be late. `/api/orders` does
+    /// not send it, so over Wi-Fi alone it is always nil.
+    var voidedAt: Stamp? = nil
+    /// When a completed job was shipped or handed over — date stamps on a job
+    /// that stays `completed`, read only for whether they are there (Simple's
+    /// board notes them on the card). Any JSON, for the reason `voidedAt` is.
+    var shippedAt: Stamp? = nil
+    var deliveredAt: Stamp? = nil
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference
@@ -575,6 +591,20 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
 
     var displayClient: String {
         client?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
+    }
+}
+
+/// A field read only for whether it is there: any JSON value decodes, and
+/// `null` counts as absent. Kept free of KhaytCore so the contract check can
+/// compile this file on its own.
+struct Stamp: Codable, Sendable {
+    let present: Bool
+    init(from decoder: Decoder) throws {
+        present = !((try? decoder.singleValueContainer().decodeNil()) ?? false)
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try present ? c.encode(true) : c.encodeNil()
     }
 }
 

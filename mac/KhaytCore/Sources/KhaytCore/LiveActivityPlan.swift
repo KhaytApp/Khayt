@@ -127,6 +127,50 @@ public enum LiveActivityPlan {
         }
     }
 
+    // MARK: - What the Mac adds: staying fresh, and a real end time
+
+    /// How long a pushed state is trusted on the phone before iOS shows it as
+    /// stale, when the printer gave no time remaining: thirty of the Mac's
+    /// ten-second polls. A Mac that stops sending (asleep, quit, off the
+    /// network) leaves a Lock Screen that goes stale within this, instead of
+    /// one that says "printing 87%" for the rest of the day (push review M1).
+    public static let staleWindow: TimeInterval = 5 * 60
+    /// A print whose state has not changed is sent again after this, so a live
+    /// stream never goes stale while the printer is still printing.
+    public static let refreshAfter: TimeInterval = 4 * 60
+
+    /// The `staleAt` a state carries: its own finish, or `staleWindow` from
+    /// now, whichever is sooner.
+    public static func staleAt(_ state: State, now: Date) -> Date {
+        let window = now.addingTimeInterval(staleWindow)
+        guard let ends = state.endsAt else { return window }
+        return min(ends, window)
+    }
+
+    /// The same state sent again, when nothing a person would notice changed
+    /// but the last send is getting old (`refreshAfter`).
+    public static func refresh(machineId: String, reading: Reading, running: [String: State],
+                               lastSent: [String: Date], now: Date) -> Step? {
+        guard let was = running[machineId], !reading.isUnheard, reading.isPrinting || reading.isPaused,
+              let last = lastSent[machineId], now.timeIntervalSince(last) >= refreshAfter else { return nil }
+        let ends = reading.timeRemaining.flatMap { $0 > 0 ? now.addingTimeInterval(TimeInterval($0)) : nil }
+        return .update(machineId: machineId, State(phase: reading.isPaused ? .paused : .printing,
+                                                   job: reading.filename,
+                                                   progress: min(100, max(0, reading.progress ?? 0)),
+                                                   startedAt: was.startedAt, endsAt: ends))
+    }
+
+    /// When a print really ended, for an end heard late. The printer reports
+    /// no finish time, so the best evidence is the finish it predicted at the
+    /// last reading: a Mac that slept through the end used to report the
+    /// moment it WOKE as the moment the print finished (push review M1).
+    /// `now` when there was no prediction, or it is still ahead.
+    public static func endedAt(_ was: State, now: Date) -> Date {
+        guard let predicted = was.endsAt, predicted < now else { return now }
+        if let started = was.startedAt, predicted < started { return now }
+        return predicted
+    }
+
     // MARK: - What the Mac adds: the cloud's 15-second floor
 
     /// The cloud refuses (429) a routine update for a machine within this long

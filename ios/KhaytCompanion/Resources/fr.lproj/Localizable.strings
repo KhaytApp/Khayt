@@ -47,7 +47,7 @@
 "settings.connection" = "Connexion";
 "settings.connection.footer" = "Même code PIN que dans Khayt, Réglages → API LAN. Ordinateur v2.2.1 ou ultérieure requis.";
 "settings.shop_name" = "Nom de l’atelier";
-"settings.host" = "IP ou nom d’hôte de l’ordinateur";
+"settings.host" = "Adresse du Mac ou du PC";
 "settings.port" = "Port : %d";
 "settings.pin" = "Code PIN LAN du propriétaire";
 "settings.retest" = "Retester l’association";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Connexion perdue";
 "settings.notify.overdue" = "Commandes en retard";
 "settings.notify.low_stock" = "Filament bas";
-"settings.docs" = "Référence de l’API LAN";
 
 /* Status */
 "status.quote" = "Devis";
@@ -836,6 +835,28 @@
 "library.priced_here" = "Calculé sur cet iPhone avec vos prix. Un modèle multicolore est chiffré sur une seule bobine, le chiffre du Mac peut donc différer un peu.";
 "library.no_copy" = "Le Mac est injoignable. Connectez-vous à Khayt Cloud dans les réglages et synchronisez une fois : votre bibliothèque vous suivra.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Rose";
+"colour.brown" = "Marron";
+"library.filter.colour" = "Couleur";
+"library.filter.type" = "Type de fichier";
+"library.filter.multi" = "Multicolore";
+"library.filter.none" = "Pas d’info de couleur";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "Autre";
+"library.type.nofile" = "Pas de fichier (du web)";
+"library.filter.colour_hint" = "Choisissez-en plusieurs pour voir les modèles qui en ont au moins une.";
+"library.filter.counts_hint" = "Les nombres portent sur la bibliothèque telle que la laissent les autres filtres. Une ligne vide est grisée, pas retirée.";
+"library.filter.n_of_m" = "%1$d sur %2$d";
+"library.filter.pill" = "%1$@ : %2$@";
+"library.filter.remove" = "Retirer %@";
+"library.filter.row" = "%1$@ : %2$d";
+"library.filter.chosen" = "%1$@, choisis : %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Catalogue";
 "catalogue.search" = "Rechercher des produits";
@@ -1008,7 +1029,7 @@
 "new.calculator.detail" = "Chiffrer une impression à la main";
 "new.expense.detail" = "Photo du reçu";
 "new.waste.detail" = "Impression ratée ou purge";
-"new.more" = "Plus";
+"new.more" = "Aussi";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Documents";
 "paper.packing_slip" = "Bordereau de colisage";
@@ -1293,3 +1314,83 @@
 "connectors.badge.updated" = "Mis à jour en %@";
 "connectors.badge.needs_app" = "Nécessite un Khayt plus récent";
 "connectors.waiting_count" = "En attente du Mac : %d";
+"intake.waiting" = "En attente";
+"spool.low" = "Faible";
+"stage.a11y.done" = "Terminé";
+"order.new.hint.client" = "Choisissez ou saisissez un nom";
+"order.new.hint.project" = "Qu’est-ce que c’est ? ex. le nom de la pièce";
+"order.new.hint.material" = "ex. PLA, noir";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Chargement impossible";
+"load.retry" = "Réessayer";
+"load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
+
+/* Settings in groups (S2) */
+"settings.search" = "Rechercher dans les réglages";
+"settings.search.none" = "Aucun réglage ne correspond à « %@ ».";
+"settings.group.this_phone" = "Ce téléphone";
+"settings.group.shop" = "Atelier";
+"settings.group.connected" = "Connexions";
+"settings.group.about" = "À propos";
+"settings.appearance" = "Apparence et langue";
+"settings.shop_details" = "Coordonnées de l’atelier";
+"settings.shop.readonly" = "Réglé sur le Mac · lecture seule ici";
+"settings.phones_wifi" = "Téléphones et Wi-Fi";
+"settings.cloud.sub" = "Synchronisation et pages clients";
+"settings.help" = "Aide";
+"settings.diag.sub" = "Ce que ce téléphone contient, dernières synchros";
+"settings.diag.syncs" = "Dernières synchros";
+"state.paired" = "Associé";
+"state.away" = "Hors de portée";
+"state.not_paired" = "Non associé";
+"state.signed_in" = "Connecté";
+"state.needs_sign_in" = "Connexion requise";
+"state.on" = "Activé";
+"state.off" = "Désactivé";
+/* S4: Simple mode */
+"mode.simple" = "Simple";
+"mode.professional" = "Professionnel";
+"mode.badge.a11y" = "Mode : %@, choisi sur le Mac";
+"simple.stage.ready" = "Prêt";
+"simple.note.on_hold" = "En attente";
+"simple.note.post" = "Finition";
+"simple.note.qc" = "En contrôle";
+"simple.note.shipped" = "Expédié";
+"simple.note.delivered" = "Livré";
+"simple.expenses.month" = "Ce mois-ci : %@ · %@";
+"simple.gate.care.title" = "Les plans d'entretien font partie du mode Professionnel";
+"simple.gate.care.body" = "Cet atelier est en mode Simple sur le Mac. Pour utiliser les plans d'entretien, passez en Professionnel dans Khayt sur votre Mac. Le téléphone suit le choix du Mac.";
+"simple.gate.parts.title" = "Les pièces à acheter font partie du mode Professionnel";
+"simple.gate.parts.body" = "Cet atelier est en mode Simple sur le Mac. La liste des pièces vient des plans d'entretien, qui font partie du mode Professionnel : changez dans Khayt sur votre Mac. Le téléphone suit le choix du Mac.";
+"simple.gate.back_machine" = "Retour à la machine";
+"simple.gate.back_machines" = "Retour aux machines";
+"simple.expenses.count" = "%d dépenses";
+"PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";
+"push.not_connected" = "Les alertes n’arrivent pas encore sur ce téléphone. Khayt réessaiera à la prochaine ouverture.";
+/* Home — Needs you */
+"home.greeting.morning" = "Bonjour.";
+"home.greeting.afternoon" = "Bon après-midi.";
+"home.greeting.evening" = "Bonsoir.";
+"needs.title" = "À traiter";
+"needs.none" = "Rien à traiter pour l’instant.";
+"needs.calm" = "Aucune commande en retard, l’étagère est pleine et personne n’attend.";
+"needs.late.one" = "%1$@ était dû le %2$@";
+"needs.late.action" = "Ouvrir les retards";
+"needs.low.title" = "L’étagère se vide";
+"needs.low.left" = "%1$@ reste %2$@";
+"needs.low.action" = "Voir le stock";
+"needs.waiting.action" = "Ouvrir les demandes";
+"needs.quotes.action" = "Ouvrir les devis";
+"tile.owed" = "On vous doit";
+"tile.machines" = "Sur les machines";
+"tile.machines.value" = "%1$d sur %2$d";
+"tile.machines.sub" = "impriment en ce moment";
+"needs.due_week" = "À rendre cette semaine";
+"needs.this_year" = "%@ cette année";
+"needs.owed" = "%@ dû";
+"needs.count" = "%d choses à traiter.";
+"needs.late" = "%d commandes en retard";
+"needs.low.count" = "%d bobines presque vides";
+"needs.quotes" = "%d devis attendent une réponse";
+"needs.more" = "et %d de plus";

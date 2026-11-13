@@ -254,7 +254,16 @@ private struct Column: View {
 
     /// The most cards one column builds.
     static let cap = Kanban.columnCap
-    static func shown(_ jobs: [Order]) -> ArraySlice<Order> { jobs.prefix(cap) }
+    ///
+    /// WHICH END IS KEPT DEPENDS ON THE COLUMN. A column is ordered longest
+    /// waiting first, which is the right end to keep while work is waiting.
+    /// In Completed and Shipped it is the wrong one: the 120 oldest were
+    /// drawn, so in a shop with more than that the card just finished flew
+    /// to its column and was not there (beta.34 pre-release review). Those
+    /// two keep the newest.
+    static func shown(_ jobs: [Order], in stage: Stage) -> ArraySlice<Order> {
+        stage == .completed || stage == .shipped ? jobs.suffix(cap) : jobs.prefix(cap)
+    }
 
     /// Why this column would refuse the card currently in the air, or nil.
     private var refusal: String? { shop.dragRefusal(stage) }
@@ -282,7 +291,7 @@ private struct Column: View {
                 // columns collapse as work moves is a board you cannot learn.
                 Text(shop.words.callIt("mac.nothing_here"))
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
             } else {
@@ -293,7 +302,7 @@ private struct Column: View {
                 // them had every job it ever finished built on each visit, on
                 // each search keystroke and after each save. The rest are one
                 // line that says how many, and the Jobs table has them all.
-                ForEach(Self.shown(jobs)) { job in
+                ForEach(Self.shown(jobs, in: stage)) { job in
                     JobCard(job: job, shop: shop, matchedLot: lots[job.id])
                         // The card's path from the column it left to the one
                         // it landed in. Keyed by job id, so the SAME card
@@ -434,7 +443,7 @@ private struct JobCard: View {
                     if let thumb = shop.modelThumbnail(for: job) {
                         Thumbnail(source: thumb).padding(3)
                     } else {
-                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(.tertiary)
+                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(Khayt.faint)
                     }
                 }
                 .frame(width: 40, height: 40)
@@ -472,7 +481,7 @@ private struct JobCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     ThreadBar(progress: Double(live.progress) / 100)
                     HStack(spacing: 4) {
-                        Image(systemName: "printer").foregroundStyle(Khayt.live)
+                        Image(systemName: "printer").foregroundStyle(.secondary)
                         Text(verbatim: shop.machineName(forId: machineId)
                              + ((live.timeRemaining ?? 0) > 0
                                 ? " · " + PrinterWatch.spell(live.timeRemaining ?? 0, shop.words) : ""))

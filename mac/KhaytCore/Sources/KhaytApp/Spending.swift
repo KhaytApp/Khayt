@@ -140,7 +140,7 @@ struct Expenses: View {
             TableColumn(shop.words.callIt("exp.note"), value: \.note) { e in
                 HStack(spacing: 6) {
                     Text(e.note.isEmpty ? "—" : e.note)
-                        .foregroundStyle(e.note.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                        .foregroundStyle(e.note.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                         .lineLimit(1)
                     // THE RECEIPT, when there is one. The record has pointed
                     // at it all along (the desktop attaches them, a phone
@@ -169,7 +169,7 @@ struct Expenses: View {
             // "Link to order (" — a column says what is in it, in a word.
             TableColumn(shop.words.callIt("mac.expense_order_col")) { e in
                 Text(e.orderId ?? "—").monospacedDigit()
-                    .foregroundStyle(e.orderId == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(e.orderId == nil ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary))
             }
             .width(min: 90, ideal: 120)
         }
@@ -183,6 +183,9 @@ struct Expenses: View {
         // with six waste entries got six rows and then twenty empty grey bands
         // down the rest of the window, which reads as a list that failed to
         // load rather than as a short list.
+        // Beside a summary in an `HSplitView`: see `TableHeaderFollowsBody`
+        // for what that did to the headings in Arabic.
+        .headerFollowsBody()
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .overlay {
@@ -336,7 +339,7 @@ struct Waste: View {
             .width(min: 110, ideal: 150)
             TableColumn(shop.words.callIt("waste.reason"), value: \.reason) { w in
                 Text(w.reason.isEmpty ? "—" : w.reason)
-                    .foregroundStyle(w.reason.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(w.reason.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
             .width(min: 120, ideal: 220)
@@ -368,6 +371,9 @@ struct Waste: View {
         }
         // As the expenses table above — including the stripes, which drew
         // twenty empty bands under this shop's six waste entries.
+        // Beside a summary in an `HSplitView`: see `TableHeaderFollowsBody`
+        // for what that did to the headings in Arabic.
+        .headerFollowsBody()
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: WasteEntry.ID.self) { ids in
@@ -685,6 +691,8 @@ struct SpendBanner: View {
                 Spacer()
                 Button(action: dismiss) { Image(systemName: "xmark") }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .help(Words.upfront("common.close"))
+                    .accessibilityLabel(Words.upfront("common.close"))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)

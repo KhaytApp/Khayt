@@ -41,6 +41,8 @@ struct OrdersView: View {
         case stage(OrderStatus)
         case overdue
         case rush
+        /// One of Simple's four stages (`SimpleBoard`).
+        case column(SimpleBoard.Column)
     }
 
     @State private var segment: Segment = .active
@@ -61,9 +63,27 @@ struct OrdersView: View {
     @State private var showNewOrder = false
     @State private var machines: [MachineInfo] = []
     @State private var loadGeneration = 0
+    /// Simple's Active list: every job filed under Pending, Printing or
+    /// Ready, each with where it is filed. Empty in Professional.
+    @State private var board: [SimpleBoard.Row] = []
+
+    /// The shop is Simple (SIMPLE_MAP `queue` reduced), so Active's chips are
+    /// the four stages. Quotes and History stay as segments in both modes:
+    /// the map keeps the jobs log (`jobsLog` show) and quoting (`quote`
+    /// reduced), and the Quotes segment is the phone's only list of open
+    /// quotes — so Simple's Quote stage IS that segment, not a second chip.
+    private var simpleBoard: Bool { api.shopMode.isReduced("queue") }
+
+    /// Active's stages in Simple: the four, less Quote (its own segment).
+    static let simpleActiveColumns: [SimpleBoard.Column] = SimpleBoard.Column.allCases.filter { $0 != .quote }
 
     private var chips: [Chip] {
         switch segment {
+        case .active where simpleBoard:
+            var ids: [Chip] = [.all] + Self.simpleActiveColumns.map(Chip.column)
+            if chip == .overdue { ids.append(.overdue) }
+            if chip == .rush || board.contains(where: { $0.order.isRush }) { ids.append(.rush) }
+            return ids
         case .active:
             var ids: [Chip] = [.all] + [OrderStatus.pending, .printing, .post, .qc].map(Chip.stage)
             if chip == .overdue { ids.append(.overdue) }
@@ -90,6 +110,20 @@ struct OrdersView: View {
         case .stage(let st): return pool.filter { $0.status == st.rawValue }
         case .overdue: return pool.filter(\.isOverdue)
         case .rush: return pool.filter(\.isRush)
+        case .column: return []
+        }
+    }
+
+    /// Simple's cards under the chosen chip.
+    private var boardRows: [SimpleBoard.Row] { board.filter { matches($0, chip) } }
+
+    private func matches(_ row: SimpleBoard.Row, _ c: Chip) -> Bool {
+        switch c {
+        case .all: return true
+        case .column(let column): return row.filing.column == column
+        case .stage(let st): return row.order.status == st.rawValue
+        case .overdue: return row.order.isOverdue
+        case .rush: return row.order.isRush
         }
     }
 
@@ -163,7 +197,10 @@ struct OrdersView: View {
         }
         .moveNotes($moveNotes)
         .refreshable { await load() }
-        .task(id: segment) { await load() }
+        .task(id: "\(segment.rawValue)|\(simpleBoard)") { await load() }
+        // The mode is the Mac's: when it changes, Active's chips change with
+        // it without a relaunch.
+        .onChange(of: simpleBoard) { _, _ in chip = .all }
         .watchesPrinters(when: segment == .active
                          && queue.contains { $0.status == "printing" && $0.machineId != nil })
         .onAppear { applyExternalFilters() }
@@ -180,7 +217,27 @@ struct OrdersView: View {
             chip = .all
         }
         #endif
-        if let pending = ordersNav.pendingStatusFilter {
+        if let pending = ordersNav.pendingStatusFilter, pending == .quote {
+            // Home's "quotes waiting" row: the Quotes list, not a chip, in
+            // either mode (Quotes is a segment in both).
+            segment = .quotes
+            chip = .all
+            ordersNav.pendingStatusFilter = nil
+            Task { await load() }
+        } else if let pending = ordersNav.pendingStatusFilter, simpleBoard {
+            // Home's "printing" or "QC" lands on the stage it is filed under;
+            // a finished job is History's, as in Professional.
+            if pending == .completed {
+                segment = .history
+                chip = .stage(.completed)
+            } else {
+                segment = .active
+                chip = SimpleBoard.filing(status: pending.rawValue)
+                    .flatMap { Self.simpleActiveColumns.contains($0.column) ? .column($0.column) : nil } ?? .all
+            }
+            ordersNav.pendingStatusFilter = nil
+            Task { await load() }
+        } else if let pending = ordersNav.pendingStatusFilter {
             if pending == .completed {
                 segment = .history
                 chip = .stage(.completed)
@@ -260,6 +317,7 @@ struct OrdersView: View {
 
     /// How many rows a chip would show, from the same pool `rows` filters.
     private func count(_ c: Chip) -> Int {
+        if simpleBoard && segment == .active { return board.filter { matches($0, c) }.count }
         let pool = segment == .active ? queue
             : history.filter { Self.finished.contains($0.status) }.map(QueueOrder.init(entry:))
         switch c {
@@ -267,6 +325,7 @@ struct OrdersView: View {
         case .stage(let st): return pool.filter { $0.status == st.rawValue }.count
         case .overdue: return pool.filter(\.isOverdue).count
         case .rush: return pool.filter(\.isRush).count
+        case .column: return 0
         }
     }
 
@@ -276,6 +335,7 @@ struct OrdersView: View {
         case .stage(let st): return st.localizedLabel
         case .overdue: return L10n.tr("orders.overdue")
         case .rush: return L10n.tr("orders.rush")
+        case .column(let column): return SimpleBoard.title(column)
         }
     }
 
@@ -285,6 +345,7 @@ struct OrdersView: View {
         case .stage(let st): return KhaytDesign.statusColor(for: st.rawValue)
         case .overdue: return KhaytDesign.late
         case .rush: return KhaytDesign.attention
+        case .column(let column): return KhaytDesign.statusColor(for: SimpleBoard.toneStatus(column))
         }
     }
 
@@ -292,18 +353,36 @@ struct OrdersView: View {
     private var list: some View {
         if !loaded && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
-        } else if rows.isEmpty {
+        } else if listIsEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
+        } else if listIsEmpty {
             VStack(spacing: 5) {
                 Text(emptyTitle)
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? emptyBody)
+                Text(emptyBody)
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 44).padding(.horizontal, 16)
+        } else if simpleBoard && segment == .active {
+            LazyVStack(spacing: 8) {
+                ForEach(boardRows) { row in
+                    let order = row.order
+                    JobCard(order: order, facts: facts[order.id], live: printers.reading(for: order.machineId), layout: .full,
+                            filing: row.filing, isUpdating: updatingId == order.id) {
+                        Task { await advance(order) }
+                    } onOpen: {
+                        openOrder = order
+                    }
+                    .overlay(RoundedRectangle(cornerRadius: 11)
+                        .strokeBorder(KhaytDesign.brand, lineWidth: 2)
+                        .opacity(isSplit && openOrder?.id == order.id ? 1 : 0))
+                }
+            }
+            .padding(.horizontal, 16)
         } else {
             LazyVStack(spacing: 8) {
                 ForEach(rows) { order in
@@ -328,12 +407,14 @@ struct OrdersView: View {
     private var quoteList: some View {
         if !loaded && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if quotes.isEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
         } else if quotes.isEmpty {
             VStack(spacing: 5) {
                 Text(L10n.tr(quotesHeld ? "orders.no_quotes" : "orders.quotes_on_mac"))
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? L10n.tr(quotesHeld ? "orders.no_quotes.sub" : "orders.quotes_on_mac.sub"))
+                Text(L10n.tr(quotesHeld ? "orders.no_quotes.sub" : "orders.quotes_on_mac.sub"))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
@@ -354,6 +435,8 @@ struct OrdersView: View {
             .padding(.horizontal, 16)
         }
     }
+
+    private var listIsEmpty: Bool { simpleBoard && segment == .active ? boardRows.isEmpty : rows.isEmpty }
 
     private var emptyTitle: String {
         L10n.tr(segment == .history ? "orders.no_completed" : "orders.queue_clear")
@@ -393,10 +476,25 @@ struct OrdersView: View {
         async let factsTask = api.fetchOrderFacts()
         do {
             switch segment {
+            case .active where simpleBoard:
+                // Active in Simple: the queue's live work, and from the book the
+                // jobs on hold and the finished ones. Quotes are their segment's.
+                let data = try await api.fetchQueue()
+                let held = try await api.fetchRecentOrders(limit: 100_000)
+                currency = await api.shopCurrency()
+                guard generation == loadGeneration else { return }
+                queue = data
+                quotes = QuoteList.select(held)
+                board = SimpleBoard.rows(queue: data, book: held).filter { $0.filing.column != .quote }
+                #if DEBUG
+                if KhaytCompanionApp.ScreenshotOpen.take("neworder") != nil { showNewOrder = true }
+                if let id = KhaytCompanionApp.ScreenshotOpen.take("pick:") { openOrder = board.first { $0.id == id }?.order }
+                #endif
             case .active:
                 let data = try await api.fetchQueue()
                 guard generation == loadGeneration else { return }
                 queue = data
+                board = []
                 #if DEBUG
                 if KhaytCompanionApp.ScreenshotOpen.take("neworder") != nil { showNewOrder = true }
                 if let id = KhaytCompanionApp.ScreenshotOpen.take("pick:") { openOrder = data.first { $0.id == id } }
@@ -428,7 +526,7 @@ struct OrdersView: View {
         } catch {
             guard generation == loadGeneration else { return }
             switch segment {
-            case .active: queue = []
+            case .active: queue = []; board = []
             case .history: history = []
             case .quotes: quotes = []
             }
@@ -447,7 +545,9 @@ struct OrdersView: View {
             CompanionHaptics.success()
             await load()
         } catch {
-            errorMessage = error.localizedDescription
+            // Said where the move was made, not in the empty state (which a
+            // list with rows never draws): F4.
+            moveNotes = [error.localizedDescription]
             CompanionHaptics.warning()
         }
     }

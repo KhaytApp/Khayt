@@ -171,6 +171,9 @@
       ...(o.jobNumber ? { jobNumber: o.jobNumber } : {}),
       // The currency `price` is in, when the job names one.
       ...(o.currency ? { currency: o.currency } : {}),
+      // A voided invoice is not live work: without this a phone on Wi-Fi alone
+      // could not tell, and showed a voided job as late.
+      ...(o.voidedAt ? { voidedAt: o.voidedAt } : {}),
     }));
   }
 
@@ -729,7 +732,11 @@
         if (Number.isFinite(+c.overheadPerHour) && c.overheadPerHour != null) overheadPerHour = Math.max(0, +c.overheadPerHour);
         else {
           const PQ = req('KhaytPublicQuote', './public-quote.js');
-          if (PQ && PQ.overheadPerHourFor) overheadPerHour = PQ.overheadPerHourFor(book, c.today || localDay());
+          if (PQ && PQ.overheadPerHourFor) {
+            // `todayOf`, not `localDay()`: with no argument that is
+            // `new Date(undefined)` and the day came out "NaN-NaN-NaN".
+            overheadPerHour = PQ.overheadPerHourFor(book, todayOf(c));
+          }
         }
       }
       const price = Pricing.quoteTotal({

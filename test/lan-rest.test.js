@@ -300,3 +300,12 @@ test('PATCH /api/orders/:id: a quote moved on gets its invoice number, once, as 
   const c = R.orderPatch(book(), 'q1', { status: 'on_hold' }, ctx);
   assert.ok(c.store.printLog[2].invoiceNum, 'a quote put on hold is an order on hold');
 });
+
+test('a voided job\'s row says so, so a phone on Wi-Fi alone does not call it late', () => {
+  const rows = R.ordersList({ printLog: [
+    { id: 'v1', status: 'pending', dueDate: '2026-11-01', voidedAt: '2026-11-05T10:00:00.000Z' },
+    { id: 'l1', status: 'pending', dueDate: '2026-11-01' },
+  ] }, {});
+  assert.equal(rows[0].voidedAt, '2026-11-05T10:00:00.000Z');
+  assert.equal('voidedAt' in rows[1], false, 'a live job\'s row keeps its shape');
+});

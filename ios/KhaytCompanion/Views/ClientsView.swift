@@ -111,12 +111,14 @@ struct ClientsView: View {
     private var content: some View {
         if clients.isEmpty && !didLoad && errorMessage == nil {
             ProgressView().frame(maxWidth: .infinity).padding(.vertical, 44)
+        } else if clients.isEmpty, let errorMessage {
+            LoadFailedView(message: errorMessage) { await load() }
         } else if displayed.isEmpty {
             VStack(spacing: 5) {
                 Text(clients.isEmpty ? L10n.tr("clients.none") : L10n.tr("clients.no_match"))
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
-                Text(errorMessage ?? (searchText.isEmpty ? L10n.tr("clients.none.sub")
+                Text((searchText.isEmpty ? L10n.tr("clients.none.sub")
                                       : L10n.format("clients.no_match.sub", searchText)))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)

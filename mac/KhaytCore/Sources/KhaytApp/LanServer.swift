@@ -101,7 +101,8 @@ final class LanServer {
         /// The shop's library for the phone (`Shop+PhoneLibrary`): a page of
         /// it, a model's picture, a model's price. Unset, the routes are not
         /// here at all, and the phone reads the 404 as "this Mac predates it".
-        var library: (@MainActor (_ q: String, _ folder: String, _ offset: Int, _ limit: Int) -> JSONValue)? = nil
+        var library: (@MainActor (_ q: String, _ folder: String, _ offset: Int, _ limit: Int,
+                                  _ filter: Shop.PhoneLibraryFilter) -> JSONValue)? = nil
         var libraryThumb: (@MainActor (_ id: String) async -> (Data, String)?)? = nil
         var libraryEstimate: (@MainActor (_ id: String, _ plate: Int?, _ qty: Int) async -> (Int, String))? = nil
         /// The calendar subscription token (`settings.lanApi.calendarToken`),
@@ -1241,7 +1242,8 @@ final class LanServer {
         case ("/api/library", true) where host.library != nil:
             if let refused = await pinGate(request) { return refused }
             let page = host.library!(request.query["q"] ?? "", request.query["folder"] ?? "",
-                                     Int(request.query["offset"] ?? "") ?? 0, Int(request.query["limit"] ?? "") ?? 50)
+                                     Int(request.query["offset"] ?? "") ?? 0, Int(request.query["limit"] ?? "") ?? 50,
+                                     Shop.PhoneLibraryFilter(colour: request.query["colour"], type: request.query["type"]))
             let body = (try? String(decoding: JSONEncoder().encode(page), as: UTF8.self)) ?? "{}"
             return .json(200, body)
 
@@ -1268,7 +1270,11 @@ final class LanServer {
         case (_, false) where request.method == "POST" && host.addJobPhoto != nil
                 && Self.jobPhotoPath(path) != nil:
             if let refused = await pinGate(request) { return refused }
-            guard LanDevices.isSigned(request.headers) else {
+            // `pinGate` lets a token-scoped request through, and `isSigned`
+            // only asks whether the device header is THERE, so an API token
+            // with any value in that header reached this "signed phones only"
+            // route (beta.34 pre-release review). A token never does.
+            guard !request.tokenScoped, LanDevices.isSigned(request.headers) else {
                 return .json(403, #"{"ok":false,"reason":"device-key-required"}"#)
             }
             let (status, body) = await host.addJobPhoto!(Self.jobPhotoPath(path)!, request.body)
@@ -2905,8 +2911,8 @@ extension Shop {
         host.calendarToken = calendarToken
         host.devices = lanDeviceStore
         host.pairing = lanPairing
-        host.library = { [weak self] q, folder, offset, limit in
-            self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit) ?? .object([:])
+        host.library = { [weak self] q, folder, offset, limit, filter in
+            self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter) ?? .object([:])
         }
         host.libraryThumb = { [weak self] id in await self?.phoneLibraryThumb(id) }
         host.libraryEstimate = { [weak self] id, plate, qty in

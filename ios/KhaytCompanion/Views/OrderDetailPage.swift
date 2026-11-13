@@ -213,7 +213,7 @@ struct OrderDetailPage: View {
                         .font(.khayt(16, .semibold, relativeTo: .headline))
                         .lineLimit(1)
                         .foregroundStyle(KhaytDesign.ink)
-                    Text("#\(order.reference) · \(order.displayClient)")
+                    Text("\(order.reference) · \(order.displayClient)")
                         .font(.khayt(11.5, relativeTo: .caption))
                         .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)
@@ -367,9 +367,11 @@ struct OrderDetailPage: View {
         if let fresh = (try? await api.fetchQueue())?.first(where: { $0.id == order.id }) {
             order = fresh
         } else {
-            order = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
-                               machine: machine, machineId: machineId, dueDate: order.dueDate,
-                               priority: order.priority, jobNumber: order.jobNumber)
+            var kept = QueueOrder(id: order.id, project: order.project, client: order.client, status: status,
+                                  machine: machine, machineId: machineId, dueDate: order.dueDate,
+                                  priority: order.priority, jobNumber: order.jobNumber)
+            kept.voided = order.voided
+            order = kept
         }
     }
 }
@@ -822,6 +824,7 @@ private struct StageStepper: View {
         .disabled(disabled || on)
         .accessibilityLabel(stage.localizedLabel)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityValue(passed ? L10n.tr("stage.a11y.done") : "")
     }
 }
 

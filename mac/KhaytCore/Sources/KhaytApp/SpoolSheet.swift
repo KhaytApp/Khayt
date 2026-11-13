@@ -23,6 +23,8 @@ struct SpoolSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var material = ""
+    /// A save is on its way to the book; a second press waits for it.
+    @State private var saving = false
     /// Delete was pressed and not yet answered: it sat beside Save, one click.
     @State private var deleting: Spool?
     /// What this item is counted in. `g` because every item recorded before
@@ -142,6 +144,7 @@ struct SpoolSheet: View {
                         } label: { Image(systemName: "magnifyingglass") }
                             .menuStyle(.borderlessButton).fixedSize()
                             .help(shop.words.callIt("mac.filament_catalog"))
+                            .accessibilityLabel(shop.words.callIt("mac.filament_catalog"))
                     }
                 }
                 GridRow {
@@ -214,7 +217,7 @@ struct SpoolSheet: View {
                                                       weight: weight, fullWeight: fullWeight) {
                             Text(shop.words.callIt("mac.per_kilo") + " "
                                  + Money.text(perKilo, shop.currency))
-                                .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                .font(.callout).foregroundStyle(Khayt.faint).monospacedDigit()
                                 .fixedSize()
                         }
                     }
@@ -235,7 +238,7 @@ struct SpoolSheet: View {
                             if vatAmount > 0, cost > vatAmount {
                                 Text(shop.words.callIt("inv.costs_a_job") + " "
                                      + Money.text(cost - vatAmount, shop.currency))
-                                    .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
+                                    .font(.callout).foregroundStyle(Khayt.faint).monospacedDigit()
                                     .fixedSize()
                             }
                         }
@@ -656,9 +659,14 @@ struct SpoolSheet: View {
         let was = opened?.input(isNew: isNew, reclaimsTax: tax)
         let id = existing?.id
         // Closes when the save is in the book, not before: see PaymentSheet.
+        // One press, one spool: the sheet stays open while it writes, and a
+        // second Return made a second record with its own new id.
+        guard !saving else { return }
+        saving = true
         shop.moveProblem = nil
         Task {
             await shop.saveSpool(input, id: id, opened: was)
+            saving = false
             if shop.moveProblem == nil, shop.spendProblem == nil { dismiss() }
         }
     }

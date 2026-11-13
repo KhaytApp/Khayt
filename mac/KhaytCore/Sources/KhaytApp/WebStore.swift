@@ -625,7 +625,7 @@ struct StorefrontDraft: Equatable {
     }
 
     private static func number(_ s: String, max upper: Double? = nil) -> Double {
-        let n = max(0, Double(s.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)) ?? 0)
+        let n = max(0, TypedNumber.parse(s) ?? 0)
         return upper.map { min($0, n) } ?? n
     }
 
@@ -769,7 +769,7 @@ struct WebStoreSheet: View {
                             }
                             if let at = shop.webStoreAt {
                                 Text(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened)))
-                                    .foregroundStyle(.tertiary).monospacedDigit()
+                                    .foregroundStyle(Khayt.faint).monospacedDigit()
                             }
                         }
                     }

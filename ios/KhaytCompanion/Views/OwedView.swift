@@ -10,13 +10,17 @@ struct OwedView: View {
     @State private var currency: String?
     @State private var openOrder: QueueOrder?
     @State private var problem: String?
+    /// The book could not be read: say so, never "Nothing is owed" (F3).
+    @State private var unreadable = false
 
     private var total: Double { (lines ?? []).reduce(0) { $0 + $1.owed } }
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
-                if let lines {
+                if unreadable {
+                    LoadFailedView(message: L10n.tr("load.book_unavailable")) { await load() }
+                } else if let lines {
                     if lines.isEmpty {
                         Text(L10n.tr("owed.empty"))
                             .font(.khayt(15, .semibold, relativeTo: .headline))
@@ -51,7 +55,12 @@ struct OwedView: View {
 
     private func load() async {
         currency = await api.shopCurrency()
-        lines = await api.fetchOwing() ?? []
+        if let read = await api.fetchOwing() {
+            lines = read
+            unreadable = false
+        } else {
+            unreadable = true
+        }
     }
 
     /// The job behind a line: every owed job is open, so it is in the queue.
@@ -83,7 +92,7 @@ struct OwedView: View {
                     .labelStyle(.iconOnly)
                     .font(.system(size: 17))
                     .frame(width: 44, height: 44)
-                    .foregroundStyle(KhaytDesign.done)
+                    .foregroundStyle(KhaytDesign.brand)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.format("owed.remind.a11y", line.client.isEmpty ? line.project : line.client))

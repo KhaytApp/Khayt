@@ -24,7 +24,7 @@ struct JobSearchEntity: IndexedEntity {
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(title)",
-                              subtitle: "\(["#" + id, client, stage].filter { !$0.isEmpty }.joined(separator: " · "))")
+                              subtitle: "\([id, client, stage].filter { !$0.isEmpty }.joined(separator: " · "))")
     }
 
     var attributeSet: CSSearchableItemAttributeSet {

@@ -113,8 +113,13 @@ extension Shop {
         for p in parts {
             var row: [String: JSONValue] = [
                 "name": .string(p.name.isEmpty ? unnamed : p.name),
-                "printWeight": .number(Double(p.grams) ?? 0),
-                "printTime": .number(Double(p.hours) ?? 0),
+                // `TypedNumber.parse`, as the sheet's own costing and totals
+                // use: `Double("١٥٠")` and `Double("1,5")` are nil, so a part
+                // typed in Arabic digits or with a decimal comma was priced
+                // right on screen and SAVED with 0 g and 0 h (beta.34
+                // pre-release review).
+                "printWeight": .number(TypedNumber.parse(p.grams) ?? 0),
+                "printTime": .number(TypedNumber.parse(p.hours) ?? 0),
                 "qty": .number(Double(max(1, p.qty))),
                 // What the shared cost model said, frozen: a job priced today
                 // must not re-cost itself at next year's filament prices.
@@ -602,6 +607,15 @@ extension Shop {
     }
 
     /// Can this shop reach that screen at all?
+    /// The screen is there for this person, and the shop's MODE is what hides
+    /// it: the lock allows it and its feature is not in Simple. `NotAllowed`
+    /// asks, so a mode gate is not explained in the staff lock's words.
+    func hiddenByMode(_ shelf: Shelf) -> Bool {
+        if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        guard let gate = Self.gate(of: shelf) else { return false }
+        return !has(gate)
+    }
+
     func canShow(_ shelf: Shelf) -> Bool {
         // The operator lock first: a screen the person signed in may not see
         // is not reachable by ANY path that asks here — the sidebars, the menu
@@ -764,8 +778,13 @@ extension Shop {
     /// One record changes, not three — but through the same door as a move, so
     /// the ownership check, the atomic swap and the undo are the ones already
     /// proven rather than a second set written for money.
-    func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async {
-        guard permitted("invoicing", "edit") else { return }
+    /// True when the payment is in the book. What follows the write — the
+    /// email, the webhooks, the accounting push, the customer's page — can
+    /// each fail and say so in `moveProblem` without the payment being any
+    /// less recorded, so the sheet closes on this and not on a clean banner.
+    @discardableResult
+    func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async -> Bool {
+        guard permitted("invoicing", "edit") else { return false }
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
         let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title"), as: .person("invoicing", "edit")) { order, engine, root in
@@ -826,7 +845,7 @@ extension Shop {
         }
         // After the write, like a move's: a delivery that went out for a
         // payment the book then refused to keep would be a lie told outward.
-        guard wrote else { return }
+        guard wrote else { return false }
         Telemetry.feature(.paymentRecorded, in: self)
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
@@ -839,6 +858,7 @@ extension Shop {
         // waves it through), and then nothing carried it: the page went on
         // asking for money already paid.
         await republishPortalIfPublished(id)
+        return true
     }
 
     /// The email a recorded payment owes the customer, or nil when it owes
@@ -876,18 +896,38 @@ extension Shop {
     /// shared rule guarantees rather than this app promising it.
     ///
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
-    func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
-        guard permitted("orders", "edit") else { return }
-        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+    ///
+    /// `nonBusiness` is the sheet's Not business box, when the shop moved it.
+    /// It is part of the SAME write: as a second write after this one, a quit
+    /// between the two (⌘Q holds for a write in flight, and none was) saved
+    /// the fields and dropped the box. One write is also one undo.
+    @discardableResult
+    func editJob(_ id: Order.ID, fields: [String: JSONValue], nonBusiness: Bool? = nil) async -> Bool {
+        guard permitted("orders", "edit") else { return false }
+        return await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+            OneOrderEdit(order: try await Self.jobEdited(order, fields: fields, nonBusiness: nonBusiness,
+                                                         settings: Self.settings(root), engine: engine,
+                                                         now: Date(), editId: Self.uid("edit")))
+        }
+    }
+
+    /// The job as Edit Job leaves it: the changed fields through
+    /// `lib/order-edit.js applyEdit`, then the Not business mark through
+    /// `lib/business-scope.js setNonBusiness` — both on one record, for one
+    /// write. With nothing to change the order comes back untouched, so the
+    /// write path finds no change, stamps nothing and syncs nothing.
+    static func jobEdited(_ order: JSONValue, fields: [String: JSONValue], nonBusiness: Bool?,
+                          settings: [String: JSONValue], engine: KhaytEngine,
+                          now: Date, editId: String) async throws -> JSONValue {
+        var out = order
+        if !fields.isEmpty {
             // The shop's settings, so a typed price caps the payment at the
             // new price plus its tax and paid/partial is read from that gross.
-            let out = try await engine.editJob(
-                order: order, fields: fields, settings: Self.settings(root),
-                now: Date(), editId: Self.uid("edit"))
-            // Nothing moved: return the order untouched so the write path finds
-            // no change, stamps nothing and syncs nothing.
-            return OneOrderEdit(order: out.order)
+            out = try await engine.editJob(order: out, fields: fields, settings: settings,
+                                           now: now, editId: editId).order
         }
+        if let nonBusiness { out = try await engine.setNonBusiness(out, on: nonBusiness) }
+        return out
     }
 
     /// Mark a job as not business — a test, a gift, something for the shop
@@ -1029,8 +1069,8 @@ extension Shop {
     func partEditCost(raw: [String: JSONValue]?, _ now: EditPartSheet.Opened,
                       opened: EditPartSheet.Opened?) async -> (spool: Spool?, costed: KhaytEngine.CostedPart?) {
         let spool = Self.partCostSpool(now, opened: opened, raw: raw, spools: spools)
-        let costed = await costedPart(spoolId: spool?.id, grams: Double(now.grams) ?? 0,
-                                      hours: Double(now.hours) ?? 0, qty: now.qty,
+        let costed = await costedPart(spoolId: spool?.id, grams: TypedNumber.parse(now.grams) ?? 0,
+                                      hours: TypedNumber.parse(now.hours) ?? 0, qty: now.qty,
                                       extra: raw ?? [:])
         return (spool, costed)
     }
@@ -1056,7 +1096,7 @@ extension Shop {
                                     reclaimsTax: Bool = false) -> JSONValue {
         guard let opened else {
             return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
-                                       grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
+                                       grams: TypedNumber.parse(now.grams) ?? 0, hours: TypedNumber.parse(now.hours) ?? 0,
                                        qty: now.qty, costed: costed, reclaimsTax: reclaimsTax)
         }
         guard case .object(var record) = order,
@@ -1065,8 +1105,8 @@ extension Shop {
             guard case .object(var part) = rows[i],
                   case .string(let id)? = part["id"], id == partId else { continue }
             if now.name != opened.name { part["name"] = .string(now.name) }
-            if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
-            if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
+            if now.grams != opened.grams { part["printWeight"] = .number(max(0, TypedNumber.parse(now.grams) ?? 0)) }
+            if now.hours != opened.hours { part["printTime"] = .number(max(0, TypedNumber.parse(now.hours) ?? 0)) }
             if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
             // `spool` is the one the cost was worked out from (`partCostSpool`),
             // so its fields go down whenever it is given — not only when the

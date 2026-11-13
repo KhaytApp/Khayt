@@ -78,6 +78,20 @@ try {
   const part = await window.evaluate(() => products.find((x) => x.id === 'PROD-keep').parts[0]);
   ok(!('prepTime' in part) && !('postTime' in part), `a blank prep/post time saves as unset, not 0 (${JSON.stringify({ prepTime: part.prepTime, postTime: part.postTime })})`);
 
+  // A product with no parts list (the sample products, older or imported
+  // records) opens: it used to throw at draft.parts.length and never open.
+  const errors = [];
+  window.on('pageerror', (e) => errors.push(String(e && e.message)));
+  await window.evaluate(() => { products.push({ id: 'PROD-noparts', nameEn: 'Desk stand', price: 35, defaultMargin: 30 }); saveAll(); });
+  await window.evaluate(() => { try { openProductEditor('PROD-noparts'); } catch (e) { window.__peErr = String(e && e.message); } });
+  await window.waitForSelector('.modal #partsEditor', { timeout: 10000 });
+  ok(!(await window.evaluate(() => window.__peErr)) && errors.length === 0, `a product with no parts list opens its editor (${errors.join(' | ')})`);
+  await window.click('.modal [data-act="save"]');
+  await window.waitForTimeout(300);
+  const untouched = await window.evaluate(() => { const p = products.find((x) => x.id === 'PROD-noparts'); return { price: p.price, hasParts: 'parts' in p, open: !!document.querySelector('.modal #partsEditor') }; });
+  ok(untouched.open && untouched.price === 35 && !untouched.hasParts, `Save still asks for a part and the stored product is untouched (${JSON.stringify(untouched)})`);
+  await window.click('.modal [data-act="cancel"]');
+
   // A new product is priced as before.
   const fresh = await window.evaluate(() => {
     const p = { id: 'PROD-new', nameEn: 'New', defaultMargin: 30, priceTiers: [], parts: [{ id: 'PRT-2', name: 'x', material: 'PLA', printWeight: 50, printTime: 1, qty: 2, spoolCost: 80, spoolWeight: 1000 }] };

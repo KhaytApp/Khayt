@@ -19,6 +19,8 @@ struct ConsumableSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    /// A save is on its way to the book; a second press waits for it.
+    @State private var saving = false
     /// Delete was pressed and not yet answered: it sat beside Save, one click.
     @State private var deleting: Consumable?
     @State private var stock: Double = 0
@@ -69,7 +71,7 @@ struct ConsumableSheet: View {
                         // item whatever this says, and a shop that leaves this
                         // at nought should know that is not "never warn me".
                         Text(shop.words.callIt("cons.min_stock_note"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
                 GridRow {
@@ -103,7 +105,7 @@ struct ConsumableSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         amount($usagePerHour, step: 0.01)
                         Text(shop.words.callIt("cons.auto_deducted"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
                 GridRow {
@@ -205,9 +207,13 @@ struct ConsumableSheet: View {
         let was = opened?.input
         let id = existing?.id
         // Closes when the save is in the book, not before: see PaymentSheet.
+        // One press, one record: see SpoolSheet.
+        guard !saving else { return }
+        saving = true
         shop.moveProblem = nil
         Task {
             await shop.saveConsumable(input, id: id, opened: was)
+            saving = false
             if shop.moveProblem == nil, shop.spendProblem == nil { dismiss() }
         }
     }

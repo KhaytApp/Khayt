@@ -702,12 +702,14 @@ enum Stage: String, CaseIterable, Identifiable, Sendable {
     /// sentence in the palette it is an instance of.
     var tint: Color? {
         switch self {
-        // "Something is being made right now" — the drop of filament in the
-        // app's own icon, and the one state worth looking up at.
-        case .printing: Khayt.hot
-        // "Wants a person, and will keep working if it does not get one" — a
-        // held job is precisely that, and nothing else on this list is.
-        case .on_hold: Khayt.attention
+        // "Something is being made right now" — the amber thread leaving the
+        // nozzle in the app's own icon. A FILL (dot, rail, bar), never the
+        // colour of a word: see `Khayt.thread`.
+        case .printing: Khayt.thread
+        // Held is purple on every Khayt app (`Khayt.hold`), and not the
+        // warning ink: amber-brown beside an amber "printing" read as one
+        // family, and a held job is not a fault.
+        case .on_hold: Khayt.hold
         // "Finished, paid, sent, agreed." — the palette's own sentence names
         // sent, so a shipped job belongs here rather than in a fifth colour.
         case .completed, .shipped, .delivered: Khayt.done

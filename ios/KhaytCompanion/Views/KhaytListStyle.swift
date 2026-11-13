@@ -49,6 +49,8 @@ struct KhaytSearchField: View {
                         .foregroundStyle(KhaytDesign.textMuted)
                 }
                 .buttonStyle(.plain)
+                .tapTarget()
+                .accessibilityLabel(L10n.tr("common.clear"))
             }
         }
         .padding(.horizontal, 12)
@@ -57,12 +59,3 @@ struct KhaytSearchField: View {
     }
 }
 
-struct KhaytListRow<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-    var body: some View {
-        content()
-            .padding(.vertical, 10)
-            .listRowBackground(KhaytDesign.surface)
-            .listRowSeparatorTint(KhaytDesign.hairline)
-    }
-}

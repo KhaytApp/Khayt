@@ -133,7 +133,7 @@ struct NameIt: View {
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase)
                 .tracking(Words.spaced(0.6))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
             TextField(example, text: $typed)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 260)

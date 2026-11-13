@@ -58,12 +58,18 @@
     gray: { fg: 'var(--ink-2)', bg: 'rgba(120,130,150,.14)' },
     // Only the Khayt theme defines --wb-steel; elsewhere it falls back to gray.
     steel: { fg: 'var(--wb-steel, var(--ink-2))', bg: 'var(--wb-steel-bg, rgba(120,130,150,.14))' },
+    // Job status chips: the shared status palette (styles.css --st-*), the
+    // same in every theme. fg is the readable ink, dot the marker.
+    'st-wait': { fg: 'var(--st-wait-ink)', bg: 'var(--st-wait-bg)', dot: 'var(--st-wait-dot)' },
+    'st-move': { fg: 'var(--st-move-ink)', bg: 'var(--st-move-bg)', dot: 'var(--st-move-dot)' },
+    'st-done': { fg: 'var(--st-done-ink)', bg: 'var(--st-done-bg)', dot: 'var(--st-done-dot)' },
+    'st-late': { fg: 'var(--st-late-ink)', bg: 'var(--st-late-bg)', dot: 'var(--st-late-dot)' },
   };
 
   function chip(cls, label) {
     const c = CHIP[cls] || CHIP.gray;
     return `<span class="wb-chip" style="color:${c.fg};background:${c.bg}">`
-      + `<span class="wb-cd" style="background:${c.fg}"></span>${escapeHtml(label)}</span>`;
+      + `<span class="wb-cd" style="background:${c.dot || c.fg}"></span>${escapeHtml(label)}</span>`;
   }
 
   // Top-level `let clients` lives in the shared global lexical scope, not on
@@ -80,31 +86,13 @@
     return (typeof currencySymbol === 'function') ? currencySymbol() : 'SAR';
   }
 
-  // Bucket a queue status into one of the prototype's chip colors.
+  // A queue status's chip: the shared status palette (steel waiting, amber
+  // printing, green done, red late), the same in every theme and on the Mac
+  // and iPhone. Themes used to bucket statuses into their own colours, so
+  // Printing was blue here, green in Khayt and amber elsewhere.
   function statusChipClass(status) {
-    // The Khayt theme uses the stage palette shared with the Mac and iPhone, so
-    // a job is the same colour on every device: pending steel, printing and
-    // post-processing green, hold and quality check purple, ready teal, quote
-    // grey. The other Workbench-hosted themes keep the prototype's buckets.
-    if (typeof document !== 'undefined' && document.body?.classList.contains('khayt-2026')) {
-      switch (status) {
-        case 'printing': case 'post': return 'green';
-        case 'completed': return 'teal';
-        case 'qc': case 'on_hold': return 'purple';
-        case 'pending': return 'steel';
-        default: return 'gray';
-      }
-    }
-    switch (status) {
-      case 'printing': return 'blue';
-      case 'completed': return 'green';
-      case 'qc': return 'green';
-      case 'post': return 'purple';
-      case 'on_hold': return 'gray';
-      case 'pending': return 'amber';
-      case 'quote': return 'teal';
-      default: return 'gray';
-    }
+    const tone = (typeof statusToneOf === 'function') ? statusToneOf(status) : 'wait';
+    return 'st-' + tone;
   }
 
   /* ---------- KPI stat tile ---------- */
@@ -119,7 +107,8 @@
     const client = showBiz ? findClient(order.clientId) : null;
     const parts = [];
     if (client) parts.push(localName(client));
-    if (order.dueDate) {
+    // A cancelled job keeps its due date; it is not overdue.
+    if (order.dueDate && order.status !== 'cancelled') {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const due = new Date(order.dueDate + 'T00:00:00');
       const diff = Math.round((due - today) / 86400000);
@@ -182,7 +171,8 @@
       state = 'printing';
     }
     const jobName = order ? (order.project || jobRef(order)) : tr('dash.idle_dash', '— idle —');
-    let cls = 'blue';
+    // A printing machine is amber (the shared status palette's "moving").
+    let cls = 'st-move';
     if (state === 'error') cls = 'red';
     else if (state === 'idle' || state === 'stale') cls = 'gray';
     const c = CHIP[cls];

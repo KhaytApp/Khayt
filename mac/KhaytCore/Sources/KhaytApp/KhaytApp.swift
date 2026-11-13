@@ -282,6 +282,9 @@ final class Activator: NSObject, NSApplicationDelegate {
         // Yesterday's feedback reports — a masked book and a picture of the
         // window each — out of the temporary directory. See `Feedback`.
         DispatchQueue.global(qos: .utility).async { Feedback.sweepOldDrafts() }
+        // ⌘→, ⌘← and ⌘⌫ go to the text being typed before the menu bar can
+        // take them (`TypingKeys`).
+        TypingKeys.install()
         if Bundle.main.bundleIdentifier == nil {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
@@ -535,8 +538,8 @@ final class Activator: NSObject, NSApplicationDelegate {
                     // that says so is right even about a picture nobody ships.
                     Text("62%").font(.caption).monospacedDigit()
                     ZStack(alignment: .leading) {
-                        LayerLinesShape().fill(Khayt.hot.opacity(0.16))
-                        LayerLinesShape(progress: 0.62).fill(Khayt.hot)
+                        LayerLinesShape().fill(Khayt.thread.opacity(Khayt.threadGhost))
+                        LayerLinesShape(progress: 0.62).fill(Khayt.thread)
                     }
                     .frame(height: 26)
                 }
@@ -566,7 +569,17 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// the one surface in the app that ships unlooked at.
     @MainActor
     static func captureView(named name: String, _ view: some View, into dir: URL) {
-        let renderer = ImageRenderer(content: view)
+        // In the shop's writing direction. A view outside a window inherits
+        // none, so the Arabic run photographed the menu-bar panel laid out
+        // left to right, which the real popover is not (Nov 11 UI review, B18:
+        // the camera, not the app).
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        // And in the run's appearance: a view outside a window inherits none of
+        // that either, so a dark run drew these light.
+        let name = fileName(name, dark: darkRun)
+        let renderer = ImageRenderer(content: view
+            .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+            .environment(\.colorScheme, darkRun ? .dark : .light))
         renderer.scale = 2
         guard let image = renderer.nsImage,
               let tiff = image.tiffRepresentation,
@@ -716,8 +729,9 @@ final class Activator: NSObject, NSApplicationDelegate {
             // does not exist until it happens.
             //
             // A process that never changes appearance never reaches that
-            // frame. `KHAYT_SNAPSHOT_DARK=1` photographs the dark screens and
-            // stops; any other value, or none, is an ordinary light run. Two
+            // frame. `KHAYT_SNAPSHOT_DARK=1` is the whole run in dark (it was
+            // nine pictures until Nov 2026; see below); any other value, or
+            // none, is the same run in light. Two
             // invocations give both sets, and neither can abort. Verified over
             // three dark and three light runs, all clean, where the combined
             // run had aborted three times out of three.
@@ -740,6 +754,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             // already sent that. In `main.swift`, before `KhaytApp.main()`,
             // `NSApp` is still nil and the process dies on the spot.
             let want: NSAppearance.Name = dark ? .darkAqua : .aqua
+            darkRun = dark
             NSApp.appearance = NSAppearance(named: want)
             for window in NSApp.windows { window.appearance = NSAppearance(named: want) }
             startWatchdog()
@@ -926,83 +941,23 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
-            // DARK FIRST, then light, then everything else in light.
+            // ── DARK IS THE SAME RUN, NOT A SHORTER ONE ───────────────────
             //
-            // A Mac app is used in both and every screenshot this runner has
-            // ever taken was light, so the dark side of it was never once
-            // looked at. Two screens is enough to catch the failure that
-            // matters — a colour written as a literal rather than taken from
-            // the system, which is invisible against one background and only
-            // one.
-            if dark {
-                capture(named: "00-dark-dashboard", into: dir)
-                // Panes as well as the whole window: the sidebar is an AppKit
-                // visual-effect view and does not draw into the window's own
-                // bitmap, so in the composite it comes out as bare white — in
-                // light mode that looks right by accident and in dark mode it
-                // looks like a bug the app does not have.
-                capturePanes(named: "00-dark-dashboard", into: dir)
-                subject?.shelf = .library(nil)
-                try? await Task.sleep(for: .milliseconds(700))
-                capture(named: "03-dark-library", into: dir)
-                capturePanes(named: "03-dark-library", into: dir)
-                // A model selected, its inspector and the storage badges, dark.
-                if let subject { await captureLibrary1a(subject, into: dir, dark: true) }
-                if let subject { await captureBeta5(subject, into: dir, dark: true) }
-                subject?.shelf = .jobs(nil)
-                try? await Task.sleep(for: .milliseconds(700))
-                capture(named: "01-dark-jobs", into: dir)
-                // The shelf, because it is the one screen in the app whose
-                // content is COLOUR. Everything else here is text on a ground
-                // and survives a theme by construction; a spool is a drawn
-                // shape whose ring, hub and bare flange are three tones that
-                // have to stay apart on both — a white spool against a light
-                // card and a black one against a dark card are different
-                // problems, and only one of them had ever been photographed.
-                // On the SAMPLE book, which the dark run had no reason to load
-                // until now: this Mac's own book has three spools with no colour
-                // and no record of what they weighed new, so every ring it can
-                // draw is the same dashed full circle. The three tones this
-                // screen has to keep apart only exist on a shelf that has a
-                // white spool, a black one and a nearly-empty one.
-                if let subject { await subject.load(.sample) }
-                subject?.shelf = .inventory
-                try? await Task.sleep(for: .milliseconds(700))
-                capturePanes(named: "08-dark-inventory", into: dir)
-                // ── AND SETTINGS › PREFERENCES, DARK ──────────────────────
-                //
-                // The pane with the switches (notifications, the menu bar's
-                // style, the browser extension) and the one that crashed in
-                // beta.7: Safari answered on its own queue into a main-actor
-                // closure. It asks the REAL Safari here, unpretended, so this
-                // picture existing is the proof that it no longer traps.
-                if !skipped("settings") {
-                    doing("settings-window-dark")
-                    let main = NSApp.windows.first { $0.isVisible && $0.contentView != nil }
-                    if let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: { $0.keyEquivalent == "," }) {
-                        NSApp.sendAction(item.action ?? #selector(NSApplication.terminate(_:)), to: item.target, from: item)
-                    }
-                    await settle()
-                    try? await Task.sleep(for: .seconds(1))
-                    if let settings = NSApp.windows.first(where: {
-                        $0.isVisible && $0 !== main && $0.contentView != nil
-                            && $0.frame.width >= 300 && $0.frame.height >= 300
-                    }) {
-                        subject?.settingsPane = .general
-                        await settle()
-                        try? await Task.sleep(for: .milliseconds(700))
-                        capture(named: "17-dark-settings-general", window: settings, into: dir)
-                        capturePanes(named: "17-dark-settings-general", window: settings, into: dir)
-                        settings.close()
-                        await settle()
-                    } else {
-                        FileHandle.standardError.write(Data("no settings window (dark)\n".utf8))
-                    }
-                }
-                // Stop here. Everything below is photographed by the light run.
-                NSApp.terminate(nil)
-                return
-            }
+            // `KHAYT_SNAPSHOT_DARK=1` used to photograph nine things here and
+            // stop: the dashboard, the library, the jobs table, the shelf and
+            // one Settings pane. The Nov 11 2026 review counted what that
+            // left out — the Board, Customers, the Machines overview, the
+            // Catalogue, the Calculator, every sheet and nine of the twelve
+            // Settings panes had never once been seen dark (B14).
+            //
+            // It was short for a reason that no longer holds. What aborts
+            // this runner is changing the appearance PART WAY THROUGH (see
+            // the top of this function); a dark run forces dark once, before
+            // anything is drawn, and never changes it. So it can walk the
+            // whole sequence below, and it does. Its pictures carry `dark` in
+            // their names (`Snapshot.fileName`): `00-dark-dashboard`,
+            // `09-dark-board`, `15-dark-new-customer`, the names the short run
+            // already used for the few it took.
             capture(named: "00-dashboard", into: dir)
             // Again once the printers have answered: the live strip is the one
             // thing on this screen that is not read from the book, so a first
@@ -1146,7 +1101,9 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.fileSelection = []
             await settle()
             await captureLibrary1a(shop, into: dir)
-            await captureBeta5(shop, into: dir, dark: false)
+            // `dark` as the run is: these scenes tag their own names and set
+            // the colour scheme of the views they draw outside a window.
+            await captureBeta5(shop, into: dir, dark: dark)
 
             await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
             await settle()
@@ -1160,15 +1117,30 @@ final class Activator: NSObject, NSApplicationDelegate {
             // like an inspector that does not work.
             shop.selection = (shop.shown.first { !$0.isSettled } ?? shop.shown.first)?.id
             await settle()
+            // WITH THE DETAILS PANEL OPEN, which it was not: by this point in
+            // the run the panel had been closed for dozens of pictures, so
+            // `02-job-selected` was a table with a grey row and its "panes"
+            // were the table and the sidebar. The job inspector — where the
+            // money lines and the payment button live — had never been
+            // photographed in any language or appearance (Nov 11 2026 review,
+            // B14). See `openDetails`.
+            await openDetails()
             capture(named: "02-job-selected", into: dir)
-            // The panes as well: the job inspector is where the money lines and
-            // the payment button live, and a window shot that simply does not
-            // contain it cannot tell you whether it is closed or broken.
+            // The panes as well: a window shot that simply does not contain
+            // the inspector cannot tell you whether it is closed or broken.
             capturePanes(named: "02-job-selected", into: dir)
+            captureInspector(named: "02c-job-inspector", into: dir)
 
             shop.shelf = .library(nil)
             await settle()
             capture(named: "03-library", into: dir)
+            // The Colour and File type rows. Their menus cannot be opened
+            // by a run that must not click, and at this width both are folded
+            // into More, so without this neither the swatches nor the words
+            // are in any picture (`LibraryFilterBar.RowsSpecimen`).
+            captureView(named: "03k-library-colour-type-rows",
+                        LibraryFilterBar.RowsSpecimen(chips: LibraryFilterBar(shop: shop).chips, words: shop.words),
+                        into: dir)
             // A model SELECTED, so the inspector is in the picture — the size,
             // the triangle count and whether it goes on a bed the shop owns all
             // live there, and a grid shot cannot show any of them. Picked as
@@ -1691,8 +1663,12 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.shelf = .customers
             shop.customerSelection = shop.shownCustomers.max { $0.owed < $1.owed }?.id
             await settle()
+            // The customer inspector, for the reason the job inspector is
+            // opened above: it had never been in a picture.
+            await openDetails()
             capture(named: "06-customers", into: dir)
             capturePanes(named: "06-customers", into: dir)
+            captureInspector(named: "06c-customer-inspector", into: dir)
             // The customer with the most written about them, for the pane's
             // lower half: agreed prices, the standing order, and the log.
             if let spoken = shop.customers.max(by: { ($0.record?.commLog.count ?? 0) < ($1.record?.commLog.count ?? 0) }),
@@ -1701,6 +1677,35 @@ final class Activator: NSObject, NSApplicationDelegate {
                 await settle()
                 capturePanes(named: "06b-customer-terms", into: dir)
             }
+
+            // ── THE EMPTY SCREENS, WHICH NO BOOK HERE CAN SHOW ───────────
+            //
+            // A new shop's first sight of Jobs, Customers, Inventory and the
+            // Catalogue is each one empty, and neither the sample nor the
+            // shop's own book is. `98-empty-drawn` is the shared drawing on
+            // its own; these are the four screens as they stand around it —
+            // the heading, the toolbar, the button that starts the first one.
+            //
+            // IN MEMORY (`Shop.pretendEmptyBook`): nothing is written, and the
+            // sample is loaded again straight after, so no later picture
+            // inherits an empty book.
+            shop.selection = nil
+            shop.customerSelection = nil
+            shop.pretendEmptyBook()
+            let emptied: [(String, Shop.Shelf)] = [
+                ("97-empty-jobs", .jobs(nil)), ("97-empty-customers", .customers),
+                ("97-empty-inventory", .inventory), ("97-empty-catalogue", .catalogue),
+            ]
+            for (name, shelf) in emptied {
+                shop.shelf = shelf
+                await settle()
+                // Twice: the details panel leaves two of these screens with an
+                // animation, and one settle photographs it half way.
+                await settle()
+                capture(named: name, into: dir)
+            }
+            await shop.load(.sample)
+            await settle()
 
             // ── SETTINGS IS PHOTOGRAPHED LAST, AND THAT IS DELIBERATE ─────
             //
@@ -2078,6 +2083,100 @@ final class Activator: NSObject, NSApplicationDelegate {
         thread.start()
     }
 
+    /// Is this the dark run? Set once, at the top of `run`, with the
+    /// appearance itself.
+    static var darkRun = false
+
+    /// The file a picture is written to: its name, with `dark` after the
+    /// number in a dark run.
+    ///
+    /// ONE PLACE, so the dark run can walk the same sequence as the light one
+    /// without every `capture(named:)` in it growing a second name.
+    /// `00-dashboard` becomes `00-dark-dashboard`, which is what the short
+    /// dark run already called it. A name that already says dark — the scenes
+    /// that tag their own (`b5-1-machines-live-dark`, `98-empty-drawn-dark`) —
+    /// is left alone, so nothing is tagged twice.
+    nonisolated static func fileName(_ name: String, dark: Bool) -> String {
+        guard dark, !name.split(separator: "-").contains("dark") else { return name }
+        guard let dash = name.firstIndex(of: "-") else { return "dark-" + name }
+        return String(name[..<dash]) + "-dark" + String(name[dash...])
+    }
+
+    /// Asks the main window to open its details panel. Posted only by the
+    /// capture run; see `ShopWindow`'s `Reachable` and `WindowPanels`.
+    nonisolated static let wantsDetails = Notification.Name("app.khayt.mac.capture.wantsDetails")
+
+    /// The details panel's own scroll view, if the panel is open: the widest
+    /// scrolling pane that is the width of a panel and sits against the
+    /// window's trailing edge. The sidebar is narrower (248) and on the other
+    /// side; the table is far wider.
+    static func detailsPane(in window: NSWindow? = nil) -> NSScrollView? {
+        guard let window = window ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
+              let root = window.contentView else { return nil }
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        var found: [NSScrollView] = []
+        func walk(_ v: NSView) {
+            if let scroll = v as? NSScrollView { found.append(scroll) }
+            v.subviews.forEach(walk)
+        }
+        walk(root)
+        return found.filter { scroll in
+            let frame = scroll.convert(scroll.bounds, to: nil)
+            return isDetailsPane(width: frame.width, minX: frame.minX, maxX: frame.maxX,
+                                 windowWidth: root.bounds.width, rtl: rtl)
+        }.max { $0.bounds.height < $1.bounds.height }
+    }
+
+    /// The geometry of that test, apart from AppKit so it can be checked.
+    nonisolated static func isDetailsPane(width: CGFloat, minX: CGFloat, maxX: CGFloat,
+                                          windowWidth: CGFloat, rtl: Bool) -> Bool {
+        guard width >= 255, width <= 430 else { return false }
+        return rtl ? minX <= 4 : maxX >= windowWidth - 4
+    }
+
+    /// Open the details panel and wait for it.
+    ///
+    /// NOT THROUGH THE MENU. View › Show details reads the window's switch
+    /// through a focused scene value, and a capture run never establishes a
+    /// responder chain (`menuTree` says why), so the item is disabled here and
+    /// pressing it does nothing. The window listens for a notification
+    /// instead, which nothing but this run posts.
+    static func openDetails() async {
+        for attempt in 1...3 where detailsPane() == nil {
+            NotificationCenter.default.post(name: wantsDetails, object: nil)
+            await settle()
+            await settle()
+            if detailsPane() != nil {
+                FileHandle.standardError.write(Data("details panel opened (attempt \(attempt))\n".utf8))
+            }
+        }
+        if detailsPane() == nil {
+            FileHandle.standardError.write(Data("the details panel did NOT open — the inspector pictures will be missing\n".utf8))
+        }
+    }
+
+    /// Photograph the details panel on its own, whole: its scrolling content
+    /// from the top to the last row, not just what the window shows.
+    static func captureInspector(named name: String, into dir: URL) {
+        let name = fileName(name, dark: darkRun)
+        doing(name)
+        guard let scroll = detailsPane() else {
+            FileHandle.standardError.write(Data("no inspector to capture for \(name)\n".utf8))
+            return
+        }
+        let target = scroll.documentView ?? scroll
+        let bounds = target.bounds
+        guard bounds.width > 1, bounds.height > 1,
+              let rep = target.bitmapImageRepForCachingDisplay(in: bounds) else { return }
+        target.effectiveAppearance.performAsCurrentDrawingAppearance {
+            target.cacheDisplay(in: bounds, to: rep)
+        }
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: dir.appending(path: name + ".png"))
+        FileHandle.standardError.write(Data(
+            "wrote \(name).png (\(Int(bounds.width))x\(Int(bounds.height))) [inspector]\n".utf8))
+    }
+
     /// Photograph each scrolling pane on its own.
     ///
     /// The whole-window shot loses a pane sometimes — two `NSScrollView`s on
@@ -2097,6 +2196,7 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// WIP limits and its QC block sit below the fold and had never been seen
     /// at all, on top of the six panes that had never been photographed.
     static func capturePanes(named name: String, window: NSWindow?, into dir: URL) {
+        let name = fileName(name, dark: darkRun)
         guard let window = window
                 ?? NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }),
               let root = window.contentView else { return }
@@ -2169,6 +2269,7 @@ final class Activator: NSObject, NSApplicationDelegate {
         // investigation this message ever sent anybody on went to the wrong
         // screen; the real hang was opening the settings window, eleven steps
         // later, which is why those six panes stayed unphotographed.
+        let name = fileName(name, dark: darkRun)
         doing(name)
         guard let host = NSApp.windows.first(where: { $0.isVisible && $0.attachedSheet != nil }),
               let sheet = host.attachedSheet,
@@ -2234,6 +2335,7 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// layout bug in the window shot. Capturing it properly needs a screen
     /// recording grant this process does not have.
     static func capture(named name: String, window: NSWindow, into dir: URL) {
+        let name = fileName(name, dark: darkRun)
         doing(name)
         guard // The theme frame, not the content view. A unified toolbar sits
               // in the title bar, which is a sibling of the content rather than
