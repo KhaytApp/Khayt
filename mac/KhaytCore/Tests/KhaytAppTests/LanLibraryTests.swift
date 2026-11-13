@@ -41,6 +41,129 @@ struct LanLibraryTests {
         #expect((kings["folders"] as? [Any])?.isEmpty == true)
     }
 
+    /// The phone's two filter menus (Turki, Nov 2026: "filter by color group,
+    /// filter by file type"). The rule is `lib/lan-library.js narrow`, whose
+    /// own tests pin the cases; this holds the Mac's native answer to the same
+    /// shape and the same arithmetic on the sample book.
+    @Test("colour and type narrow the phone's list, and each menu is counted without its own choice")
+    func filters() async throws {
+        let bench = try await LanServerTests.Bench()
+        defer { bench.stop() }
+        func page(_ query: String) async throws
+            -> (total: Int, ids: [String], colour: [String: Int], type: [String: Int], unfiltered: Int, matched: Int) {
+            let body = try Self.json(try await bench.get("/api/library" + query, headers: Self.pin))
+            let facets = try #require(body["facets"] as? [String: Any], "a Mac that filters says so with facets")
+            let items = try #require(body["items"] as? [[String: Any]])
+            return (try #require(body["total"] as? Int), items.compactMap { $0["id"] as? String },
+                    try #require(facets["colour"] as? [String: Int]), try #require(facets["type"] as? [String: Int]),
+                    try #require(body["unfilteredTotal"] as? Int), try #require(body["matchedTotal"] as? Int))
+        }
+        // A search, so the whole sample library is in play rather than one folder.
+        let all = try await page("?q=e&limit=200")
+        #expect(Set(all.colour.keys) == Set(ColourFamily.tokens), "every colour row, zeros included")
+        #expect(Set(all.type.keys) == Set(ModelFileType.allCases.map(\.rawValue)))
+        #expect(all.type.values.reduce(0, +) == all.total, "every model has exactly one type")
+        #expect(all.total > 3)
+        #expect(all.unfiltered == all.total && all.matched == all.total, "nothing chosen: N of N")
+
+        // Each colour row: asking for it gives exactly the count it showed,
+        // leaves the colour counts alone, and narrows the type counts.
+        for (key, count) in all.colour where count > 0 {
+            let one = try await page("?q=e&limit=200&colour=" + key)
+            #expect(one.total == count, "\(key)")
+            #expect(one.unfiltered == all.total, "\(key): N of M, M is the search before the menus")
+            #expect(one.colour == all.colour, "\(key): a menu is not narrowed by its own choice")
+            #expect(one.type.values.reduce(0, +) == count, "\(key): the other menu is")
+            #expect(Set(one.ids).isSubset(of: Set(all.ids)))
+        }
+        // And each type row the same way round.
+        for (key, count) in all.type where count > 0 {
+            let one = try await page("?q=e&limit=200&type=" + key)
+            #expect(one.total == count, "\(key)")
+            #expect(one.type == all.type, "\(key)")
+        }
+        // OR within a menu: two rows give at least the larger and at most the sum.
+        let rows = all.colour.filter { $0.value > 0 && $0.key != ColourFamily.multi }.keys.sorted()
+        if rows.count >= 2 {
+            let two = try await page("?q=e&limit=200&colour=\(rows[0]),\(rows[1])")
+            #expect(two.total >= max(all.colour[rows[0]]!, all.colour[rows[1]]!))
+            #expect(two.total <= all.colour[rows[0]]! + all.colour[rows[1]]!)
+        }
+        // A key nobody knows is ignored; so are case and spaces.
+        #expect(try await page("?q=e&limit=200&colour=teal").total == all.total)
+        if let first = rows.first {
+            #expect(try await page("?q=e&limit=200&colour=%20" + first.uppercased() + "%20,teal").total == all.colour[first])
+        }
+    }
+
+    @Test("the menus' arithmetic, on models made for it")
+    func narrowRule() {
+        func model(_ id: String, _ file: String?, _ hexes: [String]) -> LibraryFile {
+            Self.file(id, name: id, folder: "", filename: file, colours: hexes)
+        }
+        let files = [
+            model("a", "a.3mf", ["#ff0000", "#ffffff"]), model("b", "b.stl", []),
+            model("c", "c.3mf", ["#0000ff"]), model("d", "d.gcode", ["#0000cc"]), model("e", nil, []),
+        ]
+        func run(_ colour: String?, _ type: String?) -> (ids: [String], colour: [String: Int], type: [String: Int]) {
+            let r = Shop.libraryNarrow(files, .init(colour: colour, type: type)) { $0.colourTokens }
+            return (r.files.map(\.id), r.colour, r.type)
+        }
+        #expect(run(nil, nil).ids == ["a", "b", "c", "d", "e"])
+        #expect(run("blue", nil).ids == ["c", "d"])
+        #expect(run("blue,red", nil).ids == ["a", "c", "d"])
+        #expect(run("blue", "3mf").ids == ["c"])
+        #expect(run("multi", nil).ids == ["a"] && run("white", nil).ids == ["a"])
+        #expect(run("none", nil).ids == ["b", "e"] && run(nil, "nofile").ids == ["e"])
+        // The same figures `test/lan-library.test.js` holds the JavaScript to.
+        let none = run(nil, nil)
+        #expect(none.colour["red"] == 1 && none.colour["blue"] == 2 && none.colour["white"] == 1
+                && none.colour["multi"] == 1 && none.colour["none"] == 2 && none.colour["green"] == 0)
+        #expect(none.type == ["3mf": 2, "stl": 1, "step": 0, "obj": 0, "gcode": 1, "other": 0, "nofile": 1])
+        let blue = run("blue", nil)
+        #expect(blue.colour == none.colour)
+        #expect(blue.type == ["3mf": 1, "stl": 0, "step": 0, "obj": 0, "gcode": 1, "other": 0, "nofile": 0])
+        #expect(run(nil, "3mf").type == none.type && run(nil, "3mf").colour["none"] == 0)
+
+        // The sub-folders follow the menus, at the count of what passes.
+        let deep = files + [Self.file("f", name: "f", folder: "Deep", filename: "f.stl", colours: ["#ff0000"])]
+        func folders(_ colour: String?, _ type: String?) -> [String] {
+            let filter = Shop.PhoneLibraryFilter(colour: colour, type: type)
+            return Shop.libraryPage(deep, q: "", folder: "", offset: 0, limit: 50,
+                                    passes: { filter.passes($0) { $0.colourTokens } })
+                .folders.map { "\($0.path) \($0.count)" }
+        }
+        #expect(folders(nil, nil) == ["Deep 1"] && folders("red", nil) == ["Deep 1"])
+        #expect(folders("blue", nil).isEmpty, "nothing blue under Deep: not offered")
+        #expect(folders("red", "3mf").isEmpty, "the red one under Deep is an STL")
+
+        // What the menus are counted over: the folder and everything under
+        // it, as its sub-folders' counts are. At the top of a library whose
+        // reds are all in folders, Red must not read 0 beside a folder that
+        // says it holds two.
+        let nested = [
+            Self.file("x", name: "x", folder: "", colours: ["#00ff00"]), Self.file("y", name: "y", folder: ""),
+            Self.file("h1", name: "h1", folder: "Home", colours: ["#ff0000"]),
+            Self.file("h2", name: "h2", folder: "Home/Deep", colours: ["#ff0000"]),
+        ]
+        func scoped(_ folder: String, _ colour: String?) -> (listed: [String], inScope: Int, red: Int, matched: Int) {
+            let filter = Shop.PhoneLibraryFilter(colour: colour, type: nil)
+            var inScope = 0, red = 0, matched = 0
+            let page = Shop.libraryPage(nested, q: "", folder: folder, offset: 0, limit: 50,
+                                        passes: { filter.passes($0) { $0.colourTokens } },
+                                        narrow: { Shop.libraryNarrow($0, filter) { $0.colourTokens }.files },
+                                        scope: { scope in
+                let n = Shop.libraryNarrow(scope, filter) { $0.colourTokens }
+                inScope = scope.count; red = n.colour["red"] ?? 0; matched = n.files.count
+            })
+            return (page.files.map(\.id), inScope, red, matched)
+        }
+        #expect(scoped("", "red") == (listed: [], inScope: 4, red: 2, matched: 2))
+        #expect(scoped("", nil).red == 2, "and with nothing chosen the row is not greyed")
+        #expect(scoped("Home", "red") == (listed: ["h1"], inScope: 2, red: 2, matched: 2))
+        #expect(scoped("Home/Deep", "red") == (listed: ["h2"], inScope: 1, red: 1, matched: 1))
+    }
+
     @Test("a search covers the whole library, every word, any case or accent, and the folder name")
     func search() throws {
         let shop = Shop()
@@ -66,12 +189,48 @@ struct LanLibraryTests {
     }
 
     static func file(_ id: String, name: String, folder: String, tags: [String] = [], category: String? = nil,
-                     archived: Bool = false) -> LibraryFile {
+                     archived: Bool = false, filename: String? = nil, colours: [String] = []) -> LibraryFile {
         var o: [String: Any] = ["id": id, "name": name, "folder": folder, "tags": tags]
+        if let filename { o["sourceFile"] = ["filename": filename] }
+        if !colours.isEmpty { o["colors"] = colours.map { ["hex": $0] } }
         if let category { o["category"] = category }
         if archived { o["archivedAt"] = "2026-10-01T00:00:00Z" }
         let data = try! JSONSerialization.data(withJSONObject: o)
         return try! JSONDecoder().decode(LibraryFile.self, from: data)
+    }
+
+    /// NOT A TEST: a server for the phone's simulator to be tried against.
+    ///
+    /// The Mac app never starts its LAN server on the sample book, and pairing
+    /// is a window a person clicks, so there was no way to put the iPhone's
+    /// screen in front of the NATIVE server without a real book or a real
+    /// phone. This starts the same bench every test here uses (the native
+    /// `LanServer`, the sample book, loopback only) on a port that is asked
+    /// for, and keeps it up.
+    ///
+    ///     KHAYT_SERVE_LIBRARY=3929 KHAYT_SERVE_LIBRARY_OLD=3930 \
+    ///     KHAYT_SERVE_MINUTES=20 swift test --filter LanLibraryTests/serve
+    ///
+    /// `…_OLD` is a second server that answers as a Mac from before the
+    /// filters did, for the "menus hide" case. Without the first variable
+    /// this does nothing at all, which is every ordinary run.
+    @Test("a server for the simulator, only when asked for")
+    func serve() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let port = env["KHAYT_SERVE_LIBRARY"].flatMap(UInt16.init) else { return }
+        let minutes = min(60, max(1, env["KHAYT_SERVE_MINUTES"].flatMap(Int.init) ?? 15))
+        let bench = try await LanServerTests.Bench(port: port)
+        defer { bench.stop() }
+        var old: LanServerTests.Bench?
+        if let oldPort = env["KHAYT_SERVE_LIBRARY_OLD"].flatMap(UInt16.init) {
+            old = try await LanServerTests.Bench(port: oldPort, libraryAsBeforeFilters: true)
+        }
+        defer { old?.stop() }
+        func say(_ line: String) { FileHandle.standardError.write(Data((line + "\n").utf8)) }
+        say("SERVING the sample book at http://127.0.0.1:\(bench.port)/ for \(minutes) min (owner PIN header: the bench's test PIN)")
+        if let old { say("SERVING as a Mac before the filters at http://127.0.0.1:\(old.port)/") }
+        try await Task.sleep(for: .seconds(minutes * 60))
+        say("SERVE ended")
     }
 
     @Test("a thumbnail where there is one, a 404 where there is none")

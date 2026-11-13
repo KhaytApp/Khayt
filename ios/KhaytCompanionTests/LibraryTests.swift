@@ -46,7 +46,8 @@ final class LibraryTests: XCTestCase {
 
     func testAFolderListsItsOwnModelsAndCountsEverythingUnderASubFolder() {
         let (top, here) = SampleLibrary.search(SampleLibrary.items, query: "", folder: "")
-        XCTAssertTrue(here.isEmpty, "every sample model is filed in a folder")
+        XCTAssertEqual(here.count, 7, "the models filed at the top are listed beside its folders")
+        XCTAssertTrue(here.allSatisfy { $0.folder == nil })
         XCTAssertEqual(top.map(\.name), ["Gifts", "Home", "Parts", "Saudi Kings"])
         XCTAssertEqual(top.first { $0.path == "Home" }?.count, 2, "Home's own model and the one under Home/Lighting")
 
