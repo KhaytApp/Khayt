@@ -22,7 +22,9 @@ import UIKit
 enum PrintActivityLook {
     static let brand = dynamic(light: 0x216DCA, dark: 0x4C97F0)
     static let live = dynamic(light: 0x13803F, dark: 0x34D27A)
-    static let done = dynamic(light: 0x1B5E4F, dark: 0x4FBFA0)
+    /// Done and paid are green on every app (Turki, Nov 11); the light value
+    /// is the readable green, not the Mac's graphic #1BB55C (2.9:1 as text).
+    static let done = dynamic(light: 0x13803F, dark: 0x34D27A)
     static let attention = dynamic(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = dynamic(light: 0xBB2D44, dark: 0xF2564A)
     static let ink = dynamic(light: 0x101417, dark: 0xEAF2FB)
@@ -63,12 +65,20 @@ enum PrintActivityLook {
 
     static func tone(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
         switch phase {
-        case .printing: live
+        // Printing is amber on every app (Turki, Nov 11). As TEXT that is the
+        // warn amber; the bar uses `bar(_:)`, the graphic thread amber.
+        case .printing: attention
         case .paused: attention
         case .finished: done
         case .failed: late
         case .cancelled: note
         }
+    }
+
+    /// The progress bar's colour: amber thread while printing (the same bar
+    /// as the app and the widget), the phase's tone otherwise.
+    static func bar(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
+        phase == .printing ? thread : tone(phase)
     }
 
     static func symbol(_ phase: PrintActivityAttributes.ContentState.Phase) -> String {
@@ -250,14 +260,14 @@ struct PrintBar: View {
         if state.phase == .printing, let range = PrintActivityText.barRange(state) {
             ProgressView(timerInterval: range, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
                 .progressViewStyle(.linear)
-                .tint(PrintActivityLook.tone(state.phase))
+                .tint(PrintActivityLook.bar(state.phase))
                 .scaleEffect(x: 1, y: 1.6, anchor: .center)
         } else {
             let fraction = Double(PrintActivityText.shownProgress(state)) / 100
             GeometryReader { box in
                 ZStack(alignment: .leading) {
                     Capsule().fill(PrintActivityLook.track)
-                    Capsule().fill(PrintActivityLook.tone(state.phase))
+                    Capsule().fill(PrintActivityLook.bar(state.phase))
                         .frame(width: max(6, box.size.width * fraction))
                 }
             }

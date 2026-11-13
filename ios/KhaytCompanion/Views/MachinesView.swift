@@ -268,7 +268,7 @@ private struct MachineCard: View {
 
     private var tone: Color {
         switch mode {
-        case .printing: return KhaytDesign.live
+        case .printing: return KhaytDesign.attention  // printing is amber (Nov 11)
         case .idle, .offline: return KhaytDesign.note
         case .error: return KhaytDesign.late
         }
@@ -327,7 +327,7 @@ private struct MachineCard: View {
                         .foregroundStyle(KhaytDesign.ink)
                 }
                 .padding(.horizontal, 9).padding(.vertical, 4)
-                .background(tone.opacity(0.16), in: Capsule())
+                .background(mode == .printing ? KhaytDesign.threadWash : tone.opacity(0.16), in: Capsule())
             }
             if mode == .printing, let progress = live.progress {
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
