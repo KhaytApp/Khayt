@@ -2742,7 +2742,10 @@ final class Words {
         "mac.state_done":      ["en": "Done",      "ar": "تم"],
         "mac.state_blocked":   ["en": "Blocked",   "ar": "متوقف"],
         "mac.state_quoted":    ["en": "Quoted",    "ar": "عرض سعر"],
-        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصل"],
+        // A printer, so feminine: «غير متصلة», the word every app uses for a
+        // printer that is not connected (Nov 2026). Never «متوقفة», which is
+        // kept for a real stop.
+        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصلة"],
         "mac.state_stopped": ["en": "Stopped", "ar": "متوقفة"],
         "mac.state_check_it": ["en": "Check it", "ar": "افحصها"],
         "mac.state_worn": ["en": "Worn", "ar": "مهترئة"],
