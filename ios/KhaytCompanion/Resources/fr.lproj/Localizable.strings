@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Chiffrer une impression à la main";
 "new.expense.detail" = "Photo du reçu";
 "new.waste.detail" = "Impression ratée ou purge";
-"new.more" = "Plus";
+"new.more" = "Aussi";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Documents";
 "paper.packing_slip" = "Bordereau de colisage";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Dernière récupération cloud refusée";
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
+"intake.waiting" = "En attente";
+"spool.low" = "Faible";
+"stage.a11y.done" = "Terminé";
+"order.new.hint.client" = "Choisissez ou saisissez un nom";
+"order.new.hint.project" = "Qu’est-ce que c’est ? ex. le nom de la pièce";
+"order.new.hint.material" = "ex. PLA, noir";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Chargement impossible";
@@ -1311,3 +1317,29 @@
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
 "PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";
 "push.not_connected" = "Les alertes n’arrivent pas encore sur ce téléphone. Khayt réessaiera à la prochaine ouverture.";
+/* Home — Needs you */
+"home.greeting.morning" = "Bonjour.";
+"home.greeting.afternoon" = "Bon après-midi.";
+"home.greeting.evening" = "Bonsoir.";
+"needs.title" = "À traiter";
+"needs.none" = "Rien à traiter pour l’instant.";
+"needs.calm" = "Aucune commande en retard, l’étagère est pleine et personne n’attend.";
+"needs.late.one" = "%1$@ était dû le %2$@";
+"needs.late.action" = "Ouvrir les retards";
+"needs.low.title" = "L’étagère se vide";
+"needs.low.left" = "%1$@ reste %2$@";
+"needs.low.action" = "Voir le stock";
+"needs.waiting.action" = "Ouvrir les demandes";
+"needs.quotes.action" = "Ouvrir les devis";
+"tile.owed" = "On vous doit";
+"tile.machines" = "Sur les machines";
+"tile.machines.value" = "%1$d sur %2$d";
+"tile.machines.sub" = "impriment en ce moment";
+"needs.due_week" = "À rendre cette semaine";
+"needs.this_year" = "%@ cette année";
+"needs.owed" = "%@ dû";
+"needs.count" = "%d choses à traiter.";
+"needs.late" = "%d commandes en retard";
+"needs.low.count" = "%d bobines presque vides";
+"needs.quotes" = "%d devis attendent une réponse";
+"needs.more" = "et %d de plus";

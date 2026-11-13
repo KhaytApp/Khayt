@@ -52,7 +52,10 @@ final class DesignV2FoundationTests: XCTestCase {
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "on_hold"), .dark), "B49CFF")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "34D27A")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .light), "13803F")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "8AA4C2")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "A9B8CF")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .light), "5E6C84")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "pending"), .light), "EDF0F4")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "pending"), .dark), "3A4658")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "post"), .dark), "8AA4C2")
         // Rails stay rare: only printing and QC.
         XCTAssertEqual(["pending", "printing", "post", "qc", "completed"].filter(KhaytDesign.isRailed), ["printing", "qc"])

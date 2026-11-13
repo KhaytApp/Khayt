@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Baskıyı elle fiyatla";
 "new.expense.detail" = "Fişin fotoğrafı";
 "new.waste.detail" = "Başarısız baskı veya tasfiye";
-"new.more" = "Diğer";
+"new.more" = "Ayrıca";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Belgeler";
 "paper.packing_slip" = "Paketleme listesi";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Son reddedilen bulut çekimi";
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
+"intake.waiting" = "Bekliyor";
+"spool.low" = "Az";
+"stage.a11y.done" = "Tamamlandı";
+"order.new.hint.client" = "Seçin ya da bir ad yazın";
+"order.new.hint.project" = "Nedir? ör. parça adı";
+"order.new.hint.material" = "ör. PLA, siyah";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Yüklenemedi";
@@ -1311,3 +1317,29 @@
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
 "PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";
 "push.not_connected" = "Bildirimler henüz bu telefona ulaşmıyor. Khayt bir sonraki açılışta yeniden deneyecek.";
+/* Home — Needs you */
+"home.greeting.morning" = "Günaydın.";
+"home.greeting.afternoon" = "Tünaydın.";
+"home.greeting.evening" = "İyi akşamlar.";
+"needs.title" = "Sizi bekliyor";
+"needs.none" = "Şu an sizi bekleyen bir şey yok.";
+"needs.calm" = "Geciken iş yok, raf dolu ve bekleyen kimse yok.";
+"needs.late.one" = "%1$@ teslimi %2$@ idi";
+"needs.late.action" = "Gecikenleri aç";
+"needs.low.title" = "Raf azalıyor";
+"needs.low.left" = "%1$@ %2$@ kaldı";
+"needs.low.action" = "Envantere bak";
+"needs.waiting.action" = "Talepleri aç";
+"needs.quotes.action" = "Teklifleri aç";
+"tile.owed" = "Alacağınız";
+"tile.machines" = "Makinelerde";
+"tile.machines.value" = "%2$d makineden %1$d";
+"tile.machines.sub" = "şu an basıyor";
+"needs.due_week" = "Bu hafta teslim";
+"needs.this_year" = "bu yıl %@";
+"needs.owed" = "%@ alacak";
+"needs.count" = "%d şey sizi bekliyor.";
+"needs.late" = "%d iş gecikti";
+"needs.low.count" = "%d makara azaldı";
+"needs.quotes" = "%d teklif yanıt bekliyor";
+"needs.more" = "ve %d tane daha";

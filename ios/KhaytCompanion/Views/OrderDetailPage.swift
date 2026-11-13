@@ -213,7 +213,7 @@ struct OrderDetailPage: View {
                         .font(.khayt(16, .semibold, relativeTo: .headline))
                         .lineLimit(1)
                         .foregroundStyle(KhaytDesign.ink)
-                    Text("#\(order.reference) · \(order.displayClient)")
+                    Text("\(order.reference) · \(order.displayClient)")
                         .font(.khayt(11.5, relativeTo: .caption))
                         .foregroundStyle(KhaytDesign.note)
                         .lineLimit(1)
@@ -824,6 +824,7 @@ private struct StageStepper: View {
         .disabled(disabled || on)
         .accessibilityLabel(stage.localizedLabel)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityValue(passed ? L10n.tr("stage.a11y.done") : "")
     }
 }
 

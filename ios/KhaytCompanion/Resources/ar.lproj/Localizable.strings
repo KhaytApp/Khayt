@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "سعّر طباعة يدويًا";
 "new.expense.detail" = "صورة الإيصال";
 "new.waste.detail" = "طباعة فاشلة أو تنظيف";
-"new.more" = "المزيد";
+"new.more" = "أيضًا";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "المستندات";
 "paper.packing_slip" = "قائمة التعبئة";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+"intake.waiting" = "بالانتظار";
+"spool.low" = "منخفض";
+"stage.a11y.done" = "تمّت";
+"order.new.hint.client" = "اختر عميلًا أو اكتب اسمًا";
+"order.new.hint.project" = "ما هو؟ مثلًا اسم القطعة";
+"order.new.hint.material" = "مثلًا PLA، أسود";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "تعذّر التحميل";
@@ -1311,3 +1317,29 @@
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
 "PUSH_GENERIC" = "في متجرك ما يحتاج نظرة";
 "push.not_connected" = "التنبيهات لا تصل إلى هذا الهاتف بعد. سيحاول خيط مجدداً عند فتحه.";
+/* Home — Needs you */
+"home.greeting.morning" = "صباح الخير.";
+"home.greeting.afternoon" = "طاب يومك.";
+"home.greeting.evening" = "مساء الخير.";
+"needs.title" = "يحتاجك";
+"needs.none" = "لا شيء يحتاجك الآن.";
+"needs.calm" = "لا طلبات متأخرة، والرف ممتلئ، ولا أحد ينتظر.";
+"needs.late.one" = "%1$@ كان موعده %2$@";
+"needs.late.action" = "فتح الطلبات المتأخرة";
+"needs.low.title" = "الرف شبه فارغ";
+"needs.low.left" = "%1$@ متبقٍّ %2$@";
+"needs.low.action" = "عرض المخزون";
+"needs.waiting.action" = "فتح الطلبات الواردة";
+"needs.quotes.action" = "فتح عروض الأسعار";
+"tile.owed" = "مستحق لك";
+"tile.machines" = "على الآلات";
+"tile.machines.value" = "%1$d من %2$d";
+"tile.machines.sub" = "تطبع الآن";
+"needs.due_week" = "مستحق هذا الأسبوع";
+"needs.this_year" = "%@ هذه السنة";
+"needs.owed" = "%@ مستحق";
+"needs.count" = "%d أمر يحتاجك.";
+"needs.late" = "%d طلب متأخر";
+"needs.low.count" = "%d بكرة منخفضة";
+"needs.quotes" = "%d عرض سعر ينتظر رداً";
+"needs.more" = "و%d أمر آخر";

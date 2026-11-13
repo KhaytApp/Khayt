@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Calcula un precio a mano";
 "new.expense.detail" = "Foto del recibo";
 "new.waste.detail" = "Una impresión fallida o purga";
-"new.more" = "Más";
+"new.more" = "También";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Documentos";
 "paper.packing_slip" = "Albarán de empaque";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Última descarga de la nube rechazada";
 "diag.refused.wrong_shop" = "rechazada: otro taller";
 "diag.refused.empty" = "rechazada: vacía";
+"intake.waiting" = "En espera";
+"spool.low" = "Bajo";
+"stage.a11y.done" = "Hecho";
+"order.new.hint.client" = "Elige o escribe un nombre";
+"order.new.hint.project" = "¿Qué es? p. ej., el nombre de la pieza";
+"order.new.hint.material" = "p. ej., PLA, negro";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "No se pudo cargar";
@@ -1311,3 +1317,29 @@
 "load.book_unavailable" = "No se pudo leer el libro en este teléfono. Vuelve a intentarlo o comprueba que el Mac esté al alcance.";
 "PUSH_GENERIC" = "Hay algo en tu taller que revisar";
 "push.not_connected" = "Las alertas aún no llegan a este teléfono. Khayt lo intentará de nuevo al abrirlo.";
+/* Home — Needs you */
+"home.greeting.morning" = "Buenos días.";
+"home.greeting.afternoon" = "Buenas tardes.";
+"home.greeting.evening" = "Buenas noches.";
+"needs.title" = "Te necesita";
+"needs.none" = "Ahora mismo nada te necesita.";
+"needs.calm" = "Ningún trabajo atrasado, el estante está lleno y nadie espera.";
+"needs.late.one" = "%1$@ vencía el %2$@";
+"needs.late.action" = "Abrir atrasados";
+"needs.low.title" = "El estante se vacía";
+"needs.low.left" = "%1$@ quedan %2$@";
+"needs.low.action" = "Ver inventario";
+"needs.waiting.action" = "Abrir solicitudes";
+"needs.quotes.action" = "Abrir presupuestos";
+"tile.owed" = "Te deben";
+"tile.machines" = "En las máquinas";
+"tile.machines.value" = "%1$d de %2$d";
+"tile.machines.sub" = "imprimiendo ahora";
+"needs.due_week" = "Vence esta semana";
+"needs.this_year" = "%@ este año";
+"needs.owed" = "%@ por cobrar";
+"needs.count" = "%d cosas te necesitan.";
+"needs.late" = "%d trabajos van atrasados";
+"needs.low.count" = "%d bobinas bajas";
+"needs.quotes" = "%d presupuestos esperan respuesta";
+"needs.more" = "y %d más";
