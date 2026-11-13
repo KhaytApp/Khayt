@@ -505,8 +505,8 @@
 /* Machines, as design/ios-v2 draws them */
 "machines.idle" = "متاحة";
 "machines.error" = "خطأ";
-"machines.offline" = "متوقفة";
-"machines.offline.sub" = "أُوقفت من الماك";
+"machines.offline" = "غير متصلة";
+"machines.offline.sub" = "عُلّمت غير متصلة على الماك";
 "machines.ready" = "جاهز للمهمة التالية";
 "machines.nozzle" = "الفوهة";
 "machines.bed" = "المنصّة";
