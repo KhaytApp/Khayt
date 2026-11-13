@@ -502,7 +502,7 @@ enum FloorRead {
                 if Calendar.book.isDate(day, inSameDayAs: today) { return .today }
                 return day < start ? .overdue(day) : .on(day)
             } ?? .none
-            return NextJob(id: order.id, name: order.project.isEmpty ? order.id : order.project, due: due)
+            return NextJob(id: order.id, name: order.project.isEmpty ? order.reference : order.project, due: due)
         }
         let waiting = orders.filter { $0.status == "pending" || $0.status == "queued" }
         for id in proposed {
