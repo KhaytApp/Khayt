@@ -171,3 +171,24 @@ test('the main process sweeps only inside the existing host guard', () => {
   assert.ok(/if \(!discovered\.length\)[\s\S]{0,200}sweepForPrinters/.test(src),
     'the sweep is a fallback, not the first thing tried');
 });
+
+// ── Which printer this IS: product serial and network card, never the hostname ──
+
+const u1 = (prod, cpu, wlan, eth) => ({ result: { system_info: {
+  product_info: { serial_number: prod, device_name: 'Baby U1' },
+  cpu_info: { serial_number: cpu },
+  network: { lo: { mac_address: '00:00:00:00:00:00' }, wlan0: { mac_address: wlan }, eth0: { mac_address: eth } },
+} } });
+
+test('a U1\'s identity: the product serial first, the board serial kept, its network cards', () => {
+  const id = S.readIdentity('moonraker', u1('811002610171', 'CPU-1', 'AA:BB:CC:DD:EE:01', 'aa-bb-cc-dd-ee-02'));
+  assert.deepEqual(id, { serial: '811002610171', serials: ['811002610171', 'CPU-1'],
+    mac: 'aa:bb:cc:dd:ee:02', macs: ['aa:bb:cc:dd:ee:02', 'aa:bb:cc:dd:ee:01'] }, 'wired first, loopback never');
+  assert.equal(S.readIdentitySerial('moonraker', u1('811002610171', 'CPU-1', '', '')), '811002610171');
+  // A board with no product serial still gives its board serial, as before.
+  assert.equal(S.readIdentity('moonraker', { result: { system_info: { cpu_info: { serial_number: 'CPU-9' } } } }).serial, 'CPU-9');
+  // Nothing to read, or a protocol with no identity request: empty, not a throw.
+  assert.deepEqual(S.readIdentity('moonraker', {}), { serial: '', serials: [], mac: '', macs: [] });
+  assert.deepEqual(S.readIdentity('octoprint', u1('X', 'Y', 'AA:BB:CC:DD:EE:01', '')), { serial: '', serials: [], mac: '', macs: [] });
+  assert.deepEqual(S.readIdentity('nonsense', null), { serial: '', serials: [], mac: '', macs: [] });
+});

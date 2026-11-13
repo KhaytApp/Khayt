@@ -309,7 +309,7 @@ struct WidgetExtensionTests {
         let sources = Self.package.appending(path: "Sources")
         let palette = try String(contentsOf: sources.appending(path: "KhaytApp/Palette.swift"), encoding: .utf8)
         let widget = try String(contentsOf: sources.appending(path: "KhaytWidgetViews/WidgetViews.swift"), encoding: .utf8)
-        for role in ["brand", "hot", "attention", "late"] {
+        for role in ["brand", "thread", "attention", "late"] {
             let app = try #require(Self.pair(in: palette, #"static let \#(role) = adaptive\(light: (0x[0-9A-F]+), dark: (0x[0-9A-F]+)"#),
                                    "Palette has no \(role)")
             let mine = try #require(Self.pair(in: widget, #"static let \#(role) = Ink\(light: (0x[0-9A-F]+), dark: (0x[0-9A-F]+)\)"#),

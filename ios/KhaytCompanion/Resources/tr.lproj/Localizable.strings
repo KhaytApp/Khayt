@@ -836,6 +836,28 @@
 "library.priced_here" = "Fiyatlarınızla bu telefonda hesaplandı. Birden çok renkli bir model tek makaradan maliyetlendirilir, bu yüzden Mac’in rakamı biraz farklı olabilir.";
 "library.no_copy" = "Mac’e ulaşılamıyor. Ayarlar’da Khayt Cloud’da oturum açıp bir kez eşitleyin, kitaplığınız yanınızda olsun.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Pembe";
+"colour.brown" = "Kahverengi";
+"library.filter.colour" = "Renk";
+"library.filter.type" = "Dosya türü";
+"library.filter.multi" = "Çok renkli";
+"library.filter.none" = "Renk bilgisi yok";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "Diğer";
+"library.type.nofile" = "Dosya yok (webden)";
+"library.filter.colour_hint" = "Bunlardan herhangi birine sahip modelleri görmek için birden fazla seçin.";
+"library.filter.counts_hint" = "Sayılar, diğer filtrelerin bıraktığı kütüphane içindir. Boş bir satır silinmez, soluk gösterilir.";
+"library.filter.n_of_m" = "%1$d / %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "%@ kaldır";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@, seçili: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Ürün Kataloğu";
 "catalogue.search" = "Ürün ara";
@@ -1282,3 +1304,8 @@
 "diag.cloud_refused" = "Son reddedilen bulut çekimi";
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
+
+/* A read that failed (UI review F3) */
+"load.failed.title" = "Yüklenemedi";
+"load.retry" = "Tekrar dene";
+"load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";

@@ -76,6 +76,18 @@ test('requiredScope maps path + method to the needed scope', () => {
   assert.equal(T.requiredScope('/v1/status', 'GET'), null, 'public status needs no scope');
 });
 
+test('the phone-only routes are in no scope, so a token never stands in for the PIN there', () => {
+  // The Mac's printer commands and expense route take a signed, enrolled phone
+  // and ask only that the device header is present once the PIN gate has
+  // passed. A token passes that gate only on a route with a scope, so these
+  // must have none (the job-photo route sits under /orders, has one, and
+  // refuses a token by hand in LanServer.swift). Beta.34 security review.
+  for (const verb of ['pause', 'resume', 'stop', 'cancel']) {
+    assert.equal(T.requiredScope(`/v1/printer/M1/${verb}`, 'POST'), null, verb);
+  }
+  assert.equal(T.requiredScope('/v1/expense', 'POST'), null);
+});
+
 test('redactTokens never exposes the hash', () => {
   const { record } = T.generateToken({ label: 'A', scopes: ['orders:read'] });
   const out = T.redactTokens([record]);

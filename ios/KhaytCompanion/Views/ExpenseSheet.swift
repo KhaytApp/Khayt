@@ -58,13 +58,13 @@ struct ExpenseSheet: View {
                     if canReadReceipts { receiptQRCard }
                     V2FieldCard {
                         V2Field(label: L10n.tr("exp.amount")) {
-                            TextField("", text: $amount, prompt: Text(verbatim: "0.00"))
+                            TextField(L10n.tr("exp.amount"), text: $amount, prompt: Text(verbatim: "0.00"))
                                 .keyboardType(.decimalPad)
                                 .font(.khayt(26, .semibold, relativeTo: .title).monospacedDigit())
                         }
                         if fromReceipt != nil && reclaimsTax {
                             V2Field(label: L10n.tr("exp.vat")) {
-                                TextField("", text: $vatAmount, prompt: Text(verbatim: "0.00"))
+                                TextField(L10n.tr("exp.vat"), text: $vatAmount, prompt: Text(verbatim: "0.00"))
                                     .keyboardType(.decimalPad)
                                     .monospacedDigit()
                             }
@@ -74,7 +74,7 @@ struct ExpenseSheet: View {
                                 .padding(.vertical, 4)
                         }
                         V2Field(label: L10n.tr("exp.note"), last: true) {
-                            TextField("", text: $note, axis: .vertical)
+                            TextField(L10n.tr("exp.note"), text: $note, prompt: Text(verbatim: ""), axis: .vertical)
                                 .lineLimit(1...3)
                         }
                     }
