@@ -116,6 +116,7 @@ enum NotificationKind {
 /// The words of a print alert.
 enum PrintAlertText {
     static func content(for event: PrintFinished, orderStatus: String?,
+                        locale: Locale = AlertDigits.locale(), shopId: String? = nil,
                         tr: (String) -> String) -> UNMutableNotificationContent {
         let c = UNMutableNotificationContent()
         c.filterCriteria = NotificationKind.print
@@ -128,7 +129,13 @@ enum PrintAlertText {
         var parts = [what]
         if let machine = event.machineName, !machine.isEmpty { parts.append(machine) }
         if let s = event.durationS, s >= 60 {
+            // Western digits and the Gregorian calendar, as everywhere in the
+            // app (khayt-ios-calendar-and-digits): the formatter's own default
+            // was the SYSTEM locale, so a Saudi phone wrote "٢ س ١٥ د".
             let f = DateComponentsFormatter()
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.locale = locale
+            f.calendar = calendar
             f.allowedUnits = s >= 3600 ? [.hour, .minute] : [.minute]
             f.unitsStyle = .abbreviated
             if let t = f.string(from: s) { parts.append(t) }
@@ -136,10 +143,17 @@ enum PrintAlertText {
         c.body = parts.joined(separator: " · ")
         c.sound = .default
         c.threadIdentifier = "khayt.prints"
+        // A failed or cancelled print is worth breaking through Focus for;
+        // a finished one is not (Dev Hub, Nov 13). Takes effect once the app
+        // carries the time-sensitive entitlement; until then iOS treats it as
+        // `.active`, which is what every alert was.
+        c.interruptionLevel = event.outcome == .finished ? .active : .timeSensitive
         let action = PrintAlertAction.offered(for: event, orderStatus: orderStatus)
         c.categoryIdentifier = action?.category ?? PrintAlertAction.infoCategory
         var info: [String: Any] = ["machineId": event.machineId, "outcome": event.outcome.rawValue]
         if let order = event.orderId { info["orderId"] = order }
+        // Which shop it is about, so a tap never opens a job of another shop.
+        if let shopId { info["shopId"] = shopId }
         c.userInfo = info
         return c
     }
@@ -150,5 +164,81 @@ enum PrintAlertText {
                        "alert.print.a_job", "alert.print.move_post", "alert.print.reprint",
                        "alert.print.mark_shipped", "PUSH_TITLE", "PUSH_PRINT_FINISHED", "PUSH_INTAKE",
                        "PUSH_OVERDUE", "PUSH_LOW_STOCK", "PUSH_DUE_TODAY", "PUSH_QUOTE_DECISION",
-                       "PUSH_QUOTE_APPROVED", "PUSH_QUOTE_DECLINED", "PUSH_MESSAGE", "PUSH_PAYMENT"]
+                       "PUSH_QUOTE_APPROVED", "PUSH_QUOTE_DECLINED", "PUSH_MESSAGE", "PUSH_PAYMENT", "PUSH_GENERIC"]
+}
+
+
+// MARK: - Digits
+
+/// The locale an alert's figures are written in: the app's language with
+/// Western digits (`numberingSystem = latn`), as `L10n.locale` is in the app.
+/// The extension has no `L10n`, so it takes the language the system chose for
+/// its own bundle.
+enum AlertDigits {
+    static func locale(language: String? = Bundle.main.preferredLocalizations.first) -> Locale {
+        Locale(identifier: (language ?? "en") + "@numbers=latn")
+    }
+}
+
+// MARK: - The alert index
+
+/// What the notification extension needs from the book, and nothing else:
+/// each job's id and its stage, a few KB.
+///
+/// The extension used to decode the WHOLE book (`khayt-store.json`) to look
+/// up one job's stage. A real shop's book is 26 MB, a notification service
+/// extension may use about 24 MB, so iOS killed it and the phone showed the
+/// server's plain text without the job or its button (push review P1, Nov 13).
+/// The app writes this index beside the book whenever the book changes; the
+/// extension reads only this.
+enum AlertIndex {
+    static let fileName = "alert-index.json"
+    /// More jobs than any phone needs to answer an alert about; newest kept.
+    static let maxJobs = 2000
+
+    /// Job id → stage, from a book's `printLog` (newest last kept on a cap).
+    static func build(from printLog: [[String: Any]]) -> [String: String] {
+        var out: [String: String] = [:]
+        for row in printLog.suffix(maxJobs) {
+            guard let id = row["id"] as? String, !id.isEmpty, let status = row["status"] as? String else { continue }
+            if row["voidedAt"] != nil, !(row["voidedAt"] is NSNull) { continue }
+            out[id] = status
+        }
+        return out
+    }
+
+    static func url(in directory: URL) -> URL { directory.appending(path: fileName) }
+
+    static func write(_ index: [String: String], to directory: URL) {
+        guard let data = try? JSONSerialization.data(withJSONObject: index, options: [.sortedKeys]) else { return }
+        try? data.write(to: url(in: directory), options: [.atomic])
+    }
+
+    /// The stage of one job, read from the index alone.
+    static func status(of orderId: String, in directory: URL) -> String? {
+        guard let data = try? Data(contentsOf: url(in: directory)),
+              let index = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return nil }
+        return index[orderId]
+    }
+}
+
+// MARK: - Pushes the phone does not know
+
+/// The kinds of push this build has words for, by the key Cloud sends as
+/// `loc-key` (khayt-cloud's push list). Anything else is shown as
+/// `PUSH_GENERIC`, never as a raw key (push review C8, Nov 13).
+enum KnownPush {
+    static let keys: Set<String> = ["PUSH_TITLE", "PUSH_PRINT_FINISHED", "PUSH_INTAKE", "PUSH_OVERDUE",
+                                    "PUSH_LOW_STOCK", "PUSH_DUE_TODAY", "PUSH_QUOTE_DECISION",
+                                    "PUSH_QUOTE_APPROVED", "PUSH_QUOTE_DECLINED", "PUSH_MESSAGE",
+                                    "PUSH_PAYMENT", "PUSH_GENERIC"]
+
+    /// True when `text` is a key iOS could not translate (it shows the key
+    /// itself) rather than words.
+    static func isRawKey(_ text: String) -> Bool {
+        text.range(of: #"^[A-Z][A-Z0-9_]{3,}$"#, options: .regularExpression) != nil
+    }
+
+    /// Kinds the phone treats as needing attention through Focus.
+    static func isTimeSensitive(kind: String) -> Bool { kind == "payment" }
 }

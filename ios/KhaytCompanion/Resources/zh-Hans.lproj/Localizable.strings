@@ -1309,3 +1309,5 @@
 "load.failed.title" = "无法加载";
 "load.retry" = "重试";
 "load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
+"PUSH_GENERIC" = "店里有事需要你看一下";
+"push.not_connected" = "提醒尚未送达这部手机。下次打开时 Khayt 会再试一次。";

@@ -1309,3 +1309,5 @@
 "load.failed.title" = "Laden fehlgeschlagen";
 "load.retry" = "Erneut versuchen";
 "load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
+"PUSH_GENERIC" = "In deiner Werkstatt gibt es etwas zu sehen";
+"push.not_connected" = "Benachrichtigungen erreichen dieses iPhone noch nicht. Khayt versucht es beim nächsten Öffnen erneut.";

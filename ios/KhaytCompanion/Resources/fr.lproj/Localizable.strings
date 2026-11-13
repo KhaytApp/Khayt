@@ -1309,3 +1309,5 @@
 "load.failed.title" = "Chargement impossible";
 "load.retry" = "Réessayer";
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
+"PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";
+"push.not_connected" = "Les alertes n’arrivent pas encore sur ce téléphone. Khayt réessaiera à la prochaine ouverture.";

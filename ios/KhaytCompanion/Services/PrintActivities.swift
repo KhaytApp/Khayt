@@ -16,6 +16,18 @@ import KhaytCore
 /// print; only one seen printing and then seen not printing has ended, with
 /// the outcome `FinishDetector` would give it.
 enum PrintActivityPlan {
+    /// How long a card with no finish estimate stays fresh without a reading.
+    static let staleWithoutEstimate: TimeInterval = 5 * 60
+
+    /// When the card should go stale: the estimated finish, or — when the
+    /// printer gives no time, or the estimate has passed — a few minutes from
+    /// now, so a card nobody updates any more greys out instead of standing at
+    /// its last percent for hours (push review, Mac M1 rule, Nov 13).
+    static func staleDate(endsAt: Date?, now: Date = Date()) -> Date {
+        let soon = now.addingTimeInterval(staleWithoutEstimate)
+        guard let endsAt, endsAt > now else { return soon }
+        return max(endsAt, soon)
+    }
     typealias State = PrintActivityAttributes.ContentState
 
     enum Step: Equatable {
@@ -135,12 +147,12 @@ final class PrintActivities {
                 // system's limit is reached; the print carries on regardless.
                 // `.token`: the cloud can then move it with the app closed.
                 if let started = try? Activity.request(attributes: PrintActivityAttributes(machineId: id, machineName: name),
-                                                       content: ActivityContent(state: state, staleDate: state.endsAt),
+                                                       content: ActivityContent(state: state, staleDate: PrintActivityPlan.staleDate(endsAt: state.endsAt, now: now)),
                                                        pushType: .token) {
                     push.watch(started)
                 }
             case let .update(id, state):
-                await live[id]?.update(ActivityContent(state: state, staleDate: state.endsAt))
+                await live[id]?.update(ActivityContent(state: state, staleDate: PrintActivityPlan.staleDate(endsAt: state.endsAt, now: now)))
             case let .end(id, state):
                 // Left on the Lock Screen a while, so the result is seen.
                 await live[id]?.end(ActivityContent(state: state, staleDate: nil),

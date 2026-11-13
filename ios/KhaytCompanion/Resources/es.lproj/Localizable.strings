@@ -1309,3 +1309,5 @@
 "load.failed.title" = "No se pudo cargar";
 "load.retry" = "Reintentar";
 "load.book_unavailable" = "No se pudo leer el libro en este teléfono. Vuelve a intentarlo o comprueba que el Mac esté al alcance.";
+"PUSH_GENERIC" = "Hay algo en tu taller que revisar";
+"push.not_connected" = "Las alertas aún no llegan a este teléfono. Khayt lo intentará de nuevo al abrirlo.";
