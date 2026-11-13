@@ -859,6 +859,9 @@ final class KhaytAPIClient: ObservableObject {
     /// The session push registration goes through — a test sets its own.
     var pushSession: URLSession = .shared
 
+    /// A shop to count for: a Mac paired or a cloud sign-in.
+    var hasShop: Bool { settings.isPaired || cloud != nil }
+
     #if DEBUG
     /// Tests: sign in without the network.
     func setCloudForTesting(_ session: CloudSession?) { cloud = session }
@@ -918,7 +921,11 @@ final class KhaytAPIClient: ObservableObject {
         // on, and a tap opened a job of the wrong shop (push review P2).
         if let old = cloud, old.shopId != session.shopId || old.token != session.token {
             await unregisterForPush(old)
-            if old.shopId != session.shopId { await liveActivityPush?.forgetShop(session: old) }
+            if old.shopId != session.shopId {
+                await liveActivityPush?.forgetShop(session: old)
+                // The old shop's count is not this shop's.
+                await ShopBadge.shared.clear()
+            }
         }
         session.save()
         cloud = session
@@ -972,6 +979,7 @@ final class KhaytAPIClient: ObservableObject {
     func signOutOfCloud() {
         if let session = cloud { Task { await unregisterForPush(session) } }
         pushProblem = nil
+        Task { await ShopBadge.shared.clear() }
         CloudSession.forget()
         cloud = nil
         cloudProblem = nil

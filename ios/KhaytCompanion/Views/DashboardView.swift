@@ -554,6 +554,9 @@ struct DashboardView: View {
         machines = await machinesTask ?? []
         quotes = await quotesTask
         loaded = true
+        // The icon says what the greeting says. Only on a read that worked:
+        // a failed one would put a stale or empty count up.
+        if queueError == nil, !settings.isSampleShop { Task { await ShopBadge.shared.set(needs.total) } }
         // Spotlight and Siri find the jobs this phone holds.
         Task { await JobSearch.index() }
         // A sheet an App Intent asked for (Siri, Shortcuts, a Control).

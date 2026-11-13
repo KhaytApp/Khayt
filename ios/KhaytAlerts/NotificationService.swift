@@ -60,6 +60,9 @@ final class NotificationService: UNNotificationServiceExtension {
         if KnownPush.isRawKey(c.title) { c.title = NSLocalizedString("PUSH_TITLE", comment: "") }
         let kind = ((c.userInfo["k"] as? [String: Any])?["kind"] as? String) ?? ""
         if KnownPush.isTimeSensitive(kind: kind) { c.interruptionLevel = .timeSensitive }
+        // The icon shows Home's "Needs you" count, as the app last worked it
+        // out — never one more per alert, which drifts (Turki, Nov 13).
+        if let badge = BookPeek.badge() { c.badge = NSNumber(value: badge) }
     }
 
     /// What the server's version carried that the rewritten one must keep:
@@ -166,5 +169,11 @@ enum BookPeek {
         guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedCloud.group)
         else { return nil }
         return AlertIndex.status(of: orderId, in: dir.appending(path: "Book"))
+    }
+
+    static func badge() -> Int? {
+        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedCloud.group)
+        else { return nil }
+        return AlertIndex.badge(in: dir.appending(path: "Book"))
     }
 }

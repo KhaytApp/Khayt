@@ -74,6 +74,7 @@ struct KhaytCompanionApp: App {
             await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at, ref: ref)
         }
         PushTokenDelegate.api = apiClient
+        ShopBadge.shared.start(api: apiClient)
         KhaytType.applyNavigationBarAppearance()
         #if DEBUG
         Self.openForScreenshots(apiClient, settings: s)
@@ -165,6 +166,8 @@ struct KhaytCompanionApp: App {
                 }
                 // Nothing is polled for a screen nobody can see.
                 .onChange(of: scenePhase) { _, phase in
+                    // Jobs turn late at midnight with the app closed.
+                    if phase == .background { ShopBadge.scheduleRefresh() }
                     live.setActive(phase == .active)
                     channel.setActive(phase == .active)
                     // A token registration is fire-and-forget: one lost to a
@@ -179,6 +182,7 @@ struct KhaytCompanionApp: App {
                         // The APNs token too, unless the cloud took it in the
                         // last few minutes; and whether alerts are still allowed.
                         Task {
+                            await ShopBadge.shared.recompute()
                             await api.refreshPushRegistration()
                             await CompanionNotifications.shared.refreshAuthorization()
                         }
@@ -192,6 +196,10 @@ struct KhaytCompanionApp: App {
                 }
                 .task { channel.setActive(true) }
                 .task { await activeCount.tick() }
+        }
+        // The badge's midnight refresh: Home's count from the book, no network.
+        .backgroundTask(.appRefresh(ShopBadge.refreshTask)) {
+            await ShopBadge.shared.backgroundRefresh()
         }
     }
 }

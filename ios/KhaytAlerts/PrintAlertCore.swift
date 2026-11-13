@@ -235,16 +235,43 @@ enum AlertIndex {
 
     static func url(in directory: URL) -> URL { directory.appending(path: fileName) }
 
-    static func write(_ index: [String: String], to directory: URL) {
-        guard let data = try? JSONSerialization.data(withJSONObject: index, options: [.sortedKeys]) else { return }
+    /// The file: `{"jobs": {id: stage}, "badge": n}`. The app writes `jobs`
+    /// on every book change and `badge` whenever it works out Home's "Needs
+    /// you" count; each write keeps the other half. One process writes it (the
+    /// app), so a lock is enough.
+    private static let lock = NSLock()
+
+    private static func read(_ directory: URL) -> [String: Any] {
+        guard let data = try? Data(contentsOf: url(in: directory)),
+              let doc = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return doc
+    }
+
+    private static func change(_ directory: URL, _ edit: (inout [String: Any]) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        var doc = read(directory)
+        edit(&doc)
+        guard let data = try? JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys]) else { return }
         try? data.write(to: url(in: directory), options: [.atomic])
+    }
+
+    static func write(_ index: [String: String], to directory: URL) {
+        change(directory) { $0["jobs"] = index }
     }
 
     /// The stage of one job, read from the index alone.
     static func status(of orderId: String, in directory: URL) -> String? {
-        guard let data = try? Data(contentsOf: url(in: directory)),
-              let index = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return nil }
-        return index[orderId]
+        (read(directory)["jobs"] as? [String: String])?[orderId]
+    }
+
+    /// Home's "Needs you" count as the app last worked it out — the number
+    /// the extension puts on the app icon. Nil before the app has said.
+    static func badge(in directory: URL) -> Int? {
+        read(directory)["badge"] as? Int
+    }
+
+    static func setBadge(_ count: Int, in directory: URL) {
+        change(directory) { $0["badge"] = max(0, count) }
     }
 }
 
