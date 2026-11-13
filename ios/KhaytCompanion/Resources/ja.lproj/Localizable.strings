@@ -47,7 +47,7 @@
 "settings.connection" = "接続";
 "settings.connection.footer" = "Khaytの「設定」→「LAN API」と同じPINです。デスクトップ版v2.2.1以降が必要です。";
 "settings.shop_name" = "店名";
-"settings.host" = "デスクトップのIPまたはホスト名";
+"settings.host" = "Mac または PC のアドレス";
 "settings.port" = "ポート: %d";
 "settings.pin" = "オーナー用LAN PIN";
 "settings.retest" = "ペアリングを再テスト";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "接続の切断";
 "settings.notify.overdue" = "期限超過の注文";
 "settings.notify.low_stock" = "フィラメント残量低下";
-"settings.docs" = "LAN APIリファレンス";
 
 /* Status */
 "status.quote" = "見積";
@@ -1316,6 +1315,28 @@
 "load.retry" = "再試行";
 "load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
 
+/* Settings in groups (S2) */
+"settings.search" = "設定を検索";
+"settings.search.none" = "「%@」に一致する設定はありません。";
+"settings.group.this_phone" = "この iPhone";
+"settings.group.shop" = "ショップ";
+"settings.group.connected" = "接続";
+"settings.group.about" = "情報";
+"settings.appearance" = "外観と言語";
+"settings.shop_details" = "ショップ情報";
+"settings.shop.readonly" = "Mac で設定 · ここでは読み取り専用";
+"settings.phones_wifi" = "iPhone と Wi-Fi";
+"settings.cloud.sub" = "同期と顧客ページ";
+"settings.help" = "ヘルプ";
+"settings.diag.sub" = "この iPhone のデータ、最近の同期";
+"settings.diag.syncs" = "最近の同期";
+"state.paired" = "ペアリング済み";
+"state.away" = "圏外";
+"state.not_paired" = "未ペアリング";
+"state.signed_in" = "サインイン済み";
+"state.needs_sign_in" = "サインインが必要";
+"state.on" = "オン";
+"state.off" = "オフ";
 /* S4: Simple mode */
 "mode.simple" = "シンプル";
 "mode.professional" = "プロフェッショナル";

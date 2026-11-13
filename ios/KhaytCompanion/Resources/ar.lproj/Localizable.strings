@@ -47,7 +47,7 @@
 "settings.connection" = "الاتصال";
 "settings.connection.footer" = "نفس PIN من إعدادات تطبيق خيط → LAN API. يتطلب سطح المكتب 2.2.1+";
 "settings.shop_name" = "اسم الورشة";
-"settings.host" = "IP أو اسم المضيف";
+"settings.host" = "عنوان الماك أو الكمبيوتر";
 "settings.port" = "المنفذ: %d";
 "settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "انقطاع الاتصال";
 "settings.notify.overdue" = "طلبات متأخرة";
 "settings.notify.low_stock" = "نقص الخيط";
-"settings.docs" = "مرجع LAN API";
 
 /* Status */
 "status.quote" = "عرض سعر";
@@ -1316,6 +1315,28 @@
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
 
+/* Settings in groups (S2) */
+"settings.search" = "ابحث في الإعدادات";
+"settings.search.none" = "لا يوجد إعداد يطابق «%@».";
+"settings.group.this_phone" = "هذا الهاتف";
+"settings.group.shop" = "المتجر";
+"settings.group.connected" = "الاتصالات";
+"settings.group.about" = "حول";
+"settings.appearance" = "المظهر واللغة";
+"settings.shop_details" = "بيانات المتجر";
+"settings.shop.readonly" = "يُضبط على الماك · للقراءة فقط هنا";
+"settings.phones_wifi" = "الهواتف وWi-Fi";
+"settings.cloud.sub" = "المزامنة وصفحات العملاء";
+"settings.help" = "المساعدة";
+"settings.diag.sub" = "ما يحمله هذا الهاتف، وآخر المزامنات";
+"settings.diag.syncs" = "آخر المزامنات";
+"state.paired" = "مقترن";
+"state.away" = "بعيد";
+"state.not_paired" = "غير مقترن";
+"state.signed_in" = "مسجّل الدخول";
+"state.needs_sign_in" = "يلزم تسجيل الدخول";
+"state.on" = "مفعّل";
+"state.off" = "متوقف";
 /* S4: Simple mode */
 "mode.simple" = "بسيط";
 "mode.professional" = "احترافي";

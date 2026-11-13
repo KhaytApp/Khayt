@@ -47,7 +47,7 @@
 "settings.connection" = "Bağlantı";
 "settings.connection.footer" = "Khayt Ayarlar → LAN API’deki PIN ile aynı. Masaüstü v2.2.1 veya üzeri gerekir.";
 "settings.shop_name" = "Dükkân adı";
-"settings.host" = "Masaüstü IP’si veya ana makine adı";
+"settings.host" = "Mac veya PC adresi";
 "settings.port" = "Bağlantı noktası: %d";
 "settings.pin" = "Sahip LAN PIN’i";
 "settings.retest" = "Eşlemeyi yeniden sına";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Bağlantı kesildi";
 "settings.notify.overdue" = "Geciken siparişler";
 "settings.notify.low_stock" = "Filament azaldı";
-"settings.docs" = "LAN API başvurusu";
 
 /* Status */
 "status.quote" = "Teklif";
@@ -1316,6 +1315,28 @@
 "load.retry" = "Tekrar dene";
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
 
+/* Settings in groups (S2) */
+"settings.search" = "Ayarlarda ara";
+"settings.search.none" = "“%@” ile eşleşen ayar yok.";
+"settings.group.this_phone" = "Bu telefon";
+"settings.group.shop" = "Atölye";
+"settings.group.connected" = "Bağlantılar";
+"settings.group.about" = "Hakkında";
+"settings.appearance" = "Görünüm ve dil";
+"settings.shop_details" = "Atölye bilgileri";
+"settings.shop.readonly" = "Mac’te ayarlanır · burada salt okunur";
+"settings.phones_wifi" = "Telefonlar ve Wi-Fi";
+"settings.cloud.sub" = "Eşitleme ve müşteri sayfaları";
+"settings.help" = "Yardım";
+"settings.diag.sub" = "Bu telefonda olanlar, son eşitlemeler";
+"settings.diag.syncs" = "Son eşitlemeler";
+"state.paired" = "Eşleşti";
+"state.away" = "Erişilemiyor";
+"state.not_paired" = "Eşleşmedi";
+"state.signed_in" = "Oturum açık";
+"state.needs_sign_in" = "Oturum açılmalı";
+"state.on" = "Açık";
+"state.off" = "Kapalı";
 /* S4: Simple mode */
 "mode.simple" = "Basit";
 "mode.professional" = "Profesyonel";
