@@ -18,3 +18,4 @@
 "PUSH_QUOTE_DECLINED" = "Un client a décliné un devis";
 "PUSH_MESSAGE" = "Un client a envoyé un message";
 "PUSH_PAYMENT" = "Un paiement est arrivé";
+"PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";

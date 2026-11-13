@@ -1315,6 +1315,8 @@
 "load.failed.title" = "Yüklenemedi";
 "load.retry" = "Tekrar dene";
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
+"PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";
+"push.not_connected" = "Bildirimler henüz bu telefona ulaşmıyor. Khayt bir sonraki açılışta yeniden deneyecek.";
 /* Home — Needs you */
 "home.greeting.morning" = "Günaydın.";
 "home.greeting.afternoon" = "Tünaydın.";

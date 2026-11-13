@@ -1315,6 +1315,8 @@
 "load.failed.title" = "読み込めませんでした";
 "load.retry" = "再試行";
 "load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
+"PUSH_GENERIC" = "ショップに確認が必要な項目があります";
+"push.not_connected" = "通知はまだこのiPhoneに届いていません。次に開いたときに再試行します。";
 /* Home — Needs you */
 "home.greeting.morning" = "おはようございます。";
 "home.greeting.afternoon" = "こんにちは。";
