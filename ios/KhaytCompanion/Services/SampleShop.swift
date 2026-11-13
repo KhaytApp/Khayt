@@ -101,6 +101,7 @@ enum SampleShop {
                 // Store build's sample shop shows no connector until
                 // khaytapp.com/privacy describes them.
                 "plugins": shippedSampleConnectors,
+                "connectorUpdates": sampleConnectorUpdates,
             ], mode)),
             // The catalogue: one with a picture, a rounded price, an override,
             // one never stocked — so every line of the screen is drawn.
@@ -276,6 +277,21 @@ enum SampleShop {
     /// What the sample shop's book holds: the sample connectors once
     /// `ConnectorLaunch.launched` (the one launch-day switch for connectors
     /// on the phone), or in DEBUG; none before.
+    /// `settings.connectorUpdates` for the sample shop: empty, except in a
+    /// DEBUG build launched with `-KhaytConnectorUpdates YES`, where Lamha
+    /// has 1.2.0 waiting for the shop's OK on the Mac, so the update badges
+    /// (frame 21:729) can be photographed.
+    static var sampleConnectorUpdates: JSONValue {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "KhaytConnectorUpdates") {
+            return .object(["serial": .number(1), "connectors": .object([
+                lamhaId: .object(["pending": .object(["version": .string("1.2.0"), "offeredAt": .string("2026-11-11T09:00:00.000Z")])]),
+            ])])
+        }
+        #endif
+        return .object([:])
+    }
+
     static var shippedSampleConnectors: JSONValue {
         #if DEBUG
         sampleConnectors

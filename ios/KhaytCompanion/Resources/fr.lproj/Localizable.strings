@@ -47,7 +47,7 @@
 "settings.connection" = "Connexion";
 "settings.connection.footer" = "Même code PIN que dans Khayt, Réglages → API LAN. Ordinateur v2.2.1 ou ultérieure requis.";
 "settings.shop_name" = "Nom de l’atelier";
-"settings.host" = "IP ou nom d’hôte de l’ordinateur";
+"settings.host" = "Adresse du Mac ou du PC";
 "settings.port" = "Port : %d";
 "settings.pin" = "Code PIN LAN du propriétaire";
 "settings.retest" = "Retester l’association";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Connexion perdue";
 "settings.notify.overdue" = "Commandes en retard";
 "settings.notify.low_stock" = "Filament bas";
-"settings.docs" = "Référence de l’API LAN";
 
 /* Status */
 "status.quote" = "Devis";
@@ -1203,6 +1202,11 @@
 "connectors.status.not_reviewed" = "Non vérifié";
 "connectors.status.off" = "Désactivé";
 "connectors.status.invalid" = "Illisible";
+"connectors.status.revoked" = "Mis en pause par Khayt";
+"plg.update_updated" = "%1$@ mis à jour vers %2$@";
+"plg.update_revoked" = "Khayt a retiré la version %@ : elle est en pause.";
+"plg.update_needs_app" = "%1$@ %2$@ nécessite une version plus récente de Khayt.";
+"plg.update_pending" = "%1$@ %2$@ attend votre accord sur le Mac.";
 "connectors.yes" = "Oui";
 "connectors.no" = "Non";
 "connectors.settings.title" = "Réglages de la boutique";
@@ -1304,6 +1308,12 @@
 "diag.cloud_refused" = "Dernière récupération cloud refusée";
 "diag.refused.wrong_shop" = "refusée : autre atelier";
 "diag.refused.empty" = "refusée : vide";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Attend votre accord sur le Mac";
+"connectors.badge.updated" = "Mis à jour en %@";
+"connectors.badge.needs_app" = "Nécessite un Khayt plus récent";
+"connectors.waiting_count" = "En attente du Mac : %d";
 "intake.waiting" = "En attente";
 "spool.low" = "Faible";
 "stage.a11y.done" = "Terminé";
@@ -1316,6 +1326,28 @@
 "load.retry" = "Réessayer";
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
 
+/* Settings in groups (S2) */
+"settings.search" = "Rechercher dans les réglages";
+"settings.search.none" = "Aucun réglage ne correspond à « %@ ».";
+"settings.group.this_phone" = "Ce téléphone";
+"settings.group.shop" = "Atelier";
+"settings.group.connected" = "Connexions";
+"settings.group.about" = "À propos";
+"settings.appearance" = "Apparence et langue";
+"settings.shop_details" = "Coordonnées de l’atelier";
+"settings.shop.readonly" = "Réglé sur le Mac · lecture seule ici";
+"settings.phones_wifi" = "Téléphones et Wi-Fi";
+"settings.cloud.sub" = "Synchronisation et pages clients";
+"settings.help" = "Aide";
+"settings.diag.sub" = "Ce que ce téléphone contient, dernières synchros";
+"settings.diag.syncs" = "Dernières synchros";
+"state.paired" = "Associé";
+"state.away" = "Hors de portée";
+"state.not_paired" = "Non associé";
+"state.signed_in" = "Connecté";
+"state.needs_sign_in" = "Connexion requise";
+"state.on" = "Activé";
+"state.off" = "Désactivé";
 /* S4: Simple mode */
 "mode.simple" = "Simple";
 "mode.professional" = "Professionnel";

@@ -47,7 +47,7 @@
 "settings.connection" = "Conexão";
 "settings.connection.footer" = "Mesmo PIN do Khayt, Ajustes → API de rede local. Requer a versão 2.2.1 ou posterior do computador.";
 "settings.shop_name" = "Nome da oficina";
-"settings.host" = "IP ou nome do host do computador";
+"settings.host" = "Endereço do Mac ou PC";
 "settings.port" = "Porta: %d";
 "settings.pin" = "PIN da rede local do proprietário";
 "settings.retest" = "Testar o pareamento novamente";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Conexão perdida";
 "settings.notify.overdue" = "Pedidos atrasados";
 "settings.notify.low_stock" = "Filamento acabando";
-"settings.docs" = "Referência da API de rede local";
 
 /* Status */
 "status.quote" = "Orçamento";
@@ -1203,6 +1202,11 @@
 "connectors.status.not_reviewed" = "Não revisado";
 "connectors.status.off" = "Desativado";
 "connectors.status.invalid" = "Ilegível";
+"connectors.status.revoked" = "Pausado pelo Khayt";
+"plg.update_updated" = "%1$@ atualizado para %2$@";
+"plg.update_revoked" = "A Khayt retirou a versão %@, por isso está pausada.";
+"plg.update_needs_app" = "%1$@ %2$@ precisa de uma versão mais recente do Khayt.";
+"plg.update_pending" = "%1$@ %2$@ aguarda sua aprovação no Mac.";
 "connectors.yes" = "Sim";
 "connectors.no" = "Não";
 "connectors.settings.title" = "Ajustes da loja";
@@ -1304,6 +1308,12 @@
 "diag.cloud_refused" = "Último download da nuvem recusado";
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Precisa do seu OK no Mac";
+"connectors.badge.updated" = "Atualizado para %@";
+"connectors.badge.needs_app" = "Precisa de um Khayt mais novo";
+"connectors.waiting_count" = "Aguardando o Mac: %d";
 "intake.waiting" = "Aguardando";
 "spool.low" = "Baixo";
 "stage.a11y.done" = "Concluído";
@@ -1316,6 +1326,28 @@
 "load.retry" = "Tentar de novo";
 "load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";
 
+/* Settings in groups (S2) */
+"settings.search" = "Buscar nos ajustes";
+"settings.search.none" = "Nenhum ajuste corresponde a “%@”.";
+"settings.group.this_phone" = "Este telefone";
+"settings.group.shop" = "Oficina";
+"settings.group.connected" = "Conectado";
+"settings.group.about" = "Sobre";
+"settings.appearance" = "Aparência e idioma";
+"settings.shop_details" = "Dados da oficina";
+"settings.shop.readonly" = "Definido no Mac · aqui só leitura";
+"settings.phones_wifi" = "Telefones e Wi-Fi";
+"settings.cloud.sub" = "Sincronização e páginas de clientes";
+"settings.help" = "Ajuda";
+"settings.diag.sub" = "O que este telefone guarda, últimas sincronizações";
+"settings.diag.syncs" = "Últimas sincronizações";
+"state.paired" = "Pareado";
+"state.away" = "Fora de alcance";
+"state.not_paired" = "Não pareado";
+"state.signed_in" = "Conectado";
+"state.needs_sign_in" = "Precisa entrar";
+"state.on" = "Ativado";
+"state.off" = "Desativado";
 /* S4: Simple mode */
 "mode.simple" = "Simples";
 "mode.professional" = "Profissional";

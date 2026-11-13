@@ -47,7 +47,7 @@
 "settings.connection" = "الاتصال";
 "settings.connection.footer" = "نفس PIN من إعدادات تطبيق خيط → LAN API. يتطلب سطح المكتب 2.2.1+";
 "settings.shop_name" = "اسم الورشة";
-"settings.host" = "IP أو اسم المضيف";
+"settings.host" = "عنوان الماك أو الكمبيوتر";
 "settings.port" = "المنفذ: %d";
 "settings.pin" = "رمز المالك";
 "settings.retest" = "إعادة اختبار الاتصال";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "انقطاع الاتصال";
 "settings.notify.overdue" = "طلبات متأخرة";
 "settings.notify.low_stock" = "نقص الخيط";
-"settings.docs" = "مرجع LAN API";
 
 /* Status */
 "status.quote" = "عرض سعر";
@@ -1203,6 +1202,11 @@
 "connectors.status.not_reviewed" = "لم تتم مراجعته";
 "connectors.status.off" = "متوقف";
 "connectors.status.invalid" = "تتعذّر قراءته";
+"connectors.status.revoked" = "أوقفته خيط";
+"plg.update_updated" = "تم تحديث %1$@ إلى %2$@";
+"plg.update_revoked" = "سحبت خيط الإصدار %@، لذا أوقف مؤقتًا.";
+"plg.update_needs_app" = "يتطلب %1$@ %2$@ إصدارًا أحدث من تطبيق خيط.";
+"plg.update_pending" = "الإصدار %2$@ من %1$@ بانتظار موافقتك على الماك.";
 "connectors.yes" = "نعم";
 "connectors.no" = "لا";
 "connectors.settings.title" = "إعدادات المتجر";
@@ -1304,6 +1308,12 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "بانتظار موافقتك على الماك";
+"connectors.badge.updated" = "حُدِّث إلى %@";
+"connectors.badge.needs_app" = "يتطلب إصدارًا أحدث من تطبيق خيط";
+"connectors.waiting_count" = "بانتظار الماك: %d";
 "intake.waiting" = "بالانتظار";
 "spool.low" = "منخفض";
 "stage.a11y.done" = "تمّت";
@@ -1316,6 +1326,28 @@
 "load.retry" = "أعد المحاولة";
 "load.book_unavailable" = "تعذّرت قراءة الدفتر على هذا الهاتف. أعد المحاولة، أو تأكّد أن الماك في المتناول.";
 
+/* Settings in groups (S2) */
+"settings.search" = "ابحث في الإعدادات";
+"settings.search.none" = "لا يوجد إعداد يطابق «%@».";
+"settings.group.this_phone" = "هذا الهاتف";
+"settings.group.shop" = "المتجر";
+"settings.group.connected" = "الاتصالات";
+"settings.group.about" = "حول";
+"settings.appearance" = "المظهر واللغة";
+"settings.shop_details" = "بيانات المتجر";
+"settings.shop.readonly" = "يُضبط على الماك · للقراءة فقط هنا";
+"settings.phones_wifi" = "الهواتف وWi-Fi";
+"settings.cloud.sub" = "المزامنة وصفحات العملاء";
+"settings.help" = "المساعدة";
+"settings.diag.sub" = "ما يحمله هذا الهاتف، وآخر المزامنات";
+"settings.diag.syncs" = "آخر المزامنات";
+"state.paired" = "مقترن";
+"state.away" = "بعيد";
+"state.not_paired" = "غير مقترن";
+"state.signed_in" = "مسجّل الدخول";
+"state.needs_sign_in" = "يلزم تسجيل الدخول";
+"state.on" = "مفعّل";
+"state.off" = "متوقف";
 /* S4: Simple mode */
 "mode.simple" = "بسيط";
 "mode.professional" = "احترافي";

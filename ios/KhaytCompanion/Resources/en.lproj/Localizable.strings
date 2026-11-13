@@ -47,7 +47,7 @@
 "settings.connection" = "Connection";
 "settings.connection.footer" = "Same PIN as Khayt Settings → LAN API. Desktop v2.2.1+ required.";
 "settings.shop_name" = "Shop name";
-"settings.host" = "Desktop IP or hostname";
+"settings.host" = "Mac or PC address";
 "settings.port" = "Port: %d";
 "settings.pin" = "Owner LAN PIN";
 "settings.retest" = "Re-test pairing";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Connection lost";
 "settings.notify.overdue" = "Overdue orders";
 "settings.notify.low_stock" = "Low filament";
-"settings.docs" = "LAN API reference";
 
 /* Status */
 "status.quote" = "Quote";
@@ -1203,6 +1202,11 @@
 "connectors.status.not_reviewed" = "Not reviewed";
 "connectors.status.off" = "Off";
 "connectors.status.invalid" = "Can’t be read";
+"connectors.status.revoked" = "Paused by Khayt";
+"plg.update_updated" = "%1$@ updated to %2$@";
+"plg.update_revoked" = "Khayt withdrew version %@, so it is paused.";
+"plg.update_needs_app" = "%1$@ %2$@ needs a newer version of Khayt.";
+"plg.update_pending" = "%1$@ %2$@ is waiting for your agreement on the Mac.";
 "connectors.yes" = "Yes";
 "connectors.no" = "No";
 "connectors.settings.title" = "Shop settings";
@@ -1304,6 +1308,12 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Needs your OK on the Mac";
+"connectors.badge.updated" = "Updated to %@";
+"connectors.badge.needs_app" = "Needs a newer Khayt";
+"connectors.waiting_count" = "Waiting on the Mac: %d";
 "intake.waiting" = "Waiting";
 "spool.low" = "Low";
 "stage.a11y.done" = "Done";
@@ -1316,6 +1326,28 @@
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
 
+/* Settings in groups (S2) */
+"settings.search" = "Search settings";
+"settings.search.none" = "No setting matches “%@”.";
+"settings.group.this_phone" = "This phone";
+"settings.group.shop" = "Shop";
+"settings.group.connected" = "Connected";
+"settings.group.about" = "About";
+"settings.appearance" = "Appearance & language";
+"settings.shop_details" = "Shop details";
+"settings.shop.readonly" = "Set on the Mac · read-only here";
+"settings.phones_wifi" = "Phones & Wi-Fi";
+"settings.cloud.sub" = "Sync and customer pages";
+"settings.help" = "Help";
+"settings.diag.sub" = "What this phone holds, last syncs";
+"settings.diag.syncs" = "Last syncs";
+"state.paired" = "Paired";
+"state.away" = "Away";
+"state.not_paired" = "Not paired";
+"state.signed_in" = "Signed in";
+"state.needs_sign_in" = "Needs sign-in";
+"state.on" = "On";
+"state.off" = "Off";
 /* S4: Simple mode */
 "mode.simple" = "Simple";
 "mode.professional" = "Professional";
