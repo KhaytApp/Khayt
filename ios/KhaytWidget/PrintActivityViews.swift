@@ -43,6 +43,7 @@ enum PrintActivityLook {
     /// Hanken Grotesk: names, labels, pills. Regular, Medium or SemiBold
     /// (bolder asks get SemiBold, the heaviest the extension carries).
     static func text(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        if arabic { return .custom(arabicName(weight), fixedSize: size) }
         let name = switch weight {
         case .regular, .light, .thin, .ultraLight: "HankenGrotesk-Regular"
         case .medium: "HankenGrotesk-Medium"
@@ -52,7 +53,23 @@ enum PrintActivityLook {
     }
 
     /// Archivo Bold: the big figure (time left, counts).
-    static func display(_ size: CGFloat) -> Font { .custom("Archivo-Bold", fixedSize: size) }
+    static func display(_ size: CGFloat) -> Font {
+        .custom(arabic ? "IBMPlexSansArabic-Bold" : "Archivo-Bold", fixedSize: size)
+    }
+
+    /// IBM Plex Sans Arabic: every face when the widget speaks Arabic (Turki,
+    /// Nov 11: one Arabic font on every app). A widget draws in the phone's
+    /// own language, which is the extension bundle's chosen localization.
+    static var arabic: Bool { Bundle.main.preferredLocalizations.first?.hasPrefix("ar") == true }
+
+    static func arabicName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .bold, .heavy, .black: "IBMPlexSansArabic-Bold"
+        case .semibold: "IBMPlexSansArabic-SemiBold"
+        case .medium: "IBMPlexSansArabic-Medium"
+        default: "IBMPlexSansArabic-Regular"
+        }
+    }
 
     /// JetBrains Mono Medium: figures only (percents, counts' labels in
     /// Latin). It has no Arabic, and Arabic set in a mono fallback is spaced
@@ -61,7 +78,9 @@ enum PrintActivityLook {
 
     /// The faces the extension bundles, by PostScript name.
     static let faces = ["Archivo-Bold", "HankenGrotesk-Regular", "HankenGrotesk-Medium",
-                        "HankenGrotesk-SemiBold", "JetBrainsMono-Medium"]
+                        "HankenGrotesk-SemiBold", "JetBrainsMono-Medium",
+                        "IBMPlexSansArabic-Regular", "IBMPlexSansArabic-Medium",
+                        "IBMPlexSansArabic-SemiBold", "IBMPlexSansArabic-Bold"]
 
     static func tone(_ phase: PrintActivityAttributes.ContentState.Phase) -> Color {
         switch phase {
