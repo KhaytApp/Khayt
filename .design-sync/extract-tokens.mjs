@@ -52,7 +52,7 @@ const palette = { ...adaptives(read('Palette.swift')), ...adaptives(read('Surfac
  * Named rather than inferred: a rename in Palette.swift should stop this script
  * dead, not quietly ship a token list that is missing a colour nobody noticed.
  */
-const NEEDED = ['brand', 'onBrand', 'hot', 'done', 'attention', 'late', 'note',
+const NEEDED = ['brand', 'onBrand', 'thread', 'done', 'attention', 'late', 'note',
                 'marked', 'surface', 'ground', 'hairline'];
 const missing = NEEDED.filter((k) => !palette[k]);
 if (missing.length) {

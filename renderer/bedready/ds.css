@@ -21,7 +21,9 @@ html[data-design="studio"] {
   --text-faint:  #4a5366;
 
   /* accent is driven by --accent-h/s/l so Tweaks can swap hue */
-  --accent-h: 187; --accent-s: 76%; --accent-l: 53%;
+  --accent-h: 187;
+  --accent-s: 76%;
+  --accent-l: 53%;
   --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
   --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.14);
   --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);

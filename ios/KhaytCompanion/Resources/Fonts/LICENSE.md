@@ -11,7 +11,15 @@ app, the Mac and the site read as one product:
   Project Authors (https://github.com/JetBrains/JetBrainsMono).
   `OFL-jetbrains-mono.txt`.
 
-All three are under the SIL Open Font License, Version 1.1. The full text of
+- **IBM Plex Sans Arabic** (every face when the app is in Arabic) — Copyright
+  © 2017 IBM Corp., with Reserved Font Name "Plex"
+  (https://github.com/IBM/plex). `OFL-ibm-plex-sans-arabic.txt`. The four
+  static TrueType files (Regular, Medium, SemiBold, Bold) are google/fonts'
+  `ofl/ibmplexsansarabic` files, unmodified; their PostScript names are
+  already `IBMPlexSansArabic-<Style>`. The widget extension carries the same
+  four.
+
+All four are under the SIL Open Font License, Version 1.1. The full text of
 each licence ships in the app bundle beside the fonts, as the licence's
 condition 2 requires of any copy that is redistributed.
 

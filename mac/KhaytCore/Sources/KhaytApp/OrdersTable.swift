@@ -109,7 +109,7 @@ struct OrdersTable: View {
             // the test is the data rather than a setting somebody has to find.
             TableColumn(shop.words.callIt("mac.customer"), value: \.client) { job in
                 Text(job.client.isEmpty ? "—" : job.client)
-                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
             .width(min: 100, ideal: 110)
@@ -133,7 +133,7 @@ struct OrdersTable: View {
                         .lineLimit(1)
                         .help(label)
                 } else {
-                    Text("—").foregroundStyle(.tertiary)
+                    Text("—").foregroundStyle(Khayt.faint)
                 }
             }
             .width(min: 64, ideal: 76)
@@ -296,7 +296,7 @@ struct JobTitleCell: View {
             // still opens the job either way.
             ViewThatFits(in: .horizontal) {
                 Text(job.reference)
-                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                    .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                     .lineLimit(1).fixedSize()
                 Color.clear.frame(width: 0, height: 0)
             }
@@ -388,7 +388,7 @@ private struct StageCell: View {
             HStack(spacing: 6) {
                 // The one movement reserved for work in progress, on the one
                 // row that is work in progress.
-                Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
+                Circle().fill(Khayt.thread).frame(width: 6, height: 6).alive()
                 LayerProgress(progress: Double(live.progress) / 100, height: 14)
                     .frame(width: 32)
                 Text(verbatim: shop.words.numeral(live.progress) + "%")
@@ -396,7 +396,9 @@ private struct StageCell: View {
                     // A print gains a percent every few minutes and the figure
                     // used to be a different number with no moment in between.
                     .contentTransition(.numericText())
-                    .foregroundStyle(Khayt.hot)
+                    // Ink beside the amber dot and bar: amber is about 2:1
+                    // on a white row, and a figure has to be read.
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
             }
             .help(tooltip(stage: stage, live: live))
@@ -417,7 +419,7 @@ private struct StageCell: View {
             // animates nothing.
             .animation(Motion.of(Motion.figure, unless: reduced), value: stage)
         } else {
-            Text(job.status).foregroundStyle(.tertiary)
+            Text(job.status).foregroundStyle(Khayt.faint)
         }
     }
 
@@ -660,14 +662,18 @@ private struct Owed: View {
         // telling a shop it had been paid for work it never charged for.
         //
         // Nothing was owed and nothing was paid. That is a dash.
-        if job.price <= 0 {
+        //
+        // The same for a quote, a cancelled job, a voided or a credited one:
+        // nothing was ever charged, so "settled" is not what happened
+        // (Nov 11 2026 UI review, B8).
+        if job.price <= 0 || !job.owesAtAll {
             Text("—")
                 .foregroundStyle(.quaternary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else if job.isSettled {
             Text(words.callIt("mac.settled"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Khayt.faint)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .trailing, spacing: 3) {

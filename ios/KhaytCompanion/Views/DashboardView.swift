@@ -98,7 +98,7 @@ struct DashboardView: View {
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showSettings) { SettingsView(showsClose: true) }
             .sheet(isPresented: $showNew, onDismiss: openNewChoice) {
                 NewSheet(holdsBook: api.holdsBook) { newChoice = $0 }
             }
@@ -246,7 +246,7 @@ struct DashboardView: View {
                         .padding(.horizontal, 4)
                         .frame(minWidth: 17, minHeight: 17)
                         .background(KhaytDesign.late, in: Capsule())
-                        .offset(x: 2, y: -2)
+                        .padding(.trailing, -2).offset(y: -2)  // trailing: mirrored in Arabic (an x offset is not)
                 }
             }
         }

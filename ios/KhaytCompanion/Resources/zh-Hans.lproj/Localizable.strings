@@ -836,6 +836,28 @@
 "library.priced_here" = "已在此 iPhone 上按你的价格计算。多色模型按一卷线轴计算成本，因此可能与 Mac 上的数字略有差异。";
 "library.no_copy" = "无法连接 Mac。请在“设置”中登录 Khayt Cloud 并同步一次，你的模型库就会随身携带。";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "粉色";
+"colour.brown" = "棕色";
+"library.filter.colour" = "颜色";
+"library.filter.type" = "文件类型";
+"library.filter.multi" = "多色";
+"library.filter.none" = "无颜色信息";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "其他";
+"library.type.nofile" = "无文件（来自网页）";
+"library.filter.colour_hint" = "选择多个，可查看包含其中任意一种的模型。";
+"library.filter.counts_hint" = "数量按其他筛选条件之后的模型库计算。没有模型的行会变灰，不会被移除。";
+"library.filter.n_of_m" = "%1$d / %2$d";
+"library.filter.pill" = "%1$@：%2$@";
+"library.filter.remove" = "移除%@";
+"library.filter.row" = "%1$@：%2$d";
+"library.filter.chosen" = "%1$@，已选：%2$d";
+
 /* Catalogue */
 "catalogue.title" = "产品目录";
 "catalogue.search" = "搜索产品";
@@ -1008,7 +1030,7 @@
 "new.calculator.detail" = "手动计算价格";
 "new.expense.detail" = "拍下收据";
 "new.waste.detail" = "打印失败或冲料";
-"new.more" = "更多";
+"new.more" = "其他";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "单据";
 "paper.packing_slip" = "装箱单";
@@ -1282,6 +1304,12 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+"intake.waiting" = "等待中";
+"spool.low" = "偏低";
+"stage.a11y.done" = "已完成";
+"order.new.hint.client" = "选择或输入名称";
+"order.new.hint.project" = "做什么？例如零件名称";
+"order.new.hint.material" = "例如 PLA，黑色";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "无法加载";

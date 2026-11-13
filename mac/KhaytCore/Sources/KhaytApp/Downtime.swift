@@ -60,7 +60,7 @@ struct DowntimeCard: View {
                     Spacer().frame(width: 130)
                     ForEach(months, id: \.self) { month in
                         Text(MonthLabel.short(month))
-                            .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                            .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint)
                             .frame(maxWidth: .infinity)
                     }
                     Spacer().frame(width: 62)
@@ -96,7 +96,7 @@ struct DowntimeCard: View {
                     Text(value > 0 ? DowntimeCard.hours(value, shop.words) : "—")
                         .font(.caption).monospacedDigit()
                         .foregroundStyle(value > 0 ? AnyShapeStyle(.primary)
-                                                   : AnyShapeStyle(.tertiary))
+                                                   : AnyShapeStyle(Khayt.faint))
                         .frame(maxWidth: .infinity)
                 }
                 // The bar is the machine's TOTAL against the worst machine, so

@@ -126,17 +126,61 @@
    * 'declined'; `paid` is the payment provider's word. `advance` is true when
    * an approval should move the job on — only for a job still a quote, as the
    * desktop moved it, through the shop's own status rule.
+   *
+   * THE CLOUD CALLS A DECLINE `reject`. This read only `decline`, the word the
+   * retired PHP backend used, so against the live cloud a customer who
+   * declined a quote was reported as "no response yet" on the Mac and the
+   * desktop alike (found Nov 12 2026 while adding `stale`). Both words are a
+   * decline.
+   *
+   * `stale` is true when the decline answered an EARLIER version of the quote:
+   * the shop has since re-published the same link with a different amount,
+   * currency, items or validity, and the customer has not answered the new
+   * one. The cloud works that out (`actionStale` on the item, Khayt Cloud
+   * #209); nothing here computes a signature. `response` stays 'declined', so
+   * every count and filter that asks for a decline is unchanged, and only the
+   * wording looks at `stale`.
    */
   function responseFor(items, pubToken, order) {
     const list = Array.isArray(items) ? items : [];
     const item = list.find((x) => x && String(x.token) === String(pubToken || '')) || null;
-    if (!item) return { found: false, response: 'none', paid: false, advance: false };
+    if (!item) return { found: false, response: 'none', paid: false, advance: false, stale: false };
     const act = item.action && typeof item.action === 'object' ? item.action : null;
     const paid = !!(item.payment && item.payment.status === 'paid');
     const type = act && act.type ? String(act.type) : '';
-    const response = type === 'approve' ? 'approved' : (type === 'decline' ? 'declined' : 'none');
+    const declined = type === 'reject' || type === 'decline';
+    const response = type === 'approve' ? 'approved' : (declined ? 'declined' : 'none');
     const advance = response === 'approved' && !!order && order.status === 'quote';
-    return { found: true, response, paid, advance, note: act && act.note ? String(act.note) : '' };
+    const stale = response === 'declined' && item.actionStale === true;
+    return { found: true, response, paid, advance, stale, note: act && act.note ? String(act.note) : '' };
+  }
+
+  /**
+   * The "Check response" line, as words to look up and a tone, so every app
+   * words the same answer the same way. `said` is `responseFor`'s answer,
+   * optionally with `advanced` (the job was moved on just now).
+   *
+   * { key, tone, mark, paidNote }: `key` is a locale key, `tone` is 'live' |
+   * 'late' | 'wait' | 'muted', `mark` is '✓' | '✗' | '', and `paidNote` is true
+   * when "deposit paid" should follow the line. A decline of an EARLIER
+   * version (`stale`) is not a refusal of this quote: it is waiting, in steel.
+   */
+  function responseLine(said) {
+    const s = said || {};
+    const paid = !!s.paid;
+    if (s.response === 'approved') {
+      return s.advanced
+        ? { key: 'cloud.portal_approved_advanced', tone: 'live', mark: '✓', paidNote: paid }
+        : { key: 'cloud.portal_approved', tone: 'live', mark: '✓', paidNote: paid };
+    }
+    if (s.response === 'declined') {
+      return s.stale
+        ? { key: 'cloud.portal_declined_earlier', tone: 'wait', mark: '', paidNote: paid }
+        : { key: 'cloud.portal_declined', tone: 'late', mark: '✗', paidNote: paid };
+    }
+    return paid
+      ? { key: 'cloud.portal_deposit_paid', tone: 'live', mark: '✓', paidNote: false }
+      : { key: 'cloud.portal_no_response', tone: 'muted', mark: '', paidNote: false };
   }
 
   /**
@@ -364,7 +408,7 @@
     return { ok: true, amount: back };
   }
 
-  const api = { portalUrl, paths, trialGate, depositForm, responseFor, errorFor, linkNote, threadFrom, httpUrl,
+  const api = { portalUrl, paths, trialGate, depositForm, responseFor, responseLine, errorFor, linkNote, threadFrom, httpUrl,
     recordPortalPayment, undoPortalPayment, paymentKey, paymentAmount, MATCH_DAYS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytPortalOwner = api;

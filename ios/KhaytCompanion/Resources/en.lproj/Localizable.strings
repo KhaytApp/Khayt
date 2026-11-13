@@ -836,6 +836,28 @@
 "library.priced_here" = "Worked out on this phone with your prices. A model in several colours is costed on one spool, so the Mac's figure can differ a little.";
 "library.no_copy" = "The Mac can't be reached. Sign in to Khayt Cloud in Settings and sync once, and your library comes with you.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Pink";
+"colour.brown" = "Brown";
+"library.filter.colour" = "Colour";
+"library.filter.type" = "File type";
+"library.filter.multi" = "Multicolour";
+"library.filter.none" = "No colour info";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "Other";
+"library.type.nofile" = "No file (from the web)";
+"library.filter.colour_hint" = "Pick more than one to see models that have any of them.";
+"library.filter.counts_hint" = "Counts are for the library as the other filters leave it. A row with nothing is greyed, not removed.";
+"library.filter.n_of_m" = "%1$d of %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "Remove %@";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@, chosen: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Catalogue";
 "catalogue.search" = "Search products";
@@ -1008,7 +1030,7 @@
 "new.calculator.detail" = "Price a print by hand";
 "new.expense.detail" = "Photo of the receipt";
 "new.waste.detail" = "A failed print or purge";
-"new.more" = "More";
+"new.more" = "Also";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papers";
 "paper.packing_slip" = "Packing slip";
@@ -1282,6 +1304,12 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+"intake.waiting" = "Waiting";
+"spool.low" = "Low";
+"stage.a11y.done" = "Done";
+"order.new.hint.client" = "Choose or type a name";
+"order.new.hint.project" = "What is it? e.g. a part name";
+"order.new.hint.material" = "e.g. PLA, black";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Couldn't load";

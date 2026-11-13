@@ -5,6 +5,11 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var health: ConnectionHealth
+    @Environment(\.dismiss) private var dismiss
+    /// Opened as a sheet (Home's gear on a phone): a Close button, since a
+    /// swipe is the only other way out and VoiceOver users have no swipe
+    /// (UI review Nov 11, F6). As a tab (regular width) there is nothing to close.
+    var showsClose = false
 
     @State private var testResult: String?
     @State private var isTesting = false
@@ -69,7 +74,7 @@ struct SettingsView: View {
                     Text(L10n.format("settings.version", DiagnosticsSheet.version, DiagnosticsSheet.build))
                         .font(.khayt(11.5, relativeTo: .caption2))
                         .foregroundStyle(KhaytDesign.note)
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                         .onLongPressGesture { showDiagnostics = true }
                         .accessibilityAction(named: L10n.tr("diag.title")) { showDiagnostics = true }
@@ -85,6 +90,13 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .khaytScreen(title: L10n.tr("tab.settings"))
+            .toolbar {
+                if showsClose {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(L10n.tr("common.close")) { dismiss() }
+                    }
+                }
+            }
             .background(KhaytDesign.ground.ignoresSafeArea())
             .sheet(isPresented: $showCloudSignIn) { CloudSignInSheet() }
             .sheet(isPresented: $showDiagnostics) { DiagnosticsSheet() }

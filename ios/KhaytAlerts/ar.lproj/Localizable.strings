@@ -7,7 +7,7 @@
 "alert.print.move_post" = "انقل إلى ما بعد الطباعة";
 "alert.print.reprint" = "أعدها إلى الطابور";
 "alert.print.mark_shipped" = "علّمها مشحونة";
-"PUSH_TITLE" = "Khayt";
+"PUSH_TITLE" = "خيط";
 "PUSH_PRINT_FINISHED" = "انتهت طباعة";
 "PUSH_INTAKE" = "طلب جديد";
 "PUSH_OVERDUE" = "هناك طلبات متأخرة";

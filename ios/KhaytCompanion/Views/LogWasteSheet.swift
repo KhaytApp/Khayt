@@ -49,7 +49,7 @@ struct LogWasteSheet: View {
                             if materials.isEmpty {
                                 // Falling back to free text beats blocking the log:
                                 // a record with a typo is worth more than no record.
-                                TextField("", text: $material, prompt: Text(verbatim: "PLA"))
+                                TextField(L10n.tr("waste.material"), text: $material, prompt: Text(verbatim: "PLA"))
                             } else {
                                 V2Chips(options: materials, selection: $material) { $0 }
                                     .padding(.vertical, 4)
@@ -61,13 +61,13 @@ struct LogWasteSheet: View {
                         }
                         V2Field(label: L10n.tr("waste.weight")) {
                             HStack(spacing: 6) {
-                                TextField("", text: $weight, prompt: Text(verbatim: "0"))
+                                TextField(L10n.tr("waste.weight"), text: $weight, prompt: Text(verbatim: "0"))
                                     .keyboardType(.numberPad)
                                 Text(L10n.tr("unit.g")).foregroundStyle(KhaytDesign.note)
                             }
                         }
                         V2Field(label: L10n.tr("waste.reason"), last: true) {
-                            TextField("", text: $reason, axis: .vertical)
+                            TextField(L10n.tr("waste.reason"), text: $reason, prompt: Text(verbatim: ""), axis: .vertical)
                                 .lineLimit(1...3)
                         }
                     }

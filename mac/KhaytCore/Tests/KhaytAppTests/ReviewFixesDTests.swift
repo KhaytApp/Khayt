@@ -31,6 +31,57 @@ struct ReviewFixesDTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.contains(".damaged-") }.count == 1)
     }
 
+    /// The save rolled the DAMAGED book onto `.prev` (the only good copy) and
+    /// then renamed: a crash between the two left both files damaged.
+    @Test("a save that started from the rollback leaves the rollback alone; the next save rolls as usual")
+    func rollbackSurvivesTheSaveThatUsedIt() throws {
+        let dir = try Self.folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "khayt-store.json")
+        let prev = url.appendingPathExtension("prev")
+        let good = Data(#"{"clients":[{"id":"C1"}]}"#.utf8)
+        try Data("{ this is not json".utf8).write(to: url)
+        try good.write(to: prev)
+
+        #expect(try StoreWriter.readBookNoting(url).fromRollback)
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }, recordingDeletes: false) { root in
+            root["marker"] = .string("first")
+            // What a crash right here would leave: the rollback must still be
+            // the good book, not a link to the damaged one.
+            #expect((try? Data(contentsOf: prev)) == good)
+        }
+        #expect(try StoreWriter.readBook(url).1["marker"] == .string("first"), "the new book is good")
+        #expect(try Data(contentsOf: prev) == good, "the rollback is still the old good copy")
+        #expect(try !StoreWriter.readBookNoting(url).fromRollback)
+
+        // The book reads normally now, so this save rolls it to `.prev` as ever.
+        try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }, recordingDeletes: false) { root in
+            root["marker"] = .string("second")
+        }
+        #expect(try StoreWriter.readBook(url).1["marker"] == .string("second"))
+        let rolled = try JSONValue.decode([String: JSONValue].self, from: Data(contentsOf: prev))
+        #expect(rolled["marker"] == .string("first"))
+    }
+
+    @Test("told to keep the rollback, a save does not replace it; untold, it does")
+    func keepingRollbackIsTheOnlyDifference() throws {
+        let dir = try Self.folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "khayt-store.json")
+        let prev = url.appendingPathExtension("prev")
+        try Data("damaged".utf8).write(to: url)
+        try Data(#"{"n":1}"#.utf8).write(to: prev)
+        try StoreWriter.atomicWrite(Data(#"{"n":2}"#.utf8), to: url, keepingRollback: true)
+        #expect(try Data(contentsOf: prev) == Data(#"{"n":1}"#.utf8))
+        #expect(try Data(contentsOf: url) == Data(#"{"n":2}"#.utf8))
+        try StoreWriter.atomicWrite(Data(#"{"n":3}"#.utf8), to: url)
+        #expect(try Data(contentsOf: prev) == Data(#"{"n":2}"#.utf8))
+        // With no rollback to keep, the flag changes nothing.
+        try FileManager.default.removeItem(at: prev)
+        try StoreWriter.atomicWrite(Data(#"{"n":4}"#.utf8), to: url, keepingRollback: true)
+        #expect(try Data(contentsOf: prev) == Data(#"{"n":3}"#.utf8))
+    }
+
     @Test("a healthy book is read as it is, and a damaged one with no rollback is still refused")
     func ordinaryReads() throws {
         let dir = try Self.folder()

@@ -326,6 +326,19 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     var swaps: Int { swapCount ?? 0 }
     var palette: [Colour] { colors ?? [] }
 
+    /// The Colour filter rows this model is under: each colour family it was
+    /// sliced in, `multi` for two or more different ones, or `none` when its
+    /// record holds no colour (`ColourFamily`, `lib/colour-family.js`). Only
+    /// what the slicer wrote — never guessed from the shop's spools.
+    var colourTokens: [String] { ColourFamily.tokens(ofHexes: palette.map(\.hex)) }
+
+    /// The File type filter row this model is under (`ModelFileType`,
+    /// `lib/model-file-type.js`).
+    var fileType: ModelFileType {
+        ModelFileType.type(hasSourceFile: sourceFile != nil, ext: sourceFile?.ext, kind: sourceFile?.kind,
+                           names: [sourceFile?.filename, sourceFile?.originalName, archiveMember, externalPath])
+    }
+
     /// The group this model belongs to, or nil for ungrouped.
     ///
     /// **The PRESENCE of `folder` decides, not whether it holds anything.** A
