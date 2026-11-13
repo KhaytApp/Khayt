@@ -816,6 +816,7 @@ struct VaultSalesHooksBlock: View {
             Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u, forType: .string) }
             label: { Image(systemName: "doc.on.doc") }
                 .buttonStyle(.borderless).help(words.callIt("mac.ik_copy"))
+                .accessibilityLabel(words.callIt("mac.ik_copy"))
         }
         .environment(\.layoutDirection, .leftToRight)
     }

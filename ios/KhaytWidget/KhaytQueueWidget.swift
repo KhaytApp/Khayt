@@ -256,7 +256,7 @@ struct KhaytQueueWidget: Widget {
                 .widgetURL(URL(string: "khayt://screen/jobs"))
         }
         .configurationDisplayName("Khayt Queue")
-        .description("Queue counts and live print progress from your desktop.")
+        .description("Queue counts and live print progress from your shop.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }

@@ -79,6 +79,9 @@ async function boot() {
   vm.runInContext(read('renderer/util.js'), ctx);
   vm.runInContext(read('lib/color-mix.js'), ctx);
   vm.runInContext(read('lib/hueforge.js'), ctx);
+  // The panel's text goes through t(), as it does in both apps' pages.
+  vm.runInContext(read('renderer/locales/en.js'), ctx);
+  vm.runInContext(read('renderer/i18n.js'), ctx);
   vm.runInContext(read('renderer/hueforge.js'), ctx);
 
   window.renderHueForge();

@@ -166,6 +166,30 @@
     'nonBusiness', 'clientRef', 'locationId',
   ];
 
+  /**
+   * Write on a new job the currency its amounts are in, when that is not the
+   * shop's own.
+   *
+   * A job with no `currency` is read in its customer's. The template's
+   * amounts were copied as they are, so a repeat for a customer who bills in
+   * EUR is in EUR — and stays in EUR only while the customer does. Change the
+   * customer to USD (or let a computer on an old build sync that change in,
+   * one that does not pin the old jobs first) and an unstamped repeat
+   * becomes a USD job of the same numbers. So it says EUR, as a repeat child
+   * (`renderer/operations-extras.js`), a subscription bill and a cloud intake
+   * already do. A job in the shop's currency for a customer who bills in it
+   * carries none, as before, so its shape is unchanged.
+   *
+   * The template's own `currency`, when it has one, was carried already.
+   */
+  function stampCurrency(job, settings, clients) {
+    if (job.currency) return;
+    const base = (settings && settings.currency) || 'SAR';
+    const client = job.clientId ? arrayOf(clients).find(x => x && x.id === job.clientId) : null;
+    const cur = (client && client.currency) || base;
+    if (cur !== base) job.currency = cur;
+  }
+
   /** `srv`-style hex from the bytes the caller supplies, as `lib/order-new.js` writes it. */
   function hex(bytes) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -199,7 +223,9 @@
    * template's: a shared token opens the old job's page.
    * `ctx.tokens.id` (random bytes) is the tag on the job's id; `ctx.orders`,
    * the book, keeps the invoice counter past numbers already in it.
-   * `ctx.settings` IS MUTATED to take the invoice number.
+   * `ctx.settings` IS MUTATED to take the invoice number. `ctx.clients`, the
+   * customers, tells which currency an unstamped template is in
+   * (`stampCurrency`).
    */
   function clone(template, ctx) {
     const c = ctxOf(ctx);
@@ -223,6 +249,7 @@
     // Only keys the template HAS: a key present and undefined is a different
     // record shape from one without it.
     for (const k of CARRIED) if (Object.prototype.hasOwnProperty.call(template, k)) job[k] = copy(template[k]);
+    stampCurrency(job, settings, c.clients);
     return Object.assign(job, {
       parts: Array.isArray(template.parts) ? template.parts.map(p => freshPart(p, D.PART_RUN_KEYS, c.uid)) : [],
       id: N.mintOrderId(jobNumber, tokens.id),
@@ -275,7 +302,7 @@
     for (const effect of due(clients, list, { now, today: c.today }).effects) {
       const rec = effect.client.recurring;
       if (effect.kind === 'stop') { rec.enabled = false; continue; }
-      const order = clone(effect.template, { settings, now, recurring: rec, cycle: effect.cycle, tokens: tokens.shift(), uid: c.uid, orders: list });
+      const order = clone(effect.template, { settings, now, recurring: rec, cycle: effect.cycle, tokens: tokens.shift(), uid: c.uid, orders: list, clients });
       list.unshift(order);
       created.push(order);
       rec.nextDue = advance(rec.nextDue, rec.interval);

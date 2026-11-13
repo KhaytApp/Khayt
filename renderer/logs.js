@@ -241,7 +241,7 @@ function renderLogs() {
     return `
     <tr${isOverdue ? ' class="row-overdue"' : ''}${isSel ? ' style="background:rgba(91,156,240,0.07);"' : ''}>
       <td style="width:32px;padding:8px 6px;"><input type="checkbox" class="log-sel" data-id="${log.id}" style="width:auto;" ${isSel ? 'checked' : ''}></td>
-      <td style="font-family: var(--font-num); font-size: 12px; color: var(--text-dim); white-space:nowrap;">${escapeHtml(log.date)}</td>
+      <td style="font-family: var(--font-num); font-size: 12px; color: var(--text-dim); white-space:nowrap;">${escapeHtml(formatPrintDate(log.date))}</td>
       <td>
         ${getPriorityLevel(log) !== 'normal' ? priorityBadgeHtml(log) + ' ' : ''}<strong>${escapeHtml(log.project)}</strong>${log.dueDate && !KhaytOrderStatus.isFinished(log) && log.status !== 'cancelled' ? ' ' + formatDueDateBadge(log.dueDate) : ''}${logSplitBadge}${logSubBadge}${logKitBadge}
         ${logOperator ? `<span class="operator-badge">👤 ${escapeHtml(logOperator.name)}</span>` : ''}
@@ -250,7 +250,7 @@ function renderLogs() {
       </td>
       <td>
         <span class="badge ${escapeHtml(log.status)}">${escapeHtml(t('queue.' + log.status))}</span>${log.deliveredAt ? ` <span style="font-size:10px; color:var(--success);">✓ ${escapeHtml(t('queue.delivered'))}</span>` : ''}
-        ${KhaytOrderStatus.isFinished(log) && log.completedAt ? `<div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">✓ ${escapeHtml(t('ord.completed_at'))}: ${escapeHtml(new Date(log.completedAt).toLocaleDateString(localeTag()))}</div>` : ''}
+        ${KhaytOrderStatus.isFinished(log) && log.completedAt ? `<div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">✓ ${escapeHtml(t('ord.completed_at'))}: ${escapeHtml(formatPrintDate(log.completedAt))}</div>` : ''}
         ${log.qcPassedAt ? `<div style="margin-top:2px;"><span class="qc-badge">✅ ${escapeHtml(t('ord.qc_passed'))}</span>${log.qcNotes ? `<span style="font-size:11px;color:var(--text-muted);margin-inline-start:5px;">${escapeHtml(log.qcNotes)}</span>` : ''}</div>` : ''}
         ${(log.milestoneInvoices && log.milestoneInvoices.length > 0) ? `<div style="margin-top:2px;font-size:10.5px;color:var(--primary);">📄 ${log.milestoneInvoices.length} ${escapeHtml(t('ord.milestone_invoices'))}</div>` : ''}
         ${(() => {
@@ -324,7 +324,7 @@ function renderLogs() {
             ${(log.parts || []).length > 1 && log.status !== 'split' ? `<button class="menu-item pro-only" data-act="split-order" data-id="${log.id}">⚡ ${escapeHtml(t('ord.split'))}</button>` : ''}
             ${!KhaytOrderStatus.isFinished(log) && (log.parts || []).length > 1 ? `<button class="menu-item" data-act="partial-delivery" data-id="${log.id}">📦 ${escapeHtml(t('ord.partial_delivery'))}</button>` : ''}
             ${!KhaytOrderStatus.isFinished(log) && (log.parts || []).some(p => p.spoolId) ? `<button class="menu-item" data-act="log-spool-switch" data-id="${log.id}">🔄 ${escapeHtml(t('ord.spool_switch'))}</button>` : ''}
-            <button class="menu-item" data-act="change-order"  data-id="${log.id}">🔀 ${escapeHtml(t('ord.change_order') || 'Change Order')}</button>
+            <button class="menu-item" data-act="change-order" data-simple-pro="jobPage" data-id="${log.id}">🔀 ${escapeHtml(t('ord.change_order') || 'Change Order')}</button>
             ${!isPaid ? `<button class="menu-item" data-act="pay-remind" data-id="${log.id}">💰 ${escapeHtml(t('pay.remind_btn'))}</button>` : ''}
             <div class="menu-sep"></div>
             <!-- Print & labels -->

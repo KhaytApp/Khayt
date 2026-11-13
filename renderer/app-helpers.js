@@ -102,7 +102,7 @@ function parseTags(str) {
 function renderTagChips(tags, clickable = false) {
   if (!tags || tags.length === 0) return '';
   return tags.map(tag => clickable
-    ? `<span class="tag-chip" data-act="filter-tag" data-tag="${escapeHtml(tag)}" title="${escapeHtml(t('tag.filter_hint'))}">${escapeHtml(tag)}</span>`
+    ? `<button type="button" class="tag-chip" data-act="filter-tag" data-tag="${escapeHtml(tag)}" title="${escapeHtml(t('tag.filter_hint'))}">${escapeHtml(tag)}</button>`
     : `<span class="tag-chip">${escapeHtml(tag)}</span>`
   ).join('');
 }

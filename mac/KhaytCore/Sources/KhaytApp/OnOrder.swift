@@ -178,8 +178,8 @@ struct SuspectOrdersCard: View {
                     Text(suspect.itemName).lineLimit(1)
                     Spacer(minLength: 8)
                     Text(Money.text(suspect.currentTotal, currency))
-                        .monospacedDigit().foregroundStyle(.tertiary)
-                    Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+                        .monospacedDigit().foregroundStyle(Khayt.faint)
+                    Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(Khayt.faint)
                     if let now = suspect.suggestedTotal {
                         Text(Money.text(now, currency)).monospacedDigit().fontWeight(.medium)
                         Button(shop.words.callIt("po.fix_btn")) { confirming = suspect }

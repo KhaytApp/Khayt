@@ -131,20 +131,59 @@ html, body {
 [dir="rtl"] input[type="search"],
 [dir="rtl"] input[type="email"],
 [dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="password"],
 [dir="rtl"] input[type="tel"],
 [dir="rtl"] input:not([type]),
 [dir="rtl"] textarea {
   unicode-bidi: plaintext;
   text-align: start;
 }
+/* The placeholder is its own paragraph: "whsec_…" read "…_whsec" without it. */
+[dir="rtl"] input::placeholder,
+[dir="rtl"] textarea::placeholder {
+  unicode-bidi: plaintext;
+}
 
+/* Arabic is set in IBM Plex Sans Arabic, bundled in fonts/fonts.css (Turki,
+   Nov 11: one Arabic face on every app). The old stack named macOS-only fonts
+   first ("SF Arabic", "Geeza Pro"), so Windows and Linux fell through to
+   whatever the system had. */
 [lang="ar"] {
-  font-family: "SF Arabic", "Geeza Pro", "Tajawal", "Cairo", var(--font-sans);
+  font-family: "IBM Plex Sans Arabic", var(--font-sans);
+}
+
+/* In Arabic, the mono face (eyebrows, figures, dates) has no Arabic letters:
+   they fell back to a system monospace, letter by letter. Plex Arabic is the
+   fallback for them now, and tracking and capitals never apply to Arabic —
+   1.5 px between letters breaks their joins ("ا ل أ د و ا ت"). */
+html[dir="rtl"][data-design] {
+  --font-mono: "JetBrains Mono", "IBM Plex Sans Arabic", ui-monospace, monospace;
+  --font-num: var(--font-mono);
+}
+html[dir="rtl"] body .khayt-navhead,
+html[dir="rtl"] body .main .eyebrow,
+html[dir="rtl"] body .khayt-main .eyebrow,
+html[dir="rtl"] body .sidebar-subtitle,
+html[dir="rtl"] body .settings-nav-group-label {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* Latin values inside Arabic text keep their own order: a phone's leading +,
+   a colour's #, a URL's slashes, a key's prefix, a shortcut. */
+code, kbd, samp, bdi[dir="ltr"], .ltr-value, .cs-hex, .cs-step-hex, .cp-hex {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* -----------------------------------------------------------
    Window chrome — title bar drag area for hiddenInset style
    ----------------------------------------------------------- */
+/* The strip exists for macOS's traffic lights (hiddenInset is macOS-only in
+   Electron); Windows and Linux keep their native frame. The Workbench,
+   Command and Vivid shells hid it there already; Meridian, Flow and Foreman
+   showed an empty 38 px band under the native title bar. One rule for all. */
+html:not(.platform-darwin) .khayt-titlebar { display: none; }
 .titlebar {
   height: 38px;
   -webkit-app-region: drag;
@@ -251,9 +290,16 @@ html, body {
    ----------------------------------------------------------- */
 .grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+/* Inventory's "Add spool | Stock list" pair: a 1fr column will not shrink
+   below its widest row, so the stock table pushed the grid past the page at
+   1280 px ("Lo…", cut headers; past the left edge in Arabic). The columns may
+   shrink now and the table scrolls inside its own .table-wrap. */
+.inv-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.inv-grid > * { min-width: 0; }
 .full    { grid-column: 1 / -1; }
 @media (max-width: 1100px) {
   .grid   { grid-template-columns: 1fr; }
+  .inv-grid { grid-template-columns: minmax(0, 1fr); }
   .kanban { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
 }
 @media (max-width: 700px) {
@@ -302,6 +348,11 @@ html, body {
 .card.dark     .swatch { background: var(--text); }
 .card.warn     .swatch { background: var(--warning); }
 
+/* Native parts of controls (the date picker, its calendar icon, number
+   spinners, scrollbars) follow the app's appearance, not the OS's. */
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+
 /* -----------------------------------------------------------
    Form controls
    ----------------------------------------------------------- */
@@ -314,7 +365,14 @@ label {
 }
 label:first-child { margin-top: 0; }
 
-input[type="text"], input[type="number"], input[type="tel"], input[type="email"], select, textarea {
+/* Every typed field gets the one field style. Date, time, password and URL
+   were missing, so about 46 fields (cloud sign-in, Telegram, connectors, the
+   store's payment links, every date in a dialog) were 150 px browser boxes,
+   22 px tall next to 40 px fields, clipping their placeholders, and white in
+   dark mode (Nov 11 desktop UI review, F2). */
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"],
+input[type="password"], input[type="url"], input[type="date"], input[type="time"],
+input[type="datetime-local"], input[type="month"], select, textarea {
   width: 100%;
   padding: 9px 11px;
   font: inherit;
@@ -814,7 +872,7 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* Custom date range inputs */
 .custom-range-inputs { display:inline-flex; align-items:center; gap:6px; margin-inline-start:6px; }
-.custom-range-inputs input[type="date"] { font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
+.custom-range-inputs input[type="date"] { width:auto; font-size:12px; padding:3px 6px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--text); }
 
 /* -----------------------------------------------------------
    Empty states
@@ -1072,6 +1130,40 @@ tbody tr:hover { background: var(--surface-2); }
   background: var(--surface);
   flex-shrink: 0;
 }
+
+/* ----- Customer address editor (renderer/address-editor.js; Figma 52:2725) -----
+   640 wide; the body scrolls and the footer stays in view (.modal-form). */
+.modal.modal-form.addr-editor { max-width: 640px; }
+.addr-editor .modal-header .addr-default { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--primary); cursor: pointer; white-space: nowrap; }
+.addr-editor .addr-default input { width: auto; margin: 0; }
+.addr-editor .modal-footer .addr-remove { margin-inline-end: auto; color: var(--primary); }
+.addr-editor .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 6px; }
+.addr-editor .addr-na-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; }
+.addr-editor .addr-wide { grid-column: 1 / -1; }
+.addr-editor .addr-fld label { margin: 6px 0 4px; font-size: 12px; }
+.addr-editor .addr-fld input, .addr-editor .addr-fld select, .addr-editor .addr-fld textarea { width: 100%; }
+.addr-editor .addr-na { background: var(--bg-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin: 6px 0 8px; }
+.addr-editor .addr-sec { border-top: 1px solid var(--border-soft); margin-top: 10px; padding-top: 10px; }
+.addr-editor .addr-kicker { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+.addr-editor .addr-kicker::before { content: ''; width: 18px; height: 2px; background: #F2A541; flex-shrink: 0; }
+.addr-editor .addr-prints { white-space: pre-line; font-size: 13px; margin-top: 6px; unicode-bidi: plaintext; }
+.addr-editor .addr-warn { display: block; color: var(--warning); font-size: 11.5px; margin-top: 3px; }
+.addr-editor .addr-muted { display: block; color: var(--text-muted); font-size: 11.5px; margin: 4px 0 6px; }
+.addr-editor .addr-elsewhere { background: var(--bg-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; }
+.addr-editor .addr-elsewhere small { display: block; color: var(--warning); font-size: 11.5px; margin-top: 4px; }
+.addr-editor .addr-text-ref { white-space: pre-line; font-size: 13px; }
+.addr-editor .addr-need { color: var(--danger); font-size: 12.5px; margin-bottom: 8px; }
+.addr-row { padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.addr-row:last-child { border-bottom: 0; }
+.addr-row-head { display: flex; align-items: center; gap: 8px; }
+.addr-row-head .addr-row-label { font-weight: 600; font-size: 13px; }
+.addr-row-head .addr-edit { margin-inline-start: auto; }
+.addr-row .addr-row-text { font-size: 12.5px; margin-top: 3px; }
+.addr-row .addr-row-note { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.addr-row .addr-row-note.warn { color: var(--warning); }
+.addr-badge { font-size: 10.5px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.addr-badge.default { background: rgba(43,182,115,0.18); color: var(--success); }
+.addr-badge.check { background: var(--danger-soft); color: var(--danger); }
 
 /* ----- Update changelog modal ----- */
 .update-modal .update-notes-intro {
@@ -2680,6 +2772,8 @@ button .khayt-ico, summary .khayt-ico { opacity: .85; }
 }
 button.tag-chip, .tag-chip[data-act] {
   cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
   transition: background 0.15s;
 }
 .tag-chip[data-act]:hover {
@@ -3382,6 +3476,181 @@ button.tag-chip, .tag-chip[data-act] {
 
 /* ── Simple mode: hide professional-only features ─────────── */
 body.mode-simple .pro-only { display: none !important; }
+/* The Pro part of a SIMPLE_MAP row (renderer/simple-mode.js). Simple only:
+   enthusiast (Bed Ready) keeps what it shows today. */
+body.mode-simple [data-simple-pro] { display: none !important; }
+
+/* "Part of Professional": a gated tab shows the panel instead of its content. */
+.tab-content.sm-gated > :not(.sm-gate) { display: none !important; }
+.tab-content:not(.sm-gated) > .sm-gate { display: none; }
+/* Figma 7Iqw0GcrLLRW7CLDEhTa1P, S4 card 2 (79:175). */
+.sm-gate-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  margin: 48px auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, var(--bg-elev));
+  text-align: center;
+}
+.sm-gate-mark { inline-size: 40px; block-size: 40px; border-radius: 50%; background: var(--bg-elev, #eef0f1); }
+.sm-gate-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.sm-gate-body { margin: 0; max-width: 360px; font-size: 13px; color: var(--text-muted); }
+.sm-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.sm-gate-actions .btn { min-height: 36px; border-radius: 999px; padding-inline: 16px; }
+
+/* S4 card 1 (79:160): the mode beside the name in the sidebar head — steel,
+   the "waiting / neutral" status colour. */
+.sm-mode-badge {
+  margin-inline-start: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  background: #EDF0F4;
+  color: #5E6C84;
+}
+[data-theme="dark"] .sm-mode-badge { background: #3A4658; color: #A9B8CF; }
+.khayt-sidebar.collapsed .sm-mode-badge { display: none; }
+
+/* ── S4 cards 3–5: Simple's reduced Loyalty, Expenses and Money ──────────
+   (renderer/simple-screens-ui.js). A `.sm-simple-only` host is Simple's; the
+   markup beside it carries data-simple-pro, so each mode sees one of them. */
+body:not(.mode-simple) .sm-simple-only { display: none !important; }
+.sm-vh { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sm-card { max-width: 640px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.sm-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.sm-head-text { flex: 1; min-width: 0; }
+.sm-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.sm-title-lg { font-size: 18px; font-weight: 700; }
+.sm-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.sm-empty { margin: 8px 0; font-size: 13px; color: var(--text-muted); }
+.sm-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-box { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.sm-pill-btn { border-radius: 999px; padding-inline: 16px; }
+.sm-link { color: var(--primary); font-weight: 600; }
+.sm-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.sm-foot .sm-sub { flex: 1; margin: 0; }
+
+/* Card 3 · Loyalty */
+.sm-loyalty { margin-bottom: 4px; }
+.sm-pill-switch {
+  min-height: 24px; padding: 4px 10px; border: 0; border-radius: 999px; cursor: pointer;
+  font-size: 12px; font-weight: 600; line-height: 1;
+  background: var(--surface-2); color: var(--text-muted);
+}
+.sm-pill-switch[aria-checked="true"] { background: rgba(43, 182, 115, 0.16); color: var(--success); }
+.sm-pill-switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sm-loy-table { inline-size: 100%; border-collapse: collapse; font-size: 13px; }
+.sm-loy-table thead th { padding: 8px 14px; text-align: start; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 500; color: var(--text-muted); background: var(--surface-2); }
+.sm-loy-table tbody th, .sm-loy-table tbody td { padding: 8px 14px; text-align: start; font-weight: 500; border-top: 1px solid var(--border); }
+.sm-loy-table .sm-loy-act { text-align: end; }
+.sm-loy-after { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sm-loy-in { inline-size: 100%; min-width: 0; margin: 0; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); font: inherit; }
+.sm-loy-in:hover { border-color: var(--border); }
+.sm-loy-in:focus-visible { border-color: var(--primary); outline: none; background: var(--surface); }
+.sm-loy-orders, .sm-loy-disc { inline-size: 5ch; }
+.sm-loy-row.is-readonly { color: var(--text-dim); }
+.sm-loy-ro { font-size: 12px; color: var(--text-muted); }
+
+/* Card 4 · Expenses */
+#expSimple .sm-head { align-items: center; }
+.sm-list { list-style: none; margin: 0; padding: 0; }
+.sm-list-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.sm-list-row + .sm-list-row { border-top: 1px solid var(--border); }
+.sm-list-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sm-list-name { font-size: 14px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-list-meta { font-size: 12px; color: var(--text-muted); }
+.sm-row-del { opacity: 0; }
+.sm-list-row:hover .sm-row-del, .sm-row-del:focus-visible { opacity: 1; }
+
+/* Card 5 · Money */
+.sm-money { max-width: 720px; }
+.sm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.sm-tile {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 0; border-radius: 10px;
+  background: var(--surface-2); color: var(--text); text-align: start; font: inherit;
+}
+button.sm-tile { cursor: pointer; }
+button.sm-tile:hover { box-shadow: inset 0 0 0 1px var(--border); }
+button.sm-tile:focus-visible, .sm-line:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sm-tile-label { font-size: 12px; color: var(--text-muted); }
+.sm-tile-value { font-family: var(--font-num); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sm-tile-sub { font-size: 12px; color: var(--text-muted); }
+.sm-tile-sub.is-warn { color: var(--danger); }
+.sm-money-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 24px; }
+.sm-money-list { margin-bottom: 12px; }
+.sm-money-list ul { list-style: none; margin: 0; padding: 0; }
+.sm-eyebrow {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+  font-family: var(--font-num); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted);
+}
+.sm-eyebrow::before { content: ""; inline-size: 24px; block-size: 2px; background: var(--accent); }
+.sm-line {
+  display: flex; justify-content: space-between; gap: 12px; inline-size: 100%; padding: 4px 0;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: start;
+}
+button.sm-line { cursor: pointer; }
+button.sm-line:hover > span:first-child { text-decoration: underline; }
+/* ── S4 reduced screens (renderer/simple-forms.js) ───────────────────────
+   .sm-simple-only is drawn in Simple only; .sm-pro-form is the Professional
+   form of the same control, hidden in Simple. Professional is unchanged. */
+body:not(.mode-simple) .sm-simple-only { display: none !important; }
+body.mode-simple .sm-pro-form { display: none !important; }
+.sm-link-btn { color: var(--primary); font-weight: 600; }
+.sm-row-sub { display: block; font-size: 12px; color: var(--text-muted); margin-block-start: 2px; }
+
+/* Card 8 (80:382): the places, one bordered list. */
+.sm-rows { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.sm-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-block-size: 56px; }
+.sm-row + .sm-row { border-block-start: 1px solid var(--border-soft, var(--border)); }
+.sm-row-text { flex: 1; min-inline-size: 0; }
+.sm-row-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.sm-row-text .sm-row-sub { overflow-wrap: anywhere; }
+.sm-pill-in-use { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+body.mode-simple .sm-drive-setup:not(.sm-open) { display: none; }
+
+/* Card 7 (80:346): the two lists as rows with a word button. */
+body.mode-simple #settings-panel-production .post-check-setting-row { min-block-size: 48px; }
+
+/* Card 6 (80:231): the board in Simple — four columns. The Professional-only
+   stages are filed into them (lib/order-status.js simpleStageOf) and their
+   own columns are not drawn. */
+.kanban.sm-board > .kanban-col[data-status="on_hold"],
+.kanban.sm-board > .kanban-col[data-status="post"],
+.kanban.sm-board > .kanban-col[data-status="qc"],
+.kanban.sm-board > .kanban-col[data-status="shipped"],
+.kanban.sm-board > .kanban-col[data-status="delivered"] { display: none; }
+.kanban.sm-board > .kanban-col[data-status="printing"] h3 .dot { background: var(--warning); }
+.kanban.sm-board > .kanban-col[data-status="completed"] h3 .dot { background: #14b8a6; }
+.kanban.sm-board > #quotesSection.sm-quote-col { display: block !important; margin: 0; }
+.kanban.sm-board > #queueListView:empty { display: none; }
+.kanban.sm-board > #quotesSection .quotes-section-header {
+  margin: 0 0 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim);
+}
+.kanban.sm-board > #quotesSection .quotes-section-header::before {
+  content: ""; inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--text-muted);
+}
+.kanban.sm-board > #quotesSection .quotes-section-header .count {
+  margin-inline-start: auto; background: var(--surface-2); color: var(--text); padding: 1px 8px;
+}
+.kanban.sm-board > #quotesSection .quote-card { flex-direction: column; align-items: stretch; gap: 8px; }
+.sm-stage-note { display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  vertical-align: middle; background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+.sm-hold-chip { display: inline-flex; align-items: center; gap: 6px; margin-block-end: 8px; padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--warn-soft); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); }
+.sm-col-more { margin: 4px 0 0; padding: 8px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+/* Card 6: the customer in Simple — five fields, then where the rest lives. */
+.sm-cust-form .inline-pair { margin-block-start: 0; }
+.sm-cust-pro { margin: 14px 0 0; font-size: 12.5px; color: var(--text-muted); }
 
 /* ── Enthusiast (hobbyist) mode: no commerce at all ───────────
    Stricter than simple — hides both the Pro depth (.pro-only) and every
@@ -4558,6 +4827,7 @@ th[data-sort]:hover {
   border-radius: 8px 8px 0 0;
   background: transparent;
   color: var(--text-muted);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;

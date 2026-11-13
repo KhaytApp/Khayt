@@ -109,7 +109,7 @@ struct EmailSettings: View {
 
             if usesKey {
                 row(shop.words.callIt("set.email_api_key")) {
-                    SecureField(stored.apiKey ? "••••••••" : "", text: $draft.apiKey)
+                    SecureField("", text: $draft.apiKey, prompt: Text(verbatim: stored.apiKey ? "••••••••" : "")).labelsHidden()
                         .frame(width: 240)
                 }
                 if draft.provider == "mailgun" {
@@ -137,7 +137,7 @@ struct EmailSettings: View {
                     TextField("", text: $draft.user, prompt: Text(verbatim: "orders@yourshop.com")).frame(width: 240)
                 }
                 row(shop.words.callIt("set.smtp_pass")) {
-                    SecureField(stored.password ? "••••••••" : "", text: $draft.password)
+                    SecureField("", text: $draft.password, prompt: Text(verbatim: stored.password ? "••••••••" : "")).labelsHidden()
                         .frame(width: 240)
                 }
                 Toggle(shop.words.callIt("set.smtp_secure"), isOn: $draft.secure)

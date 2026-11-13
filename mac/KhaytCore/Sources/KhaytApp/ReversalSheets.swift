@@ -392,6 +392,9 @@ struct OrderHistorySheet: View {
             }
         }
         .padding(18)
+        // Esc closes it too: Close is the default button, so it cannot also
+        // be the cancel button, and a viewer that ignores Esc feels stuck.
+        .onExitCommand { shop.clearQuestion() }
         .frame(width: 480)
         .task(id: request.id) {
             if !started { started = true; edits = request.edits }
