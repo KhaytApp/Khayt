@@ -297,6 +297,9 @@ final class PrinterWatch {
         if task != nil, book == watching { return }
         stop()
         watching = book
+        // What was printing when this book was last watched, so a print that
+        // ended while the app was closed still has its end. A real book only.
+        if let book { finishCamera.restore(book: book.path, defaults: .standard) }
         task = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.sweep(shop: shop)
@@ -476,6 +479,8 @@ final class PrinterWatch {
             // (Shop+PrinterMoved.swift). Started, not waited for: a search can
             // take twenty-five seconds and the next poll must not.
             shop.watchForMovedPrinters()
+            // Alerts that could not go when they happened (push review).
+            shop.flushPendingEvents()
         } else if forgot {
             // Nothing was asked, but a machine's last reading went: the
             // dashboard and the widget still count it until they are told.
