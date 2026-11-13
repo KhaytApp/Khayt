@@ -400,7 +400,7 @@ struct MachineCard: View {
                             // fault rather than as a comparison.
                             Text(shop.words.callIt("mac.bed_against",
                                  ["w": .string("\(Int(saturating: shop.widestBed))"), "d": .string("\(Int(saturating: shop.deepestBed))")]))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(Khayt.faint)
                                 // It wrapped to one truncated line — "dashed:
                                 // the largest bed…" says nothing at all.
                                 .fixedSize(horizontal: false, vertical: true)
@@ -452,7 +452,9 @@ struct MachineCard: View {
                     HStack(alignment: .center, spacing: 11) {
                         WearGauge(pct: wear.pct)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold)) + " " + shop.words.callIt("common.grams"))
+                            // Isolated: "8,419 / 8,000" is used / limit, and in
+                            // an Arabic line the two swapped places.
+                            Text(verbatim: Figure.isolated(shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold))) + " " + shop.words.callIt("common.grams"))
                                 .font(.callout).monospacedDigit()
                             if wear.over {
                                 Text(shop.words.callIt("mac.nozzle_due"))
@@ -476,7 +478,7 @@ struct MachineCard: View {
                     // whose source is not stated is a number nobody can check.
                     if machine.hasPrinterHistory {
                         Text(shop.words.callIt("mac.wear_from_printer"))
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2).foregroundStyle(Khayt.faint)
                     }
                 }
             }
@@ -520,7 +522,7 @@ struct MachineCard: View {
                     VStack(alignment: .leading, spacing: 7) {
                         if upkeep.tasks.isEmpty {
                             Text(shop.words.callIt("maint.no_tasks"))
-                                .font(.caption).foregroundStyle(.tertiary)
+                                .font(.caption).foregroundStyle(Khayt.faint)
                         }
                         ForEach(upkeep.tasks) { task in
                             Upkeep(task: task, machine: machine, shop: shop)
@@ -558,7 +560,7 @@ struct MachineCard: View {
         .task(id: upkeepInputs) {
             upkeep = await shop.maintenance(for: machine)
         }
-        .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
+        .card(rail: running ? Khayt.thread : nil, padding: 14, fills: true)
     }
 
     private var upkeepInputs: String { shop.maintenanceSignature(for: machine) }
@@ -616,7 +618,7 @@ struct Upkeep: View {
                     .lineLimit(1)
                 if let every {
                     Text(verbatim: "\(shop.words.callIt("maint.every")) \(every)")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Spacer(minLength: 6)
@@ -625,11 +627,11 @@ struct Upkeep: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(colour)
                 if let left {
-                    Text(left).font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    Text(left).font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                 }
                 if task.deferred == true {
                     Text(shop.words.callIt("mac.mt_deferred"))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Button(shop.words.callIt("maint.mark_done")) {
@@ -682,7 +684,7 @@ struct Upkeep: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .font(.caption)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(Khayt.faint)
             .disabled(!shop.canMoveJobs)
             .accessibilityLabel(shop.words.callIt("common.edit"))
             .shopSheet(isPresented: $editing) {
@@ -1385,7 +1387,7 @@ struct ConsumablesCard: View {
                                 .foregroundStyle(Khayt.attention)
                         }
                     }
-                    Text(stockLine).font(.caption2).foregroundStyle(.tertiary)
+                    Text(stockLine).font(.caption2).foregroundStyle(Khayt.faint)
                 }
                 Spacer(minLength: 6)
                 VStack(alignment: .trailing, spacing: 1) {
@@ -1401,7 +1403,7 @@ struct ConsumablesCard: View {
                     // and an invented number there lands on a purchase order.
                     if let need, need.suggestQty > 0 {
                         Text(verbatim: "\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
-                            .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                            .font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                     }
                 }
             }
@@ -1591,7 +1593,7 @@ struct SpoolCard: View {
                        + shop.words.counting(shown, "mac.days_word"))
                     .font(.caption2).monospacedDigit()
                     .foregroundStyle(shown <= 14 ? AnyShapeStyle(Khayt.attention)
-                                                 : AnyShapeStyle(.tertiary))
+                                                 : AnyShapeStyle(Khayt.faint))
             }
             // Damp filament prints badly, and the shelf is where somebody is
             // standing when they could do something about it. Only the two
@@ -1602,7 +1604,7 @@ struct SpoolCard: View {
                 Text(shop.words.callIt(state == "overdue" ? "mac.dry_overdue" : "mac.dry_due"))
                     .font(.caption2)
                     .foregroundStyle(state == "overdue" ? AnyShapeStyle(Khayt.attention)
-                                                        : AnyShapeStyle(.tertiary))
+                                                        : AnyShapeStyle(Khayt.faint))
             }
         }
         .frame(maxWidth: .infinity)
@@ -1711,7 +1713,7 @@ struct SpoolCard: View {
                     if colour == nil {
                         Rectangle()
                             .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                             .frame(height: bodyH * level)
                     }
                 }
@@ -1796,7 +1798,7 @@ struct SpoolCard: View {
             // could be mistaken for grey filament.
             if colour == nil {
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(width: wound * 2, height: wound * 2)
             }
         }
@@ -1889,7 +1891,7 @@ private struct Live: View {
             }
         } else {
             Text(shop.words.callIt("mac.asking"))
-                .font(.caption).foregroundStyle(.tertiary)
+                .font(.caption).foregroundStyle(Khayt.faint)
         }
     }
 
@@ -2042,9 +2044,9 @@ private struct Live: View {
                     // it sits under its own caption, and it means something.
                     ZStack(alignment: .leading) {
                         LayerLinesShape()
-                            .fill(Khayt.hot.opacity(0.16))
+                            .fill(Khayt.thread.opacity(Khayt.threadGhost))
                         LayerLinesShape(progress: Double(status.progress) / 100)
-                            .fill(Khayt.hot)
+                            .fill(Khayt.thread)
                     }
                     .frame(height: 26)
                     .accessibilityElement()
@@ -2071,7 +2073,7 @@ private struct Live: View {
                 if let caption = PrinterWatch.progressCaption(type: status.type,
                                                               source: status.progressSource) {
                     Text(shop.words.callIt(caption))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             // A SPOOL THAT RAN OUT, said on the card as well as in the alert.

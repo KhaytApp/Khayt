@@ -51,6 +51,8 @@ test('the decisions already made', () => {
     assert.equal(simpleDecision(k), 'pro', k);
   }
   for (const k of ['queue', 'quote', 'customers', 'inventory', 'money', 'expenses', 'vatReturns']) assert.equal(simpleDecision(k), 'reduced', k);
+  // Delivery-estimate rules are Pro (Mac page 09, row 104:648); Simple keeps one default lead time.
+  assert.match(SIMPLE_MAP.find((r) => r.key === 'productionSettings').proAdds, /delivery-estimate rules/);
   assert.equal(simpleDecision('nope'), undefined);
   // Every Pro feature in the comparison is covered by some row.
   assert.ok(PRO_FEATURES.length > 0);

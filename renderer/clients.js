@@ -206,7 +206,7 @@ function renderClients() {
             </div>
           </div>
         </td>
-        <td style="font-variant-numeric: tabular-nums;">${escapeHtml(c.phone || '—')}</td>
+        <td style="font-variant-numeric: tabular-nums;"><bdi dir="ltr">${escapeHtml(c.phone || '—')}</bdi></td>
         <td style="font-variant-numeric: tabular-nums;">${stats.count}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--success);">${fmtPrice(stats.revenue)}</td>
         <td style="font-variant-numeric: tabular-nums; color: var(--text-dim);">${escapeHtml(stats.lastDate || t('cl.never_ordered'))}</td>
@@ -659,6 +659,12 @@ function openClientEditor(clientId = null) {
     ? structuredClone(existing)
     : { id: uid('CLI'), nameEn: '', nameAr: '', phone: '', email: '', cr: '', vat: '', notes: '', defaultDiscount: 0, createdAt: localDateStr() };
   if (!draft.priceList) draft.priceList = [];
+  // Simple (SIMPLE_MAP customers, S4 card 6): the five fields a small shop
+  // fills. Everything else on the record is kept as it is.
+  if (settings.mode === 'simple' && window.KhaytSimpleForms) {
+    openClientEditorSimple(existing, draft);
+    return;
+  }
   const rec = draft.recurring || { enabled: false, interval: 'monthly', nextDue: '' };
 
   const intervalOptions = ['weekly','biweekly','monthly','quarterly']
@@ -1124,6 +1130,72 @@ function openClientEditor(clientId = null) {
       toast(t('ce.saved'), 'success');
       return true;
     }
+  });
+}
+
+/**
+ * The customer editor in Simple — Figma 7Iqw0GcrLLRW7CLDEhTa1P, S4 card 6
+ * (80:231): Name, Phone + Email, Address, Notes, then a line saying the
+ * business details are in Professional.
+ *
+ * `draft` is the deep copy openClientEditor made, so the CR, VAT number,
+ * payment terms, credit limit, price list, consents, the second name and every
+ * further address ride through the save untouched (S4 rule 3).
+ *
+ * The one Address field is the address book's first row
+ * (KhaytSimpleForms.addressOf). A structured row from the address editor
+ * (#2416) is shown read-only, never flattened into one line.
+ */
+function openClientEditorSimple(existing, draft) {
+  const S = window.KhaytSimpleForms;
+  const nameKey = S.nameKey(draft, settings.lang);
+  const addr = S.addressOf(draft);
+  const bodyHtml = `
+    <div class="sm-cust-form">
+      <label for="smCustName">${escapeHtml(t('common.name'))}</label>
+      <input type="text" id="smCustName" autocomplete="off" ${nameKey === 'nameAr' ? 'dir="auto"' : ''} value="${escapeHtml(draft[nameKey] || '')}" required>
+      <div class="inline-pair">
+        <div>
+          <label for="smCustPhone">${escapeHtml(t('ce.phone'))}</label>
+          <input type="tel" id="smCustPhone" dir="ltr" autocomplete="off" placeholder="+966 5x xxx xxxx" value="${escapeHtml(draft.phone || '')}">
+        </div>
+        <div>
+          <label for="smCustEmail">${escapeHtml(t('ce.email'))}</label>
+          <input type="email" id="smCustEmail" dir="ltr" autocomplete="off" spellcheck="false" autocapitalize="none" value="${escapeHtml(draft.email || '')}">
+        </div>
+      </div>
+      <label for="smCustAddress">${escapeHtml(t('ce.addr_address'))}</label>
+      <input type="text" id="smCustAddress" autocomplete="off" value="${escapeHtml(addr.text)}"${addr.editable ? '' : ' readonly aria-describedby="smCustAddrNote"'}>
+      ${addr.editable ? '' : `<p class="settings-hint" id="smCustAddrNote" style="margin:4px 0 0;">${escapeHtml(t('sm.cust_addr_structured'))}</p>`}
+      <label for="smCustNotes">${escapeHtml(t('ce.notes'))}</label>
+      <input type="text" id="smCustNotes" placeholder="${escapeHtml(t('ce.notes_ph'))}" value="${escapeHtml(draft.notes || '')}">
+      <p class="sm-cust-pro">› ${escapeHtml(t('sm.cust_business'))}</p>
+    </div>`;
+  openFormModal({
+    title: existing ? t('ce.edit_title') : t('ce.new_title'),
+    saveLabel: t('ce.save'),
+    sizeLg: false,
+    bodyHtml,
+    onSave(modal) {
+      const v = (id) => (modal.querySelector(id)?.value || '');
+      draft[nameKey] = v('#smCustName').trim();
+      if (!String(draft.nameEn || '').trim() && !String(draft.nameAr || '').trim()) {
+        toast(t('ce.need_name'), 'error');
+        return false;
+      }
+      draft.phone = v('#smCustPhone').trim();
+      draft.email = v('#smCustEmail').trim();
+      draft.notes = v('#smCustNotes');
+      S.applyAddress(draft, v('#smCustAddress'), () => uid('ADDR'));
+      draft.addresses = (Array.isArray(draft.addresses) ? draft.addresses : []).filter(clientRowHasText);
+      const idx = clients.findIndex(c => c.id === draft.id);
+      if (idx >= 0) clients[idx] = draft;
+      else clients.push(draft);
+      saveAll();
+      renderClients();
+      toast(t('ce.saved'), 'success');
+      return true;
+    },
   });
 }
 

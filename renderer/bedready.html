@@ -131,10 +131,10 @@
         <span class="grow topbar-spacer"></span>
         <div class="row gap8 topbar-actions wrap">
           <button type="button" class="btn ghost icon sm" id="themeToggle" title="Toggle theme" aria-label="Toggle theme" data-i18n-title="ui.toggle_theme" data-i18n-aria="ui.toggle_theme">◐</button>
-          <button type="button" class="btn ghost sm" id="btnHelp" data-i18n="help.btn" data-i18n-title="help.btn_label" title="Help" aria-label="Help">?</button>
+          <button type="button" class="btn ghost sm" id="btnHelp" data-i18n="help.btn" data-i18n-title="help.btn_label" data-i18n-aria="help.btn_label" title="Help" aria-label="Help">?</button>
           <button type="button" class="btn ghost sm" id="btnGlobalSearch" aria-label="Global search" data-i18n-aria="ui.global_search" title="Global search">🔍 <span class="muted" style="font-size:10px">⌘K</span></button>
           <div class="khayt-bell tb-notif-wrap" style="position:relative">
-            <button type="button" class="btn ghost icon sm" id="btnNotifBell" title="Notifications" data-i18n-title="notif.title" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">🔔</button>
+            <button type="button" class="btn ghost icon sm" id="btnNotifBell" title="Notifications" data-i18n-title="notif.title" aria-label="Notifications" data-i18n-aria="notif.title" aria-expanded="false" aria-controls="notifPanel">🔔</button>
             <span class="khayt-bdot" id="notifBadge" style="display:none"></span>
             <div id="notifPanel" style="display:none;position:absolute;inset-inline-end:0;top:calc(100% + 8px);width:340px;max-height:480px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-pop);z-index:8000"></div>
           </div>
@@ -143,7 +143,7 @@
             <option value="">All locations</option>
           </select>
           <button type="button" class="btn ghost sm" id="btnNavSwitchOp" title="Switch operator" style="display:none">👤 <span id="operatorNavBadge"></span></button>
-          <select class="input" id="langSelect" aria-label="Language" style="width:auto;height:34px;min-width:72px">
+          <select class="input" id="langSelect" aria-label="Language" data-i18n-aria="a11y.language" style="width:auto;height:34px;min-width:72px">
             <option value="en">EN</option>
             <option value="ar">ع</option>
             <option value="de">DE</option>
@@ -574,7 +574,7 @@
              `btn small ghost`. Same shape as Khayt's queue now — search, the
              two things you reach for, and everything else behind one control. -->
         <div class="khayt-queue-toolbar-actions">
-          <input type="search" id="kanSearch" class="toolbar-search" data-i18n-placeholder="kan.search_ph" placeholder="Filter by client, project…" style="max-width:200px;">
+          <input type="search" id="kanSearch" aria-label="Search the board" data-i18n-aria="a11y.search_board" class="toolbar-search" data-i18n-placeholder="kan.search_ph" placeholder="Filter by client, project…" style="max-width:200px;">
           <button id="btnKanbanSort" class="btn ghost small" data-i18n-title="queue.sort_btn" title="Sort cards by urgency"><span data-khayt-icon="sort"></span> <span data-i18n="queue.sort_btn">Sort</span></button>
           <button id="btnPauseProduction" class="btn ghost small"><span class="pp-ico" data-khayt-icon="pause"></span> <span class="pp-label" data-i18n="prod.pause">Pause production</span></button>
           <details class="ovf">
@@ -748,7 +748,7 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             <h3 class="card-head" style="margin:0;flex:1;"><span class="swatch"></span><span data-i18n="inv.stock">Stock List</span></h3>
             <button type="button" class="btn small ghost" id="btnLotRecall" data-i18n="inv.lot_recall_open">Lot recall</button>
-            <input type="search" id="invSearch" class="toolbar-search" style="max-width:200px;" data-i18n-placeholder="inv.search_ph">
+            <input type="search" id="invSearch" aria-label="Search inventory" data-i18n-aria="a11y.search_inventory" class="toolbar-search" style="max-width:200px;" data-i18n-placeholder="inv.search_ph">
           </div>
           <!-- Inventory valuation summary -->
           <div id="invValuationSummary" style="display:none; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--text-muted); padding:8px 12px; background:var(--surface-2); border-radius:var(--radius); margin-bottom:12px;"></div>
@@ -794,7 +794,7 @@
       <div class="card pro-only" style="margin-top:16px;">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
           <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="sup.title">Suppliers / Vendors</span></h3>
-          <input type="search" id="supplierSearch" class="search-input" data-i18n-placeholder="sup.search_ph" placeholder="Search suppliers…" style="max-width:200px;">
+          <input type="search" id="supplierSearch" aria-label="Search suppliers" data-i18n-aria="a11y.search_suppliers" class="search-input" data-i18n-placeholder="sup.search_ph" placeholder="Search suppliers…" style="max-width:200px;">
           <button class="btn small primary" id="btnAddSupplier" data-i18n="sup.add">+ Add Supplier</button>
         </div>
         <div class="table-wrap">
@@ -832,7 +832,7 @@
         <button class="btn primary" id="btnLogWaste" data-i18n="waste.add">Log Failed Print</button>
       </div>
       <div class="toolbar" style="margin-bottom:16px; flex-wrap:wrap; gap:8px;">
-        <input type="search" id="wasteSearch" class="toolbar-search" style="max-width:180px;" placeholder="Search waste…" data-i18n-placeholder="waste.search_ph">
+        <input type="search" id="wasteSearch" aria-label="Search waste" data-i18n-aria="a11y.search_waste" class="toolbar-search" style="max-width:180px;" placeholder="Search waste…" data-i18n-placeholder="waste.search_ph">
         <select id="wasteMaterialFilter" class="toolbar-select" style="max-width:150px;">
           <option value="">All materials</option>
         </select>
@@ -2078,6 +2078,7 @@
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
 <script src="simple-mode.js"></script>
+<script src="simple-forms.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>

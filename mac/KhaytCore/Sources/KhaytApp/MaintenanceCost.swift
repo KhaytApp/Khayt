@@ -38,7 +38,7 @@ struct MaintenanceCostCard: View {
                     .textCase(.uppercase).tracking(Words.spaced(0.6))
                     .foregroundStyle(.secondary)
                 Text(String(year))
-                    .font(.caption).monospacedDigit().foregroundStyle(.tertiary)
+                    .font(.caption).monospacedDigit().foregroundStyle(Khayt.faint)
                 Spacer(minLength: 8)
                 if !rows.isEmpty {
                     Text(Money.text(rows.reduce(0) { $0 + $1.total }, shop.currency))
@@ -63,7 +63,7 @@ struct MaintenanceCostCard: View {
                                 // fleet list needs telling why it is not there.
                                 if row.orphan {
                                     Image(systemName: "questionmark.circle")
-                                        .font(.caption2).foregroundStyle(.tertiary)
+                                        .font(.caption2).foregroundStyle(Khayt.faint)
                                         .help(shop.words.callIt("mac.mc_sold"))
                                 }
                             }

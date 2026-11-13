@@ -135,3 +135,13 @@ test('the catalogue and the portfolio are business features, not Pro ones', () =
     assert.equal(isFeatureEnabled(key, 'enthusiast'), false, key + ' reached an enthusiast');
   }
 });
+
+test('loyalty is a Simple feature (Turki, Nov 10); break-even stays Professional', () => {
+  assert.equal(isFeatureEnabled('loyalty', 'simple'), true);
+  assert.ok(BUSINESS_FEATURES.some((f) => f.key === 'loyalty'), 'listed in the Simple column');
+  assert.ok(!PRO_FEATURES.some((f) => f.key === 'loyalty'), 'not listed as Pro');
+  assert.equal(isFeatureEnabled('breakEven', 'simple'), false);
+  // The settings card the comparison describes is not Pro-gated.
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '../renderer/index.html'), 'utf8');
+  assert.match(html, /<div class="card settings-card" id="settingsLoyaltyCard">/);
+});

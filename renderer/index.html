@@ -174,15 +174,15 @@
         <div class="khayt-search" role="search">
           <span class="dim" aria-hidden="true">⌕</span>
           <input type="text" id="topbarSearchMirror" readonly tabindex="-1" placeholder="Search…" data-i18n-placeholder="search.placeholder" style="cursor:pointer" />
-          <kbd>⌘K</kbd>
+          <kbd class="kh-shortcut" data-mac="⌘K" dir="ltr">Ctrl K</kbd>
         </div>
         <span class="grow topbar-spacer"></span>
         <div class="row gap8 topbar-actions wrap">
           <button type="button" class="btn ghost icon sm" id="themeToggle" title="Toggle theme" aria-label="Toggle theme" data-i18n-title="ui.toggle_theme" data-i18n-aria="ui.toggle_theme">◐</button>
-          <button type="button" class="btn ghost sm" id="btnHelp" data-i18n="help.btn" data-i18n-title="help.btn_label" title="Help" aria-label="Help">?</button>
-          <button type="button" class="btn ghost sm" id="btnGlobalSearch" aria-label="Global search" data-i18n-aria="ui.global_search" title="Global search">🔍 <span class="muted" style="font-size:10px">⌘K</span></button>
+          <button type="button" class="btn ghost sm" id="btnHelp" data-i18n="help.btn" data-i18n-title="help.btn_label" data-i18n-aria="help.btn_label" title="Help" aria-label="Help">?</button>
+          <button type="button" class="btn ghost sm" id="btnGlobalSearch" aria-label="Global search" data-i18n-aria="ui.global_search" title="Global search">🔍 <span class="muted kh-shortcut" data-mac="⌘K" dir="ltr" style="font-size:10px">Ctrl K</span></button>
           <div class="khayt-bell tb-notif-wrap" style="position:relative">
-            <button type="button" class="btn ghost icon sm" id="btnNotifBell" title="Notifications" data-i18n-title="notif.title" aria-label="Notifications" aria-expanded="false" aria-controls="notifPanel">🔔</button>
+            <button type="button" class="btn ghost icon sm" id="btnNotifBell" title="Notifications" data-i18n-title="notif.title" aria-label="Notifications" data-i18n-aria="notif.title" aria-expanded="false" aria-controls="notifPanel">🔔</button>
             <span class="khayt-bdot" id="notifBadge" style="display:none"></span>
             <div id="notifPanel" style="display:none;position:absolute;inset-inline-end:0;top:calc(100% + 8px);width:340px;max-height:480px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-pop);z-index:8000"></div>
           </div>
@@ -191,7 +191,7 @@
             <option value="">All locations</option>
           </select>
           <button type="button" class="btn ghost sm" id="btnNavSwitchOp" title="Switch operator" style="display:none">👤 <span id="operatorNavBadge"></span></button>
-          <select class="input" id="langSelect" aria-label="Language" style="width:auto;height:34px;min-width:72px">
+          <select class="input" id="langSelect" aria-label="Language" data-i18n-aria="a11y.language" style="width:auto;height:34px;min-width:72px">
             <option value="en">EN</option>
             <option value="ar">ع</option>
             <option value="de">DE</option>
@@ -631,7 +631,7 @@
     <section id="catalog-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-catalog-tab" aria-hidden="true" tabindex="-1">
       <div class="toolbar">
         <h3 class="card-head" style="margin: 0; flex: 1;"><span class="swatch"></span><span data-i18n="cat.title">Product Catalog</span></h3>
-        <input type="search" id="catalogSearch" class="toolbar-search" data-i18n-placeholder="cat.search_ph">
+        <input type="search" id="catalogSearch" aria-label="Search products" data-i18n-aria="a11y.search_products" class="toolbar-search" data-i18n-placeholder="cat.search_ph">
         <button id="btnImportProductsCsv" class="btn small ghost" data-i18n="csv.import_products_btn">Import CSV</button>
         <button class="btn small ghost" id="btnBundles" data-i18n="bundle.btn">🎁 Bundles</button>
         <!-- Publishing belongs where the catalogue is, not four levels into
@@ -672,7 +672,7 @@
              the menu items are styled by .ovf-menu rather than by pretending to
              be buttons in a row. -->
         <div class="khayt-queue-toolbar-actions">
-          <input type="search" id="kanSearch" class="toolbar-search" data-i18n-placeholder="kan.search_ph" placeholder="Filter by client, project…" style="max-width:200px;">
+          <input type="search" id="kanSearch" aria-label="Search the board" data-i18n-aria="a11y.search_board" class="toolbar-search" data-i18n-placeholder="kan.search_ph" placeholder="Filter by client, project…" style="max-width:200px;">
           <!-- List and Board are two ways of looking at ONE queue, so they are
                one control. As two loose buttons, "Board view" read as a command
                and gave no hint that a list view was what you were already in. -->
@@ -815,7 +815,7 @@
         <div class="toolbar" style="margin-bottom: 14px;">
           <h3 class="card-head" style="margin: 0;"><span class="swatch"></span><span data-i18n="log.title">Orders Database</span></h3>
           <span style="flex:1;"></span>
-          <input type="search" id="logSearch" class="toolbar-search" data-i18n-placeholder="log.search_ph">
+          <input type="search" id="logSearch" aria-label="Search orders" data-i18n-aria="a11y.search_orders" class="toolbar-search" data-i18n-placeholder="log.search_ph">
           <select id="logStatusFilter" class="toolbar-select">
             <option value="" data-i18n="log.all_statuses">All statuses</option>
             <option value="quote" data-i18n="queue.quote">Quote</option>
@@ -1098,7 +1098,8 @@
       </div>
 
       <!-- New vs Returning cohort chart -->
-      <div class="card" style="margin-top: 16px;">
+      <div class="card" id="newVsReturningCard" style="margin-top: 16px;">
+        <h3 class="card-head"><span class="swatch"></span><span data-i18n="an.new_vs_returning">New vs returning clients</span></h3>
         <div id="newVsReturningSection"></div>
       </div>
 
@@ -1149,7 +1150,7 @@
         <button id="btnImportSpoolsCsv" class="btn small ghost" data-i18n="csv.import_spools_btn">Import CSV</button>
         <button id="btnImportSpoolman" type="button" class="btn small ghost" data-i18n="inv.spoolman_import">Import from Spoolman</button>
       </div>
-      <div class="grid">
+      <div class="grid inv-grid">
         <div class="card warn">
           <h3 class="card-head"><span class="swatch"></span><span data-i18n="inv.add_title">Add Filament Spool</span></h3>
 
@@ -1209,7 +1210,7 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             <h3 class="card-head" style="margin:0;flex:1;"><span class="swatch"></span><span data-i18n="inv.stock">Stock List</span></h3>
             <button type="button" class="btn small ghost" id="btnLotRecall" data-i18n="inv.lot_recall_open">Lot recall</button>
-            <input type="search" id="invSearch" class="toolbar-search" style="max-width:200px;" data-i18n-placeholder="inv.search_ph">
+            <input type="search" id="invSearch" aria-label="Search inventory" data-i18n-aria="a11y.search_inventory" class="toolbar-search" style="max-width:200px;" data-i18n-placeholder="inv.search_ph">
           </div>
           <!-- Inventory valuation summary -->
           <div id="invValuationSummary" style="display:none; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--text-muted); padding:8px 12px; background:var(--surface-2); border-radius:var(--radius); margin-bottom:12px;"></div>
@@ -1256,7 +1257,7 @@
       <div class="card pro-only" style="margin-top:16px;">
         <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
           <h3 class="card-head" style="margin:0; flex:1;"><span class="swatch"></span><span data-i18n="sup.title">Suppliers / Vendors</span></h3>
-          <input type="search" id="supplierSearch" class="search-input" data-i18n-placeholder="sup.search_ph" placeholder="Search suppliers…" style="max-width:200px;">
+          <input type="search" id="supplierSearch" aria-label="Search suppliers" data-i18n-aria="a11y.search_suppliers" class="search-input" data-i18n-placeholder="sup.search_ph" placeholder="Search suppliers…" style="max-width:200px;">
           <button class="btn small primary" id="btnAddSupplier" data-i18n="sup.add">+ Add Supplier</button>
         </div>
         <div class="table-wrap">
@@ -1288,7 +1289,7 @@
              of btn-sm / small / btn small: `btn sm subtle`. What you came to
              this screen to do is add a client; the other six are occasional. -->
         <div class="row gap8 wrap khayt-clients-actions">
-          <input type="search" id="clientSearch" class="toolbar-search" data-i18n-placeholder="cl.search_ph">
+          <input type="search" id="clientSearch" aria-label="Search clients" data-i18n-aria="a11y.search_clients" class="toolbar-search" data-i18n-placeholder="cl.search_ph">
           <button class="btn primary small" id="btnAddClient"><span data-khayt-icon="plus"></span> <span data-i18n="cl.add">Add Client</span></button>
           <details class="ovf">
             <summary class="btn ghost small icon" role="button" aria-label="More client actions" data-i18n-title="common.more" title="More actions"><span data-khayt-icon="more" data-icon-size="16"></span></summary>
@@ -1327,7 +1328,7 @@
     <section id="portfolio-tab" class="tab-content khayt-tab-page" role="tabpanel" aria-labelledby="tabbtn-portfolio-tab" aria-hidden="true" tabindex="-1">
       <div class="toolbar">
         <h3 class="card-head" style="margin: 0; flex: 1;"><span class="swatch"></span><span data-i18n="pf.title">Portfolio</span></h3>
-        <input type="search" id="portfolioSearch" class="toolbar-search" data-i18n-placeholder="pf.search_ph">
+        <input type="search" id="portfolioSearch" aria-label="Search portfolio" data-i18n-aria="a11y.search_portfolio" class="toolbar-search" data-i18n-placeholder="pf.search_ph">
         <button class="btn" id="btnRevealOrderPhotos" data-i18n="pf.reveal_folder">Reveal photos folder</button>
       </div>
       <div id="portfolioGrid" class="portfolio-grid"></div>
@@ -1447,7 +1448,7 @@
         <button class="btn primary" id="btnLogWaste" data-i18n="waste.add">Log Failed Print</button>
       </div>
       <div class="toolbar" style="margin-bottom:16px; flex-wrap:wrap; gap:8px;">
-        <input type="search" id="wasteSearch" class="toolbar-search" style="max-width:180px;" placeholder="Search waste…" data-i18n-placeholder="waste.search_ph">
+        <input type="search" id="wasteSearch" aria-label="Search waste" data-i18n-aria="a11y.search_waste" class="toolbar-search" style="max-width:180px;" placeholder="Search waste…" data-i18n-placeholder="waste.search_ph">
         <select id="wasteMaterialFilter" class="toolbar-select" style="max-width:150px;">
           <option value="">All materials</option>
         </select>
@@ -1683,7 +1684,7 @@
 
         <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="font-size:12px; color:var(--text-muted);">
-            <strong data-i18n="set.about">About</strong> · <span data-i18n="app.title">Khayt</span> · خيط · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
+            <strong data-i18n="set.about">About</strong> · <span data-i18n="set.about_name">Khayt · خيط</span> · <span data-i18n="set.version">Version</span> <span id="appVersion">—</span><span id="appVersionBeta" hidden style="margin-left:6px;font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--warning-soft,#fef3c7);color:var(--warning,#b45309);">Beta</span>
             <div style="margin-top:4px; font-size:11px;" data-i18n="set.ai_credit">Built with assistance from AI tools.</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
@@ -1743,8 +1744,8 @@
           <div class="inline-pair" id="addressFields"></div>
         </div>
 
-        <div class="card settings-card">
-        <div class="settings-section-head pro-only" data-i18n="set.working_hours">Working Hours</div>
+        <div class="card settings-card pro-only">
+        <div class="settings-section-head" data-i18n="set.working_hours">Working Hours</div>
         <div class="pro-only">
           <p style="font-size:11.5px; color:var(--text-muted); margin:0 0 10px;" data-i18n="set.wh_hint">Available print hours per day of week (0 = closed)</p>
           <div id="workingHoursGrid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-bottom:12px;">
@@ -2279,7 +2280,7 @@
           <div id="nozzleWearSection"></div>
         </div>
 
-        <div class="card settings-card">
+        <div class="card settings-card" data-simple-pro="productionSettings">
         <div class="settings-section-head" data-i18n="envLogs">Environment Log</div>
         <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;">
           <button id="btnLogEnv" class="btn btn-sm btn-secondary" data-i18n="logEnvironment">+ Log</button>
@@ -2296,12 +2297,22 @@
       <div class="settings-panel" id="settings-panel-library">
         <h2 class="settings-panel-title" data-i18n="set.pane_library">Library &amp; Files</h2>
 
+        <!-- Simple (S4 card 8, Figma 80:382): three places, drawn by
+             renderer/simple-forms.js. S3 / R2, tiering and the backup copy
+             below are Professional; a library already in a bucket keeps
+             working and is listed as "Set up in Professional". -->
+        <div class="card settings-card sm-simple-only" id="plibPlacesCard">
+        <p class="settings-panel-hint" style="margin:0 0 12px;" data-i18n="sm.lib_hint">Where your models are kept.</p>
+        <div id="plibPlaces"></div>
+        </div>
+
         <div class="card settings-card">
+        <div data-simple-pro="libraryStorage">
         <div class="settings-section-head" data-i18n="set.plib_loc_section">Print library location</div>
         <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;" data-i18n="set.plib_loc_hint">Where your model files are kept. A folder on a network drive, an external disk, or a synced folder (iCloud Drive, Dropbox, Google Drive, OneDrive) all work — Khayt just needs to be able to reach it.</p>
         <label data-i18n="set.plib_loc_primary">Library folder</label>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input type="text" id="set_plibRoot" readonly placeholder="This Mac (default)" style="flex:1; min-width:220px;">
+          <input type="text" id="set_plibRoot" readonly placeholder="This computer (default)" data-i18n-placeholder="set.plib_root_ph" style="flex:1; min-width:220px;">
           <button class="btn" id="btnPlibRoot" data-i18n="set.plib_choose">Choose…</button>
           <button class="btn ghost" id="btnPlibRootClear" data-i18n="set.plib_use_default">Use this computer</button>
         </div>
@@ -2312,6 +2323,7 @@
           <button class="btn ghost" id="btnPlibMirrorClear" data-i18n="common.clear">Clear</button>
         </div>
         <p style="font-size:11.5px;color:var(--text-muted);margin:8px 0 0;" data-i18n="set.plib_mirror_hint">Every file added to the library is copied here too. Khayt never reads from it — it is a backup, not a second library.</p>
+        </div>
         <p id="plibLocStatus" style="font-size:12px;margin:10px 0 0;"></p>
 
         <div id="plibMoveBox" style="display:none; border:1px solid var(--border,#2a2e38); border-radius:8px; padding:12px; margin-top:12px;">
@@ -2325,7 +2337,7 @@
         </div>
 
         <p id="plibVaultNote" style="display:none; font-size:12px; margin:16px 0 0; padding:10px 12px; border:1px solid var(--border,#2a2e38); border-radius:8px;" data-i18n="set.plib_vault_lock">This library lives in the Khayt Vault. To change where it is kept, use the Khayt Mac app.</p>
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibS3On" style="width:auto; margin:0;">
             <span data-i18n="set.plib_s3_on">Also back up to object storage (S3, Cloudflare R2, Backblaze B2, and more)</span>
@@ -2362,7 +2374,7 @@
         <!-- Google Drive. The one non-S3 backend, because a lot of makers
              already pay for the storage. Dropbox and OneDrive are reachable as a
              synced folder via the library folder setting above, at no code cost. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div class="sm-drive-setup" id="plibDriveBlock" tabindex="-1" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibGDriveOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_gd_on">Use Google Drive instead of a bucket</span>
@@ -2384,7 +2396,7 @@
         <!-- Tiering. Separate from the backup block above because it is a
              different job with a different risk: the mirror only ever writes,
              this one deletes local files once the bucket has them. -->
-        <div style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
+        <div data-simple-pro="libraryStorage" style="border-top:1px solid var(--border,#2a2e38); margin-top:16px; padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="set_plibTierOn" style="width:auto; margin:0;">
             <span data-i18n="set.plib_tier_on">Move old models to the cloud to free up disk space</span>
@@ -3119,6 +3131,7 @@
 <script src="themes/theme-picker.js"></script>
 <script src="themes.js"></script>
 <script src="simple-mode.js"></script>
+<script src="simple-forms.js"></script>
 <script src="shell.js"></script>
 <script src="app-helpers.js"></script>
 <script src="../lib/currencies.js"></script>

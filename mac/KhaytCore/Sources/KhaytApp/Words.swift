@@ -759,7 +759,7 @@ final class Words {
         // not drawn: one line saying what is missing beats three empty lanes and
         // a legend for marks that do not appear.
         "mac.band_free_across": ["en": "{hours} free across {machines}",
-                                 "ar": "{hours} متفرغة على {machines}"],
+                                 "ar": "{hours} متاحة على {machines}"],
         "mac.band_machines": ["en": "{n} machines", "ar": "{n} طابعة"],
         "mac.band_machines_one": ["en": "{n} machine", "ar": "طابعة واحدة"],
         "mac.band_machines_two": ["en": "2 machines", "ar": "طابعتين"],
@@ -775,7 +775,7 @@ final class Words {
         "mac.band_unknown":  ["en": "no estimate",   "ar": "لا تقدير"],
         "mac.band_cannot_ask": ["en": "printing something Khayt cannot time — nothing here is a guess",
                                 "ar": "تطبع شيئاً لا يستطيع خيط تقديره — ولا شيء هنا تخمين"],
-        "mac.band_free_in":  ["en": "free in {hours} h",  "ar": "متفرغة خلال {hours} ساعة"],
+        "mac.band_free_in":  ["en": "free in {hours} h",  "ar": "متاحة خلال {hours} ساعة"],
         // A machine Khayt has no protocol for is not a machine that has stopped
         // answering, and the two must not read the same.
         "mac.band_no_protocol": ["en": "Khayt has no way to ask this kind of machine what it is doing — it is not a fault",
@@ -820,10 +820,10 @@ final class Words {
         "mac.band_printing": ["en": "Printing now",   "ar": "تطبع الآن"],
         "mac.band_queued":   ["en": "Queued — projected", "ar": "في الانتظار — متوقع"],
         "mac.band_blocked":  ["en": "Blocked on stock",  "ar": "متوقف على المخزون"],
-        "mac.band_free":     ["en": "free",           "ar": "متفرغة"],
+        "mac.band_free":     ["en": "free",           "ar": "متاحة"],
         "mac.band_state_printing": ["en": "Printing", "ar": "تطبع"],
         "mac.band_state_queued":   ["en": "Queued",   "ar": "في الانتظار"],
-        "mac.band_state_free":     ["en": "Free",     "ar": "متفرغة"],
+        "mac.band_state_free":     ["en": "Free",     "ar": "متاحة"],
         "mac.band_state_offline": ["en": "Not answering", "ar": "لا تجيب"],
         "mac.band_state_down":    ["en": "Maintenance", "ar": "صيانة"],
         "mac.band_offline_note": ["en": "not answering — its hours are left out of the free total until it does", "ar": "لا تجيب — ساعاتها خارج إجمالي الوقت المتاح حتى تجيب"],
@@ -2742,7 +2742,10 @@ final class Words {
         "mac.state_done":      ["en": "Done",      "ar": "تم"],
         "mac.state_blocked":   ["en": "Blocked",   "ar": "متوقف"],
         "mac.state_quoted":    ["en": "Quoted",    "ar": "عرض سعر"],
-        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصل"],
+        // A printer, so feminine: «غير متصلة», the word every app uses for a
+        // printer that is not connected (Nov 2026). Never «متوقفة», which is
+        // kept for a real stop.
+        "mac.state_offline":   ["en": "Offline",   "ar": "غير متصلة"],
         "mac.state_stopped": ["en": "Stopped", "ar": "متوقفة"],
         "mac.state_check_it": ["en": "Check it", "ar": "افحصها"],
         "mac.state_worn": ["en": "Worn", "ar": "مهترئة"],
@@ -3422,7 +3425,11 @@ final class Words {
         "mac.quarter_2": ["en": "Q2\u{00A0}{year}", "ar": "الربع الثاني {year}"],
         "mac.quarter_3": ["en": "Q3\u{00A0}{year}", "ar": "الربع الثالث {year}"],
         "mac.quarter_4": ["en": "Q4\u{00A0}{year}", "ar": "الربع الرابع {year}"],
-        "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
+        // «متاحة» (free), not «متوقفة»: with On hold now «متوقف مؤقتاً» on every
+        // app, an idle printer, a paused one and a held job all read as some
+        // form of "stopped" (Turki, 13 Nov 2026). A paused printer keeps
+        // «متوقفة مؤقتًا» and a real stop keeps «متوقفة».
+        "mac.idle":          ["en": "Idle",            "ar": "متاحة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
         "mach.connection":   ["en": "Connection",      "ar": "الاتصال"],
@@ -3695,7 +3702,7 @@ final class Words {
                             "ar": "تعذّر تشفير الرمز، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، والرمز غير المشفّر سينتقل معه."],
         "mac.tg_when": ["en": "Send a message when", "ar": "أرسل رسالة عند"],
         "mac.tg_on_complete": ["en": "A job is finished", "ar": "اكتمال عمل"],
-        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "تعليق عمل"],
+        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "إيقاف عمل مؤقتاً"],
         "mac.tg_on_low_stock": ["en": "Filament is running low", "ar": "انخفاض مخزون الخيط"],
         // THE LAST THREE ARE NOT THE SHARED `fleet.notify_*`, and the picture
         // is why. Those read "Notify on printer error", which is right on the
@@ -4057,6 +4064,26 @@ final class Words {
         "mac.lib_token_creator": ["en": "Creator", "ar": "المصمم"],
         "mac.lib_token_printer": ["en": "Ready on", "ar": "جاهز على"],
         "mac.lib_token_remove": ["en": "Remove {name}", "ar": "إزالة {name}"],
+        // The Library's Colour and File type menus (`LibraryFilterBar`): the
+        // eleven colour families (`ColourFamily`, lib/colour-family.js), a
+        // model with no colour on its record, and the file types that are
+        // words. The menu titles, Multicolour and Other are the shared
+        // catalogue's (`inv.color`, `brl.sort_type`, `plan.material_label`,
+        // `inv.type_other`).
+        "mac.lf_red": ["en": "Red", "ar": "أحمر"],
+        "mac.lf_orange": ["en": "Orange", "ar": "برتقالي"],
+        "mac.lf_yellow": ["en": "Yellow", "ar": "أصفر"],
+        "mac.lf_green": ["en": "Green", "ar": "أخضر"],
+        "mac.lf_blue": ["en": "Blue", "ar": "أزرق"],
+        "mac.lf_purple": ["en": "Purple", "ar": "بنفسجي"],
+        "mac.lf_pink": ["en": "Pink", "ar": "وردي"],
+        "mac.lf_brown": ["en": "Brown", "ar": "بني"],
+        "mac.lf_black": ["en": "Black", "ar": "أسود"],
+        "mac.lf_grey": ["en": "Grey", "ar": "رمادي"],
+        "mac.lf_white": ["en": "White", "ar": "أبيض"],
+        "mac.lf_no_colour": ["en": "No colour info", "ar": "بلا معلومات لون"],
+        "mac.lf_no_file": ["en": "No file", "ar": "بلا ملف"],
+        "mac.lf_gcode": ["en": "G-code", "ar": "جي كود"],
         // Where a model's bytes are (`LibrarySyncIndex`): the tile badge, the
         // Show menu pair, and the inspector's Storage section.
         "mac.lib_online_only": ["en": "Online only", "ar": "على الإنترنت فقط"],
@@ -5105,10 +5132,12 @@ final class Words {
         //
         // `name` stays as `lib/tax.js` gives it. That is the tax's own label —
         // what the shop's invoices say — and not interface wording to translate.
+        // The Arabic says the PRICE includes the tax; it used to say the tax
+        // includes the price, and began with the Latin name.
         "mac.tax_inclusive": ["en": "{name} {pct}% included in the price",
-                              "ar": "{name} {pct}% شامل السعر"],
+                              "ar": "السعر شامل {name} بنسبة {pct}%"],
         "mac.tax_exclusive": ["en": "{name} {pct}% added on top",
-                              "ar": "{name} {pct}% يُضاف على السعر"],
+                              "ar": "تُضاف {name} بنسبة {pct}% على السعر"],
         // Six months of takings on the dashboard, and the sentence over them.
         //
         // A SENTENCE, not the word "Revenue" over an axis. The HIG asks a chart
@@ -5650,6 +5679,8 @@ final class Words {
         "mac.lock_pin_unreadable": ["en": "This PIN was saved in a format Khayt can no longer check. An owner needs to set it again.", "ar": "حُفظ هذا الرمز بصيغة لم يعد خيط قادرًا على التحقق منها. يجب على المالك تعيينه من جديد."],
         "mac.lock_cooling": ["en": "Too many wrong PINs. Try again at {time}.", "ar": "محاولات خاطئة كثيرة. حاول مجددًا الساعة {time}."],
         "mac.lock_screen_not_allowed": ["en": "Your access level does not include this screen.", "ar": "مستوى صلاحيتك لا يشمل هذه الشاشة."],
+        "mac.mode_screen_hidden": ["en": "This screen is part of Professional. This shop is set to Simple.", "ar": "هذه الشاشة جزء من الوضع الاحترافي، وهذا المتجر على الوضع البسيط."],
+        "mac.mode_open_settings": ["en": "Open Settings", "ar": "فتح الإعدادات"],
         "mac.lock_signed_in_as": ["en": "Signed in as {name}", "ar": "مسجّل الدخول باسم {name}"],
         "mac.lock_sign_in_first": ["en": "Sign in first.", "ar": "سجّل الدخول أولًا."],
         "mac.lock_not_allowed": ["en": "Your access level does not allow this.", "ar": "مستوى صلاحيتك لا يسمح بهذا."],
@@ -5952,6 +5983,8 @@ final class Words {
                                  + "What has already been paid stays recorded.",
                                  "ar": "تُحذف الدفعات المتفق عليها ({n}) ومجموعها {amount}. "
                                  + "ما دُفع بالفعل يبقى مسجّلًا."],
+        "mac.price_not_read": ["en": "That price is not a number. Type a price, or clear the box.",
+                               "ar": "هذا السعر ليس رقمًا. اكتب سعرًا أو أفرغ الخانة."],
         "mac.save_zero_q":    ["en": "Save at a price of 0?",
                                "ar": "الحفظ بسعر 0؟"],
         "mac.save_zero_note": ["en": "This product would be sold and quoted for nothing. "
@@ -6480,6 +6513,9 @@ final class Words {
     /// The shared keys this app uses. `PrintFactLines` declares its own, so a
     /// key added to that panel cannot be forgotten here.
     static let borrowed = PrintFactLines.borrowedKeys + [
+        // The Library's Colour and File type menus (`LibraryFilterBar`):
+        // their titles, Multicolour and Other. (`inv.color` is further down.)
+        "brl.sort_type", "plan.material_label", "inv.type_other",
         // Partial delivery and the spool switch (`PartTrackingSheets.swift`).
         "ord.partial_delivery", "ord.parts_delivered", "ord.spool_switch", "ord.add_spool",
         // The desktop-parity reports (`ParityReportCards.swift`), the box-form
