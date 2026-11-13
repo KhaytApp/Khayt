@@ -117,6 +117,7 @@ enum NotificationKind {
 enum PrintAlertText {
     static func content(for event: PrintFinished, orderStatus: String?,
                         locale: Locale = AlertDigits.locale(), shopId: String? = nil,
+                        now: Date = Date(), timeZone: TimeZone = .current,
                         tr: (String) -> String) -> UNMutableNotificationContent {
         let c = UNMutableNotificationContent()
         c.filterCriteria = NotificationKind.print
@@ -140,13 +141,13 @@ enum PrintAlertText {
             f.unitsStyle = .abbreviated
             if let t = f.string(from: s) { parts.append(t) }
         }
+        if let ended = endedLabel(at: event.at, now: now, locale: locale, timeZone: timeZone) { parts.append(ended) }
         c.body = parts.joined(separator: " · ")
         c.sound = .default
         c.threadIdentifier = "khayt.prints"
         // A failed or cancelled print is worth breaking through Focus for;
-        // a finished one is not (Dev Hub, Nov 13). Takes effect once the app
-        // carries the time-sensitive entitlement; until then iOS treats it as
-        // `.active`, which is what every alert was.
+        // a finished one is not (Dev Hub, Nov 13). The app carries the
+        // time-sensitive entitlement (on for the App ID since Nov 13).
         c.interruptionLevel = event.outcome == .finished ? .active : .timeSensitive
         let action = PrintAlertAction.offered(for: event, orderStatus: orderStatus)
         c.categoryIdentifier = action?.category ?? PrintAlertAction.infoCategory
@@ -167,6 +168,31 @@ enum PrintAlertText {
                        "PUSH_QUOTE_APPROVED", "PUSH_QUOTE_DECLINED", "PUSH_MESSAGE", "PUSH_PAYMENT", "PUSH_GENERIC"]
 }
 
+
+extension PrintAlertText {
+    /// Up to this old, an ending is "now" and needs no time on it.
+    static let justNow: TimeInterval = 2 * 60
+
+    /// When the print ENDED, for an alert that arrives late — the Mac sends
+    /// an ending noticed while it slept at its next wake, and retries a failed
+    /// post for hours, with `at` the time the print ended (Mac lane, Nov 13).
+    /// Nil within `justNow`; the time of day the same day; the day and time
+    /// after that. Gregorian, the app's language, Western digits.
+    static func endedLabel(at: String, now: Date, locale: Locale, timeZone: TimeZone) -> String? {
+        let iso = ISO8601DateFormatter()
+        var date = iso.date(from: at)
+        if date == nil { iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; date = iso.date(from: at) }
+        guard let date, now.timeIntervalSince(date) > justNow else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        calendar.timeZone = timeZone
+        let sameDay = calendar.isDate(date, inSameDayAs: now)
+        var style = Date.FormatStyle(date: sameDay ? .omitted : .abbreviated, time: .shortened,
+                                     locale: locale, calendar: calendar, timeZone: timeZone)
+        style.capitalizationContext = .middleOfSentence
+        return date.formatted(style)
+    }
+}
 
 // MARK: - Digits
 

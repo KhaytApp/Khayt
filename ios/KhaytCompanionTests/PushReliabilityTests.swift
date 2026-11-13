@@ -85,6 +85,25 @@ final class PushReliabilityTests: XCTestCase {
         XCTAssertNotNil(c.body.range(of: "2"), c.body)
     }
 
+    /// An ending that arrives late says when the print ended (the Mac now
+    /// sends endings noticed while it slept, with `at` the real end).
+    func testALateEndingSaysWhenItEnded() {
+        let utc = TimeZone(identifier: "UTC")!
+        let ended = ISO8601DateFormatter().date(from: "2026-11-13T03:10:00Z")!
+        let en = Locale(identifier: "en_US@numbers=latn")
+        func body(_ now: Date, _ locale: Locale = en) -> String {
+            var e = event(.finished, duration: nil); e.at = "2026-11-13T03:10:00Z"
+            return PrintAlertText.content(for: e, orderStatus: nil, locale: locale, now: now, timeZone: utc) { $0 }.body
+        }
+        XCTAssertEqual(body(ended.addingTimeInterval(60)), "alert.print.a_job · U1", "just now: no time")
+        XCTAssertTrue(body(ended.addingTimeInterval(3 * 3600)).hasSuffix("· 3:10\u{202F}AM"), body(ended.addingTimeInterval(3 * 3600)))
+        let nextDay = body(ended.addingTimeInterval(22 * 3600))
+        XCTAssertTrue(nextDay.contains("Nov 13"), nextDay)
+        let ar = body(ended.addingTimeInterval(3 * 3600), Locale(identifier: "ar@numbers=latn"))
+        XCTAssertNil(ar.range(of: "[٠-٩]", options: .regularExpression), ar)
+        XCTAssertTrue(ar.contains("3:10"), ar)
+    }
+
     func testOnlyAFailedOrCancelledPrintIsTimeSensitive() {
         XCTAssertEqual(PrintAlertText.content(for: event(.finished), orderStatus: nil) { $0 }.interruptionLevel, .active)
         XCTAssertEqual(PrintAlertText.content(for: event(.failed), orderStatus: nil) { $0 }.interruptionLevel, .timeSensitive)
