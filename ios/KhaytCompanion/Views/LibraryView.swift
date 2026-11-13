@@ -115,8 +115,12 @@ struct LibraryFolderPage: View {
             }
         }
         .listStyle(.insetGrouped)
-        .khaytScreen(title: title)
-        .navigationBarTitleDisplayMode(folder.isEmpty ? .large : .inline)
+        // Inline, as every sheet (review W5); not `khaytScreen`, whose large
+        // title wins over a mode set after it.
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(KhaytDesign.bg.ignoresSafeArea())
         // A short pause while typing, so each letter is not its own question.
         .task(id: loadKey) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(300)) }

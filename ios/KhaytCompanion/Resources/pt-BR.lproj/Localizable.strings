@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Calcule um preço à mão";
 "new.expense.detail" = "Foto do recibo";
 "new.waste.detail" = "Impressão falha ou purga";
-"new.more" = "Mais";
+"new.more" = "Também";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Documentos";
 "paper.packing_slip" = "Lista de embalagem";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Último download da nuvem recusado";
 "diag.refused.wrong_shop" = "recusado: outra oficina";
 "diag.refused.empty" = "recusado: vazio";
+"intake.waiting" = "Aguardando";
+"spool.low" = "Baixo";
+"stage.a11y.done" = "Concluído";
+"order.new.hint.client" = "Escolha ou digite um nome";
+"order.new.hint.project" = "O que é? ex.: o nome da peça";
+"order.new.hint.material" = "ex.: PLA, preto";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Não foi possível carregar";

@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Price a print by hand";
 "new.expense.detail" = "Photo of the receipt";
 "new.waste.detail" = "A failed print or purge";
-"new.more" = "More";
+"new.more" = "Also";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papers";
 "paper.packing_slip" = "Packing slip";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+"intake.waiting" = "Waiting";
+"spool.low" = "Low";
+"stage.a11y.done" = "Done";
+"order.new.hint.client" = "Choose or type a name";
+"order.new.hint.project" = "What is it? e.g. a part name";
+"order.new.hint.material" = "e.g. PLA, black";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Couldn't load";

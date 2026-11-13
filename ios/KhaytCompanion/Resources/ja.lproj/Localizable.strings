@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "最後に拒否したクラウドの取得";
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
+"intake.waiting" = "待ち";
+"spool.low" = "残りわずか";
+"stage.a11y.done" = "完了";
+"order.new.hint.client" = "選ぶか名前を入力";
+"order.new.hint.project" = "何を作る？例：部品名";
+"order.new.hint.material" = "例：PLA、黒";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "読み込めませんでした";

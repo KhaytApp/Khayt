@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "سعّر طباعة يدويًا";
 "new.expense.detail" = "صورة الإيصال";
 "new.waste.detail" = "طباعة فاشلة أو تنظيف";
-"new.more" = "المزيد";
+"new.more" = "أيضًا";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "المستندات";
 "paper.packing_slip" = "قائمة التعبئة";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "آخر سحب مرفوض من سحابة خيط";
 "diag.refused.wrong_shop" = "مرفوض: ورشة أخرى";
 "diag.refused.empty" = "مرفوض: نسخة فارغة";
+"intake.waiting" = "بالانتظار";
+"spool.low" = "منخفض";
+"stage.a11y.done" = "تمّت";
+"order.new.hint.client" = "اختر عميلًا أو اكتب اسمًا";
+"order.new.hint.project" = "ما هو؟ مثلًا اسم القطعة";
+"order.new.hint.material" = "مثلًا PLA، أسود";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "تعذّر التحميل";

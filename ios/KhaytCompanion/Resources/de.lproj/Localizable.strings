@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Druck von Hand kalkulieren";
 "new.expense.detail" = "Foto vom Beleg";
 "new.waste.detail" = "Fehldruck oder Spülung";
-"new.more" = "Mehr";
+"new.more" = "Außerdem";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papiere";
 "paper.packing_slip" = "Packzettel";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
+"intake.waiting" = "Wartet";
+"spool.low" = "Knapp";
+"stage.a11y.done" = "Erledigt";
+"order.new.hint.client" = "Auswählen oder Namen eingeben";
+"order.new.hint.project" = "Was ist es? z. B. ein Teilename";
+"order.new.hint.material" = "z. B. PLA, schwarz";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Laden fehlgeschlagen";

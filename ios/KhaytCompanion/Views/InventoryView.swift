@@ -144,8 +144,9 @@ struct InventoryView: View {
 
     private var chips: some View {
         HStack(spacing: 7) {
-            chip(L10n.tr("inventory.filter.all"), on: !lowOnly) { lowOnly = false }
-            chip(L10n.tr("inventory.filter.low"), on: lowOnly) { lowOnly = true }
+            chip(L10n.tr("inventory.filter.all"), count: spools.count, tone: KhaytDesign.brand, on: !lowOnly) { lowOnly = false }
+            chip(L10n.tr("inventory.filter.low"), count: spools.filter(\.isLowStock).count,
+                 tone: KhaytDesign.attention, on: lowOnly) { lowOnly = true }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
@@ -153,15 +154,24 @@ struct InventoryView: View {
         .padding(.bottom, 14)
     }
 
-    private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+    /// The Orders filter pill (review P4): a dot in the filter's colour, the
+    /// words and the count in ink, the same size.
+    private func chip(_ title: String, count: Int, tone: Color, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.khayt(13, .semibold, relativeTo: .subheadline))
-                .padding(.horizontal, 16)
-                .frame(minHeight: 44)
-                .foregroundStyle(KhaytDesign.ink)
-                .background(on ? KhaytDesign.brand.opacity(0.18) : KhaytDesign.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(on ? KhaytDesign.brand.opacity(0.5) : KhaytDesign.hairline, lineWidth: 1))
+            HStack(spacing: 6) {
+                Circle().fill(tone).frame(width: 7, height: 7)
+                Text(title)
+                    .font(.khayt(13.5, .semibold, relativeTo: .subheadline))
+                    .lineLimit(1)
+                Text(count.formatted(.number.locale(L10n.locale)))
+                    .font(.khaytMono(12, .medium, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .foregroundStyle(KhaytDesign.ink)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(on ? tone.opacity(0.18) : KhaytDesign.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(on ? tone.opacity(0.55) : KhaytDesign.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -251,7 +261,9 @@ private struct SpoolRow: View {
         return min(1, max(0, left / full))
     }
 
-    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.collect }
+    /// Amber-brown when it is time to reorder; otherwise a quiet neutral —
+    /// `collect` teal means "ready to collect", not "plenty left".
+    private var tone: Color { spool.isLowStock ? KhaytDesign.attention : KhaytDesign.note }
 
     /// The colour's own name when it has one ("Galaxy Black"), else the label.
     private var title: String {
@@ -294,6 +306,13 @@ private struct SpoolRow: View {
                     Text(L10n.grams(Int(left.rounded())))
                         .font(.khaytMono(13, .medium, relativeTo: .caption))
                         .foregroundStyle(spool.isLowStock ? KhaytDesign.attention : KhaytDesign.ink)
+                }
+                if spool.isLowStock {
+                    // "Low" in words, not only in amber.
+                    Text("· " + L10n.tr("spool.low"))
+                        .font(.khayt(12.5, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.attention)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 if let fraction {

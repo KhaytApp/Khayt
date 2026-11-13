@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "手动计算价格";
 "new.expense.detail" = "拍下收据";
 "new.waste.detail" = "打印失败或冲料";
-"new.more" = "更多";
+"new.more" = "其他";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "单据";
 "paper.packing_slip" = "装箱单";
@@ -1304,6 +1304,12 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+"intake.waiting" = "等待中";
+"spool.low" = "偏低";
+"stage.a11y.done" = "已完成";
+"order.new.hint.client" = "选择或输入名称";
+"order.new.hint.project" = "做什么？例如零件名称";
+"order.new.hint.material" = "例如 PLA，黑色";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "无法加载";
