@@ -1202,6 +1202,11 @@
 "connectors.status.not_reviewed" = "未审核";
 "connectors.status.off" = "已关闭";
 "connectors.status.invalid" = "无法读取";
+"connectors.status.revoked" = "已被 Khayt 暂停";
+"plg.update_updated" = "%1$@ 已更新到 %2$@";
+"plg.update_revoked" = "Khayt 已撤回版本 %@，因此已暂停。";
+"plg.update_needs_app" = "%1$@ %2$@ 需要更新版本的 Khayt。";
+"plg.update_pending" = "%1$@ %2$@ 正在等待你在 Mac 上同意。";
 "connectors.yes" = "是";
 "connectors.no" = "否";
 "connectors.settings.title" = "商店设置";
@@ -1303,6 +1308,12 @@
 "diag.cloud_refused" = "最近一次被拒绝的云端拉取";
 "diag.refused.wrong_shop" = "已拒绝：店铺不符";
 "diag.refused.empty" = "已拒绝：为空";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "需要在 Mac 上确认";
+"connectors.badge.updated" = "已更新到 %@";
+"connectors.badge.needs_app" = "需要更新版本的 Khayt";
+"connectors.waiting_count" = "等待 Mac：%d";
 "intake.waiting" = "等待中";
 "spool.low" = "偏低";
 "stage.a11y.done" = "已完成";

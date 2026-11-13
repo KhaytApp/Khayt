@@ -1202,6 +1202,11 @@
 "connectors.status.not_reviewed" = "Nicht geprüft";
 "connectors.status.off" = "Aus";
 "connectors.status.invalid" = "Nicht lesbar";
+"connectors.status.revoked" = "Von Khayt pausiert";
+"plg.update_updated" = "%1$@ auf %2$@ aktualisiert";
+"plg.update_revoked" = "Khayt hat Version %@ zurückgezogen, daher ist sie pausiert.";
+"plg.update_needs_app" = "%1$@ %2$@ benötigt eine neuere Version von Khayt.";
+"plg.update_pending" = "%1$@ %2$@ wartet auf dem Mac auf Ihre Zustimmung.";
 "connectors.yes" = "Ja";
 "connectors.no" = "Nein";
 "connectors.settings.title" = "Shop-Einstellungen";
@@ -1303,6 +1308,12 @@
 "diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Braucht dein OK am Mac";
+"connectors.badge.updated" = "Aktualisiert auf %@";
+"connectors.badge.needs_app" = "Braucht ein neueres Khayt";
+"connectors.waiting_count" = "Wartet auf den Mac: %d";
 "intake.waiting" = "Wartet";
 "spool.low" = "Knapp";
 "stage.a11y.done" = "Erledigt";

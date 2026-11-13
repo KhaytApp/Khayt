@@ -1202,6 +1202,11 @@
 "connectors.status.not_reviewed" = "Not reviewed";
 "connectors.status.off" = "Off";
 "connectors.status.invalid" = "Can’t be read";
+"connectors.status.revoked" = "Paused by Khayt";
+"plg.update_updated" = "%1$@ updated to %2$@";
+"plg.update_revoked" = "Khayt withdrew version %@, so it is paused.";
+"plg.update_needs_app" = "%1$@ %2$@ needs a newer version of Khayt.";
+"plg.update_pending" = "%1$@ %2$@ is waiting for your agreement on the Mac.";
 "connectors.yes" = "Yes";
 "connectors.no" = "No";
 "connectors.settings.title" = "Shop settings";
@@ -1303,6 +1308,12 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Needs your OK on the Mac";
+"connectors.badge.updated" = "Updated to %@";
+"connectors.badge.needs_app" = "Needs a newer Khayt";
+"connectors.waiting_count" = "Waiting on the Mac: %d";
 "intake.waiting" = "Waiting";
 "spool.low" = "Low";
 "stage.a11y.done" = "Done";

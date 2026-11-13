@@ -1202,6 +1202,11 @@
 "connectors.status.not_reviewed" = "İncelenmedi";
 "connectors.status.off" = "Kapalı";
 "connectors.status.invalid" = "Okunamıyor";
+"connectors.status.revoked" = "Khayt tarafından duraklatıldı";
+"plg.update_updated" = "%1$@, %2$@ sürümüne güncellendi";
+"plg.update_revoked" = "Khayt %@ sürümünü geri çekti, bu yüzden duraklatıldı.";
+"plg.update_needs_app" = "%1$@ %2$@ için Khayt'ın daha yeni bir sürümü gerekiyor.";
+"plg.update_pending" = "%1$@ %2$@, Mac'te onayınızı bekliyor.";
 "connectors.yes" = "Evet";
 "connectors.no" = "Hayır";
 "connectors.settings.title" = "Mağaza ayarları";
@@ -1303,6 +1308,12 @@
 "diag.cloud_refused" = "Son reddedilen bulut çekimi";
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Mac'te onayınızı bekliyor";
+"connectors.badge.updated" = "%@ sürümüne güncellendi";
+"connectors.badge.needs_app" = "Daha yeni bir Khayt gerekiyor";
+"connectors.waiting_count" = "Mac'i bekleyen: %d";
 "intake.waiting" = "Bekliyor";
 "spool.low" = "Az";
 "stage.a11y.done" = "Tamamlandı";

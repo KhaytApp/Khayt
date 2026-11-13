@@ -1202,6 +1202,11 @@
 "connectors.status.not_reviewed" = "未審査";
 "connectors.status.off" = "オフ";
 "connectors.status.invalid" = "読み取れません";
+"connectors.status.revoked" = "Khaytにより一時停止";
+"plg.update_updated" = "%1$@を%2$@に更新しました";
+"plg.update_revoked" = "Khayt がバージョン %@ を取り下げたため、一時停止しています。";
+"plg.update_needs_app" = "%1$@ %2$@には新しいバージョンのKhaytが必要です。";
+"plg.update_pending" = "%1$@ %2$@はMacでの同意を待っています。";
 "connectors.yes" = "はい";
 "connectors.no" = "いいえ";
 "connectors.settings.title" = "ショップの設定";
@@ -1303,6 +1308,12 @@
 "diag.cloud_refused" = "最後に拒否したクラウドの取得";
 "diag.refused.wrong_shop" = "拒否：別のショップ";
 "diag.refused.empty" = "拒否：空";
+
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Macでの承認待ち";
+"connectors.badge.updated" = "%@ に更新";
+"connectors.badge.needs_app" = "新しいKhaytが必要";
+"connectors.waiting_count" = "Mac待ち: %d";
 "intake.waiting" = "待ち";
 "spool.low" = "残りわずか";
 "stage.a11y.done" = "完了";
