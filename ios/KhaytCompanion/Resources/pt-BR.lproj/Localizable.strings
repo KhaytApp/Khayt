@@ -1315,6 +1315,25 @@
 "load.failed.title" = "Não foi possível carregar";
 "load.retry" = "Tentar de novo";
 "load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";
+
+/* S4: Simple mode */
+"mode.simple" = "Simples";
+"mode.professional" = "Profissional";
+"mode.badge.a11y" = "Modo: %@, definido no Mac";
+"simple.stage.ready" = "Pronto";
+"simple.note.on_hold" = "Em espera";
+"simple.note.post" = "Pós-processamento";
+"simple.note.qc" = "Em inspeção";
+"simple.note.shipped" = "Enviado";
+"simple.note.delivered" = "Entregue";
+"simple.expenses.month" = "Este mês: %@ · %@";
+"simple.gate.care.title" = "Planos de manutenção fazem parte do Profissional";
+"simple.gate.care.body" = "Esta oficina está no modo Simples no Mac. Para usar planos de manutenção, mude para Profissional no Khayt do seu Mac. O telefone segue a escolha do Mac.";
+"simple.gate.parts.title" = "Peças para comprar faz parte do Profissional";
+"simple.gate.parts.body" = "Esta oficina está no modo Simples no Mac. A lista de peças vem dos planos de manutenção, que são do Profissional: mude no Khayt do seu Mac. O telefone segue a escolha do Mac.";
+"simple.gate.back_machine" = "Voltar à máquina";
+"simple.gate.back_machines" = "Voltar a Máquinas";
+"simple.expenses.count" = "%d despesas";
 "PUSH_GENERIC" = "Algo na sua loja precisa de atenção";
 "push.not_connected" = "Os alertas ainda não chegam a este telefone. O Khayt tentará de novo quando você abrir o app.";
 /* Home — Needs you */

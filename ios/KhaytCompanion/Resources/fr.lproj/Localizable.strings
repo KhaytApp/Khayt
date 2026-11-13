@@ -1315,6 +1315,25 @@
 "load.failed.title" = "Chargement impossible";
 "load.retry" = "Réessayer";
 "load.book_unavailable" = "Le registre n'a pas pu être lu sur ce téléphone. Réessayez, ou vérifiez que le Mac est à portée.";
+
+/* S4: Simple mode */
+"mode.simple" = "Simple";
+"mode.professional" = "Professionnel";
+"mode.badge.a11y" = "Mode : %@, choisi sur le Mac";
+"simple.stage.ready" = "Prêt";
+"simple.note.on_hold" = "En attente";
+"simple.note.post" = "Finition";
+"simple.note.qc" = "En contrôle";
+"simple.note.shipped" = "Expédié";
+"simple.note.delivered" = "Livré";
+"simple.expenses.month" = "Ce mois-ci : %@ · %@";
+"simple.gate.care.title" = "Les plans d'entretien font partie du mode Professionnel";
+"simple.gate.care.body" = "Cet atelier est en mode Simple sur le Mac. Pour utiliser les plans d'entretien, passez en Professionnel dans Khayt sur votre Mac. Le téléphone suit le choix du Mac.";
+"simple.gate.parts.title" = "Les pièces à acheter font partie du mode Professionnel";
+"simple.gate.parts.body" = "Cet atelier est en mode Simple sur le Mac. La liste des pièces vient des plans d'entretien, qui font partie du mode Professionnel : changez dans Khayt sur votre Mac. Le téléphone suit le choix du Mac.";
+"simple.gate.back_machine" = "Retour à la machine";
+"simple.gate.back_machines" = "Retour aux machines";
+"simple.expenses.count" = "%d dépenses";
 "PUSH_GENERIC" = "Quelque chose dans votre atelier demande un coup d’œil";
 "push.not_connected" = "Les alertes n’arrivent pas encore sur ce téléphone. Khayt réessaiera à la prochaine ouverture.";
 /* Home — Needs you */
