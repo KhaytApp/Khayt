@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Price a print by hand";
 "new.expense.detail" = "Photo of the receipt";
 "new.waste.detail" = "A failed print or purge";
-"new.more" = "More";
+"new.more" = "Also";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papers";
 "paper.packing_slip" = "Packing slip";
@@ -1304,8 +1304,40 @@
 "diag.cloud_refused" = "Last refused cloud pull";
 "diag.refused.wrong_shop" = "refused: wrong shop";
 "diag.refused.empty" = "refused: empty";
+"intake.waiting" = "Waiting";
+"spool.low" = "Low";
+"stage.a11y.done" = "Done";
+"order.new.hint.client" = "Choose or type a name";
+"order.new.hint.project" = "What is it? e.g. a part name";
+"order.new.hint.material" = "e.g. PLA, black";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Couldn't load";
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
+/* Home — Needs you */
+"home.greeting.morning" = "Good morning.";
+"home.greeting.afternoon" = "Good afternoon.";
+"home.greeting.evening" = "Good evening.";
+"needs.title" = "Needs you";
+"needs.none" = "Nothing needs you right now.";
+"needs.calm" = "No late jobs, the shelf is stocked and no one is waiting.";
+"needs.late.one" = "%1$@ was due %2$@";
+"needs.late.action" = "Open late jobs";
+"needs.low.title" = "The shelf is thin";
+"needs.low.left" = "%1$@ %2$@ left";
+"needs.low.action" = "See inventory";
+"needs.waiting.action" = "Open intake";
+"needs.quotes.action" = "Open quotes";
+"tile.owed" = "Owed to you";
+"tile.machines" = "On the machines";
+"tile.machines.value" = "%1$d of %2$d";
+"tile.machines.sub" = "printing now";
+"needs.due_week" = "Due this week";
+"needs.this_year" = "%@ this year";
+"needs.owed" = "%@ owed";
+"needs.count" = "%d things need you.";
+"needs.late" = "%d jobs are late";
+"needs.low.count" = "%d spools low";
+"needs.quotes" = "%d quotes are waiting for an answer";
+"needs.more" = "and %d more";

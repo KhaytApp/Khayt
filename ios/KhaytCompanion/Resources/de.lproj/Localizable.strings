@@ -1030,7 +1030,7 @@
 "new.calculator.detail" = "Druck von Hand kalkulieren";
 "new.expense.detail" = "Foto vom Beleg";
 "new.waste.detail" = "Fehldruck oder Spülung";
-"new.more" = "Mehr";
+"new.more" = "Außerdem";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papiere";
 "paper.packing_slip" = "Packzettel";
@@ -1304,8 +1304,40 @@
 "diag.cloud_refused" = "Zuletzt abgelehnter Cloud-Abruf";
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
+"intake.waiting" = "Wartet";
+"spool.low" = "Knapp";
+"stage.a11y.done" = "Erledigt";
+"order.new.hint.client" = "Auswählen oder Namen eingeben";
+"order.new.hint.project" = "Was ist es? z. B. ein Teilename";
+"order.new.hint.material" = "z. B. PLA, schwarz";
 
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Laden fehlgeschlagen";
 "load.retry" = "Erneut versuchen";
 "load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
+/* Home — Needs you */
+"home.greeting.morning" = "Guten Morgen.";
+"home.greeting.afternoon" = "Guten Tag.";
+"home.greeting.evening" = "Guten Abend.";
+"needs.title" = "Braucht dich";
+"needs.none" = "Gerade braucht dich nichts.";
+"needs.calm" = "Keine verspäteten Aufträge, das Regal ist voll und niemand wartet.";
+"needs.late.one" = "%1$@ war am %2$@ fällig";
+"needs.late.action" = "Verspätete öffnen";
+"needs.low.title" = "Das Regal wird leer";
+"needs.low.left" = "%1$@ noch %2$@";
+"needs.low.action" = "Lager ansehen";
+"needs.waiting.action" = "Anfragen öffnen";
+"needs.quotes.action" = "Angebote öffnen";
+"tile.owed" = "Dir geschuldet";
+"tile.machines" = "Auf den Maschinen";
+"tile.machines.value" = "%1$d von %2$d";
+"tile.machines.sub" = "drucken gerade";
+"needs.due_week" = "Diese Woche fällig";
+"needs.this_year" = "%@ dieses Jahr";
+"needs.owed" = "%@ offen";
+"needs.count" = "%d Dinge brauchen dich.";
+"needs.late" = "%d Aufträge sind verspätet";
+"needs.low.count" = "%d Spulen fast leer";
+"needs.quotes" = "%d Angebote warten auf Antwort";
+"needs.more" = "und %d weitere";

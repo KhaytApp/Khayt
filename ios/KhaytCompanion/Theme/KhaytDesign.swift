@@ -40,6 +40,13 @@ enum KhaytDesign {
     static let collect = Color(light: 0x0E7A70, dark: 0x3FD0C0)
     /// On hold and quality check.
     static let hold = Color(light: 0x6B52B5, dark: 0xB49CFF)
+    /// Waiting on someone else — a request not taken yet, a quote out.
+    /// Steel: quieter than amber progress, never read as trouble.
+    static let pending = Color(light: 0x5E6C84, dark: 0xA9B8CF)
+    static let pendingWash = Color(light: 0xEDF0F4, dark: 0x3A4658)
+    /// The ring round a colour swatch, so a black spool shows on navy and a
+    /// white one on paper (ink/tertiary in the Figma file).
+    static let swatchRing = note.opacity(0.55)
     /// The well a thumbnail sits in: lighter than the card in dark.
     static let well = Color(light: 0xEEF1F3, dark: 0x2A4670)
     /// The icon's navy, for the mark's tile and nothing that is read.
@@ -95,7 +102,8 @@ enum KhaytDesign {
     /// One colour per stage, as on the Mac's Today.
     static func statusColor(for status: String) -> Color {
         switch status.lowercased() {
-        case "pending": return note
+        // Waiting to start: the shared steel, on every app (Dev Hub, Nov 13).
+        case "pending": return pending
         case "printing": return attention
         case "post": return note
         case "qc", "on_hold": return hold
@@ -116,6 +124,7 @@ enum KhaytDesign {
     static func statusSoft(for status: String) -> Color {
         // Printing sits on the amber wash (Figma signal/progress-soft).
         if status.lowercased() == "printing" { return threadWash }
+        if status.lowercased() == "pending" { return pendingWash }
         return statusColor(for: status).opacity(0.16)
     }
 }
@@ -150,86 +159,6 @@ struct KhaytScreenBackground: View {
     }
 }
 
-/// Card surface — `khayt-design.jsx` Card (radius 16, no border).
-struct KhaytCard<Content: View>: View {
-    var padding: CGFloat = KhaytDesign.pad
-    var bordered: Bool = false
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        content()
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))
-            .overlay {
-                if bordered {
-                    RoundedRectangle(cornerRadius: KhaytDesign.radiusLG)
-                        .stroke(KhaytDesign.border, lineWidth: 1)
-                }
-            }
-    }
-}
-
-/// Home stat tile — `khayt-home.jsx` StatBlock.
-struct KhaytStatBlock: View {
-    let value: String
-    let label: String
-    let color: Color
-    var subtitle: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.khaytDisplay(34, .bold, relativeTo: .largeTitle))
-                .monospacedDigit()
-                .foregroundStyle(color)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-            Text(label)
-                .font(.khayt(12, .semibold, relativeTo: .caption))
-                .foregroundStyle(KhaytDesign.textDim)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.khayt(10, relativeTo: .caption2))
-                    .foregroundStyle(KhaytDesign.textMuted)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))
-        .overlay(
-            RoundedRectangle(cornerRadius: KhaytDesign.radiusLG)
-                .stroke(KhaytDesign.border, lineWidth: 0.5)
-        )
-    }
-}
-
-/// Section header — `SectionLabel` in mockup.
-struct KhaytSectionHeader: View {
-    let text: String
-    var actionTitle: String?
-    var action: (() -> Void)?
-
-    var body: some View {
-        HStack {
-            Text(L10n.usesArabicLayout ? text : text.uppercased())
-                .font(L10n.usesArabicLayout ? .khayt(12, .semibold, relativeTo: .caption) : .khaytMono(11.5, .medium))
-                .khaytTracking(0.6)
-                .foregroundStyle(KhaytDesign.textDim)
-            Spacer()
-            if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .font(.khayt(14, .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(KhaytDesign.brand)
-            }
-        }
-        .padding(.horizontal, KhaytDesign.pad)
-    }
-}
-
 struct KhaytEyebrow: View {
     let text: String
     var body: some View {
@@ -249,78 +178,6 @@ struct KhaytSectionTitle: View {
     }
 }
 
-struct KhaytMetric: View {
-    let value: String
-    let unit: String?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(value)
-                .font(.khaytDisplay(28, .semibold, relativeTo: .title))
-                .monospacedDigit()
-                .foregroundStyle(KhaytDesign.text)
-            if let unit {
-                Text(unit)
-                    .font(.khaytMono(12.5, .medium))
-                    .foregroundStyle(KhaytDesign.textMuted)
-            }
-        }
-    }
-}
-
-struct KhaytPill: View {
-    let text: String
-    var color: Color = KhaytDesign.brand
-    var body: some View {
-        Text(text)
-            .font(.khayt(12, .semibold, relativeTo: .caption))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .foregroundStyle(color)
-            .background(color.opacity(0.16), in: Capsule())
-    }
-}
-
-struct KhaytPrimaryButton: View {
-    let title: String
-    let icon: String?
-    let action: () -> Void
-
-    init(_ title: String, icon: String? = nil, action: @escaping () -> Void) {
-        self.title = title
-        self.icon = icon
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if let icon { Image(systemName: icon) }
-                Text(title).font(.khayt(16, .semibold, relativeTo: .headline))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .foregroundStyle(KhaytDesign.onBrand)
-            .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusMD))
-        }
-    }
-}
-
-struct KhaytGhostButton: View {
-    let title: String
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.khayt(14, .semibold, relativeTo: .subheadline))
-                .foregroundStyle(KhaytDesign.textDim)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(KhaytDesign.surface2, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusSM))
-        }
-    }
-}
-
 struct KhaytThreadDivider: View {
     var body: some View {
         Rectangle()
@@ -329,20 +186,3 @@ struct KhaytThreadDivider: View {
     }
 }
 
-struct KhaytLogoMark: View {
-    var size: CGFloat = 32
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28)
-                .fill(KhaytDesign.brandDim)
-                .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.28)
-                        .stroke(KhaytDesign.brand.opacity(0.35), lineWidth: 1)
-                )
-            Text("خ")
-                .font(.system(size: size * 0.55, weight: .semibold))
-                .foregroundStyle(KhaytDesign.brand)
-        }
-        .frame(width: size, height: size)
-    }
-}
