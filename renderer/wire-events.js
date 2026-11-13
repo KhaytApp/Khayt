@@ -2029,6 +2029,8 @@ function wireEvents() {
   $('#customFieldsList')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act="del-custom-field"]');
     if (btn) deleteCustomField(+btn.dataset.idx);
+    const edit = e.target.closest('[data-act="edit-custom-field"]');
+    if (edit) editCustomField(+edit.dataset.idx);
   });
 
   // Operational settings save — delegate to saveSettingsFromForm so all fields are preserved
