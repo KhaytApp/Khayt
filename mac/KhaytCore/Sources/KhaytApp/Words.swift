@@ -3422,7 +3422,11 @@ final class Words {
         "mac.quarter_2": ["en": "Q2\u{00A0}{year}", "ar": "الربع الثاني {year}"],
         "mac.quarter_3": ["en": "Q3\u{00A0}{year}", "ar": "الربع الثالث {year}"],
         "mac.quarter_4": ["en": "Q4\u{00A0}{year}", "ar": "الربع الرابع {year}"],
-        "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
+        // «متاحة» (free), not «متوقفة»: with On hold now «متوقف مؤقتاً» on every
+        // app, an idle printer, a paused one and a held job all read as some
+        // form of "stopped" (Turki, 13 Nov 2026). A paused printer keeps
+        // «متوقفة مؤقتًا» and a real stop keeps «متوقفة».
+        "mac.idle":          ["en": "Idle",            "ar": "متاحة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
         "mach.connection":   ["en": "Connection",      "ar": "الاتصال"],
@@ -3695,7 +3699,7 @@ final class Words {
                             "ar": "تعذّر تشفير الرمز، فلم يُحفظ شيء. الدفتر يُزامن ويُنسخ احتياطيًا، والرمز غير المشفّر سينتقل معه."],
         "mac.tg_when": ["en": "Send a message when", "ar": "أرسل رسالة عند"],
         "mac.tg_on_complete": ["en": "A job is finished", "ar": "اكتمال عمل"],
-        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "تعليق عمل"],
+        "mac.tg_on_hold": ["en": "A job is put on hold", "ar": "إيقاف عمل مؤقتاً"],
         "mac.tg_on_low_stock": ["en": "Filament is running low", "ar": "انخفاض مخزون الخيط"],
         // THE LAST THREE ARE NOT THE SHARED `fleet.notify_*`, and the picture
         // is why. Those read "Notify on printer error", which is right on the
