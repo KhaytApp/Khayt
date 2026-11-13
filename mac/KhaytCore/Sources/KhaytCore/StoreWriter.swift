@@ -103,7 +103,8 @@ public enum StoreWriter {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
 
-        var (_, root) = try readBook(url)
+        let (_, read, fromRollback) = try readBookNoting(url)
+        var root = read
 
         let before = root
         try mutate(&root)
@@ -124,7 +125,7 @@ public enum StoreWriter {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
         }
-        try atomicWrite(next, to: url)
+        try atomicWrite(next, to: url, keepingRollback: fromRollback)
     }
 
     /// The same, for a change that has to ask the shared JavaScript what to do.
@@ -154,10 +155,27 @@ public enum StoreWriter {
     /// returned are still the damaged file's, so the compare before the swap
     /// is against what is really on disk.
     public nonisolated static func readBook(_ url: URL) throws -> (Data, [String: JSONValue]) {
+        let (data, root, _) = try readBookNoting(url)
+        return (data, root)
+    }
+
+    /// `readBook`, saying also whether what it returned came from `.prev`.
+    ///
+    /// ── THE WRITE THAT FOLLOWS MUST LEAVE `.prev` ALONE ───────────────────
+    ///
+    /// `atomicWrite` rolls the current book to `.prev` before it swaps the new
+    /// one in. When the book is the damaged file and `.prev` is the only good
+    /// copy, that replaced the good copy with the damaged one and THEN renamed:
+    /// a crash or power cut between the two left a shop with two damaged files.
+    /// So a write that started from the rollback is told to keep it
+    /// (`keepingRollback`): the new book is good, `.prev` stays the older good
+    /// one, and the write after that rolls as usual.
+    public nonisolated static func readBookNoting(_ url: URL) throws
+        -> (data: Data, root: [String: JSONValue], fromRollback: Bool) {
         let data: Data
         do { data = try Data(contentsOf: url) }
         catch { throw Refusal.unreadable(error.localizedDescription) }
-        if let root = try? JSONValue.decode([String: JSONValue].self, from: data) { return (data, root) }
+        if let root = try? JSONValue.decode([String: JSONValue].self, from: data) { return (data, root, false) }
         let prev = url.appendingPathExtension("prev")
         guard let older = try? Data(contentsOf: prev),
               let root = try? JSONValue.decode([String: JSONValue].self, from: older) else {
@@ -173,7 +191,7 @@ public enum StoreWriter {
         if !FileManager.default.fileExists(atPath: aside.path) {
             try? FileManager.default.copyItem(at: url, to: aside)
         }
-        return (data, root)
+        return (data, root, true)
     }
 
     /// TESTS ONLY: run between a change being worked out and the swap, so a
@@ -219,7 +237,7 @@ public enum StoreWriter {
             // The read and decode, and below the bookkeeping and encode, OFF
             // the main thread: on a 15 MB book each is a second or more, and
             // `mutate` is the only part that has to be here.
-            let (data, decoded) = try await offMain { try readBook(url) }
+            let (data, decoded, fromRollback) = try await offMain { try readBookNoting(url) }
 
             var root = decoded
             try await mutate(&root)
@@ -255,7 +273,7 @@ public enum StoreWriter {
                         guard owns() else {
                             throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
                         }
-                        try atomicWrite(next, to: url)
+                        try atomicWrite(next, to: url, keepingRollback: fromRollback)
                         return true
                     }
                 }
@@ -450,7 +468,11 @@ public enum StoreWriter {
     /// a corrupt `.prev`, and the setup wizard. The old
     /// store rolls to `.prev` first: one generation of rollback, and the file
     /// `recoverStoreRaw` reaches for when the primary will not parse.
-    public static func atomicWrite(_ data: Data, to url: URL) throws {
+    ///
+    /// `keepingRollback` is for the one write that started from `.prev` because
+    /// the book itself was damaged (`readBookNoting`): `.prev` is then the only
+    /// good copy, and it is not replaced by the damaged file on the way.
+    public static func atomicWrite(_ data: Data, to url: URL, keepingRollback: Bool = false) throws {
         let tmp = url.deletingLastPathComponent()
             .appending(path: "\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)")
         let fm = FileManager.default
@@ -489,7 +511,10 @@ public enum StoreWriter {
         // are not possible), and the new file replaces the book with one
         // rename(2), which POSIX makes atomic: whoever opens the path gets the
         // old book or the new one, never neither.
-        if fm.fileExists(atPath: url.path) {
+        if keepingRollback, fm.fileExists(atPath: prev.path) {
+            // The only good copy: left exactly where it is, owner-only.
+            chmod(prev.path, S_IRUSR | S_IWUSR)
+        } else if fm.fileExists(atPath: url.path) {
             try? fm.removeItem(at: prev)
             if link(url.path, prev.path) != 0 { try? fm.copyItem(at: url, to: prev) }   // best-effort rollback
             // The rollback is the same book, so the same mode. A hard link

@@ -18,3 +18,4 @@
 "PUSH_QUOTE_DECLINED" = "お客様が見積を辞退しました";
 "PUSH_MESSAGE" = "お客様からメッセージが届きました";
 "PUSH_PAYMENT" = "入金がありました";
+"PUSH_GENERIC" = "ショップに確認が必要な項目があります";

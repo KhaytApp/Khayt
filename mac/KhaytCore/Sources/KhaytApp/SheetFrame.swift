@@ -62,6 +62,17 @@ enum SheetMetrics {
 
     static var ceiling: CGFloat { max(320, screenHeight() - chrome) }
 
+    /// The room under the last row of a sheet's content, inside its scroll
+    /// view: scrolled to the end, the last row stands this far clear of the
+    /// rule over the buttons instead of touching it.
+    static let contentFoot: CGFloat = 10
+
+    /// The room between that rule and the buttons.
+    static let footerHead: CGFloat = 10
+
+    /// More content than room, by more than a rounding error: half a point of
+    /// difference is two sizes that are the same size.
+    static func overflows(content: CGFloat, room: CGFloat) -> Bool { content > room + 1 }
 }
 
 /// Lay a `SheetFrame`'s content flat instead of in its ScrollView, for a
@@ -88,6 +99,28 @@ extension EnvironmentValues {
     }
 }
 
+/// The frame: scrolling content over pinned buttons.
+///
+/// ── THE MARGIN IS INSIDE THE SCROLL VIEW (Nov 11 2026 review, B4 and B5) ──
+///
+/// It used to be outside: the whole frame was padded, so the scroll view was
+/// exactly as wide as the content and CLIPPED there. A bordered text field
+/// draws its border and its focus ring a point or two outside the frame layout
+/// gives it, so every field that ran the full width of a sheet — a customer's
+/// name, a product's, a machine's — lost its trailing border and both trailing
+/// corners to the clip, in three sheets, by one cause.
+///
+/// The same clip was the bottom edge: a long sheet's content stopped dead
+/// against the gap over the buttons, mid-line, with nothing to say there was
+/// more, and scrolled to its end the last row touched that edge.
+///
+/// So the scroll view now runs edge to edge and to the top of the sheet, and
+/// the margins are inside it: nothing is drawn against a clip, the scroller
+/// sits at the sheet's edge and not over the fields, the content ends with a
+/// foot of its own (`SheetMetrics.contentFoot`), and a hairline is drawn over
+/// the buttons only while there is more content than room — which is the cue
+/// that the sheet scrolls. A short sheet gains seven points of air over its
+/// buttons and is otherwise as it was.
 struct SheetFrame<Content: View, Footer: View>: View {
     let width: CGFloat
     @ViewBuilder let content: Content
@@ -95,26 +128,44 @@ struct SheetFrame<Content: View, Footer: View>: View {
 
     private var ceiling: CGFloat { SheetMetrics.ceiling }
     @Environment(\.photographFlat) private var flat
+    /// Is there more content than the sheet has room for?
+    @State private var scrolls = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             if flat {
                 VStack(alignment: .leading, spacing: 14) { content }
                     .frame(width: width, alignment: .leading)
+                    .padding(.horizontal, SheetMetrics.padding)
+                    .padding(.top, SheetMetrics.padding)
+                    .padding(.bottom, SheetMetrics.contentFoot)
             } else {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 14) { content }
                         // The scroll view is as wide as the sheet; without this the
                         // content collapses to its ideal width inside it.
                         .frame(width: width, alignment: .leading)
+                        .padding(.horizontal, SheetMetrics.padding)
+                        .padding(.top, SheetMetrics.padding)
+                        .padding(.bottom, SheetMetrics.contentFoot)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    SheetMetrics.overflows(content: geometry.contentSize.height,
+                                   room: geometry.containerSize.height)
+                } action: { _, now in scrolls = now }
             }
+
+            Rectangle().fill(Khayt.hairline).frame(height: 1)
+                .opacity(scrolls ? 1 : 0)
+                .accessibilityHidden(true)
 
             footer
                 .frame(width: width, alignment: .leading)
+                .padding(.horizontal, SheetMetrics.padding)
+                .padding(.top, SheetMetrics.footerHead)
+                .padding(.bottom, SheetMetrics.padding)
         }
-        .padding(SheetMetrics.padding)
         .frame(maxHeight: flat ? nil : ceiling)
         .fixedSize(horizontal: true, vertical: false)
     }

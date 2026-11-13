@@ -410,11 +410,13 @@ async function testModesAndPrintFiles(window) {
     await window.hubAPI.saveStore(buildStoreSnapshot());
     const loaded = await window.hubAPI.loadStore();
     out.pfPersisted = Array.isArray(loaded.printFiles) && loaded.printFiles.some((x) => x.id === 'PF-e2e');
-    // Simple mode: business basics reachable (analytics/reports + catalog), Pro depth hidden (expenses).
+    // Simple mode: business basics reachable (the Money page + catalog), and
+    // Expenses as its short list (SIMPLE_MAP 'reduced' since S4; the tracker's
+    // budgets, recurring and exports stay Professional).
     settings.mode = 'simple'; applyMode();
     out.simpleAnalyticsVisible = vis('tabbtn-analytics-tab'); // Sales reports available to small shops
     out.simpleCatalogVisible = vis('tabbtn-catalog-tab');
-    out.simpleExpensesHidden = !vis('tabbtn-expenses-tab');   // Expense tracking = Pro only
+    out.simpleExpensesShown = vis('tabbtn-expenses-tab');
     switchTab('analytics-tab'); // reachable (not bounced) in simple
     out.simpleAnalyticsReachable = document.querySelector('.tab-content.active')?.id === 'analytics-tab';
     // beta.15: ZATCA Phase 2 (Pro-only e-invoicing) must not render in Simple mode.

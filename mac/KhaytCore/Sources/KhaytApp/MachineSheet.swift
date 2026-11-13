@@ -1820,24 +1820,36 @@ struct DowntimeEditor: View {
             // past the end of the array, and an index is not an identity — the
             // rows below a removed one were redrawn as each other.
             ForEach($blocks.byID) { $block in
-                HStack(spacing: 8) {
-                    DatePicker("", selection: Self.date($block.from), displayedComponents: [.date, .hourAndMinute])
-                        .labelsHidden().datePickerStyle(.compact)
-                    // A symbol, not a typed "→": the symbol turns round in a
-                    // right-to-left window and the character does not, so the
-                    // Arabic row pointed from the end back to the start.
-                    Image(systemName: "arrow.forward").foregroundStyle(Khayt.faint)
-                    DatePicker("", selection: Self.date($block.to), displayedComponents: [.date, .hourAndMinute])
-                        .labelsHidden().datePickerStyle(.compact)
+                // ── TWO LINES: WHEN, THEN WHY ─────────────────────────────
+                //
+                // One line held two date-and-time pickers, the reason and the
+                // remove button, and two pickers are most of a 480-point
+                // sheet: the reason was left about 80 points ("Lens clean, mi"
+                // for "Lens clean, mirror check"), and in Arabic, where the
+                // date is spelled longer, the second picker ran under the
+                // sheet's edge (Nov 11 2026 review, B10). The reason is a
+                // sentence, so it has the line under the dates to itself.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        DatePicker("", selection: Self.date($block.from), displayedComponents: [.date, .hourAndMinute])
+                            .labelsHidden().datePickerStyle(.compact)
+                        // A symbol, not a typed "→": the symbol turns round in a
+                        // right-to-left window and the character does not, so the
+                        // Arabic row pointed from the end back to the start.
+                        Image(systemName: "arrow.forward").foregroundStyle(Khayt.faint)
+                        DatePicker("", selection: Self.date($block.to), displayedComponents: [.date, .hourAndMinute])
+                            .labelsHidden().datePickerStyle(.compact)
+                        Spacer(minLength: 0)
+                        Button {
+                            let gone = block.id
+                            blocks.removeAll { $0.id == gone }
+                        } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless)
+                            .help(words.callIt("common.delete"))
+                            .accessibilityLabel(words.callIt("common.delete"))
+                    }
                     TextField(words.callIt("mach.downtime_reason"), text: $block.reason)
-                        .textFieldStyle(.roundedBorder).frame(minWidth: 90)
-                    Button {
-                        let gone = block.id
-                        blocks.removeAll { $0.id == gone }
-                    } label: { Image(systemName: "minus.circle") }
-                        .buttonStyle(.borderless)
-                        .help(words.callIt("common.delete"))
-                        .accessibilityLabel(words.callIt("common.delete"))
+                        .textFieldStyle(.roundedBorder)
                 }
                 // The pickers read in the SHOP's language, as every date this
                 // app writes does (`Words.say`) — they took this Mac's, so an

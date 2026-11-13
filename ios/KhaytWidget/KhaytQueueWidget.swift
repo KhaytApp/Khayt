@@ -178,9 +178,17 @@ struct KhaytQueueWidgetView: View {
         HStack {
             Text(s.shopName).font(Look.text(12, .semibold)).foregroundStyle(Look.ink).lineLimit(1)
             Spacer()
-            Circle()
-                .fill(s.connected ? Look.live : Look.late)
-                .frame(width: 8, height: 8)
+            // The dot says it in a word too: colour alone is lost on a
+            // colour-blind eye and on VoiceOver.
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(s.connected ? Look.live : Look.late)
+                    .frame(width: 8, height: 8)
+                Text(statusLine(s))
+                    .font(Look.text(10, .medium))
+                    .foregroundStyle(Look.note)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -256,7 +264,7 @@ struct KhaytQueueWidget: Widget {
                 .widgetURL(URL(string: "khayt://screen/jobs"))
         }
         .configurationDisplayName("Khayt Queue")
-        .description("Queue counts and live print progress from your desktop.")
+        .description("Queue counts and live print progress from your shop.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }

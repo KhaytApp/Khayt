@@ -1,0 +1,323 @@
+#!/usr/bin/env node
+/**
+ * E2E: a connector update that asks for more, on the desktop.
+ *
+ * A sample connector is installed at 2.0.0 and a verified 2.1.0 is waiting in
+ * `settings.connectorUpdates` (written straight onto the store on disk, as a
+ * check would — no network). With connectors on (KHAYT_CONNECTORS=1):
+ *   - the row shows "Update waiting" and the Settings nav entry a badge,
+ *     in steel, and no sheet opens by itself;
+ *   - "Review update" opens the sheet: what is NEW first, each line tagged
+ *     New / New place, then what was already agreed;
+ *   - "Not now" closes it and changes nothing — on disk or on screen;
+ *   - "Agree and update" goes through main (lib/plugin-update.js agree): the
+ *     entry is 2.1.0 granted what was shown, the old one kept for Revert, the
+ *     badge gone — and a later window save does not wind it back.
+ *
+ * Then, relaunched with the check on (KHAYT_CONNECTOR_UPDATES=1), through
+ * main's real check (hub:connector-updates-check: signature, sha256, write
+ * chain) with its network and signing key stubbed — a throwaway key, never
+ * Khayt's — and no reload between checks (lib/plugin-update.js, #2426):
+ *   - an index that withdraws the kept 2.0.0: Revert goes, and the row says
+ *     why ("Khayt withdrew version 2.0.0, so you can’t go back to it.");
+ *   - an index offering 2.2.0 (asks more): the badge comes; the next index
+ *     withdraws 2.2.0: the badge and "Review update" go, on the row and in
+ *     the nav;
+ *   - each index's serial is saved, even by a check that changes nothing else;
+ *   - a save the window sent before it took main's copy back does not undo
+ *     an Agree (main is the only writer of an update);
+ *   - a book from before `previousWithdrawn` (updatedFrom, no previous) shows
+ *     no "withdrew" line.
+ *
+ *   node scripts/e2e-connector-update-smoke.mjs
+ */
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { dismissWizard, launchApp, makeUserDataDir, switchTab } from './e2e/helpers.mjs';
+
+const require = createRequire(import.meta.url);
+const M = require('../lib/plugin-manifest.js');
+require('../lib/plugin-host.js');
+const U = require('../lib/plugin-update.js');
+
+const userData = makeUserDataDir();
+const storeFile = path.join(userData, 'khayt-store.json');
+const fail = (m) => { throw new Error(m); };
+const ID = 'app.test.courier';
+
+function sample(version, toA, toB) {
+  return {
+    khayt: { manifest: 1 }, id: ID, name: { en: 'Sample Courier' }, publisher: 'Test', version,
+    domains: ['api.example.com', 'tracking.example.com'],
+    actions: [
+      { id: 'ship', label: { en: 'Ship' }, placement: 'order', kind: 'post', url: 'https://api.example.com/ship',
+        body: { format: 'json-template', template: toA } },
+      { id: 'track', label: { en: 'Track' }, placement: 'order', kind: 'post', url: 'https://tracking.example.com/track',
+        body: { format: 'json-template', template: toB } },
+    ],
+    signature: 'A'.repeat(86) + '==',
+  };
+}
+const V1 = sample('2.0.0', { n: '{customer.name}', p: '{customer.phone}', j: '{order.number}' }, { t: '{order.id}' });
+const V2 = sample('2.1.0', { n: '{customer.name}', p: '{customer.phone}', a: '{customer.address}', j: '{order.number}' },
+  { t: '{order.id}', j: '{order.number}' });
+const ENTRY = { id: ID, version: '2.0.0', enabled: true, manifest: V1, granted: M.grantFor(V1), config: {} };
+
+const readDisk = () => JSON.parse(fs.readFileSync(storeFile, 'utf8'));
+async function stubReviewed(electronApp) {
+  await electronApp.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('hub:plugin-reviewed');
+    ipcMain.handle('hub:plugin-reviewed', (_e, list) => Object.fromEntries((list || []).map((m) => [m.id, !!m.signature])));
+  });
+}
+async function openConnections(window) {
+  await window.evaluate(async () => { await loadPluginsEnabled(); await refreshPluginReviewed(); renderPluginSettings(); });
+  await switchTab(window, 'settings-tab');
+  await window.click('.settings-nav-item[data-settings-section="connections"]');
+  await window.waitForSelector(`.plg-row[data-plugin="${ID}"]`, { timeout: 10000 });
+}
+
+let electronApp;
+try {
+  process.env.KHAYT_CONNECTORS = '1';
+  delete process.env.KHAYT_CONNECTOR_UPDATES;
+
+  // ── 1. a book with the sample connector installed at 2.0.0 ──
+  {
+    const l = await launchApp(userData);
+    electronApp = l.electronApp;
+    await dismissWizard(l.window);
+    await l.window.evaluate((entry) => { settings.mode = 'professional'; applyMode(); settings.plugins = [entry]; saveAll(); return flushSave(); }, ENTRY);
+    await l.window.waitForTimeout(500);
+    // A window cannot write the update state: only main does.
+    await l.window.evaluate(() => { settings.connectorUpdates = { serial: 99, connectors: { x: { skipped: ['1'] } } }; saveAll(); return flushSave(); });
+    await l.window.waitForTimeout(500);
+    if (readDisk().settings.connectorUpdates) fail('a window save wrote settings.connectorUpdates');
+    await electronApp.close();
+    electronApp = null;
+  }
+
+  // ── 2. a check found 2.1.0 (verified; written as main would write it) ──
+  {
+    const store = readDisk();
+    const NOW = Date.now();
+    const index = { khaytIndex: 1, serial: 5, issuedAt: new Date(NOW - 3600e3).toISOString(), expires: new Date(NOW + 30 * 86400e3).toISOString(),
+      entries: [{ kind: 'connector', id: ID, version: '2.1.0', url: `https://khaytapp.com/connectors/${ID}/2.1.0.json`, sha256: 'a'.repeat(64) }] };
+    const r = U.applyIndex(store.settings, index, { signedBy: 'test-key', nowMs: NOW, platform: 'desktop', appVersion: '9.9.9', schema: 1 }, { [ID]: V2 });
+    if (!r.ok || U.stateOf(r.settings, ID).pending?.version !== '2.1.0') fail(`the sample update is not pending: ${JSON.stringify(r.notes)}`);
+    store.settings = r.settings;
+    fs.writeFileSync(storeFile, JSON.stringify(store));
+  }
+
+  const l = await launchApp(userData);
+  electronApp = l.electronApp;
+  const window = l.window;
+  await dismissWizard(window);
+  await stubReviewed(electronApp);
+  await openConnections(window);
+
+  // ── 3. the badge, steel; nothing opens by itself ──
+  const look = await window.evaluate(() => {
+    const badge = document.querySelector('.plg-row .plg-update-badge');
+    const nav = document.querySelector('.settings-nav-item[data-settings-section="connections"] .plg-nav-badge');
+    return {
+      badge: badge && badge.textContent, badgeBg: badge && getComputedStyle(badge).backgroundColor,
+      nav: nav && nav.textContent, navBg: nav && getComputedStyle(nav).backgroundColor,
+      review: !!document.querySelector('.plg-row [data-plugin-act="review-update"]'),
+      sheet: !!document.querySelector('.plg-upd-sheet'),
+    };
+  });
+  if (look.badge !== 'Update waiting' || !look.review) fail(`row: ${JSON.stringify(look)}`);
+  if (look.nav !== '1') fail(`nav badge: ${JSON.stringify(look)}`);
+  const STEEL = ['rgb(58, 70, 88)', 'rgb(237, 240, 244)'];
+  if (!STEEL.includes(look.badgeBg) || !STEEL.includes(look.navBg)) fail(`the badge is not steel: ${JSON.stringify(look)}`);
+  if (look.sheet) fail('the update sheet opened by itself');
+
+  // ── 4. Review update: NEW first, tagged; then already agreed ──
+  await window.click('.plg-row [data-plugin-act="review-update"]');
+  await window.waitForSelector('.plg-upd-sheet', { timeout: 10000 });
+  const sheet = await window.evaluate(() => {
+    const el = document.querySelector('.plg-upd-sheet');
+    const sections = [...el.querySelectorAll('section')].map((s) => s.className);
+    const fresh = [...el.querySelectorAll('.plg-upd-new li')].map((li) => [li.closest('.plg-upd-host').dataset.host, li.dataset.key, li.dataset.tag, li.querySelector('.plg-upd-tag')?.textContent]);
+    const agreed = [...el.querySelectorAll('.plg-upd-agreed li')].map((li) => li.dataset.key);
+    return {
+      sections, fresh, agreed, agreedTags: el.querySelectorAll('.plg-upd-agreed .plg-upd-tag').length,
+      title: el.querySelector('h3').textContent.replace(/\s+/g, ' ').trim(),
+      reviewed: el.querySelector('.plg-upd-reviewed')?.textContent,
+      sub: el.querySelector('.plg-upd-sub').textContent, lead: el.querySelector('.plg-upd-lead')?.textContent,
+      foot: el.querySelector('.plg-upd-foot').textContent,
+      buttons: [...el.querySelectorAll('.btn-row button')].map((b) => b.textContent),
+      focused: document.activeElement && document.activeElement.dataset.act,
+    };
+  });
+  if (sheet.sections.join() !== 'plg-upd-new,plg-upd-agreed') fail(`sections out of order: ${sheet.sections}`);
+  const wantFresh = [['api.example.com', 'customer.address', 'new', 'New'], ['tracking.example.com', 'order.number', 'new_place', 'New place']];
+  if (JSON.stringify(sheet.fresh) !== JSON.stringify(wantFresh)) fail(`new lines: ${JSON.stringify(sheet.fresh)}`);
+  if (sheet.agreed.join() !== 'customer.name,customer.phone,order.number,order.id' || sheet.agreedTags) fail(`agreed lines: ${JSON.stringify(sheet)}`);
+  if (sheet.title !== 'Sample Courier 2.1.0' || sheet.reviewed !== '✓ Reviewed by Khayt') fail(`header: ${JSON.stringify(sheet)}`);
+  if (sheet.sub !== 'Updates version 2.0.0') fail(`sub: ${sheet.sub}`);
+  if (sheet.lead !== 'This version asks for more than you agreed to. Nothing new is sent until you agree.') fail(`lead: ${sheet.lead}`);
+  if (sheet.foot !== 'Version 2.0.0 keeps running until you agree. Keys you entered stay on this device, unless the update sends them to a new host; then you enter them again.') fail(`footer: ${sheet.foot}`);
+  if (sheet.buttons.join('|') !== 'Not now|Agree and update' || sheet.focused !== 'agree') fail(`buttons: ${JSON.stringify(sheet)}`);
+
+  // ── 5. Not now changes nothing ──
+  const before = fs.readFileSync(storeFile, 'utf8');
+  const beforeWindow = await window.evaluate(() => JSON.stringify([settings.plugins, settings.connectorUpdates]));
+  await window.click('.plg-upd-sheet [data-act="not-now"]');
+  await window.waitForTimeout(600);
+  if (await window.$('.plg-upd-sheet')) fail('Not now did not close the sheet');
+  if (fs.readFileSync(storeFile, 'utf8') !== before) fail('Not now changed the store on disk');
+  if (await window.evaluate(() => JSON.stringify([settings.plugins, settings.connectorUpdates])) !== beforeWindow) fail('Not now changed the window\'s book');
+  if (!(await window.$('.plg-row .plg-update-badge')) || !(await window.$('.settings-nav-item .plg-nav-badge'))) fail('the badge went away after Not now');
+
+  // ── 6. Agree and update ──
+  // The window's book as it is before Agree: sent again after main's write
+  // below, as a save already in flight would be.
+  const staleSnapshot = await window.evaluate(() => JSON.parse(JSON.stringify(buildStoreSnapshot())));
+  await window.click('.plg-row [data-plugin-act="review-update"]');
+  await window.waitForSelector('.plg-upd-sheet', { timeout: 10000 });
+  await window.click('.plg-upd-sheet [data-act="agree"]');
+  await window.waitForFunction(() => !document.querySelector('.plg-upd-sheet') && !document.querySelector('.plg-row .plg-update-badge'), null, { timeout: 10000 });
+  const check = () => {
+    const s = readDisk().settings;
+    const e = s.plugins.find((p) => p.id === ID);
+    const st = U.stateOf(s, ID);
+    if (e.version !== '2.1.0' || e.manifest.version !== '2.1.0') fail(`not updated on disk: ${e.version}`);
+    if (JSON.stringify(e.granted) !== JSON.stringify(M.grantFor(V2))) fail('the grant is not what the sheet showed');
+    if (st.pending || st.previous?.version !== '2.0.0' || st.updatedFrom !== '2.0.0') fail(`update state: ${JSON.stringify(st)}`);
+    if (s.connectorUpdates.serial !== 5) fail('the serial moved');
+  };
+  check();
+  const after = await window.evaluate(() => ({
+    version: settings.plugins[0].version, pending: !!(settings.connectorUpdates?.connectors?.['app.test.courier']?.pending),
+    nav: !!document.querySelector('.settings-nav-item .plg-nav-badge'),
+    revert: !!document.querySelector('.plg-row [data-plugin-act="revert"]'),
+  }));
+  if (after.version !== '2.1.0' || after.pending || after.nav || !after.revert) fail(`window after agree: ${JSON.stringify(after)}`);
+  // A later window save keeps it.
+  await window.evaluate(() => { settings.currency = settings.currency || 'SAR'; saveAll(); return flushSave(); });
+  await window.waitForTimeout(500);
+  check();
+  // A save the window sent BEFORE it took main's copy back arrives after the
+  // update: main is the only writer of an update, so it does not undo it.
+  const staleSave = await window.evaluate((snap) => window.hubAPI.saveStore(snap), staleSnapshot);
+  if (!staleSave || staleSave.ok === false) fail(`the stale save was refused outright: ${JSON.stringify(staleSave)}`);
+  check();
+
+  // ── 7. relaunch with the check on; main's network and key stubbed ──
+  await electronApp.close();
+  electronApp = null;
+  process.env.KHAYT_CONNECTOR_UPDATES = '1';
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
+  const KEY = { id: 'e2e-throwaway', key: publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64') };
+  const signText = (msg) => crypto.sign(null, Buffer.from(msg, 'utf8'), privateKey).toString('base64');
+  const INDEX_URL = 'https://khaytapp.com/connectors/index.json';
+  const NOW3 = Date.now();
+  function signedIndex(serial, row) {
+    const ix = { khaytIndex: 1, serial, issuedAt: new Date(NOW3 - 3600e3).toISOString(), expires: new Date(NOW3 + 30 * 86400e3).toISOString(), entries: [row] };
+    return Object.assign(ix, { signature: { keyId: KEY.id, sig: signText(U.indexSigningMessage(ix)) } });
+  }
+  const rowAt = (version, extra) => Object.assign({ kind: 'connector', id: ID, version, url: `https://khaytapp.com/connectors/${ID}/${version}.json`, sha256: 'a'.repeat(64) }, extra || {});
+  const l3 = await launchApp(userData);
+  electronApp = l3.electronApp;
+  const w3 = l3.window;
+  // The throwaway key joins main's list for this run only; every https fetch
+  // in main is served from __e2eFiles (absent → a failed download).
+  await electronApp.evaluate((_electron, key) => {
+    const M3 = process.mainModule.require('./lib/plugin-manifest.js');
+    if (!M3.SIGNING_KEYS.some((k) => k.id === key.id)) M3.SIGNING_KEYS.push(key);
+    globalThis.__e2eFiles = {};
+    globalThis.fetch = async (url) => {
+      const body = globalThis.__e2eFiles[String(url)];
+      if (body === undefined) return new Response('', { status: 404 });
+      return new Response(Buffer.from(body, 'base64'), { status: 200 });
+    };
+  }, KEY);
+  const serve = (files) => electronApp.evaluate((_electron, f) => { globalThis.__e2eFiles = f; }, files);
+  const b64 = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64');
+  await dismissWizard(w3);
+  await stubReviewed(electronApp);
+  await openConnections(w3);
+  // The launch check may be in flight (served nothing, or the real index if
+  // it ran before the stub); either way it changes nothing here. Wait it out.
+  await w3.waitForTimeout(1500);
+  if (!(await w3.$('.plg-row [data-plugin-act="revert"]'))) fail('no Revert after the update, before any withdrawal');
+  const runCheck = () => w3.evaluate(() => checkConnectorUpdates());
+
+  // 7a. The index withdraws 2.0.0, the version kept for Revert.
+  await serve({ [INDEX_URL]: b64(signedIndex(6, rowAt('2.1.0', { revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForFunction(() => !document.querySelector('.plg-row [data-plugin-act="revert"]'), null, { timeout: 10000 });
+  const why = await w3.evaluate(() => {
+    const el = document.querySelector('.plg-row .plg-revert-withdrawn');
+    return el && [el.textContent, el.dataset.pluginRevertWithdrawn];
+  });
+  if (!why || why[0] !== 'Khayt withdrew version 2.0.0, so you can’t go back to it.' || why[1] !== '2.0.0') fail(`no reason given for the missing Revert: ${why}`);
+  {
+    const s = readDisk().settings; const st = U.stateOf(s, ID);
+    if (st.previous || st.previousWithdrawn !== '2.0.0' || s.connectorUpdates.serial !== 6) fail(`after the withdrawal: ${JSON.stringify(st)} serial ${s.connectorUpdates.serial}`);
+  }
+  // 7b. A serial-only check: saved, nothing else changes.
+  const before7b = readDisk().settings.plugins;
+  await serve({ [INDEX_URL]: b64(signedIndex(7, rowAt('2.1.0', { revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForTimeout(800);
+  if (readDisk().settings.connectorUpdates.serial !== 7) fail('a check that changed nothing else did not save its serial');
+  if (JSON.stringify(readDisk().settings.plugins) !== JSON.stringify(before7b)) fail('a serial-only check changed the connector');
+
+  // 7c. 2.2.0 is offered (asks more): the badge comes, after a check, no reload.
+  const V3 = sample('2.2.0', { n: '{customer.name}', p: '{customer.phone}', a: '{customer.address}', e: '{customer.email}', j: '{order.number}' },
+    { t: '{order.id}', j: '{order.number}' });
+  delete V3.signature;
+  const V3s = Object.assign({}, V3, { signature: signText(M.canonicalJSON(V3)) });
+  const v3bytes = Buffer.from(JSON.stringify(V3s), 'utf8');
+  const v3sha = crypto.createHash('sha256').update(v3bytes).digest('hex');
+  const row3 = rowAt('2.2.0', { sha256: v3sha, revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }] });
+  await serve({ [INDEX_URL]: b64(signedIndex(8, row3)), [row3.url]: v3bytes.toString('base64') });
+  await runCheck();
+  await w3.waitForSelector('.plg-row .plg-update-badge', { timeout: 10000 });
+  if (!(await w3.$('.settings-nav-item .plg-nav-badge'))) fail('no nav badge for the waiting 2.2.0');
+  if (U.stateOf(readDisk().settings, ID).pending?.version !== '2.2.0') fail('2.2.0 is not waiting on disk');
+
+  // 7d. The next index withdraws 2.2.0: the badge goes, after a check, no reload.
+  await serve({ [INDEX_URL]: b64(signedIndex(9, rowAt('2.2.0', { sha256: v3sha,
+    revoked: [{ version: '2.0.0', reason: 'Sample withdrawal' }, { version: '2.2.0', reason: 'Sample withdrawal' }] }))) });
+  await runCheck();
+  await w3.waitForFunction(() => !document.querySelector('.plg-row .plg-update-badge')
+    && !document.querySelector('.settings-nav-item .plg-nav-badge')
+    && !document.querySelector('.plg-row [data-plugin-act="review-update"]'), null, { timeout: 10000 });
+  {
+    const s = readDisk().settings; const st = U.stateOf(s, ID);
+    if (st.pending || s.connectorUpdates.serial !== 9 || s.plugins.find((p) => p.id === ID).version !== '2.1.0') fail(`after withdrawing 2.2.0: ${JSON.stringify(st)}`);
+  }
+
+  // ── 8. a book written before previousWithdrawn: updated, nothing kept ──
+  // updatedFrom with no previous and no previousWithdrawn says nothing about
+  // a withdrawal: no Revert, and no "withdrew" line.
+  await electronApp.close();
+  electronApp = null;
+  delete process.env.KHAYT_CONNECTOR_UPDATES;
+  {
+    const store = readDisk();
+    store.settings.connectorUpdates.connectors[ID] = { updatedAt: new Date().toISOString(), updatedFrom: '2.0.0' };
+    fs.writeFileSync(storeFile, JSON.stringify(store));
+  }
+  const l4 = await launchApp(userData);
+  electronApp = l4.electronApp;
+  await dismissWizard(l4.window);
+  await stubReviewed(electronApp);
+  await openConnections(l4.window);
+  const oldShape = await l4.window.evaluate(() => ({
+    line: !!document.querySelector('.plg-row .plg-revert-withdrawn'),
+    revert: !!document.querySelector('.plg-row [data-plugin-act="revert"]'),
+  }));
+  if (oldShape.line || oldShape.revert) fail(`an older book shows a withdrawal it never recorded: ${JSON.stringify(oldShape)}`);
+
+  console.log('connector update smoke: ok');
+} finally {
+  if (electronApp) await electronApp.close().catch(() => {});
+  try { fs.rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+}

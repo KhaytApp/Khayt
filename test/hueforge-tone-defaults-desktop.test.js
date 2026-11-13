@@ -50,6 +50,9 @@ async function boot(pixels, { tones = true } = {}) {
   const calls = [];
   const real = hf.planPainting;
   hf.planPainting = (img, fils, opts) => { calls.push({ hexes: fils.map((f) => f.hex), opts }); return real(img, fils, opts); };
+  // The panel's text goes through t(), as it does in both apps' pages.
+  vm.runInContext(read('renderer/locales/en.js'), ctx);
+  vm.runInContext(read('renderer/i18n.js'), ctx);
   vm.runInContext(read('renderer/hueforge.js'), ctx);
   window.renderHueForge();
   const ev = new window.Event('drop');

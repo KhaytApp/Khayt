@@ -61,7 +61,12 @@ struct DetailSection<Content: View>: View {
             Text(title).textCase(.uppercase).tracking(Words.spaced(0.6))
         }
         .font(.system(size: 10, weight: .semibold))
-        .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tertiary))
+        // `Khayt.faint`, not the system's tertiary: "THE MACHINE", "RIGHT
+        // NOW", "NOZZLE WEAR" are 10pt captions a shop reads, and tertiary
+        // measured about 2:1 on a card. It was passed as an `AnyShapeStyle`
+        // here, which is why the sweep for `.foregroundStyle(.tertiary)`
+        // walked past it (`FaintTextIsReadableTests.noTertiaryText`).
+        .foregroundStyle(accent.map(AnyShapeStyle.init) ?? AnyShapeStyle(Khayt.faint))
     }
 
     /// The lead heading: reading size, in the colour of what is wrong, with the
@@ -108,7 +113,7 @@ struct DetailLine: View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
                 .font(.callout)
-                .foregroundStyle(dim ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(dim ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary))
             Spacer(minLength: 12)
             Text(value)
                 .font(.callout.weight(strong ? .semibold : .regular))

@@ -20,6 +20,7 @@ connection and writes the transcript as JSON.
 
 import argparse
 import base64
+import faulthandler
 import json
 import os
 import socket
@@ -165,13 +166,26 @@ def main():
     parser.add_argument("--transcript", required=True)
     args = parser.parse_args()
 
+    # ── IF THIS IS NOT LISTENING IN THIRTY SECONDS, SAY WHERE IT IS ────────
+    #
+    # Starting takes a tenth of a second. A test once waited sixty for READY
+    # and never got it, and nothing recorded what this process was doing, so
+    # the cause was never found. Python's own stack on stderr answers that the
+    # next time: the test prints this process's stderr when a start fails.
+    # It does not stop anything: a slow start still finishes.
+    faulthandler.dump_traceback_later(30, repeat=True, file=sys.stderr)
+
     with tempfile.TemporaryDirectory() as directory:
-        cert, key = self_signed(directory)
+        # A server that never offers TLS never opens the certificate, so it
+        # does not make one: one less program (openssl) between it and READY.
+        cert, key = (None, None) if args.mode == "nostarttls" else self_signed(directory)
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(("127.0.0.1", 0))
         listener.listen(1)
+        # After `listen`: READY is the promise that a connection will be taken.
         print("READY %d" % listener.getsockname()[1], flush=True)
+        faulthandler.cancel_dump_traceback_later()
 
         # ── WHY THIS IS 600 AND NOT 30 ───────────────────────────────────
         #

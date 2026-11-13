@@ -25,7 +25,7 @@ import SwiftUI
 /// what the card is about. It is the one repeated shape in the app, so it is
 /// the thing that makes two Khayt screens look like the same program, and it
 /// carries meaning rather than decorating — `Khayt.late` on the late work,
-/// `Khayt.hot` on what is being made right now, `Khayt.brand` on the shop's own
+/// `Khayt.thread` on what is being made right now, `Khayt.brand` on the shop's own
 /// figures.
 ///
 /// **A card with nothing to say gets no rail.** That is the half that makes it
@@ -523,7 +523,9 @@ struct StatStrip: View {
                     Text(stat.label).lineLimit(1)
                 }
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(stat.alive ? AnyShapeStyle(Khayt.hot) : AnyShapeStyle(.secondary))
+                // Ink either way: amber is a fill, never the colour of a word
+                // (`Khayt.thread`). The moving symbol says it is happening.
+                .foregroundStyle(stat.alive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
 
                 Text(stat.value)
                     .font(.system(size: 21, weight: .semibold, design: .rounded))

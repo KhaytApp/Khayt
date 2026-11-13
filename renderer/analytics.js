@@ -95,6 +95,9 @@ function monthGoalHtml(now = new Date()) {
 function renderSimpleReports() {
   const wrap = $('#analyticsSimpleWrap');
   if (!wrap) return;
+  // A Simple shop's Analytics tab is the one-page Money summary (SIMPLE_MAP
+  // money, S4 card 5). The reports below stay for anything else that lands here.
+  if (settings.mode === 'simple' && typeof renderMoneyPage === 'function') { renderMoneyPage(wrap); return; }
 
   const thisMonthStr = localMonthStr();
   /* The trade set. `!o.voidedAt` has always meant "this did not count";
@@ -114,13 +117,9 @@ function renderSimpleReports() {
     .filter(o => payStatus(o) !== 'paid')
     .reduce((s, o) => s + orderOwedBase(o), 0);
 
-  const tagRev = {};
-  for (const o of monthOrders) {
-    for (const tag of (o.tags || [])) {
-      tagRev[tag] = (tagRev[tag] || 0) + orderNetRevenueBase(o);
-    }
-  }
-  const topTags = Object.entries(tagRev).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  // By product, or the job's name when it has none — not by tag, which listed
+  // a shop's own labels ("1. sample") as its products (Nov 11 review, X14).
+  const topSellers = _topLists()?.topSellers(monthOrders, _topCtx(), { limit: 3 }) || [];
 
   wrap.innerHTML = `
     <div class="card" id="simpleReportsCard" style="margin-top:0;">
@@ -140,14 +139,14 @@ function renderSimpleReports() {
       </div>
     </div>
     ${monthGoalHtml()}
-    ${topTags.length > 0 ? `
+    ${topSellers.length > 0 ? `
     <h4 style="font-size:13px;font-weight:600;margin:0 0 10px;">${escapeHtml(t('an.simple_top_products') || 'Top products this month')}</h4>
     <ul class="leaderboard" style="margin-bottom:16px;">
-      ${topTags.map(([ tag, rev ], i) => `
+      ${topSellers.map((row, i) => `
         <li>
           <span class="rank">${i + 1}.</span>
-          <span class="name">${escapeHtml(tag)}</span>
-          <span class="value">${fmtPrice(rev)}</span>
+          <span class="name">${escapeHtml(row.name)}</span>
+          <span class="value">${fmtPrice(row.revenue)}</span>
         </li>`).join('')}
     </ul>` : ''}
     <button class="btn small" id="btnSimpleReportsCsv">${escapeHtml(t('an.simple_csv') || 'Download CSV')}</button>
@@ -1761,6 +1760,9 @@ function renderNewVsReturning() {
     // here, which would be a second answer.
     inWindow: (o) => inRange(o.date, analyticsRange, 'analytics'),
   });
+  // No jobs in the window: no card at all, not an empty box (Nov 11 review, X15).
+  const card = document.getElementById('newVsReturningCard');
+  if (card) card.style.display = mix.totals.jobs === 0 ? 'none' : '';
   if (mix.totals.jobs === 0) { el.innerHTML = ''; return; }
 
   const newRev = mix.fresh.revenue, retRev = mix.returning.revenue;
@@ -3534,13 +3536,16 @@ function renderAgedReceivables() {
   const notYetDue = aged.rows.filter(r => r.overdue === false).reduce((s, r) => s + r.owed, 0);
   const overdueOwed = totalOwed - notYetDue;
 
-  const bucketColors = { '0–30': 'var(--success)', '31–60': 'var(--warning)', '61–90': '#f97316', '90+': 'var(--danger)' };
+  // Ageing in the shared status palette: young debt is waiting (steel), a
+  // month or two is a warning (amber), past 60 days is late (red). Green was
+  // never right here — nothing owed is "done".
+  const bucketTone = { '0–30': 'wait', '31–60': 'move', '61–90': 'late', '90+': 'late' };
 
   let html = `
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
       ${Object.entries(buckets).map(([label, items]) => {
         const total = items.reduce((s, i) => s + i.owed, 0);
-        return `<div style="flex:1;min-width:120px;padding:12px 16px;background:var(--bg-elev);border-radius:var(--radius);border-inline-start:3px solid ${bucketColors[label]};">
+        return `<div style="flex:1;min-width:120px;padding:12px 16px;background:var(--bg-elev);border-radius:var(--radius);border-inline-start:3px solid var(--st-${bucketTone[label]}-dot);">
           <div style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('an.aged_bucket_days', { label }))}</div>
           <div style="font-size:16px;font-weight:700;margin-top:4px;">${fmtPrice(total)}</div>
           <div style="font-size:11px;color:var(--text-dim);">${escapeHtml(t('an.aged_orders_n', { n: items.length }))}</div>
@@ -3549,8 +3554,8 @@ function renderAgedReceivables() {
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div>
-        <strong style="font-size:14px;">${escapeHtml(t('an.aged_total_outstanding'))} <span style="color:var(--danger);">${fmtPrice(totalOwed)}</span></strong>
-        ${notYetDue > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${escapeHtml(t('an.aged_overdue'))} ${fmtPrice(overdueOwed)} · ${escapeHtml(t('an.aged_not_yet_due'))} ${fmtPrice(notYetDue)}</div>` : ''}
+        <strong style="font-size:14px;">${escapeHtml(t('an.aged_total_outstanding'))} <span class="aged-total">${fmtPrice(totalOwed)}</span></strong>
+        ${notYetDue > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${escapeHtml(t('an.aged_overdue'))} <span class="aged-overdue${overdueOwed > 0 ? ' is-late' : ''}">${fmtPrice(overdueOwed)}</span> · ${escapeHtml(t('an.aged_not_yet_due'))} ${fmtPrice(notYetDue)}</div>` : ''}
       </div>
       <button class="btn small ghost" id="btnExportAgedCsv">⬇ ${escapeHtml(t('exp.export_csv'))}</button>
     </div>`;
@@ -3558,7 +3563,7 @@ function renderAgedReceivables() {
   Object.entries(buckets).forEach(([label, items]) => {
     if (items.length === 0) return;
     html += `<div style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:600;color:${bucketColors[label]};margin-bottom:6px;padding:4px 8px;background:rgba(0,0,0,0.1);border-radius:4px;">${escapeHtml(t('an.aged_bucket_days', { label }))} — ${escapeHtml(t('an.aged_orders_n', { n: items.length }))}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--st-${bucketTone[label]}-ink);margin-bottom:6px;padding:4px 8px;background:var(--st-${bucketTone[label]}-bg);border-radius:4px;">${escapeHtml(t('an.aged_bucket_days', { label }))} — ${escapeHtml(t('an.aged_orders_n', { n: items.length }))}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="color:var(--text-dim);">
           <th style="text-align:start;padding:4px 6px;">${escapeHtml(t('an.aged_col_order'))}</th>
@@ -3572,9 +3577,9 @@ function renderAgedReceivables() {
           <td style="padding:5px 6px;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(jobRef(i.id))}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.project||'—')}</td>
           <td style="padding:5px 6px;">${escapeHtml(i.client||'—')}</td>
-          <td style="padding:5px 6px;text-align:end;color:var(--danger);font-weight:600;">${fmtPrice(i.owed)}</td>
+          <td style="padding:5px 6px;text-align:end;font-weight:600;">${fmtPrice(i.owed)}</td>
           <td style="padding:5px 6px;text-align:end;color:var(--text-muted);font-family:var(--font-num);">${escapeHtml(i.due || '—')}</td>
-          <td style="padding:5px 6px;text-align:end;color:${i.overdue === false ? 'var(--text-muted)' : bucketColors[label]};">${i.overdue === false ? escapeHtml(t('an.aged_not_yet_due')) : i.days}</td>
+          <td class="aged-days ${i.overdue === false || !(i.days > 0) ? 'is-wait' : 'is-late'}" style="padding:5px 6px;text-align:end;">${i.overdue === false ? escapeHtml(t('an.aged_not_yet_due')) : i.days}</td>
         </tr>`).join('')}</tbody>
       </table></div>`;
   });

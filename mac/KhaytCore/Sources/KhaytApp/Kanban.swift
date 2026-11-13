@@ -481,7 +481,7 @@ private struct JobCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     ThreadBar(progress: Double(live.progress) / 100)
                     HStack(spacing: 4) {
-                        Image(systemName: "printer").foregroundStyle(Khayt.live)
+                        Image(systemName: "printer").foregroundStyle(.secondary)
                         Text(verbatim: shop.machineName(forId: machineId)
                              + ((live.timeRemaining ?? 0) > 0
                                 ? " · " + PrinterWatch.spell(live.timeRemaining ?? 0, shop.words) : ""))

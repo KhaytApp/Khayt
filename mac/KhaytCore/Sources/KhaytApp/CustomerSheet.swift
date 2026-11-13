@@ -455,11 +455,15 @@ struct CustomerSheet: View {
             ForEach($agreements.byID) { $row in
                 HStack(spacing: 8) {
                     TextField(shop.words.callIt("ce.pl_product"), text: $row.product)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 120)
                     TextField(shop.words.callIt("ce.pl_price"), text: $row.priceText)
                         .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
+                    // As wide as the product beside it, not a fixed 120: a
+                    // note is a phrase ("Per unit, any colour") and at 120 it
+                    // showed as "Per unit, any colou" (Nov 11 2026 review,
+                    // B10). Two flexible fields share what the price leaves.
                     TextField(shop.words.callIt("ce.pl_note"), text: $row.note)
-                        .textFieldStyle(.roundedBorder).frame(width: 120)
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 120)
                     Button {
                         agreements.removeAll { $0.id == row.id }
                     } label: { Image(systemName: "minus.circle") }

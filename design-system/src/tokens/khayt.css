@@ -14,7 +14,7 @@
      means "late, failed, refused". They are not a rainbow to pick from. */
   --khayt-brand: #216dca;
   --khayt-on-brand: #ffffff;
-  --khayt-hot: #af3e18;
+  --khayt-thread: #f2a541;
   --khayt-done: #1b5e4f;
   --khayt-attention: #8a5a0b;
   --khayt-late: #bb2d44;
@@ -75,7 +75,7 @@
 [data-theme="dark"] {
   --khayt-brand: #4c97f0;
   --khayt-on-brand: #0b1622;
-  --khayt-hot: #f0763d;
+  --khayt-thread: #f2a541;
   --khayt-done: #4fbfa0;
   --khayt-attention: #e0a73c;
   --khayt-late: #f2564a;
@@ -109,7 +109,7 @@
   :root:not([data-theme="light"]) {
     --khayt-brand: #4c97f0;
     --khayt-on-brand: #0b1622;
-    --khayt-hot: #f0763d;
+    --khayt-thread: #f2a541;
     --khayt-done: #4fbfa0;
     --khayt-attention: #e0a73c;
     --khayt-late: #f2564a;

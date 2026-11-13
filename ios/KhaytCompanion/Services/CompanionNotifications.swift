@@ -30,6 +30,14 @@ final class CompanionNotifications: ObservableObject {
         }
     }
 
+    /// Whether alerts are allowed now, read without asking — iOS Settings can
+    /// change it while the app is away.
+    func refreshAuthorization() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        let allowed = status == .authorized || status == .provisional || status == .ephemeral
+        if allowed != isAuthorized { isAuthorized = allowed }
+    }
+
     func handleHealthUpdate(
         state: ConnectionHealthState,
         status: ShopStatus?,

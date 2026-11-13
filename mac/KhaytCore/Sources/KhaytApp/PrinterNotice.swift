@@ -80,6 +80,34 @@ final class PrinterNotice {
     /// runout has no business appearing on a real desktop.
     func recordForTesting(_ notice: Notice) { raised.insert(notice, at: 0) }
 
+    /// Will a notification posted now be HEARD, as far as this app can know?
+    ///
+    /// Every notice is posted with the default sound (`deliver`), so what
+    /// decides is the system's settings for Khayt: allowed at all, sounds on,
+    /// and shown somewhere (a banner or Notification Centre). Pure, so every
+    /// combination can be tested without a notification centre.
+    ///
+    /// WHAT THIS CANNOT KNOW: a Focus or Do Not Disturb that is on, the Mac's
+    /// volume or mute, and a notification summary that holds it back. macOS
+    /// does not tell an app any of those, so under a Focus this says "heard"
+    /// and the notification is in fact silent.
+    nonisolated static func audible(authorized: Bool, soundOn: Bool, shown: Bool) -> Bool {
+        authorized && soundOn && shown
+    }
+
+    /// The same question asked of the system. READS ONLY: it never asks for
+    /// permission (that is `deliver`'s, on the first notice), so before
+    /// anybody has answered the prompt the answer is no. And no in a
+    /// development run, where there is no notification centre to ask.
+    func carriesSound() async -> Bool {
+        guard Self.canDeliver else { return false }
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return Self.audible(authorized: settings.authorizationStatus == .authorized,
+                            soundOn: settings.soundSetting == .enabled,
+                            shown: settings.alertSetting == .enabled
+                                || settings.notificationCenterSetting == .enabled)
+    }
+
     private func deliver(_ notice: Notice) async {
         let centre = UNUserNotificationCenter.current()
         if !asked {
