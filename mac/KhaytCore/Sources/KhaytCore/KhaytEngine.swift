@@ -468,6 +468,10 @@ public actor KhaytEngine {
         // fields are recorded because those are the ones a customer can be told
         // a different answer about later.
         "order-edit",
+        // A customer's address in fields (Turki, Nov 10): the National
+        // Address, the text every older build reads, and the rule that keeps
+        // a row the old desktop's save can read.
+        "customer-address",
         // Spools, clients and products from a spreadsheet: the parse, the
         // column matching, the duplicate tests and the records — the rules the
         // desktop's Import CSV ran inline, so File ▸ Import CSV… builds the
@@ -6185,6 +6189,45 @@ public actor KhaytEngine {
                           [.string(lastKnownHost), .number(Double(limit))], as: [String].self)
     }
 
+    /// Which printer this is, from the answer to a protocol's identity
+    /// request (`lib/printer-sweep.js readIdentity`): the serials and network
+    /// card addresses the printer reports about itself. Never the hostname:
+    /// two Snapmaker U1s on one LAN both call themselves "lava".
+    public struct SweepIdentity: Decodable, Sendable, Equatable {
+        public let serial: String
+        public let serials: [String]
+        public let mac: String
+        public let macs: [String]
+        public var isEmpty: Bool { serials.isEmpty && macs.isEmpty }
+    }
+
+    /// The protocol's identity request path, or nil when it has none. Asked
+    /// WITHOUT credentials, always: it is how a printer at a new address is
+    /// recognised before anything secret is sent to it.
+    public func identityPath(type: String) throws -> String? {
+        let p = try runtime.call2("globalThis.KhaytPrinterSweep.identityProbeFor(ARG0)", [.string(type)], as: JSONValue.self)
+        if case .string(let path) = p, !path.isEmpty { return path }
+        return nil
+    }
+
+    public func readSweepIdentity(type: String, body: JSONValue) throws -> SweepIdentity {
+        try runtime.call2("globalThis.KhaytPrinterSweep.readIdentity(ARG0, ARG1)",
+                          [.string(type), body], as: SweepIdentity.self)
+    }
+
+    /// Is a search for moved printers worth running now
+    /// (`lib/printer-relocate.js shouldScan`): a machine is offline and not
+    /// already explained, and the last search was long enough ago.
+    public func shouldSearchForMoved(machines: [JSONValue], statusCache: [String: JSONValue],
+                                     lastScanAt: Date?, now: Date) throws -> Bool {
+        try runtime.call2(
+            "KhaytPrinterRelocate.shouldScan({ machines: ARG0.machines, statusCache: ARG0.statusCache, lastScanAt: ARG0.lastScanAt, now: ARG0.now, offlineThreshold: 3 })",
+            [.object(["machines": .array(machines), "statusCache": .object(statusCache),
+                      "lastScanAt": .number((lastScanAt?.timeIntervalSince1970 ?? 0) * 1000),
+                      "now": .number(now.timeIntervalSince1970 * 1000)])],
+            as: Bool.self)
+    }
+
     /// What answered, as a discovery record — or nil when it was not a printer.
     ///
     /// The shape matches `lib/printer-discovery.js` on purpose, so
@@ -9160,6 +9203,49 @@ public actor KhaytEngine {
             [order, clientId.map(JSONValue.string) ?? .null, .number(now.timeIntervalSince1970 * 1000),
              .string(editId), .array(clients), .object(settings)],
             as: CustomerChange.self)
+    }
+
+    // MARK: - Customer addresses (`lib/customer-address.js`)
+
+    /// A row's fields as an address a person reads, one line per "\n".
+    public func addressText(_ row: JSONValue, shopCountry: String, display: Bool = false) throws -> String {
+        // `display` is for text a screen or a page draws: it keeps
+        // "12345-6789" in order after an Arabic city. Never store the result.
+        try runtime.call2("KhaytCustomerAddress.textOf(ARG0, { shopCountry: ARG1, display: ARG2 })",
+                          [row, .string(shopCountry), .bool(display)], as: String.self)
+    }
+
+    /// 'empty' | 'unstructured' | 'structured' | 'edited_elsewhere'.
+    public func addressState(_ row: JSONValue) throws -> String {
+        try runtime.call2("KhaytCustomerAddress.stateOf(ARG0)", [row], as: String.self)
+    }
+
+    /// The fields saved onto a row: tidied, capped, the text and `textOf`
+    /// written, `label` and `address` always strings, unknown keys kept.
+    public func applyAddressFields(_ row: JSONValue, fields: [String: String],
+                                   shopCountry: String) throws -> JSONValue {
+        try runtime.call2("KhaytCustomerAddress.applyFields(ARG0, ARG1, { shopCountry: ARG2 })",
+                          [row, .object(fields.mapValues(JSONValue.string)), .string(shopCountry)],
+                          as: JSONValue.self)
+    }
+
+    /// Every row as the old desktop's save can read it (it throws on a row
+    /// whose label or address is not a string).
+    public func addressRowsForOldBuilds(_ rows: [JSONValue]) throws -> [JSONValue] {
+        try runtime.call2("KhaytCustomerAddress.rowsForOldBuilds(ARG0)", [.array(rows)], as: [JSONValue].self)
+    }
+
+    /// Where a job goes, as text: its snapshot, its typed text, else the
+    /// customer's default shipping row.
+    public func shipAddress(order: JSONValue, client: JSONValue?, shopCountry: String) throws -> String {
+        try runtime.call2("KhaytCustomerAddress.shipAddressOf(ARG0, ARG1, { shopCountry: ARG2 })",
+                          [order, client ?? .null, .string(shopCountry)], as: String.self)
+    }
+
+    /// A job's copy of the address it ships to, or nil when there is none.
+    public func shipTo(row: JSONValue, client: JSONValue?, shopCountry: String) throws -> JSONValue? {
+        try runtime.call2("KhaytCustomerAddress.shipTo(ARG0, ARG1, { shopCountry: ARG2 })",
+                          [row, client ?? .null, .string(shopCountry)], as: JSONValue?.self)
     }
 
     /// A job's edits, newest first — `lib/order-edit.js editLog`.

@@ -145,6 +145,78 @@ struct WidgetRenderTests {
         image?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
     }
 
+    // MARK: - Comparing two pictures
+
+    /// The same snapshot with nothing in it that moves, for a test that
+    /// compares two pictures.
+    ///
+    /// ── WHY TWO PICTURES OF ONE SNAPSHOT WERE NOT THE SAME BYTES ──────────
+    ///
+    /// `lateIsWorkedOutAtTheEntry` drew a snapshot twice and expected the two
+    /// PNG files to be equal, and on one full run they were not (".glance: a
+    /// job due yesterday was drawn grey") when nothing about the job differed.
+    /// Drawing one snapshot over and over and comparing the pictures found
+    /// two things that change, and neither is the job:
+    ///
+    /// 1. A printing row counts down with `Text(_, style: .relative)`, which
+    ///    reads the WALL clock when it is drawn and not the entry's `now` —
+    ///    the point of it: the widget keeps counting between reloads. 150
+    ///    pictures of the Glance widget half a second apart were alike until
+    ///    60.5 s after the snapshot was made, when "1 hr, 28 min" became
+    ///    "1 hr, 27 min". `still` leaves the printers out.
+    ///
+    /// 2. With the printers out, the first two pictures of a widget are
+    ///    alike and every later one differs from them by ONE level of one
+    ///    colour channel on a few hundred pixels at the edges of the text
+    ///    (445 of 556,192 in Up next, 44 in Glance; never more than one
+    ///    level). The eye cannot see it and a byte comparison can. Which pair
+    ///    of pictures falls either side of it depends on what else the
+    ///    process has drawn, so on which tests ran first. `difference` counts
+    ///    only channels that are further apart than that rounding.
+    ///
+    /// Which of the two the failing run met is not known. The test drew its
+    /// two pictures a few hundredths of a second apart, so the second is the
+    /// likelier.
+    static func still(_ snapshot: ShopWidgetSnapshot) -> ShopWidgetSnapshot {
+        var still = snapshot
+        still.printing = []
+        return still
+    }
+
+    /// Two levels of 255. The rounding measured between two pictures of the
+    /// same thing is one; a late date against one that is not late is a red
+    /// bold word against a grey regular one, hundreds of channels apart by
+    /// most of the scale (`lateIsWorkedOutAtTheEntry` holds that end).
+    static let rounding = 2
+
+    /// How far apart two pictures are: how many colour channels differ by
+    /// more than `rounding`, and the most any channel differs by. Nil when
+    /// they are not two pictures of one size.
+    static func difference(_ a: NSImage?, _ b: NSImage?) -> (beyondRounding: Int, most: Int)? {
+        guard let x = a?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)),
+              let y = b?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)),
+              x.pixelsWide == y.pixelsWide, x.pixelsHigh == y.pixelsHigh,
+              x.bitsPerSample == 8, y.bitsPerSample == 8,
+              x.samplesPerPixel == y.samplesPerPixel, x.bitsPerPixel == y.bitsPerPixel,
+              x.bitsPerPixel == x.samplesPerPixel * 8,
+              let p = x.bitmapData, let q = y.bitmapData else { return nil }
+        // Row by row and only as far as the pixels go: what pads a row out
+        // to its stride is not part of the picture.
+        let wide = x.pixelsWide * x.samplesPerPixel
+        var beyond = 0
+        var most = 0
+        for row in 0..<x.pixelsHigh {
+            let left = p + row * x.bytesPerRow
+            let right = q + row * y.bytesPerRow
+            for i in 0..<wide {
+                let apart = abs(Int(left[i]) - Int(right[i]))
+                if apart > most { most = apart }
+                if apart > rounding { beyond += 1 }
+            }
+        }
+        return (beyond, most)
+    }
+
     @Test("a job due before the entry's day is late, whatever the snapshot said when it was written")
     func lateIsWorkedOutAtTheEntry() throws {
         var cal = Calendar(identifier: .gregorian)
@@ -163,35 +235,100 @@ struct WidgetRenderTests {
         #expect(!JobRow.isLate(job(yesterday, late: false), at: yesterday.addingTimeInterval(3600)))
 
         // And drawn so: the stale snapshot's row looks exactly like a late one.
-        var stale = Self.snapshot("en")
+        // Without the printers, whose countdown reads the wall clock (`still`).
+        var stale = Self.still(Self.snapshot("en"))
         var late = stale
         stale.upNext = [job(yesterday, late: false)]
         late.upNext = [job(yesterday, late: true)]
         for face in [WidgetFace.upNext, .glance] {
             let family = try #require(face.families.last)
-            let a = try #require(Self.png(Self.render(face, family, stale, dark: false, now: now)))
-            let b = try #require(Self.png(Self.render(face, family, late, dark: false, now: now)))
-            #expect(a == b, "\(face): a job due yesterday was drawn grey")
+            let apart = try #require(Self.difference(Self.render(face, family, stale, dark: false, now: now),
+                                                     Self.render(face, family, late, dark: false, now: now)))
+            #expect(apart.beyondRounding == 0,
+                    "\(face): a job due yesterday was drawn grey (\(apart.beyondRounding) channels differ, by up to \(apart.most))")
         }
         // Sanity: the pictures DO tell a red row from a grey one — the same
-        // snapshot drawn before midnight, when the job was not late yet.
+        // snapshot drawn before midnight, when the job was not late yet. And
+        // by far more than the rounding the comparison above lets through.
         let before = yesterday.addingTimeInterval(3600)
-        let grey = try #require(Self.png(Self.render(.upNext, .systemLarge, stale, dark: false, now: before)))
-        let red = try #require(Self.png(Self.render(.upNext, .systemLarge, late, dark: false, now: before)))
-        #expect(grey != red)
+        let told = try #require(Self.difference(Self.render(.upNext, .systemLarge, stale, dark: false, now: before),
+                                                Self.render(.upNext, .systemLarge, late, dark: false, now: before)))
+        #expect(told.beyondRounding > 100 && told.most > 50,
+                "a grey date and a red one are \(told.beyondRounding) channels apart, by up to \(told.most)")
+    }
+
+    /// The cause of the failure `still` describes, held in place: a printer's
+    /// countdown follows the wall clock and nothing else in a widget does.
+    ///
+    /// The first printer is set to finish a second and a half past a whole
+    /// number of minutes, so the minute turns while this test is running
+    /// instead of up to sixty seconds later.
+    @Test("a printer's countdown follows the wall clock, and nothing else in a widget does")
+    func theCountdownIsTheOnlyThingThatMoves() async throws {
+        for _ in 0..<5 {
+            var moving = Self.snapshot("en")
+            let made = Date()
+            let turns = made.addingTimeInterval(1.5)
+            moving.printing[0].endsAt = turns.addingTimeInterval(89 * 60)
+            let still = Self.still(moving)
+
+            let before = Self.render(.glance, .systemLarge, moving, dark: false, now: made)
+            let stillBefore = Self.render(.glance, .systemLarge, still, dark: false, now: made)
+            // Both pictures have to be from before the minute turns. On a
+            // loaded machine they may not be; that says nothing about the
+            // widget, so the same question is asked again with a new minute.
+            guard Date() < turns else { continue }
+            while Date() < turns.addingTimeInterval(0.3) { try await Task.sleep(for: .milliseconds(50)) }
+            let after = Self.render(.glance, .systemLarge, moving, dark: false, now: made)
+            let stillAfter = Self.render(.glance, .systemLarge, still, dark: false, now: made)
+
+            let moved = try #require(Self.difference(before, after))
+            #expect(moved.beyondRounding > 0, "the countdown did not move when its minute turned: it no longer reads the wall clock, and `still` can go")
+            let stayed = try #require(Self.difference(stillBefore, stillAfter))
+            #expect(stayed.beyondRounding == 0,
+                    "something besides a printer's countdown changed between two pictures of one entry: \(stayed.beyondRounding) channels, by up to \(stayed.most)")
+            return
+        }
+        Issue.record("five times, two pictures could not be drawn inside a second and a half")
+    }
+
+    /// And in the source: one text in the widget views reads the wall clock,
+    /// the printer's countdown. A second one would make every byte-for-byte
+    /// comparison in this file a coin toss again, on a face `still` does not
+    /// know about.
+    @Test("only the printer's countdown is drawn from the wall clock")
+    func oneTextReadsTheWallClock() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytWidgetViews/WidgetViews.swift")
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let code = source.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+        // The date styles that redraw themselves, and the ways to ask what
+        // time it is. `now: Date = Date()` is the entry's moment, handed in.
+        let live = code.filter { line in
+            ["style: .relative", "style: .timer", "style: .offset", "Date.now", "Date()", "TimelineView"]
+                .contains { line.contains($0) }
+        }.map { $0.trimmingCharacters(in: .whitespaces) }
+        #expect(live.count == 2, "\(live)")
+        #expect(live.contains { $0.contains("now: Date = Date()") }, "\(live)")
+        #expect(live.contains { $0.hasPrefix("Text(ends, style: .relative)") }, "\(live)")
     }
 
     @Test("a snapshot from a build that sent no low spools claims nothing about filament")
     func glanceWithoutLowSpoolsSaysNothing() throws {
-        var old = Self.snapshot("en")
+        // `still` and `difference`: a minute turning under a printer's
+        // countdown, or one level of rounding, would make the two pictures
+        // differ whatever was drawn about filament.
+        var old = Self.still(Self.snapshot("en"))
         old.lowSpools = nil
         old.lowSpoolCount = nil
         var stocked = old
         stocked.lowSpools = []
         stocked.lowSpoolCount = 0
         let now = Date()
-        let a = try #require(Self.png(Self.render(.glance, .systemLarge, old, dark: false, now: now)))
-        let b = try #require(Self.png(Self.render(.glance, .systemLarge, stocked, dark: false, now: now)))
-        #expect(a != b, "no list was drawn as \"Every spool is stocked\"")
+        let apart = try #require(Self.difference(Self.render(.glance, .systemLarge, old, dark: false, now: now),
+                                                 Self.render(.glance, .systemLarge, stocked, dark: false, now: now)))
+        #expect(apart.beyondRounding > 100, "no list was drawn as \"Every spool is stocked\"")
     }
 }

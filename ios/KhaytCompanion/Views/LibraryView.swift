@@ -10,7 +10,7 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            LibraryFolderPage(folder: "")
+            LibraryFolderPage(folder: "", filter: $filter, openMenu: $openMenu)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("common.close")) { dismiss() } }
                 }
@@ -22,17 +22,30 @@ struct LibraryView: View {
             if let v = UserDefaults.standard.string(forKey: "KhaytOpen"), v.hasPrefix("library:") {
                 opened = SampleLibrary.items.first { $0.id == v.dropFirst("library:".count) }
             }
+            // `-KhaytLibraryFilter "colour=blue,black;type=3mf"` picks rows, and
+            // `-KhaytLibraryMenu colour|type` opens a menu — for screenshots.
+            if let v = UserDefaults.standard.string(forKey: "KhaytLibraryFilter") { filter = LibraryFilter(launchFlag: v) }
+            if let v = UserDefaults.standard.string(forKey: "KhaytLibraryMenu"), let m = LibraryFilterMenu(rawValue: v) {
+                Task { try? await Task.sleep(for: .seconds(1.5)); openMenu = m }
+            }
         }
         #endif
     }
 
     @State private var opened: LibraryItem?
+    /// The Colour and File type picks, held here so they stay while the
+    /// owner moves between folders and searches.
+    @State private var filter = LibraryFilter()
+    @State private var openMenu: LibraryFilterMenu?
 }
 
 /// One folder of the library, or — while something is typed — a search of
 /// all of it.
 struct LibraryFolderPage: View {
     let folder: String
+    @Binding var filter: LibraryFilter
+    /// The root page's menu, opened from a launch flag; a sub-folder keeps its own.
+    @Binding var openMenu: LibraryFilterMenu?
     @EnvironmentObject private var api: KhaytAPIClient
 
     @State private var query = ""
@@ -40,6 +53,7 @@ struct LibraryFolderPage: View {
     @State private var more: [LibraryItem] = []
     @State private var problem: String?
     @State private var loading = false
+    @State private var ownMenu: LibraryFilterMenu?
 
     private var title: String {
         folder.isEmpty ? L10n.tr("library.title") : (folder.split(separator: "/").last.map(String.init) ?? folder)
@@ -52,6 +66,16 @@ struct LibraryFolderPage: View {
                 KhaytSearchField(text: $query, prompt: L10n.tr("library.search"))
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                // A Mac that cannot filter sends no counts: no menus then.
+                if let page, let facets = page.facets {
+                    LibraryFilterBar(filter: $filter, facets: facets, shown: page.shownTotal,
+                                     of: page.unfilteredTotal,
+                                     open: folder.isEmpty ? $openMenu : $ownMenu)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
+                }
             }
             if let problem {
                 Section { V2Note(text: problem, tone: KhaytDesign.late).listRowBackground(Color.clear) }
@@ -62,13 +86,13 @@ struct LibraryFolderPage: View {
             if let page, !page.folders.isEmpty {
                 Section(L10n.tr("library.folders")) {
                     ForEach(page.folders) { f in
-                        NavigationLink { LibraryFolderPage(folder: f.path) } label: { folderRow(f) }
+                        NavigationLink { LibraryFolderPage(folder: f.path, filter: $filter, openMenu: $ownMenu) } label: { folderRow(f) }
                             .listRowBackground(KhaytDesign.surface)
                     }
                 }
             }
             if !items.isEmpty {
-                Section(query.isEmpty ? L10n.tr("library.models") : L10n.format("library.found", page?.total ?? items.count)) {
+                Section(query.isEmpty && !filtering ? L10n.tr("library.models") : L10n.format("library.found", page?.total ?? items.count)) {
                     ForEach(items) { item in
                         NavigationLink { LibraryItemPage(item: item) } label: { LibraryRow(item: item) }
                             .listRowBackground(KhaytDesign.surface)
@@ -81,7 +105,7 @@ struct LibraryFolderPage: View {
                 }
             } else if let page, page.folders.isEmpty, !loading, problem == nil {
                 Section {
-                    Text(L10n.tr(query.isEmpty ? "library.empty" : "library.no_match"))
+                    Text(L10n.tr(query.isEmpty && !filtering ? "library.empty" : "library.no_match"))
                         .font(.khayt(14, relativeTo: .body)).foregroundStyle(KhaytDesign.note)
                         .listRowBackground(Color.clear)
                 }
@@ -94,7 +118,7 @@ struct LibraryFolderPage: View {
         .khaytScreen(title: title)
         .navigationBarTitleDisplayMode(folder.isEmpty ? .large : .inline)
         // A short pause while typing, so each letter is not its own question.
-        .task(id: query) {
+        .task(id: loadKey) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(300)) }
             guard !Task.isCancelled else { return }
             await load()
@@ -116,11 +140,16 @@ struct LibraryFolderPage: View {
         }
     }
 
+    /// The picks count only where the Mac answered them (it sent `facets`).
+    private var filtering: Bool { !filter.isEmpty && page?.facets != nil }
+    private var baseKey: String { query + "\u{1F}" + folder }
+    private var loadKey: String { baseKey + "\u{1F}" + (filter.colourParam ?? "") + "\u{1F}" + (filter.typeParam ?? "") }
+
     private func load() async {
         loading = true
         defer { loading = false }
         do {
-            page = try await api.fetchLibrary(query: query, folder: query.isEmpty ? folder : "")
+            page = try await api.fetchLibrary(query: query, folder: query.isEmpty ? folder : "", filter: filter)
             more = []
             problem = nil
         } catch is CancellationError {
@@ -136,7 +165,7 @@ struct LibraryFolderPage: View {
         loading = true
         defer { loading = false }
         guard let next = try? await api.fetchLibrary(query: query, folder: query.isEmpty ? folder : "",
-                                                    offset: items.count) else { return }
+                                                    offset: items.count, filter: filter) else { return }
         let seen = Set(items.map(\.id))
         more += next.items.filter { !seen.contains($0.id) }
     }
@@ -161,6 +190,18 @@ struct LibraryRow: View {
                 } else if let folder = item.folder {
                     Text(folder).font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note).lineLimit(1)
                 }
+            }
+            if !item.colors.isEmpty {
+                Spacer(minLength: 4)
+                // The colours it was sliced with, as the filter reads them.
+                HStack(spacing: -4) {
+                    ForEach(Array(item.colors.prefix(3).enumerated()), id: \.offset) { _, hex in
+                        Circle().fill(Color(modelHex: hex) ?? .gray)
+                            .overlay(Circle().strokeBorder(KhaytDesign.note.opacity(0.45), lineWidth: 1))
+                            .frame(width: 12, height: 12)
+                    }
+                }
+                .accessibilityHidden(true)
             }
         }
     }
