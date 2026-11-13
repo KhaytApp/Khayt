@@ -41,8 +41,69 @@ extension Shop {
 
     /// Which models a page shows, and the folders beside them. Pure, so the
     /// search and the folder counts are tested without a server.
+    /// The two filter menus the phone draws: which keys are chosen.
+    ///
+    /// `colour=blue,black&type=3mf,stl`. A key nobody knows is ignored, not an
+    /// error, so a newer phone asking for a row this Mac has not heard of
+    /// still gets its list.
+    struct PhoneLibraryFilter: Sendable, Equatable {
+        var colours: [String] = []
+        var types: [String] = []
+
+        init() {}
+        init(colour: String?, type: String?) {
+            func keys(_ text: String?, _ known: [String]) -> [String] {
+                let want = Set((text ?? "").lowercased().split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+                return known.filter(want.contains)
+            }
+            colours = keys(colour, ColourFamily.tokens)
+            types = keys(type, ModelFileType.allCases.map(\.rawValue))
+        }
+
+        /// Does this model pass both menus as chosen? True for every model
+        /// when nothing is.
+        func passes(_ file: LibraryFile, tokens: (LibraryFile) -> [String]) -> Bool {
+            if !colours.isEmpty, !tokens(file).contains(where: colours.contains) { return false }
+            return types.isEmpty || types.contains(file.fileType.rawValue)
+        }
+    }
+
+    /// The menus counted and applied: `lib/lan-library.js narrow`, natively.
+    ///
+    /// Several rows of one menu are OR, the two menus narrow together and
+    /// with the search or the folder, and each menu is counted over
+    /// everything EXCEPT its own choice, so choosing Blue does not zero the
+    /// other colours. Every key is always counted, zeros included. `tokens`
+    /// is handed in because the shop keeps each model's colour rows
+    /// (`Shop.libraryColourTokens`); working them out again per request is
+    /// the whole cost of this on a large library.
+    nonisolated static func libraryNarrow(_ files: [LibraryFile], _ filter: PhoneLibraryFilter,
+                                          tokens: (LibraryFile) -> [String])
+        -> (files: [LibraryFile], colour: [String: Int], type: [String: Int]) {
+        var colour = Dictionary(uniqueKeysWithValues: ColourFamily.tokens.map { ($0, 0) })
+        var type = Dictionary(uniqueKeysWithValues: ModelFileType.allCases.map { ($0.rawValue, 0) })
+        var kept: [LibraryFile] = []
+        for file in files {
+            let rows = tokens(file), kind = file.fileType.rawValue
+            let colourOk = filter.colours.isEmpty || rows.contains(where: filter.colours.contains)
+            let typeOk = filter.types.isEmpty || filter.types.contains(kind)
+            if typeOk { for row in rows { colour[row, default: 0] += 1 } }
+            if colourOk { type[kind, default: 0] += 1 }
+            if colourOk && typeOk { kept.append(file) }
+        }
+        return (kept, colour, type)
+    }
+
+    /// `passes` and `narrow` are the two filter menus, for `phoneLibrary`:
+    /// `passes` says whether one model passes both as chosen (it decides which
+    /// sub-folders are listed, and at what count), and `narrow` is handed what
+    /// the search or the folder matched and returns what is left of it.
     nonisolated static func libraryPage(_ files: [LibraryFile], q: String, folder: String,
-                                        offset: Int, limit: Int)
+                                        offset: Int, limit: Int,
+                                        passes: ((LibraryFile) -> Bool)? = nil,
+                                        narrow: (([LibraryFile]) -> [LibraryFile])? = nil,
+                                        scope: (([LibraryFile]) -> Void)? = nil)
         -> (total: Int, files: [LibraryFile], folders: [(path: String, name: String, count: Int)]) {
         let live = files.filter { !$0.isArchived }
         let words = SearchText.fold(q).split(whereSeparator: \.isWhitespace).map(String.init)
@@ -54,19 +115,32 @@ extension Shop {
                 let fields = file.searchFields + [file.groupName ?? "", file.category ?? ""]
                 return words.allSatisfy { w in fields.contains { !$0.isEmpty && SearchText.containsFolded($0, w) } }
             }
+            scope?(chosen)
         } else {
             chosen = live.filter { folderPath($0.groupName) == here }
+            // What the menus and "N of M" are counted over: the folder AND
+            // everything under it, the same reach as its sub-folders' counts
+            // (`lib/lan-library.js list` says why they must agree).
+            if let scope {
+                let under = here.isEmpty ? "" : here + "/"
+                scope(live.filter { let p = folderPath($0.groupName); return p == here || p.hasPrefix(under) })
+            }
             var counts: [String: Int] = [:]
             let prefix = here.isEmpty ? "" : here + "/"
             for file in live {
                 let path = folderPath(file.groupName)
                 guard !path.isEmpty, path.hasPrefix(prefix), path != here else { continue }
+                // The sub-folders follow the two menus, so a tap never opens
+                // a folder the filter has emptied (`lib/lan-library.js list`).
+                if let passes, !passes(file) { continue }
                 let child = path.dropFirst(prefix.count).split(separator: "/").first.map(String.init) ?? ""
                 if !child.isEmpty { counts[child, default: 0] += 1 }
             }
             folders = counts.map { (path: prefix + $0.key, name: $0.key, count: $0.value) }
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
+        // After the search or the folder, before the page is cut.
+        if let narrow { chosen = narrow(chosen) }
         chosen.sort { a, b in
             if a.isFavourite != b.isFavourite { return a.isFavourite }
             let order = a.title.localizedStandardCompare(b.title)
@@ -106,8 +180,18 @@ extension Shop {
     }
 
     /// `GET /api/library`'s answer.
-    func phoneLibrary(q: String, folder: String, offset: Int, limit: Int) -> JSONValue {
-        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit)
+    func phoneLibrary(q: String, folder: String, offset: Int, limit: Int,
+                      filter: PhoneLibraryFilter = .init()) -> JSONValue {
+        var colourCounts: [String: Int] = [:], typeCounts: [String: Int] = [:], unfiltered = 0, inScope = 0
+        let tokens: (LibraryFile) -> [String] = { self.libraryColourTokens($0) }
+        let page = Self.libraryPage(files, q: q, folder: folder, offset: offset, limit: limit,
+                                    passes: { filter.passes($0, tokens: tokens) },
+                                    narrow: { Self.libraryNarrow($0, filter, tokens: tokens).files },
+                                    scope: { scope in
+            unfiltered = scope.count
+            let narrowed = Self.libraryNarrow(scope, filter, tokens: tokens)
+            colourCounts = narrowed.colour; typeCounts = narrowed.type; inScope = narrowed.files.count
+        })
         let items: [JSONValue] = page.files.map { file in
             var o: [String: JSONValue] = [
                 "id": .string(file.id), "name": .string(file.title),
@@ -160,6 +244,17 @@ extension Shop {
             "folders": .array(page.folders.map {
                 .object(["path": .string($0.path), "name": .string($0.name), "count": .number(Double($0.count))])
             }),
+            // "26 of 312": the models in scope that pass both menus, of all
+            // in scope. `total` pages `items`, which in a folder is only the
+            // models filed directly in it.
+            "matchedTotal": .number(Double(inScope)),
+            "unfilteredTotal": .number(Double(unfiltered)),
+            // An older Mac sends no `facets`; that is how a phone knows not
+            // to draw the two menus (docs/LAN_API.md).
+            "facets": .object([
+                "colour": .object(colourCounts.mapValues { .number(Double($0)) }),
+                "type": .object(typeCounts.mapValues { .number(Double($0)) }),
+            ]),
             "items": .array(items),
         ])
     }

@@ -232,7 +232,7 @@ or because its Khayt Vault file was trashed) is not in this library: it is left
 out of the items, the folder counts and the paging, and its thumbnail and
 estimate answer 404 `not-found`. The Mac's own LAN server does the same.
 
-**`GET /api/library?q=&folder=&offset=0&limit=50`**
+**`GET /api/library?q=&folder=&offset=0&limit=50&colour=&type=`**
 
 - `q` — words matched against `name`, `originalName`, `folder`, `tags` and
   `category`, ignoring case and diacritics; every word must match. With a `q`
@@ -240,11 +240,22 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
 - `folder` — without `q`: the models filed directly in that folder path (`""`
   is the top), and in `folders` its immediate sub-folders.
 - `limit` 1–200 (default 50). Favourites first, then by `name`.
+- `colour`, `type` — the two filter menus, each a comma-separated list of keys
+  (since Nov 2026; `lib/lan-library.js narrow`, and natively
+  `Shop.libraryNarrow`). Several keys in one list are OR; the two lists narrow
+  together and with `q` or `folder`. An unknown key is ignored.
+  - colour keys: `red` `orange` `yellow` `green` `blue` `purple` `pink` `brown`
+    `black` `grey` `white`, then `multi` (two or more colour families) and
+    `none` (no colour stored on the model, which is most of a real library).
+    A multicolour model is under each of its families and under `multi`.
+  - type keys: `3mf` `stl` `step` `obj` `gcode` `other` `nofile`.
 
 ```json
 {
-  "total": 7, "offset": 0,
+  "total": 7, "offset": 0, "matchedTotal": 31, "unfilteredTotal": 31,
   "folders": [ { "path": "Saudi Kings/Large", "name": "Large", "count": 12 } ],
+  "facets": { "colour": { "red": 3, "orange": 0, "…": 0, "multi": 2, "none": 41 },
+              "type": { "3mf": 30, "stl": 14, "step": 0, "obj": 0, "gcode": 2, "other": 0, "nofile": 3 } },
   "items": [ {
     "id": "PF-sample-lantern", "name": "Lantern", "folder": "Home", "category": "Decor",
     "tags": ["gift"], "material": "PLA Silk", "ext": "3mf", "size": 2400000,
@@ -257,6 +268,25 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
   } ]
 }
 ```
+
+`facets` counts each menu's rows over everything EXCEPT that menu's own choice
+(and with the other menu applied), so choosing Blue does not zero the other
+colours. Every key is always present, zeros included; take the menu's order
+from the key lists above, not from the object.
+
+**What is counted.** With `q`, the search's results. Without it, the folder
+AND everything under it, the same reach as a sub-folder's `count`: at the top
+of a library whose red models are all in folders, Red reads their number, not
+0. `matchedTotal` and `unfilteredTotal` are counted the same way: the models in
+that reach that pass both menus, and all of them (for "26 of 312").
+
+`total` and `items` are the models LISTED here, fully narrowed: in a folder
+that is only the ones filed directly in it, so `total` can be 0 while
+`matchedTotal` is not (the matches are in sub-folders). `folders` follows the
+menus too: a sub-folder is listed for the models under it that pass, at that
+count, so a tap never opens a folder the filter has emptied. **A computer from before
+this sends no `facets` and ignores the two parameters: a phone hides both
+menus when `facets` is absent.**
 
 `count` is every model at or under that folder. `printTimeMins`/`grams` are
 what a slicer recorded, or null. `estimable` means the computer has the file and
