@@ -118,6 +118,9 @@ struct MainTabView: View {
         .onChange(of: ordersNav.ordersTabRequest) { _, _ in
             selectedTab = 1
         }
+        .onChange(of: ordersNav.machinesTabRequest) { _, _ in
+            selectedTab = 3
+        }
         // A tapped alert: its job, or the requests waiting. Checked on appear
         // too — an alert that launched the app asked before this view existed.
         .onChange(of: ordersNav.orderToOpen) { _, _ in openAskedOrder() }
