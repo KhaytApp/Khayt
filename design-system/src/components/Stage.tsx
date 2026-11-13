@@ -1,4 +1,4 @@
-import { TONE_VAR, type Tone } from '../tone';
+import { TONE_VAR, toneInk, type Tone } from '../tone';
 
 /**
  * The stages a job moves through, in the order work moves through them.
@@ -63,7 +63,7 @@ export function StagePill({ stage, label }: StagePillProps) {
     <span
       className="khayt-stage"
       data-stage={stage}
-      style={tone ? { ['--khayt-stage-tone' as string]: `var(${TONE_VAR[tone]})` } : undefined}
+      style={tone ? { ['--khayt-stage-tone' as string]: `var(${TONE_VAR[tone]})`, ['--khayt-stage-ink' as string]: toneInk(tone) } : undefined}
     >
       {label ?? STAGE_LABEL[stage]}
     </span>

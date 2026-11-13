@@ -836,6 +836,28 @@
 "library.priced_here" = "お店の価格を使用してこのiPhoneで計算しました。複数色のモデルは1つのスプールで原価計算されるため、Macの金額と少し異なる場合があります。";
 "library.no_copy" = "Macに接続できません。「設定」でKhayt Cloudにサインインして一度同期すると、ライブラリを持ち出せます。";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "ピンク";
+"colour.brown" = "茶";
+"library.filter.colour" = "色";
+"library.filter.type" = "ファイル形式";
+"library.filter.multi" = "多色";
+"library.filter.none" = "色情報なし";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "その他";
+"library.type.nofile" = "ファイルなし（ウェブから）";
+"library.filter.colour_hint" = "複数選ぶと、そのいずれかを含むモデルが表示されます。";
+"library.filter.counts_hint" = "件数は他のフィルターを適用したライブラリのものです。0件の行は消さずに薄く表示します。";
+"library.filter.n_of_m" = "%2$d件中%1$d件";
+"library.filter.pill" = "%1$@：%2$@";
+"library.filter.remove" = "%@を外す";
+"library.filter.row" = "%1$@：%2$d";
+"library.filter.chosen" = "%1$@、選択：%2$d";
+
 /* Catalogue */
 "catalogue.title" = "製品カタログ";
 "catalogue.search" = "製品を検索";

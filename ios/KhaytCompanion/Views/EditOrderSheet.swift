@@ -43,7 +43,7 @@ struct EditOrderSheet: View {
     @State private var saving = false
     @State private var problem: String?
 
-    private static let dayFormat: DateFormatter = {
+    static let dayFormat: DateFormatter = {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -58,6 +58,7 @@ struct EditOrderSheet: View {
                     Toggle(L10n.tr("edit.due"), isOn: $hasDue)
                     if hasDue {
                         DatePicker(L10n.tr("edit.due"), selection: $due, displayedComponents: .date)
+                            .environment(\.calendar, Calendar(identifier: .gregorian))
                             .labelsHidden()
                     }
                 }

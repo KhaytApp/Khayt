@@ -30,6 +30,9 @@ enum LibraryCopy {
         "id", "rev", "updatedAt", "name", "originalName", "folder", "tags", "category", "material",
         "favorite", "timesPrinted", "lastPrinted", "parsed", "colors", "setups", "consumables",
         "geometryKey", "testedNotes", "sourceFile", "figuresStaleFor", "licence", "licenceExpires",
+        // For the File type filter (`ModelFileType.type(of:)`): a model in an
+        // archive, or linked from a folder, has a file without a `sourceFile`.
+        "archiveMember", "externalPath",
     ]
 
     /// Every model the Mac's library shows, slimmed. A model put aside on the
@@ -113,6 +116,10 @@ enum LibraryCopy {
         }
         if !ext.isEmpty { shaped["ext"] = .string(ext.lowercased()) }
         shaped["thumb"] = .bool(false)
+        // The filter menus: its colours as the Mac sends them, and its type
+        // read from the whole record — which the Mac's answer cannot say.
+        if case .array(let colours)? = o["colors"] { shaped["colors"] = .array(colours) }
+        shaped["fileType"] = .string(ModelFileType.type(of: row).rawValue)
         shaped["printTimeMins"] = parsed["printTimeMins"] ?? .null
         shaped["grams"] = parsed["filamentGrams"] ?? .null
         var plates: [JSONValue] = []

@@ -116,12 +116,15 @@ struct LibraryGridRedesignTests {
         }
     }
 
-    @Test("a chosen tile draws its folder link and facts in white, not brand blue on accent blue")
+    @Test("a chosen tile is a light wash, and its link, facts and chips keep their own colours")
     func selectedInk() throws {
-        #expect(Cell.groupInk(selected: true) == .white)
+        // Not white: the selection fill is a light wash in every window
+        // state, so the link keeps the brand's blue on it (B6).
+        #expect(Cell.groupInk(selected: true) == Khayt.brand)
         #expect(Cell.groupInk(selected: false) == Khayt.brand)
         let grid = try QuoteSheetStatusTests.source("LibraryGrid.swift")
         #expect(grid.contains(".foregroundStyle(Self.groupInk(selected: selected))"))
+        #expect(grid.contains("Color.accentColor.opacity(0.14)") && !grid.contains("AnyShapeStyle(.selection) : AnyShapeStyle(.clear)"))
         #expect(grid.contains(".foregroundStyle(Cell.secondaryInk(selected: selected))"), "a chosen group tile's caption")
     }
 
@@ -225,7 +228,8 @@ struct LibraryGridRedesignTests {
         #expect(!bar.contains("if !rows.isEmpty {"), "an empty axis is hidden again")
         #expect(bar.contains(".disabled(true)"))
         #expect(bar.contains("LibraryViewControls(shop: shop)"), "sort, view and size left the row")
-        #expect(LibraryFilterBar.axes.count == 5)
+        // Five, and since Nov 2026 Colour and File type after them.
+        #expect(LibraryFilterBar.axes.count == 7)
         #expect(bar.contains("ViewThatFits(in: .horizontal)") && bar.contains("more(all,"),
                 "axes that do not fit are cut instead of folded into More")
         #expect(!bar.contains("ScrollView(.horizontal"), "the row scrolls a chip half out of sight again")

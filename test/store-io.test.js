@@ -876,3 +876,139 @@ test('the book and its .prev are owner-only (0600) after a save', { skip: proces
   assert.equal(mode(fp), 0o600);
   assert.equal(mode(fp + '.prev'), 0o600);
 });
+
+// ── settings.connectorUpdates is main's (lib/plugin-update.js) ───────────
+// A window save can neither overwrite it, drop it, nor invent it — the way
+// the API tokens' server-side stamps are kept from disk. Only a connector the
+// shop removed takes its state with it.
+async function putOnDisk(io, store) {
+  await fs.promises.writeFile(io.dataFilePath(), JSON.stringify(io.encryptForDisk(store)), 'utf8');
+}
+const UPD = { serial: 7, connectors: {
+  'app.sample.one': { pending: { version: '1.1.0', manifest: { id: 'app.sample.one', version: '1.1.0' } } },
+  'app.sample.two': { previous: { version: '2.0.0', manifest: { id: 'app.sample.two' }, granted: {} }, updatedFrom: '2.0.0' },
+} };
+const PLUGINS = [{ id: 'app.sample.one', version: '1.0.0' }, { id: 'app.sample.two', version: '2.1.0' }];
+
+test('connectorUpdates: a window save that sends an older copy keeps the disk\'s', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, connectorUpdates: { serial: 6, connectors: {} } } });
+  assert.deepEqual(merged.settings.connectorUpdates, UPD);
+});
+
+test('connectorUpdates: a window save without it (an older build) does not drop it', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, currency: 'SAR' } });
+  assert.deepEqual(merged.settings.connectorUpdates, UPD);
+  assert.equal(merged.settings.currency, 'SAR');
+});
+
+test('connectorUpdates: a window cannot write one that main never did', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  assert.equal(merged.settings.connectorUpdates, undefined);
+  // Nor on a first save, with nothing on disk yet.
+  const fresh = makeStoreIo();
+  assert.equal(fresh.mergeStoreSecretsFromDisk({ settings: { connectorUpdates: UPD } }).settings.connectorUpdates, undefined);
+});
+
+test('connectorUpdates: a connector removed in the window takes its state with it', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: [PLUGINS[1]], connectorUpdates: UPD } });
+  assert.deepEqual(Object.keys(merged.settings.connectorUpdates.connectors), ['app.sample.two']);
+  assert.equal(merged.settings.connectorUpdates.serial, 7);
+});
+
+test('connectorUpdates: a restore brings back the backup\'s, not today\'s', async () => {
+  const io = makeStoreIo();
+  await putOnDisk(io, { settings: { plugins: PLUGINS, connectorUpdates: UPD } });
+  const backupUpd = { serial: 2, connectors: { 'app.sample.one': { skipped: ['1.0.5'] } } };
+  const r = await io.restoreSnapshotToDisk({ printLog: [], settings: { plugins: [PLUGINS[0]], connectorUpdates: backupUpd } });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(io.readStoreDecryptedFromDisk().settings.connectorUpdates, backupUpd);
+});
+
+// ── A window save that arrives after main updated a connector ────────────
+// Main is the only writer of an update: a save the window sent before it took
+// main's copy back must not put the old version and grant back.
+{
+  const M = require('../lib/plugin-manifest.js');
+  require('../lib/plugin-host.js');
+  const U = require('../lib/plugin-update.js');
+  const LAMHA = require('../plugins/samples/lamha-shipping.json');
+  const at = (v) => { const m = Object.assign(JSON.parse(JSON.stringify(LAMHA)), { version: v }); delete m.signature; return m; };
+  const narrow = (v) => JSON.parse(JSON.stringify(at(v)).split('"{customer.email}"').join('""'));
+  const NOW = Date.parse('2026-11-12T09:00:00.000Z');
+  const CTX = { signedBy: 'test-key', platform: 'desktop', appVersion: '9.9.9', schema: 1, nowMs: NOW };
+  const ix = (version, serial) => ({ khaytIndex: 1, serial, issuedAt: new Date(NOW - 3600e3).toISOString(), expires: new Date(NOW + 30 * 86400e3).toISOString(),
+    entries: [{ kind: 'connector', id: LAMHA.id, version, url: `https://khaytapp.com/connectors/${LAMHA.id}/${version}.json`, sha256: 'a'.repeat(64) }] });
+  const entryAt = (m) => ({ id: m.id, version: m.version, enabled: true, manifest: m, granted: M.grantFor(m), config: {}, secrets: { apiToken: 'sample-token' } });
+  const masked = (settings) => Object.assign(JSON.parse(JSON.stringify(settings)), {
+    plugins: settings.plugins.map((p) => Object.assign({}, JSON.parse(JSON.stringify(p)), { secrets: { apiToken: STORE_SECRET_MASK } })) });
+
+  test('connector entries: a stale window save after an automatic update does not undo it', async () => {
+    const io = makeStoreIo();
+    const before = { plugins: [entryAt(at('1.0.0'))], connectorUpdates: { serial: 3, connectors: {} } };
+    const after = U.applyIndex(before, ix('1.0.1', 4), CTX, { [LAMHA.id]: narrow('1.0.1') }).settings;
+    assert.equal(after.plugins[0].version, '1.0.1');
+    await putOnDisk(io, { settings: after });
+    // The window's save was serialized before it took main's copy back.
+    const stale = Object.assign(masked(before), { currency: 'SAR' });
+    const merged = io.mergeStoreSecretsFromDisk({ settings: stale });
+    const e = merged.settings.plugins[0];
+    assert.equal(e.version, '1.0.1', 'the update stands');
+    assert.deepEqual(e.granted, after.plugins[0].granted, 'with main\'s narrowed grant');
+    assert.deepEqual(e.secrets, { apiToken: 'sample-token' });
+    assert.deepEqual(merged.settings.connectorUpdates, after.connectorUpdates);
+    assert.equal(merged.settings.currency, 'SAR', 'the rest of the save stands');
+  });
+
+  test('connector entries: a stale window save after a Revert does not undo it', async () => {
+    const io = makeStoreIo();
+    const updated = U.applyIndex({ plugins: [entryAt(at('1.0.0'))] }, ix('1.0.1', 4), CTX, { [LAMHA.id]: narrow('1.0.1') }).settings;
+    const reverted = U.revert(updated, LAMHA.id).settings;
+    assert.equal(reverted.plugins[0].version, '1.0.0');
+    await putOnDisk(io, { settings: reverted });
+    const merged = io.mergeStoreSecretsFromDisk({ settings: masked(updated) });
+    assert.equal(merged.settings.plugins[0].version, '1.0.0');
+    assert.deepEqual(merged.settings.plugins[0].granted, reverted.plugins[0].granted);
+  });
+
+  test('connector entries: a window that took main\'s copy keeps its own edits (a hand install, a key)', async () => {
+    const io = makeStoreIo();
+    const updated = U.applyIndex({ plugins: [entryAt(at('1.0.0'))] }, ix('1.0.1', 4), CTX, { [LAMHA.id]: narrow('1.0.1') }).settings;
+    await putOnDisk(io, { settings: updated });
+    // Same update state as the disk: the window is current, so its entry stands.
+    const win = masked(updated);
+    win.plugins[0] = Object.assign(entryAt(at('1.2.0')), { secrets: { apiToken: 'sample-new-token' } });
+    const merged = io.mergeStoreSecretsFromDisk({ settings: win });
+    assert.equal(merged.settings.plugins[0].version, '1.2.0');
+    assert.deepEqual(merged.settings.plugins[0].secrets, { apiToken: 'sample-new-token' });
+  });
+
+  test('connector entries: a check that only offered an update keeps a key typed in a stale window', async () => {
+    const io = makeStoreIo();
+    const before = { plugins: [entryAt(narrow('1.0.0'))], connectorUpdates: { serial: 3, connectors: {} } };
+    const offered = U.applyIndex(before, ix('1.1.1', 4), CTX, { [LAMHA.id]: at('1.1.1') }).settings;
+    assert.equal(U.stateOf(offered, LAMHA.id).pending.version, '1.1.1');
+    assert.equal(offered.plugins[0].version, '1.0.0', 'the entry itself is unchanged');
+    await putOnDisk(io, { settings: offered });
+    const stale = masked(before);
+    stale.plugins[0].secrets = { apiToken: 'sample-typed-meanwhile' };
+    const merged = io.mergeStoreSecretsFromDisk({ settings: stale });
+    assert.deepEqual(merged.settings.plugins[0].secrets, { apiToken: 'sample-typed-meanwhile' });
+    assert.equal(U.stateOf(merged.settings, LAMHA.id).pending.version, '1.1.1');
+  });
+
+  test('connector entries: a connector removed in a stale window stays removed', async () => {
+    const io = makeStoreIo();
+    const updated = U.applyIndex({ plugins: [entryAt(at('1.0.0'))] }, ix('1.0.1', 4), CTX, { [LAMHA.id]: narrow('1.0.1') }).settings;
+    await putOnDisk(io, { settings: updated });
+    const merged = io.mergeStoreSecretsFromDisk({ settings: { plugins: [] } });
+    assert.deepEqual(merged.settings.plugins, []);
+  });
+}

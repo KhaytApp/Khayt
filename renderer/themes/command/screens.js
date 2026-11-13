@@ -248,7 +248,8 @@
       const job = nowPrinting.find((o) => o.machineId === m.id
         || (o.parts || []).some((p) => p.machineId === m.id));
       const { pct, state } = machineProgress(m, job);
-      const stc = state === 'printing' ? 'var(--cmd-ok)'
+      // Printing is amber in the shared status palette, never green.
+      const stc = state === 'printing' ? 'var(--st-move-dot)'
         : (state === 'idle' || state === 'reconnecting') ? 'var(--ink-3)'
         : 'var(--cmd-danger)';
       const jobName = job ? (job.project || jobRef(job)) : tr('mach.status_idle', 'idle');

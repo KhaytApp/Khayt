@@ -163,7 +163,7 @@ struct MachineBandView: View {
                         let x = geo.size.width * (minute / band.minutes)
                         Text(Self.clock(band, minute, shop.words))
                             .font(.caption2).monospacedDigit()
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                             .fixedSize()
                             // First and last hug their edges; the rest centre on
                             // the tick, or the row's ends lose their labels.
@@ -215,7 +215,7 @@ struct MachineBandView: View {
                     Text(shop.words.callIt("mac.band_no_protocol"))
                 }
             }
-            .font(.caption2).foregroundStyle(.tertiary)
+            .font(.caption2).foregroundStyle(Khayt.faint)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14).padding(.top, 6)
         }
@@ -223,11 +223,11 @@ struct MachineBandView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            Key(fill: Khayt.hot.opacity(0.16), line: Khayt.hot,
+            Key(fill: Khayt.threadWash, line: Khayt.thread,
                 text: shop.words.callIt("mac.band_printing"))
             Key(fill: Khayt.surface, line: Khayt.hairline, dashed: true,
                 text: shop.words.callIt("mac.band_queued"))
-            Key(fill: Khayt.attention.opacity(0.16), line: Khayt.attention,
+            Key(fill: Khayt.surface, line: Khayt.attention, hatched: true,
                 text: shop.words.callIt("mac.band_blocked"))
             // ONLY WHEN THERE IS ONE. A key for a block this shop never draws
             // is a line of legend explaining something that is not on screen,
@@ -252,16 +252,54 @@ struct MachineBandView: View {
     private struct Key: View {
         let fill: Color, line: Color
         var dashed = false
+        var hatched = false
         let text: String
         var body: some View {
             HStack(spacing: 5) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(fill)
                     .frame(width: 13, height: 9)
+                    .overlay {
+                        if hatched {
+                            Hatch(step: 4).stroke(line.opacity(Hatch.strength), lineWidth: 1)
+                                .clipShape(RoundedRectangle(cornerRadius: 2))
+                        }
+                    }
                     .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(
                         line, style: StrokeStyle(lineWidth: 1, dash: dashed ? [2, 2] : [])))
                 Text(text).font(.caption2)
             }
+        }
+    }
+
+    /// Diagonal lines across a block that cannot start: BLOCKED ON STOCK.
+    ///
+    /// ── WHY A PATTERN AND NOT A COLOUR ───────────────────────────────────
+    ///
+    /// Printing became amber (Nov 11 2026, B12) and a blocked block was
+    /// already a warm wash with a warm edge. In dark the two were 27 apart
+    /// (`#E0A73C` against `#F2A541`): the key said "Printing now" and
+    /// "Blocked on stock" beside two swatches nobody could tell apart, and a
+    /// machine waiting for filament read as a machine at work, which is the
+    /// one mistake this band exists to prevent. A second hue was not the
+    /// answer: every warm one is near the thread and red is for late. So a
+    /// blocked block has NO fill and is hatched: it reads as "not solid, not
+    /// happening" in either appearance and without colour vision at all.
+    struct Hatch: Shape {
+        /// The gap between lines, in points.
+        var step: CGFloat = 6
+        /// How strongly the lines are drawn over the pane.
+        static let strength = 0.45
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            guard step > 0, rect.width > 0, rect.height > 0 else { return path }
+            var x = rect.minX - rect.height
+            while x < rect.maxX {
+                path.move(to: CGPoint(x: x, y: rect.maxY))
+                path.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+                x += step
+            }
+            return path
         }
     }
 
@@ -311,12 +349,12 @@ struct MachineBandView: View {
                             .foregroundStyle(row.freeMinutes <= 0 ? Khayt.attention : Khayt.note)
                         if !compact {
                             Text(shop.words.callIt("mac.band_free_in", ["hours": .number(band.hours)]))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(Khayt.faint)
                         }
                     } else {
                         // The honest answer, and the reason the totals below are
                         // over fewer machines than the shop owns.
-                        Text("—").font(.title3.weight(.semibold)).foregroundStyle(.tertiary)
+                        Text("—").font(.title3.weight(.semibold)).foregroundStyle(Khayt.faint)
                         Text(shop.words.callIt(
                             shop.machineKinds[row.machineId]?.polled == false
                                 ? "mac.band_not_asked" : "mac.band_unknown"))
@@ -324,7 +362,7 @@ struct MachineBandView: View {
                             // Amber says "go and look". A machine Khayt simply
                             // cannot ask is not a problem, so it is not amber.
                             .foregroundStyle(shop.machineKinds[row.machineId]?.polled == false
-                                             ? AnyShapeStyle(.tertiary)
+                                             ? AnyShapeStyle(Khayt.faint)
                                              : AnyShapeStyle(Khayt.attention))
                             .multilineTextAlignment(.trailing)
                     }
@@ -338,7 +376,8 @@ struct MachineBandView: View {
         private var stateInk: Color {
             if !row.known { return Khayt.attention }
             switch row.state {
-            case "printing": return Khayt.hot
+            // Ink: "printing" is a word here, and amber is never a word.
+            case "printing": return .primary
             case "queued": return .secondary
             case "down": return Khayt.note
             default: return Khayt.note
@@ -390,7 +429,7 @@ struct MachineBandView: View {
                     // Now. Always at zero — the window starts at this moment —
                     // and drawn anyway, because a band with no now-line reads as
                     // a plan rather than as the next two days.
-                    Rectangle().fill(Khayt.hot).frame(width: 2, height: height + 8).offset(y: -4)
+                    Rectangle().fill(Khayt.thread).frame(width: 2, height: height + 8).offset(y: -4)
                 }
                 .frame(height: height)
             }
@@ -421,6 +460,12 @@ struct MachineBandView: View {
             .padding(.horizontal, width >= Self.labelledFrom ? 7 : 0)
             .padding(.vertical, compact ? 3 : 5)
             .background(fill, in: RoundedRectangle(cornerRadius: 3))
+            .background {
+                if block.kind == "blocked" {
+                    Hatch(step: 6).stroke(Khayt.attention.opacity(Hatch.strength), lineWidth: 1)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+            }
             .overlay(shape)
             .help(block.title + " · " + sub)
         }
@@ -456,14 +501,15 @@ struct MachineBandView: View {
 
         private var ink: Color {
             switch block.kind {
-            case "printing": return Khayt.hot
+            // The name of a printing job is ink on the thread's wash; the
+            // amber is the block's edge.
             case "blocked": return Khayt.attention
             default: return .primary
             }
         }
         private var line: Color {
             switch block.kind {
-            case "printing": return Khayt.hot
+            case "printing": return Khayt.thread
             case "blocked": return Khayt.attention
             // A MACHINE THE SHOP TOOK OUT OF SERVICE ON PURPOSE. Not warm —
             // nothing is happening — and not an alarm either: booking a belt
@@ -475,8 +521,9 @@ struct MachineBandView: View {
         }
         private var fill: Color {
             switch block.kind {
-            case "printing": return Khayt.hot.opacity(0.13)
-            case "blocked": return Khayt.attention.opacity(0.13)
+            case "printing": return Khayt.threadWash
+            // NO WASH. See `Hatch`: a warm wash here was the printing block.
+            case "blocked": return .clear
             case "down": return Khayt.note.opacity(0.10)
             default: return Khayt.recessed
             }

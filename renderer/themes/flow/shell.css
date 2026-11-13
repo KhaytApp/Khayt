@@ -253,10 +253,11 @@ body.khayt-flow .flow-chip {
   color: var(--text-dim);
   border: 1px solid var(--border-soft);
 }
-body.khayt-flow .flow-chip.late    { background: var(--danger-soft);  color: var(--danger);  border-color: transparent; }
-body.khayt-flow .flow-chip.soon    { background: var(--warn-soft);    color: var(--warn);    border-color: transparent; }
-body.khayt-flow .flow-chip.unpaid  { background: var(--warn-soft);    color: var(--warn);    border-color: transparent; }
-body.khayt-flow .flow-chip.ok      { background: var(--success-soft); color: var(--success); border-color: transparent; }
+/* Status chips read the shared status palette (styles.css --st-*). */
+body.khayt-flow .flow-chip.late    { background: var(--st-late-bg);   color: var(--st-late-ink);   border-color: transparent; }
+body.khayt-flow .flow-chip.soon    { background: var(--st-move-bg);   color: var(--st-move-ink);   border-color: transparent; }
+body.khayt-flow .flow-chip.unpaid  { background: var(--st-unpaid-bg); color: var(--st-unpaid-ink); border-color: transparent; }
+body.khayt-flow .flow-chip.ok      { background: var(--st-done-bg);   color: var(--st-done-ink);   border-color: transparent; }
 
 /* Drop target. Only the lane being hovered lights up, so there is never a
    question about where the card is about to land. */

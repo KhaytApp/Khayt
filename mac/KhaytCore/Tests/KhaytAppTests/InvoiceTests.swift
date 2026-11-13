@@ -257,10 +257,7 @@ struct InvoiceTests {
                 "a document carries no script of its own")
 
         let paper = InvoicePaper(document: doc)
-        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
-            try? await Task.sleep(nanoseconds: 100_000_000)
-        }
-        #expect(paper.drawn, "the document never finished laying out")
+        try await Self.waitUntilDrawn(paper)
 
         let text = (try await paper.webView
             .evaluateJavaScript("document.body.innerText") as? String) ?? ""
@@ -296,9 +293,7 @@ struct InvoiceTests {
         let doc = InvoiceDocument(html: "<span class=\"v\">575.00</span>",
                                   arabicNumerals: false, selector: ".v, .amount")
         let paper = InvoicePaper(document: doc)
-        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
-            try? await Task.sleep(nanoseconds: 100_000_000)
-        }
+        try await Self.waitUntilDrawn(paper)
         let text = (try await paper.webView
             .evaluateJavaScript("document.body.innerText") as? String) ?? ""
         #expect(text.contains("575"))
@@ -340,12 +335,10 @@ struct InvoiceTests {
         let paper = InvoicePaper(document: doc)
 
         // WebKit lays out on the run loop; the sheet's button waits for the
-        // same signal. Asking before it is drawn returns a blank page, which is
-        // the whole reason `drawn` exists.
-        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        #expect(paper.drawn, "WebKit never finished laying the document out")
+        // same signal. Asking before it is drawn is refused, because the
+        // answer would be a blank page: that is the whole reason `drawn`
+        // exists (`undrawnIsRefused`).
+        try await Self.waitUntilDrawn(paper)
 
         let data = try await paper.pdf()
         #expect(data.prefix(5) == Data("%PDF-".utf8), "a real PDF, not an error page")
@@ -357,6 +350,102 @@ struct InvoiceTests {
         if let dir = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] {
             try? data.write(to: URL(fileURLWithPath: dir).appending(path: "26-invoice.pdf"))
         }
+    }
+
+    /// Wait for WebKit to draw the paper, and stop the test there if it does
+    /// not.
+    ///
+    /// ── ONE WAIT, AND IT SAYS WHAT IT SAW ─────────────────────────────────
+    ///
+    /// Three tests each had their own copy of this loop, and each went on
+    /// after it whether or not the paper was drawn. So when a paper was still
+    /// not drawn after the whole guard (CI, Nov 2026: a 19-minute test, which
+    /// is six thousand turns of this loop on a starved main actor), the
+    /// failures that were reported were the ones that came next and meant
+    /// nothing: an 836-byte PDF, which is what WebKit prints for a page it
+    /// has not laid out, and "unsupported type" from reading the text of a
+    /// document that is not there.
+    ///
+    /// A hang guard (ten minutes of sleeping, more when the main actor is
+    /// busy), not a speed limit: the main actor is shared with every other
+    /// test. When it runs out the test stops here and says where the page
+    /// had got to, which is the only evidence there will be.
+    static func waitUntilDrawn(_ paper: InvoicePaper,
+                               sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        for _ in 0..<6_000 where !paper.drawn {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try #require(paper.drawn, Comment(rawValue:
+            "WebKit never finished laying the document out: \(paper.condition)"),
+            sourceLocation: sourceLocation)
+    }
+
+    @Test("a PDF asked for before the page is drawn is refused, not answered with a blank sheet")
+    func undrawnIsRefused() async throws {
+        let doc = try await Self.build(Self.paper())
+        let paper = InvoicePaper(document: doc)
+        // Straight away, with no wait: WebKit has not had a turn yet.
+        #expect(!paper.drawn)
+        await #expect(throws: InvoicePaper.Failure.self) { _ = try await paper.pdf() }
+        // And the same paper prints once it is drawn.
+        try await Self.waitUntilDrawn(paper)
+        #expect(try await paper.pdf().count > 8_000)
+    }
+
+    /// The process WebKit draws a page in, to end it on purpose. Zero when
+    /// this WebKit no longer says.
+    static func webProcess(_ paper: InvoicePaper) -> pid_t {
+        let asking = NSSelectorFromString("_webProcessIdentifier")
+        guard paper.webView.responds(to: asking) else { return 0 }
+        return (paper.webView.value(forKey: "_webProcessIdentifier") as? NSNumber)?.int32Value ?? 0
+    }
+
+    /// WebKit's process for a page can be ended by the system at any time.
+    /// The paper used to take no notice: see
+    /// `InvoicePaper.webViewWebContentProcessDidTerminate`.
+    @Test("a paper whose WebKit process ends is drawn again", arguments: [false, true])
+    func drawnAgainAfterItsProcessEnds(afterItWasDrawn: Bool) async throws {
+        let doc = try await Self.build(Self.paper())
+        let paper = InvoicePaper(document: doc)
+        if afterItWasDrawn { try await Self.waitUntilDrawn(paper) }
+
+        // The process is started a moment after the page is asked for.
+        var process = Self.webProcess(paper)
+        for _ in 0..<600 where process <= 1 {
+            try await Task.sleep(for: .milliseconds(10))
+            process = Self.webProcess(paper)
+        }
+        try #require(process > 1, "this WebKit does not say which process draws the page")
+        kill(process, SIGKILL)
+        for _ in 0..<6_000 where paper.processLosses == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(paper.processLosses == 1, "WebKit never said the process had gone: \(paper.condition)")
+
+        try await Self.waitUntilDrawn(paper)
+        let data = try await paper.pdf()
+        #expect(data.count > 8_000, "the page drawn again has the document in it (\(data.count) bytes)")
+    }
+
+    /// A print waits on WebKit's process. Without the process the print
+    /// operation never reports back, so the wait has to be ended for it.
+    @Test("a print whose WebKit process ends under it fails instead of waiting for ever")
+    func aPrintIsNotLeftWaiting() async throws {
+        let doc = try await Self.build(Self.paper())
+        let paper = InvoicePaper(document: doc)
+        try await Self.waitUntilDrawn(paper)
+        let process = Self.webProcess(paper)
+        try #require(process > 1, "this WebKit does not say which process draws the page")
+
+        // Stopped, so the print is certainly still waiting when it ends.
+        kill(process, SIGSTOP)
+        async let printed: Data? = try? await paper.pdf()
+        try await Task.sleep(for: .milliseconds(300))
+        kill(process, SIGKILL)
+        #expect(await printed == nil, "a print of a page whose process had gone came back with a file")
+
+        try await Self.waitUntilDrawn(paper)
+        #expect(try await paper.pdf().count > 8_000, "and the paper prints once it is drawn again")
     }
 
     // MARK: - keeping it
