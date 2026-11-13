@@ -12,4 +12,4 @@ export { CapsLabel, type CapsLabelProps } from './components/CapsLabel';
 export { StagePill, type StagePillProps, STAGES, STAGE_LABEL, STAGE_TONE, type Stage } from './components/Stage';
 export { BoardColumn, type BoardColumnProps, JobCard, type JobCardProps } from './components/Board';
 export { Theme, type ThemeProps, Stat, type StatProps, SidebarRow, type SidebarRowProps, EmptyState, type EmptyStateProps } from './components/Shell';
-export { TONES, TONE_VAR, type Tone } from './tone';
+export { TONES, TONE_VAR, toneInk, type Tone } from './tone';

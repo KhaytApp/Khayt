@@ -207,10 +207,12 @@ struct EditJobSheet: View {
         let nowNonBusiness = nonBusiness
         // Closes when the edit is in the book, not before: see PaymentSheet.
         shop.moveProblem = nil
+        // Only when it changed: an edit that did not touch it writes nothing.
+        let mark: Bool? = nowNonBusiness != wasNonBusiness ? nowNonBusiness : nil
         Task {
-            if !fields.isEmpty { await shop.editJob(id, fields: fields) }
-            // Only when it changed: an edit that did not touch it writes nothing.
-            if shop.moveProblem == nil, nowNonBusiness != wasNonBusiness { await shop.setNonBusiness(id, nowNonBusiness) }
+            // ONE write for the fields and the Not business box. They were two,
+            // and a quit between them kept the first and dropped the second.
+            if !fields.isEmpty || mark != nil { await shop.editJob(id, fields: fields, nonBusiness: mark) }
             if shop.moveProblem == nil { shop.clearQuestion() }
         }
     }

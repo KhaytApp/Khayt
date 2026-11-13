@@ -1,0 +1,776 @@
+{
+ "top-none": {
+  "opts": {
+   "name": "top-none",
+   "folder": ""
+  },
+  "answer": {
+   "total": 2,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Gifts",
+     "name": "Gifts",
+     "count": 3
+    },
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 3
+    },
+    {
+     "path": "Parts",
+     "name": "Parts",
+     "count": 4
+    }
+   ],
+   "matchedTotal": 12,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 5,
+     "stl": 2,
+     "step": 1,
+     "obj": 1,
+     "gcode": 1,
+     "other": 1,
+     "nofile": 1
+    }
+   },
+   "items": [
+    {
+     "id": "m8",
+     "name": "Grey vase",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null,
+     "colors": [
+      {
+       "hex": "#8C9196"
+      }
+     ]
+    },
+    {
+     "id": "m7",
+     "name": "Web idea",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    }
+   ]
+  }
+ },
+ "top-red": {
+  "opts": {
+   "name": "top-red",
+   "folder": "",
+   "colour": "red"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 2
+    }
+   ],
+   "matchedTotal": 2,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 2,
+     "stl": 0,
+     "step": 0,
+     "obj": 0,
+     "gcode": 0,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": []
+  }
+ },
+ "top-green": {
+  "opts": {
+   "name": "top-green",
+   "folder": "",
+   "colour": "green"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 1
+    }
+   ],
+   "matchedTotal": 1,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 1,
+     "stl": 0,
+     "step": 0,
+     "obj": 0,
+     "gcode": 0,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": []
+  }
+ },
+ "top-multi": {
+  "opts": {
+   "name": "top-multi",
+   "folder": "",
+   "colour": "multi"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 1
+    },
+    {
+     "path": "Parts",
+     "name": "Parts",
+     "count": 1
+    }
+   ],
+   "matchedTotal": 2,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 1,
+     "stl": 0,
+     "step": 0,
+     "obj": 0,
+     "gcode": 1,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": []
+  }
+ },
+ "top-none-colour": {
+  "opts": {
+   "name": "top-none-colour",
+   "folder": "",
+   "colour": "none"
+  },
+  "answer": {
+   "total": 1,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Parts",
+     "name": "Parts",
+     "count": 2
+    }
+   ],
+   "matchedTotal": 3,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 0,
+     "stl": 2,
+     "step": 0,
+     "obj": 0,
+     "gcode": 0,
+     "other": 0,
+     "nofile": 1
+    }
+   },
+   "items": [
+    {
+     "id": "m7",
+     "name": "Web idea",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    }
+   ]
+  }
+ },
+ "top-3mf": {
+  "opts": {
+   "name": "top-3mf",
+   "folder": "",
+   "type": "3mf"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Gifts",
+     "name": "Gifts",
+     "count": 2
+    },
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 3
+    }
+   ],
+   "matchedTotal": 5,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 0,
+     "purple": 0,
+     "pink": 0,
+     "brown": 1,
+     "black": 0,
+     "grey": 0,
+     "white": 1,
+     "multi": 1,
+     "none": 0
+    },
+    "type": {
+     "3mf": 5,
+     "stl": 2,
+     "step": 1,
+     "obj": 1,
+     "gcode": 1,
+     "other": 1,
+     "nofile": 1
+    }
+   },
+   "items": []
+  }
+ },
+ "top-red-3mf": {
+  "opts": {
+   "name": "top-red-3mf",
+   "folder": "",
+   "colour": "red,black",
+   "type": "3mf,gcode"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 2
+    },
+    {
+     "path": "Parts",
+     "name": "Parts",
+     "count": 1
+    }
+   ],
+   "matchedTotal": 3,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 0,
+     "brown": 1,
+     "black": 1,
+     "grey": 0,
+     "white": 1,
+     "multi": 2,
+     "none": 0
+    },
+    "type": {
+     "3mf": 2,
+     "stl": 0,
+     "step": 1,
+     "obj": 0,
+     "gcode": 1,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": []
+  }
+ },
+ "home-green": {
+  "opts": {
+   "name": "home-green",
+   "folder": "Home",
+   "colour": "green"
+  },
+  "answer": {
+   "total": 0,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Home/Lighting",
+     "name": "Lighting",
+     "count": 1
+    }
+   ],
+   "matchedTotal": 1,
+   "unfilteredTotal": 3,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 0,
+     "green": 1,
+     "blue": 0,
+     "purple": 0,
+     "pink": 0,
+     "brown": 0,
+     "black": 0,
+     "grey": 0,
+     "white": 1,
+     "multi": 1,
+     "none": 0
+    },
+    "type": {
+     "3mf": 1,
+     "stl": 0,
+     "step": 0,
+     "obj": 0,
+     "gcode": 0,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": []
+  }
+ },
+ "parts-stl": {
+  "opts": {
+   "name": "parts-stl",
+   "folder": "Parts",
+   "type": "stl"
+  },
+  "answer": {
+   "total": 2,
+   "offset": 0,
+   "folders": [],
+   "matchedTotal": 2,
+   "unfilteredTotal": 4,
+   "facets": {
+    "colour": {
+     "red": 0,
+     "orange": 0,
+     "yellow": 0,
+     "green": 0,
+     "blue": 0,
+     "purple": 0,
+     "pink": 0,
+     "brown": 0,
+     "black": 0,
+     "grey": 0,
+     "white": 0,
+     "multi": 0,
+     "none": 2
+    },
+    "type": {
+     "3mf": 0,
+     "stl": 2,
+     "step": 1,
+     "obj": 0,
+     "gcode": 1,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": [
+    {
+     "id": "m4",
+     "name": "Bracket",
+     "folder": "Parts",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    },
+    {
+     "id": "m9",
+     "name": "Zip member",
+     "folder": "Parts",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    }
+   ]
+  }
+ },
+ "parts-black": {
+  "opts": {
+   "name": "parts-black",
+   "folder": "Parts",
+   "colour": "black"
+  },
+  "answer": {
+   "total": 1,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Parts/Jobs",
+     "name": "Jobs",
+     "count": 1
+    }
+   ],
+   "matchedTotal": 2,
+   "unfilteredTotal": 4,
+   "facets": {
+    "colour": {
+     "red": 0,
+     "orange": 0,
+     "yellow": 0,
+     "green": 0,
+     "blue": 1,
+     "purple": 0,
+     "pink": 0,
+     "brown": 0,
+     "black": 2,
+     "grey": 0,
+     "white": 0,
+     "multi": 1,
+     "none": 2
+    },
+    "type": {
+     "3mf": 0,
+     "stl": 0,
+     "step": 1,
+     "obj": 0,
+     "gcode": 1,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": [
+    {
+     "id": "m5",
+     "name": "Gear",
+     "folder": "Parts",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null,
+     "colors": [
+      {
+       "hex": "#111111"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "search-red": {
+  "opts": {
+   "name": "search-red",
+   "q": "red",
+   "colour": "red"
+  },
+  "answer": {
+   "total": 2,
+   "offset": 0,
+   "folders": [],
+   "matchedTotal": 2,
+   "unfilteredTotal": 2,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 0,
+     "green": 0,
+     "blue": 0,
+     "purple": 0,
+     "pink": 0,
+     "brown": 0,
+     "black": 0,
+     "grey": 0,
+     "white": 1,
+     "multi": 1,
+     "none": 0
+    },
+    "type": {
+     "3mf": 2,
+     "stl": 0,
+     "step": 0,
+     "obj": 0,
+     "gcode": 0,
+     "other": 0,
+     "nofile": 0
+    }
+   },
+   "items": [
+    {
+     "id": "m1",
+     "name": "Red cup",
+     "folder": "Home",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null,
+     "colors": [
+      {
+       "hex": "#D93B3B"
+      }
+     ]
+    },
+    {
+     "id": "m2",
+     "name": "Red-white flag",
+     "folder": "Home",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null,
+     "colors": [
+      {
+       "hex": "#D93B3B"
+      },
+      {
+       "hex": "#FFFFFF"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "nofile": {
+  "opts": {
+   "name": "nofile",
+   "folder": "",
+   "type": "nofile"
+  },
+  "answer": {
+   "total": 1,
+   "offset": 0,
+   "folders": [],
+   "matchedTotal": 1,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 0,
+     "orange": 0,
+     "yellow": 0,
+     "green": 0,
+     "blue": 0,
+     "purple": 0,
+     "pink": 0,
+     "brown": 0,
+     "black": 0,
+     "grey": 0,
+     "white": 0,
+     "multi": 0,
+     "none": 1
+    },
+    "type": {
+     "3mf": 5,
+     "stl": 2,
+     "step": 1,
+     "obj": 1,
+     "gcode": 1,
+     "other": 1,
+     "nofile": 1
+    }
+   },
+   "items": [
+    {
+     "id": "m7",
+     "name": "Web idea",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    }
+   ]
+  }
+ },
+ "unknown-keys": {
+  "opts": {
+   "name": "unknown-keys",
+   "folder": "",
+   "colour": "teal",
+   "type": "dwg"
+  },
+  "answer": {
+   "total": 2,
+   "offset": 0,
+   "folders": [
+    {
+     "path": "Gifts",
+     "name": "Gifts",
+     "count": 3
+    },
+    {
+     "path": "Home",
+     "name": "Home",
+     "count": 3
+    },
+    {
+     "path": "Parts",
+     "name": "Parts",
+     "count": 4
+    }
+   ],
+   "matchedTotal": 12,
+   "unfilteredTotal": 12,
+   "facets": {
+    "colour": {
+     "red": 2,
+     "orange": 0,
+     "yellow": 1,
+     "green": 1,
+     "blue": 1,
+     "purple": 0,
+     "pink": 1,
+     "brown": 1,
+     "black": 2,
+     "grey": 1,
+     "white": 1,
+     "multi": 2,
+     "none": 3
+    },
+    "type": {
+     "3mf": 5,
+     "stl": 2,
+     "step": 1,
+     "obj": 1,
+     "gcode": 1,
+     "other": 1,
+     "nofile": 1
+    }
+   },
+   "items": [
+    {
+     "id": "m8",
+     "name": "Grey vase",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null,
+     "colors": [
+      {
+       "hex": "#8C9196"
+      }
+     ]
+    },
+    {
+     "id": "m7",
+     "name": "Web idea",
+     "folder": "",
+     "favorite": false,
+     "thumb": false,
+     "estimable": false,
+     "printTimeMins": null,
+     "grams": null
+    }
+   ]
+  }
+ }
+}

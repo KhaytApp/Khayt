@@ -28,6 +28,9 @@ struct DashboardView: View {
     @State private var lane: String = "all"
     @State private var updatingId: String?
     @State private var moveNotes: [String] = []
+    /// Why the queue could not be read, when it could not: Home said "Queue
+    /// clear" for a failed read (F3). Nil once a read succeeds.
+    @State private var queueError: String?
     @State private var showAddSpool = false
     @State private var showQuote = false
     @State private var showLibrary = false
@@ -89,7 +92,7 @@ struct DashboardView: View {
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showSettings) { SettingsView(showsClose: true) }
             .sheet(isPresented: $showNew, onDismiss: openNewChoice) {
                 NewSheet(holdsBook: api.holdsBook) { newChoice = $0 }
             }
@@ -476,7 +479,9 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var jobs: some View {
-        if laneJobs.isEmpty {
+        if laneJobs.isEmpty, let queueError {
+            LoadFailedView(message: queueError) { await load() }
+        } else if laneJobs.isEmpty {
             VStack(spacing: 5) {
                 Text(L10n.tr("orders.queue_clear")).font(.khayt(15, .semibold, relativeTo: .headline)).foregroundStyle(KhaytDesign.ink)
                 Text(L10n.tr("orders.queue_clear.sub")).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
@@ -519,13 +524,22 @@ struct DashboardView: View {
 
     private func load() async {
         async let statusTask = try? api.fetchStatus()
-        async let queueTask = try? api.fetchQueue()
+        async let queueTask: Result<[QueueOrder], Error> = {
+            do { return .success(try await api.fetchQueue()) } catch { return .failure(error) }
+        }()
         async let inventoryTask = try? api.fetchInventory()
         async let waitingTask = try? api.fetchWaitingList()
         async let pulseTask = api.fetchPulse()
         async let factsTask = api.fetchOrderFacts()
         status = await statusTask
-        queue = await queueTask ?? []
+        switch await queueTask {
+        case .success(let jobs):
+            queue = jobs
+            queueError = nil
+        case .failure(let error):
+            // Keep what was last shown; say why it is not fresh.
+            queueError = error.localizedDescription
+        }
         lowSpools = (await inventoryTask ?? []).filter(\.isLowStock)
         waiting = await waitingTask ?? []
         pulse = await pulseTask
@@ -574,6 +588,8 @@ struct DashboardView: View {
             CompanionHaptics.success()
             await load()
         } catch {
+            // A failed move used to be a haptic and nothing else (F4).
+            moveNotes = [error.localizedDescription]
             CompanionHaptics.warning()
         }
     }

@@ -1507,19 +1507,11 @@ async function publishOrderToCloudPortal(orderId) {
         if (!lst.ok) { resp.textContent = '✗ ' + (lst.error || 'failed'); resp.style.color = 'var(--danger)'; return; }
         // The same function the automatic look runs (portal-watch.js).
         const said = applyPortalResponse(order, lst.items, pubToken, { quiet: false });
-        const paid = said.paid;
-        const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
-        if (said.response === 'none') {
-          resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
-          resp.style.color = paid ? 'var(--success)' : 'var(--text-muted)';
-          return;
-        }
-        const approved = said.response === 'approved';
-        resp.textContent = (approved ? '✓ ' : '✗ ') + (approved ? (t('cloud.portal_approved') || 'Customer approved the quote') : (t('cloud.portal_declined') || 'Customer declined the quote')) + paidNote;
-        resp.style.color = approved ? 'var(--success)' : 'var(--danger)';
-        if (said.advanced) {
-          resp.textContent = '✓ ' + (t('cloud.portal_approved_advanced') || 'Customer approved — order moved to Pending') + paidNote;
-        }
+        // `lib/portal-owner.js responseLine` words it, the same on every app.
+        const line = KhaytPortalOwner.responseLine(said);
+        const paidNote = line.paidNote ? ('  💰 ' + t('cloud.portal_deposit_paid')) : '';
+        resp.textContent = (line.mark ? line.mark + ' ' : '') + t(line.key) + paidNote;
+        resp.style.color = { live: 'var(--success)', late: 'var(--danger)', wait: 'var(--st-wait-ink, var(--text-muted))', muted: 'var(--text-muted)' }[line.tone];
       });
       modal.querySelector('#cpUnpub')?.addEventListener('click', async () => {
         const u = await window.hubAPI.cloudUnpublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken });

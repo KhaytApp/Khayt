@@ -243,9 +243,7 @@ struct CampaignSheet: View {
     /// `!= null`, so a zero means "spent at least nothing", which is everybody
     /// — a different list from the one the shop meant.
     private static func number(_ typed: String) -> Double? {
-        let cleaned = typed.replacingOccurrences(of: ",", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        return cleaned.isEmpty ? nil : Double(cleaned)
+        TypedNumber.parse(typed)
     }
 
     private func refresh() async {
