@@ -265,6 +265,11 @@ extension Shop {
         guard let dek = await CloudKeyMemory.recall(shopId: shopId, fingerprint: print),
               cloudDek == nil else { return }
         cloudDek = dek
+        // What was changed while the cloud was locked goes up now. It used to
+        // wait for the next edit, hours later sometimes, and the phone heard
+        // about the change only then (push review M3).
+        bookChanged()
+        flushPendingEvents(force: true)
     }
 
     /// Lock the cloud again: drop the data key and stop syncing until somebody
@@ -536,8 +541,11 @@ extension Shop {
             cloudLockedByShop = false
             await keepCloudKey(dek, keyset: keyset, shopId: connection.shopId)
             // Unlocked. From here on this app pushes on its own, and the first
-            // push carries whatever was changed while it was locked.
+            // push carries whatever was changed while it was locked — sent
+            // now rather than at the next edit (push review M3).
             if case .locked = syncStatus { syncStatus = .idle }
+            bookChanged()
+            flushPendingEvents(force: true)
             let folded = try await CloudReader.store(reply, dek: dek, engine: engine)
 
             // Read from disk rather than from what this app is holding: the

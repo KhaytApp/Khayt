@@ -471,6 +471,8 @@ function renderExpenses() {
     `;
   }
   renderExpenseBudgets();
+  // Simple's short list (SIMPLE_MAP expenses) beside the tracker.
+  if (typeof renderSimpleExpenses === 'function') renderSimpleExpenses();
 }
 
 function renderExpenseBudgets() {

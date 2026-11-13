@@ -1,6 +1,7 @@
 import Combine
 import CryptoKit
 import Foundation
+import os
 import KhaytCore
 
 @MainActor
@@ -146,6 +147,28 @@ final class KhaytAPIClient: ObservableObject {
     func refreshHoldsBook() {
         let now = holdsBookOnDisk
         if holdsBook != now { holdsBook = now }
+        refreshShopMode()
+    }
+
+    /// Simple or Professional, as the book on this phone says (`ShopMode`).
+    /// Published, so a screen redraws when the Mac's settings change the mode.
+    /// Professional with no book.
+    @Published private(set) var shopMode: ShopMode = .professional
+    private var shopModeTask: Task<Void, Never>?
+
+    /// Read the mode again. Called with `refreshHoldsBook()`, which every path
+    /// that makes, replaces or deletes the book (and every refresh round) calls.
+    func refreshShopMode() {
+        shopModeTask?.cancel()
+        guard let reader else {
+            if shopMode != .professional { shopMode = .professional }
+            return
+        }
+        shopModeTask = Task { [weak self] in
+            let next = await reader.shopMode()
+            guard !Task.isCancelled, let self else { return }
+            if self.shopMode != next { self.shopMode = next }
+        }
     }
 
     /// Whether the book on this phone holds ALL of a collection, so a total
@@ -190,6 +213,7 @@ final class KhaytAPIClient: ObservableObject {
         self.reader = opened.map(BookReader.init(book:))
         _holdsBook = Published(initialValue: opened?.exists ?? false)
         gateEdits()
+        refreshShopMode()
         // Pairing a Mac (or letting it go) changes whether edits have
         // somewhere to go. `objectWillChange` fires before the change lands.
         settingsWatch = settings.objectWillChange.sink { [weak self] _ in
@@ -336,7 +360,7 @@ final class KhaytAPIClient: ObservableObject {
     /// pulled one, with nothing to pull it from and nowhere to send to.
     func openSampleShop(now: Date = Date()) throws {
         guard let book else { throw KhaytAPIError.notConfigured }
-        let store = SampleShop.book(now: now)
+        let store = SampleShop.book(now: now, mode: SampleShop.debugMode())
         try book.replace(with: store, scope: SampleShop.scope(now: now))
         try book.replaceBaseline(with: store)
         try book.replaceLibrary(SampleShop.library())
@@ -746,8 +770,19 @@ final class KhaytAPIClient: ObservableObject {
 
     // MARK: - Push (APNs), relayed by Khayt Cloud
 
-    /// This phone's APNs device token, once iOS has handed it over.
-    private var pushToken: Data?
+    /// This phone's APNs device token, once iOS has handed it over — kept on
+    /// disk too, so a sign-out right after launch (before iOS hands it over
+    /// again) still withdraws it from the cloud.
+    private var pushToken: Data? = PushRegistration.savedToken() {
+        didSet { PushRegistration.save(token: pushToken) }
+    }
+
+    /// Why this phone's alerts may not be reaching it, in a sentence, or nil.
+    /// Shown as a quiet row in Settings; never a pop-up (push review, Nov 13).
+    @Published private(set) var pushProblem: String?
+    /// When the cloud last accepted this phone's token, for which shop and
+    /// token — so a foreground re-register can be skipped while it is fresh.
+    private var pushRegistered: (shopId: String, token: Data, at: Date)?
 
     /// "sandbox" for a build run from Xcode, "production" for TestFlight and
     /// the App Store — the APNs environment the token belongs to.
@@ -765,12 +800,32 @@ final class KhaytAPIClient: ObservableObject {
         await registerForPush()
     }
 
+    /// iOS could not give this phone a token at all.
+    func pushTokenFailed(_ error: Error) {
+        PushRegistration.log.error("APNs registration failed: \(String(describing: error), privacy: .public)")
+        // The simulator and builds without Push have no token, and that is
+        // not news to anyone; only a signed-in phone is told.
+        if cloud != nil { pushProblem = L10n.tr("push.not_connected") }
+    }
+
+    /// Hand the token to the cloud again unless it was accepted for this shop
+    /// within `PushRegistration.fresh` — on every opening, and at once
+    /// (`force`) when the person changes what the phone may alert them with.
+    /// A token registered late is alerts lost: on Nov 13 a phone signed in at
+    /// 11:20 registered only at 12:05, and two print endings reached nobody.
+    func refreshPushRegistration(force: Bool = false, now: Date = Date()) async {
+        guard let session = cloud, let token = pushToken else { return }
+        if !force, let r = pushRegistered, r.shopId == session.shopId, r.token == token,
+           now.timeIntervalSince(r.at) < PushRegistration.fresh { return }
+        await registerForPush(now: now)
+    }
+
     /// `POST /v1/shops/{id}/push/apns` (khayt-cloud "Push: APNs"). Owner,
     /// manager and operator; a viewer has nothing to be alerted about and is
     /// not registered. Registering again is harmless — it makes the token the
     /// newest — so it is done on every launch and after every sign-in: a
     /// sign-out drops the registrations made with that sign-in.
-    func registerForPush() async {
+    func registerForPush(now: Date = Date()) async {
         guard let session = cloud, session.canWrite, let token = pushToken else { return }
         let hex = token.map { String(format: "%02x", $0) }.joined()
         guard var request = try? CloudReader.request(
@@ -780,18 +835,54 @@ final class KhaytAPIClient: ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
             "token": hex, "bundleId": Bundle.main.bundleIdentifier ?? "com.khaytapp.companion",
             "env": Self.pushEnvironment])
-        _ = try? await URLSession.shared.data(for: request)
+        // Said, not swallowed: an answer that is not 2xx used to be dropped
+        // silently, and the phone looked set up while nothing reached it.
+        do {
+            let (_, response) = try await pushSession.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw PushRegistration.Refused(status: code) }
+            guard cloud?.shopId == session.shopId else { return }
+            pushRegistered = (session.shopId, token, now)
+            pushProblem = nil
+        } catch {
+            PushRegistration.log.error("push register refused: \(String(describing: error), privacy: .public)")
+            guard cloud?.shopId == session.shopId else { return }
+            pushRegistered = nil
+            pushProblem = L10n.tr("push.not_connected")
+        }
     }
+
+    /// True while the cloud holds this phone's token for the signed-in shop,
+    /// so Apple will deliver its alerts.
+    var receivesPush: Bool { pushRegistered != nil && pushRegistered?.shopId == cloud?.shopId }
+
+    /// The session push registration goes through — a test sets its own.
+    var pushSession: URLSession = .shared
+
+    /// A shop to count for: a Mac paired or a cloud sign-in.
+    var hasShop: Bool { settings.isPaired || cloud != nil }
+
+    #if DEBUG
+    /// Tests: sign in without the network.
+    func setCloudForTesting(_ session: CloudSession?) { cloud = session }
+    #endif
 
     /// Stop the shop's alerts reaching this phone — before signing out, while
     /// the credential that registered it still works.
-    private func unregisterForPush(_ session: CloudSession) async {
+    func unregisterForPush(_ session: CloudSession) async {
+        if pushRegistered?.shopId == session.shopId { pushRegistered = nil }
         guard let token = pushToken else { return }
         let hex = token.map { String(format: "%02x", $0) }.joined()
         guard let request = try? CloudReader.request(
             CloudReader.Connection(url: session.url, shopId: session.shopId, storedToken: ""),
             token: session.token, method: "DELETE", tail: "/push/apns/" + hex) else { return }
-        _ = try? await URLSession.shared.data(for: request)
+        do {
+            let (_, response) = try await pushSession.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if !(200..<300).contains(code) && code != 404 { throw PushRegistration.Refused(status: code) }
+        } catch {
+            PushRegistration.log.error("push unregister failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     /// The live stream was refused as signed out — the same answer a sync
@@ -824,6 +915,18 @@ final class KhaytAPIClient: ObservableObject {
         let engine = try await reader.sharedEngine()
         let session = try await CloudSync.signIn(url: url, email: email, password: password,
                                                  passphrase: passphrase, engine: engine)
+        // Signing in again — to another shop, or as someone else — withdraws
+        // this phone from the old sign-in FIRST, while its credential still
+        // works: otherwise the old shop kept alerting a phone that had moved
+        // on, and a tap opened a job of the wrong shop (push review P2).
+        if let old = cloud, old.shopId != session.shopId || old.token != session.token {
+            await unregisterForPush(old)
+            if old.shopId != session.shopId {
+                await liveActivityPush?.forgetShop(session: old)
+                // The old shop's count is not this shop's.
+                await ShopBadge.shared.clear()
+            }
+        }
         session.save()
         cloud = session
         cloudNeedsSignIn = false
@@ -875,6 +978,8 @@ final class KhaytAPIClient: ObservableObject {
 
     func signOutOfCloud() {
         if let session = cloud { Task { await unregisterForPush(session) } }
+        pushProblem = nil
+        Task { await ShopBadge.shared.clear() }
         CloudSession.forget()
         cloud = nil
         cloudProblem = nil
@@ -1485,17 +1590,21 @@ final class KhaytAPIClient: ObservableObject {
     /// One page of the library (`GET /api/library`). The library stays on the
     /// Mac — ten thousand models in a real shop — so searching and paging
     /// happen there.
-    func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50) async throws -> LibraryPage {
-        if settings.isSampleShop { return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit) }
+    func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50,
+                      filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
+        if settings.isSampleShop {
+            return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
+        }
         do {
-            return try await libraryFromMac(query: query, folder: folder, offset: offset, limit: limit)
+            return try await libraryFromMac(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
         } catch {
             // Away from the shop: the copy that came with the cloud sync.
             guard Self.isUnreachable(error) || isMissingRoute(error) else { throw error }
             guard let rows = book?.library() else {
                 throw Self.isUnreachable(error) ? KhaytAPIError.server(L10n.tr("library.no_copy")) : error
             }
-            var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset, limit: limit)
+            var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset,
+                                          limit: limit, filter: filter)
             page.fromCopy = true
             // The pictures the Mac already sent, kept on the phone.
             let kept = await thumbShelf.kept(page.items.map(\.id))
@@ -1513,12 +1622,13 @@ final class KhaytAPIClient: ObservableObject {
         return false
     }
 
-    private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
+    private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int,
+                                filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
         if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60, book?.hasLibrary == true {
             throw KhaytAPIError.transport(URLError(.cannotConnectToHost))
         }
         do {
-            let page = try await libraryPage(query: query, folder: folder, offset: offset, limit: limit)
+            let page = try await libraryPage(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
             libraryMacDownSince = nil
             return page
         } catch {
@@ -1527,10 +1637,10 @@ final class KhaytAPIClient: ObservableObject {
         }
     }
 
-    private func libraryPage(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
+    private func libraryPage(query: String, folder: String, offset: Int, limit: Int,
+                             filter: LibraryFilter = LibraryFilter()) async throws -> LibraryPage {
         var q = URLComponents()
-        q.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "folder", value: folder),
-                        URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "limit", value: String(limit))]
+        q.queryItems = LibraryFilter.queryItems(query: query, folder: folder, offset: offset, limit: limit, filter: filter)
         let (data, response) = try await request(path: "/api/library?" + (q.percentEncodedQuery ?? ""),
                                                  method: "GET", body: nil, requiresPin: true)
         guard let http = response as? HTTPURLResponse else { throw KhaytAPIError.transport(URLError(.badServerResponse)) }
@@ -2318,4 +2428,26 @@ extension ISO8601DateFormatter {
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
+}
+
+/// Where this phone's APNs token is kept between launches, and how long a
+/// registration counts as fresh.
+enum PushRegistration {
+    static let log = Logger(subsystem: "com.khaytapp.companion", category: "push")
+    static let tokenKey = "khayt.push.token"
+    /// Opening the app re-registers no more often than this.
+    static let fresh: TimeInterval = 10 * 60
+
+    struct Refused: Error, CustomStringConvertible {
+        let status: Int
+        var description: String { "HTTP \(status)" }
+    }
+
+    static func savedToken(_ defaults: UserDefaults = .standard) -> Data? {
+        defaults.data(forKey: tokenKey)
+    }
+
+    static func save(token: Data?, _ defaults: UserDefaults = .standard) {
+        if let token { defaults.set(token, forKey: tokenKey) } else { defaults.removeObject(forKey: tokenKey) }
+    }
 }

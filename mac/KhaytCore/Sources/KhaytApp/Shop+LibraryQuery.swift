@@ -41,6 +41,8 @@ extension Shop {
             case nil: break
             }
             q.tag = libraryTag
+            q.colours = Array(libraryColours)
+            q.fileTypes = Array(libraryFileTypes)
             q.ranges = libraryRanges
             q.sort = librarySort.rawValue
             return q
@@ -65,6 +67,8 @@ extension Shop {
             let category: FilterChoice? = q.category.map { .named($0) } ?? (q.uncategorised ? .unfiled : nil)
             if libraryCategory != category { libraryCategory = category }
             if libraryTag != q.tag { libraryTag = q.tag }
+            if libraryColours != Set(q.colours) { libraryColours = Set(q.colours) }
+            if libraryFileTypes != Set(q.fileTypes) { libraryFileTypes = Set(q.fileTypes) }
             if libraryRanges != q.ranges { libraryRanges = q.ranges }
             // Nil keeps the order on screen; a name this build does not know
             // keeps it too, rather than jumping to some other order.
@@ -131,6 +135,9 @@ extension Shop {
         let category: FilterChoice? = q.category.map { .named($0) } ?? (q.uncategorised ? .unfiled : nil)
         let tag = q.tag?.lowercased()
         let creator = q.creator?.lowercased()
+        // Several rows of one menu are OR: under ANY of the chosen ones.
+        let colours: Set<String>? = q.colours.isEmpty ? nil : Set(q.colours)
+        let fileTypes: Set<String>? = q.fileTypes.isEmpty ? nil : Set(q.fileTypes)
         return { [self] f in
             // Never left out: the frame every count is made inside.
             if let focus, !focus.contains(f.id) { return nil }
@@ -157,6 +164,10 @@ extension Shop {
             if let sells, !sells.contains(f.id) { missed |= LibraryAxis.inCatalogue.bit }
             if noFigures, !libraryHasNoFigures(f) { missed |= LibraryAxis.noFigures.bit }
             if fromWeb, !f.isFromWeb { missed |= LibraryAxis.fromWeb.bit }
+            if let colours, !libraryColourTokens(f).contains(where: colours.contains) {
+                missed |= LibraryAxis.colour.bit
+            }
+            if let fileTypes, !fileTypes.contains(f.fileType.rawValue) { missed |= LibraryAxis.fileType.bit }
             // Two axes failed: out of every pool, so the range (the dearest
             // test, the tile facts) need not be asked.
             if missed & (missed &- 1) != 0 { return missed }
@@ -175,6 +186,21 @@ extension Shop {
         return LibraryQuery.Figures(minutes: facts.minutes, grams: facts.grams, price: facts.price,
                                     timesPrinted: file.printCount,
                                     addedDay: file.createdAt?.date.map { Calendar.book.dayString($0) })
+    }
+
+    /// A model's Colour filter rows (`LibraryFile.colourTokens`), kept per
+    /// model until the library moves: the recount asks every model, and a
+    /// multicolour one parses each of its hex values to answer.
+    func libraryColourTokens(_ file: LibraryFile) -> [String] {
+        let memo = libraryMemo
+        if memo.colourTokensRevision != filesRevision {
+            memo.colourTokensRevision = filesRevision
+            memo.colourTokens = [:]
+        }
+        if let known = memo.colourTokens[file.id] { return known }
+        let made = file.colourTokens
+        memo.colourTokens[file.id] = made
+        return made
     }
 
     /// Nothing to price a print from: no print time and no weight, measured
@@ -440,6 +466,8 @@ extension Shop.LibraryAxis {
         case .inCatalogue: 1 << 11
         case .fromWeb: 1 << 12
         case .fits: 1 << 13
+        case .colour: 1 << 14
+        case .fileType: 1 << 15
         }
     }
 

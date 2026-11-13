@@ -175,7 +175,7 @@ struct SettingsView: View {
         Text(L10n.format("settings.version", DiagnosticsSheet.version, DiagnosticsSheet.build))
             .font(.khayt(11.5, relativeTo: .caption2))
             .foregroundStyle(KhaytDesign.note)
-            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 2).padding(.top, 12)
             .contentShape(Rectangle())
             .onLongPressGesture { showDiagnostics = true }
@@ -453,6 +453,7 @@ struct SettingsAppearancePage: View {
 
 struct SettingsNotificationsPage: View {
     @EnvironmentObject private var settings: ConnectionSettings
+    @EnvironmentObject private var api: KhaytAPIClient
 
     var body: some View {
         SettingsPage {
@@ -469,6 +470,16 @@ struct SettingsNotificationsPage: View {
                     SettingsPieces.row(L10n.tr("settings.notifications.allow"), last: true) { SettingsPieces.chevron }
                 }
                 .buttonStyle(.plain)
+                // Quiet, never a pop-up: the cloud refused this phone's token or
+                // iOS gave none. Gone once a registration is accepted.
+                if let problem = api.pushProblem {
+                    Label(problem, systemImage: "bell.slash")
+                        .font(.khayt(13, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16).padding(.vertical, 12)
+                        .accessibilityIdentifier("settings.push_problem")
+                }
             }
             .card()
             .padding(.top, 12)
@@ -539,13 +550,19 @@ struct SettingsShopPage: View {
         let shop = settings.shopLabel.isEmpty ? settings.host : settings.shopLabel
         let detail = [shop, L10n.tr(api.holdsBook ? "settings.from_book" : "connection.live_only")]
             .filter { !$0.isEmpty }.joined(separator: " · ")
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(headline)
-                .font(.khayt(15.5, .semibold, relativeTo: .headline))
-                .foregroundStyle(tone)
-            Text(detail)
-                .font(.khayt(13, relativeTo: .footnote))
-                .foregroundStyle(KhaytDesign.note)
+        return HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(headline)
+                    .font(.khayt(15.5, .semibold, relativeTo: .headline))
+                    .foregroundStyle(tone)
+                Text(detail)
+                    .font(.khayt(13, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // The shop's mode beside its name, read from the book (SIMPLE_MAP
+            // `modeBadge`), here in Shop details as #2445 planned.
+            if api.holdsBook { ShopModeBadge(mode: api.shopMode) }
         }
         .padding(.vertical, 14).padding(.leading, 18).padding(.trailing, 15)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -845,5 +862,26 @@ struct SettingsDiagnosticsPage: View {
             return key.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).lowercased()
         }
         return L10n.format("settings.not_sent", ListFormatter.localizedString(byJoining: names))
+    }
+}
+
+/// "Simple" or "Professional", beside the shop's name: a neutral chip, read
+/// only. The mode is set on the Mac; the phone has no switch.
+struct ShopModeBadge: View {
+    let mode: ShopMode
+    var body: some View {
+        let word = L10n.tr(mode.badgeKey)
+        HStack(spacing: 5) {
+            Circle().fill(KhaytDesign.note).frame(width: 6, height: 6)
+            Text(word)
+                .font(.khayt(12.5, .medium, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.ink)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(KhaytDesign.sunk, in: Capsule())
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.format("mode.badge.a11y", word))
     }
 }

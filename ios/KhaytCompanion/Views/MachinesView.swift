@@ -87,7 +87,7 @@ struct MachinesView: View {
                 Label(L10n.tr("camera.open"), systemImage: "video")
                     .font(.khayt(14, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(KhaytDesign.brand)
-                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
         case .refused(let why)?:
@@ -226,11 +226,11 @@ struct LiveStamp: View {
         if printers.isLive, let at = printers.updatedAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 HStack(spacing: 7) {
-                    Circle().fill(KhaytDesign.done).frame(width: 7, height: 7)
+                    Circle().fill(KhaytDesign.live).frame(width: 7, height: 7)
                     Text(L10n.tr("machines.live"))
                         .font(.khayt(11, .bold, relativeTo: .caption2))
                         .khaytTracking(0.9)
-                        .foregroundStyle(KhaytDesign.done)
+                        .foregroundStyle(KhaytDesign.live)
                     Text(L10n.format("machines.live.ago", max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
                         .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)
@@ -268,7 +268,7 @@ private struct MachineCard: View {
 
     private var tone: Color {
         switch mode {
-        case .printing: return KhaytDesign.live
+        case .printing: return KhaytDesign.attention  // printing is amber (Nov 11)
         case .idle, .offline: return KhaytDesign.note
         case .error: return KhaytDesign.late
         }
@@ -327,7 +327,7 @@ private struct MachineCard: View {
                         .foregroundStyle(KhaytDesign.ink)
                 }
                 .padding(.horizontal, 9).padding(.vertical, 4)
-                .background(tone.opacity(0.16), in: Capsule())
+                .background(mode == .printing ? KhaytDesign.threadWash : tone.opacity(0.16), in: Capsule())
             }
             if mode == .printing, let progress = live.progress {
                 HStack(alignment: .lastTextBaseline, spacing: 8) {

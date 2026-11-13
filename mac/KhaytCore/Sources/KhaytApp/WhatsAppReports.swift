@@ -414,6 +414,7 @@ struct WhatsAppReportsSection: View {
                 } label: { Image(systemName: "doc.on.doc") }
                 .buttonStyle(.borderless)
                 .help(shop.words.callIt("mac.ik_copy"))
+                .accessibilityLabel(shop.words.callIt("mac.ik_copy"))
             }
         }
     }

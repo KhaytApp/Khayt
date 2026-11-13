@@ -110,23 +110,58 @@ enum PrinterSweep {
                       let record = try? await engine.identifySweep(type: type, host: host,
                                                                    status: status, body: body)
                 else { continue }
-                found.append(record)
+                found.append(await identified(record, type: type, host: host, engine: engine))
             }
         }
         return found
     }
 
-    /// One unauthenticated GET, refused unless the address is a LAN one.
-    private static func ask(_ host: String, port: Int, path: String,
-                            type: String) async -> (String, String, Int, Data)? {
+    /// The record with which printer it is, from the protocol's identity
+    /// request: the serials and network cards it reports about itself
+    /// (`lib/printer-sweep.js readIdentity`). Asked WITHOUT credentials, like
+    /// everything in a sweep: this is how a printer at a new address is
+    /// recognised before any key is sent to it. Unchanged when the protocol
+    /// has no identity request or the printer does not answer it.
+    static func identified(_ record: JSONValue, type: String, host: String,
+                           engine: KhaytEngine) async -> JSONValue {
+        guard case .object(var r) = record,
+              let path = try? await engine.identityPath(type: type),
+              case .number(let port)? = r["port"],
+              let (_, _, status, data) = await ask(host, port: Int(port), path: path, type: type),
+              status == 200,
+              let body = try? JSONValue.decode(JSONValue.self, from: data),
+              let id = try? await engine.readSweepIdentity(type: type, body: body), !id.isEmpty
+        else { return record }
+        r["serial"] = .string(id.serial)
+        r["serials"] = .array(id.serials.map(JSONValue.string))
+        r["mac"] = .string(id.mac)
+        r["macs"] = .array(id.macs.map(JSONValue.string))
+        return .object(r)
+    }
+
+    /// The request a sweep sends: a GET with a name in it and NOTHING ELSE.
+    ///
+    /// No key, no token, no cookie, whatever the machine record holds. A
+    /// sweep asks addresses that are not yet known to be this shop's printer,
+    /// and the one way this feature could hurt the shop is by sending a
+    /// printer's API key to the wrong device. `PrinterMovedTests` holds it.
+    static func request(_ host: String, port: Int, path: String) -> URLRequest? {
         guard let url = URL(string: "http://\(host):\(port)\(path)") else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = perHost
         request.httpMethod = "GET"
+        request.httpShouldHandleCookies = false
         // Says who is asking. A device owner reading a log should find a name,
         // not an anonymous probe.
         request.setValue("Khayt/mac (looking for a configured printer)",
                          forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    /// One unauthenticated GET, refused unless the address is a LAN one.
+    static func ask(_ host: String, port: Int, path: String,
+                    type: String) async -> (String, String, Int, Data)? {
+        guard let request = request(host, port: port, path: path) else { return nil }
         let session = URLSession(configuration: .ephemeral)
         session.configuration.timeoutIntervalForRequest = perHost
         defer { session.finishTasksAndInvalidate() }

@@ -20,7 +20,9 @@
 html[data-app="bedready"] {
   /* CYANOTYPE DRAFT — Signature accent is BLUEPRINT BLUE, the ONE structural
      accent (drafting discipline). !important beats applyAccent()'s inline write. */
-  --accent-h: 209 !important; --accent-s: 69% !important; --accent-l: 35% !important;
+  --accent-h: 209 !important;
+  --accent-s: 69% !important;
+  --accent-l: 35% !important;
   --accent:      hsl(var(--accent-h) var(--accent-s) var(--accent-l));
   --accent-soft: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.12);
   --accent-line: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.40);

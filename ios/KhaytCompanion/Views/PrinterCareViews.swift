@@ -82,6 +82,7 @@ enum CareWords {
 /// something due or overdue says so, in a small coloured line — modest on
 /// purpose: it is a nudge, not an alarm.
 struct MachineCareLink: View {
+    @EnvironmentObject private var api: KhaytAPIClient
     let name: String
     let machineId: String
     let care: CareBook
@@ -89,7 +90,9 @@ struct MachineCareLink: View {
 
     var body: some View {
         let tasks = care.tasks(for: machineId)
-        let needing = tasks.filter(\.needsCare)
+        // In Simple the row leads to the gated card, so it does not count
+        // care plans the shop cannot open.
+        let needing = api.shopMode.isProfessionalOnly("machineUpkeep") ? [] : tasks.filter(\.needsCare)
         let worst = needing.first?.status.status
         NavigationLink {
             MachineCarePage(name: name, machineId: machineId, reload: reload)
@@ -129,11 +132,16 @@ struct MachineCarePage: View {
 
     @State private var care = CareBook()
     @State private var loaded = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                if loaded {
+                if api.shopMode.isProfessionalOnly("machineUpkeep") {
+                    ProfessionalGateCard(title: L10n.tr("simple.gate.care.title"),
+                                         message: L10n.tr("simple.gate.care.body"),
+                                         button: L10n.tr("simple.gate.back_machine")) { dismiss() }
+                } else if loaded {
                     CareCard(machineId: machineId, care: care) { await refresh() }
                 }
             }
@@ -277,6 +285,7 @@ struct CareCard: View {
                 .background(prominent ? KhaytDesign.brand : KhaytDesign.brand.opacity(0.10), in: Capsule())
         }
         .buttonStyle(.plain)
+        .tapTarget()
         .disabled(working != nil || task.hoursUnknown)
         .opacity(working != nil || task.hoursUnknown ? 0.5 : 1)
     }
@@ -289,11 +298,18 @@ struct PartsToBuyPage: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @State private var rows: [CareRules.BuyRow] = []
     @State private var loaded = false
+    @Environment(\.dismiss) private var dismiss
+
+    private var gated: Bool { api.shopMode.isProfessionalOnly("machineUpkeep") }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                if loaded && rows.isEmpty {
+                if gated {
+                    ProfessionalGateCard(title: L10n.tr("simple.gate.parts.title"),
+                                         message: L10n.tr("simple.gate.parts.body"),
+                                         button: L10n.tr("simple.gate.back_machines")) { dismiss() }
+                } else if loaded && rows.isEmpty {
                     Text(L10n.tr("care.parts.none"))
                         .font(.khayt(14, relativeTo: .subheadline))
                         .foregroundStyle(KhaytDesign.note)
@@ -326,7 +342,7 @@ struct PartsToBuyPage: View {
         .refreshable { await load() }
         .khaytScreen(title: L10n.tr("care.parts.title"))
         .toolbar {
-            if !rows.isEmpty {
+            if !rows.isEmpty && !gated {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: CareWords.text(rows, shop: settings.shopLabel)) {
                         Label(L10n.tr("care.parts.share"), systemImage: "square.and.arrow.up")
@@ -371,5 +387,44 @@ struct PartsToBuyPage: View {
         }
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A Professional screen opened in a Simple shop (SIMPLE_MAP `gatedLink`):
+/// which mode has it, that the switch is on the Mac — the phone follows the
+/// Mac and has none — and a way back. Never an empty page, and never the
+/// staff-lock words: nobody is locked out, the shop chose Simple.
+struct ProfessionalGateCard: View {
+    let title: String
+    let message: String
+    let button: String
+    let back: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.khayt(17, .semibold, relativeTo: .headline))
+                .foregroundStyle(KhaytDesign.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(message)
+                .font(.khayt(14, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.note)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: back) {
+                Text(button)
+                    .font(.khayt(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(KhaytDesign.ink)
+                    .padding(.horizontal, 22)
+                    .frame(minHeight: 50)
+                    .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20).padding(.vertical, 24)
+        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
     }
 }

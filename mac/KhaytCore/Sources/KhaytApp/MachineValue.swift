@@ -89,12 +89,12 @@ struct FailureHint: View {
                         }
                     }
                     Text(shop.words.callIt("mac.fail_scope_" + s.scope))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 } else {
                     Text(shop.words.callIt("mac.fail_too_few", [
                         "n": .number(Double(s.attempts)), "min": .number(Double(s.minSample)),
                     ]))
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
                 }
             }
