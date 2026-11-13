@@ -3942,5 +3942,7 @@
  "mac.job_customer_locked_credited": "Zur Rechnung gibt es eine Gutschrift, daher kann der Kunde nicht mehr geändert werden.",
  "mac.job_customer_locked_paid": "Für diesen Auftrag wurde bereits gezahlt, daher kann der Kunde nicht mehr geändert werden.",
  "mac.job_customer_unknown": "Dieser Kunde ist nicht mehr im Buch.",
- "mac.job_customer_currency": "Dieser Kunde wird in einer anderen Währung abgerechnet. Der Auftrag behält Preis und Währung."
+ "mac.job_customer_currency": "Dieser Kunde wird in einer anderen Währung abgerechnet. Der Auftrag behält Preis und Währung.",
+ "mac.moved_not_now": "Nicht jetzt",
+ "mac.moved_dhcp_hint": "Khayt hat im Netzwerk gesucht und diesen Drucker unter keiner anderen Adresse gefunden. Wenn sich seine Adresse immer wieder ändert, gib ihm im Router eine feste Adresse (DHCP-Reservierung)."
 }

@@ -278,11 +278,19 @@ struct MachineCard: View {
                         .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Button(shop.words.callIt("mac.moved_apply")) {
-                    Task { await shop.applyRelocation(move) }
+                HStack(spacing: 8) {
+                    Button(shop.words.callIt("mac.moved_apply")) {
+                        Task { await shop.applyRelocation(move) }
+                    }
+                    .disabled(!shop.canMoveJobs)
+                    // A question, not a switch: an identity match found by the
+                    // background search (Shop+PrinterMoved.swift) can be put
+                    // off, and is not asked again for that address.
+                    if move.isIdentity {
+                        Button(shop.words.callIt("mac.moved_not_now")) { shop.declineRelocation(move) }
+                    }
                 }
                 .controlSize(.small)
-                .disabled(!shop.canMoveJobs)
             } else {
                 // ── THREE STATES, BECAUSE THE SECOND ONE IS SLOW ──────
                 //
@@ -311,6 +319,14 @@ struct MachineCard: View {
             // Worse since the sweep: the wait went from about a second to as
             // much as twenty-five, and silence after twenty-five seconds reads
             // as a broken button rather than as an answer.
+            // The background search looked and found it nowhere else: a
+            // printer that is off, or one whose address keeps changing, and
+            // only the second has a fix the shop can make.
+            if move == nil, shop.movedNotFound.contains(machine.id), shop.relocateNote == nil {
+                Text(shop.words.callIt("mac.moved_dhcp_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let problem = shop.relocateProblem {
                 Text(problem)
                     .font(.caption).foregroundStyle(Khayt.late)

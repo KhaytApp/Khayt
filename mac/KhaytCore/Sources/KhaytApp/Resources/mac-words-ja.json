@@ -3942,5 +3942,7 @@
  "mac.job_customer_locked_credited": "請求書にクレジットノートがあるため、顧客は変更できません。",
  "mac.job_customer_locked_paid": "この仕事には入金があるため、顧客は変更できません。",
  "mac.job_customer_unknown": "その顧客は台帳にありません。",
- "mac.job_customer_currency": "この顧客は別の通貨で請求されます。仕事の価格と通貨はそのままです。"
+ "mac.job_customer_currency": "この顧客は別の通貨で請求されます。仕事の価格と通貨はそのままです。",
+ "mac.moved_not_now": "今はしない",
+ "mac.moved_dhcp_hint": "Khayt はネットワークを探しましたが、このプリンターを別のアドレスで見つけられませんでした。アドレスが変わり続ける場合は、ルーターで固定アドレス（DHCP 予約）を割り当ててください。"
 }

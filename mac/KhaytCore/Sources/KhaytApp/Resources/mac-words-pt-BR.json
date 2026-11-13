@@ -3942,5 +3942,7 @@
  "mac.job_customer_locked_credited": "A fatura tem uma nota de crédito, então o cliente não pode mais ser alterado.",
  "mac.job_customer_locked_paid": "Já foi recebido um pagamento por este trabalho, então o cliente não pode mais ser alterado.",
  "mac.job_customer_unknown": "Esse cliente não está mais no livro.",
- "mac.job_customer_currency": "Este cliente é faturado em outra moeda. O trabalho mantém o preço e a moeda."
+ "mac.job_customer_currency": "Este cliente é faturado em outra moeda. O trabalho mantém o preço e a moeda.",
+ "mac.moved_not_now": "Agora não",
+ "mac.moved_dhcp_hint": "O Khayt procurou na rede e não encontrou esta impressora em outro endereço. Se o endereço dela muda com frequência, dê a ela um endereço fixo (uma reserva DHCP) no roteador."
 }
