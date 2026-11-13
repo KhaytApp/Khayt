@@ -48,6 +48,18 @@ test('a body that is not a part is refused, and the quantity is held to a sane r
   assert.equal(R.quotePart(store, Object.assign({}, part, { qty: 1e9 }), { overheadPerHour: 0 }).body.qty, 100000);
 });
 
+test('the desktop\'s server answers /api/quote with this rule, not a copy of it', () => {
+  // Two copies of one quote rule are two quotes for one part the day either
+  // is changed. The desktop route is plumbing: read the body, call quotePart.
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../lib/lan-server.js'), 'utf8');
+  const at = src.indexOf("pathname === '/api/quote'");
+  assert.ok(at > 0, 'the route is still served');
+  const route = src.slice(at, src.indexOf('} else if (', at + 1));
+  assert.match(route, /LanRest\.quotePart\(/);
+  assert.doesNotMatch(route, /computePart|quoteTotal|activePriceTier/, 'the route costs nothing itself');
+  assert.match(route, /checkPinForGet\(\)/, 'and is still owner-gated');
+});
+
 test('with no day handed in, the overhead is asked for TODAY, never for "NaN-NaN-NaN"', () => {
   // Both callers pass `today`, so the fallback was never reached: it called
   // `localDay()` with no argument, which is `new Date(undefined)`.
