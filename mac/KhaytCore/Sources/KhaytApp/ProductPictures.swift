@@ -34,7 +34,7 @@ struct ProductPictureStrip: View {
                 Text(shop.words.callIt("mac.pictures"))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(Words.spaced(0.6))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                 Spacer()
                 Button(shop.words.callIt("mac.add_picture")) { picking = true }
                     .buttonStyle(.link).font(.callout)
@@ -64,7 +64,7 @@ struct ProductPictureStrip: View {
                 // The question the labels exist to answer, in the shared
                 // wording both apps use.
                 Text(shop.words.callIt("pe.kind_hint"))
-                    .font(.caption).foregroundStyle(.tertiary)
+                    .font(.caption).foregroundStyle(Khayt.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -232,7 +232,7 @@ struct PictureCard: View {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(.quaternary)
                         .frame(width: Self.cardWidth, height: 70)
-                        .overlay(Image(systemName: "photo").foregroundStyle(.tertiary))
+                        .overlay(Image(systemName: "photo").foregroundStyle(Khayt.faint))
                 }
                 if isPrimary {
                     // Which one the customer sees, marked rather than implied

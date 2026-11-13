@@ -114,7 +114,7 @@ struct RatingTrendCard: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 5) {
                         Text("5").font(.caption2).monospacedDigit()
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Khayt.faint)
                         Rectangle().fill(Khayt.hairline).frame(height: 1)
                     }
                     Spacer(minLength: 0)

@@ -1046,7 +1046,11 @@ struct EditJobTests {
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/KhaytApp/Shop+Money.swift"), encoding: .utf8)
-        #expect(source.contains("order: order, fields: fields, settings: Self.settings(root),"))
+        // Two links since Edit Job became one write with the Not business
+        // mark (`Shop.jobEdited`): the write reads the settings from the book
+        // it is writing, and the rule is handed exactly those.
+        #expect(source.contains("settings: Self.settings(root), engine: engine,"))
+        #expect(source.contains("engine.editJob(order: out, fields: fields, settings: settings,"))
     }
 
     @Test("a due date can be cleared, because no due date is a real answer")

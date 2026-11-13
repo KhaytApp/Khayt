@@ -48,6 +48,8 @@ final class LibraryMemo {
         var noFigures = false
         var inCatalogue = false
         var fromWeb = false
+        var colours: Set<String> = []
+        var fileTypes: Set<String> = []
         var ranges = LibraryQuery.Ranges()
         /// What the printer chips were worked out from, while Fits is on.
         var fitsKey: [Int] = []
@@ -121,6 +123,11 @@ final class LibraryMemo {
     var entries: [LibraryEntry] = []
     var visible: [LibraryFile] = []
     var visiblePosition: [LibraryFile.ID: Int] = [:]
+
+    /// Each model's Colour filter rows, as of `filesRevision`
+    /// (`Shop.libraryColourTokens`).
+    var colourTokensRevision = -1
+    var colourTokens: [LibraryFile.ID: [String]] = [:]
 
     /// Each model's search text, folded, for the book revision it was made at.
     var foldedRevision = -1
@@ -290,7 +297,8 @@ extension Shop {
                      healthFocus: libraryHealthFocus,
                      storage: libraryStorage,
                      readyAnywhere: libraryReadyAnywhere, noFigures: libraryNoFiguresOnly,
-                     inCatalogue: libraryInCatalogueOnly, fromWeb: libraryFromWebOnly, ranges: libraryRanges,
+                     inCatalogue: libraryInCatalogueOnly, fromWeb: libraryFromWebOnly,
+                     colours: libraryColours, fileTypes: libraryFileTypes, ranges: libraryRanges,
                      fitsKey: libraryFitsOn == nil ? [] : machineFitsKey(),
                      day: libraryRanges.added.lastDays == nil ? "" : Calendar.book.dayString(Date()),
                      sync: libraryStorage == nil ? 0 : librarySyncRevision,
@@ -366,10 +374,43 @@ extension Shop {
         let words = LibraryMemo.Folded.words(query.text)
         let tokens = query.tokens.map { ($0.field, LibraryMemo.Folded.bytes($0.folded)) }
         let any = LibraryMemo.Folded.any
+        // `colour:` and `type:` are those two menus typed: the value is held
+        // against each row's id and its name in English and in the shop's
+        // language, and the token finds the models under any row that
+        // STARTS with it — so `colour:red`, `colour:أحمر` and a half-typed
+        // `colour:re` all narrow. The start, not anywhere in the word as the
+        // other tokens read: these are a dozen fixed names, and "re" inside
+        // "green" and "grey" would make `colour:re` three colours.
+        let shopWords = self.words
+        func rows(_ token: [UInt8], _ names: [(id: String, key: String?, plain: String?)]) -> Set<String> {
+            var out: Set<String> = []
+            for row in names {
+                var said = [row.id]
+                if let plain = row.plain { said.append(plain) }
+                if let key = row.key {
+                    // A key borrowed from the shared catalogue has no English
+                    // of this app's own, and reads back as itself.
+                    let english = Words.english(key)
+                    if english != key { said.append(english) }
+                    said.append(shopWords.callIt(key))
+                }
+                if said.contains(where: { LibraryMemo.Folded.bytes($0).starts(with: token) }) { out.insert(row.id) }
+            }
+            return out
+        }
+        let colourRows: [Set<String>] = query.tokens.filter { $0.field == .colour }.map { token in
+            rows(LibraryMemo.Folded.bytes(token.folded),
+                 ColourFamily.tokens.map { ($0, LibraryFilterBar.colourKey($0), nil) })
+        }
+        let typeRows: [Set<String>] = query.tokens.filter { $0.field == .type }.map { token in
+            rows(LibraryMemo.Folded.bytes(token.folded), ModelFileType.allCases.map {
+                ($0.rawValue, nil, LibraryFilterBar.typeLabel($0, shopWords))
+            })
+        }
         return { [self] file in
             let f = foldedText(file)
             for word in words where !any(f.free, word) { return false }
-            var printer = 0
+            var printer = 0, colour = 0, type = 0
             for (field, v) in tokens {
                 let ok: Bool
                 switch field {
@@ -381,6 +422,12 @@ extension Shop {
                 case .printer:
                     ok = readyFor[printer][file.id] == true
                     printer += 1
+                case .colour:
+                    ok = libraryColourTokens(file).contains(where: colourRows[colour].contains)
+                    colour += 1
+                case .type:
+                    ok = typeRows[type].contains(file.fileType.rawValue)
+                    type += 1
                 }
                 if !ok { return false }
             }

@@ -65,4 +65,24 @@ struct Beta34ReviewTests {
         #expect(board.contains("stage == .completed || stage == .shipped ? jobs.suffix(cap) : jobs.prefix(cap)"))
         #expect(board.contains("ForEach(Self.shown(jobs, in: stage))"))
     }
+
+    // ── THE LOW ITEMS OF THE SAME REVIEW ─────────────────────────────────────
+
+    @Test("something typed that is not a number is unreadable; empty and every number we read are not")
+    func unreadableNumbers() {
+        for text in ["5o", "abc", "1.2.3", "-5", "12 SAR"] { #expect(TypedNumber.unreadable(text), "\(text)") }
+        for text in ["", "   ", "50", "١٥٠", "2,5", "1,250.5", " 40 "] { #expect(!TypedNumber.unreadable(text), "'\(text)'") }
+    }
+
+    /// The box showed "5o" and the job saved at the figure typed before it.
+    @Test("a price box that was not read is marked, says so, and holds Save",
+          arguments: ["NewJobSheet.swift", "ProductSheet.swift"])
+    func aPriceNotReadHoldsTheSave(file: String) {
+        let source = MenuCoverageTests.source(file)
+        #expect(source.contains("private var priceNotRead: Bool { TypedNumber.unreadable(overrideText) }"))
+        #expect(source.contains("if TypedNumber.unreadable(overrideText) {\n"), "the box itself is outlined")
+        #expect(source.contains("shop.words.callIt(\"mac.price_not_read\")"), "and the sheet says why")
+        #expect(source.contains("|| priceNotRead)"), "Save is greyed out")
+        #expect(source.contains("guard !priceNotRead else { return }"), "and Return cannot save past it")
+    }
 }

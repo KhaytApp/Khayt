@@ -123,7 +123,7 @@ struct Portfolio: View {
                 Text(snap.project.isEmpty ? snap.orderId : snap.project)
                     .font(.callout).lineLimit(1)
                 Text(snap.orderId + (snap.date.isEmpty ? "" : " · " + snap.date))
-                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
+                    .font(.caption2).monospacedDigit().foregroundStyle(Khayt.faint).lineLimit(1)
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)

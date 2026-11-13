@@ -33,7 +33,8 @@ import JavaScriptCore
 /// from there, so a heightfield never crosses at all.
 public actor StudioEngine {
     let runtime: JSRuntime
-    private let thread: EngineThread
+    /// Its own thread, which ends when this engine does (`deinit`).
+    nonisolated let thread: EngineThread
 
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
         thread.asUnownedSerialExecutor()
@@ -54,7 +55,7 @@ public actor StudioEngine {
     public init(bundle: Bundle? = nil) throws {
         let thread = EngineThread.dedicated(name: "khayt.studio")
         self.thread = thread
-        runtime = try thread.sync {
+        do { runtime = try thread.sync {
             let runtime = try JSRuntime(modules: Self.modules, bundle: bundle)
             let resources = bundle ?? BundledResources.javaScript
             guard let url = resources.url(forResource: "hueforge-u1-template", withExtension: "json", subdirectory: "JS") else {
@@ -66,10 +67,17 @@ public actor StudioEngine {
             }
             try runtime.evaluate(Self.glue)
             return runtime
+        } } catch {
+            // An engine that could not be made has no `deinit` to stop its thread.
+            thread.retire()
+            throw error
         }
     }
 
-    isolated deinit {}
+    /// Isolated, so it runs on the engine's thread like every call: the
+    /// context is let go there. And the thread is this engine's alone, so it
+    /// is told to end once that is done (`EngineThread.retire`).
+    isolated deinit { thread.retire() }
 
     // MARK: - The picture
 

@@ -149,6 +149,7 @@ struct TestPrintLogSheet: View {
             Button(role: .destructive) { deleting = row } label: { Image(systemName: "xmark") }
                 .buttonStyle(.borderless)
                 .help(words.callIt("common.delete"))
+                .accessibilityLabel(words.callIt("common.delete"))
                 .disabled(!shop.canMoveJobs)
         }
     }
@@ -167,7 +168,7 @@ struct TestPrintLogSheet: View {
     static func temps(_ row: Shop.SpoolLogRow) -> String {
         let print: String = row.number("printTemp").map { Money.quantity($0, decimals: 0) + "\u{00B0}" } ?? "\u{2014}"
         let bed: String = row.number("bedTemp").map { Money.quantity($0, decimals: 0) + "\u{00B0}" } ?? "\u{2014}"
-        return print + " / " + bed
+        return Figure.isolated(print + " / " + bed)
     }
 
     /// The filament the test used, or a dash.
