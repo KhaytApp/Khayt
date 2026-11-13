@@ -1944,17 +1944,18 @@ private struct Live: View {
         // `PrinterControl.offers` asks `lib/printer-commands.js`, the table
         // the press itself is built from.
         let known = shop.printerVerbs[type]
-        let paused = isPaused(status.state)
-        let step: PrinterControl.Verb = paused ? .resume : .pause
-        let canStep = PrinterControl.offers(step, known)
+        // Pause or Resume through `Shop.printStep`, the one offer the menu
+        // bar's hero card draws too.
+        let step = shop.printStep(machine, paused: isPaused(status.state))
+        let canStep = step != nil
         let canCancel = PrinterControl.offers(.cancel, known)
         let canDrop = type == "moonraker"
         VStack(alignment: .leading, spacing: 6) {
             if canStep || canCancel || canDrop {
                 HStack(spacing: 8) {
-                    if canStep {
-                        Button(shop.words.callIt(paused ? "mac.printer_resume" : "mac.printer_pause")) {
-                            Task { await shop.tell(machine, step) }
+                    if let step {
+                        Button(shop.words.callIt(step.wordKey)) {
+                            Task { await shop.tell(machine, step.verb) }
                         }
                     }
                     // ASKS FIRST. Cancelling throws away however many hours are already

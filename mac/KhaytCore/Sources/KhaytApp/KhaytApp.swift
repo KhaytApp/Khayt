@@ -1290,7 +1290,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             // The menu bar's panel, which no window shot can reach.
             doing("27-menu-bar")
             captureView(named: "27-menu-bar",
-                        FloorPanel(shop: shop).background(Khayt.ground), into: dir)
+                        FloorPanel(shop: shop, now: Date()).background(Khayt.ground), into: dir)
 
             // Where the waiting work would go.
             //
