@@ -43,70 +43,128 @@ struct SmtpWireTests {
     }
 
     /// The server, its port, and where it will write what it heard.
-    final class Fake {
-        let process = Process()
+    final class Fake: @unchecked Sendable {
+        let process: Process
         let port: UInt16
         let transcript: URL
 
-        init?(mode: String) throws {
+        private init(process: Process, port: UInt16, transcript: URL) {
+            self.process = process
+            self.port = port
+            self.transcript = transcript
+        }
+
+        /// Start the server and wait until it is LISTENING: it binds its port
+        /// and only then prints `READY <port>`, so that line is the readiness.
+        ///
+        /// ── THE WAIT IS FOR THE LINE, NOT FOR A CLOCK ─────────────────────
+        ///
+        /// This used to give the server sixty seconds and then record "it is
+        /// still starting", and on a full local run (Nov 12 2026, load average
+        /// about 4) it did exactly that. Measured afterwards at the same load,
+        /// the server prints READY in 0.08–0.14 s, so those sixty seconds were
+        /// not a slow start that needed sixty-one. Something held the child up
+        /// and the helper had thrown away everything that would have said
+        /// what: it never read the child's stderr and never said whether the
+        /// child was alive. (The likeliest something: a full run of these
+        /// tests took 33 GB on a 32 GB Mac, and a new process waits a long
+        /// time for memory on a machine that is swapping. See
+        /// `Tests/KhaytTestWidth/width.c`, which is the cure for that.)
+        ///
+        /// So now the test waits for one of the two things that can actually
+        /// happen: the line arrives, or the child's output ends (it exited).
+        /// The budget is the same `patience` both ends of the conversation
+        /// already carry, as a hang guard and not a speed limit: when it runs
+        /// out the child is stopped, which ends its output, and the failure
+        /// says how long it had, and everything it wrote to stderr. The script
+        /// dumps its own Python stack there if it is not listening after
+        /// thirty seconds (`faulthandler`), so a start that hangs again names
+        /// the line it hung on.
+        ///
+        /// `async`, so the wait holds none of the cooperative pool's threads:
+        /// the old loop slept on one for as long as the server took.
+        static func start(mode: String, budget: TimeInterval = SmtpWireTests.patience) async throws -> Fake? {
             let script = URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
                 .appending(path: "Resources/fake-smtp.py")
             guard FileManager.default.fileExists(atPath: script.path) else { return nil }
-            transcript = FileManager.default.temporaryDirectory
+            let transcript = FileManager.default.temporaryDirectory
                 .appending(path: "khayt-smtp-\(UUID().uuidString).json")
 
+            let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
             process.arguments = ["python3", script.path, "--mode", mode,
                                  "--transcript", transcript.path]
             let out = Pipe()
+            let err = Pipe()
             process.standardOutput = out
-            process.standardError = Pipe()
+            process.standardError = err
             do { try process.run() } catch { return nil }
+
+            // The hang guard. Stopping the child closes its end of the pipe,
+            // so the reader below returns with whatever it had.
+            let began = Date()
+            let gaveUp = Flag()
+            let listening = Flag()
+            nonisolated(unsafe) let child = process
+            DispatchQueue.global().asyncAfter(deadline: .now() + budget) {
+                guard !listening.isSet else { return }
+                gaveUp.set()
+                child.terminate()
+            }
 
             // `READY <port>` on the first line, or the environment has no
             // usable python3 / openssl and there is nothing to test against.
             //
-            // READ ON ANOTHER THREAD, because `availableData` blocks: a loop
-            // that checks a deadline between blocking reads has no deadline at
-            // all, and on a loaded runner the generated certificate can take a
-            // while. This waits a bounded time and says what it actually saw.
-            let box = Line()
+            // READ ON ANOTHER THREAD, because `availableData` blocks.
             let handle = out.fileHandleForReading
-            Thread.detachNewThread {
-                var seen = Data()
-                while !seen.contains(0x0A) {
-                    let chunk = handle.availableData
-                    if chunk.isEmpty { break }
-                    seen.append(chunk)
+            let text: String = await withCheckedContinuation { done in
+                Thread.detachNewThread {
+                    var seen = Data()
+                    while !seen.contains(0x0A) {
+                        let chunk = handle.availableData
+                        if chunk.isEmpty { break }
+                        seen.append(chunk)
+                    }
+                    listening.set()
+                    done.resume(returning: String(decoding: seen, as: UTF8.self))
                 }
-                box.set(String(decoding: seen, as: UTF8.self))
             }
-            let deadline = Date().addingTimeInterval(60)
-            while box.text == nil, Date() < deadline { usleep(20_000) }
 
-            guard let text = box.text else {
-                process.terminate()
-                Issue.record("the fake SMTP server never printed READY — it is still starting")
-                return nil
+            let words = text.split(whereSeparator: \.isWhitespace)
+            if words.count == 2, words[0] == "READY", let port = UInt16(words[1]) {
+                return Fake(process: process, port: port, transcript: transcript)
             }
-            guard let number = text.split(separator: " ").last
-                .flatMap({ UInt16($0.trimmingCharacters(in: .whitespacesAndNewlines)) }) else {
-                process.terminate()
-                let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                Issue.record(Comment(rawValue: "the fake SMTP server said \"\(said)\" instead of "
-                                     + "READY — python3 or openssl is missing here"))
-                return nil
+
+            // Not listening. Say which of the two it was, and what the child
+            // itself said: its output has ended, so its stderr can be read to
+            // the end without blocking once it has gone.
+            process.terminate()
+            process.waitUntilExit()
+            let complaint = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let waited = Int(Date().timeIntervalSince(began))
+            let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let stderr = complaint.isEmpty
+                ? "it wrote nothing to stderr (python3 never reached the script)"
+                : "its stderr: \(complaint.suffix(2_000))"
+            if gaveUp.isSet {
+                Issue.record(Comment(rawValue: "the fake SMTP server was still not listening after "
+                                     + "\(waited)s and was stopped; \(stderr)"))
+            } else {
+                Issue.record(Comment(rawValue: "the fake SMTP server exited after \(waited)s having said "
+                                     + "\"\(said)\" instead of READY — python3 or openssl is missing "
+                                     + "here; \(stderr)"))
             }
-            port = number
+            return nil
         }
 
-        /// One line, written by a reader thread and read by the test.
-        final class Line: @unchecked Sendable {
+        /// Set once, from one thread, and read from another.
+        final class Flag: @unchecked Sendable {
             private let lock = NSLock()
-            private var value: String?
-            func set(_ s: String) { lock.lock(); value = s; lock.unlock() }
-            var text: String? { lock.lock(); defer { lock.unlock() }; return value }
+            private var value = false
+            func set() { lock.lock(); value = true; lock.unlock() }
+            var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
         }
 
         func finish() throws -> Transcript {
@@ -159,6 +217,14 @@ struct SmtpWireTests {
     /// fails if the two ever drift apart.
     static let patience: TimeInterval = 600
 
+    // ── ONLY IN A DEBUG BUILD ─────────────────────────────────────────────
+    //
+    // The four tests that hold a conversation switch on
+    // `SmtpClient.Trust.acceptAnyCertificate` and `SmtpClient.patience`, which
+    // exist only inside `#if DEBUG` (see `trustSwitchCannotShip`). Outside
+    // this block they stopped `swift test -c release` from compiling at all,
+    // for the sake of two switches a release build is right not to have.
+    #if DEBUG
     @Test("STARTTLS: the framer upgrades the socket and the whole message arrives")
     func startTlsSend() async throws {
         SmtpClient.Trust.acceptAnyCertificate = true
@@ -171,7 +237,7 @@ struct SmtpWireTests {
             SmtpClient.patience = SmtpClient.timeout
         }
 
-        guard let fake = try Fake(mode: "starttls") else {
+        guard let fake = try await Fake.start(mode: "starttls") else {
             // No python3 or no openssl. Skipping is honest; pretending to pass
             // is not, so it says so.
             Issue.record("could not start the fake SMTP server — this machine cannot run this test")
@@ -247,7 +313,7 @@ struct SmtpWireTests {
             SmtpClient.patience = SmtpClient.timeout
         }
 
-        guard let fake = try Fake(mode: "implicit") else {
+        guard let fake = try await Fake.start(mode: "implicit") else {
             Issue.record("could not start the fake SMTP server"); return
         }
         try await SmtpClient.converse(Self.mail, relay: Self.relay(port: fake.port, secure: true))
@@ -278,7 +344,7 @@ struct SmtpWireTests {
             SmtpClient.patience = SmtpClient.timeout
         }
 
-        guard let fake = try Fake(mode: "nostarttls") else {
+        guard let fake = try await Fake.start(mode: "nostarttls") else {
             Issue.record("could not start the fake SMTP server"); return
         }
         await #expect(throws: SmtpClient.Failure.self) {
@@ -313,7 +379,7 @@ struct SmtpWireTests {
             SmtpClient.patience = SmtpClient.timeout
         }
 
-        guard let fake = try Fake(mode: "nostarttls") else {
+        guard let fake = try await Fake.start(mode: "nostarttls") else {
             Issue.record("could not start the fake SMTP server"); return
         }
         var said = ""
@@ -329,6 +395,7 @@ struct SmtpWireTests {
         #expect(said.contains("encrypt"), "the shop was told: \(said)")
         #expect(said.contains("465"), "the shop was not told what to try instead: \(said)")
     }
+    #endif
 
     /// The switch that lets these tests accept a throwaway certificate must not
     /// exist in a shipping build.

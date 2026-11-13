@@ -41,15 +41,19 @@ try {
 
   // Delete, Cancel, then a save from elsewhere.
   await window.evaluate(() => openClientEditor('CLI-cd-a'));
-  await window.waitForSelector('.addr-rm', { state: 'attached', timeout: 10000 });
-  await window.evaluate(() => {
-    document.querySelector('.addr-rm[data-ai="0"]').click();
-    document.querySelector('.pl-rm')?.click();
-    const lbl = document.querySelector('.addr-label');
-    if (lbl) { lbl.value = 'Changed'; lbl.dispatchEvent(new Event('input', { bubbles: true })); }
-  });
+  await window.waitForSelector('.addr-edit', { state: 'attached', timeout: 10000 });
+  // Remove one address and relabel the other through the address editor,
+  // then Cancel the customer.
+  await window.click('.addr-edit[data-ai="0"]');
+  await window.click('.addr-editor [data-act="addr-remove"]');
+  await window.waitForSelector('.addr-editor', { state: 'detached', timeout: 10000 });
+  await window.click('.addr-edit[data-ai="0"]');
+  await window.fill('.addr-editor #addrLabel', 'Changed');
+  await window.click('.addr-editor [data-act="addr-save"]');
+  await window.waitForSelector('.addr-editor', { state: 'detached', timeout: 10000 });
+  await window.evaluate(() => document.querySelector('.pl-rm')?.click());
   await window.click('#modalMount [data-act="cancel"]');
-  await window.waitForSelector('.addr-rm', { state: 'detached', timeout: 10000 });
+  await window.waitForSelector('.addr-edit', { state: 'detached', timeout: 10000 });
   await window.evaluate(() => { settings.bizEn = 'Acme'; saveAll(); flushSave(); });
   await window.waitForTimeout(600);
   const a = await window.evaluate(() => clients.find((c) => c.id === 'CLI-cd-a'));
@@ -64,7 +68,7 @@ try {
   await window.evaluate(() => openClientEditor('CLI-cd-b'));
   await window.waitForSelector('#modalMount [data-act="save"]', { timeout: 10000 });
   await window.click('#modalMount [data-act="save"]');
-  await window.waitForSelector('.addr-rm', { state: 'detached', timeout: 10000 });
+  await window.waitForSelector('.addr-edit', { state: 'detached', timeout: 10000 });
   const b = await window.evaluate(() => clients.find((c) => c.id === 'CLI-cd-b'));
   ok(errors.length === 0, `Save did not throw (${errors.join(' | ')})`);
   ok(b.addresses.length === 2 && b.addresses[0].address === 'Jeddah 3', 'a row with no label is kept');
@@ -77,9 +81,10 @@ try {
   ok(before.join() === 'Riyadh 1,Riyadh 2', `the job's customer's book (${before})`);
   await window.evaluate(() => { const s = document.getElementById('oeCustomer'); s.value = 'CLI-cd-b'; s.dispatchEvent(new Event('change', { bubbles: true })); });
   const after = await window.evaluate(() => [...document.querySelectorAll('#oeAddressSelect option')].map((o) => o.value).filter(Boolean));
-  ok(after.join() === 'Jeddah 3,Jeddah 4', `follows the customer picked (${after})`);
-  await window.evaluate(() => { const s = document.getElementById('oeAddressSelect'); s.value = 'Jeddah 4'; s.dispatchEvent(new Event('change', { bubbles: true })); });
-  ok(await window.evaluate(() => document.querySelector('[data-f="deliveryAddress"]').value) === 'Jeddah 4', 'and picking one fills the delivery address');
+  // A row with fields is copied as its fields formatted (lib/customer-address.js textOf).
+  ok(after.join() === 'Jeddah 3,12 King Rd\nJeddah', `follows the customer picked (${JSON.stringify(after)})`);
+  await window.evaluate(() => { const s = document.getElementById('oeAddressSelect'); s.value = 'Jeddah 3'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  ok(await window.evaluate(() => document.querySelector('[data-f="deliveryAddress"]').value) === 'Jeddah 3', 'and picking one fills the delivery address');
   await window.evaluate(() => document.querySelector('#modalMount [data-act="cancel"]')?.click());
 
   console.log('e2e-client-draft: ok');

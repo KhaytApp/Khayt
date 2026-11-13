@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { TONE_VAR, type Tone } from '../tone';
+import { toneInk, type Tone } from '../tone';
 
 export interface CapsLabelProps {
   /** The text. It is uppercased by the component, so pass it in sentence case. */
@@ -26,7 +26,7 @@ export function CapsLabel({ children, tone, size = 9.5 }: CapsLabelProps) {
       className="khayt-caps"
       style={{
         ['--khayt-caps-size' as string]: `${size}px`,
-        ...(tone ? { ['--khayt-caps-tone' as string]: `var(${TONE_VAR[tone]})` } : null),
+        ...(tone ? { ['--khayt-caps-tone' as string]: toneInk(tone) } : null),
       }}
     >
       {children}

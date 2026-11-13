@@ -228,6 +228,10 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
         /// stores an empty string when the shop has not said — which the
         /// adapter reads as `default`, the name Repetier itself uses.
         let printerSlug: String?
+        /// The printer's network card, recorded while it answered at `host`
+        /// (Shop+PrinterMoved.swift). With `serial`, what tells this printer
+        /// apart from another of the same model when its address changes.
+        let mac: String?
     }
 
     /// Has the machine's own job history been read into the book?

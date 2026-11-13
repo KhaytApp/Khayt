@@ -118,7 +118,9 @@ test('every gated nav tab maps to a feature the registry names', () => {
     } else if (isPro) {
       const body = html.slice(html.indexOf(`id="${tab}"`));
       const section = body.slice(0, body.indexOf('</section>'));
-      assert.ok(section.includes('pro-only'),
+      // Since S4 the depth may instead be marked `data-simple-pro` (SIMPLE_MAP
+      // 'reduced': Simple draws its smaller form beside it — Expenses).
+      assert.ok(section.includes('pro-only') || section.includes('data-simple-pro'),
         `${tab} is only biz-only, yet "${key}" is a Pro feature and nothing inside the tab is gated — `
         + 'a simple shop would get the whole of it');
     }
@@ -132,4 +134,14 @@ test('the catalogue and the portfolio are business features, not Pro ones', () =
     // Bed Ready is commerce-free, and both of these are commerce.
     assert.equal(isFeatureEnabled(key, 'enthusiast'), false, key + ' reached an enthusiast');
   }
+});
+
+test('loyalty is a Simple feature (Turki, Nov 10); break-even stays Professional', () => {
+  assert.equal(isFeatureEnabled('loyalty', 'simple'), true);
+  assert.ok(BUSINESS_FEATURES.some((f) => f.key === 'loyalty'), 'listed in the Simple column');
+  assert.ok(!PRO_FEATURES.some((f) => f.key === 'loyalty'), 'not listed as Pro');
+  assert.equal(isFeatureEnabled('breakEven', 'simple'), false);
+  // The settings card the comparison describes is not Pro-gated.
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '../renderer/index.html'), 'utf8');
+  assert.match(html, /<div class="card settings-card" id="settingsLoyaltyCard">/);
 });

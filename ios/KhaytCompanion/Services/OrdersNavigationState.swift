@@ -18,6 +18,12 @@ final class OrdersNavigationState: ObservableObject {
         lowStockRequest += 1
     }
 
+    /// Bumped when a screen asks for the Machines tab — Home's "On the
+    /// machines" figure.
+    @Published private(set) var machinesTabRequest = 0
+
+    func openMachines() { machinesTabRequest += 1 }
+
     func openOrders(filter: OrderStatus? = nil) {
         pendingStatusFilter = filter
         ordersTabRequest += 1

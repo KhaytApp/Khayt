@@ -2449,6 +2449,8 @@ async function renderPrintLibLocation() {
   const cfg = (settings && settings.printLibrary) || {};
   rootEl.value = cfg.root || '';
   mirrorEl.value = cfg.mirror || '';
+  // Simple's three places (S4 card 8) read the same settings.
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   const s3 = cfg.s3 || {};
   const setV = (id, v) => { const el = $(id); if (el) el.value = v || ''; };
   if ($('#set_plibS3On')) $('#set_plibS3On').checked = !!s3.enabled;
@@ -2788,6 +2790,7 @@ function plibVaultLock() {
 async function renderPrintLibGDrive() {
   const cfg = ((settings && settings.printLibrary) || {}).gdrive || {};
   const status = $('#plibGDStatus');
+  window.KhaytSimpleForms?.renderLibraryPlaces?.();
   if ($('#set_plibGDriveOn')) $('#set_plibGDriveOn').checked = !!cfg.enabled;
   plibVaultLock();
   if ($('#set_plibGDClientId')) $('#set_plibGDClientId').value = cfg.clientId || '';
@@ -3933,16 +3936,16 @@ function renderOperatorLockSettings() {
   el.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
       ${activeOp
-        ? `Active operator: <strong>${escapeHtml(activeOp.name)}</strong> (${escapeHtml(activeOp.role || 'no role')})`
-        : 'No operator active — all features accessible.'}
+        ? `${escapeHtml(t('op.active_label'))}: <strong>${escapeHtml(activeOp.name)}</strong> (${escapeHtml(activeOp.role || t('op.no_role'))})`
+        : escapeHtml(t('op.none_active'))}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button id="btnSwitchOperator" class="btn small primary">${escapeHtml(t('op.switch') || 'Switch operator')}</button>
       ${activeOp ? `<button id="btnLockNow" class="btn small">${escapeHtml(t('op.lock') || 'Lock now')}</button>` : ''}
     </div>
     ${operators.length === 0
-      ? `<p style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Add operators in the Operators section above, then assign PINs.</p>`
-      : `<div style="margin-top:12px;font-size:12.5px;font-weight:600;margin-bottom:6px;">Operator PINs</div>
+      ? `<p style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">${escapeHtml(t('op.add_hint'))}</p>`
+      : `<div style="margin-top:12px;font-size:12.5px;font-weight:600;margin-bottom:6px;">${escapeHtml(t('op.pins'))}</div>
          <div style="display:flex;flex-direction:column;gap:6px;">
            ${operators.map(op => `
              <div style="display:flex;align-items:center;gap:10px;">
@@ -3950,9 +3953,9 @@ function renderOperatorLockSettings() {
                <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(op.role || '')}</span>
                <input type="password" class="op-pin-input" data-op-id="${op.id}" aria-label="${escapeHtml(t('ops.pin_for') || 'PIN for')} ${escapeHtml(op.name || op.id)}"
                  value="${op.pinHash ? '****' : ''}"
-                 placeholder="${op.pinHash ? '(set)' : 'Set PIN'}"
+                 placeholder="${escapeHtml(op.pinHash ? t('op.pin_set_ph') : t('op.pin_new_ph'))}"
                  maxlength="8" style="width:80px;font-size:12px;">
-               <button class="btn small op-save-pin" data-op-id="${op.id}">Save PIN</button>
+               <button class="btn small op-save-pin" data-op-id="${op.id}">${escapeHtml(t('op.save_pin'))}</button>
              </div>`).join('')}
          </div>`}`;
 
@@ -3989,6 +3992,8 @@ function renderOperatorLockSettings() {
 /** Show PIN pad modal to switch operator */
 
 function renderLoyaltyTiersSettings() {
+  // Simple's smaller card (SIMPLE_MAP loyalty) reads the same tiers.
+  if (typeof renderSimpleLoyalty === 'function') renderSimpleLoyalty();
   const el = $('#loyaltyTiersSection');
   if (!el) return;
   const tiers = settings.loyaltyTiers || [];
@@ -4940,7 +4945,11 @@ function renderExchangeRatesSettings() {
   const otherCurrencies = Object.entries(CURRENCIES).filter(([code]) => code !== base);
 
   const rows = otherCurrencies.map(([code, cur]) => {
-    const rate = rates[code] || '';
+    // An unset rate (none stored, or a 0 from an older build) is drawn empty
+    // with "Not set", never "0.00": with no rate an amount is left as typed,
+    // not converted to zero (lib/order-money.js convertToBase), and a field
+    // reading 0.00 said the opposite (Nov 11 review, W10).
+    const rate = +rates[code] > 0 ? rates[code] : '';
     return `<tr>
       <td style="padding:6px 8px;font-size:12.5px;">
         <strong>${escapeHtml(code)}</strong>
@@ -4949,7 +4958,7 @@ function renderExchangeRatesSettings() {
       <td style="padding:6px 8px;">
         <div style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;color:var(--text-muted);">1 ${escapeHtml(code)} =</span>
-          <input type="number" class="xr-input" data-code="${escapeHtml(code)}" aria-label="1 ${escapeHtml(code)} = ? ${escapeHtml(base)}" value="${escapeHtml(String(rate))}" min="0" step="0.0001" placeholder="0.00" style="width:90px;padding:3px 6px;font-size:12px;">
+          <input type="number" class="xr-input" data-code="${escapeHtml(code)}" aria-label="1 ${escapeHtml(code)} = ? ${escapeHtml(base)}" value="${escapeHtml(String(rate))}" min="0" step="0.0001" placeholder="${escapeHtml(t('xr.not_set'))}" style="width:90px;padding:3px 6px;font-size:12px;">
           <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(base)}</span>
         </div>
       </td>
@@ -5411,7 +5420,6 @@ function renderApiTokensSettings() {
     settings.lanApi = { ...(settings.lanApi || {}), apiTokens: [...(((settings.lanApi || {}).apiTokens) || []), r.record] };
     saveAll();
     renderApiTokensSettings();
-  renderTelemetrySettings();
     // Shown once — the plaintext is never stored and cannot be retrieved again.
     openFormModal({
       title: t('api.created') || 'API token created',
@@ -5483,7 +5491,6 @@ function renderPrivacySettings() {
     settings.privacy = { ...(settings.privacy || {}), retentionMonths: Math.max(0, num($('#set_privacyRetention')?.value, 0)) };
     saveAll();
     renderPrivacySettings();
-  renderApiTokensSettings();
     toast(t('priv.saved') || 'Privacy settings saved', 'success');
   });
 
@@ -5964,6 +5971,12 @@ function loadSettingsIntoForm() {
   renderBnplSettings();
   renderShippingSettings();
   renderPrivacySettings();
+  // The crash-report/usage switches and the API tokens list. Both calls had
+  // landed inside unrelated click handlers (the token mint and the Privacy
+  // Save), so the telemetry card was an empty heading on every visit and
+  // consent could not be changed from Settings.
+  renderTelemetrySettings();
+  renderApiTokensSettings();
   // Feature H: Exchange rates
   renderExchangeRatesSettings();
   // Round 12: Saved filter presets
@@ -6579,7 +6592,8 @@ function renderPostChecklistSettings() {
   el.innerHTML = list.map((ch, i) => `
     <div class="post-check-setting-row">
       <span style="flex:1; font-size:13px;">${escapeHtml(ch.label)}</span>
-      <button class="btn danger small" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button class="btn danger small sm-pro-form" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="del-post-check" data-idx="${i}" aria-label="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}" title="${escapeHtml(t('common.remove'))}: ${escapeHtml(ch.label)}">${escapeHtml(t('common.remove'))}</button>
     </div>`).join('');
 }
 
@@ -6616,9 +6630,10 @@ function renderCustomFieldsSettings() {
   }
   el.innerHTML = fields.map((f, i) => `
     <div class="post-check-setting-row">
-      <span style="flex:1; font-size:13px;">${escapeHtml(f.label)}</span>
-      <span style="font-size:11px; color:var(--text-muted); margin-inline-end:8px;">${escapeHtml(f.type || 'text')}</span>
-      <button class="btn danger small" data-act="del-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <span style="flex:1; font-size:13px;">${escapeHtml(f.label)}<span class="sm-simple-only sm-row-sub">${escapeHtml(t('sm.cf_text_sub'))}</span></span>
+      <span class="sm-pro-form" style="font-size:11px; color:var(--text-muted); margin-inline-end:8px;">${escapeHtml(f.type || 'text')}</span>
+      <button class="btn danger small sm-pro-form" data-act="del-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.delete'))}" title="${escapeHtml(t('common.delete'))}">×</button>
+      <button type="button" class="btn ghost small sm-simple-only sm-link-btn" data-act="edit-custom-field" data-idx="${i}" aria-label="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}" title="${escapeHtml(t('common.edit'))}: ${escapeHtml(f.label)}">${escapeHtml(t('common.edit'))}</button>
     </div>`).join('');
 }
 
@@ -6633,6 +6648,36 @@ function addCustomField() {
   saveAll();
   renderCustomFieldsSettings();
   toast(t('set.custom_field_added'), 'success');
+}
+
+/** Simple (S4 card 7): "Edit" on a custom order field renames it, or removes
+ *  it. The field keeps its id and type, so what orders already hold under it
+ *  stays theirs. */
+function editCustomField(idx) {
+  const f = (settings.customFields || [])[idx];
+  if (!f) return;
+  openFormModal({
+    title: t('sm.cf_edit_title'),
+    sizeLg: false,
+    bodyHtml: `<label for="smCfLabel">${escapeHtml(t('common.name'))}</label>
+      <input type="text" id="smCfLabel" value="${escapeHtml(f.label || '')}" required>
+      <p class="settings-hint" style="margin:6px 0 0;">${escapeHtml(t('sm.cf_text_sub'))}</p>
+      <button type="button" class="btn ghost small" id="smCfRemove" style="margin-top:14px;color:var(--danger);">${escapeHtml(t('common.remove'))}</button>`,
+    onMount(modal) {
+      modal.querySelector('#smCfRemove')?.addEventListener('click', () => {
+        modal.querySelector('[data-act="cancel"]')?.click();
+        deleteCustomField(idx);
+      });
+    },
+    onSave(modal) {
+      const label = (modal.querySelector('#smCfLabel')?.value || '').trim();
+      if (!label) return false;
+      f.label = label;
+      saveAll();
+      renderCustomFieldsSettings();
+      return true;
+    },
+  });
 }
 
 function deleteCustomField(idx) {
@@ -6990,10 +7035,10 @@ function renderTelegramSettings() {
   if (!el) return;
   const tg = settings.telegram || {};
   el.innerHTML = `
-    <label>Bot Token</label>
-    <input type="password" id="tgBotToken" value="${escapeHtml(tg.botToken || '')}" placeholder="123456:ABC-...">
-    <label style="margin-top:8px;">Chat ID</label>
-    <input type="text" id="tgChatId" value="${escapeHtml(tg.chatId || '')}" placeholder="-100123456789 or @yourchannel">
+    <label for="tgBotToken">${escapeHtml(t('tg.bot_token'))}</label>
+    <input type="password" id="tgBotToken" dir="ltr" value="${escapeHtml(tg.botToken || '')}" placeholder="123456:ABC-...">
+    <label for="tgChatId" style="margin-top:8px;">${escapeHtml(t('tg.chat_id'))}</label>
+    <input type="text" id="tgChatId" dir="ltr" value="${escapeHtml(tg.chatId || '')}" placeholder="-100123456789 · @yourchannel">
     <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${escapeHtml(t('tg.chat_id_hint') || 'A numeric id for a group, or the @username of a public channel.')}</div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
       <button class="btn small" id="btnTgTest">${escapeHtml(t('alerts.send_test'))}</button>
@@ -7001,13 +7046,13 @@ function renderTelegramSettings() {
     <div style="margin-top:12px;">
       <div style="font-weight:600;font-size:13px;">${escapeHtml(t('alerts.when'))}</div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyComplete" style="width:auto;" ${tg.notifyOnComplete ? 'checked' : ''}> Notify on order completed
+        <input type="checkbox" id="tgNotifyComplete" style="width:auto;" ${tg.notifyOnComplete ? 'checked' : ''}> ${escapeHtml(t('tg.notify_complete'))}
       </label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyHold" style="width:auto;" ${tg.notifyOnHold ? 'checked' : ''}> Notify on order on_hold
+        <input type="checkbox" id="tgNotifyHold" style="width:auto;" ${tg.notifyOnHold ? 'checked' : ''}> ${escapeHtml(t('tg.notify_hold'))}
       </label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-        <input type="checkbox" id="tgNotifyLowStock" style="width:auto;" ${tg.notifyOnLowStock ? 'checked' : ''}> Notify on low stock
+        <input type="checkbox" id="tgNotifyLowStock" style="width:auto;" ${tg.notifyOnLowStock ? 'checked' : ''}> ${escapeHtml(t('tg.notify_low'))}
       </label>
       ${_alertSwitchesHtml('tgA', {
         error: tg.notifyPrinterError !== false, offline: tg.notifyPrinterOffline !== false,
@@ -7192,6 +7237,7 @@ function renderNtfySettings() {
     addPostCheckItem,
     deletePostCheckItem,
     renderCustomFieldsSettings,
+    editCustomField,
     addCustomField,
     deleteCustomField,
     exportData,

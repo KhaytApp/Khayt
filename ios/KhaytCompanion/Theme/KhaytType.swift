@@ -9,9 +9,11 @@ import UIKit
 ///   22 pt or more, so the screens' big figures move with no call site touched.
 /// - **JetBrains Mono** for data and eyebrows: `.khaytMono`.
 ///
-/// Every size scales with Dynamic Type through `relativeTo:`. None of the three
-/// has Arabic; iOS falls back to its Arabic system face for those glyphs on its
-/// own, as the website's stack does.
+/// - **IBM Plex Sans Arabic** for every face when the app is in Arabic
+///   (Turki, Nov 11: one Arabic font on every app). None of the three above
+///   has Arabic, and iOS's fallback face sat beside them mid-line.
+///
+/// Every size scales with Dynamic Type through `relativeTo:`.
 enum KhaytType {
     /// The size from which `.khayt` draws in the display face.
     static let displayFrom: CGFloat = 22
@@ -42,10 +44,34 @@ enum KhaytType {
         }
     }
 
+    /// IBM Plex Sans Arabic: in Arabic, every face (text, display and data)
+    /// is this one (Turki, Nov 11: one Arabic font on every app, as the
+    /// desktop and the website already use). It carries Latin too, so a
+    /// customer's name or "S-1041" inside Arabic text sets in the same face
+    /// instead of iOS's Arabic fallback beside Hanken Grotesk.
+    static func arabicName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .bold, .heavy, .black: return "IBMPlexSansArabic-Bold"
+        case .semibold: return "IBMPlexSansArabic-SemiBold"
+        case .medium: return "IBMPlexSansArabic-Medium"
+        default: return "IBMPlexSansArabic-Regular"
+        }
+    }
+
+    /// The text face for the app's language: Plex Arabic in Arabic.
+    static func textName(_ weight: Font.Weight, arabic: Bool = L10n.usesArabicLayout) -> String {
+        arabic ? arabicName(weight) : postScriptName(weight)
+    }
+
+    /// The display face for the app's language: Plex Arabic Bold in Arabic.
+    static func titleName(_ weight: Font.Weight, arabic: Bool = L10n.usesArabicLayout) -> String {
+        arabic ? arabicName(.bold) : displayName(weight)
+    }
+
     /// Every face the app asks for by name — what Info.plist must register.
     static var allNames: [String] {
         let w: [Font.Weight] = [.regular, .medium, .semibold, .bold]
-        return Array(Set(w.map(postScriptName) + w.map(displayName) + w.map(monoName))).sorted()
+        return Array(Set(w.map(postScriptName) + w.map(displayName) + w.map(monoName) + w.map(arabicName))).sorted()
     }
 
     /// Navigation titles in the design's faces, set once at launch: the large
@@ -53,13 +79,13 @@ enum KhaytType {
     static func applyNavigationBarAppearance() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
-        if let large = UIFont(name: displayName(.semibold), size: 32) {
+        if let large = UIFont(name: titleName(.semibold), size: 32) {
             appearance.largeTitleTextAttributes = [
                 .font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large),
                 .kern: -0.6,
             ]
         }
-        if let inline = UIFont(name: postScriptName(.semibold), size: 17) {
+        if let inline = UIFont(name: textName(.semibold), size: 17) {
             appearance.titleTextAttributes = [.font: UIFontMetrics(forTextStyle: .headline).scaledFont(for: inline)]
         }
         UINavigationBar.appearance().standardAppearance = appearance
@@ -77,14 +103,14 @@ extension Font {
     static func khayt(_ size: CGFloat, _ weight: Font.Weight = .regular,
                       relativeTo style: Font.TextStyle = .body) -> Font {
         size >= KhaytType.displayFrom
-            ? .custom(KhaytType.displayName(weight), size: size, relativeTo: style)
-            : .custom(KhaytType.postScriptName(weight), size: size, relativeTo: style)
+            ? .custom(KhaytType.titleName(weight), size: size, relativeTo: style)
+            : .custom(KhaytType.textName(weight), size: size, relativeTo: style)
     }
 
     /// Archivo at any size — a hero number or title below the display cut.
     static func khaytDisplay(_ size: CGFloat, _ weight: Font.Weight = .bold,
                              relativeTo style: Font.TextStyle = .title) -> Font {
-        .custom(KhaytType.displayName(weight), size: size, relativeTo: style)
+        .custom(KhaytType.titleName(weight), size: size, relativeTo: style)
     }
 
     /// JetBrains Mono — order numbers, grams, times, eyebrows.
@@ -96,7 +122,7 @@ extension Font {
     static func khaytMono(_ size: CGFloat, _ weight: Font.Weight = .medium,
                           relativeTo style: Font.TextStyle = .caption) -> Font {
         L10n.usesArabicLayout
-            ? .custom(KhaytType.postScriptName(weight), size: size, relativeTo: style)
+            ? .custom(KhaytType.arabicName(weight), size: size, relativeTo: style)
             : .custom(KhaytType.monoName(weight), size: size, relativeTo: style)
     }
 }

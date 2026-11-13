@@ -130,6 +130,9 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         ShopFeed.shared.add(FeedItem(id: id, kind: kind, title: body,
                                      at: ISO8601DateFormatter().date(from: at) ?? Date(), tone: tone,
                                      unread: true, orderId: nil))
+        // Apple's copy of these is always shown (see `alwaysPushed`); a
+        // second banner from the stream would say it twice.
+        if Self.alwaysPushed.contains(kind), api.receivesPush { return }
         let c = UNMutableNotificationContent()
         c.title = L10n.tr("PUSH_TITLE")
         c.body = body
@@ -184,25 +187,66 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     /// The alert itself — the same builder the notification service
     /// extension uses for a push, so an ending reads the same however it came.
     nonisolated static func content(for event: PrintFinished, orderStatus: String?) -> UNMutableNotificationContent {
-        PrintAlertText.content(for: event, orderStatus: orderStatus, tr: L10n.tr)
+        PrintAlertText.content(for: event, orderStatus: orderStatus, locale: L10n.locale, tr: L10n.tr)
     }
 
     // MARK: - UNUserNotificationCenterDelegate
 
     /// Shown even with the app open: a print ending is worth a banner —
-    /// except Apple's copy of an ending the open stream has already said.
+    /// except Apple's copy of something the open stream says itself.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             willPresent notification: UNNotification) async
         -> UNNotificationPresentationOptions {
         let fromApple = notification.request.trigger is UNPushNotificationTrigger
-        if fromApple, await MainActor.run(body: { self.printers?.streamOpen ?? false }) { return [] }
+        let kind = Self.pushKind(notification.request.content.userInfo)
+        if fromApple, Self.streamSays(kind: kind),
+           await MainActor.run(body: { self.printers?.streamOpen ?? false }) { return [] }
         return [.banner, .sound, .list]
+    }
+
+    /// Kinds whose push is ALWAYS shown, even with the stream open: a
+    /// customer's answer, message or payment must never be lost to a stream
+    /// that dropped it (push review P8, Dev Hub Nov 13). The stream's own copy
+    /// of these goes to the feed only, so each is said once.
+    nonisolated static let alwaysPushed: Set<String> = ["quote-decision", "message", "payment"]
+
+    /// True when the open stream says this kind itself, so Apple's copy may be
+    /// held back. Unknown kinds and pushes with no kind are always shown.
+    nonisolated static func streamSays(kind: String?) -> Bool {
+        guard let kind else { return false }
+        return ["print-finished", "intake", "overdue", "low-stock", "due-today"].contains(kind)
+    }
+
+    /// The `kind` of a pushed alert: the cloud's `k` block, or a rewritten
+    /// print alert (which keeps `k`, and is a print ending by its `outcome`).
+    nonisolated static func pushKind(_ info: [AnyHashable: Any]) -> String? {
+        if let kind = (info["k"] as? [String: Any])?["kind"] as? String { return kind }
+        return info["outcome"] != nil ? "print-finished" : nil
+    }
+
+    /// The shop an alert is about, when it says: a rewritten print alert's
+    /// `shopId`, or the cloud's `k.shopId`.
+    nonisolated static func pushShop(_ info: [AnyHashable: Any]) -> String? {
+        (info["shopId"] as? String) ?? (info["k"] as? [String: Any])?["shopId"] as? String
+    }
+
+    /// May a tapped alert act on this phone's book? Not when it names a shop
+    /// other than the one signed in (push review P2): its job id would open,
+    /// or move, a job of the wrong shop. An alert that names no shop — a
+    /// local one, or from an older cloud — is this phone's own.
+    nonisolated static func belongsHere(_ info: [AnyHashable: Any], signedInShop: String?) -> Bool {
+        guard let shop = pushShop(info) else { return true }
+        return shop == signedInShop
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
         let request = response.notification.request
         let info = request.content.userInfo
+        // Another shop's alert, from before a sign-out or a switch: open the
+        // app, act on nothing.
+        let here = await MainActor.run { self.api.cloud?.shopId }
+        guard Self.belongsHere(info, signedInShop: here) else { return }
         // The alert itself tapped, not one of its buttons: open what it is about.
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
             guard var to = OrdersNavigationState.destination(identifier: request.identifier,

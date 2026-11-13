@@ -29,6 +29,8 @@ public enum KhaytJSError: Error, CustomStringConvertible {
 public final class JSRuntime {
     private let context: JSContext
     private var lastException: String?
+    /// How many arguments this context has parsed (`EngineFaults.LargeParse`).
+    private var parses = 0
     /// Where the JS resources are, kept for languages loaded after start.
     private let bundle: Bundle
 
@@ -414,6 +416,11 @@ public final class JSRuntime {
         var bound: [String] = []
         for (i, json) in jsons.enumerated() {
             lastException = nil
+            // Said before a large one starts, because a process has died
+            // inside this call and left nothing to say which (`LargeParse`).
+            EngineFaults.aboutToParse(bytes: json.utf8.count, argument: i, of: jsons.count,
+                                      parsesBefore: parses)
+            parses += 1
             let value = parse?.call(withArguments: [json])
             if let problem = lastException { unbind(bound); throw KhaytJSError.evaluationFailed(problem) }
             let name = "__karg\(i)"

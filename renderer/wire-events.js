@@ -1562,7 +1562,12 @@ function wireEvents() {
   });
 
   // Schedule view toggle (Feature 2)
-  $('#btnScheduleView')?.addEventListener('click', () => {
+  // Schedule, kiosk and campaigns are Professional (SIMPLE_MAP): their buttons
+  // are hidden in Simple, and anything that still clicks one is offered the
+  // switch instead (KhaytSimpleMode.allow).
+  const simpleAllows = (key, btn) => !window.KhaytSimpleMode || window.KhaytSimpleMode.allow(key, (btn?.textContent || '').trim());
+  $('#btnScheduleView')?.addEventListener('click', (e) => {
+    if (!simpleAllows('schedule', e.currentTarget)) return;
     const sv = $('#scheduleView');
     const kanban = document.querySelector('.kanban');
     if (!sv || !kanban) return;
@@ -1587,7 +1592,8 @@ function wireEvents() {
   $('#btnBatchPlanner')?.addEventListener('click', openBatchPlannerModal);
 
   // Kiosk view toggle
-  $('#btnKioskView')?.addEventListener('click', () => {
+  $('#btnKioskView')?.addEventListener('click', (e) => {
+    if (!simpleAllows('kiosk', e.currentTarget)) return;
     const el = $('#kioskView');
     if (!el) return;
     const isVisible = el.style.display !== 'none';
@@ -1911,7 +1917,10 @@ function wireEvents() {
   $('#btnImportSpoolman')?.addEventListener('click', () => openSpoolmanImport());
   $('#btnImportClientsCsv')?.addEventListener('click', importClientsCsv);
   $('#btnExportClientsCsv')?.addEventListener('click', () => exportClientsCsv());
-  $('#btnCampaign')?.addEventListener('click', () => openCampaignModal());
+  $('#btnCampaign')?.addEventListener('click', (e) => {
+    if (window.KhaytSimpleMode && !window.KhaytSimpleMode.allow('campaigns', e.currentTarget.textContent.trim())) return;
+    openCampaignModal();
+  });
   $('#btnSubscriptions')?.addEventListener('click', () => { if (typeof openSubscriptionsModal === 'function') openSubscriptionsModal(); });
   $('#btnActivityLog')?.addEventListener('click', () => { if (typeof openActivityLog === 'function') openActivityLog(); });
   const chkAutoDraftPo = $('#chkAutoDraftPo');
@@ -2020,6 +2029,8 @@ function wireEvents() {
   $('#customFieldsList')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act="del-custom-field"]');
     if (btn) deleteCustomField(+btn.dataset.idx);
+    const edit = e.target.closest('[data-act="edit-custom-field"]');
+    if (edit) editCustomField(+edit.dataset.idx);
   });
 
   // Operational settings save — delegate to saveSettingsFromForm so all fields are preserved

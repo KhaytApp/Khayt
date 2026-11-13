@@ -451,6 +451,12 @@ private struct Reachable: ViewModifier {
             // one is frontmost.
             .focusedSceneValue(\.inspectorShowing, $showInspector)
             .focusedSceneValue(\.searchWanted, $searchWanted)
+            // The capture run's way to open the details panel: it cannot use
+            // the menu (no responder chain in a headless run), and nothing
+            // else posts this. See `Snapshot.openDetails`.
+            .onReceive(NotificationCenter.default.publisher(for: Snapshot.wantsDetails)) { _ in
+                showInspector = true
+            }
     }
 }
 
@@ -991,6 +997,14 @@ struct WindowPanels: ViewModifier {
                     var quietly = Transaction()
                     quietly.disablesAnimations = true
                     withTransaction(quietly) { panelIsOpen = wanted }
+                }
+            }
+            // The capture run again (`Snapshot.openDetails`): this shell keeps
+            // a second switch, a turn behind the first, so both are set.
+            .onReceive(NotificationCenter.default.publisher(for: Snapshot.wantsDetails)) { _ in
+                Task { @MainActor in
+                    showInspector = true
+                    panelIsOpen = true
                 }
             }
             .inspector(isPresented: Binding(

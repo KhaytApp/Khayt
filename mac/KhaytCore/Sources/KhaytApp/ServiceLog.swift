@@ -254,7 +254,7 @@ struct ServiceLog: View {
                 // would claim it cost nothing.
                 Text(entry.cost > 0 ? Money.short(entry.cost, shop.currency) : "—")
                     .font(.callout).monospacedDigit()
-                    .foregroundStyle(entry.cost > 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(entry.cost > 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(Khayt.faint))
                 Button(action: remove) {
                     Image(systemName: "xmark.circle.fill")
                 }
