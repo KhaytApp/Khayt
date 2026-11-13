@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import KhaytCore
 
 /// Telling the shop's people that something happened, through Khayt Cloud.
@@ -32,9 +33,28 @@ enum ShopEventPublisher {
     static let maxCiphertextBytes = 3 * 1024
 
     private struct Body: Encodable {
+        /// The same for every attempt at one event, so the cloud can drop a
+        /// repeat: an alert is held and tried again (`Shop.flushPendingEvents`),
+        /// and a post that timed out AFTER the cloud took it would otherwise
+        /// reach the phones twice. Left out when nil.
+        let id: String?
         let kind: String
         let at: String
         let ciphertext: SyncCrypto.Blob
+    }
+
+    /// A stable id for one event: a hash of what makes it that event, never
+    /// of when it was sent. Not secret and not reversible: the cloud sees it
+    /// in the clear beside `kind`, so it carries no name or file.
+    static func eventId(kind: String, parts: [String]) -> String {
+        let text = ([kind] + parts).joined(separator: "\u{1F}")
+        return SHA256.hash(data: Data(text.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The print-finished id: the machine, the job (or the file when the book
+    /// names no job), and when the print ended.
+    static func printFinishedId(_ ended: FinishCamera.Ended, at: String) -> String {
+        eventId(kind: "print-finished", parts: [ended.machineId, ended.orderId ?? "", ended.filename, at])
     }
 
     /// What the iPhone decrypts for `print-finished` — payload v1, as agreed
@@ -65,13 +85,13 @@ enum ShopEventPublisher {
 
     /// Seal and send one event.
     static func send(_ connection: CloudReader.Connection, token: String, dek: Data,
-                     kind: String, at: String, payload: [String: JSONValue],
+                     kind: String, at: String, payload: [String: JSONValue], id: String? = nil,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Outcome {
         let sealed = try SyncCrypto.seal(payload, dek: dek)
         guard try JSONEncoder().encode(sealed).count <= maxCiphertextBytes else { return .tooLarge }
         var request = try CloudReader.request(connection, token: token, method: "POST", tail: "/events")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(Body(kind: kind, at: at, ciphertext: sealed))
+        request.httpBody = try JSONEncoder().encode(Body(id: id, kind: kind, at: at, ciphertext: sealed))
         let (_, response) = try await fetch(request)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200: return .sent
