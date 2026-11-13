@@ -117,6 +117,14 @@ test('moneySummary: spent this month; best customers this year; top products thi
   assert.strictEqual(m.topProducts[0].count, 2);
 });
 
+test('moneySummary: a job with no catalogue product is listed by its name, never by its tags (X14)', () => {
+  const extra = { ...book, orders: [...book.orders,
+    { id: 'J-lamp', project: 'Desk lamp', status: 'completed', date: '2026-11-10', price: 9999, tags: ['sample'], parts: [] }] };
+  const names = S.moneySummary(extra, ctx).topProducts.map((r) => r.name);
+  assert.ok(names.includes('Desk lamp'), names.join(', '));
+  assert.ok(!names.includes('sample'), names.join(', '));
+});
+
 test('moneySummary: VAT due for the quarter holding today, with the Saudi deadline', () => {
   const m = S.moneySummary(book, ctx);
   assert.ok(m.vat, 'a registered shop gets the line');
