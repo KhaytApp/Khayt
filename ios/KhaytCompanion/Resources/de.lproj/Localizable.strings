@@ -1315,6 +1315,25 @@
 "load.failed.title" = "Laden fehlgeschlagen";
 "load.retry" = "Erneut versuchen";
 "load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
+
+/* S4: Simple mode */
+"mode.simple" = "Einfach";
+"mode.professional" = "Professionell";
+"mode.badge.a11y" = "Modus: %@, auf dem Mac festgelegt";
+"simple.stage.ready" = "Fertig";
+"simple.note.on_hold" = "Pausiert";
+"simple.note.post" = "Nachbearbeitung";
+"simple.note.qc" = "In Prüfung";
+"simple.note.shipped" = "Versandt";
+"simple.note.delivered" = "Übergeben";
+"simple.expenses.month" = "Diesen Monat: %@ · %@";
+"simple.gate.care.title" = "Wartungspläne gehören zu Professionell";
+"simple.gate.care.body" = "Dieser Shop ist auf dem Mac auf Einfach gestellt. Für Wartungspläne wechsle in Khayt auf deinem Mac zu Professionell. Das Telefon folgt der Wahl des Macs.";
+"simple.gate.parts.title" = "Teile zum Kaufen gehört zu Professionell";
+"simple.gate.parts.body" = "Dieser Shop ist auf dem Mac auf Einfach gestellt. Die Teileliste stammt aus den Wartungsplänen, die zu Professionell gehören: wechsle in Khayt auf deinem Mac. Das Telefon folgt der Wahl des Macs.";
+"simple.gate.back_machine" = "Zurück zur Maschine";
+"simple.gate.back_machines" = "Zurück zu Maschinen";
+"simple.expenses.count" = "%d Ausgaben";
 "PUSH_GENERIC" = "In deiner Werkstatt gibt es etwas zu sehen";
 "push.not_connected" = "Benachrichtigungen erreichen dieses iPhone noch nicht. Khayt versucht es beim nächsten Öffnen erneut.";
 /* Home — Needs you */

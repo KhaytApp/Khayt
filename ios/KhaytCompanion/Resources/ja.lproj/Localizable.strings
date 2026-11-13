@@ -1315,6 +1315,25 @@
 "load.failed.title" = "読み込めませんでした";
 "load.retry" = "再試行";
 "load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
+
+/* S4: Simple mode */
+"mode.simple" = "シンプル";
+"mode.professional" = "プロフェッショナル";
+"mode.badge.a11y" = "モード：%@（Macで設定）";
+"simple.stage.ready" = "完成";
+"simple.note.on_hold" = "保留中";
+"simple.note.post" = "後処理中";
+"simple.note.qc" = "検品中";
+"simple.note.shipped" = "発送済み";
+"simple.note.delivered" = "引き渡し済み";
+"simple.expenses.month" = "今月：%@ · %@";
+"simple.gate.care.title" = "メンテナンス計画はプロフェッショナルの機能です";
+"simple.gate.care.body" = "このショップはMacでシンプルに設定されています。メンテナンス計画を使うには、MacのKhaytでプロフェッショナルに切り替えてください。電話はMacの設定に従います。";
+"simple.gate.parts.title" = "購入する部品はプロフェッショナルの機能です";
+"simple.gate.parts.body" = "このショップはMacでシンプルに設定されています。部品リストはプロフェッショナルの機能であるメンテナンス計画から作られます。MacのKhaytで切り替えてください。電話はMacの設定に従います。";
+"simple.gate.back_machine" = "マシンに戻る";
+"simple.gate.back_machines" = "マシンに戻る";
+"simple.expenses.count" = "経費%d件";
 "PUSH_GENERIC" = "ショップに確認が必要な項目があります";
 "push.not_connected" = "通知はまだこのiPhoneに届いていません。次に開いたときに再試行します。";
 /* Home — Needs you */

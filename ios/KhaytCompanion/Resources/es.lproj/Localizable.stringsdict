@@ -162,5 +162,21 @@
 			<string>y %d más</string>
 		</dict>
 	</dict>
+	<key>simple.expenses.count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>d</string>
+			<key>one</key>
+			<string>%d gasto</string>
+			<key>other</key>
+			<string>%d gastos</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

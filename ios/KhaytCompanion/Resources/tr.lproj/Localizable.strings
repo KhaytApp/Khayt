@@ -1315,6 +1315,25 @@
 "load.failed.title" = "Yüklenemedi";
 "load.retry" = "Tekrar dene";
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
+
+/* S4: Simple mode */
+"mode.simple" = "Basit";
+"mode.professional" = "Profesyonel";
+"mode.badge.a11y" = "Mod: %@, Mac'te ayarlanır";
+"simple.stage.ready" = "Hazır";
+"simple.note.on_hold" = "Beklemede";
+"simple.note.post" = "Son işlem";
+"simple.note.qc" = "Kontrolde";
+"simple.note.shipped" = "Kargolandı";
+"simple.note.delivered" = "Teslim edildi";
+"simple.expenses.month" = "Bu ay: %@ · %@";
+"simple.gate.care.title" = "Bakım planları Profesyonel moda dahildir";
+"simple.gate.care.body" = "Bu dükkan Mac'te Basit moda ayarlı. Bakım planlarını kullanmak için Mac'inizdeki Khayt'ta Profesyonel moda geçin. Telefon Mac'in seçimini izler.";
+"simple.gate.parts.title" = "Alınacak parçalar Profesyonel moda dahildir";
+"simple.gate.parts.body" = "Bu dükkan Mac'te Basit moda ayarlı. Parça listesi Profesyonel moddaki bakım planlarından gelir: Mac'inizdeki Khayt'ta geçiş yapın. Telefon Mac'in seçimini izler.";
+"simple.gate.back_machine" = "Makineye dön";
+"simple.gate.back_machines" = "Makinelere dön";
+"simple.expenses.count" = "%d gider";
 "PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";
 "push.not_connected" = "Bildirimler henüz bu telefona ulaşmıyor. Khayt bir sonraki açılışta yeniden deneyecek.";
 /* Home — Needs you */
