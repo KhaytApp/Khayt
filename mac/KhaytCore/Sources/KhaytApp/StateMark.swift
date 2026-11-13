@@ -208,21 +208,28 @@ enum ShopState: String, CaseIterable, Hashable {
         }
     }
 
+    /// The state's GRAPHIC colour: its glyph, a rail, a card's edge.
     var tint: Color {
         switch self {
         case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.late
         case .orderToday, .machineCheck, .nozzleWorn, .stockLow, .finishing: Role.warn
-        case .running:                     Role.ok
+        // Printing is amber on every Khayt app; green is for done and paid.
+        case .running:                     Khayt.thread
         case .queued, .done:               Role.text2
         case .quoted, .offline, .cancelled: Role.text3
         }
     }
 
+    /// The colour of the state's WORD. The same as `tint` for every state but
+    /// running: amber is about 2:1 on paper, so "PRINTING" is ink beside an
+    /// amber mark, on the thread's wash.
+    var ink: Color { self == .running ? Role.text : tint }
+
     var ground: Color? {
         switch self {
         case .orderLate, .machineStopped, .nozzleBlocked, .stockOut: Role.lateBg
         case .orderToday, .machineCheck, .nozzleWorn, .stockLow:     Role.warnBg
-        case .running:                                               Role.okBg
+        case .running:                                               Khayt.threadWash
         default:                                                     nil
         }
     }
@@ -296,6 +303,7 @@ struct StateChip: View {
                 .font(state.face.flatMap {
                     NSFont(name: $0, size: state.markSize(10)).map(Font.init)
                 })
+                .foregroundStyle(onNavy ? Role.onNavy : state.tint)
             Text(words.callIt(state.wordKey).uppercased())
                 .tracking(Words.spaced(0.9))
         }
@@ -304,7 +312,7 @@ struct StateChip: View {
         .lineLimit(1)
         .fixedSize(horizontal: false, vertical: true)
         .font(TypeScale.label(10))
-        .foregroundStyle(onNavy ? Role.onNavy : state.tint)
+        .foregroundStyle(onNavy ? Role.onNavy : state.ink)
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
         .background {

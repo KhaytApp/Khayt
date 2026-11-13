@@ -183,6 +183,7 @@ struct DryingLogSheet: View {
                             Button(role: .destructive) { deleting = row } label: { Image(systemName: "xmark") }
                                 .buttonStyle(.borderless)
                                 .help(shop.words.callIt("common.delete"))
+                                .accessibilityLabel(shop.words.callIt("common.delete"))
                                 .disabled(!shop.canMoveJobs)
                         }
                         .padding(.vertical, 5)

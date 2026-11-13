@@ -100,8 +100,8 @@ struct DepositAuditSheet: View {
             // The pair, in the order a correction reads: what is on the record
             // now, then what it should be.
             Text(Money.text(entry.currentPaid, currency))
-                .font(.callout).monospacedDigit().foregroundStyle(.tertiary)
-            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(.tertiary)
+                .font(.callout).monospacedDigit().foregroundStyle(Khayt.faint)
+            Image(systemName: "arrow.forward").font(.caption2).foregroundStyle(Khayt.faint)
             Text(Money.text(entry.recovered, currency))
                 .font(.callout).monospacedDigit().fontWeight(.medium)
             Button(shop.words.callIt("dep.restore_btn")) { confirming = entry }

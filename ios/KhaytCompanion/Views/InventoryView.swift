@@ -131,6 +131,7 @@ struct InventoryView: View {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(KhaytDesign.note)
                 }
                 .buttonStyle(.plain)
+                .tapTarget()
                 .accessibilityLabel(L10n.tr("common.clear"))
             }
         }

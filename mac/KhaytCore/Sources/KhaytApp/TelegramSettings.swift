@@ -79,7 +79,12 @@ struct TelegramSettings: View {
     var body: some View {
         Section(shop.words.callIt("mac.tg_section")) {
             row(shop.words.callIt("mac.tg_token")) {
-                SecureField(storedToken ? "••••••••" : "123456:ABC…", text: $draft.token)
+                // As a PROMPT, not a title: inside a Form a field's title is
+                // drawn as a label beside it, so the example sat outside the
+                // box (and a stored token would have printed dots there).
+                SecureField("", text: $draft.token,
+                            prompt: Text(verbatim: storedToken ? "••••••••" : "123456:ABC…"))
+                    .labelsHidden()
                     .frame(width: 240)
             }
             row(shop.words.callIt("mac.tg_chat")) {

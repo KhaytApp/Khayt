@@ -11,7 +11,8 @@ final class DesignV2FoundationTests: XCTestCase {
         for name in KhaytType.allNames {
             XCTAssertNotNil(UIFont(name: name, size: 17), name)
         }
-        XCTAssertEqual(KhaytType.allNames.count, 8)
+        // 8 website faces + 4 IBM Plex Sans Arabic (every face in Arabic).
+        XCTAssertEqual(KhaytType.allNames.count, 12)
     }
 
     func testBigSizesDrawInTheDisplayFace() {
@@ -39,13 +40,22 @@ final class DesignV2FoundationTests: XCTestCase {
         XCTAssertEqual(hex(KhaytDesign.thread, .light), "F2A541")
     }
 
-    func testStagesTakeTheMacsTodayColours() {
-        // Printing live green, QC and hold violet, done done, pending and post quiet.
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "34D27A")
+    func testStagesTakeTheSharedColours() {
+        // Turki, Nov 11, every app: printing AMBER (warn amber as ink, on the
+        // amber wash), QC and hold violet, done and paid GREEN, pending and
+        // post quiet.
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .dark), "E0A73C")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "printing"), .light), "8A5A0B")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "printing"), .light), "FDF1DE")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "printing"), .dark), "3A2C14")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "qc"), .dark), "B49CFF")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "on_hold"), .dark), "B49CFF")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "4FBFA0")
-        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "8AA4C2")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .dark), "34D27A")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "completed"), .light), "13803F")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .dark), "A9B8CF")
+        XCTAssertEqual(hex(KhaytDesign.statusColor(for: "pending"), .light), "5E6C84")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "pending"), .light), "EDF0F4")
+        XCTAssertEqual(hex(KhaytDesign.statusSoft(for: "pending"), .dark), "3A4658")
         XCTAssertEqual(hex(KhaytDesign.statusColor(for: "post"), .dark), "8AA4C2")
         // Rails stay rare: only printing and QC.
         XCTAssertEqual(["pending", "printing", "post", "qc", "completed"].filter(KhaytDesign.isRailed), ["printing", "qc"])
@@ -86,15 +96,48 @@ final class DesignV2FoundationTests: XCTestCase {
     }
 
     /// JetBrains Mono has no Arabic: in Arabic, the mono labels take the
-    /// text face (spaced letter by letter otherwise), and positive
-    /// letter-spacing is dropped, which pulled joined letters apart.
+    /// Arabic face, IBM Plex Sans Arabic (spaced letter by letter otherwise),
+    /// and positive letter-spacing is dropped, which pulled joined letters apart.
     func testArabicNeverSetsWordsInTheMonoFace() {
         let before = L10n.currentLanguage
         defer { L10n.setLanguage(before) }
         L10n.setLanguage(.en)
         XCTAssertEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
         L10n.setLanguage(.ar)
-        XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.postScriptName(.medium), size: 12, relativeTo: .caption))
+        XCTAssertEqual(Font.khaytMono(12), .custom(KhaytType.arabicName(.medium), size: 12, relativeTo: .caption))
+        XCTAssertEqual(Font.khayt(14), .custom("IBMPlexSansArabic-Regular", size: 14, relativeTo: .body))
+        XCTAssertEqual(Font.khaytDisplay(30), .custom("IBMPlexSansArabic-Bold", size: 30, relativeTo: .title))
         XCTAssertNotEqual(Font.khaytMono(12), .custom("JetBrainsMono-Medium", size: 12, relativeTo: .caption))
+    }
+
+    /// In Arabic every face is IBM Plex Sans Arabic (Turki, Nov 11: one Arabic
+    /// font on every app); English keeps the website's three. The Arabic face
+    /// is registered, really has Arabic letters, and has Latin for names and
+    /// references set inside Arabic text.
+    func testArabicUsesIBMPlexSansArabicEverywhere() throws {
+        for w: Font.Weight in [.regular, .medium, .semibold, .bold] {
+            XCTAssertTrue(KhaytType.textName(w, arabic: true).hasPrefix("IBMPlexSansArabic-"))
+            XCTAssertEqual(KhaytType.textName(w, arabic: false), KhaytType.postScriptName(w))
+            XCTAssertEqual(KhaytType.titleName(w, arabic: true), "IBMPlexSansArabic-Bold")
+            XCTAssertEqual(KhaytType.titleName(w, arabic: false), KhaytType.displayName(w))
+        }
+        for name in ["IBMPlexSansArabic-Regular", "IBMPlexSansArabic-Medium", "IBMPlexSansArabic-SemiBold", "IBMPlexSansArabic-Bold"] {
+            XCTAssertTrue(KhaytType.allNames.contains(name), name)
+            let font = try XCTUnwrap(UIFont(name: name, size: 14), "\(name) is not registered")
+            let set = CTFontCopyCharacterSet(font as CTFont) as CharacterSet
+            XCTAssertTrue(set.contains(Unicode.Scalar(0x0628)!), "\(name) has no Arabic")
+            XCTAssertTrue(set.contains(Unicode.Scalar(0x0053)!), "\(name) has no Latin")
+        }
+        XCTAssertEqual(PrintActivityLook.arabicName(.semibold), "IBMPlexSansArabic-SemiBold")
+    }
+
+    /// The Live Activity draws the same amber bar as the app and the widget,
+    /// and says "printing" in the warn amber, never the old live green.
+    func testTheLiveActivityPrintsInAmber() throws {
+        let src = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("KhaytWidget/PrintActivityViews.swift"), encoding: .utf8)
+        XCTAssertTrue(src.contains("case .printing: attention"))
+        XCTAssertTrue(src.contains("phase == .printing ? thread : tone(phase)"))
+        XCTAssertEqual(src.components(separatedBy: "PrintActivityLook.bar(state.phase)").count - 1, 2, "both bars use bar(_:)")
     }
 }

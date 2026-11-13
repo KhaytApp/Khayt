@@ -30,7 +30,7 @@ struct Sidebar: View {
     /// into its isolated forms, which is a different (and unreadable) word.
     private func eyebrow(_ key: String) -> some View {
         Text(shop.words.callIt(key))
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(TypeScale.eyebrow(10))
             .tracking(shop.words.isRTL ? 0 : 1.2)
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
@@ -261,7 +261,7 @@ struct Sidebar: View {
                 }
                 Spacer(minLength: 8)
                 if live {
-                    Circle().fill(Khayt.live).frame(width: 6, height: 6)
+                    Circle().fill(Khayt.thread).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
                 }
                 if let count {
@@ -370,7 +370,7 @@ private struct Provenance: View {
     // this window's own styling stays here.
     static func tint(_ tone: Shop.SyncTone) -> AnyShapeStyle {
         switch tone {
-        case .quiet: AnyShapeStyle(.tertiary)
+        case .quiet: AnyShapeStyle(Khayt.faint)
         case .normal: AnyShapeStyle(.secondary)
         case .attention: AnyShapeStyle(Khayt.attention)
         }

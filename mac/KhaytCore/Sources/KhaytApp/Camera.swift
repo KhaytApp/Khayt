@@ -364,7 +364,7 @@ struct CameraTile: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(.separator)
                 VStack(spacing: 6) {
-                    Drawn(mark: .machines, size: 26).foregroundStyle(.tertiary)
+                    Drawn(mark: .machines, size: 26).foregroundStyle(Khayt.faint)
                     if let note {
                         Text(note).font(.caption).foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

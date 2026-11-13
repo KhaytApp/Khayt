@@ -92,7 +92,7 @@ struct DashboardView: View {
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showSettings) { SettingsView(showsClose: true) }
             .sheet(isPresented: $showNew, onDismiss: openNewChoice) {
                 NewSheet(holdsBook: api.holdsBook) { newChoice = $0 }
             }

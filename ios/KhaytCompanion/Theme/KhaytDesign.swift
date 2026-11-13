@@ -8,10 +8,11 @@ import SwiftUI
 /// The names this app already used are kept and mapped onto these, so every
 /// screen moves to the new palette at once.
 ///
-/// Stages follow the Mac's Today: printing is `live` green, QC and on hold are
-/// `hold` violet, done is `done`, pending and post are quiet `note`. The amber
-/// `thread` is for progress and "today" only — a graphic colour, never text
-/// (#F2A541 on white is about 2:1).
+/// Stages, the same on every app (Turki, Nov 11): printing is AMBER — the
+/// warn amber `attention` as text and chip ink, on the `threadWash` — QC and
+/// on hold are `hold` violet, done and paid are GREEN, pending and post are
+/// quiet `note`. The bright `thread` amber stays graphic (bars, the today
+/// chip), never text (#F2A541 on white is about 2:1).
 enum KhaytDesign {
     // ── The palette ─────────────────────────────────────────────────────
     static let ground = Color(light: 0xF6F8F8, dark: 0x06182F)
@@ -21,7 +22,9 @@ enum KhaytDesign {
     static let brandV2 = Color(light: 0x216DCA, dark: 0x4C97F0)
     static let onBrand = Color(light: 0xFFFFFF, dark: 0x0B1622)
     static let hot = Color(light: 0xAF3E18, dark: 0xF0763D)
-    static let done = Color(light: 0x1B5E4F, dark: 0x4FBFA0)
+    /// Done and paid: green (Turki, Nov 11). The light value is the readable
+    /// green; the Mac's graphic #1BB55C is 2.9:1 as text on white.
+    static let done = Color(light: 0x13803F, dark: 0x34D27A)
     static let attention = Color(light: 0x8A5A0B, dark: 0xE0A73C)
     static let late = Color(light: 0xBB2D44, dark: 0xF2564A)
     static let note = Color(light: 0x5A636D, dark: 0x8AA4C2)
@@ -99,8 +102,9 @@ enum KhaytDesign {
     /// One colour per stage, as on the Mac's Today.
     static func statusColor(for status: String) -> Color {
         switch status.lowercased() {
-        case "pending": return note
-        case "printing": return live
+        // Waiting to start: the shared steel, on every app (Dev Hub, Nov 13).
+        case "pending": return pending
+        case "printing": return attention
         case "post": return note
         case "qc", "on_hold": return hold
         case "completed", "delivered", "shipped": return done
@@ -118,7 +122,10 @@ enum KhaytDesign {
     }
 
     static func statusSoft(for status: String) -> Color {
-        statusColor(for: status).opacity(0.16)
+        // Printing sits on the amber wash (Figma signal/progress-soft).
+        if status.lowercased() == "printing" { return threadWash }
+        if status.lowercased() == "pending" { return pendingWash }
+        return statusColor(for: status).opacity(0.16)
     }
 }
 

@@ -108,10 +108,13 @@ struct ConnectionBanner: View {
             Spacer(minLength: 0)
             Button(L10n.tr("pair.again.button")) { pairingAgain = true }
                 .font(.khayt(12, .semibold, relativeTo: .caption))
-                .foregroundStyle(Color.white)
+                // onBrand: white on the light fill, dark ink on the dark one,
+                // where white on #E0A73C read at about 2:1 (F9).
+                .foregroundStyle(KhaytDesign.onBrand)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .background(KhaytDesign.attention, in: RoundedRectangle(cornerRadius: 8))
+                .tapTarget()
         }
         .padding(.horizontal, KhaytDesign.pad)
         .padding(.vertical, 7)
@@ -143,12 +146,14 @@ struct ConnectionBanner: View {
                     .foregroundStyle(KhaytDesign.textDim)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
+                    .tapTarget()
                 Button(L10n.tr("connection.moved.use")) { Task { await health.acceptMove() } }
                     .font(.khayt(12, .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(KhaytDesign.onBrand)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
                     .background(KhaytDesign.attention, in: RoundedRectangle(cornerRadius: 8))
+                    .tapTarget()
             }
         }
         .padding(.horizontal, KhaytDesign.pad)
@@ -181,10 +186,11 @@ struct ConnectionBanner: View {
                     Task { await health.refresh() }
                 }
                 .font(.khayt(12, .semibold, relativeTo: .caption))
-                .foregroundStyle(loud ? Color.white : KhaytDesign.brand)
+                .foregroundStyle(loud ? KhaytDesign.onBrand : KhaytDesign.brand)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .background(loud ? tint : KhaytDesign.brand.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                .tapTarget()
             }
         }
         .padding(.horizontal, KhaytDesign.pad)

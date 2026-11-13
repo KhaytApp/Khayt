@@ -69,7 +69,7 @@ struct NtfySettings: View {
                         .textFieldStyle(.roundedBorder).frame(width: 240)
                 }
                 LabeledContent(shop.words.callIt("mac.ntfy_token")) {
-                    SecureField(storedToken ? "••••••••" : "", text: $draft.token)
+                    SecureField("", text: $draft.token, prompt: Text(verbatim: storedToken ? "••••••••" : "")).labelsHidden()
                         .textFieldStyle(.roundedBorder).frame(width: 240)
                 }
                 if storedToken && draft.token.isEmpty {

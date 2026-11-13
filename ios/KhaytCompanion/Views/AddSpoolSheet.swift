@@ -379,6 +379,8 @@ struct SpoolReviewForm: View {
                                             in: Capsule())
                                 .foregroundStyle(draft.material == m ? KhaytDesign.brand : KhaytDesign.textDim)
                                 .buttonStyle(.plain)
+                                .tapTarget()
+                                .accessibilityAddTraits(draft.material == m ? .isSelected : [])
                         }
                     }
                     .padding(.vertical, 2)

@@ -49,6 +49,8 @@ struct KhaytSearchField: View {
                         .foregroundStyle(KhaytDesign.textMuted)
                 }
                 .buttonStyle(.plain)
+                .tapTarget()
+                .accessibilityLabel(L10n.tr("common.clear"))
             }
         }
         .padding(.horizontal, 12)
