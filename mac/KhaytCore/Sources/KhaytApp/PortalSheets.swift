@@ -160,18 +160,15 @@ struct CustomerLinkSection: View {
         guard let checked = await shop.checkPortalResponse(job.id) else { said = shop.moveProblem; return }
         let r = checked.said
         let words = shop.words
-        var line: String
-        switch r.response {
-        case "approved":
-            // "…moved to Pending" only when it was; a refused move says why.
-            line = words.callIt(checked.moved ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
-            if r.advance, !checked.moved, let why = shop.moveProblem { line += " · " + why }
-        // Still a decline, said differently when it answered an older version
-        // of a quote the shop has since changed and sent again.
-        case "declined": line = words.callIt(r.stale == true ? "cloud.portal_declined_earlier" : "cloud.portal_declined")
-        default: line = words.callIt(r.paid ? "cloud.portal_deposit_paid" : "cloud.portal_no_response")
-        }
-        if r.paid, r.response != "none" { line += " · " + words.callIt("cloud.portal_deposit_paid") }
+        // WHICH words is the shared rule's answer (`lib/portal-owner.js
+        // responseLine`), the one the desktop reads too: approved, approved
+        // and moved on, declined, declined an earlier version, deposit paid,
+        // nothing yet. This sheet used to choose them itself, and the two
+        // apps had already parted once (a decline read "no response yet").
+        var line = words.callIt(checked.line.key)
+        // A move that was owed and refused says why.
+        if r.response == "approved", r.advance, !checked.moved, let why = shop.moveProblem { line += " · " + why }
+        if checked.line.paidNote { line += " · " + words.callIt("cloud.portal_deposit_paid") }
         // What became of the money: recorded, or why not. Nothing when it was
         // recorded on an earlier look.
         if let deposit = checked.deposit { line += " · " + deposit }
