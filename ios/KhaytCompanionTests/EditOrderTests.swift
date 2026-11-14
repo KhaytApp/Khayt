@@ -26,14 +26,21 @@ final class EditOrderTests: XCTestCase {
         try book.replace(with: SampleShop.book(), scope: SampleShop.scope())
         let engine = try await BookReader(book: book).sharedEngine()
         let order: JSONValue = .object(["id": .string("A"), "status": .string("pending"), "price": .number(100),
-                                        "paidAmount": .number(100), "priority": .bool(false)])
-        let edited = try await engine.editJob(order: order, fields: ["priorityLevel": .string("urgent"), "price": .number(80)],
-                                              now: Date(), editId: "edit-1")
+                                        "paidAmount": .number(50), "priority": .bool(false)])
+        let edited = try await engine.applyJobEdit(order: order, fields: ["priorityLevel": .string("urgent"), "price": .number(80)],
+                                                   now: Date(), editId: "edit-1", priceId: "price-1")
+        XCTAssertTrue(edited.ok)
         XCTAssertTrue(edited.changed)
         guard case .object(let o) = edited.order else { return XCTFail() }
         XCTAssertEqual(o["priorityLevel"], .string("urgent"))
         XCTAssertEqual(o["priority"], .bool(true))
         XCTAssertEqual(o["price"], .number(80))
-        XCTAssertEqual(o["paidAmount"], .number(80), "paid never exceeds the new price")
+        XCTAssertEqual(o["paidAmount"], .number(50))
+        // Below what was paid: refused, the job as it was — never capped.
+        let under = try await engine.applyJobEdit(order: order, fields: ["price": .number(40)],
+                                                  now: Date(), editId: "edit-2", priceId: "price-2")
+        XCTAssertFalse(under.ok)
+        XCTAssertEqual(under.reason, "paid_exceeds_price")
+        XCTAssertFalse(under.changed)
     }
 }
