@@ -1359,6 +1359,7 @@ const BRAND_MARK_SVG = `<svg viewBox="300 110 424 760" xmlns="http://www.w3.org/
     sendStatusWhatsApp,
     sendPaymentReminder,
     sendQuoteFollowUp,
+    markQuoteShared,
     shareTrackingWhatsApp,
     renderInvoiceForOrder,
     generateProformaInvoice,
