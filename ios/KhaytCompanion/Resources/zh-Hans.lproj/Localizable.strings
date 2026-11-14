@@ -1327,6 +1327,30 @@
 "load.retry" = "重试";
 "load.book_unavailable" = "无法在这台手机上读取账本。请重试，或确认 Mac 在附近。";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "下一步";
+"job.next.start_printing" = "开始打印";
+"job.next.mark_printed" = "标记为已打印";
+"job.next.send_to_qc" = "送去质检";
+"job.next.mark_ready" = "标记为就绪";
+"job.next.hand_over" = "交付";
+"job.next.resume" = "恢复";
+"job.next.done" = "已完成并付款";
+"job.next.none" = "无需操作";
+"job.more" = "更多";
+"job.more.label" = "此任务的更多操作";
+"job.header.due" = "截止 %@";
+"job.day_late" = "晚了 1 天";
+"job.days_late" = "晚了 %d 天";
+"job.section.parts" = "零件";
+"job.section.money" = "金额";
+"job.section.activity" = "动态";
+"job.money.price" = "价格";
+"job.money.paid" = "已付";
+"job.money.owing" = "待付";
+"job.money.owing_overdue" = "待付 · 已逾期";
+"job.parts.on_machine" = "在 %@ 上";
+"job.money.quote_sent" = "已发送";
 /* Settings in groups (S2) */
 "settings.search" = "搜索设置";
 "settings.search.none" = "没有与“%@”匹配的设置。";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d 卷线材不足";
 "needs.quotes" = "%d 份报价等待答复";
 "needs.more" = "还有 %d 项";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "发送报价";
+"job.next.take_job" = "接单";
+"job.next.hold" = "暂停订单";
+"job.next.fail_check" = "质检未通过";
+"job.blocked.production_paused" = "生产已暂停——请先恢复生产再开始新的打印任务。";
+"job.blocked.wip" = "“%2$@”已达 WIP 上限（%1$@）— 移动被阻止";
+"job.blocked.assembly_not_assembled" = "所有零件已通过质检——请将装配标记为已装配以完成订单。";
+"job.blocked.assembly_parts" = "等待零件：%@";
+"job.blocked.other" = "无法在此操作";
+"job.pill.paid" = "已付款";

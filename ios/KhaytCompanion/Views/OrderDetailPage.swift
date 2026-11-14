@@ -1,16 +1,25 @@
 import SwiftUI
 import KhaytCore
 
-/// One job, as `design/ios-v2/` draws it: a PAGE pushed onto the stack — not a
-/// sheet — with the job and who it is for, the few facts a shop floor needs,
-/// the five stages to put it in directly, and ONE button that moves it on.
+/// One job, as the 2026 redesign draws it (Figma R9W19Jakt19nKs1yM5GEde 38:93
+/// light, 39:136 dark; the shared rules on 39:265 and the Mac's 90:865): a
+/// PAGE pushed onto the stack, in six regions and in this order —
 ///
-/// There is no on-hold chip. The design has five stages and so does this page;
-/// holding a job is the Mac's.
+/// 1. the header: the job's name, `S-1041 · customer · due`, ONE stage pill
+///    in its stage colour and, only when late, "N days late" beside it;
+/// 2. the next step: ONE verb from the shared rule (`JobSteps`), pinned at the
+///    bottom above the tab bar so it is always in view, with More beside it
+///    for everything else the page can do;
+/// 3. the stage track: the five stages, tappable — for the job sent back
+///    from QC;
+/// 4. parts: what is being made, on which printer, and how far it is;
+/// 5. money: Price, Paid and Owing — Owing red only when it is overdue;
+/// 6. activity: shipping, the customer, the messages, the photos and the
+///    shop's connectors.
 ///
-/// A QUOTE has no stages to pick yet. Its page asks for the customer's answer
-/// instead — Approve, or Decline behind a confirmation — and shows the price
-/// and how long it stands, when the Quotes list handed the record over.
+/// A QUOTE has no stages to pick yet. Its next step is Approve; Decline sits
+/// in More behind a confirmation, and its price and how long it stands are in
+/// the money region when the Quotes list handed the record over.
 struct OrderDetailPage: View {
     @EnvironmentObject private var api: KhaytAPIClient
     @EnvironmentObject private var printers: LivePrinters
@@ -56,6 +65,11 @@ struct OrderDetailPage: View {
     @State private var revising: RevisingQuote?
     @State private var showingHistory = false
     @State private var followingUp = false
+    @State private var confirmingDecline = false
+    /// The shared rule's answer for this job (`lib/order-next-step.js`).
+    @State private var rule: KhaytEngine.NextSteps?
+    /// The quote's customer link, being shared (Send quote).
+    @State private var sharingQuote: ShareItem?
     @Environment(\.openURL) private var openURL
 
     init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
@@ -66,118 +80,82 @@ struct OrderDetailPage: View {
         self.onChanged = onChanged
     }
 
+    private var isQuote: Bool { order.status == OrderStatus.quote.rawValue }
+    private var isCancelled: Bool { order.status == "cancelled" }
+    private var canShip: Bool { !(shipChoices ?? []).isEmpty }
+    private var canRecordPayment: Bool { payment.map { $0.status != "paid" } ?? false }
+
+    /// The customer page link for this job, when there is one to send.
+    private var customerLink: URL? {
+        switch photoAccess {
+        case .ready(let token)?, .viewOnly(let token)?: return api.customerLink(token: token)
+        default: return nil
+        }
+    }
+
+    /// The page's next step and the others, from the shared rule (`JobSteps`).
+    private var steps: (primary: JobSteps.Step?, secondary: [JobSteps.Step]) {
+        guard let rule else { return (nil, []) }
+        return JobSteps.arranged(rule, hasCustomerLink: customerLink != nil)
+    }
+    private var stepCodes: Set<String> {
+        Set(([steps.primary].compactMap { $0 } + steps.secondary).map(\.code))
+    }
+    /// Re-asked whenever the job or what it owes changes.
+    private var ruleKey: String { "\(order.id)|\(order.status)|\(order.voided)|\(payment?.owed ?? -1)|\(api.canWrite)" }
+
+    /// Whether the activity region has anything to show.
+    private var hasActivity: Bool {
+        whatsApp != nil || canShip
+            || (customer.map { $0.dialNumber != nil || !($0.email ?? "").isEmpty } ?? false)
+            || api.holdsBook || !printPhotos.isEmpty || canAddPhoto
+            || photoAccess.map { $0 != .notPublished } ?? false
+    }
+
     var body: some View {
         ScrollViewReader { scroller in
         ScrollView {
-            // Asked where the sale is, as on the Mac: a model that may not be
-            // sold, printed and handed over, has a designer on the other end.
-            if !saleProblems.isEmpty {
-                LicenceNote(problems: saleProblems)
-                    .padding(.horizontal, 16).padding(.top, 12)
-            }
-            OrderDetailContent(order: order, facts: facts,
-                               live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
-                               isUpdating: isUpdating, machines: machines,
-                               errorMessage: errorMessage,
-                               onAdvance: { Task { await advance() } },
-                               onSetStatus: { st in Task { await setStatus(st) } },
-                               onAssignMachine: { id in Task { await assignMachine(id) } },
-                               quote: order.status == OrderStatus.quote.rawValue ? quote : nil,
-                               currency: currency,
-                               onAnswer: { answer in Task { await answerQuote(answer) } })
-                // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
-                .disabled(!api.canWrite)
-            // What the print drew from the wall, when a smart plug metered
-            // enough of it. Nothing at all otherwise.
-            if let energy {
-                EnergyCard(energy: energy)
-                    .id("energy")
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            if order.status == OrderStatus.quote.rawValue, let quoteState {
-                QuoteToolsCard(state: quoteState, followingUp: followingUp,
-                               onRevise: { Task { await startRevising() } },
-                               onFollowUp: { Task { await followUp() } },
-                               onHistory: { showingHistory = true })
+            VStack(alignment: .leading, spacing: 16) {
+                // 1 · Header. Asked where the sale is, as on the Mac: a model
+                // that may not be sold has a designer on the other end.
+                OrderDetailHeader(order: order, pillStage: rule?.pill.stage, late: rule?.late)
+                if !saleProblems.isEmpty {
+                    LicenceNote(problems: saleProblems)
+                }
+                // 2 · The next step is the bar pinned below (`nextBar`).
+                // 3 · Stage track · 4 · Parts.
+                OrderDetailContent(order: order, facts: facts,
+                                   live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
+                                   trackCurrent: rule.flatMap(JobSteps.trackCurrent),
+                                   isUpdating: isUpdating, machines: machines,
+                                   onSetStatus: { st in Task { await setStatus(st) } },
+                                   onAssignMachine: { id in Task { await assignMachine(id) } })
+                    // A viewer's cloud sign-in moves nothing (`ReadOnlyGate`).
                     .disabled(!api.canWrite)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            } else if order.status == OrderStatus.quote.rawValue, !api.holdsBook {
-                // No LAN route revises or follows up a quote: say so, rather
-                // than offer what this phone cannot do.
-                V2Note(text: L10n.tr("quote.needs_book"), tone: KhaytDesign.note)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
+                partsExtras
+                // 5 · Money.
+                moneyRegion
+                // 6 · Activity.
+                if hasActivity { activityRegion }
             }
-            if let payment {
-                PaymentCard(state: payment, currency: currency) { recordingPayment = true }
-                    .disabled(!api.canWrite)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
+            .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { nextBar }
+        .task(id: ruleKey) { rule = await api.nextSteps(orderId: order.id) }
+        // Send quote: the customer page link through the share sheet. Only a
+        // share the sheet reports done (a send, or Copy Link) marks it sent.
+        .sheet(item: $sharingQuote) { item in
+            ShareSheet(items: [item.url]) { _, completed in
+                sharingQuote = nil
+                Task {
+                    do {
+                        guard try await api.quoteShareEnded(orderId: order.id, completed: completed) else { return }
+                        rule = await api.nextSteps(orderId: order.id)
+                        await onChanged()
+                    } catch { errorMessage = error.localizedDescription }
+                }
             }
-            // A quote or a cancelled job has no invoice; the page says why for
-            // the rarer cases (waiting for approval, not numbered yet).
-            if order.status != "quote", order.status != "cancelled" {
-                Button { showingInvoice = true } label: { InvoiceCard() }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            // Accepted, not yet finished: a proforma to ask for payment with.
-            if BookReader.offersProforma(status: order.status) {
-                Button { showingProforma = true } label: { InvoiceCard(proforma: true) }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            if let shipChoices, !shipChoices.isEmpty {
-                Button { shipping = true } label: { ShipCard() }
-                    .buttonStyle(.plain)
-                    .disabled(!api.canWrite)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-                    .sheet(isPresented: $shipping) {
-                        ShipSheet(orderId: order.id, carriers: shipChoices) {
-                            self.shipChoices = await api.shipChoices(orderId: order.id)
-                        }
-                    }
-            }
-            // The papers besides the invoice, from the book. A quote is not
-            // work yet; a cancelled job is nothing to pack or make.
-            if api.holdsBook, order.status != "quote", order.status != "cancelled" {
-                JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            if let whatsApp {
-                WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            if let customer, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
-                ContactCard(client: customer)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            // The shop's connectors: their buttons for a job, and their own
-            // fields on it (read-only). Nothing is drawn without one.
-            if api.holdsBook {
-                ConnectorsCard(place: .order(order.id),
-                               outer: EdgeInsets(top: 0, leading: 16, bottom: 16, trailing: 16))
-                    .id("connectors")
-            }
-            // The finished print, as the Mac and the desktop keep it — the
-            // printer's own snapshot at the end of a print among them.
-            if !printPhotos.isEmpty || canAddPhoto {
-                PrintPhotosCard(photos: printPhotos, add: canAddPhoto ? { jpeg in
-                    let reply = await api.addJobPhoto(orderId: order.id, jpeg: jpeg)
-                    printPhotos = api.printPhotos(orderId: order.id)
-                    return reply
-                } : nil)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            // Only an order the Mac has published has a page to put a photo on.
-            if let photoAccess, photoAccess != .notPublished {
-                OrderPhotosCard(access: photoAccess)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-            }
-            // The customer's page: its link, and the messages on it.
-            if case .ready(let token)? = photoAccess {
-                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
-            } else if case .viewOnly(let token)? = photoAccess {
-                PortalCard(token: token).padding(.horizontal, 16).padding(.bottom, 16)
-            }
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $recordingPayment) {
             if let payment {
@@ -187,8 +165,21 @@ struct OrderDetailPage: View {
                 }
             }
         }
+        .sheet(isPresented: $shipping) {
+            if let shipChoices {
+                ShipSheet(orderId: order.id, carriers: shipChoices) {
+                    self.shipChoices = await api.shipChoices(orderId: order.id)
+                }
+            }
+        }
         .sheet(isPresented: $writingWhatsApp, onDismiss: { Task { whatsApp = await api.whatsAppOffer(orderId: order.id) } }) {
             WhatsAppSheet(orderId: order.id)
+        }
+        .confirmationDialog(L10n.tr("quote.decline_q"), isPresented: $confirmingDecline, titleVisibility: .visible) {
+            Button(L10n.tr("quote.decline"), role: .destructive) { Task { await answerQuote(.decline) } }
+            Button(L10n.tr("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(L10n.tr("quote.decline_body"))
         }
         .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
         .navigationDestination(isPresented: $showingProforma) { InvoicePage(orderId: order.id, proforma: true) }
@@ -206,22 +197,9 @@ struct OrderDetailPage: View {
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            // The design's two-line title: the job's number and who it is for.
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(order.displayTitle)
-                        .font(.khayt(16, .semibold, relativeTo: .headline))
-                        .lineLimit(1)
-                        .foregroundStyle(KhaytDesign.ink)
-                    Text("\(order.reference) · \(order.displayClient)")
-                        .font(.khayt(11.5, relativeTo: .caption))
-                        .foregroundStyle(KhaytDesign.note)
-                        .lineLimit(1)
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
-                if api.holdsBook, order.status != "cancelled" {
-                    Button(L10n.tr("edit.title")) { Task { editing = await api.editState(orderId: order.id) } }
+                if api.holdsBook, !isCancelled {
+                    Button(L10n.tr("edit.title")) { Task { await startEditing() } }
                         .disabled(!api.canWrite)
                 }
             }
@@ -241,7 +219,7 @@ struct OrderDetailPage: View {
             printPhotos = api.printPhotos(orderId: order.id)
             energy = api.jobEnergy(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
-            if order.status == OrderStatus.quote.rawValue { quoteState = await api.quoteState(orderId: order.id) }
+            if isQuote { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
@@ -269,6 +247,192 @@ struct OrderDetailPage: View {
         }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
         }
+    }
+
+    // MARK: - 4 · Parts, the card beside the parts card
+
+    @ViewBuilder
+    private var partsExtras: some View {
+        // What the print drew from the wall, when a smart plug metered
+        // enough of it. Nothing at all otherwise.
+        if let energy {
+            EnergyCard(energy: energy).id("energy")
+        }
+    }
+
+    // MARK: - 5 · Money
+
+    @ViewBuilder
+    private var moneyRegion: some View {
+        if payment != nil || (isQuote && quote != nil) {
+            JobMoneyCard(order: order, payment: payment, quote: isQuote ? quote : nil, currency: currency,
+                         onRecord: canRecordPayment && api.canWrite ? { recordingPayment = true } : nil)
+        }
+        if isQuote {
+            Text(L10n.tr("quote.approve_note"))
+                .font(.khayt(12, relativeTo: .caption))
+                .foregroundStyle(KhaytDesign.note)
+                .fixedSize(horizontal: false, vertical: true)
+            if let quoteState {
+                QuoteToolsCard(state: quoteState, followingUp: followingUp,
+                               onRevise: { Task { await startRevising() } },
+                               onFollowUp: { Task { await followUp() } },
+                               onHistory: { showingHistory = true })
+                    .disabled(!api.canWrite)
+            } else if !api.holdsBook {
+                // No LAN route revises or follows up a quote: say so, rather
+                // than offer what this phone cannot do.
+                V2Note(text: L10n.tr("quote.needs_book"), tone: KhaytDesign.note)
+            }
+        }
+        // A quote or a cancelled job has no invoice; the page says why for
+        // the rarer cases (waiting for approval, not numbered yet).
+        if !isQuote, !isCancelled {
+            Button { showingInvoice = true } label: { InvoiceCard() }
+                .buttonStyle(.plain)
+        }
+        // Accepted, not yet finished: a proforma to ask for payment with.
+        if BookReader.offersProforma(status: order.status) {
+            Button { showingProforma = true } label: { InvoiceCard(proforma: true) }
+                .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - 6 · Activity
+
+    private var activityRegion: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            JobRegionTitle(text: L10n.tr("job.section.activity"))
+            if canShip {
+                Button { shipping = true } label: { ShipCard() }
+                    .buttonStyle(.plain)
+                    .disabled(!api.canWrite)
+            }
+            if let whatsApp {
+                WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
+            }
+            if let customer, customer.dialNumber != nil || !(customer.email ?? "").isEmpty {
+                ContactCard(client: customer)
+            }
+            // The finished print, as the Mac and the desktop keep it — the
+            // printer's own snapshot at the end of a print among them.
+            if !printPhotos.isEmpty || canAddPhoto {
+                PrintPhotosCard(photos: printPhotos, add: canAddPhoto ? { jpeg in
+                    let reply = await api.addJobPhoto(orderId: order.id, jpeg: jpeg)
+                    printPhotos = api.printPhotos(orderId: order.id)
+                    return reply
+                } : nil)
+            }
+            // The papers besides the invoice, from the book. A quote is not
+            // work yet; a cancelled job is nothing to pack or make.
+            if api.holdsBook, !isQuote, !isCancelled {
+                JobPapersCard { kind in paper = .job(kind, orderId: order.id) }
+            }
+            // Only an order the Mac has published has a page to put a photo on.
+            if let photoAccess, photoAccess != .notPublished {
+                OrderPhotosCard(access: photoAccess)
+            }
+            // The customer's page: its link, and the messages on it.
+            if case .ready(let token)? = photoAccess {
+                PortalCard(token: token)
+            } else if case .viewOnly(let token)? = photoAccess {
+                PortalCard(token: token)
+            }
+            // The shop's connectors: their buttons for a job, and their own
+            // fields on it (read-only). Nothing is drawn without one.
+            if api.holdsBook {
+                ConnectorsCard(place: .order(order.id), outer: EdgeInsets())
+                    .id("connectors")
+            }
+        }
+    }
+
+    // MARK: - 2 · The next step, pinned
+
+    /// "Next" and the verb, More for everything else, and the verb's button.
+    /// Pinned above the tab bar so it never scrolls away. A step the phone
+    /// may not take says why in a quiet line under it.
+    private var nextBar: some View {
+        let primary = steps.primary
+        return JobNextBar(verb: primary.flatMap(JobSteps.verb), stageDone: !isCancelled && !isQuote,
+                          isUpdating: isUpdating, canWrite: api.canWrite,
+                          blocked: primary?.blocked.map(JobSteps.blockedText),
+                          refusal: errorMessage,
+                          onPrimary: { if let primary { run(primary) } }) {
+            moreMenu
+        }
+    }
+
+    /// Everything else the page can do, besides the one next step.
+    @ViewBuilder
+    private var moreMenu: some View {
+        // The rule's other steps for this stage, first.
+        ForEach(steps.secondary, id: \.code) { step in
+            if let verb = JobSteps.verb(step) {
+                Button { run(step) } label: { Text(verb) }
+                    .disabled(step.blocked != nil || !api.canWrite || isUpdating)
+            }
+        }
+        if isQuote {
+            if quoteState != nil {
+                Button { Task { await startRevising() } } label: { Label(L10n.tr("quote.revise"), systemImage: "pencil.and.list.clipboard") }
+                    .disabled(!api.canWrite)
+                Button { Task { await followUp() } } label: { Label(L10n.tr("quote.followup"), systemImage: "message") }
+                    .disabled(!api.canWrite || followingUp)
+                Button { showingHistory = true } label: { Label(L10n.tr("quote.history"), systemImage: "clock.arrow.circlepath") }
+            }
+            Button(role: .destructive) { confirmingDecline = true } label: { Label(L10n.tr("quote.decline"), systemImage: "xmark") }
+                .disabled(!api.canWrite || isUpdating)
+        }
+        if canRecordPayment, !stepCodes.contains("record_payment") {
+            Button { recordingPayment = true } label: { Label(L10n.tr("pay.modal_title"), systemImage: "banknote") }
+                .disabled(!api.canWrite)
+        }
+        if canShip, stepCodes.isDisjoint(with: ["hand_over", "ship"]) {
+            Button { shipping = true } label: { Label(L10n.tr("ship.open"), systemImage: "shippingbox") }
+                .disabled(!api.canWrite)
+        }
+        if whatsApp != nil {
+            Button { writingWhatsApp = true } label: { Label(L10n.tr("wa.update"), systemImage: "message.fill") }
+        }
+        if !isQuote, !isCancelled {
+            Button { showingInvoice = true } label: { Label(L10n.tr("invoice.open"), systemImage: "doc.text") }
+        }
+        if BookReader.offersProforma(status: order.status) {
+            Button { showingProforma = true } label: { Label(L10n.tr("proforma.open"), systemImage: "doc.text.below.ecg") }
+        }
+        if api.holdsBook, !isQuote, !isCancelled {
+            Menu {
+                ForEach(KhaytEngine.ShopPaper.allCases, id: \.self) { kind in
+                    Button(L10n.tr(PaperSubject.titleKey(kind))) { paper = .job(kind, orderId: order.id) }
+                }
+            } label: { Label(L10n.tr("paper.section"), systemImage: "doc.on.doc") }
+        }
+        if api.holdsBook, !isCancelled {
+            Button { Task { await startEditing() } } label: { Label(L10n.tr("edit.title"), systemImage: "square.and.pencil") }
+                .disabled(!api.canWrite)
+        }
+    }
+
+    /// A step, done the way the page always did it: a quote taken through
+    /// the quote's own Approve; a stage move through the status update (the
+    /// shop's rules then ask for actuals or a reason as they always have);
+    /// hand-over and payment through their sheets.
+    private func run(_ step: JobSteps.Step) {
+        guard step.blocked == nil else { return }
+        switch step.code {
+        case "send_quote":
+            if let link = customerLink { sharingQuote = ShareItem(url: link) }
+        case "take_job": Task { await answerQuote(.approve) }
+        case "hand_over", "ship": shipping = true
+        case "record_payment": recordingPayment = true
+        default:
+            if let to = step.to { Task { await setStatus(to) } }
+        }
+    }
+
+    private func startEditing() async {
+        editing = await api.editState(orderId: order.id)
     }
 
     private func loadPayment() async {
@@ -461,186 +625,203 @@ struct InvoiceCard: View {
     }
 }
 
-/// What the page shows, apart from the page. Its own view so the layout can be
-/// rendered and checked on its own — `ImageRenderer` draws no navigation stack.
+/// A stage's look, by the shared rules: one pill in the stage's own colour.
+enum JobStageLook {
+    /// Waiting on someone else.
+    static let steel = Color(light: 0x5E6C84, dark: 0xA9B8CF)
+    static let steelWash = Color(light: 0xEDF0F4, dark: 0x3A4658)
+
+    /// The pill's words and its wash: the stage's own colour
+    /// (`KhaytDesign.statusColor` / `statusSoft`, where Printing is amber and
+    /// On hold violet). A quote waits on the customer, so it is steel.
+    static func pill(_ status: String) -> (text: Color, wash: Color) {
+        if status == "quote" { return (steel, steelWash) }
+        if status == "paid" { return (KhaytDesign.done, KhaytDesign.okSoft) }
+        return (KhaytDesign.statusColor(for: status), KhaytDesign.statusSoft(for: status))
+    }
+
+    /// The stage track's thread colour, up to the job's stage.
+    static func track(_ status: String) -> Color { KhaytDesign.statusColor(for: status) }
+
+    static func name(_ status: String) -> String {
+        if status == "paid" { return L10n.tr("job.pill.paid") }
+        return OrderStatus(rawValue: status)?.localizedLabel ?? (status == "cancelled" ? L10n.tr("status.cancelled") : status)
+    }
+}
+
+/// A region's small heading: "PARTS", "MONEY", "ACTIVITY".
+struct JobRegionTitle: View {
+    let text: String
+    var body: some View {
+        Text(text.uppercased())
+            .font(.khayt(10.5, .bold, relativeTo: .caption2))
+            .khaytTracking(1.05)
+            .foregroundStyle(KhaytDesign.note)
+            .padding(.horizontal, 2)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// 1 · The header: the job's name, `S-1041 · customer · due`, ONE stage pill
+/// in its stage colour, and "N days late" beside it only when late.
+struct OrderDetailHeader: View {
+    let order: QueueOrder
+    /// The shared rule's pill stage (`shipped`, `delivered` and `paid` too);
+    /// the job's status when the rule has not answered.
+    var pillStage: String? = nil
+    /// The shared rule's late flag, when it has answered.
+    var late: Bool? = nil
+    var today = Date()
+
+    private var line: String {
+        var parts = [order.reference, order.displayClient]
+        if let due = order.formattedDueDate { parts.append(L10n.format("job.header.due", due)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var daysLate: Int? {
+        (late ?? order.isOverdue) ? JobDue.daysLate(due: order.dueDate, today: today) : nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(order.displayTitle)
+                .font(.khaytDisplay(28, .semibold, relativeTo: .largeTitle))
+                .tracking(-0.6)
+                .foregroundStyle(KhaytDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text(line)
+                .font(.khayt(13.5, relativeTo: .subheadline))
+                .foregroundStyle(KhaytDesign.note)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                let stage = pillStage ?? order.status
+                let look = JobStageLook.pill(stage)
+                HStack(spacing: 6) {
+                    Circle().fill(look.text).frame(width: 6, height: 6).accessibilityHidden(true)
+                    Text(JobStageLook.name(stage))
+                        .font(.khayt(12.5, .semibold, relativeTo: .caption))
+                        .foregroundStyle(look.text)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(look.wash, in: Capsule())
+                .accessibilityElement(children: .combine)
+                if let daysLate {
+                    Text(daysLate == 1 ? L10n.tr("job.day_late") : L10n.format("job.days_late", daysLate))
+                        .font(.khayt(12.5, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.late)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(KhaytDesign.late.opacity(0.12), in: Capsule())
+                }
+                if order.isRush { RushBadge() }
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+    }
+}
+
+/// 3 · The stage track and 4 · the parts card. Its own view so the layout can
+/// be rendered and checked on its own — `ImageRenderer` draws no navigation
+/// stack.
 struct OrderDetailContent: View {
     let order: QueueOrder
     var facts: OrderFacts? = nil
     /// The printer's live reading, while this job is printing on it.
     var live: MachineLiveStatus? = nil
+    /// The stage the track rings, from the shared rule (a held job where it
+    /// was held); the job's status when the rule has not answered.
+    var trackCurrent: OrderStatus? = nil
     let isUpdating: Bool
     var machines: [MachineInfo] = []
-    var errorMessage: String? = nil
-    let onAdvance: () -> Void
     let onSetStatus: (String) -> Void
     var onAssignMachine: ((String?) -> Void)? = nil
-    /// Set only while the job is a quote, by a page that has its record.
-    var quote: OrderLogEntry? = nil
-    var currency: String? = nil
-    /// Approve or Decline. Nil draws neither — a rendering of the layout alone.
-    var onAnswer: ((QuoteAnswer) -> Void)? = nil
-
-    @State private var confirmingDecline = false
 
     private static let stages: [OrderStatus] = [.pending, .printing, .post, .qc, .completed]
 
-    private var current: OrderStatus? { OrderStatus(rawValue: order.status) }
+    private var current: OrderStatus? { trackCurrent ?? OrderStatus(rawValue: order.status) }
     private var isQuote: Bool { current == .quote }
-    /// The stage's name. `cancelled` is not an `OrderStatus` — the phone only
-    /// ever writes it as a quote's Decline — but it is a stage a page can show.
-    private var stageName: String {
-        current?.localizedLabel ?? (order.status == "cancelled" ? L10n.tr("status.cancelled") : order.status)
-    }
-    private var next: OrderStatus? { current?.nextInQueue }
-    private var tone: Color { KhaytDesign.statusColor(for: order.status) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            fields
-            if !isQuote { picker }
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.khayt(12.5, relativeTo: .footnote))
-                    .foregroundStyle(KhaytDesign.late)
+        VStack(alignment: .leading, spacing: 16) {
+            if !isQuote, order.status != "cancelled" {
+                StageStepper(stages: Self.stages, current: current, disabled: isUpdating) { onSetStatus($0.rawValue) }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(L10n.tr("pulse.move_to"))
             }
-            if isQuote {
-                if let onAnswer { answers(onAnswer).padding(.top, 6) }
-            } else {
-                action.padding(.top, 6)
-            }
+            parts
         }
-        .padding(16)
     }
 
     // MARK: - Parts
 
-    private var header: some View {
+    private var parts: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Text(order.reference)
-                    .font(.khaytMono(12, .medium))
-                    .foregroundStyle(KhaytDesign.note)
-                    .environment(\.layoutDirection, .leftToRight)
-                // The redesign's pill: a dot in the stage colour, ink words.
-                HStack(spacing: 5) {
-                    Circle().fill(tone).frame(width: 6, height: 6)
-                    Text(stageName)
-                        .font(.khayt(12, .semibold, relativeTo: .caption))
-                        .foregroundStyle(KhaytDesign.ink)
-                }
-                .padding(.horizontal, 10).padding(.vertical, 3)
-                .background(tone.opacity(0.16), in: Capsule())
-                if order.isRush { RushBadge() }
-                if order.isOverdue {
-                    Text(L10n.tr("orders.late"))
-                        .font(.khayt(11, .bold, relativeTo: .caption2))
-                        .khaytTracking(0.6)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .foregroundStyle(KhaytDesign.late)
-                        .background(KhaytDesign.late.opacity(0.14), in: Capsule())
-                }
-            }
-            .padding(.bottom, 11)
-            Text(order.displayTitle)
-                .font(.khaytDisplay(26, .semibold, relativeTo: .title))
-                .tracking(-0.6)
-                .foregroundStyle(KhaytDesign.ink)
-            Text(order.displayClient)
-                .font(.khayt(14.5, relativeTo: .subheadline))
-                .foregroundStyle(KhaytDesign.note)
-                .padding(.top, 6)
-            if let live, live.isPrinting, let progress = live.progress {
-                printProgress(live, progress)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .strokeBorder(order.isOverdue ? KhaytDesign.late.opacity(0.7) : KhaytDesign.hairline, lineWidth: 1))
-    }
-
-    /// The design's print progress: the figure, a bar, and how long is left —
-    /// or, for a print that has only just started, that there is no estimate
-    /// yet. "— left" would be the same lie as a zero, one step quieter.
-    private func printProgress(_ live: MachineLiveStatus, _ progress: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(L10n.tr("order.detail.print_progress").uppercased())
-                    .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                    .khaytTracking(1.05)
-                    .foregroundStyle(KhaytDesign.note)
-                Spacer()
-                Text("\(progress)%")
-                    .font(.khayt(17, .semibold, relativeTo: .headline).monospacedDigit())
-                    .foregroundStyle(KhaytDesign.ink)
-                    .environment(\.layoutDirection, .leftToRight)
-            }
-            LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 7)
-                .animation(.easeOut(duration: 0.45), value: progress)
-            if let eta = live.etaLocalized, let done = live.finishesAt() {
-                Text(L10n.format("machines.left_until", eta,
-                            done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
-                    .font(.khayt(12.5, relativeTo: .footnote).monospacedDigit())
-                    .foregroundStyle(KhaytDesign.note)
-            } else {
-                Text(L10n.tr("order.detail.no_estimate"))
-                    .font(.khayt(12.5, relativeTo: .footnote))
-                    .foregroundStyle(KhaytDesign.note)
-            }
-        }
-        .padding(.top, 18)
-    }
-
-    /// Due, Filament, Quantity, Printer, Client — the design's five, less any
-    /// the phone does not know. A row with nothing in it is not drawn; a dash
-    /// would say the job has no filament, which is not what the phone knows.
-    private var fields: some View {
-        VStack(spacing: 0) {
-            if let quote {
-                if let price = quote.price {
-                    row(L10n.tr("order.new.price")) {
-                        Text(Money.text(price, currency)).foregroundStyle(KhaytDesign.ink).monospacedDigit()
-                    }
-                    Divider().overlay(KhaytDesign.hairline)
-                }
-                if let made = DueDateParser.display(quote.date) {
-                    row(L10n.tr("quote.field.made")) { Text(made).foregroundStyle(KhaytDesign.ink) }
-                    Divider().overlay(KhaytDesign.hairline)
-                }
-                if let last = DueDateParser.display(quote.quoteExpiresAt) {
-                    let expired = quote.isQuoteExpired()
-                    row(L10n.tr("quote.field.valid_until")) {
-                        Text(expired ? L10n.format("quote.expired_on", last) : last)
-                            .foregroundStyle(expired ? KhaytDesign.late : KhaytDesign.ink)
-                    }
-                    Divider().overlay(KhaytDesign.hairline)
-                }
-            }
-            if let due = order.formattedDueDate {
-                row(L10n.tr("order.detail.due_date")) {
-                    Text(due).foregroundStyle(order.isOverdue ? KhaytDesign.late : KhaytDesign.ink)
-                }
-                Divider().overlay(KhaytDesign.hairline)
-            }
-            if let material = facts?.material {
-                row(L10n.tr("order.field.filament")) { Text(material).foregroundStyle(KhaytDesign.ink) }
-                Divider().overlay(KhaytDesign.hairline)
-            }
-            if let quantity = facts?.quantity {
-                row(L10n.tr("order.field.quantity")) {
-                    Text("×\(quantity)").foregroundStyle(KhaytDesign.ink).environment(\.layoutDirection, .leftToRight)
-                }
-                Divider().overlay(KhaytDesign.hairline)
-            }
-            printerRow
+            JobRegionTitle(text: L10n.tr("job.section.parts"))
+                .padding(.horizontal, 14).padding(.vertical, 12)
             Divider().overlay(KhaytDesign.hairline)
-            row(L10n.tr("field.client")) { Text(order.displayClient).foregroundStyle(KhaytDesign.ink) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(order.displayTitle)
+                        .font(.khayt(15.5, .semibold, relativeTo: .headline))
+                        .foregroundStyle(KhaytDesign.ink)
+                    if let quantity = facts?.quantity {
+                        Text("×\(quantity)")
+                            .font(.khayt(15.5, .semibold, relativeTo: .headline).monospacedDigit())
+                            .foregroundStyle(KhaytDesign.ink)
+                            .environment(\.layoutDirection, .leftToRight)
+                    }
+                }
+                if let material = facts?.material {
+                    Text(material)
+                        .font(.khayt(13, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                }
+                if let live, live.isPrinting, let progress = live.progress {
+                    printProgress(live, progress)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Divider().overlay(KhaytDesign.hairline)
+            printerRow
         }
         .background(KhaytDesign.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+    }
+
+    /// The design's print progress: a thin amber bar, and the printer, the
+    /// figure and how long is left — or, for a print that has only just
+    /// started, that there is no estimate yet.
+    private func printProgress(_ live: MachineLiveStatus, _ progress: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.thread, height: 4)
+                .animation(.easeOut(duration: 0.45), value: progress)
+                .accessibilityLabel(L10n.tr("order.detail.print_progress"))
+                .accessibilityValue("\(progress)%")
+            Text(progressLine(live, progress))
+                .font(.khayt(12.5, .medium, relativeTo: .footnote).monospacedDigit())
+                .foregroundStyle(KhaytDesign.attention)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 4)
+    }
+
+    /// "On Bambu X1C · 28% · 2 h 8 m left · done at 14:20", or no estimate yet.
+    private func progressLine(_ live: MachineLiveStatus, _ progress: Int) -> String {
+        var parts: [String] = []
+        if let machine = order.machine { parts.append(L10n.format("job.parts.on_machine", machine)) }
+        parts.append("\(progress)%")
+        if let eta = live.etaLocalized, let done = live.finishesAt() {
+            parts.append(L10n.format("machines.left_until", eta,
+                done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
+        } else {
+            parts.append(L10n.tr("order.detail.no_estimate"))
+        }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -680,95 +861,180 @@ struct OrderDetailContent: View {
                 .font(.khayt(14.5, .medium, relativeTo: .subheadline))
                 .multilineTextAlignment(.trailing)
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 52)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 48)
         .contentShape(Rectangle())
     }
+}
 
-    /// Any of the five stages, directly — for the job sent back from QC.
-    private var picker: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(L10n.tr("pulse.move_to").uppercased())
-                .font(.khayt(10.5, .bold, relativeTo: .caption2))
-                .khaytTracking(1.05)
-                .foregroundStyle(KhaytDesign.note)
-                .padding(.horizontal, 2)
-            StageStepper(stages: Self.stages, current: current, disabled: isUpdating) { onSetStatus($0.rawValue) }
-        }
-    }
+/// 5 · Money: Price, Paid, Owing. Owing is red only when it is overdue. A
+/// quote shows its price, when it was made and how long it stands.
+struct JobMoneyCard: View {
+    let order: QueueOrder
+    let payment: BookWriter.PaymentState?
+    var quote: OrderLogEntry? = nil
+    let currency: String?
+    /// Record payment, when the job owes and the phone may write.
+    var onRecord: (() -> Void)? = nil
 
-    /// The one thing most people open this page to do: brand blue, whatever
-    /// the stage — the design keeps colour for state, not for buttons.
-    @ViewBuilder
-    private var action: some View {
-        if let next {
-            Button(action: onAdvance) {
-                HStack(spacing: 9) {
-                    if isUpdating {
-                        ProgressView().tint(KhaytDesign.onBrand)
-                    } else {
-                        Text(next == .completed ? L10n.tr("order.detail.mark_done")
-                                                : L10n.format("order.detail.move_to", next.localizedLabel))
-                        Image(systemName: "arrow.forward")
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            JobRegionTitle(text: L10n.tr("job.section.money"))
+                .padding(.horizontal, 14).padding(.vertical, 12)
+            if let quote {
+                if let price = quote.price {
+                    line(L10n.tr("job.money.price")) { Text(Money.text(price, currency)).foregroundStyle(KhaytDesign.ink) }
+                }
+                if let made = DueDateParser.display(quote.date) {
+                    line(L10n.tr("quote.field.made")) { Text(made).foregroundStyle(KhaytDesign.ink) }
+                }
+                // Sent only when it really was: `quoteSharedAt`, not the
+                // `quoteSentAt` every quote is given when it is made.
+                if let sent = DueDateParser.display(quote.quoteSharedAt) {
+                    line(L10n.tr("job.money.quote_sent")) { Text(sent).foregroundStyle(KhaytDesign.ink) }
+                }
+                if let last = DueDateParser.display(quote.quoteExpiresAt) {
+                    let expired = quote.isQuoteExpired()
+                    line(L10n.tr("quote.field.valid_until")) {
+                        Text(expired ? L10n.format("quote.expired_on", last) : last)
+                            .foregroundStyle(expired ? KhaytDesign.late : KhaytDesign.ink)
                     }
                 }
-                .font(.khayt(17, .semibold, relativeTo: .headline))
-                .foregroundStyle(KhaytDesign.onBrand)
-                .frame(maxWidth: .infinity, minHeight: 62)
-                .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 14))
+            } else if let payment {
+                let overdue = JobDue.owingIsOverdue(owed: payment.owed, due: order.dueDate)
+                line(L10n.tr("job.money.price")) { Text(Money.text(payment.billed, currency)).foregroundStyle(KhaytDesign.ink) }
+                line(L10n.tr("job.money.paid")) {
+                    Text(payment.paid > 0 ? "− " + Money.text(payment.paid, currency) : Money.text(0, currency))
+                        .foregroundStyle(payment.paid > 0 ? KhaytDesign.done : KhaytDesign.ink)
+                }
+                line(overdue ? L10n.tr("job.money.owing_overdue") : L10n.tr("job.money.owing")) {
+                    Text(Money.text(payment.owed, currency))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(overdue ? KhaytDesign.late : KhaytDesign.ink)
+                }
+                if let onRecord {
+                    Divider().overlay(KhaytDesign.hairline)
+                    Button(action: onRecord) {
+                        Text(L10n.tr("pay.modal_title"))
+                            .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(KhaytDesign.brand)
+                            .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(isUpdating)
         }
+        .background(KhaytDesign.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+    }
+
+    private func line<V: View>(_ label: String, @ViewBuilder value: () -> V) -> some View {
+        VStack(spacing: 0) {
+            Divider().overlay(KhaytDesign.hairline)
+            HStack(spacing: 12) {
+                Text(label)
+                    .font(.khayt(14.5, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.note)
+                Spacer(minLength: 12)
+                value()
+                    .font(.khayt(14.5, .medium, relativeTo: .subheadline).monospacedDigit())
+                    .multilineTextAlignment(.trailing)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 46)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
-extension OrderDetailContent {
-    /// A quote's two answers. Approve is the page's one brand button, as
-    /// "Move to" is on a job; Decline is quieter and asks first, because a
-    /// declined quote leaves the list and its customer is not asked again.
-    fileprivate func answers(_ onAnswer: @escaping (QuoteAnswer) -> Void) -> some View {
-        VStack(spacing: 10) {
-            Button { onAnswer(.approve) } label: {
-                HStack(spacing: 9) {
-                    if isUpdating {
-                        ProgressView().tint(KhaytDesign.onBrand)
-                    } else {
-                        Text(L10n.tr("quote.approve"))
-                        Image(systemName: "checkmark")
+/// 2 · The next step, pinned above the tab bar: "Next" and the verb, More,
+/// and the verb's own button. With no next step it says the job is done (or
+/// that there is nothing to do), and More stays.
+struct JobNextBar<More: View>: View {
+    /// The next step's verb; nil when the job has none.
+    let verb: String?
+    /// A job past its stages (done and paid) rather than a cancelled one.
+    let stageDone: Bool
+    let isUpdating: Bool
+    let canWrite: Bool
+    /// Why the step cannot be done now (the shared rule's `blocked`).
+    var blocked: String? = nil
+    /// The last write's refusal, said at the control.
+    var refusal: String? = nil
+    let onPrimary: () -> Void
+    @ViewBuilder let more: () -> More
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if verb == nil || !typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.tr("job.next"))
+                            .font(.khayt(11.5, relativeTo: .caption))
+                            .foregroundStyle(KhaytDesign.note)
+                        Text(verb ?? L10n.tr(stageDone ? "job.next.done" : "job.next.none"))
+                            .font(.khayt(15, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(verb == nil && stageDone ? KhaytDesign.done : KhaytDesign.ink)
+                            .lineLimit(2)
                     }
+                    .accessibilityElement(children: .combine)
+                    Spacer(minLength: 4)
                 }
-                .font(.khayt(17, .semibold, relativeTo: .headline))
-                .foregroundStyle(KhaytDesign.onBrand)
-                .frame(maxWidth: .infinity, minHeight: 62)
-                .background(KhaytDesign.brand, in: RoundedRectangle(cornerRadius: 14))
+                Menu { more() } label: {
+                    Text(L10n.tr("job.more"))
+                        .font(.khayt(15.5, .semibold, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .padding(.horizontal, 18)
+                        .frame(minWidth: 44, minHeight: 50)
+                        .background(KhaytDesign.sunk, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .accessibilityLabel(L10n.tr("job.more.label"))
+                if let verb {
+                    Button(action: onPrimary) {
+                        ZStack {
+                            if isUpdating { ProgressView().tint(KhaytDesign.onBrand) }
+                            Text(verb).opacity(isUpdating ? 0 : 1)
+                        }
+                        .font(.khayt(15.5, .semibold, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.onBrand)
+                        .lineLimit(2).multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                        .frame(minWidth: 44, maxWidth: typeSize.isAccessibilitySize ? .infinity : nil, minHeight: 50)
+                        .background(KhaytDesign.brand.opacity(canWrite && blocked == nil ? 1 : 0.4),
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdating || !canWrite || blocked != nil)
+                    .accessibilityLabel(verb)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(isUpdating)
-            Button { confirmingDecline = true } label: {
-                Text(L10n.tr("quote.decline"))
-                    .font(.khayt(15.5, .semibold, relativeTo: .body))
+            // Anything that can refuse says why, quietly, at the control.
+            if let refusal {
+                Text(refusal)
+                    .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.late)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
-                    .contentShape(RoundedRectangle(cornerRadius: 14))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if verb != nil, let why = blocked ?? (canWrite ? nil : L10n.tr("cloud.read_only.line")) {
+                Text(why)
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
-            .disabled(isUpdating)
-            .confirmationDialog(L10n.tr("quote.decline_q"), isPresented: $confirmingDecline, titleVisibility: .visible) {
-                Button(L10n.tr("quote.decline"), role: .destructive) { onAnswer(.decline) }
-                Button(L10n.tr("common.cancel"), role: .cancel) {}
-            } message: {
-                Text(L10n.tr("quote.decline_body"))
-            }
-            Text(L10n.tr("quote.approve_note"))
-                .font(.khayt(12, relativeTo: .caption))
-                .foregroundStyle(KhaytDesign.note)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(KhaytDesign.surface.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
 }
+
 
 /// The redesign's stage track: the five stages as dots on one thread, the ones
 /// behind the job filled, the job's own ringed in its colour. Any dot can be
@@ -795,7 +1061,7 @@ private struct StageStepper: View {
     private func step(_ i: Int, _ stage: OrderStatus) -> some View {
         let on = i == at
         let passed = at >= 0 && i < at
-        let tone = KhaytDesign.statusColor(for: (current ?? stage).rawValue)
+        let tone = JobStageLook.track((current ?? stage).rawValue)
         return Button { onPick(stage) } label: {
             VStack(spacing: 7) {
                 ZStack {
@@ -838,4 +1104,10 @@ private struct RevisingQuote: Identifiable {
 private struct EditingJob: Identifiable {
     let state: KhaytAPIClient.OrderEditState
     var id: String { "\(state.dueDate ?? "")|\(state.priorityLevel)|\(state.price)" }
+}
+
+/// A link handed to the share sheet.
+struct ShareItem: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
 }
