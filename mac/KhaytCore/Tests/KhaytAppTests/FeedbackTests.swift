@@ -141,7 +141,7 @@ import KhaytCore
         // The quote pay link's secret is PER DEVICE as well (Keychain on the
         // Mac; sealed and per-device on the desktop): planted, and checked
         // below to be gone.
-        let masked = paths.filter { !$0.hasPrefix("settings.plugins[]") && $0 != "settings.quotePayLink.secret" }
+        let masked = paths.filter { !$0.hasPrefix("settings.plugins[]") && $0 != "settings.quotePayLink.secret" && $0 != "settings.quoteLinkKey.seed" }
         for (index, path) in masked.enumerated() {
             let value = "planted-secret-\(index)-x7"
             planted.append(value)
@@ -154,6 +154,9 @@ import KhaytCore
         planted.append("planted-plugin-secret-2f")
         Self.plant(&root, path: "settings.quotePayLink.secret", value: .string("planted-pay-link-secret-4a"))
         planted.append("planted-pay-link-secret-4a")
+        // Pay link v2: this computer's Ed25519 seed, per device the same way.
+        Self.plant(&root, path: "settings.quoteLinkKey.seed", value: .string("planted-link-key-seed-9c"))
+        planted.append("planted-link-key-seed-9c")
         Self.plant(&root, path: "settings.someoneForgot.key", value: .string("__enc__c2VhbGVk"))
         planted.append("__enc__c2VhbGVk")
 
