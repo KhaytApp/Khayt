@@ -183,44 +183,64 @@ struct JobSheet: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        ForEach($parts) { $part in
-            let fixed = partsLocked || part.delivered
-            HStack(spacing: 6) {
-                TextField(shop.words.callIt("mac.a_part"), text: $part.name)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(partsLocked)
-                Picker("", selection: $part.spoolId) {
-                    Text(shop.words.callIt("mac.filament")).tag(String?.none)
-                    ForEach(shop.spools) { spool in
-                        Text(spool.label(shop.words, unit: shop.unit(of: spool))).tag(String?.some(spool.id))
+        // A GRID, with a header row: two bare numbers in a row say nothing
+        // about which is grams and which is hours (Dev Hub, on the first
+        // capture). The header names each column once, as the Figma frame's
+        // add row does, and every field carries the same word for VoiceOver.
+        Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
+            GridRow {
+                header("mac.a_part")
+                header("mac.filament")
+                header("mac.grams")
+                header("mac.hours")
+                header("doc.qty")
+                Color.clear.frame(width: 1, height: 1)
+            }
+            ForEach($parts) { $part in
+                let fixed = partsLocked || part.delivered
+                GridRow {
+                    TextField(shop.words.callIt("mac.a_part"), text: $part.name)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(partsLocked)
+                        .accessibilityLabel(shop.words.callIt("mac.a_part"))
+                    Picker("", selection: $part.spoolId) {
+                        Text(shop.words.callIt("mac.filament")).tag(String?.none)
+                        ForEach(shop.spools) { spool in
+                            Text(spool.label(shop.words, unit: shop.unit(of: spool))).tag(String?.some(spool.id))
+                        }
                     }
-                }
-                .labelsHidden().frame(width: 130)
-                .disabled(fixed || nameOnly)
-                TextField(shop.words.callIt("mac.grams"), text: $part.grams)
-                    .textFieldStyle(.roundedBorder).frame(width: 62).monospacedDigit()
+                    .labelsHidden().frame(width: 130)
                     .disabled(fixed || nameOnly)
-                TextField(shop.words.callIt("mac.hours"), text: $part.hours)
-                    .textFieldStyle(.roundedBorder).frame(width: 54).monospacedDigit()
-                    .disabled(fixed || nameOnly)
-                Stepper("×\(part.qty)", value: $part.qty, in: 1...999)
-                    .monospacedDigit().fixedSize()
-                    .disabled(fixed || nameOnly)
-                if part.delivered {
-                    Image(systemName: "shippingbox.fill").foregroundStyle(Role.ok)
-                        .help(shop.words.callIt("mac.parts_delivered_fixed"))
-                } else {
-                    Button {
-                        parts.removeAll { $0.id == part.id }
-                    } label: {
-                        Image(systemName: "minus.circle")
+                    .accessibilityLabel(shop.words.callIt("mac.filament"))
+                    TextField("0", text: $part.grams)
+                        .textFieldStyle(.roundedBorder).frame(width: 66).monospacedDigit()
+                        .disabled(fixed || nameOnly)
+                        .accessibilityLabel(shop.words.callIt("mac.grams"))
+                    TextField("0", text: $part.hours)
+                        .textFieldStyle(.roundedBorder).frame(width: 58).monospacedDigit()
+                        .disabled(fixed || nameOnly)
+                        .accessibilityLabel(shop.words.callIt("mac.hours"))
+                    Stepper("×\(part.qty)", value: $part.qty, in: 1...999)
+                        .monospacedDigit().fixedSize()
+                        .disabled(fixed || nameOnly)
+                        .accessibilityLabel(shop.words.callIt("doc.qty"))
+                    if part.delivered {
+                        Image(systemName: "shippingbox.fill").foregroundStyle(Role.ok)
+                            .help(shop.words.callIt("mac.parts_delivered_fixed"))
+                            .accessibilityLabel(shop.words.callIt("mac.parts_delivered_fixed"))
+                    } else {
+                        Button {
+                            parts.removeAll { $0.id == part.id }
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help(shop.words.callIt("mac.parts_remove"))
+                        .accessibilityLabel(shop.words.callIt("mac.parts_remove"))
+                        // The rule refuses the last part and a finished job's.
+                        .disabled(lock?.addRemove != true || parts.count <= 1)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help(shop.words.callIt("mac.parts_remove"))
-                    .accessibilityLabel(shop.words.callIt("mac.parts_remove"))
-                    // The rule refuses the last part and a finished job's.
-                    .disabled(lock?.addRemove != true || parts.count <= 1)
                 }
             }
         }
@@ -326,6 +346,13 @@ struct JobSheet: View {
                 .font(.caption.monospaced()).foregroundStyle(.secondary)
             content()
         }
+    }
+
+    /// A parts column's name, over the fields it names.
+    private func header(_ key: String) -> some View {
+        Text(shop.words.callIt(key))
+            .font(.caption).foregroundStyle(.secondary)
+            .lineLimit(1)
     }
 
     private func label(_ key: String) -> some View {

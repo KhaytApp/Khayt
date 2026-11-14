@@ -108,6 +108,11 @@ struct JobSheetTests {
         #expect(sheet.contains("if lock?.askPrice == true, partsCostMoved { askingPrice = true } else { commit(keepPrice: false) }"))
         #expect(sheet.contains(".disabled(saving || !changed || refusal != nil || !shop.canMoveJobs)"))
         #expect(sheet.contains("shop.previewJobSave(subject.id, pending)"))
+        // Every part column is named once, and each field says what it is.
+        for key in ["mac.a_part", "mac.filament", "mac.grams", "mac.hours", "doc.qty"] {
+            #expect(sheet.contains("header(\"\(key)\")"), "\(key) has no column header")
+            #expect(sheet.contains(".accessibilityLabel(shop.words.callIt(\"\(key)\"))"), "\(key) has no accessibility label")
+        }
         // The old sheet stays in the tree for a release.
         #expect(!MenuCoverageTests.source("EditJobSheet.swift").isEmpty)
     }
