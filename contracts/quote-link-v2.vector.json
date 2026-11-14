@@ -1,0 +1,568 @@
+{
+  "WARNING": "TEST VECTOR ONLY. These private keys are published on purpose so every implementation can check itself. Never use them, or anything derived from them, for a real shop.",
+  "spec": "Quote pay link v2: one Ed25519 key per signing device (JWS alg EdDSA, RFC 8037); kid = RFC 7638 JWK thumbprint (SHA-256, base64url); keys other than a root are endorsed by another trusted, non-revoked key of the same shop. Design approved 14 Nov 2026 (~/Khayt-proposals/pay-link-open-signing.md). Every JSON value here was serialised with JSON.stringify (no spaces, keys in the order shown); a verifier checks the bytes it receives, whatever their order.",
+  "keys": {
+    "K1": {
+      "device": "Mac, first key: the root",
+      "seed_label": "khayt quote-link v2 TEST KEY 1 (Mac, first key: the root) - public test vector, never use for a real shop",
+      "private_seed_b64url": "NRoS1Q-0jFzCg36jIFmw2KZUmxUpZ4-6AiarPoFnOJ4",
+      "public_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE",
+        "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+        "use": "sig",
+        "alg": "EdDSA"
+      },
+      "thumbprint_input": "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE\"}"
+    },
+    "K2": {
+      "device": "desktop",
+      "seed_label": "khayt quote-link v2 TEST KEY 2 (desktop) - public test vector, never use for a real shop",
+      "private_seed_b64url": "-_mVCkd5NeShYXh77hTUQMDPABXwI0hV6ygPdW4F71Y",
+      "public_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+        "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+        "use": "sig",
+        "alg": "EdDSA"
+      },
+      "thumbprint_input": "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA\"}"
+    },
+    "K3": {
+      "device": "Mac, after its yearly rotation",
+      "seed_label": "khayt quote-link v2 TEST KEY 3 (Mac, after its yearly rotation) - public test vector, never use for a real shop",
+      "private_seed_b64url": "k_grQ53wgBu6ifrOjH7YB4qjkk8cxxLs9fxw2LgC2fY",
+      "public_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+        "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+        "use": "sig",
+        "alg": "EdDSA"
+      },
+      "thumbprint_input": "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok\"}"
+    },
+    "K4": {
+      "device": "a key endorsed only through revoked K2",
+      "seed_label": "khayt quote-link v2 TEST KEY 4 (a key endorsed only through revoked K2) - public test vector, never use for a real shop",
+      "private_seed_b64url": "vArqVhnl3fKZs5pGLW05EEZYhOjc-epVefm0o6a4vKY",
+      "public_jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "Y439jfC_3jGBiEx6TVIcPZdu60Btu-VzJnX9YOTqsNw",
+        "kid": "iIFc-TiJlia9mMnoAlgInOrtot35LHduMcToBvruD5Y",
+        "use": "sig",
+        "alg": "EdDSA"
+      },
+      "thumbprint_input": "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"Y439jfC_3jGBiEx6TVIcPZdu60Btu-VzJnX9YOTqsNw\"}"
+    }
+  },
+  "endorsements": {
+    "K2_by_K1": {
+      "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+      "header": {
+        "alg": "EdDSA",
+        "typ": "khayt-key-endorsement+jwt",
+        "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw"
+      },
+      "payload": {
+        "iss": "shop_0000example",
+        "new_kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+        "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+        "iat": 1794560400
+      },
+      "signing_input": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0",
+      "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0.mvqoxQe7LmPc8BzU8fzQ2UtPdn284vR0i3v9sdmlLda7RQceHug286U9B2LorL3wHVpCCcZnnGRP-cUxYKeuCQ"
+    },
+    "K3_by_K1": {
+      "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+      "header": {
+        "alg": "EdDSA",
+        "typ": "khayt-key-endorsement+jwt",
+        "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw"
+      },
+      "payload": {
+        "iss": "shop_0000example",
+        "new_kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+        "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+        "iat": 1795075200
+      },
+      "signing_input": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0",
+      "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0.0hPB_3exJFnH7gCnda7_7iiS_SKS_5pr-8_Y82phWsqUI327jxbEAupZo6G7SLGAXmcch9mb3tJcI893N5LODA"
+    }
+  },
+  "pin_response": {
+    "what": "GET /v1/shops/{id}/quote-keys/pin with the shop import key: what a store pins first.",
+    "body": {
+      "shop": "shop_0000example",
+      "epoch": 1,
+      "roots": [
+        "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw"
+      ],
+      "current": [
+        "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+        "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g"
+      ]
+    }
+  },
+  "key_chain": {
+    "what": "GET /v1/shops/{id}/quote-keys: the whole chain, retired and revoked keys kept permanently.",
+    "body": {
+      "shop": "shop_0000example",
+      "epoch": 1,
+      "keys": [
+        {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE",
+          "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+          "use": "sig",
+          "alg": "EdDSA",
+          "status": "retired",
+          "root": true,
+          "device": "Mac",
+          "created": "2026-11-12T07:00:00Z",
+          "retired": "2026-11-19T08:00:00Z",
+          "endorsements": []
+        },
+        {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+          "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+          "use": "sig",
+          "alg": "EdDSA",
+          "status": "current",
+          "device": "Desktop",
+          "created": "2026-11-13T08:20:00Z",
+          "endorsements": [
+            {
+              "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+              "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0.mvqoxQe7LmPc8BzU8fzQ2UtPdn284vR0i3v9sdmlLda7RQceHug286U9B2LorL3wHVpCCcZnnGRP-cUxYKeuCQ"
+            }
+          ]
+        },
+        {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+          "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+          "use": "sig",
+          "alg": "EdDSA",
+          "status": "current",
+          "device": "Mac",
+          "created": "2026-11-19T08:00:00Z",
+          "endorsements": [
+            {
+              "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+              "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0.0hPB_3exJFnH7gCnda7_7iiS_SKS_5pr-8_Y82phWsqUI327jxbEAupZo6G7SLGAXmcch9mb3tJcI893N5LODA"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "store": {
+    "connected_shop": "shop_0000example",
+    "STORE_ORIGIN": "https://store.example",
+    "pinned_roots": [
+      "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw"
+    ]
+  },
+  "links": [
+    {
+      "what": "Signed by the root K1 before it retired: verifies.",
+      "header": {
+        "alg": "EdDSA",
+        "typ": "JWT",
+        "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw"
+      },
+      "payload": {
+        "v": 2,
+        "iss": "shop_0000example",
+        "aud": "https://store.example",
+        "quote_id": "q_01JCQ7Z3K8M2V5X9T4N6P0R1S2",
+        "ref": "AT-Q-0142",
+        "currency": "SAR",
+        "prices_include_vat": false,
+        "items": [
+          {
+            "title": "dragon-v2.stl",
+            "spec": "PLA, red and yellow, 180 mm",
+            "quantity": 2,
+            "unit_amount": 14500,
+            "weight_grams": 450
+          },
+          {
+            "title": "Design fee",
+            "quantity": 1,
+            "unit_amount": 5000,
+            "weight_grams": 0
+          }
+        ],
+        "lead_time_days": {
+          "min": 5,
+          "max": 7
+        },
+        "customer": {
+          "name": "Sara Example"
+        },
+        "shipping": "lamha",
+        "iat": 1794470400,
+        "exp": 1795075200
+      },
+      "payload_json": "{\"v\":2,\"iss\":\"shop_0000example\",\"aud\":\"https://store.example\",\"quote_id\":\"q_01JCQ7Z3K8M2V5X9T4N6P0R1S2\",\"ref\":\"AT-Q-0142\",\"currency\":\"SAR\",\"prices_include_vat\":false,\"items\":[{\"title\":\"dragon-v2.stl\",\"spec\":\"PLA, red and yellow, 180 mm\",\"quantity\":2,\"unit_amount\":14500,\"weight_grams\":450},{\"title\":\"Design fee\",\"quantity\":1,\"unit_amount\":5000,\"weight_grams\":0}],\"lead_time_days\":{\"min\":5,\"max\":7},\"customer\":{\"name\":\"Sara Example\"},\"shipping\":\"lamha\",\"iat\":1794470400,\"exp\":1795075200}",
+      "signing_input": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9.mM0qdj2sMxpYbfOT-X_USzNbd5V9eJ-5e4ZxS8v6NklGox_CCvi32XFVJ2mMhiI52wq8HrBARH6YMNsFznA8Dg"
+    },
+    {
+      "what": "Signed by the desktop key K2 (endorsed by K1): verifies.",
+      "header": {
+        "alg": "EdDSA",
+        "typ": "JWT",
+        "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs"
+      },
+      "payload": {
+        "v": 2,
+        "iss": "shop_0000example",
+        "aud": "https://store.example",
+        "quote_id": "q_01JCQ7Z3K8M2V5X9T4N6P0R1S2",
+        "ref": "AT-Q-0142",
+        "currency": "SAR",
+        "prices_include_vat": false,
+        "items": [
+          {
+            "title": "dragon-v2.stl",
+            "spec": "PLA, red and yellow, 180 mm",
+            "quantity": 2,
+            "unit_amount": 14500,
+            "weight_grams": 450
+          },
+          {
+            "title": "Design fee",
+            "quantity": 1,
+            "unit_amount": 5000,
+            "weight_grams": 0
+          }
+        ],
+        "lead_time_days": {
+          "min": 5,
+          "max": 7
+        },
+        "customer": {
+          "name": "Sara Example"
+        },
+        "shipping": "lamha",
+        "iat": 1794650400,
+        "exp": 1795255200
+      },
+      "payload_json": "{\"v\":2,\"iss\":\"shop_0000example\",\"aud\":\"https://store.example\",\"quote_id\":\"q_01JCQ7Z3K8M2V5X9T4N6P0R1S2\",\"ref\":\"AT-Q-0142\",\"currency\":\"SAR\",\"prices_include_vat\":false,\"items\":[{\"title\":\"dragon-v2.stl\",\"spec\":\"PLA, red and yellow, 180 mm\",\"quantity\":2,\"unit_amount\":14500,\"weight_grams\":450},{\"title\":\"Design fee\",\"quantity\":1,\"unit_amount\":5000,\"weight_grams\":0}],\"lead_time_days\":{\"min\":5,\"max\":7},\"customer\":{\"name\":\"Sara Example\"},\"shipping\":\"lamha\",\"iat\":1794650400,\"exp\":1795255200}",
+      "signing_input": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NjUwNDAwLCJleHAiOjE3OTUyNTUyMDB9",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NjUwNDAwLCJleHAiOjE3OTUyNTUyMDB9.C_GBxI1dGos8Q81K99nDgcPaNyFHSG_b2Q6rd1EUW_AR_jcHO69FXe--dmMnPE1qD_Ckf_2gm5uCbsD8oRw-DQ"
+    },
+    {
+      "what": "Re-signed by K3 after the rotation: verifies.",
+      "header": {
+        "alg": "EdDSA",
+        "typ": "JWT",
+        "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g"
+      },
+      "payload": {
+        "v": 2,
+        "iss": "shop_0000example",
+        "aud": "https://store.example",
+        "quote_id": "q_01JCQ7Z3K8M2V5X9T4N6P0R1S2",
+        "ref": "AT-Q-0142",
+        "currency": "SAR",
+        "prices_include_vat": false,
+        "items": [
+          {
+            "title": "dragon-v2.stl",
+            "spec": "PLA, red and yellow, 180 mm",
+            "quantity": 2,
+            "unit_amount": 14500,
+            "weight_grams": 450
+          },
+          {
+            "title": "Design fee",
+            "quantity": 1,
+            "unit_amount": 5000,
+            "weight_grams": 0
+          }
+        ],
+        "lead_time_days": {
+          "min": 5,
+          "max": 7
+        },
+        "customer": {
+          "name": "Sara Example"
+        },
+        "shipping": "lamha",
+        "iat": 1795075300,
+        "exp": 1795680100
+      },
+      "payload_json": "{\"v\":2,\"iss\":\"shop_0000example\",\"aud\":\"https://store.example\",\"quote_id\":\"q_01JCQ7Z3K8M2V5X9T4N6P0R1S2\",\"ref\":\"AT-Q-0142\",\"currency\":\"SAR\",\"prices_include_vat\":false,\"items\":[{\"title\":\"dragon-v2.stl\",\"spec\":\"PLA, red and yellow, 180 mm\",\"quantity\":2,\"unit_amount\":14500,\"weight_grams\":450},{\"title\":\"Design fee\",\"quantity\":1,\"unit_amount\":5000,\"weight_grams\":0}],\"lead_time_days\":{\"min\":5,\"max\":7},\"customer\":{\"name\":\"Sara Example\"},\"shipping\":\"lamha\",\"iat\":1795075300,\"exp\":1795680100}",
+      "signing_input": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk1MDc1MzAwLCJleHAiOjE3OTU2ODAxMDB9",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk1MDc1MzAwLCJleHAiOjE3OTU2ODAxMDB9.pkp7q5BapH6fQ-iCCnCDuGg8Sy8aS23_srV7ZmXqm8-SurrOV_JqwFfFz9HQnaOy4y_5oHdD9dyIUkZO62trCg"
+    }
+  ],
+  "must_refuse": [
+    {
+      "case": "tampered amount (line 1 unit_amount 14500 -> 100), original signature",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTAwLCJ3ZWlnaHRfZ3JhbXMiOjQ1MH0seyJ0aXRsZSI6IkRlc2lnbiBmZWUiLCJxdWFudGl0eSI6MSwidW5pdF9hbW91bnQiOjUwMDAsIndlaWdodF9ncmFtcyI6MH1dLCJsZWFkX3RpbWVfZGF5cyI6eyJtaW4iOjUsIm1heCI6N30sImN1c3RvbWVyIjp7Im5hbWUiOiJTYXJhIEV4YW1wbGUifSwic2hpcHBpbmciOiJsYW1oYSIsImlhdCI6MTc5NDQ3MDQwMCwiZXhwIjoxNzk1MDc1MjAwfQ.mM0qdj2sMxpYbfOT-X_USzNbd5V9eJ-5e4ZxS8v6NklGox_CCvi32XFVJ2mMhiI52wq8HrBARH6YMNsFznA8Dg",
+      "reason": "bad_signature"
+    },
+    {
+      "case": "alg HS256 keyed with the public key x (algorithm confusion)",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9.0wAT-gVs0X0GzwjdvfSpxONGRP8Hjox42XN_NHyvykw",
+      "reason": "bad_alg"
+    },
+    {
+      "case": "signed by K1 but iss is another shop",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzExMTFvdGhlciIsImF1ZCI6Imh0dHBzOi8vc3RvcmUuZXhhbXBsZSIsInF1b3RlX2lkIjoicV8wMUpDUTdaM0s4TTJWNVg5VDRONlAwUjFTMiIsInJlZiI6IkFULVEtMDE0MiIsImN1cnJlbmN5IjoiU0FSIiwicHJpY2VzX2luY2x1ZGVfdmF0IjpmYWxzZSwiaXRlbXMiOlt7InRpdGxlIjoiZHJhZ29uLXYyLnN0bCIsInNwZWMiOiJQTEEsIHJlZCBhbmQgeWVsbG93LCAxODAgbW0iLCJxdWFudGl0eSI6MiwidW5pdF9hbW91bnQiOjE0NTAwLCJ3ZWlnaHRfZ3JhbXMiOjQ1MH0seyJ0aXRsZSI6IkRlc2lnbiBmZWUiLCJxdWFudGl0eSI6MSwidW5pdF9hbW91bnQiOjUwMDAsIndlaWdodF9ncmFtcyI6MH1dLCJsZWFkX3RpbWVfZGF5cyI6eyJtaW4iOjUsIm1heCI6N30sImN1c3RvbWVyIjp7Im5hbWUiOiJTYXJhIEV4YW1wbGUifSwic2hpcHBpbmciOiJsYW1oYSIsImlhdCI6MTc5NDQ3MDQwMCwiZXhwIjoxNzk1MDc1MjAwfQ.Z6VAspPFTSaOK4hXUCZnvws1lubI-IDPLWxAT-3F-_doQhAgUpj8fyxx1-NyyZKipwVoalVsDpsChpBlHG7_Dg",
+      "reason": "wrong_iss"
+    },
+    {
+      "case": "signed by K1 but aud is another storefront",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9vdGhlci5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9.VoiL2IwmLYWygAlT0kbazDW7frT0DUf025V_5A-2k90WPP_Em3RpL6Vnon5BsiduJEKON7XL877s8NiMMHEkDA",
+      "reason": "wrong_aud"
+    },
+    {
+      "case": "signed by retired K1 with an iat after it retired",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6Im5zdnRsUDQyZ19IQVNDY1hmbVNHaEhfeUtMVjVuOG9MQlNpLVE1aWRLbHcifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk1MTAwMDAwLCJleHAiOjE3OTU3MDAwMDB9.Fcyxu_zHFSNC7bVq9TasHEfu5cpqzfZrcpoeL03ndxfiZngtSgx9cwuGS1lnJgVzUFgOzbUvM6zlYEAM1PgBAw",
+      "reason": "retired_key"
+    },
+    {
+      "case": "K2 revoked; K4 is endorsed only by K2 (whatever the iat): K4 is never trusted",
+      "key_chain": {
+        "shop": "shop_0000example",
+        "epoch": 1,
+        "keys": [
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE",
+            "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "retired",
+            "root": true,
+            "device": "Mac",
+            "created": "2026-11-12T07:00:00Z",
+            "retired": "2026-11-19T08:00:00Z",
+            "endorsements": []
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+            "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "revoked",
+            "device": "Desktop",
+            "created": "2026-11-13T08:20:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0.mvqoxQe7LmPc8BzU8fzQ2UtPdn284vR0i3v9sdmlLda7RQceHug286U9B2LorL3wHVpCCcZnnGRP-cUxYKeuCQ"
+              }
+            ],
+            "revoked": "2026-11-20T08:00:00Z"
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+            "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Mac",
+            "created": "2026-11-19T08:00:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0.0hPB_3exJFnH7gCnda7_7iiS_SKS_5pr-8_Y82phWsqUI327jxbEAupZo6G7SLGAXmcch9mb3tJcI893N5LODA"
+              }
+            ]
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Y439jfC_3jGBiEx6TVIcPZdu60Btu-VzJnX9YOTqsNw",
+            "kid": "iIFc-TiJlia9mMnoAlgInOrtot35LHduMcToBvruD5Y",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Unknown",
+            "created": "2026-11-20T09:00:00Z",
+            "endorsements": [
+              {
+                "by": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJUZ0F0Wm5NQVVLX3B6WTRCZDJWM0kySUJjWnlmSWR0eGhXVmFIVUJ1QUVzIn0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6ImlJRmMtVGlKbGlhOW1Nbm9BbGdJbk9ydG90MzVMSGR1TWNUb0J2cnVENVkiLCJ4IjoiWTQzOWpmQ18zakdCaUV4NlRWSWNQWmR1NjBCdHUtVnpKblg5WU9UcXNOdyIsImlhdCI6MTc5NTIwMDAwMH0.v7aoCnnrAO3rZdJlT42KbcHMVYr2ZoG6FWwhbU7h-WT-JCPhD1SD7-0JmNehhVfOFAzk1cPDHMuYDMbG-2cDAw"
+              }
+            ]
+          }
+        ]
+      },
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6ImlJRmMtVGlKbGlhOW1Nbm9BbGdJbk9ydG90MzVMSGR1TWNUb0J2cnVENVkifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9.Nb9gETCV5xxk_pJ_cvrakytQ-fv7B-w48cjwuJ0tv_ith6v12HIc44b4Y7rTAs5Fxdd5xgJUg1pJWjDt6_7mBQ",
+      "reason": "untrusted_key"
+    },
+    {
+      "case": "K2 revoked: its own links fail too, old ones included",
+      "key_chain": {
+        "shop": "shop_0000example",
+        "epoch": 1,
+        "keys": [
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE",
+            "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "retired",
+            "root": true,
+            "device": "Mac",
+            "created": "2026-11-12T07:00:00Z",
+            "retired": "2026-11-19T08:00:00Z",
+            "endorsements": []
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+            "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "revoked",
+            "device": "Desktop",
+            "created": "2026-11-13T08:20:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0.mvqoxQe7LmPc8BzU8fzQ2UtPdn284vR0i3v9sdmlLda7RQceHug286U9B2LorL3wHVpCCcZnnGRP-cUxYKeuCQ"
+              }
+            ],
+            "revoked": "2026-11-20T08:00:00Z"
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+            "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Mac",
+            "created": "2026-11-19T08:00:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0.0hPB_3exJFnH7gCnda7_7iiS_SKS_5pr-8_Y82phWsqUI327jxbEAupZo6G7SLGAXmcch9mb3tJcI893N5LODA"
+              }
+            ]
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Y439jfC_3jGBiEx6TVIcPZdu60Btu-VzJnX9YOTqsNw",
+            "kid": "iIFc-TiJlia9mMnoAlgInOrtot35LHduMcToBvruD5Y",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Unknown",
+            "created": "2026-11-20T09:00:00Z",
+            "endorsements": [
+              {
+                "by": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJUZ0F0Wm5NQVVLX3B6WTRCZDJWM0kySUJjWnlmSWR0eGhXVmFIVUJ1QUVzIn0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6ImlJRmMtVGlKbGlhOW1Nbm9BbGdJbk9ydG90MzVMSGR1TWNUb0J2cnVENVkiLCJ4IjoiWTQzOWpmQ18zakdCaUV4NlRWSWNQWmR1NjBCdHUtVnpKblg5WU9UcXNOdyIsImlhdCI6MTc5NTIwMDAwMH0.v7aoCnnrAO3rZdJlT42KbcHMVYr2ZoG6FWwhbU7h-WT-JCPhD1SD7-0JmNehhVfOFAzk1cPDHMuYDMbG-2cDAw"
+              }
+            ]
+          }
+        ]
+      },
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NjUwNDAwLCJleHAiOjE3OTUyNTUyMDB9.C_GBxI1dGos8Q81K99nDgcPaNyFHSG_b2Q6rd1EUW_AR_jcHO69FXe--dmMnPE1qD_Ckf_2gm5uCbsD8oRw-DQ",
+      "reason": "revoked_key"
+    },
+    {
+      "case": "K4 endorsed by K1 for ANOTHER shop (iss): the endorsement does not carry over",
+      "key_chain": {
+        "shop": "shop_0000example",
+        "epoch": 1,
+        "keys": [
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Qd3rcuHrvJT1kMLRulFf381i-18flqB9kc672UYxqeE",
+            "kid": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "retired",
+            "root": true,
+            "device": "Mac",
+            "created": "2026-11-12T07:00:00Z",
+            "retired": "2026-11-19T08:00:00Z",
+            "endorsements": []
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "-O21ewR_JbHolbrneM8bKNg0Ci_hRUjTEsQIS32VHEA",
+            "kid": "TgAtZnMAUK_pzY4Bd2V3I2IBcZyfIdtxhWVaHUBuAEs",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Desktop",
+            "created": "2026-11-13T08:20:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6IlRnQXRabk1BVUtfcHpZNEJkMlYzSTJJQmNaeWZJZHR4aFdWYUhVQnVBRXMiLCJ4IjoiLU8yMWV3Ul9KYkhvbGJybmVNOGJLTmcwQ2lfaFJValRFc1FJUzMyVkhFQSIsImlhdCI6MTc5NDU2MDQwMH0.mvqoxQe7LmPc8BzU8fzQ2UtPdn284vR0i3v9sdmlLda7RQceHug286U9B2LorL3wHVpCCcZnnGRP-cUxYKeuCQ"
+              }
+            ]
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "3Dz_T0l-JKiKqu1DPp6K6xW6Fow6wMcB271A0_lj2ok",
+            "kid": "wznFhePBj-GNsU5As8BX5nFFtr7y-tvsYaIRn7HxP9g",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Mac",
+            "created": "2026-11-19T08:00:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwibmV3X2tpZCI6Ind6bkZoZVBCai1HTnNVNUFzOEJYNW5GRnRyN3ktdHZzWWFJUm43SHhQOWciLCJ4IjoiM0R6X1QwbC1KS2lLcXUxRFBwNks2eFc2Rm93NndNY0IyNzFBMF9sajJvayIsImlhdCI6MTc5NTA3NTIwMH0.0hPB_3exJFnH7gCnda7_7iiS_SKS_5pr-8_Y82phWsqUI327jxbEAupZo6G7SLGAXmcch9mb3tJcI893N5LODA"
+              }
+            ]
+          },
+          {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "Y439jfC_3jGBiEx6TVIcPZdu60Btu-VzJnX9YOTqsNw",
+            "kid": "iIFc-TiJlia9mMnoAlgInOrtot35LHduMcToBvruD5Y",
+            "use": "sig",
+            "alg": "EdDSA",
+            "status": "current",
+            "device": "Unknown",
+            "created": "2026-11-20T09:00:00Z",
+            "endorsements": [
+              {
+                "by": "nsvtlP42g_HASCcXfmSGhH_yKLV5n8oLBSi-Q5idKlw",
+                "jws": "eyJhbGciOiJFZERTQSIsInR5cCI6ImtoYXl0LWtleS1lbmRvcnNlbWVudCtqd3QiLCJraWQiOiJuc3Z0bFA0MmdfSEFTQ2NYZm1TR2hIX3lLTFY1bjhvTEJTaS1RNWlkS2x3In0.eyJpc3MiOiJzaG9wXzExMTFvdGhlciIsIm5ld19raWQiOiJpSUZjLVRpSmxpYTltTW5vQWxnSW5PcnRvdDM1TEhkdU1jVG9CdnJ1RDVZIiwieCI6Ilk0MzlqZkNfM2pHQmlFeDZUVkljUFpkdTYwQnR1LVZ6Sm5YOVlPVHFzTnciLCJpYXQiOjE3OTUyMDAwMDB9.DzxIJOLKToDP17LyZuBaoECg8qql3ViUASvWoFoPWreMbFNX_NvmKVzu3VqQWxPSx1cbz2uqcny4ZdrY9LNMBQ"
+              }
+            ]
+          }
+        ]
+      },
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsImtpZCI6ImlJRmMtVGlKbGlhOW1Nbm9BbGdJbk9ydG90MzVMSGR1TWNUb0J2cnVENVkifQ.eyJ2IjoyLCJpc3MiOiJzaG9wXzAwMDBleGFtcGxlIiwiYXVkIjoiaHR0cHM6Ly9zdG9yZS5leGFtcGxlIiwicXVvdGVfaWQiOiJxXzAxSkNRN1ozSzhNMlY1WDlUNE42UDBSMVMyIiwicmVmIjoiQVQtUS0wMTQyIiwiY3VycmVuY3kiOiJTQVIiLCJwcmljZXNfaW5jbHVkZV92YXQiOmZhbHNlLCJpdGVtcyI6W3sidGl0bGUiOiJkcmFnb24tdjIuc3RsIiwic3BlYyI6IlBMQSwgcmVkIGFuZCB5ZWxsb3csIDE4MCBtbSIsInF1YW50aXR5IjoyLCJ1bml0X2Ftb3VudCI6MTQ1MDAsIndlaWdodF9ncmFtcyI6NDUwfSx7InRpdGxlIjoiRGVzaWduIGZlZSIsInF1YW50aXR5IjoxLCJ1bml0X2Ftb3VudCI6NTAwMCwid2VpZ2h0X2dyYW1zIjowfV0sImxlYWRfdGltZV9kYXlzIjp7Im1pbiI6NSwibWF4Ijo3fSwiY3VzdG9tZXIiOnsibmFtZSI6IlNhcmEgRXhhbXBsZSJ9LCJzaGlwcGluZyI6ImxhbWhhIiwiaWF0IjoxNzk0NDcwNDAwLCJleHAiOjE3OTUwNzUyMDB9.Nb9gETCV5xxk_pJ_cvrakytQ-fv7B-w48cjwuJ0tv_ith6v12HIc44b4Y7rTAs5Fxdd5xgJUg1pJWjDt6_7mBQ",
+      "reason": "untrusted_key"
+    }
+  ]
+}
