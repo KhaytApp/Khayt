@@ -147,14 +147,38 @@ struct SettingsWindow: View {
     }
 
     private func rows(_ group: SettingsPane.Group) -> some View {
-        ForEach(SettingsPane.panes(in: group)) { pane in
+        // S4: a pane Simple leaves out is not in the list (Team & access, AI).
+        ForEach(SettingsPane.panes(in: group).filter { !Self.professionalOnly($0, shop) }) { pane in
             Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
                 .tag(pane)
         }
     }
 
+    /// The Simple map row each pane is (`SIMPLE_MAP`), where Simple leaves it out.
+    static func simpleKey(_ pane: SettingsPane) -> String? {
+        switch pane {
+        case .team: "team"
+        case .assistant: "ai"
+        default: nil
+        }
+    }
+
+    static func professionalOnly(_ pane: SettingsPane, _ shop: Shop) -> Bool {
+        simpleKey(pane).map(shop.professionalOnly) ?? false
+    }
+
     @ViewBuilder
     private func pane(_ which: SettingsPane) -> some View {
+        if Self.professionalOnly(which, shop) {
+            // Chosen before the switch, or restored: say so, and offer it back.
+            PartOfProfessional(shop: shop, feature: shop.words.callIt(which.wordKey))
+        } else {
+            paneBody(which)
+        }
+    }
+
+    @ViewBuilder
+    private func paneBody(_ which: SettingsPane) -> some View {
         switch which {
         case .general:      GeneralPane(shop: shop)
         case .shop:         ShopPane(shop: shop)

@@ -560,7 +560,7 @@ struct JobActions: View {
         // would hide the thing this app is for.
         Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
         JobInvoiceItems(shop: shop, job: job)
-        if Shop.offersProforma(job) {
+        if Shop.offersProforma(job), !shop.professionalOnly("proforma") {
             Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
             Button(shop.words.callIt("mac.milestones") + "\u{2026}") { shop.showMilestones(job.id) }
                 .disabled(!shop.canMoveJobs)

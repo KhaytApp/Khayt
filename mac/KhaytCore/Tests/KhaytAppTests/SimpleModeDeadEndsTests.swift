@@ -46,15 +46,46 @@ struct SimpleModeDeadEndsTests {
         #expect(pro.canShow(.reports))
     }
 
-    @Test("the message names the mode and the app says it in every language it has")
+    @Test("the message names the screen and the mode, offers the switch, in every language it has")
     func theWordsExist() async {
         let shop = await Self.shop(mode: "simple")
-        for key in ["mac.mode_screen_hidden", "mac.mode_open_settings"] {
+        for key in ["sm.gated_title", "sm.gated_body", "sm.gated_switch"] {
             let said = shop.words.callIt(key)
             #expect(said != key && !said.isEmpty)
         }
+        #expect(shop.words.callIt("sm.gated_title", ["feature": .string("Kiosk")]).contains("Kiosk"))
         let source = MenuCoverageTests.source("OperatorLockViews.swift")
         #expect(source.contains("shop.hiddenByMode(shop.shelf)"))
-        #expect(source.contains("mac.mode_screen_hidden"))
+        #expect(source.contains("PartOfProfessional("))
+        #expect(source.contains("sm.gated_switch"))
+    }
+
+    @Test("S4: what the shared map calls Professional is out of Simple, and back in Professional")
+    func professionalOnlyRows() async {
+        let simple = await Self.shop(mode: "simple")
+        #expect(simple.engineProblem == nil, "no engine means this proves nothing")
+        for key in Shop.simpleMapKeys {
+            #expect(simple.professionalOnly(key), "\(key) is `pro` in SIMPLE_MAP")
+        }
+        #expect(SettingsWindow.professionalOnly(.team, simple))
+        #expect(SettingsWindow.professionalOnly(.assistant, simple))
+        #expect(!SettingsWindow.professionalOnly(.integrations, simple), "connectors stay in both modes")
+        // The old name for Simple reads the same.
+        let enthusiast = await Self.shop(mode: "enthusiast")
+        #expect(enthusiast.professionalOnly("kiosk"))
+        let pro = await Self.shop(mode: nil)
+        for key in Shop.simpleMapKeys { #expect(!pro.professionalOnly(key), "\(key)") }
+        #expect(!SettingsWindow.professionalOnly(.team, pro))
+    }
+
+    @Test("S4: every entry point to a Professional-only feature asks first")
+    func entryPointsAsk() {
+        let menus = MenuCoverageTests.source("Menus.swift")
+        for key in ["kiosk", "ai", "campaigns", "paymentPlans"] {
+            #expect(menus.contains("professionalOnly(\"\(key)\")"), "\(key)")
+        }
+        #expect(MenuCoverageTests.source("OrderInspector.swift").contains("professionalOnly(\"proforma\")"))
+        #expect(MenuCoverageTests.source("OrdersTable.swift").contains("professionalOnly(\"proforma\")"))
+        #expect(MenuCoverageTests.source("Kiosk.swift").contains("professionalOnly(\"kiosk\")"))
     }
 }
