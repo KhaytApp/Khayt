@@ -29,6 +29,12 @@ enum ShopEventPublisher {
         case failed(Int)
     }
 
+    /// The only outcomes a phone in the field can read: `PrintFinished.Outcome`
+    /// on the iPhone is a strict enum, and one other value fails the WHOLE
+    /// alert to decode. Widen this only after a TestFlight that reads the new
+    /// value is out (Dev Hub, Nov 14: `ended` waits for iPhone #2459).
+    static let phoneOutcomes: Set<String> = ["finished", "failed", "cancelled"]
+
     /// The contract's ceiling on the serialized ciphertext.
     static let maxCiphertextBytes = 3 * 1024
 

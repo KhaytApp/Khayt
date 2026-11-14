@@ -202,3 +202,43 @@ test('addImage refuses an unknown kind by falling back to render', () => {
   const out = PI.addImage({ id: 'P' }, { thumbnail: 't', kind: 'glamour' });
   assert.equal(out.image.kind, 'render');
 });
+
+// ── A FINISH THE DEVICE DID NOT SEE (Baby U1, Nov 14) ──────────────────────
+// The Mac quit mid-print and came back after the end: its memo says printing
+// at a mid-print progress, the U1 now says `standby` with no file. That is
+// not a cancel — the printer's history says how it ended.
+
+test('a missed edge with an unnamed idle state is unknown, never guessed as cancelled', () => {
+  const memo = { u1: { state: 'printing', progress: 41, filename: 'Silica Box_PETG_15h22m.gcode' } };
+  const now = { state: 'standby', progress: 0, filename: '' };
+  const missed = F.track(memo, 'u1', now, { missed: true });
+  assert.equal(missed.outcome, 'unknown');
+  assert.equal(missed.capture, false);
+  assert.equal(missed.filename, 'Silica Box_PETG_15h22m.gcode', 'the file it was printing, from the memo');
+  // Without the flag the live rule is unchanged: OctoPrint's bare return to idle at 41% is a cancel.
+  assert.equal(F.track(memo, 'u1', now).outcome, 'cancelled');
+  // A state that names how it ended still decides, missed or not.
+  assert.equal(F.track(memo, 'u1', { state: 'complete', filename: 'x' }, { missed: true }).outcome, 'finished');
+  assert.equal(F.track(memo, 'u1', { state: 'error' }, { missed: true }).outcome, 'failed');
+});
+
+test('fromHistory: the newest job for the file, with its real end', () => {
+  const jobs = [
+    { filename: 'Silica Box_PETG_15h22m.gcode', status: 'cancelled', endedAt: '2026-11-12T08:00:00.000Z' },
+    { filename: 'Silica Box_PETG_15h22m.gcode', status: 'completed', endedAt: '2026-11-14T10:43:00.000Z' },
+    { filename: 'other.gcode', status: 'completed', endedAt: '2026-11-14T11:00:00.000Z' },
+  ];
+  assert.deepEqual(F.fromHistory(jobs, 'Silica Box_PETG_15h22m.gcode'),
+    { outcome: 'finished', endedAt: '2026-11-14T10:43:00.000Z' });
+  // Matched by the last path component, case-insensitively, as jobFor matches.
+  assert.equal(F.fromHistory(jobs, 'gcodes/SILICA BOX_PETG_15H22M.gcode').outcome, 'finished');
+  assert.equal(F.fromHistory([{ filename: 'a.gcode', status: 'error', endedAt: '' }], 'a.gcode').outcome, 'failed');
+  assert.equal(F.fromHistory([{ filename: 'a.gcode', status: 'klippy_shutdown' }], 'a.gcode').outcome, 'failed');
+  assert.equal(F.fromHistory([{ filename: 'a.gcode', status: 'cancelled' }], 'a.gcode').outcome, 'cancelled');
+  // Nothing it can back: no job for the file, or a status that says nothing.
+  assert.equal(F.fromHistory(jobs, 'missing.gcode'), null);
+  assert.equal(F.fromHistory([{ filename: 'a.gcode', status: 'in_progress' }], 'a.gcode'), null);
+  assert.equal(F.fromHistory([{ filename: 'a.gcode', status: 'interrupted' }], 'a.gcode'), null);
+  assert.equal(F.fromHistory(jobs, ''), null);
+  assert.equal(F.fromHistory(null, 'a.gcode'), null);
+});
