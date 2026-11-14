@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d bobinas bajas";
 "needs.quotes" = "%d presupuestos esperan respuesta";
 "needs.more" = "y %d más";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Enviar presupuesto";
+"job.next.take_job" = "Aceptar trabajo";
+"job.next.hold" = "Poner en espera";
+"job.next.fail_check" = "No pasó el CC";
+"job.blocked.production_paused" = "La producción está pausada — reanude antes de iniciar nuevas impresiones.";
+"job.blocked.wip" = "Límite de WIP (%1$@) alcanzado en «%2$@» — movimiento bloqueado";
+"job.blocked.assembly_not_assembled" = "Todas las piezas pasaron el CC — marca el ensamblaje como ensamblado para completar el pedido.";
+"job.blocked.assembly_parts" = "A la espera de pieza(s): %@";
+"job.blocked.other" = "No se puede desde aquí";
+"job.pill.paid" = "Pagado";

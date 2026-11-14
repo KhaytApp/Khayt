@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d Spulen fast leer";
 "needs.quotes" = "%d Angebote warten auf Antwort";
 "needs.more" = "und %d weitere";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Angebot senden";
+"job.next.take_job" = "Auftrag annehmen";
+"job.next.hold" = "Zurückstellen";
+"job.next.fail_check" = "QK nicht bestanden";
+"job.blocked.production_paused" = "Produktion ist pausiert — fortsetzen vor dem Start neuer Drucke.";
+"job.blocked.wip" = "WIP-Limit (%1$@) für „%2$@“ erreicht — Verschieben blockiert";
+"job.blocked.assembly_not_assembled" = "Alle Teile haben die QK bestanden — markiere die Baugruppe als zusammengebaut, um abzuschließen.";
+"job.blocked.assembly_parts" = "Wartet auf Teil(e): %@";
+"job.blocked.other" = "Hier nicht möglich";
+"job.pill.paid" = "Bezahlt";

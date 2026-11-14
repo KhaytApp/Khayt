@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d 卷线材不足";
 "needs.quotes" = "%d 份报价等待答复";
 "needs.more" = "还有 %d 项";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "发送报价";
+"job.next.take_job" = "接单";
+"job.next.hold" = "暂停订单";
+"job.next.fail_check" = "质检未通过";
+"job.blocked.production_paused" = "生产已暂停——请先恢复生产再开始新的打印任务。";
+"job.blocked.wip" = "“%2$@”已达 WIP 上限（%1$@）— 移动被阻止";
+"job.blocked.assembly_not_assembled" = "所有零件已通过质检——请将装配标记为已装配以完成订单。";
+"job.blocked.assembly_parts" = "等待零件：%@";
+"job.blocked.other" = "无法在此操作";
+"job.pill.paid" = "已付款";

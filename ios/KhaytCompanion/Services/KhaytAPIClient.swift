@@ -1295,6 +1295,55 @@ final class KhaytAPIClient: ObservableObject {
         return ShopShoppingList(store: store, shopName: shopName)
     }
 
+    /// The shared rule's answer for one job (`lib/order-next-step.js`), from
+    /// this phone's book. Nil with no book.
+    ///
+    /// The rule runs over the job itself plus every job in a working stage —
+    /// not the whole book. Its gate reads other jobs only to count a WIP
+    /// column (`order-status.wouldExceedWipLimit`, jobs IN that stage) and
+    /// reads assembly from the job alone, so this gives the whole book's
+    /// answer at a fraction of the cost (`JobStepsParityTests` proves it on
+    /// the sample book). Late comes from the attention rule's own list, as
+    /// the dashboard counts it.
+    func nextSteps(orderId: String, now: Date = Date()) async -> KhaytEngine.NextSteps? {
+        guard let book, book.exists, let reader, let store = try? book.read(),
+              let engine = try? await reader.sharedEngine() else { return nil }
+        let all = JSRead.rows(store, "printLog")
+        guard let order = all.first(where: { if case .object(let o) = $0 { return o["id"] == .string(orderId) }; return false })
+        else { return nil }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = store["settings"] { settings = s }
+        let working: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
+        let orders = [order] + all.filter {
+            guard case .object(let o) = $0, o["id"] != .string(orderId), case .string(let st)? = o["status"] else { return false }
+            return working.contains(st)
+        }
+        let late = (try? await engine.lateOrders(all, machines: JSRead.rows(store, "machines"), settings: settings, now: now)) ?? []
+        let answer = try? await engine.orderNextSteps(orders, settings: settings,
+                                                lateIds: late.contains(orderId) ? [orderId] : [], canWrite: canWrite)
+        return answer?[orderId]
+    }
+
+    /// The share sheet for a quote's link closed. A share it reports done (a
+    /// send, or Copy Link) stamps the quote as sent; a cancelled one does
+    /// nothing. Returns whether it stamped.
+    @discardableResult
+    func quoteShareEnded(orderId: String, completed: Bool, now: Date = Date()) async throws -> Bool {
+        guard JobSteps.shareCounts(completed: completed) else { return false }
+        try await markQuoteShared(orderId: orderId, now: now)
+        return true
+    }
+
+    /// The quote was shared from this phone (its customer link sent or
+    /// copied): `quoteSharedAt` stamped in the book, then sent on. The shared
+    /// rule then leads with Take job.
+    func markQuoteShared(orderId: String, now: Date = Date()) async throws {
+        guard let book, book.exists else { throw KhaytAPIError.server(L10n.tr("quote.needs_book")) }
+        try await BookWriter(book: book).markQuoteShared(orderId: orderId, now: now)
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
     /// The stage a held job was in before it went on hold, from its
     /// `statusHistory` in the book (`JobNextStep.stageBeforeHold`). Nil with
     /// no book, or when the history does not say.

@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d بكرة منخفضة";
 "needs.quotes" = "%d عرض سعر ينتظر رداً";
 "needs.more" = "و%d أمر آخر";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "إرسال عرض السعر";
+"job.next.take_job" = "استلام العمل";
+"job.next.hold" = "إيقاف مؤقت";
+"job.next.fail_check" = "لم يجتز الفحص";
+"job.blocked.production_paused" = "الإنتاج متوقف — استأنفه قبل بدء طباعة جديدة.";
+"job.blocked.wip" = "بلغ حد العمل الجاري (%1$@) لعمود «%2$@» — النقل ممنوع";
+"job.blocked.assembly_not_assembled" = "نجحت كل القطع في الفحص — حدّد التجميعة كمُجمَّعة لإكمال الطلب.";
+"job.blocked.assembly_parts" = "بانتظار القطع: %@";
+"job.blocked.other" = "لا يمكن من هنا";
+"job.pill.paid" = "مدفوع";

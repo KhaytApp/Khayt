@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d carretéis baixos";
 "needs.quotes" = "%d orçamentos aguardam resposta";
 "needs.more" = "e mais %d";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Enviar orçamento";
+"job.next.take_job" = "Aceitar trabalho";
+"job.next.hold" = "Colocar em espera";
+"job.next.fail_check" = "Reprovado no QC";
+"job.blocked.production_paused" = "A produção está pausada — retome antes de iniciar novas impressões.";
+"job.blocked.wip" = "Limite de trabalho em andamento (%1$@) atingido em “%2$@” — movimentação bloqueada";
+"job.blocked.assembly_not_assembled" = "Todas as peças passaram no QC — marque a montagem como montada para concluir este pedido.";
+"job.blocked.assembly_parts" = "Aguardando peça(s): %@";
+"job.blocked.other" = "Não é possível daqui";
+"job.pill.paid" = "Pago";

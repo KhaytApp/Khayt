@@ -66,8 +66,10 @@ struct OrderDetailPage: View {
     @State private var showingHistory = false
     @State private var followingUp = false
     @State private var confirmingDecline = false
-    /// For a held job, the stage Resume takes it back to.
-    @State private var heldFrom: OrderStatus?
+    /// The shared rule's answer for this job (`lib/order-next-step.js`).
+    @State private var rule: KhaytEngine.NextSteps?
+    /// The quote's customer link, being shared (Send quote).
+    @State private var sharingQuote: ShareItem?
     @Environment(\.openURL) private var openURL
 
     init(order: QueueOrder, facts: OrderFacts?, quote: OrderLogEntry? = nil,
@@ -83,11 +85,24 @@ struct OrderDetailPage: View {
     private var canShip: Bool { !(shipChoices ?? []).isEmpty }
     private var canRecordPayment: Bool { payment.map { $0.status != "paid" } ?? false }
 
-    /// The page's one next step (`JobNextStep`).
-    private var nextStep: JobNextStep? {
-        JobNextStep.next(status: order.status, voided: order.voided,
-                         owed: payment?.owed ?? 0, canHandOver: canShip, heldFrom: heldFrom)
+    /// The customer page link for this job, when there is one to send.
+    private var customerLink: URL? {
+        switch photoAccess {
+        case .ready(let token)?, .viewOnly(let token)?: return api.customerLink(token: token)
+        default: return nil
+        }
     }
+
+    /// The page's next step and the others, from the shared rule (`JobSteps`).
+    private var steps: (primary: JobSteps.Step?, secondary: [JobSteps.Step]) {
+        guard let rule else { return (nil, []) }
+        return JobSteps.arranged(rule, hasCustomerLink: customerLink != nil)
+    }
+    private var stepCodes: Set<String> {
+        Set(([steps.primary].compactMap { $0 } + steps.secondary).map(\.code))
+    }
+    /// Re-asked whenever the job or what it owes changes.
+    private var ruleKey: String { "\(order.id)|\(order.status)|\(order.voided)|\(payment?.owed ?? -1)|\(api.canWrite)" }
 
     /// Whether the activity region has anything to show.
     private var hasActivity: Bool {
@@ -103,7 +118,7 @@ struct OrderDetailPage: View {
             VStack(alignment: .leading, spacing: 16) {
                 // 1 · Header. Asked where the sale is, as on the Mac: a model
                 // that may not be sold has a designer on the other end.
-                OrderDetailHeader(order: order)
+                OrderDetailHeader(order: order, pillStage: rule?.pill.stage, late: rule?.late)
                 if !saleProblems.isEmpty {
                     LicenceNote(problems: saleProblems)
                 }
@@ -111,6 +126,7 @@ struct OrderDetailPage: View {
                 // 3 · Stage track · 4 · Parts.
                 OrderDetailContent(order: order, facts: facts,
                                    live: order.status == "printing" ? printers.reading(for: order.machineId) : nil,
+                                   trackCurrent: rule.flatMap(JobSteps.trackCurrent),
                                    isUpdating: isUpdating, machines: machines,
                                    onSetStatus: { st in Task { await setStatus(st) } },
                                    onAssignMachine: { id in Task { await assignMachine(id) } })
@@ -125,6 +141,22 @@ struct OrderDetailPage: View {
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { nextBar }
+        .task(id: ruleKey) { rule = await api.nextSteps(orderId: order.id) }
+        // Send quote: the customer page link through the share sheet. Only a
+        // share the sheet reports done (a send, or Copy Link) marks it sent.
+        .sheet(item: $sharingQuote) { item in
+            ShareSheet(items: [item.url]) { _, completed in
+                sharingQuote = nil
+                Task {
+                    do {
+                        guard try await api.quoteShareEnded(orderId: order.id, completed: completed) else { return }
+                        rule = await api.nextSteps(orderId: order.id)
+                        await onChanged()
+                    } catch { errorMessage = error.localizedDescription }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $recordingPayment) {
             if let payment {
                 RecordPaymentSheet(orderId: order.id, state: payment, currency: currency) {
@@ -187,7 +219,6 @@ struct OrderDetailPage: View {
             printPhotos = api.printPhotos(orderId: order.id)
             energy = api.jobEnergy(orderId: order.id)
             saleProblems = api.saleProblems(orderId: order.id)
-            heldFrom = api.stageBeforeHold(orderId: order.id)
             if isQuote { quoteState = await api.quoteState(orderId: order.id) }
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
@@ -322,10 +353,12 @@ struct OrderDetailPage: View {
     /// Pinned above the tab bar so it never scrolls away. A step the phone
     /// may not take says why in a quiet line under it.
     private var nextBar: some View {
-        JobNextBar(step: nextStep, stageDone: !isCancelled && !isQuote,
-                   isUpdating: isUpdating, canWrite: api.canWrite,
-                   refusal: errorMessage,
-                   onPrimary: { runNextStep() }) {
+        let primary = steps.primary
+        return JobNextBar(verb: primary.flatMap(JobSteps.verb), stageDone: !isCancelled && !isQuote,
+                          isUpdating: isUpdating, canWrite: api.canWrite,
+                          blocked: primary?.blocked.map(JobSteps.blockedText),
+                          refusal: errorMessage,
+                          onPrimary: { if let primary { run(primary) } }) {
             moreMenu
         }
     }
@@ -333,6 +366,13 @@ struct OrderDetailPage: View {
     /// Everything else the page can do, besides the one next step.
     @ViewBuilder
     private var moreMenu: some View {
+        // The rule's other steps for this stage, first.
+        ForEach(steps.secondary, id: \.code) { step in
+            if let verb = JobSteps.verb(step) {
+                Button { run(step) } label: { Text(verb) }
+                    .disabled(step.blocked != nil || !api.canWrite || isUpdating)
+            }
+        }
         if isQuote {
             if quoteState != nil {
                 Button { Task { await startRevising() } } label: { Label(L10n.tr("quote.revise"), systemImage: "pencil.and.list.clipboard") }
@@ -344,11 +384,11 @@ struct OrderDetailPage: View {
             Button(role: .destructive) { confirmingDecline = true } label: { Label(L10n.tr("quote.decline"), systemImage: "xmark") }
                 .disabled(!api.canWrite || isUpdating)
         }
-        if canRecordPayment, nextStep != .recordPayment {
+        if canRecordPayment, !stepCodes.contains("record_payment") {
             Button { recordingPayment = true } label: { Label(L10n.tr("pay.modal_title"), systemImage: "banknote") }
                 .disabled(!api.canWrite)
         }
-        if canShip, nextStep != .handOver {
+        if canShip, stepCodes.isDisjoint(with: ["hand_over", "ship"]) {
             Button { shipping = true } label: { Label(L10n.tr("ship.open"), systemImage: "shippingbox") }
                 .disabled(!api.canWrite)
         }
@@ -374,13 +414,20 @@ struct OrderDetailPage: View {
         }
     }
 
-    private func runNextStep() {
-        switch nextStep {
-        case .approveQuote?: Task { await answerQuote(.approve) }
-        case .advance(let to)?, .resume(let to)?: Task { await setStatus(to.rawValue) }
-        case .handOver?: shipping = true
-        case .recordPayment?: recordingPayment = true
-        case nil: break
+    /// A step, done the way the page always did it: a quote taken through
+    /// the quote's own Approve; a stage move through the status update (the
+    /// shop's rules then ask for actuals or a reason as they always have);
+    /// hand-over and payment through their sheets.
+    private func run(_ step: JobSteps.Step) {
+        guard step.blocked == nil else { return }
+        switch step.code {
+        case "send_quote":
+            if let link = customerLink { sharingQuote = ShareItem(url: link) }
+        case "take_job": Task { await answerQuote(.approve) }
+        case "hand_over", "ship": shipping = true
+        case "record_payment": recordingPayment = true
+        default:
+            if let to = step.to { Task { await setStatus(to) } }
         }
     }
 
@@ -589,6 +636,7 @@ enum JobStageLook {
     /// On hold violet). A quote waits on the customer, so it is steel.
     static func pill(_ status: String) -> (text: Color, wash: Color) {
         if status == "quote" { return (steel, steelWash) }
+        if status == "paid" { return (KhaytDesign.done, KhaytDesign.okSoft) }
         return (KhaytDesign.statusColor(for: status), KhaytDesign.statusSoft(for: status))
     }
 
@@ -596,7 +644,8 @@ enum JobStageLook {
     static func track(_ status: String) -> Color { KhaytDesign.statusColor(for: status) }
 
     static func name(_ status: String) -> String {
-        OrderStatus(rawValue: status)?.localizedLabel ?? (status == "cancelled" ? L10n.tr("status.cancelled") : status)
+        if status == "paid" { return L10n.tr("job.pill.paid") }
+        return OrderStatus(rawValue: status)?.localizedLabel ?? (status == "cancelled" ? L10n.tr("status.cancelled") : status)
     }
 }
 
@@ -617,6 +666,11 @@ struct JobRegionTitle: View {
 /// in its stage colour, and "N days late" beside it only when late.
 struct OrderDetailHeader: View {
     let order: QueueOrder
+    /// The shared rule's pill stage (`shipped`, `delivered` and `paid` too);
+    /// the job's status when the rule has not answered.
+    var pillStage: String? = nil
+    /// The shared rule's late flag, when it has answered.
+    var late: Bool? = nil
     var today = Date()
 
     private var line: String {
@@ -626,7 +680,7 @@ struct OrderDetailHeader: View {
     }
 
     private var daysLate: Int? {
-        order.isOverdue ? JobNextStep.daysLate(due: order.dueDate, today: today) : nil
+        (late ?? order.isOverdue) ? JobNextStep.daysLate(due: order.dueDate, today: today) : nil
     }
 
     var body: some View {
@@ -642,10 +696,11 @@ struct OrderDetailHeader: View {
                 .foregroundStyle(KhaytDesign.note)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                let look = JobStageLook.pill(order.status)
+                let stage = pillStage ?? order.status
+                let look = JobStageLook.pill(stage)
                 HStack(spacing: 6) {
                     Circle().fill(look.text).frame(width: 6, height: 6).accessibilityHidden(true)
-                    Text(JobStageLook.name(order.status))
+                    Text(JobStageLook.name(stage))
                         .font(.khayt(12.5, .semibold, relativeTo: .caption))
                         .foregroundStyle(look.text)
                 }
@@ -676,6 +731,9 @@ struct OrderDetailContent: View {
     var facts: OrderFacts? = nil
     /// The printer's live reading, while this job is printing on it.
     var live: MachineLiveStatus? = nil
+    /// The stage the track rings, from the shared rule (a held job where it
+    /// was held); the job's status when the rule has not answered.
+    var trackCurrent: OrderStatus? = nil
     let isUpdating: Bool
     var machines: [MachineInfo] = []
     let onSetStatus: (String) -> Void
@@ -683,7 +741,7 @@ struct OrderDetailContent: View {
 
     private static let stages: [OrderStatus] = [.pending, .printing, .post, .qc, .completed]
 
-    private var current: OrderStatus? { OrderStatus(rawValue: order.status) }
+    private var current: OrderStatus? { trackCurrent ?? OrderStatus(rawValue: order.status) }
     private var isQuote: Bool { current == .quote }
 
     var body: some View {
@@ -894,25 +952,20 @@ struct JobMoneyCard: View {
 /// and the verb's own button. With no next step it says the job is done (or
 /// that there is nothing to do), and More stays.
 struct JobNextBar<More: View>: View {
-    let step: JobNextStep?
+    /// The next step's verb; nil when the job has none.
+    let verb: String?
     /// A job past its stages (done and paid) rather than a cancelled one.
     let stageDone: Bool
     let isUpdating: Bool
     let canWrite: Bool
+    /// Why the step cannot be done now (the shared rule's `blocked`).
+    var blocked: String? = nil
     /// The last write's refusal, said at the control.
     var refusal: String? = nil
     let onPrimary: () -> Void
     @ViewBuilder let more: () -> More
 
     @Environment(\.dynamicTypeSize) private var typeSize
-
-    private var verb: String? {
-        guard let step else { return nil }
-        if case .advance(let to) = step, step.verbKey == "order.detail.move_to" {
-            return L10n.format("order.detail.move_to", to.localizedLabel)
-        }
-        return L10n.tr(step.verbKey)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -951,12 +1004,12 @@ struct JobNextBar<More: View>: View {
                         .lineLimit(2).multilineTextAlignment(.center)
                         .padding(.horizontal, 16)
                         .frame(minWidth: 44, maxWidth: typeSize.isAccessibilitySize ? .infinity : nil, minHeight: 50)
-                        .background(KhaytDesign.brand.opacity(canWrite ? 1 : 0.4),
+                        .background(KhaytDesign.brand.opacity(canWrite && blocked == nil ? 1 : 0.4),
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .disabled(isUpdating || !canWrite)
+                    .disabled(isUpdating || !canWrite || blocked != nil)
                     .accessibilityLabel(verb)
                 }
             }
@@ -966,8 +1019,8 @@ struct JobNextBar<More: View>: View {
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.late)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if step != nil, !canWrite {
-                Text(L10n.tr("cloud.read_only.line"))
+            } else if verb != nil, let why = blocked ?? (canWrite ? nil : L10n.tr("cloud.read_only.line")) {
+                Text(why)
                     .font(.khayt(12, relativeTo: .caption))
                     .foregroundStyle(KhaytDesign.note)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1049,4 +1102,10 @@ private struct RevisingQuote: Identifiable {
 private struct EditingJob: Identifiable {
     let state: KhaytAPIClient.OrderEditState
     var id: String { "\(state.dueDate ?? "")|\(state.priorityLevel)|\(state.price)" }
+}
+
+/// A link handed to the share sheet.
+struct ShareItem: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
 }

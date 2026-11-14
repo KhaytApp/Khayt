@@ -1419,3 +1419,15 @@
 "needs.low.count" = "%d bobines presque vides";
 "needs.quotes" = "%d devis attendent une réponse";
 "needs.more" = "et %d de plus";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Envoyer le devis";
+"job.next.take_job" = "Accepter le travail";
+"job.next.hold" = "Mettre en attente";
+"job.next.fail_check" = "Échec au CQ";
+"job.blocked.production_paused" = "La production est en pause — reprenez avant de lancer de nouvelles impressions.";
+"job.blocked.wip" = "Limite d’en-cours (%1$@) atteinte pour « %2$@ » — déplacement bloqué";
+"job.blocked.assembly_not_assembled" = "Toutes les pièces ont passé le CQ — marquez l’assemblage comme assemblé pour terminer.";
+"job.blocked.assembly_parts" = "En attente de pièce(s) : %@";
+"job.blocked.other" = "Impossible d’ici";
+"job.pill.paid" = "Payé";

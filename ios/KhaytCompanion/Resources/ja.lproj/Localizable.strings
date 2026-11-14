@@ -1419,3 +1419,15 @@
 "needs.low.count" = "残り少ないスプール %d個";
 "needs.quotes" = "返答待ちの見積もり %d件";
 "needs.more" = "ほか%d件";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "見積もりを送る";
+"job.next.take_job" = "仕事を受ける";
+"job.next.hold" = "保留にする";
+"job.next.fail_check" = "QC不合格";
+"job.blocked.production_paused" = "生産が一時停止されています — 新しい印刷を開始する前に再開してください。";
+"job.blocked.wip" = "「%2$@」のWIP上限（%1$@）に達しました — 移動をブロックしました";
+"job.blocked.assembly_not_assembled" = "全パーツがQCに合格しました — 注文を完了するにはアセンブリを組み立て済みにしてください。";
+"job.blocked.assembly_parts" = "待機中のパーツ: %@";
+"job.blocked.other" = "ここではできません";
+"job.pill.paid" = "支払い済み";
