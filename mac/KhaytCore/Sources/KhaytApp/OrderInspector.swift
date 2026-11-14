@@ -16,7 +16,7 @@ struct OrderInspector: View {
     var body: some View {
         Group {
             if let job = shop.selected {
-                Detail(job: job, shop: shop, split: split)
+                JobDetail(job: job, shop: shop, split: split)
                     .task(id: job.id) { split = await shop.taxSplit(job.price) }
             } else {
                 EmptyHere(title: shop.words.callIt("mac.no_job"), message: shop.words.callIt("mac.no_job_hint"), mark: .jobs)
@@ -25,10 +25,14 @@ struct OrderInspector: View {
     }
 }
 
-private struct Detail: View {
+/// Everything the inspector says about one job. Not private: the job page
+/// (S1, `JobPage`) draws the same sections under its own header.
+struct JobDetail: View {
     let job: Order
     let shop: Shop
     let split: TaxSplit?
+    /// Inside the job page: no header and no scroll view of its own.
+    var embedded = false
     @State private var zatca: KhaytEngine.ZatcaReporting.Invoice?
     @State private var editing: Order.Part?
     /// The partial-delivery sheet (`PartsDeliveredSheet`).
@@ -45,194 +49,14 @@ private struct Detail: View {
     @State private var timelapse: KhaytEngine.TimelapseLink?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                if ReprintLinks.shows(job) {
-                    ReprintLinks(shop: shop, job: job)
-                }
-                if StoreLinesSection.shows(job) {
-                    StoreLinesSection(shop: shop, job: job)
-                }
-                // ── MAY THIS BE SOLD? ─────────────────────────────────────
-                //
-                // Asked where the sale is, not only where the model is. A
-                // non-commercial model, or one whose bought licence has run
-                // out, printed and invoiced is the one mistake here with a
-                // designer on the other end of it.
-                let problems = shop.saleProblems(job.parts.compactMap(\.printFileId))
-                if !problems.isEmpty {
-                    LicenceWarning(shop: shop, problems: problems)
-                }
-                if shop.canMoveJobs, !shop.sendablePrinters.isEmpty,
-                   !Shop.finishedStatuses.contains(job.status), job.status != "cancelled" {
-                    // Beside the job it is for: the plate goes to a machine
-                    // from where the shop is already looking at the work.
-                    VStack(alignment: .leading, spacing: 4) {
-                        Button(shop.words.callIt("mac.send_title") + "…") {
-                            shop.pendingSend = Shop.PendingHold(id: job.id, project: job.project)
-                        }
-                        .buttonStyle(.link)
-                        .font(.callout)
-                        if let note = shop.sendNote {
-                            Text(note).font(.caption).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                if job.machineId?.isEmpty == false || printed != nil {
-                    JobMachineLine(shop: shop, job: job, printed: printed)
-                }
-                if let timelapse {
-                    TimelapseLine(shop: shop, link: timelapse)
-                }
-                Divider()
-                money
-                if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {
-                    Divider()
-                    shipment
-                }
-                if !job.parts.isEmpty {
-                    Divider()
-                    parts
-                }
-                // Which spool and which LOT the filament came from — what a
-                // recall asks. Hidden when the job drew nothing.
-                let drawn = FilamentUsed.rows(for: job, spools: shop.spools)
-                if !drawn.isEmpty {
-                    Divider()
-                    FilamentUsedSection(shop: shop, rows: drawn)
-                }
-                // Who did it and the hours on it — for a shop with staff, or a
-                // job that already names somebody.
-                if JobStaffSection.shows(shop, job) {
-                    Divider()
-                    JobStaffSection(shop: shop, job: job)
-                }
-                // The shop's post-processing steps, ticked on a job in Post —
-                // the desktop's card checklist (`order.postChecks`).
-                if JobPostChecklist.shows(shop, job) {
-                    Divider()
-                    JobPostChecklist(shop: shop, job: job)
-                }
-                // The shop's own order fields that have a value here.
-                if !JobCustomFields.rows(shop, job).isEmpty {
-                    Divider()
-                    JobCustomFields(shop: shop, job: job)
-                }
-                // What the whole object came to, for a shop looking at one
-                // leg of it. Only where there is a kit to show or a book that
-                // has kits in it — a picker offering to file a job into
-                // nothing, on every job, is a control that says nothing.
-                // Only where the shop has agreed to it, and only on a job
-                // that names a customer — a message drafted about nobody has
-                // no one to send it to.
-                if shop.aiReplyAllowed, !job.client.isEmpty {
-                    Divider()
-                    Button(shop.words.callIt("mac.draft_a_message")) {
-                        shop.draftingFor = job
-                    }
-                    .buttonStyle(.link)
-                    .font(.callout)
-                }
-                // WhatsApp: the update due at this job's milestone, and the
-                // shop's OWN saved messages — no key, no connection, nobody's
-                // agreement to send a customer's details to a service. A job
-                // with no customer record still gets a message the shop can
-                // copy, and the sheet says why WhatsApp cannot be opened.
-                WhatsAppJobRow(shop: shop, job: job)
-                // A PHOTOGRAPH OF THE FINISHED PRINT. Portfolio has always
-                // read these and nothing here could write one, so the empty
-                // state told a shop to add a photo to a completed order and
-                // offered nowhere to do it.
-                if shop.canPhotograph(job) {
-                    Divider()
-                    AddPrintPhoto(shop: shop, job: job)
-                }
-                // The photos already on it — the printer's own, taken at the
-                // end of the print, or the shop's — and the one thing worth
-                // doing with a good one: putting it on the product.
-                if !shop.photos(of: job).isEmpty {
-                    Divider()
-                    JobPhotos(shop: shop, job: job)
-                }
-                if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
-                    Divider()
-                    KitSection(shop: shop, job: job)
-                }
-                // Only for an invoice that is actually owed a report. A job
-                // still on the bench is not late, and a shop that has not
-                // opted into Phase 2 is not subject to any of this — saying
-                // "not submitted" there would raise an alarm about a rule that
-                // does not apply to it.
-                if let zatca, zatca.eligible, zatca.status != "notConfigured" {
-                    Divider()
-                    ZatcaLine(state: zatca, shop: shop)
-                }
-                // ── THE PAPERS THAT GO WITH IT ───────────────────────
-                //
-                // Here rather than only on the product, because this is where
-                // somebody stands when they are about to make the thing: the
-                // assembly sheet is no use filed against a catalogue entry
-                // nobody opens while the printer is running.
-                if !papers.isEmpty {
-                    Divider()
-                    DetailSection(shop.words.callIt("pdoc.title")) {
-                        ForEach(papers) { paper in
-                            HStack(spacing: 8) {
-                                Button(paper.name) {
-                                    if let build = shop.source.build {
-                                        ProductDocs.open(paper.filename, in: build)
-                                    }
-                                }
-                                .buttonStyle(.link)
-                                .lineLimit(1).truncationMode(.middle)
-                                // Said plainly, because it decides what goes in
-                                // the box: a setup sheet the floor reads is not
-                                // a sheet to hand the customer.
-                                if !paper.packWithOrder {
-                                    Text(shop.words.callIt("pdoc.not_shipped"))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-                // A connector's buttons and fields (hidden until connectors ship).
-                if ConnectorsSwitch.isOn() {
-                    ConnectorSection(shop: shop, attach: "order", recordId: job.id)
-                }
-                if !job.notes.isEmpty {
-                    Divider()
-                    DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
-                }
-                // What happened to it: the stages it went through and how
-                // long each took, and every change to its due date, discount,
-                // shipping, priority and price.
-                Divider()
-                HStack(spacing: 14) {
-                    Button(shop.words.callIt("ord.timeline")) {
-                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project)
-                    }
-                    Button(shop.words.callIt("ord.edit_history")) {
-                        shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project, edits: true)
-                    }
-                    if shop.canMoveJobs {
-                        Button(shop.words.callIt("mac.order_details")) {
-                            shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
-                        }
-                    }
-                }
-                .buttonStyle(.link)
-                .font(.callout)
-                // Taking the job away, at the foot of the panel where a shop
-                // looks for it. The job's menu always had these; the panel did
-                // not, and "I can't delete" was the result (Nov 8 2026). Same
-                // rule, same question, same Cancel — no new way to delete.
-                InspectorRemovalRow(shop: shop, job: job)
+        Group {
+            // On the job page (S1) the page scrolls and draws its own
+            // header, next step and track; this is the rest of the job.
+            if embedded {
+                stack
+            } else {
+                ScrollView { stack.padding(16) }
             }
-            .padding(16)
         }
         .task(id: job.id) {
             zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
@@ -251,6 +75,195 @@ private struct Detail: View {
         }
         .shopSheet(item: $switching) { target in
             SpoolSwitchSheet(shop: shop, job: job, target: target)
+        }
+    }
+
+    private var stack: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if !embedded { header }
+            if ReprintLinks.shows(job) {
+                ReprintLinks(shop: shop, job: job)
+            }
+            if StoreLinesSection.shows(job) {
+                StoreLinesSection(shop: shop, job: job)
+            }
+            // ── MAY THIS BE SOLD? ─────────────────────────────────────
+            //
+            // Asked where the sale is, not only where the model is. A
+            // non-commercial model, or one whose bought licence has run
+            // out, printed and invoiced is the one mistake here with a
+            // designer on the other end of it.
+            let problems = shop.saleProblems(job.parts.compactMap(\.printFileId))
+            if !problems.isEmpty {
+                LicenceWarning(shop: shop, problems: problems)
+            }
+            if shop.canMoveJobs, !shop.sendablePrinters.isEmpty,
+               !Shop.finishedStatuses.contains(job.status), job.status != "cancelled" {
+                // Beside the job it is for: the plate goes to a machine
+                // from where the shop is already looking at the work.
+                VStack(alignment: .leading, spacing: 4) {
+                    Button(shop.words.callIt("mac.send_title") + "…") {
+                        shop.pendingSend = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    if let note = shop.sendNote {
+                        Text(note).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if job.machineId?.isEmpty == false || printed != nil {
+                JobMachineLine(shop: shop, job: job, printed: printed)
+            }
+            if let timelapse {
+                TimelapseLine(shop: shop, link: timelapse)
+            }
+            Divider()
+            money
+            if Shop.finishedStatuses.contains(job.status), job.shippingStatus != nil || shop.canMoveJobs {
+                Divider()
+                shipment
+            }
+            if !job.parts.isEmpty {
+                Divider()
+                parts
+            }
+            // Which spool and which LOT the filament came from — what a
+            // recall asks. Hidden when the job drew nothing.
+            let drawn = FilamentUsed.rows(for: job, spools: shop.spools)
+            if !drawn.isEmpty {
+                Divider()
+                FilamentUsedSection(shop: shop, rows: drawn)
+            }
+            // Who did it and the hours on it — for a shop with staff, or a
+            // job that already names somebody.
+            if JobStaffSection.shows(shop, job) {
+                Divider()
+                JobStaffSection(shop: shop, job: job)
+            }
+            // The shop's post-processing steps, ticked on a job in Post —
+            // the desktop's card checklist (`order.postChecks`).
+            if JobPostChecklist.shows(shop, job) {
+                Divider()
+                JobPostChecklist(shop: shop, job: job)
+            }
+            // The shop's own order fields that have a value here.
+            if !JobCustomFields.rows(shop, job).isEmpty {
+                Divider()
+                JobCustomFields(shop: shop, job: job)
+            }
+            // What the whole object came to, for a shop looking at one
+            // leg of it. Only where there is a kit to show or a book that
+            // has kits in it — a picker offering to file a job into
+            // nothing, on every job, is a control that says nothing.
+            // Only where the shop has agreed to it, and only on a job
+            // that names a customer — a message drafted about nobody has
+            // no one to send it to.
+            if shop.aiReplyAllowed, !job.client.isEmpty {
+                Divider()
+                Button(shop.words.callIt("mac.draft_a_message")) {
+                    shop.draftingFor = job
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+            }
+            // WhatsApp: the update due at this job's milestone, and the
+            // shop's OWN saved messages — no key, no connection, nobody's
+            // agreement to send a customer's details to a service. A job
+            // with no customer record still gets a message the shop can
+            // copy, and the sheet says why WhatsApp cannot be opened.
+            WhatsAppJobRow(shop: shop, job: job)
+            // A PHOTOGRAPH OF THE FINISHED PRINT. Portfolio has always
+            // read these and nothing here could write one, so the empty
+            // state told a shop to add a photo to a completed order and
+            // offered nowhere to do it.
+            if shop.canPhotograph(job) {
+                Divider()
+                AddPrintPhoto(shop: shop, job: job)
+            }
+            // The photos already on it — the printer's own, taken at the
+            // end of the print, or the shop's — and the one thing worth
+            // doing with a good one: putting it on the product.
+            if !shop.photos(of: job).isEmpty {
+                Divider()
+                JobPhotos(shop: shop, job: job)
+            }
+            if shop.kit(of: job.id) != nil || !shop.kits.isEmpty || shop.canWrite {
+                Divider()
+                KitSection(shop: shop, job: job)
+            }
+            // Only for an invoice that is actually owed a report. A job
+            // still on the bench is not late, and a shop that has not
+            // opted into Phase 2 is not subject to any of this — saying
+            // "not submitted" there would raise an alarm about a rule that
+            // does not apply to it.
+            if let zatca, zatca.eligible, zatca.status != "notConfigured" {
+                Divider()
+                ZatcaLine(state: zatca, shop: shop)
+            }
+            // ── THE PAPERS THAT GO WITH IT ───────────────────────
+            //
+            // Here rather than only on the product, because this is where
+            // somebody stands when they are about to make the thing: the
+            // assembly sheet is no use filed against a catalogue entry
+            // nobody opens while the printer is running.
+            if !papers.isEmpty {
+                Divider()
+                DetailSection(shop.words.callIt("pdoc.title")) {
+                    ForEach(papers) { paper in
+                        HStack(spacing: 8) {
+                            Button(paper.name) {
+                                if let build = shop.source.build {
+                                    ProductDocs.open(paper.filename, in: build)
+                                }
+                            }
+                            .buttonStyle(.link)
+                            .lineLimit(1).truncationMode(.middle)
+                            // Said plainly, because it decides what goes in
+                            // the box: a setup sheet the floor reads is not
+                            // a sheet to hand the customer.
+                            if !paper.packWithOrder {
+                                Text(shop.words.callIt("pdoc.not_shipped"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            // A connector's buttons and fields (hidden until connectors ship).
+            if ConnectorsSwitch.isOn() {
+                ConnectorSection(shop: shop, attach: "order", recordId: job.id)
+            }
+            if !job.notes.isEmpty {
+                Divider()
+                DetailSection(shop.words.callIt("doc.notes")) { Text(job.notes).textSelection(.enabled) }
+            }
+            // What happened to it: the stages it went through and how
+            // long each took, and every change to its due date, discount,
+            // shipping, priority and price.
+            Divider()
+            HStack(spacing: 14) {
+                Button(shop.words.callIt("ord.timeline")) {
+                    shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project)
+                }
+                Button(shop.words.callIt("ord.edit_history")) {
+                    shop.pendingHistory = Shop.HistoryRequest(id: job.id, project: job.project, edits: true)
+                }
+                if shop.canMoveJobs {
+                    Button(shop.words.callIt("mac.order_details")) {
+                        shop.pendingDetails = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                }
+            }
+            .buttonStyle(.link)
+            .font(.callout)
+            // Taking the job away, at the foot of the panel where a shop
+            // looks for it. The job's menu always had these; the panel did
+            // not, and "I can't delete" was the result (Nov 8 2026). Same
+            // rule, same question, same Cancel — no new way to delete.
+            InspectorRemovalRow(shop: shop, job: job)
         }
     }
 
@@ -360,21 +373,35 @@ private struct Detail: View {
                     // on hover, in the app's words.
                     .help(shop.taxSummary ?? "")
             }
+            // A QUOTE OWES NOTHING YET (`order-money` owesAtAll, and the
+            // next-step rule): "Paid 0.00, Owed 0.00" and a Record payment
+            // link read as if it did. A dash, as the iPhone shows it — unless
+            // a deposit was taken on it, which is then said.
+            let unpaidQuote = job.status == "quote" && job.paidAmount <= 0
+            if unpaidQuote {
+                DetailLine(shop.words.callIt("mac.paid"), "—", dim: true)
+                DetailLine(shop.words.callIt("flow.owed"), "—", dim: true)
+            } else {
             DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
             // In the job's OWN currency, beside its total and what was paid —
             // `owed` is the shop's, and printed it under this job's mark read
             // a 100 USD job as "Owed 375.00 USD".
             DetailLine(shop.words.callIt("flow.owed"), Money.text(job.owedInOwnCurrency, job.currency), strong: !job.isSettled)
+            }
             if shop.canMoveJobs {
                 // Where somebody is already reading what is owed. ⇧⌘P does the
                 // same thing from anywhere; this is the one place the question
                 // "has this been paid" is actually being asked.
-                Button(shop.words.callIt("pay.modal_title")) {
-                    shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
+                // Not on an unpaid quote: Job ▸ Record Payment (⇧⌘P) still
+                // takes a deposit on one.
+                if !unpaidQuote {
+                    Button(shop.words.callIt("pay.modal_title")) {
+                        shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .padding(.top, 2)
                 }
-                .buttonStyle(.link)
-                .font(.callout)
-                .padding(.top, 2)
                 // A Tabby / Tamara checkout for the customer, when the shop
                 // has either switched on — the desktop's card button.
                 if shop.offersBnpl(job) {
@@ -406,7 +433,8 @@ private struct Detail: View {
             // Beside the figures it states. Not behind `canMoveJobs`: showing
             // the document writes nothing, and the sample shop is the one book
             // most people will look at an invoice in first.
-            Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+            // A quote's paper is a quotation, and the link says so.
+            Button(shop.words.callIt(job.status == "quote" ? "doc.quotation" : "doc.invoice")) { shop.showInvoice(job.id) }
                 .buttonStyle(.link)
                 .font(.callout)
             // Before the work is invoiced: the same paper as a request for

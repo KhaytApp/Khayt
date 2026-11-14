@@ -108,6 +108,7 @@ extension Shop {
             moveProblem = why; return
         }
         await recordFollowUps([id])
+        await noteQuoteShared(id)
     }
 
     /// The follow-up on each of these quotes, in one write.

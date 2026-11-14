@@ -14,20 +14,42 @@ struct JobsLayoutPicker: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        Picker(shop.words.callIt("mac.jobs_layout"), selection: layout) {
+        // DRAWN HERE, not a system segmented `Picker`. In the toolbar the
+        // system control drew its SELECTED segment with no label — "Board
+        // [blank] Table" with List chosen (S1 B1 capture, Nov 14) — because
+        // its selected text and its selection fill came out the same colour
+        // there. Three buttons with their own fill and their own text colour
+        // cannot do that, in either shell and in a window that is not key.
+        HStack(spacing: 2) {
             ForEach(Shop.JobsLayout.allCases) { choice in
-                Text(shop.words.callIt(choice.titleKey)).tag(choice)
+                let chosen = layout.wrappedValue == choice
+                Button {
+                    layout.wrappedValue = choice
+                } label: {
+                    Text(shop.words.callIt(choice.titleKey))
+                        .font(.callout.weight(chosen ? .semibold : .regular))
+                        .foregroundStyle(chosen ? Color.primary : Color.secondary)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(chosen ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(chosen ? .isSelected : [])
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .padding(2)
+        .background(Color.primary.opacity(0.06), in: Capsule())
         .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(shop.words.callIt("mac.jobs_layout"))
         .help(shop.words.callIt("mac.jobs_layout"))
     }
 
     private var layout: Binding<Shop.JobsLayout> {
         Binding(
-            get: { shop.showingBoard ? .board : .list },
+            // A single stage is never the board (`showingBoard`): it shows
+            // as the table unless the List was chosen.
+            get: { shop.showingBoard ? .board : shop.jobsLayout == .page ? .page : .list },
             set: { shop.chooseJobsLayout($0) }
         )
     }
