@@ -44,6 +44,30 @@ struct PrintFinished: Codable, Equatable, Sendable {
     var advancedTo: String?
 }
 
+extension PrintFinished {
+    /// Read what the Mac sent, forgivingly: a missing `photo`, `v` or `kind`
+    /// (or `outcome`) gives a plainer alert, never a failed decode, which
+    /// lost the alert's job and button. Only the time and the machine are
+    /// needed. In an extension, so the memberwise initialiser stays.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        v = try c.decodeIfPresent(Int.self, forKey: .v) ?? 1
+        // This type is only ever a print ending; that is the only kind it holds.
+        kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? "print-finished"
+        at = try c.decode(String.self, forKey: .at)
+        machineId = try c.decode(String.self, forKey: .machineId)
+        machineName = try c.decodeIfPresent(String.self, forKey: .machineName)
+        orderId = try c.decodeIfPresent(String.self, forKey: .orderId)
+        project = try c.decodeIfPresent(String.self, forKey: .project)
+        client = try c.decodeIfPresent(String.self, forKey: .client)
+        filename = try c.decodeIfPresent(String.self, forKey: .filename)
+        durationS = try c.decodeIfPresent(Double.self, forKey: .durationS)
+        outcome = try c.decodeIfPresent(Outcome.self, forKey: .outcome) ?? .ended
+        photo = try c.decodeIfPresent(Bool.self, forKey: .photo) ?? false
+        advancedTo = try c.decodeIfPresent(String.self, forKey: .advancedTo)
+    }
+}
+
 /// What an alert offers, and the one move each makes.
 ///
 /// Agreed with the Mac lane, and deliberately narrow:

@@ -19,6 +19,23 @@ final class PrintEndedOutcomeTests: XCTestCase {
         XCTAssertEqual(try event("cancelled").outcome, .cancelled)
     }
 
+    /// A payload missing `photo`, `v` and `kind` (and the outcome) still
+    /// decodes: a plainer alert, never a lost one.
+    func testAPayloadMissingTheOptionalKeysStillDecodes() throws {
+        let json = #"{"at":"2026-11-14T04:30:00Z","machineId":"M1","orderId":"KH-1"}"#
+        let e = try JSONDecoder().decode(PrintFinished.self, from: Data(json.utf8))
+        XCTAssertEqual(e.v, 1)
+        XCTAssertEqual(e.kind, "print-finished")
+        XCTAssertFalse(e.photo)
+        XCTAssertEqual(e.outcome, .ended, "no outcome: said neutrally")
+        XCTAssertEqual(e.orderId, "KH-1")
+        XCTAssertEqual(PrintAlertText.content(for: e, orderStatus: nil) { $0 }.title, "alert.print.ended")
+        // And it still writes the same shape back.
+        let back = try JSONSerialization.jsonObject(with: JSONEncoder().encode(e)) as? [String: Any]
+        XCTAssertEqual(back?["photo"] as? Bool, false)
+        XCTAssertEqual(back?["kind"] as? String, "print-finished")
+    }
+
     func testTheAlertSaysItNeutrallyWithNoButton() throws {
         for raw in ["ended", "something-new"] {
             let e = try event(raw)
