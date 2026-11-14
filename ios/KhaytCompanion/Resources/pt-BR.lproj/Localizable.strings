@@ -1431,3 +1431,5 @@
 "job.blocked.assembly_parts" = "Aguardando peça(s): %@";
 "job.blocked.other" = "Não é possível daqui";
 "job.pill.paid" = "Pago";
+"mac.parts_paid_exceeds" = "Esta alteração deixaria a conta abaixo do que já foi pago. Reembolse a diferença ou emita uma nota de crédito primeiro.";
+"mac.margin" = "Margem";

@@ -1431,3 +1431,5 @@
 "job.blocked.assembly_parts" = "Wartet auf Teil(e): %@";
 "job.blocked.other" = "Hier nicht möglich";
 "job.pill.paid" = "Bezahlt";
+"mac.parts_paid_exceeds" = "Diese Änderung würde die Rechnung unter den bereits gezahlten Betrag senken. Erstatten Sie zuerst die Differenz oder stellen Sie eine Gutschrift aus.";
+"mac.margin" = "Marge";

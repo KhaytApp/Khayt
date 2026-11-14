@@ -2,9 +2,11 @@ import SwiftUI
 import KhaytCore
 
 /// Change a job's due date, priority or price — the Mac's Edit sheet's
-/// fields, through the same rule (`lib/order-edit.js`): only what was
-/// changed is sent, the edit is written in the job's history, and a typed
-/// price carries the money with it.
+/// fields, through the same rule (`lib/order-edit.js applyJobEdit`): only
+/// what was changed is sent, the edit is written in the job's history, and
+/// a typed price below what was paid is refused with the rule's reason
+/// (nothing is written, the sheet stays open), never settled by capping
+/// what was paid.
 ///
 /// ── REVISE IS THIS SHEET ──────────────────────────────────────────────────
 ///
@@ -12,7 +14,7 @@ import KhaytCore
 /// covers every field, not just the price and notes). It is the desktop's
 /// Revise — keep the quote as it is, then open the order editor — in one
 /// sheet: the due date, priority and price above, and below them the quote's
-/// own terms the order editor also writes (`applyDetails`): its notes, the
+/// own terms the order editor also writes (`applyJobEdit`): its notes, the
 /// notes printed on it, the discount and the shipping. Saving goes through
 /// `BookWriter.reviseQuote`, which keeps the version as it was
 /// (`lib/quote-revision.js`) and makes the change in ONE write; the quote stays
@@ -77,9 +79,12 @@ struct EditOrderSheet: View {
                 } header: {
                     if revising != nil { Text(L10n.tr("quote.revise.price")) }
                 } footer: {
-                    if revising == nil {
-                        Text(problem ?? L10n.tr("edit.price.note"))
-                            .foregroundStyle(problem == nil ? KhaytDesign.note : KhaytDesign.late)
+                    // The rule's refusal sits under the price it is about
+                    // (Figma 231:333), on an edit and a revision alike.
+                    if let problem {
+                        Text(problem).foregroundStyle(KhaytDesign.late)
+                    } else if revising == nil {
+                        Text(L10n.tr("edit.price.note")).foregroundStyle(KhaytDesign.note)
                     }
                 }
                 if let quote = revising { reviseSections(quote) }
@@ -140,8 +145,8 @@ struct EditOrderSheet: View {
         } header: {
             Text(L10n.tr("quote.revise.notes"))
         } footer: {
-            Text(problem ?? L10n.format("quote.revise.note", quote.version, quote.version + 1))
-                .foregroundStyle(problem == nil ? KhaytDesign.note : KhaytDesign.late)
+            Text(L10n.format("quote.revise.note", quote.version, quote.version + 1))
+                .foregroundStyle(KhaytDesign.note)
         }
     }
 
@@ -195,6 +200,7 @@ struct EditOrderSheet: View {
         guard !fields.isEmpty else { dismiss(); return }
         saving = true
         defer { saving = false }
+        problem = nil
         do {
             if revising != nil {
                 try await api.reviseQuote(orderId: orderId, fields: fields)

@@ -5896,3 +5896,34 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
   color: var(--text-muted);
 }
 .plg-upd-foot { font-size: 11.5px; color: var(--text-muted); margin: 0 0 4px; }
+
+/* ── Job page (S1 · desktop M4; renderer/job-page.js; Figma 74:387) ───── */
+#mainContent { position: relative; }
+.job-page { position: absolute; inset: 0; z-index: 20; overflow-y: auto; padding: 20px 28px 40px; background: var(--bg); }
+.job-page[hidden] { display: none; }
+.jp-top { margin-bottom: 8px; }
+.jp-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.jp-head-text { flex: 1; min-width: 260px; }
+.jp-eyebrow { font-family: var(--font-num); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.jp-title { margin: 4px 0; font-size: 26px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.jp-sub { font-size: 12.5px; color: var(--text-muted); }
+.jp-steps { display: flex; gap: 8px; flex-wrap: wrap; }
+.jp-steps .btn { border-radius: 999px; }
+.jp-blocked { margin: 0 0 12px; font-size: 13px; color: var(--st-move-ink, var(--warning)); }
+.jp-track { display: flex; list-style: none; margin: 0 0 14px; padding: 14px 18px; gap: 4px; }
+.jp-track-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; font-size: 12.5px; color: var(--text-muted); }
+.jp-dot { inline-size: 11px; block-size: 11px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); }
+.jp-track-step.is-done .jp-dot, .jp-track-step.is-current .jp-dot { background: var(--st-move-dot, var(--warning)); border-color: var(--st-move-dot, var(--warning)); }
+.jp-track-step.is-current .jp-track-name { color: var(--text); font-weight: 600; }
+.jp-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; margin-bottom: 14px; }
+@media (max-width: 900px) { .jp-grid { grid-template-columns: 1fr; } }
+.jp-card { padding: 16px 18px; }
+.jp-card-head { margin: 0 0 10px; font-family: var(--font-num); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.jp-part, .jp-row, .jp-event { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; }
+.jp-part-name { font-weight: 600; }
+.jp-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jp-row.is-muted { color: var(--text-muted); }
+.jp-row.is-strong { font-weight: 600; }
+.jp-row.is-late .jp-num { color: var(--st-late-ink, var(--danger)); }
+.jp-note, .jp-empty { margin: 4px 0; font-size: 12.5px; color: var(--text-muted); }
+.jp-event { flex-direction: column; align-items: flex-start; gap: 1px; }

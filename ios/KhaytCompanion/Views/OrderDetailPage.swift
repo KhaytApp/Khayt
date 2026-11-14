@@ -37,6 +37,7 @@ struct OrderDetailPage: View {
     @State private var isUpdating = false
     @State private var errorMessage: String?
     @State private var payment: BookWriter.PaymentState?
+    @State private var margin: BookWriter.JobMargin?
     @State private var currency: String?
     @State private var recordingPayment = false
     @State private var whatsApp: KhaytAPIClient.WhatsAppOffer?
@@ -189,6 +190,7 @@ struct OrderDetailPage: View {
             // (`EditOrderSheet`'s note).
             EditOrderSheet(orderId: order.id, start: r.edit, currency: currency, revising: r.state) {
                 await quoteRevised()
+                await loadPayment()
             }
         }
         .sheet(isPresented: $showingHistory) {
@@ -205,7 +207,11 @@ struct OrderDetailPage: View {
             }
         }
         .sheet(item: Binding(get: { editing.map(EditingJob.init) }, set: { if $0 == nil { editing = nil } })) { e in
-            EditOrderSheet(orderId: order.id, start: e.state, currency: currency) { await onChanged() }
+            EditOrderSheet(orderId: order.id, start: e.state, currency: currency) {
+                // The price moved: the money card and its margin read again.
+                await loadPayment()
+                await onChanged()
+            }
         }
         .moveNotes($moveNotes)
         .navigationBarTitleDisplayMode(.inline)
@@ -266,6 +272,7 @@ struct OrderDetailPage: View {
     private var moneyRegion: some View {
         if payment != nil || (isQuote && quote != nil) {
             JobMoneyCard(order: order, payment: payment, quote: isQuote ? quote : nil, currency: currency,
+                         margin: margin,
                          onRecord: canRecordPayment && api.canWrite ? { recordingPayment = true } : nil)
         }
         if isQuote {
@@ -438,6 +445,7 @@ struct OrderDetailPage: View {
     private func loadPayment() async {
         currency = await api.orderCurrency(orderId: order.id)
         payment = await api.paymentState(orderId: order.id)
+        margin = await api.jobMargin(orderId: order.id)
         #if DEBUG
         // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
         if payment != nil, UserDefaults.standard.bool(forKey: "KhaytPaySheet") { recordingPayment = true }
@@ -874,6 +882,9 @@ struct JobMoneyCard: View {
     let payment: BookWriter.PaymentState?
     var quote: OrderLogEntry? = nil
     let currency: String?
+    /// The margin it was priced at (`marginOf`); the last row, after the
+    /// money the customer sees. Nil hides the row (no book to read it from).
+    var margin: BookWriter.JobMargin? = nil
     /// Record payment, when the job owes and the phone may write.
     var onRecord: (() -> Void)? = nil
 
@@ -900,6 +911,7 @@ struct JobMoneyCard: View {
                             .foregroundStyle(expired ? KhaytDesign.late : KhaytDesign.ink)
                     }
                 }
+                marginLine
             } else if let payment {
                 let overdue = JobDue.owingIsOverdue(owed: payment.owed, due: order.dueDate)
                 line(L10n.tr("job.money.price")) { Text(Money.text(payment.billed, currency)).foregroundStyle(KhaytDesign.ink) }
@@ -912,6 +924,7 @@ struct JobMoneyCard: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(overdue ? KhaytDesign.late : KhaytDesign.ink)
                 }
+                marginLine
                 if let onRecord {
                     Divider().overlay(KhaytDesign.hairline)
                     Button(action: onRecord) {
@@ -929,6 +942,17 @@ struct JobMoneyCard: View {
         .background(KhaytDesign.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+    }
+
+    /// "38%", or "—" where the rule cannot say (a typed price, no parts).
+    @ViewBuilder
+    private var marginLine: some View {
+        if let margin {
+            line(L10n.tr("mac.margin")) {
+                Text(margin.text)
+                    .foregroundStyle(margin.percent == nil ? KhaytDesign.note : KhaytDesign.ink)
+            }
+        }
     }
 
     private func line<V: View>(_ label: String, @ViewBuilder value: () -> V) -> some View {
