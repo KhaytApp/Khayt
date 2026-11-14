@@ -519,6 +519,28 @@ extension Shop {
     /// surface for (S4, Nov 2026). A row the map does not have answers nil
     /// and is left as it is.
     static let simpleMapKeys = ["kiosk", "campaigns", "ai", "proforma", "paymentPlans", "team"]
+    /// The rows Simple draws SMALLER on the Mac (S4 part 2): the board, the
+    /// customer form.
+    static let simpleReducedKeys = ["queue", "customers"]
+
+    /// Simple draws this surface reduced (`SIMPLE_MAP` `reduced`).
+    func reducedInSimple(_ key: String) -> Bool { simpleSurfaces[key] == .reduced }
+
+    /// The four-column board's filing, asked of the shared rule for every job
+    /// in the book — only when Simple draws that board. After the jobs are
+    /// read (`load`), and after `readFeatures`, whose answer it needs.
+    func readSimpleFiling() async {
+        guard let engine, reducedInSimple("queue") else { simpleFiling = [:]; return }
+        let ticket = loadGeneration
+        var filing: [String: KhaytEngine.SimpleStage] = [:]
+        for row in orderRows {
+            guard case .object(let o) = row, let id = Self.plainString(o["id"]),
+                  let s = try? await engine.simpleStage(of: row) else { continue }
+            filing[id] = s
+        }
+        guard ticket == loadGeneration else { return }
+        simpleFiling = filing
+    }
 
     /// Simple leaves this out entirely: the shared map says `pro` for it.
     /// Every menu item, button and window that reaches it asks here, so
@@ -645,7 +667,7 @@ extension Shop {
     /// the one thing untested, and someone reading the screen could not tell
     /// whether it worked.
     func readFeatures() async {
-        guard let engine else { features = Set(Self.gatedFeatures); simpleSurfaces = [:]; return }
+        guard let engine else { features = Set(Self.gatedFeatures); simpleSurfaces = [:]; simpleFiling = [:]; return }
         let mode = Self.plainString(settingsDict["mode"])
         let ticket = loadGeneration
         var on: Set<String> = []
@@ -654,9 +676,10 @@ extension Shop {
         }
         // S4: the rows of the shared Simple map the Mac has a surface for.
         var surfaces: [String: KhaytEngine.SimpleSurface] = [:]
-        for key in Self.simpleMapKeys {
+        for key in Self.simpleMapKeys + Self.simpleReducedKeys {
             if let s = try? await engine.simpleSurface(key, mode: mode) { surfaces[key] = s }
         }
+
         // Not over a newer load's answer (`Shop.load`).
         guard ticket == loadGeneration else { return }
         features = on
