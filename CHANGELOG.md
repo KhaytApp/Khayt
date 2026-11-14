@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Windows/Linux: a quote that reaches its customer is marked as sent (`quoteSharedAt`).** Copying or sending the quote link on WhatsApp, exporting or sharing the quote PDF, and a follow-up message now stamp it, so the shared next-step rule (`lib/order-next-step.js`, #2462) stops offering "Send quote" once it has gone out. `quoteSentAt` is unchanged: it is the day the quote was made. `test/quote-shared-at.test.js` covers the stamp and every share path.
 - Quote pay links v2: the shared test vector `contracts/quote-link-v2.vector.json` (test-only Ed25519 keys, one per signing device, the endorsed key chain, links with their exact signing input, and the cases every verifier must refuse), checked by `test/quote-link-v2-vector.test.js`. No app behaviour changes yet.
 
 - **Shared rule: the one next step for a job (S1, no screen change yet).** New `lib/order-next-step.js` says what a job page pins next, the same for the Mac, the iPhone and Windows/Linux: Send quote, Take the job, Start printing, Mark printed, Send to check, Mark ready, Resume (back to the stage a held job came from), Hand over, Record payment. It also gives the header chip's tone, whether the job is late, what is owed, the stage track, and why a step can't be done now (production paused, a WIP limit, an unfinished assembly, read-only). The Mac's next-step button now reads it and offers exactly what it offered before; the job page will use the rest.
