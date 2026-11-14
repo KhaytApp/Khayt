@@ -3,8 +3,10 @@
  * lib/order-edit.js — changing the parts of a job that already exists
  * (S1 B2): `partsLock`, `marginOf`, `applyParts`, `applyJobEdit`.
  *
- * Turki's rules (Nov 11): parts are free until printing; in production the
- * sheet asks about the price; locked once filament is deducted; fully locked
+ * Turki's rules (Nov 11), with Dev Hub's of Nov 14: parts may change until
+ * the job is finished; once the customer has seen the price (a shared quote,
+ * any accepted job) the sheet asks whether it follows — only a draft quote
+ * follows by itself; locked once filament is deducted; fully locked
  * after ZATCA, a void or a credit; a price below what was paid is refused.
  */
 const { test } = require('node:test');
@@ -45,15 +47,22 @@ const fresh = (parts, terms) => jobOf(parts, terms).price;
 
 test('partsLock: free until printing, asked in production, name only once deducted, nothing after the invoice left', () => {
   const lock = (o) => E.partsLock(Object.assign({ status: 'pending' }, o));
-  for (const st of ['quote', 'pending', 'on_hold']) {
-    assert.deepEqual(lock({ status: st }), { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false }, st);
-  }
-  for (const st of ['printing', 'post', 'qc']) {
+  // A draft quote, never shared: parts move and the price follows by itself.
+  assert.deepEqual(lock({ status: 'quote' }), { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false });
+  // `quoteSentAt` is written at creation; it is not "shared".
+  assert.equal(lock({ status: 'quote', quoteSentAt: '2026-11-01' }).askPrice, false);
+  // Once the customer has seen the number — a shared quote, an accepted job,
+  // one in production — the sheet asks; the price never moves silently.
+  assert.equal(lock({ status: 'quote', quoteSharedAt: '2026-11-14T10:00:00Z' }).askPrice, true);
+  for (const st of ['pending', 'on_hold', 'printing', 'post', 'qc']) {
     const l = lock({ status: st });
     assert.equal(l.code, null, st);
     assert.equal(l.addRemove, true, st);
     assert.equal(l.askPrice, true, `${st}: the sheet asks about the price`);
   }
+  // An invoiced job that is not ZATCA-submitted is asked, not locked.
+  assert.deepEqual(lock({ status: 'pending', invoiceNumber: 'INV-0042' }),
+    { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: true });
   for (const o of [{ status: 'completed' }, { status: 'delivered' }, { materialDeducted: true }, { costBasis: 40 }]) {
     assert.deepEqual(lock(o), { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false });
   }
