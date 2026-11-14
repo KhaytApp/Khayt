@@ -3098,6 +3098,9 @@ final class Shop {
     /// — sealing reaches the Keychain, and a Keychain dialog hangs a test run.
     @ObservationIgnored var heldEventsDefaults: UserDefaults? =
         Bundle.main.bundleIdentifier != nil ? .standard : nil
+    /// How a printer's own history is read when an end was missed. Nil is
+    /// `PrinterWatch.history`; tests put the printer's answer here.
+    @ObservationIgnored var historyFetch: (@MainActor (Machine, KhaytEngine) async throws -> [JSONValue])?
     @ObservationIgnored var pendingEventsTriedAt: Date?
 
     // Stored for "A job's photo, on its product" (Shop+Jobs.swift).
@@ -3157,6 +3160,12 @@ final class Shop {
     var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
     /// The connector a file asked to install, waiting on the shop's OK.
     var connectorOffer: ConnectorOffer?
+    /// Installed connectors with an update waiting on the shop's yes: the
+    /// steel count on Settings ▸ Integrations (`Shop+ConnectorUpdates.swift`).
+    var connectorUpdatesWaiting = 0
+    /// How the update check fetches bytes. Nil is `fetchConnectorBytes`; tests
+    /// put a stand-in here so no request reaches the network.
+    var connectorFetch: (@Sendable (URL, Int) async throws -> Data)?
     /// Where this Mac keeps its dev connectors (`DevConnectors`); tests use their own suite.
     var devConnectorDefaults: UserDefaults = .standard
     /// Bumped on every write to the dev connectors, which the book's reload never sees.
