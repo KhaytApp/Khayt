@@ -424,6 +424,52 @@
     }
   }
   document.addEventListener('click', onV2Click);
+
+  /* Settings › Data: "Reset pay link keys…" (lost keys). Owner only, v2 on
+   * only. Revokes every key of the shop; each connected store must re-pin
+   * once. Two steps, like Revoke: a warning, then the code Khayt Cloud emails. */
+  let resetAsked = false;
+  function resetHtml() {
+    const btn = `<button type="button" class="btn danger" data-qlk-reset="start">${escapeHtml(t('qpl.v2_reset'))}</button>`;
+    if (!resetAsked) return `<div class="btn-row" style="margin-top:10px;">${btn}</div>`;
+    return `<div class="qpl-secret-edit" style="margin-top:10px;">
+      <input type="text" id="qlk_resetCode" autocomplete="one-time-code" spellcheck="false" maxlength="8" aria-label="${escapeHtml(t('qpl.v2_code'))}" placeholder="${escapeHtml(t('qpl.v2_code'))}">
+      <button type="button" class="btn danger" data-qlk-reset="confirm">${escapeHtml(t('qpl.v2_reset_now'))}</button>
+      <button type="button" class="btn ghost" data-qlk-reset="cancel">${escapeHtml(t('common.cancel'))}</button>
+      <p class="settings-field-hint">${escapeHtml(t('qpl.v2_code_sent'))}</p></div>`;
+  }
+  async function renderResetKeys() {
+    const host = document.getElementById('qlkResetHost');
+    if (!host || !global.hubAPI?.qlkStatus) return;
+    let st;
+    try { st = await global.hubAPI.qlkStatus(); } catch (_) { return; }
+    if (!st || !st.enabled || !st.cloud || !isOwner()) { host.hidden = true; host.innerHTML = ''; return; }
+    host.hidden = false;
+    host.innerHTML = resetHtml();
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('.settings-nav-item')) { setTimeout(renderResetKeys, 0); }
+    const b = e.target.closest('#qlkResetHost [data-qlk-reset]');
+    if (!b) return;
+    const act = b.dataset.qlkReset;
+    const api = global.hubAPI || {};
+    if (act === 'cancel') { resetAsked = false; renderResetKeys(); return; }
+    if (act === 'start') {
+      if (!(await confirmModal(t('qpl.v2_reset_confirm'), { okText: t('qpl.v2_reset'), danger: true }))) return;
+      const res = await api.qlkReset?.();
+      if (res && res.ok && res.codeSent) { resetAsked = true; renderResetKeys(); return; }
+      toast(t('qpl.v2_failed', { reason: (res && res.error) || '—' }), 'error');
+      return;
+    }
+    if (act === 'confirm') {
+      const input = document.getElementById('qlk_resetCode');
+      const code = (input?.value || '').trim();
+      if (!code) { input?.focus(); return; }
+      const res = await api.qlkReset?.(code);
+      if (res && res.ok) { resetAsked = false; toast(t('qpl.v2_reset_done'), 'success'); renderResetKeys(); refreshV2(); }
+      else toast(t('qpl.v2_failed', { reason: (res && res.error) || '—' }), 'error');
+    }
+  });
   // What Khayt Cloud says can change between visits (another computer asks,
   // a key is revoked), so the keys are read again each time the pane opens.
   document.addEventListener('click', (e) => {

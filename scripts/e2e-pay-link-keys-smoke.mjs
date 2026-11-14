@@ -10,6 +10,7 @@
  *        - current, another computer asking: Approve… (with the confirm) clears it;
  *        - Revoke another key: confirm, then the emailed-code row, then revoked.
  *      The v1 secret rows are hidden and the intro changes.
+ *   3. Reset pay link keys (Developer, owner only): warning, then the emailed code.
  *
  * Run: npm run test:e2e:paylinkkeys
  */
@@ -44,6 +45,9 @@ try {
   await window.waitForTimeout(300);
   ok(await window.isVisible('#quotePayLinkSection [data-qpl-set="replace"]'), 'off: the v1 secret row is there');
   ok(await window.evaluate(() => document.getElementById('qpl_v2').hidden), 'off: no v2 keys area');
+  await window.click('.settings-nav-item[data-settings-section="advanced"]');
+  await window.waitForTimeout(300);
+  ok(await window.evaluate(() => document.getElementById('qlkResetHost').hidden), 'off: no "Reset pay link keys…" in Developer');
 
   // ── 2. On, against a scripted fake in main ──────────────────────────────
   await electronApp.evaluate(({ ipcMain }, ids) => {
@@ -64,6 +68,7 @@ try {
     set('hub:qlk-approve', ({ kid }) => { st.approved = kid; st.pending = []; return { ok: true }; });
     set('hub:qlk-decline', () => { st.pending = []; return { ok: true }; });
     set('hub:qlk-rotate', () => ({ ok: true }));
+    set('hub:qlk-reset', ({ code }) => { if (!code) return { ok: true, codeSent: true }; st.resetCode = code; st.phase = 'none'; return { ok: true }; });
     set('hub:qlk-revoke', ({ kid, code }) => { if (!code) return { ok: true, codeSent: true }; st.codeUsed = code; st.revoked.push(kid); return { ok: true }; });
   }, { ME: KID_ME, MAC: KID_MAC, NEW: KID_NEW });
 
@@ -107,6 +112,19 @@ try {
   await window.click('#qpl_v2 [data-qpl-v2="revoke-confirm"]');
   await window.waitForFunction(() => !document.getElementById('qpl_v2Code') && !/Mac Studio/.test(document.getElementById('qpl_v2').innerText), null, { timeout: 5_000 });
   ok(await electronApp.evaluate(() => globalThis.__qlk.codeUsed) === 'AB12CD34', 'the typed code is what revokes it, and the key leaves the list');
+
+  // Reset (lost keys): Settings › Developer, owner only, warning then the emailed code.
+  await window.click('.settings-nav-item[data-settings-section="advanced"]');
+  await window.waitForSelector('#qlkResetHost [data-qlk-reset="start"]', { state: 'visible', timeout: 5_000 });
+  ok(true, 'Developer shows "Reset pay link keys…" to an owner with v2 on');
+  await window.click('#qlkResetHost [data-qlk-reset="start"]');
+  ok(/trust the new key once/.test(await window.evaluate(() => document.querySelector('.modal')?.innerText || '')), 'the warning says every connected store must trust the new key once');
+  await confirmOk();
+  await window.waitForSelector('#qlk_resetCode', { state: 'visible', timeout: 5_000 });
+  await window.fill('#qlk_resetCode', 'RESET123');
+  await window.click('#qlkResetHost [data-qlk-reset="confirm"]');
+  await window.waitForFunction(() => !document.getElementById('qlk_resetCode'), null, { timeout: 5_000 });
+  ok(await electronApp.evaluate(() => globalThis.__qlk.resetCode) === 'RESET123', 'the typed code is what resets the keys');
 
   console.log('e2e-pay-link-keys: ok');
 } catch (err) {
