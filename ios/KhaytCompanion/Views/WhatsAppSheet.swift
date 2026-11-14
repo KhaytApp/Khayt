@@ -195,7 +195,7 @@ struct WhatsAppSheet: View {
 }
 
 /// The system share sheet, reporting where it went.
-private struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     let done: (UIActivity.ActivityType?, Bool) -> Void
 

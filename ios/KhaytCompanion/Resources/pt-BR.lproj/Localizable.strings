@@ -1327,6 +1327,30 @@
 "load.retry" = "Tentar de novo";
 "load.book_unavailable" = "Não foi possível ler o livro neste telefone. Tente de novo ou verifique se o Mac está ao alcance.";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Próximo";
+"job.next.start_printing" = "Iniciar impressão";
+"job.next.mark_printed" = "Marcar impresso";
+"job.next.send_to_qc" = "Enviar para inspeção";
+"job.next.mark_ready" = "Marcar pronto";
+"job.next.hand_over" = "Entregar";
+"job.next.resume" = "Retomar";
+"job.next.done" = "Concluído e pago";
+"job.next.none" = "Nada a fazer";
+"job.more" = "Mais";
+"job.more.label" = "Mais ações para este trabalho";
+"job.header.due" = "entrega %@";
+"job.day_late" = "1 dia de atraso";
+"job.days_late" = "%d dias de atraso";
+"job.section.parts" = "Peças";
+"job.section.money" = "Dinheiro";
+"job.section.activity" = "Atividade";
+"job.money.price" = "Preço";
+"job.money.paid" = "Pago";
+"job.money.owing" = "Em aberto";
+"job.money.owing_overdue" = "Em aberto · vencido";
+"job.parts.on_machine" = "Em %@";
+"job.money.quote_sent" = "Enviado";
 /* Settings in groups (S2) */
 "settings.search" = "Buscar nos ajustes";
 "settings.search.none" = "Nenhum ajuste corresponde a “%@”.";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d carretéis baixos";
 "needs.quotes" = "%d orçamentos aguardam resposta";
 "needs.more" = "e mais %d";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Enviar orçamento";
+"job.next.take_job" = "Aceitar trabalho";
+"job.next.hold" = "Colocar em espera";
+"job.next.fail_check" = "Reprovado no QC";
+"job.blocked.production_paused" = "A produção está pausada — retome antes de iniciar novas impressões.";
+"job.blocked.wip" = "Limite de trabalho em andamento (%1$@) atingido em “%2$@” — movimentação bloqueada";
+"job.blocked.assembly_not_assembled" = "Todas as peças passaram no QC — marque a montagem como montada para concluir este pedido.";
+"job.blocked.assembly_parts" = "Aguardando peça(s): %@";
+"job.blocked.other" = "Não é possível daqui";
+"job.pill.paid" = "Pago";
