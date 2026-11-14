@@ -617,11 +617,360 @@
     return { ok: true, reason: null, changes, currencyDiffers: !!cl && jobCur !== clientCur };
   }
 
+  /* ── PARTS ON A JOB THAT ALREADY EXISTS (S1, Nov 2026) ────────────────────
+   *
+   * A job's parts could be set once, when it was taken. After that the Mac
+   * edited one part's figures without ever moving the job's price, time or
+   * material (`Shop.editPart`), and the desktop's editor changed only colours.
+   * The job sheet edits parts like any other field, so the rule is here:
+   * when parts may change, what the price does, and what is refused.
+   *
+   * Turki's decisions (Nov 11): parts are free until printing; during
+   * production the sheet asks about the price; they are locked once filament
+   * is deducted, and fully locked after ZATCA, a void or a credit. A change
+   * that would bring the bill below what was paid is refused — "refund or
+   * credit note first" — never settled by quietly capping what was paid.
+   */
+
+  const FROZEN_STATUSES = ['completed', 'delivered'];
+  const IN_PRODUCTION = ['printing', 'post', 'qc'];
+
+  /**
+   * What may be done to this job's parts.
+   *
+   *   { code, edit, addRemove, nameOnly, askPrice }
+   *
+   * `code` is null when nothing limits it, else why:
+   *   'zatca' | 'voided' | 'credited'   the invoice has left the shop: nothing.
+   *   'cancelled'                        a cancelled job is not edited.
+   *   'deducted'                         finished, or its filament is already
+   *                                      taken (`materialDeducted`, `costBasis`):
+   *                                      a part's NAME and note only — changing
+   *                                      what it is made of would disagree with
+   *                                      stock and the cost the job is judged on.
+   * `askPrice` is true in production (printing, post, qc): parts may still
+   * change, and the sheet asks whether the price follows (`ctx.keepPrice`).
+   * A part already handed to the customer (`delivered`) is fixed whatever the
+   * job's state — `applyParts` refuses a change to one or its removal.
+   */
+  function partsLock(order) {
+    const none = (code) => ({ code, edit: false, addRemove: false, nameOnly: false, askPrice: false });
+    if (!isObj(order)) return none('missing');
+    if (present(order.zatcaUuid) || isObj(order.zatcaSubmission)) return none('zatca');
+    if (present(order.voidedAt)) return none('voided');
+    if (present(order.creditedAt) || (Array.isArray(order.creditNotes) && order.creditNotes.length > 0)) return none('credited');
+    if (order.status === 'cancelled') return none('cancelled');
+    if (FROZEN_STATUSES.indexOf(order.status) !== -1 || order.materialDeducted === true || +order.costBasis > 0) {
+      return { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false };
+    }
+    return { code: null, edit: true, addRemove: true, nameOnly: false,
+             askPrice: IN_PRODUCTION.indexOf(order.status) !== -1 };
+  }
+
+  const partQty = (p) => Math.max(1, Math.round(amountOf(p && p.qty) || 1));
+  const agreedPart = (p) => {
+    const v = p && p.agreedPrice;
+    if (v === null || v === undefined || v === '') return false;
+    return Number.isFinite(+v) && +v >= 0;
+  };
+  const partsOf = (order) => (Array.isArray(order && order.parts) ? order.parts.filter(isObj) : []);
+  /** What a job's cost-plus price is built on: the parts no customer agreed a price for. */
+  const costedOf = (parts) => parts.reduce((s, p) => s + (agreedPart(p) ? 0 : Math.max(0, amountOf(p.baseCost))), 0);
+  const agreedOf = (parts) => parts.reduce((s, p) => s + (agreedPart(p) ? Math.max(0, +p.agreedPrice) * partQty(p) : 0), 0);
+  const fixedExtras = (order) => (order.extraLines || []).reduce((s, l) => s + (+(l && l.amount) || 0), 0);
+
+  /** The fields that decide what a part costs. Anything else is a label. */
+  const COST_FIELDS = ['material', 'filamentId', 'printWeight', 'supportWeight', 'printTime', 'qty',
+                       'spoolCost', 'spoolWeight', 'agreedPrice', 'machineId', 'partMachineId'];
+  const sameCost = (a, b) => COST_FIELDS.every((k) => String(a[k] == null ? '' : a[k]) === String(b[k] == null ? '' : b[k]));
+
+  /**
+   * How the job's price stands on its parts, read off the record as
+   * `lib/order-new.js` stored it — the inputs `repriceTerms` reads, plus the
+   * one it never needed: what the cost-plus part was MULTIPLIED by.
+   *
+   *   base     price before discount of the cost-plus part
+   *   costed   what that part cost: non-agreed parts' `baseCost`, components,
+   *            and the overhead line
+   *   factor   base ÷ costed — the margin (and, on a job in another currency,
+   *            the rate it was taken at), as ONE number the job really used.
+   *            null when it cannot be read: nothing costed, or a 100% discount.
+   *   typed    the price is not what its own inputs give (a typed total).
+   */
+  function pricedFrom(order) {
+    const parts = partsOf(order);
+    const price = +order.price || 0;
+    const discountPct = Math.min(100, Math.max(0, +order.discountPct || 0));
+    const agreed = Math.max(0, +order.agreedAmount || 0) || agreedOf(parts);
+    const shipping = +order.shippingCost || 0;
+    const extras = fixedExtras(order);
+    const rushAmt = Math.max(0, +order.rushFeeAmount || +order.rushFee || 0);
+    const typedSource = order.priceSource === 'override';
+    const roundRule = order.priceSource === 'rounded' && order.priceRound && +order.priceRound.step > 0
+      ? order.priceRound : null;
+    const storedBase = +order.priceBeforeDiscount > 0 ? +order.priceBeforeDiscount : null;
+    let base;
+    let subtotal;
+    if (storedBase !== null) {
+      base = storedBase;
+      subtotal = base * (1 - discountPct / 100) + agreed;
+    } else {
+      const computed = (typedSource || roundRule) && order.computedPrice !== null && order.computedPrice !== undefined
+        && Number.isFinite(+order.computedPrice) ? +order.computedPrice : price;
+      // The rush fee is a share of the subtotal: when it is known as an
+      // amount, take it off; the subtotal is what is left.
+      subtotal = Math.max(0, computed - shipping - extras - rushAmt);
+      const costedPart = Math.max(0, subtotal - agreed);
+      base = discountPct < 100 ? costedPart / (1 - discountPct / 100) : costedPart;
+    }
+    const rushPct = rushAmt > 0 && subtotal > 0 ? rushAmt / subtotal * 100 : 0;
+    const costed = costedOf(parts) + Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+    const factor = costed > 0 && discountPct < 100 && base > 0 ? base / costed : null;
+    const finish = (v) => (roundRule ? roundPrice(v, roundRule) : +v.toFixed(2));
+    const sum = (b, a) => {
+      const sub = b * (1 - discountPct / 100) + a;
+      const rush = sub * rushPct / 100;
+      return { total: sub + rush + shipping + extras, rush };
+    };
+    const typed = typedSource || Math.abs(finish(sum(base, agreed).total) - price) > 0.011;
+    return { base, costed, factor, agreed, discountPct, rushPct, shipping, extras, roundRule, typedSource, typed, finish, sum };
+  }
+
+  /**
+   * The margin a job was priced at, as a percentage, or null when it cannot
+   * be said: a typed price, nothing costed (every part has an agreed price),
+   * a zero price, a job with no parts, or a job taken in another currency
+   * whose rate is not on the record. `marginPct`, when the job stores one, is
+   * the answer — it is what was typed.
+   *
+   * Null is shown as "—, price was typed" (Turki, Q9): a figure worked
+   * backwards from a total somebody typed would be a guess with a % on it.
+   */
+  function marginOf(order) {
+    if (!isObj(order)) return null;
+    if (order.marginPct !== null && order.marginPct !== undefined && order.marginPct !== ''
+        && Number.isFinite(+order.marginPct)) return +(+order.marginPct).toFixed(2);
+    if (!(+order.price > 0) || partsOf(order).length === 0) return null;
+    const from = pricedFrom(order);
+    if (from.typed || from.factor === null) return null;
+    // A job in another currency folds its rate into the factor.
+    if (order.fxRate !== undefined && order.fxRate !== null && +order.fxRate !== 1) return null;
+    return +((from.factor - 1) * 100).toFixed(2);
+  }
+
+  const partLabel = (p) => `${String(p.name || '').trim() || '?'} ×${partQty(p)}`;
+  const partsLine = (parts) => parts.map(partLabel).join('; ');
+
+  /**
+   * Replace a job's parts.
+   *
+   * `parts` is the whole new list. Each part arrives COSTED by the caller
+   * (`unitCost`, `baseCost`), the way a new job's parts do — this rule moves
+   * money, it does not measure filament. A part whose cost-deciding fields did
+   * not change keeps the cost it was FROZEN at when the job was taken: only a
+   * changed or new part carries today's.
+   *
+   * THE PRICE GOES FORWARD from what the job was priced from, as
+   * `repriceTerms` does it — the cost-plus part is the new parts' cost times
+   * the factor the job really used (its margin), the agreed prices are added
+   * once, then the job's own discount, rush share, shipping and extras, and
+   * its own rounding rule. A TYPED price stays as typed; only the arithmetic
+   * figure beside it moves.
+   *
+   * `ctx`:
+   *   settings   for the tax the bill is judged under.
+   *   keepPrice  true = the parts change and the price does not (the answer
+   *              to the question asked in production). The price is then a
+   *              typed one, and is marked so.
+   *   marginPct  the margin to use when the job's own cannot be read (no
+   *              costed part before): without it such a job is priced at cost.
+   *   ids        ids for parts that arrive without one, in order.
+   *   id, now    for the history entry.
+   *
+   * Returns `{ ok, reason, changes, order }`. On a refusal the job is
+   * UNTOUCHED and `reason` says why:
+   *   the lock's code; 'name_only' (a finished job, and more than a name
+   *   moved); 'delivered_part' (a part already handed over was changed or
+   *   removed); 'no_parts'; 'paid_exceeds_price' (the new bill is below what
+   *   has been paid: refund or credit note first).
+   * `ok` with empty `changes` when nothing moved — nothing is written then.
+   */
+  function applyParts(order, parts, ctx) {
+    const c = ctxOf(ctx);
+    const refuse = (reason) => ({ ok: false, reason, changes: {}, order });
+    const lock = partsLock(order);
+    if (!lock.edit) return refuse(lock.code);
+    const before = partsOf(order);
+    const incoming = (Array.isArray(parts) ? parts : []).filter(isObj);
+    if (incoming.length === 0) return refuse('no_parts');
+
+    const byId = new Map(before.filter((p) => present(p.id)).map((p) => [String(p.id), p]));
+    const ids = Array.isArray(c.ids) ? c.ids.slice() : [];
+    const next = incoming.map((p) => {
+      const old = present(p.id) ? byId.get(String(p.id)) : null;
+      if (!old) {
+        const fresh = Object.assign({ partStatus: 'pending' }, p);
+        if (!present(fresh.id) && ids.length) fresh.id = ids.shift();
+        return fresh;
+      }
+      // Unchanged in what it costs: the frozen cost stays, whatever the
+      // caller re-costed it at today.
+      if (sameCost(old, p)) return Object.assign({}, old, p, { unitCost: old.unitCost, baseCost: old.baseCost });
+      return Object.assign({}, old, p);
+    });
+
+    // A part the customer already has is fixed.
+    for (const old of before) {
+      if (old.delivered !== true) continue;
+      const kept = next.find((p) => present(p.id) && String(p.id) === String(old.id));
+      if (!kept || !sameCost(old, kept)) return refuse('delivered_part');
+    }
+    const sameSet = before.length === next.length
+      && before.every((old, i) => String(old.id) === String(next[i].id));
+    if (lock.nameOnly) {
+      // Finished: names and notes only, on the same parts in the same order.
+      if (!sameSet || !before.every((old, i) => sameCost(old, next[i])
+        && +old.baseCost === +next[i].baseCost)) return refuse('name_only');
+    }
+    const changedParts = !sameSet || before.some((old, i) => JSON.stringify(old) !== JSON.stringify(next[i]));
+    if (!changedParts) return { ok: true, reason: null, changes: {}, order };
+
+    // ── The price, forward ──
+    const trial = JSON.parse(JSON.stringify(order));
+    trial.parts = next;
+    const from = pricedFrom(order);
+    const costMoved = !lock.nameOnly && (costedOf(before) !== costedOf(next) || agreedOf(before) !== agreedOf(next));
+    const changes = { parts: { from: partsLine(before), to: partsLine(next) } };
+    if (costMoved) {
+      const fixedCosts = Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+      const factor = from.factor !== null ? from.factor
+        : 1 + Math.max(0, amountOf(c.marginPct)) / 100;
+      const newBase = (costedOf(next) + fixedCosts) * factor;
+      const newAgreed = agreedOf(next);
+      const after = from.sum(newBase, newAgreed);
+      const arithmetic = +after.total.toFixed(2);
+      const wasPrice = +order.price || 0;
+      if (c.keepPrice === true || from.typed) {
+        // The price stays as it stands. It is no longer what its inputs
+        // give, so it is a typed one from here on, with the arithmetic
+        // beside it — exactly what `adjustPrice` writes for a typed total.
+        if (c.keepPrice === true && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
+          trial.priceSource = 'override';
+          trial.priceOverride = wasPrice;
+        }
+        if (trial.priceSource === 'override' || (has(trial, 'computedPrice') && trial.computedPrice !== null)) {
+          trial.computedPrice = arithmetic;
+        }
+      } else {
+        trial.price = Math.max(0, from.finish(after.total));
+        if (has(trial, 'computedPrice') && trial.computedPrice !== null && trial.computedPrice !== undefined) {
+          trial.computedPrice = arithmetic;
+        }
+      }
+      trial.priceBeforeDiscount = from.discountPct > 0 ? +newBase.toFixed(2) : null;
+      if (newAgreed > 0) trial.agreedAmount = +newAgreed.toFixed(2); else delete trial.agreedAmount;
+      if (from.rushPct > 0) {
+        const rush = +after.rush.toFixed(2);
+        trial.rushFeeAmount = rush;
+        if (rush > 0) trial.rushFee = rush; else delete trial.rushFee;
+      }
+      if (trial.price !== wasPrice) changes.price = { from: wasPrice, to: trial.price };
+    }
+    // What the job is, by its parts — as `newOrder` writes them.
+    if (!lock.nameOnly) {
+      trial.printTime = +next.reduce((s, p) => s + amountOf(p.printTime), 0).toFixed(1);
+      trial.material = [...new Set(next.map((p) => p.material).filter(present))].join(', ');
+    }
+
+    // ── The money guard ──
+    const settingsCtx = c.settings ? { settings: c.settings } : undefined;
+    const Money = typeof globalThis !== 'undefined' ? globalThis.KhaytOrderMoney : undefined;
+    const billed = (Money && typeof Money.orderGrossRaw === 'function')
+      ? Money.orderGrossRaw(trial, settingsCtx) : trial.price;
+    const paid = (optional(trial.paidAmount) || 0) + (optional(trial.giftCardDiscount) || 0);
+    if (changes.price && paid > billed + 0.005) return refuse('paid_exceeds_price');
+
+    // ── Commit: the job becomes the trial, in place ──
+    for (const k of Object.keys(order)) if (!has(trial, k)) delete order[k];
+    Object.assign(order, trial);
+    const Pay = typeof globalThis !== 'undefined' ? globalThis.KhaytOrderPayment : undefined;
+    if (changes.price && Pay && typeof Pay.statusOf === 'function') order.paymentStatus = Pay.statusOf(order, settingsCtx);
+    recordEdit(order, changes, c);
+    return { ok: true, reason: null, changes, order };
+  }
+
+  /**
+   * One edit of a whole job, from the job sheet: customer, then details and
+   * name, then parts, then a typed price — ONE history entry per kind as each
+   * rule writes it, and ALL OR NOTHING: a refusal anywhere leaves the job
+   * exactly as it was.
+   *
+   * `next` names only what is changing:
+   *   clientId            → `changeCustomer` (its refusals are returned)
+   *   project             → the job's name (`applyEdit`)
+   *   parts               → `applyParts` (with `ctx.keepPrice`, `ctx.marginPct`)
+   *   price               → a typed total, last (`applyDetails`); refused with
+   *                         'paid_exceeds_price' when it is below what was paid
+   *   anything else `applyDetails` understands (notes, tags, due date,
+   *   priority, discount, shipping, extra lines, courier…).
+   *
+   * Returns `{ ok, reason, step, changed }` — `step` names the rule that
+   * refused ('customer' | 'parts' | 'price').
+   */
+  function applyJobEdit(order, next, ctx) {
+    if (!isObj(order)) return { ok: false, reason: 'missing', step: null, changed: false };
+    const n = Object.assign({}, next || {});
+    const c = ctxOf(ctx);
+    const work = JSON.parse(JSON.stringify(order));
+    const stop = (reason, step) => ({ ok: false, reason, step, changed: false });
+    let changed = false;
+
+    if (has(n, 'clientId')) {
+      const r = changeCustomer(work, n.clientId, c);
+      if (!r.ok) return stop(r.reason, 'customer');
+      if (Object.keys(r.changes || {}).length) changed = true;
+    }
+    if (has(n, 'project')) {
+      const r = applyEdit(work, { project: n.project }, c);
+      if (Object.keys(r.changes).length) changed = true;
+    }
+    if (has(n, 'parts')) {
+      const r = applyParts(work, n.parts, c);
+      if (!r.ok) return stop(r.reason, 'parts');
+      if (Object.keys(r.changes).length) changed = true;
+    }
+    const details = Object.assign({}, n);
+    for (const k of ['clientId', 'project', 'parts']) delete details[k];
+    if (Object.keys(details).length) {
+      // A typed total below what has been paid is refused HERE, before the
+      // details rule would cap what was paid to fit it.
+      if (has(details, 'price')) {
+        const typed = optional(details.price);
+        if (typed !== null && typed >= 0) {
+          const probe = Object.assign({}, work, { price: Math.round(typed * 100) / 100 });
+          const settingsCtx = c.settings ? { settings: c.settings } : undefined;
+          const Money = typeof globalThis !== 'undefined' ? globalThis.KhaytOrderMoney : undefined;
+          const billed = (Money && typeof Money.orderGrossRaw === 'function')
+            ? Money.orderGrossRaw(probe, settingsCtx) : probe.price;
+          const paid = (optional(work.paidAmount) || 0) + (optional(work.giftCardDiscount) || 0);
+          if (paid > billed + 0.005) return stop('paid_exceeds_price', 'price');
+        }
+      }
+      const r = applyDetails(work, details, c);
+      if (r.changed) changed = true;
+    }
+    if (!changed) return { ok: true, reason: null, step: null, changed: false };
+    for (const k of Object.keys(order)) if (!has(work, k)) delete order[k];
+    Object.assign(order, work);
+    return { ok: true, reason: null, step: null, changed: true };
+  }
+
   const api = {
     EDIT_HISTORY_CAP, TRACKED_FIELDS, PRIORITY_LEVELS,
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
+    partsLock, marginOf, applyParts, applyJobEdit,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;

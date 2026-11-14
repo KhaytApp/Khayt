@@ -1,5 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+// order-money takes the tax profile from lib/tax.js when it is loaded, as it
+// is in every app; without it an exclusive shop is read as owing no tax.
+require('../lib/tax.js');
 const N = require('../lib/order-next-step.js');
 
 const job = (status, extra) => Object.assign({ id: 'J1', status, price: 100, paidAmount: 0 }, extra || {});
@@ -187,12 +190,13 @@ test('the track: done, current, todo; hold stands where it was held; shipped sta
 });
 
 test('owed follows the shop\'s tax: an exclusive shop is owed price plus tax', () => {
-  const settings = { tax: { enabled: true, rate: 15, mode: 'exclusive' } };
+  const settings = { tax: { name: 'VAT', mode: 'exclusive', rates: [{ id: 'vat', label: 'VAT', percent: 15, compound: false }] } };
   const plain = N.nextSteps(job('printing'), {}).owed;
   assert.equal(plain, 100);
   const M = require('../lib/order-money.js');
   const expected = Math.round(M.orderOwedRaw(job('printing'), { settings }) * 100) / 100;
   assert.equal(N.nextSteps(job('printing'), { settings }).owed, expected, 'the figure is order-money\'s, not price minus paid');
+  assert.equal(expected, 115, 'price 100 plus 15% on top');
   // A crumb left by rounding never asks for a payment.
   const crumb = N.nextSteps(job('completed', { deliveredAt: 'd', paidAmount: 99.999 }), {});
   assert.equal(crumb.primary, null);
