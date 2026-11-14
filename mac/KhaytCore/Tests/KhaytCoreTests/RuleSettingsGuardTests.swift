@@ -49,7 +49,7 @@ struct RuleSettingsGuardTests {
     ///   cashFlow, tradeRevenue   currency, exchangeRates, and the tax keys
     ///   kpis                 those, and defaultPackagingCost
     static let trimmed: Set<String> = [
-        "aiFeatures", "billedAndPaidByOrder", "cashFlow", "catalogue", "chaseSwitches",
+        "aiFeatures", "applyJobEdit", "billedAndPaidByOrder", "cashFlow", "catalogue", "chaseSwitches",
         "contentLanguages", "customerNames", "dashboardFacts", "defaultSlicer", "duplicateNumbers",
         "estimateMesh", "estimateMeshes", "inventoryUnits", "kpis", "lateOrders", "lowStock",
         "lowStockWarning", "needsOrdering", "nozzleWear", "orderFigures", "orderNextSteps", "overhead",

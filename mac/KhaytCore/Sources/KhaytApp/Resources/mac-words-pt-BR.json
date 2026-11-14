@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "Entregar",
  "mac.jp_record_payment": "Registrar pagamento",
  "mac.jp_read_only": "Você não pode alterar este trabalho aqui.",
- "mac.jp_nothing_next": "Nada a fazer"
+ "mac.jp_nothing_next": "Nada a fazer",
+ "mac.parts_locked_zatca": "A fatura deste trabalho foi enviada à ZATCA, então as peças não podem ser alteradas.",
+ "mac.parts_locked_voided": "A fatura deste trabalho foi anulada, então as peças não podem ser alteradas.",
+ "mac.parts_locked_credited": "Foi emitida uma nota de crédito para este trabalho, então as peças não podem ser alteradas.",
+ "mac.parts_locked_cancelled": "Este trabalho foi cancelado, então as peças não podem ser alteradas.",
+ "mac.parts_name_only": "Este trabalho está concluído e seu filamento já foi contabilizado; só o nome de uma peça pode mudar. Para o resto, registre uma troca de bobina ou uma reimpressão.",
+ "mac.parts_delivered_fixed": "Uma peça que o cliente já recebeu não pode ser alterada nem removida.",
+ "mac.parts_paid_exceeds": "Esta alteração deixaria a conta abaixo do que já foi pago. Reembolse a diferença ou emita uma nota de crédito primeiro.",
+ "mac.parts_last": "Um trabalho precisa de pelo menos uma peça.",
+ "mac.parts_price_q": "O cliente já viu o preço deste trabalho. Manter ou usar o novo?",
+ "mac.parts_keep_price": "Manter o preço",
+ "mac.parts_use_new_price": "Usar o novo preço",
+ "mac.parts_remove": "Remover peça…",
+ "mac.parts_remove_q": "Remover “{name}” deste trabalho?"
 }

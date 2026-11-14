@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "Remettre",
  "mac.jp_record_payment": "Enregistrer un paiement",
  "mac.jp_read_only": "Vous ne pouvez pas modifier ce travail ici.",
- "mac.jp_nothing_next": "Rien à faire"
+ "mac.jp_nothing_next": "Rien à faire",
+ "mac.parts_locked_zatca": "La facture de ce travail a été envoyée à ZATCA ; ses pièces ne peuvent plus être modifiées.",
+ "mac.parts_locked_voided": "La facture de ce travail a été annulée ; ses pièces ne peuvent pas être modifiées.",
+ "mac.parts_locked_credited": "Un avoir a été émis pour ce travail ; ses pièces ne peuvent pas être modifiées.",
+ "mac.parts_locked_cancelled": "Ce travail a été annulé ; ses pièces ne peuvent pas être modifiées.",
+ "mac.parts_name_only": "Ce travail est terminé et son filament est déjà décompté ; seul le nom d’une pièce peut changer. Pour le reste, enregistrez un changement de bobine ou une réimpression.",
+ "mac.parts_delivered_fixed": "Une pièce déjà remise au client ne peut être ni modifiée ni retirée.",
+ "mac.parts_paid_exceeds": "Ce changement ramènerait la facture sous le montant déjà payé. Remboursez la différence ou émettez d’abord un avoir.",
+ "mac.parts_last": "Un travail a besoin d’au moins une pièce.",
+ "mac.parts_price_q": "Le client a vu le prix de ce travail. Le garder ou utiliser le nouveau ?",
+ "mac.parts_keep_price": "Garder le prix",
+ "mac.parts_use_new_price": "Utiliser le nouveau prix",
+ "mac.parts_remove": "Retirer la pièce…",
+ "mac.parts_remove_q": "Retirer « {name} » de ce travail ?"
 }

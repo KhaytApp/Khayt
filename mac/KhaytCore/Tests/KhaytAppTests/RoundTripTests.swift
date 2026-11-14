@@ -793,7 +793,7 @@ struct RoundTripTests {
             ("MachineSheet.swift", "shop.saveMachine(input, id: id, catalogId: catalogId, opened: was)"),
             ("SpoolSheet.swift", "shop.saveSpool(input, id: id, opened: was)"),
             ("ConsumableSheet.swift", "shop.saveConsumable(input, id: id, opened: was)"),
-            ("EditPartSheet.swift", "shop.editPart(orderId, partId: part.id, now, opened: was)"),
+            ("EditPartSheet.swift", "shop.editPart(orderId, partId: part.id, now, opened: was, keepPrice: keepPrice)"),
             ("CustomerSheet.swift", "Self.saving(Opened("),
             ("ProductSheet.swift", "let opened = Self.opening(existing)"),
             ("SupplierSheet.swift", "Self.saving(draft, lead: lead)"),

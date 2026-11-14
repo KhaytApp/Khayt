@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "引き渡す",
  "mac.jp_record_payment": "入金を記録",
  "mac.jp_read_only": "ここではこのジョブを変更できません。",
- "mac.jp_nothing_next": "することはありません"
+ "mac.jp_nothing_next": "することはありません",
+ "mac.parts_locked_zatca": "このジョブの請求書はZATCAに送信済みのため、パーツは変更できません。",
+ "mac.parts_locked_voided": "このジョブの請求書は無効化されたため、パーツは変更できません。",
+ "mac.parts_locked_credited": "このジョブにはクレジットノートが発行済みのため、パーツは変更できません。",
+ "mac.parts_locked_cancelled": "このジョブはキャンセルされたため、パーツは変更できません。",
+ "mac.parts_name_only": "このジョブは完了しフィラメントは計上済みのため、変更できるのはパーツ名のみです。それ以外はスプール交換または再印刷を記録してください。",
+ "mac.parts_delivered_fixed": "お客様に渡済みのパーツは変更・削除できません。",
+ "mac.parts_paid_exceeds": "この変更で請求額が入金済み額を下回ります。先に差額を返金するかクレジットノートを発行してください。",
+ "mac.parts_last": "ジョブには少なくとも1つのパーツが必要です。",
+ "mac.parts_price_q": "お客様はこのジョブの価格を確認済みです。そのままにしますか、新しい価格を使いますか？",
+ "mac.parts_keep_price": "価格を維持",
+ "mac.parts_use_new_price": "新しい価格を使う",
+ "mac.parts_remove": "パーツを削除…",
+ "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？"
 }

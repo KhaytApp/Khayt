@@ -1052,9 +1052,25 @@ extension Shop {
     /// wear and failure figures), not the shop's defaults: costing from grams
     /// and hours alone is the fault that re-priced the catalogue's portrait
     /// from 50 to 13.74, and this path did it to a job's part on every save.
+    ///
+    /// ── THE JOB FOLLOWS ITS PARTS NOW (S1 B3a) ───────────────────────────
+    ///
+    /// This used to write the part and stop: the job kept the price, the
+    /// print time and the material it had before, with no lock checked and
+    /// nothing in its history. The edited parts now go through the shared
+    /// rule (`lib/order-edit.js applyJobEdit`): the price goes forward at the
+    /// job's own margin, a finished job takes a new name and nothing else, a
+    /// job whose invoice has left the shop takes nothing, and a change that
+    /// would bring the bill below what was paid is refused. `keepPrice` is the
+    /// shop's answer where the customer has already seen the price
+    /// (`PartsLock.askPrice`). One write, so one undo puts the part, the
+    /// price, the time and the material back together.
+    ///
+    /// Returns false when nothing was written; `moveProblem` says why.
+    @discardableResult
     func editPart(_ orderId: Order.ID, partId: String, _ now: EditPartSheet.Opened,
-                  opened: EditPartSheet.Opened?) async {
-        guard now != opened else { return }
+                  opened: EditPartSheet.Opened?, keepPrice: Bool = false) async -> Bool {
+        guard now != opened else { return true }
         let recost = opened.map {
             $0.grams != now.grams || $0.hours != now.hours || $0.qty != now.qty || $0.spoolId != now.spoolId
         } ?? true
@@ -1065,11 +1081,70 @@ extension Shop {
             ? await partEditCost(raw: rawPart(orderId, partId: partId), now, opened: opened)
             : (nil, nil)
 
-        await writeToOneOrder(orderId, named: words.callIt("mac.edit_part"), as: .person("orders", "edit")) { order, _, _ in
-            OneOrderEdit(order: Self.orderWithPartEdited(
+        let refusals = Self.partsRefusalWords(words)
+        let reclaims = reclaimsTax
+        return await writeToOneOrder(orderId, named: words.callIt("mac.edit_part"), as: .person("orders", "edit")) { order, engine, root in
+            let edited = Self.orderWithPartEdited(
                 order, partId: partId, now, opened: opened, spool: spool, costed: costed,
-                reclaimsTax: self.reclaimsTax))
+                reclaimsTax: reclaims)
+            return try await Self.jobWithParts(of: edited, on: order, keepPrice: keepPrice,
+                                               settings: Self.settings(root), engine: engine, refusals: refusals)
         }
+    }
+
+    /// Take a part off a job, through the same rule: the price follows (or is
+    /// kept, where the shop was asked), and the last part, a delivered part
+    /// and a locked job are refused with the reason.
+    @discardableResult
+    func removePart(_ orderId: Order.ID, partId: String, keepPrice: Bool = false) async -> Bool {
+        let refusals = Self.partsRefusalWords(words)
+        return await writeToOneOrder(orderId, named: words.callIt("mac.parts_remove"), as: .person("orders", "edit")) { order, engine, root in
+            guard case .object(var record) = order, case .array(let rows)? = record["parts"] else {
+                throw MoveRefused(sentence: refusals["missing"]!)
+            }
+            record["parts"] = .array(rows.filter { Self.recordId($0) != partId })
+            return try await Self.jobWithParts(of: .object(record), on: order, keepPrice: keepPrice,
+                                               settings: Self.settings(root), engine: engine, refusals: refusals)
+        }
+    }
+
+    /// `order` with the parts of `edited`, by the shared rule. Throws the
+    /// rule's refusal in the shop's words; hands back the job untouched when
+    /// nothing moved.
+    nonisolated static func jobWithParts(of edited: JSONValue, on order: JSONValue, keepPrice: Bool,
+                                         settings: [String: JSONValue], engine: KhaytEngine,
+                                         refusals: [String: String]) async throws -> OneOrderEdit {
+        guard case .array(let parts)? = asObject(edited)?["parts"] else { return OneOrderEdit(order: order) }
+        let r = try await engine.applyJobEdit(
+            order: order, fields: ["parts": .array(parts)], settings: settings, keepPrice: keepPrice,
+            now: Date(), editId: uid("edit"), priceId: uid("edit"))
+        guard r.ok else {
+            throw MoveRefused(sentence: refusals[r.reason ?? ""] ?? refusals["unknown"]!, code: r.reason)
+        }
+        return OneOrderEdit(order: r.changed ? r.order : order)
+    }
+
+    /// Why a job's parts cannot be changed, in the shop's words — keyed by
+    /// `lib/order-edit.js`'s reasons.
+    static func partsRefusalWords(_ words: Words) -> [String: String] {
+        ["zatca": words.callIt("mac.parts_locked_zatca"),
+         "voided": words.callIt("mac.parts_locked_voided"),
+         "credited": words.callIt("mac.parts_locked_credited"),
+         "cancelled": words.callIt("mac.parts_locked_cancelled"),
+         "deducted": words.callIt("mac.parts_name_only"),
+         "name_only": words.callIt("mac.parts_name_only"),
+         "delivered_part": words.callIt("mac.parts_delivered_fixed"),
+         "paid_exceeds_price": words.callIt("mac.parts_paid_exceeds"),
+         "no_parts": words.callIt("mac.parts_last"),
+         "missing": words.callIt("mac.move_gone"),
+         "unknown": words.callIt("mac.move_refused")]
+    }
+
+    /// What may be done to this job's parts, for a sheet to say before the
+    /// shop tries; nil without an engine or the job.
+    func partsLock(_ id: Order.ID) async -> KhaytEngine.PartsLock? {
+        guard let engine, let row = orderRow(id) else { return nil }
+        return try? await engine.partsLock(row)
     }
 
     /// The spool an edited part is costed at — and whose four fields
