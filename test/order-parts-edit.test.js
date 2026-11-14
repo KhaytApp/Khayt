@@ -362,3 +362,43 @@ test('a part stored with no id is matched by its place, keeps its cost, and gets
   assert.equal(o.price, 240);
   assert.equal(E.applyParts(o, [o.parts[0]], {}).reason, 'delivered_part');
 });
+
+test('removing the first of three id-less parts leaves the other two as they were', () => {
+  const noId = (name, cost, extra) => { const p = part(undefined, cost, Object.assign({ name }, extra)); delete p.id; return p; };
+  const o = jobOf([noId('One', 80), noId('Two', 40), noId('Three', 20, { delivered: true })], { margin: 50 });
+  // What the app hands over: parts 2 and 3, each under an id made up for the
+  // screen, and each RE-COSTED at today's filament price.
+  const two = Object.assign({}, o.parts[1], { id: 'screen-2', unitCost: 55, baseCost: 55 });
+  const three = Object.assign({}, o.parts[2], { id: 'screen-3', unitCost: 31, baseCost: 31 });
+  const r = E.applyParts(o, [two, three], {});
+  assert.equal(r.ok, true, 'the delivered third part was not read as removed, nor as changed');
+  assert.deepEqual(o.parts.map((p) => p.name), ['Two', 'Three']);
+  assert.equal(o.parts[0].baseCost, 40, 'part 2 kept its frozen cost: it was not paired with part 1');
+  assert.equal(o.parts[1].baseCost, 20, 'part 3 kept its frozen cost');
+  assert.equal(o.parts[1].delivered, true);
+  assert.ok(o.parts.every((p) => p.id === undefined), 'no made-up id went into the book');
+  assert.equal(o.price, 90, '(40 + 20) at the job\'s 50%');
+});
+
+test('id-less parts: an edit in place pairs up; an edit AND a removal at once is not guessed', () => {
+  const noId = (name, cost, extra) => { const p = part(undefined, cost, Object.assign({ name }, extra)); delete p.id; return p; };
+  // One of two changed in place: the other matches exactly, the changed one is what is left.
+  const o = jobOf([noId('One', 80), noId('Two', 40)], { margin: 50 });
+  const heavier = Object.assign({}, o.parts[1], { printWeight: 300, unitCost: 100, baseCost: 100 });
+  assert.equal(E.applyParts(o, [o.parts[0], heavier], {}).ok, true);
+  assert.equal(o.parts[0].baseCost, 80);
+  assert.equal(o.parts[1].baseCost, 100);
+  assert.equal(o.parts[1].partStatus, 'pending', 'still the stored part, edited — not a fresh one');
+  // A delivered id-less part, with another removed and itself edited in the
+  // same go: nothing says which stored part the edited one is, so it is not
+  // paired, and the delivered part counts as removed — refused, not guessed.
+  const d = jobOf([noId('One', 80), noId('Two', 40, { delivered: true }), noId('Three', 20)], { margin: 50 });
+  const before = JSON.stringify(d);
+  const changedTwo = Object.assign({}, d.parts[1], { qty: 2 });
+  assert.equal(E.applyParts(d, [changedTwo, d.parts[2]], {}).reason, 'delivered_part');
+  assert.equal(JSON.stringify(d), before);
+  // A part WITH an id removed ahead of id-less ones shifts nothing either.
+  const m = jobOf([part('A', 80), noId('Two', 40), noId('Three', 20)], { margin: 50 });
+  assert.equal(E.applyParts(m, [m.parts[1], m.parts[2]], {}).ok, true);
+  assert.deepEqual(m.parts.map((p) => p.baseCost), [40, 20]);
+});
