@@ -373,21 +373,35 @@ struct JobDetail: View {
                     // on hover, in the app's words.
                     .help(shop.taxSummary ?? "")
             }
+            // A QUOTE OWES NOTHING YET (`order-money` owesAtAll, and the
+            // next-step rule): "Paid 0.00, Owed 0.00" and a Record payment
+            // link read as if it did. A dash, as the iPhone shows it — unless
+            // a deposit was taken on it, which is then said.
+            let unpaidQuote = job.status == "quote" && job.paidAmount <= 0
+            if unpaidQuote {
+                DetailLine(shop.words.callIt("mac.paid"), "—", dim: true)
+                DetailLine(shop.words.callIt("flow.owed"), "—", dim: true)
+            } else {
             DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
             // In the job's OWN currency, beside its total and what was paid —
             // `owed` is the shop's, and printed it under this job's mark read
             // a 100 USD job as "Owed 375.00 USD".
             DetailLine(shop.words.callIt("flow.owed"), Money.text(job.owedInOwnCurrency, job.currency), strong: !job.isSettled)
+            }
             if shop.canMoveJobs {
                 // Where somebody is already reading what is owed. ⇧⌘P does the
                 // same thing from anywhere; this is the one place the question
                 // "has this been paid" is actually being asked.
-                Button(shop.words.callIt("pay.modal_title")) {
-                    shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
+                // Not on an unpaid quote: Job ▸ Record Payment (⇧⌘P) still
+                // takes a deposit on one.
+                if !unpaidQuote {
+                    Button(shop.words.callIt("pay.modal_title")) {
+                        shop.pendingPayment = Shop.PendingHold(id: job.id, project: job.project)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .padding(.top, 2)
                 }
-                .buttonStyle(.link)
-                .font(.callout)
-                .padding(.top, 2)
                 // A Tabby / Tamara checkout for the customer, when the shop
                 // has either switched on — the desktop's card button.
                 if shop.offersBnpl(job) {
@@ -419,7 +433,8 @@ struct JobDetail: View {
             // Beside the figures it states. Not behind `canMoveJobs`: showing
             // the document writes nothing, and the sample shop is the one book
             // most people will look at an invoice in first.
-            Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+            // A quote's paper is a quotation, and the link says so.
+            Button(shop.words.callIt(job.status == "quote" ? "doc.quotation" : "doc.invoice")) { shop.showInvoice(job.id) }
                 .buttonStyle(.link)
                 .font(.callout)
             // Before the work is invoiced: the same paper as a request for

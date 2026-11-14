@@ -263,10 +263,10 @@ struct NextStepBar: View {
                     }
                     .disabled(shop.stepRefusal(step) != nil)
                     if first {
-                        button.buttonStyle(.borderedProminent).controlSize(.large)
+                        button.buttonStyle(StepButtonStyle(primary: true))
                             .keyboardShortcut(.defaultAction)
                     } else {
-                        button.buttonStyle(.bordered).controlSize(.large)
+                        button.buttonStyle(StepButtonStyle(primary: false))
                     }
                 }
                 Spacer(minLength: 0)
@@ -343,5 +343,31 @@ private extension View {
         self.padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Role.surf, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// The next step's button: the ONE primary step filled in the brand colour,
+/// the others outlined. Its own style rather than `.borderedProminent`,
+/// which the system draws grey — the same as its neighbours — whenever the
+/// window is not the key one; the primary step has to read as primary at a
+/// glance from across the room (Figma 90:768).
+struct StepButtonStyle: ButtonStyle {
+    let primary: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(primary ? .semibold : .regular))
+            .foregroundStyle(primary ? Khayt.onBrand : Color.primary)
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background {
+                if primary {
+                    Capsule().fill(Khayt.brand)
+                } else {
+                    Capsule().stroke(Color.secondary.opacity(0.45), lineWidth: 1)
+                }
+            }
+            .contentShape(Capsule())
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
     }
 }
