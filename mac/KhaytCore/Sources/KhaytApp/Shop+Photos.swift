@@ -205,7 +205,7 @@ extension Shop {
         // An end nobody saw and nothing can vouch for is not told to the
         // phones: they read only finished, failed and cancelled, and a guess
         // is how a completed print reached them as cancelled.
-        guard ended.outcome != "unknown" else { return }
+        guard ShopEventPublisher.phoneOutcomes.contains(ended.outcome) else { return }
         await sendPrintFinishedEvent(ended)
     }
 

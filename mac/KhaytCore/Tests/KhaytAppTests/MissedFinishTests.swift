@@ -67,7 +67,7 @@ struct MissedFinishTests {
         #expect(await shop.historyOutcome(machine, filename: Self.file) == nil)
         // The phone alert is skipped for an unknown end (it reads only three outcomes).
         let code = MenuCoverageTests.source("Shop+Photos.swift")
-        #expect(code.contains("guard ended.outcome != \"unknown\" else { return }\n        await sendPrintFinishedEvent(ended)"))
+        #expect(code.contains("guard ShopEventPublisher.phoneOutcomes.contains(ended.outcome) else { return }\n        await sendPrintFinishedEvent(ended)"))
     }
 
     @Test("a live edge (no relaunch) keeps the live rule")
@@ -78,5 +78,31 @@ struct MissedFinishTests {
         let edge = try #require(await camera.observe("M1", status: .object([
             "state": .string("complete"), "progress": .number(100), "filename": .string(Self.file)]), engine: engine))
         #expect(edge.outcome == "finished")
+    }
+
+    /// THE PAYLOAD THE PHONES IN THE FIELD DECODE. Their `PrintFinished` is
+    /// strict: a missing `v`, `kind` or `photo`, or an outcome outside the
+    /// three, fails the whole alert (iPhone #2459 relaxes it; older phones
+    /// stay strict).
+    @Test("print-finished payload v1: v, kind and photo always there; outcome one of three")
+    func payloadContract() throws {
+        #expect(ShopEventPublisher.phoneOutcomes == ["finished", "failed", "cancelled"])
+        for outcome in ShopEventPublisher.phoneOutcomes.sorted() {
+            for photo in [true, false] {
+                let ended = FinishCamera.Ended(machineId: "M1", machineName: "Baby U1", orderId: nil,
+                                               outcome: outcome, durationS: nil, photoTaken: photo, filename: "")
+                let p = ShopEventPublisher.printFinishedPayload(ended, at: "2026-11-14T10:43:00Z", project: nil, client: nil)
+                #expect(p["v"] == .number(1))
+                #expect(p["kind"] == .string("print-finished"))
+                #expect(p["photo"] == .bool(photo))
+                #expect(p["outcome"] == .string(outcome))
+                #expect(p["at"] == .string("2026-11-14T10:43:00Z"))
+                #expect(p["machineId"] == .string("M1"))
+                // Every key is present, even when its value is null.
+                for key in ["machineName", "orderId", "project", "client", "filename", "durationS", "advancedTo"] {
+                    #expect(p.keys.contains(key), "\(key)")
+                }
+            }
+        }
     }
 }
