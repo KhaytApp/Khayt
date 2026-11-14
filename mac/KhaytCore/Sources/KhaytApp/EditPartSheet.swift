@@ -32,6 +32,13 @@ struct EditPartSheet: View {
     @State private var suggestion: KhaytEngine.PartFromFile?
     @State private var preview: KhaytEngine.CostedPart?
     @State private var saving = false
+    /// What the shared rule allows on this job's parts (`partsLock`).
+    @State private var lock: KhaytEngine.PartsLock?
+    /// The customer has seen the price: keep it, or use the new one?
+    @State private var askingPrice = false
+    @State private var askingRemove = false
+    /// Why the last save or removal was refused.
+    @State private var refused: String?
     /// The fields as the sheet opened them — what Save compares with, so a
     /// part nobody changed is not re-costed or re-spelled.
     @State private var opened: Opened?
@@ -62,6 +69,36 @@ struct EditPartSheet: View {
                       hours: number(Shop.plainNumber(raw?["printTime"]) ?? 0),
                       qty: max(1, part.qty),
                       spoolId: spool?.id)
+    }
+
+    /// A figure the part's cost is made from differs from what the sheet
+    /// opened on — the same test `Shop.editPart` re-costs by.
+    private var costMoved: Bool {
+        guard let was = opened else { return true }
+        return was.grams != grams || was.hours != hours || was.qty != qty || was.spoolId != spoolId
+    }
+
+    private func save(keepPrice: Bool) {
+        saving = true
+        refused = nil
+        let now = Opened(name: name, grams: grams, hours: hours, qty: qty, spoolId: spoolId)
+        let was = opened
+        Task {
+            let wrote = await shop.editPart(orderId, partId: part.id, now, opened: was, keepPrice: keepPrice)
+            saving = false
+            // A refusal stays on the sheet, with the reason; nothing was written.
+            if wrote { dismiss() } else { refused = shop.moveProblem }
+        }
+    }
+
+    private func remove(keepPrice: Bool) {
+        saving = true
+        refused = nil
+        Task {
+            let wrote = await shop.removePart(orderId, partId: part.id, keepPrice: keepPrice)
+            saving = false
+            if wrote { dismiss() } else { refused = shop.moveProblem }
+        }
     }
 
     var body: some View {
@@ -103,26 +140,62 @@ struct EditPartSheet: View {
 
             if let preview { costLine(preview) }
 
+            // WHAT THE RULE ALLOWS, SAID BEFORE THE SHOP TRIES: a finished job
+            // takes a new name only; one whose invoice has left takes nothing.
+            if let why = lock?.code.flatMap({ Shop.partsRefusalWords(shop.words)[$0] }) {
+                Label(why, systemImage: "lock")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // And why a save or a removal did not happen (the bill would fall
+            // below what was paid, a delivered part, the last part).
+            if let refused {
+                Label(refused, systemImage: "exclamationmark.circle")
+                    .font(.caption).foregroundStyle(Khayt.late)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
+                // Taking the part off the job: the same rule, the same locks.
+                if lock?.addRemove == true {
+                    Button(shop.words.callIt("mac.parts_remove"), role: .destructive) { askingRemove = true }
+                        .buttonStyle(.link)
+                        .foregroundStyle(Khayt.late)
+                        .disabled(saving || !shop.canMoveJobs)
+                }
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
-                    saving = true
-                    let now = Opened(name: name, grams: grams, hours: hours, qty: qty, spoolId: spoolId)
-                    let was = opened
-                    Task {
-                        await shop.editPart(orderId, partId: part.id, now, opened: was)
-                        saving = false
-                        dismiss()
-                    }
+                    // The customer has seen this job's price, and a figure the
+                    // cost is made from changed: ask before the price moves.
+                    if lock?.askPrice == true, costMoved { askingPrice = true } else { save(keepPrice: false) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(saving || !shop.canMoveJobs)
+                .disabled(saving || !shop.canMoveJobs || lock?.edit == false)
             }
         }
         .padding(20)
         .frame(width: 420)
+        .confirmationDialog(shop.words.callIt("mac.parts_price_q"), isPresented: $askingPrice) {
+            Button(shop.words.callIt("mac.parts_keep_price")) { save(keepPrice: true) }
+            Button(shop.words.callIt("mac.parts_use_new_price")) { save(keepPrice: false) }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        }
+        .confirmationDialog(
+            shop.words.callIt("mac.parts_remove_q", ["name": .string(part.name)])
+                + (lock?.askPrice == true ? " " + shop.words.callIt("mac.parts_price_q") : ""),
+            isPresented: $askingRemove
+        ) {
+            if lock?.askPrice == true {
+                Button(shop.words.callIt("mac.parts_keep_price")) { remove(keepPrice: true) }
+                Button(shop.words.callIt("mac.parts_use_new_price")) { remove(keepPrice: false) }
+            } else {
+                Button(shop.words.callIt("mac.parts_remove"), role: .destructive) { remove(keepPrice: false) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        }
+        .task(id: orderId) { lock = await shop.partsLock(orderId) }
         .task {
             let was = Self.opening(part, raw: shop.rawPart(orderId, partId: part.id),
                                    spools: shop.spools)

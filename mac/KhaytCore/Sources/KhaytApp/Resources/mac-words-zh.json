@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "交付",
  "mac.jp_record_payment": "记录付款",
  "mac.jp_read_only": "无法在此更改这个任务。",
- "mac.jp_nothing_next": "无待办"
+ "mac.jp_nothing_next": "无待办",
+ "mac.parts_locked_zatca": "此任务的发票已提交给 ZATCA，无法更改其零件。",
+ "mac.parts_locked_voided": "此任务的发票已作废，无法更改其零件。",
+ "mac.parts_locked_credited": "此任务已开具贷记单，无法更改其零件。",
+ "mac.parts_locked_cancelled": "此任务已取消，无法更改其零件。",
+ "mac.parts_name_only": "此任务已完成且耗材已入账，只能更改零件名称。其他更改请记录换卷或重印。",
+ "mac.parts_delivered_fixed": "客户已收到的零件不能更改或移除。",
+ "mac.parts_paid_exceeds": "此更改会使账单低于已付金额。请先退还差额或开具贷记单。",
+ "mac.parts_last": "任务至少需要一个零件。",
+ "mac.parts_price_q": "客户已看到此任务的价格。保留原价，还是使用新价格？",
+ "mac.parts_keep_price": "保留原价",
+ "mac.parts_use_new_price": "使用新价格",
+ "mac.parts_remove": "移除零件…",
+ "mac.parts_remove_q": "要从此任务中移除“{name}”吗？"
 }

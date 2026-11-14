@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "Teslim et",
  "mac.jp_record_payment": "Ödeme kaydet",
  "mac.jp_read_only": "Bu işi buradan değiştiremezsiniz.",
- "mac.jp_nothing_next": "Yapılacak bir şey yok"
+ "mac.jp_nothing_next": "Yapılacak bir şey yok",
+ "mac.parts_locked_zatca": "Bu işin faturası ZATCA’ya gönderildi; parçaları değiştirilemez.",
+ "mac.parts_locked_voided": "Bu işin faturası iptal edildi; parçaları değiştirilemez.",
+ "mac.parts_locked_credited": "Bu iş için alacak dekontu düzenlendi; parçaları değiştirilemez.",
+ "mac.parts_locked_cancelled": "Bu iş iptal edildi; parçaları değiştirilemez.",
+ "mac.parts_name_only": "Bu iş tamamlandı ve filamenti sayıldı; yalnızca parça adı değiştirilebilir. Diğerleri için makara değişimi veya yeniden baskı kaydedin.",
+ "mac.parts_delivered_fixed": "Müşteriye teslim edilmiş bir parça değiştirilemez veya kaldırılamaz.",
+ "mac.parts_paid_exceeds": "Bu değişiklik tutarı ödenenin altına düşürür. Önce farkı iade edin veya alacak dekontu düzenleyin.",
+ "mac.parts_last": "Bir işte en az bir parça olmalıdır.",
+ "mac.parts_price_q": "Müşteri bu işin fiyatını gördü. Koruyalım mı, yenisini mi kullanalım?",
+ "mac.parts_keep_price": "Fiyatı koru",
+ "mac.parts_use_new_price": "Yeni fiyatı kullan",
+ "mac.parts_remove": "Parçayı kaldır…",
+ "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?"
 }

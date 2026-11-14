@@ -3978,5 +3978,18 @@
  "mac.jp_hand_over": "Übergeben",
  "mac.jp_record_payment": "Zahlung erfassen",
  "mac.jp_read_only": "Sie können diesen Auftrag hier nicht ändern.",
- "mac.jp_nothing_next": "Nichts zu tun"
+ "mac.jp_nothing_next": "Nichts zu tun",
+ "mac.parts_locked_zatca": "Die Rechnung dieses Auftrags wurde an ZATCA übermittelt; die Teile können nicht mehr geändert werden.",
+ "mac.parts_locked_voided": "Die Rechnung dieses Auftrags wurde storniert; die Teile können nicht geändert werden.",
+ "mac.parts_locked_credited": "Für diesen Auftrag wurde eine Gutschrift ausgestellt; die Teile können nicht geändert werden.",
+ "mac.parts_locked_cancelled": "Dieser Auftrag wurde storniert; die Teile können nicht geändert werden.",
+ "mac.parts_name_only": "Dieser Auftrag ist fertig und sein Filament ist bereits verbucht; nur der Name eines Teils kann geändert werden. Für alles andere einen Spulenwechsel oder Nachdruck erfassen.",
+ "mac.parts_delivered_fixed": "Ein Teil, das der Kunde bereits hat, kann nicht geändert oder entfernt werden.",
+ "mac.parts_paid_exceeds": "Diese Änderung würde die Rechnung unter den bereits gezahlten Betrag senken. Erstatten Sie zuerst die Differenz oder stellen Sie eine Gutschrift aus.",
+ "mac.parts_last": "Ein Auftrag braucht mindestens ein Teil.",
+ "mac.parts_price_q": "Der Kunde hat den Preis dieses Auftrags gesehen. Beibehalten oder den neuen verwenden?",
+ "mac.parts_keep_price": "Preis beibehalten",
+ "mac.parts_use_new_price": "Neuen Preis verwenden",
+ "mac.parts_remove": "Teil entfernen…",
+ "mac.parts_remove_q": "„{name}“ aus diesem Auftrag entfernen?"
 }
