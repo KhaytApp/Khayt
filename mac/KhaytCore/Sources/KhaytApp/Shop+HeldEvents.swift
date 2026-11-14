@@ -53,7 +53,7 @@ extension Shop {
         let book = build.storeURL.path
         let held = HeldEvents(book: book, events: pendingEvents.map(HeldEvent.init))
         Task { @MainActor [weak self] in
-            let sealed: String? = held.events.isEmpty ? nil : await Self.sealHeld(held, build: build)
+            let sealed: String? = held.events.isEmpty ? nil : await Self.sealHeld(held, with: .book(build))
             guard let self, generation == self.heldEventsGeneration else { return }
             var all = defaults.dictionary(forKey: Self.heldEventsKey) as? [String: String] ?? [:]
             // Nothing held, or nothing that could be sealed: nothing on disk.
@@ -68,7 +68,7 @@ extension Shop {
         let book = build.storeURL.path
         guard let all = defaults.dictionary(forKey: Self.heldEventsKey) as? [String: String],
               let sealed = all[book],
-              let held = await Self.openHeld(sealed, build: build),
+              let held = await Self.openHeld(sealed, with: .book(build)),
               held.book == book else { return }
         for e in held.events where now.timeIntervalSince(e.since) <= Self.pendingFor {
             queueEvent(e.pending)
@@ -76,18 +76,31 @@ extension Shop {
         flushPendingEvents(force: true, now: now)
     }
 
-    nonisolated static func sealHeld(_ held: HeldEvents, build: StoreReader.Build) async -> String? {
+    /// Sealing and opening, as `Secrets` does them for this book. A test
+    /// hands in its own, so it never reaches `Secrets`' shared key source
+    /// (`SecretsTests` swaps that, and suites run side by side).
+    struct Sealer: Sendable {
+        let seal: @Sendable (String) async throws -> String
+        let open: @Sendable (String) async throws -> String
+
+        static func book(_ build: StoreReader.Build) -> Sealer {
+            Sealer(seal: { try await Secrets.seal($0, for: build) },
+                   open: { try await Secrets.open($0, for: build) })
+        }
+    }
+
+    nonisolated static func sealHeld(_ held: HeldEvents, with sealer: Sealer) async -> String? {
         guard let data = try? JSONEncoder().encode(held),
               let text = String(data: data, encoding: .utf8),
-              let sealed = try? await Secrets.seal(text, for: build),
+              let sealed = try? await sealer.seal(text),
               sealed.hasPrefix(SafeStorage.marker) else { return nil }
         return sealed
     }
 
-    nonisolated static func openHeld(_ sealed: String, build: StoreReader.Build) async -> HeldEvents? {
+    nonisolated static func openHeld(_ sealed: String, with sealer: Sealer) async -> HeldEvents? {
         // Only ever a sealed value: anything else was not written by this app.
         guard sealed.hasPrefix(SafeStorage.marker),
-              let text = try? await Secrets.open(sealed, for: build) else { return nil }
+              let text = try? await sealer.open(sealed) else { return nil }
         return try? JSONDecoder().decode(HeldEvents.self, from: Data(text.utf8))
     }
 }

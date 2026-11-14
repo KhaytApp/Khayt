@@ -5,20 +5,15 @@ import KhaytCore
 
 /// Held shop alerts survive a quit, sealed (`Shop+HeldEvents.swift`).
 ///
-/// NOTHING HERE MAY TOUCH THE LOGIN KEYCHAIN: the key is the suite's own,
-/// through `Secrets.keySource` / `keyMaker`, as `SecretsTests` does it.
-/// Serialized for the same reason: `Secrets` keeps its seams in statics.
+/// NOTHING HERE MAY TOUCH THE LOGIN KEYCHAIN, nor `Secrets`' shared key
+/// source (SecretsTests swaps it while this runs): the seal is the suite's
+/// own `Sealer`, over `SafeStorage` with a test key.
 @MainActor
-@Suite(.serialized)
 struct HeldEventsSealedTests {
 
     nonisolated static let key = SafeStorage.key(fromPassword: "a test password, not a shop's")
-
-    init() {
-        Secrets.forget()
-        Secrets.keySource = { _ in Self.key }
-        Secrets.keyMaker = { _ in Self.key }
-    }
+    static let sealer = Shop.Sealer(seal: { try SafeStorage.seal($0, key: key) },
+                                    open: { try SafeStorage.open($0, key: key) })
 
     static func event(_ n: Int, since: Date) -> Shop.PendingEvent {
         .init(kind: "print-finished", at: "2026-11-14T10:0\(n):00Z",
@@ -29,22 +24,22 @@ struct HeldEventsSealedTests {
     @Test("sealed, opened, and never in the clear")
     func roundTrip() async throws {
         let held = Shop.HeldEvents(book: "/tmp/book.json", events: [.init(Self.event(1, since: Date()))])
-        let sealed = try #require(await Shop.sealHeld(held, build: .development))
+        let sealed = try #require(await Shop.sealHeld(held, with: Self.sealer))
         #expect(sealed.hasPrefix(SafeStorage.marker))
         #expect(!sealed.contains("Customer 1") && !sealed.contains("Bracket 1"))
-        #expect(await Shop.openHeld(sealed, build: .development) == held)
+        #expect(await Shop.openHeld(sealed, with: Self.sealer) == held)
         // A value nobody sealed is not read.
         let plain = String(decoding: try JSONEncoder().encode(held), as: UTF8.self)
-        #expect(await Shop.openHeld(plain, build: .development) == nil)
+        #expect(await Shop.openHeld(plain, with: Self.sealer) == nil)
     }
 
-    @Test("no key: nothing is sealed, so nothing is written")
+    @Test("no key, or a seal that hands back plaintext: nothing is written")
     func noKey() async {
-        Secrets.forget()
-        Secrets.keySource = { _ in nil }
-        Secrets.keyMaker = { _ in nil }
         let held = Shop.HeldEvents(book: "/tmp/book.json", events: [.init(Self.event(1, since: Date()))])
-        #expect(await Shop.sealHeld(held, build: .development) == nil)
+        let locked = Shop.Sealer(seal: { _ in throw Secrets.Failure.noKeychain }, open: { $0 })
+        #expect(await Shop.sealHeld(held, with: locked) == nil)
+        let leaky = Shop.Sealer(seal: { $0 }, open: { $0 })
+        #expect(await Shop.sealHeld(held, with: leaky) == nil, "never stored in the clear")
     }
 
     @Test("the sample book, and a test runner's default, keep nothing")
