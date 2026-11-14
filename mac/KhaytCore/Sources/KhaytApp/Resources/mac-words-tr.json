@@ -3991,5 +3991,8 @@
  "mac.parts_keep_price": "Fiyatı koru",
  "mac.parts_use_new_price": "Yeni fiyatı kullan",
  "mac.parts_remove": "Parçayı kaldır…",
- "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?"
+ "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?",
+ "mac.js_margin_typed": "—, fiyat elle girildi",
+ "mac.js_more": "Diğer ayrıntılar…",
+ "mac.js_new_total": "Yeni toplam"
 }

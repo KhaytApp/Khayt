@@ -746,6 +746,7 @@ struct RoundTripTests {
         "saveQuoteFormEmbed": "never writes the book: PUTs {enabled, origins} to the cloud and shows what the cloud answers; QuoteFormEmbedTests covers the body and the answer",
         "saveQuoteFormFooter": "never writes the book: the caller of QuoteFormEmbed.saveFooter, gated, and shows what the cloud answers",
         "saveFooter": "never writes the book: PUTs {hideFooter} to the cloud's /embed/footer; QuoteFormEmbedTests.footerSave covers the body and the answers",
+        "saveJob": "hands lib/order-edit.js applyJobEdit only what the job sheet changed (JobSheet.fields) and the rule touches only those; JobSheetTests.onlyWhatChanged proves an untouched sheet names nothing, partsForSave returns an untouched part byte for byte as stored, and JobSheetSaveTests.sameAndEmpty that an empty save hands the order back unchanged",
         "editOrderDetails": "hands lib/order-edit.js applyDetails only the fields the sheet changed (OrderDetailsSheet.fields) and the rule touches only those; OrderToolsTests.onlyChanged proves an untouched sheet sends nothing",
         "saveIntake": "lib/intake-queue.js saveItem merges the editor's seven fields onto the stored entry and keeps the rest; test/intake-queue.test.js proves the intake form's phone, consent and estValue survive",
         "saveExchangeRates": "writes only settings.exchangeRates through KhaytSettingsEdit.exchangeRates over the settings read inside the write chain; every other key goes back as read (MoneyStockParityTests.exchangeRates)",

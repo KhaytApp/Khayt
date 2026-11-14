@@ -87,4 +87,58 @@ extension Shop {
         for (reason, said) in customerLockWords(words) { out["customer." + reason] = said }
         return out
     }
+
+    // MARK: - The sheet's parts, as the book will hold them
+
+    /// The parts the sheet is showing, as records: a stored part the shop did
+    /// not touch as the book has it, an edited one re-costed exactly as Edit
+    /// Part does it (`partEditCost`, its own rates and spool rule), and a new
+    /// one costed and written as a new job's parts are (`partRows`). A part
+    /// taken off in the sheet is simply not in `drafts`.
+    func partsForSave(_ orderId: Order.ID, drafts: [JobSheet.PartDraft]) async -> [JSONValue] {
+        var out: [JSONValue] = []
+        for d in drafts {
+            let now = d.fields
+            if let stored = d.storedId, let raw = rawPart(orderId, partId: stored) {
+                guard now != d.opened else { out.append(.object(raw)); continue }
+                let recost = d.opened.map {
+                    $0.grams != now.grams || $0.hours != now.hours || $0.qty != now.qty || $0.spoolId != now.spoolId
+                } ?? true
+                let (spool, costed): (Spool?, KhaytEngine.CostedPart?) = recost
+                    ? await partEditCost(raw: raw, now, opened: d.opened) : (nil, nil)
+                let one = JSONValue.object(["parts": .array([.object(raw)])])
+                let edited = Self.orderWithPartEdited(one, partId: stored, now, opened: d.opened,
+                                                      spool: spool, costed: costed, reclaimsTax: reclaimsTax)
+                if case .array(let rows)? = Self.asObject(edited)?["parts"], let first = rows.first { out.append(first) }
+            } else {
+                let costed = await costedPart(spoolId: d.spoolId, grams: TypedNumber.parse(d.grams) ?? 0,
+                                              hours: TypedNumber.parse(d.hours) ?? 0, qty: d.qty)
+                var fresh = NewJobSheet.Draft()
+                fresh.name = d.name; fresh.spoolId = d.spoolId
+                fresh.grams = d.grams; fresh.hours = d.hours; fresh.qty = d.qty
+                fresh.cost = costed?.cost ?? 0
+                fresh.rates = costed?.rates
+                out += Self.partRows([fresh], spools: spools, reclaimsTax: reclaimsTax,
+                                     unnamed: words.callIt("mac.a_part"))
+            }
+        }
+        return out
+    }
+
+    /// What the sheet's save WOULD do, without writing: the job as it would
+    /// be left, or the sentence it would be refused with. The sheet's pinned
+    /// total and its refusal line are this, so what is on screen is what Save
+    /// does.
+    func previewJobSave(_ id: Order.ID, _ save: JobSave) async -> Result<JSONValue, MoveRefused>? {
+        guard let engine, let row = orderRow(id) else { return nil }
+        do {
+            return .success(try await Self.jobSaved(row, save, clients: clientRows, settings: settingsDict,
+                                                    engine: engine, refusals: Self.jobSaveRefusalWords(words),
+                                                    now: Date()))
+        } catch let refused as MoveRefused {
+            return .failure(refused)
+        } catch {
+            return nil
+        }
+    }
 }

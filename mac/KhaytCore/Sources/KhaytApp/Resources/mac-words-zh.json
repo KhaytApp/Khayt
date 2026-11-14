@@ -3991,5 +3991,8 @@
  "mac.parts_keep_price": "保留原价",
  "mac.parts_use_new_price": "使用新价格",
  "mac.parts_remove": "移除零件…",
- "mac.parts_remove_q": "要从此任务中移除“{name}”吗？"
+ "mac.parts_remove_q": "要从此任务中移除“{name}”吗？",
+ "mac.js_margin_typed": "—，价格为手动输入",
+ "mac.js_more": "更多详情…",
+ "mac.js_new_total": "新合计"
 }

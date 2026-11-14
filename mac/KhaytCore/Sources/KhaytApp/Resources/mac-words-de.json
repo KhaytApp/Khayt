@@ -3991,5 +3991,8 @@
  "mac.parts_keep_price": "Preis beibehalten",
  "mac.parts_use_new_price": "Neuen Preis verwenden",
  "mac.parts_remove": "Teil entfernen…",
- "mac.parts_remove_q": "„{name}“ aus diesem Auftrag entfernen?"
+ "mac.parts_remove_q": "„{name}“ aus diesem Auftrag entfernen?",
+ "mac.js_margin_typed": "—, Preis wurde eingegeben",
+ "mac.js_more": "Weitere Details…",
+ "mac.js_new_total": "Neue Summe"
 }

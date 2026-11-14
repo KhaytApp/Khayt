@@ -29,6 +29,14 @@ extension Snapshot {
             await settle()
             capture(named: "s1-job-page-\(name)\(tag)", into: dir)
         }
+        // The job sheet (Edit mode), on a job with parts.
+        if let job = shop.orders.first(where: { Stage.of($0) == .pending && !$0.parts.isEmpty }) {
+            shop.pendingEdit = Shop.PendingHold(id: job.id, project: job.project)
+            await settle()
+            captureSheet(named: "s1-job-sheet-edit\(tag)", into: dir)
+            shop.pendingEdit = nil
+            await settle()
+        }
     }
 
     static func captureSimple(_ shop: Shop, into dir: URL, dark: Bool) async {
