@@ -149,6 +149,9 @@ struct SettingsWindow: View {
     private func rows(_ group: SettingsPane.Group) -> some View {
         ForEach(SettingsPane.panes(in: group)) { pane in
             Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
+                // Connector updates waiting on the shop's yes (Figma 70:234):
+                // the count goes when none is left.
+                .badge(pane == .integrations ? shop.connectorUpdatesWaiting : 0)
                 .tag(pane)
         }
     }

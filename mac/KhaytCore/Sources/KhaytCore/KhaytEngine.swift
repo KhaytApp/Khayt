@@ -1180,11 +1180,14 @@ public actor KhaytEngine {
         // identical on every device. `plugin-payload` reads
         // `KhaytPluginManifest` at load, so it comes second; `plugin-host`
         // (which connectors are live, and how an entry changes) third;
-        // `plugin-update` (the signed update index, Nov 10) last.
+        // `plugin-update` (the signed update index, Nov 10), then
+        // `plugin-update-sheet` (what a waiting update asks for, in the order
+        // every app shows it), which reads `KhaytPluginManifest`.
         "plugin-manifest",
         "plugin-payload",
         "plugin-host",
         "plugin-update",
+        "plugin-update-sheet",
     ]
 
     /// The languages whose strings are bundled: all nine the other app speaks.
@@ -8684,6 +8687,72 @@ public actor KhaytEngine {
         try runtime.call2("(function(){ var U = globalThis.KhaytPluginUpdate;"
                         + " return U.runnable(ARG0, U.stateOf(ARG1, ARG0 && ARG0.id)); })()",
                           [entry, settings], as: JSONValue.self)
+    }
+
+    /// `settings.connectorUpdates.connectors[id]`, or `{}`: what a check left
+    /// for this connector (`previous`, `pending`, `revoked`, `updatedFrom`,
+    /// `previousWithdrawn`, …). Handed `settings.connectorUpdates` only: it is
+    /// all `stateOf` reads.
+    public func pluginUpdateState(connectorUpdates: JSONValue, id: String) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytPluginUpdate.stateOf({ connectorUpdates: ARG0 }, ARG1)",
+                          [connectorUpdates, .string(id)], as: JSONValue.self)
+    }
+
+    /// The update waiting on the shop's yes for this entry (`state.pending`),
+    /// or `.null`: a pending version NEWER than the installed one, carrying
+    /// its manifest (`lib/plugin-update-sheet.js waitingFor`). Handed
+    /// `settings.connectorUpdates` only.
+    public func pluginUpdateWaiting(entry: JSONValue, connectorUpdates: JSONValue) throws -> JSONValue {
+        try runtime.call2("""
+            (function (entry, updates) {
+              var U = globalThis.KhaytPluginUpdate, S = globalThis.KhaytPluginUpdateSheet;
+              var p = S.waitingFor(entry, U.stateOf({ connectorUpdates: updates }, entry && entry.id), U.compareVersions);
+              return p || null;
+            })(ARG0, ARG1)
+            """, [entry, connectorUpdates], as: JSONValue.self)
+    }
+
+    /// What a waiting update asks for, in the order every app shows it.
+    public struct PluginUpdateSheet: Decodable, Sendable, Equatable {
+        public struct Item: Decodable, Sendable, Equatable, Hashable {
+            /// `field`, `secret` or `link`.
+            public let kind: String
+            /// A field ref, a secret's name, or "" for a link.
+            public let key: String
+            /// `new` or `new_place` under New in this version; nil under Already agreed.
+            public let tag: String?
+        }
+        public struct Host: Decodable, Sendable, Equatable, Identifiable {
+            public var id: String { host }
+            public let host: String
+            public let items: [Item]
+        }
+        public let id: String
+        public let from: String
+        public let to: String
+        public let asksMore: Bool
+        public let fresh: [Host]
+        public let scopes: [String]
+        public let refresh: Double
+        public let agreed: [Host]
+    }
+
+    /// `lib/plugin-update-sheet.js sheetFor`; nil when there is nothing to show.
+    public func pluginUpdateSheet(entry: JSONValue, pending: JSONValue) throws -> PluginUpdateSheet? {
+        try runtime.call2("globalThis.KhaytPluginUpdateSheet.sheetFor(ARG0, ARG1)", [entry, pending],
+                          as: PluginUpdateSheet?.self)
+    }
+
+    /// The keys this device must forget when an entry changes from `before` to
+    /// `after` (an Agree or a Revert): those whose hosts moved, so a key typed
+    /// in for one company is never sent to another.
+    public func pluginKeysToForget(before: JSONValue, after: JSONValue) throws -> [String] {
+        try runtime.call2("globalThis.KhaytPluginUpdate.keysToForget(ARG0, ARG1)", [before, after], as: [String].self)
+    }
+
+    /// The manifest format this build reads, as `ctx.schema`.
+    public func pluginUpdateSchema() throws -> Int {
+        try runtime.call2("globalThis.KhaytPluginUpdate.SCHEMA", [], as: Int.self)
     }
 
     public func pluginSigningKeys() throws -> [JSONValue] {

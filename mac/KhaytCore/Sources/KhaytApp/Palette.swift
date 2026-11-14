@@ -168,6 +168,13 @@ enum Khayt {
     /// a nozzle near its life, a sync that will retry. `--warning`.
     static let attention = adaptive(light: 0x8A5A0B, dark: 0xE0A73C, name: "khaytAttention")
 
+    /// Waiting on the shop's OK: a connector update that asks for more. STEEL,
+    /// because amber means progress and today (Figma 75:387). Text on
+    /// `pendingWash`, or on its own.
+    static let pending = adaptive(light: 0x5E6C84, dark: 0xA9B8CF, name: "khaytPending")
+    /// The chip behind `pending`.
+    static let pendingWash = adaptive(light: 0xEDF0F4, dark: 0x3A4658, name: "khaytPendingWash")
+
     /// Late, failed, refused. `--danger`.
     static let late = adaptive(light: 0xBB2D44, dark: 0xF2564A, name: "khaytLate")
 
