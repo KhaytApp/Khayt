@@ -125,12 +125,14 @@ final class JobStepsTests: XCTestCase {
         }
         let (api, book) = try client(store)
         let id = try aQuote(store)
-        XCTAssertEqual(await api.nextSteps(orderId: id)?.primary?.code, "send_quote")
+        let step1 = await api.nextSteps(orderId: id)
+        XCTAssertEqual(step1?.primary?.code, "send_quote")
         let stamped = try await api.quoteShareEnded(orderId: id, completed: true)
         XCTAssertTrue(stamped)
         guard case .string(let at)? = try sharedAt(book, id) else { return XCTFail("no quoteSharedAt") }
         XCTAssertNotNil(ISO8601DateFormatter().date(from: at))
-        XCTAssertEqual(await api.nextSteps(orderId: id)?.primary?.code, "take_job", "a shared quote leads with Take job")
+        let step2 = await api.nextSteps(orderId: id)
+        XCTAssertEqual(step2?.primary?.code, "take_job", "a shared quote leads with Take job")
         // A second share keeps the first stamp.
         try await api.quoteShareEnded(orderId: id, completed: true, now: Date().addingTimeInterval(3600))
         XCTAssertEqual(try sharedAt(book, id), .string(at))
@@ -147,7 +149,17 @@ final class JobStepsTests: XCTestCase {
         let stamped = try await api.quoteShareEnded(orderId: id, completed: false)
         XCTAssertFalse(stamped)
         XCTAssertNil(try sharedAt(book, id))
-        XCTAssertEqual(await api.nextSteps(orderId: id)?.primary?.code, "send_quote")
+        let step3 = await api.nextSteps(orderId: id)
+        XCTAssertEqual(step3?.primary?.code, "send_quote")
+    }
+
+    /// The job page's "Sent" line reads quoteSharedAt, never the
+    /// quoteSentAt every quote is given at creation.
+    func testSentIsTheShareStampNotTheCreationStamp() throws {
+        let unshared = try JSONDecoder().decode(OrderLogEntry.self, from: Data(#"{"id":"Q-1","status":"quote","date":"2026-11-12","quoteExpiresAt":"2026-11-19","quoteSentAt":"2026-11-12"}"#.utf8))
+        XCTAssertNil(unshared.quoteSharedAt)
+        let shared = try JSONDecoder().decode(OrderLogEntry.self, from: Data(#"{"id":"Q-1","status":"quote","date":"2026-11-12","quoteExpiresAt":"2026-11-19","quoteSharedAt":"2026-11-13T09:00:00Z"}"#.utf8))
+        XCTAssertEqual(shared.quoteSharedAt, "2026-11-13T09:00:00Z")
     }
 
     // MARK: Words

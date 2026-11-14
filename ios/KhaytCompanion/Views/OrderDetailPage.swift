@@ -7,7 +7,7 @@ import KhaytCore
 ///
 /// 1. the header: the job's name, `S-1041 · customer · due`, ONE stage pill
 ///    in its stage colour and, only when late, "N days late" beside it;
-/// 2. the next step: ONE verb for this stage (`JobNextStep`), pinned at the
+/// 2. the next step: ONE verb from the shared rule (`JobSteps`), pinned at the
 ///    bottom above the tab bar so it is always in view, with More beside it
 ///    for everything else the page can do;
 /// 3. the stage track: the five stages, tappable — for the job sent back
@@ -680,7 +680,7 @@ struct OrderDetailHeader: View {
     }
 
     private var daysLate: Int? {
-        (late ?? order.isOverdue) ? JobNextStep.daysLate(due: order.dueDate, today: today) : nil
+        (late ?? order.isOverdue) ? JobDue.daysLate(due: order.dueDate, today: today) : nil
     }
 
     var body: some View {
@@ -888,7 +888,9 @@ struct JobMoneyCard: View {
                 if let made = DueDateParser.display(quote.date) {
                     line(L10n.tr("quote.field.made")) { Text(made).foregroundStyle(KhaytDesign.ink) }
                 }
-                if let sent = DueDateParser.display(quote.quoteSentAt) {
+                // Sent only when it really was: `quoteSharedAt`, not the
+                // `quoteSentAt` every quote is given when it is made.
+                if let sent = DueDateParser.display(quote.quoteSharedAt) {
                     line(L10n.tr("job.money.quote_sent")) { Text(sent).foregroundStyle(KhaytDesign.ink) }
                 }
                 if let last = DueDateParser.display(quote.quoteExpiresAt) {
@@ -899,7 +901,7 @@ struct JobMoneyCard: View {
                     }
                 }
             } else if let payment {
-                let overdue = JobNextStep.owingIsOverdue(owed: payment.owed, due: order.dueDate)
+                let overdue = JobDue.owingIsOverdue(owed: payment.owed, due: order.dueDate)
                 line(L10n.tr("job.money.price")) { Text(Money.text(payment.billed, currency)).foregroundStyle(KhaytDesign.ink) }
                 line(L10n.tr("job.money.paid")) {
                     Text(payment.paid > 0 ? "− " + Money.text(payment.paid, currency) : Money.text(0, currency))

@@ -572,6 +572,10 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// The day the quote went to the customer (`lib/order-new.js`), shown on
     /// the job page's money. Nil when it was never sent, or over Wi-Fi alone.
     var quoteSentAt: String? = nil
+    /// When the quote was actually shared with the customer (its link sent
+    /// or copied) — the stamp the shared next-step rule counts as sent.
+    /// `quoteSentAt` is written on every quote when it is made, so it is not.
+    var quoteSharedAt: String? = nil
     /// The currency `price` is in: a job is converted into its client's
     /// currency when it is saved (#2148), so it is not always the shop's.
     /// Absent means the shop's.
