@@ -52,7 +52,7 @@ struct RuleSettingsGuardTests {
         "aiFeatures", "billedAndPaidByOrder", "cashFlow", "catalogue", "chaseSwitches",
         "contentLanguages", "customerNames", "dashboardFacts", "defaultSlicer", "duplicateNumbers",
         "estimateMesh", "estimateMeshes", "inventoryUnits", "kpis", "lateOrders", "lowStock",
-        "lowStockWarning", "needsOrdering", "nozzleWear", "orderFigures", "overhead",
+        "lowStockWarning", "needsOrdering", "nozzleWear", "orderFigures", "orderNextSteps", "overhead",
         "owedByOrder", "revenueOutlook", "riskWhen", "shopText", "slicers", "taxProfile",
         "tradeRevenue",
     ]

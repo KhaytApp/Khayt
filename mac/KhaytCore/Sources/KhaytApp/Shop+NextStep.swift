@@ -65,12 +65,34 @@ extension Shop {
     /// A finished or shipped job is handed over rather than stepped on to
     /// Shipped: most work leaves the bench in the customer's hands, and
     /// "Ship it" stays one menu item away (Job ▸ Move Along, or Shipped).
+    ///
+    /// WHAT COMES NEXT IS THE SHARED RULE'S (`lib/order-next-step.js`, read
+    /// into `nextSteps` at each load), the same answer the iPhone and the
+    /// desktop get. This app still decides whether THIS person may do it
+    /// (`canMoveJobs`), and words it. Three of the rule's steps have no
+    /// button here until the job page lands (S1): Send quote (a quote still
+    /// says Accept), Resume for a job on hold, and Record payment.
     func nextStep(for id: Order.ID) -> NextStep? {
-        guard let job = orders.first(where: { $0.id == id }) else { return nil }
-        if canMarkDelivered(job) { return .deliver }
-        guard let there = moveAlongTarget(id, by: 1) else { return nil }
-        return Stage.of(job) == .quote ? .accept(there) : .move(there)
+        guard canMoveJobs, let job = orders.first(where: { $0.id == id }),
+              let steps = nextSteps[id],
+              // Read for the stage the job is in NOW: between a move and the
+              // reload that follows it, the answer on hand is the old stage's.
+              steps.stage == Stage.of(job)?.rawValue else { return nil }
+        let offered = [steps.primary].compactMap { $0 } + steps.secondary
+        if steps.primary?.code == "hand_over" { return .deliver }
+        if let take = offered.first(where: { $0.code == "take_job" }), Stage.of(job) == .quote,
+           let there = take.to.flatMap(Stage.init(rawValue:)) {
+            return .accept(there)
+        }
+        guard let primary = steps.primary, Self.movesAlong.contains(primary.code),
+              let there = primary.to.flatMap(Stage.init(rawValue:)),
+              // The same refusal the board shows before a card is dropped.
+              dragRefusal(there) == nil else { return nil }
+        return .move(there)
     }
+
+    /// The rule's steps that are one move along the way work goes.
+    static let movesAlong: Set<String> = ["start_printing", "mark_printed", "send_to_check", "mark_ready"]
 
     /// The button's words.
     func nextStepTitle(_ step: NextStep) -> String {

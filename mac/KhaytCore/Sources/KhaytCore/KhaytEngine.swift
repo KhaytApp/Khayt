@@ -328,6 +328,11 @@ public actor KhaytEngine {
         "whatsapp-send",
         "whatsapp-message",
         "order-status",
+        // The ONE next step for a job (S1, Nov 2026): the Mac's button, the
+        // phone's pinned bar and the desktop's page all ask it. After
+        // `order-status` (stage, gate) and `order-money` (what is owed),
+        // which it reads off `globalThis`.
+        "order-next-step",
         // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
         //
         // Three modules for one answer, and none of them can give it alone.
