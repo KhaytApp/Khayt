@@ -63,7 +63,13 @@ final class FinishCamera {
               kept.book == book, now.timeIntervalSince(kept.savedAt) < 24 * 3600 else { return }
         memo = kept.memo
         predictedEnd = kept.predictedEnd
+        if case .object(let o) = kept.memo { resumed = Set(o.keys) }
     }
+
+    /// Machines whose memory came back from before a relaunch and have not
+    /// answered since: their next edge happened while nobody watched, so it
+    /// is decided by the printer's history, not guessed (`missed`).
+    private(set) var resumed: Set<String> = []
 
     /// When the print that just ended really ended: the finish predicted at
     /// the last reading when that is in the past (the Mac was asleep or closed
@@ -96,8 +102,9 @@ final class FinishCamera {
     /// Fold one answered poll in. The edge when this poll is one — whatever
     /// the outcome — and nil every other time.
     func observe(_ machineId: String, status: JSONValue, engine: KhaytEngine) async -> KhaytEngine.FinishTrack? {
+        let missed = resumed.remove(machineId) != nil
         guard let t = try? await engine.printFinishTrack(memo: memo, machineId: machineId,
-                                                         status: status) else { return nil }
+                                                         status: status, missed: missed) else { return nil }
         let was = memo
         memo = t.memo
         // The predicted finish, while it prints. Kept when the machine's state
@@ -142,8 +149,9 @@ final class FinishCamera {
         let machineName: String
         /// Nil when the book cannot say which job without guessing.
         let orderId: String?
-        /// "finished" | "failed" | "cancelled".
-        let outcome: String
+        /// "finished" | "failed" | "cancelled", or "unknown" when the end was
+        /// missed and the printer's history could not say.
+        var outcome: String
         /// Seconds, by the printer's own counter; nil when it never said.
         let durationS: Double?
         let photoTaken: Bool

@@ -159,6 +159,13 @@ extension Shop {
             await self.attachFinishPhoto(jobId: jobId, data: data)
         }
         ended.finishedAt = printers.finishCamera.finishedAt(machine.id)
+        // AN END NOBODY SAW: ask the printer how it went, and when (Baby U1,
+        // Nov 14: a print that completed while the app was closed was told to
+        // the phones as cancelled).
+        if ended.outcome == "unknown", let told = await historyOutcome(machine, filename: ended.filename) {
+            ended.outcome = told.outcome
+            if let at = Self.isoDate(told.endedAt) { ended.finishedAt = at }
+        }
         FinishCamera.lastOutcome[machine.id] = photo
         await printFinished(ended)
         // The printer's timelapse, written a little after the end — looked
@@ -195,7 +202,26 @@ extension Shop {
                                                            noticeAudible: audible))
         }
         await settleEnergy(ended)
+        // An end nobody saw and nothing can vouch for is not told to the
+        // phones: they read only finished, failed and cancelled, and a guess
+        // is how a completed print reached them as cancelled.
+        guard ended.outcome != "unknown" else { return }
         await sendPrintFinishedEvent(ended)
+    }
+
+    /// How the printer says the job printing `filename` ended, from its own
+    /// history (Moonraker only), or nil.
+    func historyOutcome(_ machine: Machine, filename: String) async -> KhaytEngine.FinishFromHistory? {
+        guard PrinterWatch.keepsHistory(machine), !filename.isEmpty, let engine,
+              let jobs = try? await (historyFetch ?? { try await PrinterWatch.history($0, engine: $1) })(machine, engine)
+        else { return nil }
+        return (try? await engine.printFinishFromHistory(jobs: jobs, filename: filename)) ?? nil
+    }
+
+    nonisolated static func isoDate(_ s: String) -> Date? {
+        guard !s.isEmpty else { return nil }
+        return (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(s))
+            ?? (try? Date.ISO8601FormatStyle().parse(s))
     }
 
     /// Tell the shop's iPhones (and any open `/live` stream) that a print
@@ -327,7 +353,8 @@ extension Shop {
     /// The most recent print that FAILED or was cancelled on a job the book
     /// could name — what the waste sheet offers first.
     func lastFailedJob() -> (orderId: String, machineId: String)? {
-        let failed = lastPrintEnded.values.filter { $0.outcome != "finished" && $0.orderId != nil }
+        // Failed or cancelled only: an end nobody saw ("unknown") is not a failure.
+        let failed = lastPrintEnded.values.filter { ["failed", "cancelled"].contains($0.outcome) && $0.orderId != nil }
         guard let one = failed.first, failed.count == 1, let id = one.orderId else { return nil }
         return (id, one.machineId)
     }
