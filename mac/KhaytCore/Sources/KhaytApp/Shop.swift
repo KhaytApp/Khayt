@@ -3091,7 +3091,17 @@ final class Shop {
     /// Shop events that could not be sent when they happened: the cloud was
     /// locked on this Mac, or the post failed. Sent at the next chance
     /// (`flushPendingEvents`). This run's only, and bounded.
-    @ObservationIgnored var pendingEvents: [Shop.PendingEvent] = []
+    /// Kept across a quit, sealed (`Shop+HeldEvents.swift`): every change is written.
+    @ObservationIgnored var pendingEvents: [Shop.PendingEvent] = [] {
+        didSet { if pendingEvents != oldValue { keepHeldEvents() } }
+    }
+    /// Which write of the held alerts is the latest (`keepHeldEvents`).
+    @ObservationIgnored var heldEventsGeneration = 0
+    /// Where held alerts are kept: this Mac's preferences in the app, and
+    /// nothing in a test runner (no bundle id) unless the test hands in its own
+    /// — sealing reaches the Keychain, and a Keychain dialog hangs a test run.
+    @ObservationIgnored var heldEventsDefaults: UserDefaults? =
+        Bundle.main.bundleIdentifier != nil ? .standard : nil
     /// How a printer's own history is read when an end was missed. Nil is
     /// `PrinterWatch.history`; tests put the printer's answer here.
     @ObservationIgnored var historyFetch: (@MainActor (Machine, KhaytEngine) async throws -> [JSONValue])?

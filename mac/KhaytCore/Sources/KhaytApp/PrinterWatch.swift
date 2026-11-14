@@ -300,6 +300,8 @@ final class PrinterWatch {
         // What was printing when this book was last watched, so a print that
         // ended while the app was closed still has its end. A real book only.
         if let book { finishCamera.restore(book: book.path, defaults: .standard) }
+        // And the alerts that could not reach the phones before the quit.
+        if book != nil { Task { await shop.restoreHeldEvents() } }
         task = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.sweep(shop: shop)
