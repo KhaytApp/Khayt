@@ -96,8 +96,12 @@ final class ShopFeed: ObservableObject {
     }
 
     nonisolated static func item(for event: PrintFinished, id: String, tr: (String) -> String) -> FeedItem {
-        let content = PrintAlertText.content(for: event, orderStatus: nil, tr: tr)
-        let tone: FeedItem.Tone = event.outcome == .finished ? .done : .late
+        let content = PrintAlertText.content(for: event, orderStatus: nil, locale: L10n.locale, tr: tr)
+        let tone: FeedItem.Tone = switch event.outcome {
+        case .finished: .done
+        case .failed, .cancelled: .late
+        case .ended: .none
+        }
         return FeedItem(id: id, kind: event.kind, title: content.title + " — " + content.body,
                         at: ISO8601DateFormatter().date(from: event.at) ?? Date(), tone: tone,
                         unread: true, orderId: event.orderId)

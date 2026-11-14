@@ -3,6 +3,7 @@
 "alert.print.finished" = "Print finished";
 "alert.print.failed" = "Print failed";
 "alert.print.cancelled" = "Print cancelled";
+"alert.print.ended" = "Print ended — check the printer";
 "alert.print.a_job" = "A job";
 "alert.print.move_post" = "Move to post-processing";
 "alert.print.reprint" = "Put back in the queue";
@@ -18,3 +19,4 @@
 "PUSH_QUOTE_DECLINED" = "A customer declined a quote";
 "PUSH_MESSAGE" = "A customer sent a message";
 "PUSH_PAYMENT" = "A payment came in";
+"PUSH_GENERIC" = "Something in your shop needs a look";

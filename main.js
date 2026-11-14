@@ -300,6 +300,7 @@ const receiptsDir    = () => ensureDir('receipts');
 const { registerPrinterDiscovery } = require('./lib/main/printer-discovery.js');
 const { registerWebcamProxy } = require('./lib/main/webcam-proxy.js');
 const { registerPaymentLinks } = require('./lib/main/payment-links.js');
+const { registerQuotePayLink } = require('./lib/main/quote-pay-link-sign.js');
 const { registerUpdater } = require('./lib/updater');
 const { setupAutoUpdater } = registerUpdater({
   app,
@@ -1944,6 +1945,10 @@ ipcMain.handle('hub:relocate-printers', async (_e, { machines, statusCache, requ
 
 // BNPL checkout links (Tabby, Tamara, Stripe) — lib/main/payment-links.js.
 registerPaymentLinks({ ipcMain, resolveStoreSecret });
+// The quote pay link: its secret, kept here, and the HMAC the shared rule
+// leaves to the device — lib/main/quote-pay-link-sign.js. Signed from the book
+// on disk, which the window flushes before it asks.
+registerQuotePayLink({ ipcMain, crypto, readBook: () => readStoreDecryptedFromDisk(), updateStoreOnDisk });
 // The nightly off-site backup (lib/main/offsite-backup.js): the Mac's, to the
 // same files. Sealed with the Khayt Cloud key, so only while that is unlocked.
 require('./lib/main/offsite-backup.js').registerOffsiteBackup({
@@ -7185,6 +7190,69 @@ ipcMain.handle('hub:plugin-send', async (_e, req) => {
       await shell.openExternal(out.url);
     }
     return out;
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
+// ── Connector updates (lib/plugin-update.js, lib/main/connector-updates.js) ──
+// `settings.connectorUpdates` is written here and nowhere else: a window save
+// keeps the disk's (lib/store-io.js keepConnectorUpdatesFromDisk). The CHECK
+// against the signed index on khaytapp.com is a second switch, off in every
+// build until updates ship: KHAYT_CONNECTOR_UPDATES=1 on top of
+// KHAYT_CONNECTORS=1. The shop's answers (Agree, Revert, the switch of a
+// withdrawn connector) only act on state a check wrote, so they follow the
+// connectors' own switch.
+const CONNECTOR_UPDATES_ON = CONNECTORS_ON && process.env.KHAYT_CONNECTOR_UPDATES === '1';
+const connectorUpdates = require('./lib/main/connector-updates');
+async function connectorFetchBytes(url, maxBytes) {
+  if (!/^https:\/\//.test(String(url))) throw new Error('https only');
+  const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > maxBytes) throw new Error('too large');
+  return buf;
+}
+ipcMain.handle('hub:connector-updates-check', async () => {
+  if (!CONNECTOR_UPDATES_ON) return { ok: false, refused: 'off' };
+  try {
+    const disk = readStoreDecryptedFromDisk();
+    if (!disk || !disk.settings) return { ok: false, error: 'no store' };
+    const U = require('./lib/plugin-update.js');
+    const ctx = { platform: 'desktop', appVersion: app.getVersion(), schema: U.SCHEMA, nowMs: Date.now() };
+    const prepared = await connectorUpdates.prepare(disk.settings, { fetchBytes: connectorFetchBytes, ctx });
+    const dry = connectorUpdates.applyPrepared(disk.settings, prepared);
+    if (!dry.ok || !dry.changed) return { ok: dry.ok, reason: dry.reason, changed: false, notes: dry.notes };
+    // Applied again inside the write chain to the store as it is NOW, with the
+    // manifests already verified above: an edit since the read is not lost.
+    let out = dry;
+    const next = await updateStoreOnDisk((cur) => {
+      out = connectorUpdates.applyPrepared((cur && cur.settings) || {}, prepared);
+      return out.changed ? { ...cur, settings: out.settings } : cur;
+    });
+    return { ok: true, changed: out.changed, notes: out.notes, ...connectorUpdates.forWindow(next.settings, STORE_SECRET_MASK) };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+ipcMain.handle('hub:connector-update', async (_e, req) => {
+  if (!CONNECTORS_ON) return { ok: false, refused: 'off' };
+  const r = req && typeof req === 'object' ? req : {};
+  if (!['agree', 'revert', 'switch'].includes(r.op) || typeof r.id !== 'string') return { ok: false, error: 'invalid' };
+  try {
+    let applied = false;
+    let reason = null;
+    const next = await updateStoreOnDisk((cur) => {
+      const got = connectorUpdates.applyOp(cur, { op: r.op, id: r.id, enabled: !!r.enabled });
+      applied = got.ok;
+      reason = got.reason || null;
+      return got.store;
+    });
+    // A Revert to a withdrawn version is refused by the lib ('revoked'): the
+    // window is handed the state so it can say why, and drop the button.
+    if (!applied && reason === 'revoked') return { ok: false, reason, ...connectorUpdates.forWindow(next.settings, STORE_SECRET_MASK) };
+    if (!applied) return { ok: false, error: 'nothing to apply' };
+    return { ok: true, ...connectorUpdates.forWindow(next.settings, STORE_SECRET_MASK) };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }

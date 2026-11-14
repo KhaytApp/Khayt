@@ -41,6 +41,8 @@
         'queue.title': 'Print queue',
         'kan.search_ph': 'Filter jobs…',
         'kan.orders': 'jobs',
+        'kan.orders_one': '{n} job',
+        'kan.orders_many': '{n} jobs',
         // "QC" reads as a business/factory term; a solo maker still inspects a print,
         // so relabel to "Inspect" (keeps the post→qc→completed board flow intact). The
         // "Delivered" column is hidden in bedready-theme.css — it only ever fills from a

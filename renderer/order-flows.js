@@ -1233,7 +1233,7 @@ function openShipModal(orderId) {
         <label>${escapeHtml(t('ship.address') || 'Delivery address')}</label>
         <select id="shipAddress" style="margin-bottom:8px;">
           <option value="">${escapeHtml(order.deliveryAddress || t('ship.address_none') || '—')}</option>
-          ${addresses.map(a => `<option value="${escapeHtml(a.address)}">${escapeHtml(a.label || a.address)}</option>`).join('')}
+          ${addressPickOptionsHtml(addresses.filter(a => a && typeof a === 'object'))}
         </select>` : ''}
       <label>${escapeHtml(t('ship.tracking') || 'Tracking number')}</label>
       <input type="text" id="shipTracking" value="${escapeHtml(order.trackingNumber || '')}" placeholder="${escapeHtml(t('ship.tracking_ph') || 'AWB / waybill')}" autocomplete="off">
@@ -1598,6 +1598,9 @@ function openOrderEditor(orderId) {
   };
 
   const bodyHtml = `
+    ${/* The quote pay link's line: ready, sent, expired, paid or mismatch
+         (renderer/quote-pay-link.js). Nothing when the job has none. */
+      typeof payLinkLineHtml === 'function' ? payLinkLineHtml(order) : ''}
     <div style="display:flex; align-items:center; gap:12px; margin-top:0; margin-bottom:8px;">
       <label style="margin:0; font-size:13px; white-space:nowrap;">${escapeHtml(t('oe.priority'))}</label>
       <select data-f="priorityLevel" style="flex:1; max-width:160px;">
@@ -1773,7 +1776,7 @@ function openOrderEditor(orderId) {
       </div>
     </details>
 
-    <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
+    <div data-simple-pro="paymentPlans" id="oeInstalmentsBlock" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <label style="margin:0; flex:1; font-size:12.5px; font-weight:600;">${escapeHtml(t('inst.title'))}</label>
         <button class="btn ghost small" id="oeGenInstalments" type="button">${escapeHtml(t('inst.generate') || 'Generate plan')}</button>
@@ -1803,7 +1806,7 @@ function openOrderEditor(orderId) {
 
     ${buildProfitabilityHtml(order)}
 
-    <div class="pro-only" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
+    <div class="pro-only" data-simple-pro="proforma" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <label style="margin:0; flex:1; font-size:12.5px; font-weight:600;">${escapeHtml(t('ord.milestone_invoices'))}${(order.milestoneInvoices && order.milestoneInvoices.length > 0) ? ` <span style="font-size:11px;color:var(--primary);">(${order.milestoneInvoices.length})</span>` : ''}</label>
         <button class="btn ghost small" id="oeOpenMilestones" type="button" data-act="milestone-invoices" data-id="${escapeHtml(order.id)}">${escapeHtml(t('ord.milestone_manage'))}</button>
@@ -3071,8 +3074,25 @@ function oeAddressPickHtml(clientId) {
   return `<label style="margin-top:10px;">${escapeHtml(t('oe.select_address'))}</label>
         <select id="oeAddressSelect" style="margin-bottom:6px;">
           <option value="">— ${escapeHtml(t('oe.select_address'))} —</option>
-          ${rows.map(a => `<option value="${escapeHtml(String(a.address || ''))}">${escapeHtml(String(a.label || a.address || ''))}</option>`).join('')}
+          ${addressPickOptionsHtml(rows)}
         </select>`;
+}
+
+/**
+ * One <option> per address book row: the label and the address on one line
+ * as the screen shows it, the value the plain text that is copied onto the
+ * job (lib/customer-address.js textOf — never the display marks).
+ */
+function addressPickOptionsHtml(rows) {
+  const A = KhaytCustomerAddress;
+  const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+  const fmt = { shopCountry: A.shopCountry(settings), countryName: (c) => KhaytAddressEditor.countryName(c, lang) };
+  return rows.map((a) => {
+    const line = KhaytAddressEditor.oneLine(a, fmt);
+    const label = String(a.label || '').trim();
+    const shown = label && line ? label + ' — ' + line : (label || line);
+    return `<option value="${escapeHtml(A.textOf(a, fmt))}">${escapeHtml(shown)}</option>`;
+  }).join('');
 }
 
 /** The warning under the picker when the new customer bills in another currency. Nothing is converted. */

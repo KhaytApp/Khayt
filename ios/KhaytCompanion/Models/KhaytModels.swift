@@ -582,6 +582,11 @@ struct OrderLogEntry: Codable, Identifiable, Sendable {
     /// counts: a voided job is finished and cannot be late. `/api/orders` does
     /// not send it, so over Wi-Fi alone it is always nil.
     var voidedAt: Stamp? = nil
+    /// When a completed job was shipped or handed over — date stamps on a job
+    /// that stays `completed`, read only for whether they are there (Simple's
+    /// board notes them on the card). Any JSON, for the reason `voidedAt` is.
+    var shippedAt: Stamp? = nil
+    var deliveredAt: Stamp? = nil
 
     var displayTitle: String {
         (project?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? reference

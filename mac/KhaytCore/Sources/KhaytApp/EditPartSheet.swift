@@ -158,7 +158,7 @@ struct EditPartSheet: View {
                 Text(said(s)).font(.caption).foregroundStyle(.secondary)
                 if !s.missing.isEmpty {
                     Text(s.missing.joined(separator: " · "))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                 }
             }
             Spacer(minLength: 6)

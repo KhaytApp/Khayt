@@ -106,7 +106,7 @@ struct WhatsAppSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("common.close")) { dismiss() } }
             }
-            .task { await fill(lang: nil) }
+            .task { await fill(lang: api.whatsAppStartLanguage(orderId: orderId)) }
             .sheet(isPresented: $showCamera) { LabelCameraPicker(image: $photo) }
             .sheet(isPresented: $sharing) {
                 ShareSheet(items: [photo as Any, text].compactMap { $0 }) { activity, completed in

@@ -411,7 +411,7 @@ private struct Detail: View {
                 .font(.callout)
             // Before the work is invoiced: the same paper as a request for
             // payment, which numbers nothing (`showProforma`).
-            if Shop.offersProforma(job) {
+            if Shop.offersProforma(job), !shop.professionalOnly("proforma") {
                 Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
                     .buttonStyle(.link)
                     .font(.callout)
@@ -598,7 +598,7 @@ struct ZatcaLine: View {
                     Image(systemName: symbol).foregroundStyle(colour)
                     Text(shop.words.callIt(key)).foregroundStyle(colour)
                     if let icv = state.icv {
-                        Text("·").foregroundStyle(.tertiary)
+                        Text("·").foregroundStyle(Khayt.faint)
                         // The counter the authority requires to be unbroken, so
                         // a gap in it is something a shop can be asked about.
                         Text(verbatim: "ICV \(icv.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale)))")
@@ -615,7 +615,7 @@ struct ZatcaLine: View {
             if let at = state.at {
                 Text(shop.words.say(Date(timeIntervalSince1970: at / 1000),
                                     Date.FormatStyle(date: .abbreviated, time: .shortened)))
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(.caption2).foregroundStyle(Khayt.faint)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -671,7 +671,7 @@ struct JobMachineLine: View {
                 }
                 if !printed.earlier.isEmpty {
                     Text(Self.earlier(printed.earlier, name: name, words: shop.words))
-                        .font(.caption2).foregroundStyle(.tertiary)
+                        .font(.caption2).foregroundStyle(Khayt.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

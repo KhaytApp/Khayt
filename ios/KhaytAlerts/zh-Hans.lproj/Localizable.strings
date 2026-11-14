@@ -3,6 +3,7 @@
 "alert.print.finished" = "打印完成";
 "alert.print.failed" = "打印失败";
 "alert.print.cancelled" = "打印已取消";
+"alert.print.ended" = "打印已结束——请检查打印机";
 "alert.print.a_job" = "一个作业";
 "alert.print.move_post" = "移至后处理";
 "alert.print.reprint" = "放回队列";
@@ -18,3 +19,4 @@
 "PUSH_QUOTE_DECLINED" = "客户已拒绝报价";
 "PUSH_MESSAGE" = "客户发来一条消息";
 "PUSH_PAYMENT" = "收到一笔付款";
+"PUSH_GENERIC" = "店里有事需要你看一下";

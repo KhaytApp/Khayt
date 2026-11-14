@@ -92,7 +92,7 @@ struct KhaytCommands: Commands {
             // The inspector's viewer: iso, front, top, side (⌥⌘1–4).
             ModelViewCommands().environment(shop).disabled(shop.needsSignIn)
             Divider()
-            KioskCommand().disabled(shop.needsSignIn)
+            if !shop.professionalOnly("kiosk") { KioskCommand().disabled(shop.needsSignIn) }
         }
 
         // Find, where every Mac app keeps it. `.searchable` puts the field in
@@ -258,10 +258,16 @@ private struct BookMenu: View {
         // Only where the shop has agreed to it. A menu item offering to send a
         // summary of the book to a vendor, on a shop that has switched the
         // feature off, is an advertisement in a menu.
+        // In Simple neither is there at all (S4: `ai` and `campaigns` are
+        // Professional in the shared map).
         if shop.aiAssistantAllowed {
-            Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
-                .disabled(!shop.lockAllows("analytics", "view"))
-            Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
+            if !shop.professionalOnly("ai") {
+                Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
+                    .disabled(!shop.lockAllows("analytics", "view"))
+            }
+            if !shop.professionalOnly("campaigns") {
+                Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
+            }
         }
 
         // The cloud account. Also under File ▸ Khayt Cloud and in Settings ›
@@ -744,10 +750,12 @@ private struct JobMenu: View {
         // other is what was agreed about the cash still to come. No shortcut —
         // a plan is set up once in a job's life, and the two keys either side
         // of this one are used every day.
-        Button(Words.upfront("inst.title") + "\u{2026}") {
-            if let one = job { shop.planFor = one }
+        if !shop.professionalOnly("paymentPlans") {
+            Button(Words.upfront("inst.title") + "\u{2026}") {
+                if let one = job { shop.planFor = one }
+            }
+            .disabled(!canMove)
         }
-        .disabled(!canMove)
         Button(Words.upfront("ord.hold_btn")) {
             guard let one = job else { return }
             shop.pendingHold = Shop.PendingHold(id: one.id, project: one.project)

@@ -92,6 +92,44 @@ struct FloorLine: Identifiable, Equatable, Sendable {
     let filename: String
     /// Why it is not printing, for a quiet line (`Shop.Quiet`).
     let quiet: Shop.Quiet?
+
+    // ── WHAT THE HERO CARD ADDED ──────────────────────────────────────────
+    //
+    // Each one nil or empty when nobody said, and each with a default, so a
+    // line built the old way is still a line.
+
+    /// "Layer 212 of 330", when the printer reports both.
+    var layer: Int? = nil
+    var totalLayers: Int? = nil
+    /// What is loaded, head by head, as hex colours, when the printer says.
+    var loaded: [String] = []
+    /// When the reading these figures came from was TAKEN. A missed poll
+    /// rewrites `Reading.at`, so this is worked back to the last poll that
+    /// answered (`FloorRead.lines`); the time left counts down from here.
+    var readAt: Date? = nil
+    /// When this machine's last print ended, as this run of the app saw it at
+    /// the finish seam (`Shop.printFinished`). Nil for a machine that has not
+    /// ended a print since the app opened.
+    var endedAt: Date? = nil
+    /// That print FINISHED (not failed, not cancelled), the machine is not in
+    /// another job, and nobody has said the plate is clear since.
+    var finished: Bool = false
+
+    /// In a job right now, running or held: printing, paused, out of filament,
+    /// or stopped by a fault part-way through. These are the lines the hero
+    /// card is chosen from.
+    var midPrint: Bool {
+        if printing { return true }
+        switch attention {
+        case .paused, .runout: return true
+        case .fault: return progress > 0 && progress < 100
+        case .bedNotClear, nil: return false
+        }
+    }
+
+    /// Finished and still on the plate: the finish seam said so, or the
+    /// dispatcher did (`ad.bed_not_clear`).
+    var isFinished: Bool { finished || attention == .bedNotClear }
 }
 
 @MainActor
@@ -125,7 +163,9 @@ enum FloorRead {
     }
 
     static func line(id: String, name: String, status: KhaytEngine.PrinterStatus?,
-                     quiet: Shop.Quiet?, bedNotClear: Bool) -> FloorLine {
+                     quiet: Shop.Quiet?, bedNotClear: Bool,
+                     readAt: Date? = nil, ended: (at: Date, finished: Bool)? = nil,
+                     bedClearedAt: Date? = nil) -> FloorLine {
         let attention = attention(status, bedNotClear: bedNotClear)
         let printing = status.map { PrinterWatch.isPrinting($0.state) } ?? false
         let rank: FloorLine.Rank
@@ -134,15 +174,27 @@ enum FloorRead {
         else if status == nil, quiet == .notAnswering || quiet == .underService { rank = .offline }
         else { rank = .idle }
         let left = status?.timeRemaining.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
-        return FloorLine(id: id, name: name, rank: rank, attention: attention, printing: printing,
-                         progress: min(100, max(0, status?.progress ?? 0)),
-                         left: printing ? left : nil,
-                         filename: status?.filename ?? "", quiet: status == nil ? quiet : nil)
+        var line = FloorLine(id: id, name: name, rank: rank, attention: attention, printing: printing,
+                             progress: min(100, max(0, status?.progress ?? 0)),
+                             left: printing ? left : nil,
+                             filename: status?.filename ?? "", quiet: status == nil ? quiet : nil)
+        if let layers = status?.layers { line.layer = layers.current; line.totalLayers = layers.total }
+        line.loaded = (status?.loaded ?? []).sorted { $0.slot < $1.slot }.map(\.hex)
+        line.readAt = status == nil ? nil : readAt
+        line.endedAt = ended?.at
+        // Finished only while it is true: not once the machine is in another
+        // job, not for a machine that stopped answering, and not after
+        // somebody said the plate is clear.
+        if let ended, ended.finished, status != nil, !line.midPrint {
+            line.finished = bedClearedAt.map { $0 < ended.at } ?? true
+        }
+        return line
     }
 
     /// Attention, printing (soonest finish first; a print that does not say
-    /// how long goes after those that do), idle, offline. Ties keep the
-    /// book's order — the order the shop put its machines in.
+    /// how long goes after those that do, the furthest along first), idle (a
+    /// finished plate before an empty one), offline. Ties keep the book's
+    /// order — the order the shop put its machines in.
     static func sorted(_ lines: [FloorLine]) -> [FloorLine] {
         lines.enumerated().sorted { a, b in
             if a.element.rank != b.element.rank { return a.element.rank < b.element.rank }
@@ -151,9 +203,12 @@ enum FloorRead {
                 case let (x?, y?) where x != y: return x < y
                 case (_?, nil): return true
                 case (nil, _?): return false
+                case (nil, nil) where a.element.progress != b.element.progress:
+                    return a.element.progress > b.element.progress
                 default: break
                 }
             }
+            if a.element.rank == .idle, a.element.finished != b.element.finished { return a.element.finished }
             return a.offset < b.offset
         }.map(\.element)
     }
@@ -164,10 +219,110 @@ enum FloorRead {
         let bed = Set((shop.dispatch?.waiting ?? []).filter { $0.blocked == "ad.bed_not_clear" }.map(\.machineId))
         return sorted(shop.machinesInUse.map { machine in
             let status = shop.printers.heard(machine.id)
+            let ended = shop.lastPrintEndedAt[machine.id].map {
+                (at: $0, finished: shop.lastPrintEnded[machine.id]?.outcome == "finished")
+            }
             return line(id: machine.id, name: machine.name, status: status,
                         quiet: status == nil ? shop.quiet(machine) : nil,
-                        bedNotClear: bed.contains(machine.id))
+                        bedNotClear: bed.contains(machine.id),
+                        readAt: shop.printers.readings[machine.id].map(goodAt),
+                        ended: ended, bedClearedAt: shop.bedClearedAt(machine.id))
         })
+    }
+
+    /// When the status a reading carries was really taken. A failed poll
+    /// writes a new `at` and carries the last good status along, so the status
+    /// is older than `at` by one poll interval for every miss.
+    static func goodAt(_ reading: PrinterWatch.Reading) -> Date {
+        reading.at.addingTimeInterval(-Double(reading.consecutiveFailures) * pollEvery)
+    }
+
+    /// `PrinterWatch.every`, in seconds.
+    static var pollEvery: TimeInterval {
+        let c = PrinterWatch.every.components
+        return Double(c.seconds) + Double(c.attoseconds) / 1e18
+    }
+
+    // MARK: - The time left, between readings
+
+    /// The time left NOW, and whether that is a reading or an estimate.
+    struct LeftNow: Equatable, Sendable {
+        var seconds: Double
+        var estimate: Bool
+    }
+
+    /// A reading older than this is an estimate.
+    ///
+    /// TWO POLL INTERVALS. The poller asks every ten seconds
+    /// (`PrinterWatch.every`), so a healthy printer's reading is at most ten
+    /// seconds old plus the moment the sweep takes to reach it. Past twenty
+    /// seconds at least one poll was missed or failed, and the figure on the
+    /// card is this Mac's own subtraction rather than something the printer
+    /// said recently. It keeps counting until `PrinterWatch.heard` gives the
+    /// printer up (three misses), when the line stops being a print at all.
+    static var estimateAfter: TimeInterval { 2 * pollEvery }
+
+    /// Count the last reading's time left down to now. NO PRINTER IS ASKED:
+    /// the panel is drawn between polls from the reading it already has.
+    /// Never below zero, and a clock that reads earlier than the reading (a
+    /// time change) counts as no time passed rather than adding any.
+    static func leftNow(left: Double, readAt: Date?, now: Date) -> LeftNow {
+        guard let readAt else { return LeftNow(seconds: max(0, left), estimate: false) }
+        let age = max(0, now.timeIntervalSince(readAt))
+        return LeftNow(seconds: max(0, left - age), estimate: age > estimateAfter)
+    }
+
+    // MARK: - The hero
+
+    /// The line the panel's large card is given, or nil when no machine is in
+    /// a job (the empty state takes its place).
+    ///
+    /// Among the lines that are mid-print: the ones PRINTING and saying how
+    /// long, soonest finish first; then every other one (a print that does not
+    /// say how long, and a print that is paused, out of filament or stopped by
+    /// a fault, which has no finish to wait for) by highest progress. Ties
+    /// keep the book's order. A stopped print is eligible like any other, and
+    /// its card leads with the action that resolves it.
+    static func hero(_ lines: [FloorLine]) -> FloorLine? {
+        asRunning(lines.filter(\.midPrint)).first.flatMap { first in lines.first { $0.id == first.id } }
+    }
+
+    /// Ranked as printing whatever their attention, so a runout mid-print is
+    /// still ordered by when it finishes.
+    private static func asRunning(_ lines: [FloorLine]) -> [FloorLine] {
+        sorted(lines.map {
+            var line = FloorLine(id: $0.id, name: $0.name, rank: .printing, attention: $0.attention,
+                                 printing: $0.printing, progress: $0.progress, left: $0.left,
+                                 filename: $0.filename, quiet: nil)
+            line.readAt = $0.readAt
+            return line
+        })
+    }
+
+    // MARK: - The finish moment
+
+    /// How long a finished print's card holds its green wash in the open
+    /// panel before it settles to an ordinary "Finished" row.
+    static let cardHold: TimeInterval = 6
+    /// How long the status item shows the ring with a tick. Longer than the
+    /// card: the item is redrawn on a five-second tick and glanced at, not
+    /// watched.
+    static let iconHold: TimeInterval = 30
+
+    /// Which machines have just finished, and until when each holds its green.
+    ///
+    /// NOT A SECOND EDGE DETECTOR. What "finished" means is decided once, at
+    /// the finish seam (`Shop.printFinished`), and reaches a line as
+    /// `finished`. This only notices a line TURNING finished between two looks
+    /// at the floor, so a machine that was already finished when the panel
+    /// opened, or one seen for the first time, is not a moment.
+    static func justFinished(previous: [FloorLine], current: [FloorLine], now: Date) -> [String: Date] {
+        let was = Dictionary(previous.map { ($0.id, $0.finished) }, uniquingKeysWith: { a, _ in a })
+        var out: [String: Date] = [:]
+        for line in current where line.finished && was[line.id] == false {
+            out[line.id] = now.addingTimeInterval(cardHold)
+        }
+        return out
     }
 
     // MARK: - The label
@@ -178,34 +333,45 @@ enum FloorRead {
         var ring: Double?
         var text: String
         var attention: Bool
+        /// A print has just finished: the ring is closed with a tick in it.
+        var tick: Bool = false
     }
 
     /// The job the label leads with: the print that finishes soonest, and how
     /// many others are running beside it.
     static func lead(_ lines: [FloorLine]) -> (line: FloorLine, others: Int)? {
-        let running = sorted(lines.filter(\.printing).map {
-            // Ranked as printing whatever their attention, so a runout mid-print
-            // is still ordered by when it finishes.
-            FloorLine(id: $0.id, name: $0.name, rank: .printing, attention: $0.attention,
-                      printing: true, progress: $0.progress, left: $0.left,
-                      filename: $0.filename, quiet: nil)
-        })
+        let running = asRunning(lines.filter(\.printing))
         guard let first = running.first else { return nil }
         return (first, running.count - 1)
     }
 
+    /// What the status item draws.
+    ///
+    /// - nothing printing: the nozzle;
+    /// - one print: its ring and "64%";
+    /// - two or more: the ring of the one finishing soonest and HOW MANY are
+    ///   printing ("2"). It used to read "64% · 1h 02m +2", which is three
+    ///   figures in a menu bar and pushed other items off a small screen; the
+    ///   time is one click away, said twice, in the panel;
+    /// - a print finished less than `iconHold` ago (`tickUntil`): a closed
+    ///   ring with a tick, then back to whichever of the above is true;
+    /// - a machine wants somebody: the mark, in every state and style.
+    ///
+    /// `now` is handed in, never read here, so the expiry can be tested.
     @MainActor
-    static func label(_ lines: [FloorLine], style: MenuBarStyle, words: Words) -> Label {
+    static func label(_ lines: [FloorLine], style: MenuBarStyle, words: Words,
+                      tickUntil: Date? = nil, now: Date = .distantPast) -> Label {
         let attention = lines.contains { $0.attention != nil }
-        guard style != .glyphOnly, let lead = lead(lines) else {
-            return Label(ring: nil, text: "", attention: attention)
+        guard style != .glyphOnly else { return Label(ring: nil, text: "", attention: attention) }
+        if let tickUntil, now < tickUntil {
+            return Label(ring: 1, text: "", attention: attention, tick: true)
         }
+        guard let lead = lead(lines) else { return Label(ring: nil, text: "", attention: attention) }
         let ring = Double(lead.line.progress) / 100
         guard style == .ringAndFigures else { return Label(ring: ring, text: "", attention: attention) }
-        var text = figures(progress: lead.line.progress, left: lead.line.left, words: words)
-        if lead.others > 0 {
-            text += " " + words.callIt("mac.mbp_more", ["n": .string(words.numeral(lead.others))])
-        }
+        let text = lead.others > 0
+            ? words.numeral(lead.others + 1)
+            : words.callIt("mac.mbp_pct", ["pct": .string(words.numeral(lead.line.progress))])
         return Label(ring: ring, text: text, attention: attention)
     }
 
@@ -242,6 +408,135 @@ enum FloorRead {
         let time = sameDay ? words.say(at, .dateTime.hour().minute())
                            : words.say(at, .dateTime.weekday(.abbreviated).hour().minute())
         return words.callIt("mac.mbp_done_at", ["time": .string(time)])
+    }
+
+    // MARK: - What the panel says
+
+    /// "2 printing · next free 4:35 pm", or "Nothing on the beds". From the
+    /// lines, so the header and the cards under it cannot disagree.
+    @MainActor
+    static func headline(_ lines: [FloorLine], now: Date, words: Words) -> String {
+        let running = lines.filter(\.printing)
+        guard !running.isEmpty else {
+            // A print held part-way is not "nothing on the beds": say what
+            // holds it, in the words its card uses.
+            if let held = hero(lines)?.attention { return words.callIt(held.wordKey) }
+            return words.callIt("mac.nothing_printing")
+        }
+        let count = words.counting(running.count, "mac.printing_count")
+        let soonest = running.compactMap { line in
+            line.left.map { leftNow(left: $0, readAt: line.readAt, now: now).seconds }
+        }.min()
+        guard let soonest else { return count }
+        let at = now.addingTimeInterval(soonest)
+        let time = Calendar.book.isDate(at, inSameDayAs: now)
+            ? words.say(at, .dateTime.hour().minute())
+            : words.say(at, .dateTime.weekday(.abbreviated).hour().minute())
+        return count + " · " + words.callIt("mac.mbh_next_free_at", ["time": .string(time)])
+    }
+
+    /// "1h 12m left", or "about 1h 12m left" when the reading is old.
+    @MainActor
+    static func leftPhrase(_ left: LeftNow, words: Words) -> String {
+        words.callIt(left.estimate ? "mac.mbh_left_est" : "mac.mbp_left",
+                     ["left": .string(duration(left.seconds, words))])
+    }
+
+    /// What VoiceOver reads for one machine, as ONE sentence: "Snapmaker U1,
+    /// printing Drone arm v4, 64 percent, 1 hour 12 minutes left, done at
+    /// 4:35 pm". The card is a ring, three sizes of text and a row of dots;
+    /// read piece by piece that is nine stops for one fact.
+    @MainActor
+    static func spoken(_ line: FloorLine, job: String, now: Date, words: Words) -> String {
+        var parts = [line.name]
+        if let attention = line.attention, attention != .bedNotClear {
+            parts.append(words.callIt(attention.wordKey))
+            if !job.isEmpty { parts.append(job) }
+        } else if line.printing {
+            parts.append(job.isEmpty ? words.callIt("mac.printing")
+                                     : words.callIt("mac.mbh_vo_printing", ["job": .string(job)]))
+        } else if line.isFinished {
+            parts.append(words.callIt("mac.mbh_finished"))
+            if !job.isEmpty { parts.append(job) }
+        } else {
+            parts.append(words.callIt("mac.idle"))
+        }
+        if line.midPrint {
+            parts.append(words.callIt("mac.mbh_vo_percent", ["pct": .string(words.numeral(line.progress))]))
+        }
+        if line.printing, let left = line.left {
+            let live = leftNow(left: left, readAt: line.readAt, now: now)
+            let long = live.seconds < 60
+                ? words.callIt("mac.dur_under_1m")
+                : Duration.seconds(Int(live.seconds)).formatted(
+                    .units(allowed: [.hours, .minutes], width: .wide).locale(words.locale))
+            parts.append(words.callIt(live.estimate ? "mac.mbh_left_est" : "mac.mbp_left", ["left": .string(long)]))
+            parts.append(finishes(live.seconds, now: now, words: words))
+        }
+        return parts.joined(separator: words.language == "ar" ? "، " : ", ")
+    }
+
+    // MARK: - What could start
+
+    /// The job the empty panel offers: "Next up: Turbine bracket, due today."
+    struct NextJob: Equatable, Sendable {
+        /// `overdue` is a due day before today: it is said as late, in the late
+        /// tone, not as an appointment still to come.
+        enum Due: Equatable, Sendable { case none, today, on(Date), overdue(Date) }
+        let id: String
+        let name: String
+        let due: Due
+    }
+
+    /// The dispatcher's first proposal when it has one (`Shop.dispatch`, the
+    /// plan "Next up" on the Machines screen already shows); otherwise the
+    /// waiting job (pending or queued) due soonest, one with no due date after
+    /// those that have one, ties in the book's order. Nil when nothing waits.
+    static func nextUp(_ orders: [Order], proposed: [String], today: Date) -> NextJob? {
+        func job(_ order: Order) -> NextJob {
+            let day = Order.day(order.dueDate)
+            // By the book's calendar (`Calendar.book`), day against day: a job
+            // due today is not overdue at four in the afternoon.
+            let start = Calendar.book.startOfDay(for: today)
+            let due: NextJob.Due = day.map { day in
+                if Calendar.book.isDate(day, inSameDayAs: today) { return .today }
+                return day < start ? .overdue(day) : .on(day)
+            } ?? .none
+            return NextJob(id: order.id, name: order.project.isEmpty ? order.reference : order.project, due: due)
+        }
+        let waiting = orders.filter { $0.status == "pending" || $0.status == "queued" }
+        for id in proposed {
+            if let order = waiting.first(where: { $0.id == id }) { return job(order) }
+        }
+        return waiting.enumerated().min { a, b in
+            switch (Order.day(a.element.dueDate), Order.day(b.element.dueDate)) {
+            case let (x?, y?) where x != y: return x < y
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return a.offset < b.offset
+            }
+        }.map { job($0.element) }
+    }
+
+    @MainActor
+    static func nextUpLine(_ next: NextJob, words: Words) -> String {
+        let name = JSONValue.string(Figure.isolated(next.name))
+        switch next.due {
+        // The late part is its own line, in the late tone (`overdueLine`).
+        case .none, .overdue: return words.callIt("mac.mbh_next_up", ["job": name])
+        case .today: return words.callIt("mac.mbh_next_up_today", ["job": name])
+        case .on(let day):
+            return words.callIt("mac.mbh_next_up_due",
+                                ["job": name, "date": .string(words.say(day, .dateTime.day().month(.abbreviated)))])
+        }
+    }
+
+    /// "Overdue · was due Oct 24" for a next job whose day has passed; nil for
+    /// one due today, later, or with no date.
+    @MainActor
+    static func overdueLine(_ next: NextJob, words: Words) -> String? {
+        guard case .overdue(let day) = next.due else { return nil }
+        return words.callIt("mac.mbh_overdue", ["date": .string(words.say(day, .dateTime.day().month(.abbreviated)))])
     }
 
     // MARK: - Which job
@@ -286,10 +581,28 @@ enum FloorRead {
 /// clear colors", with alpha allowed. Neither offers a coloured accent, so the
 /// attention mark is a SHAPE — a solid dot cut out of the glyph's corner — not
 /// a colour. It follows the light, dark and tinted menu bars like the rest.
+@MainActor
 enum StatusGlyph {
     static let size = NSSize(width: 18, height: 18)
 
-    static func image(ring: Double?, attention: Bool) -> NSImage {
+    /// Every picture the item has drawn, kept. A ring comes in whole percents
+    /// (`FloorRead.label` divides an `Int`), so there are at most a hundred and
+    /// one rings, each with or without the mark, the tick and the nozzle: a
+    /// few hundred 18-point drawings at the very most, and in practice the
+    /// handful a print passes through. The item's redraw is then a dictionary
+    /// lookup, and the same picture is the same object.
+    private static var drawn: [Key: NSImage] = [:]
+    private struct Key: Hashable { let ring: Int?; let attention: Bool; let tick: Bool }
+
+    static func image(ring: Double?, attention: Bool, tick: Bool = false) -> NSImage {
+        let key = Key(ring: ring.map { Int((min(1, max(0, $0)) * 100).rounded()) }, attention: attention, tick: tick)
+        if let had = drawn[key] { return had }
+        let image = draw(ring: key.ring.map { Double($0) / 100 }, attention: attention, tick: tick)
+        drawn[key] = image
+        return image
+    }
+
+    private static func draw(ring: Double?, attention: Bool, tick: Bool) -> NSImage {
         let image = NSImage(size: size, flipped: true) { rect in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             ctx.setStrokeColor(NSColor.black.cgColor)
@@ -309,6 +622,17 @@ enum StatusGlyph {
                     ctx.setLineCap(.round)
                     ctx.addArc(center: centre, radius: radius, startAngle: -.pi / 2,
                                endAngle: -.pi / 2 + .pi * 2 * done, clockwise: false)
+                    ctx.strokePath()
+                }
+                if tick {
+                    // Just finished: a tick inside the closed ring. A shape,
+                    // like the attention mark, because a template has no green.
+                    ctx.setLineWidth(1.7)
+                    ctx.setLineCap(.round)
+                    ctx.setLineJoin(.round)
+                    ctx.move(to: CGPoint(x: centre.x - 2.9, y: centre.y + 0.2))
+                    ctx.addLine(to: CGPoint(x: centre.x - 0.8, y: centre.y + 2.4))
+                    ctx.addLine(to: CGPoint(x: centre.x + 3.0, y: centre.y - 2.2))
                     ctx.strokePath()
                 }
             } else {
@@ -340,22 +664,88 @@ enum StatusGlyph {
     }
 }
 
-/// A small progress ring for the popover's rows.
+/// A progress ring: the panel's small ones and the hero card's large one.
+///
+/// ── MOTION, AND ONLY WHILE SOMEBODY IS LOOKING ───────────────────────────
+///
+/// The ring eases to each new reading (`Motion.progress`, about a second),
+/// and a printing ring has a slow, faint pulse: a thin halo outside it that
+/// breathes with `Alive`, the one repeating movement this app has and the one
+/// it keeps for a print running right now. The ring itself never fades; a
+/// figure that dims every second is a figure that is harder to read. Both
+/// live in a view that exists only while the panel is open
+/// (`FloorStatus.toggle` builds it on opening and drops it on closing), so
+/// nothing animates behind a closed menu bar item. With Reduce Motion there
+/// is no halo and a value changes at once; with Increase Contrast the track
+/// is solid rather than a tint of the ring.
 struct ProgressRing: View {
     let value: Double
     let tint: Color
     var size: CGFloat = 16
+    var line: CGFloat = 2.5
+    /// The slow pulse, for a print that is running.
+    var pulses = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         ZStack {
-            Circle().stroke(tint.opacity(0.22), lineWidth: 2.5)
+            if pulses && !reduced {
+                Circle().stroke(tint.opacity(0.4), lineWidth: max(1, line / 4))
+                    .padding(-(line / 2 + max(2, line / 3)))
+                    .alive()
+            }
+            Circle().stroke(contrast == .increased ? AnyShapeStyle(Color.primary.opacity(0.55))
+                                                   : AnyShapeStyle(tint.opacity(0.22)),
+                            lineWidth: line)
             Circle().trim(from: 0, to: min(1, max(0, value)))
-                .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .animation(Motion.of(Motion.progress, unless: reduced), value: value)
         }
         .frame(width: size, height: size)
         // Progress runs clockwise in every language.
         .environment(\.layoutDirection, .leftToRight)
         .accessibilityHidden(true)
+    }
+}
+
+/// The finish chime: one soft system sound when a print finishes.
+///
+/// A SETTING, AND OFF UNLESS SWITCHED ON. A Mac that makes a noise nobody
+/// asked for in a shop, an office or a bedroom is a Mac whose owner goes
+/// looking for what to uninstall. Mac-local like `mac.menuBar`: whether this
+/// Mac chimes is not the shop's business and does not follow the book around.
+/// A system sound, so no audio file ships with the app.
+@MainActor
+enum FinishChime {
+    static let defaultsKey = "mac.menuBarChime"
+    static let sound = "Glass"
+
+    static var wanted: Bool { UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? false }
+
+    /// Should the chime sound for this finish?
+    ///
+    /// NOT ON TOP OF THE NOTIFICATION'S OWN SOUND. The finish notification
+    /// (`Shop.noticePrintEnded`) is posted with the system's default sound, and
+    /// a chime a second later is two noises for one print. So the chime is for
+    /// the finishes that would otherwise be silent: the setting is on, and
+    /// either no notification is posted for this finish (the shop switched
+    /// "Notify me when a print finishes" off, or this run cannot post one) or
+    /// the one posted will not be heard (`PrinterNotice.audible`: Khayt's
+    /// notifications are not allowed, their sound is off, or they are shown
+    /// nowhere).
+    static func shouldRing(wanted: Bool, noticePosted: Bool, noticeAudible: Bool) -> Bool {
+        wanted && !(noticePosted && noticeAudible)
+    }
+
+    /// Play it if the setting is on. Returns whether it was played. `play` is
+    /// the seam the tests count through; the app passes nothing.
+    @discardableResult
+    static func ring(wanted: Bool = FinishChime.wanted,
+                     play: (String) -> Void = { NSSound(named: NSSound.Name($0))?.play() }) -> Bool {
+        guard wanted else { return false }
+        play(sound)
+        return true
     }
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { TONE_VAR, type Tone } from '../tone';
+import { TONE_VAR, toneInk, type Tone } from '../tone';
 
 export interface ChipProps {
   /** The label. Figures inside it are tabular, so a column of chips lines up. */
@@ -26,7 +26,7 @@ export interface ChipProps {
  */
 export function Chip({ children, tone = 'brand', icon }: ChipProps) {
   return (
-    <span className="khayt-chip" style={{ ['--khayt-chip-tone' as string]: `var(${TONE_VAR[tone]})` }}>
+    <span className="khayt-chip" style={{ ['--khayt-chip-tone' as string]: `var(${TONE_VAR[tone]})`, ['--khayt-chip-ink' as string]: toneInk(tone) }}>
       {icon ? <span className="khayt-chip__icon">{icon}</span> : null}
       {children}
     </span>

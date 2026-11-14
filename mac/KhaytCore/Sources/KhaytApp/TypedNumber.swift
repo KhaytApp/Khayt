@@ -20,6 +20,17 @@ import Foundation
 /// Anything else — a letter, a second decimal point, a minus — is not a
 /// number, and the caller gets nil rather than a guess.
 enum TypedNumber {
+    /// Something was typed and it is not a number. Empty is not unreadable:
+    /// an empty box means "none", and each field says what none is.
+    ///
+    /// For a box whose value is only taken when it parses (a price typed over
+    /// the calculated one): the box kept showing "5o" while the job saved at
+    /// the figure before it. Such a box is marked and its Save waits.
+    static func unreadable(_ text: String) -> Bool {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !typed.isEmpty && parse(typed) == nil
+    }
+
     static func parse(_ text: String) -> Double? {
         var plain = ""
         for ch in text.trimmingCharacters(in: .whitespacesAndNewlines) {

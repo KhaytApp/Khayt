@@ -167,9 +167,14 @@ extension Shop {
 
     /// The finish seam's notice. A finish is good news, so it is delivered
     /// but not kept in "Printer trouble"; a failure is trouble and is kept.
-    func noticePrintEnded(_ ended: FinishCamera.Ended) {
+    ///
+    /// Returns whether a FINISHED notification is being posted on this Mac,
+    /// for the finish chime, which stays quiet when that notification will
+    /// make a sound of its own (`FinishChime.shouldRing`).
+    @discardableResult
+    func noticePrintEnded(_ ended: FinishCamera.Ended) -> Bool {
         guard let kind = printers.notices.ledger.ended(ended.machineId, outcome: ended.outcome), kind.wanted
-        else { return }
+        else { return false }
         // The job's title only, never the customer: a banner shows on a
         // locked screen and in Notification Centre.
         let project = goToKinds.contains(.job)
@@ -189,6 +194,7 @@ extension Shop {
             at: Date(), orderId: ended.orderId, progress: progress)
         if kind == .finished { printers.notices.announce(notice) } else { printers.notices.raise(notice) }
         sendPrintNotice(kind, notice, bare: "")
+        return kind == .finished && PrinterNotice.canDeliver
     }
 
     /// AND TO THE SHOP'S PHONE: the same notice through its Telegram and

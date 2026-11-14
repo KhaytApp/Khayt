@@ -26,12 +26,44 @@ struct LibraryLocationSettings: View {
         return LibraryMove.under(here, cloud.path)
     }
 
+    /// What the "Now" row says.
+    ///
+    /// A path when the book has a library folder. When it has none the row
+    /// used to be a label with nothing beside it (Nov 11 2026 review, B11):
+    /// the sample shop has no folder at all, and a book whose engine has not
+    /// answered yet has none to show. Both now say something true in words
+    /// the app already had.
+    enum Now: Equatable {
+        case path(String)
+        case word(String)
+    }
+
+    static func now(path: String, isReal: Bool) -> Now {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return .path((trimmed as NSString).abbreviatingWithTildeInPath) }
+        // The sample shop keeps no files; a real book with no answer yet is
+        // in this Mac's own folder, which is where every book starts.
+        return .word(isReal ? "mac.on_this_mac" : "mac.sample")
+    }
+
+    /// Is anything moving or being scanned, so the progress row has
+    /// something in it? An empty `HStack` in a grouped form is still a row:
+    /// it drew as a blank strip at the foot of the section.
+    static func showsProgress(progress: Bool, busy: Bool, stoppable: Bool) -> Bool {
+        progress || busy || stoppable
+    }
+
     var body: some View {
         Section(shop.words.callIt("mac.libmove_title")) {
             LabeledContent(shop.words.callIt("mac.libmove_now")) {
-                Text(verbatim: (here as NSString).abbreviatingWithTildeInPath)
-                    .font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
-                    .textSelection(.enabled)
+                switch Self.now(path: here, isReal: shop.source.isReal) {
+                case .path(let path):
+                    Text(verbatim: path)
+                        .font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
+                        .textSelection(.enabled)
+                case .word(let key):
+                    Text(shop.words.callIt(key)).foregroundStyle(.secondary)
+                }
             }
             if inICloud {
                 Label(shop.words.callIt("mac.libmove_in_icloud"), systemImage: "icloud")
@@ -114,6 +146,8 @@ struct LibraryLocationSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            if Self.showsProgress(progress: shop.libraryMoveProgress != nil, busy: shop.libraryMoveBusy,
+                                  stoppable: shop.libraryScanStop != nil) {
             HStack(spacing: 8) {
                 if let p = shop.libraryMoveProgress {
                     ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
@@ -135,6 +169,7 @@ struct LibraryLocationSettings: View {
                         .controlSize(.small)
                         .disabled(shop.libraryScanStopping)
                 }
+            }
             }
             if let note = shop.libraryMoveNote {
                 Label(note, systemImage: "checkmark.circle").font(.caption).foregroundStyle(Khayt.done)

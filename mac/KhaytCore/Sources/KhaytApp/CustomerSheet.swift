@@ -116,6 +116,9 @@ struct CustomerSheet: View {
             || !draft.nameAr.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Simple draws the reduced form (SIMPLE_MAP `customers`).
+    private var simple: Bool { shop.reducedInSimple("customers") }
+
     var body: some View {
         // Four sections now, so it fits the screen the way the product sheet
         // does: the content scrolls, the buttons do not. See `SheetFrame`.
@@ -123,12 +126,19 @@ struct CustomerSheet: View {
             Text(shop.words.callIt(isNew ? "mac.new_customer" : "mac.edit_customer"))
                 .font(.headline)
             details
+            if simple {
+                Text(shop.words.callIt("sm.cust_business"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Divider()
             addressBook
-            Divider()
-            priceAgreements
-            Divider()
-            standingOrder
+            // Price agreements and standing orders are Professional (S4).
+            if !simple {
+                Divider()
+                priceAgreements
+                Divider()
+                standingOrder
+            }
         } footer: {
             HStack {
                 if !canSave {
@@ -260,124 +270,131 @@ struct CustomerSheet: View {
                     .foregroundStyle(.secondary)
                 LatinField(text: binding(\.email))
             }
-            GridRow {
-                Text(shop.words.callIt("ce.cr")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                TextField("", text: binding(\.cr)).textFieldStyle(.roundedBorder)
-            }
-            GridRow {
-                Text(shop.words.callIt("ce.vat")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                TextField("", text: binding(\.vat)).textFieldStyle(.roundedBorder)
-            }
-            GridRow {
-                // ── WHERE THEY CAME FROM ──────────────────────────────────
-                //
-                // The one field on this sheet that is not about reaching the
-                // customer. It is here because nothing else can put it there:
-                // the Reports screen counts customers by source, and with no
-                // way to set one every shop that does not also run the other
-                // app read "Other" for all of them.
-                //
-                // The list is the RULE's, fetched rather than written down —
-                // this is the field that broke by having two lists of it, one
-                // of which had never heard of the intake form's `online`.
-                Text(shop.words.callIt("cl.source")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                Picker("", selection: binding(\.source)) {
-                    // A customer whose source was never asked. Not the same as
-                    // "Other", which is a shop saying it asked and none of
-                    // these fitted — so the report can tell them apart.
-                    Text(shop.words.callIt("mac.cs_unset")).tag("")
-                    if !sources.isEmpty { Divider() }
-                    ForEach(sources, id: \.self) { source in
-                        Text(shop.words.callIt("cl.source_" + source)).tag(source)
+            // S4: in Simple a customer is the five fields a small shop fills; the
+            // business details are Professional, and what is saved is kept.
+            if !simple {
+                GridRow {
+                    Text(shop.words.callIt("ce.cr")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    TextField("", text: binding(\.cr)).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    Text(shop.words.callIt("ce.vat")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    TextField("", text: binding(\.vat)).textFieldStyle(.roundedBorder)
+                }
+                GridRow {
+                    // ── WHERE THEY CAME FROM ──────────────────────────────────
+                    //
+                    // The one field on this sheet that is not about reaching the
+                    // customer. It is here because nothing else can put it there:
+                    // the Reports screen counts customers by source, and with no
+                    // way to set one every shop that does not also run the other
+                    // app read "Other" for all of them.
+                    //
+                    // The list is the RULE's, fetched rather than written down —
+                    // this is the field that broke by having two lists of it, one
+                    // of which had never heard of the intake form's `online`.
+                    Text(shop.words.callIt("cl.source")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: binding(\.source)) {
+                        // A customer whose source was never asked. Not the same as
+                        // "Other", which is a shop saying it asked and none of
+                        // these fitted — so the report can tell them apart.
+                        Text(shop.words.callIt("mac.cs_unset")).tag("")
+                        if !sources.isEmpty { Divider() }
+                        ForEach(sources, id: \.self) { source in
+                            Text(shop.words.callIt("cl.source_" + source)).tag(source)
+                        }
+                        // A value this build does not know — written by a newer
+                        // Khayt, or by hand. Shown as itself and kept on save
+                        // rather than silently becoming "Other".
+                        if !draft.source.isEmpty, !sources.contains(draft.source) {
+                            Divider()
+                            Text(draft.source).tag(draft.source)
+                        }
                     }
-                    // A value this build does not know — written by a newer
-                    // Khayt, or by hand. Shown as itself and kept on save
-                    // rather than silently becoming "Other".
-                    if !draft.source.isEmpty, !sources.contains(draft.source) {
-                        Divider()
-                        Text(draft.source).tag(draft.source)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                GridRow {
+                    // ── PAYMENT TERMS ─────────────────────────────────────────
+                    //
+                    // When this customer's invoices fall due: on receipt (the
+                    // default), net 7…90, or a custom number of days. The rule is
+                    // `lib/payment-terms.js` / `PaymentTerms`; receivables, the
+                    // invoice and the reminders all count from it.
+                    Text(shop.words.callIt("mac.payment_terms")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Picker("", selection: termsChoice) {
+                                Text(shop.words.callIt("mac.terms_receipt")).tag(0)
+                                ForEach(PaymentTerms.presets.filter { $0 > 0 }, id: \.self) { n in
+                                    Text(shop.words.callIt("mac.terms_net", ["n": .number(Double(n))])).tag(n)
+                                }
+                                Divider()
+                                Text(shop.words.callIt("mac.terms_custom")).tag(Self.customTag)
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                            if customTerms {
+                                TextField("", value: Binding(
+                                    get: { draft.paymentTermsDays },
+                                    set: { draft = draft.onTerms($0) }), format: .number.locale(Money.digits))
+                                    .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                            }
+                        }
+                        if draft.paymentTermsDays > 0 {
+                            Text(shop.words.counting(draft.paymentTermsDays, "mac.terms_days"))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
-                .labelsHidden()
-                .fixedSize()
-            }
-            GridRow {
-                // ── PAYMENT TERMS ─────────────────────────────────────────
-                //
-                // When this customer's invoices fall due: on receipt (the
-                // default), net 7…90, or a custom number of days. The rule is
-                // `lib/payment-terms.js` / `PaymentTerms`; receivables, the
-                // invoice and the reminders all count from it.
-                Text(shop.words.callIt("mac.payment_terms")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Picker("", selection: termsChoice) {
-                            Text(shop.words.callIt("mac.terms_receipt")).tag(0)
-                            ForEach(PaymentTerms.presets.filter { $0 > 0 }, id: \.self) { n in
-                                Text(shop.words.callIt("mac.terms_net", ["n": .number(Double(n))])).tag(n)
-                            }
-                            Divider()
-                            Text(shop.words.callIt("mac.terms_custom")).tag(Self.customTag)
-                        }
-                        .labelsHidden()
-                        .fixedSize()
-                        if customTerms {
+                GridRow {
+                    // The most this customer may owe; 0 is no limit. The list and
+                    // the customer's page flag anyone over it, as the desktop does.
+                    Text(shop.words.callIt("ce.credit_limit")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
                             TextField("", value: Binding(
-                                get: { draft.paymentTermsDays },
-                                set: { draft = draft.onTerms($0) }), format: .number.locale(Money.digits))
-                                .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                                get: { draft.creditLimit },
+                                set: { draft = draft.limited(to: $0) }), format: .number.locale(Money.digits))
+                                .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
+                            Text(shop.currency).foregroundStyle(.secondary)
                         }
-                    }
-                    if draft.paymentTermsDays > 0 {
-                        Text(shop.words.counting(draft.paymentTermsDays, "mac.terms_days"))
+                        Text(shop.words.callIt("ce.credit_limit_hint"))
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            GridRow {
-                // The most this customer may owe; 0 is no limit. The list and
-                // the customer's page flag anyone over it, as the desktop does.
-                Text(shop.words.callIt("ce.credit_limit")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        TextField("", value: Binding(
-                            get: { draft.creditLimit },
-                            set: { draft = draft.limited(to: $0) }), format: .number.locale(Money.digits))
-                            .textFieldStyle(.roundedBorder).frame(width: 110).monospacedDigit()
-                        Text(shop.currency).foregroundStyle(.secondary)
-                    }
-                    Text(shop.words.callIt("ce.credit_limit_hint"))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            GridRow {
-                // The currency this customer is invoiced in; "Default" is the
-                // shop's own and is stored as "". A code the shop does not
-                // list but the book holds stays in the menu, so opening and
-                // saving never replaces it.
-                Text(shop.words.callIt("ce.currency")).gridColumnAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Picker("", selection: Binding(get: { draft.currency },
-                                                  set: { draft = draft.inCurrency($0) })) {
-                        Text(shop.words.callIt("mac.currency_default",
-                                               ["code": .string(shop.currency)])).tag("")
-                        ForEach(shop.words.currencyChoices(shop.currencies.mapValues(\.label),
-                                                           current: draft.currency), id: \.code) {
-                            Text($0.label).tag($0.code)
+            // A customer's own currency only when one is set (SIMPLE_MAP multiCurrency).
+            if !simple || !draft.currency.isEmpty {
+                GridRow {
+                    // The currency this customer is invoiced in; "Default" is the
+                    // shop's own and is stored as "". A code the shop does not
+                    // list but the book holds stays in the menu, so opening and
+                    // saving never replaces it.
+                    Text(shop.words.callIt("ce.currency")).gridColumnAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("", selection: Binding(get: { draft.currency },
+                                                      set: { draft = draft.inCurrency($0) })) {
+                            Text(shop.words.callIt("mac.currency_default",
+                                                   ["code": .string(shop.currency)])).tag("")
+                            ForEach(shop.words.currencyChoices(shop.currencies.mapValues(\.label),
+                                                               current: draft.currency), id: \.code) {
+                                Text($0.label).tag($0.code)
+                            }
                         }
+                        .labelsHidden().frame(maxWidth: 300, alignment: .leading)
+                        Text(shop.words.callIt("ce.currency_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .labelsHidden().frame(maxWidth: 300, alignment: .leading)
-                    Text(shop.words.callIt("ce.currency_hint"))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             GridRow {
@@ -438,6 +455,7 @@ struct CustomerSheet: View {
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(shop.words.callIt("common.delete"))
                 }
             }
             Button(shop.words.callIt("ce.addr_add")) { addresses.append(ClientAddress()) }
@@ -454,16 +472,21 @@ struct CustomerSheet: View {
             ForEach($agreements.byID) { $row in
                 HStack(spacing: 8) {
                     TextField(shop.words.callIt("ce.pl_product"), text: $row.product)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 120)
                     TextField(shop.words.callIt("ce.pl_price"), text: $row.priceText)
                         .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
+                    // As wide as the product beside it, not a fixed 120: a
+                    // note is a phrase ("Per unit, any colour") and at 120 it
+                    // showed as "Per unit, any colou" (Nov 11 2026 review,
+                    // B10). Two flexible fields share what the price leaves.
                     TextField(shop.words.callIt("ce.pl_note"), text: $row.note)
-                        .textFieldStyle(.roundedBorder).frame(width: 120)
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 120)
                     Button {
                         agreements.removeAll { $0.id == row.id }
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.plain)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(IconLabel.naming(shop.words.callIt("common.delete"), row.product))
                 }
             }
             Button(shop.words.callIt("common.add")) { agreements.append(AgreementRow()) }

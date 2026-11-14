@@ -121,6 +121,20 @@ struct LockScreen: View {
 struct NotAllowed: View {
     let shop: Shop
     var body: some View {
+        // A SCREEN THE SHOP'S MODE HIDES IS NOT A SCREEN A PERSON MAY NOT SEE.
+        // A Simple shop that reached Reports was told "Your access level does
+        // not include this screen" and offered "Switch person" — the staff
+        // lock's words, to an owner with nobody to switch to (Nov 11 UI
+        // review, B27). It is told which mode has the screen, and where the
+        // switch is.
+        if shop.hiddenByMode(shop.shelf) {
+            PartOfProfessional(shop: shop, feature: shop.words.callIt(Shop.titleKey(of: shop.shelf)))
+        } else {
+            lockMessage
+        }
+    }
+
+    @ViewBuilder private var lockMessage: some View {
         VStack(spacing: 12) {
             Image(systemName: "hand.raised")
                 .font(.system(size: 28)).foregroundStyle(.secondary)
@@ -368,5 +382,38 @@ struct SignedInRow: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
         }
+    }
+}
+
+/// A screen the shop's MODE leaves out, reached anyway — a window restoring
+/// onto it, a link, a pane chosen before the switch (S4 `gatedLink`, Figma
+/// 103:610): "{feature} is part of Professional", "This shop is set to
+/// Simple.", and the switch itself — never an empty page, and never the staff
+/// lock's words. The wording is the desktop's (`sm.gated_*`).
+struct PartOfProfessional: View {
+    let shop: Shop
+    /// The screen's own name, as the menu or sidebar calls it.
+    let feature: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "rectangle.stack")
+                .font(.system(size: 28)).foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(shop.words.callIt("sm.gated_title", ["feature": .string(feature)]))
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text(shop.words.callIt("sm.gated_body"))
+                .font(.callout).foregroundStyle(.secondary)
+            Button(shop.words.callIt("sm.gated_switch")) {
+                Task { await shop.chooseMode("professional") }
+            }
+            .buttonStyle(.borderedProminent)
+            // Choosing a mode is a settings change like any other.
+            .disabled(!shop.lockAllows("settings", "edit") || shop.source.build == nil)
+        }
+        .frame(maxWidth: 360)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Khayt.ground)
     }
 }

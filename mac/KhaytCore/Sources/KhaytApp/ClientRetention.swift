@@ -40,7 +40,7 @@ struct ClientRetentionCard: View {
                         ForEach(Array(report.top.enumerated()), id: \.element.id) { index, regular in
                             HStack(spacing: 8) {
                                 Text("\(index + 1).")
-                                    .monospacedDigit().foregroundStyle(.tertiary)
+                                    .monospacedDigit().foregroundStyle(Khayt.faint)
                                 Text(regular.name).lineLimit(1)
                                 Spacer(minLength: 8)
                                 Text(words.callIt("an.retention_orders_n",
@@ -97,7 +97,7 @@ struct ClientRetentionCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let note {
                     Text(note)
-                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                        .font(.caption2).foregroundStyle(Khayt.faint).monospacedDigit()
                 }
             }
         }

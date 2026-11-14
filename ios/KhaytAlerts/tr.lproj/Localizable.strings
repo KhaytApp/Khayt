@@ -3,6 +3,7 @@
 "alert.print.finished" = "Baskı bitti";
 "alert.print.failed" = "Baskı başarısız";
 "alert.print.cancelled" = "Baskı iptal edildi";
+"alert.print.ended" = "Baskı sona erdi — yazıcıyı kontrol edin";
 "alert.print.a_job" = "Bir iş";
 "alert.print.move_post" = "Son işleme taşı";
 "alert.print.reprint" = "Sıraya geri koy";
@@ -18,3 +19,4 @@
 "PUSH_QUOTE_DECLINED" = "Bir müşteri teklifi reddetti";
 "PUSH_MESSAGE" = "Bir müşteri mesaj gönderdi";
 "PUSH_PAYMENT" = "Bir ödeme geldi";
+"PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";

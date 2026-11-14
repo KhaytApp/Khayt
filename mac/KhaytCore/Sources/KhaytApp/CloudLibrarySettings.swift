@@ -491,7 +491,7 @@ struct CloudLibrarySettings: View {
             TextField("", text: $draft.accessKeyId).textFieldStyle(.roundedBorder).frame(width: 240)
         }
         LabeledContent(shop.words.callIt("mac.cloudlib_secret")) {
-            SecureField(storedSecret ? "••••••••" : "", text: $draft.secret)
+            SecureField("", text: $draft.secret, prompt: Text(verbatim: storedSecret ? "••••••••" : "")).labelsHidden()
                 .textFieldStyle(.roundedBorder).frame(width: 240)
         }
         HStack {

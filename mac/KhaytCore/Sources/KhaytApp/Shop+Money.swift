@@ -515,6 +515,38 @@ extension Shop {
     /// the loyalty settings card, so a Simple shop CAN switch the rewards
     /// programme on in that window; hiding it here would take away something
     /// the shop has and is using.
+    /// The Simple map rows (`SIMPLE_MAP`) this app draws a Professional-only
+    /// surface for (S4, Nov 2026). A row the map does not have answers nil
+    /// and is left as it is.
+    static let simpleMapKeys = ["kiosk", "campaigns", "ai", "proforma", "paymentPlans", "team"]
+    /// The rows Simple draws SMALLER on the Mac (S4 part 2): the board, the
+    /// customer form.
+    static let simpleReducedKeys = ["queue", "customers"]
+
+    /// Simple draws this surface reduced (`SIMPLE_MAP` `reduced`).
+    func reducedInSimple(_ key: String) -> Bool { simpleSurfaces[key] == .reduced }
+
+    /// The four-column board's filing, asked of the shared rule for every job
+    /// in the book — only when Simple draws that board. After the jobs are
+    /// read (`load`), and after `readFeatures`, whose answer it needs.
+    func readSimpleFiling() async {
+        guard let engine, reducedInSimple("queue") else { simpleFiling = [:]; return }
+        let ticket = loadGeneration
+        var filing: [String: KhaytEngine.SimpleStage] = [:]
+        for row in orderRows {
+            guard case .object(let o) = row, let id = Self.plainString(o["id"]),
+                  let s = try? await engine.simpleStage(of: row) else { continue }
+            filing[id] = s
+        }
+        guard ticket == loadGeneration else { return }
+        simpleFiling = filing
+    }
+
+    /// Simple leaves this out entirely: the shared map says `pro` for it.
+    /// Every menu item, button and window that reaches it asks here, so
+    /// "not in Simple" means it cannot be reached, not that one list omits it.
+    func professionalOnly(_ key: String) -> Bool { simpleSurfaces[key] == .professionalOnly }
+
     static let gatedFeatures = ["analytics", "expenses", "maintenance", "purchasing", "zatca"]
 
     /// Does this shop's mode include it? Unknown keys are on: a screen this
@@ -607,6 +639,15 @@ extension Shop {
     }
 
     /// Can this shop reach that screen at all?
+    /// The screen is there for this person, and the shop's MODE is what hides
+    /// it: the lock allows it and its feature is not in Simple. `NotAllowed`
+    /// asks, so a mode gate is not explained in the staff lock's words.
+    func hiddenByMode(_ shelf: Shelf) -> Bool {
+        if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
+        guard let gate = Self.gate(of: shelf) else { return false }
+        return !has(gate)
+    }
+
     func canShow(_ shelf: Shelf) -> Bool {
         // The operator lock first: a screen the person signed in may not see
         // is not reachable by ANY path that asks here — the sidebars, the menu
@@ -626,16 +667,23 @@ extension Shop {
     /// the one thing untested, and someone reading the screen could not tell
     /// whether it worked.
     func readFeatures() async {
-        guard let engine else { features = Set(Self.gatedFeatures); return }
+        guard let engine else { features = Set(Self.gatedFeatures); simpleSurfaces = [:]; simpleFiling = [:]; return }
         let mode = Self.plainString(settingsDict["mode"])
         let ticket = loadGeneration
         var on: Set<String> = []
         for key in Self.gatedFeatures {
             if (try? await engine.featureEnabled(key, mode: mode)) ?? true { on.insert(key) }
         }
+        // S4: the rows of the shared Simple map the Mac has a surface for.
+        var surfaces: [String: KhaytEngine.SimpleSurface] = [:]
+        for key in Self.simpleMapKeys + Self.simpleReducedKeys {
+            if let s = try? await engine.simpleSurface(key, mode: mode) { surfaces[key] = s }
+        }
+
         // Not over a newer load's answer (`Shop.load`).
         guard ticket == loadGeneration else { return }
         features = on
+        simpleSurfaces = surfaces
     }
 
     var settingsDict: [String: JSONValue] {
@@ -887,18 +935,38 @@ extension Shop {
     /// shared rule guarantees rather than this app promising it.
     ///
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
-    func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
-        guard permitted("orders", "edit") else { return }
-        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+    ///
+    /// `nonBusiness` is the sheet's Not business box, when the shop moved it.
+    /// It is part of the SAME write: as a second write after this one, a quit
+    /// between the two (⌘Q holds for a write in flight, and none was) saved
+    /// the fields and dropped the box. One write is also one undo.
+    @discardableResult
+    func editJob(_ id: Order.ID, fields: [String: JSONValue], nonBusiness: Bool? = nil) async -> Bool {
+        guard permitted("orders", "edit") else { return false }
+        return await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+            OneOrderEdit(order: try await Self.jobEdited(order, fields: fields, nonBusiness: nonBusiness,
+                                                         settings: Self.settings(root), engine: engine,
+                                                         now: Date(), editId: Self.uid("edit")))
+        }
+    }
+
+    /// The job as Edit Job leaves it: the changed fields through
+    /// `lib/order-edit.js applyEdit`, then the Not business mark through
+    /// `lib/business-scope.js setNonBusiness` — both on one record, for one
+    /// write. With nothing to change the order comes back untouched, so the
+    /// write path finds no change, stamps nothing and syncs nothing.
+    static func jobEdited(_ order: JSONValue, fields: [String: JSONValue], nonBusiness: Bool?,
+                          settings: [String: JSONValue], engine: KhaytEngine,
+                          now: Date, editId: String) async throws -> JSONValue {
+        var out = order
+        if !fields.isEmpty {
             // The shop's settings, so a typed price caps the payment at the
             // new price plus its tax and paid/partial is read from that gross.
-            let out = try await engine.editJob(
-                order: order, fields: fields, settings: Self.settings(root),
-                now: Date(), editId: Self.uid("edit"))
-            // Nothing moved: return the order untouched so the write path finds
-            // no change, stamps nothing and syncs nothing.
-            return OneOrderEdit(order: out.order)
+            out = try await engine.editJob(order: out, fields: fields, settings: settings,
+                                           now: now, editId: editId).order
         }
+        if let nonBusiness { out = try await engine.setNonBusiness(out, on: nonBusiness) }
+        return out
     }
 
     /// Mark a job as not business — a test, a gift, something for the shop
@@ -1040,8 +1108,8 @@ extension Shop {
     func partEditCost(raw: [String: JSONValue]?, _ now: EditPartSheet.Opened,
                       opened: EditPartSheet.Opened?) async -> (spool: Spool?, costed: KhaytEngine.CostedPart?) {
         let spool = Self.partCostSpool(now, opened: opened, raw: raw, spools: spools)
-        let costed = await costedPart(spoolId: spool?.id, grams: Double(now.grams) ?? 0,
-                                      hours: Double(now.hours) ?? 0, qty: now.qty,
+        let costed = await costedPart(spoolId: spool?.id, grams: TypedNumber.parse(now.grams) ?? 0,
+                                      hours: TypedNumber.parse(now.hours) ?? 0, qty: now.qty,
                                       extra: raw ?? [:])
         return (spool, costed)
     }
@@ -1067,7 +1135,7 @@ extension Shop {
                                     reclaimsTax: Bool = false) -> JSONValue {
         guard let opened else {
             return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
-                                       grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
+                                       grams: TypedNumber.parse(now.grams) ?? 0, hours: TypedNumber.parse(now.hours) ?? 0,
                                        qty: now.qty, costed: costed, reclaimsTax: reclaimsTax)
         }
         guard case .object(var record) = order,
@@ -1076,8 +1144,8 @@ extension Shop {
             guard case .object(var part) = rows[i],
                   case .string(let id)? = part["id"], id == partId else { continue }
             if now.name != opened.name { part["name"] = .string(now.name) }
-            if now.grams != opened.grams { part["printWeight"] = .number(max(0, Double(now.grams) ?? 0)) }
-            if now.hours != opened.hours { part["printTime"] = .number(max(0, Double(now.hours) ?? 0)) }
+            if now.grams != opened.grams { part["printWeight"] = .number(max(0, TypedNumber.parse(now.grams) ?? 0)) }
+            if now.hours != opened.hours { part["printTime"] = .number(max(0, TypedNumber.parse(now.hours) ?? 0)) }
             if now.qty != opened.qty { part["qty"] = .number(Double(max(1, now.qty))) }
             // `spool` is the one the cost was worked out from (`partCostSpool`),
             // so its fields go down whenever it is given — not only when the

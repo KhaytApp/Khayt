@@ -3,6 +3,7 @@
 "alert.print.finished" = "Impresión terminada";
 "alert.print.failed" = "Impresión fallida";
 "alert.print.cancelled" = "Impresión cancelada";
+"alert.print.ended" = "Impresión terminada: revisa la impresora";
 "alert.print.a_job" = "Un trabajo";
 "alert.print.move_post" = "Pasar a postprocesado";
 "alert.print.reprint" = "Devolver a la cola";
@@ -18,3 +19,4 @@
 "PUSH_QUOTE_DECLINED" = "Un cliente rechazó un presupuesto";
 "PUSH_MESSAGE" = "Un cliente envió un mensaje";
 "PUSH_PAYMENT" = "Llegó un pago";
+"PUSH_GENERIC" = "Hay algo en tu taller que revisar";

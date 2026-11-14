@@ -47,7 +47,7 @@
 "settings.connection" = "Bağlantı";
 "settings.connection.footer" = "Khayt Ayarlar → LAN API’deki PIN ile aynı. Masaüstü v2.2.1 veya üzeri gerekir.";
 "settings.shop_name" = "Dükkân adı";
-"settings.host" = "Masaüstü IP’si veya ana makine adı";
+"settings.host" = "Mac veya PC adresi";
 "settings.port" = "Bağlantı noktası: %d";
 "settings.pin" = "Sahip LAN PIN’i";
 "settings.retest" = "Eşlemeyi yeniden sına";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Bağlantı kesildi";
 "settings.notify.overdue" = "Geciken siparişler";
 "settings.notify.low_stock" = "Filament azaldı";
-"settings.docs" = "LAN API başvurusu";
 
 /* Status */
 "status.quote" = "Teklif";
@@ -570,6 +569,7 @@
 "alert.print.finished" = "Baskı bitti";
 "alert.print.failed" = "Baskı başarısız";
 "alert.print.cancelled" = "Baskı iptal edildi";
+"alert.print.ended" = "Baskı sona erdi — yazıcıyı kontrol edin";
 "alert.print.a_job" = "Bir iş";
 "alert.print.move_post" = "Son işleme taşı";
 "alert.print.reprint" = "Sıraya geri koy";
@@ -836,6 +836,28 @@
 "library.priced_here" = "Fiyatlarınızla bu telefonda hesaplandı. Birden çok renkli bir model tek makaradan maliyetlendirilir, bu yüzden Mac’in rakamı biraz farklı olabilir.";
 "library.no_copy" = "Mac’e ulaşılamıyor. Ayarlar’da Khayt Cloud’da oturum açıp bir kez eşitleyin, kitaplığınız yanınızda olsun.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Pembe";
+"colour.brown" = "Kahverengi";
+"library.filter.colour" = "Renk";
+"library.filter.type" = "Dosya türü";
+"library.filter.multi" = "Çok renkli";
+"library.filter.none" = "Renk bilgisi yok";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-code";
+"library.type.other" = "Diğer";
+"library.type.nofile" = "Dosya yok (webden)";
+"library.filter.colour_hint" = "Bunlardan herhangi birine sahip modelleri görmek için birden fazla seçin.";
+"library.filter.counts_hint" = "Sayılar, diğer filtrelerin bıraktığı kütüphane içindir. Boş bir satır silinmez, soluk gösterilir.";
+"library.filter.n_of_m" = "%1$d / %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "%@ kaldır";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@, seçili: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Ürün Kataloğu";
 "catalogue.search" = "Ürün ara";
@@ -1008,7 +1030,7 @@
 "new.calculator.detail" = "Baskıyı elle fiyatla";
 "new.expense.detail" = "Fişin fotoğrafı";
 "new.waste.detail" = "Başarısız baskı veya tasfiye";
-"new.more" = "Diğer";
+"new.more" = "Ayrıca";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Belgeler";
 "paper.packing_slip" = "Paketleme listesi";
@@ -1181,6 +1203,11 @@
 "connectors.status.not_reviewed" = "İncelenmedi";
 "connectors.status.off" = "Kapalı";
 "connectors.status.invalid" = "Okunamıyor";
+"connectors.status.revoked" = "Khayt tarafından duraklatıldı";
+"plg.update_updated" = "%1$@, %2$@ sürümüne güncellendi";
+"plg.update_revoked" = "Khayt %@ sürümünü geri çekti, bu yüzden duraklatıldı.";
+"plg.update_needs_app" = "%1$@ %2$@ için Khayt'ın daha yeni bir sürümü gerekiyor.";
+"plg.update_pending" = "%1$@ %2$@, Mac'te onayınızı bekliyor.";
 "connectors.yes" = "Evet";
 "connectors.no" = "Hayır";
 "connectors.settings.title" = "Mağaza ayarları";
@@ -1283,6 +1310,18 @@
 "diag.refused.wrong_shop" = "reddedildi: başka atölye";
 "diag.refused.empty" = "reddedildi: boş";
 
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Mac'te onayınızı bekliyor";
+"connectors.badge.updated" = "%@ sürümüne güncellendi";
+"connectors.badge.needs_app" = "Daha yeni bir Khayt gerekiyor";
+"connectors.waiting_count" = "Mac'i bekleyen: %d";
+"intake.waiting" = "Bekliyor";
+"spool.low" = "Az";
+"stage.a11y.done" = "Tamamlandı";
+"order.new.hint.client" = "Seçin ya da bir ad yazın";
+"order.new.hint.project" = "Nedir? ör. parça adı";
+"order.new.hint.material" = "ör. PLA, siyah";
+
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Yüklenemedi";
 "load.retry" = "Tekrar dene";
@@ -1312,3 +1351,71 @@
 "job.money.owing_overdue" = "Kalan · gecikmiş";
 "job.parts.on_machine" = "%@ üzerinde";
 "job.money.quote_sent" = "Gönderildi";
+/* Settings in groups (S2) */
+"settings.search" = "Ayarlarda ara";
+"settings.search.none" = "“%@” ile eşleşen ayar yok.";
+"settings.group.this_phone" = "Bu telefon";
+"settings.group.shop" = "Atölye";
+"settings.group.connected" = "Bağlantılar";
+"settings.group.about" = "Hakkında";
+"settings.appearance" = "Görünüm ve dil";
+"settings.shop_details" = "Atölye bilgileri";
+"settings.shop.readonly" = "Mac’te ayarlanır · burada salt okunur";
+"settings.phones_wifi" = "Telefonlar ve Wi-Fi";
+"settings.cloud.sub" = "Eşitleme ve müşteri sayfaları";
+"settings.help" = "Yardım";
+"settings.diag.sub" = "Bu telefonda olanlar, son eşitlemeler";
+"settings.diag.syncs" = "Son eşitlemeler";
+"state.paired" = "Eşleşti";
+"state.away" = "Erişilemiyor";
+"state.not_paired" = "Eşleşmedi";
+"state.signed_in" = "Oturum açık";
+"state.needs_sign_in" = "Oturum açılmalı";
+"state.on" = "Açık";
+"state.off" = "Kapalı";
+/* S4: Simple mode */
+"mode.simple" = "Basit";
+"mode.professional" = "Profesyonel";
+"mode.badge.a11y" = "Mod: %@, Mac'te ayarlanır";
+"simple.stage.ready" = "Hazır";
+"simple.note.on_hold" = "Beklemede";
+"simple.note.post" = "Son işlem";
+"simple.note.qc" = "Kontrolde";
+"simple.note.shipped" = "Kargolandı";
+"simple.note.delivered" = "Teslim edildi";
+"simple.expenses.month" = "Bu ay: %@ · %@";
+"simple.gate.care.title" = "Bakım planları Profesyonel moda dahildir";
+"simple.gate.care.body" = "Bu dükkan Mac'te Basit moda ayarlı. Bakım planlarını kullanmak için Mac'inizdeki Khayt'ta Profesyonel moda geçin. Telefon Mac'in seçimini izler.";
+"simple.gate.parts.title" = "Alınacak parçalar Profesyonel moda dahildir";
+"simple.gate.parts.body" = "Bu dükkan Mac'te Basit moda ayarlı. Parça listesi Profesyonel moddaki bakım planlarından gelir: Mac'inizdeki Khayt'ta geçiş yapın. Telefon Mac'in seçimini izler.";
+"simple.gate.back_machine" = "Makineye dön";
+"simple.gate.back_machines" = "Makinelere dön";
+"simple.expenses.count" = "%d gider";
+"PUSH_GENERIC" = "Atölyende bakılması gereken bir şey var";
+"push.not_connected" = "Bildirimler henüz bu telefona ulaşmıyor. Khayt bir sonraki açılışta yeniden deneyecek.";
+/* Home — Needs you */
+"home.greeting.morning" = "Günaydın.";
+"home.greeting.afternoon" = "Tünaydın.";
+"home.greeting.evening" = "İyi akşamlar.";
+"needs.title" = "Sizi bekliyor";
+"needs.none" = "Şu an sizi bekleyen bir şey yok.";
+"needs.calm" = "Geciken iş yok, raf dolu ve bekleyen kimse yok.";
+"needs.late.one" = "%1$@ teslimi %2$@ idi";
+"needs.late.action" = "Gecikenleri aç";
+"needs.low.title" = "Raf azalıyor";
+"needs.low.left" = "%1$@ %2$@ kaldı";
+"needs.low.action" = "Envantere bak";
+"needs.waiting.action" = "Talepleri aç";
+"needs.quotes.action" = "Teklifleri aç";
+"tile.owed" = "Alacağınız";
+"tile.machines" = "Makinelerde";
+"tile.machines.value" = "%2$d makineden %1$d";
+"tile.machines.sub" = "şu an basıyor";
+"needs.due_week" = "Bu hafta teslim";
+"needs.this_year" = "bu yıl %@";
+"needs.owed" = "%@ alacak";
+"needs.count" = "%d şey sizi bekliyor.";
+"needs.late" = "%d iş gecikti";
+"needs.low.count" = "%d makara azaldı";
+"needs.quotes" = "%d teklif yanıt bekliyor";
+"needs.more" = "ve %d tane daha";

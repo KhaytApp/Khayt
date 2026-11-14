@@ -27,18 +27,25 @@ import AppKit
 /// ── THE LOGO'S ORANGE WAS ALREADY HERE ────────────────────────────────────
 ///
 /// The obvious move on a re-brand is to make the app's accent the logo's
-/// strongest colour, and it is the wrong one. Measured: the filament in the
-/// mark is hue 23°, and `hot` below — the palette's "something is being made
-/// right now" — is hue 19°. **Four degrees.** The new icon did not introduce
-/// an orange to this app; it agreed with the one already in it, and it did so
-/// for the same reason `hot` was picked in the first place. The filament IS
-/// the warm thing in both marks.
+/// strongest colour, and it is the wrong one. The filament is the warm thing
+/// in the mark, and the warm colour here already has a job: "something is
+/// being made right now" (`thread` below — the 2026 icon's amber).
 ///
 /// So making the accent orange would not have made the app look like its icon.
 /// It would have spent the one colour that means "printing" on selection,
-/// links and section rails — and `Dashboard.swift` draws the distinction on a
-/// single control, `tint: printing ? Khayt.hot : Khayt.brand`, where the two
-/// being one colour says nothing at all.
+/// links and section rails, where the two being one colour says nothing at
+/// all.
+///
+/// ── PRINTING IS AMBER, AND AMBER IS NEVER A WORD (Nov 2026) ─────────────
+///
+/// "Being made right now" used to be a rust, `hot` (#AF3E18 / #F0763D), dark
+/// enough to set text in — and close enough to `late` that a job at 93% read
+/// as a job in trouble (Nov 11 2026 UI review, B12). The owner's decision for
+/// every Khayt app: **printing is amber; green stays for done and paid; held
+/// is purple.** `hot` is gone. What it painted is `thread` now, and because
+/// `thread` is about 2:1 on white it is only ever a FILL — a dot, a rail, a
+/// bar, a block's edge — with the figure or the word beside it in ordinary
+/// ink. `PaletteTests.amberIsNeverText` holds that line.
 ///
 /// The accent is therefore the icon's OTHER colour, the navy ground, at hue
 /// 213 lifted to a lightness a label can be read at. That leaves every meaning
@@ -154,24 +161,19 @@ enum Khayt {
     /// the way `contrastHolds` measures the rest.
     static let onBrand = adaptive(light: 0xFFFFFF, dark: 0x0B1622, name: "khaytOnBrand")
 
-    /// The filament itself, and the ONE thing it is allowed to mean: something
-    /// is being made right now.
-    ///
-    /// Not "warning" — that is `attention` below and it is a different idea. A
-    /// printer mid-job is not a problem, it is the good state, and it is the
-    /// one thing on any of these screens worth looking up at.
-    ///
-    /// **Unchanged by the re-brand, and that is the finding rather than an
-    /// omission.** This is hue 19°; the loop of filament in the new icon is
-    /// hue 23°. The palette had the mark's orange before the mark did.
-    static let hot = adaptive(light: 0xAF3E18, dark: 0xF0763D, name: "khaytHot")
-
     /// Finished, paid, sent, agreed. `--cmd-ok` / `--success`.
     static let done = adaptive(light: 0x1B5E4F, dark: 0x4FBFA0, name: "khaytDone")
 
     /// Wants a person, and will keep working if it does not get one: low stock,
     /// a nozzle near its life, a sync that will retry. `--warning`.
     static let attention = adaptive(light: 0x8A5A0B, dark: 0xE0A73C, name: "khaytAttention")
+
+    /// Waiting on the shop's OK: a connector update that asks for more. STEEL,
+    /// because amber means progress and today (Figma 75:387). Text on
+    /// `pendingWash`, or on its own.
+    static let pending = adaptive(light: 0x5E6C84, dark: 0xA9B8CF, name: "khaytPending")
+    /// The chip behind `pending`.
+    static let pendingWash = adaptive(light: 0xEDF0F4, dark: 0x3A4658, name: "khaytPendingWash")
 
     /// Late, failed, refused. `--danger`.
     static let late = adaptive(light: 0xBB2D44, dark: 0xF2564A, name: "khaytLate")
@@ -189,7 +191,7 @@ enum Khayt {
     /// A model the shop has starred.
     ///
     /// Gold, because a star is gold everywhere and fighting that would cost
-    /// recognition for nothing. Deliberately NOT `hot`: amber already means
+    /// recognition for nothing. Deliberately NOT `thread`: amber already means
     /// "being made right now", and a favourite is not that.
     ///
     /// The only colour here held to 3:1 rather than 4.5:1, and it is allowed to
@@ -203,22 +205,47 @@ enum Khayt {
     // ── REDESIGN 2026 (Figma Qqxg4imtKVgC3TfNGcRGOk) ─────────────────────
     //
     // Cool paper in light, the website's navy in dark (the surfaces live in
-    // Surface.swift). One amber THREAD for progress and "today" only — a
+    // Surface.swift). One amber THREAD for printing, progress and "today" — a
     // graphic colour, never text: #F2A541 on white is about 2:1. Every stage
     // gets one colour that is not the action blue, and a status label is ink
     // beside a dot of that colour, never text in it.
 
-    /// The thread: progress bars, the "today" chip, the week line, section
-    /// dashes. Graphic only — never text.
+    /// The thread, and the ONE thing it is allowed to mean: something is being
+    /// made right now. The Printing stage's dot and pill, a running machine's
+    /// rail, progress bars and layer stacks, the timeline's "printing now"
+    /// block and its now-line, the "today" chip, the week line, section
+    /// dashes.
+    ///
+    /// Not "warning" — that is `attention` above and it is a different idea. A
+    /// printer mid-job is not a problem, it is the good state.
+    ///
+    /// GRAPHIC ONLY — never text. The figure beside it ("93%") is ink.
     static let thread = adaptive(light: 0xF2A541, dark: 0xF2A541, name: "khaytThread")
-    /// The thread's wash, behind a "today" chip or a thread-coloured tile.
+    /// The thread's wash: behind a Printing pill, a "today" chip, a
+    /// "printing now" block or a thread-coloured tile. Ink is written on it.
     static let threadWash = adaptive(light: 0xFDF1DE, dark: 0x3A2C14, name: "khaytThreadWash")
-    /// A machine printing right now (the stage dot and the live count).
+    /// How strongly the part of a progress drawing NOT yet printed is ghosted
+    /// in the thread's colour. One number, so the layer stack on a machine
+    /// card and the one in the jobs table are the same drawing.
+    static let threadGhost: Double = 0.28
+    /// The plain "it is fine" green of a dot: the book is saved, a thing is
+    /// done or paid. NOT printing — that was this colour until Nov 2026 and
+    /// is `thread` now.
     static let live = adaptive(light: 0x13803F, dark: 0x34D27A, name: "khaytLive")
     /// Ready to collect.
     static let collect = adaptive(light: 0x0E7A70, dark: 0x3FD0C0, name: "khaytCollect")
     /// On hold and quality check.
     static let hold = adaptive(light: 0x6B52B5, dark: 0xB49CFF, name: "khaytHold")
+    /// THE FAINTEST TEXT THAT IS STILL TEXT: order numbers, dates, column and
+    /// section captions, "settled", the dash for "not recorded".
+    ///
+    /// These were SwiftUI's `.tertiary`, which is the label colour at reduced
+    /// opacity: about 1.9:1 on a white card and 2.2:1 on a navy one, measured
+    /// from the running app (Nov 11 2026 UI review, B25). That is a texture,
+    /// and it was carrying data. This clears 4.5:1 on every card and ground in
+    /// both appearances (`FaintTextIsReadableTests`) and is still a step
+    /// quieter than `.secondary`. `.tertiary` stays for strokes and symbols.
+    static let faint = adaptive(light: 0x636B78, dark: 0x8593AB, name: "khaytFaint")
     /// The well a model thumbnail sits in: lighter than the card in dark, so
     /// a black print does not vanish into navy.
     static let well = adaptive(light: 0xEEF1F3, dark: 0x2A4670, name: "khaytWell")

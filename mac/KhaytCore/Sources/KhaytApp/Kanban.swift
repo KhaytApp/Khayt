@@ -24,6 +24,33 @@ import KhaytCore
 struct Kanban: View {
     /// The most cards one column builds — see `Column.shown`.
     static let columnCap = 120
+
+    /// A column's name: Simple's own words for the three columns that stand
+    /// for more than one stage (`sm.col_*`, the desktop's), the stage's
+    /// otherwise.
+    static func titleKey(_ stage: Stage, simple: Bool) -> String {
+        guard simple else { return stage.key }
+        switch stage {
+        case .quote: return "sm.col_quote"
+        case .pending: return "sm.col_queued"
+        case .completed: return "sm.col_ready"
+        default: return stage.key
+        }
+    }
+
+    /// The finer stage a Simple card carries: on hold (and whether it had
+    /// started printing), post-processing, QC, shipped, delivered. Nil when
+    /// the job is plainly in its column.
+    @MainActor
+    static func simpleNote(_ filing: KhaytEngine.SimpleStage?, words: Words) -> String? {
+        guard let note = filing?.note, !note.isEmpty else { return nil }
+        if note == "on_hold", filing?.midPrint == true { return words.callIt("sm.note_mid_print") }
+        if let stage = Stage(rawValue: note) { return words.callIt(stage.key) }
+        let key = "ord." + note
+        let said = words.callIt(key)
+        return said == key ? nil : said
+    }
+
     @Bindable var shop: Shop
 
     /// ── THE ONE MOMENT THE BOARD EXISTS FOR ──────────────────────────────
@@ -44,13 +71,17 @@ struct Kanban: View {
     /// or on hold had no column and therefore no card: it did not move to the
     /// end of the board, it vanished from it, and a board that silently omits
     /// the jobs somebody is waiting on is worse than no board.
-    private var columns: [Stage] { Stage.boardColumns }
+    /// Four in Simple (S4: Quote · Queued · Printing · Ready), every stage in
+    /// Professional — `Shop.boardColumns`.
+    private var columns: [Stage] { shop.boardColumns }
 
     /// Jobs that matched the search but left the board by being delivered or
     /// cancelled — the ones a shop would otherwise think had vanished.
     private var finished: Int {
         shop.matching(shop.orders).filter {
-            guard shop.inSite($0), let stage = Stage.of($0) else { return false }
+            guard shop.inSite($0) else { return false }
+            if shop.reducedInSimple("queue") { return shop.simpleColumn($0) == nil && Stage.of($0) != nil }
+            guard let stage = Stage.of($0) else { return false }
             return !Stage.boardColumns.contains(stage)
         }.count
     }
@@ -277,7 +308,8 @@ private struct Column: View {
             HStack(spacing: 7) {
                 Circle().fill(jobs.isEmpty ? Color.secondary.opacity(0.5) : stage.dot)
                     .frame(width: 7, height: 7)
-                Text(shop.words.callIt(stage.key)).font(.system(size: 13, weight: .semibold))
+                Text(shop.words.callIt(Kanban.titleKey(stage, simple: shop.reducedInSimple("queue"))))
+                    .font(.system(size: 13, weight: .semibold))
                 Text(verbatim: shop.words.numeral(jobs.count))
                     .font(.system(size: 12))
                     .monospacedDigit()
@@ -291,7 +323,7 @@ private struct Column: View {
                 // columns collapse as work moves is a board you cannot learn.
                 Text(shop.words.callIt("mac.nothing_here"))
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Khayt.faint)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
             } else {
@@ -304,6 +336,17 @@ private struct Column: View {
                 // line that says how many, and the Jobs table has them all.
                 ForEach(Self.shown(jobs, in: stage)) { job in
                     JobCard(job: job, shop: shop, matchedLot: lots[job.id])
+                        // In Simple the finer stage rides on the card (S4).
+                        .overlay(alignment: .bottomTrailing) {
+                            if let note = Kanban.simpleNote(shop.simpleFiling[job.id], words: shop.words) {
+                                Text(note)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(.quaternary, in: Capsule())
+                                    .padding(6)
+                            }
+                        }
                         // The card's path from the column it left to the one
                         // it landed in. Keyed by job id, so the SAME card
                         // travels rather than one fading out while another
@@ -443,7 +486,7 @@ private struct JobCard: View {
                     if let thumb = shop.modelThumbnail(for: job) {
                         Thumbnail(source: thumb).padding(3)
                     } else {
-                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(.tertiary)
+                        Image(systemName: "cube").font(.system(size: 15)).foregroundStyle(Khayt.faint)
                     }
                 }
                 .frame(width: 40, height: 40)
@@ -481,7 +524,7 @@ private struct JobCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     ThreadBar(progress: Double(live.progress) / 100)
                     HStack(spacing: 4) {
-                        Image(systemName: "printer").foregroundStyle(Khayt.live)
+                        Image(systemName: "printer").foregroundStyle(.secondary)
                         Text(verbatim: shop.machineName(forId: machineId)
                              + ((live.timeRemaining ?? 0) > 0
                                 ? " · " + PrinterWatch.spell(live.timeRemaining ?? 0, shop.words) : ""))

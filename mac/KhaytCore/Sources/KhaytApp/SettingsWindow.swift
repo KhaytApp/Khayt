@@ -147,14 +147,44 @@ struct SettingsWindow: View {
     }
 
     private func rows(_ group: SettingsPane.Group) -> some View {
-        ForEach(SettingsPane.panes(in: group)) { pane in
+        // S4: a pane Simple leaves out is not in the list (Team & access, AI).
+        ForEach(SettingsPane.panes(in: group).filter { !Self.professionalOnly($0, shop) }) { pane in
             Label(shop.words.callIt(pane.wordKey), systemImage: pane.symbol)
+                // Connector updates waiting on the shop's yes (Figma 70:234):
+                // the count goes when none is left.
+                .badge(pane == .integrations ? shop.connectorUpdatesWaiting : 0)
                 .tag(pane)
         }
     }
 
+    /// The Simple map row each pane is (`SIMPLE_MAP`), where Simple leaves it out.
+    static func simpleKey(_ pane: SettingsPane) -> String? {
+        switch pane {
+        // NOT Team & access: it holds the staff sign-in lock, which a Simple
+        // shop must still be able to switch off ("the owner's app-lock PIN
+        // stays in both modes", SIMPLE_MAP staffPins). In Simple the pane
+        // shows the lock alone (`TeamPane`). Beta.36 pre-release review.
+        case .assistant: "ai"
+        default: nil
+        }
+    }
+
+    static func professionalOnly(_ pane: SettingsPane, _ shop: Shop) -> Bool {
+        simpleKey(pane).map(shop.professionalOnly) ?? false
+    }
+
     @ViewBuilder
     private func pane(_ which: SettingsPane) -> some View {
+        if Self.professionalOnly(which, shop) {
+            // Chosen before the switch, or restored: say so, and offer it back.
+            PartOfProfessional(shop: shop, feature: shop.words.callIt(which.wordKey))
+        } else {
+            paneBody(which)
+        }
+    }
+
+    @ViewBuilder
+    private func paneBody(_ which: SettingsPane) -> some View {
         switch which {
         case .general:      GeneralPane(shop: shop)
         case .shop:         ShopPane(shop: shop)
@@ -843,9 +873,24 @@ struct TeamPane: View {
 
     var body: some View {
         Form {
-            Section { OperatorsSection(shop: shop) }
-            Section { LockSection(shop: shop) }
-            TeamSettings(shop: shop)
+            // Simple leaves out the team and staff PINs (SIMPLE_MAP `team`),
+            // and keeps the lock, so a shop that switched it on can switch
+            // it off.
+            if shop.professionalOnly("team") {
+                Section { LockSection(shop: shop) }
+                Section {
+                    Text(shop.words.callIt("sm.gated_title", ["feature": .string(shop.words.callIt("mac.nav_team"))]))
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button(shop.words.callIt("sm.gated_switch")) {
+                        Task { await shop.chooseMode("professional") }
+                    }
+                    .disabled(!shop.lockAllows("settings", "edit") || shop.source.build == nil)
+                }
+            } else {
+                Section { OperatorsSection(shop: shop) }
+                Section { LockSection(shop: shop) }
+                TeamSettings(shop: shop)
+            }
         }
         .formStyle(.grouped)
     }
@@ -1246,6 +1291,7 @@ struct GeneralPane: View {
     @AppStorage("mac.menuBar") private var menuBar = true
     @AppStorage(Spotlight.defaultsKey) private var spotlight = true
     @AppStorage(MenuBarStyle.defaultsKey) private var menuBarStyle = MenuBarStyle.ringAndFigures.rawValue
+    @AppStorage(FinishChime.defaultsKey) private var finishChime = false
     @AppStorage(PrintNoticeKind.finished.defaultsKey) private var notifyFinished = true
     @AppStorage(PrintNoticeKind.failed.defaultsKey) private var notifyFailed = true
     @AppStorage(PrintNoticeKind.paused.defaultsKey) private var notifyPaused = true
@@ -1314,7 +1360,7 @@ struct GeneralPane: View {
                             if on { FloorStatus.shared.install(shop: shop) }
                             else { FloorStatus.shared.remove() }
                         }
-                    // What the item draws: the ring and "64% · 1h 02m", the ring
+                    // What the item draws: the ring and "64%" (or how many print), the ring
                     // alone, or the nozzle as it always was. Mac-local, beside
                     // the switch above (`MenuBarStyle`).
                     Picker(shop.words.callIt("mac.mbp_style"), selection: $menuBarStyle) {
@@ -1324,6 +1370,10 @@ struct GeneralPane: View {
                     }
                     .disabled(!menuBar)
                     .onChange(of: menuBarStyle) { _, _ in FloorStatus.shared.restyle() }
+                    // One soft sound when a print finishes. Off unless
+                    // somebody wants it (`FinishChime`), and not tied to the
+                    // menu bar switch: the print finishes either way.
+                    Toggle(shop.words.callIt("mac.mbh_chime"), isOn: $finishChime)
                     // The print notices this Mac did not send before
                     // (`PrintNotices.swift`). Faults, runouts and silent
                     // printers were already notified and have no switch here.
@@ -1648,7 +1698,9 @@ struct AssistantPane: View {
                         }
                     }
                     row(shop.words.callIt("calc.ai_key")) {
-                        SecureField(hasStoredKey ? "••••••••" : "", text: $draft.key)
+                        SecureField("", text: $draft.key,
+                                    prompt: Text(verbatim: hasStoredKey ? "••••••••" : ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                     if hasStoredKey && draft.key.isEmpty {
@@ -1656,7 +1708,9 @@ struct AssistantPane: View {
                             .font(.caption)
                     }
                     row(shop.words.callIt("set.ai_model")) {
-                        TextField(chosen?.defaultModel ?? "", text: $draft.model)
+                        TextField("", text: $draft.model,
+                                  prompt: Text(verbatim: chosen?.defaultModel ?? ""))
+                            .labelsHidden()
                             .frame(width: 240)
                     }
                 }
@@ -2013,7 +2067,7 @@ struct SlicersPane: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(slicer.name)
                                 Text(slicer.path)
-                                    .font(.caption).foregroundStyle(.tertiary)
+                                    .font(.caption).foregroundStyle(Khayt.faint)
                                     .lineLimit(1).truncationMode(.head)
                                     .help(slicer.path)
                             }
@@ -2044,7 +2098,7 @@ struct SlicersPane: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Text(shop.words.callIt("mac.slicer_why"))
-                        .font(.caption).foregroundStyle(.tertiary)
+                        .font(.caption).foregroundStyle(Khayt.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

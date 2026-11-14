@@ -51,7 +51,8 @@ struct LanServerTests {
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
              readTimeout: TimeInterval = 15, foldsDeltas: Bool = false,
              rest: Bool = false, printerWebhookToken: String = "",
-             identity: Curve25519.Signing.PrivateKey = .init()) async throws {
+             identity: Curve25519.Signing.PrivateKey = .init(),
+             port wanted: UInt16 = 0, libraryAsBeforeFilters: Bool = false) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -79,8 +80,17 @@ struct LanServerTests {
             let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
             self.pairing = pairing
             host.pairing = pairing
-            host.library = { [shop] q, folder, offset, limit in
-                shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
+            host.library = { [shop] q, folder, offset, limit, filter in
+                guard libraryAsBeforeFilters else {
+                    return shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter)
+                }
+                // A Mac from before the filters, for a phone to be tried
+                // against: it ignores the two parameters and its answer has
+                // none of the three fields they brought (`LanLibraryTests.serve`).
+                guard case .object(var page) = shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
+                else { return .object([:]) }
+                for key in ["facets", "matchedTotal", "unfilteredTotal"] { page[key] = nil }
+                return .object(page)
             }
             host.libraryThumb = { [shop] id in await shop.phoneLibraryThumb(id) }
             host.libraryEstimate = { [shop] id, plate, qty in await shop.phoneLibraryEstimate(id, plate: plate, qty: qty) }
@@ -173,7 +183,7 @@ struct LanServerTests {
             }
             let server = LanServer(host: host)
             self.server = server
-            port = try await server.start(port: 0, bind: .loopback)
+            port = try await server.start(port: wanted, bind: .loopback)
             clock = Self.start
         }
         let box: ClockBox

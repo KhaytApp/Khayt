@@ -402,6 +402,18 @@ final class Shop {
         productRows = rows
     }
 
+    /// Empty the book's jobs, customers, shelf and catalogue, for the capture
+    /// run's pictures of each screen with nothing on it. The book on disk is
+    /// not touched, and loading any book puts everything back.
+    func pretendEmptyBook() {
+        orders = []
+        clients = []
+        spools = []
+        consumables = []
+        productRows = []
+        catalogueRows = []
+    }
+
     /// Give the shop a library, for a test. The book on disk is not touched.
     func pretendLibrary(_ rows: [JSONValue]) {
         files = withPrintHistory(Self.decodeFiles(["printFiles": .array(rows)]).items)
@@ -626,7 +638,7 @@ final class Shop {
     /// is nothing that way" rather than the app swallowing the key.
     @discardableResult
     func moveBoardSelection(dx: Int, dy: Int) -> Bool {
-        let columns = Stage.boardColumns
+        let columns = boardColumns
         let filled = columns.map { board[$0] ?? [] }
         guard filled.contains(where: { !$0.isEmpty }) else { return false }
 
@@ -657,17 +669,44 @@ final class Shop {
         return true
     }
 
+    /// The board's columns: four in Simple (Quote · Queued · Printing ·
+    /// Ready, `SIMPLE_COLUMNS`), every stage in Professional.
+    var boardColumns: [Stage] {
+        reducedInSimple("queue") ? Self.simpleBoardColumns : Stage.boardColumns
+    }
+    static let simpleBoardColumns: [Stage] = [.quote, .pending, .printing, .completed]
+
+    /// The column a job is under in Simple: what the shared rule filed it
+    /// as, nil when the rule leaves it off the board (cancelled, failed).
+    func simpleColumn(_ order: Order) -> Stage? {
+        guard let f = simpleFiling[order.id] else { return nil }
+        switch f.column {
+        case "quote": return .quote
+        case "queued": return .pending
+        case "printing": return .printing
+        case "ready": return .completed
+        default: return nil
+        }
+    }
+
     var board: [Stage: [Order]] {
+        let simple = reducedInSimple("queue")
         var out: [Stage: [Order]] = [:]
         // The search box is one box for the whole window. A board that ignored
         // it left somebody typing a customer's name into a field that visibly
         // did nothing.
         // And the site, when the shop is looking at one (SiteFilter.swift).
         for order in matching(orders) where inSite(order) {
-            guard let stage = Stage.of(order) else { continue }
+            guard let stage = simple ? simpleColumn(order) : Stage.of(order) else { continue }
             out[stage, default: []].append(order)
         }
         for (stage, jobs) in out {
+            // Ready in Simple is the newest first (`simpleColumnJobs`): what
+            // was just finished is what is waiting to be collected.
+            if simple, stage == .completed {
+                out[stage] = jobs.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+                continue
+            }
             // Urgent first, then by due date, then by what has been waiting
             // longest — the order someone would work through them in. Each
             // job's two days are read once, not once per comparison (Nov 2026:
@@ -1142,6 +1181,8 @@ final class Shop {
                 fileRows = []
             }
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
+            await readSimpleFiling()
+            if overtaken() { return }
             let twice = (try? await engine?.duplicateNumbers(orders: orderRows, settings: Self.settings(root))) ?? []
             if overtaken() { return }
             duplicateNumbers = twice
@@ -1632,6 +1673,12 @@ final class Shop {
         guard let late = try? await engine.lateOrders(
             rows, machines: fleet, settings: settings, now: now), ticket == loadGeneration else { return }
         for i in orders.indices { orders[i].isLateResolved = late.contains(orders[i].id) }
+        // Each job's next step, from the shared rule, with the same late list
+        // (`Shop+NextStep`). Read-only is this app's to say per person and
+        // per book, at the control (`canMoveJobs`), so the rule is not told.
+        let steps = try? await engine.orderNextSteps(rows, settings: settings, lateIds: Array(late))
+        guard ticket == loadGeneration else { return }
+        nextSteps = steps ?? [:]
     }
 
     /// One call per load, not one per tile. Building the arguments means
@@ -2032,6 +2079,14 @@ final class Shop {
     /// True while the subnets are being asked, which is the slow half and
     /// worth saying: mDNS answers instantly and a sweep takes seconds.
     var sweeping = false
+    /// The background search for a printer that changed address
+    /// (Shop+PrinterMoved.swift): when it last ran, whether it is running,
+    /// the quiet machines it looked for and could not find, and the machines
+    /// whose identity was already asked for this launch.
+    var movedSearchedAt: Date?
+    var movedSearching = false
+    var movedNotFound: Set<String> = []
+    var identityAsked: Set<String> = []
 
     // Stored for "Telling a printer what to do" (Shop+Printers.swift).
     /// What went wrong the last time a machine was told something, by machine.
@@ -2306,6 +2361,18 @@ final class Shop {
     /// Resolved once per load rather than asked per row: the sidebar redraws
     /// constantly and the answer only changes when the book does.
     var features: Set<String> = []
+    /// What Simple does with each row of the shared Simple map
+    /// (`lib/feature-tiers.js SIMPLE_MAP`, asked through `simpleSurface`):
+    /// filled by `readFeatures` beside `features`. Empty is Professional.
+    var simpleSurfaces: [String: KhaytEngine.SimpleSurface] = [:]
+    /// Each job's next step, by `lib/order-next-step.js` (S1): filled once a
+    /// load and at each new day, beside the late badges (`resolveLate`).
+    var nextSteps: [String: KhaytEngine.NextSteps] = [:]
+    /// In Simple: which of the four board columns each open job is filed
+    /// under, and the note its card carries (`lib/order-status.js
+    /// simpleStageOf`, asked through `simpleStage`). Filled by `readFeatures`;
+    /// empty in Professional.
+    var simpleFiling: [String: KhaytEngine.SimpleStage] = [:]
 
     // Stored for "Money received" (Shop+Money.swift).
     /// The job waiting for someone to say what was paid.
@@ -3061,6 +3128,27 @@ final class Shop {
 
     /// The last print that ended on each machine, as `printFinished` saw it.
     var lastPrintEnded: [String: FinishCamera.Ended] = [:]
+    /// And when: `Ended` carries no time, and the menu bar panel says "Free
+    /// since 9:10 am" and holds a finished print's green for a few seconds.
+    var lastPrintEndedAt: [String: Date] = [:]
+    /// Shop events that could not be sent when they happened: the cloud was
+    /// locked on this Mac, or the post failed. Sent at the next chance
+    /// (`flushPendingEvents`). This run's only, and bounded.
+    /// Kept across a quit, sealed (`Shop+HeldEvents.swift`): every change is written.
+    @ObservationIgnored var pendingEvents: [Shop.PendingEvent] = [] {
+        didSet { if pendingEvents != oldValue { keepHeldEvents() } }
+    }
+    /// Which write of the held alerts is the latest (`keepHeldEvents`).
+    @ObservationIgnored var heldEventsGeneration = 0
+    /// Where held alerts are kept: this Mac's preferences in the app, and
+    /// nothing in a test runner (no bundle id) unless the test hands in its own
+    /// — sealing reaches the Keychain, and a Keychain dialog hangs a test run.
+    @ObservationIgnored var heldEventsDefaults: UserDefaults? =
+        Bundle.main.bundleIdentifier != nil ? .standard : nil
+    /// How a printer's own history is read when an end was missed. Nil is
+    /// `PrinterWatch.history`; tests put the printer's answer here.
+    @ObservationIgnored var historyFetch: (@MainActor (Machine, KhaytEngine) async throws -> [JSONValue])?
+    @ObservationIgnored var pendingEventsTriedAt: Date?
 
     // Stored for "A job's photo, on its product" (Shop+Jobs.swift).
     /// The job whose invoice is on screen.
@@ -3119,6 +3207,12 @@ final class Shop {
     var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
     /// The connector a file asked to install, waiting on the shop's OK.
     var connectorOffer: ConnectorOffer?
+    /// Installed connectors with an update waiting on the shop's yes: the
+    /// steel count on Settings ▸ Integrations (`Shop+ConnectorUpdates.swift`).
+    var connectorUpdatesWaiting = 0
+    /// How the update check fetches bytes. Nil is `fetchConnectorBytes`; tests
+    /// put a stand-in here so no request reaches the network.
+    var connectorFetch: (@Sendable (URL, Int) async throws -> Data)?
     /// Where this Mac keeps its dev connectors (`DevConnectors`); tests use their own suite.
     var devConnectorDefaults: UserDefaults = .standard
     /// Bumped on every write to the dev connectors, which the book's reload never sees.
@@ -3302,6 +3396,12 @@ final class Shop {
     var libraryFitsOn: String? { didSet { if libraryFitsOn != oldValue { libraryViewChanged() } } }
     /// One creator's models. See `LibraryFile.creator`.
     var libraryCreator: String? { didSet { libraryViewChanged() } }
+    /// The Colour menu's chosen rows — colour families, `multi`, `none`
+    /// (`LibraryFile.colourTokens`). Several are OR: a model under any of
+    /// them is in.
+    var libraryColours: Set<String> = [] { didSet { if libraryColours != oldValue { libraryViewChanged() } } }
+    /// The File type menu's chosen rows (`ModelFileType` raw values), OR.
+    var libraryFileTypes: Set<String> = [] { didSet { if libraryFileTypes != oldValue { libraryViewChanged() } } }
     /// The library as models (true, the default — "All models") or as
     /// folders ("Groups"). In All models a group that is one print in parts is
     /// still one tile; see `libraryEntries`.

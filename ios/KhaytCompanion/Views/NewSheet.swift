@@ -23,24 +23,23 @@ struct NewSheet: View {
         let title: String
         let detail: String
         let icon: String
-        let tone: Color
         var id: Choice { choice }
     }
 
     private var tiles: [Tile] {
         [
             Tile(choice: .job, title: L10n.tr("order.new.title"), detail: L10n.tr("new.job.detail"),
-                 icon: "square.stack.3d.up", tone: KhaytDesign.brand),
+                 icon: "square.stack.3d.up"),
             Tile(choice: .quoteFile, title: L10n.tr("quote.file.pick"), detail: L10n.tr("new.quote_file.detail"),
-                 icon: "doc", tone: KhaytDesign.attention),
+                 icon: "doc"),
             Tile(choice: .spool, title: L10n.tr("home.action.add_spool"), detail: L10n.tr("new.spool.detail"),
-                 icon: "viewfinder", tone: KhaytDesign.live),
+                 icon: "viewfinder"),
             Tile(choice: .calculator, title: L10n.tr("home.action.calculator"), detail: L10n.tr("new.calculator.detail"),
-                 icon: "function", tone: KhaytDesign.collect),
+                 icon: "function"),
             Tile(choice: .expense, title: L10n.tr("home.action.expense"), detail: L10n.tr("new.expense.detail"),
-                 icon: "doc.text.viewfinder", tone: KhaytDesign.note),
+                 icon: "doc.text.viewfinder"),
             Tile(choice: .waste, title: L10n.tr("home.action.waste"), detail: L10n.tr("new.waste.detail"),
-                 icon: "exclamationmark.triangle", tone: KhaytDesign.late),
+                 icon: "exclamationmark.triangle"),
         ]
     }
 
@@ -81,14 +80,16 @@ struct NewSheet: View {
             }
             .background(KhaytDesign.ground.ignoresSafeArea())
             .navigationTitle(L10n.tr("new.title"))
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("common.close")) { dismiss() }
                 }
             }
         }
-        .presentationDetents([.large, .medium])
+        // Full height: at the medium detent two of the six choices sat
+        // below the fold (review W4, Figma 28:83).
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
@@ -101,10 +102,12 @@ struct NewSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             Image(systemName: tile.icon)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(tile.tone)
+                .foregroundStyle(KhaytDesign.brand)
                 .frame(width: 38, height: 38)
-                .background(tile.tone.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
-            Spacer(minLength: 14)
+                // One tint for every tile: the live/collect/attention tints
+                // borrowed status colours and said nothing.
+                .background(KhaytDesign.accentSoft, in: RoundedRectangle(cornerRadius: 10))
+            Spacer(minLength: 10)
             Text(tile.title)
                 .font(.khayt(16, .semibold, relativeTo: .headline))
                 .foregroundStyle(KhaytDesign.ink)
@@ -117,7 +120,7 @@ struct NewSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
         }
-        .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
         .padding(14)
         .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))
         .contentShape(RoundedRectangle(cornerRadius: KhaytDesign.radiusLG))

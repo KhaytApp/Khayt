@@ -47,6 +47,16 @@ struct KioskWindow: View {
     @State private var minute = 0
 
     var body: some View {
+        // A kiosk window restored onto a shop that is now Simple (S4).
+        if shop.professionalOnly("kiosk") {
+            PartOfProfessional(shop: shop, feature: shop.words.callIt("mac.kiosk_title"))
+                .frame(minWidth: 640, minHeight: 400)
+        } else {
+            board
+        }
+    }
+
+    private var board: some View {
         VStack(spacing: 0) {
             header
             if shop.machinesInUse.isEmpty {
@@ -189,14 +199,25 @@ struct KioskCardView: View {
 
     private var words: Words { shop.words }
 
-    /// The palette's own sentences, as the board uses them: printing is "hot",
-    /// held wants a person, and the ordinary course of a job is ordinary text.
+    /// The palette's own sentences, as the board uses them: printing is the
+    /// amber thread, held is purple, and the ordinary course of a job is
+    /// ordinary text. This is the GRAPHIC colour (border, bar, the chip's
+    /// wash); the chip's word takes `stateInk`.
     private var stateTint: Color {
         switch card.state {
-        case "printing", "busy": Khayt.hot
-        case "on_hold": Khayt.attention
+        case "printing", "busy": Khayt.thread
+        case "on_hold": Khayt.hold
         case "idle": Role.text3
         default: Role.text2
+        }
+    }
+
+    /// The colour of the state's WORD. Amber is about 2:1 on a white card, so
+    /// "Printing" is ink on an amber wash and never amber itself.
+    private var stateInk: Color {
+        switch card.state {
+        case "printing", "busy": Role.text
+        default: stateTint
         }
     }
 
@@ -251,7 +272,7 @@ struct KioskCardView: View {
                 if card.offline && card.state == "idle" {
                     chip(words.callIt("ad.no_reading"), Khayt.late)
                 } else {
-                    chip(stateWord, stateTint)
+                    chip(stateWord, stateTint, ink: stateInk)
                 }
             }
             if card.offline && card.state != "idle" {
@@ -302,13 +323,16 @@ struct KioskCardView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func chip(_ text: String, _ colour: Color) -> some View {
+    private func chip(_ text: String, _ colour: Color, ink: Color? = nil) -> some View {
         Text(text)
             .font(.system(size: 14 * scale, weight: .semibold))
             .padding(.horizontal, 10 * scale)
             .padding(.vertical, 4 * scale)
-            .foregroundStyle(colour)
-            .background(colour.opacity(0.14), in: Capsule())
+            .foregroundStyle(ink ?? colour)
+            // An amber wash at 14% is nothing at all on white; the thread has
+            // a wash of its own.
+            .background(colour == Khayt.thread ? AnyShapeStyle(Khayt.threadWash)
+                                               : AnyShapeStyle(colour.opacity(0.14)), in: Capsule())
             .lineLimit(1)
             .fixedSize()
     }

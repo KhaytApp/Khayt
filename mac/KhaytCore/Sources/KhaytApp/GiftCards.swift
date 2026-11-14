@@ -108,11 +108,11 @@ struct GiftCards: View {
                         HStack(spacing: 4) {
                             if closed(card) {
                                 Text(shop.words.callIt("mac.gc_closed"))
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(Khayt.faint)
                             } else {
                                 Text(Money.figure(card.balance ?? 0)).monospacedDigit()
                             }
-                            Text("/").foregroundStyle(.tertiary)
+                            Text("/").foregroundStyle(Khayt.faint)
                             Text(Money.text(card.initialBalance ?? 0, shop.currency))
                                 .monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -121,7 +121,7 @@ struct GiftCards: View {
                     .width(min: 140, ideal: 180)
                     TableColumn(shop.words.callIt("giftCardIssuedTo")) { card in
                         Text(holder(card) ?? "—")
-                            .foregroundStyle(holder(card) == nil ? .tertiary : .primary)
+                            .foregroundStyle(holder(card) == nil ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.primary))
                             .opacity(closed(card) ? 0.55 : 1)
                     }
                     .width(min: 120, ideal: 200)
@@ -130,7 +130,7 @@ struct GiftCards: View {
                     // nothing about the dates in it.
                     TableColumn(shop.words.callIt("giftCardExpires")) { card in
                         Text(card.expiresAt ?? "—").monospacedDigit()
-                            .foregroundStyle(card.expiresAt == nil ? .tertiary : .secondary)
+                            .foregroundStyle(card.expiresAt == nil ? AnyShapeStyle(Khayt.faint) : AnyShapeStyle(.secondary))
                             .opacity(closed(card) ? 0.55 : 1)
                     }
                     .width(min: 100, ideal: 130)

@@ -47,7 +47,7 @@
 "settings.connection" = "Verbindung";
 "settings.connection.footer" = "Dieselbe PIN wie in Khayt, Einstellungen → LAN-API. Desktop ab Version 2.2.1 erforderlich.";
 "settings.shop_name" = "Name des Shops";
-"settings.host" = "Desktop-IP oder Hostname";
+"settings.host" = "Adresse des Mac oder PC";
 "settings.port" = "Port: %d";
 "settings.pin" = "LAN-PIN des Inhabers";
 "settings.retest" = "Kopplung erneut testen";
@@ -59,7 +59,6 @@
 "settings.notify.connection" = "Verbindung verloren";
 "settings.notify.overdue" = "Überfällige Aufträge";
 "settings.notify.low_stock" = "Wenig Filament";
-"settings.docs" = "LAN-API-Referenz";
 
 /* Status */
 "status.quote" = "Angebot";
@@ -570,6 +569,7 @@
 "alert.print.finished" = "Druck abgeschlossen";
 "alert.print.failed" = "Druck fehlgeschlagen";
 "alert.print.cancelled" = "Druck abgebrochen";
+"alert.print.ended" = "Druck beendet – Drucker prüfen";
 "alert.print.a_job" = "Ein Auftrag";
 "alert.print.move_post" = "In die Nachbearbeitung verschieben";
 "alert.print.reprint" = "Zurück in die Warteschlange";
@@ -836,6 +836,28 @@
 "library.priced_here" = "Auf diesem iPhone mit deinen Preisen berechnet. Ein mehrfarbiges Modell wird auf einer Spule berechnet, daher kann der Wert des Macs leicht abweichen.";
 "library.no_copy" = "Der Mac ist nicht erreichbar. Melde dich in den Einstellungen bei Khayt Cloud an und synchronisiere einmal, dann ist deine Bibliothek dabei.";
 
+/* Library filters: Colour and File type */
+"colour.pink" = "Rosa";
+"colour.brown" = "Braun";
+"library.filter.colour" = "Farbe";
+"library.filter.type" = "Dateityp";
+"library.filter.multi" = "Mehrfarbig";
+"library.filter.none" = "Keine Farbangabe";
+"library.type.3mf" = "3MF";
+"library.type.stl" = "STL";
+"library.type.step" = "STEP";
+"library.type.obj" = "OBJ";
+"library.type.gcode" = "G-Code";
+"library.type.other" = "Andere";
+"library.type.nofile" = "Keine Datei (aus dem Web)";
+"library.filter.colour_hint" = "Wähle mehrere, um Modelle mit einer davon zu sehen.";
+"library.filter.counts_hint" = "Die Zahlen gelten für die Bibliothek mit den anderen Filtern. Eine leere Zeile wird ausgegraut, nicht entfernt.";
+"library.filter.n_of_m" = "%1$d von %2$d";
+"library.filter.pill" = "%1$@: %2$@";
+"library.filter.remove" = "%@ entfernen";
+"library.filter.row" = "%1$@: %2$d";
+"library.filter.chosen" = "%1$@, gewählt: %2$d";
+
 /* Catalogue */
 "catalogue.title" = "Produktkatalog";
 "catalogue.search" = "Produkte suchen";
@@ -1008,7 +1030,7 @@
 "new.calculator.detail" = "Druck von Hand kalkulieren";
 "new.expense.detail" = "Foto vom Beleg";
 "new.waste.detail" = "Fehldruck oder Spülung";
-"new.more" = "Mehr";
+"new.more" = "Außerdem";
 /* Shop papers and quote tools on the phone (Nov 2026) */
 "paper.section" = "Papiere";
 "paper.packing_slip" = "Packzettel";
@@ -1181,6 +1203,11 @@
 "connectors.status.not_reviewed" = "Nicht geprüft";
 "connectors.status.off" = "Aus";
 "connectors.status.invalid" = "Nicht lesbar";
+"connectors.status.revoked" = "Von Khayt pausiert";
+"plg.update_updated" = "%1$@ auf %2$@ aktualisiert";
+"plg.update_revoked" = "Khayt hat Version %@ zurückgezogen, daher ist sie pausiert.";
+"plg.update_needs_app" = "%1$@ %2$@ benötigt eine neuere Version von Khayt.";
+"plg.update_pending" = "%1$@ %2$@ wartet auf dem Mac auf Ihre Zustimmung.";
 "connectors.yes" = "Ja";
 "connectors.no" = "Nein";
 "connectors.settings.title" = "Shop-Einstellungen";
@@ -1283,6 +1310,18 @@
 "diag.refused.wrong_shop" = "abgelehnt: falsche Werkstatt";
 "diag.refused.empty" = "abgelehnt: leer";
 
+/* Connector update badges (frame 21:729) */
+"connectors.badge.pending" = "Braucht dein OK am Mac";
+"connectors.badge.updated" = "Aktualisiert auf %@";
+"connectors.badge.needs_app" = "Braucht ein neueres Khayt";
+"connectors.waiting_count" = "Wartet auf den Mac: %d";
+"intake.waiting" = "Wartet";
+"spool.low" = "Knapp";
+"stage.a11y.done" = "Erledigt";
+"order.new.hint.client" = "Auswählen oder Namen eingeben";
+"order.new.hint.project" = "Was ist es? z. B. ein Teilename";
+"order.new.hint.material" = "z. B. PLA, schwarz";
+
 /* A read that failed (UI review F3) */
 "load.failed.title" = "Laden fehlgeschlagen";
 "load.retry" = "Erneut versuchen";
@@ -1312,3 +1351,71 @@
 "job.money.owing_overdue" = "Offen · überfällig";
 "job.parts.on_machine" = "Auf %@";
 "job.money.quote_sent" = "Gesendet";
+/* Settings in groups (S2) */
+"settings.search" = "Einstellungen durchsuchen";
+"settings.search.none" = "Keine Einstellung passt zu „%@“.";
+"settings.group.this_phone" = "Dieses iPhone";
+"settings.group.shop" = "Werkstatt";
+"settings.group.connected" = "Verbunden";
+"settings.group.about" = "Über";
+"settings.appearance" = "Darstellung & Sprache";
+"settings.shop_details" = "Werkstattdaten";
+"settings.shop.readonly" = "Auf dem Mac festgelegt · hier nur lesbar";
+"settings.phones_wifi" = "iPhones & WLAN";
+"settings.cloud.sub" = "Abgleich und Kundenseiten";
+"settings.help" = "Hilfe";
+"settings.diag.sub" = "Was dieses iPhone hat, letzte Abgleiche";
+"settings.diag.syncs" = "Letzte Abgleiche";
+"state.paired" = "Gekoppelt";
+"state.away" = "Nicht erreichbar";
+"state.not_paired" = "Nicht gekoppelt";
+"state.signed_in" = "Angemeldet";
+"state.needs_sign_in" = "Anmeldung nötig";
+"state.on" = "Ein";
+"state.off" = "Aus";
+/* S4: Simple mode */
+"mode.simple" = "Einfach";
+"mode.professional" = "Professionell";
+"mode.badge.a11y" = "Modus: %@, auf dem Mac festgelegt";
+"simple.stage.ready" = "Fertig";
+"simple.note.on_hold" = "Pausiert";
+"simple.note.post" = "Nachbearbeitung";
+"simple.note.qc" = "In Prüfung";
+"simple.note.shipped" = "Versandt";
+"simple.note.delivered" = "Übergeben";
+"simple.expenses.month" = "Diesen Monat: %@ · %@";
+"simple.gate.care.title" = "Wartungspläne gehören zu Professionell";
+"simple.gate.care.body" = "Dieser Shop ist auf dem Mac auf Einfach gestellt. Für Wartungspläne wechsle in Khayt auf deinem Mac zu Professionell. Das Telefon folgt der Wahl des Macs.";
+"simple.gate.parts.title" = "Teile zum Kaufen gehört zu Professionell";
+"simple.gate.parts.body" = "Dieser Shop ist auf dem Mac auf Einfach gestellt. Die Teileliste stammt aus den Wartungsplänen, die zu Professionell gehören: wechsle in Khayt auf deinem Mac. Das Telefon folgt der Wahl des Macs.";
+"simple.gate.back_machine" = "Zurück zur Maschine";
+"simple.gate.back_machines" = "Zurück zu Maschinen";
+"simple.expenses.count" = "%d Ausgaben";
+"PUSH_GENERIC" = "In deiner Werkstatt gibt es etwas zu sehen";
+"push.not_connected" = "Benachrichtigungen erreichen dieses iPhone noch nicht. Khayt versucht es beim nächsten Öffnen erneut.";
+/* Home — Needs you */
+"home.greeting.morning" = "Guten Morgen.";
+"home.greeting.afternoon" = "Guten Tag.";
+"home.greeting.evening" = "Guten Abend.";
+"needs.title" = "Braucht dich";
+"needs.none" = "Gerade braucht dich nichts.";
+"needs.calm" = "Keine verspäteten Aufträge, das Regal ist voll und niemand wartet.";
+"needs.late.one" = "%1$@ war am %2$@ fällig";
+"needs.late.action" = "Verspätete öffnen";
+"needs.low.title" = "Das Regal wird leer";
+"needs.low.left" = "%1$@ noch %2$@";
+"needs.low.action" = "Lager ansehen";
+"needs.waiting.action" = "Anfragen öffnen";
+"needs.quotes.action" = "Angebote öffnen";
+"tile.owed" = "Dir geschuldet";
+"tile.machines" = "Auf den Maschinen";
+"tile.machines.value" = "%1$d von %2$d";
+"tile.machines.sub" = "drucken gerade";
+"needs.due_week" = "Diese Woche fällig";
+"needs.this_year" = "%@ dieses Jahr";
+"needs.owed" = "%@ offen";
+"needs.count" = "%d Dinge brauchen dich.";
+"needs.late" = "%d Aufträge sind verspätet";
+"needs.low.count" = "%d Spulen fast leer";
+"needs.quotes" = "%d Angebote warten auf Antwort";
+"needs.more" = "und %d weitere";
