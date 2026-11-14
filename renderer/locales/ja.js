@@ -874,6 +874,7 @@
   "oe.delete_refused_invoiced": "{id} には請求書番号があるため削除できません（請求書番号に欠番が生じます）。代わりに注文をキャンセルしますか？",
   "oe.delete_refused_paid": "{id} には支払いが記録されているため削除できません。代わりに注文をキャンセルしますか？",
   "oe.delete_refused_cancelled": "{id} はすでにキャンセル済みです。請求書番号または支払いがあるため記録に残ります。",
+  "oe.paid_exceeds_price": "保存できません：価格が支払済みの {paid} を下回ります。先に返金を記録するか、価格をそのままにしてください。",
   "oe.cancel_job": "注文をキャンセル",
   "oe.undo": "元に戻す",
   "oe.discount_pct": "割引",

@@ -874,6 +874,7 @@
   "oe.delete_refused_invoiced": "{id} bir fatura numarasına sahip, bu yüzden silinemez — fatura sıranızda boşluk bırakır. Bunun yerine sipariş iptal edilsin mi?",
   "oe.delete_refused_paid": "{id} için ödeme kaydedilmiş, bu yüzden silinemez. Bunun yerine sipariş iptal edilsin mi?",
   "oe.delete_refused_cancelled": "{id} zaten iptal edildi. Fatura numarası veya ödemesi olduğu için kayıtta kalır.",
+  "oe.paid_exceeds_price": "Kaydedilemiyor: fiyat, ödenmiş olan {paid} tutarının altına düşer. Önce bir iade kaydedin ya da fiyatı koruyun.",
   "oe.cancel_job": "Siparişi iptal et",
   "oe.undo": "Geri al",
   "oe.discount_pct": "İndirim",
