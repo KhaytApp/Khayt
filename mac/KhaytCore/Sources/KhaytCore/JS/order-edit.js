@@ -944,6 +944,15 @@
     return { ok: true, reason: null, changes, order };
   }
 
+  /** What the customer is billed for this job: the price, plus tax where the
+   *  shop adds it on top (`order-money` orderGrossRaw). */
+  function billedOf(order, ctx) {
+    const settingsCtx = ctx && ctx.settings ? { settings: ctx.settings } : undefined;
+    const Money = typeof globalThis !== 'undefined' ? globalThis.KhaytOrderMoney : undefined;
+    return (Money && typeof Money.orderGrossRaw === 'function')
+      ? Money.orderGrossRaw(order, settingsCtx) : (+order.price || 0);
+  }
+
   /**
    * One edit of a whole job, from the job sheet: customer, then details and
    * name, then parts, then a typed price — ONE history entry per kind as each
@@ -954,8 +963,10 @@
    *   clientId            → `changeCustomer` (its refusals are returned)
    *   project             → the job's name (`applyEdit`)
    *   parts               → `applyParts` (with `ctx.keepPrice`, `ctx.marginPct`)
-   *   price               → a typed total, last (`applyDetails`); refused with
-   *                         'paid_exceeds_price' when it is below what was paid
+   *   price               → a typed total, last (`applyDetails`)
+   *   Any of these that LOWERS the bill below what has been paid — a typed
+   *   total, a discount, shipping or an extra line taken off — is refused
+   *   with 'paid_exceeds_price' (step 'price').
    *   anything else `applyDetails` understands (notes, tags, due date,
    *   priority, discount, shipping, extra lines, courier…).
    *
@@ -987,21 +998,21 @@
     const details = Object.assign({}, n);
     for (const k of ['clientId', 'project', 'parts']) delete details[k];
     if (Object.keys(details).length) {
-      // A typed total below what has been paid is refused HERE, before the
-      // details rule would cap what was paid to fit it.
-      if (has(details, 'price')) {
-        const typed = optional(details.price);
-        if (typed !== null && typed >= 0) {
-          const probe = Object.assign({}, work, { price: Math.round(typed * 100) / 100 });
-          const settingsCtx = c.settings ? { settings: c.settings } : undefined;
-          const Money = typeof globalThis !== 'undefined' ? globalThis.KhaytOrderMoney : undefined;
-          const billed = (Money && typeof Money.orderGrossRaw === 'function')
-            ? Money.orderGrossRaw(probe, settingsCtx) : probe.price;
-          const paid = (optional(work.paidAmount) || 0) + (optional(work.giftCardDiscount) || 0);
-          if (paid > billed + 0.005) return stop('paid_exceeds_price', 'price');
-        }
-      }
+      // WHATEVER LOWERS THE BILL is held to what has been paid — a typed
+      // total, and just as much a discount raised, shipping taken off or an
+      // extra line removed (found by the iPhone lane, Nov 14: only the typed
+      // total was checked, and a discount went through). `applyDetails` and
+      // `repriceTerms` settle such a change by CAPPING what was paid, which
+      // is the money quietly disappearing from the record. So what was paid
+      // is read BEFORE they run, the bill after, and a bill below it is
+      // refused: refund or credit note first.
+      const paidBefore = (optional(work.paidAmount) || 0) + (optional(work.giftCardDiscount) || 0);
+      const billedBefore = billedOf(work, c);
       const r = applyDetails(work, details, c);
+      const billedAfter = billedOf(work, c);
+      if (billedAfter < billedBefore - 0.005 && paidBefore > billedAfter + 0.005) {
+        return stop('paid_exceeds_price', 'price');
+      }
       if (r.changed) changed = true;
     }
     if (!changed) return { ok: true, reason: null, step: null, changed: false };
