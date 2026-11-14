@@ -289,6 +289,7 @@ function renderLogs() {
           <!-- ── Dropdown menu ── -->
           <div class="row-actions-menu" data-for="${log.id}">
             <!-- Documents -->
+            <button class="menu-item" data-act="job-page" data-id="${escapeHtml(log.id)}">📄 ${escapeHtml(t('jp.open_page'))}</button>
             <div class="menu-label">${escapeHtml(t('menu.documents') || 'Documents')}</div>
             ${typeof payLinkCanSend === 'function' && payLinkCanSend(log) ? `<button class="menu-item" data-act="qpl-send" data-id="${escapeHtml(log.id)}">💳 ${escapeHtml(t('qpl.send'))}</button>` : ''}
             <button class="menu-item" data-act="inv-wa"  data-id="${log.id}">📱 ${escapeHtml(t('inv.share_whatsapp'))}</button>

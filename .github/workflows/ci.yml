@@ -358,6 +358,10 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:paylink
 
+      - name: E2E smoke (job page read side, next step, track, parts, money)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:jobpage
+
       - name: E2E smoke (pay link v2 keys in Settings, switched off by default)
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:paylinkkeys
