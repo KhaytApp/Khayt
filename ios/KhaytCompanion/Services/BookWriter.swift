@@ -177,6 +177,19 @@ struct BookWriter {
         }
     }
 
+    /// A quote shared with its customer: `quoteSharedAt`, the stamp the shared
+    /// next-step rule counts as "sent" (`quoteSentAt` is written on every
+    /// quote at creation, so it says nothing). The first share is kept.
+    func markQuoteShared(orderId: String, now: Date = Date()) async throws {
+        let at = ISO8601DateFormatter().string(from: now)
+        try await rewriteOrder(orderId) { row, _ in
+            guard case .object(var o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
+            if let had = o["quoteSharedAt"], had != .null { return nil }
+            o["quoteSharedAt"] = .string(at)
+            return .object(o)
+        }
+    }
+
     /// One job worked out by the engine and written back — the compare-and-
     /// swap `setOrderStatus` does: worked out against the book as read, and
     /// written only if the book is still that book, otherwise worked out

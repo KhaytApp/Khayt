@@ -1327,6 +1327,30 @@
 "load.retry" = "再試行";
 "load.book_unavailable" = "このiPhoneで帳簿を読み込めませんでした。もう一度試すか、Macに接続できるか確認してください。";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "次";
+"job.next.start_printing" = "印刷を開始";
+"job.next.mark_printed" = "印刷済みにする";
+"job.next.send_to_qc" = "検品へ";
+"job.next.mark_ready" = "準備完了にする";
+"job.next.hand_over" = "引き渡す";
+"job.next.resume" = "再開";
+"job.next.done" = "完了・支払済み";
+"job.next.none" = "することはありません";
+"job.more" = "その他";
+"job.more.label" = "このジョブのその他の操作";
+"job.header.due" = "期限 %@";
+"job.day_late" = "1日遅れ";
+"job.days_late" = "%d日遅れ";
+"job.section.parts" = "パーツ";
+"job.section.money" = "金額";
+"job.section.activity" = "アクティビティ";
+"job.money.price" = "価格";
+"job.money.paid" = "支払済み";
+"job.money.owing" = "未払い";
+"job.money.owing_overdue" = "未払い · 期限超過";
+"job.parts.on_machine" = "%@で印刷中";
+"job.money.quote_sent" = "送付日";
 /* Settings in groups (S2) */
 "settings.search" = "設定を検索";
 "settings.search.none" = "「%@」に一致する設定はありません。";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "残り少ないスプール %d個";
 "needs.quotes" = "返答待ちの見積もり %d件";
 "needs.more" = "ほか%d件";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "見積もりを送る";
+"job.next.take_job" = "仕事を受ける";
+"job.next.hold" = "保留にする";
+"job.next.fail_check" = "QC不合格";
+"job.blocked.production_paused" = "生産が一時停止されています — 新しい印刷を開始する前に再開してください。";
+"job.blocked.wip" = "「%2$@」のWIP上限（%1$@）に達しました — 移動をブロックしました";
+"job.blocked.assembly_not_assembled" = "全パーツがQCに合格しました — 注文を完了するにはアセンブリを組み立て済みにしてください。";
+"job.blocked.assembly_parts" = "待機中のパーツ: %@";
+"job.blocked.other" = "ここではできません";
+"job.pill.paid" = "支払い済み";

@@ -1327,6 +1327,30 @@
 "load.retry" = "Erneut versuchen";
 "load.book_unavailable" = "Das Buch konnte auf diesem iPhone nicht gelesen werden. Versuche es erneut oder prüfe, ob der Mac erreichbar ist.";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Weiter";
+"job.next.start_printing" = "Druck starten";
+"job.next.mark_printed" = "Als gedruckt markieren";
+"job.next.send_to_qc" = "Zur QS";
+"job.next.mark_ready" = "Als fertig markieren";
+"job.next.hand_over" = "Übergeben";
+"job.next.resume" = "Fortsetzen";
+"job.next.done" = "Fertig und bezahlt";
+"job.next.none" = "Nichts zu tun";
+"job.more" = "Mehr";
+"job.more.label" = "Weitere Aktionen für diesen Auftrag";
+"job.header.due" = "fällig %@";
+"job.day_late" = "1 Tag zu spät";
+"job.days_late" = "%d Tage zu spät";
+"job.section.parts" = "Teile";
+"job.section.money" = "Geld";
+"job.section.activity" = "Aktivität";
+"job.money.price" = "Preis";
+"job.money.paid" = "Bezahlt";
+"job.money.owing" = "Offen";
+"job.money.owing_overdue" = "Offen · überfällig";
+"job.parts.on_machine" = "Auf %@";
+"job.money.quote_sent" = "Gesendet";
 /* Settings in groups (S2) */
 "settings.search" = "Einstellungen durchsuchen";
 "settings.search.none" = "Keine Einstellung passt zu „%@“.";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d Spulen fast leer";
 "needs.quotes" = "%d Angebote warten auf Antwort";
 "needs.more" = "und %d weitere";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Angebot senden";
+"job.next.take_job" = "Auftrag annehmen";
+"job.next.hold" = "Zurückstellen";
+"job.next.fail_check" = "QK nicht bestanden";
+"job.blocked.production_paused" = "Produktion ist pausiert — fortsetzen vor dem Start neuer Drucke.";
+"job.blocked.wip" = "WIP-Limit (%1$@) für „%2$@“ erreicht — Verschieben blockiert";
+"job.blocked.assembly_not_assembled" = "Alle Teile haben die QK bestanden — markiere die Baugruppe als zusammengebaut, um abzuschließen.";
+"job.blocked.assembly_parts" = "Wartet auf Teil(e): %@";
+"job.blocked.other" = "Hier nicht möglich";
+"job.pill.paid" = "Bezahlt";

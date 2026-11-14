@@ -1327,6 +1327,30 @@
 "load.retry" = "Try again";
 "load.book_unavailable" = "The book couldn't be read on this phone. Try again, or check that the Mac is in reach.";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Next";
+"job.next.start_printing" = "Start printing";
+"job.next.mark_printed" = "Mark printed";
+"job.next.send_to_qc" = "Send to QC";
+"job.next.mark_ready" = "Mark ready";
+"job.next.hand_over" = "Hand over";
+"job.next.resume" = "Resume";
+"job.next.done" = "Done and paid";
+"job.next.none" = "Nothing to do";
+"job.more" = "More";
+"job.more.label" = "More actions for this job";
+"job.header.due" = "due %@";
+"job.day_late" = "1 day late";
+"job.days_late" = "%d days late";
+"job.section.parts" = "Parts";
+"job.section.money" = "Money";
+"job.section.activity" = "Activity";
+"job.money.price" = "Price";
+"job.money.paid" = "Paid";
+"job.money.owing" = "Owing";
+"job.money.owing_overdue" = "Owing · overdue";
+"job.parts.on_machine" = "On %@";
+"job.money.quote_sent" = "Sent";
 /* Settings in groups (S2) */
 "settings.search" = "Search settings";
 "settings.search.none" = "No setting matches “%@”.";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d spools low";
 "needs.quotes" = "%d quotes are waiting for an answer";
 "needs.more" = "and %d more";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Send quote";
+"job.next.take_job" = "Take job";
+"job.next.hold" = "Put on hold";
+"job.next.fail_check" = "Failed QC";
+"job.blocked.production_paused" = "Production is paused — resume before starting new prints.";
+"job.blocked.wip" = "WIP limit (%1$@) reached for “%2$@” — move blocked";
+"job.blocked.assembly_not_assembled" = "All parts passed QC — mark the assembly as assembled to complete this order.";
+"job.blocked.assembly_parts" = "Waiting on part(s): %@";
+"job.blocked.other" = "Can’t be done from here";
+"job.pill.paid" = "Paid";

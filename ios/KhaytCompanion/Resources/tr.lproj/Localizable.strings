@@ -1327,6 +1327,30 @@
 "load.retry" = "Tekrar dene";
 "load.book_unavailable" = "Defter bu telefonda okunamadı. Tekrar deneyin ya da Mac'in erişimde olduğunu kontrol edin.";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Sıradaki";
+"job.next.start_printing" = "Baskıyı başlat";
+"job.next.mark_printed" = "Basıldı olarak işaretle";
+"job.next.send_to_qc" = "Kalite kontrole gönder";
+"job.next.mark_ready" = "Hazır olarak işaretle";
+"job.next.hand_over" = "Teslim et";
+"job.next.resume" = "Devam ettir";
+"job.next.done" = "Bitti ve ödendi";
+"job.next.none" = "Yapılacak bir şey yok";
+"job.more" = "Diğer";
+"job.more.label" = "Bu iş için diğer işlemler";
+"job.header.due" = "teslim %@";
+"job.day_late" = "1 gün gecikmeli";
+"job.days_late" = "%d gün gecikmeli";
+"job.section.parts" = "Parçalar";
+"job.section.money" = "Para";
+"job.section.activity" = "Etkinlik";
+"job.money.price" = "Fiyat";
+"job.money.paid" = "Ödenen";
+"job.money.owing" = "Kalan";
+"job.money.owing_overdue" = "Kalan · gecikmiş";
+"job.parts.on_machine" = "%@ üzerinde";
+"job.money.quote_sent" = "Gönderildi";
 /* Settings in groups (S2) */
 "settings.search" = "Ayarlarda ara";
 "settings.search.none" = "“%@” ile eşleşen ayar yok.";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d makara azaldı";
 "needs.quotes" = "%d teklif yanıt bekliyor";
 "needs.more" = "ve %d tane daha";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Teklifi gönder";
+"job.next.take_job" = "İşi al";
+"job.next.hold" = "Askıya al";
+"job.next.fail_check" = "KK’den geçmedi";
+"job.blocked.production_paused" = "Üretim duraklatıldı — yeni baskılara başlamadan önce sürdürün.";
+"job.blocked.wip" = "“%2$@” için WIP limitine (%1$@) ulaşıldı — taşıma engellendi";
+"job.blocked.assembly_not_assembled" = "Tüm parçalar KK’den geçti — siparişi tamamlamak için montajı monte edildi olarak işaretleyin.";
+"job.blocked.assembly_parts" = "Beklenen parça(lar): %@";
+"job.blocked.other" = "Buradan yapılamaz";
+"job.pill.paid" = "Ödendi";
