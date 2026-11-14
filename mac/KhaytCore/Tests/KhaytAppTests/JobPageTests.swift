@@ -136,4 +136,16 @@ struct JobPageTests {
         #expect(inspector.contains("if !embedded { header }"))
         #expect(inspector.contains("shop.nextStep(for: job.id)"), "the inspector's own button is unchanged")
     }
+
+    @Test("the list leads with open work; finished and cancelled jobs follow, newest first")
+    func listOrder() async {
+        let shop = await Self.shop()
+        let rows = JobsList.ordered(shop.orders)
+        #expect(rows.count == shop.orders.count)
+        let over: Set<Stage> = [.completed, .shipped, .delivered, .cancelled]
+        let firstOver = rows.firstIndex { Stage.of($0).map(over.contains) ?? false } ?? rows.count
+        #expect(rows[..<firstOver].allSatisfy { !(Stage.of($0).map(over.contains) ?? false) })
+        #expect(rows[firstOver...].allSatisfy { Stage.of($0).map(over.contains) ?? false }, "no open job below a finished one")
+        #expect(firstOver > 0, "the sample has open work")
+    }
 }

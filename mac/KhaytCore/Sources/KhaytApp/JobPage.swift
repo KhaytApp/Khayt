@@ -15,8 +15,18 @@ import KhaytCore
 struct JobsList: View {
     @Bindable var shop: Shop
 
-    /// The order work is done in: urgent, then due, then longest waiting.
-    private var rows: [Order] { Shop.boardSorted(shop.shown) }
+    private var rows: [Order] { Self.ordered(shop.shown) }
+
+    /// Open work first, in the order it is done (urgent, then due, then
+    /// longest waiting); then what is finished or called off, newest first.
+    /// A list that led with last month's completed jobs made the shop scroll
+    /// for the thing it came to do.
+    nonisolated static func ordered(_ jobs: [Order]) -> [Order] {
+        let over: Set<Stage> = [.completed, .shipped, .delivered, .cancelled]
+        let open = jobs.filter { Stage.of($0).map { !over.contains($0) } ?? true }
+        let rest = jobs.filter { Stage.of($0).map(over.contains) ?? false }
+        return Shop.boardSorted(open) + rest.sorted { ($0.completedAt ?? $0.date) > ($1.completedAt ?? $1.date) }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
