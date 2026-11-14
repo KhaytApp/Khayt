@@ -3,6 +3,7 @@
 "alert.print.finished" = "打印完成";
 "alert.print.failed" = "打印失败";
 "alert.print.cancelled" = "打印已取消";
+"alert.print.ended" = "打印已结束——请检查打印机";
 "alert.print.a_job" = "一个作业";
 "alert.print.move_post" = "移至后处理";
 "alert.print.reprint" = "放回队列";

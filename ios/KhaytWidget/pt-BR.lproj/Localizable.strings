@@ -49,3 +49,5 @@
 /* Queue widget gallery name and description (KhaytQueueWidget.swift) */
 "Khayt Queue" = "Khayt Fila";
 "Queue counts and live print progress from your shop." = "Contagens da fila e progresso de impressão ao vivo da sua oficina.";
+"Print ended — check the printer" = "Impressão encerrada — confira a impressora";
+"Ended" = "Encerrada";
