@@ -3787,6 +3787,21 @@ final class Words {
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],
         "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
+        // Parts on an existing job go through the shared rule (S1 B3a):
+        // its locks, its refusal, and the price question.
+        "mac.parts_locked_zatca": ["en": "This job’s invoice was sent to ZATCA, so its parts can’t be changed.", "ar": "أُرسلت فاتورة هذه المهمة إلى هيئة الزكاة، فلا يمكن تغيير قطعها."],
+        "mac.parts_locked_voided": ["en": "This job’s invoice was voided, so its parts can’t be changed.", "ar": "أُلغيت فاتورة هذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.parts_locked_credited": ["en": "A credit note was issued for this job, so its parts can’t be changed.", "ar": "صدر إشعار دائن لهذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.parts_locked_cancelled": ["en": "This job was cancelled, so its parts can’t be changed.", "ar": "أُلغيت هذه المهمة، فلا يمكن تغيير قطعها."],
+        "mac.parts_name_only": ["en": "This job is finished and its filament is already counted, so only a part’s name can change. For anything else, record a spool switch or a reprint.", "ar": "هذه المهمة منتهية وخيوطها محسوبة، فلا يمكن تغيير سوى اسم القطعة. لأي شيء آخر سجّل تبديل بكرة أو إعادة طباعة."],
+        "mac.parts_delivered_fixed": ["en": "A part the customer already has can’t be changed or removed.", "ar": "لا يمكن تغيير أو حذف قطعة استلمها العميل."],
+        "mac.parts_paid_exceeds": ["en": "This change would bring the bill below what has been paid. Refund the difference or issue a credit note first.", "ar": "هذا التغيير يجعل الفاتورة أقل مما دُفع. أعد الفرق أو أصدر إشعارًا دائنًا أولًا."],
+        "mac.parts_last": ["en": "A job needs at least one part.", "ar": "تحتاج المهمة إلى قطعة واحدة على الأقل."],
+        "mac.parts_price_q": ["en": "The customer has seen this job’s price. Keep it, or use the new one?", "ar": "رأى العميل سعر هذه المهمة. هل تُبقيه أم تستخدم السعر الجديد؟"],
+        "mac.parts_keep_price": ["en": "Keep the price", "ar": "إبقاء السعر"],
+        "mac.parts_use_new_price": ["en": "Use the new price", "ar": "استخدام السعر الجديد"],
+        "mac.parts_remove": ["en": "Remove part…", "ar": "حذف القطعة…"],
+        "mac.parts_remove_q": ["en": "Remove “{name}” from this job?", "ar": "حذف «{name}» من هذه المهمة؟"],
         // Partial delivery and the spool switch on a job's parts (the
         // desktop's `openPartialDeliveryModal` / `openSpoolSwitchModal`).
         // The titles and the count line are the desktop's own `ord.*` words.

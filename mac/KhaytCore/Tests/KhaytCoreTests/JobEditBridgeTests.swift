@@ -31,8 +31,12 @@ struct JobEditBridgeTests {
     @Test("the lock and the margin cross as the rule gave them")
     func lockAndMargin() async throws {
         let engine = try KhaytEngine()
-        let open = try await engine.partsLock(Self.job())
-        #expect(open.code == nil && open.edit && open.addRemove && !open.askPrice)
+        // A draft quote follows its parts by itself; once the customer has
+        // seen the price (a shared quote, any accepted job) the sheet asks.
+        let draft = try await engine.partsLock(Self.job(["status": .string("quote")]))
+        #expect(draft.code == nil && draft.edit && draft.addRemove && !draft.askPrice)
+        #expect(try await engine.partsLock(Self.job(["status": .string("quote"), "quoteSharedAt": .string("2026-11-14T10:00:00Z")])).askPrice)
+        #expect(try await engine.partsLock(Self.job()).askPrice, "an accepted job")
         #expect(try await engine.partsLock(Self.job(["status": .string("printing")])).askPrice)
         let done = try await engine.partsLock(Self.job(["status": .string("completed")]))
         #expect(done.code == "deducted" && done.nameOnly && !done.addRemove)

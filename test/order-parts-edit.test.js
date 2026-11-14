@@ -341,3 +341,24 @@ test('applyJobEdit: nothing named, nothing changed', () => {
   assert.equal(JSON.stringify(o), before);
   assert.equal(E.applyJobEdit(null, {}, {}).reason, 'missing');
 });
+
+// ── Parts the book holds without an id (older books) ──────────────────────
+
+test('a part stored with no id is matched by its place, keeps its cost, and gets no made-up id', () => {
+  const noId = (cost, extra) => { const p = part(undefined, cost, extra); delete p.id; return p; };
+  const o = jobOf([noId(80), noId(40, { delivered: true })], { margin: 50 });
+  // The app shows them with ids it made up for the screen, and renames the first.
+  const shown = [Object.assign({}, o.parts[0], { id: 'screen-1', name: 'Body', unitCost: 99, baseCost: 99 }),
+                 Object.assign({}, o.parts[1], { id: 'screen-2' })];
+  const r = E.applyParts(o, shown, {});
+  assert.equal(r.ok, true, 'the delivered part was not read as removed');
+  assert.equal(o.parts[0].name, 'Body');
+  assert.equal(o.parts[0].baseCost, 80, 'frozen: it was not a new part');
+  assert.equal(o.parts[0].id, undefined, 'no id is written into the book');
+  assert.equal(o.price, 180);
+  // Changing what one costs still re-prices; removing the delivered one is still refused.
+  const heavier = Object.assign({}, o.parts[0], { printWeight: 200, unitCost: 120, baseCost: 120 });
+  assert.equal(E.applyParts(o, [heavier, o.parts[1]], { keepPrice: false }).ok, true);
+  assert.equal(o.price, 240);
+  assert.equal(E.applyParts(o, [o.parts[0]], {}).reason, 'delivered_part');
+});
