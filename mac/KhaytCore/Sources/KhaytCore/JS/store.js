@@ -81,6 +81,8 @@
     if (s.quotePayLink && typeof s.quotePayLink === 'object') {
       s.quotePayLink = { ...s.quotePayLink }; delete s.quotePayLink.secret; delete s.quotePayLink.secretSetAt;
     }
+    // Pay link v2: this computer's signing key, per device too.
+    delete s.quoteLinkKey;
     // Per-subscription webhook signing secrets.
     if (Array.isArray(s.webhooks?.subscriptions)) {
       s.webhooks.subscriptions = s.webhooks.subscriptions.map(sub => (
