@@ -123,16 +123,20 @@ extension Shop {
     /// connector that updated or was withdrawn), empty when nothing changed.
     @discardableResult
     func checkConnectorUpdates() async -> [String] {
+        // lock: system — the app's own hourly check of Khayt's signed index, not
+        // a person's action; what it may write is only what the index and
+        // the shop's earlier grants allow (an update that asks for more waits
+        // for the shop's Agree, which asks the lock).
         guard ConnectorUpdatesSwitch.isOn(), let engine, source.build != nil else { return [] }
         guard let prepared = await prepareConnectorCheck(engine: engine) else { return [] }
         var notes: [JSONValue] = []
-        let ok = await writeConnectorState { settings in
+        let ok = await writeConnectorState({ settings in
             let r = Self.object(try await engine.pluginApplyIndex(settings: .object(settings), index: prepared.index,
                                                                    ctx: prepared.ctx, fetched: prepared.fetched))
             guard r["ok"] == .bool(true), r["changed"] == .bool(true) else { return nil }
             if case .array(let n)? = r["notes"] { notes = n }
             return Self.object(r["settings"])
-        }
+        })
         await refreshConnectorUpdatesWaiting()
         guard ok else { return [] }
         return notes.compactMap { note in
@@ -275,7 +279,7 @@ extension Shop {
         var before: JSONValue?
         var after: JSONValue?
         var refused: String?
-        let ok = await writeConnectorState { settings in
+        let ok = await writeConnectorState({ settings in
             let r = Self.object(try await answer(settings))
             guard r["ok"] == .bool(true) else {
                 refused = Shop.plainString(r["reason"]) ?? ""
@@ -285,7 +289,7 @@ extension Shop {
             before = Self.entry(in: settings["plugins"] ?? .null, id: id)
             after = Self.entry(in: next["plugins"] ?? .null, id: id)
             return next
-        }
+        })
         await refreshConnectorUpdatesWaiting()
         if let refused { return .refused(refused) }
         guard ok, let after else { return .failed }
@@ -299,6 +303,7 @@ extension Shop {
     /// on the settings as they are on disk. `change` returns the new settings,
     /// or nil to write nothing; ONLY those two keys are taken from it.
     private func writeConnectorState(_ change: @escaping ([String: JSONValue]) async throws -> [String: JSONValue]?) async -> Bool {
+        // lock: callers — checkConnectorUpdates, applyConnectorAnswer
         guard let build = source.build else { settingsProblem = words.callIt("mac.move_sample"); return false }
         var wrote = false
         do {
