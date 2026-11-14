@@ -161,15 +161,20 @@ struct KhaytApp: App {
                     if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil {
                         WebSaveInbox.shared.start(shop: shop)
                     }
+                    // The steel count on Settings ▸ Integrations, from the book.
+                    await shop.refreshConnectorUpdatesWaiting()
                     // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
                     // while the app is open. After "Free up space" the cloud
                     // holds the only copy, and nothing else ever looks again —
                     // see `Shop.verifyCloudCopies`.
-                    // CONNECTOR UPDATES: the signed index, on launch and every
-                    // hour after, while updates are switched on
-                    // (`Shop+ConnectorUpdates`). What changed is said once.
-                    await shop.refreshConnectorUpdatesWaiting()
                     while !Task.isCancelled {
+                        await shop.verifyCloudCopiesIfDue()
+                        // WHAT ANOTHER MAC DID IN THE VAULT, applied here: on
+                        // launch and every hour after (`Shop+VaultApply`).
+                        await shop.applyVaultChangesIfDue()
+                        // CONNECTOR UPDATES: the signed index, on launch and
+                        // every hour after, while updates are switched on
+                        // (`Shop+ConnectorUpdates`). What changed is said once.
                         let notes = await shop.checkConnectorUpdates()
                         if !notes.isEmpty {
                             shop.moveNotices = notes
@@ -177,10 +182,6 @@ struct KhaytApp: App {
                                 Shop.notifyArrival(title: shop.words.callIt("plg.title"), body: n, id: "connector-update:\(i):" + n)
                             }
                         }
-                        await shop.verifyCloudCopiesIfDue()
-                        // WHAT ANOTHER MAC DID IN THE VAULT, applied here: on
-                        // launch and every hour after (`Shop+VaultApply`).
-                        await shop.applyVaultChangesIfDue()
                         try? await Task.sleep(for: .seconds(3600))
                     }
                 }

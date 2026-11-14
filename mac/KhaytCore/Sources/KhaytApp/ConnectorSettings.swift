@@ -507,7 +507,8 @@ struct ConnectorUpdateLists: View {
     }
 
     private func label(_ key: String, _ args: [String: JSONValue]) -> some View {
-        Text(shop.words.callIt(key, args).uppercased(with: Locale(identifier: shop.words.language)))
+        Text(shop.words.callIt(key, args))
+            .textCase(.uppercase)
             .font(.caption.monospaced())
             .foregroundStyle(.secondary)
     }

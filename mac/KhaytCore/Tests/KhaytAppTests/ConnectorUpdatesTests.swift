@@ -202,13 +202,10 @@ private actor Asked {
             "offeredAt": .string("2026-11-14T10:00:00Z")])])
         let review = try #require(await shop.connectorUpdateReview(ConnectorUpdatesTests.lamhaId))
         let snap = SnapshotTests()
-        let page = ConnectorUpdateSheet(shop: shop, review: review) { _ in }
-        let size = CGSize(width: 480, height: 640)
-        try snap.render(page.background(Khayt.ground), "80-connector-update-sheet", size: size)
-        try snap.renderDark(page, "80-connector-update-sheet-dark", size: size)
-        // The lists the sheet scrolls, which the whole-sheet render leaves blank.
+        // The lists the sheet scrolls: a whole-sheet render leaves a
+        // ScrollView's contents blank, which is all the ink check would see.
         let lists = ConnectorUpdateLists(shop: shop, review: review).padding(20).frame(width: 480, alignment: .top)
-        let lsize = CGSize(width: 480, height: 420)
+        let lsize = CGSize(width: 480, height: 900)
         try snap.render(lists.background(Khayt.ground), "81-connector-update-lists", size: lsize)
         try snap.renderDark(lists, "81-connector-update-lists-dark", size: lsize)
     }
