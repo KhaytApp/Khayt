@@ -6,6 +6,8 @@
  * bill 170. The editor used to save it and quietly cap the payment at 170;
  * now Save is refused with the reason, the sheet stays open, and the job and
  * its payment are unchanged. Taking the discount back to 0 saves.
+ * A reopened job (a cost on record, no filament deducted) is not name-only:
+ * its discount saves.
  *
  * Run: npm run test:e2e:paidfloor
  */
@@ -25,6 +27,14 @@ try {
       id: 'PF-1', jobNumber: 'PF-1', status: 'pending', currency: 'SAR', date: '2026-11-12', project: 'Paid floor',
       price: 340, paidAmount: 300, paidAt: '2026-11-12T09:00:00Z', discountPct: 0, material: 'PLA',
       statusHistory: [{ status: 'pending', at: '2026-11-12T08:00:00Z' }],
+      parts: [{ name: 'part.stl', material: 'PLA', qty: 1, printWeight: 100, baseCost: 40 }],
+    });
+    // Reopened: was Completed, moved back to Pending, a cost on record but no
+    // filament deducted. Not frozen (Mac #2473): its terms still save.
+    printLog.unshift({
+      id: 'PF-2', jobNumber: 'PF-2', status: 'pending', currency: 'SAR', date: '2026-11-12', project: 'Reopened',
+      price: 200, paidAmount: 0, discountPct: 0, material: 'PLA', costBasis: 40, materialDeducted: false,
+      statusHistory: [{ status: 'pending', at: '2026-11-10T08:00:00Z' }, { status: 'completed', at: '2026-11-11T08:00:00Z' }, { status: 'pending', at: '2026-11-12T08:00:00Z' }],
       parts: [{ name: 'part.stl', material: 'PLA', qty: 1, printWeight: 100, baseCost: 40 }],
     });
     saveAll();
@@ -48,6 +58,16 @@ try {
   await window.waitForFunction(() => !document.querySelector('#modalMount .modal-form'), null, { timeout: 5_000 });
   ok(true, 'with the discount back at 0, Save goes through and the editor closes');
   ok((await job()).paid === 300, 'the 300 paid is still on the record');
+
+  // A reopened job is not name-only: its discount saves (nothing was paid).
+  await switchTab(window, 'logs-tab');
+  await window.click('[data-act="edit-log"][data-id="PF-2"]');
+  await window.waitForSelector('#modalMount .modal-form [data-f="discountPct"]', { state: 'visible', timeout: 5_000 });
+  await window.fill('#modalMount [data-f="discountPct"]', '10');
+  await window.click('#modalMount [data-act="save"]');
+  await window.waitForFunction(() => !document.querySelector('#modalMount .modal-form'), null, { timeout: 5_000 });
+  const reopened = await window.evaluate(() => { const o = printLog.find((x) => x.id === 'PF-2'); return { disc: o.discountPct, price: o.price }; });
+  ok(reopened.disc === 10 && reopened.price < 200, `a reopened job (cost on record, no filament deducted) saves its discount (${JSON.stringify(reopened)})`);
 
   console.log('e2e-editor-paid-floor: ok');
 } catch (err) {
