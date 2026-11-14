@@ -5827,6 +5827,9 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .qpl-secret-dots { flex: 1; min-width: 200px; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--bg-soft, var(--bg)); font-size: 13px; color: var(--text-dim); }
 .qpl-secret-dots.is-empty { font-style: italic; }
 .qpl-remove.btn { color: var(--primary); background: none; border-color: transparent; box-shadow: none; }
+/* Pay link v2 key rows (Figma 94:543/778/1013): Revoke and Decline are links, rows spaced like the frame. */
+#quotePayLinkSection .qpl-secret-row .qpl-remove.btn { color: var(--primary); background: none; border-color: transparent; box-shadow: none; }
+.qpl-key-row + .qpl-key-row { margin-top: 8px; }
 #quotePayLinkSection #qpl_storeUrl { inline-size: 100%; box-sizing: border-box; }
 .qpl-secret-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .qpl-secret-edit[hidden] { display: none; }

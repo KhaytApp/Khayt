@@ -358,6 +358,10 @@ jobs:
         timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:paylink
 
+      - name: E2E smoke (pay link v2 keys in Settings, switched off by default)
+        timeout-minutes: 5
+        run: xvfb-run -a npm run test:e2e:paylinkkeys
+
       - name: E2E smoke (sign out one paired phone)
         run: xvfb-run -a npm run test:e2e:phones
 

@@ -1949,6 +1949,14 @@ registerPaymentLinks({ ipcMain, resolveStoreSecret });
 // leaves to the device — lib/main/quote-pay-link-sign.js. Signed from the book
 // on disk, which the window flushes before it asks.
 registerQuotePayLink({ ipcMain, crypto, readBook: () => readStoreDecryptedFromDisk(), updateStoreOnDisk });
+// Pay link v2 (switched off unless KHAYT_PAYLINK_V2=1): this computer's own
+// Ed25519 key and the shop's keys on Khayt Cloud — lib/main/quote-link-keys-ipc.js.
+// The cloud address and token are read from the book here, never from the window.
+require('./lib/main/quote-link-keys-ipc.js').registerQuoteLinkKeys({
+  ipcMain, readBook: () => readStoreDecryptedFromDisk(), updateStoreOnDisk,
+  transportFor: (url, token) => cloudClient.httpTransport(url, token),
+  deviceName: () => String(require('os').hostname() || '').slice(0, 80),
+});
 // The nightly off-site backup (lib/main/offsite-backup.js): the Mac's, to the
 // same files. Sealed with the Khayt Cloud key, so only while that is unlocked.
 require('./lib/main/offsite-backup.js').registerOffsiteBackup({
