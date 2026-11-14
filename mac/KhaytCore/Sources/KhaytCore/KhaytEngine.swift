@@ -5381,10 +5381,29 @@ public actor KhaytEngine {
 
     /// `print-finish-photo.track`: the edge, the outcome and the memory are
     /// all the module's, so a finish is decided the same way in both apps.
+    ///
+    /// `missed`: this device was not watching when the job ended (the memo is
+    /// from before a relaunch), so an idle printer that names no outcome is
+    /// `unknown`, not a guess — ask `printFinishFromHistory`.
     public func printFinishTrack(memo: JSONValue, machineId: String,
-                                 status: JSONValue) throws -> FinishTrack {
-        try runtime.call2("globalThis.KhaytPrintFinishPhoto.track(ARG0, ARG1, ARG2)",
-                          [memo, .string(machineId), status], as: FinishTrack.self)
+                                 status: JSONValue, missed: Bool = false) throws -> FinishTrack {
+        try runtime.call2("globalThis.KhaytPrintFinishPhoto.track(ARG0, ARG1, ARG2, { missed: ARG3 })",
+                          [memo, .string(machineId), status, .bool(missed)], as: FinishTrack.self)
+    }
+
+    /// How a job really ended, by the printer's own history.
+    public struct FinishFromHistory: Decodable, Sendable, Equatable {
+        /// `finished` | `failed` | `cancelled`.
+        public let outcome: String
+        /// ISO, or "" when the printer did not say.
+        public let endedAt: String
+    }
+
+    /// `print-finish-photo.fromHistory`: the newest job in `jobs`
+    /// (`printerHistoryJobs`) for `filename` with an ending status, or nil.
+    public func printFinishFromHistory(jobs: [JSONValue], filename: String) throws -> FinishFromHistory? {
+        try runtime.call2("globalThis.KhaytPrintFinishPhoto.fromHistory(ARG0, ARG1)",
+                          [.array(jobs), .string(filename)], as: FinishFromHistory?.self)
     }
 
     /// The job a finished print belongs to, or nil when the book cannot say

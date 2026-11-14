@@ -3092,6 +3092,9 @@ final class Shop {
     /// locked on this Mac, or the post failed. Sent at the next chance
     /// (`flushPendingEvents`). This run's only, and bounded.
     @ObservationIgnored var pendingEvents: [Shop.PendingEvent] = []
+    /// How a printer's own history is read when an end was missed. Nil is
+    /// `PrinterWatch.history`; tests put the printer's answer here.
+    @ObservationIgnored var historyFetch: (@MainActor (Machine, KhaytEngine) async throws -> [JSONValue])?
     @ObservationIgnored var pendingEventsTriedAt: Date?
 
     // Stored for "A job's photo, on its product" (Shop+Jobs.swift).
