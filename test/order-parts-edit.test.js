@@ -63,9 +63,13 @@ test('partsLock: free until printing, asked in production, name only once deduct
   // An invoiced job that is not ZATCA-submitted is asked, not locked.
   assert.deepEqual(lock({ status: 'pending', invoiceNumber: 'INV-0042' }),
     { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: true });
-  for (const o of [{ status: 'completed' }, { status: 'delivered' }, { materialDeducted: true }, { costBasis: 40 }]) {
+  for (const o of [{ status: 'completed' }, { status: 'delivered' }, { materialDeducted: true }]) {
     assert.deepEqual(lock(o), { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false });
   }
+  // A cost basis ALONE is not "filament taken": it is written at completion,
+  // so an open job that has one was finished once and moved back.
+  assert.equal(lock({ status: 'pending', costBasis: 40 }).code, null);
+  assert.equal(lock({ status: 'printing', costBasis: 40, materialDeducted: false }).code, null);
   const none = { edit: false, addRemove: false, nameOnly: false, askPrice: false };
   assert.deepEqual(lock({ zatcaUuid: 'u-1' }), Object.assign({ code: 'zatca' }, none));
   assert.deepEqual(lock({ zatcaSubmission: { status: 'cleared' } }), Object.assign({ code: 'zatca' }, none));
@@ -444,4 +448,20 @@ test('applyJobEdit: the guard is about the bill FALLING, not about a job already
   assert.equal(E.applyJobEdit(taxed, { discountPct: 10 }, { settings }).ok, true);
   const taxedOver = jobOf([a], { margin: 50 }, { paidAmount: 125 });
   assert.equal(E.applyJobEdit(taxedOver, { discountPct: 10 }, { settings }).reason, 'paid_exceeds_price');
+});
+
+test('an open job that carries a cost basis: its parts may change, and the basis follows them', () => {
+  const a = part('A', 80), b = part('B', 40);
+  const reopened = jobOf([a, b], { margin: 50 }, { status: 'pending', costBasis: 120 });
+  assert.equal(E.applyParts(reopened, [a], { keepPrice: false }).ok, true);
+  assert.equal(reopened.price, 120);
+  assert.equal(reopened.costBasis, 80, 'not the two old parts\' 120');
+  // A job that never had one gets none: completion fixes it.
+  const fresh = jobOf([a, b], { margin: 50 });
+  E.applyParts(fresh, [a], {});
+  assert.equal(fresh.costBasis, undefined);
+  // A name alone does not touch it.
+  const named = jobOf([a], { margin: 50 }, { costBasis: 80 });
+  E.applyParts(named, [Object.assign({}, a, { name: 'Body' })], {});
+  assert.equal(named.costBasis, 80);
 });
