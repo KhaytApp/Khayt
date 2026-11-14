@@ -1240,10 +1240,11 @@ final class KhaytAPIClient: ObservableObject {
         return OrderEditState(dueDate: due, priorityLevel: level, price: price)
     }
 
-    /// An edit to a job — `lib/order-edit.js` `applyEdit` through KhaytCore,
-    /// as the Mac's Edit sheet: only the fields named, the edit written down
-    /// in the job's history, the money following a typed price. Returns
-    /// whether anything changed.
+    /// An edit to a job — `lib/order-edit.js` `applyJobEdit` through
+    /// KhaytCore, the rule the Mac's job sheet runs: only the fields named,
+    /// the edit written down in the job's history, and a typed price below
+    /// what was paid refused (`BookWriter.JobEditRefused`). Returns whether
+    /// anything changed.
     @discardableResult
     func editOrder(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Bool {
         guard let book, book.exists, let reader else {
@@ -1259,8 +1260,13 @@ final class KhaytAPIClient: ObservableObject {
         }
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = store["settings"] { settings = s }
-        let edited = try await reader.sharedEngine().editJob(order: row, fields: fields, settings: settings,
-                                                            now: now, editId: BookWriter.lanId("edit", now: now))
+        // The shared edit (`applyJobEdit`), all or nothing: a typed price
+        // below what was paid is REFUSED with its reason, never settled by
+        // capping what was paid, and nothing is written.
+        let edited = try await reader.sharedEngine().applyJobEdit(
+            order: row, fields: fields, settings: settings, now: now,
+            editId: BookWriter.lanId("edit", now: now), priceId: BookWriter.lanId("price", now: now))
+        guard edited.ok else { throw BookWriter.JobEditRefused(reason: edited.reason) }
         guard edited.changed, case .object(let after) = edited.order else { return false }
         try book.updateRecord(collection: "printLog", id: orderId) { record in
             for (key, value) in after where before[key] != value { record[key] = value }
@@ -1427,6 +1433,22 @@ final class KhaytAPIClient: ObservableObject {
         guard let engine = try? await reader.sharedEngine(),
               let due = try? await engine.cashDue(order: .object(order), settings: settings) else { return nil }
         return BookWriter.paymentState(order: order, gross: due.gross, cash: due.cash)
+    }
+
+    /// The margin a job was priced at (`lib/order-edit.js marginOf`), from
+    /// this phone's book. Nil with no book or no such job; a `JobMargin`
+    /// whose `percent` is nil when the rule cannot say (a typed price, no
+    /// parts, another currency), which the money card shows as "—".
+    func jobMargin(orderId: String) async -> BookWriter.JobMargin? {
+        guard let book, book.exists, let reader,
+              case .array(let rows)? = try? book.read()["printLog"],
+              let row = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }),
+              let engine = try? await reader.sharedEngine() else { return nil }
+        // Not `try?`: it would fold "the rule cannot say" into "no answer".
+        do { return BookWriter.JobMargin(percent: try await engine.marginOf(row)) } catch { return nil }
     }
 
     /// The models behind a job that may not be sold today (`LibraryCopy.saleProblems`).
