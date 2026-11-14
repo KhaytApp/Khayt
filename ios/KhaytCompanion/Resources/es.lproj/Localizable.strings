@@ -1327,6 +1327,30 @@
 "load.retry" = "Reintentar";
 "load.book_unavailable" = "No se pudo leer el libro en este teléfono. Vuelve a intentarlo o comprueba que el Mac esté al alcance.";
 
+/* Job page (S1): six regions and the pinned next step */
+"job.next" = "Siguiente";
+"job.next.start_printing" = "Empezar a imprimir";
+"job.next.mark_printed" = "Marcar impreso";
+"job.next.send_to_qc" = "Enviar a control";
+"job.next.mark_ready" = "Marcar listo";
+"job.next.hand_over" = "Entregar";
+"job.next.resume" = "Reanudar";
+"job.next.done" = "Terminado y pagado";
+"job.next.none" = "Nada que hacer";
+"job.more" = "Más";
+"job.more.label" = "Más acciones para este trabajo";
+"job.header.due" = "entrega %@";
+"job.day_late" = "1 día de retraso";
+"job.days_late" = "%d días de retraso";
+"job.section.parts" = "Piezas";
+"job.section.money" = "Dinero";
+"job.section.activity" = "Actividad";
+"job.money.price" = "Precio";
+"job.money.paid" = "Pagado";
+"job.money.owing" = "Pendiente";
+"job.money.owing_overdue" = "Pendiente · vencido";
+"job.parts.on_machine" = "En %@";
+"job.money.quote_sent" = "Enviado";
 /* Settings in groups (S2) */
 "settings.search" = "Buscar en ajustes";
 "settings.search.none" = "Ningún ajuste coincide con «%@».";
@@ -1395,3 +1419,15 @@
 "needs.low.count" = "%d bobinas bajas";
 "needs.quotes" = "%d presupuestos esperan respuesta";
 "needs.more" = "y %d más";
+
+/* S1 next step from the shared rule (lib/order-next-step.js) */
+"job.next.send_quote" = "Enviar presupuesto";
+"job.next.take_job" = "Aceptar trabajo";
+"job.next.hold" = "Poner en espera";
+"job.next.fail_check" = "No pasó el CC";
+"job.blocked.production_paused" = "La producción está pausada — reanude antes de iniciar nuevas impresiones.";
+"job.blocked.wip" = "Límite de WIP (%1$@) alcanzado en «%2$@» — movimiento bloqueado";
+"job.blocked.assembly_not_assembled" = "Todas las piezas pasaron el CC — marca el ensamblaje como ensamblado para completar el pedido.";
+"job.blocked.assembly_parts" = "A la espera de pieza(s): %@";
+"job.blocked.other" = "No se puede desde aquí";
+"job.pill.paid" = "Pagado";
