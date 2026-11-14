@@ -1491,7 +1491,7 @@ async function publishOrderToCloudPortal(orderId) {
       </div>`,
     onMount(modal) {
       modal.querySelector('#cpCopy')?.addEventListener('click', async () => {
-        if (await copyText(portalUrl)) toast(t('common.copied') || 'Copied!', 'success');
+        if (await copyText(portalUrl)) { toast(t('common.copied') || 'Copied!', 'success'); if (isQuote) markQuoteShared(order); }
         else toast(portalUrl, 'info', 6000);
       });
       modal.querySelector('#cpWa')?.addEventListener('click', async () => {
@@ -1499,6 +1499,7 @@ async function publishOrderToCloudPortal(orderId) {
         const cl = order.clientId ? clients.find(x => x.id === order.clientId) : null;
         if (window.hubAPI?.shareWhatsApp) await window.hubAPI.shareWhatsApp({ phone: cl?.phone || '', message: waMsg, pdfPath: null });
         else window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank');
+        if (isQuote) markQuoteShared(order);
       });
       modal.querySelector('#cpCheck')?.addEventListener('click', async () => {
         const resp = modal.querySelector('#cpResp');
@@ -1632,7 +1633,7 @@ async function openQuoteApprovalLinkModal(orderId) {
       </div>`,
     onMount(modal) {
       modal.querySelector('#quoteApprovalCopy')?.addEventListener('click', async () => {
-        if (await copyText(url)) toast(t('common.copied') || 'Copied!', 'success');
+        if (await copyText(url)) { toast(t('common.copied') || 'Copied!', 'success'); markQuoteShared(order); }
         else toast(url, 'info', 6000);
       });
       modal.querySelector('#quoteApprovalWa')?.addEventListener('click', async () => {
@@ -1644,6 +1645,7 @@ async function openQuoteApprovalLinkModal(orderId) {
         } else {
           window.open(`https://wa.me/?text=${encodeURIComponent(waMsg)}`, '_blank');
         }
+        markQuoteShared(order);
       });
     },
   });

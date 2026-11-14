@@ -280,6 +280,21 @@ function openQuoteRevisionsModal(orderId) {
 }
 
 /* --- extracted 10062-10277 --- */
+/**
+ * A quote reached its customer: stamp `quoteSharedAt` (now, ISO). The shared
+ * next-step rule (lib/order-next-step.js) reads it as "sent" — NOT
+ * `quoteSentAt`, which order-new.js writes the moment a quote is created.
+ * Called from every place the desktop shares a quote: the quote link sheets
+ * (copy, WhatsApp), the quote's PDF (export, WhatsApp) and a follow-up. Only a
+ * job that is still a quote is stamped; each share moves it to the latest.
+ */
+function markQuoteShared(order) {
+  if (!order || order.status !== 'quote') return false;
+  order.quoteSharedAt = new Date().toISOString();
+  if (typeof saveAll === 'function') saveAll();
+  return true;
+}
+
 async function exportInvoicePDF(orderId, { askWhere = true, openAfter = true } = {}) {
   const order = printLog.find(o => o.id === orderId);
   if (!order) return null;
@@ -295,6 +310,7 @@ async function exportInvoicePDF(orderId, { askWhere = true, openAfter = true } =
       defaultName: `${jobRef(order)}.pdf`
     });
     if (!finalPath) return null;
+    markQuoteShared(order);
     toast(t('inv.saved'), 'success');
     if (openAfter && window.hubAPI.openPath) await window.hubAPI.openPath(finalPath);
     return finalPath;
@@ -330,6 +346,7 @@ async function shareInvoiceWhatsApp(orderId) {
       message,
       pdfPath
     });
+    markQuoteShared(order);
   }
 }
 
@@ -467,6 +484,7 @@ async function sendQuoteFollowUp(orderId, opts = {}) {
     order.followUpSentAt = new Date().toISOString();
     order.followUpCount = (+order.followUpCount || 0) + 1;
   }
+  markQuoteShared(order);
   saveAll();
   if (typeof renderDashboard === 'function') renderDashboard();
   if (!opts.silent) toast(t('quote.followup_sent'), 'success', 3000);
@@ -1341,6 +1359,7 @@ const BRAND_MARK_SVG = `<svg viewBox="300 110 424 760" xmlns="http://www.w3.org/
     sendStatusWhatsApp,
     sendPaymentReminder,
     sendQuoteFollowUp,
+    markQuoteShared,
     shareTrackingWhatsApp,
     renderInvoiceForOrder,
     generateProformaInvoice,
