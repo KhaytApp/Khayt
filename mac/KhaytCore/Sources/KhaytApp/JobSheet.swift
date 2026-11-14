@@ -259,7 +259,13 @@ struct JobSheet: View {
     private var priceFields: some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 9) {
             GridRow {
-                label("mac.margin")
+                // MARKUP, and called that. The price is cost × (1 + this %)
+                // (`lib/pricing.js quoteTotal`), so the figure `marginOf`
+                // reads back is a markup on cost — 229% on a 142 part sold
+                // at 469 — and a margin (profit as a share of the PRICE)
+                // would be 70% for the same job. The Catalogue and the
+                // product sheet already say Markup for it (Dev Hub, Nov 14).
+                label("mac.markup")
                 // Read off the job by the shared rule. Where it cannot be
                 // said (a typed price), it says so rather than guessing.
                 switch margin {

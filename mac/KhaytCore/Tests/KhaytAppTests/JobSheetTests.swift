@@ -113,6 +113,8 @@ struct JobSheetTests {
             #expect(sheet.contains("header(\"\(key)\")"), "\(key) has no column header")
             #expect(sheet.contains(".accessibilityLabel(shop.words.callIt(\"\(key)\"))"), "\(key) has no accessibility label")
         }
+        // The percentage is a markup on cost, and the sheet calls it that.
+        #expect(sheet.contains("label(\"mac.markup\")") && !sheet.contains("label(\"mac.margin\")"))
         // The old sheet stays in the tree for a release.
         #expect(!MenuCoverageTests.source("EditJobSheet.swift").isEmpty)
     }
