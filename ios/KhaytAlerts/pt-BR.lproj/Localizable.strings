@@ -3,6 +3,7 @@
 "alert.print.finished" = "Impressão concluída";
 "alert.print.failed" = "Falha na impressão";
 "alert.print.cancelled" = "Impressão cancelada";
+"alert.print.ended" = "Impressão encerrada — confira a impressora";
 "alert.print.a_job" = "Um trabalho";
 "alert.print.move_post" = "Mover para pós-processamento";
 "alert.print.reprint" = "Devolver à fila";

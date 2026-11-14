@@ -49,3 +49,5 @@
 /* Queue widget gallery name and description (KhaytQueueWidget.swift) */
 "Khayt Queue" = "Khayt 队列";
 "Queue counts and live print progress from your shop." = "来自你的工坊的队列数量和实时打印进度。";
+"Print ended — check the printer" = "打印已结束——请检查打印机";
+"Ended" = "已结束";

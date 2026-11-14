@@ -49,3 +49,5 @@
 /* Queue widget gallery name and description (KhaytQueueWidget.swift) */
 "Khayt Queue" = "Khayt Warteschlange";
 "Queue counts and live print progress from your shop." = "Zahlen der Warteschlange und Druckfortschritt live aus deiner Werkstatt.";
+"Print ended — check the printer" = "Druck beendet – Drucker prüfen";
+"Ended" = "Beendet";

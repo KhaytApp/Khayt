@@ -515,6 +515,16 @@ extension Shop {
     /// the loyalty settings card, so a Simple shop CAN switch the rewards
     /// programme on in that window; hiding it here would take away something
     /// the shop has and is using.
+    /// The Simple map rows (`SIMPLE_MAP`) this app draws a Professional-only
+    /// surface for (S4, Nov 2026). A row the map does not have answers nil
+    /// and is left as it is.
+    static let simpleMapKeys = ["kiosk", "campaigns", "ai", "proforma", "paymentPlans", "team"]
+
+    /// Simple leaves this out entirely: the shared map says `pro` for it.
+    /// Every menu item, button and window that reaches it asks here, so
+    /// "not in Simple" means it cannot be reached, not that one list omits it.
+    func professionalOnly(_ key: String) -> Bool { simpleSurfaces[key] == .professionalOnly }
+
     static let gatedFeatures = ["analytics", "expenses", "maintenance", "purchasing", "zatca"]
 
     /// Does this shop's mode include it? Unknown keys are on: a screen this
@@ -635,16 +645,22 @@ extension Shop {
     /// the one thing untested, and someone reading the screen could not tell
     /// whether it worked.
     func readFeatures() async {
-        guard let engine else { features = Set(Self.gatedFeatures); return }
+        guard let engine else { features = Set(Self.gatedFeatures); simpleSurfaces = [:]; return }
         let mode = Self.plainString(settingsDict["mode"])
         let ticket = loadGeneration
         var on: Set<String> = []
         for key in Self.gatedFeatures {
             if (try? await engine.featureEnabled(key, mode: mode)) ?? true { on.insert(key) }
         }
+        // S4: the rows of the shared Simple map the Mac has a surface for.
+        var surfaces: [String: KhaytEngine.SimpleSurface] = [:]
+        for key in Self.simpleMapKeys {
+            if let s = try? await engine.simpleSurface(key, mode: mode) { surfaces[key] = s }
+        }
         // Not over a newer load's answer (`Shop.load`).
         guard ticket == loadGeneration else { return }
         features = on
+        simpleSurfaces = surfaces
     }
 
     var settingsDict: [String: JSONValue] {

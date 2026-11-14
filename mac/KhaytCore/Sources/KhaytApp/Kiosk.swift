@@ -47,6 +47,16 @@ struct KioskWindow: View {
     @State private var minute = 0
 
     var body: some View {
+        // A kiosk window restored onto a shop that is now Simple (S4).
+        if shop.professionalOnly("kiosk") {
+            PartOfProfessional(shop: shop, feature: shop.words.callIt("mac.kiosk_title"))
+                .frame(minWidth: 640, minHeight: 400)
+        } else {
+            board
+        }
+    }
+
+    private var board: some View {
         VStack(spacing: 0) {
             header
             if shop.machinesInUse.isEmpty {

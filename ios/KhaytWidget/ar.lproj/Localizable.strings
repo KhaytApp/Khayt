@@ -47,3 +47,5 @@
 /* Queue widget gallery name and description (KhaytQueueWidget.swift) */
 "Khayt Queue" = "طابور خيط";
 "Queue counts and live print progress from your shop." = "أعداد الطابور وتقدّم الطباعة المباشر من ورشتك.";
+"Print ended — check the printer" = "انتهت الطباعة — تحقّق من الطابعة";
+"Ended" = "انتهت";
