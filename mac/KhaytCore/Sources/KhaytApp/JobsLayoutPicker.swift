@@ -27,7 +27,9 @@ struct JobsLayoutPicker: View {
 
     private var layout: Binding<Shop.JobsLayout> {
         Binding(
-            get: { shop.showingBoard ? .board : .list },
+            // A single stage is never the board (`showingBoard`): it shows
+            // as the table unless the List was chosen.
+            get: { shop.showingBoard ? .board : shop.jobsLayout == .page ? .page : .list },
             set: { shop.chooseJobsLayout($0) }
         )
     }

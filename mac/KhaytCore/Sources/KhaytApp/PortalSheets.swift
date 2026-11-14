@@ -101,6 +101,7 @@ struct CustomerLinkSection: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(link, forType: .string)
             said = shop.words.callIt("mac.portal_published_copied")
+            await shop.noteQuoteShared(job.id)
         } else {
             said = shop.moveProblem
         }
@@ -126,9 +127,11 @@ struct CustomerLinkSection: View {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(quoteMessage(link), forType: .string)
             said = shop.words.callIt("mac.qfe_send_no_app")
+            await shop.noteQuoteShared(job.id)
             return
         }
         NSWorkspace.shared.open(url)
+        await shop.noteQuoteShared(job.id)
     }
 
     private func sendEmail() async {
@@ -145,6 +148,7 @@ struct CustomerLinkSection: View {
               let to = email.addingPercentEncoding(withAllowedCharacters: allowed.union(CharacterSet(charactersIn: "@+"))),
               let url = URL(string: "mailto:" + to + "?subject=" + s + "&body=" + b) else { return }
         NSWorkspace.shared.open(url)
+        await shop.noteQuoteShared(job.id)
     }
 
     private func copy() async {
@@ -152,6 +156,8 @@ struct CustomerLinkSection: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(link, forType: .string)
         said = shop.words.callIt("mac.tracking_link_copied")
+        // A quote whose link was copied has gone out (S1: `quoteSharedAt`).
+        await shop.noteQuoteShared(job.id)
     }
 
     private func check() async {

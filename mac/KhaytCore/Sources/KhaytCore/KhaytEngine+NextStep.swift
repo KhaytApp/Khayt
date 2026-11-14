@@ -17,6 +17,10 @@ extension KhaytEngine {
             /// `assembly_parts`, `read_only`, `stage_not_a_status`.
             public let code: String
             public let params: [String: JSONValue]
+
+            public init(code: String, params: [String: JSONValue]) {
+                self.code = code; self.params = params
+            }
         }
 
         public struct Step: Decodable, Sendable, Equatable {
@@ -32,6 +36,10 @@ extension KhaytEngine {
             public let asks: String?
             /// Why it cannot be done now, said at the control; nil when it can.
             public let blocked: Blocked?
+
+            public init(code: String, to: String?, asks: String?, blocked: Blocked?) {
+                self.code = code; self.to = to; self.asks = asks; self.blocked = blocked
+            }
         }
 
         public struct Pill: Decodable, Sendable, Equatable {
