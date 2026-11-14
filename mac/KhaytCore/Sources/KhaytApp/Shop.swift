@@ -3150,6 +3150,12 @@ final class Shop {
     var connectorSecrets: any ConnectorSecretStore = ConnectorKeychain()
     /// The connector a file asked to install, waiting on the shop's OK.
     var connectorOffer: ConnectorOffer?
+    /// Installed connectors with an update waiting on the shop's yes: the
+    /// steel count on Settings ▸ Integrations (`Shop+ConnectorUpdates.swift`).
+    var connectorUpdatesWaiting = 0
+    /// How the update check fetches bytes. Nil is `fetchConnectorBytes`; tests
+    /// put a stand-in here so no request reaches the network.
+    var connectorFetch: (@Sendable (URL, Int) async throws -> Data)?
     /// Where this Mac keeps its dev connectors (`DevConnectors`); tests use their own suite.
     var devConnectorDefaults: UserDefaults = .standard
     /// Bumped on every write to the dev connectors, which the book's reload never sees.
