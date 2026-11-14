@@ -402,3 +402,46 @@ test('id-less parts: an edit in place pairs up; an edit AND a removal at once is
   assert.equal(E.applyParts(m, [m.parts[1], m.parts[2]], {}).ok, true);
   assert.deepEqual(m.parts.map((p) => p.baseCost), [40, 20]);
 });
+
+// ── The paid guard covers every way the bill can fall (iPhone lane, Nov 14) ─
+
+test('applyJobEdit: a discount, shipping or an extra line that drops the bill below what was paid is refused', () => {
+  const a = part('A', 80);
+  // 80 at 50% = 120, plus 20 shipping and a 10 box = 150. Paid 145.
+  const terms = { margin: 50, shippingCost: 20, extraLines: [{ label: 'Box', amount: 10 }] };
+  const paid = () => jobOf([a], terms, { paidAmount: 145, paymentStatus: 'partial' });
+  for (const next of [{ discountPct: 20 }, { shippingCost: 0 }, { extraLines: [] }]) {
+    const o = paid();
+    const before = JSON.stringify(o);
+    const r = E.applyJobEdit(o, Object.assign({ notes: 'also this' }, next), {});
+    assert.deepEqual(r, { ok: false, reason: 'paid_exceeds_price', step: 'price', changed: false }, JSON.stringify(next));
+    assert.equal(JSON.stringify(o), before, 'untouched: paid was not capped, and the note was not written');
+  }
+  // A smaller discount that still leaves the bill at or above what was paid is taken.
+  const ok = paid();
+  assert.equal(E.applyJobEdit(ok, { discountPct: 3 }, {}).ok, true);
+  assert.equal(ok.price, 146.4);
+  assert.equal(ok.paidAmount, 145);
+  // Exactly what was paid is allowed: taking the 10 box off a job paid 140.
+  const exact = jobOf([a], terms, { paidAmount: 140 });
+  assert.equal(E.applyJobEdit(exact, { extraLines: [] }, {}).ok, true);
+  assert.equal(exact.price, 140);
+});
+
+test('applyJobEdit: the guard is about the bill FALLING, not about a job already over-paid', () => {
+  const a = part('A', 80);
+  // Paid more than the bill already (a deposit taken before a price was cut elsewhere).
+  const over = jobOf([a], { margin: 50 }, { paidAmount: 200 });
+  // Details that do not move the bill are still saved…
+  assert.equal(E.applyJobEdit(over, { notes: 'call first', dueDate: '2026-12-01' }, {}).ok, true);
+  assert.equal(over.notes, 'call first');
+  // …and so is one that RAISES it.
+  assert.equal(E.applyJobEdit(over, { shippingCost: 30 }, {}).ok, true);
+  assert.equal(over.price, 150);
+  // With tax on top the bill is price + tax: 120 less 10% is 108, 124.20 billed.
+  const settings = { tax: { name: 'VAT', mode: 'exclusive', rates: [{ id: 'vat', label: 'VAT', percent: 15, compound: false }] } };
+  const taxed = jobOf([a], { margin: 50 }, { paidAmount: 124 });
+  assert.equal(E.applyJobEdit(taxed, { discountPct: 10 }, { settings }).ok, true);
+  const taxedOver = jobOf([a], { margin: 50 }, { paidAmount: 125 });
+  assert.equal(E.applyJobEdit(taxedOver, { discountPct: 10 }, { settings }).reason, 'paid_exceeds_price');
+});
