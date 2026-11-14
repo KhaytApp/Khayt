@@ -135,7 +135,7 @@ struct BookWriter {
     /// Revise a quote: keep what it says now as a revision and move it on a
     /// version (`lib/quote-revision.js` `revise` — `quoteRevisions[]`,
     /// `quoteVersion`), then make the change (`lib/order-edit.js`
-    /// `applyDetails`: the price as a typed total, the notes), in ONE write.
+    /// `applyJobEdit`: the price as a typed total, the notes), in ONE write.
     ///
     /// The Mac keeps the revision and then opens its editor; the phone's sheet
     /// has the change already in hand, so the two land together, and a
@@ -152,14 +152,47 @@ struct BookWriter {
             let editId = Self.lanId("edit", now: now)
             let priceId = Self.lanId("price", now: now)
             // Asked of the quote as it is first: a revision kept for a change
-            // that changes nothing is a version nobody made.
-            let trial = try await engine.editOrderDetails(order: row, fields: fields, settings: settings,
-                                                          now: now, editId: editId, priceId: priceId)
+            // that changes nothing is a version nobody made, and one the rule
+            // refuses (a price below a deposit already paid) keeps nothing.
+            let trial = try await engine.applyJobEdit(order: row, fields: fields, settings: settings,
+                                                      now: now, editId: editId, priceId: priceId)
+            guard trial.ok else { throw JobEditRefused(reason: trial.reason) }
             guard trial.changed else { return nil }
             let revised = try await engine.reviseQuote(order: row, now: now)
-            let edited = try await engine.editOrderDetails(order: revised, fields: fields, settings: settings,
-                                                           now: now, editId: editId, priceId: priceId)
+            let edited = try await engine.applyJobEdit(order: revised, fields: fields, settings: settings,
+                                                       now: now, editId: editId, priceId: priceId)
+            guard edited.ok else { throw JobEditRefused(reason: edited.reason) }
             return edited.order
+        }
+    }
+
+    /// An edit the shared rule refused (`lib/order-edit.js applyJobEdit`),
+    /// in the Mac's words (the same keys). Nothing was written.
+    struct JobEditRefused: Error, LocalizedError, Equatable {
+        let reason: String?
+
+        var errorDescription: String? {
+            switch reason {
+            case "paid_exceeds_price": return L10n.tr("mac.parts_paid_exceeds")
+            default: return L10n.tr("move.refused")
+            }
+        }
+    }
+
+    /// The margin a job was priced at (`marginOf`): nil when it cannot be
+    /// said, shown as "—" (Turki, Q9) — never a figure worked backwards from
+    /// a typed total.
+    struct JobMargin: Equatable {
+        let percent: Double?
+
+        /// Western digits, whole where it is whole: "38%", "12.5%", "—".
+        var text: String {
+            guard let p = percent, p.isFinite else { return "—" }
+            let rounded = (p * 10).rounded() / 10
+            let figure = rounded == rounded.rounded()
+                ? String(Int(rounded))
+                : String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), rounded)
+            return figure + "%"
         }
     }
 
