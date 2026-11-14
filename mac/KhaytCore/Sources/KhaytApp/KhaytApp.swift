@@ -892,6 +892,16 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the job page (S1) and/or the Simple screens (S4), on the
+            // sample, in memory (`SnapshotJobPage.swift`).
+            let wantsPage = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_JOBPAGE"] == "1"
+            let wantsSimple = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_SIMPLE"] == "1"
+            if wantsPage || wantsSimple, let shop = subject {
+                if wantsPage { await captureJobPage(shop, into: dir, dark: dark) }
+                if wantsSimple { await captureSimple(shop, into: dir, dark: dark) }
+                NSApp.terminate(nil)
+                return
+            }
             // Only the menu bar item's label states and its fleet panel, on
             // the sample, in memory (`SnapshotMenuBar.swift`).
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MENUBAR"] == "1", let shop = subject {
