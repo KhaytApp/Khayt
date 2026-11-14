@@ -189,7 +189,7 @@ struct JobSheet: View {
         // add row does, and every field carries the same word for VoiceOver.
         Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
             GridRow {
-                header("mac.a_part")
+                header("pe.part")
                 header("mac.filament")
                 header("mac.grams")
                 header("mac.hours")

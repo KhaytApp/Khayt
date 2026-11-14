@@ -109,8 +109,10 @@ struct JobSheetTests {
         #expect(sheet.contains(".disabled(saving || !changed || refusal != nil || !shop.canMoveJobs)"))
         #expect(sheet.contains("shop.previewJobSave(subject.id, pending)"))
         // Every part column is named once, and each field says what it is.
-        for key in ["mac.a_part", "mac.filament", "mac.grams", "mac.hours", "doc.qty"] {
+        for key in ["pe.part", "mac.filament", "mac.grams", "mac.hours", "doc.qty"] {
             #expect(sheet.contains("header(\"\(key)\")"), "\(key) has no column header")
+        }
+        for key in ["mac.a_part", "mac.filament", "mac.grams", "mac.hours", "doc.qty"] {
             #expect(sheet.contains(".accessibilityLabel(shop.words.callIt(\"\(key)\"))"), "\(key) has no accessibility label")
         }
         // The percentage is a markup on cost, and the sheet calls it that.
