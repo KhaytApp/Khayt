@@ -20,6 +20,8 @@ struct ConnectorSettings: View {
     @State private var removing: ConnectorRow?
     /// Settings being typed, per connector: key → text ("true"/"" for a box).
     @State private var drafts: [String: [String: String]] = [:]
+    /// The update sheet, opened only from Review update.
+    @State private var reviewing: ConnectorUpdateReview?
 
     private var mayWrite: Bool { shop.lockAllows("settings", "edit") && shop.source.build != nil }
 
@@ -54,6 +56,12 @@ struct ConnectorSettings: View {
                 Task { await reload() }
             }
         }
+        .shopSheet(item: $reviewing) { review in
+            ConnectorUpdateSheet(shop: shop, review: review) { said in
+                result = said
+                Task { await reload() }
+            }
+        }
         .confirmationDialog(
             removing.map { shop.words.callIt("plg.remove_q").replacingOccurrences(of: "{name}", with: $0.name) } ?? "",
             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })
@@ -83,6 +91,13 @@ struct ConnectorSettings: View {
             HStack {
                 Text(row.name).font(.body.weight(.medium))
                 Text(row.version).font(.caption).foregroundStyle(.secondary)
+                if row.update.waiting != nil {
+                    Text(shop.words.callIt("plg.update_waiting"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Khayt.pending)
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(Khayt.pendingWash, in: Capsule())
+                }
                 Spacer()
                 Text(shop.words.callIt("plg.state_" + row.state))
                     .font(.caption)
@@ -91,6 +106,17 @@ struct ConnectorSettings: View {
             if row.dev {
                 Label(shop.words.callIt("plg.dev_badge"), systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(Khayt.attention)
+            }
+            if let w = row.update.withdrawn {
+                Text(shop.words.callIt("plg.upd_revoked", ["v": .string(w.version)]) + (w.reason.isEmpty ? "" : " " + w.reason))
+                    .font(.caption).foregroundStyle(Khayt.late)
+            }
+            if let from = row.update.updatedFrom {
+                Text(shop.words.callIt("plg.upd_updated_note", ["from": .string(from), "to": .string(row.version)]))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let gone = row.update.revertWithdrawn {
+                Text(shop.words.callIt("plg.upd_revert_withdrawn", ["v": .string(gone)]))
+                    .font(.caption).foregroundStyle(.secondary)
             }
             // Events this connector's service turned down: kept, with its words,
             // until the shop retries or dismisses them (`withFailed`).
@@ -145,9 +171,29 @@ struct ConnectorSettings: View {
                     }
                     .disabled((keys[row.id] ?? [:]).values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty })
                 }
+                if row.update.waiting != nil {
+                    Button(shop.words.callIt("plg.review_update")) {
+                        Task { reviewing = await shop.connectorUpdateReview(row.id) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                if let back = row.update.revertTo {
+                    Button(shop.words.callIt("plg.upd_revert", ["v": .string(back)])) {
+                        Task {
+                            result = await shop.revertConnectorUpdate(row.id)
+                            await reload()
+                        }
+                    }
+                }
                 if row.state == "on" || row.state == "off" {
-                    Button(shop.words.callIt(row.state == "on" ? "plg.turn_off" : "plg.turn_on")) {
-                        Task { await shop.setConnector(row.id, enabled: row.state != "on") }
+                    // While withdrawn the entry is off whatever the shop chose;
+                    // the button says what the shop chose (kept for the fix).
+                    let on = row.update.switchedOn ?? (row.state == "on")
+                    Button(shop.words.callIt(on ? "plg.turn_off" : "plg.turn_on")) {
+                        Task {
+                            await shop.setConnector(row.id, enabled: !on)
+                            await reload()
+                        }
                     }
                 }
                 if row.state == "paused", let manifest = manifest(row.id) {
@@ -351,4 +397,142 @@ struct ConnectorFailedEvents: View {
     }
 
     private func reload() async { items = await shop.failedConnectorEvents(pluginId: pluginId) }
+}
+
+/// The connector update sheet (Figma 70:284; the desktop's is 52:2434, from
+/// it). Opened only from Review update. What is NEW comes first, host by
+/// host, each line tagged; what the shop already agreed to after, quieter.
+/// "Not now" changes nothing: the installed version keeps running and the
+/// badge stays. "Agree and update" is the default button; nothing is accepted
+/// for the shop, and there is no timer. The order is `sheetFor`'s, the words
+/// the desktop's (`plg.upd_*`), so both apps say the same thing.
+struct ConnectorUpdateSheet: View {
+    let shop: Shop
+    let review: ConnectorUpdateReview
+    let done: (String?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var agreeing = false
+
+    private var sheet: KhaytEngine.PluginUpdateSheet { review.sheet }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(review.name).font(.title3.weight(.semibold))
+                Text(sheet.to).foregroundStyle(.secondary)
+                Spacer()
+                if review.reviewed {
+                    Label(shop.words.callIt("plg.reviewed_by_khayt"), systemImage: "checkmark")
+                        .font(.callout).foregroundStyle(Khayt.done)
+                }
+            }
+            Text(shop.words.callIt("plg.upd_updates", ["v": .string(sheet.from)]))
+                .font(.callout).foregroundStyle(.secondary)
+            if sheet.asksMore {
+                Text(shop.words.callIt("plg.upd_asks_more")).fixedSize(horizontal: false, vertical: true)
+            }
+            ScrollView {
+                ConnectorUpdateLists(shop: shop, review: review)
+            }
+            .frame(minHeight: 140, maxHeight: 380)
+            Text(shop.words.callIt("plg.upd_footer", ["v": .string(sheet.from)]))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(shop.words.callIt("plg.upd_not_now")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(shop.words.callIt("plg.upd_agree")) {
+                    agreeing = true
+                    Task {
+                        let said = await shop.agreeConnectorUpdate(review.id)
+                        agreeing = false
+                        done(said)
+                        dismiss()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(agreeing)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+    }
+
+}
+
+/// The sheet's two lists: New in this version (tagged, on the steel wash) and
+/// Already agreed (quieter). Its own view so a snapshot can draw it: an
+/// `ImageRenderer` leaves a ScrollView's contents blank.
+struct ConnectorUpdateLists: View {
+    let shop: Shop
+    let review: ConnectorUpdateReview
+
+    private var sheet: KhaytEngine.PluginUpdateSheet { review.sheet }
+    private var hasNew: Bool { !sheet.fresh.isEmpty || !sheet.scopes.isEmpty || sheet.refresh > 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if hasNew {
+                VStack(alignment: .leading, spacing: 8) {
+                    label("plg.upd_new_head", [:])
+                    ForEach(sheet.fresh) { host in hostRows(host, fresh: true) }
+                    if !sheet.scopes.isEmpty {
+                        HStack(spacing: 6) {
+                            Text(shop.words.callIt("plg.consent_scopes") + ": "
+                                 + sheet.scopes.map { shop.words.callIt("plg.scope." + $0) }.joined(separator: ", "))
+                            tag("new")
+                        }
+                    }
+                    if sheet.refresh > 0 {
+                        HStack(spacing: 6) {
+                            Text(shop.words.callIt("plg.upd_refresh", ["n": .string(String(Int(sheet.refresh)))]))
+                            tag("new")
+                        }
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Khayt.pendingWash, in: RoundedRectangle(cornerRadius: 10))
+            }
+            if !sheet.agreed.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    label("plg.upd_agreed_head", ["v": .string(sheet.from)])
+                    ForEach(sheet.agreed) { host in hostRows(host, fresh: false) }
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func label(_ key: String, _ args: [String: JSONValue]) -> some View {
+        Text(shop.words.callIt(key, args).uppercased(with: Locale(identifier: shop.words.language)))
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func hostRows(_ host: KhaytEngine.PluginUpdateSheet.Host, fresh: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // A host is Latin whatever the language: it reads left to right.
+            Text(host.host).font(.body.weight(.medium))
+                .environment(\.layoutDirection, .leftToRight)
+            ForEach(host.items, id: \.self) { item in
+                HStack(spacing: 6) {
+                    Text("• " + shop.connectorUpdateItemName(item, manifest: review.manifest))
+                    if fresh, let t = item.tag { tag(t) }
+                }
+                .font(.callout)
+            }
+        }
+    }
+
+    private func tag(_ which: String) -> some View {
+        Text(shop.words.callIt(which == "new" ? "plg.upd_tag_new" : "plg.upd_tag_new_place"))
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(Khayt.pending)
+            .padding(.horizontal, 6).padding(.vertical, 1)
+            .background(Color.primary.opacity(0.06), in: Capsule())
+    }
 }

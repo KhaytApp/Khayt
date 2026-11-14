@@ -165,7 +165,18 @@ struct KhaytApp: App {
                     // while the app is open. After "Free up space" the cloud
                     // holds the only copy, and nothing else ever looks again —
                     // see `Shop.verifyCloudCopies`.
+                    // CONNECTOR UPDATES: the signed index, on launch and every
+                    // hour after, while updates are switched on
+                    // (`Shop+ConnectorUpdates`). What changed is said once.
+                    await shop.refreshConnectorUpdatesWaiting()
                     while !Task.isCancelled {
+                        let notes = await shop.checkConnectorUpdates()
+                        if !notes.isEmpty {
+                            shop.moveNotices = notes
+                            for (i, n) in notes.enumerated() {
+                                Shop.notifyArrival(title: shop.words.callIt("plg.title"), body: n, id: "connector-update:\(i):" + n)
+                            }
+                        }
                         await shop.verifyCloudCopiesIfDue()
                         // WHAT ANOTHER MAC DID IN THE VAULT, applied here: on
                         // launch and every hour after (`Shop+VaultApply`).

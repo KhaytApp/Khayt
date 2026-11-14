@@ -79,8 +79,11 @@ extension Shop {
                 secrets: declared.map { .init(name: $0.name, label: Self.connectorLabel($0.label, words.language, fallback: $0.name),
                                               held: held.contains($0.name)) },
                 settings: Self.settingRows(entry, lang: words.language),
-                dev: isDev))
+                dev: isDev,
+                // A dev connector is this Mac's alone: no index ever names it.
+                update: isDev ? .init() : await connectorUpdateLine(entry)))
         }
+        await refreshConnectorUpdatesWaiting()
         return out
     }
 
@@ -215,7 +218,10 @@ extension Shop {
     }
 
     /// Switch an installed connector on or off. Its fields stay on the records.
+    /// A book connector goes through the lib (`switchConnector`), so a
+    /// withdrawn version stays off and the choice is kept for the fix.
     func setConnector(_ id: String, enabled: Bool) async {
+        if !isDevConnector(id) { await switchConnector(id, enabled: enabled); return }
         _ = await writeConnectors(dev: isDevConnector(id)) { plugins in
             guard case .array(var rows) = plugins,
                   let i = rows.firstIndex(where: { Self.object($0)["id"] == .string(id) }),
@@ -410,6 +416,27 @@ struct ConnectorRow: Identifiable, Equatable {
         /// As saved; "" for none, "true" for a ticked box.
         let value: String
         struct Option: Equatable, Hashable { let value: String; let label: String }
+    }
+
+    /// What a check against the signed index left for this connector.
+    var update = Update()
+
+    struct Update: Equatable {
+        /// A newer version waiting on the shop's yes: "Update waiting" and
+        /// Review update.
+        var waiting: String?
+        /// The kept version Revert goes back to, after an update.
+        var revertTo: String?
+        /// The version an update replaced, for "Updated to X from Y."
+        var updatedFrom: String?
+        /// Khayt withdrew the version an update replaced: why there is no Revert.
+        var revertWithdrawn: String?
+        /// The installed version is withdrawn: paused, and why.
+        var withdrawn: Withdrawn?
+        /// While withdrawn: whether the shop wants it on once the fix arrives.
+        var switchedOn: Bool?
+
+        struct Withdrawn: Equatable { let version: String; let reason: String }
     }
 
     var keysMissing: Bool { secrets.contains { !$0.held } }
