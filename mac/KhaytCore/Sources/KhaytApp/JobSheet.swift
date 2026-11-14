@@ -149,7 +149,7 @@ struct JobSheet: View {
                 .toggleStyle(.checkbox)
             }
             GridRow {
-                label("oe.priority")
+                label("waiting.priority_label")
                 Picker("", selection: $form.priority) {
                     ForEach(Shop.priorityLevels, id: \.self) { level in
                         Text(shop.words.callIt(EditJobSheet.wordFor(level))).tag(level)
