@@ -1673,6 +1673,12 @@ final class Shop {
         guard let late = try? await engine.lateOrders(
             rows, machines: fleet, settings: settings, now: now), ticket == loadGeneration else { return }
         for i in orders.indices { orders[i].isLateResolved = late.contains(orders[i].id) }
+        // Each job's next step, from the shared rule, with the same late list
+        // (`Shop+NextStep`). Read-only is this app's to say per person and
+        // per book, at the control (`canMoveJobs`), so the rule is not told.
+        let steps = try? await engine.orderNextSteps(rows, settings: settings, lateIds: Array(late))
+        guard ticket == loadGeneration else { return }
+        nextSteps = steps ?? [:]
     }
 
     /// One call per load, not one per tile. Building the arguments means
@@ -2359,6 +2365,9 @@ final class Shop {
     /// (`lib/feature-tiers.js SIMPLE_MAP`, asked through `simpleSurface`):
     /// filled by `readFeatures` beside `features`. Empty is Professional.
     var simpleSurfaces: [String: KhaytEngine.SimpleSurface] = [:]
+    /// Each job's next step, by `lib/order-next-step.js` (S1): filled once a
+    /// load and at each new day, beside the late badges (`resolveLate`).
+    var nextSteps: [String: KhaytEngine.NextSteps] = [:]
     /// In Simple: which of the four board columns each open job is filed
     /// under, and the note its card carries (`lib/order-status.js
     /// simpleStageOf`, asked through `simpleStage`). Filled by `readFeatures`;
