@@ -9628,6 +9628,28 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.36] - 2026-11-14
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release fixes a print alert that said the wrong thing, keeps waiting alerts when Khayt quits, and redraws the menu bar.
+
+### Fixed
+
+- **An alert for a print that finished while Khayt was closed now says finished, not cancelled.** When Khayt was quit during a print and opened again after it ended, it guessed from the printer's idle state and told your iPhone the print was cancelled. It now asks the printer's own job history (Klipper printers such as the U1) and uses what really happened and when it ended. If nothing can say how a print ended, no alert is sent, rather than a guess.
+- **Alerts waiting for your iPhone are kept when Khayt quits or updates.** An alert that couldn't be sent at the time (the cloud locked on this Mac, or the network down) used to be lost on quit. It's now kept on this Mac, sealed with the same key as your saved passwords, and sent when Khayt is open again. Anything older than six hours is dropped.
+- **"Check response" on a quote link** uses the same words as the other apps, so a declined quote never reads as "no response yet".
+
+### Changed
+
+- **The menu bar leads with the print that finishes next**, in large type, with a ring showing how far it has got, the time left and its finish time. The other printers are listed below it. The chime is optional and off unless you switch it on in Settings.
+- **Simple mode leaves out what is part of Professional:** Kiosk, Ask the Book, Campaigns, payment plans, proforma and milestones, and the AI settings. A screen reached anyway (a window that reopens on it, for example) says "… is part of Professional" with a button to switch. Settings › Team & access keeps the staff sign-in lock in Simple, so it can always be switched off.
+
+### Please check on your Mac
+
+- **The menu bar:** while a print is running, pull down the Khayt item in the menu bar and check that the large card shows the right printer, the time left and the finish time, and that the other printers are listed below it. Please tell us if anything looks wrong.
+
 ## [4.0.0-beta.35] - 2026-11-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

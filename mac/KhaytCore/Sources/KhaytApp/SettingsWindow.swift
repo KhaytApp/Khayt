@@ -160,7 +160,10 @@ struct SettingsWindow: View {
     /// The Simple map row each pane is (`SIMPLE_MAP`), where Simple leaves it out.
     static func simpleKey(_ pane: SettingsPane) -> String? {
         switch pane {
-        case .team: "team"
+        // NOT Team & access: it holds the staff sign-in lock, which a Simple
+        // shop must still be able to switch off ("the owner's app-lock PIN
+        // stays in both modes", SIMPLE_MAP staffPins). In Simple the pane
+        // shows the lock alone (`TeamPane`). Beta.36 pre-release review.
         case .assistant: "ai"
         default: nil
         }
@@ -870,9 +873,24 @@ struct TeamPane: View {
 
     var body: some View {
         Form {
-            Section { OperatorsSection(shop: shop) }
-            Section { LockSection(shop: shop) }
-            TeamSettings(shop: shop)
+            // Simple leaves out the team and staff PINs (SIMPLE_MAP `team`),
+            // and keeps the lock, so a shop that switched it on can switch
+            // it off.
+            if shop.professionalOnly("team") {
+                Section { LockSection(shop: shop) }
+                Section {
+                    Text(shop.words.callIt("sm.gated_title", ["feature": .string(shop.words.callIt("mac.nav_team"))]))
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button(shop.words.callIt("sm.gated_switch")) {
+                        Task { await shop.chooseMode("professional") }
+                    }
+                    .disabled(!shop.lockAllows("settings", "edit") || shop.source.build == nil)
+                }
+            } else {
+                Section { OperatorsSection(shop: shop) }
+                Section { LockSection(shop: shop) }
+                TeamSettings(shop: shop)
+            }
         }
         .formStyle(.grouped)
     }

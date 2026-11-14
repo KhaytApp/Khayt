@@ -67,7 +67,11 @@ struct SimpleModeDeadEndsTests {
         for key in Shop.simpleMapKeys {
             #expect(simple.professionalOnly(key), "\(key) is `pro` in SIMPLE_MAP")
         }
-        #expect(SettingsWindow.professionalOnly(.team, simple))
+        // Team & access stays: it holds the staff sign-in lock, which a
+        // Simple shop must be able to switch off. It shows only the lock.
+        #expect(!SettingsWindow.professionalOnly(.team, simple))
+        #expect(simple.professionalOnly("team"))
+        #expect(MenuCoverageTests.source("SettingsWindow.swift").contains("if shop.professionalOnly(\"team\") {\n                Section { LockSection(shop: shop) }"))
         #expect(SettingsWindow.professionalOnly(.assistant, simple))
         #expect(!SettingsWindow.professionalOnly(.integrations, simple), "connectors stay in both modes")
         // The old name for Simple reads the same.
