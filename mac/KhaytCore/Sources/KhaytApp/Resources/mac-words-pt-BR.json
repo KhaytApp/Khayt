@@ -3966,5 +3966,17 @@
  "mac.moved_not_now": "Agora não",
  "mac.moved_dhcp_hint": "O Khayt procurou na rede e não encontrou esta impressora em outro endereço. Se o endereço dela muda com frequência, dê a ela um endereço fixo (uma reserva DHCP) no roteador.",
  "mac.moved_why_serial": "A impressora nesse endereço informou o número de série desta máquina.",
- "mac.moved_why_mac": "A impressora nesse endereço tem a placa de rede desta máquina."
+ "mac.moved_why_mac": "A impressora nesse endereço tem a placa de rede desta máquina.",
+ "mac.view_table": "Tabela",
+ "mac.jp_send_quote": "Enviar orçamento",
+ "mac.jp_take_job": "Aceitar o trabalho",
+ "mac.jp_start_printing": "Iniciar impressão",
+ "mac.jp_mark_printed": "Marcar impresso",
+ "mac.jp_send_to_check": "Enviar para inspeção",
+ "mac.jp_mark_ready": "Marcar pronto",
+ "mac.jp_resume": "Retomar",
+ "mac.jp_hand_over": "Entregar",
+ "mac.jp_record_payment": "Registrar pagamento",
+ "mac.jp_read_only": "Você não pode alterar este trabalho aqui.",
+ "mac.jp_nothing_next": "Nada a fazer"
 }

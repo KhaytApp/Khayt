@@ -59,7 +59,9 @@ struct ShopWindow: View {
     /// the screens that carry their own detail — a card, or a table wide
     /// enough to read — because a panel there would repeat.
     private var wantsPanel: Bool {
+        // The List carries the job's page beside it (S1): a panel would repeat it.
         showInspector && !shop.needsSignIn && !shop.showingDashboard && !shop.showingBoard
+            && !shop.showingJobPage
             && !shop.showingMachines && !shop.showingInventory
             && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
             && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
@@ -218,6 +220,11 @@ struct ShopWindow: View {
                 GiftCards(shop: shop)
             } else if shop.showingCustomers {
                 CustomersTable(shop: shop)
+            } else if shop.showingJobPage {
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .jobs)
+                    JobsList(shop: shop)
+                }
             } else {
                 // The kits above the book they group. Nothing at all when
                 // the shop has never made one — a band explaining an empty

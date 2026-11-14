@@ -3966,5 +3966,17 @@
  "mac.moved_not_now": "今はしない",
  "mac.moved_dhcp_hint": "Khayt はネットワークを探しましたが、このプリンターを別のアドレスで見つけられませんでした。アドレスが変わり続ける場合は、ルーターで固定アドレス（DHCP 予約）を割り当ててください。",
  "mac.moved_why_serial": "そのアドレスのプリンターが、この機械のシリアル番号を返しました。",
- "mac.moved_why_mac": "そのアドレスのプリンターは、この機械のネットワークカードを持っています。"
+ "mac.moved_why_mac": "そのアドレスのプリンターは、この機械のネットワークカードを持っています。",
+ "mac.view_table": "表",
+ "mac.jp_send_quote": "見積もりを送る",
+ "mac.jp_take_job": "受注する",
+ "mac.jp_start_printing": "印刷を開始",
+ "mac.jp_mark_printed": "印刷済みにする",
+ "mac.jp_send_to_check": "検品へ",
+ "mac.jp_mark_ready": "準備完了にする",
+ "mac.jp_resume": "再開",
+ "mac.jp_hand_over": "引き渡す",
+ "mac.jp_record_payment": "入金を記録",
+ "mac.jp_read_only": "ここではこのジョブを変更できません。",
+ "mac.jp_nothing_next": "することはありません"
 }
