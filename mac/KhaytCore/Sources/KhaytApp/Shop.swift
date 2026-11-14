@@ -638,7 +638,7 @@ final class Shop {
     /// is nothing that way" rather than the app swallowing the key.
     @discardableResult
     func moveBoardSelection(dx: Int, dy: Int) -> Bool {
-        let columns = Stage.boardColumns
+        let columns = boardColumns
         let filled = columns.map { board[$0] ?? [] }
         guard filled.contains(where: { !$0.isEmpty }) else { return false }
 
@@ -669,17 +669,44 @@ final class Shop {
         return true
     }
 
+    /// The board's columns: four in Simple (Quote · Queued · Printing ·
+    /// Ready, `SIMPLE_COLUMNS`), every stage in Professional.
+    var boardColumns: [Stage] {
+        reducedInSimple("queue") ? Self.simpleBoardColumns : Stage.boardColumns
+    }
+    static let simpleBoardColumns: [Stage] = [.quote, .pending, .printing, .completed]
+
+    /// The column a job is under in Simple: what the shared rule filed it
+    /// as, nil when the rule leaves it off the board (cancelled, failed).
+    func simpleColumn(_ order: Order) -> Stage? {
+        guard let f = simpleFiling[order.id] else { return nil }
+        switch f.column {
+        case "quote": return .quote
+        case "queued": return .pending
+        case "printing": return .printing
+        case "ready": return .completed
+        default: return nil
+        }
+    }
+
     var board: [Stage: [Order]] {
+        let simple = reducedInSimple("queue")
         var out: [Stage: [Order]] = [:]
         // The search box is one box for the whole window. A board that ignored
         // it left somebody typing a customer's name into a field that visibly
         // did nothing.
         // And the site, when the shop is looking at one (SiteFilter.swift).
         for order in matching(orders) where inSite(order) {
-            guard let stage = Stage.of(order) else { continue }
+            guard let stage = simple ? simpleColumn(order) : Stage.of(order) else { continue }
             out[stage, default: []].append(order)
         }
         for (stage, jobs) in out {
+            // Ready in Simple is the newest first (`simpleColumnJobs`): what
+            // was just finished is what is waiting to be collected.
+            if simple, stage == .completed {
+                out[stage] = jobs.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+                continue
+            }
             // Urgent first, then by due date, then by what has been waiting
             // longest — the order someone would work through them in. Each
             // job's two days are read once, not once per comparison (Nov 2026:
@@ -1154,6 +1181,8 @@ final class Shop {
                 fileRows = []
             }
             if case .array(let jobs)? = root["printLog"] { orderRows = jobs } else { orderRows = [] }
+            await readSimpleFiling()
+            if overtaken() { return }
             let twice = (try? await engine?.duplicateNumbers(orders: orderRows, settings: Self.settings(root))) ?? []
             if overtaken() { return }
             duplicateNumbers = twice
@@ -2339,6 +2368,11 @@ final class Shop {
     /// Each job's next step, by `lib/order-next-step.js` (S1): filled once a
     /// load and at each new day, beside the late badges (`resolveLate`).
     var nextSteps: [String: KhaytEngine.NextSteps] = [:]
+    /// In Simple: which of the four board columns each open job is filed
+    /// under, and the note its card carries (`lib/order-status.js
+    /// simpleStageOf`, asked through `simpleStage`). Filled by `readFeatures`;
+    /// empty in Professional.
+    var simpleFiling: [String: KhaytEngine.SimpleStage] = [:]
 
     // Stored for "Money received" (Shop+Money.swift).
     /// The job waiting for someone to say what was paid.
