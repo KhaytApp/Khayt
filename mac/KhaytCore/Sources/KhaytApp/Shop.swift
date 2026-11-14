@@ -590,11 +590,23 @@ final class Shop {
     /// scene state). Only the board needs the whole book, so choosing a stage
     /// from a link or ⌘K shows the table for that stage whatever this says —
     /// see `showingBoard`.
+    ///
+    /// THREE NOW (S1): Board · List · Table. `page` is the new List — a row
+    /// per job with the job's page beside it. `list` is the TABLE and keeps
+    /// its stored name: every window saved before this holds "list", and
+    /// renaming the case would move them all to a view they did not choose
+    /// (Turki, Q1: existing windows stay on Table).
     enum JobsLayout: String, CaseIterable, Identifiable {
-        case board, list
+        case board, page, list
         var id: String { rawValue }
         /// The word for its place in the picker.
-        var titleKey: String { self == .board ? "mac.board" : "mac.view_list" }
+        var titleKey: String {
+            switch self {
+            case .board: "mac.board"
+            case .page: "mac.view_list"
+            case .list: "mac.view_table"
+            }
+        }
     }
     var jobsLayout: JobsLayout = .list
 
@@ -608,6 +620,9 @@ final class Shop {
     /// Jobs, drawn as a board. Never true for a single stage: that is a filter
     /// of the table, and the board already shows every stage.
     var showingBoard: Bool { shelf == .jobs(nil) && jobsLayout == .board }
+    /// Jobs, drawn as the list with the job's page beside it (S1). Any stage:
+    /// the list is filtered like the table.
+    var showingJobPage: Bool { if case .jobs = shelf { jobsLayout == .page } else { false } }
     var showingExpenses: Bool { shelf == .expenses }
     var showingWaste: Bool { shelf == .waste }
     var showingReports: Bool { shelf == .reports }

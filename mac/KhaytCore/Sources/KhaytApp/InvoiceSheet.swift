@@ -107,6 +107,8 @@ struct InvoiceSheet: View {
     private func share() async {
         guard let url = await sharable() else { return }
         Shop.presentSharePicker([url])
+        // A quote's paper handed to the share sheet has gone out.
+        await shop.noteQuoteShared(subject.id)
     }
 
     private func sendPayLink(_ plan: KhaytEngine.ReminderPlan) async {

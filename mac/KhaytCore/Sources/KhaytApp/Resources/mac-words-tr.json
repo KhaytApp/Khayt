@@ -3966,5 +3966,17 @@
  "mac.moved_not_now": "Şimdi değil",
  "mac.moved_dhcp_hint": "Khayt ağda aradı ve bu yazıcıyı başka bir adreste bulamadı. Adresi sürekli değişiyorsa, yönlendiricide ona sabit bir adres (DHCP rezervasyonu) verin.",
  "mac.moved_why_serial": "Oradaki yazıcı bu makinenin seri numarasını bildirdi.",
- "mac.moved_why_mac": "Oradaki yazıcı bu makinenin ağ kartına sahip."
+ "mac.moved_why_mac": "Oradaki yazıcı bu makinenin ağ kartına sahip.",
+ "mac.view_table": "Tablo",
+ "mac.jp_send_quote": "Teklifi gönder",
+ "mac.jp_take_job": "İşi al",
+ "mac.jp_start_printing": "Baskıyı başlat",
+ "mac.jp_mark_printed": "Basıldı olarak işaretle",
+ "mac.jp_send_to_check": "Kalite kontrole gönder",
+ "mac.jp_mark_ready": "Hazır olarak işaretle",
+ "mac.jp_resume": "Devam ettir",
+ "mac.jp_hand_over": "Teslim et",
+ "mac.jp_record_payment": "Ödeme kaydet",
+ "mac.jp_read_only": "Bu işi buradan değiştiremezsiniz.",
+ "mac.jp_nothing_next": "Yapılacak bir şey yok"
 }

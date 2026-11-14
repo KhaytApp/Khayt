@@ -3966,5 +3966,17 @@
  "mac.moved_not_now": "Nicht jetzt",
  "mac.moved_dhcp_hint": "Khayt hat im Netzwerk gesucht und diesen Drucker unter keiner anderen Adresse gefunden. Wenn sich seine Adresse immer wieder ändert, gib ihm im Router eine feste Adresse (DHCP-Reservierung).",
  "mac.moved_why_serial": "Der Drucker dort hat die Seriennummer dieser Maschine gemeldet.",
- "mac.moved_why_mac": "Der Drucker dort hat die Netzwerkkarte dieser Maschine."
+ "mac.moved_why_mac": "Der Drucker dort hat die Netzwerkkarte dieser Maschine.",
+ "mac.view_table": "Tabelle",
+ "mac.jp_send_quote": "Angebot senden",
+ "mac.jp_take_job": "Auftrag annehmen",
+ "mac.jp_start_printing": "Druck starten",
+ "mac.jp_mark_printed": "Als gedruckt markieren",
+ "mac.jp_send_to_check": "Zur QS",
+ "mac.jp_mark_ready": "Als fertig markieren",
+ "mac.jp_resume": "Fortsetzen",
+ "mac.jp_hand_over": "Übergeben",
+ "mac.jp_record_payment": "Zahlung erfassen",
+ "mac.jp_read_only": "Sie können diesen Auftrag hier nicht ändern.",
+ "mac.jp_nothing_next": "Nichts zu tun"
 }
