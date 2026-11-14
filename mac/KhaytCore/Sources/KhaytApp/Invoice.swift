@@ -235,6 +235,18 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     private var loadProblem: String?
     /// The print that is waiting on WebKit, if one is.
     private var printing: Printed?
+    /// The last print operation handed to AppKit, kept so a test can tell
+    /// when AppKit has finished with it (`printStillRunning`).
+    private var lastPrint: Printed?
+
+    /// A print is waiting on WebKit right now.
+    var isPrinting: Bool { printing != nil }
+
+    /// The last print operation has not reported back to AppKit yet. An
+    /// operation whose wait was ended early (WebKit's process went) is still
+    /// AppKit's and WebKit's until it does, and starting the next thing on
+    /// its web view before then is a race.
+    var printStillRunning: Bool { lastPrint?.appKitHasReported == false }
 
     /// How many times a page whose process went away is handed over again.
     /// Not for ever: a page that kills its process every time would loop.
@@ -469,6 +481,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         // Kept so that losing WebKit's process can end the wait: until the
         // page is drawn again, the print operation does not report back.
         printing = printed
+        lastPrint = printed
         defer { if printing === printed { printing = nil } }
         return await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
             printed.wait(done)
@@ -496,6 +509,12 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         private let lock = NSLock()
         private var done: CheckedContinuation<Bool, Never>?
         private var untilAppKitReports: Printed?
+        private var reported = false
+        /// AppKit has called `printOperationDidRun`: the operation is over.
+        var appKitHasReported: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return reported
+        }
         /// Where a print to a file is writing, if it is.
         private let saving: URL?
 
@@ -517,6 +536,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
             lock.lock()
             let me = untilAppKitReports
             untilAppKitReports = nil
+            reported = true
             lock.unlock()
             _ = me
         }
