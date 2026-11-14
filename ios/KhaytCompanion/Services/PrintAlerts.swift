@@ -192,16 +192,27 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - UNUserNotificationCenterDelegate
 
+    // The completion-handler forms, never the `async` ones: UIKit asserts its
+    // completion runs on the main thread, and a `nonisolated async` delegate
+    // method ends on whichever thread its last line ran on. A tap that
+    // returned early (the Mac's test alert, linked to no job) ended on a
+    // background thread and the app aborted (TestFlight 202611131908, Nov 14).
+    // Here the work runs on the main actor and the completion is called there,
+    // on every path.
+
     /// Shown even with the app open: a print ending is worth a banner —
     /// except Apple's copy of something the open stream says itself.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            willPresent notification: UNNotification) async
-        -> UNNotificationPresentationOptions {
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler:
+                                                @escaping (UNNotificationPresentationOptions) -> Void) {
         let fromApple = notification.request.trigger is UNPushNotificationTrigger
         let kind = Self.pushKind(notification.request.content.userInfo)
-        if fromApple, Self.streamSays(kind: kind),
-           await MainActor.run(body: { self.printers?.streamOpen ?? false }) { return [] }
-        return [.banner, .sound, .list]
+        nonisolated(unsafe) let done = completionHandler
+        Task { @MainActor in
+            let held = fromApple && Self.streamSays(kind: kind) && (self.printers?.streamOpen ?? false)
+            done(held ? [] : [.banner, .sound, .list])
+        }
     }
 
     /// Kinds whose push is ALWAYS shown, even with the stream open: a
@@ -240,28 +251,38 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse) async {
+                                            didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
         let request = response.notification.request
-        let info = request.content.userInfo
+        let identifier = request.identifier
+        let thread = request.content.threadIdentifier
+        let action = response.actionIdentifier
+        nonisolated(unsafe) let info = request.content.userInfo
+        nonisolated(unsafe) let done = completionHandler
+        Task { @MainActor in
+            await self.handleTap(identifier: identifier, thread: thread, userInfo: info, action: action)
+            done()
+        }
+    }
+
+    /// A tapped alert, or one of its buttons — on the main actor.
+    func handleTap(identifier: String, thread: String, userInfo info: [AnyHashable: Any], action: String) async {
         // Another shop's alert, from before a sign-out or a switch: open the
         // app, act on nothing.
-        let here = await MainActor.run { self.api.cloud?.shopId }
-        guard Self.belongsHere(info, signedInShop: here) else { return }
+        guard Self.belongsHere(info, signedInShop: api.cloud?.shopId) else { return }
         // The alert itself tapped, not one of its buttons: open what it is about.
-        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-            guard var to = OrdersNavigationState.destination(identifier: request.identifier,
-                                                             thread: request.content.threadIdentifier,
+        if action == UNNotificationDefaultActionIdentifier {
+            guard var to = OrdersNavigationState.destination(identifier: identifier, thread: thread,
                                                              userInfo: info) else { return }
             if case .published(let item) = to {
                 to = await api.orderId(publishedItem: item).map { .order($0) } ?? .orders
             }
-            let target = to
-            await MainActor.run { self.navigation?.go(target) }
+            navigation?.go(to)
             return
         }
-        guard let action = PrintAlertAction(rawValue: response.actionIdentifier),
+        guard let move = PrintAlertAction(rawValue: action),
               let orderId = info["orderId"] as? String else { return }
-        await perform(action, orderId: orderId)
+        await perform(move, orderId: orderId)
     }
 
     /// The button's move, made the way the same move is made in the app —
