@@ -8,7 +8,7 @@ import XCTest
 /// the Mac will send `ended` when it cannot tell).
 final class PrintEndedOutcomeTests: XCTestCase {
     private func event(_ outcome: String) throws -> PrintFinished {
-        let json = #"{"v":1,"kind":"print-finished","at":"2026-11-14T04:30:00Z","machineId":"M1","machineName":"U1","orderId":"KH-1","outcome":"\#(outcome)"}"#
+        let json = #"{"v":1,"kind":"print-finished","at":"2026-11-14T04:30:00Z","machineId":"M1","machineName":"U1","orderId":"KH-1","project":null,"client":null,"filename":"a.gcode","durationS":3600,"outcome":"\#(outcome)","photo":false,"advancedTo":null}"#
         return try JSONDecoder().decode(PrintFinished.self, from: Data(json.utf8))
     }
 
