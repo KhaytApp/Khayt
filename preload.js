@@ -419,6 +419,15 @@ contextBridge.exposeInMainWorld('hubAPI', {
   quotePayLinkSetSecret: (secret) => ipcRenderer.invoke('hub:quote-pay-link-set-secret', secret),
   quotePayLinkRemoveSecret: () => ipcRenderer.invoke('hub:quote-pay-link-remove-secret'),
   quotePayLinkSign: (opts) => ipcRenderer.invoke('hub:quote-pay-link-sign', opts),
+  // Pay link v2 keys (off unless KHAYT_PAYLINK_V2=1): status and the owner/manager actions.
+  qlkStatus: () => ipcRenderer.invoke('hub:qlk-status'),
+  qlkSetup: () => ipcRenderer.invoke('hub:qlk-setup'),
+  qlkCancel: () => ipcRenderer.invoke('hub:qlk-cancel'),
+  qlkApprove: (kid) => ipcRenderer.invoke('hub:qlk-approve', { kid }),
+  qlkDecline: (kid) => ipcRenderer.invoke('hub:qlk-decline', { kid }),
+  qlkRotate: () => ipcRenderer.invoke('hub:qlk-rotate'),
+  qlkRevoke: (kid, code) => ipcRenderer.invoke('hub:qlk-revoke', { kid, code }),
+  qlkReset: (code) => ipcRenderer.invoke('hub:qlk-reset', { code }),
 
   // Telegram notifications
   sendTelegram: (opts) => ipcRenderer.invoke('hub:send-telegram', opts),

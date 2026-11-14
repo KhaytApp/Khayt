@@ -289,9 +289,11 @@
           <button type="button" class="btn" data-qpl-set="replace">${escapeHtml(t('qpl.set_secret'))}</button>
         </div>`;
     return `<div class="settings-section-head">${escapeHtml(t('qpl.settings_title'))}</div>
-      <p class="settings-panel-hint">${escapeHtml(t('qpl.settings_intro'))}</p>
+      <p class="settings-panel-hint" id="qpl_intro">${escapeHtml(t('qpl.settings_intro'))}</p>
       <label for="qpl_storeUrl">${escapeHtml(t('qpl.store_address'))}</label>
       <input type="url" id="qpl_storeUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" value="${escapeHtml(c.storeUrl || '')}">
+      <div class="qpl-v2" id="qpl_v2" hidden></div>
+      <div class="qpl-v1" id="qpl_v1">
       <div class="qpl-label" id="qpl_secretLabel">${escapeHtml(t('qpl.link_secret'))}</div>
       <div role="group" aria-labelledby="qpl_secretLabel">${stored}
         <div class="qpl-secret-edit" hidden>
@@ -301,7 +303,8 @@
           <p class="settings-field-hint" id="qpl_secretRule">${escapeHtml(t('qpl.secret_rule'))}</p>
         </div>
       </div>
-      <p class="settings-field-hint">${escapeHtml(t('qpl.secret_hint'))}</p>`;
+      <p class="settings-field-hint">${escapeHtml(t('qpl.secret_hint'))}</p>
+      </div>`;
   }
 
   function renderPayLinkSettings(keepTyped) {
@@ -312,7 +315,120 @@
     const value = typed ? typed.value : null;
     el.innerHTML = settingsHtml();
     if (value !== null) el.querySelector('#qpl_storeUrl').value = value;
+    refreshV2();
   }
+
+  /* ── Pay link v2: this computer's key and the shop's keys ────────────────
+   * Figma 7Iqw0GcrLLRW7CLDEhTa1P, frames 94:543 (this computer signs),
+   * 94:778 (waiting for approval) and 94:1013 (approving another computer).
+   * Off unless main answers `enabled` (KHAYT_PAYLINK_V2=1); then the v1
+   * secret rows are hidden and these take their place. Main holds the key and
+   * the Cloud token; the window gets short kids, statuses and labels. */
+
+  let v2Revoking = '';
+  const isOwner = () => ((settings.cloud && settings.cloud.role) || 'owner') === 'owner';
+  const v2Date = (iso) => { const ms = Date.parse(iso || ''); return Number.isFinite(ms) ? shortDate(ms) : ''; };
+  const tail = (kid) => String(kid || '').slice(-4);
+
+  function v2Row(text, buttons) {
+    return `<div class="qpl-secret-row qpl-key-row">
+      <div class="qpl-secret-dots">${escapeHtml(text)}</div>${buttons || ''}</div>`;
+  }
+  const v2Btn = (act, label, kid, cls) => `<button type="button" class="btn ${cls || ''}" data-qpl-v2="${act}"${kid ? ` data-kid="${escapeHtml(kid)}"` : ''}>${escapeHtml(label)}</button>`;
+
+  function v2Html(st) {
+    if (!st.cloud) return `<div class="qpl-label">${escapeHtml(t('qpl.v2_keys'))}</div>${v2Row(t('qpl.v2_no_cloud'))}`;
+    if (!st.ok) return `<div class="qpl-label">${escapeHtml(t('qpl.v2_keys'))}</div>${v2Row(t('qpl.v2_unreachable'), v2Btn('refresh', t('qpl.v2_retry')))}`;
+    const others = (st.keys || []).filter((k) => !k.mine);
+    // While this computer waits for approval it acts on no other key (frame 94:778).
+    const mayAct = isOwner() && st.state !== 'pending';
+    const otherRows = others.map((k) => v2Row(t('qpl.v2_key_other', { device: k.device || t('qpl.v2_another_computer'), date: v2Date(k.created), key: k.short }),
+      mayAct ? v2Btn('revoke', t('qpl.v2_revoke'), k.kid, 'ghost qpl-remove') : '')).join('');
+    const codeRow = v2Revoking ? `<div class="qpl-secret-edit">
+        <input type="text" id="qpl_v2Code" autocomplete="one-time-code" spellcheck="false" maxlength="8" aria-label="${escapeHtml(t('qpl.v2_code'))}" placeholder="${escapeHtml(t('qpl.v2_code'))}">
+        ${v2Btn('revoke-confirm', t('qpl.v2_revoke'), v2Revoking, 'danger')}
+        ${v2Btn('revoke-cancel', t('common.cancel'), '', 'ghost')}
+        <p class="settings-field-hint">${escapeHtml(t('qpl.v2_code_sent'))}</p></div>` : '';
+
+    if (st.state === 'none' || st.state === 'unpublished' || st.state === 'revoked') {
+      return `<div class="qpl-label">${escapeHtml(t('qpl.v2_this_computer'))}</div>
+        ${v2Row(t('qpl.v2_none'), v2Btn('setup', t('qpl.v2_setup'), '', 'primary'))}${otherRows}${codeRow}
+        <p class="settings-field-hint">${escapeHtml(t('qpl.v2_hint'))}</p>`;
+    }
+    if (st.state === 'pending') {
+      return `<div class="qpl-label">${escapeHtml(t('qpl.v2_this_computer'))}</div>
+        ${v2Row(t('qpl.v2_waiting', { date: v2Date(st.mine && st.mine.requestedAt) }), v2Btn('cancel', t('qpl.v2_cancel_request')))}${otherRows}
+        <p class="settings-field-hint">${escapeHtml(t('qpl.v2_waiting_hint', { key: tail(st.mine && st.mine.kid) }))}</p>`;
+    }
+    const mine = (st.keys || []).find((k) => k.mine);
+    const mineRow = v2Row(t('qpl.v2_key_mine', { status: t('qpl.v2_status_' + st.state), date: v2Date(mine && mine.created), key: st.mine.short }),
+      (st.state === 'current' ? v2Btn('rotate', t('qpl.v2_rotate')) : '') + (isOwner() ? v2Btn('revoke', t('qpl.v2_revoke'), st.mine.kid, 'ghost qpl-remove') : ''));
+    const asks = (st.pending || []).map((p) => v2Row(t('qpl.v2_asks', { device: p.device || t('qpl.v2_another_computer'), key: p.short, date: v2Date(p.requested) }),
+      v2Btn('approve', t('qpl.v2_approve'), p.kid) + v2Btn('decline', t('qpl.v2_decline'), p.kid, 'ghost qpl-remove'))).join('');
+    const asksBlock = asks ? `<div class="qpl-label">${escapeHtml(t('qpl.v2_asks_head'))}</div>${asks}
+        <p class="settings-field-hint">${escapeHtml(t('qpl.v2_approve_hint', { key: tail(st.pending[0].kid) }))}</p>` : '';
+    return `${asksBlock}<div class="qpl-label">${escapeHtml(t('qpl.v2_keys'))}</div>${mineRow}${otherRows}${codeRow}
+      <p class="settings-field-hint">${escapeHtml(t('qpl.v2_hint'))}</p>`;
+  }
+
+  async function refreshV2() {
+    const host = document.getElementById('qpl_v2');
+    if (!host || !global.hubAPI?.qlkStatus) return;
+    let st;
+    try { st = await global.hubAPI.qlkStatus(); } catch (_) { return; }
+    if (!st || !st.enabled) return;
+    const v1 = document.getElementById('qpl_v1');
+    if (v1) v1.hidden = true;
+    const intro = document.getElementById('qpl_intro');
+    if (intro) intro.textContent = t('qpl.v2_intro');
+    host.hidden = false;
+    host.innerHTML = v2Html(st);
+  }
+
+  async function onV2Click(e) {
+    const b = e.target.closest('#qpl_v2 [data-qpl-v2]');
+    if (!b) return;
+    const act = b.dataset.qplV2;
+    const kid = b.dataset.kid || '';
+    const api = global.hubAPI || {};
+    const done = (res, okMsg) => {
+      if (res && res.ok) { if (okMsg) toast(t(okMsg), 'success'); }
+      else toast(t('qpl.v2_failed', { reason: (res && res.error) || '—' }), 'error');
+      refreshV2();
+    };
+    if (act === 'refresh') { refreshV2(); return; }
+    if (act === 'setup') { done(await api.qlkSetup?.(), 'qpl.v2_setup_done'); return; }
+    if (act === 'cancel') { done(await api.qlkCancel?.()); return; }
+    if (act === 'approve') {
+      if (!(await confirmModal(t('qpl.v2_approve_confirm', { key: tail(kid) }), { okText: t('qpl.v2_approve') }))) return;
+      done(await api.qlkApprove?.(kid), 'qpl.v2_approved'); return;
+    }
+    if (act === 'decline') { done(await api.qlkDecline?.(kid)); return; }
+    if (act === 'rotate') {
+      if (!(await confirmModal(t('qpl.v2_rotate_confirm'), { okText: t('qpl.v2_rotate') }))) return;
+      done(await api.qlkRotate?.(), 'qpl.v2_rotated'); return;
+    }
+    if (act === 'revoke') {
+      if (!(await confirmModal(t('qpl.v2_revoke_confirm'), { okText: t('qpl.v2_revoke'), danger: true }))) return;
+      const res = await api.qlkRevoke?.(kid);
+      if (res && res.ok && res.codeSent) { v2Revoking = kid; refreshV2(); return; }
+      done(res); return;
+    }
+    if (act === 'revoke-cancel') { v2Revoking = ''; refreshV2(); return; }
+    if (act === 'revoke-confirm') {
+      const code = (document.getElementById('qpl_v2Code')?.value || '').trim();
+      if (!code) { document.getElementById('qpl_v2Code')?.focus(); return; }
+      const res = await api.qlkRevoke?.(kid, code);
+      if (res && res.ok) v2Revoking = '';
+      done(res, 'qpl.v2_revoked');
+    }
+  }
+  document.addEventListener('click', onV2Click);
+  // What Khayt Cloud says can change between visits (another computer asks,
+  // a key is revoked), so the keys are read again each time the pane opens.
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.settings-nav-item[data-settings-section="store"]')) refreshV2();
+  });
 
   /** Called by the pane's Save: the store address is an ordinary setting. */
   function savePayLinkSettingsFromForm() {
