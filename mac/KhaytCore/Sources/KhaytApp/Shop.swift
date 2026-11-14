@@ -2326,6 +2326,10 @@ final class Shop {
     /// Resolved once per load rather than asked per row: the sidebar redraws
     /// constantly and the answer only changes when the book does.
     var features: Set<String> = []
+    /// What Simple does with each row of the shared Simple map
+    /// (`lib/feature-tiers.js SIMPLE_MAP`, asked through `simpleSurface`):
+    /// filled by `readFeatures` beside `features`. Empty is Professional.
+    var simpleSurfaces: [String: KhaytEngine.SimpleSurface] = [:]
 
     // Stored for "Money received" (Shop+Money.swift).
     /// The job waiting for someone to say what was paid.

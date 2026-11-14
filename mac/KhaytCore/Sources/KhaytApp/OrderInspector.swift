@@ -411,7 +411,7 @@ private struct Detail: View {
                 .font(.callout)
             // Before the work is invoiced: the same paper as a request for
             // payment, which numbers nothing (`showProforma`).
-            if Shop.offersProforma(job) {
+            if Shop.offersProforma(job), !shop.professionalOnly("proforma") {
                 Button(shop.words.callIt("ord.gen_proforma")) { shop.showProforma(job.id) }
                     .buttonStyle(.link)
                     .font(.callout)
