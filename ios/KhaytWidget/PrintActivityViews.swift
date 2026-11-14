@@ -91,6 +91,7 @@ enum PrintActivityLook {
         case .finished: done
         case .failed: late
         case .cancelled: note
+        case .ended: note
         }
     }
 
@@ -107,6 +108,7 @@ enum PrintActivityLook {
         case .finished: "checkmark.circle.fill"
         case .failed: "exclamationmark.triangle.fill"
         case .cancelled: "xmark.circle.fill"
+        case .ended: "stop.circle.fill"
         }
     }
 
@@ -229,6 +231,7 @@ struct PrintHeadline: View {
         case .finished: Text("Ready to collect", bundle: bundle)
         case .failed: Text("Print failed", bundle: bundle)
         case .cancelled: Text("Print stopped", bundle: bundle)
+        case .ended: Text("Print ended — check the printer", bundle: bundle)
         }
     }
 }
@@ -304,7 +307,7 @@ enum PrintActivityText {
         switch phase {
         case .finished: return "post"
         case .failed, .cancelled: return "reprint"
-        case .printing, .paused: return nil
+        case .printing, .paused, .ended: return nil
         }
     }
 
@@ -368,6 +371,7 @@ enum PrintActivityText {
         case .finished: Text("Done", bundle: bundle)
         case .failed: Text("Failed", bundle: bundle)
         case .cancelled: Text("Cancelled", bundle: bundle)
+        case .ended: Text("Ended", bundle: bundle)
         }
     }
 }

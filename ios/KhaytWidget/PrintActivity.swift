@@ -17,7 +17,17 @@ import Foundation
 /// way it can stay right.
 struct PrintActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
-        enum Phase: String, Codable, Hashable { case printing, paused, finished, failed, cancelled }
+        enum Phase: String, Codable, Hashable {
+            case printing, paused, finished, failed, cancelled
+            /// Stopped, and the Mac cannot tell how; also any phase this build
+            /// does not know, so a newer Mac's word never drops the update.
+            case ended
+
+            init(from decoder: Decoder) throws {
+                let raw = try decoder.singleValueContainer().decode(String.self)
+                self = Phase(rawValue: raw) ?? .ended
+            }
+        }
         var phase: Phase
         /// The file on the printer, as the printer names it.
         var job: String?

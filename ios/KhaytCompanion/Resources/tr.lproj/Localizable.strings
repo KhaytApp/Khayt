@@ -569,6 +569,7 @@
 "alert.print.finished" = "Baskı bitti";
 "alert.print.failed" = "Baskı başarısız";
 "alert.print.cancelled" = "Baskı iptal edildi";
+"alert.print.ended" = "Baskı sona erdi — yazıcıyı kontrol edin";
 "alert.print.a_job" = "Bir iş";
 "alert.print.move_post" = "Son işleme taşı";
 "alert.print.reprint" = "Sıraya geri koy";

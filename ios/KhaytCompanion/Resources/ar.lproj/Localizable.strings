@@ -569,6 +569,7 @@
 "alert.print.finished" = "انتهت الطباعة";
 "alert.print.failed" = "فشلت الطباعة";
 "alert.print.cancelled" = "أُلغيت الطباعة";
+"alert.print.ended" = "انتهت الطباعة — تحقّق من الطابعة";
 "alert.print.a_job" = "مهمة";
 "alert.print.move_post" = "انقل إلى ما بعد الطباعة";
 "alert.print.reprint" = "أعدها إلى الطابور";

@@ -12,7 +12,19 @@ import UserNotifications
 /// shape is built on the phone from the live readings, so there is one kind
 /// of alert whichever way it was noticed.
 struct PrintFinished: Codable, Equatable, Sendable {
-    enum Outcome: String, Codable, Sendable { case finished, failed, cancelled }
+    enum Outcome: String, Codable, Sendable {
+        case finished, failed, cancelled
+        /// The print stopped and the Mac cannot tell how (Mac lane, Nov 14):
+        /// said neutrally, "check the printer". Also what any outcome this
+        /// build does not know becomes, so a new word from a newer Mac shows
+        /// a sensible alert instead of failing the whole decode.
+        case ended
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Outcome(rawValue: raw) ?? .ended
+        }
+    }
 
     var v: Int = 1
     var kind: String = "print-finished"
@@ -70,6 +82,9 @@ enum PrintAlertAction: String, CaseIterable {
             return status == "printing" ? .moveToPost : nil
         case .failed, .cancelled:
             return status == "printing" ? .reprint : nil
+        case .ended:
+            // How it ended is not known, so neither move is offered.
+            return nil
         }
     }
 
@@ -125,6 +140,7 @@ enum PrintAlertText {
         case .finished: c.title = tr("alert.print.finished")
         case .failed: c.title = tr("alert.print.failed")
         case .cancelled: c.title = tr("alert.print.cancelled")
+        case .ended: c.title = tr("alert.print.ended")
         }
         let what = event.project ?? event.filename ?? tr("alert.print.a_job")
         var parts = [what]
@@ -148,7 +164,8 @@ enum PrintAlertText {
         // A failed or cancelled print is worth breaking through Focus for;
         // a finished one is not (Dev Hub, Nov 13). The app carries the
         // time-sensitive entitlement (on for the App ID since Nov 13).
-        c.interruptionLevel = event.outcome == .finished ? .active : .timeSensitive
+        // An ending of unknown kind is said plainly, not through Focus.
+        c.interruptionLevel = (event.outcome == .finished || event.outcome == .ended) ? .active : .timeSensitive
         let action = PrintAlertAction.offered(for: event, orderStatus: orderStatus)
         c.categoryIdentifier = action?.category ?? PrintAlertAction.infoCategory
         var info: [String: Any] = ["machineId": event.machineId, "outcome": event.outcome.rawValue]
@@ -161,7 +178,7 @@ enum PrintAlertText {
 
     /// Every key the alert uses — the extension carries its own copy of these,
     /// and a test holds the two copies to the same words.
-    static let keys = ["alert.print.finished", "alert.print.failed", "alert.print.cancelled",
+    static let keys = ["alert.print.finished", "alert.print.failed", "alert.print.cancelled", "alert.print.ended",
                        "alert.print.a_job", "alert.print.move_post", "alert.print.reprint",
                        "alert.print.mark_shipped", "PUSH_TITLE", "PUSH_PRINT_FINISHED", "PUSH_INTAKE",
                        "PUSH_OVERDUE", "PUSH_LOW_STOCK", "PUSH_DUE_TODAY", "PUSH_QUOTE_DECISION",

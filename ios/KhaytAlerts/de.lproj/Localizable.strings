@@ -3,6 +3,7 @@
 "alert.print.finished" = "Druck abgeschlossen";
 "alert.print.failed" = "Druck fehlgeschlagen";
 "alert.print.cancelled" = "Druck abgebrochen";
+"alert.print.ended" = "Druck beendet – Drucker prüfen";
 "alert.print.a_job" = "Ein Auftrag";
 "alert.print.move_post" = "In die Nachbearbeitung verschieben";
 "alert.print.reprint" = "Zurück in die Warteschlange";
