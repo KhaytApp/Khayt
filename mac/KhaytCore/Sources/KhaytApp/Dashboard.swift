@@ -395,12 +395,9 @@ struct RunningOut: View {
         }
         .padding(.vertical, 5)
         .contentShape(Rectangle())
-        // Open the job, the way every other row on this screen does: the jobs
-        // table with it selected, so the inspector beside it answers "why".
-        .onTapGesture {
-            shop.shelf = .jobs(nil)
-            shop.selection = job.id
-        }
+        // Open the job, the way every other row on this screen does: its
+        // page, which answers "why".
+        .onTapGesture { shop.openJobPage(job.id) }
     }
 
     /// `2026-09-12` as the shop reads it. The stored form is unambiguous and
@@ -509,10 +506,7 @@ struct ToChase: View {
                     // that says "chase this" and cannot be opened left the
                     // shop searching for the job to message the customer
                     // from.
-                    .onTapGesture {
-                        shop.shelf = .jobs(nil)
-                        shop.selection = row.id
-                    }
+                    .onTapGesture { shop.openJobPage(row.id) }
                     if row.id != rows.last?.id { LayerRule() }
                 }
             }
@@ -755,9 +749,7 @@ private struct NeedsAttention: View {
             switch item.kind {
             case "stock": shop.shelf = .inventory
             case "machine", "nozzle": shop.shelf = .machines
-            default:
-                shop.shelf = .jobs(nil)
-                shop.selection = item.id
+            default: shop.openJobPage(item.id)
             }
         }
     }

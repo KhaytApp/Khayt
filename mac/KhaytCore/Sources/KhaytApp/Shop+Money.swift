@@ -207,6 +207,7 @@ extension Shop {
                      extraLines: [ExtraLine] = [],
                      overheadPerHour: Double = 0,
                      notes: String = "", dueDate: String? = nil,
+                     priorityLevel: String = "normal",
                      carried: [String: JSONValue] = [:]) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools, reclaimsTax: reclaimsTax,
@@ -225,6 +226,9 @@ extension Shop {
         let said = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !said.isEmpty { input["notes"] = .string(said) }
         if let dueDate, !asQuote { input["dueDate"] = .string(dueDate) }
+        // Only a job taken as high or urgent says so: `newOrder` writes a normal
+        // job in the shape it always had.
+        if priorityLevel == "high" || priorityLevel == "urgent" { input["priorityLevel"] = .string(priorityLevel) }
         // The charges that are not printing. Dropped when half-written, for
         // the reason `previewQuote` gives.
         let charges = extraLines.filter(\.isWorthKeeping)

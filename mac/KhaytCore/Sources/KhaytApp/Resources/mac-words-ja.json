@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "まだランク付けされていません（価格または印刷時間なし）：{n} 件",
  "mac.preferences": "環境設定",
  "mac.price": "価格",
+ "mac.more_pricing": "その他の価格設定",
  "mac.price_history": "仕入先への支払価格",
  "mac.price_history_sub": "単位あたり、記録上の直近の購入価格です。",
  "mac.price_kept": "保存済みの価格を維持。現在のコストでは {now} になります",

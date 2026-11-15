@@ -175,7 +175,7 @@
     const b = e.target.closest('#jobPage [data-jp], #jobPage [data-jp-step]');
     if (!b) return;
     if (b.dataset.jp === 'back') { closeJobPage(); return; }
-    if (b.dataset.jp === 'edit') { openOrderEditor(openId); return; }
+    if (b.dataset.jp === 'edit') { (typeof openJobSheet === 'function' ? openJobSheet : openOrderEditor)(openId); return; }
     if (b.dataset.jpStep) runStep(b.dataset.jpStep);
   });
   document.addEventListener('keydown', (e) => {

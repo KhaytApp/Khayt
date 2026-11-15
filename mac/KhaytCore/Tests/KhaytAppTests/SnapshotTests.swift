@@ -504,7 +504,12 @@ import KhaytCore
         // sheet here gave a title and three buttons over an empty page. The
         // chrome around it is in the app's own capture, `14-new-job`.
         try render(NewJobSheet(shop: shop).paper,
-                   "23-new-job-words", size: CGSize(width: NewJobSheet.width, height: 420))
+                   "23-new-job-words", size: CGSize(width: NewJobSheet.width, height: 570))
+        // What "More pricing" unfolds: `ImageRenderer` draws a closed
+        // DisclosureGroup as its title alone, so the group is photographed
+        // directly, as `paper` is.
+        try render(NewJobSheet(shop: shop).morePricing.padding(18),
+                   "23c-new-job-more-pricing-words", size: CGSize(width: NewJobSheet.width, height: 200))
         // As "Quote this model…" opens it: a sliced line and an estimated one,
         // each saying which it is.
         var sliced = NewJobSheet.Draft()
@@ -516,7 +521,7 @@ import KhaytCore
         try render(NewJobSheet(shop: shop, seed: .init(project: "Dallah + Vase",
                                                        parts: [sliced, estimated],
                                                        preferQuote: true)).paper,
-                   "23b-quote-from-model-words", size: CGSize(width: NewJobSheet.width, height: 470))
+                   "23b-quote-from-model-words", size: CGSize(width: NewJobSheet.width, height: 640))
         // The footer, opened for a quote and for a job, so its default button
         // can be checked in each language (alpha.74 review N8): Save as quote
         // is the default only when a quote was asked for. (The whole sheet
