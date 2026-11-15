@@ -5475,6 +5475,7 @@
   "js.auto": "auto",
   "js.more": "More: shipping, extra charges, rush fee, payments (full editor)",
   "js.total": "Total",
+  "js.price_fixed": "Price is fixed: parts changes won’t move it.",
   "js.ask_title": "The customer has seen this price",
   "js.ask_body": "The customer was given {was}. With the new parts it comes to {now}. Keep the price the customer saw, or use the new one?",
   "js.ask_saw": "The customer saw",

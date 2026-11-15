@@ -191,6 +191,9 @@
       line.hidden = verdict.ok;
       modal.querySelector('[data-act="save"]').disabled = !verdict.ok;
       modal.querySelector('[data-js="total"]').textContent = priceText(billed(verdict.ok ? trial : order));
+      // A typed price (Keep, or a total typed here) is fixed: the rule leaves
+      // it where it is when the parts change, and the sheet says so.
+      q('fixed').hidden = (verdict.ok ? trial : order).priceSource !== 'override';
     }
 
     function loadRow(i) {
@@ -263,7 +266,7 @@
         modal = m;
         modal.classList.add('job-sheet-modal');
         const footer = modal.querySelector('.modal-footer');
-        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div></div>`);
+        footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div></div>`);
         drawParts();
         modal.addEventListener('input', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });
         modal.addEventListener('change', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });

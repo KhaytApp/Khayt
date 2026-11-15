@@ -71,6 +71,7 @@ try {
   await openSheet('JS-SEEN');
   ok(/Parts · 1/i.test(await window.textContent('#modalMount [data-js="partsHead"]')), 'the sheet lists the job\'s parts');
   ok(/340/.test(await window.textContent('#modalMount [data-js="total"]')), 'the total is pinned at the foot (340)');
+  ok(await window.evaluate(() => document.querySelector('#modalMount [data-js="fixed"]').hidden), 'a price worked from its parts carries no "fixed" note');
   await shot('job-sheet');
   await window.fill('#modalMount [data-js="project"]', 'Renamed sample');
   await window.click('#modalMount [data-js-pr="high"]');
@@ -93,6 +94,11 @@ try {
   j = await job('JS-SEEN');
   ok(j.parts.length === 2 && j.price === 340, `Keep: two parts, the price stays 340 (${j.price})`);
   ok(j.parts[1].baseCost > 0 && j.parts[1].filamentId === 'F-JS', 'the new part is costed off its filament');
+  await window.click('#jobPage [data-jp="edit"]');
+  await window.waitForSelector('#modalMount [data-js="fixed"]:not([hidden])', { timeout: 5_000 });
+  ok(/fixed/.test(await window.textContent('#modalMount [data-js="fixed"]')), 'after Keep, the sheet says the price is fixed');
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
 
   // ── Use the new price (a job whose price is still its parts' arithmetic;
   //    after Keep the price is a typed one, and the rule leaves it as typed) ──

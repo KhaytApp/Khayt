@@ -5474,6 +5474,7 @@
   "js.auto": "otomatik",
   "js.more": "Daha fazla: kargo, ek ücretler, acele ücreti, ödemeler (tam düzenleyici)",
   "js.total": "Toplam",
+  "js.price_fixed": "Fiyat sabit: parça değişiklikleri onu değiştirmez.",
   "js.ask_title": "Müşteri bu fiyatı gördü",
   "js.ask_body": "Müşteriye {was} verildi. Yeni parçalarla {now} oluyor. Müşterinin gördüğü fiyat kalsın mı, yoksa yenisi mi kullanılsın?",
   "js.ask_saw": "Müşterinin gördüğü",

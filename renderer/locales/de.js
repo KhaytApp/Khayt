@@ -5474,6 +5474,7 @@
   "js.auto": "automatisch",
   "js.more": "Mehr: Versand, Zusatzkosten, Eilzuschlag, Zahlungen (vollständiger Editor)",
   "js.total": "Gesamt",
+  "js.price_fixed": "Preis ist fest: Änderungen an Teilen ändern ihn nicht.",
   "js.ask_title": "Der Kunde kennt diesen Preis",
   "js.ask_body": "Dem Kunden wurde {was} genannt. Mit den neuen Teilen ergibt sich {now}. Den Preis behalten, den der Kunde gesehen hat, oder den neuen verwenden?",
   "js.ask_saw": "Der Kunde sah",

@@ -5475,6 +5475,7 @@
   "js.auto": "auto",
   "js.more": "Mais: frete, cobranças extras, taxa de urgência, pagamentos (editor completo)",
   "js.total": "Total",
+  "js.price_fixed": "O preço é fixo: mudanças nas peças não o alteram.",
   "js.ask_title": "O cliente já viu este preço",
   "js.ask_body": "O cliente recebeu {was}. Com as novas peças fica {now}. Manter o preço que o cliente viu ou usar o novo?",
   "js.ask_saw": "O cliente viu",
