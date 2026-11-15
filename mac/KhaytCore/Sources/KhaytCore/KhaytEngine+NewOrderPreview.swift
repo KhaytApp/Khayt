@@ -32,7 +32,10 @@ extension KhaytEngine {
                                 clients: [JSONValue] = []) throws -> NewOrderPreview {
         try runtime.call2(
             "KhaytOrderNew.previewTotal(ARG0, { settings: ARG1, consumables: ARG2, clients: ARG3 })",
-            [.object(input), .object(settings), .array(consumables), .array(clients)],
+            // Trimmed (`ruleSettings`): the rule reads currency, exchangeRates,
+            // rushFeePct and the tax keys, never the logo or the library, and
+            // returns no settings, so nothing is lost by sending less.
+            [.object(input), .object(ruleSettings(settings)), .array(consumables), .array(clients)],
             as: NewOrderPreview.self)
     }
 
