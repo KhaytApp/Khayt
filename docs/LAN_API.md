@@ -232,13 +232,15 @@ answers **403** `{"ok":false,"reason":"connector-scope"}` to a request whose
 2. The plugin sends `POST /api/connectors/pair`
    `{"publicKey":"<base64 raw X25519>","name":"…","app":"OrcaSlicer","version":"2.5.1"}`
    (no PIN, no signature; `Host` must be a local address, else **421**).
-   It gets **200** `{"pairId","pollSecret","deviceId","publicKey","sig"}`: the
-   Mac's X25519 key, signed by its identity key over the same
-   `khayt-enrol:` message as `POST /api/devices`. One request waits at a
+   It gets **200** `{"pairId","pollSecret","deviceId","publicKey","sig","identity"}`:
+   the Mac's X25519 key, signed by its identity key over the same
+   `khayt-enrol:` message as `POST /api/devices`, and that identity key
+   (Ed25519, base64 raw), which the plugin pins: it cannot ask
+   `/api/identity`, which takes the PIN. One request waits at a
    time; another gets **409** `{"reason":"pairing-busy"}`. A key that is not
    32 bytes, or gives the all-zero secret, is **400**. Nothing is enrolled yet.
 3. Both sides show a 6-digit **check number**: SHA-256 of
-   `khayt-connector-check-v1\n<deviceId>\n<Mac publicKey>\n<plugin publicKey>`
+   `khayt-connector-check-v1\n<deviceId>\n<identity>\n<Mac publicKey>\n<plugin publicKey>`
    (keys base64 as sent), the first 4 bytes big-endian, modulo 1,000,000,
    zero-padded. Vectors: [`connector-pair.vectors.json`](connector-pair.vectors.json).
    A device in the middle that swapped a key makes the numbers differ.

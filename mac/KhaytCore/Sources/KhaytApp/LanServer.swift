@@ -1092,7 +1092,7 @@ final class LanServer {
                 let offer = try window.request(publicKey: publicKey, name: text("name"), app: text("app"),
                                                version: text("version"), address: request.remote,
                                                identity: identity)
-                return .json(200, #"{"pairId":"\#(offer.pairId)","pollSecret":"\#(offer.pollSecret)","deviceId":"\#(offer.deviceId)","publicKey":"\#(offer.publicKey)","sig":"\#(offer.sig)"}"#)
+                return .json(200, #"{"pairId":"\#(offer.pairId)","pollSecret":"\#(offer.pollSecret)","deviceId":"\#(offer.deviceId)","publicKey":"\#(offer.publicKey)","sig":"\#(offer.sig)","identity":"\#(offer.identity)"}"#)
             } catch .closed {
                 return .json(403, LanConnectorPairing.closedBody)
             } catch .busy {

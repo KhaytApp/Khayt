@@ -22,7 +22,7 @@ struct LanConnectorPairingTests {
         }
     }
 
-    struct Offer: Decodable { let pairId, pollSecret, deviceId, publicKey, sig: String }
+    struct Offer: Decodable { let pairId, pollSecret, deviceId, publicKey, sig, identity: String }
 
     static func ask(_ bench: LanServerTests.Bench, _ plugin: Plugin) async throws -> (LanServerTests.Bench.Reply, Offer?) {
         let reply = try await bench.send("POST", "/api/connectors/pair", body: plugin.body())
@@ -45,7 +45,8 @@ struct LanConnectorPairingTests {
 
     struct Vectors: Decodable {
         struct Case: Decodable {
-            let name, serverPrivateHex, pluginPrivateHex, deviceId, serverPublic, pluginPublic, check: String
+            let name, identitySeedHex, serverPrivateHex, pluginPrivateHex, deviceId: String
+            let identityPublic, serverPublic, pluginPublic, check: String
         }
         let cases: [Case]
     }
@@ -65,15 +66,18 @@ struct LanConnectorPairingTests {
         #expect(vectors.cases.count >= 4)
         #expect(vectors.cases.contains { $0.check.hasPrefix("0") }, "a check with a leading zero keeps it")
         for c in vectors.cases {
+            let identity = try Curve25519.Signing.PrivateKey(rawRepresentation: Self.hex(c.identitySeedHex))
+            #expect(identity.publicKey.rawRepresentation.base64EncodedString() == c.identityPublic, "\(c.name)")
             let server = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: Self.hex(c.serverPrivateHex))
             let plugin = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: Self.hex(c.pluginPrivateHex))
             #expect(server.publicKey.rawRepresentation.base64EncodedString() == c.serverPublic, "\(c.name)")
             #expect(plugin.publicKey.rawRepresentation.base64EncodedString() == c.pluginPublic, "\(c.name)")
-            #expect(LanConnectorPairing.check(deviceId: c.deviceId, serverPublic: c.serverPublic,
-                                              pluginPublic: c.pluginPublic) == c.check, "\(c.name)")
+            #expect(LanConnectorPairing.check(deviceId: c.deviceId, identityPublic: c.identityPublic,
+                                              serverPublic: c.serverPublic, pluginPublic: c.pluginPublic) == c.check,
+                    "\(c.name)")
         }
         let checks = Set(vectors.cases.map(\.check))
-        #expect(checks.count == vectors.cases.count, "the id and the order of the keys change the number")
+        #expect(checks.count == vectors.cases.count, "the id, the identity and the order of the keys change the number")
     }
 
     // MARK: - Over the network
@@ -102,13 +106,17 @@ struct LanConnectorPairingTests {
         #expect(reply.status == 200, "\(reply.text)")
         let offer = try #require(maybe)
 
-        // The plugin checks the Mac's key is the Mac's, then works out the number.
+        // The plugin checks the Mac's X25519 key against the identity key it
+        // was handed, then works out the number over all three.
+        #expect(offer.identity == identity.publicKey.rawRepresentation.base64EncodedString())
+        let macIdentity = try Curve25519.Signing.PublicKey(
+            rawRepresentation: try #require(Data(base64Encoded: offer.identity)))
         let sig = try #require(Data(base64Encoded: offer.sig))
-        #expect(identity.publicKey.isValidSignature(sig, for: LanDevices.enrolMessage(
+        #expect(macIdentity.isValidSignature(sig, for: LanDevices.enrolMessage(
             deviceId: offer.deviceId, serverPublic: offer.publicKey, phonePublic: plugin.publicKey)))
         let pending = try #require(bench.connectorPairing.pending)
-        #expect(LanConnectorPairing.check(deviceId: offer.deviceId, serverPublic: offer.publicKey,
-                                          pluginPublic: plugin.publicKey) == pending.check)
+        #expect(LanConnectorPairing.check(deviceId: offer.deviceId, identityPublic: offer.identity,
+                                          serverPublic: offer.publicKey, pluginPublic: plugin.publicKey) == pending.check)
         #expect(pending.name == "OrcaSlicer on Studio iMac" && pending.app == "OrcaSlicer" && pending.version == "2.5.1")
 
         // Nothing is enrolled while the owner looks.

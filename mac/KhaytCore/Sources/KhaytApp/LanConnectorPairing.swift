@@ -16,8 +16,9 @@ import CryptoKit
 /// ── WHAT STOPS A DEVICE IN THE MIDDLE ────────────────────────────────────
 ///
 /// The plugin sends a fresh X25519 key; the Mac answers with one of its own,
-/// signed by its `LanIdentity`. Both work out a 6-digit check number from the
-/// two keys and the device id (`check`). A device on the Wi-Fi that swapped
+/// signed by its `LanIdentity`, and that identity key itself (which the plugin
+/// pins). Both work out a 6-digit check number from the three keys and the
+/// device id (`check`). A device on the Wi-Fi that swapped
 /// either key makes the two screens disagree, and the owner denies. Until the
 /// owner approves, nothing is enrolled: the plugin's key opens nothing.
 ///
@@ -71,6 +72,10 @@ final class LanConnectorPairing {
         let deviceId: String
         let publicKey: String
         let sig: String
+        /// The Mac's identity key, which the plugin pins. It cannot ask
+        /// `/api/identity` (that takes the PIN), so it is sent here and the
+        /// check number covers it.
+        let identity: String
     }
 
     enum Refusal: Error, Equatable { case closed, busy, badKey }
@@ -134,16 +139,18 @@ final class LanConnectorPairing {
               let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
               LanDevices.derive(serverKey, theirs, deviceId: deviceId) != nil else { throw .badKey }
         let serverPublic = serverKey.publicKey.rawRepresentation.base64EncodedString()
+        let identityPublic = identity.publicKey.rawRepresentation.base64EncodedString()
         guard let sig = try? identity.signature(for: LanDevices.enrolMessage(
             deviceId: deviceId, serverPublic: serverPublic, phonePublic: publicKey)) else { throw .badKey }
         pending = Request(pairId: pairId, pollHash: Self.hash(pollSecret), deviceId: deviceId,
                           serverKey: serverKey, serverPublic: serverPublic, pluginPublic: publicKey,
                           name: Self.field(name), app: Self.field(app), version: Self.field(version),
                           address: address,
-                          check: Self.check(deviceId: deviceId, serverPublic: serverPublic, pluginPublic: publicKey))
+                          check: Self.check(deviceId: deviceId, identityPublic: identityPublic,
+                                            serverPublic: serverPublic, pluginPublic: publicKey))
         outcomes[pairId] = .waiting
         return Offer(pairId: pairId, pollSecret: pollSecret, deviceId: deviceId,
-                     publicKey: serverPublic, sig: sig.base64EncodedString())
+                     publicKey: serverPublic, sig: sig.base64EncodedString(), identity: identityPublic)
     }
 
     /// The plugin asks how its request went. Nil for an id this window never
@@ -191,12 +198,15 @@ final class LanConnectorPairing {
 
     // MARK: - Shared with the plugin
 
-    /// The 6-digit number both screens show. SHA-256 over the device id and
-    /// both public keys (base64, as sent), one per line after a fixed prefix;
+    /// The 6-digit number both screens show. SHA-256 over the device id, the
+    /// Mac's identity key and both X25519 keys (base64, as sent), one per line
+    /// after a fixed prefix;
     /// the first four bytes big-endian, modulo 10^6, zero-padded. The vectors
     /// are `docs/connector-pair.vectors.json`; the plugin computes the same.
-    nonisolated static func check(deviceId: String, serverPublic: String, pluginPublic: String) -> String {
-        let text = ["khayt-connector-check-v1", deviceId, serverPublic, pluginPublic].joined(separator: "\n")
+    nonisolated static func check(deviceId: String, identityPublic: String, serverPublic: String,
+                                  pluginPublic: String) -> String {
+        let text = ["khayt-connector-check-v1", deviceId, identityPublic, serverPublic, pluginPublic]
+            .joined(separator: "\n")
         let digest = Array(SHA256.hash(data: Data(text.utf8)))
         let n = (UInt32(digest[0]) << 24) | (UInt32(digest[1]) << 16) | (UInt32(digest[2]) << 8) | UInt32(digest[3])
         let six = String(n % 1_000_000)
