@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normal";
 "edit.priority.high" = "Yüksek";
 "edit.priority.urgent" = "Acil";
-"edit.price.note" = "Yeni fiyat, müşterinin ödeyeceği toplamdır. Önceden ödenen tutar, yeni toplama kadar korunur.";
+"edit.price.note" = "Yeni fiyat, müşterinin ödeyeceği toplamdır. Önceden ödenen tutarın altına inemez.";
 /* Printer control */
 "printer.pause" = "Duraklat";
 "printer.resume" = "Sürdür";
@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "Ödendi";
 "mac.parts_paid_exceeds" = "Bu değişiklik tutarı ödenenin altına düşürür. Önce farkı iade edin veya alacak dekontu düzenleyin.";
 "mac.markup" = "Kâr payı";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "Fiyat elle girildi, bu yüzden maliyet üzeri kâr onu değiştiremez. Önce “Veya fiyatı siz belirleyin” alanını temizleyin.";
+"mac.js_markup_bad" = "Maliyet üzeri kârı 0 veya daha büyük bir sayı olarak girin.";
+"mac.js_markup_q" = "Müşteri bu işin fiyatını gördü. Yeni maliyet üzeri kâra göre değiştirilsin mi?";
+"mac.js_markup_change" = "Fiyatı değiştir";
+"mac.js_new_total" = "Yeni toplam";

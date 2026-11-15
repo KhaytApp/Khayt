@@ -34,7 +34,7 @@ final class JobEditRuleTests: XCTestCase {
         let ctx = try XCTUnwrap(JSContext())
         var thrown: String?
         ctx.exceptionHandler = { _, e in thrown = e?.toString() }
-        for file in ["lib/tax.js", "lib/pricing.js", "lib/order-money.js", "lib/order-payment.js", "lib/order-edit.js"] {
+        for file in ["lib/tax.js", "lib/product-price.js", "lib/pricing.js", "lib/order-money.js", "lib/order-payment.js", "lib/order-edit.js"] {
             let source = try String(contentsOf: root.appending(path: file), encoding: .utf8)
             ctx.evaluateScript(source)
             XCTAssertNil(thrown, "\(file) did not load: \(thrown ?? "")")
@@ -178,6 +178,212 @@ final class JobEditRuleTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(dashes, 2, "a typed price and another currency give —")
     }
 
+    // MARK: - The markup (Mac #2494): the 11 shared vectors
+
+    /// `test/order-parts-edit.test.js`'s `part`, `jobOf` and markup cases,
+    /// built in JavaScript exactly as there: a job priced the way newOrder
+    /// prices one (`quoteTotal` over its parts).
+    private static let vectorScript = #"""
+    (function () {
+      var Pricing = globalThis.KhaytPricing;
+      function part(id, baseCost, extra) { return Object.assign({ id: id, name: 'Part ' + id, material: 'PLA', filamentId: 'sp-1',
+        printWeight: 100, supportWeight: 0, printTime: 2, qty: 1, unitCost: baseCost, baseCost: baseCost, partStatus: 'pending' }, extra || {}); }
+      function jobOf(parts, terms, extra) {
+        var t = Object.assign({ margin: 50, discountPct: 0, shippingCost: 0, extraLines: [], rushEnabled: false, rushPct: 25 }, terms || {});
+        var costed = parts.reduce(function (s, p) { return s + (p.agreedPrice != null ? 0 : p.baseCost); }, 0);
+        var agreed = parts.reduce(function (s, p) { return s + (p.agreedPrice != null ? p.agreedPrice * (p.qty || 1) : 0); }, 0);
+        var q = Pricing.quoteTotal(Object.assign({}, t, { baseCost: costed, agreedAmount: agreed, qty: 1 }));
+        var rush = q.rushFee > 0 ? +q.rushFee.toFixed(2) : 0;
+        return Object.assign({ id: 'J1', status: 'pending', project: 'Bracket', parts: parts.map(function (p) { return Object.assign({}, p); }),
+          price: +q.total.toFixed(2), discountPct: t.discountPct,
+          priceBeforeDiscount: t.discountPct > 0 ? +q.priceBeforeDiscount.toFixed(2) : null,
+          shippingCost: t.shippingCost, extraLines: t.extraLines,
+          printTime: parts.reduce(function (s, p) { return s + p.printTime; }, 0), material: 'PLA', paidAmount: 0 },
+          agreed > 0 ? { agreedAmount: agreed } : {}, rush > 0 ? { rushFee: rush, rushFeeAmount: rush } : { rushFeeAmount: 0 },
+          q.priceSource !== 'base' ? { computedPrice: +q.computedTotal.toFixed(2), priceSource: q.priceSource } : {},
+          q.priceSource === 'rounded' ? { priceRound: t.priceRound } : {},
+          q.priceSource === 'override' ? { priceOverride: +q.total.toFixed(2) } : {}, extra || {});
+      }
+      function draftQuote(terms, extra) { return jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote' }, extra || {})); }
+      var extras = { discountPct: 10, rushEnabled: true, shippingCost: 20, extraLines: [{ label: 'Paint', amount: 15 }] };
+      var c = [];
+      function add(name, order, fields, seen, ids) { c.push({ name: name, order: order, fields: fields, seen: !!seen, ids: ids || [] }); }
+      add('reprice', draftQuote(), { marginPct: 25 });
+      add('same', draftQuote(), { marginPct: 50 });
+      add('terms stay', draftQuote(extras), { marginPct: 25 });
+      add('agreed', jobOf([part('A', 80), part('B', 40, { agreedPrice: 100 })], {}, { status: 'quote' }), { marginPct: 25 });
+      add('rounding', draftQuote({ priceRound: { step: 5, mode: 'up' } }), { marginPct: 33 });
+      add('typed', draftQuote({ priceOverride: 199 }), { marginPct: 25 });
+      add('all agreed', jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote' }), { marginPct: 25 });
+      [{ quoteSharedAt: '2026-11-14T10:00:00Z' }, { status: 'pending' }, { status: 'printing' },
+       { status: 'pending', invoiceNumber: 'INV-2026-0007' }].forEach(function (x, i) {
+        add('seen ' + i, draftQuote({}, x), { marginPct: 25 });
+        add('seen ok ' + i, draftQuote({}, x), { marginPct: 25 }, true);
+      });
+      [[{ status: 'completed' }, 'deducted'], [{ status: 'pending', materialDeducted: true }, 'deducted'],
+       [{ status: 'cancelled' }, 'cancelled'], [{ status: 'pending', zatcaUuid: 'u-1' }, 'zatca'],
+       [{ status: 'pending', voidedAt: '2026-11-10' }, 'voided']].forEach(function (x) {
+        add('lock ' + x[1], draftQuote({}, x[0]), { marginPct: 25 }, true);
+      });
+      var paid = draftQuote({}, { status: 'pending', paidAmount: 170, paymentStatus: 'partial' });
+      add('under paid', paid, { marginPct: 25 }, true);
+      add('over paid', paid, { marginPct: 60 }, true);
+      add('negative', draftQuote(), { marginPct: -5 });
+      add('unreadable', draftQuote(), { marginPct: 'lots' });
+      add('parts and markup', draftQuote(), { parts: [part('A', 80), part('B', 40), part('C', 30)], marginPct: 20 }, false, ['C']);
+      add('fresh terms', jobOf([part('A', 80), part('B', 40)], Object.assign({ margin: 25 }, extras)), {});
+      return c;
+    })()
+    """#
+
+    func testTheMarkupVectorsGiveLibsAnswerOnThePhone() async throws {
+        let store = SampleShop.book()
+        let engine = try await BookReader(book: { let b = CompanionBook(directory: dir); try b.replace(with: store, scope: nil); return b }()).sharedEngine()
+        guard case .array(let cases) = try ask(Self.vectorScript) else { return XCTFail("the vectors") }
+        var results: [String: (ok: Bool, reason: String?, step: String?, changed: Bool, order: [String: JSONValue])] = [:]
+        var freshTermsPrice: Double?
+        for item in cases {
+            guard case .object(let c) = item, case .string(let name)? = c["name"], let order = c["order"],
+                  case .object(let fields)? = c["fields"], case .bool(let seen)? = c["seen"],
+                  case .array(let idValues)? = c["ids"] else { return XCTFail("a vector") }
+            let ids = idValues.compactMap { if case .string(let s) = $0 { return s }; return nil }
+            if name == "fresh terms" {
+                if case .object(let o) = order, case .number(let p)? = o["price"] { freshTermsPrice = p }
+                continue
+            }
+            // The phone's engine (KhaytCore's bundled lib)…
+            let swift = try await engine.applyJobEdit(order: order, fields: fields, priceSeenOk: seen,
+                                                      newPartIds: ids, now: now, editId: "edit-1", priceId: "price-1")
+            // …and the repo's lib, called the same way.
+            let lib = try ask("""
+                (function () { var o = \(json(order));
+                  var r = KhaytOrderEdit.applyJobEdit(o, \(json(.object(fields))), { clients: [], settings: {},
+                    keepPrice: false, marginPct: null, ids: \(json(.array(idValues))), now: \(now.timeIntervalSince1970 * 1000),
+                    id: 'edit-1', priceId: 'price-1', priceSeenOk: \(seen) });
+                  return { ok: r.ok, reason: r.reason || null, step: r.step || null, changed: !!r.changed, order: o }; })()
+                """)
+            guard case .object(let l) = lib, case .object(let after) = swift.order else { return XCTFail(name) }
+            XCTAssertEqual(.bool(swift.ok), l["ok"], "\(name): ok")
+            XCTAssertEqual(swift.reason.map(JSONValue.string) ?? .null, l["reason"], "\(name): reason")
+            XCTAssertEqual(swift.step.map(JSONValue.string) ?? .null, l["step"], "\(name): step")
+            XCTAssertEqual(swift.order, l["order"], "\(name): the job after")
+            results[name] = (swift.ok, swift.reason, swift.step, swift.changed, after)
+        }
+        func price(_ n: String) -> JSONValue? { results[n]?.order["price"] }
+        // The vectors' own figures.
+        XCTAssertEqual(price("reprice"), .number(150), "120 at 25%")
+        XCTAssertEqual(results["reprice"]?.order["marginPct"], .number(25))
+        let back = try await engine.marginOf(.object(try XCTUnwrap(results["reprice"]?.order)))
+        XCTAssertEqual(back, 25)
+        XCTAssertEqual(results["same"]?.changed, false)
+        XCTAssertEqual(price("same"), .number(180))
+        XCTAssertEqual(price("terms stay"), freshTermsPrice.map(JSONValue.number))
+        XCTAssertEqual(results["terms stay"]?.order["priceBeforeDiscount"], .number(150))
+        XCTAssertEqual(price("agreed"), .number(200), "80 at 25% + 100 agreed")
+        XCTAssertEqual(price("rounding"), .number(160))
+        XCTAssertEqual(results["rounding"]?.order["computedPrice"], .number(159.6))
+        XCTAssertEqual(results["typed"]?.reason, "price_fixed")
+        XCTAssertEqual(price("typed"), .number(199))
+        XCTAssertEqual(results["all agreed"]?.reason, "price_fixed")
+        for i in 0..<4 {
+            XCTAssertEqual(results["seen \(i)"]?.reason, "ask_price", "seen \(i)")
+            XCTAssertEqual(results["seen \(i)"]?.step, "markup")
+            XCTAssertEqual(price("seen \(i)"), .number(180), "nothing written while asking")
+            XCTAssertEqual(results["seen ok \(i)"]?.ok, true)
+            XCTAssertEqual(price("seen ok \(i)"), .number(150))
+        }
+        for code in ["deducted", "cancelled", "zatca", "voided"] {
+            XCTAssertEqual(results["lock \(code)"]?.reason, code)
+            XCTAssertEqual(price("lock \(code)"), .number(180))
+        }
+        XCTAssertEqual(results["under paid"]?.reason, "paid_exceeds_price")
+        XCTAssertEqual(results["under paid"]?.step, "markup")
+        XCTAssertEqual(results["over paid"]?.ok, true, "raising it is fine")
+        XCTAssertEqual(price("over paid"), .number(192))
+        XCTAssertEqual(results["negative"]?.reason, "bad_markup")
+        XCTAssertEqual(results["unreadable"]?.reason, "bad_markup")
+        XCTAssertEqual(price("parts and markup"), .number(180), "150 at 20%")
+    }
+
+    // MARK: - The markup, as Edit job uses it
+
+    /// A cost-plus job at 50%, accepted (so the customer has seen the price).
+    private static let seenJob: JSONValue = .object([
+        "id": .string("T-SEEN"), "project": .string("Bracket"), "status": .string("pending"),
+        "price": .number(150), "paidAmount": .number(0), "priority": .bool(false),
+        "parts": .array([part("a", base: 60), part("b", base: 40)]),
+    ])
+
+    func testEditJobOffersTheMarkupOnlyWhereTheRuleTakesOne() async throws {
+        let done: JSONValue = { guard case .object(var o) = Self.seenJob else { return .null }
+            o["id"] = .string("T-DONE"); o["status"] = .string("completed"); return .object(o) }()
+        let (api, _) = try client(orders: [Self.seenJob, Self.typed, Self.foreign, done, Self.costPlus])
+        let seen = await api.markupState(orderId: "T-SEEN")
+        XCTAssertEqual(seen?.typed, "50")
+        XCTAssertEqual(seen?.askPrice, true, "an accepted job's price has been seen")
+        let forty = await api.markupState(orderId: "T-40")
+        XCTAssertEqual(forty?.typed, "40")
+        let typed = await api.markupState(orderId: "T-TYPED")
+        XCTAssertNil(typed, "a typed price: no field")
+        let fx = await api.markupState(orderId: "T-FX")
+        XCTAssertNil(fx, "another currency: no field")
+        let finished = await api.markupState(orderId: "T-DONE")
+        XCTAssertNil(finished, "a finished job: no field")
+        XCTAssertEqual(KhaytAPIClient.MarkupState(percent: 12.5, askPrice: false).typed, "12.5")
+        XCTAssertEqual(KhaytAPIClient.MarkupState(percent: 33.333, askPrice: false).typed, "33.33")
+        // Only a changed markup is sent; an unreadable one is sent as typed.
+        let state = KhaytAPIClient.MarkupState(percent: 50, askPrice: true)
+        XCTAssertNil(EditOrderSheet.markupField("50", opened: state))
+        XCTAssertNil(EditOrderSheet.markupField(" ", opened: state))
+        XCTAssertNil(EditOrderSheet.markupField("50.00", opened: state))
+        XCTAssertEqual(EditOrderSheet.markupField("25", opened: state), .number(25))
+        XCTAssertEqual(EditOrderSheet.markupField("lots", opened: state), .string("lots"))
+        XCTAssertNil(EditOrderSheet.markupField("25", opened: nil))
+    }
+
+    func testASeenPriceIsAskedThenSavedWithPriceSeenOk() async throws {
+        let (api, book) = try client(orders: [Self.seenJob])
+        let before = try book.read()
+        // The new total, before saving: the same rule on a copy.
+        let preview = try await api.previewJobEdit(orderId: "T-SEEN", fields: ["marginPct": .number(25)], now: now)
+        XCTAssertEqual(preview, 125, "100 of cost at 25%")
+        XCTAssertEqual(try book.read(), before, "a preview writes nothing")
+        do {
+            try await api.editOrder(orderId: "T-SEEN", fields: ["marginPct": .number(25)], now: now)
+            XCTFail("a seen price is asked first")
+        } catch let refusal as BookWriter.JobEditRefused {
+            XCTAssertTrue(refusal.needsAsking)
+            XCTAssertEqual(refusal.localizedDescription, L10n.tr("mac.js_markup_q"))
+        }
+        XCTAssertEqual(try book.read(), before, "nothing written while asking")
+        let wrote = try await api.editOrder(orderId: "T-SEEN", fields: ["marginPct": .number(25)],
+                                            priceSeenOk: true, now: now)
+        XCTAssertTrue(wrote)
+        guard case .object(let o) = try row(book, "T-SEEN") else { return XCTFail() }
+        XCTAssertEqual(o["price"], .number(125))
+        XCTAssertEqual(o["marginPct"], .number(25))
+        let margin = await api.jobMargin(orderId: "T-SEEN")
+        XCTAssertEqual(margin?.text, "25%", "the money card reads back what was typed")
+    }
+
+    func testMarkupRefusalsAreInTheMacsWordsUnderTheMarkup() async throws {
+        let (api, book) = try client(orders: [Self.seenJob, Self.typed])
+        let before = try book.read()
+        for (id, value, reason, key) in [("T-SEEN", JSONValue.number(-5), "bad_markup", "mac.js_markup_bad"),
+                                         ("T-SEEN", .string("lots"), "bad_markup", "mac.js_markup_bad"),
+                                         ("T-TYPED", .number(25), "price_fixed", "mac.js_markup_fixed")] {
+            do {
+                try await api.editOrder(orderId: id, fields: ["marginPct": value], priceSeenOk: true, now: now)
+                XCTFail("\(id) \(value) is refused")
+            } catch let refusal as BookWriter.JobEditRefused {
+                XCTAssertEqual(refusal.reason, reason)
+                XCTAssertTrue(refusal.isMarkup, "shown under the Markup row")
+                XCTAssertEqual(refusal.localizedDescription, L10n.tr(key))
+            }
+        }
+        XCTAssertEqual(try book.read(), before)
+    }
+
     // MARK: - What the shop sees
 
     func testAPriceBelowWhatWasPaidIsRefusedInTheMacsWordsAndNothingIsWritten() async throws {
@@ -246,7 +452,8 @@ final class JobEditRuleTests: XCTestCase {
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             let path = try XCTUnwrap(bundle.path(forResource: lang, ofType: "lproj"), lang)
             let b = try XCTUnwrap(Bundle(path: path))
-            for key in ["mac.parts_paid_exceeds", "mac.markup"] {
+            for key in ["mac.parts_paid_exceeds", "mac.markup", "mac.js_markup_fixed", "mac.js_markup_bad",
+                        "mac.js_markup_q", "mac.js_markup_change", "mac.js_new_total"] {
                 let v = b.localizedString(forKey: key, value: "∅", table: nil)
                 XCTAssertNotEqual(v, "∅", "\(lang): \(key)")
                 XCTAssertNotEqual(v, key, "\(lang): \(key)")
