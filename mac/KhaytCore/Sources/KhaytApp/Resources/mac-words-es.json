@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "El cliente ya ha visto el precio de este trabajo. ¿Cambiarlo al nuevo recargo?",
  "mac.js_markup_change": "Cambiar el precio",
  "mac.js_more": "Más detalles…",
- "mac.js_new_total": "Nuevo total"
+ "mac.js_new_total": "Nuevo total",
+ "mac.apps_title": "Apps conectadas",
+ "mac.apps_none": "Ninguna todavía",
+ "mac.apps_unnamed": "Laminador",
+ "mac.apps_hint": "Laminadores que pueden enviar archivos a tu bandeja «Del laminador». No pueden leer tu libro, tus clientes ni tus precios. Cambiar el PIN de la red local también los desconecta.",
+ "mac.apps_remove": "Quitar",
+ "mac.apps_remove_q": "¿Quitar «{name}»?",
+ "mac.apps_remove_note": "Deja de enviar a este Mac al instante. Para volver a usarlo, emparéjalo de nuevo.",
+ "mac.apps_pair": "Emparejar un laminador",
+ "mac.apps_pair_hint": "En OrcaSlicer, abre Khayt, luego Emparejar, luego En esta red, e introduce esta dirección:",
+ "mac.apps_waiting": "Esperando un laminador… {time}",
+ "mac.apps_ask": "¿Aprobar «{name}»?",
+ "mac.apps_ask_from": "{app} {version} pidió emparejarse desde {address}.",
+ "mac.apps_check": "El laminador debe mostrar el mismo número. Si no, deniega.",
+ "mac.apps_may": "Puede enviar laminados a la bandeja «Del laminador» y leer la cola de trabajos (nombres y tiempos, nunca clientes). Nunca puede leer tu libro, tus clientes, tus precios ni tus ajustes.",
+ "mac.apps_approve": "Aprobar",
+ "mac.apps_deny": "Denegar",
+ "mac.apps_timed_out": "Ningún laminador se emparejó a tiempo. Haz clic en Emparejar un laminador para volver a intentarlo."
 }

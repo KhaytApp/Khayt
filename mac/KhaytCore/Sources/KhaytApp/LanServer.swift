@@ -95,6 +95,9 @@ final class LanServer {
         /// Nil — a test that never asked for one — is a window never opened:
         /// enrolment is refused `pairing-closed`.
         var pairing: LanPairingWindow? = nil
+        /// The window the owner opens for a slicer plugin
+        /// (`LanConnectorPairing`). Nil: never opened, `pairing-closed`.
+        var connectorPairing: LanConnectorPairing? = nil
         /// This Mac's identity key (`LanIdentity`), asked for when a route
         /// needs it. A test hands its own, so parallel tests never share one.
         var identity: @Sendable () -> Curve25519.Signing.PrivateKey? = { LanIdentity.key() }
@@ -1062,6 +1065,52 @@ final class LanServer {
             }
             window.paired(name: String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(LanDevices.maxName)))
             return .json(200, #"{"deviceId":"\#(enrolled.deviceId)","publicKey":"\#(enrolled.publicKey)","sig":"\#(enrolled.sig)"}"#)
+
+        // ── A SLICER PLUGIN ASKS TO PAIR (`LanConnectorPairing`) ─────────
+        //
+        // No PIN: a connector must never learn it. Only while the owner has
+        // clicked Pair a slicer, and only a request; the owner approves on the
+        // Mac after both screens show the same check number. Exact paths: a
+        // connector's routes never match by prefix (Mac review of #2484).
+        case ("/api/connectors/pair", false) where request.method == "POST":
+            guard Self.hostIsLocal(request.headers["host"]) else {
+                return .json(421, #"{"error":"host-not-local"}"#)
+            }
+            guard let window = host.connectorPairing, window.isOpen() else {
+                return .json(403, LanConnectorPairing.closedBody)
+            }
+            guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
+            guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body),
+                  case .string(let publicKey)? = asked["publicKey"] else {
+                return .json(400, #"{"error":"publicKey"}"#)
+            }
+            func text(_ key: String) -> String {
+                if case .string(let given)? = asked[key] { return given }
+                return ""
+            }
+            do throws(LanConnectorPairing.Refusal) {
+                let offer = try window.request(publicKey: publicKey, name: text("name"), app: text("app"),
+                                               version: text("version"), address: request.remote,
+                                               identity: identity)
+                return .json(200, #"{"pairId":"\#(offer.pairId)","pollSecret":"\#(offer.pollSecret)","deviceId":"\#(offer.deviceId)","publicKey":"\#(offer.publicKey)","sig":"\#(offer.sig)"}"#)
+            } catch .closed {
+                return .json(403, LanConnectorPairing.closedBody)
+            } catch .busy {
+                return .json(409, LanConnectorPairing.busyBody)
+            } catch {
+                return .json(400, #"{"error":"publicKey"}"#)
+            }
+
+        // How the owner answered. `x-khayt-poll` is the secret the request
+        // was given, so only the plugin that asked hears the answer.
+        case (let p, true) where p.hasPrefix("/api/connectors/pair/")
+                && LanConnectorPairing.plausiblePairId(String(p.dropFirst("/api/connectors/pair/".count))):
+            let pairId = String(p.dropFirst("/api/connectors/pair/".count))
+            guard let window = host.connectorPairing,
+                  let outcome = window.poll(pairId: pairId, secret: request.headers["x-khayt-poll"] ?? "") else {
+                return .json(404, #"{"state":"unknown"}"#)
+            }
+            return .json(200, #"{"state":"\#(outcome.rawValue)"}"#)
 
         case ("/api/queue", true):
             if let refused = await pinGate(request) { return refused }
@@ -2927,7 +2976,7 @@ extension Shop {
         // that fails, or comes up on loopback, closes it below.
         stopLanServer(keepPairing: true)
         lanProblem = nil
-        guard let engine else { lanPairing.serverStopped(); lanProblem = words.callIt("mac.move_no_engine"); return }
+        guard let engine else { lanPairing.serverStopped(); lanConnectorPairing.serverStopped(); lanProblem = words.callIt("mac.move_no_engine"); return }
         let config = lanConfig
         // Sealed on disk by whichever app wrote it; opened here, once, and
         // handed to the server — never read back out of the book per request.
@@ -2939,6 +2988,7 @@ extension Shop {
         host.calendarToken = calendarToken
         host.devices = lanDeviceStore
         host.pairing = lanPairing
+        host.connectorPairing = lanConnectorPairing
         host.library = { [weak self] q, folder, offset, limit, filter in
             self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter) ?? .object([:])
         }
@@ -2965,6 +3015,7 @@ extension Shop {
         host.failed = { [weak self] said in
             guard let self else { return }
             self.lanPairing.serverStopped()
+            self.lanConnectorPairing.serverStopped()
             self.lanProblem = self.words.callIt("mac.lan_failed", ["error": .string(said)])
         }
         var carrierSecrets: [String: String] = [:]
@@ -3038,7 +3089,7 @@ extension Shop {
             lanRunning = config
             lanCalendarToken = calendarToken
             // On loopback no phone can reach it, so there is nothing to pair.
-            if !config.bindLan { lanPairing.serverStopped() }
+            if !config.bindLan { lanPairing.serverStopped(); lanConnectorPairing.serverStopped() }
             // The server refuses a short PIN on every owner route; the shop
             // is told why here rather than finding its phone locked out.
             if LanServer.pinTooShort(pin) {
@@ -3047,6 +3098,7 @@ extension Shop {
             }
         } catch {
             lanPairing.serverStopped()
+            lanConnectorPairing.serverStopped()
             lanProblem = Self.lanFailure(error, port: Int(config.port), words: words)
         }
     }
@@ -3519,7 +3571,7 @@ extension Shop {
     /// Stopping closes an open pairing window (`LanPairingWindow`): no phone
     /// can reach a server that is not there. `keepPairing` is a restart.
     func stopLanServer(keepPairing: Bool = false) {
-        if !keepPairing { lanPairing.serverStopped() }
+        if !keepPairing { lanPairing.serverStopped(); lanConnectorPairing.serverStopped() }
         lanServer?.stop()
         lanServer = nil
         lanRunning = nil

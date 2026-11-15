@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "客户已看到此作业的价格。要按新的加价率更改吗？",
  "mac.js_markup_change": "更改价格",
  "mac.js_more": "更多详情…",
- "mac.js_new_total": "新合计"
+ "mac.js_new_total": "新合计",
+ "mac.apps_title": "已连接的应用",
+ "mac.apps_none": "暂无",
+ "mac.apps_unnamed": "切片软件",
+ "mac.apps_hint": "可以向“来自切片软件”收件箱发送文件的切片软件。它们无法读取你的账本、客户或价格。更改局域网 PIN 也会让它们退出。",
+ "mac.apps_remove": "移除",
+ "mac.apps_remove_q": "移除“{name}”？",
+ "mac.apps_remove_note": "它会立即停止向这台 Mac 发送。要再次使用，请重新配对。",
+ "mac.apps_pair": "配对切片软件",
+ "mac.apps_pair_hint": "在 OrcaSlicer 中打开 Khayt，然后“配对”，再选“在此网络”，并输入此地址：",
+ "mac.apps_waiting": "正在等待切片软件… {time}",
+ "mac.apps_ask": "批准“{name}”？",
+ "mac.apps_ask_from": "{app} {version} 从 {address} 请求配对。",
+ "mac.apps_check": "切片软件必须显示相同的数字。如果不同，请拒绝。",
+ "mac.apps_may": "它可以把切片发送到“来自切片软件”收件箱，并读取任务队列（任务名称和时间，从不包含客户）。它永远无法读取你的账本、客户、价格或设置。",
+ "mac.apps_approve": "批准",
+ "mac.apps_deny": "拒绝",
+ "mac.apps_timed_out": "没有切片软件按时配对。点击“配对切片软件”重试。"
 }

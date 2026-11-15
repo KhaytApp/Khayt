@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "Müşteri bu işin fiyatını gördü. Yeni maliyet üzeri kâra göre değiştirilsin mi?",
  "mac.js_markup_change": "Fiyatı değiştir",
  "mac.js_more": "Diğer ayrıntılar…",
- "mac.js_new_total": "Yeni toplam"
+ "mac.js_new_total": "Yeni toplam",
+ "mac.apps_title": "Bağlı uygulamalar",
+ "mac.apps_none": "Henüz yok",
+ "mac.apps_unnamed": "Dilimleyici",
+ "mac.apps_hint": "“Dilimleyiciden” kutunuza dosya gönderebilen dilimleyiciler. Defterinizi, müşterilerinizi veya fiyatlarınızı okuyamazlar. Yerel ağ PIN’ini değiştirmek onların da oturumunu kapatır.",
+ "mac.apps_remove": "Kaldır",
+ "mac.apps_remove_q": "“{name}” kaldırılsın mı?",
+ "mac.apps_remove_note": "Bu Mac’e göndermeyi hemen bırakır. Yeniden kullanmak için yeniden eşleştirin.",
+ "mac.apps_pair": "Dilimleyici eşleştir",
+ "mac.apps_pair_hint": "OrcaSlicer’da Khayt’ı, ardından Eşleştir’i, ardından Bu ağda’yı açın ve bu adresi girin:",
+ "mac.apps_waiting": "Bir dilimleyici bekleniyor… {time}",
+ "mac.apps_ask": "“{name}” onaylansın mı?",
+ "mac.apps_ask_from": "{app} {version}, {address} adresinden eşleşmek istedi.",
+ "mac.apps_check": "Dilimleyici aynı numarayı göstermelidir. Göstermiyorsa reddedin.",
+ "mac.apps_may": "“Dilimleyiciden” kutusuna dilim gönderebilir ve iş kuyruğunu okuyabilir (iş adları ve süreleri, asla müşteriler değil). Defterinizi, müşterilerinizi, fiyatlarınızı veya ayarlarınızı asla okuyamaz.",
+ "mac.apps_approve": "Onayla",
+ "mac.apps_deny": "Reddet",
+ "mac.apps_timed_out": "Zamanında hiçbir dilimleyici eşleşmedi. Yeniden denemek için Dilimleyici eşleştir’e tıklayın."
 }

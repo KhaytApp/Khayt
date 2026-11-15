@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "Der Kunde hat den Preis dieses Auftrags gesehen. Auf den neuen Aufschlag ändern?",
  "mac.js_markup_change": "Preis ändern",
  "mac.js_more": "Weitere Details…",
- "mac.js_new_total": "Neue Summe"
+ "mac.js_new_total": "Neue Summe",
+ "mac.apps_title": "Verbundene Apps",
+ "mac.apps_none": "Noch keine",
+ "mac.apps_unnamed": "Slicer",
+ "mac.apps_hint": "Slicer, die Dateien in Ihren Eingang „Vom Slicer“ senden können. Sie können weder Ihr Buch noch Kunden oder Preise lesen. Eine Änderung der LAN-PIN meldet sie ebenfalls ab.",
+ "mac.apps_remove": "Entfernen",
+ "mac.apps_remove_q": "„{name}“ entfernen?",
+ "mac.apps_remove_note": "Er sendet sofort nichts mehr an diesen Mac. Um ihn wieder zu nutzen, koppeln Sie ihn erneut.",
+ "mac.apps_pair": "Slicer koppeln",
+ "mac.apps_pair_hint": "Öffnen Sie in OrcaSlicer Khayt, dann Koppeln, dann In diesem Netzwerk, und geben Sie diese Adresse ein:",
+ "mac.apps_waiting": "Warten auf einen Slicer… {time}",
+ "mac.apps_ask": "„{name}“ zulassen?",
+ "mac.apps_ask_from": "{app} {version} hat von {address} aus um Kopplung gebeten.",
+ "mac.apps_check": "Der Slicer muss dieselbe Zahl zeigen. Wenn nicht, lehnen Sie ab.",
+ "mac.apps_may": "Er darf Slices in den Eingang „Vom Slicer“ senden und die Auftragsliste lesen (Auftragsnamen und Zeiten, nie Kunden). Ihr Buch, Kunden, Preise oder Einstellungen kann er nie lesen.",
+ "mac.apps_approve": "Zulassen",
+ "mac.apps_deny": "Ablehnen",
+ "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln."
 }

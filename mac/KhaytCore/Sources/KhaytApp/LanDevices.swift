@@ -266,6 +266,22 @@ final class LanDevices: @unchecked Sendable {
         let serverPublic = serverKey.publicKey.rawRepresentation.base64EncodedString()
         let sig = try identity.signature(for: Self.enrolMessage(deviceId: deviceId, serverPublic: serverPublic,
                                                                 phonePublic: phonePublic))
+        insert(id: deviceId, name: name, key: key, pin: pin, now: now, kind: kind)
+        return Enrolled(deviceId: deviceId, publicKey: serverPublic, sig: sig.base64EncodedString())
+    }
+
+    /// Enrol a slicer plugin the owner approved (`LanConnectorPairing`). The
+    /// Mac's answer was signed when the plugin asked; this only keeps the key
+    /// both sides derived, as a `connector`, under the PIN in force now.
+    func admitConnector(pluginPublic: String, serverKey: Curve25519.KeyAgreement.PrivateKey,
+                        deviceId: String, name: String, pin: String, now: Date) throws {
+        guard let raw = Data(base64Encoded: pluginPublic), raw.count == 32,
+              let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
+              let key = Self.derive(serverKey, theirs, deviceId: deviceId) else { throw EnrolError.badKey }
+        insert(id: deviceId, name: name, key: key, pin: pin, now: now, kind: Self.kindConnector)
+    }
+
+    private func insert(id deviceId: String, name: String, key: Data, pin: String, now: Date, kind: String?) {
         let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxName))
 
         lock.lock(); defer { lock.unlock() }
@@ -285,7 +301,6 @@ final class LanDevices: @unchecked Sendable {
         saved.devices.append(Device(id: deviceId, name: trimmed, key: key, pinTag: current,
                                     createdAt: now, lastSeenAt: now, kind: kind))
         save()
-        return Enrolled(deviceId: deviceId, publicKey: serverPublic, sig: sig.base64EncodedString())
     }
 
     static func freshId() -> String {

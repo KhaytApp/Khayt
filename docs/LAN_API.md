@@ -219,6 +219,43 @@ Shared test values for all three implementations are in
 and Ed25519 keys, the derived key, an enrolment signature and two signed
 requests. Each side's tests should reproduce every value in it.
 
+### `POST /api/connectors/pair` — a slicer plugin pairs without the PIN (native Mac only)
+
+A **connector** (Khayt for OrcaSlicer) signs its requests exactly as a phone
+does, but its key opens `/api/connectors/*` and nothing else: any other route
+answers **403** `{"ok":false,"reason":"connector-scope"}` to a request whose
+`x-khayt-device` names a connector, signed or not. It never sees the PIN.
+
+1. The owner (or a manager) clicks **Pair a slicer** (Mac: Settings → Online →
+   Connected apps). The window is open for 120 s. Outside it the route answers
+   **403** `{"reason":"pairing-closed"}`.
+2. The plugin sends `POST /api/connectors/pair`
+   `{"publicKey":"<base64 raw X25519>","name":"…","app":"OrcaSlicer","version":"2.5.1"}`
+   (no PIN, no signature; `Host` must be a local address, else **421**).
+   It gets **200** `{"pairId","pollSecret","deviceId","publicKey","sig"}`: the
+   Mac's X25519 key, signed by its identity key over the same
+   `khayt-enrol:` message as `POST /api/devices`. One request waits at a
+   time; another gets **409** `{"reason":"pairing-busy"}`. A key that is not
+   32 bytes, or gives the all-zero secret, is **400**. Nothing is enrolled yet.
+3. Both sides show a 6-digit **check number**: SHA-256 of
+   `khayt-connector-check-v1\n<deviceId>\n<Mac publicKey>\n<plugin publicKey>`
+   (keys base64 as sent), the first 4 bytes big-endian, modulo 1,000,000,
+   zero-padded. Vectors: [`connector-pair.vectors.json`](connector-pair.vectors.json).
+   A device in the middle that swapped a key makes the numbers differ.
+4. The plugin polls `GET /api/connectors/pair/{pairId}` with
+   `x-khayt-poll: <pollSecret>`: **200** `{"state":"waiting"|"approved"|"denied"|"expired"}`,
+   or **404** `{"state":"unknown"}` for an id it was not given or the wrong
+   secret. **Approve** enrols the device with kind `connector` and closes the
+   window; **Deny** answers that request and keeps the window open.
+5. From then on the plugin signs with the key both derived (HKDF as above,
+   info = `deviceId`). **Remove** in Connected apps answers `device-revoked`;
+   a change of the LAN PIN signs connectors out with the phones
+   (`device-unknown`).
+
+The connector's own routes (`/api/connectors/slices`, `/api/connectors/queue`)
+come in later steps and match exact paths. The desktop (`lib/lan-server.js`)
+has none of this yet.
+
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
 
 The shop's library (`printFiles`) stays on the computer: it is a quarter of a

@@ -1954,6 +1954,10 @@ final class Shop {
     /// The Shop's, not the server's, so a restart of the server on a settings
     /// save does not shut a window the owner just opened.
     let lanPairing = LanPairingWindow()
+    /// The window a slicer plugin may ask to pair in (Connected apps).
+    let lanConnectorPairing = LanConnectorPairing()
+    /// Slicer plugins paired with this Mac (`Shop+ConnectedApps`), as last read.
+    var connectedApps: [LanDevices.Listed] = []
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

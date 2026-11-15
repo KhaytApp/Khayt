@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "Le client a déjà vu le prix de ce travail. Le changer selon la nouvelle majoration ?",
  "mac.js_markup_change": "Changer le prix",
  "mac.js_more": "Plus de détails…",
- "mac.js_new_total": "Nouveau total"
+ "mac.js_new_total": "Nouveau total",
+ "mac.apps_title": "Apps connectées",
+ "mac.apps_none": "Aucune pour l’instant",
+ "mac.apps_unnamed": "Trancheur",
+ "mac.apps_hint": "Trancheurs pouvant envoyer des fichiers dans votre boîte « Du trancheur ». Ils ne peuvent lire ni votre registre, ni vos clients, ni vos prix. Changer le code PIN du réseau local les déconnecte aussi.",
+ "mac.apps_remove": "Retirer",
+ "mac.apps_remove_q": "Retirer « {name} » ?",
+ "mac.apps_remove_note": "Il cesse aussitôt d’envoyer à ce Mac. Pour le réutiliser, associez-le à nouveau.",
+ "mac.apps_pair": "Associer un trancheur",
+ "mac.apps_pair_hint": "Dans OrcaSlicer, ouvrez Khayt, puis Associer, puis Sur ce réseau, et saisissez cette adresse :",
+ "mac.apps_waiting": "En attente d’un trancheur… {time}",
+ "mac.apps_ask": "Approuver « {name} » ?",
+ "mac.apps_ask_from": "{app} {version} a demandé l’association depuis {address}.",
+ "mac.apps_check": "Le trancheur doit afficher le même nombre. Sinon, refusez.",
+ "mac.apps_may": "Il peut envoyer des tranchages dans la boîte « Du trancheur » et lire la file des travaux (noms et durées, jamais les clients). Il ne peut jamais lire votre registre, vos clients, vos prix ou vos réglages.",
+ "mac.apps_approve": "Approuver",
+ "mac.apps_deny": "Refuser",
+ "mac.apps_timed_out": "Aucun trancheur associé à temps. Cliquez sur Associer un trancheur pour réessayer."
 }
