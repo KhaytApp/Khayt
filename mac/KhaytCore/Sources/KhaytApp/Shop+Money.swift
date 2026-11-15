@@ -87,6 +87,21 @@ extension Shop {
         return try? await engine.quoteTotal(input)
     }
 
+    /// A new job's total while it is typed: `lib/order-new.js previewTotal`
+    /// over the very input `createJob` hands `newOrder` (`newJobInput`), so
+    /// the sheet shows what the book will hold and what the desktop shows.
+    func previewNewJob(_ input: [String: JSONValue]) async -> KhaytEngine.NewOrderPreview? {
+        guard let engine else { return nil }
+        return try? await engine.previewNewOrder(input, settings: settingsDict,
+                                                 consumables: consumableRows, clients: clientRows)
+    }
+
+    /// Whether the job can be taken as it stands (`canTake`): it has a part.
+    func canTakeNewJob(_ input: [String: JSONValue]) async -> Bool {
+        guard let engine else { return false }
+        return (try? await engine.canTakeNewOrder(input))?.ok ?? false
+    }
+
     /// The print hours a cart's overhead is charged on, counted by the rule
     /// the saved job is priced with (`KhaytOrderNew.overheadHours`: print time
     /// × quantity, agreed parts left out, none at all on a job taken from a

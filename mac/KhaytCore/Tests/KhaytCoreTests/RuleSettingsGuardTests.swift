@@ -48,12 +48,14 @@ struct RuleSettingsGuardTests {
     ///   owedByOrder, billedAndPaidByOrder, orderFigures, revenueOutlook,
     ///   cashFlow, tradeRevenue   currency, exchangeRates, and the tax keys
     ///   kpis                 those, and defaultPackagingCost
+    ///   previewNewOrder      currency, exchangeRates, rushFeePct (lib/order-new.js
+    ///                        previewTotal reads; it returns no settings)
     static let trimmed: Set<String> = [
         "aiFeatures", "applyJobEdit", "billedAndPaidByOrder", "cashFlow", "catalogue", "chaseSwitches",
         "contentLanguages", "customerNames", "dashboardFacts", "defaultSlicer", "duplicateNumbers",
         "estimateMesh", "estimateMeshes", "inventoryUnits", "kpis", "lateOrders", "lowStock",
         "lowStockWarning", "needsOrdering", "nozzleWear", "orderFigures", "orderNextSteps", "overhead",
-        "owedByOrder", "revenueOutlook", "riskWhen", "shopText", "slicers", "taxProfile",
+        "owedByOrder", "previewNewOrder", "revenueOutlook", "riskWhen", "shopText", "slicers", "taxProfile",
         "tradeRevenue",
     ]
 
