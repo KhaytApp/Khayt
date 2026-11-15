@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "Quitar pieza…",
  "mac.parts_remove_q": "¿Quitar «{name}» de este trabajo?",
  "mac.js_margin_typed": "—, el precio se escribió",
+ "mac.js_markup_fixed": "El precio se escribió a mano, así que un recargo no lo mueve. Borra primero «O fija el precio».",
+ "mac.js_markup_bad": "Escribe el recargo como un número, 0 o más.",
+ "mac.js_markup_q": "El cliente ya ha visto el precio de este trabajo. ¿Cambiarlo al nuevo recargo?",
+ "mac.js_markup_change": "Cambiar el precio",
  "mac.js_more": "Más detalles…",
  "mac.js_new_total": "Nuevo total"
 }

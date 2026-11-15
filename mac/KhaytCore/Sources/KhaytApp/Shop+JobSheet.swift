@@ -29,6 +29,9 @@ extension Shop {
         var nonBusiness: Bool? = nil
         /// Where the customer has seen the price: keep it though the parts changed.
         var keepPrice = false
+        /// The shop was asked, and agreed, to move a price the customer has
+        /// already seen (a new markup; `applyMarkup`'s 'ask_price').
+        var priceSeenOk = false
 
         var isEmpty: Bool { fields.isEmpty && customer == nil && parts == nil && nonBusiness == nil }
     }
@@ -59,6 +62,7 @@ extension Shop {
         if !fields.isEmpty {
             let r = try await engine.applyJobEdit(
                 order: order, fields: fields, clients: clients, settings: settings, keepPrice: save.keepPrice,
+                priceSeenOk: save.priceSeenOk,
                 newPartIds: uids("PRT", count: save.parts?.count ?? 0),
                 now: now, editId: uid("edit"), priceId: uid("edit"))
             guard r.ok else {

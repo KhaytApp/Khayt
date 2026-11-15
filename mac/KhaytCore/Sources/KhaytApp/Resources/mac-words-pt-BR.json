@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "Remover peça…",
  "mac.parts_remove_q": "Remover “{name}” deste trabalho?",
  "mac.js_margin_typed": "—, o preço foi digitado",
+ "mac.js_markup_fixed": "O preço foi digitado, então um acréscimo não o altera. Limpe primeiro “Ou defina o preço”.",
+ "mac.js_markup_bad": "Digite o acréscimo como número, 0 ou mais.",
+ "mac.js_markup_q": "O cliente já viu o preço deste trabalho. Mudar para o novo acréscimo?",
+ "mac.js_markup_change": "Mudar o preço",
  "mac.js_more": "Mais detalhes…",
  "mac.js_new_total": "Novo total"
 }

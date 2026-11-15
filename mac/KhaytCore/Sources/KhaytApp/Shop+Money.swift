@@ -1155,6 +1155,9 @@ extension Shop {
          "name_only": words.callIt("mac.parts_name_only"),
          "delivered_part": words.callIt("mac.parts_delivered_fixed"),
          "paid_exceeds_price": words.callIt("mac.parts_paid_exceeds"),
+         "price_fixed": words.callIt("mac.js_markup_fixed"),
+         "bad_markup": words.callIt("mac.js_markup_bad"),
+         "ask_price": words.callIt("mac.js_markup_q"),
          "no_parts": words.callIt("mac.parts_last"),
          "missing": words.callIt("mac.move_gone"),
          "unknown": words.callIt("mac.move_refused")]

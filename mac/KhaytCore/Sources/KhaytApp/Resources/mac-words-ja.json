@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "パーツを削除…",
  "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？",
  "mac.js_margin_typed": "—、価格は手入力",
+ "mac.js_markup_fixed": "価格が手入力されているため、上乗せ率では変わりません。先に「または価格を指定」を空にしてください。",
+ "mac.js_markup_bad": "上乗せ率は0以上の数値で入力してください。",
+ "mac.js_markup_q": "お客様はこの案件の価格をすでに見ています。新しい上乗せ率で価格を変更しますか？",
+ "mac.js_markup_change": "価格を変更",
  "mac.js_more": "詳細…",
  "mac.js_new_total": "新しい合計"
 }

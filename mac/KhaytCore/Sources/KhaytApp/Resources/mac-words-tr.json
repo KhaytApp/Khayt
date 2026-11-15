@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "Parçayı kaldır…",
  "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?",
  "mac.js_margin_typed": "—, fiyat elle girildi",
+ "mac.js_markup_fixed": "Fiyat elle girildi, bu yüzden maliyet üzeri kâr onu değiştiremez. Önce “Veya fiyatı siz belirleyin” alanını temizleyin.",
+ "mac.js_markup_bad": "Maliyet üzeri kârı 0 veya daha büyük bir sayı olarak girin.",
+ "mac.js_markup_q": "Müşteri bu işin fiyatını gördü. Yeni maliyet üzeri kâra göre değiştirilsin mi?",
+ "mac.js_markup_change": "Fiyatı değiştir",
  "mac.js_more": "Diğer ayrıntılar…",
  "mac.js_new_total": "Yeni toplam"
 }

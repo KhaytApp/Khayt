@@ -105,7 +105,8 @@ struct JobSheetTests {
         #expect(MenuCoverageTests.source("ShopWindow.swift").contains("shopSheet(item: $shop.pendingEdit) { JobSheet(shop: shop, subject: $0) }"))
         let sheet = MenuCoverageTests.source("JobSheet.swift")
         #expect(sheet.contains("await shop.saveJob(subject.id, pending)"))
-        #expect(sheet.contains("if lock?.askPrice == true, partsCostMoved { askingPrice = true } else { commit(keepPrice: false) }"))
+        #expect(sheet.contains("if lock?.askPrice == true, markupChanged { askingMarkup = true }")
+            && sheet.contains("else if lock?.askPrice == true, partsCostMoved { askingPrice = true }"))
         #expect(sheet.contains(".disabled(saving || !changed || refusal != nil || !shop.canMoveJobs)"))
         #expect(sheet.contains("shop.previewJobSave(subject.id, pending)"))
         // Every part column is named once, and each field says what it is.

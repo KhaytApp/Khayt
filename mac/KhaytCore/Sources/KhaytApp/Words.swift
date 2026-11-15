@@ -3789,6 +3789,10 @@ final class Words {
         "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
         // The job sheet (S1 B3b).
         "mac.js_margin_typed": ["en": "—, price was typed", "ar": "—، السعر مُدخل يدويًا"],
+        "mac.js_markup_fixed": ["en": "The price was typed, so a markup can’t move it. Clear “Or set the price” first.", "ar": "السعر مُدخل يدويًا، فلا تغيّره نسبة الإضافة. امسح «أو حدّد السعر» أولًا."],
+        "mac.js_markup_bad": ["en": "Type the markup as a number, 0 or more.", "ar": "اكتب نسبة الإضافة رقمًا، صفرًا أو أكثر."],
+        "mac.js_markup_q": ["en": "The customer has seen this job’s price. Change it to the new markup?", "ar": "رأى العميل سعر هذه المهمة. هل تغيّره إلى نسبة الإضافة الجديدة؟"],
+        "mac.js_markup_change": ["en": "Change the price", "ar": "تغيير السعر"],
         "mac.js_more": ["en": "More details…", "ar": "تفاصيل أكثر…"],
         "mac.js_new_total": ["en": "New total", "ar": "الإجمالي الجديد"],
         // Parts on an existing job go through the shared rule (S1 B3a):

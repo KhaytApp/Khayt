@@ -465,3 +465,109 @@ test('an open job that carries a cost basis: its parts may change, and the basis
   E.applyParts(named, [Object.assign({}, a, { name: 'Body' })], {});
   assert.equal(named.costBasis, 80);
 });
+
+// ── A new markup on an existing job (applyJobEdit `marginPct`) ────────────
+//
+// Shared vectors: the desktop, the Mac and the iPhone run this same rule.
+
+const draftQuote = (terms, extra) => jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote' }, extra || {}));
+
+test('markup: a draft quote is repriced from cost and the markup is stored', () => {
+  const o = draftQuote();                       // 120 of cost at 50%: 180
+  assert.equal(o.price, 180);
+  const r = E.applyJobEdit(o, { marginPct: 25 }, {});
+  assert.equal(r.ok, true);
+  assert.equal(o.price, 150, '120 at 25%');
+  assert.equal(o.marginPct, 25);
+  assert.equal(E.marginOf(o), 25);
+});
+
+test('markup: the same markup changes nothing', () => {
+  const o = draftQuote();
+  const r = E.applyJobEdit(o, { marginPct: 50 }, {});
+  assert.equal(r.ok, true);
+  assert.equal(r.changed, false);
+  assert.equal(o.price, 180);
+});
+
+test('markup: discount, rush, shipping and a fixed extra stay on the price, as they were', () => {
+  const o = draftQuote({ discountPct: 10, rushEnabled: true, shippingCost: 20, extraLines: [{ label: 'Paint', amount: 15 }] });
+  const r = E.applyJobEdit(o, { marginPct: 25 }, {});
+  assert.equal(r.ok, true);
+  assert.equal(o.price, fresh([part('A', 80), part('B', 40)],
+    { margin: 25, discountPct: 10, rushEnabled: true, shippingCost: 20, extraLines: [{ label: 'Paint', amount: 15 }] }));
+  assert.equal(o.priceBeforeDiscount, 150);
+});
+
+test('markup: an agreed part stays at its agreed price', () => {
+  const parts = [part('A', 80), part('B', 40, { agreedPrice: 100 })];
+  const o = jobOf(parts, {}, { status: 'quote' });         // 80 at 50% + 100 agreed = 220
+  assert.equal(o.price, 220);
+  assert.equal(E.applyJobEdit(o, { marginPct: 25 }, {}).ok, true);
+  assert.equal(o.price, 200, '80 at 25% + 100');
+});
+
+test('markup: the rounding rule still rounds', () => {
+  const o = draftQuote({ priceRound: { step: 5, mode: 'up' } });
+  assert.equal(E.applyJobEdit(o, { marginPct: 33 }, {}).ok, true);
+  assert.equal(o.price, 160, '159.60 rounded up to 5');
+  assert.equal(o.computedPrice, 159.6);
+});
+
+test('markup: a typed price is fixed, and so is a job with nothing costed', () => {
+  const typed = draftQuote({ priceOverride: 199 });
+  assert.deepEqual(E.applyJobEdit(typed, { marginPct: 25 }, {}).reason, 'price_fixed');
+  assert.equal(typed.price, 199);
+  const allAgreed = jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote' });
+  assert.equal(E.applyJobEdit(allAgreed, { marginPct: 25 }, {}).reason, 'price_fixed');
+});
+
+test('markup: once the customer has seen the price it is asked, then allowed', () => {
+  for (const extra of [{ quoteSharedAt: '2026-11-14T10:00:00Z' }, { status: 'pending' }, { status: 'printing' },
+    { status: 'pending', invoiceNumber: 'INV-2026-0007' }]) {
+    const o = draftQuote({}, extra);
+    const asked = E.applyJobEdit(o, { marginPct: 25 }, {});
+    assert.equal(asked.ok, false, JSON.stringify(extra));
+    assert.equal(asked.reason, 'ask_price');
+    assert.equal(asked.step, 'markup');
+    assert.equal(o.price, 180, 'nothing written while asking');
+    assert.equal(E.applyJobEdit(o, { marginPct: 25 }, { priceSeenOk: true }).ok, true);
+    assert.equal(o.price, 150);
+  }
+});
+
+test('markup: refused with the lock\'s own code once finished, deducted, cancelled or the invoice has left', () => {
+  const cases = [[{ status: 'completed' }, 'deducted'], [{ status: 'pending', materialDeducted: true }, 'deducted'],
+    [{ status: 'cancelled' }, 'cancelled'], [{ status: 'pending', zatcaUuid: 'u-1' }, 'zatca'],
+    [{ status: 'pending', voidedAt: '2026-11-10' }, 'voided']];
+  for (const [extra, code] of cases) {
+    const o = draftQuote({}, extra);
+    const r = E.applyJobEdit(o, { marginPct: 25 }, { priceSeenOk: true });
+    assert.equal(r.reason, code, JSON.stringify(extra));
+    assert.equal(o.price, 180);
+  }
+});
+
+test('markup: a bill brought under what was paid is refused', () => {
+  const o = draftQuote({}, { status: 'pending', paidAmount: 170, paymentStatus: 'partial' });
+  const r = E.applyJobEdit(o, { marginPct: 25 }, { priceSeenOk: true });
+  assert.equal(r.reason, 'paid_exceeds_price');
+  assert.equal(r.step, 'markup');
+  assert.equal(o.price, 180);
+  assert.equal(E.applyJobEdit(o, { marginPct: 60 }, { priceSeenOk: true }).ok, true, 'raising it is fine');
+  assert.equal(o.price, 192);
+});
+
+test('markup: a negative or unreadable markup is refused', () => {
+  for (const m of [-5, 'lots']) {
+    const o = draftQuote();
+    assert.equal(E.applyJobEdit(o, { marginPct: m }, {}).reason, 'bad_markup');
+  }
+});
+
+test('markup: parts and a markup in one save price the new parts at the new markup', () => {
+  const o = draftQuote();
+  const r = E.applyJobEdit(o, { parts: [part('A', 80), part('B', 40), part('C', 30)], marginPct: 20 }, { ids: ['C'] });
+  assert.equal(r.ok, true);
+  assert.equal(o.price, 180, '150 at 20%');
+});

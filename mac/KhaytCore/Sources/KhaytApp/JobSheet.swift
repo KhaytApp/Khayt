@@ -64,6 +64,9 @@ struct JobSheet: View {
         var discount = ""
         /// A typed total. Empty is "leave the price to the arithmetic".
         var price = ""
+        /// The markup, as `marginOf` read it when the sheet opened, or as
+        /// typed since. Empty where it cannot be said (a typed price).
+        var markup = ""
     }
 
     @State private var form = Form()
@@ -80,6 +83,8 @@ struct JobSheet: View {
     @State private var newTotal: String?
     @State private var refusal: String?
     @State private var askingPrice = false
+    /// A new markup on a price the customer has seen: asked before it moves.
+    @State private var askingMarkup = false
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
     private var currency: String { (job?.currency.isEmpty == false ? job?.currency : nil) ?? shop.currency }
@@ -108,7 +113,19 @@ struct JobSheet: View {
             Button(shop.words.callIt("mac.parts_use_new_price")) { commit(keepPrice: false) }
             Button(shop.words.callIt("common.cancel"), role: .cancel) {}
         }
+        .confirmationDialog(shop.words.callIt("mac.js_markup_q"), isPresented: $askingMarkup) {
+            Button(shop.words.callIt("mac.js_markup_change")) { commit(keepPrice: false, priceSeenOk: true) }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        }
     }
+
+    /// The markup field is offered where the rule would take one: a price
+    /// made from cost (not typed), on a job whose parts may still change.
+    private var markupEditable: Bool {
+        if case .some(.some) = margin { return !partsLocked && !nameOnly && shop.canMoveJobs }
+        return false
+    }
+    private var markupChanged: Bool { form.markup != opened.markup }
 
     private struct Signature: Equatable { let form: Form; let parts: [PartDraft] }
 
@@ -272,8 +289,17 @@ struct JobSheet: View {
                 // Read off the job by the shared rule. Where it cannot be
                 // said (a typed price), it says so rather than guessing.
                 switch margin {
-                case .some(.some(let pct)):
-                    Text(verbatim: shop.words.numeral(Int(pct.rounded())) + "%").monospacedDigit()
+                case .some(.some):
+                    // EDITABLE (Dev Hub, Nov 15): the price is worked again
+                    // from cost by the shared rule (`applyMarkup`), with the
+                    // discount, rush, shipping and rounding as they were.
+                    HStack(spacing: 4) {
+                        TextField("0", text: $form.markup)
+                            .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
+                            .disabled(!markupEditable)
+                            .accessibilityLabel(shop.words.callIt("mac.markup"))
+                        Text(verbatim: "%").foregroundStyle(.secondary)
+                    }
                 case .some(.none):
                     Text(shop.words.callIt("mac.js_margin_typed")).foregroundStyle(.secondary)
                 case .none:
@@ -332,7 +358,12 @@ struct JobSheet: View {
                 Button(shop.words.callIt("common.save")) {
                     // The customer has seen this price, and what the parts
                     // cost moved: ask before it does.
-                    if lock?.askPrice == true, partsCostMoved { askingPrice = true } else { commit(keepPrice: false) }
+                    // A new markup moves the price by definition: asked once
+                    // the customer has seen it. Otherwise, parts whose cost
+                    // moved ask whether to keep the price.
+                    if lock?.askPrice == true, markupChanged { askingMarkup = true }
+                    else if lock?.askPrice == true, partsCostMoved { askingPrice = true }
+                    else { commit(keepPrice: false) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(saving || !changed || refusal != nil || !shop.canMoveJobs)
@@ -398,7 +429,16 @@ struct JobSheet: View {
             lock = await shop.partsLock(subject.id)
             customerLock = await shop.customerLock(subject.id)
             if let engine = shop.engine, let row = shop.orderRow(subject.id) {
-                margin = .some(try? await engine.marginOf(row))
+                let read = try? await engine.marginOf(row)
+                margin = .some(read)
+                // The field opens on what the job was priced at. Set on both
+                // sides, so reading it is not a change.
+                if let read {
+                    let shown = Self.percent(read)
+                    let text = shown.isEmpty ? "0" : shown
+                    if form.markup == opened.markup { form.markup = text }
+                    opened.markup = text
+                }
             }
         }
     }
@@ -424,10 +464,16 @@ struct JobSheet: View {
         let was = TypedNumber.parse(opened.discount) ?? 0
         let pct = min(100, max(0, TypedNumber.parse(now.discount) ?? 0))
         if pct != was { out["discountPct"] = .number(pct) }
+        // A markup only when it was changed. An unreadable one is sent as typed
+        // so the rule refuses it ('bad_markup') and the sheet says why.
+        let typedMarkup = now.markup.trimmingCharacters(in: .whitespaces)
+        if typedMarkup != opened.markup.trimmingCharacters(in: .whitespaces), !typedMarkup.isEmpty {
+            out["marginPct"] = TypedNumber.parse(typedMarkup).map(JSONValue.number) ?? .string(typedMarkup)
+        }
         return out
     }
 
-    private func save(keepPrice: Bool) async -> Shop.JobSave {
+    private func save(keepPrice: Bool, priceSeenOk: Bool = false) async -> Shop.JobSave {
         var save = Shop.JobSave()
         save.fields = Self.fields(opened: opened, now: form)
         if form.customerId != opened.customerId {
@@ -436,6 +482,7 @@ struct JobSheet: View {
         if form.nonBusiness != opened.nonBusiness { save.nonBusiness = form.nonBusiness }
         if partsChanged { save.parts = await shop.partsForSave(subject.id, drafts: parts) }
         save.keepPrice = keepPrice
+        save.priceSeenOk = priceSeenOk
         return save
     }
 
@@ -445,7 +492,9 @@ struct JobSheet: View {
         // A breath, so typing a number is one question, not one per key.
         try? await Task.sleep(for: .milliseconds(250))
         if Task.isCancelled { return }
-        let pending = await save(keepPrice: false)
+        // As if agreed: the preview shows what the new markup comes to; the
+        // question is asked on Save (`askingMarkup`).
+        let pending = await save(keepPrice: false, priceSeenOk: true)
         guard !Task.isCancelled, let answer = await shop.previewJobSave(subject.id, pending) else { return }
         switch answer {
         case .success(let after):
@@ -459,11 +508,11 @@ struct JobSheet: View {
         }
     }
 
-    private func commit(keepPrice: Bool) {
+    private func commit(keepPrice: Bool, priceSeenOk: Bool = false) {
         saving = true
         shop.moveProblem = nil
         Task {
-            let pending = await save(keepPrice: keepPrice)
+            let pending = await save(keepPrice: keepPrice, priceSeenOk: priceSeenOk)
             let wrote = await shop.saveJob(subject.id, pending)
             saving = false
             if wrote, shop.moveProblem == nil { shop.clearQuestion() }

@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "Retirer la pièce…",
  "mac.parts_remove_q": "Retirer « {name} » de ce travail ?",
  "mac.js_margin_typed": "—, prix saisi",
+ "mac.js_markup_fixed": "Le prix a été saisi, une majoration ne peut donc pas le changer. Videz d’abord « Ou fixez le prix ».",
+ "mac.js_markup_bad": "Saisissez la majoration en nombre, 0 ou plus.",
+ "mac.js_markup_q": "Le client a déjà vu le prix de ce travail. Le changer selon la nouvelle majoration ?",
+ "mac.js_markup_change": "Changer le prix",
  "mac.js_more": "Plus de détails…",
  "mac.js_new_total": "Nouveau total"
 }
