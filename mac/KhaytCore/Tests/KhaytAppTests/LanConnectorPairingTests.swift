@@ -208,6 +208,22 @@ struct LanConnectorPairingTests {
         #expect(try await Self.ask(bench, Plugin()).0.status == 200)
     }
 
+    @Test("an oversized ask is answered 413 and closed cleanly, and holds no slot")
+    func oversizedAsk() async throws {
+        let bench = try await LanServerTests.Bench(pin: Self.pin)
+        defer { bench.stop() }
+        bench.connectorPairing.open()
+        // Over a megabyte: refused from the head (not a large-body route), the
+        // answer must reach the client rather than be lost to a reset (#2497).
+        var body = Plugin().body()
+        body.append(Data(repeating: 0x20, count: LanServer.maxBody + 1024))
+        let reply = try await bench.send("POST", "/api/connectors/pair", body: body)
+        #expect(reply.status == 413, "answered \(reply.status) \(reply.text)")
+        #expect(bench.connectorPairing.pending == nil)
+        #expect(bench.connectorPairing.isOpenNow, "the window stays open for a proper ask")
+        #expect(try await Self.ask(bench, Plugin()).0.status == 200)
+    }
+
     // MARK: - Units
 
     @Test("a PIN change signs a connector out, as it does a phone")
