@@ -5442,7 +5442,7 @@
   "jp.paid": "Ödenen",
   "jp.owing": "Kalan",
   "jp.cost": "Maliyet (filament, makine, işçilik)",
-  "jp.margin": "Kâr marjı",
+  "jp.markup": "Kâr payı",
   "jp.margin_typed": "—, fiyat elle girildi",
   "jp.quote_money_note": "Teklifte borç olmaz; bu yüzden onaylanana kadar Ödenen ve Kalan “—” gösterir.",
   "jp.no_parts": "Henüz parça yok",

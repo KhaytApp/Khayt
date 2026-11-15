@@ -61,7 +61,7 @@
       + row(t('jp.owing'), quote ? '—' : money(o, steps.owed || 0), 'is-strong' + (!quote && steps.late && steps.owed > 0 ? ' is-late' : ''))
       + (quote ? `<p class="jp-note">${escapeHtml(t('jp.quote_money_note'))}</p>` : '')
       + row(t('jp.cost'), cost > 0 ? money(o, cost) : '—', 'is-muted')
-      + row(t('jp.margin'), margin === null ? t('jp.margin_typed') : `${margin} %`, 'is-muted');
+      + row(t('jp.markup'), margin === null ? t('jp.margin_typed') : `${margin} %`, 'is-muted');
   }
 
   function activityHtml(o) {

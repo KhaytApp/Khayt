@@ -5442,7 +5442,7 @@
   "jp.paid": "已付",
   "jp.owing": "待付",
   "jp.cost": "成本（耗材、机器、人工）",
-  "jp.margin": "利润率",
+  "jp.markup": "加价",
   "jp.margin_typed": "—，价格为手动输入",
   "jp.quote_money_note": "报价阶段无需付款，因此在批准前“已付”和“待付”显示为“—”。",
   "jp.no_parts": "还没有零件",

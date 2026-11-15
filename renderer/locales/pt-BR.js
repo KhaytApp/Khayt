@@ -5443,7 +5443,7 @@
   "jp.paid": "Pago",
   "jp.owing": "A receber",
   "jp.cost": "Custo (filamento, máquina, mão de obra)",
-  "jp.margin": "Margem",
+  "jp.markup": "Acréscimo",
   "jp.margin_typed": "—, preço digitado",
   "jp.quote_money_note": "Nada é devido em um orçamento, então Pago e A receber mostram “—” até ele ser aprovado.",
   "jp.no_parts": "Ainda sem peças",

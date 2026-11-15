@@ -5443,7 +5443,7 @@
   "jp.paid": "Paid",
   "jp.owing": "Owing",
   "jp.cost": "Cost (filament, machine, labour)",
-  "jp.margin": "Margin",
+  "jp.markup": "Markup",
   "jp.margin_typed": "—, price was typed",
   "jp.quote_money_note": "Nothing is owed on a quote, so Paid and Owing read “—” until it is approved.",
   "jp.no_parts": "No parts yet",

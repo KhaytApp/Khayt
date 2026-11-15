@@ -5442,7 +5442,7 @@
   "jp.paid": "Pagado",
   "jp.owing": "Pendiente",
   "jp.cost": "Costo (filamento, máquina, mano de obra)",
-  "jp.margin": "Margen",
+  "jp.markup": "Recargo",
   "jp.margin_typed": "—, precio introducido a mano",
   "jp.quote_money_note": "En una cotización no se debe nada, así que Pagado y Pendiente muestran «—» hasta que se apruebe.",
   "jp.no_parts": "Aún no hay piezas",

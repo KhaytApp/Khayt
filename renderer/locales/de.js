@@ -5442,7 +5442,7 @@
   "jp.paid": "Bezahlt",
   "jp.owing": "Offen",
   "jp.cost": "Kosten (Filament, Maschine, Arbeit)",
-  "jp.margin": "Marge",
+  "jp.markup": "Aufschlag",
   "jp.margin_typed": "—, Preis wurde eingegeben",
   "jp.quote_money_note": "Bei einem Angebot ist nichts offen, deshalb zeigen Bezahlt und Offen „—“, bis es angenommen ist.",
   "jp.no_parts": "Noch keine Teile",

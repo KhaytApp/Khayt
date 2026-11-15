@@ -5442,7 +5442,7 @@
   "jp.paid": "Payé",
   "jp.owing": "Reste dû",
   "jp.cost": "Coût (filament, machine, main-d’œuvre)",
-  "jp.margin": "Marge",
+  "jp.markup": "Majoration",
   "jp.margin_typed": "—, prix saisi à la main",
   "jp.quote_money_note": "Rien n’est dû sur un devis : Payé et Reste dû affichent « — » jusqu’à son acceptation.",
   "jp.no_parts": "Pas encore de pièces",
