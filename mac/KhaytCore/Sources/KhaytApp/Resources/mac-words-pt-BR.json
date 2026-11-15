@@ -3991,5 +3991,8 @@
  "mac.parts_keep_price": "Manter o preço",
  "mac.parts_use_new_price": "Usar o novo preço",
  "mac.parts_remove": "Remover peça…",
- "mac.parts_remove_q": "Remover “{name}” deste trabalho?"
+ "mac.parts_remove_q": "Remover “{name}” deste trabalho?",
+ "mac.js_margin_typed": "—, o preço foi digitado",
+ "mac.js_more": "Mais detalhes…",
+ "mac.js_new_total": "Novo total"
 }
