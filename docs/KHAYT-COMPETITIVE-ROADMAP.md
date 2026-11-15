@@ -1349,3 +1349,250 @@ Turki asked for the five recommendations from this reading to be done:
 3. **A starter maintenance list** — 13 tasks in `lib/maintenance.js` (`STARTER_TASKS`), offered on the Mac's new-task sheet.
 4. **R10 written** — [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).
 5. **Qoyod export — still blocked.** Qoyod's help centre publishes no invoice-import columns: the invoice import takes only the Excel template downloaded from the shop's own Qoyod account, with locked headers and account-filled dropdowns ([sales](https://www.qoyod.com/en/knowledge-base/how-to-import-sales-invoices-via-excel/), [purchases](https://www.qoyod.com/en/knowledge-base/how-to-import-purchase-invoices-via-excel/)). The journal-entry import lists its fields but needs the shop's own account codes and would land sales as entries, not invoices. `lib/accounting-export.js` already says so ("QOYOD IS DELIBERATELY ABSENT"). Unblocking it needs someone with a Qoyod account to download the templates.
+
+## Weekly reading — 2026-11-15
+
+This run re-read every product in §0, §6, §7, the weekly entries and both watch lists, and
+searched for new products. It ran on Turki's Mac. Every claim about Khayt below was checked in
+`lib/`, `renderer/`, `mac/KhaytCore/Sources` and `ios/` on `origin/main` (`b6a5e1973`).
+
+**Limits on this run:**
+
+- Three parallel readers used WebFetch and the GitHub API. Their sessions could not run headless
+  Chrome, so the JavaScript-only pages were rendered afterwards from the main session, in a
+  throwaway profile. Those rows are marked "rendered".
+- **Reddit was not read.** WebFetch refuses reddit.com and old.reddit.com, and Chrome was not
+  tried on it this run. So again nothing is known about what r/3dprintingbusiness, r/PrintFarm
+  or r/3Dprinting say they use.
+- **Layova was not read on purpose**, because its `robots.txt` still excludes ClaudeBot.
+
+### What the 2026-11-01 ranked ideas became
+
+| 2026-11-01 idea | State | Where |
+|---|---|---|
+| 1. Read the AMS slot from the Bambu report | **Open, still blocked on hardware** | No `tray_type`, `tray_color`, `tray_uuid` or `tag_uid` in any of the four trees. `remain` appears only as print time remaining (`lib/bambu-report.js` line 41) |
+| 2. The shop's money on the iPhone Home Screen | **Shipped** (#2309, 2026-11-07) | `ios/KhaytWidget/MoneyWidgetViews.swift`; widgets also show how old their figures are (`WidgetFreshness.swift`) |
+| 3. Tell people that `khayt-mcp` reads the books | **Half done** | `mac/README.md` lists all eight tools with the five books tools (line 1706 on). Its opening line (1685) still calls it a server "over the shop's model library". The website is its own repository and was not checked |
+| 4. Write R10 | **Done** (2026-11-04) | [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md) |
+
+Three ideas from the 2026-10-26 reading had also landed in the code without the doc saying so:
+
+- **Payment terms per customer:** #2106 (`lib/payment-terms.js`, `PaymentTerms.swift`).
+- **Khayt as a printer in the slicer:** #2107. `LanServer.swift` answers `/api/version` and
+  `POST /api/files/local` once a slicer key exists.
+- **A quote form for the shop's own store:** #2083 (`QuoteFormEmbed.swift`). It is built, but
+  the cloud keeps it **switched off** (`QUOTE_EMBED_ENABLED`) until the privacy policy covers it.
+
+**Picture search in the library** (2026-10-26, idea 3) is still open: no `VNClassifyImage` or
+feature-print code in `mac/` or `ios/`.
+
+### Products already on the list
+
+| Product | Change since 2026-11-01 | Read? |
+|---|---|---|
+| [FoxTrack](https://foxtrack.studio/changelog) | **The fastest mover again.** Prices unchanged: Free, $12 and $39. Changelog entries:<br>• **2 Nov:** one invoice can bill a seller for many orders.<br>• **3 Nov:** carrier tracking on labels; a delivered parcel marks the order Received.<br>• **7 Nov:** Bridge 2.6.1 with a print queue and backup.<br>• **9 Nov:** restock runs; quote tags carry over to orders.<br>• **10 Nov:** order import grouped by order number; a Print menu with job sheets, packing slips, item cards and labels.<br>Late October: Shippo, ShipStation and EasyPost labels in beta, a tax-exempt switch, invoices marked sent or paid in bulk.<br>**Help pages:** a **UBL XML e-invoice download** and an "Apply tax to shipping" switch.<br>**Open question answered:** the five document languages are **EN/FR/DE/ES/NL, and Arabic is not one of them.** No RTL appears anywhere on the site.<br>The `/roadmap` page now returns 404. | ✅ (roadmap ❌ 404) |
+| [3D Print Manager](https://3dprintmanager.eu/changelog.php) | The top tiers are renamed FARM Core (€19.99) and FARM Connect (€39.99).<br>• **31 Oct:** print time and expected finish per order; a scheduled run waits for the printer's real start.<br>• **1 Nov:** the finish time is coloured against the due date.<br>• **2 Nov:** **objects skipped mid-print are counted, with a one-click reprint of the missing pieces.**<br>Still HR/EN/DE. Bambu is still read through Bambu Cloud. | ✅ |
+| [Printago](https://printago.io/changelog) | **2 Nov: Printago Studio**, a full slicer in the browser on the Bambu Studio and OrcaSlicer engines. On the [roadmap](https://printago.io/roadmap), Reporting is still In Progress, Part Estimation is still Up Next, and Quote Portal and Part & SKU Inventory are Exploring. Still no invoicing or tax. | ✅ |
+| [SimplyPrint](https://simplyprint.io/blog) | **The Shop has still not launched.** The newest post is still 15 Oct, and `/shop` returns 404. Prices unchanged. No invoicing or tax anywhere. | ✅ |
+| [Meshory](https://meshory.com/roadmap) | **Confirmed at $39.99** ("Early access ended Nov 7"). **v1.13 (8 Nov):** imports from Patreon, MakerWorld and Printables, model sets, print history, and six UI languages (no Arabic). **An MCP server is "In progress"**, and filament inventory is "Planned". | ✅ |
+| [MeshVault](https://www.meshvault.app/) | Downloads now point to **v2.6.1.0** (was v2.5.0.1). The page shows the desktop price as **A$19.99**, so the "USD $19.99" of 2026-10-26 may have been a regional rendering. The iOS app is still on TestFlight. | ✅ |
+| [Stimalo](https://stimalo.com/pricing) | Black Friday: 40% off the first year of Pro until 30 Nov. The page counts 3,345 registered makers, 251 of them on Find a Maker. Still EN/IT. | ✅ |
+| [FilaOps](https://github.com/Blb3D/filaops/releases) | **v4.4.0 (12 Nov):** planned orders release into production orders (behind a flag), and a Print Batches page that needs non-Core features. No PRO release note. | ✅ |
+| [Bambuddy](https://github.com/maziggy/bambuddy/releases) | **v1.3.0 (7 Nov) adds costing:** wear per printing hour, **hourly electricity prices from a Home Assistant sensor**, and Recalculate Costs. It also unassigns AMS spools, and returns RFID spools automatically. **v1.3.1 (11 Nov):** "any model" jobs go to the printer with the fewest print hours. Still no invoicing or VAT. | ✅ GitHub API |
+| [PrintOps](https://github.com/ichwars/PrintOps) | v1.2.8.3 (12 Nov): Bambuddy integration work and six dependency vulnerabilities fixed. | ✅ GitHub API |
+| [Watchtower](https://watchtower3d.com/pricing) | **The tier prices are now on its own site**, so they no longer rest on competitors' comparison pages. Kickstarter price / retail, one-time: Hobby $59 / $99 (5 printers), Basic $119 / $199 (10), Pro $209 / $349 (15), Farm $359 / $599 (25), Farm Plus $539 / $899 (50), Farm Ultra $809 / $1,349 (100). **Basic adds "AI spaghetti detection", "Automatic part ejection" and "Auto-ready between jobs".** Pro adds Etsy and Shopify plus a "farm agent (text based queries and control)". Its home page still says "Live Now On Kickstarter". Still no costing beyond fleet analytics, and no quotes or invoices. | ✅ rendered |
+| [Spoolara](https://spoolara.com/) | **First full read of its own page.** Hobbyist $9.99/mo billed yearly ($14.99 monthly), Maker $19.99 ($29.99). The desktop app is still "Coming soon", and Enterprise "for studios, shops and teams" is still "Coming soon". The Inventory Manager tracks spools, resin, nozzles, plates and tools with low-stock flags. Still sells files, not prints. No orders, invoices or tax. | ✅ rendered |
+| [CalcMyPrint](https://calcmyprint.com/) | **First rendered read** (§7 had only its JS bundle). A costing and inventory tool: product recipes, G-code import, depreciation, defect rate, FDM and SLA, supplies. Web, iOS and Android. "Hobby plan is free during Beta!" Still no invoicing, tax or languages beyond English. | ✅ rendered |
+| [PrintTender](https://github.com/frankt2012/PrintTender) | v1.1.0 (2 Nov) adds an Android tablet layout; v1.3.0 (6 Nov) adds update checks. | ✅ GitHub API |
+| [FilaStash](https://littlecreative.agency/filastash/) | 1.2.6 (5 Nov): Traditional Chinese, hex colours, VoiceOver. | ✅ |
+| [Spool: Filament Tracker](https://apps.apple.com/app/id6756892049) | 1.1.91 (31 Oct), bug fixes only. | ✅ |
+| [PrintStream](https://github.com/PrintStreamApp/printstream) | v1.3.19–1.3.22 (2–13 Nov), dispatch fixes only. | ✅ GitHub API |
+| [O.D.I.N.](https://runsodin.pages.dev/) | **The site no longer resolves** (DNS failure, twice). It may have moved or shut down; re-check next week. | ❌ ENOTFOUND |
+| [CalcuMake](https://github.com/cmbaldwin/calcumake) | calcumake.com does not resolve. The repo has had only security bumps (23–24 Oct) and no feature work since May. | ⚠️ repo only |
+| PrintMate, Layers, Printforge CRM, 3DPCC, Manuflo, 3D Print Pricing, Quot3D, SpoolDeck, Filaquote, AutoQuote3D, MakerQuote.IO, Prinate, PrintPulse, 3DPBOSS, Print Farm Manager, Printventory, PrintStash, SnapCon, FARMONE 3D, Printlooper, FlowForgeStudio, FilAccount, Print Hive, AutoPrintFarm, PrintRegistry, Trove, FilaMan, Spool cost calculator, 3dPrintOps, OctoPrint, Prusa Connect Farm, 3DPrinterOS, Quote3D, 3D Price Lab, 3DPPC, MeshTune, Daedalus | **No change that matters.** OctoPrint 2.0 is still at rc7. PrintMate is still at 2026.10.01, with Arabic and a VAT field. Quote3D's pricing page and its FAQ disagree about the free plan. | ✅ |
+| OctoFarm | Still dead: last push May 2023. | ✅ |
+| FlowQ | Login wall; the rendered page shows only usage counters. | ⚠️ rendered, login wall |
+| 3D Filament Profiles | 429 to WebFetch, and **403 Forbidden** even when rendered in Chrome. | ❌ |
+| Print Planner, Bambu Farm Manager, PrintTrack (main page) | Title only, 402, or not rendered this run. | ❌ |
+| STLMaid, Obloid, BuildBee, Print&Go, 3DiWell, RIGHTPrint | Not found or not read again. | ❌ |
+| Layova | `robots.txt` blocks ClaudeBot. | ❌ not read on purpose |
+
+**No shutdowns confirmed** (O.D.I.N. is only unresolved). **No product added ZATCA, Saudi
+e-invoicing or Arabic.** FoxTrack's document languages, the open question from last week, turn out
+to exclude Arabic.
+
+### New products
+
+| Product | Category | Model | Read? |
+|---|---|---|---|
+| [3D Print Farm](https://www.3dprint.farm/) ("a 3D Print Land product", UK) | **Shop and farm desktop app**, Windows plus Android. Imports orders from eight stores, including TikTok Shop UK, plus CSV. Assigns them to printers by "production recipes". **QC sign-off per unit, where a rejection creates a linked reprint.** LAN control of Bambu, PrusaLink, OctoPrint, Klipper and Elegoo. Material reservations, a read-only workshop wall display, signed local webhooks, and roles. Screenshots show v0.0.2. No invoicing or tax on the page. | Free (3 printers) / £5 / £15 / from £39 a month | ✅ home and /pricing |
+| [SpoolPilot](https://apps.apple.com/us/app/spoolpilot-3d-print-profit/id6796133961) | **iPhone seller-profit app.** A profit "receipt" per order with the whole Etsy and eBay fee stack, ad fees included. **Reads print time and grams from a camera photo of the slicer screen.** Barcode spools, sales at fairs, a "what to print next" list, stock forecasts, widgets. v1.1.4 (14 Sep) to v1.5.1 (Nov). EN/DE/ES, no invoicing. | Free; Pro $17.99/mo, $149.99/yr or $349 lifetime | ✅ App Store |
+| [Printfarm](https://www.printfarm.tools/) | **Filament, cost and catalogue tool.** **Imports a supplier's PDF invoice, matches its lines to catalogue filaments and creates the spools.** Spools by room, rack and shelf; AMS slots; drying cycles; reel tare; Square consignment import. Private beta with a waitlist. | Free in beta | ✅ |
+| [Artisan Hub](https://github.com/norjms/artisan-hub) | Self-hosted shop hub (AGPL): models as products with a bill of materials, a **licence check before a model can be listed for sale**, Woo, Shopify and Etsy with pooled stock, a farm queue, Spoolman and InvenTree, MCP. Created 10 Nov 2026. | Free | ✅ README |
+| [FarmSlicer](https://farmslicer.com) | Self-hosted OrcaSlicer plus farm manager (AGPL). It **holds a plate whose G-code does not fit the printer model** for an admin to approve. Repo created 26 Oct 2026. | Free | ✅ |
+| [BamDude](https://bamdude.top) | Bambu farm manager (AGPL): a virtual printer for the slicer, staggered starts, swap mode for A1s, a Telegram bot, Prometheus. OrcaSlicer plugin on 5 Nov 2026. No costs or invoicing. | Free | ✅ |
+| [Pocket Print Farm](https://github.com/abjelosevic88/pocket-homelab-print-farm) | Single-binary Go farm manager: cost per print with a suggested price, and a draft invoice through a sibling app. 1 commit, 11 Nov 2026. | MIT | ✅ README |
+| Older, first seen this week: [3D Print Desk](https://3dprintdesk.com) (South Africa: CRM with health scores, **quotes tracked as sent, viewed and accepted**, $0 / $19), [Calcura3D](https://www.calcura3d.com/en) (quote-open notifications, $39), [LayerMath](https://layermath.com) (UK: back-solves a listing price from a target margin; UK/EU VAT and reverse charge), [3D PrintForce](https://3dprintforce.com) (fee profiles, Etsy, SimplyPrint routing) | Quote and pricing tools | mixed | ✅ (3D Print Desk through its `/llms.txt`) |
+| Small GitHub projects, Oct–Nov 2026: farmhand, Open3DFarmManager, Overprint, local-print-factory, LayerPal and flibuddy (iPhone and Flipper apps for Bambuddy), FilMaNH (Bambu spool manager in 7 languages), two OrcaSlicer quoting services | Farm and monitoring only | free | ✅ READMEs |
+
+**Saudi / Arabic: none again.** Arabic and English queries found only Pea3D (free Arabic web
+cost calculators: no SAR, no VAT, no shop features), Khamsat freelancer listings, and Saudi service
+bureaus (NAMI, Abaad, Immensa). Arabic shop software is still Layers, PrintMate, CalcuMake (whose
+site is now down) and the Spool cost calculator, and **none of them does ZATCA**.
+
+### The finding: the open-source Bambu tools started costing, and the field is still tax-blind
+
+- **Bambuddy now costs prints:** wear per hour, and hourly electricity from Home Assistant. With
+  PrintOps and FilMaNH, the self-hosted Bambu crowd now does what Printago and SimplyPrint did in
+  October, which is to put a cost on each print. **Nobody in that group invoices.**
+- **The automation tools moved again on Khayt's R10 lines, not on books:**
+  - Printago now slices in the browser (R10.1).
+  - Watchtower sells part ejection and "auto-ready between jobs" on its second-cheapest tier (R10.2).
+  - Watchtower's farm agent takes control by text (R10.4).
+
+  Khayt's answers are already written down: `clearsOwnBed` (2026-11-04) covers the honest part
+  of "auto-ready", and the rest is declined in [KHAYT-AUTOMATION-LINE.md](./KHAYT-AUTOMATION-LINE.md).
+- **Khayt's agent lead narrows.** Meshory's MCP server is in progress, and Artisan Hub, Print Hive
+  and Printventory already ship one. None of them exposes invoices or receivables.
+- **New tax engines appeared, none of them Saudi.** FoxTrack added a UBL e-invoice download and
+  a tax-exempt switch, and LayerMath handles UK/EU reverse charge. Both are Europe-shaped, and
+  ZATCA is still Khayt's alone.
+
+### False alarms
+
+| Looked missing | Competitor | Where it is in Khayt |
+|---|---|---|
+| QC sign-off with a linked reprint | 3D Print Farm | `lib/reprint.js`, shared by both apps, and `lib/qc-failure.js` |
+| Material reserved against orders | 3D Print Farm | `committedByItem` in `lib/reorder.js` (§7) |
+| A read-only wall display | 3D Print Farm, Artisan Hub | `ShopFloor.swift`, `Kiosk.swift` |
+| Signed outbound webhooks | 3D Print Farm | `lib/webhook-send.js`: `X-Khayt-Signature` (HMAC-SHA256 of the body) and a timestamped `-V2` |
+| A licence check before selling a model | Artisan Hub | `ModelLicence.swift` (`sellable`). It **warns** on NonCommercial; it does not block |
+| The whole marketplace fee stack in profit | SpoolPilot, 3D PrintForce | `lib/platform-fees.js`, grossed up into the price since October |
+| A price worked back from a target margin after fees | LayerMath | the gross-up in `lib/pricing.js` and `lib/platform-fees.js`; `BreakEven.swift` |
+| "What to print next" | SpoolPilot | Print next (#2057) and Next up (#2245) |
+| Drying cycles and reel tare | Printfarm | `FilamentDryness.swift`; tare in `lib/filament-catalog.js` and `lib/spoolman-import.js` |
+| A tax-exempt sale | FoxTrack | `lib/vat-return.js` has a zero-rated box. Khayt applies **one shop-level rate** on purpose, and says so on the return (line 164) |
+| Tax on shipping | FoxTrack | Shipping is a line inside the price (`lib/pricing.js` line 186), so VAT is charged on it with everything else; there is nothing to switch |
+| Billing one customer for many orders | FoxTrack (2 Nov) | A customer statement (`renderer/clients.js`, "Print statement"). One *tax invoice* covering several orders was not looked for further |
+| Sending from the slicer | BamDude, Watchtower | #2107 (Mac) |
+| A Telegram channel | BamDude | `lib/telegram-message.js` (outbound alerts; there is no inbound bot) |
+
+### Verified gaps
+
+- **An object skipped mid-print is not booked on the job.**
+  - `lib/exclude-object.js` excludes an object on Klipper. Its own header says an object dropped by
+    mistake "is scrap, and the shop finds out at the end".
+  - The Mac (`PrinterControl.swift`) and the desktop (`renderer/machines.js`) send the command.
+  - Nothing records the excluded object against the job. `lib/order-*.js`, `lib/printer-actuals.js`
+    and `lib/qc-*.js` never mention it, and `lib/reprint.js` reprints a whole job, with no quantity.
+  - So a 4-part U1 plate with one part excluded completes as if all four were made.
+  - 3D Print Manager shipped counting skipped objects with a reprint of only the missing pieces
+    (2 Nov).
+- **Whether the customer opened a quote is not recorded.** No `viewedAt` or similar exists in
+  `lib/`, `renderer/`, `mac/KhaytCore/Sources` or `ios/`, so `lib/quote-followup.js` follows up
+  without knowing. 3D Print Desk and Calcura3D both track it. *The Cloud's portal is its own
+  repository and was not checked*; it may log views that the apps do not read.
+- **No download of an invoice's UBL XML.**
+  - Khayt builds the ZATCA UBL XML: `renderer/invoicing.js` is the only source file with
+    `cbc:`/`urn:oasis`. `ZatcaSubmit.swift` carries the Phase 2 submission rules.
+  - Nothing saves that XML for the shop or its accountant. A search for `.xml` exports finds only
+    3MF and Orca files.
+  - FoxTrack offers the download.
+  - *Not ranked high:* whether a Saudi B2B buyer or accountant asks for the XML was not checked.
+- **A supplier's PDF invoice does not become spools.** Khayt reads the ZATCA QR on a receipt into
+  an expense (§7 idea 1) and matches a supplier invoice to its purchase order
+  (`lib/supplier-invoice.js`). Nothing parses a PDF's lines, and a ZATCA QR carries no lines.
+  Printfarm does this. It needs line OCR, the guesswork §7 avoided, so it is not ranked.
+- **Photo of the slicer screen → grams and time** (SpoolPilot). Not in Khayt. A 3MF or G-code
+  file already gives the exact figures (R1), and #2107 sends them straight from the slicer, so
+  this is not ranked.
+- **Hourly electricity prices** (Bambuddy, and two iOS apps on 2026-11-01). Still one tariff in
+  `lib/print-energy.js`. Still unranked, because whether Saudi commercial tariffs vary by hour was
+  not checked.
+- Unchanged: the AMS slot (blocked on hardware), and picture search in the library.
+
+### Ranked ideas
+
+The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic and English.
+
+1. **Book an excluded object on the job, and offer to reprint only the missing pieces.**
+   - *What:* when an object is excluded, record its name and count on the job, and show it on
+     completion as "3 of 4 made". Then offer a linked reprint (`lib/reprint.js`) for the missing
+     quantity only. The excluded part's filament goes to waste, as `qc-failure.js` already books a
+     failure.
+   - *Why:* this is the U1 case that `exclude-object.js` was written for. Without it the job's
+     piece count and cost per piece are wrong in exactly the moment the feature saves the plate.
+     3D Print Manager shipped it on 2 Nov.
+   - **Not blocked on hardware:** the U1 on the bench runs Klipper.
+   - *Effort:* small to medium. *Lanes:* lib (`exclude-object` → order record, then `reprint` with
+     a quantity), then Mac, then Electron.
+2. **Record when a customer opens a quote, and let the follow-up use it.**
+   - *What:* the portal or quote link stamps the first open. `quote-followup.js` then distinguishes
+     "not opened" from "opened, no answer".
+   - *Why:* a Saudi shop sends quotes by WhatsApp, and "seen" is the question the owner asks
+     before chasing. 3D Print Desk and Calcura3D track it.
+   - *Effort:* small. *Lanes:* Cloud first (check what it already logs), then lib, then the Mac
+     and the iPhone.
+3. **Save an invoice's UBL XML.**
+   - *What:* "Save XML" beside the PDF, for an invoice that has one. The builder already exists.
+   - *Effort:* tiny on the desktop. On the Mac, the XML builder lives only in
+     `renderer/invoicing.js`, so it would need porting first.
+   - Only worth doing if an accountant asks for it, so ask a real shop first.
+4. **Finish telling people that `khayt-mcp` reads the books.**
+   - *What:* fix the opening line of `mac/README.md`, and the website copy.
+   - *Why:* four library and farm tools now ship MCP, and Meshory's is coming. None of them exposes
+     receivables or a P&L.
+   - *Effort:* tiny. *Lanes:* docs, website.
+5. **Refresh the website comparison table.**
+   - *What:* add Watchtower's published prices, FoxTrack's documents in five languages with no
+     Arabic, and Meshory at $39.99.
+   - *Effort:* tiny. *Lane:* website.
+6. Carried over and still blocked on hardware: the **AMS slot**. Still open and medium: **picture
+   search** in the library.
+
+### Deliberately not doing
+
+- **A slicer in the browser** (Printago Studio, FarmSlicer). This is R10.1.
+- **Part ejection, "auto-ready" without a person, or an agent that controls printers by text**
+  (Watchtower). These are R10.2 and R10.4. `clearsOwnBed` is as far as Khayt goes.
+- **TikTok Shop UK and the other marketplace connectors** (3D Print Farm). This is R10.3.
+- **Reading an invoice PDF with OCR** (Printfarm). The exact ZATCA QR read is the Saudi answer,
+  and it shipped.
+
+### Next reading
+
+- Has SimplyPrint's Shop launched, and with what?
+- Is O.D.I.N. gone, or has it moved?
+- Has Meshory's MCP shipped, and does it touch anything beyond the library?
+- Has Watchtower's site moved from Kickstarter prices to retail?
+- Try Reddit through headless Chrome, unless its `robots.txt` excludes that.
+- Retry 3D Filament Profiles, which now returns 403 even when rendered.
+
+### Sources
+
+FoxTrack [changelog](https://foxtrack.studio/changelog), [pricing](https://foxtrack.studio/pricing), [help: quotes](https://foxtrack.studio/help/quotes), [help: invoices](https://foxtrack.studio/help/invoices) ·
+3D Print Manager [changelog](https://3dprintmanager.eu/changelog.php) ·
+Printago [changelog](https://printago.io/changelog), [roadmap](https://printago.io/roadmap) ·
+SimplyPrint [blog](https://simplyprint.io/blog), [pricing](https://simplyprint.io/pricing) ·
+Meshory [home](https://meshory.com/), [roadmap](https://meshory.com/roadmap) · [MeshVault](https://www.meshvault.app/) ·
+Stimalo [pricing](https://stimalo.com/pricing) · FilaOps [releases](https://github.com/Blb3D/filaops/releases) ·
+Bambuddy [releases](https://github.com/maziggy/bambuddy/releases) · PrintOps [releases](https://github.com/ichwars/PrintOps/releases) ·
+Watchtower [home](https://watchtower3d.com/), [pricing](https://watchtower3d.com/pricing) (rendered) · [Spoolara](https://spoolara.com/) (rendered) ·
+[CalcMyPrint](https://www.calcmyprint.com/) (rendered) · [FlowQ](https://flowq.infinityflow3d.com/) (rendered) ·
+[PrintTender](https://github.com/frankt2012/PrintTender/releases) · [FilaStash](https://littlecreative.agency/filastash/) ·
+[Spool: Filament Tracker](https://apps.apple.com/app/id6756892049) · [PrintStream](https://github.com/PrintStreamApp/printstream/releases) ·
+[PrintMate](https://apps.apple.com/us/app/3d-print-cost-sales-printmate/id6743996044) · Layers [plans](https://layers.app/plans) ·
+[Printforge CRM](https://crm.printforge.com.au) · [3DPCC](https://3dpcc.com) · [Manuflo](https://manuflo-9y7.pages.dev/) ·
+[3D Print Pricing](https://3dprintpricing.pro/) · [Quot3D](https://quot3d.pages.dev) · [SpoolDeck](https://spooldeck.com) ·
+[Filaquote](https://apps.shopify.com/3d-print-quote) · [AutoQuote3D](https://autoquote3d.com/pricing) · [Print Hive](https://printhiv3d.com) ·
+[AutoPrintFarm](https://apps.shopify.com/autoprintfarm) · [Printlooper](https://printlooper.com) · [FARMONE 3D](https://farmone-cwu.pages.dev) ·
+[Quote3D](https://quote3d.com/pricing) · OctoPrint [releases](https://github.com/OctoPrint/OctoPrint/releases) · [Prusa Farm](https://www.prusa3d.com/p/prusa-farm/) ·
+New: [3D Print Farm](https://www.3dprint.farm/) · [SpoolPilot](https://apps.apple.com/us/app/spoolpilot-3d-print-profit/id6796133961) ·
+[Printfarm](https://www.printfarm.tools/) · [Artisan Hub](https://github.com/norjms/artisan-hub) · [FarmSlicer](https://farmslicer.com) ·
+[BamDude](https://bamdude.top) · [Pocket Print Farm](https://github.com/abjelosevic88/pocket-homelab-print-farm) ·
+[3D Print Desk](https://3dprintdesk.com) · [Calcura3D](https://www.calcura3d.com/en) · [LayerMath](https://layermath.com) ·
+[3D PrintForce](https://3dprintforce.com) · [Pea3D](https://pea3d.com/ar)
+
+*Caveat, as §5–§7: these are vendor pages read once, not hands-on evaluations. They are enough to
+place a product, not to trust a feature matrix. Some rows come from parallel readers working
+through a summarising fetch.*
