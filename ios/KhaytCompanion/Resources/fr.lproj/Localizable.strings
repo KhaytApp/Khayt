@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normale";
 "edit.priority.high" = "Haute";
 "edit.priority.urgent" = "Urgente";
-"edit.price.note" = "Un nouveau prix est le total que le client paie. Ce qui a déjà été payé reste, jusqu’au nouveau total.";
+"edit.price.note" = "Un nouveau prix est le total que le client paie. Il ne peut pas être inférieur à ce qui a déjà été payé.";
 /* Printer control */
 "printer.pause" = "Pause";
 "printer.resume" = "Reprendre";
@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "Payé";
 "mac.parts_paid_exceeds" = "Ce changement ramènerait la facture sous le montant déjà payé. Remboursez la différence ou émettez d’abord un avoir.";
 "mac.markup" = "Majoration";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "Le prix a été saisi, une majoration ne peut donc pas le changer. Videz d’abord « Ou fixez le prix ».";
+"mac.js_markup_bad" = "Saisissez la majoration en nombre, 0 ou plus.";
+"mac.js_markup_q" = "Le client a déjà vu le prix de ce travail. Le changer selon la nouvelle majoration ?";
+"mac.js_markup_change" = "Changer le prix";
+"mac.js_new_total" = "Nouveau total";

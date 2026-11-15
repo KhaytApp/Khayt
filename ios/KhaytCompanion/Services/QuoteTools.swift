@@ -68,9 +68,11 @@ extension KhaytAPIClient {
     /// Revise a quote from the book (`BookWriter.reviseQuote`), and send it on.
     /// Returns whether anything changed.
     @discardableResult
-    func reviseQuote(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Bool {
+    func reviseQuote(orderId: String, fields: [String: JSONValue], priceSeenOk: Bool = false,
+                     now: Date = Date()) async throws -> Bool {
         guard let book, book.exists, let reader else { throw KhaytAPIError.server(L10n.tr("quote.needs_book")) }
         let wrote = try await BookWriter(book: book).reviseQuote(orderId: orderId, fields: fields,
+                                                                 priceSeenOk: priceSeenOk,
                                                                  engine: reader.sharedEngine(), now: now)
         if wrote {
             await refreshPendingCount()

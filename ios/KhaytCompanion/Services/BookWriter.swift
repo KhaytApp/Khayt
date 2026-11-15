@@ -145,7 +145,7 @@ struct BookWriter {
     /// Only a quote is revised. A job the customer has accepted throws
     /// `Refusal.notAQuote`: it is changed by an edit, not a new version.
     @discardableResult
-    func reviseQuote(orderId: String, fields: [String: JSONValue],
+    func reviseQuote(orderId: String, fields: [String: JSONValue], priceSeenOk: Bool = false,
                      engine: KhaytEngine, now: Date = Date()) async throws -> Bool {
         try await rewriteOrder(orderId) { row, settings in
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
@@ -155,13 +155,15 @@ struct BookWriter {
             // that changes nothing is a version nobody made, and one the rule
             // refuses (a price below a deposit already paid) keeps nothing.
             let trial = try await engine.applyJobEdit(order: row, fields: fields, settings: settings,
+                                                      priceSeenOk: priceSeenOk,
                                                       now: now, editId: editId, priceId: priceId)
-            guard trial.ok else { throw JobEditRefused(reason: trial.reason) }
+            guard trial.ok else { throw JobEditRefused(reason: trial.reason, step: trial.step) }
             guard trial.changed else { return nil }
             let revised = try await engine.reviseQuote(order: row, now: now)
             let edited = try await engine.applyJobEdit(order: revised, fields: fields, settings: settings,
+                                                       priceSeenOk: priceSeenOk,
                                                        now: now, editId: editId, priceId: priceId)
-            guard edited.ok else { throw JobEditRefused(reason: edited.reason) }
+            guard edited.ok else { throw JobEditRefused(reason: edited.reason, step: edited.step) }
             return edited.order
         }
     }
@@ -170,10 +172,21 @@ struct BookWriter {
     /// in the Mac's words (the same keys). Nothing was written.
     struct JobEditRefused: Error, LocalizedError, Equatable {
         let reason: String?
+        /// The rule that refused: 'customer' | 'parts' | 'markup' | 'price'.
+        var step: String? = nil
+
+        /// The customer has seen the price and a new markup would move it:
+        /// asked (`mac.js_markup_q`), then saved again with `priceSeenOk`.
+        var needsAsking: Bool { reason == "ask_price" }
+        /// A refusal about the markup, shown under the Markup row.
+        var isMarkup: Bool { step == "markup" }
 
         var errorDescription: String? {
             switch reason {
             case "paid_exceeds_price": return L10n.tr("mac.parts_paid_exceeds")
+            case "price_fixed": return L10n.tr("mac.js_markup_fixed")
+            case "bad_markup": return L10n.tr("mac.js_markup_bad")
+            case "ask_price": return L10n.tr("mac.js_markup_q")
             default: return L10n.tr("move.refused")
             }
         }

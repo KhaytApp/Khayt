@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normal";
 "edit.priority.high" = "High";
 "edit.priority.urgent" = "Urgent";
-"edit.price.note" = "A new price is the total the customer pays. What was already paid stays, up to the new total.";
+"edit.price.note" = "A new price is the total the customer pays. It can’t go below what has already been paid.";
 /* Printer control */
 "printer.pause" = "Pause";
 "printer.resume" = "Resume";
@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "Paid";
 "mac.parts_paid_exceeds" = "This change would bring the bill below what has been paid. Refund the difference or issue a credit note first.";
 "mac.markup" = "Markup";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "The price was typed, so a markup can’t move it. Clear “Or set the price” first.";
+"mac.js_markup_bad" = "Type the markup as a number, 0 or more.";
+"mac.js_markup_q" = "The customer has seen this job’s price. Change it to the new markup?";
+"mac.js_markup_change" = "Change the price";
+"mac.js_new_total" = "New total";

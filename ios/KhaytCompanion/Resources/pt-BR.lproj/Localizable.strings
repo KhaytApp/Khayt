@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normal";
 "edit.priority.high" = "Alta";
 "edit.priority.urgent" = "Urgente";
-"edit.price.note" = "Um novo preço é o total que o cliente paga. O que já foi pago permanece, até o novo total.";
+"edit.price.note" = "Um novo preço é o total que o cliente paga. Ele não pode ficar abaixo do que já foi pago.";
 /* Printer control */
 "printer.pause" = "Pausar";
 "printer.resume" = "Retomar";
@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "Pago";
 "mac.parts_paid_exceeds" = "Esta alteração deixaria a conta abaixo do que já foi pago. Reembolse a diferença ou emita uma nota de crédito primeiro.";
 "mac.markup" = "Acréscimo";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "O preço foi digitado, então um acréscimo não o altera. Limpe primeiro “Ou defina o preço”.";
+"mac.js_markup_bad" = "Digite o acréscimo como número, 0 ou mais.";
+"mac.js_markup_q" = "O cliente já viu o preço deste trabalho. Mudar para o novo acréscimo?";
+"mac.js_markup_change" = "Mudar o preço";
+"mac.js_new_total" = "Novo total";

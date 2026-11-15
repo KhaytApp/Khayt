@@ -1246,7 +1246,8 @@ final class KhaytAPIClient: ObservableObject {
     /// what was paid refused (`BookWriter.JobEditRefused`). Returns whether
     /// anything changed.
     @discardableResult
-    func editOrder(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Bool {
+    func editOrder(orderId: String, fields: [String: JSONValue], priceSeenOk: Bool = false,
+                   now: Date = Date()) async throws -> Bool {
         guard let book, book.exists, let reader else {
             throw KhaytAPIError.server(L10n.tr("alert.print.needs_book"))
         }
@@ -1264,9 +1265,9 @@ final class KhaytAPIClient: ObservableObject {
         // below what was paid is REFUSED with its reason, never settled by
         // capping what was paid, and nothing is written.
         let edited = try await reader.sharedEngine().applyJobEdit(
-            order: row, fields: fields, settings: settings, now: now,
+            order: row, fields: fields, settings: settings, priceSeenOk: priceSeenOk, now: now,
             editId: BookWriter.lanId("edit", now: now), priceId: BookWriter.lanId("price", now: now))
-        guard edited.ok else { throw BookWriter.JobEditRefused(reason: edited.reason) }
+        guard edited.ok else { throw BookWriter.JobEditRefused(reason: edited.reason, step: edited.step) }
         guard edited.changed, case .object(let after) = edited.order else { return false }
         try book.updateRecord(collection: "printLog", id: orderId) { record in
             for (key, value) in after where before[key] != value { record[key] = value }
@@ -1449,6 +1450,59 @@ final class KhaytAPIClient: ObservableObject {
               let engine = try? await reader.sharedEngine() else { return nil }
         // Not `try?`: it would fold "the rule cannot say" into "no answer".
         do { return BookWriter.JobMargin(percent: try await engine.marginOf(row)) } catch { return nil }
+    }
+
+    /// The job's markup as Edit job offers it (Mac #2494): the percentage
+    /// `marginOf` reads, and whether the customer has seen the price
+    /// (`partsLock.askPrice`, asked before it moves). Nil where the rule would
+    /// not take a new one, so the sheet shows no field: no book, a typed
+    /// price or another currency (`marginOf` is nil), or parts that may no
+    /// longer change (finished, deducted, cancelled, the invoice gone).
+    struct MarkupState: Equatable {
+        let percent: Double
+        let askPrice: Bool
+
+        /// As the box shows it to be edited: "25", "12.5", "33.33".
+        var typed: String {
+            let r = (percent * 100).rounded() / 100
+            if r == r.rounded() { return String(Int(r)) }
+            return String(format: "%g", locale: Locale(identifier: "en_US_POSIX"), r)
+        }
+    }
+
+    func markupState(orderId: String) async -> MarkupState? {
+        guard let (row, _) = bookOrder(orderId), let reader,
+              let engine = try? await reader.sharedEngine(),
+              let lock = try? await engine.partsLock(row), lock.edit, !lock.nameOnly else { return nil }
+        guard let pct = (try? await engine.marginOf(row)) ?? nil, pct.isFinite else { return nil }
+        return MarkupState(percent: pct, askPrice: lock.askPrice)
+    }
+
+    /// What an edit would come to, without writing it: the same rule
+    /// (`applyJobEdit`) on a copy, so Edit job can show the new total a
+    /// markup makes before it is saved. As if the price question were
+    /// answered yes — it is asked on Save. Throws the rule's refusal.
+    func previewJobEdit(orderId: String, fields: [String: JSONValue], now: Date = Date()) async throws -> Double? {
+        guard let (row, settings) = bookOrder(orderId), let reader else { return nil }
+        let r = try await reader.sharedEngine().applyJobEdit(
+            order: row, fields: fields, settings: settings, priceSeenOk: true, now: now,
+            editId: "preview", priceId: "preview")
+        guard r.ok else { throw BookWriter.JobEditRefused(reason: r.reason, step: r.step) }
+        guard case .object(let o) = r.order, case .number(let price)? = o["price"] else { return nil }
+        return price
+    }
+
+    /// A job's row in this phone's book, and the book's settings.
+    private func bookOrder(_ orderId: String) -> (JSONValue, [String: JSONValue])? {
+        guard let book, book.exists, let store = try? book.read(),
+              case .array(let rows)? = store["printLog"],
+              let row = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }) else { return nil }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = store["settings"] { settings = s }
+        return (row, settings)
     }
 
     /// The models behind a job that may not be sold today (`LibraryCopy.saleProblems`).
