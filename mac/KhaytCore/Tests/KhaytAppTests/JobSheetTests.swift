@@ -120,4 +120,51 @@ struct JobSheetTests {
         // The old sheet stays in the tree for a release.
         #expect(!MenuCoverageTests.source("EditJobSheet.swift").isEmpty)
     }
+
+    // MARK: - A part the book holds with no id (pre-release review, beta.37)
+
+    /// The desktop's calculator writes parts without an id, and the real book
+    /// has some. The sheet found stored parts by id alone, so such a part
+    /// opened with 0 hours and, on any save that touched the parts, went back
+    /// as a NEW part: costed again from nothing, its colour and model gone.
+    @Test("a part with no id opens with its own figures and goes back untouched, byte for byte")
+    func partWithNoId() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let job = try #require(shop.orders.first { $0.parts.count == 1 })
+        // Take the id off the stored part, as the calculator would have left it.
+        var rows = shop.orderRows
+        let at = try #require(rows.firstIndex { Shop.plainString(Shop.asObject($0)?["id"]) == job.id })
+        guard case .object(var order) = rows[at], case .array(var parts)? = order["parts"],
+              case .object(var part) = parts[0] else { Issue.record("the sample job has a part"); return }
+        part.removeValue(forKey: "id")
+        parts[0] = .object(part); order["parts"] = .array(parts); rows[at] = .object(order)
+        shop.orderRows = rows
+        // What `Order.Part.id` is for such a part: made up on each read.
+        let madeUp = "made-up-on-this-read"
+        let shown = try #require(job.parts.first)
+
+        #expect(shop.rawPart(job.id, partId: madeUp) == nil, "a made-up id finds nothing")
+        let raw = try #require(shop.rawPart(job.id, partId: madeUp, at: 0))
+        #expect(raw == part)
+        let o = EditPartSheet.opening(shown, raw: raw, spools: shop.spools)
+        #expect(o.hours != "0" && !o.hours.isEmpty, "it opened with no print time")
+        #expect(EditPartSheet.opening(shown, raw: nil, spools: shop.spools).hours != o.hours,
+                "found by id alone, the sheet opened it without its print time")
+
+        let draft = JobSheet.PartDraft(id: madeUp, storedId: madeUp, storedIndex: 0, name: o.name,
+                                       grams: o.grams, hours: o.hours, qty: o.qty, spoolId: o.spoolId, opened: o)
+        let same = await shop.partsForSave(job.id, drafts: [draft])
+        #expect(same == [.object(part)], "untouched: exactly the stored part, still with no id")
+
+        var renamed = draft
+        renamed.name = "Renamed"
+        let out = await shop.partsForSave(job.id, drafts: [renamed])
+        guard case .object(let after)? = out.first else { Issue.record("one part back"); return }
+        #expect(after["name"] == .string("Renamed"))
+        #expect(after["id"] == nil, "the borrowed id is not written into the book")
+        #expect(after["baseCost"] == part["baseCost"] && after["colour"] == part["colour"])
+        #expect(after["printTime"] == part["printTime"])
+    }
+
 }

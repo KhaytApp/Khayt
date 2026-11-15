@@ -1190,7 +1190,12 @@ extension Shop {
     }
 
     /// A part as the book holds it, every field.
-    func rawPart(_ orderId: Order.ID, partId: String) -> [String: JSONValue]? {
+    ///
+    /// `index` finds a part the book holds WITHOUT an id. The desktop's
+    /// calculator writes parts that way (`Order.Part.id` is made up on each
+    /// read for those), so the id finds nothing; its place in the job does.
+    /// Only a row that really has no id is taken by place.
+    func rawPart(_ orderId: Order.ID, partId: String, at index: Int? = nil) -> [String: JSONValue]? {
         guard case .object(let order)? = orderRows.first(where: {
             if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == orderId }
             return false
@@ -1198,6 +1203,8 @@ extension Shop {
         for row in rows {
             if case .object(let part) = row, case .string(let id)? = part["id"], id == partId { return part }
         }
+        if let index, rows.indices.contains(index), case .object(let part) = rows[index],
+           Self.plainString(part["id"]) == nil { return part }
         return nil
     }
 
