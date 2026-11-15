@@ -34,6 +34,7 @@
   "conv.fil_generic": "Genérico (auto)",
   "conv.fil_hint": "Elige el filamento cargado en cada ranura (de tu biblioteca de Snapmaker Orca):",
   "conv.fil_none": "Instala Snapmaker Orca para elegir filamentos; las ranuras usan Genérico por defecto.",
+  "conv.fil_packed": "Tu OrcaSlicer guarda los perfiles de Snapmaker en un archivo empaquetado que Khayt aún no puede leer. Mantén Snapmaker Orca instalado para elegir filamentos; las ranuras serán Genéricas.",
   "conv.print_quality": "Calidad de impresión",
   "conv.slicer_catalogue": "— Impresoras del slicer instalado —",
   "conv.printer_loading": "Leyendo perfil de impresora…",

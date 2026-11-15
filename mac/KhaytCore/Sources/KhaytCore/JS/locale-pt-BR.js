@@ -34,6 +34,7 @@
   "conv.fil_generic": "Genérico (automático)",
   "conv.fil_hint": "Escolha o filamento carregado em cada slot (da sua biblioteca do Snapmaker Orca):",
   "conv.fil_none": "Instale o Snapmaker Orca para escolher filamentos específicos; os slots usam Genérico por padrão.",
+  "conv.fil_packed": "Seu OrcaSlicer guarda os perfis da Snapmaker num arquivo compactado que o Khayt ainda não lê. Mantenha o Snapmaker Orca instalado para escolher filamentos; os slots ficam Genéricos.",
   "conv.print_quality": "Qualidade de impressão",
   "conv.slicer_catalogue": "— Impressoras dos fatiadores instalados —",
   "conv.printer_loading": "Lendo o perfil da impressora…",

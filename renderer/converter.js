@@ -671,7 +671,7 @@
         let bandEnabled = false, bandData = null;
 
         // Filament + process presets from the maker's installed Snapmaker Orca (loaded once, lazily).
-        let orcaFilaments = null, orcaProcesses = [], procPick = null, orcaLoaded = false, filPicks = {};
+        let orcaFilaments = null, orcaProcesses = [], procPick = null, orcaLoaded = false, filPicks = {}, orcaPacked = [];
         async function ensureOrcaFilaments() {
           if (orcaLoaded) return;
           orcaLoaded = true;
@@ -680,6 +680,7 @@
             orcaFilaments = (r && r.available && r.filaments) ? r.filaments : [];
             orcaProcesses = (r && r.available && r.processes) ? r.processes : [];
             procPick = (r && r.defaultProcess) || null;
+            orcaPacked = (r && Array.isArray(r.packed)) ? r.packed : [];
           } catch (_) { orcaFilaments = []; orcaProcesses = []; }
           paintFilaments();
         }
@@ -712,6 +713,9 @@
           };
           const dbNote = (orcaFilaments && orcaFilaments.length)
             ? (t('conv.fil_hint') || 'Pick the filament loaded in each slot (from your Snapmaker Orca library):')
+            // OrcaSlicer 2.5 keeps Snapmaker's profiles packed in one file Khayt cannot read (lib/orca-db.js
+            // packedOnlyVendors): say that, rather than "install" to someone who has a slicer installed.
+            : orcaPacked.includes('Snapmaker') ? t('conv.fil_packed')
             : (t('conv.fil_none') || 'Install Snapmaker Orca to pick specific filaments; slots default to Generic.');
           const rows = Array.from({ length: slotCount }, (_, i) =>
             `<label class="conv-fil-row"><span class="conv-fil-slot">${swatch(slotHex(i), 16)} ${escapeHtml((t('conv.slot') || 'Slot') + ' ' + (i + 1))}</span>
