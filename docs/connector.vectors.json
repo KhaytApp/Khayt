@@ -1,0 +1,341 @@
+{
+  "v": 1,
+  "about": "Shared vectors for reading per-slot filament figures out of sliced G-code. lib/gcode-parse.js (parseFilaments) and the Khayt for OrcaSlicer plugin's Python reader must both pass every case. Join `lines` with \\n to get the text. All figures are samples.",
+  "gcodeFilaments": [
+    {
+      "name": "orca-single-filament",
+      "lines": [
+        "; filament used [mm] = 4136.20",
+        "; filament used [cm3] = 9.95",
+        "; filament used [g] = 12.34",
+        "; filament cost = 0.25",
+        "; total filament used [g] = 12.34",
+        "; total filament cost = 0.25",
+        "; total layers count = 120",
+        "; estimated printing time (normal mode) = 1h 2m 5s",
+        "; CONFIG_BLOCK_START",
+        "; filament_colour = #FFFFFF",
+        "; filament_cost = 20",
+        "; filament_density = 1.24",
+        "; filament_settings_id = \"Generic PLA @U1\"",
+        "; filament_type = PLA",
+        "; CONFIG_BLOCK_END"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 12.34,
+          "cm3": 9.95,
+          "mm": 4136.2,
+          "cost": 0.25,
+          "type": "PLA",
+          "colour": "#FFFFFF",
+          "preset": "Generic PLA @U1",
+          "density": 1.24,
+          "costPerKg": 20
+        }
+      ],
+      "filamentGrams": 12.34
+    },
+    {
+      "name": "orca-four-slots-one-unused",
+      "lines": [
+        "; filament used [mm] = 4136.20, 0.00, 812.50, 95.10",
+        "; filament used [cm3] = 9.95, 0.00, 1.95, 0.23",
+        "; filament used [g] = 12.34, 0.00, 2.48, 0.29",
+        "; filament cost = 0.25, 0.00, 0.07, 0.01",
+        "; total filament used [g] = 15.11",
+        "; total filament cost = 0.33",
+        "; total filament change = 3",
+        "; estimated printing time (normal mode) = 3h 0m 0s",
+        "; CONFIG_BLOCK_START",
+        "; default_filament_colour = ;;;",
+        "; filament_colour = #FFFFFF;#000000;#ff8000;#1E90FF80",
+        "; filament_cost = 20,20,28.5,24",
+        "; filament_density = 1.24,1.24,1.27,1.24",
+        "; filament_settings_id = \"Generic PLA @U1\";\"Generic PLA @U1\";\"Generic PETG @U1\";\"Generic PLA @U1\"",
+        "; filament_type = PLA;PLA;PETG;PLA",
+        "; CONFIG_BLOCK_END"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 12.34,
+          "cm3": 9.95,
+          "mm": 4136.2,
+          "cost": 0.25,
+          "type": "PLA",
+          "colour": "#FFFFFF",
+          "preset": "Generic PLA @U1",
+          "density": 1.24,
+          "costPerKg": 20
+        },
+        {
+          "slot": 3,
+          "grams": 2.48,
+          "cm3": 1.95,
+          "mm": 812.5,
+          "cost": 0.07,
+          "type": "PETG",
+          "colour": "#FF8000",
+          "preset": "Generic PETG @U1",
+          "density": 1.27,
+          "costPerKg": 28.5
+        },
+        {
+          "slot": 4,
+          "grams": 0.29,
+          "cm3": 0.23,
+          "mm": 95.1,
+          "cost": 0.01,
+          "type": "PLA",
+          "colour": "#1E90FF80",
+          "preset": "Generic PLA @U1",
+          "density": 1.24,
+          "costPerKg": 24
+        }
+      ],
+      "filamentGrams": 15.11,
+      "note": "Slot 2 used nothing and is left out; slots 3 and 4 keep their numbers. An 8-digit colour keeps its alpha."
+    },
+    {
+      "name": "prusaslicer-footer",
+      "lines": [
+        "; filament used [mm] = 10027.94",
+        "; filament used [cm3] = 24.12",
+        "; filament used [g] = 29.91",
+        "; filament cost = 0.76",
+        "; total filament used [g] = 29.91",
+        "; total filament cost = 0.76",
+        "; estimated printing time (normal mode) = 2h 1m 22s",
+        "; prusaslicer_config = begin",
+        "; filament_colour = #FF8000",
+        "; filament_cost = 25.4",
+        "; filament_density = 1.24",
+        "; filament_settings_id = \"Generic PLA\"",
+        "; filament_type = PLA",
+        "; prusaslicer_config = end"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 29.91,
+          "cm3": 24.12,
+          "mm": 10027.94,
+          "cost": 0.76,
+          "type": "PLA",
+          "colour": "#FF8000",
+          "preset": "Generic PLA",
+          "density": 1.24,
+          "costPerKg": 25.4
+        }
+      ],
+      "filamentGrams": 29.91
+    },
+    {
+      "name": "preset-names-with-separators",
+      "lines": [
+        "; filament used [g] = 5.00, 6.50",
+        "; filament_settings_id = \"Shop PLA; white, matte\";\"He said \\\"black\\\" PETG\"",
+        "; filament_type = PLA;PETG"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 5,
+          "cm3": null,
+          "mm": null,
+          "cost": null,
+          "type": "PLA",
+          "colour": null,
+          "preset": "Shop PLA; white, matte",
+          "density": null,
+          "costPerKg": null
+        },
+        {
+          "slot": 2,
+          "grams": 6.5,
+          "cm3": null,
+          "mm": null,
+          "cost": null,
+          "type": "PETG",
+          "colour": null,
+          "preset": "He said \"black\" PETG",
+          "density": null,
+          "costPerKg": null
+        }
+      ],
+      "filamentGrams": 11.5,
+      "note": "A quoted name may hold ; and , and an escaped quote."
+    },
+    {
+      "name": "no-profile-volume-only",
+      "lines": [
+        "; filament used [mm] = 1492.61",
+        "; filament used [cm3] = 3.59",
+        "; filament used [g] = 0.00",
+        "; filament cost = 0.00",
+        "; total filament used [g] = 0.00"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": null,
+          "cm3": 3.59,
+          "mm": 1492.61,
+          "cost": 0,
+          "type": null,
+          "colour": null,
+          "preset": null,
+          "density": null,
+          "costPerKg": null
+        }
+      ],
+      "filamentGrams": null,
+      "note": "The slicer had no density, so it wrote 0 g for a slot that has a volume. grams is null, not 0."
+    },
+    {
+      "name": "lists-of-different-lengths",
+      "lines": [
+        "; filament used [mm] = 100.00, 200.00, 300.00",
+        "; filament used [g] = 1.00, 2.00",
+        "; filament_type = PLA",
+        "; filament_colour = #112233;not-a-colour;#445566",
+        "; filament_density = 1.24,x,1.3"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 1,
+          "cm3": null,
+          "mm": 100,
+          "cost": null,
+          "type": "PLA",
+          "colour": "#112233",
+          "preset": null,
+          "density": 1.24,
+          "costPerKg": null
+        },
+        {
+          "slot": 2,
+          "grams": 2,
+          "cm3": null,
+          "mm": 200,
+          "cost": null,
+          "type": null,
+          "colour": null,
+          "preset": null,
+          "density": null,
+          "costPerKg": null
+        },
+        {
+          "slot": 3,
+          "grams": null,
+          "cm3": null,
+          "mm": 300,
+          "cost": null,
+          "type": null,
+          "colour": "#445566",
+          "preset": null,
+          "density": 1.3,
+          "costPerKg": null
+        }
+      ],
+      "filamentGrams": 3,
+      "note": "A missing or unreadable entry is null for that slot; the others are kept."
+    },
+    {
+      "name": "bambu-header",
+      "lines": [
+        "; HEADER_BLOCK_START",
+        "; BambuStudio 01.09.07.52",
+        "; model printing time: 1h 2m 3s; total estimated time: 1h 8m 9s",
+        "; total filament length [mm] : 2345.67,123.45",
+        "; total filament volume [cm^3] : 5642.10,297.00",
+        "; total filament weight [g] : 7.11,0.37",
+        "; filament_density: 1.26,1.26",
+        "; HEADER_BLOCK_END",
+        "; CONFIG_BLOCK_START",
+        "; filament_colour = #00AE42;#F2754E",
+        "; filament_settings_id = \"Bambu PLA Basic @BBL X1C\";\"Bambu PLA Basic @BBL X1C\"",
+        "; filament_type = PLA;PLA",
+        "; CONFIG_BLOCK_END"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 7.11,
+          "cm3": null,
+          "mm": 2345.67,
+          "cost": null,
+          "type": "PLA",
+          "colour": "#00AE42",
+          "preset": "Bambu PLA Basic @BBL X1C",
+          "density": 1.26,
+          "costPerKg": null
+        },
+        {
+          "slot": 2,
+          "grams": 0.37,
+          "cm3": null,
+          "mm": 123.45,
+          "cost": null,
+          "type": "PLA",
+          "colour": "#F2754E",
+          "preset": "Bambu PLA Basic @BBL X1C",
+          "density": 1.26,
+          "costPerKg": null
+        }
+      ],
+      "filamentGrams": 7.48,
+      "note": "Hand-written from the Bambu Studio header layout, not from a real slice. The volume line is not read."
+    },
+    {
+      "name": "cura-no-lists",
+      "lines": [
+        ";FLAVOR:Marlin",
+        ";TIME:3600",
+        ";Filament used: 1.23456m",
+        ";Generated with Cura_SteamEngine 5.4.0"
+      ],
+      "filaments": [],
+      "filamentGrams": null,
+      "note": "No per-filament lists, so the breakdown is empty."
+    },
+    {
+      "name": "crlf-line-endings",
+      "lines": [
+        "; filament used [g] = 3.50, 0.00, 1.25\r",
+        "; filament_type = ABS;ABS;ASA\r",
+        "; filament_colour = #000000;#111111;#222222\r"
+      ],
+      "filaments": [
+        {
+          "slot": 1,
+          "grams": 3.5,
+          "cm3": null,
+          "mm": null,
+          "cost": null,
+          "type": "ABS",
+          "colour": "#000000",
+          "preset": null,
+          "density": null,
+          "costPerKg": null
+        },
+        {
+          "slot": 3,
+          "grams": 1.25,
+          "cm3": null,
+          "mm": null,
+          "cost": null,
+          "type": "ASA",
+          "colour": "#222222",
+          "preset": null,
+          "density": null,
+          "costPerKg": null
+        }
+      ],
+      "filamentGrams": 4.75
+    }
+  ]
+}

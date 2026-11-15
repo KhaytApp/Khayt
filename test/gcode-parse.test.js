@@ -92,7 +92,7 @@ test('empty / nullish input is safe', () => {
   // The full shape, so a field added here has to be added deliberately.
   const empty = {
     printTimeMins: null, filamentGrams: null, filamentGramsDerived: false,
-    filamentCm3: null, filamentType: null, filamentCost: null, slicer: null,
+    filamentCm3: null, filamentType: null, filamentCost: null, filaments: [], slicer: null,
   };
   assert.deepEqual(parseGcodeText(''), empty);
   assert.deepEqual(parseGcodeText(null), empty);
@@ -190,4 +190,53 @@ test('no density means no derived weight — the old behaviour is unchanged', ()
 test('mm3 is accepted as well as cm3', () => {
   const mm3 = PROFILELESS.replace('filament used [cm3] = 3.59', 'filament used [mm3] = 3590');
   assert.equal(parseGcodeText(mm3, { densityGPerCm3: 1.24 }).filamentGrams, 4.45);
+});
+
+// ---- Per-slot figures: docs/connector.vectors.json ------------------------
+// The same file is read by the OrcaSlicer plugin's Python reader, so a case
+// added here is a case both readers have to agree on.
+const VECTORS = require('../docs/connector.vectors.json');
+
+test('per-slot vectors: every case reads as written', () => {
+  const { parseFilaments } = require('../lib/gcode-parse.js');
+  assert.ok(VECTORS.gcodeFilaments.length >= 9);
+  for (const v of VECTORS.gcodeFilaments) {
+    const text = v.lines.join('\n');
+    assert.deepEqual(parseFilaments(text), v.filaments, v.name);
+    const whole = parseGcodeText(text);
+    assert.deepEqual(whole.filaments, v.filaments, v.name + ' (through parseGcodeText)');
+    // The total a caller has always read is untouched by the breakdown.
+    if (v.filamentGrams == null) assert.equal(whole.filamentGrams, null, v.name);
+    else assert.ok(Math.abs(whole.filamentGrams - v.filamentGrams) < 1e-9, v.name + ' total');
+  }
+});
+
+test('per-slot vectors span their cases', () => {
+  // A vector file where every case is one white PLA slot proves nothing.
+  const all = VECTORS.gcodeFilaments;
+  const slots = all.flatMap((v) => v.filaments);
+  assert.ok(all.some((v) => v.filaments.length === 0), 'a file with no breakdown');
+  assert.ok(all.some((v) => v.filaments.length >= 3), 'a multi-filament print');
+  assert.ok(all.some((v) => v.filaments.some((f, i) => f.slot !== i + 1)), 'a skipped slot keeps the numbering');
+  assert.ok(slots.some((f) => f.grams == null && f.cm3 > 0), 'a slot the slicer could not weigh');
+  assert.ok(slots.some((f) => f.preset && /[;,"]/.test(f.preset)), 'a preset name holding a separator');
+  assert.ok(slots.some((f) => f.colour == null) && slots.some((f) => f.colour), 'colour present and absent');
+  assert.ok(new Set(slots.map((f) => f.type)).size >= 4, 'several materials');
+  for (const f of slots) {
+    assert.deepEqual(Object.keys(f), ['slot', 'grams', 'cm3', 'mm', 'cost', 'type', 'colour', 'preset', 'density', 'costPerKg']);
+  }
+});
+
+test('per-slot grams add up to the total the slicer wrote', () => {
+  for (const v of VECTORS.gcodeFilaments) {
+    if (v.filamentGrams == null || !v.filaments.length) continue;
+    const sum = v.filaments.reduce((a, f) => a + (f.grams || 0), 0);
+    assert.ok(Math.abs(sum - v.filamentGrams) < 0.011, v.name + ': ' + sum + ' vs ' + v.filamentGrams);
+  }
+});
+
+test('per-slot: a config key that only ends like ours is not read', () => {
+  const { parseFilaments } = require('../lib/gcode-parse.js');
+  const r = parseFilaments('; filament used [g] = 2.00\n; default_filament_colour = #ABCDEF\n; total filament cost = 9\n; G1 X1 ; filament_type = NOPE');
+  assert.deepEqual(r, [{ slot: 1, grams: 2, cm3: null, mm: null, cost: null, type: null, colour: null, preset: null, density: null, costPerKg: null }]);
 });
