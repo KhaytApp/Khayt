@@ -3480,6 +3480,7 @@ async function captureFailurePhoto(orderId) {
     runPaymentEffects,
     renderOeExtraLinesHtml,
     openOrderEditor,
+    oeCustomerReasonText,
     openBatchPlannerModal,
     openOrderTimeline,
     duplicateOrder,

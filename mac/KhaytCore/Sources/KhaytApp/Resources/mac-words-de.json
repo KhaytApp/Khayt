@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "Noch nicht eingestuft (kein Preis oder keine Druckstunden): {n}",
  "mac.preferences": "Einstellungen",
  "mac.price": "Preis",
+ "mac.more_pricing": "Weitere Preisoptionen",
  "mac.price_history": "An Lieferanten gezahlter Preis",
  "mac.price_history_sub": "Pro Einheit, der letzte Einkauf im Protokoll.",
  "mac.price_kept": "Gespeicherter Preis beibehalten; die heutigen Kosten ergeben {now}",

@@ -5081,6 +5081,7 @@ final class Words {
         "mac.times_ordered": ["en": "Orders",       "ar": "الطلبات"],
         "mac.unnamed":       ["en": "(no name yet)", "ar": "(بلا اسم بعد)"],
         "mac.price":         ["en": "Price",        "ar": "السعر"],
+        "mac.more_pricing":  ["en": "More pricing", "ar": "خيارات تسعير أخرى"],
         "mac.engine_failed": ["en": "The shared rules did not load",
                               "ar": "لم تُحمَّل القواعد المشتركة"],
         "mac.last_crash":    ["en": "It stopped unexpectedly last time",

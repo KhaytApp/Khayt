@@ -1432,4 +1432,4 @@
 "job.blocked.other" = "No se puede desde aquí";
 "job.pill.paid" = "Pagado";
 "mac.parts_paid_exceeds" = "Este cambio dejaría la factura por debajo de lo pagado. Reembolse la diferencia o emita una nota de crédito primero.";
-"mac.margin" = "Margen";
+"mac.markup" = "Recargo";

@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "Pas encore classés (sans prix ou sans heures d’impression) : {n}",
  "mac.preferences": "Préférences",
  "mac.price": "Prix",
+ "mac.more_pricing": "Plus d’options de prix",
  "mac.price_history": "Prix payé aux fournisseurs",
  "mac.price_history_sub": "Par unité, le dernier achat du journal.",
  "mac.price_kept": "Prix enregistré conservé ; les coûts d’aujourd’hui donnent {now}",
