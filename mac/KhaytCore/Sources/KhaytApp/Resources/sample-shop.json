@@ -260,7 +260,7 @@
      "printTime": 23.7389,
      "qty": 12,
      "unitCost": 52.71,
-     "baseCost": 52.71,
+     "baseCost": 632.52,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-dental-a"
@@ -270,7 +270,6 @@
    "price": 1343.24,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 632.52,
    "paymentStatus": "unpaid",
    "paidAmount": 0.0,
    "paymentMethod": null,
@@ -310,7 +309,7 @@
      "printTime": 19.9026,
      "qty": 2,
      "unitCost": 700,
-     "baseCost": 700,
+     "baseCost": 1400,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -370,7 +369,7 @@
      "printTime": 10.4705,
      "qty": 24,
      "unitCost": 75.21,
-     "baseCost": 75.21,
+     "baseCost": 1805.04,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -428,7 +427,7 @@
      "printTime": 6.1737,
      "qty": 4,
      "unitCost": 339.32,
-     "baseCost": 339.32,
+     "baseCost": 1357.28,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-king-7"
@@ -438,7 +437,6 @@
    "price": 2219.61,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1357.28,
    "paymentStatus": "partial",
    "paidAmount": 665.88,
    "paymentMethod": null,
@@ -489,7 +487,6 @@
    "price": 82.82,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 41.92,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -537,7 +534,6 @@
    "price": 237.47,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 118.08,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -769,7 +765,6 @@
    "price": 774.19,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 315.4,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -809,7 +804,7 @@
      "printTime": 18.0657,
      "qty": 24,
      "unitCost": 193.84,
-     "baseCost": 193.84,
+     "baseCost": 4652.16,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-dallah"
@@ -819,7 +814,6 @@
    "price": 13615.06,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 4652.16,
    "paymentStatus": "partial",
    "paidAmount": 9076.71,
    "paymentMethod": null,
@@ -886,7 +880,7 @@
      "printTime": 3.0843,
      "qty": 24,
      "unitCost": 202.44,
-     "baseCost": 202.44,
+     "baseCost": 4858.56,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -949,7 +943,7 @@
      "printTime": 12.9201,
      "qty": 24,
      "unitCost": 159.85,
-     "baseCost": 159.85,
+     "baseCost": 3836.4,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1004,7 +998,7 @@
      "printTime": 23.6242,
      "qty": 4,
      "unitCost": 306.65,
-     "baseCost": 306.65,
+     "baseCost": 1226.6,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1013,7 +1007,6 @@
    "price": 2774.95,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1226.6,
    "paymentStatus": "partial",
    "paidAmount": 832.48,
    "paymentMethod": null,
@@ -1051,7 +1044,7 @@
      "printTime": 8.7755,
      "qty": 4,
      "unitCost": 81.92,
-     "baseCost": 81.92,
+     "baseCost": 327.68,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1167,7 +1160,7 @@
      "printTime": 7.883,
      "qty": 24,
      "unitCost": 121.15,
-     "baseCost": 121.15,
+     "baseCost": 2907.6,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-gripper"
@@ -1298,7 +1291,7 @@
      "printTime": 18.7984,
      "qty": 6,
      "unitCost": 326.62,
-     "baseCost": 326.62,
+     "baseCost": 1959.72,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1307,7 +1300,6 @@
    "price": 5550.1,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1959.72,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -1346,7 +1338,7 @@
      "printTime": 18.4347,
      "qty": 6,
      "unitCost": 191.78,
-     "baseCost": 191.78,
+     "baseCost": 1150.68,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-bracket"
@@ -1356,7 +1348,6 @@
    "price": 3802.16,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1150.68,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -1396,7 +1387,7 @@
      "printTime": 25.5548,
      "qty": 2,
      "unitCost": 219.43,
-     "baseCost": 219.43,
+     "baseCost": 438.86,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-dental-a"
@@ -1455,7 +1446,7 @@
      "printTime": 22.3657,
      "qty": 2,
      "unitCost": 307.79,
-     "baseCost": 307.79,
+     "baseCost": 615.58,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1519,7 +1510,7 @@
      "printTime": 1.6846,
      "qty": 12,
      "unitCost": 265.37,
-     "baseCost": 265.37,
+     "baseCost": 3184.44,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1571,7 +1562,7 @@
      "printTime": 14.8811,
      "qty": 24,
      "unitCost": 322.53,
-     "baseCost": 322.53,
+     "baseCost": 7740.72,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-king-7"
@@ -1581,7 +1572,6 @@
    "price": 19248.43,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 7740.72,
    "paymentStatus": "partial",
    "paidAmount": 9624.22,
    "paymentMethod": null,
@@ -1622,7 +1612,7 @@
      "printTime": 14.0105,
      "qty": 4,
      "unitCost": 118.37,
-     "baseCost": 118.37,
+     "baseCost": 473.48,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1631,7 +1621,6 @@
    "price": 1082.47,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 473.48,
    "paymentStatus": "partial",
    "paidAmount": 541.24,
    "paymentMethod": null,
@@ -1670,7 +1659,7 @@
      "printTime": 5.0026,
      "qty": 12,
      "unitCost": 26.94,
-     "baseCost": 26.94,
+     "baseCost": 323.28,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1854,7 +1843,7 @@
      "printTime": 21.5945,
      "qty": 4,
      "unitCost": 249.1,
-     "baseCost": 249.1,
+     "baseCost": 996.4,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1906,7 +1895,7 @@
      "printTime": 16.6227,
      "qty": 2,
      "unitCost": 188.54,
-     "baseCost": 188.54,
+     "baseCost": 377.08,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -1956,7 +1945,7 @@
      "printTime": 3.2448,
      "qty": 2,
      "unitCost": 303.79,
-     "baseCost": 303.79,
+     "baseCost": 607.58,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-dallah"
@@ -2022,7 +2011,6 @@
    "price": 128.48,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 48.93,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -2062,7 +2050,7 @@
      "printTime": 5.1468,
      "qty": 24,
      "unitCost": 52.19,
-     "baseCost": 52.19,
+     "baseCost": 1252.56,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -2071,7 +2059,6 @@
    "price": 2088.5,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1252.56,
    "paymentStatus": "partial",
    "paidAmount": 1044.25,
    "paymentMethod": null,
@@ -2111,7 +2098,7 @@
      "printTime": 6.0941,
      "qty": 24,
      "unitCost": 42.99,
-     "baseCost": 42.99,
+     "baseCost": 1031.76,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -2120,7 +2107,6 @@
    "price": 1830.43,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1031.76,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -2160,7 +2146,7 @@
      "printTime": 13.7165,
      "qty": 12,
      "unitCost": 164.17,
-     "baseCost": 164.17,
+     "baseCost": 1970.04,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -2213,7 +2199,7 @@
      "printTime": 3.7301,
      "qty": 12,
      "unitCost": 201.44,
-     "baseCost": 201.44,
+     "baseCost": 2417.28,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-lantern"
@@ -2272,7 +2258,7 @@
      "printTime": 2.5779,
      "qty": 6,
      "unitCost": 301.31,
-     "baseCost": 301.31,
+     "baseCost": 1807.86,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-gripper"
@@ -2282,7 +2268,6 @@
    "price": 5153.55,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 1807.86,
    "paymentStatus": "partial",
    "paidAmount": 2576.78,
    "paymentMethod": null,
@@ -2331,7 +2316,6 @@
    "price": 306.08,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 92.74,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -2371,7 +2355,7 @@
      "printTime": 7.2672,
      "qty": 2,
      "unitCost": 243.8,
-     "baseCost": 243.8,
+     "baseCost": 487.6,
      "layerHeight": 0.2,
      "infill": null
     }
@@ -2380,7 +2364,6 @@
    "price": 1448.72,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 487.6,
    "paymentStatus": "unpaid",
    "paidAmount": 0.0,
    "paymentMethod": null,
@@ -2420,7 +2403,7 @@
      "printTime": 25.8766,
      "qty": 4,
      "unitCost": 98.79,
-     "baseCost": 98.79,
+     "baseCost": 395.16,
      "layerHeight": 0.2,
      "infill": null,
      "printFileId": "PF-sample-bracket"
@@ -2430,7 +2413,6 @@
    "price": 1276.43,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 395.16,
    "paymentStatus": "unpaid",
    "paidAmount": 0,
    "paymentMethod": null,
@@ -2479,7 +2461,6 @@
    "price": 468.52,
    "priceBeforeDiscount": null,
    "currency": "SAR",
-   "costBasis": 142.43,
    "paymentStatus": "partial",
    "paidAmount": 234.26,
    "paymentMethod": null,
