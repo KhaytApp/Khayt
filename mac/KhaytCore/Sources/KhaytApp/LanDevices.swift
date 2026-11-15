@@ -81,6 +81,7 @@ final class LanDevices: @unchecked Sendable {
         let sig: String
     }
 
+    /// Per kind: 32 phones and 32 connectors at most.
     static let maxDevices = 32
     /// Signed-out ids remembered; the oldest go first. An id is random, so a
     /// forgotten one is only a phone told `device-unknown` instead.
@@ -271,8 +272,13 @@ final class LanDevices: @unchecked Sendable {
         let current = tag(pin)
         // Anything enrolled under another PIN is gone now, not when next seen.
         saved.devices.removeAll { $0.pinTag != current || $0.id == deviceId }
-        while saved.devices.count >= Self.maxDevices,
-              let oldest = saved.devices.indices.min(by: { saved.devices[$0].lastSeenAt < saved.devices[$1].lastSeenAt }) {
+        // A full store makes room within the SAME kind: a connector never
+        // pushes out a phone (the shop would find it unpaired with no reason
+        // shown), and a phone never pushes out a connector. Mac review, Nov 15.
+        func sameKind(_ i: Int) -> Bool { saved.devices[i].kind == kind }
+        while saved.devices.indices.filter(sameKind).count >= Self.maxDevices,
+              let oldest = saved.devices.indices.filter(sameKind)
+                .min(by: { saved.devices[$0].lastSeenAt < saved.devices[$1].lastSeenAt }) {
             seen.removeValue(forKey: saved.devices[oldest].id)
             saved.devices.remove(at: oldest)
         }

@@ -2399,12 +2399,15 @@ final class LanServer {
     /// phone can say "wait" rather than "wrong PIN".
     /// 403 `connector-scope` when the request names an enrolled connector
     /// (`LanDevices.isRestricted`) and asks for anything outside
-    /// `/api/connectors/`. Judged on the id alone, before any signature or
-    /// route: whether the signature is good, a connector's key never opens
-    /// the book. Run before every route and again in `pinGate`, which the
+    /// `/api/connectors/`. Judged on the id alone, whenever the header names
+    /// one, before any signature or route: whether the signature is good, a
+    /// connector's key never opens the book. `request.path` arrives
+    /// percent-decoded (`URLComponents.path`), so `%2e%2e` is `..` here.
+    /// When pairing adds real `/api/connectors/` routes, they match exact
+    /// paths, never a prefix. Run before every route and again in `pinGate`, which the
     /// large-upload heads call before `route` ever sees the request.
     func connectorRefusal(_ headers: [String: String], path: String) -> Response? {
-        guard LanDevices.isSigned(headers), let id = headers["x-khayt-device"],
+        guard let id = headers["x-khayt-device"],
               LanDevices.isRestricted(kind: host.devices.kind(of: id)) else { return nil }
         if path.hasPrefix(LanDevices.connectorPrefix), !path.contains("/../"), !path.hasSuffix("/..") {
             return nil

@@ -105,6 +105,11 @@ struct LanConnectorScopeTests {
         #expect(reply.status == 403 && reply.text.contains("connector-scope"))
         let dotted = try await bench.get("/api/connectors/../store", headers: headers)
         #expect(dotted.status != 200, "a dotted path does not climb out of /api/connectors")
+        let encoded = try await bench.get("/api/connectors/%2e%2e/store", headers: headers)
+        #expect(encoded.status != 200, "nor an encoded one")
+        // Unsigned but naming a connector: refused all the same (fail closed).
+        let bare = try await bench.get("/api/store", headers: ["x-khayt-device": connector.id, "x-khayt-pin": Self.pin])
+        #expect(bare.status == 403 && bare.text.contains("connector-scope"))
     }
 
     @Test("a large upload is refused from its head, before the body is read")
@@ -130,6 +135,25 @@ struct LanConnectorScopeTests {
             let reply = try await bench.get(path, headers: connector.headers("GET", path, Data(), time: now))
             #expect(!reply.text.contains("connector-scope"), "\(path) answered \(reply.status) \(reply.text)")
         }
+    }
+
+    @Test("a full store makes room within a kind: a connector never unpairs a phone")
+    func evictionStaysWithinAKind() throws {
+        let devices = LanDevices.inMemory()
+        var phones: [Signer] = []
+        for i in 0..<LanDevices.maxDevices { phones.append(try Self.enrol(devices, kind: nil, name: "Phone \(i)")) }
+        let connector = try Self.enrol(devices, kind: LanDevices.kindConnector, name: "Orca")
+        let now = LanServerTests.Bench.start
+        for var phone in phones {
+            let h = phone.headers("GET", "/api/store", Data(), time: Int(now.timeIntervalSince1970))
+            #expect(devices.verify(headers: h, method: "GET", target: "/api/store", body: Data(),
+                                   pin: Self.pin, now: now) == .pass, "\(phone.id) still verifies")
+        }
+        #expect(devices.kind(of: connector.id) == LanDevices.kindConnector)
+        // And the other way: a 33rd phone pushes out a phone, not the connector.
+        _ = try Self.enrol(devices, kind: nil, name: "Phone 33")
+        #expect(devices.kind(of: connector.id) == LanDevices.kindConnector)
+        #expect(devices.list().filter { $0.kind == nil }.count == LanDevices.maxDevices)
     }
 
     @Test("kinds: a phone saved before kinds existed is a phone; an unknown kind fails closed; Paired phones lists phones only")
