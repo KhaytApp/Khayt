@@ -1003,6 +1003,7 @@ final class LanServer {
            let bearer = ApiTokens.bearer(from: request.headers["authorization"]) {
             if let refused = await apiTokenGate(&request, bearer: bearer, path: path) { return refused }
         }
+        if let refused = connectorRefusal(request.headers, path: path) { return refused }
         if let answered = await restRoute(request, path: path, isGet: isGet) { return answered }
 
         switch (path, isGet) {
@@ -2396,6 +2397,32 @@ final class LanServer {
     /// Nil when no PIN was sent; `.some(nil)` when it opens; `.some(refusal)`
     /// with `pinGate`'s answer when it does not — 429 when locked out, so the
     /// phone can say "wait" rather than "wrong PIN".
+    /// 403 `connector-scope` when the request names an enrolled connector
+    /// (`LanDevices.isRestricted`) and asks for anything outside
+    /// `/api/connectors/`. Judged on the id alone, whenever the header names
+    /// one, before any signature or route: whether the signature is good, a
+    /// connector's key never opens the book. `request.path` arrives
+    /// percent-decoded (`URLComponents.path`), so `%2e%2e` is `..` here.
+    /// When pairing adds real `/api/connectors/` routes, they match exact
+    /// paths, never a prefix. Run before every route and again in `pinGate`, which the
+    /// large-upload heads call before `route` ever sees the request.
+    func connectorRefusal(_ headers: [String: String], path: String) -> Response? {
+        guard let id = headers["x-khayt-device"],
+              LanDevices.isRestricted(kind: host.devices.kind(of: id)) else { return nil }
+        if path.hasPrefix(LanDevices.connectorPrefix), !path.contains("/../"), !path.hasSuffix("/..") {
+            return nil
+        }
+        return .json(403, #"{"ok":false,"reason":"connector-scope"}"#)
+    }
+
+    /// `route`'s own spelling of a path: no trailing slash, `/v1` as `/api`.
+    nonisolated static func routePath(_ raw: String) -> String {
+        var path = raw
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        if path == "/v1" || path.hasPrefix("/v1/") { path = "/api" + path.dropFirst(3) }
+        return path
+    }
+
     private func ownerPinRefusal(_ request: Request) async -> Response?? {
         guard request.headers["x-khayt-pin"] != nil || LanDevices.isSigned(request.headers) else { return nil }
         return .some(await pinGate(request))
@@ -2444,6 +2471,7 @@ final class LanServer {
         guard !Self.pinTooShort(host.pin) else {
             return .json(401, #"{"reason":"pin-too-short","error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
         }
+        if let refused = connectorRefusal(request.headers, path: Self.routePath(request.path)) { return refused }
         if formPin == nil, LanDevices.isSigned(request.headers) {
             let verdict = host.devices.verify(headers: request.headers, method: request.method,
                                               target: request.target.isEmpty ? request.path : request.target,
