@@ -26,16 +26,13 @@ struct NewJobPreviewParityTests {
         return .object(p)
     }
 
-    static let clients: [JSONValue] = [.object(["id": .string("C-EUR"), "currency": .string("EUR")])]
+    static let clients: [JSONValue] = [.object(["id": .string("C-EUR"), "currency": .string("EUR")]),
+                                       .object(["id": .string("C-USD"), "currency": .string("USD")])]
     static let settings: [String: JSONValue] = [
         "currency": .string("SAR"), "invNumNext": .number(7), "quoteNumNext": .number(3),
-        "rushFeePct": .number(25), "currencyRates": .object(["EUR": .number(4)])]
-    // NOTE: the desktop's vectors set `currencyRates`, but the rule reads
-    // `exchangeRates` (`jobCurrency`), so its "another currency" cart has no
-    // rate and is priced in the shop's. Kept as it is, to stay the desktop's
-    // case; `aCustomerAbroad` below is the one with a real rate.
+        "rushFeePct": .number(25), "exchangeRates": .object(["EUR": .number(4)])]
 
-    /// The desktop's nine carts, and what its own run of them comes to (the
+    /// The desktop's carts (`test/order-new-preview.test.js`, with #2492's currency fix), and what its own run of them comes to (the
     /// job's price), so a change to either app's arithmetic is caught here.
     static let cases: [(name: String, input: [String: JSONValue])] = [
         ("plain", ["parts": .array([part()]), "margin": .number(30)]),
@@ -52,6 +49,8 @@ struct NewJobPreviewParityTests {
                                   .object(["label": .string("Fee"), "pct": .number(5)])])]),
         ("a customer in another currency", ["parts": .array([part()]), "margin": .number(30),
                                             "clientId": .string("C-EUR")]),
+        ("a customer in a currency with no rate", ["parts": .array([part()]), "margin": .number(30),
+                                                   "clientId": .string("C-USD")]),
         ("the overhead line", ["parts": .array([part()]), "margin": .number(30), "overheadPerHour": .number(3)]),
     ]
 
@@ -89,25 +88,12 @@ struct NewJobPreviewParityTests {
         #expect(typed.total == 99)
         #expect(typed.quote.priceSource == "override")
         #expect(agreed.total == 126, "70 agreed, and 40 at 40%")
-        #expect(plain.currency == nil, "a job in the shop's own currency carries none")
-        let noRate = try await total("a customer in another currency")
-        #expect(noRate.total == 52 && noRate.currency == "SAR", "no rate on file: priced in the shop's currency, and said")
-    }
-
-    @Test("a customer kept in euros with a rate on file is previewed in euros, at the price recorded")
-    func aCustomerAbroad() async throws {
-        let engine = try KhaytEngine()
-        var settings = Self.settings
-        settings["exchangeRates"] = .object(["EUR": .number(0.25)])
-        let input: [String: JSONValue] = ["parts": .array([Self.part()]), "margin": .number(30), "clientId": .string("C-EUR")]
-        let shown = try await engine.previewNewOrder(input, settings: settings, clients: Self.clients)
-        #expect(shown.currency == "EUR" && shown.total == 208)
-        let made = try await engine.newOrder(input, orders: [], settings: settings, now: Date(),
-                                             tokens: (tracking: [UInt8](repeating: 0, count: 16),
-                                                      quoteApproval: [UInt8](repeating: 0, count: 16)),
-                                             clients: Self.clients)
-        let record = try #require(Shop.asObject(made.order))
-        #expect(Shop.plainNumber(record["price"]) == 208 && Shop.plainString(record["currency"]) == "EUR")
+        // The three outcomes the desktop pins (#2492) for the same job.
+        #expect(plain.currency == nil && plain.total == 52, "the shop's own currency carries none")
+        let euro = try await total("a customer in another currency")
+        #expect(euro.currency == "EUR" && euro.total == 13, "52 SAR at 4 SAR to the euro")
+        let noRate = try await total("a customer in a currency with no rate")
+        #expect(noRate.currency == "SAR" && noRate.total == 52, "no rate on file: the shop's currency, and said")
     }
 
     @Test("showing the total allocates nothing")
