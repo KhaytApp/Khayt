@@ -139,27 +139,13 @@ function logPrint(asQuote = false) {
     now: new Date(),
     tokens: { tracking: bytes(N.TOKEN_BYTES), quoteApproval: bytes(N.TOKEN_BYTES), id: bytes(4) },
   });
-  // The counters it advanced are the shop's, and an allocation nobody wrote
-  // down hands the same invoice number to the next job.
-  saveAll();
-  printLog.unshift(entry);
-  // A new job is new hours in the log the overhead rate is measured from.
-  if (typeof clearOverheadCache === 'function') clearOverheadCache();
-  // Names the rest of this function still reads.
-  const finalPrice = entry.price;
-  const id = entry.id;
-  const project = entry.project;
-  const totalPrintTime = entry.printTime;
-
-  // Linked reprint: stamp reprintOf/reason/cost/chain onto this new order and
-  // back-reference the original (never re-deducts the original's material).
-  if (pendingReprintMeta && !asQuote) {
-    applyReprintMeta(printLog[0], pendingReprintMeta, printLog);
-  }
+  const reprint = pendingReprintMeta;
   pendingReprintMeta = null;
-
-  if (typeof logActivity === 'function') logActivity(asQuote ? 'quote_created' : 'order_created', `${id}${project ? ' · ' + project : ''}`, id);
-  saveAll();
+  recordNewJob(entry, asQuote, {
+    // Linked reprint: stamp reprintOf/reason/cost/chain onto this new order and
+    // back-reference the original (never re-deducts the original's material).
+    afterInsert: reprint && !asQuote ? (job) => applyReprintMeta(job, reprint, printLog) : null,
+  });
 
   currentBuild = [];
   currentBuildFromProductId = null;
@@ -189,19 +175,39 @@ function logPrint(asQuote = false) {
   if (rush) rush.checked = false;
   const tierStrip = $('#priceTiersStrip');
   if (tierStrip) tierStrip.style.display = 'none';
+}
 
+/**
+ * Record a job `lib/order-new.js newOrder` has just made: into the book, the
+ * activity log, every view, and out to the shop's webhooks (and, for a quote
+ * the shop sends by itself, the customer's email). The ONE way the desktop
+ * records a new job — the calculator's Log and the New Job sheet
+ * (renderer/job-sheet.js) both end here, so neither can skip a step.
+ *
+ * `opts.afterInsert(job)` runs once the job is in the book, before it is
+ * saved and announced (the calculator stamps a linked reprint there).
+ */
+function recordNewJob(entry, asQuote, opts) {
+  // The counters newOrder advanced are the shop's, and an allocation nobody
+  // wrote down hands the same invoice number to the next job.
+  saveAll();
+  printLog.unshift(entry);
+  // A new job is new hours in the log the overhead rate is measured from.
+  if (typeof clearOverheadCache === 'function') clearOverheadCache();
+  if (opts && typeof opts.afterInsert === 'function') opts.afterInsert(entry);
+  const id = entry.id;
+  const project = entry.project;
+  if (typeof logActivity === 'function') logActivity(asQuote ? 'quote_created' : 'order_created', `${id}${project ? ' · ' + project : ''}`, id);
+  saveAll();
   toast(asQuote ? t('quote.saved') : t('calc.quote.saved'), 'success');
   renderLogs();
   renderKanban();
   renderAnalytics();
   renderDashboard();
   // Round 12 — Webhook: order_created
-  const newOrder = printLog[0];
-  if (newOrder) {
-    fireStatusWebhook('order_created', newOrder);
-    fireOrderWebhook('created', newOrder);
-    if (asQuote) autoSendEmailNotification(newOrder, 'quote');
-  }
+  fireStatusWebhook('order_created', entry);
+  fireOrderWebhook('created', entry);
+  if (asQuote) autoSendEmailNotification(entry, 'quote');
 }
 
 /* ============================================================
@@ -3481,6 +3487,7 @@ async function captureFailurePhoto(orderId) {
     renderOeExtraLinesHtml,
     openOrderEditor,
     oeCustomerReasonText,
+    recordNewJob,
     openBatchPlannerModal,
     openOrderTimeline,
     duplicateOrder,
