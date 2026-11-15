@@ -20,9 +20,10 @@
  *
  * Opened from the job page's Edit, and — with nothing in it — as the NEW JOB
  * sheet (Jobs › New job): the same three sections, the markup typed rather
- * than read, priced by `lib/order-new.js newOrder` (run on a copy of the
- * settings for the live total, since it advances the shop's counters), and
- * recorded through `recordNewJob`, the one way the desktop records a new job.
+ * than read. Whether it can be taken and the live total are the shared rules
+ * `lib/order-new.js canTake` and `previewTotal` (no number allocated); the job
+ * is `newOrder`'s, priced by the same arithmetic, and recorded through
+ * `recordNewJob`, the one way the desktop records a new job.
  */
 (function (global) {
   'use strict';
@@ -171,14 +172,15 @@
         discountPct: Math.min(100, Math.max(0, num(q('discountPct').value))),
         priceOverride: typed === '' ? null : Math.max(0, num(typed)),
         overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : 0,
+        priorityLevel: priority(),
         asQuote: !!asQuote,
       };
     }
-    /** newOrder writes the shop's counters into `settings`: a preview runs on a copy. */
-    function newJob(asQuote, preview) {
+    /** The job itself: newOrder allocates its number from the shop's counters. */
+    function newJob(asQuote) {
       const N = NEW();
       return N.newOrder(inputOf(asQuote), {
-        settings: preview ? JSON.parse(JSON.stringify(settings)) : settings,
+        settings,
         orders: list('printLog'),
         clients: list('clients'),
         now: new Date(),
@@ -192,8 +194,13 @@
     /** The rule's answer on a copy: the job as it would be, or why not. */
     function dryRun(extra) {
       if (isNew) {
-        if (!st.parts.length) return { verdict: { ok: false, reason: 'no_parts', step: 'parts' }, trial: order };
-        return { verdict: { ok: true }, trial: newJob(false, true) };
+        // The shared rules: whether it can be taken, and the total newOrder
+        // would record — with no number allocated (lib/order-new.js).
+        const input = inputOf(false);
+        const ready = NEW().canTake(input);
+        if (!ready.ok) return { verdict: { ok: false, reason: ready.reason, step: 'parts' }, trial: order };
+        const shown = NEW().previewTotal(input, { settings, clients: list('clients') });
+        return { verdict: { ok: true }, trial: { price: shown.total, currency: shown.currency, priceSource: shown.quote.priceSource } };
       }
       const trial = JSON.parse(JSON.stringify(order));
       const verdict = ED().applyJobEdit(trial, nextOf(), ctxOf(Object.assign({ keepPrice: st.keepPrice }, extra || {})));
@@ -318,9 +325,8 @@
 
     /** Take the job (or save it as a quote): newOrder, then the desktop's one way of recording a new job. */
     function create(asQuote) {
-      if (!st.parts.length) { refresh(); return false; }
-      const entry = newJob(asQuote, false);
-      Object.assign(entry, ED().priorityFrom(priority()));
+      if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
+      const entry = newJob(asQuote);
       if (typeof recordNewJob === 'function') recordNewJob(entry, asQuote);
       else { list('printLog').unshift(entry); saveAll(); }
       if (typeof openJobPage === 'function') setTimeout(() => openJobPage(entry.id), 0);
