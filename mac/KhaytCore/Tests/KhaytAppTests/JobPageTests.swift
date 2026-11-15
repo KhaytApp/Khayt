@@ -173,6 +173,22 @@ struct JobPageTests {
         #expect(MenuCoverageTests.source("OrdersTable.swift").contains("shop.openJobPage(id)"))
         #expect(MenuCoverageTests.source("Shop+GoTo.swift").contains("openJobPage(entry.id)"))
         #expect(MenuCoverageTests.source("Shop+StoreOrders.swift").contains("func goToJob(_ id: Order.ID) { openJobPage(id) }"))
+        // Today's rows, the ledger, a spending line and a scanned label too
+        // (Dev Hub, before beta.37): "open a job" behaves one way everywhere.
+        let dashboard = MenuCoverageTests.source("Dashboard.swift")
+        #expect(dashboard.components(separatedBy: "shop.openJobPage(").count - 1 == 3)
+        for (file, call) in [("Ledger.swift", "shop.openJobPage(order.id)"),
+                             ("TodayPieces.swift", "shop.openJobPage(order.id)"),
+                             ("Spending.swift", "shop.openJobPage(row.orderId)"),
+                             ("Shop+Jobs.swift", "openJobPage(job.id)")] {
+            #expect(MenuCoverageTests.source(file).contains(call), "\(file) opens a job its own way")
+        }
+        // And none of them still does it by hand: the table with a row chosen.
+        // (The dashboard and the board also go to Jobs with NO job, which is right.)
+        for file in ["Ledger.swift", "TodayPieces.swift", "Spending.swift"] {
+            #expect(!MenuCoverageTests.source(file).contains("shop.shelf = .jobs(nil)"),
+                    "\(file) goes to Jobs without opening the job")
+        }
     }
 
     @Test("⌘K and a khayt://job link open the page")

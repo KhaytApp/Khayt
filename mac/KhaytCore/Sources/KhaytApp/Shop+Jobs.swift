@@ -1483,12 +1483,11 @@ extension Shop {
                 match = orders.first { $0.id == id }
             }
             guard let job = match else { return words.callIt("scan.order_missing") }
-            // The search box narrows the table, and a job filtered out of it
-            // cannot be selected — so a scan that lands on a job the shop
-            // cannot see would look like a scan that did nothing.
-            search = ""
-            shelf = .jobs(nil)
-            selection = job.id
+            // The job's page. `openJobPage` clears the search first: a job
+            // filtered out of the list cannot be selected, and a scan that
+            // lands on a job the shop cannot see would look like a scan that
+            // did nothing.
+            openJobPage(job.id)
             return nil
         case "empty":
             return words.callIt("mac.scan_unknown")
