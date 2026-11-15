@@ -29,6 +29,9 @@ struct JobSheet: View {
         let id: String
         /// The stored part this is; nil for one added here.
         var storedId: String?
+        /// Its place among the job's parts as it opened: how a part the book
+        /// holds with no id is found again (`Shop.rawPart(_:partId:at:)`).
+        var storedIndex: Int?
         var name = ""
         var grams = ""
         var hours = ""
@@ -384,9 +387,11 @@ struct JobSheet: View {
         was.discount = Self.percent(Shop.plainNumber(fields["discountPct"]) ?? 0)
         form = was
         opened = was
-        let drafts: [PartDraft] = (job?.parts ?? []).map { part in
-            let o = EditPartSheet.opening(part, raw: shop.rawPart(subject.id, partId: part.id), spools: shop.spools)
-            return PartDraft(id: part.id, storedId: part.id, name: o.name, grams: o.grams, hours: o.hours,
+        let drafts: [PartDraft] = (job?.parts ?? []).enumerated().map { index, part in
+            let o = EditPartSheet.opening(part, raw: shop.rawPart(subject.id, partId: part.id, at: index),
+                                          spools: shop.spools)
+            return PartDraft(id: part.id, storedId: part.id, storedIndex: index,
+                             name: o.name, grams: o.grams, hours: o.hours,
                              qty: o.qty, spoolId: o.spoolId, opened: o, delivered: part.delivered)
         }
         parts = drafts
