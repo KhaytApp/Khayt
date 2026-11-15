@@ -561,11 +561,10 @@ private struct JobCard: View {
         .liftsOnHover(hovering)
         .onHover { hovering = $0 }
         .onTapGesture {
-            // The board is for seeing; the table is for reading one job. A tap
-            // takes you there rather than opening a panel the board has no room
-            // for.
-            shop.selection = job.id
-            shop.shelf = .jobs(nil)
+            // The board is for seeing; a job's page is for reading one job. A
+            // tap takes you there rather than opening a panel the board has no
+            // room for.
+            shop.openJobPage(job.id)
         }
         .help(job.id)
         // A read-only book is not draggable at all. Offering the gesture and
