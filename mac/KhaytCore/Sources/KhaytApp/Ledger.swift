@@ -324,8 +324,7 @@ struct JobInspector: View {
         HStack(spacing: Space.sm) {
             Button {
                 if let order = shop.orders.first(where: { $0.id == row.id }) {
-                    shop.selection = order.id
-                    shop.shelf = .jobs(nil)
+                    shop.openJobPage(order.id)
                 }
             } label: {
                 Text(shop.words.callIt("mac.edit_job"))

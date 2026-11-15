@@ -1536,7 +1536,7 @@
  "mac.margin_at_least": "利润率",
  "mac.mark_all_not_business": "全部标记为非业务",
  "mac.mark_dried": "今日已烘干",
- "mac.markup": "加价",
+ "mac.markup": "加价率",
  "mac.material_ph": "PLA、PETG、树脂…",
  "mac.mb_bad_name": "该套件中包含一个 Khayt 不会解包的文件：{name}",
  "mac.mb_bundle_figures": "套件中的估算（另一家店铺的切片）：{figures}",
@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "尚未排名（无价格或无打印小时数）：{n}",
  "mac.preferences": "偏好设置",
  "mac.price": "价格",
+ "mac.more_pricing": "更多定价选项",
  "mac.price_history": "付给供应商的价格",
  "mac.price_history_sub": "每单位，取日志中最近一次采购。",
  "mac.price_kept": "已保留保存的价格；按今天的成本为 {now}",
@@ -3991,5 +3992,8 @@
  "mac.parts_keep_price": "保留原价",
  "mac.parts_use_new_price": "使用新价格",
  "mac.parts_remove": "移除零件…",
- "mac.parts_remove_q": "要从此任务中移除“{name}”吗？"
+ "mac.parts_remove_q": "要从此任务中移除“{name}”吗？",
+ "mac.js_margin_typed": "—，价格为手动输入",
+ "mac.js_more": "更多详情…",
+ "mac.js_new_total": "新合计"
 }

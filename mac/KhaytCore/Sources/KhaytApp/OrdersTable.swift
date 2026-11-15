@@ -209,9 +209,9 @@ struct OrdersTable: View {
                 JobActions(shop: shop, job: job)
             }
         } primaryAction: { ids in
-            // Double-click opens what a double-click opens everywhere else
-            // here: the thing itself.
-            if let id = ids.first { shop.showInvoice(id) }
+            // Double-click opens the job (Turki, Q5): its page, where the
+            // invoice is one of the things on it. It used to open the invoice.
+            if let id = ids.first { shop.openJobPage(id) }
         }
         // ⌫ asks to delete the chosen jobs — and says why when it may not.
         .onDeleteCommand { shop.askToDeleteFrontmost() }

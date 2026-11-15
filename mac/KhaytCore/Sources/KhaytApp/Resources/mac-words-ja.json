@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "まだランク付けされていません（価格または印刷時間なし）：{n} 件",
  "mac.preferences": "環境設定",
  "mac.price": "価格",
+ "mac.more_pricing": "その他の価格設定",
  "mac.price_history": "仕入先への支払価格",
  "mac.price_history_sub": "単位あたり、記録上の直近の購入価格です。",
  "mac.price_kept": "保存済みの価格を維持。現在のコストでは {now} になります",
@@ -3991,5 +3992,8 @@
  "mac.parts_keep_price": "価格を維持",
  "mac.parts_use_new_price": "新しい価格を使う",
  "mac.parts_remove": "パーツを削除…",
- "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？"
+ "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？",
+ "mac.js_margin_typed": "—、価格は手入力",
+ "mac.js_more": "詳細…",
+ "mac.js_new_total": "新しい合計"
 }

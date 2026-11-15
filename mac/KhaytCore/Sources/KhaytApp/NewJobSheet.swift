@@ -54,7 +54,10 @@ struct NewJobSheet: View {
     /// The part of the sheet that scrolls.
     var scrolled: some View {
         VStack(alignment: .leading, spacing: 16) {
-            who
+            VStack(alignment: .leading, spacing: 8) {
+                sectionTitle("mac.job")
+                who
+            }
             if let agreementNote {
                 Text(agreementNote).font(.caption).foregroundStyle(.secondary)
             }
@@ -69,7 +72,14 @@ struct NewJobSheet: View {
                 LicenceWarning(shop: shop, problems: problems)
             }
             cart
-            money
+            VStack(alignment: .leading, spacing: 8) {
+                sectionTitle("mac.price")
+                money
+            }
+            DisclosureGroup(shop.words.callIt("mac.more_pricing"), isExpanded: Binding(
+                get: { showMore || moreInUse }, set: { showMore = $0 })) {
+                morePricing.padding(.top, 8)
+            }
             // "Where the number came from", under the controls that move it.
             // The total itself is pinned below: see `pinnedTotal`.
             breakdown
@@ -111,6 +121,10 @@ struct NewJobSheet: View {
     @State private var shippingCost = 0.0
     @State private var deposit = 0.0
     @State private var rush = false
+    /// "More pricing", opened by hand. It is also open whenever `moreInUse`.
+    @State private var showMore = false
+    /// normal | high | urgent, as `lib/order-new.js newOrder` takes it.
+    @State private var priority = "normal"
     @State private var quoted: QuoteTotal?
     @State private var problem: String?
     /// Save found a part still in the fields and put it on the job; the next
@@ -365,10 +379,25 @@ struct NewJobSheet: View {
         .padding(18)
     }
 
+    /// A part field under its name.
+    private func named<Field: View>(_ key: String, @ViewBuilder _ field: () -> Field) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(shop.words.callIt(key)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            // One height for all five, so the names sit on one line: a picker
+            // is a few points shorter than a text field and its name dropped.
+            field().frame(height: 24)
+        }
+    }
+
+    /// A group's name over its fields, as `JobSheet.section` draws it.
+    private func sectionTitle(_ key: String) -> some View {
+        Text(shop.words.callIt(key)).sectionCaps(shop.words)
+    }
+
     private var who: some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
             GridRow {
-                Text(shop.words.callIt("mac.job")).gridColumnAlignment(.trailing)
+                Text(shop.words.callIt("common.name")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 TextField(shop.words.callIt("mac.what_is_it"), text: $project)
                     .textFieldStyle(.roundedBorder)
@@ -409,6 +438,21 @@ struct NewJobSheet: View {
                     .toggleStyle(.checkbox)
                 }
             }
+            // The same question Edit Job asks, in the same place (S1): New and
+            // Edit are one form. A quote is asked too; it keeps the answer
+            // when it becomes a job.
+            GridRow {
+                Text(shop.words.callIt("waiting.priority_label")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: $priority) {
+                    ForEach(Shop.priorityLevels, id: \.self) { level in
+                        Text(shop.words.callIt(EditJobSheet.wordFor(level))).tag(level)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
             GridRow {
                 Text(shop.words.callIt("common.notes")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
@@ -431,7 +475,7 @@ struct NewJobSheet: View {
 
     private var cart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(shop.words.callIt("mac.parts")).font(.subheadline.weight(.semibold))
+            sectionTitle("mac.parts")
 
             if nothingToCost, let product {
                 Text(shop.words.callIt("mac.product_not_costed",
@@ -603,38 +647,43 @@ struct NewJobSheet: View {
     /// far that "Machine time" wrapped one letter per line. The two groups ask
     /// about different things and have no reason to line up.
     private var partForm: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        // A LABEL OVER EACH FIELD (S1), the same five names Edit Job's parts
+        // carry. They were prompts inside the fields, which vanish the moment
+        // a figure is typed: "180" and "4" said nothing about which was grams.
+        // Return in either figure adds the part: the sheet's default button
+        // is greyed out until there is one.
+        HStack(alignment: .bottom, spacing: 8) {
+            named("pe.part") {
                 TextField(shop.words.callIt("mac.a_part"), text: $draft.name)
-                    .textFieldStyle(.roundedBorder)
-                Picker("", selection: $draft.spoolId) {
-                    Text(shop.words.callIt("mac.filament")).tag(String?.none)
+                    .textFieldStyle(.roundedBorder).frame(minWidth: 110)
+            }
+            named("mac.filament") {
+                Picker(shop.words.callIt("mac.filament"), selection: $draft.spoolId) {
+                    Text(verbatim: "—").tag(String?.none)
                     ForEach(shop.spools) { spool in
                         Text(spool.label(shop.words, unit: shop.unit(of: spool))).tag(String?.some(spool.id))
                     }
                 }
                 .labelsHidden()
-                .frame(width: 190)
+                .frame(width: 160)
             }
-            HStack(spacing: 8) {
-                // Short prompts inside the fields rather than labels beside
-                // them: three numbers on one line is the shape of the question
-                // ("180 grams, four hours, two of them"), and a label each
-                // would take the width the numbers need.
-                // Return in either figure adds the part: the sheet's default
-                // button is greyed out until there is one.
-                TextField(shop.words.callIt("mac.grams"), text: $draft.grams)
-                    .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+            named("mac.grams") {
+                TextField(shop.words.callIt("mac.grams"), text: $draft.grams, prompt: Text(verbatim: "0"))
+                    .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
                     .onSubmit { if draft.isComplete { Task { await addPart() } } }
-                TextField(shop.words.callIt("mac.hours"), text: $draft.hours)
-                    .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
+            }
+            named("mac.hours") {
+                TextField(shop.words.callIt("mac.hours"), text: $draft.hours, prompt: Text(verbatim: "0"))
+                    .textFieldStyle(.roundedBorder).frame(width: 64).monospacedDigit()
                     .onSubmit { if draft.isComplete { Task { await addPart() } } }
+            }
+            named("doc.qty") {
                 Stepper("× \(draft.qty)", value: $draft.qty, in: 1...999)
                     .monospacedDigit().fixedSize()
-                Spacer(minLength: 8)
-                Button(shop.words.callIt("mac.add_part")) { Task { await addPart() } }
-                    .disabled(!draft.isComplete)
+                    .accessibilityLabel(shop.words.callIt("doc.qty"))
             }
+            Button(shop.words.callIt("mac.add_part")) { Task { await addPart() } }
+                .disabled(!draft.isComplete)
         }
         .card(padding: 10)
     }
@@ -648,7 +697,6 @@ struct NewJobSheet: View {
                     percent($margin)
                     Text(shop.words.callIt("calc.quote.discount")).foregroundStyle(.secondary)
                     percent($discountPct)
-                    Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
                 }
             }
             // ── THE PRODUCT'S OWN TIERS ───────────────────────────────────
@@ -683,11 +731,112 @@ struct NewJobSheet: View {
             }
             // ── THE LAST WORD ON THE TOTAL ────────────────────────────────
             //
-            // Cost plus margin is where a price starts, not where it ends. A
-            // shop that quotes 1,847.36 says 1,850, and one that has just
-            // agreed 1,800 on the phone types 1,800. Same steps and words as
-            // a product's price; the rule is lib/pricing.js and the record
-            // says which of the three reached the figure.
+            // Cost plus markup is where a price starts, not where it ends: a
+            // shop that has just agreed 1,800 on the phone types 1,800. The
+            // rounding rule that used to share this row is under "More
+            // pricing"; the record says which of the three reached the figure.
+            GridRow {
+                Text(shop.words.callIt("pe.price_override")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
+                    .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
+                    .overlay {
+                        if TypedNumber.unreadable(overrideText) {
+                            RoundedRectangle(cornerRadius: 5).strokeBorder(Khayt.attention, lineWidth: 1.5)
+                        }
+                    }
+                    .onChange(of: overrideText) { _, typed in
+                        let cleaned = typed.trimmingCharacters(in: .whitespaces)
+                        // Half a number, or not one, leaves the price as
+                        // it was rather than making the job free — and the
+                        // box is outlined, the footer says so and the job
+                        // cannot be saved until it reads (`priceNotRead`):
+                        // the box showed one figure and the job took another.
+                        if cleaned.isEmpty { rule.override = nil }
+                        else if let n = TypedNumber.parse(cleaned) { rule.override = n }
+                    }
+            }
+            // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
+            //
+            // No model is involved. `buildComparables` is arithmetic over the
+            // shop's own finished jobs, so a shop with the assistant switched
+            // off — or with no key, or no wish to send anything anywhere — gets
+            // this, which is most of the value and none of the risk.
+            //
+            // NET OF TAX. For an inclusive-VAT shop part of every price was the
+            // tax authority's and was never revenue; margin against the gross
+            // overstates it, and a shop pricing to an overstated median prices
+            // thin by exactly that much.
+            if let c = comparables, c.hasHistory, let median = c.medianMarginPct {
+                GridRow {
+                    Color.clear.frame(height: 0)
+                    HStack(spacing: 6) {
+                        Text(shop.words.callIt(
+                            c.sameMaterial ? "mac.you_usually_make_material"
+                                           : "mac.you_usually_make",
+                            ["n": .number(Double(c.count)),
+                             "pct": .number(median),
+                             "material": .string(c.material)]))
+                            .font(.caption).foregroundStyle(.secondary)
+                        // The figure is a margin on PRICE; the field is a
+                        // markup on cost (`lib/pricing.js`). Typing the
+                        // median in priced 30% as 23.1%, so the field gets
+                        // the markup that earns it.
+                        if let markup = c.suggestedMarkup, abs(margin - markup) >= 0.05 {
+                            Button(shop.words.callIt("mac.use_it")) { margin = markup }
+                                .buttonStyle(.link).font(.caption)
+                        }
+                        // The OPTIONAL second opinion. The median above was
+                        // computed here with nothing sent anywhere; this asks a
+                        // model to weigh outliers and a thin sample and say why
+                        // in a sentence. Offered only where the shop agreed.
+                        if shop.aiPriceAllowed {
+                            Button(shop.words.callIt("mac.ask_what_to_charge")) {
+                                Task { await advise() }
+                            }
+                            .buttonStyle(.link).font(.caption)
+                            .disabled(advising)
+                        }
+                        if advising { ProgressView().controlSize(.small) }
+                        Spacer()
+                    }
+                }
+            }
+            if let advice {
+                GridRow {
+                    Color.clear.frame(height: 0)
+                    Text(advice).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// Whether anything under "More pricing" is moving the total.
+    ///
+    /// The group opens by itself while this is true, and cannot be closed:
+    /// a figure that changes what the customer pays is never folded away.
+    private var moreInUse: Bool {
+        Self.moreInUse(rush: rush, roundStep: rule.step, extraLines: extraLines.count,
+                       platform: platformId, shipping: shippingCost, deposit: deposit)
+    }
+
+    static func moreInUse(rush: Bool, roundStep: Double, extraLines: Int,
+                          platform: String, shipping: Double, deposit: Double) -> Bool {
+        rush || roundStep > 0 || extraLines > 0 || !platform.isEmpty || shipping > 0 || deposit > 0
+    }
+
+    /// Rush, rounding, a marketplace's cut, extra charges, shipping and a
+    /// deposit: what most jobs never touch (S1, Figma 90:768). Photographed on
+    /// its own by the snapshot, like `paper`.
+    var morePricing: some View {
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+            GridRow {
+                Text(shop.words.callIt("calc.rush_fee")).gridColumnAlignment(.trailing)
+                    .foregroundStyle(.secondary).fixedSize()
+                Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush)
+                    .labelsHidden().toggleStyle(.checkbox)
+            }
             GridRow {
                 Text(shop.words.callIt("pe.round_to")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary).fixedSize()
@@ -709,25 +858,6 @@ struct NewJobSheet: View {
                     }
                     .labelsHidden().frame(width: 96)
                     .disabled(rule.step <= 0)
-                    Text(shop.words.callIt("pe.price_override"))
-                        .foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                    TextField(shop.words.callIt("pe.price_override_ph"), text: $overrideText)
-                        .textFieldStyle(.roundedBorder).frame(width: 84).monospacedDigit()
-                        .overlay {
-                            if TypedNumber.unreadable(overrideText) {
-                                RoundedRectangle(cornerRadius: 5).strokeBorder(Khayt.attention, lineWidth: 1.5)
-                            }
-                        }
-                        .onChange(of: overrideText) { _, typed in
-                            let cleaned = typed.trimmingCharacters(in: .whitespaces)
-                            // Half a number, or not one, leaves the price as
-                            // it was rather than making the job free — and the
-                            // box is outlined, the footer says so and the job
-                            // cannot be saved until it reads (`priceNotRead`):
-                            // the box showed one figure and the job took another.
-                            if cleaned.isEmpty { rule.override = nil }
-                            else if let n = TypedNumber.parse(cleaned) { rule.override = n }
-                        }
                 }
             }
             // ── CHARGES THAT ARE NOT PRINTING ─────────────────────────────
@@ -876,59 +1006,6 @@ struct NewJobSheet: View {
             }
             .onChange(of: extraLines) { Task { await reprice() } }
 
-            // ── WHAT THIS SHOP HAS ACTUALLY MADE ON WORK LIKE THIS ────────
-            //
-            // No model is involved. `buildComparables` is arithmetic over the
-            // shop's own finished jobs, so a shop with the assistant switched
-            // off — or with no key, or no wish to send anything anywhere — gets
-            // this, which is most of the value and none of the risk.
-            //
-            // NET OF TAX. For an inclusive-VAT shop part of every price was the
-            // tax authority's and was never revenue; margin against the gross
-            // overstates it, and a shop pricing to an overstated median prices
-            // thin by exactly that much.
-            if let c = comparables, c.hasHistory, let median = c.medianMarginPct {
-                GridRow {
-                    Color.clear.frame(height: 0)
-                    HStack(spacing: 6) {
-                        Text(shop.words.callIt(
-                            c.sameMaterial ? "mac.you_usually_make_material"
-                                           : "mac.you_usually_make",
-                            ["n": .number(Double(c.count)),
-                             "pct": .number(median),
-                             "material": .string(c.material)]))
-                            .font(.caption).foregroundStyle(.secondary)
-                        // The figure is a margin on PRICE; the field is a
-                        // markup on cost (`lib/pricing.js`). Typing the
-                        // median in priced 30% as 23.1%, so the field gets
-                        // the markup that earns it.
-                        if let markup = c.suggestedMarkup, abs(margin - markup) >= 0.05 {
-                            Button(shop.words.callIt("mac.use_it")) { margin = markup }
-                                .buttonStyle(.link).font(.caption)
-                        }
-                        // The OPTIONAL second opinion. The median above was
-                        // computed here with nothing sent anywhere; this asks a
-                        // model to weigh outliers and a thin sample and say why
-                        // in a sentence. Offered only where the shop agreed.
-                        if shop.aiPriceAllowed {
-                            Button(shop.words.callIt("mac.ask_what_to_charge")) {
-                                Task { await advise() }
-                            }
-                            .buttonStyle(.link).font(.caption)
-                            .disabled(advising)
-                        }
-                        if advising { ProgressView().controlSize(.small) }
-                        Spacer()
-                    }
-                }
-            }
-            if let advice {
-                GridRow {
-                    Color.clear.frame(height: 0)
-                    Text(advice).font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
             GridRow {
                 Text(shop.words.callIt("oe.shipping")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
@@ -1255,6 +1332,7 @@ struct NewJobSheet: View {
             // the price the sheet showed.
             overheadPerHour: shop.overheadPerHour,
             notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
+            priorityLevel: priority,
             carried: carried))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }

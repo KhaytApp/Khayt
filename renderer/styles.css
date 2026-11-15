@@ -5929,3 +5929,35 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .jp-row.is-late .jp-num { color: var(--st-late-ink, var(--danger)); }
 .jp-note, .jp-empty { margin: 4px 0; font-size: 12.5px; color: var(--text-muted); }
 .jp-event { flex-direction: column; align-items: flex-start; gap: 1px; }
+
+/* ── The job edit sheet (S1 · Figma 75:583, 95:461, 95:596) ── */
+.job-sheet { display: flex; flex-direction: column; gap: 10px; }
+.js-sub { font-size: 12.5px; color: var(--text-muted); margin-top: -6px; }
+.js-sec { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-family: var(--font-num); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
+.js-sec::before { content: ""; inline-size: 22px; block-size: 1.5px; background: var(--st-move-dot, var(--warning)); }
+.job-sheet .js-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; margin: 0; font-size: 12.5px; }
+.js-field > span { font-weight: 600; }
+.js-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.js-hint { font-size: 11.5px; color: var(--text-muted); }
+.js-static { padding: 8px 0; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.js-seg { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: var(--radius-sm); background: var(--surface-2, var(--bg)); }
+.js-seg button { border: 0; background: transparent; padding: 5px 14px; border-radius: calc(var(--radius-sm) - 2px); color: var(--text-muted); cursor: pointer; font: inherit; }
+.js-seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.js-parts { display: flex; flex-direction: column; gap: 8px; }
+.js-part { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.js-part.is-editing { border-color: var(--accent, var(--primary)); }
+.js-part-name { font-weight: 600; }
+.js-part-acts { display: flex; gap: 12px; }
+.js-add { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.js-add[hidden] { display: none; }
+.js-add .js-field { flex: 1 1 90px; }
+.js-add .js-field:first-child, .js-add .js-field:nth-child(2) { flex: 2 1 140px; }
+.linkish { border: 0; background: none; padding: 0; color: var(--primary, var(--accent)); cursor: pointer; font: inherit; font-size: 12.5px; }
+.linkish:hover { text-decoration: underline; }
+.js-more { align-self: flex-start; }
+.job-sheet-modal .modal-footer { align-items: center; }
+.js-totalbox { margin-inline-end: auto; }
+.js-total { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; }
+.js-refused[hidden] { display: none; }
+.js-ask { max-width: 560px; width: 100%; }
+.js-ask .js-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; padding: 14px 18px; border-radius: var(--radius-sm); background: var(--surface-2, var(--bg)); }

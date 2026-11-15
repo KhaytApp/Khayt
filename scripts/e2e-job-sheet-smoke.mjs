@@ -1,0 +1,155 @@
+/**
+ * E2E: the job edit sheet (S1 · Figma 75:583, 95:461, 95:596), with real
+ * clicks. Sample data only.
+ *
+ *   - The job page's Edit opens the sheet: Job · Parts · Price, total pinned.
+ *   - Name and priority save through lib/order-edit.js applyJobEdit.
+ *   - A part added to or edited on a job the customer has seen asks
+ *     keep-or-new (95:461): Keep leaves the price, Use takes the new one.
+ *   - A draft quote's price follows its parts without asking.
+ *   - A discount that drops the bill below what was paid shows the refusal
+ *     line and Save is disabled (95:596); taking it back clears it.
+ *   - A finished job offers no new part and no Remove.
+ *
+ * Run: npm run test:e2e:jobsheet
+ */
+import { launchApp, dismissWizard, makeUserDataDir, switchTab } from './e2e/helpers.mjs';
+
+const ok = (c, m) => { if (!c) throw new Error('ASSERT FAILED: ' + m); console.log('  ✓ ' + m); };
+const { electronApp, window } = await launchApp(makeUserDataDir());
+let failed = false;
+const job = (id) => window.evaluate((i) => JSON.parse(JSON.stringify(printLog.find((o) => o.id === i))), id);
+const shot = async (name) => { if (process.env.E2E_SHOTS) await window.locator('#modalMount .modal').last().screenshot({ path: `${process.env.E2E_SHOTS}/${name}.png` }); };
+
+const openSheet = async (id) => {
+  await switchTab(window, 'logs-tab');
+  await window.click(`.row-more-btn[data-id="${id}"]`);
+  await window.click(`.row-actions-menu[data-for="${id}"] [data-act="job-page"]`);
+  await window.waitForSelector('#jobPage:not([hidden]) .jp-title', { timeout: 5_000 });
+  await window.click('#jobPage [data-jp="edit"]');
+  await window.waitForSelector('#modalMount .job-sheet', { state: 'visible', timeout: 5_000 });
+};
+const save = () => window.click('#modalMount .job-sheet-modal [data-act="save"]');
+const closed = () => window.waitForFunction(() => !document.querySelector('#modalMount .job-sheet'), null, { timeout: 5_000 });
+const addPart = async (name, grams, hours) => {
+  await window.fill('#modalMount [data-js="pName"]', name);
+  await window.fill('#modalMount [data-js="pGrams"]', String(grams));
+  await window.fill('#modalMount [data-js="pHours"]', String(hours));
+  await window.click('#modalMount [data-js="pAdd"]');
+};
+
+try {
+  await dismissWizard(window);
+  await window.evaluate(() => {
+    settings.mode = 'professional'; settings.currency = 'SAR'; settings.enableVat = false;
+    KhaytShell.applyMode();
+    inventory.unshift({ id: 'F-JS', material: 'PLA Black', color: '#111111', cost: 90, spoolWeight: 1000, weight: 1000 });
+    const part = { id: 'P-1', name: 'body.stl', material: 'PLA Black', filamentId: 'F-JS', qty: 1, printWeight: 100, printTime: 2,
+      spoolCost: 90, spoolWeight: 1000 };
+    // Costed as the app costs it, so a re-costed part moves from a true figure.
+    const rated = KhaytPrintRates.withRates(part, { settings });
+    part.unitCost = KhaytCalculatorCost.computePartBaseCost(rated, { inventory, settings });
+    part.baseCost = part.unitCost;
+    const base = (id, over) => Object.assign({
+      id, jobNumber: id, status: 'pending', currency: 'SAR', date: '2026-11-12', project: 'Sample ' + id,
+      price: 340, paidAmount: 0, discountPct: 0, material: 'PLA Black', printTime: 2,
+      statusHistory: [{ status: 'pending', at: '2026-11-12T08:00:00Z' }],
+      parts: [JSON.parse(JSON.stringify(part))],
+    }, over || {});
+    printLog.unshift(
+      base('JS-SEEN'),
+      base('JS-USE'),
+      base('JS-DRAFT', { status: 'quote', statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
+      base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
+      base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
+    );
+    saveAll();
+    return flushSave();
+  });
+
+  // ── Job fields ───────────────────────────────────────────────────────────
+  await openSheet('JS-SEEN');
+  ok(/Parts · 1/i.test(await window.textContent('#modalMount [data-js="partsHead"]')), 'the sheet lists the job\'s parts');
+  ok(/340/.test(await window.textContent('#modalMount [data-js="total"]')), 'the total is pinned at the foot (340)');
+  ok(await window.evaluate(() => document.querySelector('#modalMount [data-js="fixed"]').hidden), 'a price worked from its parts carries no "fixed" note');
+  await shot('job-sheet');
+  await window.fill('#modalMount [data-js="project"]', 'Renamed sample');
+  await window.click('#modalMount [data-js-pr="high"]');
+  await save(); await closed();
+  let j = await job('JS-SEEN');
+  ok(j.project === 'Renamed sample' && j.priorityLevel === 'high', 'name and priority saved through applyJobEdit');
+  ok(j.price === 340, 'the price did not move');
+
+  // ── Keep the price the customer saw ──────────────────────────────────────
+  await window.click('#jobPage [data-jp="edit"]');
+  await window.waitForSelector('#modalMount .job-sheet', { state: 'visible', timeout: 5_000 });
+  await addPart('clip.stl', 50, 1);
+  ok(/Parts · 2/i.test(await window.textContent('#modalMount [data-js="partsHead"]')), 'Add part puts a second part in the list');
+  await save();
+  await window.waitForSelector('#modalMount .js-ask', { state: 'visible', timeout: 5_000 });
+  await shot('job-sheet-ask');
+  ok(/340/.test(await window.textContent('#modalMount .js-ask [data-ask="keep"]')), 'the customer has seen the price: Keep 340 is offered');
+  await window.click('#modalMount .js-ask [data-ask="keep"]');
+  await closed();
+  j = await job('JS-SEEN');
+  ok(j.parts.length === 2 && j.price === 340, `Keep: two parts, the price stays 340 (${j.price})`);
+  ok(j.parts[1].baseCost > 0 && j.parts[1].filamentId === 'F-JS', 'the new part is costed off its filament');
+  await window.click('#jobPage [data-jp="edit"]');
+  await window.waitForSelector('#modalMount [data-js="fixed"]:not([hidden])', { timeout: 5_000 });
+  ok(/fixed/.test(await window.textContent('#modalMount [data-js="fixed"]')), 'after Keep, the sheet says the price is fixed');
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
+
+  // ── Use the new price (a job whose price is still its parts' arithmetic;
+  //    after Keep the price is a typed one, and the rule leaves it as typed) ──
+  await window.click('#jobPage [data-jp="back"]');
+  await openSheet('JS-USE');
+  await window.click('#modalMount [data-js-edit="0"]');
+  await window.fill('#modalMount [data-js="pGrams"]', '150');
+  await window.click('#modalMount [data-js="pAdd"]');
+  await save();
+  await window.waitForSelector('#modalMount .js-ask', { state: 'visible', timeout: 5_000 });
+  await window.click('#modalMount .js-ask [data-ask="new"]');
+  await closed();
+  j = await job('JS-USE');
+  ok(j.price > 340 && j.parts[0].printWeight === 150 && j.parts.length === 1, `Use: a part edited in place, the price follows it (${j.price})`);
+  await window.click('#jobPage [data-jp="back"]');
+
+  // ── A draft quote follows its parts ──────────────────────────────────────
+  await openSheet('JS-DRAFT');
+  await addPart('lid.stl', 40, 1);
+  await save(); await closed();
+  ok(await window.evaluate(() => !document.querySelector('#modalMount .js-ask')), 'a draft quote is not asked');
+  j = await job('JS-DRAFT');
+  ok(j.parts.length === 2 && j.price > 340, `its price follows the new part (${j.price})`);
+  await window.click('#jobPage [data-jp="back"]');
+
+  // ── The paid floor ───────────────────────────────────────────────────────
+  await openSheet('JS-PAID');
+  await window.fill('#modalMount [data-js="discountPct"]', '50');
+  await window.waitForSelector('#modalMount .js-refused:not([hidden])', { timeout: 5_000 });
+  const why = await window.textContent('#modalMount .js-refused');
+  ok(/already paid/.test(why) && /300/.test(why), `a 50 % discount on a job with 300 paid is refused live (${why.trim()})`);
+  ok(await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'), 'Save is disabled while it would be refused');
+  await shot('job-sheet-refused');
+  await window.fill('#modalMount [data-js="discountPct"]', '0');
+  ok(await window.isEnabled('#modalMount .job-sheet-modal [data-act="save"]'), 'with the discount back, Save comes back');
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
+  j = await job('JS-PAID');
+  ok(j.paidAmount === 300 && j.price === 340 && !j.discountPct, 'the paid job is unchanged');
+  await window.click('#jobPage [data-jp="back"]');
+
+  // ── A finished job ───────────────────────────────────────────────────────
+  await openSheet('JS-DONE');
+  ok(await window.evaluate(() => document.querySelector('#modalMount [data-js="addRow"]').hidden), 'a finished job offers no new part');
+  ok(await window.evaluate(() => !document.querySelector('#modalMount [data-js-rm]')), 'and no Remove');
+
+  console.log('e2e-job-sheet: ok');
+} catch (err) {
+  failed = true;
+  console.error('e2e-job-sheet FAILED:', err && err.message);
+} finally {
+  await electronApp.close();
+  process.exit(failed ? 1 : 0);
+}
