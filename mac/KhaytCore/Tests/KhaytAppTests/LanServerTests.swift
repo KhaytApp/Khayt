@@ -236,10 +236,14 @@ struct LanServerTests {
             return Reply(status: http.statusCode, headers: out, body: data)
         }
         /// Any method, any body — the REST routes take PATCH and DELETE.
+        /// `timeout`: how long this one request may take, in place of the
+        /// session's 900 s. For a test whose failure is a HANG, so it fails
+        /// in seconds instead of holding a CI shard for a quarter of an hour.
         func send(_ method: String, _ path: String, body: Data? = nil,
-                  headers: [String: String] = [:]) async throws -> Reply {
+                  headers: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> Reply {
             var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
             request.httpMethod = method
+            if let timeout { request.timeoutInterval = timeout }
             request.httpBody = body
             if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
             for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }

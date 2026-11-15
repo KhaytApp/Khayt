@@ -120,8 +120,52 @@ struct LanConnectorScopeTests {
         let body = Data(repeating: 0x41, count: LanServer.maxBody + 1024)
         for path in ["/api/expense", "/api/orders/o_1/photos"] {
             let headers = connector.headers("POST", path, body, time: Int(LanServerTests.Bench.start.timeIntervalSince1970))
-            let reply = try await bench.send("POST", path, body: body, headers: headers)
+            let reply = try await bench.send("POST", path, body: body, headers: headers, timeout: 300)
             #expect(reply.status == 403 && reply.text.contains("connector-scope"), "\(path) answered \(reply.status)")
+        }
+    }
+
+    /// The answer to a request refused from its head has to REACH the client.
+    ///
+    /// The server answered at once and closed with the body still arriving;
+    /// the kernel met the unread bytes with a reset, and the reset could
+    /// destroy the answer first. Measured before the fix: 6 of 40 URLSession
+    /// uploads got -1005 instead of the 403, and on CI the same race was a
+    /// 15-minute -1001 in `largeUploadHead` (3 of 5 main runs after #2484).
+    /// The server now closes its side and drains (`LanServer.linger`).
+    ///
+    /// 300 s per request, not the session's 900: a loaded CI shard can keep a
+    /// request waiting minutes for the main actor (`LanServerTests.session`),
+    /// so seconds would fail a healthy server, but a hang now ends a run in
+    /// five minutes instead of fifteen. The 40 outcomes are the real check.
+    @Test("a refused oversized upload gets its answer every time, never a reset")
+    func refusalSurvivesTheBodyStillArriving() async throws {
+        let bench = try await LanServerTests.Bench(pin: Self.pin)
+        defer { bench.stop() }
+        let connector = try Self.enrol(bench.devices, kind: LanDevices.kindConnector, name: "Orca")
+        let body = Data(repeating: 0x41, count: LanServer.maxBody + 1024)
+        var outcomes: [String: Int] = [:]
+        for _ in 0..<40 {
+            do {
+                let reply = try await bench.send("POST", "/api/expense", body: body,
+                                                 headers: ["x-khayt-device": connector.id, "x-khayt-pin": Self.pin],
+                                                 timeout: 300)
+                outcomes["\(reply.status)", default: 0] += 1
+            } catch let error as URLError {
+                outcomes["URLError \(error.code.rawValue)", default: 0] += 1
+            }
+        }
+        #expect(outcomes == ["403": 40], "\(outcomes)")
+    }
+
+    @Test("every refusal decided from the head lingers before the connection closes")
+    func everyHeadRefusalLingers() {
+        let server = EmptyStateTests.source("LanServer.swift")
+        let catches = server.components(separatedBy: "\n        } catch ").dropFirst()
+            .filter { $0.hasPrefix("ReadRefusal.") || $0.hasPrefix("let error as URLError where error.code == .dataLengthExceedsMaximum") }
+        #expect(catches.count == 5)
+        for branch in catches {
+            #expect(branch.contains("await Self.linger(connection, on: queue)"), "\(branch.prefix(60))")
         }
     }
 
