@@ -56,6 +56,24 @@ extension Shop {
         }
     }
 
+    /// Open a job: its page, in Jobs › List (S1, "the page is home").
+    ///
+    /// Every way of saying "this job" lands here: a card on the board, a
+    /// double-click in the table, ⌘K, a `khayt://job/…` link, a reprint's
+    /// link to its original. They used to select the row in the table and
+    /// leave the reading to a side panel.
+    ///
+    /// The search and the kit filter are taken off first, as ⌘K always did:
+    /// either can hide the job from the list, and an opened job that is not
+    /// on the screen looks like a link that did nothing.
+    func openJobPage(_ id: Order.ID) {
+        search = ""
+        kitFilter = nil
+        jobsLayout = .page
+        shelf = .jobs(nil)
+        selection = id
+    }
+
     /// Do a step — through the same calls the Job menu makes, so the lock,
     /// the gate and the questions (why on hold, what it took, what failed)
     /// are theirs. A refused step does nothing: its button is disabled and

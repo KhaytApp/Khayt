@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "Ainda sem classificação (sem preço ou sem horas de impressão): {n}",
  "mac.preferences": "Preferências",
  "mac.price": "Preço",
+ "mac.more_pricing": "Mais opções de preço",
  "mac.price_history": "Preço pago a fornecedores",
  "mac.price_history_sub": "Por unidade, a compra mais recente no registro.",
  "mac.price_kept": "Preço salvo mantido; os custos de hoje dão {now}",
@@ -3991,5 +3992,8 @@
  "mac.parts_keep_price": "Manter o preço",
  "mac.parts_use_new_price": "Usar o novo preço",
  "mac.parts_remove": "Remover peça…",
- "mac.parts_remove_q": "Remover “{name}” deste trabalho?"
+ "mac.parts_remove_q": "Remover “{name}” deste trabalho?",
+ "mac.js_margin_typed": "—, o preço foi digitado",
+ "mac.js_more": "Mais detalhes…",
+ "mac.js_new_total": "Novo total"
 }

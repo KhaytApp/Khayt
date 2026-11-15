@@ -293,10 +293,7 @@ struct DueThisWeek: View {
             }
             .padding(.vertical, 8)
             .contentShape(Rectangle())
-            .onTapGesture {
-                shop.shelf = .jobs(nil)
-                shop.selection = order.id
-            }
+            .onTapGesture { shop.openJobPage(order.id) }
         }
 
         private var chip: some View {

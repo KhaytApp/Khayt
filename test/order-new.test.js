@@ -289,11 +289,18 @@ test('the lifted record and the original agree, all forty-five fields', () => {
     recordA.jobNumber = recordA.id;
     recordA.id = `${recordA.id}-0123`;
 
+    // AND A THIRD (S1): the markup the shop typed is kept on the record as
+    // `marginPct`, wherever it priced something. Checked on its own below; it
+    // is taken off here so the other forty-five are still compared exactly.
     const b = JSON.parse(JSON.stringify(shop));
     const recordB = N.newOrder(form, {
       settings: b.settings, orders: b.printLog, now: NOW, tokens: TOKENS,
     });
 
+    if ('marginPct' in recordB) {
+      assert.equal(recordB.marginPct, Math.max(0, form.margin || 0));
+      delete recordB.marginPct;
+    }
     assert.deepEqual(recordB, recordA, `the record diverged: ${JSON.stringify({ form, shop })}`);
     // And the counters it advanced, which are the shop's and which a caller
     // must save with the order.
@@ -641,4 +648,45 @@ test('a converted job loads back into the calculator in the shop\'s currency', (
   // A job in the shop's own currency comes back as it is.
   const plain = fxJob({ shippingCost: 40 });
   assert.equal(N.inShopCurrency(plain, fxShop()).shippingCost, 40);
+});
+
+
+/* ── S1: what the job sheet's New mode stores ──────────────────────────────── */
+
+test('a new job keeps the markup it was priced at, and reads it back', () => {
+  require('../lib/order-edit.js');
+  const E = globalThis.KhaytOrderEdit || require('../lib/order-edit.js');
+  const order = N.newOrder(base({ margin: 35 }), ctx());
+  assert.equal(order.marginPct, 35);
+  assert.equal(order.price, 135);
+  assert.equal(E.marginOf(order), 35);
+  // A rounded price would read back as 34.6% if it were derived.
+  const rounded = N.newOrder(base({ margin: 34.6, priceRound: { step: 5, mode: 'nearest' } }), ctx());
+  assert.equal(rounded.marginPct, 34.6);
+  assert.equal(E.marginOf(rounded), 34.6);
+});
+
+test('no markup is stored where it priced nothing: a typed total', () => {
+  const E = globalThis.KhaytOrderEdit || require('../lib/order-edit.js');
+  const typed = N.newOrder(base({ margin: 35, priceOverride: 400 }), ctx());
+  assert.equal(typed.price, 400);
+  assert.equal('marginPct' in typed, false);
+  assert.equal(E.marginOf(typed), null);
+});
+
+test('a price typed over a job later stops the stored markup being shown', () => {
+  const E = globalThis.KhaytOrderEdit || require('../lib/order-edit.js');
+  const order = N.newOrder(base({ margin: 35 }), ctx());
+  assert.equal(E.marginOf(Object.assign({}, order, { priceSource: 'override', priceOverride: 90, price: 90 })), null);
+});
+
+test('a new job can be taken as high or urgent; anything else is normal, in the old shape', () => {
+  const urgent = N.newOrder(base({ priorityLevel: 'urgent' }), ctx());
+  assert.equal(urgent.priority, true);
+  assert.equal(urgent.priorityLevel, 'urgent');
+  for (const level of [undefined, 'normal', 'whenever', true]) {
+    const plain = N.newOrder(base({ priorityLevel: level }), ctx());
+    assert.equal(plain.priority, false);
+    assert.equal('priorityLevel' in plain, false);
+  }
 });

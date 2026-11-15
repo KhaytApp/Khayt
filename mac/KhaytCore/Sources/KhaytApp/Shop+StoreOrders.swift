@@ -91,8 +91,5 @@ extension Shop {
     }
 
     /// Put the person on another job — a reprint's original, or its reprint.
-    func goToJob(_ id: Order.ID) {
-        selection = id
-        shelf = .jobs(nil)
-    }
+    func goToJob(_ id: Order.ID) { openJobPage(id) }
 }

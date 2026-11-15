@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "Henüz sıralanmadı (fiyat veya baskı saati yok): {n}",
  "mac.preferences": "Tercihler",
  "mac.price": "Fiyat",
+ "mac.more_pricing": "Diğer fiyat seçenekleri",
  "mac.price_history": "Tedarikçilere ödenen fiyat",
  "mac.price_history_sub": "Birim başına, kayıttaki en son satın alma.",
  "mac.price_kept": "Kayıtlı fiyat korundu; bugünkü maliyetler {now} veriyor",
@@ -3991,5 +3992,8 @@
  "mac.parts_keep_price": "Fiyatı koru",
  "mac.parts_use_new_price": "Yeni fiyatı kullan",
  "mac.parts_remove": "Parçayı kaldır…",
- "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?"
+ "mac.parts_remove_q": "“{name}” bu işten kaldırılsın mı?",
+ "mac.js_margin_typed": "—, fiyat elle girildi",
+ "mac.js_more": "Diğer ayrıntılar…",
+ "mac.js_new_total": "Yeni toplam"
 }
