@@ -60,7 +60,7 @@ try {
   await shot('job-page-pending');
   const moneyText = await text('#jobPage .jp-grid .jp-card:nth-child(2)');
   ok(/340/.test(moneyText) && /100/.test(moneyText) && /240/.test(moneyText), 'money: price 340, paid 100, owing 240');
-  ok(/Margin/.test(moneyText) && /Cost/.test(moneyText), 'with cost and margin');
+  ok(/Markup/.test(moneyText) && !/Margin/.test(moneyText) && /Cost/.test(moneyText), 'with cost and markup (Turki: the % is a markup on cost)');
   ok(/Moved to/.test(await text('#jobPage')), 'activity lists the moves');
 
   // A save elsewhere (here: a payment written and saved) shows on the open page.

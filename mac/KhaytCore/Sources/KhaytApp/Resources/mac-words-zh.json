@@ -1536,7 +1536,7 @@
  "mac.margin_at_least": "利润率",
  "mac.mark_all_not_business": "全部标记为非业务",
  "mac.mark_dried": "今日已烘干",
- "mac.markup": "加价",
+ "mac.markup": "加价率",
  "mac.material_ph": "PLA、PETG、树脂…",
  "mac.mb_bad_name": "该套件中包含一个 Khayt 不会解包的文件：{name}",
  "mac.mb_bundle_figures": "套件中的估算（另一家店铺的切片）：{figures}",
