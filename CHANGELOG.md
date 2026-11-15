@@ -9657,6 +9657,44 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.37] - 2026-11-15
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **Opening a job now opens its page, and double-click in the Table no longer opens the invoice.** Every job has a page of its own in Jobs, under the new **List** view: its stage, the next step as one button, its parts, money and activity. A card on the board, a double-click in the Table, ⌘K, a row on Today, a ledger line and a scanned job label all open that page, where they used to select the job's row in the Table. To reach the invoice, open the job and use **Invoice** in its money section, or press ⌘P as before. A window you left on the Table or the Board stays on it; a new window opens on the List.
+- **Edit Job and New Job are laid out differently.** Both are now three groups, **Job**, **Parts** and **Price**, and Edit Job has one Save for everything, parts included. In New Job the rush fee, rounding, marketplace fees, extra charges, shipping and the deposit have moved under **More pricing**, at the bottom of Price; it opens by itself whenever one of them is changing the total. Nothing has been removed.
+- **Changing a job's parts now changes its price.** Until now, changing a part's weight, hours, quantity or filament updated that part's cost and left the job's price where it was. From this version the price, print time and material follow the parts, and the new total is shown before you save. While a job is still a quote or queued, the price simply follows. Once it is in production Khayt asks whether to keep the price the customer was given or use the new one. After a job is finished, or its filament has been taken from stock, only a part's name can change.
+- **"Target profit margin" is now called "Markup".** It is the same number and the same arithmetic as before, the percentage added on top of cost, and your prices do not change. Only the word has, because the figure was never a margin on the price. The minimum-margin warning keeps its name, as it really is a margin.
+
+This release gives every job a page of its own, with the next step pinned at the top, and makes New Job and Edit Job the same form.
+
+### New
+
+- **Jobs has a List view, with the job's page beside it.** The view switcher is now Board · List · Table. The page shows the job's name, customer and due date, its stage, the one next step as a button (Send quote, Take the job, Start printing, Mark printed and so on, with the other steps beside it), then the stage track, parts, money and activity. A new window opens on the List; a window you left on the Table or the Board stays there.
+- **Opening a job opens its page.** A card on the board, ⌘K, a row on Today, a ledger or spending line, a scanned job label and a `khayt://job` link all land on the job's page.
+- **Priority when you take a job.** New Job and New Quote have Normal, High priority and Urgent, the same choice Edit Job has.
+
+### Changed
+
+- **Edit Job is one sheet:** Job, Parts and Price, with one Save. Parts are edited in place, and the new total is shown before you save.
+- **New Job and New Quote are in the same three groups.** Each part field has its name over it (Part, Filament, grams, hours, Qty). Rush fee, rounding, marketplace fees, extra charges, shipping and the deposit are under **More pricing**, which stays open whenever one of them changes the total.
+- **A new job remembers the markup it was priced at,** so Edit Job shows the figure you typed, not one worked back from a rounded price. Jobs made before this release show the worked-out figure, or "price was typed".
+- **Simple mode's board has four columns:** Quote, Queued, Printing, Ready. The customer form in Simple asks for less.
+
+### Fixed
+
+- **A change that would bring a job's bill below what has been paid is refused,** whichever way it is made: a typed total, a discount, shipping removed, an extra charge removed or a part changed. Khayt says how much has been paid.
+- **A job that was finished and then moved back to the queue can have its parts changed again.**
+- **Arabic:** the group names on the job page, Edit Job and New Job (العمل, الأجزاء, السعر) were drawn with their letters standing apart. They are joined now.
+
+### Please check on your Mac
+
+- **The job page:** open Jobs, choose List, pick a job and press the blue button at the top for its next step. Check that the step it offers is the one you would take, on a quote, a queued job and a printing job.
+- **Edit Job on an older job:** open a job made before this update, change one part's weight, and check the new total shown before saving is what you expect. Please tell us if anything looks wrong.
+
 ## [4.0.0-beta.36] - 2026-11-14
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

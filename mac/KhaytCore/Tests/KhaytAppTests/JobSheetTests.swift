@@ -260,4 +260,15 @@ struct JobSheetTests {
         #expect(money.contains("if lent { edited = Self.returningLentId(edited, partId: partId) }"))
     }
 
+
+    @Test("a group's name is never set in the mono face by hand: Arabic letters come apart in it")
+    func sectionTitlesGoThroughOnePlace() {
+        for file in ["JobPage.swift", "JobSheet.swift", "NewJobSheet.swift"] {
+            let source = EmptyStateTests.source(file)
+            #expect(source.contains(".sectionCaps(shop.words)"), "\(file)")
+            #expect(source.components(separatedBy: ".textCase(.uppercase)").count - 1 == (file == "JobSheet.swift" ? 1 : 0),
+                    "\(file) raises capitals itself")
+        }
+    }
+
 }

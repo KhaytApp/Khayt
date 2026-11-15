@@ -391,9 +391,7 @@ struct NewJobSheet: View {
 
     /// A group's name over its fields, as `JobSheet.section` draws it.
     private func sectionTitle(_ key: String) -> some View {
-        Text(shop.words.callIt(key))
-            .textCase(.uppercase)
-            .font(.caption.monospaced()).foregroundStyle(.secondary)
+        Text(shop.words.callIt(key)).sectionCaps(shop.words)
     }
 
     private var who: some View {
