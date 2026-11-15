@@ -3991,5 +3991,8 @@
  "mac.parts_keep_price": "価格を維持",
  "mac.parts_use_new_price": "新しい価格を使う",
  "mac.parts_remove": "パーツを削除…",
- "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？"
+ "mac.parts_remove_q": "「{name}」をこのジョブから削除しますか？",
+ "mac.js_margin_typed": "—、価格は手入力",
+ "mac.js_more": "詳細…",
+ "mac.js_new_total": "新しい合計"
 }

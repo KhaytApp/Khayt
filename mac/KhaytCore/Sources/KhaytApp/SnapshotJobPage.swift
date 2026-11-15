@@ -29,6 +29,17 @@ extension Snapshot {
             await settle()
             capture(named: "s1-job-page-\(name)\(tag)", into: dir)
         }
+        // The job sheet (Edit mode), on a job with parts.
+        // One whose parts are single pieces: the sample stores a 12-off
+        // part's line cost as one piece's, which reads as a 2,448% margin.
+        let open = shop.orders.filter { Stage.of($0) == .pending && !$0.parts.isEmpty }
+        if let job = open.first(where: { $0.parts.allSatisfy { $0.qty == 1 } }) ?? open.first {
+            shop.pendingEdit = Shop.PendingHold(id: job.id, project: job.project)
+            await settle()
+            captureSheet(named: "s1-job-sheet-edit\(tag)", into: dir)
+            shop.pendingEdit = nil
+            await settle()
+        }
     }
 
     static func captureSimple(_ shop: Shop, into dir: URL, dark: Bool) async {

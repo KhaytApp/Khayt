@@ -3787,6 +3787,10 @@ final class Words {
                                     "ar": "هذا الربع لم ينتهِ، فتُحتسب تكاليفه الثابتة بحسب الأيام المنقضية."],
         "mac.edit_spool":    ["en": "Edit spool",   "ar": "تعديل البكرة"],
         "mac.edit_part":     ["en": "Edit part",    "ar": "تعديل الجزء"],
+        // The job sheet (S1 B3b).
+        "mac.js_margin_typed": ["en": "—, price was typed", "ar": "—، السعر مُدخل يدويًا"],
+        "mac.js_more": ["en": "More details…", "ar": "تفاصيل أكثر…"],
+        "mac.js_new_total": ["en": "New total", "ar": "الإجمالي الجديد"],
         // Parts on an existing job go through the shared rule (S1 B3a):
         // its locks, its refusal, and the price question.
         "mac.parts_locked_zatca": ["en": "This job’s invoice was sent to ZATCA, so its parts can’t be changed.", "ar": "أُرسلت فاتورة هذه المهمة إلى هيئة الزكاة، فلا يمكن تغيير قطعها."],
