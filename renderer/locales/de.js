@@ -34,6 +34,7 @@
   "conv.fil_generic": "Generisch (auto)",
   "conv.fil_hint": "Wähle das Filament in jedem Slot (aus deiner Snapmaker-Orca-Bibliothek):",
   "conv.fil_none": "Installiere Snapmaker Orca, um Filamente zu wählen; Slots sind sonst generisch.",
+  "conv.fil_packed": "Dein OrcaSlicer speichert die Snapmaker-Profile in einer gepackten Datei, die Khayt noch nicht lesen kann. Lass Snapmaker Orca installiert, um Filamente zu wählen; Slots sind sonst generisch.",
   "conv.print_quality": "Druckqualität",
   "conv.slicer_catalogue": "— Drucker aus installiertem Slicer —",
   "conv.printer_loading": "Druckerprofil wird gelesen…",

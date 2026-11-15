@@ -34,6 +34,7 @@
   "conv.fil_generic": "Générique (auto)",
   "conv.fil_hint": "Choisissez le filament chargé dans chaque emplacement (bibliothèque Snapmaker Orca) :",
   "conv.fil_none": "Installez Snapmaker Orca pour choisir des filaments ; sinon Générique par défaut.",
+  "conv.fil_packed": "Votre OrcaSlicer range les profils Snapmaker dans un fichier compressé que Khayt ne sait pas encore lire. Gardez Snapmaker Orca installé pour choisir des filaments ; les emplacements restent Génériques.",
   "conv.print_quality": "Qualité d’impression",
   "conv.slicer_catalogue": "— Imprimantes du trancheur installé —",
   "conv.printer_loading": "Lecture du profil d’imprimante…",

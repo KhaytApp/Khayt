@@ -246,7 +246,7 @@ final class JobEditRuleTests: XCTestCase {
         for lang in ["en", "ar", "de", "es", "fr", "ja", "pt-BR", "tr", "zh-Hans"] {
             let path = try XCTUnwrap(bundle.path(forResource: lang, ofType: "lproj"), lang)
             let b = try XCTUnwrap(Bundle(path: path))
-            for key in ["mac.parts_paid_exceeds", "mac.margin"] {
+            for key in ["mac.parts_paid_exceeds", "mac.markup"] {
                 let v = b.localizedString(forKey: key, value: "∅", table: nil)
                 XCTAssertNotEqual(v, "∅", "\(lang): \(key)")
                 XCTAssertNotEqual(v, key, "\(lang): \(key)")
