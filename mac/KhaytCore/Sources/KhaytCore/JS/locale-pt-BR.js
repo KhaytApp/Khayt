@@ -875,6 +875,7 @@
   "oe.delete_refused_invoiced": "{id} tem número de fatura, então não pode ser excluído — isso deixaria uma lacuna na sequência de faturas. Cancelar o pedido em vez disso?",
   "oe.delete_refused_paid": "{id} tem pagamentos registrados, então não pode ser excluído. Cancelar o pedido em vez disso?",
   "oe.delete_refused_cancelled": "{id} já está cancelado. Ele permanece no registro porque tem número de fatura ou pagamentos.",
+  "oe.paid_exceeds_price": "Não é possível salvar: o preço ficaria abaixo dos {paid} já pagos. Registre um reembolso antes ou mantenha o preço.",
   "oe.cancel_job": "Cancelar pedido",
   "oe.undo": "Desfazer",
   "oe.discount_pct": "Desconto",

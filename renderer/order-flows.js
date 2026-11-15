@@ -2264,6 +2264,26 @@ function openOrderEditor(orderId) {
         }
       }
 
+      // The bill may not drop below what has been paid. A discount raised,
+      // shipping or an extra line taken off, or a typed total, used to be
+      // settled by CAPPING what was paid (repriceTerms / applyEdit), so the
+      // money quietly left the payment record. lib/order-edit.js applyJobEdit
+      // (Mac #2470) refuses such an edit; it is asked first, on a copy, and a
+      // refusal stops the save with the reason in the sheet (Figma 95:596).
+      {
+        const typed = String(document.querySelector('[data-f="priceOverride"]')?.value ?? '').trim();
+        const next = { discountPct: draft.discountPct, shippingCost: draft.shippingCost, extraLines: draft.extraLines };
+        if (typed !== '') next.price = Math.max(0, +typed || 0);
+        const trial = JSON.parse(JSON.stringify(order));
+        const verdict = EditRules().applyJobEdit(trial, next, { now: Date.now(), id: 'dry-run', settings });
+        if (!verdict.ok && verdict.reason === 'paid_exceeds_price') {
+          const code = KhaytOrderMoney.orderCurrency ? KhaytOrderMoney.orderCurrency(order, { settings, clients }) : settings.currency;
+          oeShowRefusal(t('oe.paid_exceeds_price', { paid: fmtMoneyIn(+order.paidAmount || 0, code) }));
+          return false;
+        }
+        oeShowRefusal('');
+      }
+
       // Feature 3: Spool over-commit check
       const ocWarnings = checkSpoolOvercommit(order.parts || [], order.id);
       if (ocWarnings.length > 0) {
@@ -3116,6 +3136,21 @@ function recordOrderEdit(order, changedFields) {
 }
 
 /** The order-edit rules, however this file happens to be loaded. */
+/** The job editor's refusal line, above Cancel and Save (Figma 95:596). '' clears it. */
+function oeShowRefusal(text) {
+  const footer = document.querySelector('#modalMount .modal-form .modal-footer');
+  if (!footer) return;
+  let line = footer.parentElement.querySelector('.oe-refused');
+  if (!text) { line?.remove(); return; }
+  if (!line) {
+    line = document.createElement('p');
+    line.className = 'oe-refused';
+    line.setAttribute('role', 'alert');
+    footer.parentElement.insertBefore(line, footer);
+  }
+  line.textContent = text;
+}
+
 function EditRules() {
   if (EditRules.cached) return EditRules.cached;
   if (typeof globalThis !== 'undefined' && globalThis.KhaytOrderEdit) {

@@ -5897,6 +5897,8 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 }
 .plg-upd-foot { font-size: 11.5px; color: var(--text-muted); margin: 0 0 4px; }
 
+/* The job editor refuses an edit that drops the bill below what was paid (Figma 95:596). */
+.oe-refused { margin: 0; padding: 10px 20px 0; font-size: 13px; color: var(--st-late-ink, var(--danger)); }
 /* ── Job page (S1 · desktop M4; renderer/job-page.js; Figma 74:387) ───── */
 #mainContent { position: relative; }
 .job-page { position: absolute; inset: 0; z-index: 20; overflow-y: auto; padding: 20px 28px 40px; background: var(--bg); }
