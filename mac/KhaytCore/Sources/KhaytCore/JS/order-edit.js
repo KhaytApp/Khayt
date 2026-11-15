@@ -752,15 +752,19 @@
    * The margin a job was priced at, as a percentage, or null when it cannot
    * be said: a typed price, nothing costed (every part has an agreed price),
    * a zero price, a job with no parts, or a job taken in another currency
-   * whose rate is not on the record. `marginPct`, when the job stores one, is
-   * the answer — it is what was typed.
+   * whose rate is not on the record. `marginPct`, when the job stores one
+   * (`newOrder` does) and its price has not been typed since, is the answer —
+   * it is what was typed.
    *
    * Null is shown as "—, price was typed" (Turki, Q9): a figure worked
    * backwards from a total somebody typed would be a guess with a % on it.
    */
   function marginOf(order) {
     if (!isObj(order)) return null;
-    if (order.marginPct !== null && order.marginPct !== undefined && order.marginPct !== ''
+    // Not once the price has been typed over it: the stored figure is what
+    // the job was TAKEN at, and it no longer says how this price was reached.
+    if (order.priceSource !== 'override'
+        && order.marginPct !== null && order.marginPct !== undefined && order.marginPct !== ''
         && Number.isFinite(+order.marginPct)) return +(+order.marginPct).toFixed(2);
     if (!(+order.price > 0) || partsOf(order).length === 0) return null;
     const from = pricedFrom(order);
