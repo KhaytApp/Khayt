@@ -176,9 +176,7 @@ struct JobPage: View {
     /// What happened to the job, newest first: each stage it reached and when.
     private var activity: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(shop.words.callIt("audit.btn"))
-                .textCase(.uppercase)
-                .font(.caption.monospaced()).foregroundStyle(.secondary)
+            Text(shop.words.callIt("audit.btn")).sectionCaps(shop.words)
             let steps = (timeline?.steps ?? []).reversed()
             if steps.isEmpty {
                 Text(shop.words.callIt("mac.nothing_here")).font(.callout).foregroundStyle(Khayt.faint)
