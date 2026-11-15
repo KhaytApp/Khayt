@@ -41,7 +41,7 @@ struct ShopWindow: View {
     @State private var searchWanted = false
     @SceneStorage("shelf") private var storedShelf = ""
     /// Board or List for Jobs, remembered per window like the shelf is.
-    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.list.rawValue
+    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.page.rawValue
     // A new key: under the old one every window remembered "Khayt's order",
     // and the new default (newest first) would never have been seen.
     @SceneStorage("library.sort.v2") private var storedSort = LibrarySort.added.rawValue
@@ -384,7 +384,7 @@ struct ShopWindow: View {
             // would open on an empty screen with no way to tell why.
             // The view first, then the shelf: a window saved on the old Board
             // screen restores to "board", which sets the layout itself.
-            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .list
+            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .page
             if let restored = Shelves.shelf(storedShelf, in: shop) { shop.shelf = restored }
         }
         // Kept for the Window menu, Mission Control and VoiceOver; the toolbar

@@ -99,8 +99,17 @@ extension Shop {
         var out: [JSONValue] = []
         for d in drafts {
             let now = d.fields
-            if let stored = d.storedId, let raw = rawPart(orderId, partId: stored) {
+            if let stored = d.storedId, var raw = rawPart(orderId, partId: stored, at: d.storedIndex) {
+                // UNTOUCHED GOES BACK AS THE BOOK HOLDS IT, id or no id. A part
+                // with no id (the desktop calculator's) was not found by id,
+                // fell through to "a part added here", and was costed again at
+                // today's rates from 0 hours, losing its colour and its model.
                 guard now != d.opened else { out.append(.object(raw)); continue }
+                // Edited: the edit is made by id, so one without is lent this
+                // read's id for the edit and handed back without it; the rule
+                // gives a changed id-less part a real id of its own.
+                let lent = Self.plainString(raw["id"]) == nil
+                if lent { raw["id"] = .string(stored) }
                 let recost = d.opened.map {
                     $0.grams != now.grams || $0.hours != now.hours || $0.qty != now.qty || $0.spoolId != now.spoolId
                 } ?? true
@@ -109,7 +118,10 @@ extension Shop {
                 let one = JSONValue.object(["parts": .array([.object(raw)])])
                 let edited = Self.orderWithPartEdited(one, partId: stored, now, opened: d.opened,
                                                       spool: spool, costed: costed, reclaimsTax: reclaimsTax)
-                if case .array(let rows)? = Self.asObject(edited)?["parts"], let first = rows.first { out.append(first) }
+                if case .array(let rows)? = Self.asObject(edited)?["parts"], case .object(var first)? = rows.first {
+                    if lent { first.removeValue(forKey: "id") }
+                    out.append(.object(first))
+                }
             } else {
                 let costed = await costedPart(spoolId: d.spoolId, grams: TypedNumber.parse(d.grams) ?? 0,
                                               hours: TypedNumber.parse(d.hours) ?? 0, qty: d.qty)

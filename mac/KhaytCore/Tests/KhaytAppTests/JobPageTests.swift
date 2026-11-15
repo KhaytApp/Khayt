@@ -22,10 +22,11 @@ struct JobPageTests {
         #expect(Shop.JobsLayout.list.titleKey == "mac.view_table")
         #expect(Shop.JobsLayout.page.titleKey == "mac.view_list")
         #expect(Shop.JobsLayout(rawValue: "page") == .page)
-        // New windows still open on the Table: nothing defaults to List yet.
-        #expect(Shop().jobsLayout == .list)
+        // A NEW window opens on the List (S1 B5). One that was saved keeps
+        // what it saved, so a window left on the Table is still the Table
+        // (Turki, Q1): the stored word wins over this default.
         #expect(MenuCoverageTests.source("ShopWindow.swift")
-            .contains("@SceneStorage(\"jobs.layout\") private var storedJobsLayout = Shop.JobsLayout.list.rawValue"))
+            .contains("@SceneStorage(\"jobs.layout\") private var storedJobsLayout = Shop.JobsLayout.page.rawValue"))
     }
 
     @Test("the List shows the page, any stage, and has no side panel beside it")
@@ -148,4 +149,55 @@ struct JobPageTests {
         #expect(rows[firstOver...].allSatisfy { Stage.of($0).map(over.contains) ?? false }, "no open job below a finished one")
         #expect(firstOver > 0, "the sample has open work")
     }
+
+    // MARK: - The page is home (B5)
+
+    @Test("opening a job lands on its page, from the board, a stage, or another screen")
+    func openingAJob() async throws {
+        let shop = await Self.shop()
+        let job = try #require(shop.orders.first)
+        for start: Shop.Shelf in [.jobs(nil), .jobs(.printing), .customers, .dashboard] {
+            shop.shelf = start
+            shop.jobsLayout = .board
+            shop.search = "nothing matches this"
+            shop.openJobPage(job.id)
+            #expect(shop.showingJobPage, "from \(start)")
+            #expect(shop.shelf == .jobs(nil) && shop.selection == job.id)
+            #expect(shop.search.isEmpty, "a search left on would hide the job that was opened")
+        }
+    }
+
+    @Test("every way of saying 'this job' goes through the one function")
+    func theEntryPointsAreWired() {
+        #expect(MenuCoverageTests.source("Kanban.swift").contains("shop.openJobPage(job.id)"))
+        #expect(MenuCoverageTests.source("OrdersTable.swift").contains("shop.openJobPage(id)"))
+        #expect(MenuCoverageTests.source("Shop+GoTo.swift").contains("openJobPage(entry.id)"))
+        #expect(MenuCoverageTests.source("Shop+StoreOrders.swift").contains("func goToJob(_ id: Order.ID) { openJobPage(id) }"))
+        // Today's rows, the ledger, a spending line and a scanned label too
+        // (Dev Hub, before beta.37): "open a job" behaves one way everywhere.
+        let dashboard = MenuCoverageTests.source("Dashboard.swift")
+        #expect(dashboard.components(separatedBy: "shop.openJobPage(").count - 1 == 3)
+        for (file, call) in [("Ledger.swift", "shop.openJobPage(order.id)"),
+                             ("TodayPieces.swift", "shop.openJobPage(order.id)"),
+                             ("Spending.swift", "shop.openJobPage(row.orderId)"),
+                             ("Shop+Jobs.swift", "openJobPage(job.id)")] {
+            #expect(MenuCoverageTests.source(file).contains(call), "\(file) opens a job its own way")
+        }
+        // And none of them still does it by hand: the table with a row chosen.
+        // (The dashboard and the board also go to Jobs with NO job, which is right.)
+        for file in ["Ledger.swift", "TodayPieces.swift", "Spending.swift"] {
+            #expect(!MenuCoverageTests.source(file).contains("shop.shelf = .jobs(nil)"),
+                    "\(file) goes to Jobs without opening the job")
+        }
+    }
+
+    @Test("⌘K and a khayt://job link open the page")
+    func paletteAndLink() async throws {
+        let shop = await Self.shop()
+        let job = try #require(shop.orders.first)
+        shop.shelf = .dashboard
+        shop.goTo(GoToIndex.Entry(kind: .job, id: job.id, title: job.id, fields: []))
+        #expect(shop.showingJobPage && shop.selection == job.id)
+    }
+
 }

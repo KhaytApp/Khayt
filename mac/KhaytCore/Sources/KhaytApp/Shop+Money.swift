@@ -1087,10 +1087,20 @@ extension Shop {
 
         let refusals = Self.partsRefusalWords(words)
         let reclaims = reclaimsTax
+        let place = partPlace(orderId, partId: partId)
         return await writeToOneOrder(orderId, named: words.callIt("mac.edit_part"), as: .person("orders", "edit")) { order, engine, root in
-            let edited = Self.orderWithPartEdited(
-                order, partId: partId, now, opened: opened, spool: spool, costed: costed,
+            // A part with no id in the book is lent this read's id for the
+            // edit. One that cannot be found is REFUSED: the edit used to find
+            // nothing, write nothing and close the sheet as if it had saved.
+            let (found, lent) = Self.lendingPartId(order, partId: partId, at: place, named: opened?.name)
+            guard case .array(let rows)? = Self.asObject(found)?["parts"],
+                  rows.contains(where: { Self.recordId($0) == partId }) else {
+                throw MoveRefused(sentence: refusals["missing"]!)
+            }
+            var edited = Self.orderWithPartEdited(
+                found, partId: partId, now, opened: opened, spool: spool, costed: costed,
                 reclaimsTax: reclaims)
+            if lent { edited = Self.returningLentId(edited, partId: partId) }
             return try await Self.jobWithParts(of: edited, on: order, keepPrice: keepPrice,
                                                settings: Self.settings(root), engine: engine, refusals: refusals)
         }
@@ -1102,8 +1112,14 @@ extension Shop {
     @discardableResult
     func removePart(_ orderId: Order.ID, partId: String, keepPrice: Bool = false) async -> Bool {
         let refusals = Self.partsRefusalWords(words)
+        let place = partPlace(orderId, partId: partId)
         return await writeToOneOrder(orderId, named: words.callIt("mac.parts_remove"), as: .person("orders", "edit")) { order, engine, root in
-            guard case .object(var record) = order, case .array(let rows)? = record["parts"] else {
+            // Lent an id first when the book holds it without one, so the one
+            // filter below takes exactly that part; a part that is not there
+            // is refused, never "removed" by writing the job back unchanged.
+            let (found, _) = Self.lendingPartId(order, partId: partId, at: place, named: nil)
+            guard case .object(var record) = found, case .array(let rows)? = record["parts"],
+                  rows.contains(where: { Self.recordId($0) == partId }) else {
                 throw MoveRefused(sentence: refusals["missing"]!)
             }
             record["parts"] = .array(rows.filter { Self.recordId($0) != partId })
@@ -1194,7 +1210,12 @@ extension Shop {
     }
 
     /// A part as the book holds it, every field.
-    func rawPart(_ orderId: Order.ID, partId: String) -> [String: JSONValue]? {
+    ///
+    /// `index` finds a part the book holds WITHOUT an id. The desktop's
+    /// calculator writes parts that way (`Order.Part.id` is made up on each
+    /// read for those), so the id finds nothing; its place in the job does.
+    /// Only a row that really has no id is taken by place.
+    func rawPart(_ orderId: Order.ID, partId: String, at index: Int? = nil) -> [String: JSONValue]? {
         guard case .object(let order)? = orderRows.first(where: {
             if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == orderId }
             return false
@@ -1202,7 +1223,49 @@ extension Shop {
         for row in rows {
             if case .object(let part) = row, case .string(let id)? = part["id"], id == partId { return part }
         }
+        if let index = index ?? partPlace(orderId, partId: partId), rows.indices.contains(index),
+           case .object(let part) = rows[index], Self.plainString(part["id"]) == nil { return part }
         return nil
+    }
+
+    /// Where a part sits in its job, by the id the screen holds for it.
+    ///
+    /// For a part the book holds without an id, that id was made up when the
+    /// book was last read, so it names the part only until the next read. A
+    /// sheet opened before a reload finds nothing here, and its save is
+    /// refused as "gone" instead of landing on whichever part moved into
+    /// that place.
+    func partPlace(_ orderId: Order.ID, partId: String) -> Int? {
+        orders.first { $0.id == orderId }?.parts.firstIndex { $0.id == partId }
+    }
+
+    /// `order` with the id-less part at `place` LENT `partId`, so an edit made
+    /// by id can find it. Nothing is lent when a part already carries that id,
+    /// when the row at `place` has an id of its own, or when its name is not
+    /// the one the sheet opened (`named`): the book moved under the sheet.
+    nonisolated static func lendingPartId(_ order: JSONValue, partId: String, at place: Int?,
+                                          named: String?) -> (order: JSONValue, lent: Bool) {
+        guard case .object(var record) = order, case .array(var rows)? = record["parts"] else { return (order, false) }
+        if rows.contains(where: { recordId($0) == partId }) { return (order, false) }
+        guard let place, rows.indices.contains(place), case .object(var part) = rows[place],
+              plainString(part["id"]) == nil else { return (order, false) }
+        let stored = plainString(part["name"]) ?? ""
+        if let named, !stored.isEmpty, stored != named { return (order, false) }
+        part["id"] = .string(partId)
+        rows[place] = .object(part)
+        record["parts"] = .array(rows)
+        return (.object(record), true)
+    }
+
+    /// The lent id taken back off, so the book never holds a made-up one.
+    nonisolated static func returningLentId(_ order: JSONValue, partId: String) -> JSONValue {
+        guard case .object(var record) = order, case .array(let rows)? = record["parts"] else { return order }
+        record["parts"] = .array(rows.map { row in
+            guard case .object(var part) = row, plainString(part["id"]) == partId else { return row }
+            part.removeValue(forKey: "id")
+            return .object(part)
+        })
+        return .object(record)
     }
 
     /// `orderWithPartEdited`, writing only the fields that differ from what

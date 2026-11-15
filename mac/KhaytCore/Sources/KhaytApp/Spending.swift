@@ -588,9 +588,7 @@ struct Waste: View {
                             let job = shop.orders.first { $0.id == row.orderId }
                             Button {
                                 guard job != nil else { return }
-                                shop.shelf = .jobs(nil)
-                                shop.search = ""
-                                shop.selection = row.orderId
+                                shop.openJobPage(row.orderId)
                             } label: {
                                 DetailLine((job.map { $0.project.isEmpty ? $0.reference : $0.project } ?? row.orderId)
                                            + " \u{00B7} " + shop.words.counting(row.count, "mac.waste_n_failures"),

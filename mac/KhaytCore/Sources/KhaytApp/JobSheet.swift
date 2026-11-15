@@ -29,6 +29,9 @@ struct JobSheet: View {
         let id: String
         /// The stored part this is; nil for one added here.
         var storedId: String?
+        /// Its place among the job's parts as it opened: how a part the book
+        /// holds with no id is found again (`Shop.rawPart(_:partId:at:)`).
+        var storedIndex: Int?
         var name = ""
         var grams = ""
         var hours = ""
@@ -347,9 +350,7 @@ struct JobSheet: View {
 
     private func section<Content: View>(_ key: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(shop.words.callIt(key))
-                .textCase(.uppercase)
-                .font(.caption.monospaced()).foregroundStyle(.secondary)
+            Text(shop.words.callIt(key)).sectionCaps(shop.words)
             content()
         }
     }
@@ -384,9 +385,11 @@ struct JobSheet: View {
         was.discount = Self.percent(Shop.plainNumber(fields["discountPct"]) ?? 0)
         form = was
         opened = was
-        let drafts: [PartDraft] = (job?.parts ?? []).map { part in
-            let o = EditPartSheet.opening(part, raw: shop.rawPart(subject.id, partId: part.id), spools: shop.spools)
-            return PartDraft(id: part.id, storedId: part.id, name: o.name, grams: o.grams, hours: o.hours,
+        let drafts: [PartDraft] = (job?.parts ?? []).enumerated().map { index, part in
+            let o = EditPartSheet.opening(part, raw: shop.rawPart(subject.id, partId: part.id, at: index),
+                                          spools: shop.spools)
+            return PartDraft(id: part.id, storedId: part.id, storedIndex: index,
+                             name: o.name, grams: o.grams, hours: o.hours,
                              qty: o.qty, spoolId: o.spoolId, opened: o, delivered: part.delivered)
         }
         parts = drafts
@@ -464,6 +467,23 @@ struct JobSheet: View {
             let wrote = await shop.saveJob(subject.id, pending)
             saving = false
             if wrote, shop.moveProblem == nil { shop.clearQuestion() }
+        }
+    }
+}
+
+extension View {
+    /// A group's name over its fields: small capitals in the mono face.
+    ///
+    /// NOT IN ARABIC. A monospaced face has no joined Arabic forms, so the
+    /// system drew each letter standing alone ("ا ل ع م ل" for "العمل") on
+    /// the job page, Edit Job and New Job. Found in the beta.37 pre-release
+    /// captures. Arabic takes the text face, a little heavier, and has no
+    /// capitals to raise.
+    @ViewBuilder func sectionCaps(_ words: Words) -> some View {
+        if words.isRTL {
+            self.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+        } else {
+            self.textCase(.uppercase).font(.caption.monospaced()).foregroundStyle(.secondary)
         }
     }
 }
