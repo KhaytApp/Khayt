@@ -1536,7 +1536,7 @@
  "mac.margin_at_least": "Marj",
  "mac.mark_all_not_business": "Tümünü İşle İlgisiz Olarak İşaretle",
  "mac.mark_dried": "Bugün kurutuldu",
- "mac.markup": "Kâr payı",
+ "mac.markup": "Maliyet üzeri kâr",
  "mac.material_ph": "PLA, PETG, Reçine…",
  "mac.mb_bad_name": "Paket, Khayt'in açmayacağı bir dosyayı adlandırıyor: {name}",
  "mac.mb_bundle_figures": "Paketin tahmini (başka bir dükkânın dilimlemesi): {figures}",
