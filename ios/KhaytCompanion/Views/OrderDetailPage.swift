@@ -911,7 +911,7 @@ struct JobMoneyCard: View {
                             .foregroundStyle(expired ? KhaytDesign.late : KhaytDesign.ink)
                     }
                 }
-                marginLine
+                markupLine
             } else if let payment {
                 let overdue = JobDue.owingIsOverdue(owed: payment.owed, due: order.dueDate)
                 line(L10n.tr("job.money.price")) { Text(Money.text(payment.billed, currency)).foregroundStyle(KhaytDesign.ink) }
@@ -924,7 +924,7 @@ struct JobMoneyCard: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(overdue ? KhaytDesign.late : KhaytDesign.ink)
                 }
-                marginLine
+                markupLine
                 if let onRecord {
                     Divider().overlay(KhaytDesign.hairline)
                     Button(action: onRecord) {
@@ -946,9 +946,9 @@ struct JobMoneyCard: View {
 
     /// "38%", or "—" where the rule cannot say (a typed price, no parts).
     @ViewBuilder
-    private var marginLine: some View {
+    private var markupLine: some View {
         if let margin {
-            line(L10n.tr("mac.margin")) {
+            line(L10n.tr("mac.markup")) {
                 Text(margin.text)
                     .foregroundStyle(margin.percent == nil ? KhaytDesign.note : KhaytDesign.ink)
             }
