@@ -39,6 +39,7 @@
     "test:e2e:paylink": "node scripts/e2e-quote-pay-link-smoke.mjs",
     "test:e2e:paidfloor": "node scripts/e2e-editor-paid-floor-smoke.mjs",
     "test:e2e:jobpage": "node scripts/e2e-job-page-smoke.mjs",
+    "test:e2e:jobsheet": "node scripts/e2e-job-sheet-smoke.mjs",
     "test:e2e:paylinkkeys": "node scripts/e2e-pay-link-keys-smoke.mjs",
     "test:e2e:webhooks": "node scripts/e2e-webhook-bus-smoke.mjs",
     "test:e2e:lots": "node scripts/e2e-lot-recall-smoke.mjs",
