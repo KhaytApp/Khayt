@@ -167,4 +167,97 @@ struct JobSheetTests {
         #expect(after["printTime"] == part["printTime"])
     }
 
+
+    /// Three parts with no id, as the calculator leaves them.
+    static func idless(_ name: String, _ cost: Double, colour: String, file: String) -> JSONValue {
+        .object(["name": .string(name), "material": .string("PLA"), "colour": .string(colour),
+                 "printFileId": .string(file), "printWeight": .number(100), "printTime": .number(2),
+                 "qty": .number(1), "unitCost": .number(cost), "baseCost": .number(cost)])
+    }
+
+    @Test("removing one of three id-less parts leaves the other two exactly as stored")
+    func removalKeepsTheOthers() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try KhaytEngine()
+        let stored = [Self.idless("One", 60, colour: "red", file: "PF-1"),
+                      Self.idless("Two", 80, colour: "blue", file: "PF-2"),
+                      Self.idless("Three", 40, colour: "green", file: "PF-3")]
+        // 180 of cost at 50%: 270.
+        let order = JobPartsRuleTests.with(JobPartsRuleTests.job(["price": .number(270), "printTime": .number(6)]),
+                                           parts: stored)
+        shop.orderRows = [order]
+        // The sheet's drafts, as it opened: each part's place among the three.
+        let drafts: [JobSheet.PartDraft] = try stored.enumerated().map { index, row in
+            let raw = try #require(shop.rawPart("J1", partId: "read-\(index)", at: index))
+            let o = EditPartSheet.Opened(name: Shop.plainString(raw["name"]) ?? "", grams: "100", hours: "2",
+                                         qty: 1, spoolId: nil)
+            return JobSheet.PartDraft(id: "read-\(index)", storedId: "read-\(index)", storedIndex: index,
+                                      name: o.name, grams: o.grams, hours: o.hours, qty: 1, spoolId: nil, opened: o)
+        }
+        // Part ONE is removed in the sheet: the places are the ones it opened
+        // with, not the places in the shorter list.
+        let kept = await shop.partsForSave("J1", drafts: Array(drafts.dropFirst()))
+        #expect(kept == [stored[1], stored[2]], "Two and Three, byte for byte: cost, colour, linked model")
+
+        var save = Shop.JobSave()
+        save.parts = kept
+        let out = try await Shop.jobSaved(order, save, clients: [], settings: [:], engine: engine,
+                                          refusals: Shop.jobSaveRefusalWords(shop.words), now: Date())
+        guard case .array(let after)? = Shop.asObject(out)?["parts"] else { Issue.record("parts"); return }
+        #expect(after == [stored[1], stored[2]])
+        #expect(Shop.plainNumber(Shop.asObject(out)?["price"]) == 180, "120 of cost at the job's 50%")
+    }
+
+    // MARK: - The single-part editor, on a part with no id
+
+    @Test("one id-less part edited from the page: found by place, the others untouched, no made-up id written")
+    func singlePartEditor() async throws {
+        let engine = try KhaytEngine()
+        let shop = Shop()
+        let stored = [Self.idless("One", 60, colour: "red", file: "PF-1"),
+                      Self.idless("Two", 80, colour: "blue", file: "PF-2")]
+        let order = JobPartsRuleTests.with(JobPartsRuleTests.job(["price": .number(210)]), parts: stored)
+        let was = EditPartSheet.Opened(name: "Two", grams: "100", hours: "2", qty: 1, spoolId: nil)
+        var now = was
+        now.name = "Two, v2"
+
+        let (found, lent) = Shop.lendingPartId(order, partId: "read-1", at: 1, named: was.name)
+        #expect(lent)
+        var edited = Shop.orderWithPartEdited(found, partId: "read-1", now, opened: was, spool: nil, costed: nil)
+        edited = Shop.returningLentId(edited, partId: "read-1")
+        let out = try await Shop.jobWithParts(of: edited, on: order, keepPrice: false, settings: [:], engine: engine,
+                                              refusals: Shop.partsRefusalWords(shop.words))
+        guard case .array(let after)? = Shop.asObject(out.order)?["parts"], after.count == 2,
+              case .object(let two) = after[1] else { Issue.record("two parts back"); return }
+        #expect(after[0] == stored[0], "the part not edited is exactly as stored")
+        #expect(two["name"] == .string("Two, v2"))
+        #expect(two["id"] != .string("read-1"), "the made-up id reached the book")
+        #expect(two["colour"] == .string("blue") && two["printFileId"] == .string("PF-2") && two["baseCost"] == .number(80))
+        #expect(Shop.plainNumber(Shop.asObject(out.order)?["price"]) == 210, "a rename moves no price")
+    }
+
+    @Test("nothing is lent when the place holds another part, or one with an id of its own")
+    func lendingIsCareful() {
+        let order = JobPartsRuleTests.with(JobPartsRuleTests.job(), parts: [
+            Self.idless("One", 60, colour: "red", file: "PF-1"), JobPartsRuleTests.part("B", 40)])
+        #expect(!Shop.lendingPartId(order, partId: "x", at: 0, named: "Somebody else").lent,
+                "the book moved under the sheet: that place is another part now")
+        #expect(!Shop.lendingPartId(order, partId: "x", at: 1, named: nil).lent, "it has an id of its own")
+        #expect(!Shop.lendingPartId(order, partId: "x", at: 7, named: nil).lent)
+        #expect(!Shop.lendingPartId(order, partId: "x", at: nil, named: nil).lent)
+        #expect(!Shop.lendingPartId(order, partId: "B", at: 0, named: nil).lent, "a part already carries that id")
+        let (found, lent) = Shop.lendingPartId(order, partId: "x", at: 0, named: "One")
+        #expect(lent)
+        #expect(Shop.returningLentId(found, partId: "x") == order)
+    }
+
+    @Test("the single-part save and remove refuse a part they cannot find, and look by place")
+    func singlePartIsWired() {
+        let money = EmptyStateTests.source("Shop.swift")
+        #expect(money.components(separatedBy: "let place = partPlace(orderId, partId: partId)").count - 1 == 2)
+        #expect(money.components(separatedBy: "Self.lendingPartId(order, partId: partId, at: place").count - 1 == 2)
+        #expect(money.contains("if lent { edited = Self.returningLentId(edited, partId: partId) }"))
+    }
+
 }
