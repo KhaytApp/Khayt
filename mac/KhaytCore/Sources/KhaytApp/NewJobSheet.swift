@@ -126,6 +126,10 @@ struct NewJobSheet: View {
     /// normal | high | urgent, as `lib/order-new.js newOrder` takes it.
     @State private var priority = "normal"
     @State private var quoted: QuoteTotal?
+    /// The currency `quoted` is in: the customer's, when they are kept in one.
+    @State private var quotedCurrency: String?
+    /// The rule's own answer to "can this be taken?" (`canTake`): it has a part.
+    @State private var takeable = false
     @State private var problem: String?
     /// Save found a part still in the fields and put it on the job; the next
     /// press saves. Shown as a caption until then.
@@ -246,6 +250,9 @@ struct NewJobSheet: View {
         if let seed {
             _project = State(initialValue: seed.project)
             _parts = State(initialValue: seed.parts)
+            // Until the rule has answered (`reprice`): a sheet opened with
+            // parts can be taken, as `canTake` will say.
+            _takeable = State(initialValue: !seed.parts.isEmpty)
             _product = State(initialValue: seed.product)
             _componentsCost = State(initialValue: seed.componentsCost)
             _assemblyQty = State(initialValue: seed.assemblyQty)
@@ -1059,6 +1066,11 @@ struct NewJobSheet: View {
             Text(shop.words.callIt("common.total")).foregroundStyle(.secondary)
             Text(quoted.map { Money.figure($0.total) } ?? "—")
                 .font(.title2.weight(.semibold)).monospacedDigit()
+            // A customer kept in another currency is quoted in theirs: said,
+            // so the figure is never read as the shop's money.
+            if quoted != nil, let quotedCurrency, quotedCurrency != shop.currency {
+                Text(verbatim: quotedCurrency).font(.callout).foregroundStyle(.secondary)
+            }
             if let quoted, quoted.differsFromComputed, let computed = quoted.computedTotal {
                 // A rounded or typed total never passes for a calculated one.
                 Text(shop.words.callIt(quoted.priceSource == "override" ? "pe.price_is_override" : "pe.price_is_rounded")
@@ -1126,10 +1138,10 @@ struct NewJobSheet: View {
             // sheet was opened to make a quote.
             Button(shop.words.callIt("mac.save_quote")) { Task { await save(asQuote: true) } }
                 .keyboardShortcut(preferQuote ? .defaultAction : nil)
-                .disabled((parts.isEmpty && !draft.isComplete) || priceNotRead)
+                .disabled((!takeable && !draft.isComplete) || priceNotRead)
             Button(shop.words.callIt("mac.take_the_job")) { Task { await save(asQuote: false) } }
                 .keyboardShortcut(preferQuote ? nil : .defaultAction)
-                .disabled((parts.isEmpty && !draft.isComplete) || priceNotRead)
+                .disabled((!takeable && !draft.isComplete) || priceNotRead)
         }
         .padding(18)
     }
@@ -1160,17 +1172,7 @@ struct NewJobSheet: View {
     /// Everything the price depends on, so the preview re-runs when any of it
     /// moves and not on every keystroke in the job's name.
     private var signature: String {
-        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)h\($0.hours)" }.joined())|\(shop.overheadPerHour)|\(product?.id ?? "")|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
-    }
-
-    /// The cart in two halves, the way the rule takes it: what is priced at
-    /// cost plus margin, and what the customer has already agreed.
-    private var costedBase: Double {
-        parts.filter { $0.agreedPrice == nil }.reduce(0) { $0 + $1.cost * Double($1.qty) }
-            + componentsCost
-    }
-    private var agreedAmount: Double {
-        parts.reduce(0) { $0 + ($1.agreedPrice ?? 0) * Double($1.qty) }
+        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)h\($0.hours)" }.joined())|\(shop.overheadPerHour)|\(product?.id ?? "")|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)|\(clientId ?? "")|\(assemblyQty)"
     }
 
     private func addPart() async {
@@ -1268,19 +1270,33 @@ struct NewJobSheet: View {
         }
     }
 
+    /// The job as `newOrder` will be handed it. ONE builder for the preview
+    /// and the save, so the two cannot be given different jobs.
+    private func jobInput(asQuote: Bool) -> [String: JSONValue] {
+        shop.newJobInput(
+            parts: parts, project: project, clientId: clientId,
+            margin: margin, discountPct: discountPct, shippingCost: shippingCost,
+            deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
+            assemblyQty: hasComponents ? Double(assemblyQty) : nil,
+            rule: rule, extraLines: extraLines,
+            // The rate the preview was priced at, so the job is saved at the
+            // price the sheet showed.
+            overheadPerHour: shop.overheadPerHour,
+            notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
+            priorityLevel: priority,
+            carried: carried)
+    }
+
+    /// The total, from the rule the job is saved by (`previewTotal`): the
+    /// costed base, what was agreed, the overhead hours and the customer's
+    /// currency are worked out there, once, for every app.
     private func reprice() async {
-        guard !parts.isEmpty else { quoted = nil; return }
-        // The cart's print hours, for the overhead line — counted by the rule
-        // the saved job is priced with, so this preview is the saved price.
-        // None on a job taken from a product: the catalogue, the storefront
-        // and a shelf sale price it without the line, and so does this.
-        let hours = await shop.overheadHours(of: parts, productId: product?.id)
-        quoted = await shop.previewQuote(
-            baseCost: costedBase,
-            margin: margin, discountPct: discountPct,
-            shippingCost: shippingCost, rush: rush,
-            agreedAmount: agreedAmount, rule: rule, extraLines: extraLines,
-            overheadHours: hours)
+        let input = jobInput(asQuote: preferQuote)
+        takeable = await shop.canTakeNewJob(input)
+        guard !parts.isEmpty else { quoted = nil; quotedCurrency = nil; return }
+        let preview = await shop.previewNewJob(input)
+        quoted = preview?.quote
+        quotedCurrency = preview?.currency
     }
 
     /// The shop's minimum order amount when `total` is under it, else nil.
@@ -1322,18 +1338,7 @@ struct NewJobSheet: View {
             let warnings = await shop.overcommitWarnings(for: parts)
             if !warnings.isEmpty { overcommitted = warnings; return }
         }
-        await shop.createJob(shop.newJobInput(
-            parts: parts, project: project, clientId: clientId,
-            margin: margin, discountPct: discountPct, shippingCost: shippingCost,
-            deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
-            assemblyQty: hasComponents ? Double(assemblyQty) : nil,
-            rule: rule, extraLines: extraLines,
-            // The rate the preview above was priced at, so the job is saved at
-            // the price the sheet showed.
-            overheadPerHour: shop.overheadPerHour,
-            notes: notes, dueDate: promised && !asQuote ? Shop.localDay(promisedDay) : nil,
-            priorityLevel: priority,
-            carried: carried))
+        await shop.createJob(jobInput(asQuote: asQuote))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }
