@@ -458,7 +458,10 @@ test('the calculator works the rate out once, not per keystroke, and again when 
 
 test('every save that changes the rate clears the calculator\'s copy', () => {
   assert.match(fnSource('renderer/settings.js', 'wireOverheadSettings'), /clearOverheadCache\(\);\n\s+saveAll\(\);/);
-  assert.match(fnSource('renderer/order-flows.js', 'logPrint'),
+  // Every new job (the calculator's Log and the New Job sheet) is recorded by
+  // recordNewJob, and logPrint goes through it.
+  assert.match(fnSource('renderer/order-flows.js', 'logPrint'), /recordNewJob\(entry, asQuote/);
+  assert.match(fnSource('renderer/order-flows.js', 'recordNewJob'),
     /printLog\.unshift\(entry\);\n[^\n]*\n\s+if \(typeof clearOverheadCache === 'function'\) clearOverheadCache\(\);/);
   assert.match(fnSource('renderer/machines.js', 'deleteMachine'), /clearOverheadCache\(\)/);
   assert.match(read('renderer/machines.js'),
