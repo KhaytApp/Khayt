@@ -429,6 +429,34 @@ struct InvoiceTests {
 
     /// A print waits on WebKit's process. Without the process the print
     /// operation never reports back, so the wait has to be ended for it.
+    ///
+    /// ── THE PROCESS IS STOPPED, NOT KILLED, WHILE THE PRINT IS LIVE ───────
+    ///
+    /// This test used to SIGKILL WebKit's process 300 ms after starting the
+    /// print, and is the ONLY test that had a print operation alive across
+    /// the death of its page's process. Mac CI died three times in two days
+    /// on PRs with no Mac code in them (#2433, #2440, #2471), each time in
+    /// this shard, and the two crash reports CI printed are the same:
+    ///
+    ///     EXC_BAD_ACCESS (SIGSEGV) at 0x78, main thread
+    ///     WebKit::WebPageProxy::headerHeightForPrinting(WebFrameProxy&)
+    ///     -[WKPrintingView _adjustPrintingMarginsForHeaderAndFooter]
+    ///
+    /// — WebKit's printing view, on the main thread, reading a page that has
+    /// gone. A live print operation is not ours to cancel, so once the
+    /// process dies under one, whether that step still runs is WebKit's and
+    /// AppKit's timing, not this test's. WHAT IS NOT KNOWN: the exact
+    /// interleaving. It did not reproduce here — not with the kill moved to
+    /// the instant the print starts, nor in twelve rounds of the old sequence
+    /// under a CPU load of twenty busy processes. The fix does not depend on
+    /// it: it removes the condition, a process dying under a live print.
+    ///
+    /// So the paper is TOLD the process went — the very callback WebKit
+    /// makes — while the process is only stopped. The wait ends, which is
+    /// what this test is about; the process is then let run, the abandoned
+    /// operation finishes against a page that still exists, and only when
+    /// AppKit has reported is the paper printed again. A real kill, with no
+    /// print in flight, is `drawnAgainAfterItsProcessEnds` above.
     @Test("a print whose WebKit process ends under it fails instead of waiting for ever")
     func aPrintIsNotLeftWaiting() async throws {
         let doc = try await Self.build(Self.paper())
@@ -437,12 +465,27 @@ struct InvoiceTests {
         let process = Self.webProcess(paper)
         try #require(process > 1, "this WebKit does not say which process draws the page")
 
-        // Stopped, so the print is certainly still waiting when it ends.
+        // Stopped, so the print is certainly still waiting when it is told.
         kill(process, SIGSTOP)
+        // Whatever happens below, the process is never left stopped.
+        defer { kill(process, SIGCONT) }
         async let printed: Data? = try? await paper.pdf()
-        try await Task.sleep(for: .milliseconds(300))
-        kill(process, SIGKILL)
+        for _ in 0..<3_000 where !paper.isPrinting {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(paper.isPrinting, "the print never started waiting")
+
+        paper.webViewWebContentProcessDidTerminate(paper.webView)
         #expect(await printed == nil, "a print of a page whose process had gone came back with a file")
+        #expect(paper.processLosses == 1)
+
+        // The operation whose wait was ended is still AppKit's. Let the
+        // process answer it, and wait for AppKit to say it is over.
+        kill(process, SIGCONT)
+        for _ in 0..<6_000 where paper.printStillRunning {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!paper.printStillRunning, "the abandoned print never reported back: \(paper.condition)")
 
         try await Self.waitUntilDrawn(paper)
         #expect(try await paper.pdf().count > 8_000, "and the paper prints once it is drawn again")
