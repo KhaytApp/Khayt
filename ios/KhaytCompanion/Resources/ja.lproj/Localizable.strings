@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "支払い済み";
 "mac.parts_paid_exceeds" = "この変更で請求額が入金済み額を下回ります。先に差額を返金するかクレジットノートを発行してください。";
 "mac.markup" = "上乗せ率";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "価格が手入力されているため、上乗せ率では変わりません。先に「または価格を指定」を空にしてください。";
+"mac.js_markup_bad" = "上乗せ率は0以上の数値で入力してください。";
+"mac.js_markup_q" = "お客様はこの案件の価格をすでに見ています。新しい上乗せ率で価格を変更しますか？";
+"mac.js_markup_change" = "価格を変更";
+"mac.js_new_total" = "新しい合計";

@@ -1433,3 +1433,10 @@
 "job.pill.paid" = "Bezahlt";
 "mac.parts_paid_exceeds" = "Diese Änderung würde die Rechnung unter den bereits gezahlten Betrag senken. Erstatten Sie zuerst die Differenz oder stellen Sie eine Gutschrift aus.";
 "mac.markup" = "Aufschlag";
+
+/* Edit job: the markup (Mac #2494, the Mac's words). */
+"mac.js_markup_fixed" = "Der Preis wurde eingegeben, ein Aufschlag kann ihn nicht ändern. Leere zuerst „Oder Preis festlegen“.";
+"mac.js_markup_bad" = "Gib den Aufschlag als Zahl ein, 0 oder mehr.";
+"mac.js_markup_q" = "Der Kunde hat den Preis dieses Auftrags gesehen. Auf den neuen Aufschlag ändern?";
+"mac.js_markup_change" = "Preis ändern";
+"mac.js_new_total" = "Neue Summe";
