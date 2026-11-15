@@ -39,7 +39,24 @@ final class LanDevices: @unchecked Sendable {
         var pinTag: Data
         var createdAt: Date
         var lastSeenAt: Date
+        /// What enrolled: nil is a phone (every device saved before kinds
+        /// existed), `kindConnector` a slicer plugin. See `isRestricted`.
+        var kind: String? = nil
     }
+
+    // ── A CONNECTOR OPENS ITS OWN ROUTES AND NOTHING ELSE ──────────────────
+    //
+    // A phone's key opens whatever the owner PIN opens, `/api/store` included:
+    // the phone is the owner's. A connector (the Khayt for OrcaSlicer plugin)
+    // runs inside somebody's slicer and only sends slices and reads a redacted
+    // queue, so its key opens `/api/connectors/*` and is refused everywhere
+    // else (`LanServer.connectorRefusal`). Any kind this build does not know
+    // is held to the same rule: a newer app's device fails closed here.
+    static let kindConnector = "connector"
+    static let connectorPrefix = "/api/connectors/"
+
+    /// True for every device that is not a phone.
+    static func isRestricted(kind: String?) -> Bool { kind != nil }
 
     struct Saved: Codable {
         var salt: Data
@@ -181,13 +198,14 @@ final class LanDevices: @unchecked Sendable {
         let name: String
         let createdAt: Date
         let lastSeenAt: Date
+        var kind: String? = nil
     }
 
     /// Every paired phone, the one seen most recently first.
     func list() -> [Listed] {
         lock.lock(); defer { lock.unlock() }
         return saved.devices
-            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt) }
+            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt, kind: $0.kind) }
             .sorted { $0.lastSeenAt > $1.lastSeenAt }
     }
 
@@ -211,6 +229,14 @@ final class LanDevices: @unchecked Sendable {
         return true
     }
 
+    /// The kind of an enrolled device, by the id a request names; nil for a
+    /// phone or an id nobody enrolled. Says nothing about the signature,
+    /// which `verify` judges: it only decides which routes may be asked.
+    func kind(of id: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return saved.devices.first(where: { $0.id == id })?.kind
+    }
+
     func removeAll() {
         lock.lock(); defer { lock.unlock() }
         saved.devices = []
@@ -232,7 +258,7 @@ final class LanDevices: @unchecked Sendable {
     func enrol(phonePublic: String, name: String, pin: String,
                identity: Curve25519.Signing.PrivateKey, now: Date,
                serverKey: Curve25519.KeyAgreement.PrivateKey = .init(),
-               deviceId: String = LanDevices.freshId()) throws -> Enrolled {
+               deviceId: String = LanDevices.freshId(), kind: String? = nil) throws -> Enrolled {
         guard let raw = Data(base64Encoded: phonePublic), raw.count == 32,
               let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
               let key = Self.derive(serverKey, theirs, deviceId: deviceId) else { throw EnrolError.badKey }
@@ -251,7 +277,7 @@ final class LanDevices: @unchecked Sendable {
             saved.devices.remove(at: oldest)
         }
         saved.devices.append(Device(id: deviceId, name: trimmed, key: key, pinTag: current,
-                                    createdAt: now, lastSeenAt: now))
+                                    createdAt: now, lastSeenAt: now, kind: kind))
         save()
         return Enrolled(deviceId: deviceId, publicKey: serverPublic, sig: sig.base64EncodedString())
     }

@@ -108,6 +108,11 @@ extension LanServer {
     func readSlicerUpload(_ connection: NWConnection, on queue: DispatchQueue, requestLine: [String],
                           headers: [String: String], start: Data, length: Int, remote: String,
                           slot: LargeBodySlot) async throws -> Request {
+        // A connector's key opens /api/connectors/* only, here as on every
+        // route (`connectorRefusal`): this head is judged before `route` runs.
+        if let refused = connectorRefusal(headers, path: Self.routePath(requestLine[1].split(separator: "?").first.map(String.init) ?? requestLine[1])) {
+            throw ReadRefusal.refused(refused)
+        }
         if let refused = await slicerGate(headers: headers, remote: remote) { throw ReadRefusal.refused(refused) }
         guard Multipart.boundary(headers["content-type"]) != nil, length > 0 else {
             throw ReadRefusal.refused(.json(400, #"{"error":"No file included"}"#))

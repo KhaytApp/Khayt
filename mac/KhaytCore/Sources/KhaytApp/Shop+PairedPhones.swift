@@ -18,7 +18,8 @@ extension Shop {
     nonisolated static let outsideTheApp = LanDevices.inMemory()
 
     func refreshPairedPhones() {
-        pairedPhones = lanDeviceStore.list()
+        // Phones only: a connector is not a phone, and gets its own list.
+        pairedPhones = lanDeviceStore.list().filter { $0.kind == nil }
     }
 
     /// Open the window a new phone may pair in, for `LanPairingWindow.length`.
