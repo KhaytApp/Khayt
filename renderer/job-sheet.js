@@ -18,7 +18,12 @@
  * photos, payments, instalments…) stays in the existing job editor, one click
  * away under the price.
  *
- * Opened from the job page's Edit.
+ * Opened from the job page's Edit, and — with nothing in it — as the NEW JOB
+ * sheet (Jobs › New job): the same three sections, the markup typed rather
+ * than read. Whether it can be taken and the live total are the shared rules
+ * `lib/order-new.js canTake` and `previewTotal` (no number allocated); the job
+ * is `newOrder`'s, priced by the same arithmetic, and recorded through
+ * `recordNewJob`, the one way the desktop records a new job.
  */
 (function (global) {
   'use strict';
@@ -60,27 +65,44 @@
     return rated;
   }
 
-  function openJobSheet(orderId) {
-    const order = list('printLog').find((o) => o.id === orderId);
-    if (!order || !ED() || typeof openFormModal !== 'function') return;
-    const lock = ED().partsLock(order);
-    const custLock = order.clientId ? ED().customerLocked(order) : null;
+  const NEW = () => global.KhaytOrderNew;
+  const bytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
+  /** The markup the calculator would use now: its own field, as typed there. */
+  const calcMarkup = () => {
+    const el = document.getElementById('margin');
+    const v = el ? +el.value : NaN;
+    return Number.isFinite(v) && v >= 0 ? v : 30;
+  };
+
+  /**
+   * One sheet for New and Edit (Figma 75:583). `orderId` edits that job;
+   * none opens a NEW job (`opts.clientId` to start it for a customer).
+   */
+  function openJobSheet(orderId, opts) {
+    const isNew = !orderId;
+    const order = isNew
+      ? { id: null, project: '', clientId: (opts && opts.clientId) || null, dueDate: '', notes: '', parts: [], discountPct: 0 }
+      : list('printLog').find((o) => o.id === orderId);
+    if (!order || !ED() || typeof openFormModal !== 'function' || (isNew && !NEW())) return;
+    // A new job has nothing to protect yet: every part may come and go.
+    const lock = isNew ? { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false } : ED().partsLock(order);
+    const custLock = !isNew && order.clientId ? ED().customerLocked(order) : null;
     const st = {
       parts: (order.parts || []).map((p) => JSON.parse(JSON.stringify(p))),
       touched: false,
       editing: -1,
       keepPrice: undefined,
     };
-    const ref = typeof jobRef === 'function' ? jobRef(order) : order.id;
-    const level = ED().priorityOf ? ED().priorityOf(order) : (order.priorityLevel || 'normal');
+    const ref = isNew ? '' : (typeof jobRef === 'function' ? jobRef(order) : order.id);
+    const level = isNew ? 'normal' : (ED().priorityOf ? ED().priorityOf(order) : (order.priorityLevel || 'normal'));
     const field = (label, inner, cls) => `<label class="js-field ${cls || ''}"><span>${escapeHtml(label)}</span>${inner}</label>`;
     const clientOpts = [`<option value="">${escapeHtml(t('js.no_customer'))}</option>`]
       .concat(list('clients').map((c) => `<option value="${escapeHtml(c.id)}"${c.id === order.clientId ? ' selected' : ''}>${escapeHtml(localName(c) || c.id)}</option>`)).join('');
     const filOpts = list('inventory').map((i) => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.material || i.id)}</option>`).join('');
-    const marg = ED().marginOf(order);
+    const marg = isNew ? null : ED().marginOf(order);
 
     const bodyHtml = `<div class="job-sheet">
-      <div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>
+      ${isNew ? '' : `<div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>`}
       <h4 class="js-sec">${escapeHtml(t('js.sec_job'))}</h4>
       ${field(t('js.name'), `<input type="text" data-js="project" value="${escapeHtml(order.project || '')}">`)}
       <div class="js-row">
@@ -105,11 +127,13 @@
       </div>` : `<p class="js-hint">${escapeHtml(t('js.parts_locked'))}</p>`}
       <h4 class="js-sec">${escapeHtml(t('js.sec_price'))}</h4>
       <div class="js-row">
-        <div class="js-field"><span>${escapeHtml(t('js.markup'))}</span><div class="js-static" data-js="markup">${escapeHtml(marg === null ? t('jp.margin_typed') : marg + ' %')}</div></div>
+        ${isNew
+          ? field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${escapeHtml(String(calcMarkup()))}">`)
+          : `<div class="js-field"><span>${escapeHtml(t('js.markup'))}</span><div class="js-static" data-js="markup">${escapeHtml(marg === null ? t('jp.margin_typed') : marg + ' %')}</div></div>`}
         ${field(t('js.discount'), `<input type="number" min="0" max="100" step="any" data-js="discountPct" value="${escapeHtml(String(+order.discountPct || 0))}">`)}
         ${field(t('js.set_price'), `<input type="number" min="0" step="any" data-js="price" placeholder="${escapeHtml(t('js.auto'))}">`)}
       </div>
-      <button type="button" class="linkish js-more" data-js="more">› ${escapeHtml(t('js.more'))}</button>
+      ${isNew ? '' : `<button type="button" class="linkish js-more" data-js="more">› ${escapeHtml(t('js.more'))}</button>`}
     </div>`;
 
     let modal = null;
@@ -135,12 +159,49 @@
       if (typed !== '') n.price = Math.max(0, num(typed));
       return n;
     }
+    /** A new job's input to lib/order-new.js newOrder, as the sheet holds it. */
+    function inputOf(asQuote) {
+      const typed = q('price').value.trim();
+      return {
+        parts: st.parts,
+        project: q('project').value.trim(),
+        clientId: q('clientId').value || null,
+        dueDate: q('dueDate').value || undefined,
+        notes: q('notes').value,
+        margin: Math.max(0, num(q('margin').value)),
+        discountPct: Math.min(100, Math.max(0, num(q('discountPct').value))),
+        priceOverride: typed === '' ? null : Math.max(0, num(typed)),
+        overheadPerHour: typeof shopOverheadPerHour === 'function' ? shopOverheadPerHour() : 0,
+        priorityLevel: priority(),
+        asQuote: !!asQuote,
+      };
+    }
+    /** The job itself: newOrder allocates its number from the shop's counters. */
+    function newJob(asQuote) {
+      const N = NEW();
+      return N.newOrder(inputOf(asQuote), {
+        settings,
+        orders: list('printLog'),
+        clients: list('clients'),
+        now: new Date(),
+        tokens: { tracking: bytes(N.TOKEN_BYTES), quoteApproval: bytes(N.TOKEN_BYTES), id: bytes(4) },
+      });
+    }
     const ctxOf = (extra) => Object.assign({
       now: Date.now(), id: uid('edit'), priceId: uid('edit'), settings, clients: list('clients'), nameOf: localName,
       ids: st.parts.filter((p) => !p.id).map(() => uid('PRT')),
     }, extra || {});
     /** The rule's answer on a copy: the job as it would be, or why not. */
     function dryRun(extra) {
+      if (isNew) {
+        // The shared rules: whether it can be taken, and the total newOrder
+        // would record — with no number allocated (lib/order-new.js).
+        const input = inputOf(false);
+        const ready = NEW().canTake(input);
+        if (!ready.ok) return { verdict: { ok: false, reason: ready.reason, step: 'parts' }, trial: order };
+        const shown = NEW().previewTotal(input, { settings, clients: list('clients') });
+        return { verdict: { ok: true }, trial: { price: shown.total, currency: shown.currency, priceSource: shown.quote.priceSource } };
+      }
       const trial = JSON.parse(JSON.stringify(order));
       const verdict = ED().applyJobEdit(trial, nextOf(), ctxOf(Object.assign({ keepPrice: st.keepPrice }, extra || {})));
       return { verdict, trial };
@@ -187,9 +248,12 @@
         modal.insertBefore(p, modal.querySelector('.modal-footer'));
         return p;
       })();
-      line.textContent = verdict.ok ? '' : reasonText(verdict);
-      line.hidden = verdict.ok;
+      // An empty new job is not refused, it is just not ready: Save waits.
+      const quiet = verdict.ok || (isNew && verdict.reason === 'no_parts');
+      line.textContent = quiet ? '' : reasonText(verdict);
+      line.hidden = quiet;
       modal.querySelector('[data-act="save"]').disabled = !verdict.ok;
+      if (q('asQuote')) q('asQuote').disabled = !verdict.ok;
       modal.querySelector('[data-js="total"]').textContent = priceText(billed(verdict.ok ? trial : order));
       // A typed price (Keep, or a total typed here) is fixed: the rule leaves
       // it where it is when the parts change, and the sheet says so.
@@ -259,14 +323,36 @@
       });
     }
 
+    /** Take the job (or save it as a quote): newOrder, then the desktop's one way of recording a new job. */
+    function create(asQuote) {
+      if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
+      const entry = newJob(asQuote);
+      if (typeof recordNewJob === 'function') recordNewJob(entry, asQuote);
+      else { list('printLog').unshift(entry); saveAll(); }
+      if (typeof openJobPage === 'function') setTimeout(() => openJobPage(entry.id), 0);
+      return true;
+    }
+
     openFormModal({
-      title: t('js.title'),
+      title: t(isNew ? 'js.title_new' : 'js.title'),
+      saveLabel: isNew ? t('js.create_job') : undefined,
       bodyHtml,
       onMount(m) {
         modal = m;
         modal.classList.add('job-sheet-modal');
         const footer = modal.querySelector('.modal-footer');
         footer.insertAdjacentHTML('afterbegin', `<div class="js-totalbox"><div class="js-hint">${escapeHtml(t('js.total'))}</div><div class="js-total" data-js="total"></div><div class="js-hint js-fixed" data-js="fixed" hidden>${escapeHtml(t('js.price_fixed'))}</div></div>`);
+        if (isNew) {
+          const asQuote = document.createElement('button');
+          asQuote.type = 'button';
+          asQuote.className = 'btn';
+          asQuote.dataset.js = 'asQuote';
+          asQuote.textContent = t('js.save_quote');
+          modal.querySelector('[data-act="save"]').before(asQuote);
+          asQuote.addEventListener('click', () => {
+            if (create(true)) modal.querySelector('.modal-footer [data-act="cancel"]').click();
+          });
+        }
         drawParts();
         modal.addEventListener('input', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });
         modal.addEventListener('change', (e) => { if (!e.target.closest('[data-js="addRow"]')) refresh(); });
@@ -292,6 +378,7 @@
         refresh();
       },
       async onSave() {
+        if (isNew) return create(false);
         st.keepPrice = undefined;
         // A price the customer has seen does not move under them silently.
         if (st.touched && lock.askPrice && q('price').value.trim() === '') {
@@ -315,5 +402,12 @@
     });
   }
 
-  Object.assign(global, { openJobSheet });
+  /** The New Job sheet: the same sheet, with nothing in it yet. */
+  function openNewJobSheet(opts) { openJobSheet(null, opts); }
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#btnNewJobSheet')) openNewJobSheet();
+  });
+
+  Object.assign(global, { openJobSheet, openNewJobSheet });
 })(typeof window !== 'undefined' ? window : globalThis);

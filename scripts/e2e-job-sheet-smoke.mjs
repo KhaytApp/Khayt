@@ -10,6 +10,9 @@
  *   - A discount that drops the bill below what was paid shows the refusal
  *     line and Save is disabled (95:596); taking it back clears it.
  *   - A finished job offers no new part and no Remove.
+ *   - Jobs › New job opens the same sheet empty: Take job waits for a part,
+ *     records the job as the sheet priced it and opens its page; Save as
+ *     quote records a quote.
  *
  * Run: npm run test:e2e:jobsheet
  */
@@ -144,6 +147,43 @@ try {
   await openSheet('JS-DONE');
   ok(await window.evaluate(() => document.querySelector('#modalMount [data-js="addRow"]').hidden), 'a finished job offers no new part');
   ok(await window.evaluate(() => !document.querySelector('#modalMount [data-js-rm]')), 'and no Remove');
+
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
+  await window.click('#jobPage [data-jp="back"]');
+
+  // ── New job: the same sheet, empty ───────────────────────────────────────
+  const before = await window.evaluate(() => printLog.length);
+  await switchTab(window, 'logs-tab');
+  await window.click('#btnNewJobSheet');
+  await window.waitForSelector('#modalMount .job-sheet', { state: 'visible', timeout: 5_000 });
+  ok(/New job/.test(await window.textContent('#modalMount #modalTitle')), 'Jobs › New job opens the sheet as New job');
+  ok(await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'), 'with no part yet, Take job waits');
+  ok(await window.evaluate(() => document.querySelector('#modalMount .js-refused')?.hidden !== false), 'and nothing is shown as refused');
+  await window.fill('#modalMount [data-js="project"]', 'New sample');
+  await addPart('new.stl', 80, 1.5);
+  await window.click('#modalMount [data-js-pr="urgent"]');
+  const shown = await window.textContent('#modalMount [data-js="total"]');
+  ok(await window.isEnabled('#modalMount .job-sheet-modal [data-act="save"]') && /\d/.test(shown), `a part makes it ready, with a total (${shown.trim()})`);
+  await shot('job-sheet-new');
+  await save(); await closed();
+  const made = await window.evaluate(() => JSON.parse(JSON.stringify(printLog[0])));
+  ok(made.project === 'New sample' && made.status === 'pending' && made.parts.length === 1, 'Take job records a pending job with its part');
+  ok(made.priorityLevel === 'urgent', 'at the priority picked');
+  ok(shown.replace(/[^\d.]/g, '').startsWith(String(made.price.toFixed(2)).replace(/[^\d.]/g, '')), `the job is priced as the sheet showed (${made.price})`);
+  await window.waitForSelector('#jobPage:not([hidden]) .jp-title', { timeout: 5_000 });
+  ok((await window.textContent('#jobPage .jp-title')).includes('New sample'), 'and its job page opens');
+  await window.click('#jobPage [data-jp="back"]');
+
+  await window.click('#btnNewJobSheet');
+  await window.waitForSelector('#modalMount .job-sheet', { state: 'visible', timeout: 5_000 });
+  await window.fill('#modalMount [data-js="project"]', 'Quoted sample');
+  await addPart('q.stl', 30, 0.5);
+  await window.click('#modalMount [data-js="asQuote"]');
+  await closed();
+  const quoted = await window.evaluate(() => JSON.parse(JSON.stringify(printLog[0])));
+  ok(quoted.project === 'Quoted sample' && quoted.status === 'quote', 'Save as quote records a quote');
+  ok(await window.evaluate(() => printLog.length) === before + 2, 'two jobs were added, no more');
 
   console.log('e2e-job-sheet: ok');
 } catch (err) {
