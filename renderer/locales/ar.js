@@ -34,6 +34,7 @@
   "conv.fil_generic": "عام (تلقائي)",
   "conv.fil_hint": "اختر الخيط المُحمّل في كل فتحة (من مكتبة Snapmaker Orca):",
   "conv.fil_none": "ثبّت Snapmaker Orca لاختيار خيوط محددة؛ تكون الفتحات عامة افتراضيًا.",
+  "conv.fil_packed": "يحفظ OrcaSlicer لديك ملفات Snapmaker في ملف مضغوط لا يستطيع خيط قراءته بعد. أبقِ Snapmaker Orca مثبّتًا لاختيار خيوط محددة؛ تكون الفتحات عامة افتراضيًا.",
   "conv.print_quality": "جودة الطباعة",
   "conv.slicer_catalogue": "— طابعات المُقطِّع المثبَّتة —",
   "conv.printer_loading": "جارٍ قراءة ملف الطابعة…",

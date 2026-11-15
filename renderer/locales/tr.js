@@ -34,6 +34,7 @@
   "conv.fil_generic": "Genel (otomatik)",
   "conv.fil_hint": "Her yuvaya yüklü filamenti seçin (Snapmaker Orca kitaplığınızdan):",
   "conv.fil_none": "Belirli filament seçmek için Snapmaker Orca kurun; yuvalar varsayılan olarak Genel.",
+  "conv.fil_packed": "OrcaSlicer’ınız Snapmaker profillerini Khayt’ın henüz okuyamadığı paketlenmiş bir dosyada tutuyor. Filament seçmek için Snapmaker Orca’yı yüklü tutun; yuvalar Genel olur.",
   "conv.print_quality": "Baskı kalitesi",
   "conv.slicer_catalogue": "— Kurulu dilimleyici yazıcıları —",
   "conv.printer_loading": "Yazıcı profili okunuyor…",

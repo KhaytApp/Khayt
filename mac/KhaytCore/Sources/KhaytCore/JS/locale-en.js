@@ -34,6 +34,7 @@
   "conv.fil_generic": "Generic (auto)",
   "conv.fil_hint": "Pick the filament loaded in each slot (from your Snapmaker Orca library):",
   "conv.fil_none": "Install Snapmaker Orca to pick specific filaments; slots default to Generic.",
+  "conv.fil_packed": "Your OrcaSlicer keeps Snapmaker’s profiles in a packed file Khayt can’t read yet. Keep Snapmaker Orca installed to pick specific filaments; slots default to Generic.",
   "conv.print_quality": "Print quality",
   "conv.slicer_catalogue": "— Installed-slicer printers —",
   "conv.printer_loading": "Reading printer profile…",
