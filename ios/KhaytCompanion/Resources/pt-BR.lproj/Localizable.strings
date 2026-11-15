@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normal";
 "edit.priority.high" = "Alta";
 "edit.priority.urgent" = "Urgente";
-"edit.price.note" = "Um novo preço é o total que o cliente paga. O que já foi pago permanece, até o novo total.";
+"edit.price.note" = "Um novo preço é o total que o cliente paga. Ele não pode ficar abaixo do que já foi pago.";
 /* Printer control */
 "printer.pause" = "Pausar";
 "printer.resume" = "Retomar";

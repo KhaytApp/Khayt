@@ -970,7 +970,7 @@
 "edit.priority.normal" = "Normal";
 "edit.priority.high" = "Yüksek";
 "edit.priority.urgent" = "Acil";
-"edit.price.note" = "Yeni fiyat, müşterinin ödeyeceği toplamdır. Önceden ödenen tutar, yeni toplama kadar korunur.";
+"edit.price.note" = "Yeni fiyat, müşterinin ödeyeceği toplamdır. Önceden ödenen tutarın altına inemez.";
 /* Printer control */
 "printer.pause" = "Duraklat";
 "printer.resume" = "Sürdür";

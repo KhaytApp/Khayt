@@ -970,7 +970,7 @@
 "edit.priority.normal" = "通常";
 "edit.priority.high" = "高";
 "edit.priority.urgent" = "緊急";
-"edit.price.note" = "新しい価格は、お客様が支払う合計額です。支払い済みの金額は、新しい合計額を上限としてそのまま残ります。";
+"edit.price.note" = "新しい価格は、お客様が支払う合計額です。支払い済みの金額を下回ることはできません。";
 /* Printer control */
 "printer.pause" = "一時停止";
 "printer.resume" = "再開";

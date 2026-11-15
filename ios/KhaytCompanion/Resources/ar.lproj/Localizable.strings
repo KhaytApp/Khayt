@@ -970,7 +970,7 @@
 "edit.priority.normal" = "عادية";
 "edit.priority.high" = "عالية";
 "edit.priority.urgent" = "عاجلة";
-"edit.price.note" = "السعر الجديد هو الإجمالي الذي يدفعه العميل. يبقى المدفوع كما هو حتى الإجمالي الجديد.";
+"edit.price.note" = "السعر الجديد هو الإجمالي الذي يدفعه العميل. ولا يمكن أن يقل عمّا دُفع بالفعل.";
 /* Printer control */
 "printer.pause" = "إيقاف مؤقت";
 "printer.resume" = "استئناف";

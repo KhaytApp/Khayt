@@ -970,7 +970,7 @@
 "edit.priority.normal" = "普通";
 "edit.priority.high" = "高";
 "edit.priority.urgent" = "紧急";
-"edit.price.note" = "新价格是客户支付的总额。已付款项保留，最多不超过新总额。";
+"edit.price.note" = "新价格是客户支付的总额。不能低于已付款项。";
 /* Printer control */
 "printer.pause" = "暂停";
 "printer.resume" = "继续";
