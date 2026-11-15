@@ -115,6 +115,131 @@ function parseFilamentType(text) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Per-slot figures (a slot is a filament position: slot 1 is the slicer's
+// first filament, tool T0 on a toolchanger).
+//
+// PrusaSlicer / SuperSlicer / OrcaSlicer write one comma list per figure, by
+// filament index and zero-filled, plus the filament presets in the config
+// block. The totals above sum those lists, which is right for a price and
+// loses which spool used what. docs/connector.vectors.json holds the cases;
+// the OrcaSlicer plugin's Python reader has to pass the same file.
+// ---------------------------------------------------------------------------
+
+/** The value of the first comment line "; <key> = value" (or ":"), or null. */
+function commentValue(text, keyPattern) {
+  const re = new RegExp('^[ \\t]*;[ \\t]*' + keyPattern + '[ \\t]*[:=][ \\t]*(.*)$', 'im');
+  const m = text.match(re);
+  return m ? m[1].replace(/\r$/, '').trim() : null;
+}
+
+/** "1.2, 0.00, 3" -> [1.2, 0, 3]; an entry that is not a number is null. */
+function numberList(value) {
+  if (value == null || value === '') return [];
+  return String(value).split(/[,;]/).map((part) => {
+    const t = part.trim();
+    if (!/^\d+(\.\d+)?$|^\.\d+$/.test(t)) return null;
+    return parseFloat(t);
+  });
+}
+
+/**
+ * A slicer string list: `"Generic PLA @U1";"PETG; black"` or `PLA;PETG`.
+ * Entries are separated by ";" and may be double-quoted, in which case they
+ * may hold a ";" or a "," themselves, and \" and \\ are escapes.
+ */
+function stringList(value) {
+  if (value == null || value === '') return [];
+  const s = String(value);
+  const out = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '\\' && i + 1 < s.length) { cur += s[++i]; continue; }
+      if (c === '"') { quoted = false; continue; }
+      cur += c;
+    } else if (c === '"') {
+      quoted = true;
+    } else if (c === ';') {
+      out.push(cur.trim());
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function colourOrNull(v) {
+  const t = String(v || '').trim();
+  return /^#([0-9a-f]{6}|[0-9a-f]{8})$/i.test(t) ? t.toUpperCase() : null;
+}
+
+function at(list, i) {
+  const v = list[i];
+  return v == null || v === '' ? null : v;
+}
+
+/**
+ * What each filament slot used, for the slots that used any.
+ *
+ * `slot` is 1-based and keeps its position: a print on filaments 1 and 3 gives
+ * slots 1 and 3, never 1 and 2. A slot with no length, volume or weight is
+ * left out. `grams` is null when the slicer wrote 0 for a slot that has a
+ * volume: it had no density to weigh with (see parseFilamentCm3), and 0 g
+ * would read as a fact. `costPerKg` and `cost` are in the slicer's currency.
+ *
+ * Returns [] when the file has no per-filament lists (Cura, a hand-written
+ * file), so a caller can tell "one filament" from "not said".
+ */
+function parseFilaments(text) {
+  const s = String(text || '');
+  let grams = numberList(commentValue(s, 'filament used \\[g\\]'));
+  let mm = numberList(commentValue(s, 'filament used \\[mm\\]'));
+  let cm3 = numberList(commentValue(s, 'filament used \\[cm3\\]'));
+  if (!cm3.length) {
+    cm3 = numberList(commentValue(s, 'filament used \\[mm3\\]')).map((v) => (v == null ? null : v / 1000));
+  }
+  // Bambu Studio's header block names its per-filament lists differently. Its
+  // volume line is left alone: it is labelled cm^3 and has carried mm^3.
+  if (!grams.length) grams = numberList(commentValue(s, 'total filament weight \\[g\\]'));
+  if (!mm.length) mm = numberList(commentValue(s, 'total filament length \\[mm\\]'));
+  const count = Math.max(grams.length, mm.length, cm3.length);
+  if (!count) return [];
+
+  const cost = numberList(commentValue(s, 'filament cost'));
+  const types = stringList(commentValue(s, 'filament_type'));
+  const colours = stringList(commentValue(s, 'filament_colour'));
+  const presets = stringList(commentValue(s, 'filament_settings_id'));
+  const density = numberList(commentValue(s, 'filament_density'));
+  const perKg = numberList(commentValue(s, 'filament_cost'));
+
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const g = at(grams, i);
+    const l = at(mm, i);
+    const v = at(cm3, i);
+    if (!(g > 0) && !(l > 0) && !(v > 0)) continue;
+    const type = at(types, i);
+    out.push({
+      slot: i + 1,
+      grams: g > 0 ? g : null,
+      cm3: v > 0 ? v : null,
+      mm: l > 0 ? l : null,
+      cost: at(cost, i),
+      type: type ? String(type).toUpperCase() : null,
+      colour: colourOrNull(at(colours, i)),
+      preset: at(presets, i),
+      density: at(density, i) > 0 ? at(density, i) : null,
+      costPerKg: at(perKg, i) > 0 ? at(perKg, i) : null,
+    });
+  }
+  return out;
+}
+
 /** Best-effort slicer name, for display/debugging. */
 function detectSlicer(text) {
   if (/PrusaSlicer/i.test(text)) return 'PrusaSlicer';
@@ -128,6 +253,8 @@ function detectSlicer(text) {
 /**
  * Parse slicer metadata from gcode/3mf text (pass head+tail for large files).
  * @returns {{ printTimeMins: number|null, filamentGrams: number|null, slicer: string|null }}
+ * `filaments` is the per-slot breakdown (parseFilaments); `filamentGrams` stays
+ * the total, so a caller that only prices the print reads what it always did.
  */
 function parseGcodeText(text, opts = {}) {
   const s = String(text || '');
@@ -145,6 +272,7 @@ function parseGcodeText(text, opts = {}) {
     filamentCm3: cm3,
     filamentType: parseFilamentType(s),
     filamentCost: parseFilamentCost(s),
+    filaments: parseFilaments(s),
     slicer: detectSlicer(s),
   };
 }
@@ -157,6 +285,7 @@ const api = {
   gramsFromCm3,
   parseFilamentType,
   parseFilamentCost,
+  parseFilaments,
   detectSlicer,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
