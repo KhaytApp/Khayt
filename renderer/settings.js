@@ -4543,7 +4543,7 @@ function renderLanApiSettings() {
         </div>
         <div class="inline-pair" style="margin-top:8px;">
           <div>
-            <label data-i18n="lan.iq_margin">Margin %</label>
+            <label data-i18n="lan.iq_margin">Markup %</label>
             <input type="number" id="lan_iq_margin" min="0" step="1" value="${+(lan.intakeQuote?.marginPct) || 0}">
           </div>
           <div>
