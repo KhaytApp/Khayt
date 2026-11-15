@@ -2162,6 +2162,7 @@
  "mac.pph_unranked": "Henüz sıralanmadı (fiyat veya baskı saati yok): {n}",
  "mac.preferences": "Tercihler",
  "mac.price": "Fiyat",
+ "mac.more_pricing": "Diğer fiyat seçenekleri",
  "mac.price_history": "Tedarikçilere ödenen fiyat",
  "mac.price_history_sub": "Birim başına, kayıttaki en son satın alma.",
  "mac.price_kept": "Kayıtlı fiyat korundu; bugünkü maliyetler {now} veriyor",
