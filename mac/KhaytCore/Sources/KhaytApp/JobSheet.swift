@@ -196,7 +196,7 @@ struct JobSheet: View {
                 header("doc.qty")
                 Color.clear.frame(width: 1, height: 1)
             }
-            ForEach($parts) { $part in
+            ForEach($parts.byID) { $part in
                 let fixed = partsLocked || part.delivered
                 GridRow {
                     TextField(shop.words.callIt("mac.a_part"), text: $part.name)
