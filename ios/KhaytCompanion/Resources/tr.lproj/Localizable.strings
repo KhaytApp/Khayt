@@ -1432,4 +1432,4 @@
 "job.blocked.other" = "Buradan yapılamaz";
 "job.pill.paid" = "Ödendi";
 "mac.parts_paid_exceeds" = "Bu değişiklik tutarı ödenenin altına düşürür. Önce farkı iade edin veya alacak dekontu düzenleyin.";
-"mac.margin" = "Marj";
+"mac.markup" = "Kâr payı";

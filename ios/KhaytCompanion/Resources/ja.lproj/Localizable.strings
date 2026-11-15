@@ -1432,4 +1432,4 @@
 "job.blocked.other" = "ここではできません";
 "job.pill.paid" = "支払い済み";
 "mac.parts_paid_exceeds" = "この変更で請求額が入金済み額を下回ります。先に差額を返金するかクレジットノートを発行してください。";
-"mac.margin" = "利益率";
+"mac.markup" = "上乗せ率";

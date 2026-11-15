@@ -4432,7 +4432,9 @@ ipcMain.handle('hub:orca-filaments', async () => {
   try {
     const db = require('./lib/orca-db');
     return { ok: true, available: db.available(), filaments: db.listU1Filaments(),
-      processes: db.listU1Processes(), defaultProcess: db.defaultU1Process() };
+      processes: db.listU1Processes(), defaultProcess: db.defaultU1Process(),
+      // Vendors only in a packed OrcaSlicer 2.5 archive (unreadable): the converter says why.
+      packed: db.packedOnlyVendors() };
   } catch (e) { return { ok: false, available: false, filaments: [], processes: [], error: String((e && e.message) || e) }; }
 });
 

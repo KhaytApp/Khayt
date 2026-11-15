@@ -96,12 +96,10 @@ extension Shop {
         goingTo = false
         switch entry.kind {
         case .job:
-            // The dashboard's "open the job" move, with the two things that
-            // could hide the row from the table taken off first.
-            shelf = .jobs(nil)
-            search = ""
-            kitFilter = nil
-            selection = entry.id
+            // The job's page (`openJobPage`), which takes off the two things
+            // that could hide it from the list first. A `khayt://job/…` link
+            // comes through here too.
+            openJobPage(entry.id)
         case .customer:
             shelf = .customers
             search = ""
