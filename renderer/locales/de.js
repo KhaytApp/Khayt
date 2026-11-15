@@ -874,6 +874,7 @@
   "oe.delete_refused_invoiced": "{id} hat eine Rechnungsnummer und kann nicht gelöscht werden – sonst entstünde eine Lücke in Ihrer Rechnungsfolge. Stattdessen den Auftrag stornieren?",
   "oe.delete_refused_paid": "Für {id} sind Zahlungen erfasst, daher kann er nicht gelöscht werden. Stattdessen den Auftrag stornieren?",
   "oe.delete_refused_cancelled": "{id} ist bereits storniert. Er bleibt im Buch, weil er eine Rechnungsnummer oder Zahlungen hat.",
+  "oe.paid_exceeds_price": "Speichern nicht möglich: Der Preis läge unter den bereits bezahlten {paid}. Erfasse zuerst eine Erstattung oder behalte den Preis.",
   "oe.cancel_job": "Auftrag stornieren",
   "oe.undo": "Rückgängig",
   "oe.discount_pct": "Rabatt",
