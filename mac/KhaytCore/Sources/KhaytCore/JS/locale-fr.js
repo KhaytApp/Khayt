@@ -874,6 +874,7 @@
   "oe.delete_refused_invoiced": "{id} a un numéro de facture : le supprimer laisserait un trou dans votre séquence de factures. Annuler la commande à la place ?",
   "oe.delete_refused_paid": "{id} a des paiements enregistrés, il ne peut donc pas être supprimé. Annuler la commande à la place ?",
   "oe.delete_refused_cancelled": "{id} est déjà annulée. Elle reste dans le registre car elle a un numéro de facture ou des paiements.",
+  "oe.paid_exceeds_price": "Impossible d’enregistrer : le prix serait inférieur aux {paid} déjà payés. Enregistre d’abord un remboursement, ou garde le prix.",
   "oe.cancel_job": "Annuler la commande",
   "oe.undo": "Annuler",
   "oe.discount_pct": "Remise",
