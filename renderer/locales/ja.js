@@ -34,6 +34,7 @@
   "conv.fil_generic": "汎用（自動）",
   "conv.fil_hint": "各スロットに入っているフィラメントを選択（Snapmaker Orca ライブラリから）:",
   "conv.fil_none": "Snapmaker Orca をインストールすると個別に選べます。既定は汎用です。",
+  "conv.fil_packed": "お使いの OrcaSlicer は Snapmaker のプロファイルを Khayt がまだ読めない圧縮ファイルに保存しています。フィラメントを選ぶには Snapmaker Orca をインストールしたままにしてください。スロットは汎用になります。",
   "conv.print_quality": "印刷品質",
   "conv.slicer_catalogue": "— インストール済みスライサーのプリンター —",
   "conv.printer_loading": "プリンタープロファイルを読み込み中…",

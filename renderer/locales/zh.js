@@ -34,6 +34,7 @@
   "conv.fil_generic": "通用（自动）",
   "conv.fil_hint": "选择每个槽位装载的耗材（来自你的 Snapmaker Orca 库）：",
   "conv.fil_none": "安装 Snapmaker Orca 可选择具体耗材；槽位默认使用通用。",
+  "conv.fil_packed": "你的 OrcaSlicer 将 Snapmaker 配置保存在 Khayt 暂时无法读取的打包文件中。请保留已安装的 Snapmaker Orca 以选择具体耗材；槽位默认为通用。",
   "conv.print_quality": "打印质量",
   "conv.slicer_catalogue": "— 已安装切片软件的打印机 —",
   "conv.printer_loading": "正在读取打印机配置…",
