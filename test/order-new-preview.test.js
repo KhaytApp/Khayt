@@ -13,8 +13,8 @@ const N = require('../lib/order-new.js');
 
 const part = (over) => Object.assign({ name: 'p.stl', material: 'PLA', qty: 1, printWeight: 100, printTime: 2, unitCost: 40, baseCost: 40 }, over || {});
 const tokens = () => ({ tracking: new Uint8Array(N.TOKEN_BYTES), quoteApproval: new Uint8Array(N.TOKEN_BYTES), id: new Uint8Array(4) });
-const clients = [{ id: 'C-EUR', currency: 'EUR' }];
-const baseSettings = () => ({ currency: 'SAR', invNumNext: 7, quoteNumNext: 3, rushFeePct: 25, currencyRates: { EUR: 4 } });
+const clients = [{ id: 'C-EUR', currency: 'EUR' }, { id: 'C-USD', currency: 'USD' }];
+const baseSettings = () => ({ currency: 'SAR', invNumNext: 7, quoteNumNext: 3, rushFeePct: 25, exchangeRates: { EUR: 4 } });
 
 const CASES = [
   { parts: [part()], margin: 30 },
@@ -25,6 +25,7 @@ const CASES = [
   { parts: [part({ agreedPrice: 70 }), part()], margin: 40 },
   { parts: [part()], margin: 30, extraLines: [{ label: 'Paint', amount: 15 }, { label: 'Fee', pct: 5 }] },
   { parts: [part()], margin: 30, clientId: 'C-EUR' },
+  { parts: [part()], margin: 30, clientId: 'C-USD' },
   { parts: [part()], margin: 30, overheadPerHour: 3 },
 ];
 
@@ -52,4 +53,16 @@ test('canTake: a job needs a part', () => {
   assert.deepEqual(N.canTake({}), { ok: false, reason: 'no_parts' });
   assert.deepEqual(N.canTake({ parts: [null] }), { ok: false, reason: 'no_parts' });
   assert.deepEqual(N.canTake({ parts: [part()] }), { ok: true, reason: null });
+});
+
+test('a customer in another currency is really priced in it, and the three currency outcomes are pinned', () => {
+  const ctx = { settings: baseSettings(), clients };
+  const own = N.previewTotal({ parts: [part()], margin: 30 }, ctx);
+  const eur = N.previewTotal({ parts: [part()], margin: 30, clientId: 'C-EUR' }, ctx);
+  const usd = N.previewTotal({ parts: [part()], margin: 30, clientId: 'C-USD' }, ctx);
+  assert.equal(own.currency, undefined, "the shop's own currency leaves the record's currency unset, as newOrder does");
+  assert.equal(eur.currency, 'EUR');
+  assert.equal(eur.total, own.total / 4, 'converted at exchangeRates.EUR (4 SAR per EUR)');
+  assert.equal(usd.currency, 'SAR', 'no rate for USD: an honest price in the shop currency');
+  assert.equal(usd.total, own.total);
 });
