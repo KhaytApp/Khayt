@@ -3994,6 +3994,10 @@
  "mac.parts_remove": "Teil entfernen…",
  "mac.parts_remove_q": "„{name}“ aus diesem Auftrag entfernen?",
  "mac.js_margin_typed": "—, Preis wurde eingegeben",
+ "mac.js_markup_fixed": "Der Preis wurde eingegeben, ein Aufschlag kann ihn nicht ändern. Leere zuerst „Oder Preis festlegen“.",
+ "mac.js_markup_bad": "Gib den Aufschlag als Zahl ein, 0 oder mehr.",
+ "mac.js_markup_q": "Der Kunde hat den Preis dieses Auftrags gesehen. Auf den neuen Aufschlag ändern?",
+ "mac.js_markup_change": "Preis ändern",
  "mac.js_more": "Weitere Details…",
  "mac.js_new_total": "Neue Summe"
 }

@@ -90,4 +90,65 @@ struct JobSheetSaveTests {
         #expect(try await Self.saved(order, Shop.JobSave(), shop: shop, engine: engine) == order)
         #expect(Shop.JobSave().isEmpty)
     }
+
+    // MARK: - A new markup (applyJobEdit `marginPct`)
+
+    @Test("a changed markup is sent; an unchanged one, or one never read, is not")
+    func markupField() {
+        var opened = JobSheet.Form()
+        opened.markup = "50"
+        var now = opened
+        #expect(JobSheet.fields(opened: opened, now: now)["marginPct"] == nil)
+        now.markup = "25"
+        #expect(JobSheet.fields(opened: opened, now: now)["marginPct"] == .number(25))
+        now.markup = "٣٠"
+        #expect(JobSheet.fields(opened: opened, now: now)["marginPct"] == .number(30), "Arabic digits are read")
+        now.markup = "lots"
+        #expect(JobSheet.fields(opened: opened, now: now)["marginPct"] == .string("lots"), "sent so the rule says why")
+        var typed = JobSheet.Form()
+        typed.price = "199"
+        #expect(JobSheet.fields(opened: typed, now: typed)["marginPct"] == nil, "a typed price has no markup field")
+    }
+
+    @Test("a new markup reprices a draft quote; a seen price needs the shop's yes")
+    func markupSaves() async throws {
+        let engine = try KhaytEngine()
+        let shop = Shop()
+        var save = Shop.JobSave()
+        save.fields = ["marginPct": .number(25)]
+        let draft = JobPartsRuleTests.job(["status": .string("quote")])
+        let out = try await Self.saved(draft, save, shop: shop, engine: engine)
+        #expect(Self.field(out, "price") == .number(150), "120 of cost at 25%")
+        #expect(Self.field(out, "marginPct") == .number(25))
+
+        let seen = JobPartsRuleTests.job()                     // pending: the customer has seen it
+        do {
+            _ = try await Self.saved(seen, save, shop: shop, engine: engine)
+            Issue.record("a seen price moved without asking")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "ask_price")
+        }
+        save.priceSeenOk = true
+        let agreed = try await Self.saved(seen, save, shop: shop, engine: engine)
+        #expect(Self.field(agreed, "price") == .number(150))
+    }
+
+    @Test("a markup on a typed price is refused in the shop's words")
+    func markupOnTypedPrice() async throws {
+        let engine = try KhaytEngine()
+        let shop = Shop()
+        var save = Shop.JobSave()
+        save.fields = ["marginPct": .number(25)]
+        save.priceSeenOk = true
+        let typed = JobPartsRuleTests.job(["priceSource": .string("override"), "priceOverride": .number(199),
+                                           "price": .number(199), "computedPrice": .number(180)])
+        do {
+            _ = try await Self.saved(typed, save, shop: shop, engine: engine)
+            Issue.record("a typed price moved")
+        } catch let refused as Shop.MoveRefused {
+            #expect(refused.code == "price_fixed")
+            #expect(refused.sentence == shop.words.callIt("mac.js_markup_fixed"))
+        }
+    }
+
 }

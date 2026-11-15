@@ -57,6 +57,7 @@ extension KhaytEngine {
     public func applyJobEdit(order: JSONValue, fields: [String: JSONValue],
                              clients: [JSONValue] = [], settings: [String: JSONValue] = [:],
                              keepPrice: Bool = false, marginPct: Double? = nil,
+                             priceSeenOk: Bool = false,
                              newPartIds: [String] = [], now: Date,
                              editId: String, priceId: String) throws -> JobEditResult {
         try runtime.call2("""
@@ -65,11 +66,12 @@ extension KhaytEngine {
               var r = globalThis.KhaytOrderEdit.applyJobEdit(o, fields, ctx);
               return { ok: r.ok, reason: r.reason || null, step: r.step || null, changed: !!r.changed, order: o };
             })(ARG0, ARG1, { clients: ARG2, settings: ARG3, keepPrice: ARG4, marginPct: ARG5,
-                             ids: ARG6, now: ARG7, id: ARG8, priceId: ARG9 })
+                             ids: ARG6, now: ARG7, id: ARG8, priceId: ARG9, priceSeenOk: ARG10 })
             """,
             [order, .object(fields), .array(clients), .object(ruleSettings(settings)), .bool(keepPrice),
              marginPct.map(JSONValue.number) ?? .null, .array(newPartIds.map(JSONValue.string)),
-             .number(now.timeIntervalSince1970 * 1000), .string(editId), .string(priceId)],
+             .number(now.timeIntervalSince1970 * 1000), .string(editId), .string(priceId),
+             .bool(priceSeenOk)],
             as: JobEditResult.self)
     }
 }
