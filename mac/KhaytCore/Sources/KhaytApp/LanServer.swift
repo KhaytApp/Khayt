@@ -685,16 +685,33 @@ final class LanServer {
                 response = await respond(to: request)
             }
             try await write(response, method: request.method, to: connection)
+        // ── A REFUSAL FROM THE HEAD IS ANSWERED, THEN LINGERED ON ─────────
+        //
+        // Each of these is decided before the body is read, so the client is
+        // still sending it when the answer goes. Closing at once, with its
+        // bytes unread, makes the kernel answer them with a RESET, and a reset
+        // can throw away the answer before the client reads it: measured, 6 of
+        // 40 URLSession uploads of an oversized body got "connection lost"
+        // (-1005) instead of the 403, and on CI the same race showed as a
+        // 15-minute timeout (LanConnectorScopeTests, Nov 15). So the answer is
+        // written, our side is closed, and what the client still sends is
+        // read and thrown away for a short, bounded while (`linger`) before
+        // the connection goes. The body is never kept or looked at.
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
             try? await write(.open(413, #"{"error":"Request too large"}"#), method: "POST", to: connection)
+            await Self.linger(connection, on: queue)
         } catch ReadRefusal.tooLarge {
             try? await write(.open(413, #"{"ok":false,"reason":"too-large"}"#), method: "POST", to: connection)
+            await Self.linger(connection, on: queue)
         } catch ReadRefusal.busy {
             try? await write(.open(503, #"{"ok":false,"reason":"busy"}"#), method: "POST", to: connection)
+            await Self.linger(connection, on: queue)
         } catch ReadRefusal.off {
             try? await write(.open(403, #"{"ok":false,"reason":"off"}"#), method: "POST", to: connection)
+            await Self.linger(connection, on: queue)
         } catch ReadRefusal.refused(let answer) {
             try? await write(answer, method: "POST", to: connection)
+            await Self.linger(connection, on: queue)
         } catch {
             // A client that hung up mid-request, a read that ran out of time,
             // or a listener being stopped.
@@ -852,6 +869,63 @@ final class LanServer {
     /// waiting for the client. The deadline still works the only way that
     /// does (see `serve`): it cancels the connection, which makes the pending
     /// `receive` fail and the phase throw.
+    /// How long, and how much, a refused request's remaining body is read
+    /// and dropped before its connection closes (`linger`).
+    nonisolated static let lingerSeconds: TimeInterval = 2
+    nonisolated static let lingerBytes = 64 * 1024 * 1024
+
+    /// Close our side, then read and DROP what the client is still sending,
+    /// until it is done, `lingerBytes` have passed or `lingerSeconds` are up.
+    /// Nothing read is kept. Ends by itself; the caller's `cancel` follows.
+    nonisolated static func linger(_ connection: NWConnection, on queue: DispatchQueue) async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            Linger(connection: connection, queue: queue, cont: cont).start()
+        }
+    }
+
+    /// One `linger`, touched only on the connection's serial `queue`.
+    private final class Linger: @unchecked Sendable {
+        private let connection: NWConnection
+        private let queue: DispatchQueue
+        private var cont: CheckedContinuation<Void, Never>?
+        private var dropped = 0
+
+        init(connection: NWConnection, queue: DispatchQueue, cont: CheckedContinuation<Void, Never>) {
+            self.connection = connection
+            self.queue = queue
+            self.cont = cont
+        }
+
+        func start() {
+            queue.async { [self] in
+                // Our side is done: the client reads the answer and an end.
+                connection.send(content: nil, contentContext: .finalMessage, isComplete: true,
+                                completion: .contentProcessed { _ in })
+                // The deadline cancels the connection, which ends a pending
+                // receive with an error (the same reason `gather` does it so).
+                let connection = self.connection
+                queue.asyncAfter(deadline: .now() + LanServer.lingerSeconds) { [self] in
+                    if cont != nil { connection.cancel(); finish() }
+                }
+                step()
+            }
+        }
+
+        private func step() {
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [self] data, _, complete, error in
+                dropped += data?.count ?? 0
+                if complete || error != nil || dropped >= LanServer.lingerBytes { finish(); return }
+                step()
+            }
+        }
+
+        private func finish() {
+            guard let cont else { return }
+            self.cont = nil
+            cont.resume()
+        }
+    }
+
     nonisolated static func gather(_ connection: NWConnection, on queue: DispatchQueue,
                                    from start: Data, timeout: TimeInterval,
                                    enough: @escaping @Sendable (Data) throws -> Bool) async throws -> Gathered {

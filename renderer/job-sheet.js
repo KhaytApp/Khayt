@@ -129,7 +129,7 @@
       <div class="js-row">
         ${isNew
           ? field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${escapeHtml(String(calcMarkup()))}">`)
-          : `<div class="js-field"><span>${escapeHtml(t('js.markup'))}</span><div class="js-static" data-js="markup">${escapeHtml(marg === null ? t('jp.margin_typed') : marg + ' %')}</div></div>`}
+          : field(t('js.markup'), `<input type="number" min="0" step="any" data-js="margin" value="${marg === null ? '' : escapeHtml(String(marg))}"${marg === null ? ` placeholder="${escapeHtml(t('jp.margin_typed'))}"` : ''}>`)}
         ${field(t('js.discount'), `<input type="number" min="0" max="100" step="any" data-js="discountPct" value="${escapeHtml(String(+order.discountPct || 0))}">`)}
         ${field(t('js.set_price'), `<input type="number" min="0" step="any" data-js="price" placeholder="${escapeHtml(t('js.auto'))}">`)}
       </div>
@@ -155,6 +155,9 @@
       const disc = Math.min(100, Math.max(0, num(q('discountPct').value)));
       if (disc !== (+order.discountPct || 0)) n.discountPct = disc;
       if (st.touched) n.parts = st.parts;
+      // A new markup goes to the rule as typed: it refuses a bad one itself.
+      const mk = q('margin').value.trim();
+      if (mk !== '' && (marg === null || Math.abs(Number(mk) - marg) >= 0.005)) n.marginPct = Number(mk);
       const typed = q('price').value.trim();
       if (typed !== '') n.price = Math.max(0, num(typed));
       return n;
@@ -203,13 +206,16 @@
         return { verdict: { ok: true }, trial: { price: shown.total, currency: shown.currency, priceSource: shown.quote.priceSource } };
       }
       const trial = JSON.parse(JSON.stringify(order));
-      const verdict = ED().applyJobEdit(trial, nextOf(), ctxOf(Object.assign({ keepPrice: st.keepPrice }, extra || {})));
+      const verdict = ED().applyJobEdit(trial, nextOf(), ctxOf(Object.assign({ keepPrice: st.keepPrice, priceSeenOk: true }, extra || {})));
       return { verdict, trial };
     }
     const billed = (o) => (Money() && Money().orderGrossRaw ? Money().orderGrossRaw(o, { settings }) : +o.price || 0);
     const priceText = (n) => (typeof fmtOrderPrice === 'function' ? fmtOrderPrice(n, order) : fmtMoney(n));
     function reasonText(v) {
       if (v.reason === 'paid_exceeds_price') return t('oe.paid_exceeds_price', { paid: priceText(+order.paidAmount || 0) });
+      if (v.step === 'markup' && ['price_fixed', 'bad_markup', 'ask_price'].includes(v.reason)) {
+        return t({ price_fixed: 'js.markup_fixed', bad_markup: 'js.markup_bad', ask_price: 'js.markup_q' }[v.reason]);
+      }
       if (v.step === 'customer') return typeof oeCustomerReasonText === 'function' ? oeCustomerReasonText(v.reason) : t('js.refused_other');
       if (['name_only', 'delivered_part', 'no_parts'].includes(v.reason)) return t('js.refused_' + v.reason);
       if (['zatca', 'voided', 'credited', 'cancelled'].includes(v.reason)) return t('js.parts_locked');
@@ -323,6 +329,30 @@
       });
     }
 
+    /** The customer has seen the price and the markup changes it: change it, or not. Resolves true, or null when closed. */
+    function askMarkup(was, now) {
+      return new Promise((resolve) => {
+        const overlay = appendStackedModal(`<div class="modal js-ask" role="dialog" aria-modal="true" aria-labelledby="jsMkTitle">
+          <h3 id="jsMkTitle">${escapeHtml(t('js.markup_change'))}</h3>
+          <div class="js-sub">${escapeHtml(ref)}${order.project ? ' · ' + escapeHtml(order.project) : ''}</div>
+          <p>${escapeHtml(t('js.markup_q'))}</p>
+          <div class="js-foot"><div><div class="js-hint">${escapeHtml(t('js.ask_saw'))}</div><div class="js-total">${escapeHtml(priceText(was))}</div></div>
+            <div class="btn-row"><button type="button" class="btn" data-ask="cancel">${escapeHtml(t('common.cancel'))}</button>
+            <button type="button" class="btn primary" data-ask="change">${escapeHtml(t('js.use', { amount: priceText(now) }))}</button></div></div>
+        </div>`, { zIndex: 10060 });
+        const done = (v) => {
+          document.removeEventListener('keydown', esc, true);
+          overlay.remove();
+          resolve(v);
+        };
+        const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+        document.addEventListener('keydown', esc, true);
+        overlay.querySelector('[data-ask="cancel"]').addEventListener('click', () => done(null));
+        overlay.querySelector('[data-ask="change"]').addEventListener('click', () => done(true));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
+      });
+    }
+
     /** Take the job (or save it as a quote): newOrder, then the desktop's one way of recording a new job. */
     function create(asQuote) {
       if (!NEW().canTake(inputOf(asQuote)).ok) { refresh(); return false; }
@@ -380,8 +410,19 @@
       async onSave() {
         if (isNew) return create(false);
         st.keepPrice = undefined;
+        let seenOk = false;
+        const typedTotal = q('price').value.trim() !== '';
         // A price the customer has seen does not move under them silently.
-        if (st.touched && lock.askPrice && q('price').value.trim() === '') {
+        if (lock.askPrice && !typedTotal && Object.prototype.hasOwnProperty.call(nextOf(), 'marginPct')) {
+          // A new markup is a new price on purpose: one question covers it,
+          // parts changes included (the Mac asks the same, #2494).
+          const { verdict, trial } = dryRun({ keepPrice: false });
+          if (verdict.ok && Math.abs((+trial.price || 0) - (+order.price || 0)) > 0.005) {
+            if (!(await askMarkup(+order.price || 0, +trial.price || 0))) return false;
+          }
+          st.keepPrice = false;
+          seenOk = true;
+        } else if (st.touched && lock.askPrice && !typedTotal) {
           const { verdict, trial } = dryRun({ keepPrice: false });
           if (verdict.ok && Math.abs((+trial.price || 0) - (+order.price || 0)) > 0.005) {
             const keep = await askKeep(+order.price || 0, +trial.price || 0);
@@ -389,7 +430,7 @@
             st.keepPrice = keep;
           }
         }
-        const verdict = ED().applyJobEdit(order, nextOf(), ctxOf({ keepPrice: st.keepPrice }));
+        const verdict = ED().applyJobEdit(order, nextOf(), ctxOf({ keepPrice: st.keepPrice, priceSeenOk: seenOk }));
         if (!verdict.ok) { refresh(); return false; }
         if (verdict.changed) {
           saveAll();

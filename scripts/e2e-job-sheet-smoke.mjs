@@ -62,6 +62,7 @@ try {
     printLog.unshift(
       base('JS-SEEN'),
       base('JS-USE'),
+      base('JS-MK'),
       base('JS-DRAFT', { status: 'quote', statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
@@ -143,6 +144,49 @@ try {
   ok(j.paidAmount === 300 && j.price === 340 && !j.discountPct, 'the paid job is unchanged');
   await window.click('#jobPage [data-jp="back"]');
 
+  // ── Markup (#2494's applyMarkup) ─────────────────────────────────────────
+  await openSheet('JS-MK');
+  const mk0 = await window.inputValue('#modalMount [data-js="margin"]');
+  ok(mk0 !== '' && Number(mk0) > 0, `Markup is a field, holding the markup the job was priced at (${mk0})`);
+  await window.fill('#modalMount [data-js="margin"]', '-5');
+  await window.waitForSelector('#modalMount .js-refused:not([hidden])', { timeout: 5_000 });
+  ok(/0 or more/.test(await window.textContent('#modalMount .js-refused')), 'a negative markup is refused in its own words');
+  await window.fill('#modalMount [data-js="margin"]', '200');
+  await window.waitForFunction(() => document.querySelector('#modalMount .js-refused').hidden, null, { timeout: 5_000 });
+  const shown = await window.textContent('#modalMount [data-js="total"]');
+  ok(!/340/.test(shown), `the new total shows before saving (${shown.trim()})`);
+  await save();
+  await window.waitForSelector('#modalMount .js-ask', { state: 'visible', timeout: 5_000 });
+  ok(/seen this job/.test(await window.textContent('#modalMount .js-ask')), 'the customer has seen the price: the sheet asks first');
+  await shot('job-sheet-markup-ask');
+  await window.click('#modalMount .js-ask [data-ask="cancel"]');
+  ok(await window.evaluate(() => !!document.querySelector('#modalMount .job-sheet')), 'Cancel keeps the sheet open');
+  ok((await job('JS-MK')).price === 340, 'and saves nothing');
+  await save();
+  await window.waitForSelector('#modalMount .js-ask', { state: 'visible', timeout: 5_000 });
+  await window.click('#modalMount .js-ask [data-ask="change"]');
+  await closed();
+  j = await job('JS-MK');
+  ok(j.marginPct === 200 && j.price !== 340, `Change the price: markup 200 stored, the price worked again from cost (${j.price})`);
+  ok(shown.replace(/[^0-9.]/g, '').includes(j.price.toFixed(2)), 'the price saved is the total the sheet showed');
+  await window.click('#jobPage [data-jp="back"]');
+  await openSheet('JS-SEEN');
+  ok(await window.inputValue('#modalMount [data-js="margin"]') === '', 'a typed price has no markup to show');
+  await window.fill('#modalMount [data-js="margin"]', '80');
+  await window.waitForSelector('#modalMount .js-refused:not([hidden])', { timeout: 5_000 });
+  ok(/price was typed/.test(await window.textContent('#modalMount .js-refused')), 'a markup on a typed price is refused in its own words, not the parts note');
+  ok(await window.isDisabled('#modalMount .job-sheet-modal [data-act="save"]'), 'and Save waits');
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
+  await window.click('#jobPage [data-jp="back"]');
+  await openSheet('JS-PAID');
+  await window.fill('#modalMount [data-js="margin"]', '0');
+  await window.waitForSelector('#modalMount .js-refused:not([hidden])', { timeout: 5_000 });
+  ok(/already paid/.test(await window.textContent('#modalMount .js-refused')), 'a markup that takes the price under what was paid is refused');
+  await window.click('#modalMount .job-sheet-modal [data-act="cancel"]');
+  await closed();
+  await window.click('#jobPage [data-jp="back"]');
+
   // ── A finished job ───────────────────────────────────────────────────────
   await openSheet('JS-DONE');
   ok(await window.evaluate(() => document.querySelector('#modalMount [data-js="addRow"]').hidden), 'a finished job offers no new part');
@@ -163,14 +207,14 @@ try {
   await window.fill('#modalMount [data-js="project"]', 'New sample');
   await addPart('new.stl', 80, 1.5);
   await window.click('#modalMount [data-js-pr="urgent"]');
-  const shown = await window.textContent('#modalMount [data-js="total"]');
-  ok(await window.isEnabled('#modalMount .job-sheet-modal [data-act="save"]') && /\d/.test(shown), `a part makes it ready, with a total (${shown.trim()})`);
+  const mkShown = await window.textContent('#modalMount [data-js="total"]');
+  ok(await window.isEnabled('#modalMount .job-sheet-modal [data-act="save"]') && /\d/.test(mkShown), `a part makes it ready, with a total (${mkShown.trim()})`);
   await shot('job-sheet-new');
   await save(); await closed();
   const made = await window.evaluate(() => JSON.parse(JSON.stringify(printLog[0])));
   ok(made.project === 'New sample' && made.status === 'pending' && made.parts.length === 1, 'Take job records a pending job with its part');
   ok(made.priorityLevel === 'urgent', 'at the priority picked');
-  ok(shown.replace(/[^\d.]/g, '').startsWith(String(made.price.toFixed(2)).replace(/[^\d.]/g, '')), `the job is priced as the sheet showed (${made.price})`);
+  ok(mkShown.replace(/[^\d.]/g, '').startsWith(String(made.price.toFixed(2)).replace(/[^\d.]/g, '')), `the job is priced as the sheet showed (${made.price})`);
   await window.waitForSelector('#jobPage:not([hidden]) .jp-title', { timeout: 5_000 });
   ok((await window.textContent('#jobPage .jp-title')).includes('New sample'), 'and its job page opens');
   await window.click('#jobPage [data-jp="back"]');
