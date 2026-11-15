@@ -2011,6 +2011,7 @@ function updateResinFieldsVisibility() {
     saveQuoteTemplate,
     deleteQuoteTemplate,
     populateFilamentDropdown,
+    spoolCostBasis,
     updateFilamentColorDot,
     handleFilamentChange,
     updateSpoolPicker,

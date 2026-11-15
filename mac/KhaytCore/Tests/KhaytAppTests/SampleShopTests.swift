@@ -51,6 +51,45 @@ struct SampleShopTests {
         return nil
     }
 
+    // MARK: - What a job cost
+
+    /// Every sample job carried a cost basis, quotes included, so the rule that
+    /// reads one as "this job was finished once" (`lib/order-edit.js`) saw the
+    /// whole queue as finished. The app fixes a cost basis when a job is
+    /// completed (`lib/order-status.js`), and a job moved back keeps it.
+    @Test("a cost basis sits on finished jobs, and on exactly one job moved back to the queue")
+    func costBasisOnlyWhereTheAppWritesIt() throws {
+        let jobs = try Self.rows("printLog")
+        let finished: Set<String> = ["completed", "delivered"]
+        var reopened = 0
+        for job in jobs {
+            guard case .string(let status)? = job["status"] else { continue }
+            let has = Self.number(job, "costBasis") != nil
+            if finished.contains(status) { #expect(has, "a finished job with no cost basis") }
+            else if has { reopened += 1 }
+        }
+        #expect(reopened == 1)
+    }
+
+    /// A part's `baseCost` is the LINE's cost, already multiplied by quantity:
+    /// the cost basis is those summed. The sample stored one piece's cost on a
+    /// batch of twelve, so every figure built on it was a twelfth of the truth.
+    @Test("a part made in a batch stores the whole line's cost")
+    func batchPartsStoreALineCost() throws {
+        var batches = 0
+        for job in try Self.rows("printLog") {
+            guard case .array(let parts)? = job["parts"] else { continue }
+            for case .object(let part) in parts {
+                guard let qty = Self.number(part, "qty"), qty > 1,
+                      let each = Self.number(part, "unitCost"),
+                      let line = Self.number(part, "baseCost") else { continue }
+                batches += 1
+                #expect(abs(line - each * qty) < 0.01)
+            }
+        }
+        #expect(batches > 10)
+    }
+
     // MARK: - The catalogue
 
     /// The margin column drew `35%` twenty times. A shop prices a commodity

@@ -41,7 +41,7 @@ struct ShopWindow: View {
     @State private var searchWanted = false
     @SceneStorage("shelf") private var storedShelf = ""
     /// Board or List for Jobs, remembered per window like the shelf is.
-    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.list.rawValue
+    @SceneStorage("jobs.layout") private var storedJobsLayout = Shop.JobsLayout.page.rawValue
     // A new key: under the old one every window remembered "Khayt's order",
     // and the new default (newest first) would never have been seen.
     @SceneStorage("library.sort.v2") private var storedSort = LibrarySort.added.rawValue
@@ -384,7 +384,7 @@ struct ShopWindow: View {
             // would open on an empty screen with no way to tell why.
             // The view first, then the shelf: a window saved on the old Board
             // screen restores to "board", which sets the layout itself.
-            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .list
+            shop.jobsLayout = Shop.JobsLayout(rawValue: storedJobsLayout) ?? .page
             if let restored = Shelves.shelf(storedShelf, in: shop) { shop.shelf = restored }
         }
         // Kept for the Window menu, Mission Control and VoiceOver; the toolbar
@@ -748,7 +748,9 @@ struct WindowSheets: ViewModifier {
             .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingConvert) { ConvertSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingBatchConvert) { BatchConvertSheet(shop: shop, request: $0) }
-            .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
+            // The job sheet (S1 B3b): Job · Parts · Price in one sheet and one
+            // save. `EditJobSheet` stays in the tree, unused, for a release.
+            .shopSheet(item: $shop.pendingEdit) { JobSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
             // The desktop's order tools (`Shop+OrderTools.swift`), as one
             // modifier so this chain does not grow by eight.
