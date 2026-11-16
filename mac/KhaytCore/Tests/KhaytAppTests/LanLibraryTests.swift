@@ -33,6 +33,13 @@ struct LanLibraryTests {
         #expect(lantern["thumb"] as? Bool == true && lantern["estimable"] as? Bool == true)
         let falcon = try #require(items.first { $0["id"] as? String == "PF-sample-falcon" })
         #expect(falcon["printTimeMins"] is NSNull, "null, never a made-up 0")
+        // The swaps as the record holds them (`lib/lan-library.js` itemOf, #2515).
+        #expect(lantern["swapCount"] as? Int == 4 && lantern["swapsKnown"] as? Bool == true)
+        #expect(falcon["swapCount"] as? Int == 1 && falcon["swapsKnown"] as? Bool == false,
+                "an unsliced model: the count is a guess, and the phone is told so")
+        let bracket = try #require(items.first { $0["id"] as? String == "PF-sample-bracket" })
+        #expect(bracket["swapCount"] as? Int == 0 && bracket["swapsKnown"] == nil,
+                "a record from before the field sends none: the phone works it out, the Mac does not guess")
 
         let kings = try Self.json(try await bench.get("/api/library?folder=Saudi%20Kings&limit=3&offset=2",
                                                       headers: Self.pin))
