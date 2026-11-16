@@ -819,6 +819,12 @@
 "library.no_match" = "没有匹配的模型。";
 "library.favorite" = "收藏";
 "library.printed" = "已打印 %d 次";
+"library.colours" = "颜色";
+"library.colours_tip" = "颜色：%d。这次打印使用的耗材。";
+"library.swaps" = "%d 次换色";
+"library.swaps_tip" = "换色次数：约 %d 次。打印机在这次打印中更换耗材的次数，来自切片文件。";
+"library.swaps_unknown" = "文件切片后才能知道换色次数。";
+"library.colours_more" = "+%d";
 "library.plate" = "打印板";
 "library.plate.all" = "所有打印板";
 "library.plate.n" = "打印板 %d";

@@ -819,6 +819,12 @@
 "library.no_match" = "一致するモデルはありません。";
 "library.favorite" = "お気に入り";
 "library.printed" = "%d回印刷";
+"library.colours" = "色";
+"library.colours_tip" = "色数: %d。この印刷で使うフィラメントです。";
+"library.swaps" = "%d スワップ";
+"library.swaps_tip" = "フィラメントのスワップ: 約%d回。この印刷中にプリンターがフィラメントを交換する回数で、スライス済みファイルによります。";
+"library.swaps_unknown" = "フィラメントのスワップ回数は、ファイルをスライスすると分かります。";
+"library.colours_more" = "+%d";
 "library.plate" = "プレート";
 "library.plate.all" = "すべてのプレート";
 "library.plate.n" = "プレート %d";

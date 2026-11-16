@@ -819,6 +819,12 @@
 "library.no_match" = "Nenhum modelo corresponde.";
 "library.favorite" = "Favorito";
 "library.printed" = "Impresso %d vezes";
+"library.colours" = "Cores";
+"library.colours_tip" = "Cores: %d. Os filamentos que esta impressão usa.";
+"library.swaps" = "%d trocas";
+"library.swaps_tip" = "Trocas de filamento: cerca de %d. Quantas vezes a impressora troca de filamento durante esta impressão, segundo o arquivo fatiado.";
+"library.swaps_unknown" = "As trocas de filamento são conhecidas depois que o arquivo é fatiado.";
+"library.colours_more" = "+%d";
 "library.plate" = "Placa";
 "library.plate.all" = "Todas as placas";
 "library.plate.n" = "Placa %d";

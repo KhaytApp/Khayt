@@ -819,6 +819,12 @@
 "library.no_match" = "Eşleşen model yok.";
 "library.favorite" = "Favori";
 "library.printed" = "%d kez basıldı";
+"library.colours" = "Renkler";
+"library.colours_tip" = "Renkler: %d. Bu baskının kullandığı filamentler.";
+"library.swaps" = "%d değişim";
+"library.swaps_tip" = "Filament değişimi: yaklaşık %d. Yazıcının bu baskı sırasında filamenti kaç kez değiştirdiği, dilimlenmiş dosyaya göre.";
+"library.swaps_unknown" = "Filament değişimleri dosya dilimlendiğinde bilinir.";
+"library.colours_more" = "+%d";
 "library.plate" = "Plaka";
 "library.plate.all" = "Tüm plakalar";
 "library.plate.n" = "Plaka %d";

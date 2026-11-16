@@ -127,4 +127,90 @@ final class LibraryTests: XCTestCase {
         XCTAssertNil(LibraryItemPage.shareText(item, plate: nil, qty: 1, answer: try answer(#"{"ok":false,"reason":"busy"}"#)))
         XCTAssertNil(LibraryItemPage.shareText(item, plate: nil, qty: 1, answer: try answer(#"{"ok":true,"price":0}"#)))
     }
+
+    // MARK: - Colours and swaps (iPhone Figma 235:49 / 235:109 / 235:134)
+
+    private func item(_ json: String) throws -> LibraryItem {
+        try JSONDecoder().decode(LibraryItem.self, from: Data(json.utf8))
+    }
+
+    func testARowShowsThreeDotsThenHowManyMore() throws {
+        let five = try item(##"{"id":"d","name":"Dragon","colors":[{"hex":"#1B1B1F"},{"hex":"#C8102E"},"#F2C200",{"hex":"#2E6DB4"},{"hex":"#FFFFFF"}]}"##)
+        XCTAssertEqual(LibraryColours.dots(five), ["#1B1B1F", "#C8102E", "#F2C200"])
+        XCTAssertEqual(LibraryColours.more(five), "+2")
+        let three = try item(##"{"id":"t","name":"T","colors":["#111111","#222222","#333333"]}"##)
+        XCTAssertNil(LibraryColours.more(three), "three fit: no +0")
+        XCTAssertEqual(LibraryColours.dots(three).count, 3)
+    }
+
+    func testTheSwapNumberIsTheSlicersAndOnlyAboveZero() throws {
+        L10n.setLanguage(.en)
+        defer { L10n.setLanguage(.system) }
+        let sliced = try item(##"{"id":"s","name":"S","colors":["#111111","#C8102E"],"swapCount":4,"swapsKnown":true}"##)
+        XCTAssertEqual(sliced.swapCount, 4)
+        XCTAssertTrue(sliced.swapsKnown)
+        XCTAssertEqual(LibraryColours.colours(sliced), "Colours: 2. The filaments this print uses.")
+        XCTAssertEqual(LibraryColours.swaps(sliced), "4 swaps")
+        XCTAssertEqual(LibraryColours.swapsMeaning(sliced),
+                       "Filament swaps: about 4. How many times the printer changes filament during this print, from the sliced file.")
+        XCTAssertNil(LibraryColours.swapsUnknown(sliced))
+        // Never sliced: a 0 is not a count, and it says swaps come with a slice.
+        let raw = try item(##"{"id":"r","name":"R","colors":["#111111","#C8102E"],"swapCount":0,"swapsKnown":false}"##)
+        XCTAssertNil(LibraryColours.swaps(raw))
+        XCTAssertEqual(LibraryColours.swapsUnknown(raw), "Filament swaps are known once the file is sliced.")
+        XCTAssertEqual(LibraryColours.spoken(raw),
+                       "Colours: 2. The filaments this print uses. Filament swaps are known once the file is sliced.")
+        // Sliced in one colour: known, nothing to say about swaps.
+        let one = try item(##"{"id":"o","name":"O","colors":["#111111"],"swapCount":0,"swapsKnown":true}"##)
+        XCTAssertNil(LibraryColours.swaps(one))
+        XCTAssertNil(LibraryColours.swapsUnknown(one))
+        // A slicer did not count a fraction or a negative.
+        let junk = try item(##"{"id":"j","name":"J","colors":["#111111"],"swapCount":-2,"swapsKnown":"yes"}"##)
+        XCTAssertNil(junk.swapCount)
+        XCTAssertNil(junk.swapsKnownSaid)
+    }
+
+    /// An older Mac, or a record from before swapsKnown, sends neither field:
+    /// the print time decides, as on the Mac and desktop cards.
+    func testWithoutTheFieldsThePrintTimeDecides() throws {
+        let slicedOld = try item(##"{"id":"a","name":"A","colors":["#111111","#C8102E"],"printTimeMins":96}"##)
+        XCTAssertNil(slicedOld.swapsKnownSaid)
+        XCTAssertTrue(slicedOld.swapsKnown)
+        XCTAssertNil(LibraryColours.swaps(slicedOld), "no number it was not given")
+        XCTAssertNil(LibraryColours.swapsUnknown(slicedOld))
+        let rawOld = try item(##"{"id":"b","name":"B","colors":["#111111","#C8102E"],"printTimeMins":null}"##)
+        XCTAssertFalse(rawOld.swapsKnown)
+        XCTAssertNotNil(LibraryColours.swapsUnknown(rawOld))
+    }
+
+    /// The phone's own copy passes the record's swaps on, as the server does
+    /// (`lib/lan-library.js` itemOf).
+    func testThePhonesCopyKeepsTheRecordsSwaps() throws {
+        let rec: JSONValue = .object(["id": .string("PF-x"), "name": .string("X"),
+                                      "colors": .array([.object(["hex": .string("#111111")]), .object(["hex": .string("#C8102E")])]),
+                                      "swapCount": .number(3), "swapsKnown": .bool(true)])
+        let copy = try XCTUnwrap(LibraryCopy.item(rec))
+        XCTAssertEqual(copy.swapCount, 3)
+        XCTAssertEqual(copy.swapsKnownSaid, true)
+        let bare: JSONValue = .object(["id": .string("PF-y"), "name": .string("Y"), "swapCount": .number(1.5)])
+        let none = try XCTUnwrap(LibraryCopy.item(bare))
+        XCTAssertNil(none.swapCount)
+        XCTAssertNil(none.swapsKnownSaid)
+    }
+
+    func testTheColourWordsAreInEveryLanguageWithOneNumber() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("KhaytCompanion/Resources")
+        let langs = ["en", "ar", "de", "fr", "es", "pt-BR", "tr", "ja", "zh-Hans"]
+        for lang in langs {
+            let url = root.appendingPathComponent("\(lang).lproj/Localizable.strings")
+            let table = try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String], lang)
+            XCTAssertFalse((table["library.colours"] ?? "").isEmpty, "\(lang): library.colours")
+            XCTAssertFalse((table["library.swaps_unknown"] ?? "").isEmpty, "\(lang): library.swaps_unknown")
+            for key in ["library.colours_tip", "library.swaps", "library.swaps_tip", "library.colours_more"] {
+                let value = try XCTUnwrap(table[key], "\(lang): \(key)")
+                XCTAssertEqual(value.components(separatedBy: "%d").count - 1, 1, "\(lang): \(key) takes one number")
+            }
+        }
+    }
 }
