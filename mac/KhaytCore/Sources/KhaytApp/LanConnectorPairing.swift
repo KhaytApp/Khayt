@@ -44,6 +44,10 @@ final class LanConnectorPairing {
         case timedOut
         case byOwner
         case serverStopped
+        /// The LAN PIN could not be read, so nothing was enrolled: a connector
+        /// enrolled under a PIN nothing uses could never connect, and making
+        /// room for it under that PIN took every phone off (beta.38 review).
+        case pinUnreadable
     }
 
     /// What a poll is told about a request.
@@ -89,12 +93,26 @@ final class LanConnectorPairing {
     private(set) var outcomes: [String: Outcome] = [:]
 
     @ObservationIgnored let clock: () -> TimeInterval
+    /// This window's own answer to `enabled`, for a test that builds one: so a
+    /// suite running beside others never has to write the shared static.
+    @ObservationIgnored let enabledHere: Bool?
 
-    init(clock: @escaping () -> TimeInterval = LanPairingWindow.monotonic) {
+    init(clock: @escaping () -> TimeInterval = LanPairingWindow.monotonic, enabled: Bool? = nil) {
         self.clock = clock
+        self.enabledHere = enabled
     }
 
+    /// Pairing a slicer is OFF in beta.38 (Dev Hub, Nov 16): the protocol gets
+    /// a commit-then-reveal before any plugin is public, and until then no
+    /// window opens, so the pair route answers `pairing-closed`. On for a
+    /// developer with `defaults write <bundle id> connectorPairing -bool YES`.
+    nonisolated static var enabled: Bool {
+        UserDefaults.standard.bool(forKey: "connectorPairing") || enabledForTests
+    }
+    nonisolated(unsafe) static var enabledForTests = false
+
     func open() {
+        guard enabledHere ?? Self.enabled else { return }
         deadline = clock() + Self.length
         pending = nil
         outcomes = [:]
@@ -188,6 +206,12 @@ final class LanConnectorPairing {
         outcomes[request.pairId] = outcome
         answeredHashes[request.pairId] = request.pollHash
         pending = nil
+    }
+
+    /// End the window for a reason the owner is told (`pinUnreadable`).
+    func refuse(_ why: Closed) {
+        guard deadline != nil else { return }
+        shut(why)
     }
 
     private func shut(_ why: Closed) {

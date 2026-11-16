@@ -4014,9 +4014,10 @@
  "mac.apps_waiting": "Bir dilimleyici bekleniyor… {time}",
  "mac.apps_ask": "“{name}” onaylansın mı?",
  "mac.apps_ask_from": "{app} {version}, {address} adresinden eşleşmek istedi.",
- "mac.apps_check": "Dilimleyici aynı numarayı göstermelidir. Göstermiyorsa reddedin.",
+ "mac.apps_check": "Dilimleyici bu numarayı gösteriyor mu? Göstermiyorsa reddedin.",
  "mac.apps_may": "“Dilimleyiciden” kutusuna dilim gönderebilir ve iş kuyruğunu okuyabilir (iş adları ve süreleri, asla müşteriler değil). Defterinizi, müşterilerinizi, fiyatlarınızı veya ayarlarınızı asla okuyamaz.",
- "mac.apps_approve": "Onayla",
+ "mac.apps_approve": "Numaralar eşleşiyor — onayla",
  "mac.apps_deny": "Reddet",
- "mac.apps_timed_out": "Zamanında hiçbir dilimleyici eşleşmedi. Yeniden denemek için Dilimleyici eşleştir’e tıklayın."
+ "mac.apps_timed_out": "Zamanında hiçbir dilimleyici eşleşmedi. Yeniden denemek için Dilimleyici eşleştir’e tıklayın.",
+ "mac.apps_pin_unreadable": "Yerel ağ PIN’i Anahtar Zinciri’nden okunamadı, bu yüzden hiçbir şey eşleşmedi. Yukarıda yerel ağ PIN’ini yeniden ayarlayın, sonra dilimleyiciyi eşleştirin."
 }

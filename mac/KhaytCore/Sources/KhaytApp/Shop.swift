@@ -1105,9 +1105,10 @@ final class Shop {
             var owedPartIds = false
             if let engine, let made = await Self.rowsWithPartIds(Self.rows(root, "printLog"), engine: engine) {
                 if overtaken() { return }
+                // Owed a write only for jobs it can be written to (`writable`).
+                owedPartIds = !Self.writable(made, in: Self.rows(root, "printLog")).isEmpty
                 root["printLog"] = .array(made.orders)
                 if let again = try? Self.decodeOrders(root) { orders = again.items }
-                owedPartIds = true
             }
             // `settings.lang` and not the system language: a Riyadh shop on an
             // English Mac still keeps its book in Arabic, and the book is what
