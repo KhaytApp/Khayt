@@ -9679,6 +9679,36 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.38] - 2026-11-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release shows New Job's total as the job will be saved, lets you change a job's markup in Edit Job, and shows each library model in the colours its print really uses.
+
+### New
+
+- **New Job shows the total the job will be saved at.** The total at the foot of New Job comes from the same rule that saves the job. A customer kept in another currency is shown in their currency, with the currency named.
+- **The markup can be changed in Edit Job.** Where a job's price was worked out from cost, Edit Job has a Markup field. A new markup works the price out again from cost, with the discount, rush, shipping and rounding as they were. If the customer has already seen the price, Khayt asks before changing it, and a markup that would bring the bill below what has been paid is refused.
+- **Library colours are the colours the print uses.** A 3MF that was never sliced used to show every spool the printer had loaded. It now shows only the filaments the print uses. Hover the dots or the swap number on a card to see what they mean; the swap number shows only for a sliced file.
+
+### Changed
+
+- **Some library cards show fewer colour dots after this update.** In the background, one model at a time, Khayt reads again the models whose colours were read the old way, where the file is on this Mac. A card may lose dots for spools its print never used. Nothing else about the model changes, and a model whose file isn't on this Mac is left as it is.
+- **Parts that had no id get one.** A few older parts, written by the desktop calculator, are given a permanent id the first time this version opens the book, so editing them works reliably. Nothing you can see changes.
+
+### Fixed
+
+- **A phone or app sending a large upload the Mac refuses always gets the refusal,** instead of "connection lost".
+- **New Job's cost breakdown counts each part as many times as the job prints it.** A part made four times showed one piece's material, machine, labour and buffer.
+- **A crafted 3MF or G-code file can no longer freeze Khayt** while its colours or picture are read.
+- **Approving a slicer can no longer unpair your phones.** If the LAN PIN can't be read, Khayt refuses and tells you to set the PIN again.
+- **Pressing Return in Settings no longer approves a slicer's pairing request;** you click Approve.
+
+### Not in this beta
+
+- **Pairing a slicer plugin is hidden** (Settings → Online → Connected apps) while its pairing check is made stronger. No slicer plugin is public yet, so nothing you use goes away.
+
 ## [4.0.0-beta.37] - 2026-11-15
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
