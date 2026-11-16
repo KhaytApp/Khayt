@@ -22,22 +22,42 @@ extension Shop {
     /// and handed everything, so a test runs exactly this against a scratch
     /// folder.
     nonisolated static func fileSlicerUpload(_ file: URL, name: String, root: URL,
-                                             engine: KhaytEngine?, now: Date = Date()) async throws -> SlicerUpload {
+                                             engine: KhaytEngine?, now: Date = Date(),
+                                             origin: SlicerOrigin? = nil) async throws -> SlicerUpload {
         var figures: [String: JSONValue]?
         if let engine { figures = await SlicerFigures.read(file, engine: engine) }
         let read = figures
         let filed: Result<SlicerUpload, Error> = await PinWork.run {
-            Result { try SlicerInbox.file(file, name: name, figures: read, root: root, now: now) }
+            Result { try SlicerInbox.file(file, name: name, figures: read, root: root, now: now, origin: origin) }
         }
         return try filed.get()
     }
 
-    /// The server's `slicerReceive`.
+    /// The server's `slicerReceive`. The same bytes already waiting are that
+    /// item, not a second one (`SlicerInbox.Duplicate`): the slicer is told
+    /// its file arrived, which it has.
     func receiveSlicerUpload(_ file: URL, name: String) async throws {
         guard let root = slicerInboxRoot else { throw CocoaError(.fileWriteNoPermission) }
-        let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine)
+        do {
+            let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine)
+            slicerUploads.removeAll { $0.id == item.id }
+            slicerUploads.insert(item, at: 0)
+        } catch is SlicerInbox.Duplicate {
+            refreshSlicerInbox()
+        }
+    }
+
+    /// The server's `connectorReceive`: a paired plugin's file, its hash
+    /// already checked. Nothing in the book is written — not a job, a quote,
+    /// a client or an activity row: the inbox is beside the book, and the
+    /// shop decides there. Throws `SlicerInbox.Duplicate` / `Full` for the
+    /// server to answer.
+    func receiveConnectorUpload(_ file: URL, name: String, origin: SlicerOrigin) async throws -> SlicerUpload {
+        guard let root = slicerInboxRoot else { throw CocoaError(.fileWriteNoPermission) }
+        let item = try await Self.fileSlicerUpload(file, name: name, root: root, engine: engine, origin: origin)
         slicerUploads.removeAll { $0.id == item.id }
         slicerUploads.insert(item, at: 0)
+        return item
     }
 
     /// Throw one away — the file and its folder, nothing else.

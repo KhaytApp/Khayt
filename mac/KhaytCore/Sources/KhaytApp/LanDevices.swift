@@ -238,6 +238,15 @@ final class LanDevices: @unchecked Sendable {
         return saved.devices.first(where: { $0.id == id })?.kind
     }
 
+    /// An enrolled CONNECTOR's derived key and name, by id: what its answers
+    /// are signed and its sealed bodies keyed with. Nil for a phone or an id
+    /// nobody enrolled — a phone's key never leaves `verify`.
+    func connector(_ id: String) -> (key: Data, name: String)? {
+        lock.lock(); defer { lock.unlock() }
+        guard let d = saved.devices.first(where: { $0.id == id }), d.kind == Self.kindConnector else { return nil }
+        return (d.key, d.name)
+    }
+
     func removeAll() {
         lock.lock(); defer { lock.unlock() }
         saved.devices = []
@@ -325,8 +334,12 @@ final class LanDevices: @unchecked Sendable {
 
     // MARK: - A signed request
 
-    static func canonical(method: String, target: String, time: String, nonce: String, body: Data) -> String {
-        let hash = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
+    /// `bodyHash`: the body's SHA-256 in lower-case hex when the body is not
+    /// in hand yet — a connector's file upload, verified at its head against
+    /// the hash its capture declared (`LanServer+Connector`).
+    static func canonical(method: String, target: String, time: String, nonce: String, body: Data,
+                          bodyHash: String? = nil) -> String {
+        let hash = bodyHash ?? SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
         return [canonicalPrefix, method.uppercased(), target, time, nonce, hash].joined(separator: "\n")
     }
 
@@ -354,8 +367,12 @@ final class LanDevices: @unchecked Sendable {
     /// The whole check. `headOnly` is the large-upload head, which has no body
     /// yet: it asks only that the device is enrolled and its clock agrees, and
     /// spends no nonce. The route then makes the whole check on the body.
+    ///
+    /// `bodyHash` stands in for the body's own hash: a WHOLE check (nonce
+    /// spent) on a head whose body has not been read, because the hash it
+    /// will have was declared and signed before (a connector's file upload).
     func verify(headers: [String: String], method: String, target: String, body: Data,
-                pin: String, now: Date, headOnly: Bool = false) -> Verdict {
+                pin: String, now: Date, headOnly: Bool = false, bodyHash: String? = nil) -> Verdict {
         let auth = Verdict.refused("device-auth", now: nil)
         guard let id = headers["x-khayt-device"], Self.plausibleId(id),
               let timeText = headers["x-khayt-time"], let time = Int(timeText), String(time) == timeText,
@@ -377,7 +394,7 @@ final class LanDevices: @unchecked Sendable {
         if !headOnly {
             let expected = Self.mac(key: saved.devices[at].key,
                                     canonical: Self.canonical(method: method, target: target, time: timeText,
-                                                              nonce: nonce, body: body))
+                                                              nonce: nonce, body: body, bodyHash: bodyHash))
             guard Self.constantTimeEqual(expected, sent) else { return auth }
         }
         guard abs(time - nowSeconds) <= Int(Self.skew), time >= since else {

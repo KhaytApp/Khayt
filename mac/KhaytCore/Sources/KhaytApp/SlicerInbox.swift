@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import CryptoKit
 import KhaytCore
 
 /// One file a slicer sent (`LanServer+SlicerUpload`), waiting in the inbox,
@@ -16,6 +17,31 @@ struct SlicerUpload: Identifiable, Codable, Equatable, Sendable {
     var minutes: Double?
     var material: String?
     var slicer: String?
+    /// The file's SHA-256, lower-case hex: one dedupe rule for every way in
+    /// (OctoPrint and the plugin). Nil on items filed before it existed.
+    var sha256: String? = nil
+    /// `"connector"` for a paired slicer plugin; nil for the OctoPrint path.
+    var source: String? = nil
+    var connectorId: String? = nil
+    var connectorName: String? = nil
+    /// What the plugin ASKED for (`inbox`/`quote`/`job`/`attach`/`print`):
+    /// a suggestion beside the item, never acted on by the server.
+    var suggested: JSONValue? = nil
+    /// The plugin's per-slot figures ("what the slicer said"); the Mac's own
+    /// reading above wins.
+    var slots: JSONValue? = nil
+    var sliceId: String? = nil
+}
+
+/// Who sent an inbox item when it was not the OctoPrint path: a paired slicer
+/// plugin, as `LanServer+Connector` checked it.
+struct SlicerOrigin: Sendable, Equatable {
+    var connectorId: String
+    var connectorName: String
+    var sliceId: String
+    var sha256: String
+    var suggested: JSONValue
+    var slots: JSONValue?
 }
 
 /// ── THE "FROM SLICER" INBOX ──────────────────────────────────────────────
@@ -36,6 +62,23 @@ enum SlicerInbox {
 
     struct Full: Error, CustomStringConvertible {
         var description: String { "The Khayt slicer inbox is full — clear it in Khayt first" }
+    }
+
+    /// The same bytes are already waiting: the item that holds them. Whichever
+    /// way each came in (OctoPrint or the plugin), one file is one item.
+    struct Duplicate: Error { let item: SlicerUpload }
+
+    /// A file's SHA-256, read in 1 MB pieces: a plate can be a gigabyte.
+    static func sha256(of url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            guard let chunk = try? handle.read(upToCount: 1 << 20) else { return nil }
+            if chunk.isEmpty { break }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     static func root(storeURL: URL) -> URL {
@@ -78,10 +121,15 @@ enum SlicerInbox {
     }
 
     /// Move `upload` into the inbox and write what is known about it.
+    /// `origin`: a paired plugin's, with the hash it declared and the server
+    /// checked while spooling; nil (OctoPrint) hashes the file here.
     static func file(_ upload: URL, name: String, figures: [String: JSONValue]?, root: URL,
-                     now: Date = Date()) throws -> SlicerUpload {
-        // lock: system — a slicer's upload through the LAN server, which checked its API key; it only fills this Mac's own inbox folder.
-        guard list(root: root).count < maxWaiting else { throw Full() }
+                     now: Date = Date(), origin: SlicerOrigin? = nil) throws -> SlicerUpload {
+        // lock: system — a slicer's upload through the LAN server, which checked its API key (or a paired plugin's signature); it only fills this Mac's own inbox folder.
+        let waiting = list(root: root)
+        let hash = origin?.sha256 ?? sha256(of: upload)
+        if let hash, let same = waiting.first(where: { $0.sha256 == hash }) { throw Duplicate(item: same) }
+        guard waiting.count < maxWaiting else { throw Full() }
         let stamp = Int(now.timeIntervalSince1970 * 1000)
         let id = ["SU", String(stamp), String(format: "%04x", Int(UInt16.random(in: 0...UInt16.max)))]
             .joined(separator: "-")
@@ -103,9 +151,18 @@ enum SlicerInbox {
             if case .string(let s)? = figures?[key], !s.isEmpty { return s }
             return nil
         }
-        let item = SlicerUpload(id: id, name: name, arrived: now, bytes: size,
+        var item = SlicerUpload(id: id, name: name, arrived: now, bytes: size,
                                 grams: number("filamentGrams"), minutes: number("printTimeMins"),
                                 material: text("filamentType"), slicer: text("slicer"))
+        item.sha256 = hash
+        if let origin {
+            item.source = "connector"
+            item.connectorId = origin.connectorId
+            item.connectorName = origin.connectorName
+            item.sliceId = origin.sliceId
+            item.suggested = origin.suggested
+            item.slots = origin.slots
+        }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         do {
