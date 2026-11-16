@@ -1,0 +1,859 @@
+{
+  "about": "lib/connector-slice.js check(input, opts) -> expect. Sample data only. The plugin builds captures that pass these.",
+  "cases": [
+    {
+      "name": "inbox, full",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "inbox",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "expect": {
+        "ok": true,
+        "capture": {
+          "v": 1,
+          "id": "cap_sample_0001",
+          "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "file": {
+            "name": "Bracket_PLA.gcode",
+            "bytes": 2048,
+            "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+            "type": "gcode"
+          },
+          "suggested": {
+            "intent": "inbox"
+          },
+          "at": "2026-11-16T09:00:00Z",
+          "slicer": {
+            "name": "OrcaSlicer",
+            "version": "2.5.1",
+            "plugin": "0.1.0"
+          },
+          "printer": {
+            "preset": "Snapmaker U1 (0.4 nozzle)",
+            "nozzle": 0.4
+          },
+          "process": {
+            "preset": "0.20mm Standard @U1",
+            "layerHeight": 0.2
+          },
+          "plate": {
+            "index": 1,
+            "name": "Plate 1",
+            "objects": [
+              "Bracket"
+            ]
+          },
+          "timeSec": 3725,
+          "layers": 120,
+          "toolchanges": 3,
+          "filaments": [
+            {
+              "slot": 1,
+              "grams": 12.34,
+              "cm3": 9.95,
+              "mm": 4136.2,
+              "type": "PLA",
+              "colour": "#FFFFFF",
+              "preset": "Generic PLA @U1",
+              "density": 1.24,
+              "costPerKg": 20,
+              "cost": 0.25
+            }
+          ],
+          "thumbnail": {
+            "type": "png",
+            "w": 2,
+            "h": 2,
+            "b64": "iVBORw0KGgo="
+          }
+        },
+        "dropped": []
+      }
+    },
+    {
+      "name": "attach to a job",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "attach",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        },
+        "jobId": "J-1042"
+      },
+      "expect": {
+        "ok": true,
+        "capture": {
+          "v": 1,
+          "id": "cap_sample_0001",
+          "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "file": {
+            "name": "Bracket_PLA.gcode",
+            "bytes": 2048,
+            "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+            "type": "gcode"
+          },
+          "suggested": {
+            "intent": "attach",
+            "jobId": "J-1042"
+          },
+          "at": "2026-11-16T09:00:00Z",
+          "slicer": {
+            "name": "OrcaSlicer",
+            "version": "2.5.1",
+            "plugin": "0.1.0"
+          },
+          "printer": {
+            "preset": "Snapmaker U1 (0.4 nozzle)",
+            "nozzle": 0.4
+          },
+          "process": {
+            "preset": "0.20mm Standard @U1",
+            "layerHeight": 0.2
+          },
+          "plate": {
+            "index": 1,
+            "name": "Plate 1",
+            "objects": [
+              "Bracket"
+            ]
+          },
+          "timeSec": 3725,
+          "layers": 120,
+          "toolchanges": 3,
+          "filaments": [
+            {
+              "slot": 1,
+              "grams": 12.34,
+              "cm3": 9.95,
+              "mm": 4136.2,
+              "type": "PLA",
+              "colour": "#FFFFFF",
+              "preset": "Generic PLA @U1",
+              "density": 1.24,
+              "costPerKg": 20,
+              "cost": 0.25
+            }
+          ],
+          "thumbnail": {
+            "type": "png",
+            "w": 2,
+            "h": 2,
+            "b64": "iVBORw0KGgo="
+          }
+        },
+        "dropped": []
+      }
+    },
+    {
+      "name": "print is kept as asked, never acted on",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "print",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        },
+        "machineId": "m_1a2b",
+        "startPrint": true
+      },
+      "expect": {
+        "ok": true,
+        "capture": {
+          "v": 1,
+          "id": "cap_sample_0001",
+          "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "file": {
+            "name": "Bracket_PLA.gcode",
+            "bytes": 2048,
+            "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+            "type": "gcode"
+          },
+          "suggested": {
+            "intent": "print",
+            "machineId": "m_1a2b",
+            "startPrint": true
+          },
+          "at": "2026-11-16T09:00:00Z",
+          "slicer": {
+            "name": "OrcaSlicer",
+            "version": "2.5.1",
+            "plugin": "0.1.0"
+          },
+          "printer": {
+            "preset": "Snapmaker U1 (0.4 nozzle)",
+            "nozzle": 0.4
+          },
+          "process": {
+            "preset": "0.20mm Standard @U1",
+            "layerHeight": 0.2
+          },
+          "plate": {
+            "index": 1,
+            "name": "Plate 1",
+            "objects": [
+              "Bracket"
+            ]
+          },
+          "timeSec": 3725,
+          "layers": 120,
+          "toolchanges": 3,
+          "filaments": [
+            {
+              "slot": 1,
+              "grams": 12.34,
+              "cm3": 9.95,
+              "mm": 4136.2,
+              "type": "PLA",
+              "colour": "#FFFFFF",
+              "preset": "Generic PLA @U1",
+              "density": 1.24,
+              "costPerKg": 20,
+              "cost": 0.25
+            }
+          ],
+          "thumbnail": {
+            "type": "png",
+            "w": 2,
+            "h": 2,
+            "b64": "iVBORw0KGgo="
+          }
+        },
+        "dropped": []
+      }
+    },
+    {
+      "name": "unknown intent becomes inbox",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "pause",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "expect": {
+        "ok": true,
+        "capture": {
+          "v": 1,
+          "id": "cap_sample_0001",
+          "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "file": {
+            "name": "Bracket_PLA.gcode",
+            "bytes": 2048,
+            "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+            "type": "gcode"
+          },
+          "suggested": {
+            "intent": "inbox"
+          },
+          "at": "2026-11-16T09:00:00Z",
+          "slicer": {
+            "name": "OrcaSlicer",
+            "version": "2.5.1",
+            "plugin": "0.1.0"
+          },
+          "printer": {
+            "preset": "Snapmaker U1 (0.4 nozzle)",
+            "nozzle": 0.4
+          },
+          "process": {
+            "preset": "0.20mm Standard @U1",
+            "layerHeight": 0.2
+          },
+          "plate": {
+            "index": 1,
+            "name": "Plate 1",
+            "objects": [
+              "Bracket"
+            ]
+          },
+          "timeSec": 3725,
+          "layers": 120,
+          "toolchanges": 3,
+          "filaments": [
+            {
+              "slot": 1,
+              "grams": 12.34,
+              "cm3": 9.95,
+              "mm": 4136.2,
+              "type": "PLA",
+              "colour": "#FFFFFF",
+              "preset": "Generic PLA @U1",
+              "density": 1.24,
+              "costPerKg": 20,
+              "cost": 0.25
+            }
+          ],
+          "thumbnail": {
+            "type": "png",
+            "w": 2,
+            "h": 2,
+            "b64": "iVBORw0KGgo="
+          }
+        },
+        "dropped": [
+          "intent"
+        ]
+      }
+    },
+    {
+      "name": "a .gcode.3mf plate",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "inbox",
+        "file": {
+          "name": "Plate_1.gcode.3mf",
+          "bytes": 4096,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "expect": {
+        "ok": true,
+        "capture": {
+          "v": 1,
+          "id": "cap_sample_0001",
+          "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "file": {
+            "name": "Plate_1.gcode.3mf",
+            "bytes": 4096,
+            "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+            "type": "gcode.3mf"
+          },
+          "suggested": {
+            "intent": "inbox"
+          },
+          "at": "2026-11-16T09:00:00Z",
+          "slicer": {
+            "name": "OrcaSlicer",
+            "version": "2.5.1",
+            "plugin": "0.1.0"
+          },
+          "printer": {
+            "preset": "Snapmaker U1 (0.4 nozzle)",
+            "nozzle": 0.4
+          },
+          "process": {
+            "preset": "0.20mm Standard @U1",
+            "layerHeight": 0.2
+          },
+          "plate": {
+            "index": 1,
+            "name": "Plate 1",
+            "objects": [
+              "Bracket"
+            ]
+          },
+          "timeSec": 3725,
+          "layers": 120,
+          "toolchanges": 3,
+          "filaments": [
+            {
+              "slot": 1,
+              "grams": 12.34,
+              "cm3": 9.95,
+              "mm": 4136.2,
+              "type": "PLA",
+              "colour": "#FFFFFF",
+              "preset": "Generic PLA @U1",
+              "density": 1.24,
+              "costPerKg": 20,
+              "cost": 0.25
+            }
+          ],
+          "thumbnail": {
+            "type": "png",
+            "w": 2,
+            "h": 2,
+            "b64": "iVBORw0KGgo="
+          }
+        },
+        "dropped": []
+      }
+    },
+    {
+      "name": "idem must be the file hash",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "inbox",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "expect": {
+        "ok": false,
+        "reason": "idem-mismatch",
+        "field": "idem"
+      }
+    },
+    {
+      "name": "a model is not a slice",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "inbox",
+        "file": {
+          "name": "part.stl",
+          "bytes": 10,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "expect": {
+        "ok": false,
+        "reason": "wrong-kind",
+        "field": "file.name"
+      }
+    },
+    {
+      "name": "over the Mac cap",
+      "input": {
+        "v": 1,
+        "kind": "slice",
+        "id": "cap_sample_0001",
+        "idem": "sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "at": "2026-11-16T09:00:00Z",
+        "intent": "inbox",
+        "file": {
+          "name": "Bracket_PLA.gcode",
+          "bytes": 2048,
+          "sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+          "type": "gcode"
+        },
+        "slicer": {
+          "name": "OrcaSlicer",
+          "version": "2.5.1",
+          "plugin": "0.1.0"
+        },
+        "printer": {
+          "preset": "Snapmaker U1 (0.4 nozzle)",
+          "nozzle": 0.4
+        },
+        "process": {
+          "preset": "0.20mm Standard @U1",
+          "layerHeight": 0.2
+        },
+        "plate": {
+          "index": 1,
+          "name": "Plate 1",
+          "objects": [
+            "Bracket"
+          ]
+        },
+        "timeSec": 3725,
+        "layers": 120,
+        "toolchanges": 3,
+        "filaments": [
+          {
+            "slot": 1,
+            "preset": "Generic PLA @U1",
+            "type": "PLA",
+            "colour": "#ffffff",
+            "grams": 12.34,
+            "cm3": 9.95,
+            "mm": 4136.2,
+            "density": 1.24,
+            "costPerKg": 20,
+            "cost": 0.25
+          },
+          {
+            "slot": 2,
+            "type": "PETG",
+            "grams": 0
+          }
+        ],
+        "thumbnail": {
+          "type": "png",
+          "w": 2,
+          "h": 2,
+          "b64": "iVBORw0KGgo="
+        }
+      },
+      "opts": {
+        "maxFileBytes": 1024
+      },
+      "expect": {
+        "ok": false,
+        "reason": "too-large",
+        "field": "file.bytes"
+      }
+    }
+  ]
+}
