@@ -14,8 +14,9 @@ import KhaytCore
 /// height ranges (`layer_config_ranges.xml`), and the paint on the mesh. The
 /// first two are config text; the paint is in the `.model` XML, encoded per
 /// triangle, and only `lib/mf-mesh.js` decodes it. So the Mac hands the mesh
-/// to that one codec (`KhaytEngine.paintSlots`) rather than keeping a second
-/// decoder in Swift.
+/// to that one codec (`StudioEngine.paintSlots`, the studio's own JavaScript
+/// context, so seconds of decoding never hold the shop's engine) rather than
+/// keeping a second decoder in Swift.
 ///
 /// ── THE CHEAP CASE FIRST ─────────────────────────────────────────────────
 ///
@@ -71,8 +72,11 @@ enum ColourRead {
         let unread: JSONValue = .object(["unread": .bool(true)])
         guard let isPainted = await PinWork.run({ painted(entries, in: url) }) else { return unread }
         guard isPainted else { return .object(["slots": .array([])]) }
-        guard let read = try? await Converter.describeOffMain(url, bindMeshes: true),
-              let slots = try? await engine.paintSlots(read.described, meshes: read.meshes) else { return unread }
+        // On the studio's engine, not the shop's: seconds of decoding must not
+        // hold the actor every screen's rules wait on.
+        guard let studio = await Studio.engine(),
+              let read = try? await Converter.describeOffMain(url, bindMeshes: true),
+              let slots = try? await studio.paintSlots(read.described, meshes: read.meshes) else { return unread }
         return .object(["slots": .array(slots.map { .number(Double($0)) })])
     }
 

@@ -4323,29 +4323,6 @@ public actor KhaytEngine {
         as: Colours.self)
     }
 
-    /// The slots a 3MF's paint uses, from its `.model` members (laid out as
-    /// `Converter.describe` lays them, the XML bound by name in `meshes`):
-    /// `lib/mf-mesh.js` `slotsUsed`, the same codec the desktop reads paint
-    /// with. Nil when the mesh could not be read (past the hard cap, broken).
-    public func paintSlots(_ members: [JSONValue], meshes: [String: String]) throws -> [Int]? {
-        try runtime.withBoundStrings(meshes) {
-            try runtime.call2("""
-                (function (members) {
-                  members = members.map(function (m) {
-                    if (!m || !m.meshVar) return m;
-                    var text = globalThis[m.meshVar];
-                    return typeof text === 'string' ? { name: m.name, data: text } : m;
-                  }).filter(function (m) { return m && typeof m.data === 'string'; });
-                  var mesh = null;
-                  // One preview face: only slotsUsed is wanted, counted over every triangle.
-                  try { mesh = KhaytMfMesh.extractMeshFromMembers(members, 1); } catch (e) { mesh = null; }
-                  if (!mesh || mesh.skipped || !Array.isArray(mesh.slotsUsed)) return null;
-                  return mesh.slotsUsed;
-                })(ARG0)
-                """, [.array(members)], as: [Int]?.self)
-        }
-    }
-
     /// `KhaytThumb.applyColours`: a colour re-read put on a library record,
     /// by the rule both apps share (never empties colours it cannot name,
     /// keeps a slice's grams, stamps `coloursReader`, leaves `updatedAt`).

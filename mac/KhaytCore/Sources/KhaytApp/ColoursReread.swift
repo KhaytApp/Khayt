@@ -32,6 +32,12 @@ enum ColoursReread {
     /// is kept.
     static let fields = ["colors", "swapCount", "coloursReader", "swapsKnown"]
 
+    /// Records read before what has been read is written (and so survives a
+    /// launch cut short).
+    static let batch = 10
+    /// Between two records, so a book of painted models never runs the CPU flat.
+    static let pause: Duration = .milliseconds(150)
+
     /// `rows` with each id in `patches` given its patched colour fields.
     /// Records not in `patches` are untouched.
     nonisolated static func apply(_ patches: [String: [String: JSONValue]],
@@ -51,8 +57,19 @@ extension Shop {
 
     /// Read again, once per book per launch, the 3MFs whose colours an older
     /// reader wrote. Started from `remeasureIfDue`, beside the geometry
-    /// re-read, on the same terms: background, one write at the end, nothing
-    /// for the sample book.
+    /// re-read, on the same terms: background, nothing for the sample book.
+    ///
+    /// ── NEVER IN THE WAY ─────────────────────────────────────────────────
+    ///
+    /// A painted mesh takes seconds to decode (the desktop measured up to
+    /// ~7 s), and a book can hold hundreds of them. So: one record at a time;
+    /// the zip on a dispatch queue (`PinWork`, `Converter.readQueue`) and the
+    /// paint on the STUDIO's engine (`StudioEngine.paintSlots`), never the
+    /// main thread or the shop's engine that every screen's rules wait on; a
+    /// pause between records; and what has been read is written every
+    /// `batch` records, each stamped with its reader, so a launch cut short
+    /// resumes where it stopped instead of starting again. The screen is
+    /// reloaded once, at the end.
     func rereadColoursIfDue(build: StoreReader.Build, engine: KhaytEngine) {
         let files = self.files
         let rows = libraryShownRows
@@ -62,36 +79,46 @@ extension Shop {
             guard !due.isEmpty, let self else { return }
             var raw: [String: [String: JSONValue]] = [:]
             for case .object(let o) in rows { if case .string(let id)? = o["id"] { raw[id] = o } }
-            var patches: [String: [String: JSONValue]] = [:]
+            var pending: [String: [String: JSONValue]] = [:]
+            var wroteAny = false
+            func writeReadColours() async -> Bool {
+                guard !pending.isEmpty else { return true }
+                let sending = pending
+                do {
+                    // lock: system — background: colours re-read because the colour rule changed (reader 2).
+                    try await StoreWriter.updateOffMain(
+                        storeURL: build.storeURL,
+                        owns: { StoreLock.weOwnIt(build) },
+                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+                    ) { root in
+                        guard case .array(let rows)? = root["printFiles"] else { return }
+                        root["printFiles"] = .array(ColoursReread.apply(sending, to: rows))
+                    }
+                } catch {
+                    // Not ours, or the disk refused: what was not written is
+                    // still due at the next launch.
+                    return false
+                }
+                pending = [:]
+                wroteAny = true
+                return true
+            }
             for file in due {
+                if Task.isCancelled { break }
                 guard let url = self.modelFile(for: file), let record = raw[file.id] else { continue }
                 if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
-                guard FileManager.default.fileExists(atPath: url.path),
+                guard await PinWork.run({ FileManager.default.fileExists(atPath: url.path) }),
                       let entries = await PinWork.run({ try? Zip.entries(of: url) }),
                       let read = await ColourRead.colours(url, entries: entries, engine: engine),
                       let applied = try? await engine.applyColours(record, read: read),
                       applied.changed else { continue }
                 var patch: [String: JSONValue] = [:]
                 for k in ColoursReread.fields { if let v = applied.record[k] { patch[k] = v } }
-                patches[file.id] = patch
+                pending[file.id] = patch
+                if pending.count >= ColoursReread.batch, !(await writeReadColours()) { return }
+                try? await Task.sleep(for: ColoursReread.pause)
             }
-            guard !patches.isEmpty else { return }
-            let sending = patches
-            do {
-                // lock: system — background: colours re-read because the colour rule changed (reader 2).
-                try await StoreWriter.updateOffMain(
-                    storeURL: build.storeURL,
-                    owns: { StoreLock.weOwnIt(build) },
-                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-                ) { root in
-                    guard case .array(let rows)? = root["printFiles"] else { return }
-                    root["printFiles"] = .array(ColoursReread.apply(sending, to: rows))
-                }
-            } catch {
-                // Not ours, or the disk refused: nothing was stamped, so the
-                // same files are due at the next launch.
-                return
-            }
+            guard await writeReadColours(), wroteAny else { return }
             await self.load(self.source)
         }
     }
