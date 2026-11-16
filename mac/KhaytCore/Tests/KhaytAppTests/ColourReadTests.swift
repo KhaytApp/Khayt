@@ -21,7 +21,7 @@ struct ColourReadTests {
         .deletingLastPathComponent()   // the repository root
         .appending(path: "test/fixtures/library-colours")
 
-    struct Expected: Decodable { let hexes: [String]; let swapCount: Int; let slotsKnown: Bool; let reader: Int }
+    struct Expected: Decodable { let hexes: [String]; let swapCount: Int; let slotsKnown: Bool; let reader: Int; let paintSlots: [Int]? }
 
     static func expected() throws -> [String: Expected] {
         try JSONDecoder().decode([String: Expected].self,
@@ -36,7 +36,7 @@ struct ColourReadTests {
     func fixturesAgree() async throws {
         let engine = try KhaytEngine()
         let want = try Self.expected()
-        #expect(want.count == 3)
+        #expect(want.count == 4)
         for (name, w) in want {
             let url = Self.fixtures.appending(path: name)
             let entries = try Zip.entries(of: url)
@@ -48,9 +48,52 @@ struct ColourReadTests {
         }
     }
 
+    /// The Mac's own paint path, step by step, against what `lib/mf-mesh.js`
+    /// decodes under node (`expected.json` paintSlots). Beta.38 shipped with
+    /// each step right and the colours wrong, because the fixtures had no
+    /// unsliced project carrying a stub `slice_info.config` and the Mac
+    /// skipped the paint for it (reader 3).
+    @Test("the paint path (streamed check, describe, StudioEngine.paintSlots) decodes what node decodes")
+    func paintPathParity() async throws {
+        let engine = try KhaytEngine()
+        let want = try Self.expected()
+        var painted = 0
+        for (name, w) in want.sorted(by: { $0.key < $1.key }) {
+            let url = Self.fixtures.appending(path: name)
+            let entries = try Zip.entries(of: url)
+            guard ColourRead.painted(entries, in: url) == true else { continue }
+            painted += 1
+            // The three steps `ColourRead.paint` takes, each on its own.
+            let read = try await Converter.describeOffMain(url, bindMeshes: true)
+            let studio = try #require(await Studio.engine())
+            let slots = try await studio.paintSlots(read.described, meshes: read.meshes)
+            #expect(slots == w.paintSlots, Comment(rawValue: name))
+            // And the whole of it, as the colour read calls it.
+            guard case .object(let p) = await ColourRead.paint(url, entries: entries, engine: engine),
+                  case .array(let raw)? = p["slots"] else { Issue.record("\(name): paint unread"); continue }
+            #expect(raw.compactMap { if case .number(let n) = $0 { return Int(n) }; return nil } == w.paintSlots,
+                    Comment(rawValue: name))
+        }
+        #expect(painted == 2, "both painted fixtures, with and without a stub slice")
+    }
+
+    @Test("a stub slice_info (no filament) is not a slice; a real one is")
+    func stubSliceIsNotASlice() async throws {
+        let engine = try KhaytEngine()
+        func configs(_ name: String) throws -> ColourRead.Configs {
+            let url = Self.fixtures.appending(path: name)
+            return ColourRead.configs(try Zip.entries(of: url), in: url)
+        }
+        let stub = try configs("painted-stub-slice.3mf")
+        #expect(!stub.sliceInfo.isEmpty, "the fixture carries a stub")
+        #expect(await ColourRead.slice(stub, engine: engine) == nil)
+        #expect(await ColourRead.slice(try configs("sliced.3mf"), engine: engine)?.colors.count == 2)
+        #expect(await ColourRead.slice(try configs("painted-1-2-5.3mf"), engine: engine) == nil)
+    }
+
     @Test("the paint check: a painted model is found, an unpainted one is not")
     func paintCheck() throws {
-        for (name, painted) in [("painted-1-2-5.3mf", true), ("unpainted-slot4.3mf", false)] {
+        for (name, painted) in [("painted-1-2-5.3mf", true), ("painted-stub-slice.3mf", true), ("unpainted-slot4.3mf", false)] {
             let url = Self.fixtures.appending(path: name)
             #expect(ColourRead.painted(try Zip.entries(of: url), in: url) == painted, Comment(rawValue: name))
         }
@@ -65,6 +108,10 @@ struct ColourReadTests {
         let entries = try Zip.entries(of: url)
         let c = ColourRead.configs(entries, in: url)
         #expect(await ColourRead.usedSlots(url, entries: entries, configs: c, engine: engine) == [1, 2, 5])
+        let stub = Self.fixtures.appending(path: "painted-stub-slice.3mf")
+        let te = try Zip.entries(of: stub)
+        #expect(await ColourRead.usedSlots(stub, entries: te, configs: ColourRead.configs(te, in: stub),
+                                           engine: engine) == [1, 2, 5], "a stub slice_info is not a slice")
         let sliced = Self.fixtures.appending(path: "sliced.3mf")
         let se = try Zip.entries(of: sliced)
         #expect(await ColourRead.usedSlots(sliced, entries: se, configs: ColourRead.configs(se, in: sliced),
@@ -148,6 +195,16 @@ struct ColourReadTests {
         let now = try Self.file(["id": .string("now"), "sourceFile": threeMF, "coloursReader": .number(2)])
         let mesh = try Self.file(["id": .string("stl"), "sourceFile": stl])
         #expect(ColoursReread.due([old, one, now, mesh], reader: 2).map(\.id) == ["old", "one"])
+    }
+
+    @Test("today's reader is 3, so a record beta.38 stamped reader 2 is read again")
+    func readerTwoIsDue() async throws {
+        let reader = try await KhaytEngine().coloursReader()
+        #expect(reader == 3)
+        let threeMF: JSONValue = .object(["filename": .string("a.3mf"), "ext": .string("3mf")])
+        let two = try Self.file(["id": .string("two"), "sourceFile": threeMF, "coloursReader": .number(2)])
+        let three = try Self.file(["id": .string("three"), "sourceFile": threeMF, "coloursReader": .number(3)])
+        #expect(ColoursReread.due([two, three], reader: reader).map(\.id) == ["two"])
     }
 
     // MARK: - What the card says on hover
