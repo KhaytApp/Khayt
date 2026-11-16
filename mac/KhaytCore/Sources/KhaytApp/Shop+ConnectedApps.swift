@@ -127,7 +127,7 @@ struct PairASlicer: View {
                     .environment(\.layoutDirection, .leftToRight)
                     .accessibilityIdentifier("connector-check")
                 Text(shop.words.callIt("mac.apps_check"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.callout)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
                 Text(shop.words.callIt("mac.apps_may"))
