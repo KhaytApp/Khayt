@@ -6,6 +6,8 @@ const zlib = require('zlib');
 
 /**
  * entries: [{ name, data:Buffer|string, method?:0|8 }] → ZIP Buffer
+ * An entry may instead give `comp` (already raw-deflated) and `size` (its
+ * inflated length): a member far larger than the test should hold.
  *
  * `opts.zip64` writes the archive the way a writer that always uses zip64
  * does — some do, size regardless: every 32-bit size and offset in the
@@ -20,9 +22,10 @@ function makeZip(entries, opts) {
   const centrals = [];
   let offset = 0;
   for (const e of entries) {
-    const raw = Buffer.isBuffer(e.data) ? e.data : Buffer.from(String(e.data), 'utf8');
-    const method = e.method === 8 ? 8 : 0;
-    const comp = method === 8 ? zlib.deflateRawSync(raw) : raw;
+    const pre = Buffer.isBuffer(e.comp);
+    const raw = pre ? { length: e.size } : Buffer.isBuffer(e.data) ? e.data : Buffer.from(String(e.data), 'utf8');
+    const method = pre || e.method === 8 ? 8 : 0;
+    const comp = pre ? e.comp : method === 8 ? zlib.deflateRawSync(raw) : raw;
     const name = Buffer.from(e.name, 'utf8');
 
     const lfh = Buffer.alloc(30);
