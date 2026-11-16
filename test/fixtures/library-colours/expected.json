@@ -5,7 +5,10 @@
     ],
     "swapCount": 0,
     "slotsKnown": true,
-    "reader": 2
+    "reader": 3,
+    "paintSlots": [
+      4
+    ]
   },
   "painted-1-2-5.3mf": {
     "hexes": [
@@ -15,7 +18,12 @@
     ],
     "swapCount": 0,
     "slotsKnown": true,
-    "reader": 2
+    "reader": 3,
+    "paintSlots": [
+      1,
+      2,
+      5
+    ]
   },
   "sliced.3mf": {
     "hexes": [
@@ -24,6 +32,24 @@
     ],
     "swapCount": 1,
     "slotsKnown": true,
-    "reader": 2
+    "reader": 3,
+    "paintSlots": [
+      1
+    ]
+  },
+  "painted-stub-slice.3mf": {
+    "hexes": [
+      "#111111",
+      "#222222",
+      "#555555"
+    ],
+    "swapCount": 0,
+    "slotsKnown": true,
+    "reader": 3,
+    "paintSlots": [
+      1,
+      2,
+      5
+    ]
   }
 }

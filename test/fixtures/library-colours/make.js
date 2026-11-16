@@ -42,11 +42,23 @@ const cases = {
   'sliced.3mf': threeMf({ loaded: LOADED8.slice(0, 3), extruder: 1, paints: [null],
     slice: '<config><plate><filament id="1" color="#111111" used_g="4.2"/><filament id="2" color="#222222" used_g="0"/><filament id="3" color="#333333" used_g="1.5"/></plate></config>' }),
 };
+// What an UNSLICED Bambu/Orca project carries as slice_info.config: a header,
+// no <filament>. Beta.38's Mac took it for a slice and skipped the paint, so
+// a model painted in five kept one dot (reader 3).
+const STUB_SLICE = '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n  <header>\n' +
+  '    <header_item key="X-BBL-Client-Type" value="slicer"/>\n    <header_item key="X-BBL-Client-Version" value="02.00.00.00"/>\n' +
+  '  </header>\n</config>\n';
+// Eight loaded, painted with 2 and 5 and a split, and a stub slice: the same three.
+cases['painted-stub-slice.3mf'] = threeMf({ loaded: LOADED8, extruder: 1,
+  paints: [Mesh.encodeSolidPaint(2), Mesh.encodeSolidPaint(5), SPLIT_0_2], slice: STUB_SLICE });
 const expected = {};
 for (const [name, buf] of Object.entries(cases)) {
   fs.writeFileSync(path.join(__dirname, name), buf);
   const r = T.colours3mf(buf);
-  expected[name] = { hexes: r.colors.map((c) => c.hex), swapCount: r.swapCount, slotsKnown: r.slotsKnown, reader: r.reader };
+  // The paint's slots as lib/mf-mesh.js decodes them, for the Mac's paint path.
+  const mesh = Mesh.extractMeshFromBuffer(buf, 1);
+  expected[name] = { hexes: r.colors.map((c) => c.hex), swapCount: r.swapCount, slotsKnown: r.slotsKnown, reader: r.reader,
+    paintSlots: mesh && Array.isArray(mesh.slotsUsed) ? mesh.slotsUsed : null };
 }
 fs.writeFileSync(path.join(__dirname, 'expected.json'), JSON.stringify(expected, null, 2) + '\n');
 console.log(JSON.stringify(expected));
