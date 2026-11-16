@@ -63,6 +63,11 @@ try {
       base('JS-SEEN'),
       base('JS-USE'),
       base('JS-MK'),
+      // Taken in US dollars at 3.75 SAR each: the same job as JS-MK, priced in
+      // the job's currency (newOrder divides the shop-currency cost by fxRate).
+      // It carries the markup it was taken at, as newOrder stores it: a markup
+      // is never worked backwards through a rate (order-edit.js marginOf).
+      base('JS-USD', { currency: 'USD', fxRate: 3.75, marginPct: 100, price: Math.round(340 / 3.75 * 100) / 100 }),
       base('JS-DRAFT', { status: 'quote', statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
@@ -169,6 +174,25 @@ try {
   j = await job('JS-MK');
   ok(j.marginPct === 200 && j.price !== 340, `Change the price: markup 200 stored, the price worked again from cost (${j.price})`);
   ok(shown.replace(/[^0-9.]/g, '').includes(j.price.toFixed(2)), 'the price saved is the total the sheet showed');
+  await window.click('#jobPage [data-jp="back"]');
+
+  // A job in another currency: the cost is in the shop's (SAR), the price in
+  // the job's (USD at 3.75). At the same markup its price is JS-MK's divided
+  // by the rate, not multiplied (beta.38 review: about 14x too high).
+  const sarAt200 = j.price;
+  await openSheet('JS-USD');
+  const mkUsd = await window.inputValue('#modalMount [data-js="margin"]');
+  ok(mkUsd === '100', `a USD job shows the markup it was taken at (${mkUsd})`);
+  await window.fill('#modalMount [data-js="margin"]', '200');
+  await window.waitForFunction(() => document.querySelector('#modalMount .js-refused').hidden, null, { timeout: 5_000 });
+  await save();
+  await window.waitForSelector('#modalMount .js-ask', { state: 'visible', timeout: 5_000 });
+  await window.click('#modalMount .js-ask [data-ask="change"]');
+  await closed();
+  j = await job('JS-USD');
+  ok(j.marginPct === 200 && j.currency === 'USD' && j.fxRate === 3.75, 'the USD job keeps its currency and rate');
+  ok(Math.abs(j.price - sarAt200 / 3.75) <= 0.02,
+    `markup 200 on the USD job is the SAR price divided by 3.75 (${j.price} vs ${(sarAt200 / 3.75).toFixed(2)})`);
   await window.click('#jobPage [data-jp="back"]');
   await openSheet('JS-SEEN');
   ok(await window.inputValue('#modalMount [data-js="margin"]') === '', 'a typed price has no markup to show');
