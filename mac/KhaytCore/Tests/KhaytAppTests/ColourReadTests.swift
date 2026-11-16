@@ -36,7 +36,7 @@ struct ColourReadTests {
     func fixturesAgree() async throws {
         let engine = try KhaytEngine()
         let want = try Self.expected()
-        #expect(want.count == 4)
+        #expect(want.count == 5)
         for (name, w) in want {
             let url = Self.fixtures.appending(path: name)
             let entries = try Zip.entries(of: url)
@@ -68,13 +68,44 @@ struct ColourReadTests {
             let studio = try #require(await Studio.engine())
             let slots = try await studio.paintSlots(read.described, meshes: read.meshes)
             #expect(slots == w.paintSlots, Comment(rawValue: name))
+            // One member at a time: the same slots as the whole file.
+            #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio) == w.paintSlots,
+                    Comment(rawValue: name))
             // And the whole of it, as the colour read calls it.
             guard case .object(let p) = await ColourRead.paint(url, entries: entries, engine: engine),
                   case .array(let raw)? = p["slots"] else { Issue.record("\(name): paint unread"); continue }
             #expect(raw.compactMap { if case .number(let n) = $0 { return Int(n) }; return nil } == w.paintSlots,
                     Comment(rawValue: name))
         }
-        #expect(painted == 2, "both painted fixtures, with and without a stub slice")
+        #expect(painted == 3, "the painted fixtures: with and without a stub slice, and in two members")
+    }
+
+    /// The budget is on the largest member, not the sum: a project whose
+    /// members together pass it is still read (7 of the shop's files, 1.0 to
+    /// 1.5 GB of model XML against 910 MB, kept the wrong dots after beta.39).
+    @Test("member by member: read when the sum is past the budget, refused when one member or the total is")
+    func memberBudget() async throws {
+        let url = Self.fixtures.appending(path: "painted-two-members.3mf")
+        let entries = try Zip.entries(of: url)
+        let models = entries.filter { $0.name.lowercased().hasSuffix(".model") }
+        #expect(models.count == 3)
+        let largest = try #require(models.map(\.size).max())
+        let sum = models.reduce(0) { $0 + $1.size }
+        #expect(sum > largest)
+        let studio = try #require(await Studio.engine())
+        // The largest member fits; the sum does not have to.
+        #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio,
+                                               memberLimit: largest) == [2, 3, 7])
+        // One member past the budget: not read, never half an answer.
+        #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio,
+                                               memberLimit: largest - 1) == nil)
+        // The total bounds the work a file can ask for.
+        #expect(await ColourRead.slotsByMember(url, entries: entries, studio: studio,
+                                               memberLimit: largest, totalLimit: sum - 1) == nil)
+        // And the colours the card shows are the rule's.
+        let want = try #require(try Self.expected()["painted-two-members.3mf"])
+        let read = try #require(await ColourRead.colours(url, entries: entries, engine: try KhaytEngine()))
+        #expect(Self.hexes(read.colors) == want.hexes)
     }
 
     @Test("a stub slice_info (no filament) is not a slice; a real one is")
@@ -93,7 +124,7 @@ struct ColourReadTests {
 
     @Test("the paint check: a painted model is found, an unpainted one is not")
     func paintCheck() throws {
-        for (name, painted) in [("painted-1-2-5.3mf", true), ("painted-stub-slice.3mf", true), ("unpainted-slot4.3mf", false)] {
+        for (name, painted) in [("painted-1-2-5.3mf", true), ("painted-stub-slice.3mf", true), ("painted-two-members.3mf", true), ("unpainted-slot4.3mf", false)] {
             let url = Self.fixtures.appending(path: name)
             #expect(ColourRead.painted(try Zip.entries(of: url), in: url) == painted, Comment(rawValue: name))
         }
