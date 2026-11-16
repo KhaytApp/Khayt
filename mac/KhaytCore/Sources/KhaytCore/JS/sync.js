@@ -168,6 +168,26 @@
   }
 
   /**
+   * Make the next stampChanges treat these records as edited, though the
+   * index was seeded from what they hold now. For a repair made at load that
+   * must sync (lib/part-ids.js): it runs before seedIndex so every later step
+   * sees the repaired record, and this is what still gets it stamped and sent.
+   * Only records the index holds are touched; returns how many.
+   */
+  function markChanged(coll, ids, scope) {
+    const idx = indexFor(scope);
+    if (!idx) return 0;
+    let n = 0;
+    for (const id of ids || []) {
+      const e = idx.get(coll + ':' + id);
+      if (!e || e.fp === null) continue;
+      e.fp = null;
+      n++;
+    }
+    return n;
+  }
+
+  /**
    * The rev at which this device last agreed with the server about a record, or
    * null when that is not known.
    *
@@ -753,6 +773,7 @@
     arrayCollections,
     fingerprint,
     seedIndex,
+    markChanged,
     backfill,
     findResurrected,
     summarizeResurrected,

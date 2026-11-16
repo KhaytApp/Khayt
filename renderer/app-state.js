@@ -946,6 +946,18 @@ async function loadAll() {
     }
   } catch (e) { console.error('split deposit migration failed:', e); }
 
+  /* Parts with no id get the one they are owed (lib/part-ids.js), before
+   * anything below reads the jobs. Made from what the part holds, so the Mac
+   * and this app give the same ids to the same book. Written back only when
+   * this app owns the book (hub:store-owned); otherwise they live in memory
+   * and the app that owns it writes them. */
+  let partIdJobs = [];
+  try {
+    if (typeof KhaytPartIds !== 'undefined' && Array.isArray(printLog)) {
+      partIdJobs = [...new Set(KhaytPartIds.assignPartIds(printLog).map((g) => g.orderId))];
+    }
+  } catch (e) { console.error('part ids failed:', e); }
+
   // Phase 0 sync foundation: backfill change metadata (rev/updatedAt) for records
   // that predate it, then seed the in-memory index from the final loaded state so
   // the next save only stamps records that actually changed (no churn on restart).
@@ -958,6 +970,18 @@ async function loadAll() {
       KhaytSync.seedIndex(collectStoreCollections());
     }
   } catch (e) { console.error('sync foundation init failed:', e); }
+
+  if (partIdJobs.length) {
+    let owned = false;
+    try { owned = !!(window.hubAPI && window.hubAPI.storeOwned && await window.hubAPI.storeOwned()); }
+    catch (e) { owned = false; }
+    if (owned && window.KhaytSync && KhaytSync.markChanged) {
+      KhaytSync.markChanged('printLog', partIdJobs);
+      // Now, not debounced: a reseed (a cloud pull, a shop switch) before the
+      // write would forget the mark, and the ids would never be stamped.
+      Promise.resolve(flushSave()).catch((e) => console.error('part ids save failed:', e));
+    }
+  }
 
   // Records the old merge bug brought back after they were deleted. The fix
   // stops new ones; it cannot undo what is already on disk, so say so rather
