@@ -43,11 +43,22 @@ extension Shop {
     static func givePartIds(_ root: inout [String: JSONValue], engine: KhaytEngine) async -> Int {
         let before = rows(root, "printLog")
         guard let made = await rowsWithPartIds(before, engine: engine) else { return 0 }
-        let jobs = Set(made.given.map(\.orderId))
+        let jobs = writable(made, in: before)
+        guard !jobs.isEmpty else { return 0 }
         let changed = made.orders.filter { jobs.contains(recordId($0) ?? "") }
         var undo: [ChangedRecord] = []
         write(&root, "printLog", changed: changed, before: before, into: &undo)
-        return made.given.count
+        return made.given.filter { jobs.contains($0.orderId) }.count
+    }
+
+    /// The jobs whose ids can be written: those the book keys by a STRING id.
+    /// The rule gives a part of a job with a numeric or missing id an id too
+    /// (it reads `String(o.id)`), but `Shop.write` finds rows by string id, so
+    /// such a job is never written, and counting it had every load rewrite the
+    /// whole book for nothing (beta.38 review).
+    nonisolated static func writable(_ made: KhaytEngine.PartIds, in rows: [JSONValue]) -> Set<String> {
+        let keyed = Set(rows.compactMap(recordId))
+        return Set(made.given.map(\.orderId)).intersection(keyed)
     }
 
     /// Write the ids the book's id-less parts are owed. Nothing happens unless
@@ -68,7 +79,11 @@ extension Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 wrote = await Self.givePartIds(&root, engine: engine)
+                // Nothing that can be written: leave the file as it is.
+                if wrote == 0 { throw NothingToWrite() }
             }
+        } catch is NothingToWrite {
+            return false
         } catch {
             // Not owned any more, or the disk said no: the ids stay in memory
             // and the next load that owns the book tries again.

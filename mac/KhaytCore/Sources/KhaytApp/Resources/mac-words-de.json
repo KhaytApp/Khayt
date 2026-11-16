@@ -4014,10 +4014,11 @@
  "mac.apps_waiting": "Warten auf einen Slicer… {time}",
  "mac.apps_ask": "„{name}“ zulassen?",
  "mac.apps_ask_from": "{app} {version} hat von {address} aus um Kopplung gebeten.",
- "mac.apps_check": "Der Slicer muss dieselbe Zahl zeigen. Wenn nicht, lehnen Sie ab.",
+ "mac.apps_check": "Zeigt der Slicer diese Zahl? Wenn nicht, lehnen Sie ab.",
  "mac.apps_may": "Er darf Slices in den Eingang „Vom Slicer“ senden und die Auftragsliste lesen (Auftragsnamen und Zeiten, nie Kunden). Ihr Buch, Kunden, Preise oder Einstellungen kann er nie lesen.",
  "mac.apps_offers_used": "Die Kopplung wurde nach 3 nicht bestätigten Versuchen beendet. Klicken Sie erneut auf „Slicer koppeln“.",
- "mac.apps_approve": "Zulassen",
+ "mac.apps_approve": "Zahlen stimmen — zulassen",
  "mac.apps_deny": "Ablehnen",
- "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln."
+ "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln.",
+ "mac.apps_pin_unreadable": "Die LAN-PIN konnte nicht aus dem Schlüsselbund gelesen werden, daher wurde nichts gekoppelt. Legen Sie die LAN-PIN oben erneut fest und koppeln Sie dann den Slicer."
 }

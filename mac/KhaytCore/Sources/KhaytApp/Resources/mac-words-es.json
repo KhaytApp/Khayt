@@ -4014,10 +4014,11 @@
  "mac.apps_waiting": "Esperando un laminador… {time}",
  "mac.apps_ask": "¿Aprobar «{name}»?",
  "mac.apps_ask_from": "{app} {version} pidió emparejarse desde {address}.",
- "mac.apps_check": "El laminador debe mostrar el mismo número. Si no, deniega.",
+ "mac.apps_check": "¿El laminador muestra este número? Si no, deniega.",
  "mac.apps_may": "Puede enviar laminados a la bandeja «Del laminador» y leer la cola de trabajos (nombres y tiempos, nunca clientes). Nunca puede leer tu libro, tus clientes, tus precios ni tus ajustes.",
  "mac.apps_offers_used": "El emparejamiento se detuvo tras 3 intentos no aprobados. Haz clic en Emparejar un laminador para volver a intentarlo.",
- "mac.apps_approve": "Aprobar",
+ "mac.apps_approve": "Los números coinciden — aprobar",
  "mac.apps_deny": "Denegar",
- "mac.apps_timed_out": "Ningún laminador se emparejó a tiempo. Haz clic en Emparejar un laminador para volver a intentarlo."
+ "mac.apps_timed_out": "Ningún laminador se emparejó a tiempo. Haz clic en Emparejar un laminador para volver a intentarlo.",
+ "mac.apps_pin_unreadable": "No se pudo leer el PIN de la red local del llavero, así que no se emparejó nada. Vuelve a establecer el PIN arriba y empareja el laminador."
 }

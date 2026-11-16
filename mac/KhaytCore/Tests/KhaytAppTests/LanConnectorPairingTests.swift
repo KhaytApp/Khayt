@@ -14,6 +14,29 @@ struct LanConnectorPairingTests {
 
     static let pin = "24682468"
 
+    /// Pairing is off in beta.38 (`LanConnectorPairing.enabled`); these tests
+    /// are about the protocol, so they turn it on.
+    init() { LanConnectorPairing.enabledForTests = true }
+
+    @Test("off by default: no window opens, so a plugin is told pairing-closed")
+    func offByDefault() throws {
+        LanConnectorPairing.enabledForTests = false
+        defer { LanConnectorPairing.enabledForTests = true }
+        guard !UserDefaults.standard.bool(forKey: "connectorPairing") else { return }
+        let window = LanConnectorPairing()
+        window.open()
+        #expect(!window.isOpen())
+        #expect(window.deadline == nil)
+        var drawn = 0
+        #expect(throws: LanConnectorPairing.Refusal.closed) {
+            _ = try window.request(commitment: Plugin().commit, name: "x", app: "OrcaSlicer", version: "1",
+                                   address: "192.168.1.9", identity: Curve25519.Signing.PrivateKey(),
+                                   freshKey: { drawn += 1; return .init() })
+        }
+        #expect(drawn == 0, "no key is drawn while pairing is off")
+    }
+
+
     /// The plugin's side: its key, its nonce, and what it sends.
     struct Plugin {
         let key = Curve25519.KeyAgreement.PrivateKey()
