@@ -4682,10 +4682,35 @@ ipcMain.handle('hub:extract-thumbnail', async (_e, filePath) => {
       // caller had nothing to report. The mesh budget, because a picture is
       // exactly what this is: the file is read for its numbers either way.
       if (stat.size > MESH_ANALYSIS_MAX_BYTES) return Object.assign({}, empty, { tooLarge: true });
-      return extractPrintThumb({ ext, buf: fs.readFileSync(safe) });
+      // The picture here; the colours in the converter's worker, because they
+      // read a painted model's mesh and that takes seconds (lib/mf-jobs.js).
+      const th = extractPrintThumb({ ext, buf: fs.readFileSync(safe), colours: false });
+      const c = await mfRun('colours', { src: safe, maxBytes: MESH_ANALYSIS_MAX_BYTES }).catch(() => null);
+      return Object.assign(th, c && c.ok
+        ? { colors: c.colors || [], swapCount: c.swapCount || 0, slotsKnown: c.slotsKnown !== false, coloursReader: c.reader }
+        : { colors: [], swapCount: 0, slotsKnown: false });
     }
   } catch (_) { /* silent */ }
   return empty;
+});
+
+// A library 3MF's colours, read again: the slots it prints with, not the
+// printer's loaded spools (lib/thumbnail-extract.js COLOURS_READER). For the
+// re-read of records an older reader wrote. A tiered file is NOT fetched back
+// for this; it is read when it is here.
+ipcMain.handle('hub:print-colours', async (_e, filePath) => {
+  const safe = path.resolve(String(filePath || ''));
+  const allowed = [app.getPath('userData'), app.getPath('documents'), app.getPath('downloads'), app.getPath('desktop')];
+  if (!printLibContains(safe) && !allowed.some((d) => safe.startsWith(path.resolve(d) + path.sep))) return { ok: false, reason: 'unavailable' };
+  if (path.extname(safe).toLowerCase() !== '.3mf') return { ok: false, reason: 'not-3mf' };
+  try {
+    const stat = await fs.promises.stat(safe);
+    if (!stat.isFile()) return { ok: false, reason: 'unavailable' };
+    if (stat.size > MESH_ANALYSIS_MAX_BYTES) return { ok: false, reason: 'too-large' };
+  } catch (_) { return { ok: false, reason: 'unavailable' }; }
+  const c = await mfRun('colours', { src: safe, maxBytes: MESH_ANALYSIS_MAX_BYTES }).catch(() => null);
+  return c && c.ok ? { ok: true, colors: c.colors || [], swapCount: c.swapCount || 0, slotsKnown: c.slotsKnown !== false, reader: c.reader }
+    : { ok: false, reason: 'unreadable' };
 });
 
 // --- Feature 8: Auto-export status page ---

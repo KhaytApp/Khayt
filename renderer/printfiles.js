@@ -1231,7 +1231,61 @@
   /** Back to one page. Every filter, search or view change starts at the top. */
   function resetPage() { _page = PAGE; growThumbCache(PAGE); }
 
+  /* ── A RECORD'S COLOURS ARE THE PRINT'S, NOT THE PRINTER'S ──────────────
+   *
+   * Until reader 2 an unsliced 3MF's colours were project_settings'
+   * filament_colour: the spools LOADED when it was saved, four on a U1
+   * whatever the model needs (vegueta22: 8 shown, 5 printed). The rule now
+   * names only the slots the print uses (lib/thumbnail-extract.js), and the
+   * records the old one wrote are read again where their file is here —
+   * once a session, one at a time, in the converter's worker. Same number as
+   * lib/thumbnail-extract.js COLOURS_READER; test/library-colours.test.js
+   * holds them together. */
+  const COLOURS_READER = 2;
+  const coloursStale = (rec) => !(Number(rec && rec.coloursReader) >= COLOURS_READER);
+  /** Put a colour read on a record. A read that cannot name the slots (a
+   *  painted model whose mesh would not read, a mixed filament) stamps the
+   *  record and leaves its colours: a re-read never empties what was there. */
+  function applyColours(rec, r) {
+    if (!rec || !r) return false;
+    const was = JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.coloursReader || 0]);
+    if (r.reader) rec.coloursReader = r.reader;
+    const list = Array.isArray(r.colors) ? r.colors : [];
+    if (r.slotsKnown !== false && list.length) {
+      const old = Array.isArray(rec.colors) ? rec.colors : [];
+      // Grams a slice gave before, kept where the same colour is still there.
+      rec.colors = list.map((c) => {
+        const o = old.find((x) => x && x.hex === c.hex);
+        return o && c.grams == null && o.grams != null ? Object.assign({}, c, { grams: o.grams }) : c;
+      });
+      rec.swapCount = r.swapCount || 0;
+    }
+    return was !== JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.coloursReader || 0]);
+  }
+  let _coloursSweep = null;
+  function sweepColours() {
+    const hub = api();
+    if (_coloursSweep || !hub || !hub.printColours) return;
+    _coloursSweep = (async () => {
+      const stale = (printFiles || []).filter((r) => r && r.sourceFile && r.sourceFile.ext === '3mf' && coloursStale(r));
+      let changed = 0;
+      for (const rec of stale) {
+        let full = null;
+        try { full = await resolveModelPath(rec); } catch (_) { full = null; }
+        if (!full) continue; // not on this computer: read when it is
+        let r = null;
+        try { r = await hub.printColours(full); } catch (_) { r = null; }
+        if (!r || !r.ok) continue;
+        // What a file is printed in is not an edit to the print: updatedAt stays.
+        if (applyColours(rec, r)) { changed++; if (changed % 25 === 0) saveAll(); }
+        await new Promise((res) => setTimeout(res, 20));
+      }
+      if (changed) { saveAll(); renderPrintFiles(); }
+    })().catch(() => {});
+  }
+
   function renderPrintFiles() {
+    if (!_coloursSweep) setTimeout(sweepColours, 5000);
     if (!renderPrintFiles._vlAsked) { renderPrintFiles._vlAsked = true; refreshVaultLinksOn(); }
     // Older multi-plate 3MFs get their corrected totals, once, after the library shows.
     if (!_plateRescanDone) setTimeout(rescanOldPlates, 3000);
@@ -2599,8 +2653,11 @@
           // different sentence.
           if (th && th.tooLarge) noPicture = true;
           if (th) {
-            if (Array.isArray(th.colors) && th.colors.length) rec.colors = th.colors;
-            if (th.swapCount) rec.swapCount = th.swapCount;
+            if (th.coloursReader) applyColours(rec, { colors: th.colors, swapCount: th.swapCount, slotsKnown: th.slotsKnown, reader: th.coloursReader });
+            else {
+              if (Array.isArray(th.colors) && th.colors.length) rec.colors = th.colors;
+              if (th.swapCount) rec.swapCount = th.swapCount;
+            }
             if (th.pngBase64) await setThumb(rec, await resizeDataUrl('data:image/png;base64,' + th.pngBase64, 280, 0.82), 'embedded');
           }
         }
