@@ -28,7 +28,7 @@ struct JobSheetSaveTests {
     func together() async throws {
         let engine = try KhaytEngine()
         let shop = Shop()
-        let order = JobPartsRuleTests.job(["status": .string("quote")])
+        let order = JobPartsRuleTests.job(["status": .string("quote"), "quoteShareStamped": .bool(true)])
         var save = Shop.JobSave()
         save.fields = ["project": .string("Bracket v2"), "notes": .string("collects Sunday"),
                        "priorityLevel": .string("urgent"), "dueDate": .string("2026-12-01")]
@@ -116,7 +116,7 @@ struct JobSheetSaveTests {
         let shop = Shop()
         var save = Shop.JobSave()
         save.fields = ["marginPct": .number(25)]
-        let draft = JobPartsRuleTests.job(["status": .string("quote")])
+        let draft = JobPartsRuleTests.job(["status": .string("quote"), "quoteShareStamped": .bool(true)])
         let out = try await Self.saved(draft, save, shop: shop, engine: engine)
         #expect(Self.field(out, "price") == .number(150), "120 of cost at 25%")
         #expect(Self.field(out, "marginPct") == .number(25))
