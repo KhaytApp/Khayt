@@ -114,7 +114,7 @@ extension Shop {
                 guard !pending.isEmpty else { return true }
                 let sending = pending
                 do {
-                    // lock: system — background: colours re-read because the colour rule changed (reader 2).
+                    // lock: system — background: colours re-read because the colour reader changed (reader 3).
                     // NOT STAMPED (`recordingDeletes: false`): what a file is
                     // printed in is read from the file, not an edit, and a
                     // stamped re-read would beat another machine's real edit
