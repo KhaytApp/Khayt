@@ -675,8 +675,29 @@
     if (FROZEN_STATUSES.indexOf(order.status) !== -1 || order.materialDeducted === true) {
       return { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false };
     }
-    const draftQuote = order.status === 'quote' && !present(order.quoteSharedAt);
+    const draftQuote = order.status === 'quote' && quoteIsDraft(order);
     return { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: !draftQuote };
+  }
+
+  /**
+   * Whether a quote is POSITIVELY a draft no customer has seen, so its price
+   * may follow a parts change without asking. A quote whose price may have
+   * been seen never re-prices silently (Dev Hub, Nov 16).
+   *
+   * `quoteSharedAt` is stamped when a quote goes out, but only by builds from
+   * 4.10 / Mac beta.40 on: a quote shared before that has none and is not a
+   * draft for it. So a draft needs `quoteShareStamped` — written by
+   * `newOrder` on every quote it makes, meaning "the app that made this
+   * stamps quoteSharedAt when it is sent" — and no sign of having been sent:
+   * `quoteSharedAt`, `quoteAcceptedAt`, a revision (`quoteRevisions`,
+   * `quoteVersion` past 1). Anything else asks.
+   */
+  function quoteIsDraft(order) {
+    if (!order || order.quoteShareStamped !== true) return false;
+    if (present(order.quoteSharedAt) || present(order.quoteAcceptedAt)) return false;
+    if (Array.isArray(order.quoteRevisions) && order.quoteRevisions.length) return false;
+    if (+order.quoteVersion > 1) return false;
+    return true;
   }
 
   const partQty = (p) => Math.max(1, Math.round(amountOf(p && p.qty) || 1));
@@ -955,18 +976,27 @@
     const changes = { parts: { from: partsLine(before), to: partsLine(next) } };
     if (costMoved) {
       const fixedCosts = Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+      // No factor: the old parts cost nothing on record, so the price was not
+      // built from them. With no markup given, a price that is there stays
+      // (below, as a typed one): it fell to the bare cost of the new part,
+      // a 200 job became 50 (pre-release review, Nov 16). A markup given is
+      // on the shop-currency cost, so a job in another currency divides by
+      // its rate, as applyMarkup does.
+      const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
+      const markupGiven = optional(c.marginPct) !== null;
+      const unbuilt = from.factor === null && !markupGiven && (+order.price || 0) > 0;
       const factor = from.factor !== null ? from.factor
-        : 1 + Math.max(0, amountOf(c.marginPct)) / 100;
+        : (1 + Math.max(0, amountOf(c.marginPct)) / 100) / fx;
       const newBase = (costedOf(next) + fixedCosts) * factor;
       const newAgreed = agreedOf(next);
       const after = from.sum(newBase, newAgreed);
       const arithmetic = +after.total.toFixed(2);
       const wasPrice = +order.price || 0;
-      if (c.keepPrice === true || from.typed) {
+      if (c.keepPrice === true || from.typed || unbuilt) {
         // The price stays as it stands. It is no longer what its inputs
         // give, so it is a typed one from here on, with the arithmetic
         // beside it — exactly what `adjustPrice` writes for a typed total.
-        if (c.keepPrice === true && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
+        if ((c.keepPrice === true || unbuilt) && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
           trial.priceSource = 'override';
           trial.priceOverride = wasPrice;
         }
@@ -1114,7 +1144,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
-    partsLock, marginOf, applyMarkup, applyParts, applyJobEdit,
+    partsLock, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;

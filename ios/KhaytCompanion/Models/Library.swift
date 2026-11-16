@@ -101,6 +101,13 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let figuresStale: Bool
     /// The colours it was sliced with, as hex (`colors: [{hex, grams}]`).
     let colors: [String]
+    /// How many times the printer changes filament during the print, and
+    /// whether a slicer counted it (`lib/thumbnail-extract.js` applyColours).
+    /// Nil when the record or the computer sends none: an older Mac, or a
+    /// record written before the fields (`swapsKnown` then follows the print
+    /// time, the Mac and desktop cards' rule).
+    let swapCount: Int?
+    let swapsKnownSaid: Bool?
     /// Its File type row (`ModelFileType`). The Mac's answer says only `ext`,
     /// so a model there without one reads as `nofile`; the phone's copy
     /// works it out from the whole record and sends `fileType`.
@@ -110,9 +117,14 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
     /// or more, `none` for no colour on the record.
     var colourKeys: [String] { ColourFamily.tokens(ofHexes: colors) }
 
+    /// Whether the swap count is a slicer's: the record's `swapsKnown` when it
+    /// has one, else whether a slicer recorded a print time (desktop
+    /// `renderer/printfiles.js` swapsKnown, Mac `LibraryFile.swapsKnownGuess`).
+    var swapsKnown: Bool { swapsKnownSaid ?? (printTimeMins != nil) }
+
     private enum CodingKeys: String, CodingKey {
         case id, name, folder, category, tags, material, ext, favorite, timesPrinted, lastPrinted, thumb,
-             estimable, printTimeMins, grams, plates, testedNotes, figuresStale, colors, fileType
+             estimable, printTimeMins, grams, plates, testedNotes, figuresStale, colors, fileType, swapCount, swapsKnown
     }
 
     private struct Swatch: Decodable {
@@ -148,6 +160,8 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
         plates = ((try? c.decode([Lenient<Plate>].self, forKey: .plates)) ?? []).compactMap(\.value)
         colors = ((try? c.decode([Lenient<Swatch>].self, forKey: .colors)) ?? []).compactMap { $0.value?.hex }
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        swapCount = (try? c.decode(Int.self, forKey: .swapCount)).flatMap { $0 >= 0 ? $0 : nil }
+        swapsKnownSaid = try? c.decode(Bool.self, forKey: .swapsKnown)
         if let said = text(.fileType)?.lowercased(), ModelFileType(rawValue: said) != nil {
             fileType = said
         } else {

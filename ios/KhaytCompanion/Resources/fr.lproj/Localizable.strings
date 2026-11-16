@@ -819,6 +819,12 @@
 "library.no_match" = "Aucun modèle ne correspond.";
 "library.favorite" = "Favori";
 "library.printed" = "Imprimé %d fois";
+"library.colours" = "Couleurs";
+"library.colours_tip" = "Couleurs : %d. Les filaments utilisés par cette impression.";
+"library.swaps" = "%d changements";
+"library.swaps_tip" = "Changements de filament : environ %d. Le nombre de fois où l’imprimante change de filament pendant cette impression, d’après le fichier tranché.";
+"library.swaps_unknown" = "Les changements de filament sont connus une fois le fichier tranché.";
+"library.colours_more" = "+%d";
 "library.plate" = "Plateau";
 "library.plate.all" = "Tous les plateaux";
 "library.plate.n" = "Plateau %d";

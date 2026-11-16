@@ -373,6 +373,7 @@ estimate answer 404 `not-found`. The Mac's own LAN server does the same.
     "printTimeMins": 318, "grams": 154,
     "plates": [ { "index": 1, "name": "Body", "printTimeMins": 205, "grams": 112 } ],
     "colors": [ { "hex": "#0F5257", "grams": 88 } ],
+    "swapCount": 0, "swapsKnown": true,
     "testedNotes": "…"
   } ]
 }
@@ -396,6 +397,15 @@ menus too: a sub-folder is listed for the models under it that pass, at that
 count, so a tap never opens a folder the filter has emptied. **A computer from before
 this sends no `facets` and ignores the two parameters: a phone hides both
 menus when `facets` is absent.**
+
+`swapCount` is how many times the printer changes filament during the print, and
+`swapsKnown` whether a slicer counted it (`true` only for a sliced file; `false`
+means the colours are known but the swaps are not until the file is sliced).
+Both are sent as the record holds them and left out when it holds none. A
+computer from before them sends neither, and neither does a record written
+before `swapsKnown`: a phone then counts the swaps as known when
+`printTimeMins` is set, the rule the desktop and Mac cards use, and shows no
+swap number it was not given.
 
 `count` is every model at or under that folder. `printTimeMins`/`grams` are
 what a slicer recorded, or null. `estimable` means the computer has the file and

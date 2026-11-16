@@ -197,15 +197,24 @@ struct LibraryRow: View {
             }
             if !item.colors.isEmpty {
                 Spacer(minLength: 4)
-                // The colours it was sliced with, as the filter reads them.
-                HStack(spacing: -4) {
-                    ForEach(Array(item.colors.prefix(3).enumerated()), id: \.offset) { _, hex in
-                        Circle().fill(Color(modelHex: hex) ?? .gray)
-                            .overlay(Circle().strokeBorder(KhaytDesign.note.opacity(0.45), lineWidth: 1))
-                            .frame(width: 12, height: 12)
+                // The colours the print uses: three dots, then "+N" for the
+                // rest (iPhone Figma 235:49). VoiceOver hears the Mac card's
+                // words, not a row of dots.
+                HStack(spacing: 5) {
+                    HStack(spacing: -4) {
+                        ForEach(Array(LibraryColours.dots(item).enumerated()), id: \.offset) { _, hex in
+                            Circle().fill(Color(modelHex: hex) ?? .gray)
+                                .overlay(Circle().strokeBorder(KhaytDesign.note.opacity(0.45), lineWidth: 1))
+                                .frame(width: 12, height: 12)
+                        }
+                    }
+                    if let more = LibraryColours.more(item) {
+                        Text(more).font(.khayt(11, .semibold, relativeTo: .caption2)).foregroundStyle(KhaytDesign.note)
+                            .monospacedDigit()
                     }
                 }
-                .accessibilityHidden(true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(LibraryColours.spoken(item))
             }
         }
     }
@@ -273,6 +282,8 @@ struct LibraryItemPage: View {
                     }
                 }
                 .padding(.bottom, 4)
+
+                if !item.colors.isEmpty { LibraryColoursCard(item: item) }
 
                 V2FieldCard {
                     if item.plates.count > 1 {
@@ -453,5 +464,83 @@ struct EstimateCard: View {
             }
         }
         .padding(14).frame(maxWidth: .infinity, alignment: .leading).card()
+    }
+}
+
+/// What a model's colour dots and swap number say, in the Mac and desktop
+/// cards' words (`PaletteTips`, `renderer/printfiles.js` colorDotsHtml). The
+/// phone has no hover, so the model's page writes them out (iPhone Figma
+/// 235:109 / 235:134) and a row says them to VoiceOver.
+enum LibraryColours {
+    /// The dots a row shows.
+    static let rowDots = 3
+
+    static func dots(_ item: LibraryItem) -> [String] { Array(item.colors.prefix(rowDots)) }
+
+    /// "+2" for the colours past the row's three, or nil.
+    static func more(_ item: LibraryItem) -> String? {
+        let extra = item.colors.count - rowDots
+        return extra > 0 ? L10n.format("library.colours_more", extra) : nil
+    }
+
+    /// "Colours: 5. The filaments this print uses."
+    static func colours(_ item: LibraryItem) -> String { L10n.format("library.colours_tip", item.colors.count) }
+
+    /// The swap number, only when a slicer counted it and it is above 0.
+    static func swapCount(_ item: LibraryItem) -> Int? {
+        guard item.swapsKnown, let n = item.swapCount, n > 0 else { return nil }
+        return n
+    }
+
+    /// "4 swaps", or nil.
+    static func swaps(_ item: LibraryItem) -> String? { swapCount(item).map { L10n.format("library.swaps", $0) } }
+
+    /// "Filament swaps: about 4. …", or nil.
+    static func swapsMeaning(_ item: LibraryItem) -> String? { swapCount(item).map { L10n.format("library.swaps_tip", $0) } }
+
+    /// "Filament swaps are known once the file is sliced.", for a file no
+    /// slicer has counted; nil otherwise.
+    static func swapsUnknown(_ item: LibraryItem) -> String? { item.swapsKnown ? nil : L10n.tr("library.swaps_unknown") }
+
+    /// All of it, as VoiceOver reads a row.
+    static func spoken(_ item: LibraryItem) -> String {
+        [colours(item), swapsUnknown(item), swapsMeaning(item)].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+/// The model page's Colours card (iPhone Figma 235:109 / 235:134).
+struct LibraryColoursCard: View {
+    let item: LibraryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.tr("library.colours")).font(.khayt(12, .semibold, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
+            // Every colour, wrapping onto a second line when there are many.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 18, maximum: 18), spacing: 6, alignment: .leading)],
+                      alignment: .leading, spacing: 6) {
+                ForEach(Array(item.colors.enumerated()), id: \.offset) { _, hex in
+                    Circle().fill(Color(modelHex: hex) ?? .gray)
+                        .overlay(Circle().strokeBorder(KhaytDesign.note.opacity(0.45), lineWidth: 1))
+                        .frame(width: 18, height: 18)
+                }
+            }
+            .accessibilityHidden(true)
+            Text(LibraryColours.colours(item)).font(.khayt(14, relativeTo: .body)).foregroundStyle(KhaytDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            if LibraryColours.swaps(item) != nil || LibraryColours.swapsUnknown(item) != nil { Divider() }
+            if let swaps = LibraryColours.swaps(item), let meaning = LibraryColours.swapsMeaning(item) {
+                Label(swaps, systemImage: "arrow.left.arrow.right")
+                    .font(.khayt(14, .semibold, relativeTo: .body)).foregroundStyle(KhaytDesign.ink)
+                    .accessibilityHidden(true)
+                Text(meaning).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let unknown = LibraryColours.swapsUnknown(item) {
+                Text(unknown).font(.khayt(13, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
     }
 }

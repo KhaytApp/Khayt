@@ -48,9 +48,16 @@ const fresh = (parts, terms) => jobOf(parts, terms).price;
 test('partsLock: free until printing, asked in production, name only once deducted, nothing after the invoice left', () => {
   const lock = (o) => E.partsLock(Object.assign({ status: 'pending' }, o));
   // A draft quote, never shared: parts move and the price follows by itself.
-  assert.deepEqual(lock({ status: 'quote' }), { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false });
+  // Known to be one only when the app that made it stamps sharing.
+  assert.deepEqual(lock({ status: 'quote', quoteShareStamped: true }), { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false });
   // `quoteSentAt` is written at creation; it is not "shared".
-  assert.equal(lock({ status: 'quote', quoteSentAt: '2026-11-01' }).askPrice, false);
+  assert.equal(lock({ status: 'quote', quoteShareStamped: true, quoteSentAt: '2026-11-01' }).askPrice, false);
+  // A quote from an older app may have been sent with no stamp: it asks.
+  assert.equal(lock({ status: 'quote' }).askPrice, true);
+  // Any sign it went out asks, marker or not.
+  for (const sign of [{ quoteAcceptedAt: '2026-11-14' }, { quoteRevisions: [{ v: 1 }] }, { quoteVersion: 2 }]) {
+    assert.equal(lock(Object.assign({ status: 'quote', quoteShareStamped: true }, sign)).askPrice, true, JSON.stringify(sign));
+  }
   // Once the customer has seen the number — a shared quote, an accepted job,
   // one in production — the sheet asks; the price never moves silently.
   assert.equal(lock({ status: 'quote', quoteSharedAt: '2026-11-14T10:00:00Z' }).askPrice, true);
@@ -470,7 +477,7 @@ test('an open job that carries a cost basis: its parts may change, and the basis
 //
 // Shared vectors: the desktop, the Mac and the iPhone run this same rule.
 
-const draftQuote = (terms, extra) => jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote' }, extra || {}));
+const draftQuote = (terms, extra) => jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote', quoteShareStamped: true }, extra || {}));
 
 test('markup: a draft quote is repriced from cost and the markup is stored', () => {
   const o = draftQuote();                       // 120 of cost at 50%: 180
@@ -501,7 +508,7 @@ test('markup: discount, rush, shipping and a fixed extra stay on the price, as t
 
 test('markup: an agreed part stays at its agreed price', () => {
   const parts = [part('A', 80), part('B', 40, { agreedPrice: 100 })];
-  const o = jobOf(parts, {}, { status: 'quote' });         // 80 at 50% + 100 agreed = 220
+  const o = jobOf(parts, {}, { status: 'quote', quoteShareStamped: true });         // 80 at 50% + 100 agreed = 220
   assert.equal(o.price, 220);
   assert.equal(E.applyJobEdit(o, { marginPct: 25 }, {}).ok, true);
   assert.equal(o.price, 200, '80 at 25% + 100');
@@ -518,7 +525,7 @@ test('markup: a typed price is fixed, and so is a job with nothing costed', () =
   const typed = draftQuote({ priceOverride: 199 });
   assert.deepEqual(E.applyJobEdit(typed, { marginPct: 25 }, {}).reason, 'price_fixed');
   assert.equal(typed.price, 199);
-  const allAgreed = jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote' });
+  const allAgreed = jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote', quoteShareStamped: true });
   assert.equal(E.applyJobEdit(allAgreed, { marginPct: 25 }, {}).reason, 'price_fixed');
 });
 
@@ -570,4 +577,37 @@ test('markup: parts and a markup in one save price the new parts at the new mark
   const r = E.applyJobEdit(o, { parts: [part('A', 80), part('B', 40), part('C', 30)], marginPct: 20 }, { ids: ['C'] });
   assert.equal(r.ok, true);
   assert.equal(o.price, 180, '150 at 20%');
+});
+
+// ── Pre-release review (Nov 16): a job whose old parts cost nothing on record ──
+// Its price was not built from them (LAN, subscription, inventory-sale jobs,
+// old books), so `pricedFrom` has no factor. The sheets pass no markup, and
+// the fallback was 1: a 200 job given a 50 part became 50.
+const ctxP = (extra) => Object.assign({ now: 1, id: 'e', ids: ['P-new'], settings: { currency: 'SAR' }, clients: [] }, extra || {});
+
+test('a price not built from its parts stays when a costed part is added (a typed one now)', () => {
+  const o = { id: 'J-L', status: 'pending', price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', printWeight: 10, qty: 1 }] };
+  const v = E.applyJobEdit(o, { parts: [o.parts[0], { name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP());
+  assert.equal(v.ok, true);
+  assert.equal(o.price, 200);
+  assert.equal(o.priceSource, 'override');
+  assert.equal(o.computedPrice, 50);
+  assert.equal(o.parts.length, 2);
+});
+
+test('with a markup given, such a job is priced on it, divided by the rate in another currency', () => {
+  const sar = { id: 'J-M', status: 'pending', price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', qty: 1 }] };
+  E.applyJobEdit(sar, { parts: [sar.parts[0], { name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP({ marginPct: 100 }));
+  assert.equal(sar.price, 100);
+  const usd = { id: 'J-U', status: 'pending', currency: 'USD', fxRate: 3.75, price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', qty: 1 }] };
+  E.applyJobEdit(usd, { parts: [usd.parts[0], { name: 'b', baseCost: 75, unitCost: 75, qty: 1 }] }, ctxP({ marginPct: 100 }));
+  assert.equal(usd.price, 40);
+});
+
+test('a job with no price and no costed parts takes the new parts\' cost, as before', () => {
+  const o = { id: 'J-Z', status: 'pending', price: 0, paidAmount: 0, parts: [] };
+  const v = E.applyJobEdit(o, { parts: [{ name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP());
+  assert.equal(v.ok, true);
+  assert.equal(o.price, 50);
+  assert.notEqual(o.priceSource, 'override');
 });
