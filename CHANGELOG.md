@@ -9684,6 +9684,27 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.39] - 2026-11-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release fixes beta.38 showing a single colour dot on painted library models.
+
+### Fixed
+
+- **Painted models show all their colours again.** Beta.38 read a painted 3MF that had not been sliced as one colour, so its Library card showed a single dot. Khayt now reads the paint, and the card shows every filament the print uses.
+
+### What happens on first launch
+
+- **Khayt reads your painted Library files again, in the background.** It goes one model at a time, only where the file is on this Mac, and you can keep working. A large library takes about half an hour. Cards fill in their dots as it goes; nothing else about a model changes.
+- **It may use a few GB of memory for a short time** while it reads a very large painted file. The memory is given back when that file is done.
+
+### Known in this beta
+
+- **A few very large painted projects still show too few dots.** A project with more than about 900 MB of model data is too large to read in one piece on this Mac, so its card keeps the dots it has. A later beta reads these in pieces.
+- **Pairing a slicer plugin is still hidden** (Settings → Online → Connected apps). Its stronger pairing check is in this build, switched off until the plugin is ready.
+
 ## [4.0.0-beta.38] - 2026-11-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
