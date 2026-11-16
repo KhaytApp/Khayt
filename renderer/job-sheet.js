@@ -410,8 +410,12 @@
       async onSave() {
         if (isNew) return create(false);
         st.keepPrice = undefined;
-        let seenOk = false;
         const typedTotal = q('price').value.trim() !== '';
+        // A total typed here is a new price on purpose, so a markup changed
+        // with it needs no question either. Without this the save was
+        // refused 'ask_price' while refresh() (seen-ok) showed no reason,
+        // and Save did nothing (pre-release review, Nov 16).
+        let seenOk = typedTotal;
         // A price the customer has seen does not move under them silently.
         if (lock.askPrice && !typedTotal && Object.prototype.hasOwnProperty.call(nextOf(), 'marginPct')) {
           // A new markup is a new price on purpose: one question covers it,
@@ -431,7 +435,14 @@
           }
         }
         const verdict = ED().applyJobEdit(order, nextOf(), ctxOf({ keepPrice: st.keepPrice, priceSeenOk: seenOk }));
-        if (!verdict.ok) { refresh(); return false; }
+        if (!verdict.ok) {
+          refresh();
+          // Say why THIS save was refused, even where the dry run (asked as
+          // if the price had been seen) found nothing to refuse.
+          const line = modal.parentElement.querySelector('.js-refused');
+          if (line) { line.textContent = reasonText(verdict); line.hidden = false; }
+          return false;
+        }
         if (verdict.changed) {
           saveAll();
           if (typeof renderLogs === 'function') renderLogs();

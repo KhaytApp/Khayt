@@ -53,7 +53,14 @@
     const quote = steps.stage === 'quote';
     const paid = +o.paidAmount || 0;
     const parts = Array.isArray(o.parts) ? o.parts : [];
-    const cost = parts.reduce((s, p) => s + (+p.baseCost || 0) * Math.max(1, +p.qty || 1), 0);
+    // A part's `baseCost` is its whole line (quantity included, as
+    // lib/order-edit.js costedOf sums it) and is in the SHOP's currency, so a
+    // job taken in another one shows it divided by the rate it was taken at,
+    // as its price is. It was multiplied by the quantity again and shown in
+    // the job's currency unconverted (pre-release review, Nov 16).
+    const fx = +o.fxRate > 0 && +o.fxRate !== 1 ? +o.fxRate : 1;
+    const cost = (parts.reduce((s, p) => s + Math.max(0, +p.baseCost || 0), 0)
+      + Math.max(0, +o.componentsCost || 0) + Math.max(0, +o.overheadCost || 0)) / fx;
     const margin = ED() && ED().marginOf ? ED().marginOf(o) : null;
     const row = (label, value, cls) => `<div class="jp-row ${cls || ''}"><span>${escapeHtml(label)}</span><span class="jp-num">${escapeHtml(value)}</span></div>`;
     return row(t('jp.price'), money(o, +o.price || 0))

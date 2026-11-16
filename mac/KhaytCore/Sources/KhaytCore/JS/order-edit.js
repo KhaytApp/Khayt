@@ -976,18 +976,27 @@
     const changes = { parts: { from: partsLine(before), to: partsLine(next) } };
     if (costMoved) {
       const fixedCosts = Math.max(0, +order.componentsCost || 0) + Math.max(0, +order.overheadCost || 0);
+      // No factor: the old parts cost nothing on record, so the price was not
+      // built from them. With no markup given, a price that is there stays
+      // (below, as a typed one): it fell to the bare cost of the new part,
+      // a 200 job became 50 (pre-release review, Nov 16). A markup given is
+      // on the shop-currency cost, so a job in another currency divides by
+      // its rate, as applyMarkup does.
+      const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
+      const markupGiven = optional(c.marginPct) !== null;
+      const unbuilt = from.factor === null && !markupGiven && (+order.price || 0) > 0;
       const factor = from.factor !== null ? from.factor
-        : 1 + Math.max(0, amountOf(c.marginPct)) / 100;
+        : (1 + Math.max(0, amountOf(c.marginPct)) / 100) / fx;
       const newBase = (costedOf(next) + fixedCosts) * factor;
       const newAgreed = agreedOf(next);
       const after = from.sum(newBase, newAgreed);
       const arithmetic = +after.total.toFixed(2);
       const wasPrice = +order.price || 0;
-      if (c.keepPrice === true || from.typed) {
+      if (c.keepPrice === true || from.typed || unbuilt) {
         // The price stays as it stands. It is no longer what its inputs
         // give, so it is a typed one from here on, with the arithmetic
         // beside it — exactly what `adjustPrice` writes for a typed total.
-        if (c.keepPrice === true && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
+        if ((c.keepPrice === true || unbuilt) && !from.typed && Math.abs(from.finish(after.total) - wasPrice) > 0.011) {
           trial.priceSource = 'override';
           trial.priceOverride = wasPrice;
         }

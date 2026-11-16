@@ -578,3 +578,36 @@ test('markup: parts and a markup in one save price the new parts at the new mark
   assert.equal(r.ok, true);
   assert.equal(o.price, 180, '150 at 20%');
 });
+
+// ── Pre-release review (Nov 16): a job whose old parts cost nothing on record ──
+// Its price was not built from them (LAN, subscription, inventory-sale jobs,
+// old books), so `pricedFrom` has no factor. The sheets pass no markup, and
+// the fallback was 1: a 200 job given a 50 part became 50.
+const ctxP = (extra) => Object.assign({ now: 1, id: 'e', ids: ['P-new'], settings: { currency: 'SAR' }, clients: [] }, extra || {});
+
+test('a price not built from its parts stays when a costed part is added (a typed one now)', () => {
+  const o = { id: 'J-L', status: 'pending', price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', printWeight: 10, qty: 1 }] };
+  const v = E.applyJobEdit(o, { parts: [o.parts[0], { name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP());
+  assert.equal(v.ok, true);
+  assert.equal(o.price, 200);
+  assert.equal(o.priceSource, 'override');
+  assert.equal(o.computedPrice, 50);
+  assert.equal(o.parts.length, 2);
+});
+
+test('with a markup given, such a job is priced on it, divided by the rate in another currency', () => {
+  const sar = { id: 'J-M', status: 'pending', price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', qty: 1 }] };
+  E.applyJobEdit(sar, { parts: [sar.parts[0], { name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP({ marginPct: 100 }));
+  assert.equal(sar.price, 100);
+  const usd = { id: 'J-U', status: 'pending', currency: 'USD', fxRate: 3.75, price: 200, paidAmount: 0, parts: [{ id: 'P1', name: 'a', qty: 1 }] };
+  E.applyJobEdit(usd, { parts: [usd.parts[0], { name: 'b', baseCost: 75, unitCost: 75, qty: 1 }] }, ctxP({ marginPct: 100 }));
+  assert.equal(usd.price, 40);
+});
+
+test('a job with no price and no costed parts takes the new parts\' cost, as before', () => {
+  const o = { id: 'J-Z', status: 'pending', price: 0, paidAmount: 0, parts: [] };
+  const v = E.applyJobEdit(o, { parts: [{ name: 'b', baseCost: 50, unitCost: 50, qty: 1 }] }, ctxP());
+  assert.equal(v.ok, true);
+  assert.equal(o.price, 50);
+  assert.notEqual(o.priceSource, 'override');
+});
