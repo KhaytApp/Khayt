@@ -184,6 +184,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibMesh:       (fullPath)          => ipcRenderer.invoke('hub:printlib-mesh', fullPath),
   convertMesh:        (opts)              => ipcRenderer.invoke('hub:convert-mesh', opts),
   extractThumbnail:   (filePath)          => ipcRenderer.invoke('hub:extract-thumbnail', filePath),
+  printColours:       (filePath)          => ipcRenderer.invoke('hub:print-colours', filePath),
 
   // 3MF converter (multi-printer)
   mfPick:      ()     => ipcRenderer.invoke('hub:mf-pick'),
