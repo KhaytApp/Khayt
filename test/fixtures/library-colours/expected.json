@@ -1,0 +1,29 @@
+{
+  "unpainted-slot4.3mf": {
+    "hexes": [
+      "#444444"
+    ],
+    "swapCount": 0,
+    "slotsKnown": true,
+    "reader": 2
+  },
+  "painted-1-2-5.3mf": {
+    "hexes": [
+      "#111111",
+      "#222222",
+      "#555555"
+    ],
+    "swapCount": 0,
+    "slotsKnown": true,
+    "reader": 2
+  },
+  "sliced.3mf": {
+    "hexes": [
+      "#111111",
+      "#333333"
+    ],
+    "swapCount": 1,
+    "slotsKnown": true,
+    "reader": 2
+  }
+}

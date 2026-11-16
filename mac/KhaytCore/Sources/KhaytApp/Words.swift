@@ -3113,7 +3113,16 @@ final class Words {
         "mac.no_kits_hint":  ["en": "A figure printed as head, hands and body is four jobs and one object. File them together and Khayt totals them.",
                               "ar": "تمثال يُطبع رأسًا ويدين وجسمًا هو أربعة أعمال وشيء واحد. احفظها معًا يجمعها خيط."],
         "mac.filament_n":    ["en": "Filament {n}",    "ar": "الخيط {n}"],
-        "mac.n_swaps":       ["en": "{n} filament swaps", "ar": "{n} تبديلات خيط"],
+        // The Library card's dots and swap number, explained on hover (.help and
+        // VoiceOver). One wording with the desktop (plib.colours_tip /
+        // swaps_tip / swaps_unknown); "Label: {n}" because neither app has
+        // plural forms. Figma: Mac file, page 15.
+        "mac.lib_colours_tip": ["en": "Colours: {n}. The filaments this print uses.",
+                                "ar": "الألوان: {n}. الخيوط التي تستخدمها هذه الطباعة."],
+        "mac.lib_swaps_tip":   ["en": "Filament swaps: about {n}. How many times the printer changes filament during this print, from the sliced file.",
+                                "ar": "تبديلات الخيط: نحو {n}. عدد مرات تغيير الطابعة للخيط أثناء هذه الطباعة، من الملف المقطّع."],
+        "mac.lib_swaps_unknown": ["en": "Filament swaps are known once the file is sliced.",
+                                  "ar": "تُعرف تبديلات الخيط بعد تقطيع الملف."],
         "mac.library_wont_open": ["en": "This library will not open", "ar": "لا تُفتح هذه المكتبة"],
         "mac.no_models":     ["en": "No models yet",   "ar": "لا نماذج بعد"],
         // WAS "Print files added in Khayt appear here." — which stopped being

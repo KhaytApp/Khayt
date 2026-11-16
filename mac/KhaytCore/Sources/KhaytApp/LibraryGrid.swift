@@ -992,6 +992,16 @@ struct Cell: View {
 }
 
 /// The filament colours, and how many swaps the print needs.
+///
+/// ── EXPLAINED ON HOVER (Turki, Nov 16 2026) ─────────────────────────────
+///
+/// "swaps and colors are confusing specially for new users": a row of dots
+/// and a bare number said nothing about what they counted, and the number was
+/// read as a colour count (snoopy: three dots and "2"). The dots and the
+/// number each say what they are (`.help`, and the same words to VoiceOver),
+/// in the wording the desktop's card uses. The number is the SLICER's swap
+/// count, so it shows only for a sliced file; an unsliced file's dots say its
+/// swaps are known once it is sliced. Figma: Mac file, page 15.
 private struct Palette: View {
     let file: LibraryFile
     let words: Words
@@ -1000,17 +1010,24 @@ private struct Palette: View {
         let swatches = file.palette.prefix(6)
         if !swatches.isEmpty {
             HStack(spacing: 3) {
-                ForEach(Array(swatches.enumerated()), id: \.offset) { _, colour in
-                    if colour.rgb != nil {
-                        Swatch(rgb: colour.rgb, size: 9, round: true)
+                HStack(spacing: 3) {
+                    ForEach(Array(swatches.enumerated()), id: \.offset) { _, colour in
+                        if colour.rgb != nil {
+                            Swatch(rgb: colour.rgb, size: 9, round: true)
+                        }
                     }
                 }
-                if file.swaps > 0 {
+                .contentShape(Rectangle())
+                .help(PaletteTips.colours(file, words))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(PaletteTips.colours(file, words))
+                if let swapsTip = PaletteTips.swaps(file, words) {
                     Text("\(file.swaps)")
                         .font(.system(size: 9, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(.white)
-                        .help(words.callIt("mac.n_swaps", ["n": .number(Double(file.swaps))]))
+                        .help(swapsTip)
+                        .accessibilityLabel(swapsTip)
                 }
             }
             .padding(.horizontal, 5)
@@ -1018,6 +1035,24 @@ private struct Palette: View {
             .background(.black.opacity(0.42), in: Capsule())
             .padding(6)
         }
+    }
+}
+
+/// What a Library card's dots and swap number say on hover (`Palette`).
+@MainActor
+enum PaletteTips {
+    /// The dots: how many colours, and, for a file that was never sliced,
+    /// that its swaps are not known yet.
+    static func colours(_ file: LibraryFile, _ words: Words) -> String {
+        let colours = words.callIt("mac.lib_colours_tip", ["n": .number(Double(file.palette.count))])
+        return file.swapsKnownGuess ? colours : colours + "\n" + words.callIt("mac.lib_swaps_unknown")
+    }
+
+    /// The number, or nil when there is no number to show: no swaps, or swaps
+    /// no slicer has counted.
+    static func swaps(_ file: LibraryFile, _ words: Words) -> String? {
+        guard file.swapsKnownGuess, file.swaps > 0 else { return nil }
+        return words.callIt("mac.lib_swaps_tip", ["n": .number(Double(file.swaps))])
     }
 }
 

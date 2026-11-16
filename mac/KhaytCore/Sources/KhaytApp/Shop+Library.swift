@@ -19,6 +19,8 @@ extension Shop {
         guard case .store(let build) = source, let roots = libraryRoots, let engine,
               !remeasuredBooks.contains(build.rawValue) else { return }
         remeasuredBooks.insert(build.rawValue)
+        // The colours an older reader wrote, read again on the same terms.
+        rereadColoursIfDue(build: build, engine: engine)
         let files = self.files
         let vault = URL(fileURLWithPath: roots.primary)
         remeasuring = Task { [weak self] in
@@ -3608,28 +3610,23 @@ extension Shop {
             // A DISPATCH thread, not `Task.detached`: unzipping blocks, and
             // blocking holds one of the cooperative pool's few threads — the
             // swift-pool-starvation trap (`PinWork`, `SlicerFigures.offPool`).
-            let configs: (project: String, model: String, prusa: String)? = await PinWork.run {
+            let read: (entries: [Zip.Entry], configs: ColourRead.Configs)? = await PinWork.run {
                 guard let entries = try? Zip.entries(of: url) else { return nil }
-                func text(_ name: String) -> String {
-                    guard let e = entries.first(where: { $0.name.lowercased() == name.lowercased() }),
-                          let d = try? Zip.data(of: e, in: url) else { return "" }
-                    return String(decoding: d, as: UTF8.self)
-                }
-                let project = text("Metadata/project_settings.config")
-                let model = text("Metadata/model_settings.config")
-                // Either spelling, depending on how old the PrusaSlicer was.
-                var prusa = text("Metadata/Slic3r_PE.config")
-                if prusa.isEmpty { prusa = text("Metadata/Prusa_Slicer.config") }
-                if project.isEmpty && model.isEmpty && prusa.isEmpty { return nil }
-                return (project, model, prusa)
+                let c = ColourRead.configs(entries, in: url)
+                if c.project.isEmpty && c.model.isEmpty && c.prusa.isEmpty { return nil }
+                return (entries, c)
             }
             guard let self else { return }
+            guard let read else { self.factsInFlight.remove(id); self.factsByFile[id] = .some(nil); return }
+            // The slots the print uses narrow its materials to those, not every
+            // loaded spool's (`lib/print-facts.js` usedSlots, #2500).
+            let slots = await ColourRead.usedSlots(url, entries: read.entries, configs: read.configs, engine: engine)
             self.factsInFlight.remove(id)
-            guard let configs else { self.factsByFile[id] = .some(nil); return }
             self.factsByFile[id] = .some(try? await engine.printFacts(
-                projectSettings: configs.project,
-                modelSettings: configs.model,
-                prusa: configs.prusa))
+                projectSettings: read.configs.project,
+                modelSettings: read.configs.model,
+                prusa: read.configs.prusa,
+                usedSlots: slots))
         }
     }
 

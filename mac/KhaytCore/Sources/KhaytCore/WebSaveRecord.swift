@@ -145,7 +145,7 @@ public enum WebSaveRecord {
     /// The fields an import measures and a web record lacks: what the file
     /// is, where it went, and what it was read as.
     public static let fileFields: [String] = [
-        "originalName", "sourceFile", "parsed", "externalPath", "colors", "swapCount",
+        "originalName", "sourceFile", "parsed", "externalPath", "colors", "swapCount", "coloursReader",
         "thumbFile", "thumbSource", "contentHash", "geometryKey", "geometryReader", "printRisk",
     ]
 
