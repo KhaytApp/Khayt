@@ -4687,7 +4687,7 @@ ipcMain.handle('hub:extract-thumbnail', async (_e, filePath) => {
       const th = extractPrintThumb({ ext, buf: fs.readFileSync(safe), colours: false });
       const c = await mfRun('colours', { src: safe, maxBytes: MESH_ANALYSIS_MAX_BYTES }).catch(() => null);
       return Object.assign(th, c && c.ok
-        ? { colors: c.colors || [], swapCount: c.swapCount || 0, slotsKnown: c.slotsKnown !== false, coloursReader: c.reader }
+        ? { colors: c.colors || [], swapCount: c.swapCount || 0, swapsKnown: c.swapsKnown === true, slotsKnown: c.slotsKnown !== false, coloursReader: c.reader }
         : { colors: [], swapCount: 0, slotsKnown: false });
     }
   } catch (_) { /* silent */ }
@@ -4709,7 +4709,7 @@ ipcMain.handle('hub:print-colours', async (_e, filePath) => {
     if (stat.size > MESH_ANALYSIS_MAX_BYTES) return { ok: false, reason: 'too-large' };
   } catch (_) { return { ok: false, reason: 'unavailable' }; }
   const c = await mfRun('colours', { src: safe, maxBytes: MESH_ANALYSIS_MAX_BYTES }).catch(() => null);
-  return c && c.ok ? { ok: true, colors: c.colors || [], swapCount: c.swapCount || 0, slotsKnown: c.slotsKnown !== false, reader: c.reader }
+  return c && c.ok ? { ok: true, colors: c.colors || [], swapCount: c.swapCount || 0, swapsKnown: c.swapsKnown === true, slotsKnown: c.slotsKnown !== false, reader: c.reader }
     : { ok: false, reason: 'unreadable' };
 });
 
