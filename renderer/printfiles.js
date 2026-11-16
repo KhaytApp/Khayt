@@ -437,6 +437,12 @@
     return `<div class="pf-thumb pf-thumb-icon" title="${escapeHtml(why)}">${ico}</div>`;
   }
 
+  /** Whether a record's swap count is a slicer's, not a guess. A record written
+   *  before `swapsKnown` counts when it was sliced, which a print time says. */
+  function swapsKnown(rec) {
+    if (rec.swapsKnown === true || rec.swapsKnown === false) return rec.swapsKnown;
+    return !!(rec.parsed && +rec.parsed.printTimeMins > 0);
+  }
   function colorDotsHtml(rec) {
     if (!Array.isArray(rec.colors) || !rec.colors.length) return '';
     const cols = rec.colors.slice(0, 8);
@@ -445,8 +451,15 @@
     const dots = _BDR
       ? cols.map((c, i) => `<span class="pf-lchip" title="${escapeHtml(c.label || c.hex)}${c.grams ? ' · ' + c.grams + ' g' : ''}"><span class="pf-lchip-sw" style="background:${escapeHtml(c.hex)};border-color:var(--l${(i % 6) + 1})"></span><span class="pf-lchip-n">L${i + 1}</span></span>`).join('')
       : cols.map((c) => `<span class="pf-dot" title="${escapeHtml(c.label || c.hex)}${c.grams ? ' · ' + c.grams + ' g' : ''}" style="background:${escapeHtml(c.hex)}"></span>`).join('');
-    const swap = rec.swapCount > 0 ? `<span class="pf-chip">↔ ${rec.swapCount} ${escapeHtml(t('plib.swaps') || 'swaps')}</span>` : '';
-    return `<div class="pf-colors">${dots}${swap}</div>`;
+    // What the dots and the number MEAN, on hover and to a screen reader: new
+    // shops read the swap number as a colour count (Turki, Nov 2026). The same
+    // three sentences as the Mac card's.
+    const known = swapsKnown(rec);
+    const colourTip = t('plib.colours_tip', { n: rec.colors.length });
+    const swapTip = known && rec.swapCount > 0 ? t('plib.swaps_tip', { n: rec.swapCount }) : '';
+    const tip = colourTip + (known ? '' : ' ' + t('plib.swaps_unknown'));
+    const swap = swapTip ? `<span class="pf-chip" title="${escapeHtml(swapTip)}">↔ ${rec.swapCount} ${escapeHtml(t('plib.swaps') || 'swaps')}</span>` : '';
+    return `<div class="pf-colors" role="group" aria-label="${escapeHtml(tip + (swapTip ? ' ' + swapTip : ''))}"><span class="pf-colors-dots" title="${escapeHtml(tip)}">${dots}</span>${swap}</div>`;
   }
 
   /** What a parse says, as a record keeps it: the totals, and for a project of
@@ -1248,7 +1261,7 @@
    *  record and leaves its colours: a re-read never empties what was there. */
   function applyColours(rec, r) {
     if (!rec || !r) return false;
-    const was = JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.coloursReader || 0]);
+    const was = JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.swapsKnown, rec.coloursReader || 0]);
     if (r.reader) rec.coloursReader = r.reader;
     const list = Array.isArray(r.colors) ? r.colors : [];
     if (r.slotsKnown !== false && list.length) {
@@ -1259,8 +1272,9 @@
         return o && c.grams == null && o.grams != null ? Object.assign({}, c, { grams: o.grams }) : c;
       });
       rec.swapCount = r.swapCount || 0;
+      rec.swapsKnown = r.swapsKnown === true;
     }
-    return was !== JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.coloursReader || 0]);
+    return was !== JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.swapsKnown, rec.coloursReader || 0]);
   }
   let _coloursSweep = null;
   function sweepColours() {
@@ -2653,7 +2667,7 @@
           // different sentence.
           if (th && th.tooLarge) noPicture = true;
           if (th) {
-            if (th.coloursReader) applyColours(rec, { colors: th.colors, swapCount: th.swapCount, slotsKnown: th.slotsKnown, reader: th.coloursReader });
+            if (th.coloursReader) applyColours(rec, { colors: th.colors, swapCount: th.swapCount, swapsKnown: th.swapsKnown, slotsKnown: th.slotsKnown, reader: th.coloursReader });
             else {
               if (Array.isArray(th.colors) && th.colors.length) rec.colors = th.colors;
               if (th.swapCount) rec.swapCount = th.swapCount;

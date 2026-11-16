@@ -162,3 +162,15 @@ test('the desktop\'s re-read and the rule agree on which reader is current', () 
   assert.equal(T.coloursStale({}), true);
   assert.equal(T.coloursStale({ coloursReader: T.COLOURS_READER }), false);
 });
+
+test('swapsKnown: only a slice knows its swaps, so a card can tell "not yet" from a sliced 0', () => {
+  const unsliced = T.colorsFromConfigs({ projectSettings: project(LOADED8.slice(0, 2)), modelSettings: modelSettings([{ extruder: 1, parts: [1] }]), paint: { slots: [] } });
+  assert.equal(unsliced.swapCount, 0);
+  assert.equal(unsliced.swapsKnown, false);
+  const oneColour = T.colorsFromConfigs({ sliceInfo: '<filament id="1" color="#123456" used_g="5"/>', paint: { slots: [] } });
+  assert.equal(oneColour.swapCount, 0);
+  assert.equal(oneColour.swapsKnown, true, 'a sliced one-colour print really has no swaps');
+  const legacy = T.colorsFromConfigs({ projectSettings: project(LOADED8.slice(0, 3)) });
+  assert.equal(legacy.swapsKnown, false, 'the old colours − 1 is a guess');
+  assert.equal(T.colours3mf(Buffer.from('nonsense')).swapsKnown, false);
+});
