@@ -444,3 +444,27 @@ test('the library-wire fixtures are current, and say what the phone was promised
   // Unknown keys change nothing.
   assert.deepEqual(stored['unknown-keys'].answer, Object.assign({}, top));
 });
+
+test('an item carries the swap count and whether a slicer counted it, as the record holds them', () => {
+  const { itemOf } = require(path.join(ROOT, 'lib/lan-library.js'));
+  const colors = [{ hex: '#C8102E' }, { hex: '#1B1B1F' }];
+  // Sliced: the slicer's count, and that it is the slicer's.
+  const sliced = itemOf({ id: 's', name: 'S', colors, swapCount: 4, swapsKnown: true });
+  assert.equal(sliced.swapCount, 4);
+  assert.equal(sliced.swapsKnown, true);
+  // Never sliced: no number to trust, and it says so.
+  const raw = itemOf({ id: 'r', name: 'R', colors, swapCount: 0, swapsKnown: false });
+  assert.equal(raw.swapCount, 0);
+  assert.equal(raw.swapsKnown, false);
+  // A record from before the fields: nothing sent, so the phone works it out
+  // from the print time as the desktop and Mac do — never a made-up value.
+  const old = itemOf({ id: 'o', name: 'O', colors, parsed: { printTimeMins: 90 } });
+  assert.equal('swapCount' in old, false);
+  assert.equal('swapsKnown' in old, false);
+  // Junk is not passed on.
+  const junk = itemOf({ id: 'j', name: 'J', colors, swapCount: '3', swapsKnown: 'yes' });
+  assert.equal('swapCount' in junk, false);
+  assert.equal('swapsKnown' in junk, false);
+  assert.equal('swapCount' in itemOf({ id: 'n', name: 'N', swapCount: -1 }), false);
+  assert.equal('swapCount' in itemOf({ id: 'f', name: 'F', swapCount: 2.5 }), false);
+});

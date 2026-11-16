@@ -16,11 +16,11 @@ const LanLibrary = require(path.resolve(__dirname, '../../../lib/lan-library.js'
 
 const files = [
   { id: 'm1', name: 'Red cup', folder: 'Home', sourceFile: { filename: 'cup.3mf' }, colors: [{ hex: '#D93B3B' }] },
-  { id: 'm2', name: 'Red-white flag', folder: 'Home', sourceFile: { filename: 'flag.3mf' }, colors: [{ hex: '#D93B3B' }, { hex: '#FFFFFF' }] },
+  { id: 'm2', name: 'Red-white flag', folder: 'Home', sourceFile: { filename: 'flag.3mf' }, colors: [{ hex: '#D93B3B' }, { hex: '#FFFFFF' }], swapsKnown: false },
   { id: 'm3', name: 'Lantern', folder: 'Home/Lighting', sourceFile: { filename: 'lantern.3mf' }, colors: [{ hex: '#2EA65A' }] },
   { id: 'm4', name: 'Bracket', folder: 'Parts', sourceFile: { filename: 'bracket.stl' } },
   { id: 'm5', name: 'Gear', folder: 'Parts', sourceFile: { filename: 'gear.step' }, colors: [{ hex: '#111111' }] },
-  { id: 'm6', name: 'Plate job', folder: 'Parts/Jobs', sourceFile: { filename: 'plate.gcode.3mf' }, colors: [{ hex: '#2F6DB5' }, { hex: '#111111' }] },
+  { id: 'm6', name: 'Plate job', folder: 'Parts/Jobs', sourceFile: { filename: 'plate.gcode.3mf' }, colors: [{ hex: '#2F6DB5' }, { hex: '#111111' }], swapCount: 3, swapsKnown: true },
   { id: 'm7', name: 'Web idea', folder: '', colors: [] },
   { id: 'm8', name: 'Grey vase', folder: '', sourceFile: { filename: 'vase.obj' }, colors: [{ hex: '#8C9196' }] },
   { id: 'm9', name: 'Zip member', folder: 'Parts', archiveMember: 'pack.zip/clip.stl' },
