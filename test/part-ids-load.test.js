@@ -110,5 +110,36 @@ test('loadAll: ids before the backfill, stamped only when the book is ours', () 
   const preload = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
   assert.match(preload, /storeOwned:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('hub:store-owned'\)/);
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  assert.match(main, /ipcMain\.handle\('hub:store-owned'[^\n]*_storeLockVerdict !== 'held'/);
+  assert.match(main, /ipcMain\.handle\('hub:store-owned', \(\) => StoreLock\.ownsBook\(_storeLockMine, _storeLockVerdict\)\)/);
+  assert.match(main, /_storeLockVerdict = verdict\.action;/);
+});
+
+test('the lock is ours but another machine held the book at launch: no write', () => {
+  const L = require('../lib/store-lock.js');
+  const now = Date.now();
+  const theirs = L.claim({ app: 'Khayt', pid: 4242, host: 'office-mac', now: now - 1000 });
+  const verdict = L.decide(theirs, { pid: 100, host: 'shop-floor', now, alive: null });
+  assert.equal(verdict.action, 'held');
+  assert.equal(verdict.reason, 'other-host-fresh');
+  // Electron takes the lock anyway (main.js acquireStoreOwnership) ...
+  const mine = L.claim({ app: 'Khayt', pid: 100, host: 'shop-floor', now });
+  // ... and still does not own the book for a repair.
+  assert.equal(L.ownsBook(mine, verdict.action), false);
+  const snap = book();
+  load(snap, L.ownsBook(mine, verdict.action), 'part-ids-other-host');
+  assert.deepEqual(Sync.stampChanges(snap).changed, []);
+  assert.equal(snap.printLog[0].rev, 3);
+});
+
+test('ownsBook: free, stale or ours at launch is yes; held, unknown or no lock is no', () => {
+  const L = require('../lib/store-lock.js');
+  const mine = L.claim({ app: 'Khayt', pid: 100, host: 'h', now: Date.now() });
+  assert.equal(L.ownsBook(mine, 'take'), true);
+  assert.equal(L.ownsBook(mine, 'own'), true);
+  assert.equal(L.ownsBook(mine, 'held'), false);
+  assert.equal(L.ownsBook(mine, null), false);
+  assert.equal(L.ownsBook(null, 'take'), false);
+  // The same machine, the other app still running: held, so no write.
+  const mac = L.claim({ app: 'Khayt Mac', pid: 4242, host: 'h', now: Date.now() });
+  assert.equal(L.ownsBook(mine, L.decide(mac, { pid: 100, host: 'h', now: Date.now(), alive: true }).action), false);
 });

@@ -7588,7 +7588,7 @@ let _storeLockVerdict = null;
 
 /** Does this app own the book: it holds the lock and found nobody else
  *  holding it at launch? Unknown is "no", as on the Mac. */
-ipcMain.handle('hub:store-owned', () => !!_storeLockMine && _storeLockVerdict !== null && _storeLockVerdict !== 'held');
+ipcMain.handle('hub:store-owned', () => StoreLock.ownsBook(_storeLockMine, _storeLockVerdict));
 
 const storeLockPath = () => path.join(app.getPath('userData'), StoreLock.LOCK_FILENAME);
 
