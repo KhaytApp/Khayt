@@ -781,10 +781,14 @@
     const from = pricedFrom(order);
     if (from.typed || !(from.costed > 0)) return { ok: false, reason: 'price_fixed', changes: {} };
     if (lock.askPrice && c.priceSeenOk !== true) return { ok: false, reason: 'ask_price', changes: {} };
-    // A job taken in another currency carries the rate it was taken at; the
-    // parts' costs are in the shop's.
+    // A job taken in another currency carries the rate it was taken at
+    // (`fxRate`: shop currency per one unit of the job's, `order-new.js`
+    // jobCurrency), and the parts' costs are in the shop's. So the cost is
+    // DIVIDED by it into the job's currency, as `newOrder` prices it
+    // (`toJob = v / fx`). It was multiplied: a USD job at 3.75 re-marked to
+    // 60% came out 600 instead of 42.67 (beta.38 review, Nov 16).
     const fx = +order.fxRate > 0 && +order.fxRate !== 1 ? +order.fxRate : 1;
-    const newBase = from.costed * fx * (1 + wanted / 100);
+    const newBase = from.costed / fx * (1 + wanted / 100);
     const after = from.sum(newBase, from.agreed);
     const wasPrice = +order.price || 0;
     order.price = Math.max(0, from.finish(after.total));
