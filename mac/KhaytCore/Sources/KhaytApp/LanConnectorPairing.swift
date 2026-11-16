@@ -15,12 +15,22 @@ import CryptoKit
 ///
 /// ── WHAT STOPS A DEVICE IN THE MIDDLE ────────────────────────────────────
 ///
-/// The plugin sends a fresh X25519 key; the Mac answers with one of its own,
-/// signed by its `LanIdentity`, and that identity key itself (which the plugin
-/// pins). Both work out a 6-digit check number from the three keys and the
-/// device id (`check`). A device on the Wi-Fi that swapped
-/// either key makes the two screens disagree, and the owner denies. Until the
-/// owner approves, nothing is enrolled: the plugin's key opens nothing.
+/// Commit, then reveal (v2). The plugin first sends only a commitment: the
+/// SHA-256 of its fresh X25519 key and a random nonce (`commitment`). Only then
+/// does the Mac draw a fresh X25519 key for this request and answer with it,
+/// signed by its `LanIdentity`, and the identity key itself (which the plugin
+/// pins). The plugin checks the signature, then reveals its key and nonce; the
+/// Mac checks them against the commitment (constant time), and only now does a
+/// 6-digit check number exist on either screen (`check`).
+///
+/// Why the order matters (v1 had none): a 6-digit number is one in 10^6, which
+/// a device in the middle could beat by grinding its own keys once it had seen
+/// every other input. Now it cannot. Toward the plugin, it must send its keys
+/// before the plugin's key and nonce are revealed; toward the Mac, it must
+/// commit before the Mac draws its fresh key. Either way one screen's number is
+/// a blind guess, and at most `maxOffers` offers per opened window bound it to
+/// 3 in 10^6 per click of Pair a slicer. Until the owner approves, nothing is
+/// enrolled: the plugin's key opens nothing.
 ///
 /// ── ONE REQUEST AT A TIME ─────────────────────────────────────────────────
 ///
@@ -38,31 +48,45 @@ final class LanConnectorPairing {
     nonisolated static let length: TimeInterval = 120
     /// What a plugin may call itself, and its app and version.
     nonisolated static let maxField = 60
+    /// Offers one opened window gives out, whatever became of them (denied,
+    /// abandoned, a bad or late reveal). Then the owner must click again.
+    nonisolated static let maxOffers = 3
+    /// The plugin reveals at once; a reveal later than this expires the offer.
+    nonisolated static let revealWithin: TimeInterval = 30
+    /// The plugin's nonce: at least this many random bytes.
+    nonisolated static let minNonce = 16
 
     enum Closed: Equatable {
         case paired(name: String)
         case timedOut
         case byOwner
         case serverStopped
+        /// `maxOffers` offers were given out and none was approved.
+        case offersUsed
     }
 
     /// What a poll is told about a request.
     enum Outcome: String, Equatable { case waiting, approved, denied, expired }
 
     /// A plugin that asked and waits for the owner. The Mac's private key is
-    /// held here, in memory only, until the owner answers.
+    /// held here, in memory only, until the owner answers. `pluginPublic` and
+    /// `check` stay nil until the plugin's reveal matches its commitment: there
+    /// is no number to show, and nothing to approve, before that.
     struct Request {
         let pairId: String
         let pollHash: Data
         let deviceId: String
         let serverKey: Curve25519.KeyAgreement.PrivateKey
         let serverPublic: String
-        let pluginPublic: String
+        let identityPublic: String
+        let commitment: Data
+        let offeredAt: TimeInterval
         let name: String
         let app: String
         let version: String
         let address: String
-        let check: String
+        fileprivate(set) var pluginPublic: String?
+        fileprivate(set) var check: String?
     }
 
     /// What the route answers a plugin that asked.
@@ -78,7 +102,10 @@ final class LanConnectorPairing {
         let identity: String
     }
 
-    enum Refusal: Error, Equatable { case closed, busy, badKey }
+    enum Refusal: Error, Equatable { case closed, busy, badCommit }
+
+    /// How a reveal went. `refused` expired the offer: no number exists.
+    enum Revealed: Equatable { case accepted, unknown, already, refused }
 
     private(set) var deadline: TimeInterval?
     var isOpenNow: Bool { deadline != nil }
@@ -87,6 +114,8 @@ final class LanConnectorPairing {
     private(set) var pending: Request?
     /// Answers given in this window, by pair id, for the plugin's poll.
     private(set) var outcomes: [String: Outcome] = [:]
+    /// Offers this window may still give out.
+    private(set) var offersLeft = 0
 
     @ObservationIgnored let clock: () -> TimeInterval
 
@@ -98,16 +127,21 @@ final class LanConnectorPairing {
         deadline = clock() + Self.length
         pending = nil
         outcomes = [:]
+        offersLeft = Self.maxOffers
     }
 
-    /// Whether a plugin may ask now. Past the deadline, this closes it.
+    /// Whether a plugin may ask now. Past the deadline, this closes it; an
+    /// offer never revealed in time expires here, so it cannot hold the slot.
     func isOpen() -> Bool {
         guard let deadline else { return false }
         if clock() >= deadline {
             shut(.timedOut)
             return false
         }
-        return true
+        if let request = pending, request.check == nil, clock() - request.offeredAt > Self.revealWithin {
+            answer(request, .expired)
+        }
+        return self.deadline != nil
     }
 
     func remaining() -> TimeInterval? {
@@ -126,31 +160,58 @@ final class LanConnectorPairing {
         shut(.serverStopped)
     }
 
-    /// A plugin asks to pair. Nothing is enrolled: the owner decides.
-    func request(publicKey: String, name: String, app: String, version: String, address: String,
+    /// A plugin asks to pair with its commitment. The Mac's X25519 key is
+    /// drawn here, after the commitment arrived and only if it is well formed
+    /// (`freshKey` is called once or not at all). Nothing is enrolled, and no
+    /// check number exists yet.
+    func request(commitment: String, name: String, app: String, version: String, address: String,
                  identity: Curve25519.Signing.PrivateKey,
-                 serverKey: Curve25519.KeyAgreement.PrivateKey = .init(),
+                 freshKey: () -> Curve25519.KeyAgreement.PrivateKey = { .init() },
                  deviceId: String = LanDevices.freshId(),
                  pairId: String = LanConnectorPairing.freshSecret(12),
                  pollSecret: String = LanConnectorPairing.freshSecret(32)) throws(Refusal) -> Offer {
         guard isOpen() else { throw .closed }
         guard pending == nil else { throw .busy }
-        guard let raw = Data(base64Encoded: publicKey), raw.count == 32,
-              let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
-              LanDevices.derive(serverKey, theirs, deviceId: deviceId) != nil else { throw .badKey }
+        guard let commit = Data(base64Encoded: commitment), commit.count == 32 else { throw .badCommit }
+        let serverKey = freshKey()
         let serverPublic = serverKey.publicKey.rawRepresentation.base64EncodedString()
         let identityPublic = identity.publicKey.rawRepresentation.base64EncodedString()
-        guard let sig = try? identity.signature(for: LanDevices.enrolMessage(
-            deviceId: deviceId, serverPublic: serverPublic, phonePublic: publicKey)) else { throw .badKey }
+        guard let sig = try? identity.signature(for: Self.offerMessage(
+            deviceId: deviceId, serverPublic: serverPublic, commitment: commitment)) else { throw .badCommit }
+        offersLeft -= 1
         pending = Request(pairId: pairId, pollHash: Self.hash(pollSecret), deviceId: deviceId,
-                          serverKey: serverKey, serverPublic: serverPublic, pluginPublic: publicKey,
+                          serverKey: serverKey, serverPublic: serverPublic, identityPublic: identityPublic,
+                          commitment: commit, offeredAt: clock(),
                           name: Self.field(name), app: Self.field(app), version: Self.field(version),
-                          address: address,
-                          check: Self.check(deviceId: deviceId, identityPublic: identityPublic,
-                                            serverPublic: serverPublic, pluginPublic: publicKey))
+                          address: address, pluginPublic: nil, check: nil)
         outcomes[pairId] = .waiting
         return Offer(pairId: pairId, pollSecret: pollSecret, deviceId: deviceId,
                      publicKey: serverPublic, sig: sig.base64EncodedString(), identity: identityPublic)
+    }
+
+    /// The plugin reveals the key and nonce it committed to. Anything but an
+    /// exact, timely match expires the offer (it was counted when given) and no
+    /// check number is ever worked out for it.
+    func reveal(pairId: String, secret: String, publicKey: String, nonce: String) -> Revealed {
+        guard let request = pending, request.pairId == pairId else { return .unknown }
+        guard LanDevices.constantTimeEqual(request.pollHash, Self.hash(secret)) else { return .unknown }
+        guard request.check == nil else { return .already }
+        guard isOpen(), pending?.pairId == pairId else { return .refused }
+        guard let raw = Data(base64Encoded: publicKey), raw.count == 32,
+              let theirs = try? Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw),
+              LanDevices.derive(request.serverKey, theirs, deviceId: request.deviceId) != nil,
+              let n = Data(base64Encoded: nonce), n.count >= Self.minNonce,
+              LanDevices.constantTimeEqual(request.commitment, Self.commitment(pluginPublic: publicKey, nonce: nonce))
+        else {
+            answer(request, .expired)
+            return .refused
+        }
+        var revealed = request
+        revealed.pluginPublic = publicKey
+        revealed.check = Self.check(deviceId: request.deviceId, identityPublic: request.identityPublic,
+                                    serverPublic: request.serverPublic, pluginPublic: publicKey, nonce: nonce)
+        pending = revealed
+        return .accepted
     }
 
     /// The plugin asks how its request went. Nil for an id this window never
@@ -172,7 +233,7 @@ final class LanConnectorPairing {
     /// The owner approved. `enrol` writes the device; when it throws, nothing
     /// changes and the request still waits.
     func approve(_ enrol: (Request) throws -> Void) rethrows {
-        guard let request = pending, isOpen() else { return }
+        guard isOpen(), let request = pending, request.check != nil, request.pluginPublic != nil else { return }
         try enrol(request)
         answer(request, .approved)
         shut(.paired(name: request.name))
@@ -188,6 +249,7 @@ final class LanConnectorPairing {
         outcomes[request.pairId] = outcome
         answeredHashes[request.pairId] = request.pollHash
         pending = nil
+        if outcome != .approved, offersLeft <= 0, deadline != nil { shut(.offersUsed) }
     }
 
     private func shut(_ why: Closed) {
@@ -198,18 +260,38 @@ final class LanConnectorPairing {
 
     // MARK: - Shared with the plugin
 
-    /// The 6-digit number both screens show. SHA-256 over the device id, the
-    /// Mac's identity key and both X25519 keys (base64, as sent), one per line
-    /// after a fixed prefix;
-    /// the first four bytes big-endian, modulo 10^6, zero-padded. The vectors
-    /// are `docs/connector-pair.vectors.json`; the plugin computes the same.
-    nonisolated static func check(deviceId: String, identityPublic: String, serverPublic: String,
-                                  pluginPublic: String) -> String {
-        let text = ["khayt-connector-check-v1", deviceId, identityPublic, serverPublic, pluginPublic]
+    // Every input below is hashed as the exact UTF-8 bytes of the strings as
+    // sent (base64 for keys and the nonce), joined by "\n" after a fixed
+    // prefix. The vectors are `docs/connector-pair.vectors.json`; the plugin
+    // computes the same.
+
+    /// What the plugin commits to before it sees anything of the Mac's.
+    nonisolated static func commitment(pluginPublic: String, nonce: String) -> Data {
+        let text = ["khayt-connector-commit-v2", pluginPublic, nonce].joined(separator: "\n")
+        return Data(SHA256.hash(data: Data(text.utf8)))
+    }
+
+    /// What the Mac's identity signs in its offer: its fresh key, bound to the
+    /// device id and to the commitment it answers.
+    nonisolated static func offerMessage(deviceId: String, serverPublic: String, commitment: String) -> Data {
+        Data("khayt-enrol-commit-v2:\(deviceId):\(serverPublic):\(commitment)".utf8)
+    }
+
+    /// The first four bytes, big-endian, of the SHA-256 the check number is
+    /// cut from. Tests use it with a small modulus to measure grinding.
+    nonisolated static func checkValue(deviceId: String, identityPublic: String, serverPublic: String,
+                                       pluginPublic: String, nonce: String) -> UInt32 {
+        let text = ["khayt-connector-check-v2", deviceId, identityPublic, serverPublic, pluginPublic, nonce]
             .joined(separator: "\n")
         let digest = Array(SHA256.hash(data: Data(text.utf8)))
-        let n = (UInt32(digest[0]) << 24) | (UInt32(digest[1]) << 16) | (UInt32(digest[2]) << 8) | UInt32(digest[3])
-        let six = String(n % 1_000_000)
+        return (UInt32(digest[0]) << 24) | (UInt32(digest[1]) << 16) | (UInt32(digest[2]) << 8) | UInt32(digest[3])
+    }
+
+    /// The 6-digit number both screens show: `checkValue` modulo 10^6, zero-padded.
+    nonisolated static func check(deviceId: String, identityPublic: String, serverPublic: String,
+                                  pluginPublic: String, nonce: String) -> String {
+        let six = String(checkValue(deviceId: deviceId, identityPublic: identityPublic, serverPublic: serverPublic,
+                                    pluginPublic: pluginPublic, nonce: nonce) % 1_000_000)
         return String(repeating: "0", count: 6 - six.count) + six
     }
 
@@ -241,6 +323,8 @@ final class LanConnectorPairing {
 
     nonisolated static let closedBody =
         #"{"reason":"pairing-closed","error":"On the Mac, open Settings, Online, Connected apps, and click Pair a slicer"}"#
+    nonisolated static let upgradeBody =
+        #"{"reason":"pairing-upgrade","error":"Update Khayt for OrcaSlicer: this Mac pairs with version 2 of the handshake"}"#
     nonisolated static let busyBody =
         #"{"reason":"pairing-busy","error":"Another slicer is waiting for the shop to answer. Try again in a minute"}"#
 }

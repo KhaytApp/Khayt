@@ -1144,8 +1144,11 @@ final class LanServer {
         //
         // No PIN: a connector must never learn it. Only while the owner has
         // clicked Pair a slicer, and only a request; the owner approves on the
-        // Mac after both screens show the same check number. Exact paths: a
-        // connector's routes never match by prefix (Mac review of #2484).
+        // Mac after both screens show the same check number. Commit, then
+        // reveal (v2): this route takes only the plugin's commitment, and the
+        // reveal route below its key. A v1 body (a bare publicKey) is told to
+        // upgrade before any key is drawn. Exact paths: a connector's routes
+        // never match by prefix (Mac review of #2484).
         case ("/api/connectors/pair", false) where request.method == "POST":
             guard Self.hostIsLocal(request.headers["host"]) else {
                 return .json(421, #"{"error":"host-not-local"}"#)
@@ -1153,17 +1156,19 @@ final class LanServer {
             guard let window = host.connectorPairing, window.isOpen() else {
                 return .json(403, LanConnectorPairing.closedBody)
             }
-            guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
-            guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body),
-                  case .string(let publicKey)? = asked["publicKey"] else {
-                return .json(400, #"{"error":"publicKey"}"#)
+            guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body) else {
+                return .json(400, #"{"error":"commit"}"#)
             }
+            guard case .number(let v)? = asked["v"], v == 2, case .string(let commit)? = asked["commit"] else {
+                return .json(400, LanConnectorPairing.upgradeBody)
+            }
+            guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
             func text(_ key: String) -> String {
                 if case .string(let given)? = asked[key] { return given }
                 return ""
             }
             do throws(LanConnectorPairing.Refusal) {
-                let offer = try window.request(publicKey: publicKey, name: text("name"), app: text("app"),
+                let offer = try window.request(commitment: commit, name: text("name"), app: text("app"),
                                                version: text("version"), address: request.remote,
                                                identity: identity)
                 return .json(200, #"{"pairId":"\#(offer.pairId)","pollSecret":"\#(offer.pollSecret)","deviceId":"\#(offer.deviceId)","publicKey":"\#(offer.publicKey)","sig":"\#(offer.sig)","identity":"\#(offer.identity)"}"#)
@@ -1172,7 +1177,31 @@ final class LanServer {
             } catch .busy {
                 return .json(409, LanConnectorPairing.busyBody)
             } catch {
-                return .json(400, #"{"error":"publicKey"}"#)
+                return .json(400, #"{"error":"commit"}"#)
+            }
+
+        // The plugin reveals the key and nonce it committed to. A mismatch, a
+        // malformed body or a late reveal expires the offer; the check number
+        // exists only after a match. `x-khayt-poll` proves it is the asker.
+        case (let p, false) where request.method == "POST"
+                && p.hasPrefix("/api/connectors/pair/") && p.hasSuffix("/reveal")
+                && LanConnectorPairing.plausiblePairId(String(p.dropFirst("/api/connectors/pair/".count).dropLast("/reveal".count))):
+            let pairId = String(p.dropFirst("/api/connectors/pair/".count).dropLast("/reveal".count))
+            guard Self.hostIsLocal(request.headers["host"]) else {
+                return .json(421, #"{"error":"host-not-local"}"#)
+            }
+            guard let window = host.connectorPairing else { return .json(404, #"{"state":"unknown"}"#) }
+            var publicKey = "", nonce = ""
+            if case .object(let shown)? = try? JSONDecoder().decode(JSONValue.self, from: request.body) {
+                if case .string(let k)? = shown["publicKey"] { publicKey = k }
+                if case .string(let n)? = shown["nonce"] { nonce = n }
+            }
+            switch window.reveal(pairId: pairId, secret: request.headers["x-khayt-poll"] ?? "",
+                                 publicKey: publicKey, nonce: nonce) {
+            case .accepted: return .json(200, #"{"state":"waiting"}"#)
+            case .unknown: return .json(404, #"{"state":"unknown"}"#)
+            case .already: return .json(409, #"{"reason":"already-revealed"}"#)
+            case .refused: return .json(403, #"{"state":"expired","reason":"bad-reveal"}"#)
             }
 
         // How the owner answered. `x-khayt-poll` is the secret the request
