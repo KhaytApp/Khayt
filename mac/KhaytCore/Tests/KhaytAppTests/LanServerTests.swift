@@ -46,6 +46,8 @@ struct LanServerTests {
         /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
         let devices = LanDevices.inMemory()
         let pairing: LanPairingWindow
+        /// The "Pair a slicer" window, on the same clock.
+        let connectorPairing: LanConnectorPairing
 
         init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
@@ -80,6 +82,9 @@ struct LanServerTests {
             let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
             self.pairing = pairing
             host.pairing = pairing
+            let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 })
+            self.connectorPairing = connectorPairing
+            host.connectorPairing = connectorPairing
             host.library = { [shop] q, folder, offset, limit, filter in
                 guard libraryAsBeforeFilters else {
                     return shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit, filter: filter)

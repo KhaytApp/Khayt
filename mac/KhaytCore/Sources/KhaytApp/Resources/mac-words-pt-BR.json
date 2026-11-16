@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "O cliente já viu o preço deste trabalho. Mudar para o novo acréscimo?",
  "mac.js_markup_change": "Mudar o preço",
  "mac.js_more": "Mais detalhes…",
- "mac.js_new_total": "Novo total"
+ "mac.js_new_total": "Novo total",
+ "mac.apps_title": "Apps conectados",
+ "mac.apps_none": "Nenhum ainda",
+ "mac.apps_unnamed": "Fatiador",
+ "mac.apps_hint": "Fatiadores que podem enviar arquivos para a caixa “Do fatiador”. Eles não leem seu livro, seus clientes nem seus preços. Trocar o PIN da rede local também os desconecta.",
+ "mac.apps_remove": "Remover",
+ "mac.apps_remove_q": "Remover “{name}”?",
+ "mac.apps_remove_note": "Ele para de enviar para este Mac na hora. Para usá-lo de novo, pareie outra vez.",
+ "mac.apps_pair": "Parear um fatiador",
+ "mac.apps_pair_hint": "No OrcaSlicer, abra Khayt, depois Parear, depois Nesta rede, e digite este endereço:",
+ "mac.apps_waiting": "Aguardando um fatiador… {time}",
+ "mac.apps_ask": "Aprovar “{name}”?",
+ "mac.apps_ask_from": "{app} {version} pediu para parear a partir de {address}.",
+ "mac.apps_check": "O fatiador deve mostrar o mesmo número. Se não mostrar, recuse.",
+ "mac.apps_may": "Ele pode enviar fatiamentos para a caixa “Do fatiador” e ler a fila de trabalhos (nomes e tempos, nunca clientes). Nunca pode ler seu livro, clientes, preços ou ajustes.",
+ "mac.apps_approve": "Aprovar",
+ "mac.apps_deny": "Recusar",
+ "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo."
 }

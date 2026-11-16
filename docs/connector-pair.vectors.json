@@ -1,0 +1,93 @@
+{
+  "about": "The 6-digit check number both screens show when a slicer plugin pairs (LanConnectorPairing.check). text = 'khayt-connector-check-v1', deviceId, the Mac's identity key (Ed25519), the Mac's X25519 key, the plugin's X25519 key, joined with '\\n' (keys base64 of the raw 32 bytes, as sent); n = first 4 bytes of SHA-256(text) big-endian; check = n mod 1000000, zero-padded to 6. Seeds and private keys are sample values for tests only.",
+  "cases": [
+    {
+      "name": "first",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0001",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "026228"
+    },
+    {
+      "name": "second-device-id",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0002",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "354984"
+    },
+    {
+      "name": "other-identity",
+      "identitySeedHex": "2222222222222222222222222222222222222222222222222222222222222222",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0001",
+      "identityPublic": "oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "435407"
+    },
+    {
+      "name": "other-keys",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "pluginPrivateHex": "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
+      "deviceId": "dev_SampleConnector0001",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "8LT9i+SANJKTq2HwUF67W6/M34pBJ94iHm7z2yDgPSk=",
+      "pluginPublic": "7icibqL3O7GPJHVM1Ege8MP8MNPdKtk6pikXNK4OsRw=",
+      "check": "057653"
+    },
+    {
+      "name": "swapped-keys",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "pluginPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "deviceId": "dev_SampleConnector0001",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "pluginPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "check": "770853"
+    },
+    {
+      "name": "third-device-id",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0003",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "462462"
+    },
+    {
+      "name": "fourth-device-id",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0004",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "622902"
+    },
+    {
+      "name": "fifth-device-id",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "deviceId": "dev_SampleConnector0005",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "check": "584386"
+    }
+  ]
+}

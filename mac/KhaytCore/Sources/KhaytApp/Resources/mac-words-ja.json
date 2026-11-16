@@ -3999,5 +3999,22 @@
  "mac.js_markup_q": "お客様はこの案件の価格をすでに見ています。新しい上乗せ率で価格を変更しますか？",
  "mac.js_markup_change": "価格を変更",
  "mac.js_more": "詳細…",
- "mac.js_new_total": "新しい合計"
+ "mac.js_new_total": "新しい合計",
+ "mac.apps_title": "接続済みアプリ",
+ "mac.apps_none": "まだありません",
+ "mac.apps_unnamed": "スライサー",
+ "mac.apps_hint": "「スライサーから」受信箱にファイルを送れるスライサーです。帳簿・顧客・価格は読めません。LAN PIN を変更するとこれらもサインアウトされます。",
+ "mac.apps_remove": "削除",
+ "mac.apps_remove_q": "「{name}」を削除しますか？",
+ "mac.apps_remove_note": "このMacへの送信はすぐに止まります。再び使うにはもう一度ペアリングしてください。",
+ "mac.apps_pair": "スライサーをペアリング",
+ "mac.apps_pair_hint": "OrcaSlicer で Khayt →「ペアリング」→「このネットワーク」を開き、このアドレスを入力してください：",
+ "mac.apps_waiting": "スライサーを待っています… {time}",
+ "mac.apps_ask": "「{name}」を承認しますか？",
+ "mac.apps_ask_from": "{app} {version} が {address} からペアリングを求めています。",
+ "mac.apps_check": "スライサーに同じ番号が表示されているはずです。違う場合は拒否してください。",
+ "mac.apps_may": "「スライサーから」受信箱へのスライス送信と、ジョブ一覧（ジョブ名と時間のみ、顧客は含まない）の閲覧ができます。帳簿・顧客・価格・設定は決して読めません。",
+ "mac.apps_approve": "承認",
+ "mac.apps_deny": "拒否",
+ "mac.apps_timed_out": "時間内にペアリングされたスライサーはありません。もう一度「スライサーをペアリング」をクリックしてください。"
 }
