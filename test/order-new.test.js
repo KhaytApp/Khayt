@@ -301,6 +301,11 @@ test('the lifted record and the original agree, all forty-five fields', () => {
       assert.equal(recordB.marginPct, Math.max(0, form.margin || 0));
       delete recordB.marginPct;
     }
+    // AND A FOURTH (Nov 16): a cart part without an id leaves with the one
+    // lib/part-ids.js owes it. The original stored it bare.
+    recordA.parts.forEach((p, i) => {
+      if (!p.id) p.id = require('../lib/part-ids.js').partIdFor(recordA.id, i, p);
+    });
     assert.deepEqual(recordB, recordA, `the record diverged: ${JSON.stringify({ form, shop })}`);
     // And the counters it advanced, which are the shop's and which a caller
     // must save with the order.

@@ -1,0 +1,147 @@
+{
+  "about": "lib/part-ids.js: id = PRT- + cyrb53(text, 0) base36, 11 chars zero-padded; text = orderId U+001F index U+001F stableJson(part without id). Read by test/part-ids.test.js and the Mac PartIdsParityTests.",
+  "cyrb53": [
+    {
+      "text": "a",
+      "hash": 7929297801672961
+    },
+    {
+      "text": "",
+      "hash": 3338908027751811
+    },
+    {
+      "text": "خيط",
+      "hash": 3839623849183606
+    }
+  ],
+  "cases": [
+    {
+      "why": "plain part",
+      "orderId": "INV-2026-0001",
+      "index": 0,
+      "part": {
+        "name": "Bracket",
+        "material": "PLA",
+        "qty": 2,
+        "printWeight": 12.5,
+        "unitCost": 3,
+        "baseCost": 6
+      },
+      "text": "INV-2026-0001\u001f0\u001f{\"baseCost\":6,\"material\":\"PLA\",\"name\":\"Bracket\",\"printWeight\":12.5,\"qty\":2,\"unitCost\":3}",
+      "id": "PRT-1j59mwdwcdq"
+    },
+    {
+      "why": "same part, keys in another order and 1.0 for 1: same id",
+      "orderId": "INV-2026-0001",
+      "index": 0,
+      "part": {
+        "baseCost": 6,
+        "unitCost": 3,
+        "printWeight": 12.5,
+        "qty": 2,
+        "material": "PLA",
+        "name": "Bracket"
+      },
+      "text": "INV-2026-0001\u001f0\u001f{\"baseCost\":6,\"material\":\"PLA\",\"name\":\"Bracket\",\"printWeight\":12.5,\"qty\":2,\"unitCost\":3}",
+      "id": "PRT-1j59mwdwcdq"
+    },
+    {
+      "why": "same part at index 1: a different id",
+      "orderId": "INV-2026-0001",
+      "index": 1,
+      "part": {
+        "name": "Bracket",
+        "material": "PLA",
+        "qty": 2,
+        "printWeight": 12.5,
+        "unitCost": 3,
+        "baseCost": 6
+      },
+      "text": "INV-2026-0001\u001f1\u001f{\"baseCost\":6,\"material\":\"PLA\",\"name\":\"Bracket\",\"printWeight\":12.5,\"qty\":2,\"unitCost\":3}",
+      "id": "PRT-1i96p7uqn3y"
+    },
+    {
+      "why": "same part in another job: a different id",
+      "orderId": "INV-2026-0002",
+      "index": 0,
+      "part": {
+        "name": "Bracket",
+        "material": "PLA",
+        "qty": 2,
+        "printWeight": 12.5,
+        "unitCost": 3,
+        "baseCost": 6
+      },
+      "text": "INV-2026-0002\u001f0\u001f{\"baseCost\":6,\"material\":\"PLA\",\"name\":\"Bracket\",\"printWeight\":12.5,\"qty\":2,\"unitCost\":3}",
+      "id": "PRT-1uvmv76gpps"
+    },
+    {
+      "why": "Arabic text is hashed as UTF-16 code units, not escaped",
+      "orderId": "INV-2026-0003-3y0z",
+      "index": 0,
+      "part": {
+        "name": "حامل جوال",
+        "material": "PETG",
+        "qty": 1,
+        "printWeight": 40,
+        "unitCost": 9.75,
+        "colour": "أسود"
+      },
+      "text": "INV-2026-0003-3y0z\u001f0\u001f{\"colour\":\"أسود\",\"material\":\"PETG\",\"name\":\"حامل جوال\",\"printWeight\":40,\"qty\":1,\"unitCost\":9.75}",
+      "id": "PRT-1tojjxk4apq"
+    },
+    {
+      "why": "nested objects and arrays sort their keys too",
+      "orderId": "X",
+      "index": 2,
+      "part": {
+        "name": "n",
+        "additionalSpools": [
+          {
+            "weight": 5,
+            "spoolId": "S1"
+          }
+        ],
+        "extra": {
+          "b": 1,
+          "a": [
+            1,
+            2
+          ]
+        }
+      },
+      "text": "X\u001f2\u001f{\"additionalSpools\":[{\"spoolId\":\"S1\",\"weight\":5}],\"extra\":{\"a\":[1,2],\"b\":1},\"name\":\"n\"}",
+      "id": "PRT-1sj3o38ntf0"
+    },
+    {
+      "why": "fractional and negative numbers as JSON.stringify writes them",
+      "orderId": "Q-1",
+      "index": 0,
+      "part": {
+        "name": "p",
+        "printWeight": 0.1,
+        "unitCost": -2.5,
+        "qty": 1e+21,
+        "ratio": 0.3333333333333333
+      },
+      "text": "Q-1\u001f0\u001f{\"name\":\"p\",\"printWeight\":0.1,\"qty\":1e+21,\"ratio\":0.3333333333333333,\"unitCost\":-2.5}",
+      "id": "PRT-2cp84mdootu"
+    },
+    {
+      "why": "an id already on the part does not enter the text",
+      "orderId": "INV-2026-0001",
+      "index": 0,
+      "part": {
+        "id": "",
+        "name": "Bracket",
+        "material": "PLA",
+        "qty": 2,
+        "printWeight": 12.5,
+        "unitCost": 3,
+        "baseCost": 6
+      },
+      "text": "INV-2026-0001\u001f0\u001f{\"baseCost\":6,\"material\":\"PLA\",\"name\":\"Bracket\",\"printWeight\":12.5,\"qty\":2,\"unitCost\":3}",
+      "id": "PRT-1j59mwdwcdq"
+    }
+  ]
+}
