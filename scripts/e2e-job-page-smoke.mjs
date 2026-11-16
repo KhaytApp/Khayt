@@ -44,6 +44,8 @@ try {
     printLog.unshift(
       job('JP-PENDING'),
       job('JP-QUOTE', { status: 'quote', paidAmount: 0, paidAt: null, dueDate: null, statusHistory: [{ status: 'quote', at: '2026-11-13T08:00:00Z' }] }),
+      // Taken in USD at 3.75: its part's 75 SAR of cost is 20 USD.
+      job('JP-USD', { currency: 'USD', fxRate: 3.75, price: 40, paidAmount: 0, paidAt: null, parts: [{ name: 'hook.stl', material: 'PLA', qty: 3, printWeight: 30, printTime: 1, baseCost: 75 }] }),
     );
     saveAll();
     return flushSave();
@@ -61,6 +63,9 @@ try {
   const moneyText = await text('#jobPage .jp-grid .jp-card:nth-child(2)');
   ok(/340/.test(moneyText) && /100/.test(moneyText) && /240/.test(moneyText), 'money: price 340, paid 100, owing 240');
   ok(/Markup/.test(moneyText) && !/Margin/.test(moneyText) && /Cost/.test(moneyText), 'with cost and markup (Turki: the % is a markup on cost)');
+  // baseCost is the part's whole line (×2 already in it): the page multiplied
+  // it by the quantity again and showed 160 (pre-release review, Nov 16).
+  ok(/Cost[^\n]*\n\s*80[.,]00/.test(moneyText) && !/160/.test(moneyText), 'the cost is the parts\' cost as stored (80), not ×qty again');
   ok(/Moved to/.test(await text('#jobPage')), 'activity lists the moves');
 
   // A save elsewhere (here: a payment written and saved) shows on the open page.
@@ -83,6 +88,14 @@ try {
   const qMoney = await text('#jobPage .jp-grid .jp-card:nth-child(2)');
   await shot('job-page-quote');
   ok(/Paid\s*—/.test(qMoney) && /Owing\s*—/.test(qMoney), 'Paid and Owing read "—" on a quote');
+
+  // A job taken in USD at 3.75: its parts' 75 SAR of cost reads 20 USD.
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-USD');
+  const usdMoney = await text('#jobPage .jp-grid .jp-card:nth-child(2)');
+  ok(/Cost[^\n]*\n[^\n]*20[.,]00/.test(usdMoney) && !/75[.,]00/.test(usdMoney), 'a USD job shows its SAR cost in USD (75 / 3.75 = 20)');
+  await window.click('#jobPage [data-jp="back"]');
+  await openPage('JP-QUOTE');
 
   // The old editor is still there, from the page's Edit.
   await window.click('#jobPage [data-jp="edit"]');
