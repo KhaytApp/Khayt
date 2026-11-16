@@ -301,6 +301,12 @@ test('the lifted record and the original agree, all forty-five fields', () => {
       assert.equal(recordB.marginPct, Math.max(0, form.margin || 0));
       delete recordB.marginPct;
     }
+    // AND A FIFTH (Nov 16): a quote says the app that made it stamps
+    // `quoteSharedAt` when it goes out (order-edit.js quoteIsDraft).
+    if (form.asQuote) {
+      assert.equal(recordB.quoteShareStamped, true);
+      delete recordB.quoteShareStamped;
+    } else assert.equal(recordB.quoteShareStamped, undefined);
     // AND A FOURTH (Nov 16): a cart part without an id leaves with the one
     // lib/part-ids.js owes it. The original stored it bare.
     recordA.parts.forEach((p, i) => {
