@@ -7580,6 +7580,15 @@ app.on('open-url', (event, url) => { // macOS
 const StoreLock = require('./lib/store-lock');
 let _storeLockBeat = null;
 let _storeLockMine = null;
+// The lock's verdict at launch: 'held' when another live app (the native Mac)
+// claimed the book first. Electron takes ownership anyway (above), but a
+// repair the app makes on its own — not one the shop asked for — is written
+// only when nobody else held the book (hub:store-owned, lib/part-ids.js).
+let _storeLockVerdict = null;
+
+/** Does this app own the book: it holds the lock and found nobody else
+ *  holding it at launch? Unknown is "no", as on the Mac. */
+ipcMain.handle('hub:store-owned', () => !!_storeLockMine && _storeLockVerdict !== null && _storeLockVerdict !== 'held');
 
 const storeLockPath = () => path.join(app.getPath('userData'), StoreLock.LOCK_FILENAME);
 
@@ -7601,6 +7610,7 @@ function acquireStoreOwnership() {
     const sameHost = existing && String(existing.host || '') === host;
     const alive = sameHost && Number(existing.pid) ? pidIsAlive(Number(existing.pid)) : null;
     const verdict = StoreLock.decide(existing, { pid: process.pid, host, now: Date.now(), alive });
+    _storeLockVerdict = verdict.action;
     if (verdict.action === 'held') {
       console.warn('store lock:', StoreLock.describe({ ...verdict, selfHost: host })
         || 'another application claims this store; taking ownership anyway');
