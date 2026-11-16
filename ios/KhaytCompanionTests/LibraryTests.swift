@@ -130,8 +130,8 @@ final class LibraryTests: XCTestCase {
 
     // MARK: - Colours and swaps (iPhone Figma 235:49 / 235:109 / 235:134)
 
-    private func item(_ json: String) throws -> LibraryItem {
-        try JSONDecoder().decode(LibraryItem.self, from: Data(json.utf8))
+    private func item(_ json: String) throws -> KhaytCompanion.LibraryItem {
+        try JSONDecoder().decode(KhaytCompanion.LibraryItem.self, from: Data(json.utf8))
     }
 
     func testARowShowsThreeDotsThenHowManyMore() throws {
