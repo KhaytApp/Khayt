@@ -433,6 +433,62 @@ final class JobEditRuleTests: XCTestCase {
         }
     }
 
+    // MARK: - A quote the phone makes is a draft until it is sent (#2524)
+
+    /// `lib/order-edit.js` quoteIsDraft: a draft needs `quoteShareStamped`
+    /// (the app that made it stamps `quoteSharedAt` when it goes out) and no
+    /// sign of a send. The phone makes quotes itself (`BookWriter.orderRecord`)
+    /// and stamps the send (`markQuoteShared`), so it writes the stamp too.
+    func testAQuoteThePhoneMakesIsADraftUntilItIsSent() async throws {
+        var draft = NewOrderDraft()
+        draft.project = "Bracket"; draft.isQuote = true
+        let made = try BookWriter.orderRecord(from: draft, settings: [:], machines: [], existing: [], now: now)
+        XCTAssertEqual(made["quoteShareStamped"], .bool(true), "stamped as newOrder stamps it")
+        XCTAssertNotNil(made["quoteSentAt"], "written at creation, as before")
+        guard case .string(let id)? = made["id"] else { return XCTFail("no id") }
+        XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(.object(made))))"), .bool(true), "lib: a draft")
+
+        let (api, book) = try client(orders: [.object(made)])
+        let engine = try await BookReader(book: book).sharedEngine()
+        let fresh = try row(book, id)
+        let before = try await engine.partsLock(fresh)
+        XCTAssertFalse(before.askPrice, "never sent: its price follows without asking")
+
+        try await api.markQuoteShared(orderId: id, now: now)
+        let sent = try row(book, id)
+        guard case .object(let o) = sent else { return XCTFail("the quote") }
+        XCTAssertNotNil(o["quoteSharedAt"])
+        let after = try await engine.partsLock(sent)
+        XCTAssertTrue(after.askPrice, "sent from this phone: a re-price asks first")
+        XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(sent)))"), .bool(false), "lib agrees")
+    }
+
+    /// The `quoteSentAt` every quote is given when it is made is not a send;
+    /// a quote with no stamp (an older app's) asks whatever it holds.
+    func testQuoteSentAtIsNoSendAndAnUnstampedQuoteAsks() async throws {
+        let engine = try await BookReader(book: {
+            let b = CompanionBook(directory: dir); try b.replace(with: SampleShop.book(), scope: nil); return b }()).sharedEngine()
+        func quote(_ extra: [String: JSONValue]) -> JSONValue {
+            var o: [String: JSONValue] = ["id": .string("Q-1"), "project": .string("Plate"), "status": .string("quote"),
+                                          "price": .number(150), "quoteSentAt": .string("2026-11-14"),
+                                          "quoteVersion": .number(1), "parts": .array([Self.part("a", base: 100)])]
+            for (k, v) in extra { o[k] = v }
+            return .object(o)
+        }
+        let cases: [(String, JSONValue, Bool)] = [
+            ("stamped, quoteSentAt only", quote(["quoteShareStamped": .bool(true)]), false),
+            ("unstamped (an older app's)", quote([:]), true),
+            ("shared", quote(["quoteShareStamped": .bool(true), "quoteSharedAt": .string("2026-11-15T10:00:00Z")]), true),
+            ("accepted", quote(["quoteShareStamped": .bool(true), "quoteAcceptedAt": .string("2026-11-15T10:00:00Z")]), true),
+            ("revised", quote(["quoteShareStamped": .bool(true), "quoteVersion": .number(2)]), true),
+        ]
+        for (name, order, asks) in cases {
+            let lock = try await engine.partsLock(order)
+            XCTAssertEqual(lock.askPrice, asks, name)
+            XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(order)))"), .bool(!asks), "lib: \(name)")
+        }
+    }
+
     // MARK: - What the shop sees
 
     func testAPriceBelowWhatWasPaidIsRefusedInTheMacsWordsAndNothingIsWritten() async throws {

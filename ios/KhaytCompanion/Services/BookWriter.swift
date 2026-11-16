@@ -1269,6 +1269,12 @@ struct BookWriter {
             order["quoteSentAt"] = .string(day)
             order["quoteExpiresAt"] = .string(localDay(now.addingTimeInterval(days * 86_400), in: zone))
             order["quoteVersion"] = .number(1)
+            // "The app that made this quote stamps `quoteSharedAt` when it is
+            // sent" — this phone does (`markQuoteShared`). Without it the
+            // shared rule cannot tell a draft from a quote an older app sent,
+            // so it asks before every re-price (`lib/order-edit.js`
+            // quoteIsDraft, `newOrder` writes the same, #2524).
+            order["quoteShareStamped"] = .bool(true)
         }
         return order
     }
