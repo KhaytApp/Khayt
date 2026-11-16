@@ -335,11 +335,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     var swaps: Int { swapCount ?? 0 }
 
     /// Whether the swap count is the slicer's. The record's `swapsKnown` when
-    /// it has one; otherwise a record with any swaps, or with a colour that
-    /// carries grams (which only a slice gives), was read from a slice.
+    /// it has one; a record written before the field counts when it was
+    /// sliced, which a print time says (the desktop's rule, #2502).
     var swapsKnownGuess: Bool {
         if let swapsKnown { return swapsKnown }
-        return swaps > 0 || (colors ?? []).contains { $0.grams != nil }
+        return (parsed?.printTimeMins ?? 0) > 0
     }
     var palette: [Colour] { colors ?? [] }
 

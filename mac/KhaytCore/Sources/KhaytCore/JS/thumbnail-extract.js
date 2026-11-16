@@ -346,7 +346,7 @@ function extract(input) {
  *     what was there;
  *   - otherwise the colours are the read's, keeping the grams an earlier slice
  *     gave for a colour that is still there and that this read has none for;
- *   - `swapsKnown`, when the read says, is copied;
+ *   - `swapsKnown` is true only when the read says so (only a slice knows);
  *   - `updatedAt` is never touched: what a file is printed in is not an edit.
  */
 function applyColours(rec, read) {
@@ -363,7 +363,7 @@ function applyColours(rec, read) {
       return o && c.grams == null && o.grams != null ? Object.assign({}, c, { grams: o.grams }) : c;
     });
     rec.swapCount = read.swapCount || 0;
-    if (typeof read.swapsKnown === 'boolean') rec.swapsKnown = read.swapsKnown;
+    rec.swapsKnown = read.swapsKnown === true;
   }
   return { changed: was !== snap() };
 }

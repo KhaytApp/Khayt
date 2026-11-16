@@ -425,7 +425,7 @@ enum LibraryImport {
         let a = await analyse(destination, ext: ext, dir: dir, engine: engine, analyseRisk: analyseRisk)
         let size = a.size, said = a.provenance, geometry = a.geometry, riskAnalysis = a.riskAnalysis
         let key = a.key, colours = a.colours, swapCount = a.swapCount, thumbFile = a.thumbFile
-        let coloursReader = a.coloursReader
+        let coloursReader = a.coloursReader, swapsKnown = a.swapsKnown
 
         // The folder's name when the folder named it (a model alone in
         // `King Abdulaziz/` is "King Abdulaziz", not "crown"); the file's name
@@ -436,7 +436,7 @@ enum LibraryImport {
                                  filename: filename, ext: ext, size: size,
                                  hash: hash, key: key,
                                  reader: a.reader, colours: colours,
-                                 swapCount: swapCount, coloursReader: coloursReader,
+                                 swapCount: swapCount, coloursReader: coloursReader, swapsKnown: swapsKnown,
                                  thumbFile: thumbFile, group: group,
                                  provenance: said, riskAnalysis: riskAnalysis,
                                  parsed: a.parsed,
@@ -590,6 +590,8 @@ enum LibraryImport {
         /// `lib/thumbnail-extract.js` COLOURS_READER for a 3MF read here; nil
         /// for anything without a colour read.
         var coloursReader: Int? = nil
+        /// True only when a slice gave `swapCount` (#2502).
+        var swapsKnown: Bool? = nil
         var thumbFile: String?
         var parsed: [String: JSONValue]
     }
@@ -650,12 +652,14 @@ enum LibraryImport {
         var colours: [JSONValue] = []
         var swapCount = 0
         var coloursReader: Int?
+        var swapsKnown: Bool?
         var thumbFile: String?
         if ext == "3mf" {
             let found = try? await readPreviewAndColours(destination, dir: dir, engine: engine)
             colours = found?.colours ?? []
             swapCount = found?.swapCount ?? 0
             coloursReader = found?.reader
+            swapsKnown = found?.swapsKnown
             thumbFile = found?.thumbFile
         }
         // AN STL HAS NO PREVIEW, so one is drawn from its own triangles.
@@ -677,7 +681,8 @@ enum LibraryImport {
         }
         return Analysis(size: size, provenance: said, geometry: geometry, riskAnalysis: riskAnalysis,
                         key: key, reader: try? await engine.geometryReader(), colours: colours,
-                        swapCount: swapCount, coloursReader: coloursReader, thumbFile: thumbFile,
+                        swapCount: swapCount, coloursReader: coloursReader, swapsKnown: swapsKnown,
+                        thumbFile: thumbFile,
                         parsed: await SlicerFigures.read(destination, engine: engine) ?? [:])
     }
 
@@ -937,7 +942,8 @@ enum LibraryImport {
                        filename: String, ext: String, size: Int,
                        hash: String?, key: String?, reader: Int? = nil,
                        colours: [JSONValue],
-                       swapCount: Int, coloursReader: Int? = nil, thumbFile: String?,
+                       swapCount: Int, coloursReader: Int? = nil, swapsKnown: Bool? = nil,
+                       thumbFile: String?,
                        group: String? = nil,
                        provenance: Mesh.Provenance? = nil,
                        riskAnalysis: [String: JSONValue]? = nil,
@@ -1003,6 +1009,7 @@ enum LibraryImport {
         // print uses, #2500). Absent when nothing read colours (not a 3MF, or the
         // read failed): such a 3MF is read again where its file is (`ColoursReread`).
         if let coloursReader { out["coloursReader"] = .number(Double(coloursReader)) }
+        if let swapsKnown { out["swapsKnown"] = .bool(swapsKnown) }
         // Absent rather than null when the walk did not happen. A null here
         // would be indistinguishable from a walk that found nothing, and the
         // inspector has to be able to offer the button for the first and not
@@ -1030,7 +1037,7 @@ enum LibraryImport {
 
     /// The embedded preview and the filament colours, from a 3MF.
     private static func readPreviewAndColours(_ file: URL, dir: URL, engine: KhaytEngine)
-        async throws -> (thumbFile: String?, colours: [JSONValue], swapCount: Int, reader: Int?) {
+        async throws -> (thumbFile: String?, colours: [JSONValue], swapCount: Int, reader: Int?, swapsKnown: Bool?) {
         let entries = try Zip.entries(of: file)
         func text(_ name: String) -> String {
             guard let entry = entries.first(where: { $0.name.lowercased() == name.lowercased() }),
@@ -1060,6 +1067,6 @@ enum LibraryImport {
 
         // Reader 2: the slots the print uses, with its paint read (`ColourRead`).
         let found = await ColourRead.colours(file, entries: entries, engine: engine)
-        return (thumbFile, found?.colors ?? [], found?.swapCount ?? 0, found?.reader)
+        return (thumbFile, found?.colors ?? [], found?.swapCount ?? 0, found?.reader, found?.swapsKnown)
     }
 }

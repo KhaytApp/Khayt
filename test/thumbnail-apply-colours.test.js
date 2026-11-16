@@ -45,13 +45,15 @@ test('the same read twice: the second changes nothing', () => {
   assert.equal(T.applyColours(rec, read).changed, false);
 });
 
-test('swapsKnown is copied when the read says', () => {
+test('swapsKnown: true only when the read says so', () => {
   const rec = { colors: [RED] };
   T.applyColours(rec, { colors: [RED], swapCount: 0, slotsKnown: true, swapsKnown: false, reader: 2 });
   assert.equal(rec.swapsKnown, false);
   assert.equal(T.applyColours(rec, { colors: [RED], swapCount: 4, slotsKnown: true, swapsKnown: true, reader: 2 }).changed, true);
   assert.equal(rec.swapsKnown, true);
   assert.equal(rec.swapCount, 4);
+  T.applyColours(rec, { colors: [RED], swapCount: 0, slotsKnown: true, reader: 2 });
+  assert.equal(rec.swapsKnown, false, 'a read that does not say is not a slice');
 });
 
 test('nothing to read, or no record: no change', () => {

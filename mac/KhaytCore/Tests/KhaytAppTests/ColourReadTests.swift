@@ -147,7 +147,8 @@ struct ColourReadTests {
     @Test("the card: the number only for a sliced file with swaps; an unsliced file's dots say swaps come with slicing")
     func cardTips() throws {
         let words = Words()
-        let sliced = try Self.file(["colors": .array([Self.red, Self.blue, Self.red]), "swapCount": .number(2)])
+        let sliced = try Self.file(["colors": .array([Self.red, Self.blue, Self.red]), "swapCount": .number(2),
+                                    "swapsKnown": .bool(true)])
         #expect(PaletteTips.colours(sliced, words) == "Colours: 3. The filaments this print uses.")
         #expect(PaletteTips.swaps(sliced, words)
                 == "Filament swaps: about 2. How many times the printer changes filament during this print, from the sliced file.")
@@ -155,8 +156,9 @@ struct ColourReadTests {
         #expect(PaletteTips.colours(unsliced, words)
                 == "Colours: 1. The filaments this print uses.\nFilament swaps are known once the file is sliced.")
         #expect(PaletteTips.swaps(unsliced, words) == nil, "no number for swaps no slicer counted")
-        // An older record with no swapsKnown: a colour with grams came from a slice.
-        let oldSliced = try Self.file(["colors": .array([Self.red]), "swapCount": .number(0)])
+        // An older record with no swapsKnown: a print time says it was sliced (#2502's rule).
+        let oldSliced = try Self.file(["colors": .array([Self.red]), "swapCount": .number(0),
+                                       "parsed": .object(["printTimeMins": .number(42)])])
         #expect(oldSliced.swapsKnownGuess)
         #expect(PaletteTips.swaps(oldSliced, words) == nil, "a sliced file with no swaps shows no number")
         let oldUnsliced = try Self.file(["colors": .array([Self.blue]), "swapCount": .number(0)])

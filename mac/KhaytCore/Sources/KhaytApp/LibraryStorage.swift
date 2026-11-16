@@ -771,6 +771,7 @@ extension Shop {
         let colours: [JSONValue]
         let swapCount: Int
         var coloursReader: Int? = nil
+        var swapsKnown: Bool? = nil
         let thumbFile: String?
         let parsed: [String: JSONValue]
         let size: Int
@@ -792,7 +793,7 @@ extension Shop {
         let a = await LibraryImport.analyse(file, ext: ext, dir: pictures ?? file.deletingLastPathComponent(),
                                             engine: engine, analyseRisk: false)
         return DownloadedRead(hash: hash, key: a.key, reader: a.reader, colours: a.colours, swapCount: a.swapCount,
-                              coloursReader: a.coloursReader, thumbFile: a.thumbFile, parsed: a.parsed, size: a.size,
+                              coloursReader: a.coloursReader, swapsKnown: a.swapsKnown, thumbFile: a.thumbFile, parsed: a.parsed, size: a.size,
                               designer: a.provenance?.designer,
                               licence: a.provenance.flatMap { ModelLicence.fromFile($0.licence)?.id })
     }
@@ -826,6 +827,7 @@ extension Shop {
             if empty("colors") {
                 o["colors"] = .array(read.colours); o["swapCount"] = .number(Double(read.swapCount))
                 if let r = read.coloursReader { o["coloursReader"] = .number(Double(r)) }
+                if let k = read.swapsKnown { o["swapsKnown"] = .bool(k) }
             }
             if empty("thumbFile"), let thumbFile = read.thumbFile {
                 o["thumbFile"] = .string(thumbFile); o["thumbSource"] = .string("embedded")
