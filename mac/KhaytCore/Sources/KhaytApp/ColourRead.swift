@@ -27,15 +27,27 @@ import KhaytCore
 /// the rule then names no colours rather than the loaded list.
 enum ColourRead {
 
-    /// Whether any `.model` member carries paint. Nil when one cannot be read.
+    /// How much `.model` text the paint check inflates, over every member of
+    /// one file together. A file that would take more is not scanned on: it
+    /// is "unread", and the rule then names no colours rather than guess. A
+    /// zip can point many entries at the same data, so a cap per member is no
+    /// cap at all (beta.38 review).
+    nonisolated(unsafe) static var scanBudget = 1 << 30
+
+    /// Whether any `.model` member carries paint. Nil when one cannot be read,
+    /// or the scan would pass `scanBudget`.
     nonisolated static func painted(_ entries: [Zip.Entry], in url: URL) -> Bool? {
         let needles: [[UInt8]] = [Array("paint_color=".utf8), Array("mmu_segmentation=".utf8)]
         let keep = needles.map(\.count).max()! - 1
+        var left = scanBudget
         for entry in entries where entry.name.lowercased().hasSuffix(".model") {
+            guard left > 0 else { return nil }
             var found = false
             var carry: [UInt8] = []
+            var seen = 0
             do {
-                try Zip.stream(entry, in: url) { chunk in
+                try Zip.stream(entry, in: url, totalLimit: left) { chunk in
+                    seen += chunk.count
                     var buffer = carry
                     buffer.append(contentsOf: chunk.bindMemory(to: UInt8.self))
                     if needles.contains(where: { contains(buffer, $0) }) { found = true; return false }
@@ -44,6 +56,7 @@ enum ColourRead {
                 }
             } catch { return nil }
             if found { return true }
+            left -= seen
         }
         return false
     }

@@ -4054,6 +4054,8 @@ final class Words {
         "mac.apps_approve": ["en": "Approve", "ar": "موافقة"],
         "mac.apps_deny": ["en": "Deny", "ar": "رفض"],
         "mac.apps_timed_out": ["en": "No slicer paired in time. Click Pair a slicer to try again.", "ar": "لم يقترن أي برنامج تقطيع في الوقت المحدد. اضغط «إقران برنامج تقطيع» للمحاولة مجددًا."],
+        "mac.apps_pin_unreadable": ["en": "The LAN PIN couldn’t be read from the Keychain, so nothing was paired. Set the LAN PIN again above, then pair the slicer.",
+                                    "ar": "تعذّرت قراءة رمز الشبكة المحلية من سلسلة المفاتيح، فلم يُقرَن شيء. عيّن رمز الشبكة المحلية مجددًا في الأعلى، ثم أقرِن برنامج التقطيع."],
         "mac.linked_regrouped": ["en": "Regrouped from their folders: {n}. Groups you set yourself were left alone.", "ar": "أُعيد تجميعها حسب مجلداتها: {n}. المجموعات التي اخترتها بنفسك بقيت كما هي."],
         "mac.linked_sort": ["en": "Sort linked folders…", "ar": "فرز المجلدات المرتبطة…"],
         "mac.linked_sort_help": ["en": "Find the prints in your linked folders and make each one a group, with its picture. Shows what would change before anything moves.", "ar": "يجد الطباعات في مجلداتك المرتبطة ويجعل كل طباعة مجموعة بصورتها. يعرض ما سيتغير قبل نقل أي شيء."],

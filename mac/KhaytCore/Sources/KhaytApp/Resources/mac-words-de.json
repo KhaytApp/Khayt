@@ -4018,5 +4018,6 @@
  "mac.apps_may": "Er darf Slices in den Eingang „Vom Slicer“ senden und die Auftragsliste lesen (Auftragsnamen und Zeiten, nie Kunden). Ihr Buch, Kunden, Preise oder Einstellungen kann er nie lesen.",
  "mac.apps_approve": "Zulassen",
  "mac.apps_deny": "Ablehnen",
- "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln."
+ "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln.",
+ "mac.apps_pin_unreadable": "Die LAN-PIN konnte nicht aus dem Schlüsselbund gelesen werden, daher wurde nichts gekoppelt. Legen Sie die LAN-PIN oben erneut fest und koppeln Sie dann den Slicer."
 }
