@@ -28,5 +28,5 @@ test("the loaded spools are not the print's colours", () => {
   assert.deepEqual(expected['painted-1-2-5.3mf'].hexes, ['#111111', '#222222', '#555555'], 'eight loaded, three used');
   // An unsliced project's stub slice_info names no filament: still the paint (reader 3).
   assert.deepEqual(expected['painted-stub-slice.3mf'].hexes, expected['painted-1-2-5.3mf'].hexes, 'a stub slice is not a slice');
-  assert.equal(T.COLOURS_READER, 3);
+  assert.equal(T.COLOURS_READER, 4);
 });

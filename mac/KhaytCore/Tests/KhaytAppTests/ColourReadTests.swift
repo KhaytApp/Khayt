@@ -228,14 +228,15 @@ struct ColourReadTests {
         #expect(ColoursReread.due([old, one, now, mesh], reader: 2).map(\.id) == ["old", "one"])
     }
 
-    @Test("today's reader is 3, so a record beta.38 stamped reader 2 is read again")
-    func readerTwoIsDue() async throws {
+    @Test("today's reader is 4, so a record an older reader stamped is read again")
+    func olderReaderIsDue() async throws {
         let reader = try await KhaytEngine().coloursReader()
-        #expect(reader == 3)
+        #expect(reader == 4)
         let threeMF: JSONValue = .object(["filename": .string("a.3mf"), "ext": .string("3mf")])
         let two = try Self.file(["id": .string("two"), "sourceFile": threeMF, "coloursReader": .number(2)])
         let three = try Self.file(["id": .string("three"), "sourceFile": threeMF, "coloursReader": .number(3)])
-        #expect(ColoursReread.due([two, three], reader: reader).map(\.id) == ["two"])
+        let four = try Self.file(["id": .string("four"), "sourceFile": threeMF, "coloursReader": .number(4)])
+        #expect(ColoursReread.due([two, three, four], reader: reader).map(\.id) == ["two", "three"])
     }
 
     // MARK: - What the card says on hover
