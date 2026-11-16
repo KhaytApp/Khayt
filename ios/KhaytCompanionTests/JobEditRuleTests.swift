@@ -34,7 +34,8 @@ final class JobEditRuleTests: XCTestCase {
         let ctx = try XCTUnwrap(JSContext())
         var thrown: String?
         ctx.exceptionHandler = { _, e in thrown = e?.toString() }
-        for file in ["lib/tax.js", "lib/product-price.js", "lib/pricing.js", "lib/order-money.js", "lib/order-payment.js", "lib/order-edit.js"] {
+        for file in ["lib/tax.js", "lib/product-price.js", "lib/pricing.js", "lib/working-week.js", "lib/calculator-cost.js",
+                     "lib/order-money.js", "lib/order-payment.js", "lib/order-new.js", "lib/order-edit.js"] {
             let source = try String(contentsOf: root.appending(path: file), encoding: .utf8)
             ctx.evaluateScript(source)
             XCTAssertNil(thrown, "\(file) did not load: \(thrown ?? "")")
@@ -382,6 +383,54 @@ final class JobEditRuleTests: XCTestCase {
             }
         }
         XCTAssertEqual(try book.read(), before)
+    }
+
+    // MARK: - The markup on a job in another currency (Mac #2506)
+
+    /// `test/order-markup-currency.test.js`: jobs taken by `newOrder` at 50%
+    /// and at 60%, in the shop's currency and for a USD customer at 3.75
+    /// (parts 100 SAR). Built by lib's own `newOrder`, as the Mac takes one.
+    private static let currencyScript = #"""
+    (function () {
+      var N = globalThis.KhaytOrderNew;
+      function part() { return { name: 'p.stl', material: 'PLA', qty: 1, printWeight: 100, printTime: 2, unitCost: 100, baseCost: 100 }; }
+      function take(margin, clientId) {
+        return N.newOrder({ parts: [part()], clientId: clientId, margin: margin }, {
+          settings: { currency: 'SAR', invNumNext: 7, quoteNumNext: 3, rushFeePct: 25, exchangeRates: { USD: 3.75 } },
+          orders: [], clients: [{ id: 'C-USD', currency: 'USD' }], now: new Date('2026-11-16T08:00:00Z'),
+          tokens: { tracking: new Uint8Array(N.TOKEN_BYTES), quoteApproval: new Uint8Array(N.TOKEN_BYTES), id: new Uint8Array(4) } });
+      }
+      return { sar50: take(50), sar60: take(60), usd50: take(50, 'C-USD'), usd60: take(60, 'C-USD') };
+    })()
+    """#
+
+    func testAUSDJobsMarkupIsPricedInItsOwnCurrency() async throws {
+        guard case .object(let jobs) = try ask(Self.currencyScript),
+              case .object(var usd50)? = jobs["usd50"], case .object(let usd60)? = jobs["usd60"],
+              case .object(var sar50)? = jobs["sar50"], case .object(let sar60)? = jobs["sar60"] else { return XCTFail("the jobs") }
+        XCTAssertEqual(usd50["fxRate"], .number(3.75), "the fixture is a USD job")
+        XCTAssertEqual(usd50["price"], .number(40), "100 SAR × 1.5 ÷ 3.75")
+        XCTAssertEqual(usd60["price"], .number(42.67), "100 SAR × 1.6 ÷ 3.75")
+        usd50["id"] = .string("T-USD"); sar50["id"] = .string("T-SAR")
+        let (api, book) = try client(orders: [.object(usd50), .object(sar50)])
+        for (id, at60) in [("T-USD", usd60), ("T-SAR", sar60)] {
+            // The money card's Markup row and Edit job's field…
+            let row = await api.jobMargin(orderId: id)
+            XCTAssertEqual(row?.text, "50%", "\(id): the row")
+            let field = await api.markupState(orderId: id)
+            XCTAssertEqual(field?.typed, "50", "\(id): the field is offered")
+            // …the new total shown before saving…
+            let preview = try await api.previewJobEdit(orderId: id, fields: ["marginPct": .number(60)], now: now)
+            XCTAssertEqual(preview.map(JSONValue.number), at60["price"], "\(id): 50% changed to 60% costs what a job taken at 60% costs")
+            // …and what is saved, with the money card reading it back.
+            let wrote = try await api.editOrder(orderId: id, fields: ["marginPct": .number(60)], priceSeenOk: true, now: now)
+            XCTAssertTrue(wrote)
+            guard case .object(let o) = try self.row(book, id) else { return XCTFail(id) }
+            XCTAssertEqual(o["price"], at60["price"], "\(id): saved")
+            XCTAssertEqual(o["marginPct"], .number(60))
+            let after = await api.jobMargin(orderId: id)
+            XCTAssertEqual(after?.text, "60%", "\(id): the row after")
+        }
     }
 
     // MARK: - What the shop sees

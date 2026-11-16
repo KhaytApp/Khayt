@@ -154,11 +154,31 @@ test('print-facts: materials narrowed to the slots used, when the host says whic
   assert.deepEqual(F.printFacts({ projectSettings, usedSlots: [5] }).materials, ['PLA', 'PETG', 'TPU'], 'a slot past the list: all, not a guess');
 });
 
-test('the desktop\'s re-read and the rule agree on which reader is current', () => {
+test('the desktop\'s re-read runs the shared rule, not a copy of it', () => {
   const src = fs.readFileSync(path.join(__dirname, '../renderer/printfiles.js'), 'utf8');
-  const m = /const COLOURS_READER = (\d+);/.exec(src);
-  assert.ok(m, 'renderer/printfiles.js names the reader it re-reads below');
-  assert.equal(+m[1], T.COLOURS_READER);
+  assert.doesNotMatch(src, /const COLOURS_READER = \d+;/, 'no reader number of its own');
+  assert.doesNotMatch(src, /function applyColours\(/, 'no applyColours of its own');
+  assert.match(src, /T\.applyColours\(rec, r\)\.changed/);
+  assert.match(src, /T\.coloursStale\(rec\)/);
+  // Every page, not a list: main.js opens one entry per flavour, and any other
+  // page that loads printfiles.js must load the rule (and the readers it
+  // names) before it.
+  const main = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+  const entries = /const ENTRY_HTML = isBedReady \? '([\w.-]+)' : '([\w.-]+)';/.exec(main);
+  assert.ok(entries, 'main.js names its entry pages');
+  const pages = fs.readdirSync(path.join(__dirname, '../renderer')).filter((n) => n.endsWith('.html'));
+  for (const e of entries.slice(1)) assert.ok(pages.includes(e), e);
+  let checked = 0;
+  for (const page of pages) {
+    const html = fs.readFileSync(path.join(__dirname, '../renderer', page), 'utf8');
+    const at = (src) => html.indexOf('<script src="' + src + '"></script>');
+    if (at('printfiles.js') < 0 && at('../lib/zip-read.js') < 0) continue;
+    checked++;
+    const order = ['../lib/zip-read.js', '../lib/mf-mesh.js', '../lib/thumbnail-extract.js', 'printfiles.js'].map(at);
+    assert.ok(order.every((i) => i > 0), page + ' loads all four');
+    assert.deepEqual([...order].sort((a, b) => a - b), order, page + ': readers, then the rule, then printfiles.js');
+  }
+  assert.ok(checked >= entries.length - 1, 'both entry pages were checked');
   assert.equal(T.coloursStale({}), true);
   assert.equal(T.coloursStale({ coloursReader: T.COLOURS_READER }), false);
 });
