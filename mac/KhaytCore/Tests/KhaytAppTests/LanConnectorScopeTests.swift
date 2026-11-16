@@ -169,15 +169,16 @@ struct LanConnectorScopeTests {
         }
     }
 
-    @Test("its own routes are not refused for scope (none exist yet, so they are not found)")
+    @Test("its own routes are not refused for scope: self answers, an unknown one is not found")
     func ownRoutesPassTheScope() async throws {
         let bench = try await LanServerTests.Bench(pin: Self.pin)
         defer { bench.stop() }
         var connector = try Self.enrol(bench.devices, kind: LanDevices.kindConnector, name: "Orca")
         let now = Int(LanServerTests.Bench.start.timeIntervalSince1970)
-        for path in ["/api/connectors/queue", "/v1/connectors/queue"] {
+        for path in ["/api/connectors/self", "/v1/connectors/self", "/api/connectors/nothing-here"] {
             let reply = try await bench.get(path, headers: connector.headers("GET", path, Data(), time: now))
             #expect(!reply.text.contains("connector-scope"), "\(path) answered \(reply.status) \(reply.text)")
+            #expect(reply.status == (path.hasSuffix("self") ? 200 : 404), "\(path) answered \(reply.status) \(reply.text)")
         }
     }
 

@@ -283,9 +283,50 @@ and the nonce base64, standard and padded, of the raw bytes), joined with
    a change of the LAN PIN signs connectors out with the phones
    (`device-unknown`).
 
-The connector's own routes (`/api/connectors/slices`, `/api/connectors/queue`)
-come in later steps and match exact paths. The desktop (`lib/lan-server.js`)
-has none of this yet.
+### The connector's own routes — a paired plugin sends its slices (native Mac only)
+
+All dark (the ordinary 404) while "Pair a slicer" is off. Exact paths, a
+connector's signed request only: unsigned is 401, a phone's key, the PIN or an
+API token 403 `connector-only`. Every answer to a verified request carries
+`x-khayt-reply-mac` = base64 `HMAC-SHA256(K, "khayt-reply-v1\n" + requestNonce +
+"\n" + status + "\n" + hex(sha256(body)))`, and the plugin drops one that does not
+verify. Per connector: 600 requests, 30 announces and 30 files an hour (429 with
+`Retry-After`).
+
+| Route | Body | Answer |
+|---|---|---|
+| `GET /api/connectors/self` | none | `{connectorId, name, shop:{name}, limits:{maxFileBytes, maxMetaBytes}, scopes}` |
+| `DELETE /api/connectors/self` | none | `{ok:true}`; unpaired as Remove does |
+| `POST /api/connectors/slices` | sealed capture, ≤ 64 KB | 201 `{sliceId, state:"awaiting-file", uploadBy, dropped, intentHonoured?}`; 200 `{…, duplicate:true}` when the same bytes are waiting; 422 with the shared rule's `reason`/`field`; 409 `inbox-full` |
+| `PUT /api/connectors/slices/{sliceId}/file` | the raw file, exact `Content-Length`, `x-khayt-content-sha256` | 201 `{sliceId, state:"in-inbox"}`; 422 `hash-mismatch` (`retry` once) |
+| `GET /api/connectors/slices/{sliceId}` | none | `{sliceId, state}`: `awaiting-file`, `in-inbox`, `left-inbox`, `expired` |
+
+**Sealed capture.** `{"v":1,"alg":"A256GCM","nonce":b64(12 bytes),"ct":b64(ciphertext ‖ 16-byte tag)}`
+under `HKDF-SHA256(K, salt "khayt-connector-seal-v1", info connectorId)`, AAD
+`"POST /api/connectors/slices"` (method, one space, path). The capture inside is
+checked field by field by `lib/connector-slice.js`.
+
+**The file, judged from its head.** The signature is checked whole before any
+body is read: the canonical request's body hash is the `x-khayt-content-sha256`
+the head names, which must be the hash the capture declared. Then the slice
+(404 unknown or another connector's, 409 `not-awaiting-file`), the length (400
+`length-mismatch`, 413 `too-large`), the two upload slots shared with the
+OctoPrint path (503), the disk (507); only then `100 Continue`. The bytes are
+hashed as they land. **On the LAN the G-code goes in clear**, bound by that
+signed hash; a Cloud relay must seal it end to end instead.
+
+**Inbox-first.** The file lands in the "From slicer" inbox with `source:
+"connector"`, `connectorId`, `connectorName`, `sha256`, `suggested` (what the
+plugin asked: never acted on) and `slots`; the Mac reads the file's own figures.
+Nothing in the book is written. One SHA-256 dedupe for both ways in: the same
+bytes from the OctoPrint path or a plugin are one item. Every other
+`/api/connectors/*` path is 404 for every verb: no pause, resume or stop.
+Slice records (id, connector, state, hash, size, times; never a file name)
+are kept beside the inbox in `From slicer/.slices/`, swept at launch: a slice
+still waiting for its file when the app stopped is `expired`, and the plugin
+announces again.
+Vectors: `docs/connector-routes.vectors.json`. `GET /api/connectors/queue` comes
+next. The desktop (`lib/lan-server.js`) has none of this yet.
 
 ### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
 

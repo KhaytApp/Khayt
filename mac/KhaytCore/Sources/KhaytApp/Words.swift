@@ -4050,7 +4050,7 @@ final class Words {
         "mac.apps_ask": ["en": "Approve “{name}”?", "ar": "الموافقة على «{name}»؟"],
         "mac.apps_ask_from": ["en": "{app} {version} asked to pair from {address}.", "ar": "طلب {app} {version} الاقتران من {address}."],
         "mac.apps_check": ["en": "Does the slicer show this number? If not, deny.", "ar": "هل يظهر هذا الرقم في برنامج التقطيع؟ إن لم يظهر فارفض."],
-        "mac.apps_may": ["en": "It may send slices to the From slicer inbox and read the job queue (job names and times, never customers). It can never read your book, customers, prices or settings.", "ar": "يمكنه إرسال الملفات المقطّعة إلى صندوق «من برنامج التقطيع» وقراءة قائمة الأعمال (أسماء الأعمال وأوقاتها، دون العملاء). لا يمكنه أبدًا قراءة دفترك أو عملائك أو أسعارك أو إعداداتك."],
+        "mac.apps_may": ["en": "It may send slices to the From slicer inbox and see the job queue (job numbers, stages and machines only, never titles or customers). It can never read your book, customers, prices or settings.", "ar": "يمكنه إرسال الملفات المقطّعة إلى صندوق «من برنامج التقطيع» ورؤية قائمة الأعمال (أرقام الأعمال ومراحلها والآلات فقط، دون العناوين أو العملاء). لا يمكنه أبدًا قراءة دفترك أو عملائك أو أسعارك أو إعداداتك."],
         "mac.apps_offers_used": ["en": "Pairing stopped after 3 tries that weren’t approved. Click Pair a slicer to try again.", "ar": "توقف الاقتران بعد ٣ محاولات لم تتم الموافقة عليها. انقر «إقران برنامج تقطيع» للمحاولة مجددًا."],
         "mac.apps_approve": ["en": "Numbers match — approve", "ar": "الرقمان متطابقان — موافقة"],
         "mac.apps_deny": ["en": "Deny", "ar": "رفض"],

@@ -210,6 +210,17 @@ final class LanServer {
         /// made safe). Throws when the inbox cannot take it.
         var slicerReceive: @MainActor (_ file: URL, _ name: String) async throws -> Void
             = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// File a paired slicer plugin's upload (`LanServer+Connector`), its
+        /// hash already checked. Throws `SlicerInbox.Duplicate` / `Full`.
+        var connectorReceive: @MainActor (_ file: URL, _ name: String, _ origin: SlicerOrigin) async throws -> SlicerUpload
+            = { _, _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Where a paired plugin's slice records are kept across a restart
+        /// (`LanServer+Connector`): beside the inbox, never in the book. Nil
+        /// keeps them in memory only.
+        var sliceFolder: URL? = nil
+        /// What is waiting in the inbox now — for a plugin's dedupe and the
+        /// inbox's state, never its contents.
+        var slicerInbox: @MainActor () -> [SlicerUpload] = { [] }
         /// The most one slicer upload may be, multipart and all.
         var slicerMaxBytes: Int = LanServer.maxInflate
         /// Where an upload's body is streamed while it arrives.
@@ -249,6 +260,10 @@ final class LanServer {
         /// An API token was presented, verified, and holds the scope this
         /// route needs (`LanServer+Rest`). Set by the server, never the wire.
         var tokenScoped = false
+        /// A connector's file upload, judged and verified at its head
+        /// (`LanServer+Connector`): the SHA-256 of the bytes actually spooled.
+        /// Set by the server, never the wire.
+        var spooledSha256: String? = nil
     }
 
     struct Response {
@@ -297,8 +312,18 @@ final class LanServer {
     /// Wrong slicer API keys, by visitor — their own bucket, so a slicer with
     /// a stale key cannot lock the owner's phone out of the PIN.
     var slicerFailures: [String: KhaytEngine.LanFailures] = [:]
-    /// Slicer uploads being received right now (`maxSlicerUploads`).
+    /// Slicer uploads being received right now (`maxSlicerUploads`) — the
+    /// OctoPrint path and a paired plugin's files together.
     var slicerUploads = 0
+    /// Slices paired plugins announced (`LanServer+Connector`), by slice id.
+    /// In memory: a restart forgets them, and a plugin announces again.
+    var connectorSlices: [String: ConnectorSlice] = [:] {
+        didSet { if slicesLoaded { persistSlices(old: oldValue) } }
+    }
+    /// Whether `connectorSlices` has been read back from `Host.sliceFolder`.
+    var slicesLoaded = false
+    /// Each connector's recent requests, by bucket (`connectorRates`).
+    var connectorHits: [String: [String: [TimeInterval]]] = [:]
 
     // ── ONE COUNTER UPDATE AT A TIME ──────────────────────────────────────
     //
@@ -492,7 +517,10 @@ final class LanServer {
 
     /// Start, and return the port actually bound (asked for 0, given one).
     func start(port wanted: UInt16, bind: Bind) async throws -> UInt16 {
-        try await start(port: wanted, bind: bind, advertise: true)
+        // A paired plugin's slice records, read back and swept at launch
+        // (`LanServer+Connector`): expired and week-old ones go now.
+        pruneSlices()
+        return try await start(port: wanted, bind: bind, advertise: true)
     }
 
     private func start(port wanted: UInt16, bind: Bind, advertise: Bool) async throws -> UInt16 {
@@ -763,6 +791,12 @@ final class LanServer {
         }
         // A slicer's upload goes to DISK, judged from the head first — see
         // `LanServer+SlicerUpload`. Nothing else here reads to a file.
+        // A paired plugin's file: to disk as well, judged (and its signature
+        // checked whole) from the head first — see `LanServer+Connector`.
+        if Self.isConnectorFileUpload(method: requestLine[0], target: requestLine[1]) {
+            return try await readConnectorFile(connection, on: queue, requestLine: requestLine, headers: headers,
+                                               start: body, length: length, remote: remote, slot: slot)
+        }
         if Self.isSlicerUpload(method: requestLine[0], target: requestLine[1]) {
             return try await readSlicerUpload(connection, on: queue, requestLine: requestLine, headers: headers,
                                               start: body, length: length, remote: remote, slot: slot)
@@ -1081,6 +1115,9 @@ final class LanServer {
             if let refused = await apiTokenGate(&request, bearer: bearer, path: path) { return refused }
         }
         if let refused = connectorRefusal(request.headers, path: path) { return refused }
+        // A paired slicer plugin's own routes (`LanServer+Connector`), exact
+        // paths, 404 while "Pair a slicer" is off. The pairing routes below.
+        if let answered = await connectorRoute(request, path: path) { return answered }
         if let answered = await restRoute(request, path: path, isGet: isGet) { return answered }
 
         switch (path, isGet) {
@@ -3177,7 +3214,15 @@ extension Shop {
             guard let self else { throw CocoaError(.fileWriteUnknown) }
             try await self.receiveSlicerUpload(file, name: name)
         }
+        // A paired slicer plugin's file (`LanServer+Connector`): dark while
+        // "Pair a slicer" is off, like the pairing itself.
+        host.connectorReceive = { [weak self] file, name, origin in
+            guard let self else { throw CocoaError(.fileWriteUnknown) }
+            return try await self.receiveConnectorUpload(file, name: name, origin: origin)
+        }
+        host.slicerInbox = { [weak self] in self?.slicerUploads ?? [] }
         if let root = slicerInboxRoot {
+            host.sliceFolder = SlicerInbox.sliceRecords(root: root)
             host.slicerScratch = SlicerInbox.incoming(root: root)
             // Nothing is uploading before the server starts, so whatever is
             // here was left by a quit or a crash mid-upload: up to a GiB a
