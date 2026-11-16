@@ -819,6 +819,12 @@
 "library.no_match" = "لا توجد نماذج مطابقة.";
 "library.favorite" = "مفضّل";
 "library.printed" = "طُبع %d مرة";
+"library.colours" = "الألوان";
+"library.colours_tip" = "الألوان: %d. الخيوط التي تستخدمها هذه الطباعة.";
+"library.swaps" = "%d تبديلات";
+"library.swaps_tip" = "تبديلات الخيط: نحو %d. عدد مرات تغيير الطابعة للخيط أثناء هذه الطباعة، من الملف المقطّع.";
+"library.swaps_unknown" = "تُعرف تبديلات الخيط بعد تقطيع الملف.";
+"library.colours_more" = "+%d";
 "library.plate" = "اللوح";
 "library.plate.all" = "كل الألواح";
 "library.plate.n" = "اللوح %d";
