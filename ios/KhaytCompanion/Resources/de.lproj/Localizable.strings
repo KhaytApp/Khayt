@@ -819,6 +819,12 @@
 "library.no_match" = "Keine passenden Modelle.";
 "library.favorite" = "Favorit";
 "library.printed" = "%d-mal gedruckt";
+"library.colours" = "Farben";
+"library.colours_tip" = "Farben: %d. Die Filamente, die dieser Druck verwendet.";
+"library.swaps" = "%d Wechsel";
+"library.swaps_tip" = "Filamentwechsel: etwa %d. Wie oft der Drucker während dieses Drucks das Filament wechselt, laut der geslicten Datei.";
+"library.swaps_unknown" = "Die Filamentwechsel sind bekannt, sobald die Datei geslict ist.";
+"library.colours_more" = "+%d";
 "library.plate" = "Platte";
 "library.plate.all" = "Alle Platten";
 "library.plate.n" = "Platte %d";

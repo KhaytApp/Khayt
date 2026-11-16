@@ -119,6 +119,10 @@ enum LibraryCopy {
         // The filter menus: its colours as the Mac sends them, and its type
         // read from the whole record — which the Mac's answer cannot say.
         if case .array(let colours)? = o["colors"] { shaped["colors"] = .array(colours) }
+        // Its swaps as the record holds them (`lib/lan-library.js` itemOf):
+        // left out when it holds none, so the print-time rule applies.
+        if case .number(let n)? = o["swapCount"], n >= 0, n == n.rounded() { shaped["swapCount"] = .number(n) }
+        if case .bool(let known)? = o["swapsKnown"] { shaped["swapsKnown"] = .bool(known) }
         shaped["fileType"] = .string(ModelFileType.type(of: row).rawValue)
         shaped["printTimeMins"] = parsed["printTimeMins"] ?? .null
         shaped["grams"] = parsed["filamentGrams"] ?? .null

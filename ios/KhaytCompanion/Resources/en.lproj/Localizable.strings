@@ -819,6 +819,12 @@
 "library.no_match" = "No models match.";
 "library.favorite" = "Favourite";
 "library.printed" = "Printed %d times";
+"library.colours" = "Colours";
+"library.colours_tip" = "Colours: %d. The filaments this print uses.";
+"library.swaps" = "%d swaps";
+"library.swaps_tip" = "Filament swaps: about %d. How many times the printer changes filament during this print, from the sliced file.";
+"library.swaps_unknown" = "Filament swaps are known once the file is sliced.";
+"library.colours_more" = "+%d";
 "library.plate" = "Plate";
 "library.plate.all" = "Every plate";
 "library.plate.n" = "Plate %d";
