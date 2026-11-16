@@ -509,7 +509,11 @@
         ],
         "manifestPatch": {
           "chunks": 2,
-          "bytes": 8388608
+          "bytes": 8388608,
+          "chunkHashes": [
+            "eb00585ea53528b60e39b8b0bcd1b4c115e2eaf43d806d4c3e2afbec6ef318b2",
+            "8873d570614422a18c0dffdb989f0b3d2f540a12668ae89f8db360c466b6a3dd"
+          ]
         }
       },
       "expect": "unopenable",

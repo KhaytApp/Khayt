@@ -306,7 +306,7 @@ function build() {
     { name: 'non-zero-padding', sealed: badPad('NonZeroPad001', nonZero), expect: 'bad-padding',
       note: 'marker present, last byte 0x01' },
     { name: 'chunks-swapped', file: { order: [1, 0, 2] }, expect: 'unopenable' },
-    { name: 'last-chunk-missing', file: { order: [0, 1], manifestPatch: { chunks: 2, bytes: 2 * CHUNK_BYTES } }, expect: 'unopenable',
+    { name: 'last-chunk-missing', file: { order: [0, 1], manifestPatch: { chunks: 2, bytes: 2 * CHUNK_BYTES, chunkHashes: chunks.slice(0, 2).map((c) => c.cipherSha256) } }, expect: 'unopenable',
       note: 'a truncated file read as a whole one: chunk 1 opened as the last chunk fails, its AAD says last=0' },
     { name: 'last-flag-lied', file: { lastFlags: [false, true, true] }, expect: 'unopenable' },
     { name: 'dk-wrapped-for-other-file', file: { unwrapFileId: otherFileId }, expect: 'unopenable' },

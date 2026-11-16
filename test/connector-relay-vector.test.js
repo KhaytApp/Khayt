@@ -5,11 +5,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
- * The connector Cloud relay vectors (docs/connector-relay.vectors.json),
- * checked by a reference opener written here, separately from the generator,
- * from the rules in the file's `about` (connector-cloud-relay-design.md rev 2/3).
+ * The connector Cloud relay: lib/connector-relay.js (the shipping module)
+ * against docs/connector-relay.vectors.json, cross-checked by a reference
+ * opener written here, separately from both the module and the generator,
+ * from the rules in the file's `about` (connector-cloud-relay-design.md, approved).
  *
- * The Swift and Python openers must pass the same file. Each refusal case
+ * Three implementations agree on every byte: the generator made the file, the
+ * module must reproduce and refuse it, and the opener below must too. The Swift
+ * and Python openers must pass the same file. Each refusal case
  * names the word the opener returns, so a case passes only when it fails for
  * the stated reason. The generator is also re-run and must reproduce the
  * committed file byte for byte, so the file cannot drift from its rules.
@@ -249,4 +252,166 @@ test('the same opener accepts each base envelope when nothing is wrong (the refu
     'ten minutes ahead is still filed (with a clock warning), not refused');
   const q = ENV.queue;
   assert.equal(typeof open(q.envelope, ctOf(q), { key: 'down' }, { lastSeq: q.seq - 1 }), 'object');
+});
+
+// ── lib/connector-relay.js, the shipping module ─────────────────────────
+
+const R = require('../lib/connector-relay.js');
+const P = R.nodePrimitives();
+const bytesOf = (b) => Uint8Array.from(b);
+const LK = R.deriveKeys(P, bytesOf(K), first.deviceId);
+
+test('lib: the four keys and the LAN seal key match the vectors', () => {
+  for (const label of ['up', 'down', 'wrap', 'tag']) assert.equal(R.toHex(LK[label]), VEC.derived[label].keyHex, label);
+  assert.equal(R.toHex(R.lanSealKey(P, bytesOf(K), first.deviceId)), VEC.derived.lanSealKeyHex);
+});
+
+test('lib: seal reproduces every envelope byte for byte (fixed IV), and open returns its plaintext', () => {
+  for (const e of VEC.envelopes) {
+    const r = R.seal(P, LK, { k: e.k, deviceId: first.deviceId, id: e.id, seq: e.seq, plaintext: e.plaintext },
+      { iv: R.fromHex(e.ivHex) });
+    assert.ok(r.ok, e.name);
+    assert.equal(r.padTo, e.padTo, e.name);
+    assert.equal(r.envelope.tag, e.envelope.tag, e.name);
+    assert.equal(sha(R.fromBase64(r.envelope.ct)), e.ctSha256, e.name);
+    if (e.envelope.ct) assert.equal(r.envelope.ct, e.envelope.ct, e.name);
+    const o = R.open(P, LK, r.envelope, { k: e.k, deviceId: first.deviceId });
+    assert.ok(o.ok, `${e.name}: ${o.reason}`);
+    assert.deepEqual(o.plaintext, e.plaintext, e.name);
+  }
+});
+
+test('lib: a real seal draws a fresh IV, so two seals of the same message differ and both open', () => {
+  const m = { k: 'status', deviceId: first.deviceId, id: 'msg_FreshIvCheck01', plaintext: { at: '2026-11-16T10:00:00Z', state: 'in-inbox' } };
+  const a = R.seal(P, LK, m), b = R.seal(P, LK, m);
+  assert.notEqual(a.envelope.iv, b.envelope.iv);
+  assert.notEqual(a.envelope.ct, b.envelope.ct);
+  assert.ok(R.open(P, LK, a.envelope, { k: 'status', deviceId: first.deviceId }).ok);
+  assert.ok(R.open(P, LK, b.envelope, { k: 'status', deviceId: first.deviceId }).ok);
+});
+
+test('lib: chunks, wrapped DK and a whole-file read match the vectors', () => {
+  const dk = R.fromHex(F.dkHex);
+  assert.equal(R.wrapDk(P, LK.wrap, dk, F.fileId, R.fromHex(F.wrapIvHex)), F.wrappedDk);
+  assert.deepEqual(R.unwrapDk(P, LK.wrap, F.wrappedDk, F.fileId), dk);
+  const ck = R.chunkKey(P, dk, F.fileId);
+  assert.equal(R.toHex(ck), F.chunkKeyHex);
+  const mine = F.chunks.map((c) => {
+    assert.equal(R.toHex(R.chunkNonce(c.index)), c.nonceHex);
+    assert.equal(R.chunkAad(F.fileId, c.index, c.last), c.aad);
+    const part = bytesOf(PLAIN.subarray(c.index * CHUNK, (c.index + 1) * CHUNK));
+    const sealed = R.sealChunk(P, ck, F.fileId, c.index, c.last, part);
+    assert.equal(sha(sealed), c.cipherSha256, 'chunk ' + c.index);
+    return sealed;
+  });
+  assert.equal(R.checkManifest(F.manifest), null);
+  const r = R.readFile(P, LK.wrap, F.manifest, (i) => mine[i]);
+  assert.ok(r.ok, r.reason);
+  assert.equal(sha(r.bytes), F.sha256);
+});
+
+test('lib: queue seq, dedupe tags and the slice clock window', () => {
+  for (const c of VEC.seqRule) assert.equal(R.nextSeq(c.lastSeq, c.nowMs), c.next, c.note);
+  for (const d of VEC.dedupe) {
+    assert.equal(R.dedupeInput(d), d.input);
+    assert.equal(R.dedupeTag(P, LK.tag, d), d.tag);
+  }
+  const doc = ENV.slice.plaintext;
+  const at = Date.parse(doc.at);
+  assert.deepEqual(R.judgeSlice(doc, 'msg_X0000001', { nowMs: at }), { ok: true, clock: null });
+  assert.deepEqual(R.judgeSlice(doc, 'msg_X0000001', { nowMs: at - 11 * 60 * 1000 }), { ok: true, clock: 'ahead' },
+    '11 minutes fast is filed with a clock warning (design N1)');
+  assert.equal(R.rememberUntil(doc), at + 15 * 24 * 60 * 60 * 1000);
+});
+
+/** Each must-refuse case through the module, mapped to the call a host would make. */
+function libRefusal(c) {
+  if (c.envelope) {
+    const e = ENV[c.envelope];
+    const env = { ...e.envelope, ct: R.toBase64(bytesOf(ctOf(e))), ...(c.open && c.open.id ? { id: c.open.id } : {}) };
+    const deviceId = (c.open && c.open.deviceId) || first.deviceId;
+    const keys = deviceId === first.deviceId ? LK : R.deriveKeys(P, bytesOf(K), deviceId);
+    const as = { k: (c.open && c.open.k) || e.k, deviceId, v: c.open && c.open.v };
+    if (c.open && c.open.key === 'lanSeal') { keys.lanSeal = R.lanSealKey(P, bytesOf(K), first.deviceId); as.key = 'lanSeal'; }
+    else if (c.open && c.open.key) as.key = c.open.key;
+    const o = R.open(P, keys, env, as);
+    if (!o.ok) return o.reason;
+    const st = c.state || {};
+    if (e.k === 'queue') { const q = R.judgeQueue(env.seq, st.lastSeq); return q.ok ? 'accepted' : q.reason; }
+    if (e.k === 'slice') {
+      const j = R.judgeSlice(o.plaintext, env.id, { seenIds: st.seenIds, nowMs: st.nowIso ? Date.parse(st.nowIso) : Date.parse(o.plaintext.at) });
+      return j.ok ? 'accepted' : j.reason;
+    }
+    return 'accepted';
+  }
+  if (c.sealed) {
+    const o = R.open(P, LK, c.sealed.envelope, { k: c.sealed.k, deviceId: first.deviceId });
+    return o.ok ? 'accepted' : o.reason;
+  }
+  const f = c.file;
+  const manifest = { ...F.manifest, ...(f.manifestPatch || {}) };
+  if (f.unwrapFileId) return R.unwrapDk(P, LK.wrap, manifest.wrappedDk, f.unwrapFileId) ? 'accepted' : 'unopenable';
+  if (f.lastFlags) {
+    const ck = R.chunkKey(P, R.fromHex(F.dkHex), F.fileId);
+    for (let i = 0; i < SEALED.length; i++) {
+      if (!R.openChunk(P, ck, F.fileId, i, f.lastFlags[i], bytesOf(SEALED[i]))) return 'unopenable';
+    }
+    return 'accepted';
+  }
+  const order = f.order || [...Array(manifest.chunks).keys()];
+  const r = R.readFile(P, LK.wrap, manifest, (i) => bytesOf(SEALED[order[i]]));
+  return r.ok ? 'accepted' : r.reason;
+}
+
+test('lib: every must-refuse case is refused by the module with exactly its word', () => {
+  for (const c of VEC.mustRefuse) {
+    assert.ok(R.REFUSALS.includes(c.expect), `${c.name}: ${c.expect} is not a module refusal word`);
+    assert.equal(libRefusal(c), c.expect, c.name);
+  }
+});
+
+test('lib: base64, base64url, hex and UTF-8 agree with Node on awkward input', () => {
+  const samples = [new Uint8Array(0), Uint8Array.of(0), Uint8Array.of(255, 254), Uint8Array.of(1, 2, 3, 4),
+    bytesOf(crypto.randomBytes(1000))];
+  for (const b of samples) {
+    assert.equal(R.toBase64(b), Buffer.from(b).toString('base64'));
+    assert.equal(R.toBase64(b, true), Buffer.from(b).toString('base64url'));
+    assert.deepEqual(R.fromBase64(R.toBase64(b)), b);
+    assert.deepEqual(R.fromBase64(R.toBase64(b, true), true), b);
+    assert.deepEqual(R.fromHex(R.toHex(b)), b);
+  }
+  for (const t of ['', 'abc', 'فاطمة', 'emoji 🧵 thread', 'lone \ud800 surrogate']) {
+    assert.deepEqual(R.utf8(t), bytesOf(new TextEncoder().encode(t)), JSON.stringify(t));
+  }
+  assert.equal(R.fromUtf8(Uint8Array.of(0xc0, 0x80)), null, 'overlong');
+  assert.equal(R.fromUtf8(Uint8Array.of(0xed, 0xa0, 0x80)), null, 'a surrogate');
+  assert.equal(R.fromBase64('abc'), null);
+  assert.equal(R.fromBase64('ab$=', false), null);
+});
+
+test('lib: runs where JavaScriptCore runs it: no require, no module, no host byte type or codecs', () => {
+  const vm = require('node:vm');
+  const src = fs.readFileSync(path.join(ROOT, 'lib', 'connector-relay.js'), 'utf8');
+  for (const word of ['global.', 'process.', 'Buffer', 'TextEncoder', 'TextDecoder', 'atob(', 'btoa(']) {
+    assert.ok(!src.includes(word), `lib/connector-relay.js must not mention ${word}`);
+  }
+  const ctx = vm.createContext({});
+  vm.runInContext(src, ctx);
+  for (const name of ['require', 'module', 'Buffer', 'TextEncoder', 'process']) {
+    assert.equal(vm.runInContext(`typeof ${name}`, ctx), 'undefined', name + ' must be absent in the bare context');
+  }
+  // The bare context has the module and nothing else; hand it Node's primitives
+  // as the Mac hands it CryptoKit's, and it must still seal and open the vectors.
+  ctx.P = P; ctx.Kbytes = bytesOf(K); ctx.deviceId = first.deviceId; ctx.e = ENV.status;
+  const out = vm.runInContext(`(() => {
+    const R = globalThis.KhaytConnectorRelay;
+    const keys = R.deriveKeys(P, Uint8Array.from(Kbytes), deviceId);
+    const r = R.seal(P, keys, { k: e.k, deviceId, id: e.id, seq: e.seq, plaintext: e.plaintext }, { iv: R.fromHex(e.ivHex) });
+    const o = R.open(P, keys, r.envelope, { k: e.k, deviceId });
+    return JSON.stringify({ ct: r.envelope.ct, tag: r.envelope.tag, ok: o.ok, state: o.plaintext && o.plaintext.state });
+  })()`, ctx);
+  const got = JSON.parse(out);
+  assert.equal(got.ct, ENV.status.envelope.ct);
+  assert.equal(got.tag, ENV.status.envelope.tag);
+  assert.deepEqual([got.ok, got.state], [true, 'in-inbox']);
 });
