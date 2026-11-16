@@ -378,6 +378,52 @@ struct LanConnectorRoutesTests {
         #expect(filedAgain.hasPrefix("HTTP/1.1 409") && filedAgain.contains("not-awaiting-file"))
     }
 
+    @Test("no oracle on slice ids: an unsigned or forged head is answered the same for a real id and a made-up one")
+    func noSliceOracle() async throws {
+        let (bench, root) = try await Self.bench()
+        defer { bench.stop(); try? FileManager.default.removeItem(at: root) }
+        let peer = try Self.enrol(bench)
+        let (_, real) = try await Self.announce(bench, peer, Self.gcode)
+        let madeUp = "QRSTUVWXYZ234567"
+        #expect(real != madeUp)
+        let port = bench.port
+        let declared = Self.hexSha(Self.gcode)
+        /// Only the status line and the body: the rest is the same server's headers.
+        func answer(_ id: String, _ headers: (String) -> [String: String]) async -> String {
+            let path = "\(Self.slices)/\(id)/file"
+            let head = Self.gibHead(path, headers: headers(path))
+            let raw = await offPool { Self.raw(port: port, head) }
+            let status = raw.components(separatedBy: "\r\n").first ?? ""
+            let body = raw.components(separatedBy: "\r\n\r\n").dropFirst().joined()
+            return status + " " + body
+        }
+        let ways: [(String, (String) -> [String: String])] = [
+            ("unsigned", { _ in [LanServer.connectorHashHeader: declared] }),
+            ("forged", { path in
+                var h = peer.headers("PUT", path, bodyHash: declared)
+                h[LanServer.connectorHashHeader] = declared
+                h["x-khayt-mac"] = Data(repeating: 7, count: 32).base64EncodedString()
+                return h }),
+            ("signed over another hash", { path in
+                var h = peer.headers("PUT", path, bodyHash: String(repeating: "b", count: 64))
+                h[LanServer.connectorHashHeader] = declared
+                return h }),
+            ("stranger", { path in
+                var h = Peer(id: "dev_NotEnrolledAtAll12", key: Data(repeating: 1, count: 32))
+                    .headers("PUT", path, bodyHash: declared)
+                h[LanServer.connectorHashHeader] = declared
+                return h }),
+        ]
+        for (name, headers) in ways {
+            let forReal = await answer(real, headers)
+            let forNone = await answer(madeUp, headers)
+            #expect(forReal.hasPrefix("HTTP/1.1 401"), Comment(rawValue: "\(name): \(forReal)"))
+            #expect(forReal == forNone, Comment(rawValue: "\(name): real \(forReal) vs made-up \(forNone)"))
+        }
+        // None of it touched the slice: it still takes its file.
+        #expect(try await Self.put(bench, peer, real, Self.gcode).status == 201)
+    }
+
     @Test("over the Mac's own cap: refused at the announce, and 413 from a file's head")
     func overTheCap() async throws {
         let (bench, root) = try await Self.bench(maxBytes: 64)
