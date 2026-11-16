@@ -43,6 +43,8 @@ struct StoreRoundTripTests {
         // it is Node's own idea of equality that matters.
         let before = try Self.write(data, as: "before.json")
         let after = try Self.write(reencoded, as: "after.json")
+        // A real shop's book when this Mac has one: gone when the test ends.
+        defer { try? FileManager.default.removeItem(at: before.deletingLastPathComponent()) }
         let verdict = try Self.node("""
         const a = require(process.argv[1]), b = require(process.argv[2]);
         const stable = (v) => {
@@ -55,10 +57,25 @@ struct StoreRoundTripTests {
         const sa = stable(a), sb = stable(b);
         if (sa === sb) { process.stdout.write('identical'); }
         else {
-          // Name the first place they part company rather than dumping a store.
-          let i = 0; while (i < sa.length && i < sb.length && sa[i] === sb[i]) i++;
-          process.stdout.write('differs at ' + i + ': ' + JSON.stringify(sa.slice(Math.max(0, i - 60), i + 60))
-            + ' vs ' + JSON.stringify(sb.slice(Math.max(0, i - 60), i + 60)));
+          // Name the first place they part company, by PATH: the key, the
+          // record's id, the field's name. Never the text around it: on a
+          // Mac with a real book this is a shop's customers and prices.
+          const where = (x, y, path) => {
+            if (Array.isArray(x) && Array.isArray(y)) {
+              if (x.length !== y.length) return path + ': ' + x.length + ' rows became ' + y.length;
+              for (let k = 0; k < x.length; k++) if (stable(x[k]) !== stable(y[k])) {
+                const id = x[k] && typeof x[k] === 'object' && typeof x[k].id === 'string' ? '(id ' + x[k].id + ')' : '';
+                return where(x[k], y[k], path + '[' + k + ']' + id);
+              }
+            } else if (x && y && typeof x === 'object' && typeof y === 'object') {
+              for (const k of [...new Set([...Object.keys(x), ...Object.keys(y)])].sort()) {
+                if (!(k in x) || !(k in y)) return path + '.' + k + (k in x ? ' vanished' : ' appeared');
+                if (stable(x[k]) !== stable(y[k])) return where(x[k], y[k], path + '.' + k);
+              }
+            }
+            return path + ': a ' + typeof x + ' became a ' + typeof y + ' or changed';
+          };
+          process.stdout.write('differs at ' + where(a, b, 'store'));
         }
         """, args: [before.path, after.path])
 
