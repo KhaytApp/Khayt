@@ -132,7 +132,8 @@ function usedSlots(input) {
  *                     loaded spools, which is the bug this replaced.
  * A host that passes no `paint` at all predates this and gets the old answer
  * (`legacy: true`) until it is moved over; the Mac app is one (Nov 2026).
- * No slice, no swap figure: swapCount is 0, not colours − 1.
+ * No slice, no swap figure: swapCount is 0, not colours − 1, and swapsKnown is
+ * false — so a card can tell "not known yet" from a sliced one-colour 0.
  *
  * @param {{sliceInfo?:string, projectSettings?:string, modelSettings?:string, prusa?:string,
  *          layerRanges?:string, paint?:{slots?:number[], unread?:boolean}}} configs
@@ -196,7 +197,7 @@ function colorsFromConfigs(configs) {
       // A painted file whose mesh was not read, or a mixed filament, gives
       // nothing rather than the loaded spools.
       if (!slotsKnown) colors.length = 0;
-      return { colors, swapCount: 0, usedFilaments, slotsKnown, colourCount: slotsKnown ? colors.length : null, reader: COLOURS_READER };
+      return { colors, swapCount: 0, swapsKnown: false, usedFilaments, slotsKnown, colourCount: slotsKnown ? colors.length : null, reader: COLOURS_READER };
     }
   }
 
@@ -226,7 +227,9 @@ function colorsFromConfigs(configs) {
   if (chg) swapCount = parseInt(chg[1], 10);
   else if (colors.length > 1) swapCount = colors.length - 1;
 
-  const out = { colors, swapCount, usedFilaments, slotsKnown, colourCount: colors.length, reader: COLOURS_READER };
+  // Only a slice knows how often the printer changes filament; anything else
+  // is a guess (colours − 1), and a card must not show it as a count.
+  const out = { colors, swapCount, swapsKnown: sliced, usedFilaments, slotsKnown, colourCount: colors.length, reader: COLOURS_READER };
   if (legacy && !sliced) { out.legacy = true; out.reader = 1; }
   return out;
 }
@@ -278,7 +281,7 @@ function paintOf(zip, buf) {
 
 /** A 3MF's colours only, with its paint read: what a library record stores. */
 function colours3mf(buf) {
-  const none = { colors: [], swapCount: 0, slotsKnown: false, colourCount: null, reader: COLOURS_READER, unreadable: true };
+  const none = { colors: [], swapCount: 0, swapsKnown: false, slotsKnown: false, colourCount: null, reader: COLOURS_READER, unreadable: true };
   if (!KhaytZip || !buf) return none;
   let zip;
   try { zip = KhaytZip.openZip(buf); } catch (_) { return none; }
@@ -307,6 +310,7 @@ function extract3mf(buf, opts) {
   out.colors = c.colors;
   out.swapCount = c.swapCount;
   out.slotsKnown = c.slotsKnown;
+  out.swapsKnown = c.swapsKnown;
   out.coloursReader = c.reader;
   return out;
 }
@@ -325,7 +329,7 @@ function extract(input) {
   }
   if (ext === '3mf') {
     const r = extract3mf(input.buf, { colours: input.colours });
-    return { pngBase64: r.pngBase64, colors: r.colors, swapCount: r.swapCount, slotsKnown: r.slotsKnown, coloursReader: r.coloursReader, source: r.pngBase64 ? 'embedded' : null };
+    return { pngBase64: r.pngBase64, colors: r.colors, swapCount: r.swapCount, slotsKnown: r.slotsKnown, swapsKnown: r.swapsKnown, coloursReader: r.coloursReader, source: r.pngBase64 ? 'embedded' : null };
   }
   return { pngBase64: null, colors: [], swapCount: 0, source: null };
 }

@@ -3760,6 +3760,7 @@ body.mode-enthusiast .biz-only { display: none !important; }
 .pf-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .pf-chip { font-size: 11px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border-soft, var(--border)); border-radius: 999px; padding: 1px 8px; }
 .pf-colors { display: flex; align-items: center; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+.pf-colors-dots { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .pf-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); display: inline-block; }
 /* Bed Ready CAD layer-index chips: filament colour fill, index-coded hairline, mono L-number */
 .pf-lchip { display: inline-flex; align-items: center; gap: 4px; }
