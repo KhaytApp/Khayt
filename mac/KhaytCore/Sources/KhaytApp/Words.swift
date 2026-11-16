@@ -3113,7 +3113,16 @@ final class Words {
         "mac.no_kits_hint":  ["en": "A figure printed as head, hands and body is four jobs and one object. File them together and Khayt totals them.",
                               "ar": "تمثال يُطبع رأسًا ويدين وجسمًا هو أربعة أعمال وشيء واحد. احفظها معًا يجمعها خيط."],
         "mac.filament_n":    ["en": "Filament {n}",    "ar": "الخيط {n}"],
-        "mac.n_swaps":       ["en": "{n} filament swaps", "ar": "{n} تبديلات خيط"],
+        // The Library card's dots and swap number, explained on hover (.help and
+        // VoiceOver). One wording with the desktop (plib.colours_tip /
+        // swaps_tip / swaps_unknown); "Label: {n}" because neither app has
+        // plural forms. Figma: Mac file, page 15.
+        "mac.lib_colours_tip": ["en": "Colours: {n}. The filaments this print uses.",
+                                "ar": "الألوان: {n}. الخيوط التي تستخدمها هذه الطباعة."],
+        "mac.lib_swaps_tip":   ["en": "Filament swaps: about {n}. How many times the printer changes filament during this print, from the sliced file.",
+                                "ar": "تبديلات الخيط: نحو {n}. عدد مرات تغيير الطابعة للخيط أثناء هذه الطباعة، من الملف المقطّع."],
+        "mac.lib_swaps_unknown": ["en": "Filament swaps are known once the file is sliced.",
+                                  "ar": "تُعرف تبديلات الخيط بعد تقطيع الملف."],
         "mac.library_wont_open": ["en": "This library will not open", "ar": "لا تُفتح هذه المكتبة"],
         "mac.no_models":     ["en": "No models yet",   "ar": "لا نماذج بعد"],
         // WAS "Print files added in Khayt appear here." — which stopped being
@@ -4045,6 +4054,8 @@ final class Words {
         "mac.apps_approve": ["en": "Numbers match — approve", "ar": "الرقمان متطابقان — موافقة"],
         "mac.apps_deny": ["en": "Deny", "ar": "رفض"],
         "mac.apps_timed_out": ["en": "No slicer paired in time. Click Pair a slicer to try again.", "ar": "لم يقترن أي برنامج تقطيع في الوقت المحدد. اضغط «إقران برنامج تقطيع» للمحاولة مجددًا."],
+        "mac.apps_pin_unreadable": ["en": "The LAN PIN couldn’t be read from the Keychain, so nothing was paired. Set the LAN PIN again above, then pair the slicer.",
+                                    "ar": "تعذّرت قراءة رمز الشبكة المحلية من سلسلة المفاتيح، فلم يُقرَن شيء. عيّن رمز الشبكة المحلية مجددًا في الأعلى، ثم أقرِن برنامج التقطيع."],
         "mac.linked_regrouped": ["en": "Regrouped from their folders: {n}. Groups you set yourself were left alone.", "ar": "أُعيد تجميعها حسب مجلداتها: {n}. المجموعات التي اخترتها بنفسك بقيت كما هي."],
         "mac.linked_sort": ["en": "Sort linked folders…", "ar": "فرز المجلدات المرتبطة…"],
         "mac.linked_sort_help": ["en": "Find the prints in your linked folders and make each one a group, with its picture. Shows what would change before anything moves.", "ar": "يجد الطباعات في مجلداتك المرتبطة ويجعل كل طباعة مجموعة بصورتها. يعرض ما سيتغير قبل نقل أي شيء."],

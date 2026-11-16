@@ -184,6 +184,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibMesh:       (fullPath)          => ipcRenderer.invoke('hub:printlib-mesh', fullPath),
   convertMesh:        (opts)              => ipcRenderer.invoke('hub:convert-mesh', opts),
   extractThumbnail:   (filePath)          => ipcRenderer.invoke('hub:extract-thumbnail', filePath),
+  printColours:       (filePath)          => ipcRenderer.invoke('hub:print-colours', filePath),
 
   // 3MF converter (multi-printer)
   mfPick:      ()     => ipcRenderer.invoke('hub:mf-pick'),
@@ -216,6 +217,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Task 0: File-based data store (replaces localStorage)
   loadStore:     ()       => ipcRenderer.invoke('hub:load-store'),
   saveStore:     (data)   => ipcRenderer.invoke('hub:save-store', data),
+  storeOwned:    ()       => ipcRenderer.invoke('hub:store-owned'),
   fetchExchangeRates: (base) => ipcRenderer.invoke('hub:fetch-exchange-rates', base),
   hashPin: (pin) => ipcRenderer.invoke('hub:hash-pin', pin),
   verifyPin: (plain, stored) => ipcRenderer.invoke('hub:verify-pin', plain, stored),

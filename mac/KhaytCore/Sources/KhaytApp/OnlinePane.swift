@@ -378,8 +378,12 @@ struct OnlinePane: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     PairedPhones(shop: shop)
-                    Divider()
-                    ConnectedApps(shop: shop)
+                    // Off in beta.38 until the pairing protocol commits before
+                    // it reveals (`LanConnectorPairing.enabled`).
+                    if LanConnectorPairing.enabled {
+                        Divider()
+                        ConnectedApps(shop: shop)
+                    }
 
                     // ── WHAT THE STOREFRONT WAS LAST TOLD ─────────────────
                     //

@@ -1732,7 +1732,9 @@
  "mac.n_people_one": "{n} 人",
  "mac.n_plates": "{n} 块打印板",
  "mac.n_plates_one": "{n} 块打印板",
- "mac.n_swaps": "{n} 次换料",
+ "mac.lib_colours_tip": "颜色：{n}。这次打印使用的耗材。",
+ "mac.lib_swaps_tip": "换色次数：约 {n} 次。打印机在这次打印中更换耗材的次数，来自切片文件。",
+ "mac.lib_swaps_unknown": "文件切片后才能知道换色次数。",
  "mac.n_things_need_you": "有 {n} 件事需要你处理",
  "mac.n_things_need_you_one": "有 {n} 件事需要你处理",
  "mac.n_without_cost": "{n} 个没有成本",
@@ -4016,5 +4018,6 @@
  "mac.apps_may": "它可以把切片发送到“来自切片软件”收件箱，并读取任务队列（任务名称和时间，从不包含客户）。它永远无法读取你的账本、客户、价格或设置。",
  "mac.apps_approve": "数字一致 — 批准",
  "mac.apps_deny": "拒绝",
- "mac.apps_timed_out": "没有切片软件按时配对。点击“配对切片软件”重试。"
+ "mac.apps_timed_out": "没有切片软件按时配对。点击“配对切片软件”重试。",
+ "mac.apps_pin_unreadable": "无法从钥匙串读取局域网 PIN，因此没有配对任何设备。请在上方重新设置局域网 PIN，然后再配对切片软件。"
 }

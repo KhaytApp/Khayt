@@ -250,7 +250,10 @@
     // record shape from one without it.
     for (const k of CARRIED) if (Object.prototype.hasOwnProperty.call(template, k)) job[k] = copy(template[k]);
     stampCurrency(job, settings, c.clients);
-    return Object.assign(job, {
+    // A host with no `uid` leaves parts bare in `freshPart`; they still leave
+    // here with an id, the one lib/part-ids.js owes them.
+    const PI = typeof globalThis !== 'undefined' ? globalThis.KhaytPartIds : undefined;
+    const made = Object.assign(job, {
       parts: Array.isArray(template.parts) ? template.parts.map(p => freshPart(p, D.PART_RUN_KEYS, c.uid)) : [],
       id: N.mintOrderId(jobNumber, tokens.id),
       jobNumber,
@@ -278,6 +281,8 @@
       comments: [],
       recurringCycle: cycle,
     }, tokens.tracking ? { trackingToken: hex(tokens.tracking) } : {});
+    if (PI && typeof PI.assignOrder === 'function') PI.assignOrder(made);
+    return made;
   }
 
   /**

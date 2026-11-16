@@ -149,7 +149,12 @@ function ini(text, key) {
 /**
  * The facts, from whichever dialect the file is written in.
  *
- * @param {{projectSettings?:string, modelSettings?:string, prusa?:string}} configs
+ * `usedSlots` (1-based, from lib/thumbnail-extract.js usedSlots) narrows the
+ * materials to the slots the print uses: `filament_type` is one entry per
+ * LOADED spool, so a PLA print on a printer with PETG loaded read "PLA, PETG".
+ * Without it the materials are every loaded one, as before.
+ *
+ * @param {{projectSettings?:string, modelSettings?:string, prusa?:string, usedSlots?:number[]}} configs
  * @returns {{printer:?string, layerHeight:?number, nozzle:?number,
  *            nozzleVaries:boolean, materials:string[], infill:?string,
  *            infillVaries:boolean, support:?boolean, supportStyle:?string,
@@ -173,7 +178,10 @@ function printFacts(configs) {
 
   if (proj && typeof proj === 'object') {
     const nozzle = oneOf(proj.nozzle_diameter);
-    const types = oneOf(proj.filament_type);
+    const slots = Array.isArray(cfg.usedSlots) ? cfg.usedSlots.filter((n) => +n > 0) : [];
+    const loadedTypes = Array.isArray(proj.filament_type) ? proj.filament_type : null;
+    const types = oneOf(loadedTypes && slots.length && slots.every((n) => n <= loadedTypes.length)
+      ? slots.map((n) => loadedTypes[n - 1]) : proj.filament_type);
     const infill = effective(objects, 'sparse_infill_density',
                              proj.sparse_infill_density == null ? null
                                : String(proj.sparse_infill_density));

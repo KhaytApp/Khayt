@@ -1732,7 +1732,9 @@
  "mac.n_people_one": "{n} personne",
  "mac.n_plates": "{n} plateaux",
  "mac.n_plates_one": "{n} plateau",
- "mac.n_swaps": "{n} changements de filament",
+ "mac.lib_colours_tip": "Couleurs : {n}. Les filaments utilisés par cette impression.",
+ "mac.lib_swaps_tip": "Changements de filament : environ {n}. Le nombre de fois où l’imprimante change de filament pendant cette impression, d’après le fichier tranché.",
+ "mac.lib_swaps_unknown": "Les changements de filament sont connus une fois le fichier tranché.",
  "mac.n_things_need_you": "{n} éléments demandent votre attention",
  "mac.n_things_need_you_one": "{n} élément demande votre attention",
  "mac.n_without_cost": "{n} sans coût",
@@ -4016,5 +4018,6 @@
  "mac.apps_may": "Il peut envoyer des tranchages dans la boîte « Du trancheur » et lire la file des travaux (noms et durées, jamais les clients). Il ne peut jamais lire votre registre, vos clients, vos prix ou vos réglages.",
  "mac.apps_approve": "Les nombres correspondent — approuver",
  "mac.apps_deny": "Refuser",
- "mac.apps_timed_out": "Aucun trancheur associé à temps. Cliquez sur Associer un trancheur pour réessayer."
+ "mac.apps_timed_out": "Aucun trancheur associé à temps. Cliquez sur Associer un trancheur pour réessayer.",
+ "mac.apps_pin_unreadable": "Le code PIN du réseau local n’a pas pu être lu dans le trousseau : rien n’a été associé. Définissez de nouveau le code PIN ci-dessus, puis associez le trancheur."
 }

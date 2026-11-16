@@ -667,10 +667,16 @@
     const discountPct = Math.min(100, positive(i.discountPct));
     const shippingCost = toJob(positive(i.shippingCost));
     const rushFee = quote.rushFee > 0 ? +quote.rushFee.toFixed(2) : 0;
+    // Unique across computers; `jobNumber` is the readable half (mintOrderId).
+    const id = mintOrderId(jobNumber, tokens.id);
+    // Every part leaves here with an id. A cart part without one used to be
+    // stored without one, and the Mac then made one up on every read
+    // (lib/part-ids.js says why that broke editing it).
+    const PI = sibling('KhaytPartIds', './part-ids.js');
+    if (PI && typeof PI.assignOrder === 'function') PI.assignOrder({ id, parts });
 
     return {
-      // Unique across computers; `jobNumber` is the readable half (mintOrderId).
-      id: mintOrderId(jobNumber, tokens.id),
+      id,
       jobNumber,
       invoiceNum,
       invoiceNumber: invoiceNum,

@@ -517,6 +517,9 @@ public actor KhaytEngine {
         "calculator-cost",
         // A failure allowance learned from the shop's own QC fails and waste.
         "failure-rate",
+        // The id a part without one is owed (stable across computers).
+        // Before `order-new` and `recurring-orders`, which give it.
+        "part-ids",
         "order-new",
         // A linked reprint after a QC failure — the desktop's rule, so a Mac
         // reprint reaches the first-pass and RMA figures. After `order-new`,
@@ -4278,23 +4281,75 @@ public actor KhaytEngine {
     // MARK: - What a model is printed in
 
     /// The filament colours a 3MF's slicer configs describe.
-    public struct Colours: Decodable, Sendable, Equatable {
+    ///
+    /// Reader 2 (`lib/thumbnail-extract.js` COLOURS_READER, Nov 16 2026): an
+    /// unsliced project names only the slots the print USES, not the printer's
+    /// loaded spools, when it is handed the paint (`paint`). `slotsKnown` false
+    /// means the slots could not be named (painted but unread, a mixed
+    /// filament) and `colors` is then empty, never the loaded list.
+    public struct Colours: Codable, Sendable, Equatable {
         public let colors: [JSONValue]
         public let swapCount: Int
+        public var slotsKnown: Bool?
+        public var colourCount: Int?
+        public var reader: Int?
+        public var swapsKnown: Bool?
+
+        public init(colors: [JSONValue], swapCount: Int, slotsKnown: Bool? = nil,
+                    colourCount: Int? = nil, reader: Int? = nil, swapsKnown: Bool? = nil) {
+            self.colors = colors; self.swapCount = swapCount; self.slotsKnown = slotsKnown
+            self.colourCount = colourCount; self.reader = reader; self.swapsKnown = swapsKnown
+        }
     }
 
     /// Reads the CONFIG TEXT, not a zip — see `lib/thumbnail-extract.js`. Three
     /// slicer formats and their precedence live there, and re-implementing them
     /// is how two apps come to disagree about what a model is printed in.
+    ///
+    /// `paint` is `{slots:[…]}` (1-based painted slots, `[]` when nothing is
+    /// painted) or `{unread:true}` (`ColourRead.paint`). Left nil, the rule
+    /// answers as it did before reader 2, marked `legacy`.
     public func coloursFromConfigs(sliceInfo: String, projectSettings: String,
-                                   modelSettings: String, prusa: String) throws -> Colours {
+                                   modelSettings: String, prusa: String,
+                                   layerRanges: String = "", paint: JSONValue? = nil) throws -> Colours {
         try runtime.call2("""
         globalThis.KhaytThumb.colorsFromConfigs({
-          sliceInfo: ARG0, projectSettings: ARG1, modelSettings: ARG2, prusa: ARG3
+          sliceInfo: ARG0, projectSettings: ARG1, modelSettings: ARG2, prusa: ARG3,
+          layerRanges: ARG4, paint: ARG5 || undefined
         })
         """,
-        [.string(sliceInfo), .string(projectSettings), .string(modelSettings), .string(prusa)],
+        [.string(sliceInfo), .string(projectSettings), .string(modelSettings), .string(prusa),
+         .string(layerRanges), paint ?? .null],
         as: Colours.self)
+    }
+
+    /// `KhaytThumb.applyColours`: a colour re-read put on a library record,
+    /// by the rule both apps share (never empties colours it cannot name,
+    /// keeps a slice's grams, stamps `coloursReader`, leaves `updatedAt`).
+    public func applyColours(_ record: [String: JSONValue], read: Colours) throws
+        -> (record: [String: JSONValue], changed: Bool) {
+        struct Out: Decodable { let record: [String: JSONValue]; let changed: Bool }
+        let readValue = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(read))
+        let out = try runtime.call2("""
+            (function (rec, read) {
+              var r = KhaytThumb.applyColours(rec, read);
+              return { record: rec, changed: !!r.changed };
+            })(ARG0, ARG1)
+            """, [.object(record), readValue], as: Out.self)
+        return (out.record, out.changed)
+    }
+
+    /// `lib/thumbnail-extract.js` COLOURS_READER: the colour reader today.
+    public func coloursReader() throws -> Int {
+        try runtime.call2("globalThis.KhaytThumb.COLOURS_READER", [], as: Int.self)
+    }
+
+    /// The slots (1-based) an unsliced project prints with: `KhaytThumb.usedSlots`.
+    public func usedSlots(modelSettings: String, layerRanges: String, paintSlots: [Int]) throws -> [Int] {
+        try runtime.call2("""
+            globalThis.KhaytThumb.usedSlots({ modelSettings: ARG0, layerRanges: ARG1, paintSlots: ARG2 })
+            """, [.string(modelSettings), .string(layerRanges), .array(paintSlots.map { .number(Double($0)) })],
+            as: [Int].self)
     }
 
     /// What a slicer's configs say about the print itself.
@@ -4324,13 +4379,16 @@ public actor KhaytEngine {
     /// settings beat the project's; all of that is in `lib/print-facts.js`,
     /// under test, once.
     public func printFacts(projectSettings: String, modelSettings: String,
-                           prusa: String) throws -> PrintFacts {
+                           prusa: String, usedSlots: [Int]? = nil) throws -> PrintFacts {
+        // `usedSlots`: the slots the print uses (`usedSlots(…)`), which narrow
+        // the materials to those, not every loaded spool's.
         try runtime.call2("""
         globalThis.KhaytPrintFacts.printFacts({
-          projectSettings: ARG0, modelSettings: ARG1, prusa: ARG2
+          projectSettings: ARG0, modelSettings: ARG1, prusa: ARG2, usedSlots: ARG3 || undefined
         })
         """,
-        [.string(projectSettings), .string(modelSettings), .string(prusa)],
+        [.string(projectSettings), .string(modelSettings), .string(prusa),
+         usedSlots.map { .array($0.map { .number(Double($0)) }) } ?? .null],
         as: PrintFacts.self)
     }
 

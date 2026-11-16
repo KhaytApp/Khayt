@@ -51,11 +51,14 @@ test('3mf: extracts embedded PNG + colours + swap estimate', () => {
   assert.equal(r.swapCount, 1); // 2 colours, single-extruder floor
 });
 
-test('3mf: falls back to project_settings filament_colour when no slice_info', () => {
+test('3mf: no slice_info: the slots the print uses, not every loaded spool (Nov 2026)', () => {
+  // filament_colour is the printer's LOADED spools. With no model_settings to
+  // name an object's slot, every object prints with slot 1, the slicer's default.
   const proj = '{"filament_colour":["#112233","#445566","#112233"],"other":1}';
   const zip = makeZip([{ name: 'Metadata/project_settings.config', data: proj, method: 8 }]);
   const r = extract3mf(zip);
-  assert.deepEqual(r.colors.map((c) => c.hex), ['#112233', '#445566']); // deduped
+  assert.deepEqual(r.colors.map((c) => c.hex), ['#112233']);
+  assert.equal(r.swapCount, 0, 'no slice, no swap figure');
   assert.equal(r.pngBase64, null);
 });
 
@@ -174,8 +177,12 @@ test('colorsFromConfigs: the split changed nothing, across every slicer shape', 
   cases.push({ 'Metadata/Slic3r_PE.config': 'filament_colour = #CCCCCC',
                'Metadata/Prusa_Slicer.config': 'filament_colour = #DDDDDD' });
 
+  // A host that passes no paint (the adapter below, the Mac until it moves
+  // over) gets the original answer; the fields added since are compared by
+  // test/library-colours.test.js.
+  const orig = (r) => ({ colors: r.colors, swapCount: r.swapCount, usedFilaments: r.usedFilaments });
   for (const files of cases) {
-    assert.deepEqual(parse3mfColors(fakeZip(files)), ORIGINAL_parse3mfColors(fakeZip(files)),
+    assert.deepEqual(orig(parse3mfColors(fakeZip(files))), ORIGINAL_parse3mfColors(fakeZip(files)),
       `differs for ${JSON.stringify(files)}`);
   }
   assert.ok(cases.length > 120, 'the corpus shrank');

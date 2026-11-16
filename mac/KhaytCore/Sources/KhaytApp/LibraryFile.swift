@@ -24,6 +24,15 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let bundleFigures: Parsed?
     let colors: [Colour]?
     let swapCount: Int?
+    /// Which colour reader wrote `colors` (`lib/thumbnail-extract.js`
+    /// COLOURS_READER). Below 2, or absent, a 3MF's dots may be the printer's
+    /// LOADED spools rather than the print's, and it is read again where its
+    /// file is here (`ColoursReread`).
+    let coloursReader: Int?
+    /// Whether `swapCount` came from a slice. False for an unsliced project,
+    /// whose swaps are not known until it is sliced. Absent on records written
+    /// before the field: see `swapsKnownGuess`.
+    let swapsKnown: Bool?
     let thumbFile: String?
     /// What made `thumbFile`: "embedded" (a file's own preview, or for an
     /// STL a drawing an import made), "mesh" (the Mac's `--thumbnails` pass),
@@ -324,6 +333,14 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// newest finished job's.
     var printedLast: String? { printed == nil ? lastPrinted : printed?.lastPrinted }
     var swaps: Int { swapCount ?? 0 }
+
+    /// Whether the swap count is the slicer's. The record's `swapsKnown` when
+    /// it has one; a record written before the field counts when it was
+    /// sliced, which a print time says (the desktop's rule, #2502).
+    var swapsKnownGuess: Bool {
+        if let swapsKnown { return swapsKnown }
+        return (parsed?.printTimeMins ?? 0) > 0
+    }
     var palette: [Colour] { colors ?? [] }
 
     /// The Colour filter rows this model is under: each colour family it was

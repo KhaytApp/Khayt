@@ -1732,7 +1732,9 @@
  "mac.n_people_one": "{n} Person",
  "mac.n_plates": "{n} Platten",
  "mac.n_plates_one": "{n} Platte",
- "mac.n_swaps": "{n} Filamentwechsel",
+ "mac.lib_colours_tip": "Farben: {n}. Die Filamente, die dieser Druck verwendet.",
+ "mac.lib_swaps_tip": "Filamentwechsel: etwa {n}. Wie oft der Drucker während dieses Drucks das Filament wechselt, laut der geslicten Datei.",
+ "mac.lib_swaps_unknown": "Die Filamentwechsel sind bekannt, sobald die Datei geslict ist.",
  "mac.n_things_need_you": "{n} Dinge brauchen Sie",
  "mac.n_things_need_you_one": "{n} Ding braucht Sie",
  "mac.n_without_cost": "{n} ohne Kosten",
@@ -4016,5 +4018,6 @@
  "mac.apps_may": "Er darf Slices in den Eingang „Vom Slicer“ senden und die Auftragsliste lesen (Auftragsnamen und Zeiten, nie Kunden). Ihr Buch, Kunden, Preise oder Einstellungen kann er nie lesen.",
  "mac.apps_approve": "Zahlen stimmen — zulassen",
  "mac.apps_deny": "Ablehnen",
- "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln."
+ "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln.",
+ "mac.apps_pin_unreadable": "Die LAN-PIN konnte nicht aus dem Schlüsselbund gelesen werden, daher wurde nichts gekoppelt. Legen Sie die LAN-PIN oben erneut fest und koppeln Sie dann den Slicer."
 }

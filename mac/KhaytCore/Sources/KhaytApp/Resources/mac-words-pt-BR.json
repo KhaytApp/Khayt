@@ -1732,7 +1732,9 @@
  "mac.n_people_one": "{n} pessoa",
  "mac.n_plates": "{n} placas",
  "mac.n_plates_one": "{n} placa",
- "mac.n_swaps": "{n} trocas de filamento",
+ "mac.lib_colours_tip": "Cores: {n}. Os filamentos que esta impressão usa.",
+ "mac.lib_swaps_tip": "Trocas de filamento: cerca de {n}. Quantas vezes a impressora troca de filamento durante esta impressão, segundo o arquivo fatiado.",
+ "mac.lib_swaps_unknown": "As trocas de filamento são conhecidas depois que o arquivo é fatiado.",
  "mac.n_things_need_you": "{n} itens precisam de você",
  "mac.n_things_need_you_one": "{n} item precisa de você",
  "mac.n_without_cost": "{n} estão sem custo",
@@ -4016,5 +4018,6 @@
  "mac.apps_may": "Ele pode enviar fatiamentos para a caixa “Do fatiador” e ler a fila de trabalhos (nomes e tempos, nunca clientes). Nunca pode ler seu livro, clientes, preços ou ajustes.",
  "mac.apps_approve": "Os números conferem — aprovar",
  "mac.apps_deny": "Recusar",
- "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo."
+ "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo.",
+ "mac.apps_pin_unreadable": "Não foi possível ler o PIN da rede local nas Chaves, então nada foi pareado. Defina o PIN da rede local de novo acima e depois pareie o fatiador."
 }
