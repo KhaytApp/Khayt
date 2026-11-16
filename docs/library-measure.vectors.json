@@ -1,0 +1,499 @@
+{
+  "about": "lib/library-measure.js: which engine measures (Automatic: orca → bambu → snapmaker-orca → khayt-orca-engine → builtin; prusa never automatic), the Bambu Studio result.json adapter (verified on 02.08.02.61; the 0 g with a length case is that real slice of a 20 mm cube), the G-code summary adapter (the Bambu mm³-labelled-cm³ volume line is never read), staleness and the pricing guard. Expected grams are mm × π(d/2)² / 1000 × density, rounded to 0.01 g, computed independently of the module.",
+  "choose": [
+    {
+      "name": "auto, all installed",
+      "setting": "auto",
+      "available": [
+        {
+          "id": "prusa",
+          "version": "3.0"
+        },
+        {
+          "id": "bambu",
+          "version": "02.08"
+        },
+        {
+          "id": "orca",
+          "version": "2.5.1"
+        }
+      ],
+      "expect": {
+        "engine": "orca",
+        "version": "2.5.1",
+        "auto": true,
+        "fallback": null
+      }
+    },
+    {
+      "name": "auto, no orca",
+      "setting": "auto",
+      "available": [
+        {
+          "id": "snapmaker-orca",
+          "version": "2.4.1"
+        },
+        {
+          "id": "bambu",
+          "version": "02.08"
+        }
+      ],
+      "expect": {
+        "engine": "bambu",
+        "version": "02.08",
+        "auto": true,
+        "fallback": null
+      }
+    },
+    {
+      "name": "auto, only the engine",
+      "setting": "auto",
+      "available": [
+        {
+          "id": "khayt-orca-engine",
+          "version": "0.1"
+        }
+      ],
+      "expect": {
+        "engine": "khayt-orca-engine",
+        "version": "0.1",
+        "auto": true,
+        "fallback": null
+      }
+    },
+    {
+      "name": "auto, prusa only: never automatic",
+      "setting": "auto",
+      "available": [
+        {
+          "id": "prusa",
+          "version": "3.0"
+        }
+      ],
+      "expect": {
+        "engine": "builtin",
+        "version": null,
+        "auto": true,
+        "fallback": null
+      }
+    },
+    {
+      "name": "auto, nothing installed",
+      "setting": null,
+      "available": [],
+      "expect": {
+        "engine": "builtin",
+        "version": null,
+        "auto": true,
+        "fallback": null
+      }
+    },
+    {
+      "name": "prusa chosen by hand",
+      "setting": "prusa",
+      "available": [
+        {
+          "id": "prusa",
+          "version": "3.0"
+        },
+        {
+          "id": "orca",
+          "version": "2.5.1"
+        }
+      ],
+      "expect": {
+        "engine": "prusa",
+        "version": "3.0",
+        "auto": false,
+        "fallback": null
+      }
+    },
+    {
+      "name": "chosen but not installed",
+      "setting": "orca",
+      "available": [],
+      "expect": {
+        "engine": "builtin",
+        "version": null,
+        "auto": false,
+        "fallback": "orca"
+      }
+    },
+    {
+      "name": "unknown setting is automatic",
+      "setting": "cura",
+      "available": [
+        {
+          "id": "bambu",
+          "version": "02.08"
+        }
+      ],
+      "expect": {
+        "engine": "bambu",
+        "version": "02.08",
+        "auto": true,
+        "fallback": null
+      }
+    }
+  ],
+  "bambu": [
+    {
+      "name": "real 02.08 cube: 0 g reported for 1232.38 mm, grams derived",
+      "result": {
+        "error_string": "Success.",
+        "return_code": 0,
+        "layer_height": 0.2,
+        "sliced_plates": [
+          {
+            "id": 1,
+            "total_predication": 612.9144897460938,
+            "main_predication": 611.9346313476562,
+            "filament_change_times": 0,
+            "filaments": [
+              {
+                "filament_id": "",
+                "id": 1,
+                "main_used_g": 0.0,
+                "total_used_g": 0.0
+              }
+            ],
+            "warning_message": ""
+          }
+        ]
+      },
+      "opts": {
+        "lengths": {
+          "1": [
+            1232.38
+          ]
+        },
+        "materials": {
+          "1": {
+            "density": 1.26,
+            "diameter": 1.75
+          }
+        }
+      },
+      "expect": {
+        "ok": true,
+        "plates": [
+          {
+            "index": 1,
+            "timeSec": 613,
+            "changes": 0,
+            "slots": [
+              {
+                "slot": 1,
+                "grams": 3.73,
+                "mm": 1232.38,
+                "gramsDerived": true
+              }
+            ],
+            "warnings": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "0 g and no density: grams stay unknown, never 0",
+      "result": {
+        "error_string": "Success.",
+        "return_code": 0,
+        "layer_height": 0.2,
+        "sliced_plates": [
+          {
+            "id": 1,
+            "total_predication": 612.9144897460938,
+            "main_predication": 611.9346313476562,
+            "filament_change_times": 0,
+            "filaments": [
+              {
+                "filament_id": "",
+                "id": 1,
+                "main_used_g": 0.0,
+                "total_used_g": 0.0
+              }
+            ],
+            "warning_message": ""
+          }
+        ]
+      },
+      "opts": {
+        "lengths": {
+          "1": [
+            1232.38
+          ]
+        }
+      },
+      "expect": {
+        "ok": true,
+        "plates": [
+          {
+            "index": 1,
+            "timeSec": 613,
+            "changes": 0,
+            "slots": [
+              {
+                "slot": 1,
+                "grams": null,
+                "mm": 1232.38,
+                "gramsDerived": false
+              }
+            ],
+            "warnings": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "two plates, slots keep their numbers, a warning",
+      "result": {
+        "error_string": "Success.",
+        "return_code": 0,
+        "sliced_plates": [
+          {
+            "id": 1,
+            "total_predication": 3725.4,
+            "filament_change_times": 14,
+            "filaments": [
+              {
+                "id": 1,
+                "total_used_g": 12.34
+              },
+              {
+                "id": 3,
+                "total_used_g": 2.48
+              }
+            ],
+            "warning_message": "Floating regions detected; supports may be needed."
+          },
+          {
+            "id": 2,
+            "total_predication": 600,
+            "filament_change_times": 0,
+            "filaments": [
+              {
+                "id": 1,
+                "total_used_g": 5.0
+              }
+            ],
+            "warning_message": ""
+          }
+        ]
+      },
+      "opts": {},
+      "expect": {
+        "ok": true,
+        "plates": [
+          {
+            "index": 1,
+            "timeSec": 3725,
+            "changes": 14,
+            "slots": [
+              {
+                "slot": 1,
+                "grams": 12.34,
+                "mm": null,
+                "gramsDerived": false
+              },
+              {
+                "slot": 3,
+                "grams": 2.48,
+                "mm": null,
+                "gramsDerived": false
+              }
+            ],
+            "warnings": [
+              "Floating regions detected; supports may be needed."
+            ]
+          },
+          {
+            "index": 2,
+            "timeSec": 600,
+            "changes": 0,
+            "slots": [
+              {
+                "slot": 1,
+                "grams": 5.0,
+                "mm": null,
+                "gramsDerived": false
+              }
+            ],
+            "warnings": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "a failed slice",
+      "result": {
+        "return_code": -50,
+        "error_string": "Nothing to be sliced",
+        "sliced_plates": []
+      },
+      "opts": {},
+      "expect": {
+        "ok": false,
+        "reason": "Nothing to be sliced"
+      }
+    }
+  ],
+  "gcode": [
+    {
+      "name": "Bambu header: weight 0, volume line mislabelled; grams from length, volume never read",
+      "lines": [
+        "; total filament length [mm] : 1232.38",
+        "; total filament volume [cm^3] : 2964.21",
+        "; total filament weight [g] : 0.00",
+        "; filament_density: 1.26",
+        "; filament_diameter: 1.75",
+        "; model printing time: 10m 11s; total estimated time: 10m 12s"
+      ],
+      "timeMins": 10.2,
+      "changes": 0,
+      "expect": {
+        "ok": true,
+        "plates": [
+          {
+            "index": 1,
+            "timeSec": 612,
+            "changes": 0,
+            "slots": [
+              {
+                "slot": 1,
+                "grams": 3.73,
+                "mm": 1232.38,
+                "gramsDerived": true
+              }
+            ],
+            "warnings": []
+          }
+        ]
+      }
+    }
+  ],
+  "stale": [
+    {
+      "name": "same engine, version, profiles",
+      "a": {
+        "engine": "orca",
+        "version": "2.5.1",
+        "profiles": {
+          "machine": "Snapmaker U1 (0.4 nozzle)",
+          "process": "0.20mm Standard @U1",
+          "filaments": [
+            "Generic PLA @U1"
+          ]
+        }
+      },
+      "b": {
+        "engine": "orca",
+        "version": "2.5.1",
+        "profiles": {
+          "machine": "Snapmaker U1 (0.4 nozzle)",
+          "process": "0.20mm Standard @U1",
+          "filaments": [
+            "Generic PLA @U1"
+          ]
+        }
+      },
+      "stale": false
+    },
+    {
+      "name": "new version",
+      "a": {
+        "engine": "orca",
+        "version": "2.5.1",
+        "profiles": {}
+      },
+      "b": {
+        "engine": "orca",
+        "version": "2.5.2",
+        "profiles": {}
+      },
+      "stale": true
+    },
+    {
+      "name": "another filament profile",
+      "a": {
+        "engine": "bambu",
+        "version": "02.08",
+        "profiles": {
+          "filaments": [
+            "Bambu PLA Basic"
+          ]
+        }
+      },
+      "b": {
+        "engine": "bambu",
+        "version": "02.08",
+        "profiles": {
+          "filaments": [
+            "Bambu PETG HF"
+          ]
+        }
+      },
+      "stale": true
+    },
+    {
+      "name": "another engine",
+      "a": {
+        "engine": "builtin",
+        "version": null,
+        "profiles": {}
+      },
+      "b": {
+        "engine": "orca",
+        "version": "2.5.1",
+        "profiles": {}
+      },
+      "stale": true
+    }
+  ],
+  "reprice": [
+    {
+      "name": "an unsent quote",
+      "order": {
+        "status": "quote"
+      },
+      "may": true
+    },
+    {
+      "name": "a sent quote",
+      "order": {
+        "status": "quote",
+        "quoteSentAt": "2026-11-10T09:00:00Z"
+      },
+      "may": false
+    },
+    {
+      "name": "an accepted job",
+      "order": {
+        "status": "pending",
+        "price": 120
+      },
+      "may": false
+    },
+    {
+      "name": "invoiced",
+      "order": {
+        "status": "completed",
+        "invoiceNumber": "INV-0042"
+      },
+      "may": false
+    },
+    {
+      "name": "a quote with an invoice number (proforma)",
+      "order": {
+        "status": "quote",
+        "invoiceNo": "P-7"
+      },
+      "may": false
+    },
+    {
+      "name": "nothing",
+      "order": null,
+      "may": false
+    }
+  ]
+}
