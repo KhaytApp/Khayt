@@ -517,6 +517,9 @@ public actor KhaytEngine {
         "calculator-cost",
         // A failure allowance learned from the shop's own QC fails and waste.
         "failure-rate",
+        // The id a part without one is owed (stable across computers).
+        // Before `order-new` and `recurring-orders`, which give it.
+        "part-ids",
         "order-new",
         // A linked reprint after a QC failure — the desktop's rule, so a Mac
         // reprint reaches the first-pass and RMA figures. After `order-new`,

@@ -224,6 +224,9 @@ final class Shop {
     /// the controls that appear only then (a rename pencil, Restore) are in
     /// the picture. The sample has no build, so every write still refuses.
     var pretendsWritable = false
+    /// A write of the ids id-less parts are owed is under way
+    /// (`writeMissingPartIds`); the reload it ends with must not start another.
+    @ObservationIgnored var partIdsWriting = false
     /// The snapshot runner asking the VAT card for a dialog: "unfile" or "refile".
     var pretendVatDialog: String?
     /// The snapshot runner drawing the machine cards as a shop that may press them
@@ -958,7 +961,7 @@ final class Shop {
         // (`OvertakenLoadTests`.)
         func overtaken() -> Bool { generation != loadGeneration }
         do {
-            let root: [String: JSONValue]
+            var root: [String: JSONValue]
             var library: (items: [LibraryFile], skipped: [String])?
             // The jobs and their print history, decoded with the library off
             // the main thread when the book was read from disk.
@@ -1095,6 +1098,16 @@ final class Shop {
             if engine == nil {
                 do { engine = try KhaytEngine() }
                 catch { engineProblem = self.said(error) }
+            }
+            // Parts with no id in the book get the id they are owed, here,
+            // before anything below reads the jobs (`Shop+PartIds.swift`).
+            // Written back only when this Mac owns the book.
+            var owedPartIds = false
+            if let engine, let made = await Self.rowsWithPartIds(Self.rows(root, "printLog"), engine: engine) {
+                if overtaken() { return }
+                root["printLog"] = .array(made.orders)
+                if let again = try? Self.decodeOrders(root) { orders = again.items }
+                owedPartIds = true
             }
             // `settings.lang` and not the system language: a Riyadh shop on an
             // English Mac still keeps its book in Arabic, and the book is what
@@ -1552,6 +1565,11 @@ final class Shop {
             remeasureIfDue()
             createRecurringIfDue()
             readProvenanceIfDue()
+            // The ids given above, into the book, when it is this Mac's to
+            // write. The reload that write ends with finds none missing.
+            if owedPartIds, ownership != nil, next.build != nil, !partIdsWriting {
+                Task { await self.writeMissingPartIds() }
+            }
             // The quote follow-ups the shop switched on (Settings ▸ Quote
             // follow-ups) — after the dashboard has chosen which are due.
             followUpQuotesIfDue()
