@@ -219,7 +219,16 @@ struct BookWriter {
     func recordFollowUp(orderId: String, engine: KhaytEngine, now: Date = Date()) async throws {
         try await rewriteOrder(orderId) { row, _ in
             guard case .object(let o) = row, o["status"] == .string("quote") else { throw Refusal.notAQuote }
-            return try await engine.markFollowUp(order: row, now: now)
+            let marked = try await engine.markFollowUp(order: row, now: now)
+            // The follow-up message carries the quote's total to the customer,
+            // so it is a send: stamped `quoteSharedAt` (the first one kept), or
+            // the shared rule (`quoteIsDraft`, #2524) would still take it for
+            // a draft whose price may follow a parts change unasked.
+            guard case .object(var after) = marked else { return marked }
+            if after["quoteSharedAt"] == nil || after["quoteSharedAt"] == .null {
+                after["quoteSharedAt"] = .string(ISO8601DateFormatter().string(from: now))
+            }
+            return .object(after)
         }
     }
 

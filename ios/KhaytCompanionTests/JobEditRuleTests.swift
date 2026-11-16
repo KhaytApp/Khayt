@@ -463,6 +463,47 @@ final class JobEditRuleTests: XCTestCase {
         XCTAssertEqual(try ask("KhaytOrderEdit.quoteIsDraft(\(json(sent)))"), .bool(false), "lib agrees")
     }
 
+    /// Every way the phone sends a quote stamps it, so the stamp's promise
+    /// holds: Send quote and the customer-page card's share (both
+    /// `quoteShareEnded`), and a WhatsApp follow-up, whose message carries the
+    /// total (`recordFollowUp`). After each, a re-price asks.
+    func testEveryWayThePhoneSendsAQuoteMakesARepriceAsk() async throws {
+        var draft = NewOrderDraft()
+        draft.project = "Bracket"; draft.isQuote = true
+        var made = try BookWriter.orderRecord(from: draft, settings: [:], machines: [], existing: [], now: now)
+        guard case .string(let shareId)? = made["id"] else { return XCTFail("no id") }
+        made["parts"] = .array([Self.part("a", base: 100)])
+        var second = made; second["id"] = .string("Q-FOLLOW")
+        let (api, book) = try client(orders: [.object(made), .object(second)])
+        let engine = try await BookReader(book: book).sharedEngine()
+        for id in [shareId, "Q-FOLLOW"] {
+            let lock = try await engine.partsLock(try row(book, id))
+            XCTAssertFalse(lock.askPrice, "\(id): a draft before it goes out")
+        }
+        // A share the sheet reports cancelled is no send.
+        let cancelled = try await api.quoteShareEnded(orderId: shareId, completed: false, now: now)
+        XCTAssertFalse(cancelled)
+        let stillDraft = try await engine.partsLock(try row(book, shareId))
+        XCTAssertFalse(stillDraft.askPrice)
+        // Shared (Send quote, or the customer-page card): it asks.
+        let shared = try await api.quoteShareEnded(orderId: shareId, completed: true, now: now)
+        XCTAssertTrue(shared)
+        let afterShare = try await engine.partsLock(try row(book, shareId))
+        XCTAssertTrue(afterShare.askPrice, "shared: a re-price asks")
+        // Followed up on WhatsApp, never shared: the message had its total.
+        try await BookWriter(book: book).recordFollowUp(orderId: "Q-FOLLOW", engine: engine, now: now)
+        let followed = try row(book, "Q-FOLLOW")
+        guard case .object(let f) = followed else { return XCTFail("the quote") }
+        XCTAssertEqual(f["followUpCount"], .number(1))
+        XCTAssertNotNil(f["quoteSharedAt"], "a follow-up is a send")
+        let afterFollowUp = try await engine.partsLock(followed)
+        XCTAssertTrue(afterFollowUp.askPrice, "followed up: a re-price asks")
+        // A second follow-up keeps the first send's stamp.
+        try await BookWriter(book: book).recordFollowUp(orderId: "Q-FOLLOW", engine: engine, now: now.addingTimeInterval(86_400))
+        guard case .object(let again) = try row(book, "Q-FOLLOW") else { return XCTFail("the quote") }
+        XCTAssertEqual(again["quoteSharedAt"], f["quoteSharedAt"], "the first send is kept")
+    }
+
     /// The `quoteSentAt` every quote is given when it is made is not a send;
     /// a quote with no stamp (an older app's) asks whatever it holds.
     func testQuoteSentAtIsNoSendAndAnUnstampedQuoteAsks() async throws {

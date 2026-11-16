@@ -4,6 +4,14 @@ import SwiftUI
 /// it, answered from here.
 struct PortalCard: View {
     let token: String
+    /// The quote this page is for, when the job is one. Its link carries the
+    /// price, so a share the sheet reports done stamps it sent
+    /// (`quoteSharedAt`), as Send quote does — else the shared rule
+    /// (`quoteIsDraft`) would take a sent quote for a draft (#2524).
+    var quoteId: String? = nil
+    /// After a quote's share was stamped: the page reads the job again.
+    var onQuoteShared: (() async -> Void)? = nil
+    @State private var sharingQuote: ShareItem?
     @EnvironmentObject private var api: KhaytAPIClient
     @State private var messages: [PortalMessage]?
     @State private var reply = ""
@@ -18,8 +26,15 @@ struct PortalCard: View {
                     .foregroundStyle(KhaytDesign.ink)
                 Spacer()
                 if let link = api.customerLink(token: token) {
-                    ShareLink(item: link) { Label(L10n.tr("portal.share"), systemImage: "square.and.arrow.up") }
+                    if quoteId != nil {
+                        Button { sharingQuote = ShareItem(url: link) } label: {
+                            Label(L10n.tr("portal.share"), systemImage: "square.and.arrow.up")
+                        }
                         .font(.khayt(13, .semibold, relativeTo: .footnote))
+                    } else {
+                        ShareLink(item: link) { Label(L10n.tr("portal.share"), systemImage: "square.and.arrow.up") }
+                            .font(.khayt(13, .semibold, relativeTo: .footnote))
+                    }
                 }
             }
             if let messages {
@@ -61,6 +76,19 @@ struct PortalCard: View {
         .padding(14)
         .card()
         .task { await load() }
+        .sheet(item: $sharingQuote) { item in
+            ShareSheet(items: [item.url]) { _, completed in
+                sharingQuote = nil
+                guard let quoteId else { return }
+                Task {
+                    do {
+                        guard try await api.quoteShareEnded(orderId: quoteId, completed: completed) else { return }
+                        await onQuoteShared?()
+                    } catch { problem = error.localizedDescription }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     private func load() async {
