@@ -334,7 +334,41 @@ function extract(input) {
   return { pngBase64: null, colors: [], swapCount: 0, source: null };
 }
 
-const api = { extract, extractGcodeThumbnail, extract3mf, parse3mfColors, colorsFromConfigs, colours3mf, usedSlots, coloursStale, COLOURS_READER, normHex };
+/**
+ * Put a colour read on a library record: the one rule both apps re-read with
+ * (lifted from renderer/printfiles.js on Nov 16 2026, for the Mac's re-read).
+ *
+ * MUTATES `rec`. Returns `{ changed }`: whether its colours, swap count, reader
+ * or swapsKnown moved. Rules:
+ *   - the read's `reader` is stamped as `coloursReader`, whatever it found;
+ *   - a read that cannot name the slots (`slotsKnown: false`) or found none
+ *     leaves the colours and swap count as they were: a re-read never empties
+ *     what was there;
+ *   - otherwise the colours are the read's, keeping the grams an earlier slice
+ *     gave for a colour that is still there and that this read has none for;
+ *   - `swapsKnown` is true only when the read says so (only a slice knows);
+ *   - `updatedAt` is never touched: what a file is printed in is not an edit.
+ */
+function applyColours(rec, read) {
+  if (!rec || typeof rec !== 'object' || !read || typeof read !== 'object') return { changed: false };
+  const snap = () => JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.coloursReader || 0,
+    rec.swapsKnown === undefined ? null : rec.swapsKnown]);
+  const was = snap();
+  if (read.reader) rec.coloursReader = read.reader;
+  const list = Array.isArray(read.colors) ? read.colors : [];
+  if (read.slotsKnown !== false && list.length) {
+    const old = Array.isArray(rec.colors) ? rec.colors : [];
+    rec.colors = list.map((c) => {
+      const o = old.find((x) => x && c && x.hex === c.hex);
+      return o && c.grams == null && o.grams != null ? Object.assign({}, c, { grams: o.grams }) : c;
+    });
+    rec.swapCount = read.swapCount || 0;
+    rec.swapsKnown = read.swapsKnown === true;
+  }
+  return { changed: was !== snap() };
+}
+
+const api = { extract, extractGcodeThumbnail, extract3mf, parse3mfColors, colorsFromConfigs, colours3mf, usedSlots, coloursStale, applyColours, COLOURS_READER, normHex };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytThumb = api;
 

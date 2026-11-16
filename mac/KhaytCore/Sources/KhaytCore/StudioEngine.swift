@@ -738,4 +738,32 @@ public actor StudioEngine {
         }
     }
 
+
+    /// The slots a 3MF's paint uses, from its `.model` members (laid out as
+    /// `Converter.describe` lays them, the XML bound by name in `meshes`):
+    /// `lib/mf-mesh.js` `slotsUsed`, the same codec the desktop reads paint
+    /// with. Nil when the mesh could not be read (past the hard cap, broken).
+    ///
+    /// HERE, NOT ON `KhaytEngine`: decoding a painted mesh takes seconds (the
+    /// desktop measured up to ~7 s), and the shop's engine is the one actor
+    /// every screen's rules wait on. This engine is the studio's own context.
+    public func paintSlots(_ members: [JSONValue], meshes: [String: String]) throws -> [Int]? {
+        try runtime.withBoundStrings(meshes) {
+            try runtime.call2("""
+                (function (members) {
+                  members = members.map(function (m) {
+                    if (!m || !m.meshVar) return m;
+                    var text = globalThis[m.meshVar];
+                    return typeof text === 'string' ? { name: m.name, data: text } : m;
+                  }).filter(function (m) { return m && typeof m.data === 'string'; });
+                  var mesh = null;
+                  // One preview face: only slotsUsed is wanted, counted over every triangle.
+                  try { mesh = KhaytMfMesh.extractMeshFromMembers(members, 1); } catch (e) { mesh = null; }
+                  if (!mesh || mesh.skipped || !Array.isArray(mesh.slotsUsed)) return null;
+                  return mesh.slotsUsed;
+                })(ARG0)
+                """, [.array(members)], as: [Int]?.self)
+        }
+    }
+
 }
