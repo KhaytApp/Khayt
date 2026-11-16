@@ -106,23 +106,31 @@ struct ColourReadTests {
 
     // MARK: - The re-read's write
 
-    @Test("the re-read writes only the four colour fields, and only to records it read")
+    @Test("the re-read writes only the four colour fields, only to records it read, and only where they did not change meanwhile")
     func rereadPatch() {
         let rows: [JSONValue] = [
             .object(["id": .string("a"), "name": .string("kept"), "colors": .array([Self.red, Self.blue]),
                      "swapCount": .number(3), "notes": .string("typed meanwhile")]),
             .object(["id": .string("b"), "colors": .array([Self.blue])]),
+            // Its colours changed after the file was read (a slice's figures, a pull).
+            .object(["id": .string("c"), "colors": .array([Self.red]), "swapCount": .number(5)]),
         ]
-        let patch: [String: JSONValue] = ["colors": .array([Self.red]), "swapCount": .number(0), "coloursReader": .number(2)]
-        let out = ColoursReread.apply(["a": patch], to: rows)
-        guard case .object(let a) = out[0] else { Issue.record("not an object"); return }
+        let now: [String: JSONValue] = ["colors": .array([Self.red]), "swapCount": .number(0), "coloursReader": .number(2)]
+        let patches: [String: ColoursReread.Patch] = [
+            "a": .init(was: ["colors": .array([Self.red, Self.blue]), "swapCount": .number(3)], now: now),
+            "c": .init(was: ["colors": .array([Self.blue]), "swapCount": .number(1)], now: now),
+        ]
+        let out = ColoursReread.apply(patches, to: rows)
+        #expect(out.written == 1)
+        guard case .object(let a) = out.rows[0] else { Issue.record("not an object"); return }
         #expect(a["colors"] == .array([Self.red]))
         #expect(a["swapCount"] == .number(0))
         #expect(a["coloursReader"] == .number(2))
         #expect(a["swapsKnown"] == nil)
-        #expect(a["notes"] == .string("typed meanwhile"), "an edit that landed meanwhile is kept")
+        #expect(a["notes"] == .string("typed meanwhile"), "an edit to another field is kept")
         #expect(a["name"] == .string("kept"))
-        #expect(out[1] == rows[1])
+        #expect(out.rows[1] == rows[1], "not read: untouched")
+        #expect(out.rows[2] == rows[2], "changed since it was read: untouched, and due again next launch")
     }
 
     static func file(_ o: [String: JSONValue]) throws -> LibraryFile {

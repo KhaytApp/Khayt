@@ -1032,9 +1032,7 @@ struct NewJobSheet: View {
     /// which is the thing that was missing while this app quoted material and
     /// called it a price.
     @ViewBuilder private var breakdown: some View {
-        let sum = parts.compactMap(\.parts).reduce(into: (m: 0.0, k: 0.0, l: 0.0, b: 0.0)) { out, p in
-            out.m += p.material; out.k += p.machine; out.l += p.labor; out.b += p.buffer
-        }
+        let sum = Self.breakdownSum(parts)
         if sum.m + sum.k + sum.l + sum.b > 0 {
             HStack(spacing: 14) {
                 chip("calc.bd.material", sum.m)
@@ -1042,6 +1040,19 @@ struct NewJobSheet: View {
                 chip("calc.bd.labor", sum.l)
                 chip("calc.bd.buffer", sum.b)
             }
+        }
+    }
+
+    /// The cart's cost, by where it went: each part's breakdown is for ONE
+    /// piece (`part.cost` beside it is too, and the row shows cost × qty), so
+    /// it is counted `qty` times. Summed once per line, a "×4" bracket showed a
+    /// quarter of its material, machine, labour and buffer under a total that
+    /// charged all four (beta.38 review, Nov 16).
+    static func breakdownSum(_ drafts: [Draft]) -> (m: Double, k: Double, l: Double, b: Double) {
+        drafts.reduce(into: (m: 0.0, k: 0.0, l: 0.0, b: 0.0)) { out, d in
+            guard let p = d.parts else { return }
+            let q = Double(max(d.qty, 0))
+            out.m += p.material * q; out.k += p.machine * q; out.l += p.labor * q; out.b += p.buffer * q
         }
     }
 

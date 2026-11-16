@@ -16,6 +16,11 @@ import KhaytCore
 /// A file that is not here (a vault on another Mac, a linked Drive model not
 /// downloaded) is left exactly as it was and read when it is here: reading it
 /// would be downloading it.
+/// Thrown from inside a write that turns out to have nothing to write, so the
+/// book is not rewritten (and its rollback copy not rolled) for nothing. A
+/// StoreWriter write always rewrites the file once its closure returns.
+struct NothingToWrite: Error {}
+
 enum ColoursReread {
 
     static func is3MF(_ file: LibraryFile) -> Bool {
@@ -38,19 +43,43 @@ enum ColoursReread {
     /// Between two records, so a book of painted models never runs the CPU flat.
     static let pause: Duration = .milliseconds(150)
 
-    /// `rows` with each id in `patches` given its patched colour fields.
-    /// Records not in `patches` are untouched.
-    nonisolated static func apply(_ patches: [String: [String: JSONValue]],
-                                  to rows: [JSONValue]) -> [JSONValue] {
-        rows.map { row in
+    /// One record's re-read: its four colour fields as they were when the
+    /// file was read (`was`) and as the rule left them (`now`).
+    struct Patch: Sendable {
+        var was: [String: JSONValue]
+        var now: [String: JSONValue]
+    }
+
+    /// The four colour fields of a record, those it has.
+    nonisolated static func colourFields(_ o: [String: JSONValue]) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        for k in fields { if let v = o[k] { out[k] = v } }
+        return out
+    }
+
+    /// `rows` with each patched record given its new colour fields, ONLY
+    /// where those fields are still what they were when the file was read.
+    /// A record whose colours changed meanwhile (a slice's figures read the
+    /// same launch, another machine's copy pulled in) is left as it is, and
+    /// is due again next launch if its reader is still old. Compare-and-set,
+    /// because the re-read takes seconds a file and the book does not wait
+    /// (beta.38 review). Returns the rows and how many were written.
+    nonisolated static func apply(_ patches: [String: Patch],
+                                  to rows: [JSONValue]) -> (rows: [JSONValue], written: Int) {
+        var written = 0
+        let out = rows.map { row -> JSONValue in
             guard case .object(var o) = row, case .string(let id)? = o["id"],
-                  let patch = patches[id] else { return row }
+                  let patch = patches[id], colourFields(o) == patch.was else { return row }
             for k in fields {
-                if let v = patch[k] { o[k] = v } else { o.removeValue(forKey: k) }
+                if let v = patch.now[k] { o[k] = v } else { o.removeValue(forKey: k) }
             }
+            written += 1
             return .object(o)
         }
+        return (out, written)
     }
+
+
 }
 
 extension Shop {
@@ -79,21 +108,32 @@ extension Shop {
             guard !due.isEmpty, let self else { return }
             var raw: [String: [String: JSONValue]] = [:]
             for case .object(let o) in rows { if case .string(let id)? = o["id"] { raw[id] = o } }
-            var pending: [String: [String: JSONValue]] = [:]
+            var pending: [String: ColoursReread.Patch] = [:]
             var wroteAny = false
             func writeReadColours() async -> Bool {
                 guard !pending.isEmpty else { return true }
                 let sending = pending
                 do {
                     // lock: system — background: colours re-read because the colour rule changed (reader 2).
+                    // NOT STAMPED (`recordingDeletes: false`): what a file is
+                    // printed in is read from the file, not an edit, and a
+                    // stamped re-read would beat another machine's real edit
+                    // to the same record that has not been pulled yet. The
+                    // other derived re-reads write the same way (Shop+Library).
                     try await StoreWriter.updateOffMain(
                         storeURL: build.storeURL,
                         owns: { StoreLock.weOwnIt(build) },
-                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                        recordingDeletes: false
                     ) { root in
-                        guard case .array(let rows)? = root["printFiles"] else { return }
-                        root["printFiles"] = .array(ColoursReread.apply(sending, to: rows))
+                        guard case .array(let rows)? = root["printFiles"] else { throw NothingToWrite() }
+                        let done = ColoursReread.apply(sending, to: rows)
+                        guard done.written > 0 else { throw NothingToWrite() }
+                        root["printFiles"] = .array(done.rows)
                     }
+                } catch is NothingToWrite {
+                    pending = [:]
+                    return true
                 } catch {
                     // Not ours, or the disk refused: what was not written is
                     // still due at the next launch.
@@ -109,12 +149,17 @@ extension Shop {
                 if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
                 guard await PinWork.run({ FileManager.default.fileExists(atPath: url.path) }),
                       let entries = await PinWork.run({ try? Zip.entries(of: url) }),
-                      let read = await ColourRead.colours(url, entries: entries, engine: engine),
-                      let applied = try? await engine.applyColours(record, read: read),
+                      var read = await ColourRead.colours(url, entries: entries, engine: engine) else { continue }
+                // A completed read is stamped with TODAY's reader, whatever path
+                // the rule took: a file whose project settings are not JSON
+                // falls to the old loaded-spools answer marked reader 1, and
+                // stamped 1 it was due again at every launch, forever (beta.38
+                // review). It was read by this reader; that is what the number says.
+                if (read.reader ?? 0) < reader { read.reader = reader }
+                guard let applied = try? await engine.applyColours(record, read: read),
                       applied.changed else { continue }
-                var patch: [String: JSONValue] = [:]
-                for k in ColoursReread.fields { if let v = applied.record[k] { patch[k] = v } }
-                pending[file.id] = patch
+                pending[file.id] = ColoursReread.Patch(was: ColoursReread.colourFields(record),
+                                                       now: ColoursReread.colourFields(applied.record))
                 if pending.count >= ColoursReread.batch, !(await writeReadColours()) { return }
                 try? await Task.sleep(for: ColoursReread.pause)
             }

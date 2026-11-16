@@ -82,7 +82,8 @@ struct LanServerTests {
             let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
             self.pairing = pairing
             host.pairing = pairing
-            let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 })
+            // Off in beta.38; these tests exercise it, on this window only.
+            let connectorPairing = LanConnectorPairing(clock: { box.now.timeIntervalSince1970 }, enabled: true)
             self.connectorPairing = connectorPairing
             host.connectorPairing = connectorPairing
             host.library = { [shop] q, folder, offset, limit, filter in

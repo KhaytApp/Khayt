@@ -27,7 +27,13 @@ extension Shop {
     /// PIN change signs it out with the phones.
     func approveConnector() async {
         guard permitted("settings", "edit") else { return }
-        let pin = (try? await Secrets.open(lanConfig.pin, for: source)) ?? ""
+        // REFUSED when the PIN will not unseal, never enrolled under "". The
+        // store makes room under the PIN it is given, so "" took every phone
+        // off, and the connector, keyed to a PIN nothing uses, could never
+        // connect either (beta.38 review).
+        let pin: String
+        do { pin = try await Secrets.open(lanConfig.pin, for: source) }
+        catch { lanConnectorPairing.refuse(.pinUnreadable); return }
         let store = lanDeviceStore
         let now = Date()
         try? lanConnectorPairing.approve { asked in
@@ -121,7 +127,7 @@ struct PairASlicer: View {
                     .environment(\.layoutDirection, .leftToRight)
                     .accessibilityIdentifier("connector-check")
                 Text(shop.words.callIt("mac.apps_check"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.callout)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
                 Text(shop.words.callIt("mac.apps_may"))
@@ -133,7 +139,9 @@ struct PairASlicer: View {
                         .disabled(!mayApprove)
                         .accessibilityIdentifier("connector-deny")
                     Button(shop.words.callIt("mac.apps_approve")) { Task { await shop.approveConnector() } }
-                        .keyboardShortcut(.defaultAction)
+                        // No default action: Return in Settings at the wrong
+                        // moment must not approve a request that has just
+                        // appeared (beta.38 review).
                         .disabled(!mayApprove)
                         .accessibilityIdentifier("connector-approve")
                 }
@@ -189,6 +197,7 @@ struct PairASlicer: View {
         case .paired(let name)?: return words.callIt("mac.pair_done", ["name": .string(ConnectedApps.name(name, words))])
         case .timedOut?: return words.callIt("mac.apps_timed_out")
         case .serverStopped?: return words.callIt("mac.pair_server_stopped")
+        case .pinUnreadable?: return words.callIt("mac.apps_pin_unreadable")
         case .byOwner?, nil: return nil
         }
     }
