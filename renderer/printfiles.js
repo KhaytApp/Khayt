@@ -1251,31 +1251,16 @@
    * whatever the model needs (vegueta22: 8 shown, 5 printed). The rule now
    * names only the slots the print uses (lib/thumbnail-extract.js), and the
    * records the old one wrote are read again where their file is here —
-   * once a session, one at a time, in the converter's worker. Same number as
-   * lib/thumbnail-extract.js COLOURS_READER; test/library-colours.test.js
-   * holds them together. */
-  const COLOURS_READER = 2;
-  const coloursStale = (rec) => !(Number(rec && rec.coloursReader) >= COLOURS_READER);
-  /** Put a colour read on a record. A read that cannot name the slots (a
-   *  painted model whose mesh would not read, a mixed filament) stamps the
-   *  record and leaves its colours: a re-read never empties what was there. */
-  function applyColours(rec, r) {
-    if (!rec || !r) return false;
-    const was = JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.swapsKnown, rec.coloursReader || 0]);
-    if (r.reader) rec.coloursReader = r.reader;
-    const list = Array.isArray(r.colors) ? r.colors : [];
-    if (r.slotsKnown !== false && list.length) {
-      const old = Array.isArray(rec.colors) ? rec.colors : [];
-      // Grams a slice gave before, kept where the same colour is still there.
-      rec.colors = list.map((c) => {
-        const o = old.find((x) => x && x.hex === c.hex);
-        return o && c.grams == null && o.grams != null ? Object.assign({}, c, { grams: o.grams }) : c;
-      });
-      rec.swapCount = r.swapCount || 0;
-      rec.swapsKnown = r.swapsKnown === true;
-    }
-    return was !== JSON.stringify([rec.colors || [], rec.swapCount || 0, rec.swapsKnown, rec.coloursReader || 0]);
-  }
+   * once a session, one at a time, in the converter's worker.
+   *
+   * One rule for every app: KhaytThumb (lib/thumbnail-extract.js) names the
+   * current reader and puts a read on a record. A read that cannot name the
+   * slots stamps the record and leaves its colours: a re-read never empties
+   * what was there, and keeps a slice's grams where the colour is still there.
+   * The Mac runs the same copy (test/thumbnail-apply-colours.test.js). */
+  const Thumb = () => (typeof KhaytThumb !== 'undefined' ? KhaytThumb : null);
+  const coloursStale = (rec) => { const T = Thumb(); return !!T && T.coloursStale(rec); };
+  const applyColours = (rec, r) => { const T = Thumb(); return !!T && T.applyColours(rec, r).changed; };
   let _coloursSweep = null;
   function sweepColours() {
     const hub = api();
