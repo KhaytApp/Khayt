@@ -5,6 +5,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **iPhone library: what the colour dots mean, "+N" past three, and the filament swaps.** A Library row shows up to three colour dots, then "+2" for the rest (a painted five-colour model no longer looks like a three-colour one), and VoiceOver reads it in the Mac card's words ("Colours: 5. The filaments this print uses."). A model's page has a new Colours card: every dot, the colour line, and, for a sliced file, "↔ 4 swaps" with what that means, or for an unsliced one, that swaps are known once it is sliced. The rule is the Mac's and desktop's: the record's `swapsKnown`, else a print time; the number shows only when a slicer counted it and it is above 0. The phone's own copy reads `swapCount`/`swapsKnown` from the record; at the shop it reads them from `GET /api/library` (#2515 for the desktop's server; the Mac's answer follows), and an older computer that sends neither still works by the print-time rule. Words from the desktop's `plib.*` in all 9 languages. Figma: iPhone file, 235:49 / 235:109 / 235:134. Sample shop: the King Abdulaziz relief has five colours (unsliced), the drone arm 14 swaps.
+- **LAN library answer: each model says its filament swaps (`swapCount`, `swapsKnown`).** `lib/lan-library.js itemOf` now passes on the record's swap count and whether a slicer counted it (the fields `applyColours` writes, #2500/#2502), so a phone at the shop can say "about N swaps" as the Mac and desktop cards do. Both are left out when the record has none; a phone then works `swapsKnown` out from the print time, the cards' rule. Documented in `docs/LAN_API.md`; the library-wire fixtures carry one sliced and one unsliced model. The Mac's native answer (`Shop+PhoneLibrary.swift`) follows in the Mac lane.
+- **Fixed (Mac): beta.38 showed one colour dot on painted models. They are read again.** An unsliced Orca/Bambu project carries a `slice_info.config` that is only a header and names no filament. Beta.38's new colour reader (#2504) took that for a slice and never read the paint, so a model painted in five colours kept only its base filament. On this shop's 660 local 3MFs, 206 came out wrong, nearly all of them painted models left with 1 dot. The Mac now asks the shared rule whether the slice names a filament it printed, and reads the paint when it does not. The colour reader number moves from 2 to 3, so **on the first launch of this build every model beta.38 read is read again in the background**, where its file is on this Mac; nothing else about a model changes. Checked on copies of all 662 local 3MFs against `lib/thumbnail-extract.js` under node: 644 name the same colours in the same order, 186 models gain the dots they lost and none loses one. 11 others are single models of 436 MB that the Mac reads and node cannot; they are unchanged. 7 painted projects hold more model data than this Mac's paint budget (over 910 MB); they keep the colours they have until the paint can be read in pieces. The desktop is not affected: it reads the paint whenever no filament is named. New sample fixture `painted-stub-slice.3mf`, and a Swift test that runs the Mac's own paint path (streamed check, describe, `StudioEngine.paintSlots`) and requires the slots `lib/mf-mesh.js` decodes under node, which is the test that was missing.
 - **Shared rules for the slicer plugin (not wired yet).** Two pure modules the Mac will use when the slicer plugin's routes land, both off until "Pair a slicer" is switched on. `lib/connector-slice.js` checks what Khayt for OrcaSlicer announces before it sends a file. It copies the fields one by one from an allowlist and refuses anything that would unbind the file from its hash. Its quote, job, attach or print request is kept only as a suggestion for the From slicer inbox, and nothing creates a job. `lib/connector-queue.js` builds the queue the plugin's tab shows: open jobs with their number, stage, machine name, and the name of the file that plugin itself sent. It never includes a title, a customer's name, phone, email or address, a price or a note, because titles can hold a customer's name. A redaction test proves it on a sample book. `docs/connector-capture.vectors.json` lets the plugin check its captures against the same rule.
 - **Security (Mac): slicer pairing commits before it reveals (v2).** In v1, the check number both screens show could be beaten by a device in the middle that tried about a million keys of its own, which takes well under a second. That was found in pre-release review, before any slicer was paired. Now the plugin sends only a hash of its key and a random nonce first. The Mac draws a fresh key after that, and the plugin reveals its key only after checking the Mac's signed answer. No number exists before the reveal matches. Each opened window allows at most 3 offers. A device in the middle now gets one blind 1-in-a-million guess per offer. A v1 plugin is told to upgrade. Covered by new shared vectors and a grinding test. `docs/LAN_API.md` describes the protocol. Pair a slicer stays hidden in beta.38.
 - **Desktop library: the colour re-read runs the one shared rule.** renderer/printfiles.js now calls KhaytThumb.applyColours and coloursStale from lib/thumbnail-extract.js, the copy the Mac runs, and its own copy is gone. Nothing a shop sees changes.
@@ -9683,6 +9685,27 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.39] - 2026-11-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+This release fixes beta.38 showing a single colour dot on painted library models.
+
+### Fixed
+
+- **Painted models show all their colours again.** Beta.38 read a painted 3MF that had not been sliced as one colour, so its Library card showed a single dot. Khayt now reads the paint, and the card shows every filament the print uses.
+
+### What happens on first launch
+
+- **Khayt reads your painted Library files again, in the background.** It goes one model at a time, only where the file is on this Mac, and you can keep working. A large library takes about half an hour. Cards fill in their dots as it goes; nothing else about a model changes.
+- **It may use a few GB of memory for a short time** while it reads a very large painted file. The memory is given back when that file is done.
+
+### Known in this beta
+
+- **A few very large painted projects still show too few dots.** A project with more than about 900 MB of model data is too large to read in one piece on this Mac, so its card keeps the dots it has. A later beta reads these in pieces.
+- **Pairing a slicer plugin is still hidden** (Settings → Online → Connected apps). Its stronger pairing check is in this build, switched off until the plugin is ready.
 
 ## [4.0.0-beta.38] - 2026-11-16
 

@@ -77,8 +77,13 @@ function normHex(h) {
  * written by the rule that took the printer's LOADED spools for the print's
  * colours, and is read again where its file is in reach (`coloursStale`).
  * Reader 2: only the slots the print uses (Nov 16 2026).
+ * Reader 3: the same rule; the number moved because the Mac's reader 2 (beta.38)
+ * took an unsliced project's stub slice_info.config, which names no filament,
+ * for a slice and never read the paint, so a painted model kept only its
+ * base filament (one dot for a print in five). Every reader-2 record is read
+ * again (Nov 16 2026).
  */
-const COLOURS_READER = 2;
+const COLOURS_READER = 3;
 function coloursStale(rec) {
   const r = Number(rec && rec.coloursReader);
   return !(Number.isFinite(r) && r >= COLOURS_READER);

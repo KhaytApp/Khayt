@@ -2,7 +2,8 @@ import Foundation
 import KhaytCore
 
 /// What a 3MF is printed in: the slots the print USES, read the way the
-/// desktop reads them (`lib/thumbnail-extract.js` reader 2, #2500).
+/// desktop reads them (`lib/thumbnail-extract.js` reader 2, #2500; reader 3
+/// for the stub-slice fix).
 ///
 /// ── WHY THE PAINT HAS TO BE READ ─────────────────────────────────────────
 ///
@@ -116,16 +117,33 @@ enum ColourRead {
         return c
     }
 
-    /// A 3MF's colours, under reader 2: the configs and the paint.
+    /// A 3MF's colours, under reader 3: the configs and the paint.
     static func colours(_ url: URL, entries: [Zip.Entry], engine: KhaytEngine) async -> KhaytEngine.Colours? {
         let c = await PinWork.run { configs(entries, in: url) }
         // A sliced file names its colours from the slice; the paint is not needed.
-        let paint: JSONValue = c.sliceInfo.isEmpty
-            ? await paint(url, entries: entries, engine: engine)
-            : .object(["slots": .array([])])
+        if let sliced = await slice(c, engine: engine) { return sliced }
         return try? await engine.coloursFromConfigs(
             sliceInfo: c.sliceInfo, projectSettings: c.project, modelSettings: c.model,
-            prusa: c.prusa, layerRanges: c.layerRanges, paint: paint)
+            prusa: c.prusa, layerRanges: c.layerRanges,
+            paint: await paint(url, entries: entries, engine: engine))
+    }
+
+    /// The colours a SLICE names, or nil when the file is not sliced.
+    ///
+    /// Asked of the rule, not read off whether `slice_info.config` exists: an
+    /// unsliced Orca/Bambu project carries one too, a stub with a header and
+    /// no `<filament>`. Beta.38 took the stub for a slice and skipped the
+    /// paint, so a painted model kept only its base filament: one dot for a
+    /// print in five, on 206 of the shop's 660 local 3MFs (reader 3). The rule
+    /// says a file is sliced when the slice names a filament it printed
+    /// (`swapsKnown`), and that is the answer used here.
+    static func slice(_ c: Configs, engine: KhaytEngine) async -> KhaytEngine.Colours? {
+        guard !c.sliceInfo.isEmpty,
+              let read = try? await engine.coloursFromConfigs(
+                sliceInfo: c.sliceInfo, projectSettings: c.project, modelSettings: c.model,
+                prusa: c.prusa, layerRanges: c.layerRanges, paint: .object(["slots": .array([])])),
+              read.swapsKnown == true else { return nil }
+        return read
     }
 
     /// The slots an unsliced project uses, for `printFacts`' materials. Nil
@@ -133,7 +151,7 @@ enum ColourRead {
     /// what the file says, as before.
     static func usedSlots(_ url: URL, entries: [Zip.Entry], configs c: Configs,
                           engine: KhaytEngine) async -> [Int]? {
-        guard c.sliceInfo.isEmpty, !c.project.isEmpty else { return nil }
+        guard !c.project.isEmpty, await slice(c, engine: engine) == nil else { return nil }
         guard case .object(let p) = await paint(url, entries: entries, engine: engine),
               case .array(let raw)? = p["slots"] else { return nil }
         let painted = raw.compactMap { v -> Int? in if case .number(let n) = v { return Int(n) } else { return nil } }
