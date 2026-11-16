@@ -912,6 +912,12 @@ public actor KhaytEngine {
         // their siblings at call time, so their place here is not load-bearing.
         "api-token-scopes",
         "lan-rest",
+        // A paired slicer plugin (Khayt for OrcaSlicer): what its capture may
+        // say (`connector-slice`, checked field by field into the inbox) and
+        // the queue its tab may see (`connector-queue`: no customer data, an
+        // allowlist). Both read `order-status` / `machine-status` at call time.
+        "connector-slice",
+        "connector-queue",
         "carriers",
         // A job handed to a carrier: who, which service, under what tracking
         // number, and a parcel's status moved by hand without going backwards.
@@ -8051,6 +8057,12 @@ public actor KhaytEngine {
                 || 'Khayt';
             })(ARG0)
             """, [store], as: String.self)
+    }
+    /// A slicer plugin's capture, checked field by field (`lib/connector-slice.js`):
+    /// `{ok:true, capture, dropped}` or `{ok:false, reason, field}`.
+    public func connectorCheckSlice(_ capture: JSONValue, maxFileBytes: Int) throws -> JSONValue {
+        try runtime.call2("globalThis.KhaytConnectorSlice.check(ARG0, { maxFileBytes: ARG1 })",
+                          [capture, .number(Double(maxFileBytes))], as: JSONValue.self)
     }
     /// `YYYY-MM-DD` in the shop's own calendar, as the rule compares it.
     public func lanQuoteExpired(order: JSONValue, today: String) throws -> Bool {

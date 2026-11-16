@@ -1,0 +1,108 @@
+{
+  "about": "Khayt connector routes (Mac LanServer+Connector, plugin khayt-orca): the canonical request with a DECLARED body hash (a file upload signed at its head), the reply MAC, and the capture/queue seal. Fixed keys and nonces, test use only.",
+  "request": [
+    {
+      "name": "file head 0",
+      "keyHex": "8b2ef4a851780b65666d911ff9f55651abdb50d81d91514ef2cc2ba40effbb27",
+      "method": "PUT",
+      "target": "/api/connectors/slices/ABCDEFGHIJKLMNOP/file",
+      "time": "1800000000",
+      "nonce": "4304b5c7ed65f6fb9b49af49e978c829",
+      "bodyB64": "RzI4CkcxIFgxMCBZMTAK",
+      "bodyHash": "a515612f48fac2c3870ef43324ac2096c67273fc4df8488cd3d27cb15dff2c95",
+      "canonical": "khayt-req-v1\nPUT\n/api/connectors/slices/ABCDEFGHIJKLMNOP/file\n1800000000\n4304b5c7ed65f6fb9b49af49e978c829\na515612f48fac2c3870ef43324ac2096c67273fc4df8488cd3d27cb15dff2c95",
+      "mac": "zGbhn1hDOZkqegIckSbaqqA+wTM/3oQekqX8jFBzA3M="
+    },
+    {
+      "name": "file head 1",
+      "keyHex": "6774080293f1981d753a128d8f15cb97fdb7ea68ea74c31101c5398e93e30206",
+      "method": "PUT",
+      "target": "/api/connectors/slices/QRSTUVWXYZ234567/file",
+      "time": "1800000037",
+      "nonce": "1de162d66afcc5efd8a22daaab3c1f5e",
+      "bodyB64": "",
+      "bodyHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical": "khayt-req-v1\nPUT\n/api/connectors/slices/QRSTUVWXYZ234567/file\n1800000037\n1de162d66afcc5efd8a22daaab3c1f5e\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mac": "6t0ZSDih/YAf1Eekkw57zvKNfHSIQAf+seqCfC7Iics="
+    },
+    {
+      "name": "file head 2",
+      "keyHex": "b9478e3eb2f1a3fccb3883ab8126c402780c3b2221373dd918176e771ef3ffb2",
+      "method": "PUT",
+      "target": "/v1/connectors/slices/A2B3C4D5E6F7G2H3/file",
+      "time": "1800000074",
+      "nonce": "99008f28658b3115adbc14b4c8d260fa",
+      "bodyB64": "2KTYmyB1bmljb2RlIOKckyBHLWNvZGUgOyBvawo=",
+      "bodyHash": "aaf8f22e2fe1e5e9d261c6cb001617e5038dc7158c8142845295569500cb20ea",
+      "canonical": "khayt-req-v1\nPUT\n/v1/connectors/slices/A2B3C4D5E6F7G2H3/file\n1800000074\n99008f28658b3115adbc14b4c8d260fa\naaf8f22e2fe1e5e9d261c6cb001617e5038dc7158c8142845295569500cb20ea",
+      "mac": "1Ybhk0p00M0FCyy9HY/fccPOSeOGFGSdqWfLVZ6uN3s="
+    }
+  ],
+  "reply": [
+    {
+      "name": "reply 0",
+      "keyHex": "8b2ef4a851780b65666d911ff9f55651abdb50d81d91514ef2cc2ba40effbb27",
+      "nonce": "4304b5c7ed65f6fb9b49af49e978c829",
+      "status": 201,
+      "bodyB64": "eyJzbGljZUlkIjoiQUJDREVGR0hJSktMTU5PUCIsInN0YXRlIjoiaW4taW5ib3gifQ==",
+      "text": "khayt-reply-v1\n4304b5c7ed65f6fb9b49af49e978c829\n201\nf9cb6aeda6f0a97e468512bfe2be8437d876011b83a81df13e198e80a945b121",
+      "mac": "Bumu2wptef8czFItqXiJOGPGndVvgzWEfl/cDI+dKUo="
+    },
+    {
+      "name": "reply 1",
+      "keyHex": "6774080293f1981d753a128d8f15cb97fdb7ea68ea74c31101c5398e93e30206",
+      "nonce": "1de162d66afcc5efd8a22daaab3c1f5e",
+      "status": 422,
+      "bodyB64": "eyJvayI6ZmFsc2UsInJlYXNvbiI6Imhhc2gtbWlzbWF0Y2giLCJyZXRyeSI6dHJ1ZX0=",
+      "text": "khayt-reply-v1\n1de162d66afcc5efd8a22daaab3c1f5e\n422\nfbb95b2615761f09454bebac21a32acfaadd835e9b44b420a9b5a013a808f944",
+      "mac": "YNfElitfX4YK0/UhtXTos9DJthg9TmFOwwXmGgVOmIM="
+    },
+    {
+      "name": "reply 2",
+      "keyHex": "b9478e3eb2f1a3fccb3883ab8126c402780c3b2221373dd918176e771ef3ffb2",
+      "nonce": "99008f28658b3115adbc14b4c8d260fa",
+      "status": 200,
+      "bodyB64": "",
+      "text": "khayt-reply-v1\n99008f28658b3115adbc14b4c8d260fa\n200\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mac": "lte2fbkSbLRySDv+JLiACkmzwhdvFawO+bOxmeEzfo4="
+    }
+  ],
+  "seal": [
+    {
+      "name": "seal 0",
+      "keyHex": "8b2ef4a851780b65666d911ff9f55651abdb50d81d91514ef2cc2ba40effbb27",
+      "connectorId": "dev_AbCdEfGhIjKlMnOpQrSt",
+      "sealKeyHex": "75ab4d46960ef0056a280596b6e126595ed5fcac7d9630fe741f951b14ac9ee1",
+      "method": "POST",
+      "path": "/api/connectors/slices",
+      "aad": "POST /api/connectors/slices",
+      "nonceB64": "lzLbhI+FggZYJiHq",
+      "plainB64": "eyJ2IjoxLCJraW5kIjoic2xpY2UiLCJpZCI6ImNhcDAwMDAwIiwibm90ZSI6ItmB2KfYt9mF2KkifQ==",
+      "ctB64": "2dyrb2Xh4v1WlA1Z2ZoRog9IMWp6F6NY4r8knes+RW6srLCgHRT+W1OvqbKiEATR4gkRDgSl2v4Y4mvDzwSCFAxtoO1Wnrlf0GQ="
+    },
+    {
+      "name": "seal 1",
+      "keyHex": "6774080293f1981d753a128d8f15cb97fdb7ea68ea74c31101c5398e93e30206",
+      "connectorId": "dev_0123456789abcdefghij",
+      "sealKeyHex": "4951afb4104d10edbdbdf0307639a13ba4ef06903f2e19bb7a0327fc787a63c3",
+      "method": "GET",
+      "path": "/api/connectors/queue",
+      "aad": "GET /api/connectors/queue",
+      "nonceB64": "ox/9/9UlrLn1W52c",
+      "plainB64": "eyJ2IjoxLCJqb2JzIjpbXX0=",
+      "ctB64": "fju8Yut8GXN2PcbvyE2/wsJz4KYe5NXi+bvIT78s96BW"
+    },
+    {
+      "name": "seal 2",
+      "keyHex": "b9478e3eb2f1a3fccb3883ab8126c402780c3b2221373dd918176e771ef3ffb2",
+      "connectorId": "dev_ZZZZZZZZZZZZZZZZZZZZ",
+      "sealKeyHex": "d64f79c9b9f8e65645f75813d731223c7bf750332fb1bab5be034e7b5f68e46a",
+      "method": "POST",
+      "path": "/api/connectors/slices",
+      "aad": "POST /api/connectors/slices",
+      "nonceB64": "TsAdexEG6WonZYPE",
+      "plainB64": "eyJ2IjoxLCJraW5kIjoic2xpY2UiLCJpZCI6ImNhcDAwMDAyIiwibm90ZSI6ItmB2KfYt9mF2KkifQ==",
+      "ctB64": "y/5yHoMsZaRFty7702zUZMAtyaePu+Iq6KdhWOQ//4/wGT3aezygk15+qOgtlEAI4ILGTDYfOzN2EnvpOb9tG8U9oq2t754l4Hk="
+    }
+  ]
+}
