@@ -321,6 +321,10 @@ plugin asked: never acted on) and `slots`; the Mac reads the file's own figures.
 Nothing in the book is written. One SHA-256 dedupe for both ways in: the same
 bytes from the OctoPrint path or a plugin are one item. Every other
 `/api/connectors/*` path is 404 for every verb: no pause, resume or stop.
+Slice records (id, connector, state, hash, size, times; never a file name)
+are kept beside the inbox in `From slicer/.slices/`, swept at launch: a slice
+still waiting for its file when the app stopped is `expired`, and the plugin
+announces again.
 Vectors: `docs/connector-routes.vectors.json`. `GET /api/connectors/queue` comes
 next. The desktop (`lib/lan-server.js`) has none of this yet.
 

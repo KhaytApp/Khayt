@@ -51,9 +51,12 @@ extension LanServer {
     /// A file whose bytes do not hash to what was declared may be sent once
     /// more; the second mismatch expires the slice.
     nonisolated static let connectorMaxAttempts = 2
-    /// Slices remembered at most (in memory; a restart forgets them all).
+    /// Slices remembered at most.
     nonisolated static let connectorMaxSlices = 1000
-    nonisolated static let connectorKeepSeconds: TimeInterval = 24 * 3600
+    /// An expired slice is forgotten a day after it expired; one that left
+    /// the inbox, a week after (Dev Hub, Nov 16).
+    nonisolated static let connectorKeepExpired: TimeInterval = 24 * 3600
+    nonisolated static let connectorKeepLeft: TimeInterval = 7 * 24 * 3600
 
     struct ConnectorRateRule: Sendable { let limit: Int; let window: TimeInterval }
     /// Per connector, by bucket. The queue's own (1 per 10 s) comes with its route.
@@ -75,7 +78,7 @@ extension LanServer {
 
     // MARK: - Slices
 
-    enum SliceState: String, Sendable {
+    enum SliceState: String, Sendable, Codable {
         case awaitingFile = "awaiting-file"
         /// A file is arriving for it now; shown as `awaiting-file`.
         case receiving
@@ -86,20 +89,38 @@ extension LanServer {
         case expired
     }
 
-    struct ConnectorSlice: Sendable {
+    struct ConnectorSlice: Sendable, Equatable {
         let id: String
         let connectorId: String
+        /// The file name, the suggestion and the slots: in memory only, never
+        /// on disk (a file name can hold a client's name). Empty for a slice
+        /// read back after a restart, which is why such a slice cannot take a
+        /// file any more (`loadSlices`).
         let name: String
         let bytes: Int
         let sha256: String
         let suggested: JSONValue
         let slots: JSONValue?
-        /// On `host.lockoutClock`, which only goes forward.
-        let announcedAt: TimeInterval
         let uploadBy: Date
         var state: SliceState
         var attempts = 0
         var inboxId: String?
+        /// When `state` last changed, on the wall clock (`host.now`).
+        var changedAt: Date
+
+        /// What is kept on disk: ids, state, hash, size, times. No names.
+        struct Saved: Codable, Equatable {
+            var id, connectorId, sha256: String
+            var bytes: Int
+            var state: SliceState
+            var uploadBy, changedAt: Date
+            var attempts: Int
+            var inboxId: String?
+        }
+        var saved: Saved {
+            Saved(id: id, connectorId: connectorId, sha256: sha256, bytes: bytes, state: state,
+                  uploadBy: uploadBy, changedAt: changedAt, attempts: attempts, inboxId: inboxId)
+        }
     }
 
     /// 16 characters of RFC 4648 base32: 80 random bits.
@@ -113,20 +134,81 @@ extension LanServer {
         id.count == 16 && id.allSatisfy { ("A"..."Z").contains($0) || ("2"..."7").contains($0) }
     }
 
-    /// Expire what waited too long, forget what is old, keep the map bounded.
+    /// Expire what waited past `uploadBy`, forget what is old, keep the map
+    /// bounded. On the wall clock: the records outlive the app.
     func pruneSlices() {
-        let now = host.lockoutClock()
+        loadSlices()
+        let now = host.now()
         for (id, slice) in connectorSlices {
-            if now - slice.announcedAt > Self.connectorKeepSeconds {
+            switch slice.state {
+            case .awaitingFile where now > slice.uploadBy:
+                setSlice(id, .expired)
+            case .expired where now.timeIntervalSince(slice.changedAt) > Self.connectorKeepExpired,
+                 .leftInbox where now.timeIntervalSince(slice.changedAt) > Self.connectorKeepLeft:
                 connectorSlices[id] = nil
-            } else if slice.state == .awaitingFile, now - slice.announcedAt > Self.connectorAwaitSeconds {
-                connectorSlices[id]?.state = .expired
+            default: break
             }
         }
         if connectorSlices.count > Self.connectorMaxSlices {
-            let oldest = connectorSlices.values.sorted { $0.announcedAt < $1.announcedAt }
+            let oldest = connectorSlices.values.sorted { $0.changedAt < $1.changedAt }
                 .prefix(connectorSlices.count - Self.connectorMaxSlices)
             for slice in oldest { connectorSlices[slice.id] = nil }
+        }
+    }
+
+    /// A slice's state, and when it changed.
+    func setSlice(_ id: String, _ state: SliceState) {
+        guard connectorSlices[id] != nil else { return }
+        connectorSlices[id]?.state = state
+        connectorSlices[id]?.changedAt = host.now()
+    }
+
+    // MARK: - Kept across a restart (beside the inbox, never in the book)
+
+    /// Read the records once, on first use. A slice that was waiting for its
+    /// file (or receiving one) when the app stopped is expired: its file name
+    /// was never written down, so it could not be filed — the plugin announces
+    /// again. The rest are kept for the plugin's "where is it" and the dedupe.
+    func loadSlices() {
+        guard !slicesLoaded else { return }
+        slicesLoaded = true
+        guard let dir = host.sliceFolder,
+              let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var loaded: [String: ConnectorSlice] = [:]
+        for file in names where file.hasSuffix(".json") {
+            let url = dir.appending(path: file)
+            guard let data = try? Data(contentsOf: url), let s = try? decoder.decode(ConnectorSlice.Saved.self, from: data),
+                  Self.plausibleSliceId(s.id), file == s.id + ".json" else {
+                try? FileManager.default.removeItem(at: url) // scratch: an unreadable slice record
+                continue
+            }
+            let waiting = s.state == .awaitingFile || s.state == .receiving
+            loaded[s.id] = ConnectorSlice(
+                id: s.id, connectorId: s.connectorId, name: "", bytes: s.bytes, sha256: s.sha256,
+                suggested: .object([:]), slots: nil, uploadBy: s.uploadBy,
+                state: waiting ? .expired : s.state, attempts: s.attempts, inboxId: s.inboxId,
+                changedAt: waiting ? host.now() : s.changedAt)
+        }
+        connectorSlices = loaded
+    }
+
+    /// Write what changed, remove what went: one small JSON per slice,
+    /// written atomically. Called from `connectorSlices`' observer.
+    func persistSlices(old: [String: ConnectorSlice]) {
+        guard let dir = host.sliceFolder else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        for (id, slice) in connectorSlices where old[id]?.saved != slice.saved {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            if let data = try? encoder.encode(slice.saved) {
+                try? data.write(to: dir.appending(path: id + ".json"), options: .atomic)
+            }
+        }
+        for id in old.keys where connectorSlices[id] == nil {
+            try? FileManager.default.removeItem(at: dir.appending(path: id + ".json")) // scratch: a forgotten slice's record
         }
     }
 
@@ -372,7 +454,7 @@ extension LanServer {
         if state == .receiving { state = .awaitingFile }
         if state == .inInbox, let inboxId = slice.inboxId, !host.slicerInbox().contains(where: { $0.id == inboxId }) {
             state = .leftInbox
-            connectorSlices[sliceId]?.state = .leftInbox
+            setSlice(sliceId, .leftInbox)
         }
         return .json(200, Self.jsonText(["sliceId": .string(sliceId), "state": .string(state.rawValue)]))
     }
@@ -417,8 +499,8 @@ extension LanServer {
             if mine == nil {
                 connectorSlices[sliceId] = ConnectorSlice(
                     id: sliceId, connectorId: caller.id, name: name, bytes: Int(bytes), sha256: sha,
-                    suggested: suggested, slots: capture["filaments"], announcedAt: host.lockoutClock(),
-                    uploadBy: host.now(), state: .inInbox, inboxId: held.id)
+                    suggested: suggested, slots: capture["filaments"],
+                    uploadBy: host.now(), state: .inInbox, inboxId: held.id, changedAt: host.now())
             }
             return .json(200, Self.jsonText(["sliceId": .string(sliceId), "state": .string("in-inbox"),
                                              "duplicate": .bool(true)]))
@@ -437,8 +519,8 @@ extension LanServer {
         let uploadBy = host.now().addingTimeInterval(Self.connectorAwaitSeconds)
         connectorSlices[sliceId] = ConnectorSlice(
             id: sliceId, connectorId: caller.id, name: name, bytes: Int(bytes), sha256: sha,
-            suggested: suggested, slots: capture["filaments"], announcedAt: host.lockoutClock(),
-            uploadBy: uploadBy, state: .awaitingFile)
+            suggested: suggested, slots: capture["filaments"],
+            uploadBy: uploadBy, state: .awaitingFile, changedAt: host.now())
         var answer: [String: JSONValue] = [
             "sliceId": .string(sliceId), "state": .string("awaiting-file"),
             "uploadBy": .string(Self.isoTime(uploadBy)), "dropped": dropped,
@@ -467,6 +549,7 @@ extension LanServer {
             slice.attempts += 1
             let retry = slice.attempts < Self.connectorMaxAttempts
             slice.state = retry ? .awaitingFile : .expired
+            slice.changedAt = host.now()
             connectorSlices[sliceId] = slice
             return .json(422, #"{"ok":false,"reason":"hash-mismatch","retry":\#(retry)}"#)
         }
@@ -474,19 +557,19 @@ extension LanServer {
                                   sha256: sha, suggested: slice.suggested, slots: slice.slots)
         do {
             let item = try await host.connectorReceive(file, slice.name, origin)
-            connectorSlices[sliceId]?.state = .inInbox
+            setSlice(sliceId, .inInbox)
             connectorSlices[sliceId]?.inboxId = item.id
             return .json(201, Self.jsonText(["sliceId": .string(sliceId), "state": .string("in-inbox")]))
         } catch let same as SlicerInbox.Duplicate {
-            connectorSlices[sliceId]?.state = .inInbox
+            setSlice(sliceId, .inInbox)
             connectorSlices[sliceId]?.inboxId = same.item.id
             return .json(200, Self.jsonText(["sliceId": .string(sliceId), "state": .string("in-inbox"),
                                              "duplicate": .bool(true)]))
         } catch is SlicerInbox.Full {
-            connectorSlices[sliceId]?.state = .awaitingFile
+            setSlice(sliceId, .awaitingFile)
             return .json(409, #"{"ok":false,"reason":"inbox-full"}"#)
         } catch {
-            connectorSlices[sliceId]?.state = .awaitingFile
+            setSlice(sliceId, .awaitingFile)
             return .json(500, #"{"ok":false,"reason":"store"}"#)
         }
     }
@@ -550,6 +633,7 @@ extension LanServer {
         slicerUploads += 1
         slot.slicer = true
         slice.state = .receiving
+        slice.changedAt = host.now()
         connectorSlices[sliceId] = slice
         do {
             if (headers["expect"] ?? "").lowercased() == "100-continue" {
@@ -563,7 +647,7 @@ extension LanServer {
             return request
         } catch {
             // The client went, or stalled: the slice may be sent again.
-            if connectorSlices[sliceId]?.state == .receiving { connectorSlices[sliceId]?.state = .awaitingFile }
+            if connectorSlices[sliceId]?.state == .receiving { setSlice(sliceId, .awaitingFile) }
             throw error
         }
     }

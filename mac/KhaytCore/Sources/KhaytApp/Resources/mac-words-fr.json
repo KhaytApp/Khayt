@@ -4015,7 +4015,7 @@
  "mac.apps_ask": "Approuver « {name} » ?",
  "mac.apps_ask_from": "{app} {version} a demandé l’association depuis {address}.",
  "mac.apps_check": "Le trancheur affiche-t-il ce nombre ? Sinon, refusez.",
- "mac.apps_may": "Il peut envoyer des tranchages dans la boîte « Du trancheur » et lire la file des travaux (noms et durées, jamais les clients). Il ne peut jamais lire votre registre, vos clients, vos prix ou vos réglages.",
+ "mac.apps_may": "Il peut envoyer des tranchages dans la boîte « Du trancheur » et voir la file des travaux (numéros, étapes et machines seulement, jamais les titres ni les clients). Il ne peut jamais lire votre registre, vos clients, vos prix ou vos réglages.",
  "mac.apps_offers_used": "L’association s’est arrêtée après 3 tentatives non approuvées. Cliquez sur Associer un trancheur pour réessayer.",
  "mac.apps_approve": "Les nombres correspondent — approuver",
  "mac.apps_deny": "Refuser",

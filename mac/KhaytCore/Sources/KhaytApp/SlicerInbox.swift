@@ -89,6 +89,10 @@ enum SlicerInbox {
     /// own folder, so filing it is a rename on the same disk.
     static func incoming(root: URL) -> URL { root.appending(path: ".incoming", directoryHint: .isDirectory) }
 
+    /// A paired plugin's slice records (`LanServer+Connector`): ids, states
+    /// and hashes, one small JSON each. Hidden, so `list` never reads them.
+    static func sliceRecords(root: URL) -> URL { root.appending(path: ".slices", directoryHint: .isDirectory) }
+
     /// Empty `.incoming`: spooled bodies and half-extracted files from an
     /// upload the app quit or crashed during. Only when nothing is uploading.
     static func sweepIncoming(root: URL) {

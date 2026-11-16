@@ -214,6 +214,10 @@ final class LanServer {
         /// hash already checked. Throws `SlicerInbox.Duplicate` / `Full`.
         var connectorReceive: @MainActor (_ file: URL, _ name: String, _ origin: SlicerOrigin) async throws -> SlicerUpload
             = { _, _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Where a paired plugin's slice records are kept across a restart
+        /// (`LanServer+Connector`): beside the inbox, never in the book. Nil
+        /// keeps them in memory only.
+        var sliceFolder: URL? = nil
         /// What is waiting in the inbox now — for a plugin's dedupe and the
         /// inbox's state, never its contents.
         var slicerInbox: @MainActor () -> [SlicerUpload] = { [] }
@@ -313,7 +317,11 @@ final class LanServer {
     var slicerUploads = 0
     /// Slices paired plugins announced (`LanServer+Connector`), by slice id.
     /// In memory: a restart forgets them, and a plugin announces again.
-    var connectorSlices: [String: ConnectorSlice] = [:]
+    var connectorSlices: [String: ConnectorSlice] = [:] {
+        didSet { if slicesLoaded { persistSlices(old: oldValue) } }
+    }
+    /// Whether `connectorSlices` has been read back from `Host.sliceFolder`.
+    var slicesLoaded = false
     /// Each connector's recent requests, by bucket (`connectorRates`).
     var connectorHits: [String: [String: [TimeInterval]]] = [:]
 
@@ -509,7 +517,10 @@ final class LanServer {
 
     /// Start, and return the port actually bound (asked for 0, given one).
     func start(port wanted: UInt16, bind: Bind) async throws -> UInt16 {
-        try await start(port: wanted, bind: bind, advertise: true)
+        // A paired plugin's slice records, read back and swept at launch
+        // (`LanServer+Connector`): expired and week-old ones go now.
+        pruneSlices()
+        return try await start(port: wanted, bind: bind, advertise: true)
     }
 
     private func start(port wanted: UInt16, bind: Bind, advertise: Bool) async throws -> UInt16 {
@@ -3211,6 +3222,7 @@ extension Shop {
         }
         host.slicerInbox = { [weak self] in self?.slicerUploads ?? [] }
         if let root = slicerInboxRoot {
+            host.sliceFolder = SlicerInbox.sliceRecords(root: root)
             host.slicerScratch = SlicerInbox.incoming(root: root)
             // Nothing is uploading before the server starts, so whatever is
             // here was left by a quit or a crash mid-upload: up to a GiB a

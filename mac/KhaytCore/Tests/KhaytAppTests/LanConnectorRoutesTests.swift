@@ -14,8 +14,9 @@ import KhaytCore
 struct LanConnectorRoutesTests {
 
     static let pin = "24682468"
-    static let now = Int(LanServerTests.Bench.start.timeIntervalSince1970)
-    static let slices = "/api/connectors/slices"
+    /// `LanServerTests.Bench.start`, as a number nothing has to hop to the main actor for.
+    nonisolated static let now = 1_800_000_000
+    nonisolated static let slices = "/api/connectors/slices"
 
     // MARK: - Helpers
 
@@ -140,7 +141,7 @@ struct LanConnectorRoutesTests {
     }
 
     /// A PUT head declaring a GiB, of which nothing is ever sent.
-    static func gibHead(_ path: String, headers: [String: String]) -> String {
+    nonisolated static func gibHead(_ path: String, headers: [String: String]) -> String {
         var text = "PUT \(path) HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/octet-stream\r\n"
             + "Content-Length: \(1 << 30)\r\nExpect: 100-continue\r\n"
         for (k, v) in headers { text += "\(k): \(v)\r\n" }
@@ -366,15 +367,17 @@ struct LanConnectorRoutesTests {
         bench.server.slicerUploads = 0
         // The nonce is spent at the head: the same signed head twice is a replay.
         let once = signed(peer, path, declared)
-        _ = await offPool { Self.raw(port: port, Self.gibHead(path, headers: once)) }
-        let twice = await offPool { Self.raw(port: port, Self.gibHead(path, headers: once)) }
+        let onceHead = Self.gibHead(path, headers: once)
+        _ = await offPool { Self.raw(port: port, onceHead) }
+        let twice = await offPool { Self.raw(port: port, onceHead) }
         #expect(twice.hasPrefix("HTTP/1.1 401") && twice.contains("device-replay"), Comment(rawValue: twice))
 
         #expect(SlicerInbox.list(root: root).isEmpty)
         #expect(bench.server.slicerUploads == 0, "no slot was kept")
         // Still waiting: none of that cost the slice its chance.
         #expect(try await Self.put(bench, peer, sliceId, Self.gcode).status == 201)
-        let filedAgain = await offPool { Self.raw(port: port, Self.gibHead(path, headers: signed(peer, path, declared))) }
+        let againHead = Self.gibHead(path, headers: signed(peer, path, declared))
+        let filedAgain = await offPool { Self.raw(port: port, againHead) }
         #expect(filedAgain.hasPrefix("HTTP/1.1 409") && filedAgain.contains("not-awaiting-file"))
     }
 
@@ -494,16 +497,54 @@ struct LanConnectorRoutesTests {
         let (_, sliceId) = try await Self.announce(bench, a, Self.gcode)
         #expect(try await Self.call(bench, b, "GET", "\(Self.slices)/\(sliceId)").status == 404)
         #expect(try await Self.put(bench, b, sliceId, Self.gcode).status == 404)
-        // Announced eleven minutes ago (the slice's own clock, so the signing
-        // clock stays where the device check wants it).
+        // Its upload-by time has passed (the slice's own clock, so the
+        // signing clock stays where the device check wants it).
         let s = try #require(bench.server.connectorSlices[sliceId])
         bench.server.connectorSlices[sliceId] = LanServer.ConnectorSlice(
             id: s.id, connectorId: s.connectorId, name: s.name, bytes: s.bytes, sha256: s.sha256,
-            suggested: s.suggested, slots: s.slots, announcedAt: s.announcedAt - LanServer.connectorAwaitSeconds - 1,
-            uploadBy: s.uploadBy, state: s.state)
+            suggested: s.suggested, slots: s.slots, uploadBy: bench.box.now.addingTimeInterval(-1),
+            state: s.state, changedAt: s.changedAt)
         let state = try await Self.call(bench, a, "GET", "\(Self.slices)/\(sliceId)")
         #expect(state.json["state"] as? String == "expired")
         #expect(try await Self.put(bench, a, sliceId, Self.gcode).status == 404)
+    }
+
+    @Test("slice records survive a restart beside the inbox, with no names; a waiting one expires, old ones are swept")
+    func survivesARestart() async throws {
+        let (bench, root) = try await Self.bench()
+        defer { bench.stop(); try? FileManager.default.removeItem(at: root) }
+        let peer = try Self.enrol(bench)
+        let (_, waiting) = try await Self.announce(bench, peer, Self.gcode + Data("; waiting\n".utf8), intent: "quote")
+        let (_, filed) = try await Self.announce(bench, peer, Self.gcode)
+        #expect(try await Self.put(bench, peer, filed, Self.gcode).status == 201)
+        let dir = SlicerInbox.sliceRecords(root: root)
+        let records = try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
+        #expect(records == [filed + ".json", waiting + ".json"].sorted())
+        #expect(SlicerInbox.list(root: root).count == 1, "the records are hidden from the inbox")
+        for name in records {
+            let text = try String(contentsOf: dir.appending(path: name), encoding: .utf8)
+            for never in ["Bracket", "gcode", "quote", "suggested", "slots", "PLA", "OrcaSlicer"] {
+                #expect(!text.contains(never), "\(name) holds \(never): \(text)")
+            }
+        }
+        // A week-old record of a slice that left the inbox, and a broken file.
+        let old = LanServer.ConnectorSlice.Saved(
+            id: "OLDOLDOLDOLDOLD2", connectorId: peer.id, sha256: String(repeating: "c", count: 64), bytes: 9,
+            state: .leftInbox, uploadBy: bench.box.now.addingTimeInterval(-8 * 86400),
+            changedAt: bench.box.now.addingTimeInterval(-8 * 86400), attempts: 0, inboxId: nil)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(old).write(to: dir.appending(path: "OLDOLDOLDOLDOLD2.json"))
+        try Data("not json".utf8).write(to: dir.appending(path: "BROKENBROKENBRO2.json"))
+
+        // The app restarts: a new server on the same host, the same folder.
+        let again = LanServer(host: bench.server.host)
+        #expect(again.ownSlice(filed, connector: peer.id)?.state == .inInbox)
+        #expect(again.ownSlice(waiting, connector: peer.id)?.state == .expired,
+                "a slice waiting for its file cannot take it after a restart: its name was never written")
+        #expect(again.ownSlice("OLDOLDOLDOLDOLD2", connector: peer.id) == nil)
+        let left = try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
+        #expect(left == [filed + ".json", waiting + ".json"].sorted(), "old and broken records are swept: \(left)")
     }
 
     @Test("a sealed capture that was changed, or one the shared rule refuses, files nothing")

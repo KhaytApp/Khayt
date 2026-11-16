@@ -204,6 +204,7 @@ struct LanServerTests {
                     try await Shop.fileSlicerUpload(file, name: name, root: slicerRoot, engine: engine, origin: origin)
                 }
                 host.slicerInbox = { SlicerInbox.list(root: slicerRoot) }
+                host.sliceFolder = SlicerInbox.sliceRecords(root: slicerRoot)
             }
             let server = LanServer(host: host)
             self.server = server
