@@ -68,7 +68,8 @@ try {
       // It carries the markup it was taken at, as newOrder stores it: a markup
       // is never worked backwards through a rate (order-edit.js marginOf).
       base('JS-USD', { currency: 'USD', fxRate: 3.75, marginPct: 100, price: Math.round(340 / 3.75 * 100) / 100 }),
-      base('JS-DRAFT', { status: 'quote', statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
+      // A draft made by an app that stamps sharing (lib/order-new.js).
+      base('JS-DRAFT', { status: 'quote', quoteShareStamped: true, statusHistory: [{ status: 'quote', at: '2026-11-12T08:00:00Z' }] }),
       base('JS-PAID', { paidAmount: 300, paidAt: '2026-11-12T09:00:00Z' }),
       base('JS-DONE', { status: 'completed', materialDeducted: true, costBasis: 100 }),
     );

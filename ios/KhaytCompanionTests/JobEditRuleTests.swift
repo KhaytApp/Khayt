@@ -205,17 +205,17 @@ final class JobEditRuleTests: XCTestCase {
           q.priceSource === 'rounded' ? { priceRound: t.priceRound } : {},
           q.priceSource === 'override' ? { priceOverride: +q.total.toFixed(2) } : {}, extra || {});
       }
-      function draftQuote(terms, extra) { return jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote' }, extra || {})); }
+      function draftQuote(terms, extra) { return jobOf([part('A', 80), part('B', 40)], terms, Object.assign({ status: 'quote', quoteShareStamped: true }, extra || {})); }
       var extras = { discountPct: 10, rushEnabled: true, shippingCost: 20, extraLines: [{ label: 'Paint', amount: 15 }] };
       var c = [];
       function add(name, order, fields, seen, ids) { c.push({ name: name, order: order, fields: fields, seen: !!seen, ids: ids || [] }); }
       add('reprice', draftQuote(), { marginPct: 25 });
       add('same', draftQuote(), { marginPct: 50 });
       add('terms stay', draftQuote(extras), { marginPct: 25 });
-      add('agreed', jobOf([part('A', 80), part('B', 40, { agreedPrice: 100 })], {}, { status: 'quote' }), { marginPct: 25 });
+      add('agreed', jobOf([part('A', 80), part('B', 40, { agreedPrice: 100 })], {}, { status: 'quote', quoteShareStamped: true }), { marginPct: 25 });
       add('rounding', draftQuote({ priceRound: { step: 5, mode: 'up' } }), { marginPct: 33 });
       add('typed', draftQuote({ priceOverride: 199 }), { marginPct: 25 });
-      add('all agreed', jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote' }), { marginPct: 25 });
+      add('all agreed', jobOf([part('A', 80, { agreedPrice: 90 })], {}, { status: 'quote', quoteShareStamped: true }), { marginPct: 25 });
       [{ quoteSharedAt: '2026-11-14T10:00:00Z' }, { status: 'pending' }, { status: 'printing' },
        { status: 'pending', invoiceNumber: 'INV-2026-0007' }].forEach(function (x, i) {
         add('seen ' + i, draftQuote({}, x), { marginPct: 25 });
