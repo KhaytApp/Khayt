@@ -73,11 +73,11 @@ enum SlicerInbox {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         var hasher = SHA256()
-        while true {
-            guard let chunk = try? handle.read(upToCount: 1 << 20) else { return nil }
-            if chunk.isEmpty { break }
-            hasher.update(data: chunk)
-        }
+        // `read(upToCount:)` answers nil at the end of the file, not only on
+        // an error: a nil here is the end, a throw is the failure.
+        do {
+            while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty { hasher.update(data: chunk) }
+        } catch { return nil }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 

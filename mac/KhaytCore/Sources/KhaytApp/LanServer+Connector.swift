@@ -541,8 +541,13 @@ extension LanServer {
     /// The file is on disk and hashed; file it, or say why not.
     func connectorFileArrived(_ request: Request, sliceId: String, sha: String,
                               caller: ConnectorCaller) async -> Response {
-        guard var slice = connectorSlices[sliceId], slice.connectorId == caller.id, slice.state == .receiving,
-              let file = request.bodyFile else {
+        guard let file = request.bodyFile else { return .json(404, #"{"ok":false,"reason":"unknown-slice"}"#) }
+        // The spool's own folder (`readConnectorFile`), whatever happens below.
+        defer {
+            let dir = file.deletingLastPathComponent()
+            if dir.lastPathComponent.hasPrefix("khayt-connector-") { try? FileManager.default.removeItem(at: dir) } // scratch
+        }
+        guard var slice = connectorSlices[sliceId], slice.connectorId == caller.id, slice.state == .receiving else {
             return .json(404, #"{"ok":false,"reason":"unknown-slice"}"#)
         }
         guard sha == slice.sha256 else {
@@ -639,8 +644,19 @@ extension LanServer {
             if (headers["expect"] ?? "").lowercased() == "100-continue" {
                 try await Self.sendRaw(Data("HTTP/1.1 100 Continue\r\n\r\n".utf8), on: connection)
             }
-            let file = host.slicerScratch.appending(path: "khayt-connector-\(UUID().uuidString).part")
-            let sha = try await Self.spool(connection, on: queue, start: start, length: length, to: file, idle: readTimeout)
+            // Under its own name, in a folder of its own: the Mac reads a file's
+            // figures by its extension (`SlicerFigures`), and a ".part" is
+            // nothing it reads. The folder goes once the file is filed.
+            let dir = host.slicerScratch.appending(path: "khayt-connector-\(UUID().uuidString)", directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let file = dir.appending(path: slice.name)
+            let sha: String
+            do {
+                sha = try await Self.spool(connection, on: queue, start: start, length: length, to: file, idle: readTimeout)
+            } catch {
+                try? FileManager.default.removeItem(at: dir) // scratch: a body that never arrived whole
+                throw error
+            }
             var request = Request(method: "PUT", path: components?.path ?? target, query: [:], headers: headers,
                                   body: Data(), remote: remote, target: target, bodyFile: file)
             request.spooledSha256 = sha
