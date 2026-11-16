@@ -33,7 +33,7 @@ struct JobEditBridgeTests {
         let engine = try KhaytEngine()
         // A draft quote follows its parts by itself; once the customer has
         // seen the price (a shared quote, any accepted job) the sheet asks.
-        let draft = try await engine.partsLock(Self.job(["status": .string("quote")]))
+        let draft = try await engine.partsLock(Self.job(["status": .string("quote"), "quoteShareStamped": .bool(true)]))
         #expect(draft.code == nil && draft.edit && draft.addRemove && !draft.askPrice)
         #expect(try await engine.partsLock(Self.job(["status": .string("quote"), "quoteSharedAt": .string("2026-11-14T10:00:00Z")])).askPrice)
         #expect(try await engine.partsLock(Self.job()).askPrice, "an accepted job")

@@ -675,8 +675,29 @@
     if (FROZEN_STATUSES.indexOf(order.status) !== -1 || order.materialDeducted === true) {
       return { code: 'deducted', edit: true, addRemove: false, nameOnly: true, askPrice: false };
     }
-    const draftQuote = order.status === 'quote' && !present(order.quoteSharedAt);
+    const draftQuote = order.status === 'quote' && quoteIsDraft(order);
     return { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: !draftQuote };
+  }
+
+  /**
+   * Whether a quote is POSITIVELY a draft no customer has seen, so its price
+   * may follow a parts change without asking. A quote whose price may have
+   * been seen never re-prices silently (Dev Hub, Nov 16).
+   *
+   * `quoteSharedAt` is stamped when a quote goes out, but only by builds from
+   * 4.10 / Mac beta.40 on: a quote shared before that has none and is not a
+   * draft for it. So a draft needs `quoteShareStamped` — written by
+   * `newOrder` on every quote it makes, meaning "the app that made this
+   * stamps quoteSharedAt when it is sent" — and no sign of having been sent:
+   * `quoteSharedAt`, `quoteAcceptedAt`, a revision (`quoteRevisions`,
+   * `quoteVersion` past 1). Anything else asks.
+   */
+  function quoteIsDraft(order) {
+    if (!order || order.quoteShareStamped !== true) return false;
+    if (present(order.quoteSharedAt) || present(order.quoteAcceptedAt)) return false;
+    if (Array.isArray(order.quoteRevisions) && order.quoteRevisions.length) return false;
+    if (+order.quoteVersion > 1) return false;
+    return true;
   }
 
   const partQty = (p) => Math.max(1, Math.round(amountOf(p && p.qty) || 1));
@@ -1123,7 +1144,7 @@
     priorityFrom, priorityOf, changesBetween, recordEdit, applyEdit, adjustPrice,
     parseTags, repriceTerms, applyDetails, editLog, timeline,
     customerLocked, canChangeCustomer, changeCustomer,
-    partsLock, marginOf, applyMarkup, applyParts, applyJobEdit,
+    partsLock, quoteIsDraft, marginOf, applyMarkup, applyParts, applyJobEdit,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderEdit = api;
