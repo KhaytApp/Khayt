@@ -21,6 +21,12 @@ struct StoreWriterTests {
         return url
     }
 
+    /// The copy is a real shop's book when this Mac has one: it is removed as
+    /// soon as its test ends, with its rollback and anything set beside it.
+    static func discard(_ url: URL) {
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
     static func source() throws -> Data {
         for build in StoreReader.Build.allCases where build.exists {
             return try Data(contentsOf: build.storeURL)
@@ -38,6 +44,47 @@ struct StoreWriterTests {
         return id
     }
 
+    /// Where two books first differ, in words: the key, then the record's id
+    /// and the field's NAME, never a value (the copy is a real shop's book). These tests run on a copy of this Mac's real book when there is
+    /// one, and "before != after" on 27 MB says nothing about where. Two of
+    /// them failed once under a full local run (Nov 16 2026) and passed alone,
+    /// and what had changed was not recorded.
+    static func firstDifference(_ a: [String: JSONValue], _ b: [String: JSONValue]) -> String {
+        for key in Set(a.keys).union(b.keys).sorted() where a[key] != b[key] {
+            guard let x = a[key], let y = b[key] else { return "\(key): \(a[key] == nil ? "appeared" : "vanished")" }
+            return "\(key): " + differ(x, y)
+        }
+        return "no difference"
+    }
+
+    static func differ(_ x: JSONValue, _ y: JSONValue) -> String {
+        switch (x, y) {
+        case (.array(let p), .array(let q)):
+            if p.count != q.count { return "\(p.count) rows became \(q.count)" }
+            for i in p.indices where p[i] != q[i] {
+                var id = ""
+                if case .object(let o) = p[i], case .string(let s)? = o["id"] { id = " (id \(s))" }
+                return "row \(i)\(id): " + differ(p[i], q[i])
+            }
+            return "equal arrays"
+        case (.object(let p), .object(let q)):
+            for key in Set(p.keys).union(q.keys).sorted() where p[key] != q[key] {
+                guard let v = p[key], let w = q[key] else { return "field \(key) \(p[key] == nil ? "appeared" : "vanished")" }
+                return "field \(key): " + differ(v, w)
+            }
+            return "equal objects"
+        case (.number(let p), .number(let q)):
+            // Never the figure itself: this runs on a copy of a real book.
+            let scale = max(abs(p), abs(q))
+            let near = scale > 0 && abs(p - q) / scale < 1e-9
+            return near ? "a number moved in its last digits (a round trip that is not exact)" : "a number changed"
+        case (.string(let p), .string(let q)):
+            return "a string of \(p.utf8.count) bytes became one of \(q.utf8.count)"
+        default:
+            return "a value changed kind"
+        }
+    }
+
     static func owner() -> Bool { true }
     static func nobody() -> String? { nil }
 
@@ -46,6 +93,7 @@ struct StoreWriterTests {
     @Test("an edit changes the record it names, and stamps it")
     func editsOneRecord() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Self.read(url)
         guard let id = Self.firstFileId(before) else { return }   // no library on this store
 
@@ -74,6 +122,7 @@ struct StoreWriterTests {
     @Test("nothing else in the book moves")
     func touchesNothingElse() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Self.read(url)
         guard let id = Self.firstFileId(before) else { return }
 
@@ -85,7 +134,8 @@ struct StoreWriterTests {
 
         #expect(before.keys.sorted() == after.keys.sorted(), "a collection appeared or vanished")
         for key in before.keys where key != "printFiles" {
-            #expect(before[key] == after[key], "\(key) changed and had no business changing")
+            #expect(before[key] == after[key],
+                    "\(key) changed and had no business changing: \(Self.firstDifference(before, after))")
         }
         // The secrets in particular: this path never decrypts, so they must come
         // through byte for byte. Re-encrypting a working credential into
@@ -98,6 +148,7 @@ struct StoreWriterTests {
     @Test("the previous book is kept, and no temp file is left behind")
     func keepsOneGeneration() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Data(contentsOf: url)
         guard let id = Self.firstFileId(try Self.read(url)) else { return }
 
@@ -118,6 +169,7 @@ struct StoreWriterTests {
     @Test("it refuses, and changes nothing, when the book is not ours")
     func refusesWhenNotOwner() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Data(contentsOf: url)
         var ran = false
         #expect(throws: StoreWriter.Refusal.self) {
@@ -134,6 +186,7 @@ struct StoreWriterTests {
     @Test("a store that would outgrow every backup is refused")
     func refusesOversizeStore() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Data(contentsOf: url)
         #expect(throws: StoreWriter.Refusal.self) {
             try StoreWriter.update(storeURL: url, owns: Self.owner, whoHasIt: Self.nobody) { root in
@@ -149,12 +202,14 @@ struct StoreWriterTests {
     @Test("an edit naming a record that is not there is a no-op, not a wipe")
     func unknownRecordIsHarmless() throws {
         let url = try Self.freshCopy()
+        defer { Self.discard(url) }
         let before = try Self.read(url)
         try StoreWriter.updateRecord(storeURL: url, owns: Self.owner, whoHasIt: Self.nobody,
                                      collection: "printFiles", id: "PF-does-not-exist") { record in
             record["favorite"] = .bool(true)
         }
-        #expect(try Self.read(url) == before)
+        let after = try Self.read(url)
+        #expect(after == before, "a no-op edit changed the book: \(Self.firstDifference(before, after))")
     }
 
     @Test("the timestamp is the one JavaScript writes")
