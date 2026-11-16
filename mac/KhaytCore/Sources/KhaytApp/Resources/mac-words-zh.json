@@ -4012,9 +4012,9 @@
  "mac.apps_waiting": "正在等待切片软件… {time}",
  "mac.apps_ask": "批准“{name}”？",
  "mac.apps_ask_from": "{app} {version} 从 {address} 请求配对。",
- "mac.apps_check": "切片软件必须显示相同的数字。如果不同，请拒绝。",
+ "mac.apps_check": "切片软件显示的是这个数字吗？如果不是，请拒绝。",
  "mac.apps_may": "它可以把切片发送到“来自切片软件”收件箱，并读取任务队列（任务名称和时间，从不包含客户）。它永远无法读取你的账本、客户、价格或设置。",
- "mac.apps_approve": "批准",
+ "mac.apps_approve": "数字一致 — 批准",
  "mac.apps_deny": "拒绝",
  "mac.apps_timed_out": "没有切片软件按时配对。点击“配对切片软件”重试。"
 }
