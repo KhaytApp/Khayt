@@ -85,7 +85,7 @@
       : list('printLog').find((o) => o.id === orderId);
     if (!order || !ED() || typeof openFormModal !== 'function' || (isNew && !NEW())) return;
     // A new job has nothing to protect yet: every part may come and go.
-    const lock = isNew ? { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false } : ED().partsLock(order);
+    const lock = isNew ? { code: null, edit: true, addRemove: true, nameOnly: false, askPrice: false } : ED().partsLock(order, { clients: list('clients') });
     const custLock = !isNew && order.clientId ? ED().customerLocked(order) : null;
     const st = {
       parts: (order.parts || []).map((p) => JSON.parse(JSON.stringify(p))),
