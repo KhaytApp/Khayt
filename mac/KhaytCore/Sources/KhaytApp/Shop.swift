@@ -1564,12 +1564,12 @@ final class Shop {
             if overtaken() { return }
             remeasureIfDue()
             createRecurringIfDue()
+            readProvenanceIfDue()
             // The ids given above, into the book, when it is this Mac's to
             // write. The reload that write ends with finds none missing.
             if owedPartIds, ownership != nil, next.build != nil, !partIdsWriting {
                 Task { await self.writeMissingPartIds() }
             }
-            readProvenanceIfDue()
             // The quote follow-ups the shop switched on (Settings ▸ Quote
             // follow-ups) — after the dashboard has chosen which are due.
             followUpQuotesIfDue()
