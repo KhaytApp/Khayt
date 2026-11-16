@@ -154,11 +154,17 @@ test('print-facts: materials narrowed to the slots used, when the host says whic
   assert.deepEqual(F.printFacts({ projectSettings, usedSlots: [5] }).materials, ['PLA', 'PETG', 'TPU'], 'a slot past the list: all, not a guess');
 });
 
-test('the desktop\'s re-read and the rule agree on which reader is current', () => {
+test('the desktop\'s re-read runs the shared rule, not a copy of it', () => {
   const src = fs.readFileSync(path.join(__dirname, '../renderer/printfiles.js'), 'utf8');
-  const m = /const COLOURS_READER = (\d+);/.exec(src);
-  assert.ok(m, 'renderer/printfiles.js names the reader it re-reads below');
-  assert.equal(+m[1], T.COLOURS_READER);
+  assert.doesNotMatch(src, /const COLOURS_READER = \d+;/, 'no reader number of its own');
+  assert.doesNotMatch(src, /function applyColours\(/, 'no applyColours of its own');
+  assert.match(src, /T\.applyColours\(rec, r\)\.changed/);
+  assert.match(src, /T\.coloursStale\(rec\)/);
+  for (const page of ['index.html', 'bedready.html']) {
+    const html = fs.readFileSync(path.join(__dirname, '../renderer', page), 'utf8');
+    const lib = html.indexOf('<script src="../lib/thumbnail-extract.js"></script>');
+    assert.ok(lib > 0 && lib < html.indexOf('<script src="printfiles.js"></script>'), page + ' loads the rule before printfiles.js');
+  }
   assert.equal(T.coloursStale({}), true);
   assert.equal(T.coloursStale({ coloursReader: T.COLOURS_READER }), false);
 });
