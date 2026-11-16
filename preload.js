@@ -217,6 +217,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // Task 0: File-based data store (replaces localStorage)
   loadStore:     ()       => ipcRenderer.invoke('hub:load-store'),
   saveStore:     (data)   => ipcRenderer.invoke('hub:save-store', data),
+  storeOwned:    ()       => ipcRenderer.invoke('hub:store-owned'),
   fetchExchangeRates: (base) => ipcRenderer.invoke('hub:fetch-exchange-rates', base),
   hashPin: (pin) => ipcRenderer.invoke('hub:hash-pin', pin),
   verifyPin: (plain, stored) => ipcRenderer.invoke('hub:verify-pin', plain, stored),
