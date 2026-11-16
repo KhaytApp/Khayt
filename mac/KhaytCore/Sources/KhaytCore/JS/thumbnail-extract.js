@@ -94,12 +94,16 @@ function usedSlots(input) {
   const i = input || {};
   const out = new Set();
   const ex = (text) => +((/<metadata\b[^>]*key="extruder"[^>]*value="(\d+)"/.exec(text) || [])[1] || 0);
-  for (const o of String(i.modelSettings || '').split(/<object\b/).slice(1)) {
+  const objects = String(i.modelSettings || '').split(/<object\b/).slice(1);
+  for (const o of objects) {
     const [head, ...parts] = o.split(/<part\b/);
     const own = ex(head);
     if (!parts.length) out.add(own || 1);
     for (const p of parts) out.add(ex(p) || own || 1);
   }
+  // No model_settings naming an object: every object prints with slot 1, the
+  // slicer's default (lib/mf-mesh.js starts from the same baseState).
+  if (!objects.length) out.add(1);
   for (const m of String(i.layerRanges || '').matchAll(/opt_key="extruder"\s*>\s*(\d+)/g)) if (+m[1] > 0) out.add(+m[1]);
   for (const n of (Array.isArray(i.paintSlots) ? i.paintSlots : [])) if (+n > 0) out.add(+n);
   return [...out].sort((a, b) => a - b);
