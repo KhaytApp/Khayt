@@ -4016,6 +4016,7 @@
  "mac.apps_ask_from": "{app} {version} hat von {address} aus um Kopplung gebeten.",
  "mac.apps_check": "Zeigt der Slicer diese Zahl? Wenn nicht, lehnen Sie ab.",
  "mac.apps_may": "Er darf Slices in den Eingang „Vom Slicer“ senden und die Auftragsliste lesen (Auftragsnamen und Zeiten, nie Kunden). Ihr Buch, Kunden, Preise oder Einstellungen kann er nie lesen.",
+ "mac.apps_offers_used": "Die Kopplung wurde nach 3 nicht bestätigten Versuchen beendet. Klicken Sie erneut auf „Slicer koppeln“.",
  "mac.apps_approve": "Zahlen stimmen — zulassen",
  "mac.apps_deny": "Ablehnen",
  "mac.apps_timed_out": "Kein Slicer wurde rechtzeitig gekoppelt. Klicken Sie erneut auf Slicer koppeln.",

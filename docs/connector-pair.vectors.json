@@ -1,93 +1,133 @@
 {
-  "about": "The 6-digit check number both screens show when a slicer plugin pairs (LanConnectorPairing.check). text = 'khayt-connector-check-v1', deviceId, the Mac's identity key (Ed25519), the Mac's X25519 key, the plugin's X25519 key, joined with '\\n' (keys base64 of the raw 32 bytes, as sent); n = first 4 bytes of SHA-256(text) big-endian; check = n mod 1000000, zero-padded to 6. Seeds and private keys are sample values for tests only.",
+  "about": "Connector pairing v2, commit then reveal (LanConnectorPairing, docs/LAN_API.md). Every hash input is the exact UTF-8 bytes of the strings as sent, joined with '\\n'. Keys and the nonce are base64 (standard, padded) of the raw bytes. commit = base64 SHA-256('khayt-connector-commit-v2' \\n pluginPublic \\n nonce). offerMessage = 'khayt-enrol-commit-v2:' + deviceId + ':' + serverPublic + ':' + commit, signed by the Mac's Ed25519 identity (sig, deterministic). check = first 4 bytes big-endian of SHA-256('khayt-connector-check-v2' \\n deviceId \\n identityPublic \\n serverPublic \\n pluginPublic \\n nonce) mod 1000000, zero-padded to 6. The nonce is 16 random bytes in real use. Seeds, private keys and nonces here are sample values for tests only.",
   "cases": [
     {
       "name": "first",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
       "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
       "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "nonceHex": "30303030303030303030303030303030",
       "deviceId": "dev_SampleConnector0001",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
       "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
       "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "026228"
+      "nonce": "MDAwMDAwMDAwMDAwMDAwMA==",
+      "commit": "r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0001:pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=:r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "sig": "n1sj+0pYKaxSbBokKXgu1587XOcjWrYY138p1Nqr344Ked6C1vHNy8/kqLn0rwRfkuw9rxgpnGNCRn5i7K/YCQ==",
+      "check": "620327"
     },
     {
       "name": "second-device-id",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
       "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
       "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "nonceHex": "30303030303030303030303030303030",
       "deviceId": "dev_SampleConnector0002",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
       "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
       "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "354984"
+      "nonce": "MDAwMDAwMDAwMDAwMDAwMA==",
+      "commit": "r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0002:pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=:r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "sig": "sasKAmABUlqvFvcId59obdNA69HPkj56NAbTToCnLMV30LSwoPUxrcdr4bbx3d/JwlgNjVHH91THPavwzf9tAw==",
+      "check": "617963"
     },
     {
       "name": "other-identity",
       "identitySeedHex": "2222222222222222222222222222222222222222222222222222222222222222",
       "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
       "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "nonceHex": "30303030303030303030303030303030",
       "deviceId": "dev_SampleConnector0001",
       "identityPublic": "oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA=",
       "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
       "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "435407"
+      "nonce": "MDAwMDAwMDAwMDAwMDAwMA==",
+      "commit": "r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0001:pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=:r1ZgqqAbCWF6vSW3f/w9KxCl+QVnlQ/dmJXbnrbajwE=",
+      "sig": "ddlblNK38Gx4RpybEHSI7gHBVI1VHMwGUwqbGlsEIRo58oZ+95rSI0+NK6qElAN2utVd4DgPTHXGxcXI5t27Aw==",
+      "check": "489638"
     },
     {
       "name": "other-keys",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
       "serverPrivateHex": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
       "pluginPrivateHex": "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
+      "nonceHex": "30303030303030303030303030303030",
       "deviceId": "dev_SampleConnector0001",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
       "serverPublic": "8LT9i+SANJKTq2HwUF67W6/M34pBJ94iHm7z2yDgPSk=",
       "pluginPublic": "7icibqL3O7GPJHVM1Ege8MP8MNPdKtk6pikXNK4OsRw=",
-      "check": "057653"
+      "nonce": "MDAwMDAwMDAwMDAwMDAwMA==",
+      "commit": "TcwtBe4RuSyUMNVlZ+CG2gn0ISKGjWK0/o1Xd9pIpDI=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0001:8LT9i+SANJKTq2HwUF67W6/M34pBJ94iHm7z2yDgPSk=:TcwtBe4RuSyUMNVlZ+CG2gn0ISKGjWK0/o1Xd9pIpDI=",
+      "sig": "NNQzji1oO78kfqkE9C6xLLJFKbVAuW+y1MxjnZZZTFZMdE3oo0SwBEuewZgu4fxrT2GLp3awFEptY/HEzMzZBw==",
+      "check": "473152"
     },
     {
       "name": "swapped-keys",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
       "serverPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
       "pluginPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "nonceHex": "30303030303030303030303030303030",
       "deviceId": "dev_SampleConnector0001",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
       "serverPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
       "pluginPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
-      "check": "770853"
+      "nonce": "MDAwMDAwMDAwMDAwMDAwMA==",
+      "commit": "i128uRk9JBxTTuL71wNjtJFHej86AqcL8ZPIMXaSIsI=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0001:zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=:i128uRk9JBxTTuL71wNjtJFHej86AqcL8ZPIMXaSIsI=",
+      "sig": "+bQipzO9AUBSWHAQEmLk3DjLCH6yrX0w5C0DtdzXWUbCFh3KBVZsBG7AgWwoMIdxL4gKryWpLcCS0ltu3B+3BA==",
+      "check": "540178"
     },
     {
-      "name": "third-device-id",
+      "name": "other-nonce",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
       "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
       "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "nonceHex": "40404040404040404040404040404040",
+      "deviceId": "dev_SampleConnector0001",
+      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
+      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
+      "nonce": "QEBAQEBAQEBAQEBAQEBAQA==",
+      "commit": "Y2xMf6T3aMi5NHABr6ehLqD1LjHftC3xGcBOvPgU77A=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0001:pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=:Y2xMf6T3aMi5NHABr6ehLqD1LjHftC3xGcBOvPgU77A=",
+      "sig": "/AyqsqCbfZP08I6cdYToS4GTKs3tgon3DgKO20TLyZqRglsxXQ4o1Pgi4ln3E2nZYrH170jLqPAxqOhz5bRpCg==",
+      "check": "700458"
+    },
+    {
+      "name": "leading-zero-a",
+      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
+      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "nonceHex": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c",
       "deviceId": "dev_SampleConnector0003",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
       "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
       "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "462462"
+      "nonce": "PDw8PDw8PDw8PDw8PDw8PA==",
+      "commit": "W+ATvGyytORCIHFl5wg0LUkj7EJny1/b6R+jNnJds1s=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0003:pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=:W+ATvGyytORCIHFl5wg0LUkj7EJny1/b6R+jNnJds1s=",
+      "sig": "Ry9TuoBNdsy40BH+rEc6pQ++SxgZy1yhmyia1n7ABwzt6KyVku6AC0urTul3n1ObVb/0wCYBDY6+BJ0MHKAvBg==",
+      "check": "076843"
     },
     {
-      "name": "fourth-device-id",
+      "name": "leading-zero-b",
       "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
-      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
-      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "serverPrivateHex": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "pluginPrivateHex": "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
+      "nonceHex": "33333333333333333333333333333333",
       "deviceId": "dev_SampleConnector0004",
       "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
-      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
-      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "622902"
-    },
-    {
-      "name": "fifth-device-id",
-      "identitySeedHex": "1111111111111111111111111111111111111111111111111111111111111111",
-      "serverPrivateHex": "0101010101010101010101010101010101010101010101010101010101010101",
-      "pluginPrivateHex": "0202020202020202020202020202020202020202020202020202020202020202",
-      "deviceId": "dev_SampleConnector0005",
-      "identityPublic": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
-      "serverPublic": "pOCSkrZRwni5dyxWn1+puxPZBrRqtoyd+dwrRAn4ogk=",
-      "pluginPublic": "zo060cy2M+x7cMF4FKXHbs0CloUFDTRHRboFhw5YfVk=",
-      "check": "584386"
+      "serverPublic": "8LT9i+SANJKTq2HwUF67W6/M34pBJ94iHm7z2yDgPSk=",
+      "pluginPublic": "7icibqL3O7GPJHVM1Ege8MP8MNPdKtk6pikXNK4OsRw=",
+      "nonce": "MzMzMzMzMzMzMzMzMzMzMw==",
+      "commit": "fub4nr2eXry6LGMNkK3r8cZb11MBJQSpR+dvAUyQsEw=",
+      "offerMessage": "khayt-enrol-commit-v2:dev_SampleConnector0004:8LT9i+SANJKTq2HwUF67W6/M34pBJ94iHm7z2yDgPSk=:fub4nr2eXry6LGMNkK3r8cZb11MBJQSpR+dvAUyQsEw=",
+      "sig": "eKi3nYA3LZkYk96QtmhPUv9zoq4GymT7c8Jls3FWa8itBjwZcG7nTtkr9kkxUxoZLFvo/fphFlvb3MLjs+wjDg==",
+      "check": "011855"
     }
   ]
 }

@@ -37,7 +37,9 @@ extension Shop {
         let store = lanDeviceStore
         let now = Date()
         try? lanConnectorPairing.approve { asked in
-            try store.admitConnector(pluginPublic: asked.pluginPublic, serverKey: asked.serverKey,
+            // `approve` only hands over a revealed request; never enrol without a key.
+            guard let pluginPublic = asked.pluginPublic else { throw CancellationError() }
+            try store.admitConnector(pluginPublic: pluginPublic, serverKey: asked.serverKey,
                                      deviceId: asked.deviceId, name: asked.name, pin: pin, now: now)
         }
         refreshConnectedApps()
@@ -112,7 +114,9 @@ struct PairASlicer: View {
         let window = shop.lanConnectorPairing
         let mayApprove = shop.lockAllows("settings", "edit")
         VStack(alignment: .leading, spacing: 6) {
-            if let asked = window.pending {
+            // Before the plugin reveals its key there is no number, so nothing
+            // to compare and nothing to approve: the sheet keeps waiting.
+            if let asked = window.pending, let check = asked.check {
                 Text(shop.words.callIt("mac.apps_ask", ["name": .string(ConnectedApps.name(asked.name, shop.words))]))
                     .font(.headline)
                 Text(shop.words.callIt("mac.apps_ask_from", [
@@ -121,7 +125,7 @@ struct PairASlicer: View {
                     "address": .string(asked.address)]))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(verbatim: LanConnectorPairing.spaced(asked.check))
+                Text(verbatim: LanConnectorPairing.spaced(check))
                     .font(.system(size: 28, weight: .medium, design: .monospaced))
                     .frame(maxWidth: .infinity)
                     .environment(\.layoutDirection, .leftToRight)
@@ -196,6 +200,7 @@ struct PairASlicer: View {
         switch closed {
         case .paired(let name)?: return words.callIt("mac.pair_done", ["name": .string(ConnectedApps.name(name, words))])
         case .timedOut?: return words.callIt("mac.apps_timed_out")
+        case .offersUsed?: return words.callIt("mac.apps_offers_used")
         case .serverStopped?: return words.callIt("mac.pair_server_stopped")
         case .pinUnreadable?: return words.callIt("mac.apps_pin_unreadable")
         case .byOwner?, nil: return nil

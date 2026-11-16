@@ -4016,6 +4016,7 @@
  "mac.apps_ask_from": "{app} {version} pediu para parear a partir de {address}.",
  "mac.apps_check": "O fatiador mostra este número? Se não, recuse.",
  "mac.apps_may": "Ele pode enviar fatiamentos para a caixa “Do fatiador” e ler a fila de trabalhos (nomes e tempos, nunca clientes). Nunca pode ler seu livro, clientes, preços ou ajustes.",
+ "mac.apps_offers_used": "O pareamento parou após 3 tentativas não aprovadas. Clique em Parear um fatiador para tentar de novo.",
  "mac.apps_approve": "Os números conferem — aprovar",
  "mac.apps_deny": "Recusar",
  "mac.apps_timed_out": "Nenhum fatiador pareou a tempo. Clique em Parear um fatiador para tentar de novo.",

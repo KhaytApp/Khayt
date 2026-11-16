@@ -226,29 +226,58 @@ does, but its key opens `/api/connectors/*` and nothing else: any other route
 answers **403** `{"ok":false,"reason":"connector-scope"}` to a request whose
 `x-khayt-device` names a connector, signed or not. It never sees the PIN.
 
+**Commit, then reveal (v2).** The plugin commits to its key before it sees
+anything of the Mac's, and the Mac draws a fresh key only after that, so a
+device in the middle cannot grind its own keys until the two 6-digit numbers
+match: one side's number is always a blind 1-in-10^6 guess for it, and a window
+gives out at most 3 offers. (v1 sent the plugin's key in the clear and was
+withdrawn before release: its number could be ground in about 10^6 tries.)
+
+Every hash input below is the exact UTF-8 bytes of the strings as sent (keys
+and the nonce base64, standard and padded, of the raw bytes), joined with
+`\n` after a fixed prefix. Vectors: [`connector-pair.vectors.json`](connector-pair.vectors.json)
+(commitment, the signed offer message with a signature, and the check, 8 cases).
+
 1. The owner (or a manager) clicks **Pair a slicer** (Mac: Settings → Online →
-   Connected apps). The window is open for 120 s. Outside it the route answers
-   **403** `{"reason":"pairing-closed"}`.
-2. The plugin sends `POST /api/connectors/pair`
-   `{"publicKey":"<base64 raw X25519>","name":"…","app":"OrcaSlicer","version":"2.5.1"}`
+   Connected apps). The window is open for 120 s and gives out at most **3
+   offers**, whatever becomes of them (denied, abandoned, a bad or late
+   reveal); after the third the window shuts and the owner must click again.
+   Outside it the routes answer **403** `{"reason":"pairing-closed"}`.
+2. The plugin draws a fresh X25519 key and a nonce of at least 16 random bytes,
+   and sends `POST /api/connectors/pair`
+   `{"v":2,"commit":"<base64 SHA-256>","name":"…","app":"OrcaSlicer","version":"2.5.1"}`
+   with `commit = SHA-256("khayt-connector-commit-v2\n<plugin publicKey>\n<nonce>")`
    (no PIN, no signature; `Host` must be a local address, else **421**).
+   A body without `"v":2` and a `commit` (a v1 plugin) gets **400**
+   `{"reason":"pairing-upgrade"}`; a commit that is not 32 bytes is **400**.
+   Neither draws a key or uses an offer.
    It gets **200** `{"pairId","pollSecret","deviceId","publicKey","sig","identity"}`:
-   the Mac's X25519 key, signed by its identity key over the same
-   `khayt-enrol:` message as `POST /api/devices`, and that identity key
-   (Ed25519, base64 raw), which the plugin pins: it cannot ask
-   `/api/identity`, which takes the PIN. One request waits at a
-   time; another gets **409** `{"reason":"pairing-busy"}`. A key that is not
-   32 bytes, or gives the all-zero secret, is **400**. Nothing is enrolled yet.
-3. Both sides show a 6-digit **check number**: SHA-256 of
-   `khayt-connector-check-v1\n<deviceId>\n<identity>\n<Mac publicKey>\n<plugin publicKey>`
-   (keys base64 as sent), the first 4 bytes big-endian, modulo 1,000,000,
-   zero-padded. Vectors: [`connector-pair.vectors.json`](connector-pair.vectors.json).
-   A device in the middle that swapped a key makes the numbers differ.
-4. The plugin polls `GET /api/connectors/pair/{pairId}` with
-   `x-khayt-poll: <pollSecret>`: **200** `{"state":"waiting"|"approved"|"denied"|"expired"}`,
-   or **404** `{"state":"unknown"}` for an id it was not given or the wrong
-   secret. **Approve** enrols the device with kind `connector` and closes the
-   window; **Deny** answers that request and keeps the window open.
+   a fresh X25519 key drawn for this request, signed by the Mac's identity key over
+   `khayt-enrol-commit-v2:<deviceId>:<Mac publicKey>:<commit>`, and that identity
+   key (Ed25519, base64 raw), which the plugin pins: it cannot ask
+   `/api/identity`, which takes the PIN. One request waits at a time; another
+   gets **409** `{"reason":"pairing-busy"}`. No check number exists yet; the Mac
+   shows no Approve.
+3. The plugin verifies the signature against the identity it was sent and the
+   commit it sent. It shows nothing if that fails. Then, within **30 s**, it sends
+   `POST /api/connectors/pair/{pairId}/reveal` with `x-khayt-poll: <pollSecret>`
+   and `{"publicKey":"<base64 raw X25519>","nonce":"<base64>"}`. The Mac checks the
+   commitment in constant time: **200** `{"state":"waiting"}` on a match. A
+   mismatch, a nonce under 16 bytes, a key that is not 32 bytes or gives the
+   all-zero secret, a malformed body or a late reveal is **403**
+   `{"state":"expired","reason":"bad-reveal"}`: the offer is spent and no check
+   number is ever worked out for it. A second reveal is **409**; the wrong poll
+   secret is **404** and spends nothing. An offer never revealed expires after
+   30 s and frees the slot.
+4. Only now do both sides show the 6-digit **check number**: SHA-256 of
+   `khayt-connector-check-v2\n<deviceId>\n<identity>\n<Mac publicKey>\n<plugin publicKey>\n<nonce>`,
+   the first 4 bytes big-endian, modulo 1,000,000, zero-padded. The Mac's
+   button reads **Numbers match — approve**. The plugin polls
+   `GET /api/connectors/pair/{pairId}` with `x-khayt-poll: <pollSecret>`:
+   **200** `{"state":"waiting"|"approved"|"denied"|"expired"}`, or **404**
+   `{"state":"unknown"}` for an id it was not given or the wrong secret.
+   **Approve** enrols the device with kind `connector` and closes the window;
+   **Deny** answers that request and keeps the window open.
 5. From then on the plugin signs with the key both derived (HKDF as above,
    info = `deviceId`). **Remove** in Connected apps answers `device-revoked`;
    a change of the LAN PIN signs connectors out with the phones
