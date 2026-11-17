@@ -20,6 +20,18 @@
   // Reserved fields excluded from a record's content fingerprint, so stamping
   // them never counts as a content change (the critical idempotency property).
   const RESERVED = new Set(['rev', 'updatedAt']);
+  // Fields a READER works out from a library model's file, by collection. Each
+  // device re-reads them itself (the Mac's colour sweep writes them unstamped,
+  // announce:false), so they are not an edit: left out of the fingerprint, a
+  // re-read is never stamped, never a conflict and never a "replaced" loss.
+  // Two copies at the same rev that differ only here keep the one read by the
+  // higher reader (see applyDeltas). Before this, about half of a Mac's colour
+  // re-read reverted on each cloud pull and was logged as a sync loss (beta.40
+  // data review, Nov 17).
+  const DERIVED = {
+    printFiles: new Set(['colors', 'swapCount', 'swapsKnown', 'coloursReader', 'geometryReader', 'coloursUnreadBudget', 'coloursUnreadFile']),
+  };
+  const derivedOf = (coll) => (coll && DERIVED[coll]) || null;
 
   /**
    * One change-index per shop — "collection:id" -> {fp, rev}.
@@ -106,11 +118,33 @@
     return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
   }
 
-  /** Content fingerprint of a record, excluding the reserved change-metadata fields. */
-  function fingerprint(rec) {
+  /**
+   * Of two copies at the same rev with the same content, whether `incoming`
+   * should replace `local` for its DERIVED fields: the higher colour reader,
+   * then the higher geometry reader, then (read alike but different) a stable
+   * compare, so every device converges on one copy whoever pulled first.
+   */
+  function derivedWins(coll, incoming, local) {
+    const derived = derivedOf(coll);
+    if (!derived) return false;
+    const pick = (r) => { const o = {}; for (const k of derived) if (r[k] !== undefined) o[k] = r[k]; return o; };
+    const a = stableStringify(pick(incoming)), b = stableStringify(pick(local));
+    if (a === b) return false;
+    const reader = (r, k) => (Number.isFinite(+r[k]) ? +r[k] : 0);
+    for (const k of ['coloursReader', 'geometryReader']) {
+      if (reader(incoming, k) !== reader(local, k)) return reader(incoming, k) > reader(local, k);
+    }
+    return a > b;
+  }
+
+  /** Content fingerprint of a record, excluding the reserved change-metadata
+   *  fields and, given its collection, the fields a reader derives (DERIVED). */
+  function fingerprint(rec, coll) {
+    const derived = derivedOf(coll);
     const o = {};
     for (const k of Object.keys(rec)) {
       if (RESERVED.has(k)) continue;
+      if (derived && derived.has(k)) continue;
       o[k] = rec[k];
     }
     return stableStringify(o);
@@ -158,7 +192,7 @@
         // every merge, and wiping it there would throw away the one fact the
         // merge had just established about each record.
         const was = prior && prior.get(key);
-        const e = { fp: fingerprint(rec), rev: revOf(rec) };
+        const e = { fp: fingerprint(rec, coll), rev: revOf(rec) };
         if (was && typeof was.syncedRev === 'number') e.syncedRev = was.syncedRev;
         idx.set(key, e);
       }
@@ -217,7 +251,7 @@
       for (const rec of snapshot[coll]) {
         if (!rec || typeof rec !== 'object' || typeof rec.id !== 'string') continue;
         const key = coll + ':' + rec.id;
-        const e = idx.get(key) || { fp: fingerprint(rec), rev: revOf(rec) };
+        const e = idx.get(key) || { fp: fingerprint(rec, coll), rev: revOf(rec) };
         if (e.syncedRev !== revOf(rec)) { e.syncedRev = revOf(rec); n++; }
         idx.set(key, e);
       }
@@ -230,7 +264,7 @@
     const idx = indexFor(scope);
     if (!idx || !rec || typeof rec.id !== 'string') return;
     const key = coll + ':' + rec.id;
-    const e = idx.get(key) || { fp: fingerprint(rec), rev: revOf(rec) };
+    const e = idx.get(key) || { fp: fingerprint(rec, coll), rev: revOf(rec) };
     e.syncedRev = revOf(rec);
     idx.set(key, e);
   }
@@ -271,7 +305,7 @@
         if (!rec || typeof rec !== 'object') continue;
         ensureId(rec, coll);
         const key = coll + ':' + rec.id;
-        const fp = fingerprint(rec);
+        const fp = fingerprint(rec, coll);
         const prev = lastIndex.get(key);
         if (prev === undefined) {
           rec.rev = (typeof rec.rev === 'number' ? rec.rev : 0) + 1;
@@ -566,7 +600,7 @@
         // contain. Same outcome, but the discarded copy is handed to the host so
         // someone can be told. An unknown baseline says nothing: see syncedRevOf.
         const base = syncedRevOf(coll, incoming.id, scope);
-        if (base !== null && curRev > base && fingerprint(incoming) !== fingerprint(arr[i])) {
+        if (base !== null && curRev > base && fingerprint(incoming, coll) !== fingerprint(arr[i], coll)) {
           result.conflicts.push({
             collection: coll, id: incoming.id, kind: 'remote_over_local_edit',
             localRev: curRev, incomingRev: inRev, syncedRev: base,
@@ -588,15 +622,20 @@
         // ends up with the same record, instead of each believing it is right.
         // Tie-break on updatedAt, then on a stable fingerprint compare so the
         // outcome never depends on who pulled first.
-        if (fingerprint(incoming) !== fingerprint(arr[i])) {
+        if (fingerprint(incoming, coll) !== fingerprint(arr[i], coll)) {
           const curT = String(arr[i].updatedAt || '');
           const inT = String(incoming.updatedAt || '');
           const takeIncoming = inT !== curT
             ? inT > curT
-            : fingerprint(incoming) > fingerprint(arr[i]);
+            : fingerprint(incoming, coll) > fingerprint(arr[i], coll);
           if (takeIncoming) { arr[i] = keepSecrets(arr[i], incoming); result.applied++; noteSynced(coll, incoming, scope); }
           else { result.skipped++; }
           result.conflicts.push({ collection: coll, id: incoming.id, rev: inRev, tookIncoming: takeIncoming });
+        } else if (derivedWins(coll, incoming, arr[i])) {
+          // The same content, read by a later reader (or, read alike, the one
+          // every device picks): take it quietly. Not a conflict and not a
+          // loss, since neither copy holds an edit the other lacks.
+          arr[i] = keepSecrets(arr[i], incoming); result.applied++; noteSynced(coll, incoming, scope);
         } else {
           result.skipped++;   // identical content — not a conflict, just a re-send
         }
