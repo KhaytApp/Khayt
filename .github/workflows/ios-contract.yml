@@ -141,4 +141,7 @@ jobs:
       - name: Which assertions failed
         if: failure()
         run: |
-          grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test' "$RUNNER_TEMP/companion-tests.log" | head -200 || true
+          # Also a test that never reached an assertion: a crash, a hang the
+          # runner timed out, or a restarted test host (#2546 failed with no
+          # `error:` line at all).
+          grep -E 'error: |Failing tests:|^\s+[A-Za-z]+Tests\.test|[Cc]rash|[Tt]imed out|timeout|Restarting after|unexpected exit|lost connection|Test Case .* failed' "$RUNNER_TEMP/companion-tests.log" | head -200 || true
