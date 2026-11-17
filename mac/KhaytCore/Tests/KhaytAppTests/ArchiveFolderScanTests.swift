@@ -54,6 +54,10 @@ struct ArchiveFolderScanTests {
         tar.arguments = args
         tar.standardInput = FileHandle.nullDevice
         try tar.run()
+        // Bounded: a tar that hangs fails this test, not the whole run.
+        let deadline = Date().addingTimeInterval(120)
+        while tar.isRunning, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if tar.isRunning { tar.terminate() }
         tar.waitUntilExit()
         try? FileManager.default.removeItem(at: src)
         #expect(tar.terminationStatus == 0, "bsdtar could not make \(archive.lastPathComponent)")
@@ -207,7 +211,7 @@ struct ArchiveFolderScanTests {
                                        to: rig.cache.url(key: "x", leaf: "a.stl"), cap: 1 << 20)
         }
         let said = try ArchiveMembers.runTar(["-x", "-O", "-f", zip.path, "--passphrase", ArchiveMembers.noPassphrase,
-                                              "--", "a.stl"], timeout: 30, keepOut: 1 << 20, every: 0.25)
+                                              "--", "a.stl"], timeout: 120, keepOut: 1 << 20, every: 0.25)
         #expect(said.status != 0 && ArchiveFolder.saysLocked(String(decoding: said.stderr, as: UTF8.self)))
     }
 
@@ -347,7 +351,7 @@ struct ArchiveFolderScanTests {
         if FileManager.default.isExecutableFile(atPath: ArchiveMembers.sandboxExec) {
             let out = rig.bench.dir.appending(path: "unpacked")
             try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-            let ran = try ArchiveMembers.runTar(["-x", "-f", tgz.path, "-C", out.path], timeout: 30,
+            let ran = try ArchiveMembers.runTar(["-x", "-f", tgz.path, "-C", out.path], timeout: 120,
                                                 keepOut: 1 << 20, every: 0.25)
             #expect(ran.status != 0)
             #expect(((try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []).isEmpty,

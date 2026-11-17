@@ -719,14 +719,22 @@ public enum StoreWriter {
         }
         for (collection, value) in after where collection != "tombstones" {
             guard case .array(var rows) = value else { continue }
-            var was: [String: [String: JSONValue]] = [:]
+            // BY ID AND OCCURRENCE. A book can hold two records with one id
+            // (an old merge, a hand edit); keyed by id alone, the last one
+            // stood for both, so the first was "changed" and re-stamped on
+            // every write (beta.40 full review). The n-th row with an id is
+            // compared with the n-th row that had it before.
+            var was: [String: [[String: JSONValue]]] = [:]
             if case .array(let old)? = before[collection] {
-                for case .object(let o) in old { if case .string(let id)? = o["id"] { was[id] = o } }
+                for case .object(let o) in old { if case .string(let id)? = o["id"] { was[id, default: []].append(o) } }
             }
+            var seen: [String: Int] = [:]
             var changed = false
             for i in rows.indices {
                 guard case .object(var o) = rows[i], case .string(let id)? = o["id"] else { continue }
-                let prior = was[id]
+                let nth = seen[id, default: 0]
+                seen[id] = nth + 1
+                let prior = was[id].flatMap { nth < $0.count ? $0[nth] : nil }
                 let oldRev = revOf(prior), newRev = revOf(o)
                 // NEW HERE, AND NO REV: stamped rev 1, as `lib/sync.js`
                 // stampChanges stamps a created record. Left unstamped, it

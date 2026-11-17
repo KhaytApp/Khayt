@@ -41,6 +41,11 @@ struct SampleClockTests {
             "pins 2026-09-19 against orders it writes itself at 2026-09-18 and "
             + "2026-01-01 — both sides literal, so nothing drifts. Its sample-book "
             + "tests are separate and use Date().",
+        "QuoteFormTests.swift":
+            "pins 2026-11-04 (`QuoteFormImportTests.fixedNow`) for the cloud intake "
+            + "runs, against a payload whose file `expiresAt` 2026-11-05 is written "
+            + "in the test itself: both sides literal. Its sample-book tests are "
+            + "separate and use Date().",
     ]
 
     @Test("no test pins a clock over the sample book, which moves under it")
