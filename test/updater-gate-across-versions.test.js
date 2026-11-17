@@ -88,3 +88,34 @@ test('a version label cannot inject markup', () => {
   const r = notesSince([{ version: '9.0.0"><img src=x>', note: plain }, { version: '8.0.0', note: plain }], '1.0.0');
   assert.doesNotMatch(r.text, /<img/);
 });
+
+// ── Past the feed's window (Dev Hub, Nov 17) ────────────────────────────────
+// GitHub's feed lists only about the ten newest releases, so a shop further
+// behind cannot be shown every gate. When the oldest release listed does not
+// directly follow the installed one, the gate says so and asks anyway.
+const { followsDirectly, OLDER_VERSION_ITEM } = require('../lib/updater.js');
+
+test('a version that directly follows: same release, next patch, minor or major', () => {
+  for (const [a, b] of [['4.9.0', '4.9.1'], ['4.9.3', '4.10.0'], ['3.11.23', '4.0.0'], ['3.7.0-beta.24', '3.7.0-beta.25'], ['3.7.0-beta.25', '3.7.0']]) {
+    assert.equal(followsDirectly(a, b), true, `${a} → ${b}`);
+  }
+  for (const [a, b] of [['4.5.0', '4.8.0'], ['4.9.0', '4.10.1'], ['4.9.0', '4.9.2'], ['3.11.23', '4.1.0'], ['2.0.0', '4.0.0']]) {
+    assert.equal(followsDirectly(a, b), false, `${a} → ${b}`);
+  }
+});
+
+test('updating from older than the feed reaches: the "much older" item first, then the gates the feed has', () => {
+  // A shop on 4.2.0; the feed starts at 4.10.0 (4.3.0's gate is out of reach).
+  const r = notesSince(FEED, '4.2.0');
+  assert.equal(r.majorChanges.needsConsent, true);
+  assert.equal(r.majorChanges.items[0], OLDER_VERSION_ITEM);
+  assert.equal(r.majorChanges.items.length, 3);
+  // Even when nothing in the window is gated.
+  const quiet = notesSince([{ version: '4.11.0', note: plain }], '4.2.0');
+  assert.deepEqual(quiet.majorChanges.items, [OLDER_VERSION_ITEM]);
+});
+
+test('a shop one release behind is not told it is much older', () => {
+  assert.ok(!notesSince(FEED, '4.9.0').majorChanges.items.includes(OLDER_VERSION_ITEM));
+  assert.equal(notesSince([{ version: '4.11.0', note: plain }], '4.10.1').majorChanges.needsConsent, false);
+});
