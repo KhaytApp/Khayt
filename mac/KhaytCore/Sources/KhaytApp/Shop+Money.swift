@@ -1167,7 +1167,8 @@ extension Shop {
         guard case .array(let parts)? = asObject(edited)?["parts"] else { return OneOrderEdit(order: order) }
         let r = try await engine.applyJobEdit(
             order: order, fields: ["parts": .array(parts)], clients: clients, settings: settings,
-            keepPrice: keepPrice, now: Date(), editId: uid("edit"), priceId: uid("edit"))
+            keepPrice: keepPrice, marginPct: await markupForAddedParts(order, settings: settings, engine: engine),
+            now: Date(), editId: uid("edit"), priceId: uid("edit"))
         guard r.ok else {
             throw MoveRefused(sentence: refusals[r.reason ?? ""] ?? refusals["unknown"]!, code: r.reason)
         }

@@ -480,7 +480,10 @@ struct JobSheet: View {
             save.customer = .some(form.customerId.isEmpty ? nil : form.customerId)
         }
         if form.nonBusiness != opened.nonBusiness { save.nonBusiness = form.nonBusiness }
-        if partsChanged { save.parts = await shop.partsForSave(subject.id, drafts: parts) }
+        if partsChanged {
+            save.parts = await shop.partsForSave(subject.id, drafts: parts,
+                                                 clientId: form.customerId.isEmpty ? nil : form.customerId)
+        }
         save.keepPrice = keepPrice
         save.priceSeenOk = priceSeenOk
         return save
