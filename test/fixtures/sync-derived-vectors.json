@@ -1,5 +1,5 @@
 {
-  "about": "lib/sync.js applyDeltas at EQUAL rev for a printFiles record: what each device keeps when the incoming copy differs from the local one. Derived reader fields (colors, swapCount, swapsKnown, coloursReader, geometryReader, coloursUnreadBudget, coloursUnreadFile) are not an edit: a difference only there is never a conflict, and the higher reader's copy wins, then a stable compare. `keep` is 'incoming' or 'local'; `conflict` is whether a conflict is reported. Every app runs these through its engine.",
+  "about": "lib/sync.js applyDeltas at EQUAL rev for a printFiles record: what each device keeps when the incoming copy differs from the local one. Derived reader fields (colors, swapCount, swapsKnown, coloursReader, geometryReader, coloursUnreadBudget, coloursUnreadFile) are not an edit: a difference only there is never a conflict, and the higher reader's copy wins, then a full read over an over-budget one (coloursUnreadBudget/coloursUnreadFile), then the higher budget, then a stable compare. `keep` is 'incoming' or 'local'; `conflict` is whether a conflict is reported. Every app runs these through its engine.",
   "cases": [
     {
       "why": "only the colours differ; incoming read by a higher reader",
@@ -83,7 +83,7 @@
       "conflict": false
     },
     {
-      "why": "the unread-budget fields alone differ, same readers: one stable choice (here the copy without them), no conflict",
+      "why": "the unread-budget fields alone differ, same readers: the full read wins (no conflict)",
       "local": {
         "name": "B",
         "coloursReader": 5,
@@ -98,7 +98,7 @@
       "conflict": false
     },
     {
-      "why": "the same, seen from the other device: it converges on the same copy (the one without them)",
+      "why": "the same, seen from the other device: it keeps its full read",
       "local": {
         "name": "B",
         "coloursReader": 5
@@ -138,6 +138,101 @@
         "coloursReader": 4
       },
       "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "a 3-dot full read against a 1-dot over-budget copy at the same reader (a string compare would pick the 1-dot one): the full read wins, incoming side",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#AA0000"
+          },
+          {
+            "hex": "#BB0000"
+          },
+          {
+            "hex": "#CC0000"
+          }
+        ],
+        "swapCount": 2
+      },
+      "keep": "incoming",
+      "conflict": false
+    },
+    {
+      "why": "the same from the machine holding the full read: it keeps it",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#AA0000"
+          },
+          {
+            "hex": "#BB0000"
+          },
+          {
+            "hex": "#CC0000"
+          }
+        ],
+        "swapCount": 2
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "keep": "local",
+      "conflict": false
+    },
+    {
+      "why": "both over budget: the higher budget wins",
+      "local": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 400000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "incoming": {
+        "name": "B",
+        "coloursReader": 5,
+        "colors": [
+          {
+            "hex": "#FFFFFF"
+          }
+        ],
+        "swapCount": 0,
+        "coloursUnreadBudget": 900000000,
+        "coloursUnreadFile": "1500000000:1763370000000"
+      },
+      "keep": "incoming",
       "conflict": false
     }
   ]
